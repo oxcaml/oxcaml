@@ -2,23 +2,24 @@ open Std
 
 module Facts = Module_implementation_facts
 
-module Dependency_analysis : sig
+module Implementation_search : sig
   type t
 
-  type impact = { witness : Facts.Key.t; check : Facts.Check.t }
+  type matching_check = { target_instance : Facts.Key.t; check : Facts.Check.t }
 
-  type result = { impacts : impact list; omissions : Facts.Omission.t list }
+  type result =
+    { matches : matching_check list; omissions : Facts.Omission.t list }
 
   val create : Facts.t -> t
 
-  val query_family : t -> Shape.Uid.t -> result
+  val find_for_family : t -> Shape.Uid.t -> result
 
-  val query_anon : t -> Shape.Uid.t -> result
+  val find_for_anonymous_type : t -> Shape.Uid.t -> result
 end = struct
   module Context = Facts.Context
   module Key = Facts.Key
   module Uid = Shape.Uid
-  module Ctx_map = Map.Make (Context)
+  module Context_map = Map.Make (Context)
   module Int_set = Set.Make (Int)
 
   type context_node =
@@ -60,33 +61,33 @@ end = struct
 
   type t =
     { context_nodes : context_node Dynarray.t;
-      parent : int Dynarray.t;
-      rank : int Dynarray.t;
-      class_label : int Dynarray.t;
-      uses : int list Dynarray.t;
-      use_size : int Dynarray.t;
-      mutable atoms : int Ctx_map.t;
+      context_parent : int Dynarray.t;
+      context_rank : int Dynarray.t;
+      context_class_label : int Dynarray.t;
+      congruence_uses : int list Dynarray.t;
+      congruence_use_count : int Dynarray.t;
+      mutable atoms : int Context_map.t;
       mutable congruences : int Congruence_map.t;
       mutable key_ids : int Key_map.t;
-      key_witness : Key.t Dynarray.t;
-      key_family : Uid.t option Dynarray.t;
-      key_checks : Facts.Check.t list Dynarray.t;
-      key_out : int list Dynarray.t;
-      mutable families : Int_set.t Uid.Map.t;
+      canonical_keys : Key.t Dynarray.t;
+      family_by_key : Uid.t option Dynarray.t;
+      checks_by_key : Facts.Check.t list Dynarray.t;
+      requiring_keys : int list Dynarray.t;
+      mutable keys_by_family : Int_set.t Uid.Map.t;
       mutable paired_families : Uid.Set.t Uid.Map.t;
       mutable global_omissions : Facts.Omission.t list;
       mutable family_omissions : Facts.Omission.t list Uid.Map.t;
-      mutable comp_of : int array;
-      mutable comp_keys : int list array;
-      mutable comp_out : int list array;
-      mutable comp_count : int
+      mutable component_by_key : int array;
+      mutable component_keys : int list array;
+      mutable requiring_components : int list array;
+      mutable component_count : int
     }
 
-  let find t i =
+  let find_context_root t i =
     let i = ref i in
-    while Dynarray.get t.parent !i <> !i do
-      let p = Dynarray.get t.parent !i in
-      Dynarray.set t.parent !i (Dynarray.get t.parent p);
+    while Dynarray.get t.context_parent !i <> !i do
+      let p = Dynarray.get t.context_parent !i in
+      Dynarray.set t.context_parent !i (Dynarray.get t.context_parent p);
       i := p
     done;
     !i
@@ -94,140 +95,159 @@ end = struct
   let new_context_node t context_node =
     let id = Dynarray.length t.context_nodes in
     Dynarray.add_last t.context_nodes context_node;
-    Dynarray.add_last t.parent id;
-    Dynarray.add_last t.rank 0;
-    Dynarray.add_last t.class_label id;
-    Dynarray.add_last t.uses [];
-    Dynarray.add_last t.use_size 0;
+    Dynarray.add_last t.context_parent id;
+    Dynarray.add_last t.context_rank 0;
+    Dynarray.add_last t.context_class_label id;
+    Dynarray.add_last t.congruence_uses [];
+    Dynarray.add_last t.congruence_use_count 0;
     id
 
   let add_use t root parent_node =
-    Dynarray.set t.uses root (parent_node :: Dynarray.get t.uses root);
-    Dynarray.set t.use_size root (Dynarray.get t.use_size root + 1)
+    Dynarray.set t.congruence_uses root
+      (parent_node :: Dynarray.get t.congruence_uses root);
+    Dynarray.set t.congruence_use_count root
+      (Dynarray.get t.congruence_use_count root + 1)
 
-  let class_label t i = Dynarray.get t.class_label (find t i)
+  let context_class_label t i =
+    Dynarray.get t.context_class_label (find_context_root t i)
 
   let congruence_key_of_node t i =
     match Dynarray.get t.context_nodes i with
     | Atomic -> None
     | Application (f, a) ->
-      Some (Congruence_key.Apply (class_label t f, class_label t a))
-    | Projection (c, u) -> Some (Congruence_key.Project (class_label t c, u))
+      Some
+        (Congruence_key.Apply (context_class_label t f, context_class_label t a))
+    | Projection (c, u) ->
+      Some (Congruence_key.Project (context_class_label t c, u))
 
-  let merge t a b =
+  let merge_contexts t a b =
     let pending = Queue.create () in
     Queue.add (a, b) pending;
     while not (Queue.is_empty pending) do
       let a, b = Queue.take pending in
-      let ra = find t a and rb = find t b in
+      let ra = find_context_root t a and rb = find_context_root t b in
       if ra <> rb then begin
         let rep, absorbed =
-          if Dynarray.get t.rank ra >= Dynarray.get t.rank rb then (ra, rb)
+          if Dynarray.get t.context_rank ra >= Dynarray.get t.context_rank rb
+          then (ra, rb)
           else (rb, ra)
         in
-        if Dynarray.get t.rank rep = Dynarray.get t.rank absorbed then
-          Dynarray.set t.rank rep (Dynarray.get t.rank rep + 1);
+        if
+          Dynarray.get t.context_rank rep = Dynarray.get t.context_rank absorbed
+        then
+          Dynarray.set t.context_rank rep (Dynarray.get t.context_rank rep + 1);
         let big, small =
-          if Dynarray.get t.use_size ra >= Dynarray.get t.use_size rb then
-            (ra, rb)
+          if
+            Dynarray.get t.congruence_use_count ra
+            >= Dynarray.get t.congruence_use_count rb
+          then (ra, rb)
           else (rb, ra)
         in
-        let surviving_label = Dynarray.get t.class_label big in
-        let moved = Dynarray.get t.uses small in
-        let combined = List.rev_append moved (Dynarray.get t.uses big) in
-        let total = Dynarray.get t.use_size ra + Dynarray.get t.use_size rb in
-        Dynarray.set t.parent absorbed rep;
-        Dynarray.set t.uses ra [];
-        Dynarray.set t.uses rb [];
-        Dynarray.set t.use_size ra 0;
-        Dynarray.set t.use_size rb 0;
-        Dynarray.set t.uses rep combined;
-        Dynarray.set t.use_size rep total;
-        Dynarray.set t.class_label rep surviving_label;
+        let surviving_label = Dynarray.get t.context_class_label big in
+        let moved = Dynarray.get t.congruence_uses small in
+        let combined =
+          List.rev_append moved (Dynarray.get t.congruence_uses big)
+        in
+        let total =
+          Dynarray.get t.congruence_use_count ra
+          + Dynarray.get t.congruence_use_count rb
+        in
+        Dynarray.set t.context_parent absorbed rep;
+        Dynarray.set t.congruence_uses ra [];
+        Dynarray.set t.congruence_uses rb [];
+        Dynarray.set t.congruence_use_count ra 0;
+        Dynarray.set t.congruence_use_count rb 0;
+        Dynarray.set t.congruence_uses rep combined;
+        Dynarray.set t.congruence_use_count rep total;
+        Dynarray.set t.context_class_label rep surviving_label;
         List.iter moved ~f:(fun p ->
             match congruence_key_of_node t p with
             | None -> ()
             | Some key -> (
               match Congruence_map.find_opt key t.congruences with
-              | Some q -> if find t q <> find t p then Queue.add (p, q) pending
+              | Some q ->
+                if find_context_root t q <> find_context_root t p then
+                  Queue.add (p, q) pending
               | None -> t.congruences <- Congruence_map.add key p t.congruences))
       end
     done
 
-  let rec intern t (context : Context.t) =
+  let rec intern_context t (context : Context.t) =
     match context with
     | Def _ | Body _ | Site _ -> (
-      match Ctx_map.find_opt context t.atoms with
+      match Context_map.find_opt context t.atoms with
       | Some id -> id
       | None ->
         let id = new_context_node t Atomic in
-        t.atoms <- Ctx_map.add context id t.atoms;
+        t.atoms <- Context_map.add context id t.atoms;
         id)
     | App (functor_, argument) -> (
-      let f = intern t functor_ in
-      let a = intern t argument in
-      let key = Congruence_key.Apply (class_label t f, class_label t a) in
+      let f = intern_context t functor_ in
+      let a = intern_context t argument in
+      let key =
+        Congruence_key.Apply (context_class_label t f, context_class_label t a)
+      in
       match Congruence_map.find_opt key t.congruences with
       | Some id -> id
       | None ->
         let id = new_context_node t (Application (f, a)) in
-        add_use t (find t f) id;
-        add_use t (find t a) id;
+        add_use t (find_context_root t f) id;
+        add_use t (find_context_root t a) id;
         t.congruences <- Congruence_map.add key id t.congruences;
         id)
     | Proj (inner, uid) -> (
-      let c = intern t inner in
-      let key = Congruence_key.Project (class_label t c, uid) in
+      let c = intern_context t inner in
+      let key = Congruence_key.Project (context_class_label t c, uid) in
       match Congruence_map.find_opt key t.congruences with
       | Some id -> id
       | None ->
         let id = new_context_node t (Projection (c, uid)) in
-        add_use t (find t c) id;
+        add_use t (find_context_root t c) id;
         t.congruences <- Congruence_map.add key id t.congruences;
         id)
 
   let key_repr t (key : Key.t) : Key_repr.t =
     match key with
     | Named { context; family_uid } ->
-      Named (find t (intern t context), family_uid)
+      Named (find_context_root t (intern_context t context), family_uid)
     | Anon uid -> Anon uid
 
   let key_id t (key : Key.t) =
     let repr = key_repr t key in
     match Key_map.find_opt repr t.key_ids with
     | Some id ->
-      if Key.compare key (Dynarray.get t.key_witness id) < 0 then
-        Dynarray.set t.key_witness id key;
+      if Key.compare key (Dynarray.get t.canonical_keys id) < 0 then
+        Dynarray.set t.canonical_keys id key;
       id
     | None ->
-      let id = Dynarray.length t.key_witness in
+      let id = Dynarray.length t.canonical_keys in
       t.key_ids <- Key_map.add repr id t.key_ids;
-      Dynarray.add_last t.key_witness key;
-      Dynarray.add_last t.key_family (Key.family key);
-      Dynarray.add_last t.key_checks [];
-      Dynarray.add_last t.key_out [];
+      Dynarray.add_last t.canonical_keys key;
+      Dynarray.add_last t.family_by_key (Key.family key);
+      Dynarray.add_last t.checks_by_key [];
+      Dynarray.add_last t.requiring_keys [];
       id
 
   let observe_family t id =
-    match Dynarray.get t.key_family id with
+    match Dynarray.get t.family_by_key id with
     | None -> ()
     | Some family ->
-      t.families <-
+      t.keys_by_family <-
         Uid.Map.update family
           (fun ids ->
             let ids = Option.value ids ~default:Int_set.empty in
             Some (Int_set.add id ids))
-          t.families
+          t.keys_by_family
 
-  let build_condensation t =
-    let n = Dynarray.length t.key_out in
+  let build_requirement_components t =
+    let n = Dynarray.length t.requiring_keys in
     let visit_index = Array.make n (-1) in
     let lowlink = Array.make n 0 in
     let on_stack = Array.make n false in
-    let comp_of = Array.make n (-1) in
+    let component_by_key = Array.make n (-1) in
     let scc_stack = ref [] in
     let next_index = ref 0 in
-    let comp_count = ref 0 in
+    let component_count = ref 0 in
     let start v =
       visit_index.(v) <- !next_index;
       lowlink.(v) <- !next_index;
@@ -238,7 +258,7 @@ end = struct
     for root = 0 to n - 1 do
       if visit_index.(root) = -1 then begin
         start root;
-        let frames = ref [ (root, Dynarray.get t.key_out root) ] in
+        let frames = ref [ (root, Dynarray.get t.requiring_keys root) ] in
         while !frames <> [] do
           match !frames with
           | [] -> ()
@@ -248,7 +268,7 @@ end = struct
               frames := (v, edges) :: rest;
               if visit_index.(w) = -1 then begin
                 start w;
-                frames := (w, Dynarray.get t.key_out w) :: !frames
+                frames := (w, Dynarray.get t.requiring_keys w) :: !frames
               end
               else if on_stack.(w) then
                 lowlink.(v) <- min lowlink.(v) visit_index.(w)
@@ -259,8 +279,8 @@ end = struct
                 lowlink.(parent_v) <- min lowlink.(parent_v) lowlink.(v)
               | [] -> ());
               if lowlink.(v) = visit_index.(v) then begin
-                let comp = !comp_count in
-                incr comp_count;
+                let comp = !component_count in
+                incr component_count;
                 let continue = ref true in
                 while !continue do
                   match !scc_stack with
@@ -268,105 +288,107 @@ end = struct
                   | w :: remaining ->
                     scc_stack := remaining;
                     on_stack.(w) <- false;
-                    comp_of.(w) <- comp;
+                    component_by_key.(w) <- comp;
                     if w = v then continue := false
                 done
               end)
         done
       end
     done;
-    let comp_keys = Array.make !comp_count [] in
+    let component_keys = Array.make !component_count [] in
     for id = n - 1 downto 0 do
-      let c = comp_of.(id) in
-      comp_keys.(c) <- id :: comp_keys.(c)
+      let c = component_by_key.(id) in
+      component_keys.(c) <- id :: component_keys.(c)
     done;
-    let comp_out = Array.make !comp_count [] in
+    let requiring_components = Array.make !component_count [] in
     for id = 0 to n - 1 do
-      let c = comp_of.(id) in
-      List.iter (Dynarray.get t.key_out id) ~f:(fun derived ->
-          let d = comp_of.(derived) in
-          if c <> d then comp_out.(c) <- d :: comp_out.(c))
+      let c = component_by_key.(id) in
+      List.iter (Dynarray.get t.requiring_keys id) ~f:(fun derived ->
+          let d = component_by_key.(derived) in
+          if c <> d then
+            requiring_components.(c) <- d :: requiring_components.(c))
     done;
-    for c = 0 to !comp_count - 1 do
-      let out = List.sort_uniq ~cmp:Int.compare comp_out.(c) in
-      comp_out.(c) <- out
+    for c = 0 to !component_count - 1 do
+      let out = List.sort_uniq ~cmp:Int.compare requiring_components.(c) in
+      requiring_components.(c) <- out
     done;
-    t.comp_of <- comp_of;
-    t.comp_keys <- comp_keys;
-    t.comp_out <- comp_out;
-    t.comp_count <- !comp_count
+    t.component_by_key <- component_by_key;
+    t.component_keys <- component_keys;
+    t.requiring_components <- requiring_components;
+    t.component_count <- !component_count
 
   let empty () =
     { context_nodes = Dynarray.create ();
-      parent = Dynarray.create ();
-      rank = Dynarray.create ();
-      class_label = Dynarray.create ();
-      uses = Dynarray.create ();
-      use_size = Dynarray.create ();
-      atoms = Ctx_map.empty;
+      context_parent = Dynarray.create ();
+      context_rank = Dynarray.create ();
+      context_class_label = Dynarray.create ();
+      congruence_uses = Dynarray.create ();
+      congruence_use_count = Dynarray.create ();
+      atoms = Context_map.empty;
       congruences = Congruence_map.empty;
       key_ids = Key_map.empty;
-      key_witness = Dynarray.create ();
-      key_family = Dynarray.create ();
-      key_checks = Dynarray.create ();
-      key_out = Dynarray.create ();
-      families = Uid.Map.empty;
+      canonical_keys = Dynarray.create ();
+      family_by_key = Dynarray.create ();
+      checks_by_key = Dynarray.create ();
+      requiring_keys = Dynarray.create ();
+      keys_by_family = Uid.Map.empty;
       paired_families = Uid.Map.empty;
       global_omissions = [];
       family_omissions = Uid.Map.empty;
-      comp_of = [||];
-      comp_keys = [||];
-      comp_out = [||];
-      comp_count = 0
+      component_by_key = [||];
+      component_keys = [||];
+      requiring_components = [||];
+      component_count = 0
     }
 
   let merge_equalities t equalities =
     Facts.Context_equality_set.iter
       (fun equality ->
-        merge t
-          (intern t (Facts.Context_equality.left equality))
-          (intern t (Facts.Context_equality.right equality)))
+        merge_contexts t
+          (intern_context t (Facts.Context_equality.left equality))
+          (intern_context t (Facts.Context_equality.right equality)))
       equalities
 
   let index_checks t checks =
     Facts.Check_set.iter
       (fun (check : Facts.Check.t) ->
         let id = key_id t check.expectation in
-        Dynarray.set t.key_checks id (check :: Dynarray.get t.key_checks id);
+        Dynarray.set t.checks_by_key id
+          (check :: Dynarray.get t.checks_by_key id);
         observe_family t id)
       checks
 
-  let index_dependencies t dependencies =
+  let index_requirement_edges t relations =
     Facts.Dependency_set.iter
       (fun ({ derived; source; reason } : Facts.Dependency.t) ->
         let derived_id = key_id t derived in
         let source_id = key_id t source in
-        let forward () =
-          Dynarray.set t.key_out source_id
-            (derived_id :: Dynarray.get t.key_out source_id)
+        let add_requirement_edge () =
+          Dynarray.set t.requiring_keys source_id
+            (derived_id :: Dynarray.get t.requiring_keys source_id)
         in
         observe_family t derived_id;
         match reason with
         | Definition ->
-          forward ();
-          Dynarray.set t.key_out derived_id
-            (source_id :: Dynarray.get t.key_out derived_id);
+          add_requirement_edge ();
+          Dynarray.set t.requiring_keys derived_id
+            (source_id :: Dynarray.get t.requiring_keys derived_id);
           observe_family t source_id
-        | Instance -> forward ()
+        | Instance -> add_requirement_edge ()
         | Alias
         | Include
         | With_constraint
         | Module_type_of
         | Strengthening
         | Interface ->
-          forward ();
+          add_requirement_edge ();
           observe_family t source_id
         | Destructive_substitution
         | Functor_type
         | Argument_member
         | Interface_member -> observe_family t source_id
         | Interface_pair -> (
-          forward ();
+          add_requirement_edge ();
           observe_family t source_id;
           match (Facts.Key.family derived, Facts.Key.family source) with
           | Some left, Some right when not (Uid.equal left right) ->
@@ -382,7 +404,7 @@ end = struct
             pair left right;
             pair right left
           | (Some _ | None), _ -> ()))
-      dependencies
+      relations
 
   let index_omissions t omissions =
     Facts.Omission_set.iter
@@ -402,24 +424,25 @@ end = struct
       omissions
 
   let normalize_edges t =
-    for id = 0 to Dynarray.length t.key_out - 1 do
-      Dynarray.set t.key_out id
-        (List.sort_uniq ~cmp:Int.compare (Dynarray.get t.key_out id))
+    for id = 0 to Dynarray.length t.requiring_keys - 1 do
+      Dynarray.set t.requiring_keys id
+        (List.sort_uniq ~cmp:Int.compare (Dynarray.get t.requiring_keys id))
     done
 
   let create (facts : Facts.t) =
     let t = empty () in
     merge_equalities t facts.equalities;
     index_checks t facts.checks;
-    index_dependencies t facts.dependencies;
+    index_requirement_edges t facts.dependencies;
     index_omissions t facts.omissions;
     normalize_edges t;
-    build_condensation t;
+    build_requirement_components t;
     t
 
-  type impact = { witness : Key.t; check : Facts.Check.t }
+  type matching_check = { target_instance : Key.t; check : Facts.Check.t }
 
-  type result = { impacts : impact list; omissions : Facts.Omission.t list }
+  type result =
+    { matches : matching_check list; omissions : Facts.Omission.t list }
 
   let scoped_omissions t families =
     let omissions =
@@ -432,77 +455,91 @@ end = struct
     in
     List.sort_uniq ~cmp:Facts.Omission.compare omissions
 
-  let impact_compare a b =
-    let c = Key.compare a.witness b.witness in
+  let compare_matching_check a b =
+    let c = Key.compare a.target_instance b.target_instance in
     if c <> 0 then c else Facts.Check.compare a.check b.check
 
-  let query_seeds t ~queried_families seeds =
-    let sets = Array.make t.comp_count Int_set.empty in
-    let witnesses = Array.of_list (List.map seeds ~f:fst) in
-    List.iteri seeds ~f:(fun w (_, id) ->
-        let c = t.comp_of.(id) in
-        sets.(c) <- Int_set.add w sets.(c));
-    for c = t.comp_count - 1 downto 0 do
-      if not (Int_set.is_empty sets.(c)) then
-        List.iter t.comp_out.(c) ~f:(fun d ->
-            sets.(d) <- Int_set.union sets.(d) sets.(c))
+  let find_matching_checks t ~queried_families target_keys =
+    let targets_by_component = Array.make t.component_count Int_set.empty in
+    let target_instances = Array.of_list (List.map target_keys ~f:fst) in
+    List.iteri target_keys ~f:(fun target_index (_, key_id) ->
+        let component = t.component_by_key.(key_id) in
+        targets_by_component.(component) <-
+          Int_set.add target_index targets_by_component.(component));
+    for component = t.component_count - 1 downto 0 do
+      if not (Int_set.is_empty targets_by_component.(component)) then
+        List.iter t.requiring_components.(component)
+          ~f:(fun requiring_component ->
+            targets_by_component.(requiring_component) <-
+              Int_set.union
+                targets_by_component.(requiring_component)
+                targets_by_component.(component))
     done;
-    let impacts = ref [] in
-    let families = ref queried_families in
-    for c = 0 to t.comp_count - 1 do
-      let reaching = sets.(c) in
-      if not (Int_set.is_empty reaching) then
-        List.iter t.comp_keys.(c) ~f:(fun id ->
-            (match Dynarray.get t.key_family id with
+    let matches = ref [] in
+    let reached_families = ref queried_families in
+    for component = 0 to t.component_count - 1 do
+      let matching_targets = targets_by_component.(component) in
+      if not (Int_set.is_empty matching_targets) then
+        List.iter t.component_keys.(component) ~f:(fun key_id ->
+            (match Dynarray.get t.family_by_key key_id with
             | None -> ()
-            | Some family -> families := Uid.Set.add family !families);
-            List.iter (Dynarray.get t.key_checks id) ~f:(fun check ->
+            | Some family ->
+              reached_families := Uid.Set.add family !reached_families);
+            List.iter (Dynarray.get t.checks_by_key key_id) ~f:(fun check ->
                 Int_set.iter
-                  (fun w ->
-                    impacts := { witness = witnesses.(w); check } :: !impacts)
-                  reaching))
+                  (fun target_index ->
+                    matches :=
+                      { target_instance = target_instances.(target_index);
+                        check
+                      }
+                      :: !matches)
+                  matching_targets))
     done;
-    { impacts = List.sort_uniq ~cmp:impact_compare !impacts;
-      omissions = scoped_omissions t !families
+    { matches = List.sort_uniq ~cmp:compare_matching_check !matches;
+      omissions = scoped_omissions t !reached_families
     }
 
-  let query_family t family =
-    let rec close pending families =
+  let find_for_family t family =
+    let rec collect_paired_families pending families =
       match pending with
       | [] -> families
       | family :: pending ->
-        if Uid.Set.mem family families then close pending families
+        if Uid.Set.mem family families then
+          collect_paired_families pending families
         else
           let paired =
             match Uid.Map.find_opt family t.paired_families with
             | None -> []
             | Some set -> Uid.Set.elements set
           in
-          close (List.rev_append paired pending) (Uid.Set.add family families)
+          collect_paired_families
+            (List.rev_append paired pending)
+            (Uid.Set.add family families)
     in
-    let queried_families = close [ family ] Uid.Set.empty in
-    let seeds =
+    let queried_families = collect_paired_families [ family ] Uid.Set.empty in
+    let target_keys =
       Uid.Set.fold
-        (fun family seeds ->
-          match Uid.Map.find_opt family t.families with
-          | None -> seeds
+        (fun family target_keys ->
+          match Uid.Map.find_opt family t.keys_by_family with
+          | None -> target_keys
           | Some ids ->
             List.rev_append
               (List.map (Int_set.elements ids) ~f:(fun id ->
-                   (Dynarray.get t.key_witness id, id)))
-              seeds)
+                   (Dynarray.get t.canonical_keys id, id)))
+              target_keys)
         queried_families []
     in
-    match seeds with
-    | [] -> { impacts = []; omissions = scoped_omissions t queried_families }
-    | _ :: _ -> query_seeds t ~queried_families seeds
+    match target_keys with
+    | [] -> { matches = []; omissions = scoped_omissions t queried_families }
+    | _ :: _ -> find_matching_checks t ~queried_families target_keys
 
-  let query_anon t uid =
+  let find_for_anonymous_type t uid =
     let queried_families = Uid.Set.singleton uid in
     match Key_map.find_opt (Key_repr.Anon uid) t.key_ids with
-    | None -> { impacts = []; omissions = scoped_omissions t queried_families }
+    | None -> { matches = []; omissions = scoped_omissions t queried_families }
     | Some id ->
-      query_seeds t ~queried_families [ (Dynarray.get t.key_witness id, id) ]
+      find_matching_checks t ~queried_families
+        [ (Dynarray.get t.canonical_keys id, id) ]
 end
 
 let { Logger.log } = Logger.for_section "module-type-impls"
@@ -686,7 +723,7 @@ let own_interface_implementation mconfig ~own_file
       ~f:(fun impl_file ->
         { target = Own_interface;
           target_loc = None;
-          instance = None;
+          target_instance = None;
           implementation_uid = None;
           implementation_name = None;
           site =
@@ -727,9 +764,7 @@ let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
         })
   | Uid (Compilation_unit unit_name as unit_uid) ->
     let unit_loc =
-      match
-        Locate.lookup_loc_of_uid ~config:mconfig ~local_defs unit_uid
-      with
+      match Locate.lookup_loc_of_uid ~config:mconfig ~local_defs unit_uid with
       | Some (`Compilation_unit loc) -> Some loc
       | Some (`Declaration _) | None -> None
       | exception Not_found -> None
@@ -804,8 +839,8 @@ let reason_of_omission (omission : Facts.Omission.t) :
       reason = string_of_omission_reason omission.reason
     }
 
-let render_witness (witness : Facts.Key.t) =
-  Format.asprintf "%a" Facts.Key.print witness
+let render_target_instance (target_instance : Facts.Key.t) =
+  Format.asprintf "%a" Facts.Key.print target_instance
 
 let render_site (site : Location.t) =
   let start = site.loc_start in
@@ -820,11 +855,11 @@ type site_resolution =
   | Resolved_site of Location.t
   | Unresolved_site
 
-type impact_resolution =
-  | Resolved_impact of
+type matching_check_resolution =
+  | Resolved_match of
       Query_protocol.Module_type_impls.implementation
       * Query_protocol.Module_type_impls.reason list
-  | Unresolved_impact of Query_protocol.Module_type_impls.reason list
+  | Unresolved_match of Query_protocol.Module_type_impls.reason list
 
 let compare_target left right =
   let open Query_protocol.Module_type_impls in
@@ -850,7 +885,7 @@ let compare_check_kind left right =
   in
   Int.compare (rank left) (rank right)
 
-let compare_implementation
+let compare_implementation_identity
     (left : Query_protocol.Module_type_impls.implementation)
     (right : Query_protocol.Module_type_impls.implementation) =
   let c = compare_target left.target right.target in
@@ -875,12 +910,22 @@ let compare_implementation
         else
           let c = Location.compare left.site.impl_loc right.site.impl_loc in
           if c <> 0 then c
-          else
-            let c =
-              compare_impl_kind left.site.impl_kind right.site.impl_kind
-            in
-            if c <> 0 then c
-            else Stdlib.Option.compare compare_check_kind left.check right.check
+          else compare_impl_kind left.site.impl_kind right.site.impl_kind
+
+let unique_implementations implementations =
+  let compare left right =
+    let c = compare_implementation_identity left right in
+    if c <> 0 then c
+    else Stdlib.Option.compare compare_check_kind left.check right.check
+  in
+  List.sort implementations ~cmp:compare
+  |> List.fold_left ~init:[] ~f:(fun unique implementation ->
+      match unique with
+      | previous :: _
+        when compare_implementation_identity previous implementation = 0 ->
+        unique
+      | _ -> implementation :: unique)
+  |> List.rev
 
 let reason_rank : Query_protocol.Module_type_impls.reason -> int = function
   | No_index_files -> 0
@@ -901,7 +946,7 @@ let compare_reason left right =
     let c = String.compare left.target right.target in
     if c <> 0 then c
     else
-      let c = String.compare left.witness right.witness in
+      let c = String.compare left.target_instance right.target_instance in
       if c <> 0 then c
       else
         let c = String.compare left.implementation right.implementation in
@@ -911,7 +956,7 @@ let compare_reason left right =
     let c = String.compare left.target right.target in
     if c <> 0 then c
     else
-      let c = String.compare left.witness right.witness in
+      let c = String.compare left.target_instance right.target_instance in
       if c <> 0 then c else String.compare left.site right.site
   | _, _ -> Int.compare (reason_rank left) (reason_rank right)
 
@@ -929,10 +974,10 @@ let check_site_resolution mconfig (check : Facts.Check.t) =
     | Some loc -> Resolved_site loc
     | None -> Unresolved_site
 
-let resolve_impact ~mconfig ~local_defs ~own_file target
-    ({ witness; check } : Dependency_analysis.impact) =
+let resolve_matching_check ~mconfig ~local_defs ~own_file target
+    ({ target_instance; check } : Implementation_search.matching_check) =
   let open Query_protocol.Module_type_impls in
-  let witness = render_witness witness in
+  let target_instance = render_target_instance target_instance in
   let site_resolution = check_site_resolution mconfig check in
   let site_reasons =
     match site_resolution with
@@ -940,18 +985,18 @@ let resolve_impact ~mconfig ~local_defs ~own_file target
     | Unresolved_site ->
       [ Unresolved_check_site
           { target = target.target_name;
-            witness;
+            target_instance;
             site = render_site check.site
           }
       ]
   in
   match resolve_implementation mconfig ~local_defs check.implementation with
   | Some { implementation_uid; implementation_name; site } ->
-    Resolved_impact
+    Resolved_match
       ( { target = Modtype target.target_name;
           target_loc =
             Some (Helpers.location_in_file own_file target.target_loc);
-          instance = Some witness;
+          target_instance = Some target_instance;
           implementation_uid;
           implementation_name;
           site;
@@ -968,31 +1013,31 @@ let resolve_impact ~mconfig ~local_defs ~own_file target
       | Resolved_site loc -> Some loc.loc_start.Lexing.pos_fname
       | No_recorded_site | Unresolved_site -> None
     in
-    Unresolved_impact
+    Unresolved_match
       (Unresolved_implementation
          { target = target.target_name;
-           witness;
+           target_instance;
            implementation = Format.asprintf "%a" pp_node check.implementation;
            site
          }
       :: site_reasons)
 
-let resolve_impacts ~mconfig ~local_defs ~own_file results =
+let resolve_matching_checks ~mconfig ~local_defs ~own_file results =
   let resolutions =
     List.concat_map results
-      ~f:(fun ((target, result) : target * Dependency_analysis.result) ->
-        List.map result.impacts
-          ~f:(resolve_impact ~mconfig ~local_defs ~own_file target))
+      ~f:(fun ((target, result) : target * Implementation_search.result) ->
+        List.map result.matches
+          ~f:(resolve_matching_check ~mconfig ~local_defs ~own_file target))
   in
   let implementations =
     List.filter_map resolutions ~f:(function
-      | Resolved_impact (implementation, _) -> Some implementation
-      | Unresolved_impact _ -> None)
-    |> List.sort_uniq ~cmp:compare_implementation
+      | Resolved_match (implementation, _) -> Some implementation
+      | Unresolved_match _ -> None)
+    |> unique_implementations
   in
   let reasons =
     List.concat_map resolutions ~f:(function
-        | Resolved_impact (_, reasons) | Unresolved_impact reasons -> reasons)
+        | Resolved_match (_, reasons) | Unresolved_match reasons -> reasons)
     |> List.sort_uniq ~cmp:compare_reason
   in
   (implementations, reasons)
@@ -1011,14 +1056,14 @@ let status_and_reasons ~index_files ~facts_present ~omissions
     | [] -> (Complete, [])
     | _ :: _ -> (Partial, reasons))
 
-let query_results engine targets =
+let find_target_checks search targets =
   List.map targets ~f:(fun target ->
       let result =
-        match engine with
+        match search with
         | None ->
-          ({ impacts = []; omissions = [] } : Dependency_analysis.result)
-        | Some engine ->
-          Dependency_analysis.query_family engine target.target_uid
+          ({ matches = []; omissions = [] } : Implementation_search.result)
+        | Some search ->
+          Implementation_search.find_for_family search target.target_uid
       in
       (target, result))
 
@@ -1041,17 +1086,17 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
   let open Query_protocol.Module_type_impls in
   let index_files = mconfig.merlin.index_files in
   let facts = Helpers.module_facts mconfig in
-  let engine =
+  let search =
     match facts with
     | None | Some None -> None
-    | Some (Some facts) -> Some (Dependency_analysis.create facts)
+    | Some (Some facts) -> Some (Implementation_search.create facts)
   in
-  let results = query_results engine targets in
+  let results = find_target_checks search targets in
   let targets, implementations =
     List.split
       (List.map results ~f:(fun ((target, result) as target_result) ->
            let implementations, resolution_reasons =
-             resolve_impacts ~mconfig ~local_defs:typedtree ~own_file
+             resolve_matching_checks ~mconfig ~local_defs:typedtree ~own_file
                [ target_result ]
            in
            let status, reasons =
@@ -1066,23 +1111,26 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
              },
              implementations )))
   in
-  let implementations =
-    List.concat implementations |> List.sort_uniq ~cmp:compare_implementation
-  in
+  let implementations = List.concat implementations |> unique_implementations in
   let own_interface_rows =
     match own_interface_implementation mconfig ~own_file typedtree with
     | Some own_interface -> [ own_interface ]
     | None -> (
-      match (typedtree, engine) with
+      match (typedtree, search) with
       | `Implementation _, _ | _, None -> []
-      | `Interface _, Some engine ->
+      | `Interface _, Some search ->
         let unit_uid =
           Shape.Uid.of_compilation_unit_id
             (Compilation_unit.of_string (Mconfig.unitname mconfig))
         in
-        let result = Dependency_analysis.query_anon engine unit_uid in
-        List.filter_map result.impacts
-          ~f:(fun ({ witness; check } : Dependency_analysis.impact) ->
+        let result =
+          Implementation_search.find_for_anonymous_type search unit_uid
+        in
+        List.filter_map result.matches
+          ~f:(fun
+              ({ target_instance; check } :
+                Implementation_search.matching_check)
+            ->
             Option.map
               (resolve_implementation mconfig ~local_defs:typedtree
                  check.implementation)
@@ -1092,7 +1140,8 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
                 ->
                 { target = Own_interface;
                   target_loc = None;
-                  instance = Some (render_witness witness);
+                  target_instance =
+                    Some (render_target_instance target_instance);
                   implementation_uid;
                   implementation_name;
                   site;
@@ -1105,8 +1154,7 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
   in
   let own_interface_rows = if buffer_wide then own_interface_rows else [] in
   let implementations =
-    List.sort_uniq ~cmp:compare_implementation
-      (own_interface_rows @ implementations)
+    unique_implementations (own_interface_rows @ implementations)
   in
   log ~title:"query" "%d targets, %d rows" (List.length targets)
     (List.length implementations);
