@@ -205,9 +205,6 @@
   pparse
   ;; DIAGNOSTICS
   structured_diagnostic
-  diagnostic_plan
-  diagnostic_source
-  diagnostic_request
   ;; TYPING
   ident
   global_module))
@@ -319,6 +316,7 @@
   data_types
   ;; DIAGNOSTICS
   diagnostic_nlg
+  diagnostic_term
   module_diagnostics
   kind_diagnostics
   type_diagnostics
