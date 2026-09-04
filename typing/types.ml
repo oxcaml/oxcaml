@@ -1068,6 +1068,25 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
+(* CR zeisbach: it makes me sad to add YET ANOTHER one of these conversion
+   functions, since there already are so many. Maybe we could refactor some of
+   Element_repr and use this in there? Or vice-verse?
+   This organization is something that's definitely considering again. *)
+let rec mixed_block_element_of_layout_const
+    (layout : Jkind_types.Layout.Const.t) : mixed_block_element option =
+  match layout with
+  | Any _ | Univar _ | Genvar _ -> None
+  | Base (Scannable, scannable_axes) -> Some (Scannable scannable_axes)
+  | Base (base, _) ->
+    Some
+      (mixed_block_element_of_const_sort (Jkind_types.Sort.Const.base base))
+  | Product layouts ->
+    Option.map (fun elements -> Product (Array.of_list elements))
+      (Misc.Stdlib.List.map_option mixed_block_element_of_layout_const layouts)
+  | Addressable layout ->
+    Option.map (fun element -> Addressable element)
+      (mixed_block_element_of_layout_const layout)
+
 let find_unboxed_type decl =
   match decl.type_kind with
     Type_record

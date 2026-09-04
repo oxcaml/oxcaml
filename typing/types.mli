@@ -1350,6 +1350,11 @@ val equal_variant_representation_up_to_scannable_axes :
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
+(** Returns [None] if the layout is not representable.
+    Unlike with sorts, we get precise scannable axis information. *)
+val mixed_block_element_of_layout_const :
+  Jkind_types.Layout.Const.t -> mixed_block_element option
+
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.
