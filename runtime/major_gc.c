@@ -982,18 +982,21 @@ static uintnat gc_slice_work(uintnat allocated_words,
 
 }
 
-/* The [log_events] parameter is used to disable writing to the ring for two
-   reasons:
-   1. To prevent spamming the ring with numerous events generated during
-      an opportunistic GC slice.
-   2. To avoid logging events when the calling domain is not part of the
-      Stop-The-World (STW) participant set. If the domain is not part of
-      the STW set, the ring could be torn down concurrently while this domain
-      attempts to write to it. */
+/* Values for the event counters describing a slice's inputs, computed by
+   [update_major_slice_work] and logged by [slice_events_begin]. */
+struct slice_counters {
+  uintnat alloc_words, dependent_words, new_work, total_work, budget;
+};
+
+/* Updates the work accounting at the start of a slice, filling [counters]
+   with values for the slice's event counters. Logs no events itself: the
+   caller decides whether the slice is logged at all (in particular a domain
+   being torn down must not write to the ring, as it is no longer in the STW
+   participant set and the ring could be torn down concurrently). */
 static void
 update_major_slice_work(intnat howmuch,
                         int may_access_gc_phase,
-                        bool log_events /* log events to the ring? */)
+                        struct slice_counters *counters)
 {
   caml_domain_state *dom_st = Caml_state;
   uintnat work_done_between_slices =
@@ -1064,20 +1067,13 @@ update_major_slice_work(intnat howmuch,
                   new_work,
                   dom_st->slice_budget);
 
-  if (log_events) {
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_WORDS,
-                    my_alloc_count);
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
-                    my_dependent_count);
-    /* TODO: add counters for direct, suspended, resumed allocs. */
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_NEW_WORK,
-                    new_work);
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_TOTAL_WORK,
-                    (uintnat)diffmod(atomic_load(&total_work_incurred),
-                                     atomic_load(&total_work_completed)));
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_BUDGET,
-                    dom_st->slice_budget);
-  }
+  counters->alloc_words = my_alloc_count;
+  counters->dependent_words = my_dependent_count;
+  /* TODO: add counters for direct, suspended, resumed allocs. */
+  counters->new_work = new_work;
+  counters->total_work = (uintnat)diffmod(atomic_load(&total_work_incurred),
+                                          atomic_load(&total_work_completed));
+  counters->budget = dom_st->slice_budget;
 }
 
 #define Chunk_size 0x4000
@@ -1785,13 +1781,14 @@ void caml_mark_roots_stw (int participant_count, caml_domain_state** barrier_par
   /* Wait until global roots are marked. It's fine if other domains are still
      marking their local roots, as long as the globals are done */
   if (atomic_load_acquire(&global_roots_scanned) != WORK_COMPLETE) {
-    CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
+    struct caml_opportunistic_events evs = { false, 0 };
     SPIN_WAIT {
-      caml_opportunistic_major_collection_slice(1000);
+      caml_opportunistic_events_add
+        (&evs, caml_opportunistic_major_collection_slice(1000));
       if (atomic_load_acquire(&global_roots_scanned) == WORK_COMPLETE)
         break;
     }
-    CAML_EV_END(EV_MAJOR_MARK_OPPORTUNISTIC);
+    caml_opportunistic_events_end(&evs);
   }
 }
 
@@ -2200,11 +2197,32 @@ static char collection_slice_mode_char(collection_slice_mode mode)
   }
 }
 
-static void major_collection_slice(intnat howmuch,
-                                   int participant_count,
-                                   caml_domain_state** barrier_participants,
-                                   collection_slice_mode mode,
-                                   int compaction_mode)
+/* Begins the events of a major slice, at the first point in the slice where
+   we know it has work to do. Slices which find no work (they may have no
+   budget, or nothing to sweep or mark) log no events at all, as they would
+   spam the ring. Opportunistic slices never log events here: their spin
+   phases are aggregated by [caml_opportunistic_events_add]. */
+static void slice_events_begin(collection_slice_mode mode,
+                               bool *events_begun,
+                               const struct slice_counters *counters)
+{
+  if (mode == Slice_opportunistic || *events_begun) return;
+  *events_begun = true;
+  CAML_EV_BEGIN(EV_MAJOR_SLICE);
+  CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_WORDS, counters->alloc_words);
+  CAML_EV_COUNTER(EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
+                  counters->dependent_words);
+  CAML_EV_COUNTER(EV_C_MAJOR_SLICE_NEW_WORK, counters->new_work);
+  CAML_EV_COUNTER(EV_C_MAJOR_SLICE_TOTAL_WORK, counters->total_work);
+  CAML_EV_COUNTER(EV_C_MAJOR_SLICE_BUDGET, counters->budget);
+}
+
+/* Returns the total amount of work done in the slice. */
+static uintnat major_collection_slice(intnat howmuch,
+                                      int participant_count,
+                                      caml_domain_state** barrier_participants,
+                                      collection_slice_mode mode,
+                                      int compaction_mode)
 {
   caml_domain_state* domain_state = Caml_state;
   uintnat sweep_work=0, mark_work=0, ephe_sweep_work=0, ephe_mark_work=0;
@@ -2221,29 +2239,28 @@ static void major_collection_slice(intnat howmuch,
                   !caml_incoming_interrupts_queued() ? '.' : '*',
                   caml_gc_phase_char(may_access_gc_phase));
 
-  bool log_events = mode != Slice_opportunistic ||
-                    (atomic_load_relaxed(&caml_verb_gc) &
-                     CAML_GC_MSG_SLICE);
+  struct slice_counters counters;
+  bool events_begun = false;
 
-  update_major_slice_work(howmuch, may_access_gc_phase, log_events);
+  update_major_slice_work(howmuch, may_access_gc_phase, &counters);
 
   /* When a full slice of major GC work is done,
      or the slice is interrupted (in mode Slice_interruptible),
      get_major_slice_work(mode) will return a budget <= 0 */
 
-  /* shortcut out if there is no opportunistic work to be done
-   * NB: needed particularly to avoid caml_ev spam when polling */
+  /* shortcut out if there is no opportunistic work to be done */
   if (mode == Slice_opportunistic &&
       !caml_opportunistic_major_work_available(domain_state)) {
     commit_major_slice_sweepwork (0);
-    return;
+    return 0;
   }
 
-  if (log_events) CAML_EV_BEGIN(EV_MAJOR_SLICE);
   call_timing_hook(&caml_major_slice_begin_hook);
 
-  if (!domain_state->sweeping_done) {
-    if (log_events) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
+  if (!domain_state->sweeping_done &&
+      get_major_slice_sweepwork(mode) > 0) {
+    slice_events_begin(mode, &events_begun, &counters);
+    if (events_begun) CAML_EV_BEGIN(EV_MAJOR_SWEEP);
 
     while (!domain_state->sweeping_done &&
            (budget = get_major_slice_sweepwork(mode)) > 0) {
@@ -2258,7 +2275,7 @@ static void major_collection_slice(intnat howmuch,
       }
     }
 
-    if (log_events) CAML_EV_END(EV_MAJOR_SWEEP);
+    if (events_begun) CAML_EV_END(EV_MAJOR_SWEEP);
   }
 
   if (domain_state->sweeping_done && !caml_marking_started()) {
@@ -2302,7 +2319,8 @@ mark_again:
   if (caml_marking_started() &&
       !domain_state->marking_done &&
       get_major_slice_markwork(mode) > 0) {
-    if (log_events) CAML_EV_BEGIN(EV_MAJOR_MARK);
+    slice_events_begin(mode, &events_begun, &counters);
+    if (events_begun) CAML_EV_BEGIN(EV_MAJOR_MARK);
 
     while (!domain_state->marking_done &&
            (budget = get_major_slice_markwork(mode)) > 0) {
@@ -2317,7 +2335,7 @@ mark_again:
       commit_major_slice_markwork(work_done);
     }
 
-    if (log_events) CAML_EV_END(EV_MAJOR_MARK);
+    if (events_begun) CAML_EV_END(EV_MAJOR_MARK);
   }
 
   if (mode != Slice_opportunistic && caml_marking_started()) {
@@ -2360,6 +2378,7 @@ mark_again:
       if (domain_state->ephe_info->todo != (value) NULL &&
           saved_ephe_round > domain_state->ephe_info->round &&
           get_major_slice_markwork(mode) > 0) {
+        slice_events_begin(mode, &events_begun, &counters);
         CAML_EV_BEGIN(EV_MAJOR_EPHE_MARK);
 
         int ephe_completed_marking = 0;
@@ -2422,9 +2441,11 @@ mark_again:
         }
       }
 
-      if (domain_state->ephe_info->todo != 0) {
+      if (domain_state->ephe_info->todo != 0 &&
+          get_major_slice_sweepwork(mode) > 0) {
         CAMLassert (domain_state->ephe_info->must_sweep_ephe == 0);
         /* Sweep the ephemeron todo list */
+        slice_events_begin(mode, &events_begun, &counters);
         CAML_EV_BEGIN(EV_MAJOR_EPHE_SWEEP);
 
         while (domain_state->ephe_info->todo != 0 &&
@@ -2459,11 +2480,13 @@ mark_again:
     }
   }
 
+  uintnat total_work =
+    sweep_work + mark_work + ephe_mark_work + ephe_sweep_work;
+
   call_timing_hook(&caml_major_slice_end_hook);
-  if (log_events) {
+  if (events_begun) {
     CAML_EV_END(EV_MAJOR_SLICE);
-    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_WORK_DONE,
-                    sweep_work + mark_work + ephe_mark_work + ephe_sweep_work);
+    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_WORK_DONE, total_work);
   }
 
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
@@ -2478,8 +2501,7 @@ mark_again:
                   domain_state->stat_blocks_marked - blocks_marked_before,
                   ephe_mark_work, ephe_sweep_work);
 
-  domain_state->stat_major_work_done +=
-    sweep_work + mark_work + ephe_mark_work + ephe_sweep_work;
+  domain_state->stat_major_work_done += total_work;
 
   if (mode != Slice_opportunistic && is_complete_phase_sweep_ephe()) {
     /* To handle the case where multiple domains try to finish the major cycle
@@ -2501,11 +2523,51 @@ mark_again:
       }
     }
   }
+
+  return total_work;
 }
 
-void caml_opportunistic_major_collection_slice(intnat howmuch)
+uintnat caml_opportunistic_major_collection_slice(intnat howmuch)
 {
-  major_collection_slice(howmuch, 0, 0, Slice_opportunistic, Compaction_none);
+  return major_collection_slice(howmuch, 0, 0, Slice_opportunistic,
+                                Compaction_none);
+}
+
+/* Opportunistic slices log no events themselves: a spin phase can run very
+   many of them, mostly tiny, and logging each one spams the ring. These
+   functions log one span per spin phase instead, and only if some work was
+   done. The work counter is logged within the span, so that consumers can
+   attribute it to opportunistic work. */
+
+void caml_opportunistic_events_add(struct caml_opportunistic_events *evs,
+                                   uintnat work_done)
+{
+  evs->work_done += work_done;
+  if (work_done > 0 && !evs->span_open) {
+    evs->span_open = true;
+    CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
+  }
+}
+
+void caml_opportunistic_events_end(struct caml_opportunistic_events *evs)
+{
+  if (evs->span_open) {
+    CAML_EV_COUNTER(EV_C_MAJOR_SLICE_WORK_DONE, evs->work_done);
+    CAML_EV_END(EV_MAJOR_MARK_OPPORTUNISTIC);
+    evs->span_open = false;
+  }
+}
+
+bool caml_do_opportunistic_major_slice
+  (caml_domain_state* domain_state, struct caml_opportunistic_events *evs)
+{
+  bool work_available = caml_opportunistic_major_work_available(domain_state);
+  if (work_available) {
+    uintnat work_done =
+      caml_opportunistic_major_collection_slice(Major_slice_work_min);
+    caml_opportunistic_events_add(evs, work_done);
+  }
+  return work_available;
 }
 
 void caml_major_collection_slice(intnat howmuch)
@@ -2712,10 +2774,10 @@ void caml_teardown_major_gc(void) {
    so we may not access the gc phase. */
   int may_access_gc_phase = 0;
 
-  /* Account for latest allocations, but do not write to the event ring since
-     we are out of the STW participant set; the ring may be torn down
-     concurrently. */
-  update_major_slice_work (0, may_access_gc_phase, false);
+  /* Account for latest allocations. No events are logged here: we are out
+     of the STW participant set, so the ring may be torn down concurrently. */
+  struct slice_counters ignored;
+  update_major_slice_work (0, may_access_gc_phase, &ignored);
   CAMLassert(!caml_addrmap_iter_ok(&d->mark_stack->compressed_stack,
                                    d->mark_stack->compressed_stack_iter));
   caml_addrmap_clear(&d->mark_stack->compressed_stack);
