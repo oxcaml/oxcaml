@@ -228,7 +228,7 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   let gen_binop nty =
     Gen.when_ (can_recurse ~complexity) (fun () ->
         let inner_ty = gen_ty nty in
-        let binop = random_element st (Bin_op.ops_for_ty (Ty.Number nty)) in
+        let binop = random_element st (Bin_op.ops_for_ty (Ty.Number inner_ty)) in
         let lhs = gen_number st env inner_ty ~complexity in
         let rhs = gen_number st env inner_ty ~complexity in
         Expr.Convert

@@ -163,6 +163,9 @@ module Bin_op = struct
     | Add
     | Sub
     | Mul
+    | Bit_and
+    | Bit_or
+    | Bit_xor
     | Eq
     | Lt
     | Le
@@ -173,9 +176,12 @@ module Bin_op = struct
 
   let num_binops = [Add; Sub; Mul]
 
+  let integral_binops = num_binops @ [Bit_and; Bit_or; Bit_xor]
+
   let ops_for_ty (ty : Ty.t) =
     match ty with
-    | Number _ -> num_binops
+    | Number nty ->
+      if NumberTy.is_floating_point nty then num_binops else integral_binops
     | Bool ->
       Misc.fatal_errorf
         "Bin_op.ops_for_ty: only numeric types allowed, but got Bool"
@@ -191,6 +197,9 @@ module Bin_op = struct
     | Add -> call "add"
     | Sub -> call "sub"
     | Mul -> call "mul"
+    | Bit_and -> call "logand"
+    | Bit_or -> call "logor"
+    | Bit_xor -> call "logxor"
     | Eq -> call "equal"
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]

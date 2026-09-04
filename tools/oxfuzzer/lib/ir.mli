@@ -78,6 +78,9 @@ module Bin_op : sig
     | Add
     | Sub
     | Mul
+    | Bit_and
+    | Bit_or
+    | Bit_xor
     | Eq
     | Lt
     | Le
