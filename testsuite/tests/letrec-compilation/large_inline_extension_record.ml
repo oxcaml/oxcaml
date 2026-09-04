@@ -145,7 +145,7 @@ let () =
   | Record fields ->
     let rec copy : t = Record { fields with next = copy } in
     let copy : t = Sys.opaque_identity copy in
-    let expected_size = 256 in
-    assert (Obj.size (Obj.repr original) = expected_size)
+    let expected_size = 257 in
+    assert (Obj.size (Obj.repr original) = expected_size);
     assert (Obj.size (Obj.repr copy) = expected_size)
   | _ -> failwith "expected Record"
