@@ -207,7 +207,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     let context = Context.Expr in
     ignore (Type_utils.type_in_env ~verbosity ~context env ppf source : bool);
     to_string ()
-  | Structured_errors { pronouns } ->
+  | Structured_errors ->
     let typer = Mpipeline.typer_result pipeline in
     let browse_tree = Mbrowse.of_typedtree (Mtyper.get_typedtree typer) in
     let errors = Mpipeline.typer_errors pipeline in
@@ -359,16 +359,16 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           }
       }
     in
-    let pronouns : Mode_diagnostics.Pronouns.t =
-      if pronouns then Use_pronouns else Names_only
-    in
     List.filter_map errors ~f:(fun exn ->
         match Location.error_of_exn exn with
         | Some (`Ok report) ->
           let loc = Location.loc_of_report report in
           let snap = Btype.snapshot () in
           let result =
-            try Mode_diagnostics.error ~source ~context ~pronouns ~loc exn with
+            try
+              Mode_diagnostics.error ~source ~context
+                ~pronouns:Mode_diagnostics.Pronouns.Use_pronouns ~loc exn
+            with
             | (Out_of_memory | Stack_overflow) as e ->
               Btype.backtrack snap;
               raise e
