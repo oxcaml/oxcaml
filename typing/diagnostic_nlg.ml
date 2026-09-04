@@ -1,9 +1,5 @@
-module Diagnostic = Structured_diagnostic
 module Annotation = Structured_diagnostic.Annotation
-module Block = Structured_diagnostic.Block
-module Entities = Structured_diagnostic.Entities
 module Form = Structured_diagnostic.Form
-module Glossary = Structured_diagnostic.Glossary
 module Inline = Structured_diagnostic.Inline
 module Kind = Structured_diagnostic.Kind
 module Location_key = Structured_diagnostic.Location_key
@@ -52,10 +48,33 @@ let term t : _ Phrase.segment = Term t
 
 let ref_source loc content : _ Phrase.segment = Source { loc; content }
 
+let ordinal n =
+  let suffix =
+    let mod100 = n mod 100 in
+    if mod100 >= 11 && mod100 <= 13
+    then "th"
+    else match n mod 10 with 1 -> "st" | 2 -> "nd" | 3 -> "rd" | _ -> "th"
+  in
+  string_of_int n ^ suffix
+
+let rec longident_name (lid : Longident.t) : string option =
+  match lid with
+  | Lident name -> Some name
+  | Ldot (prefix, name) ->
+    Option.map
+      (fun prefix -> prefix ^ "." ^ name.txt)
+      (longident_name prefix.txt)
+  | Lapply _ -> None
+
 type subject =
   { name : Phrase.word list;
     span : Location.t option
   }
+
+let subject ?span name : subject = { name; span }
+
+let sentence_subject (subject : subject) : subject option =
+  Option.map (fun (_ : Location.t) -> subject) subject.span
 
 let subject_entity (subject : subject) : Location_key.t option =
   Option.map Location_key.of_location subject.span
@@ -99,6 +118,23 @@ type 'term plan =
     children : (Relation.t * 'term plan) list
   }
 
+module Plan = struct
+  let statement ?(children = []) statement =
+    { statement = Some statement; children }
+
+  let group children = { statement = None; children }
+
+  let with_children t children = { t with children }
+
+  let without_statement t = { t with statement = None }
+end
+
+let claims (plans : 'term plan list) : (Relation.t * 'term plan) list =
+  List.map (fun plan -> Relation.Claim, plan) plans
+
+let elaboration (statement : 'term Statement.t) : Relation.t * 'term plan =
+  Relation.Elaboration, Plan.statement statement
+
 let rec nominals (segments : _ Phrase.segment list) :
     (Location_key.t * Form.t) list =
   List.concat_map
@@ -137,11 +173,58 @@ let sentence ?(kind = Kind.Explanation) ?subject ?clause main : _ Statement.t =
     subject;
   { kind; body = Statement.Sentence { subject; main; clause } }
 
-let fragment ?(kind = Kind.Explanation) phrase : _ Statement.t =
-  (match phrase with
-  | [] -> invalid_arg "Diagnostic_nlg.fragment: empty phrase"
-  | _ :: _ -> ());
-  { kind; body = Statement.Fragment phrase }
+type 'term aside = Relation.t * 'term plan
+
+type 'term beat = 'term plan
+
+type 'term story = 'term beat
+
+let said ?kind ?subject segments =
+  sentence ?kind ?subject:(Option.bind subject sentence_subject) segments
+
+let note ?subject ?(asides = []) segments : _ aside =
+  Relation.Elaboration,
+  Plan.statement ~children:asides (said ?subject segments)
+
+let background segments : _ aside =
+  elaboration (said ~kind:Kind.Background segments)
+
+let suggest segments : _ aside =
+  elaboration (said ~kind:Kind.Suggestion segments)
+
+let claim ?subject ?(asides = []) segments : _ beat =
+  Plan.statement ~children:asides (said ?subject segments)
+
+let but ?subject ?(asides = []) segments : _ beat =
+  claim ?subject ~asides (txt "but " :: segments)
+
+let sub_claim ?subject ?asides segments : _ aside =
+  Relation.Claim, claim ?subject ?asides segments
+
+let child (beat : _ beat) : _ aside = Relation.Claim, beat
+
+let story (beats : _ beat list) : _ story = Plan.group (claims beats)
+
+let plain ~claim:claim_phrase ?contrast ?(background = []) ?(suggestions = [])
+    () : _ story =
+  let extra kind phrase = elaboration (sentence ~kind phrase) in
+  let extras =
+    List.map (extra Kind.Background) background
+    @ List.map (extra Kind.Suggestion) suggestions
+  in
+  let claim_plans =
+    match contrast with
+    | None -> [Plan.statement ~children:extras (sentence claim_phrase)]
+    | Some contrast ->
+      [ Plan.statement (sentence claim_phrase);
+        Plan.statement ~children:extras (sentence contrast) ]
+  in
+  Plan.group (claims claim_plans)
+
+let beheaded (beat : _ beat) : _ beat = Plan.without_statement beat
+
+let reframe (beat : _ beat) (stories : _ story list) : _ beat =
+  Plan.with_children beat (claims stories)
 
 let pronominalize (plans : 'term plan list) : 'term plan list =
   let statement_nominals (s : _ Statement.t) =
@@ -176,7 +259,7 @@ let pronominalize (plans : 'term plan list) : 'term plan list =
          [] entities)
   in
   let rewrite ~prev_last ~prev_pronouns (s : _ Statement.t) : _ Statement.t =
-    let sentence_subject =
+    let sentence_entity =
       match s.body with
       | Fragment _ -> None
       | Sentence { subject; main = _; clause = _ } ->
@@ -195,7 +278,7 @@ let pronominalize (plans : 'term plan list) : 'term plan list =
       | Mention { span = Some span; name; case; form } ->
         let entity = Location_key.of_location span in
         let entity_is_sentence_subject =
-          match sentence_subject with
+          match sentence_entity with
           | Some e -> Location_key.equal e entity
           | None -> false
         in
@@ -308,23 +391,11 @@ let pronominalize (plans : 'term plan list) : 'term plan list =
   in
   snd (List.fold_left_map go_plan (None, []) plans)
 
-module Tables = struct
-  type t =
-    { entities : Entities.t;
-      glossary : Glossary.t
-    }
-
-  let initial = { entities = Entities.empty; glossary = Glossary.empty }
-end
-
-module Phrase_state = struct
-  type t =
-    { tables : Tables.t;
-      pronoun_before : bool
-    }
-
-  let of_tables tables = { tables; pronoun_before = false }
-end
+let pronominalize_one (plan : 'term plan) : 'term plan =
+  match pronominalize [plan] with
+  | [plan] -> plan
+  | [] | _ :: _ :: _ ->
+    invalid_arg "Diagnostic_nlg.pronominalize_one: plan count changed"
 
 let annotated annotation content : Inline.t = Annotated { annotation; content }
 
@@ -333,43 +404,34 @@ let inline_of_word (word : Phrase.word) : Inline.t =
   | Text text -> Inline.Text text
   | Code text -> annotated Annotation.Code [Inline.Text text]
 
-let realize_phrase ~term_entry ~term_words (tables : Tables.t)
-    (phrase : _ Phrase.t) : Tables.t * Inline.t list =
-  let rec segment ~followed_by_more (state : Phrase_state.t)
-      (seg : _ Phrase.segment) : Phrase_state.t * Inline.t list =
+let realize_phrase ~term_entry ~term_words (phrase : _ Phrase.t) :
+    Inline.t list =
+  let rec segment ~followed_by_more ~pronoun_before (seg : _ Phrase.segment) =
     match seg with
     | Phrase.Word word ->
-      { state with pronoun_before = false }, [inline_of_word word]
+      false, [inline_of_word word]
     | Phrase.Copula number ->
       let word =
         match number with
         | Phrase.Singular ->
-          if state.pronoun_before && followed_by_more then "'s" else " is"
+          if pronoun_before && followed_by_more then "'s" else " is"
         | Phrase.Plural -> " are"
       in
-      { state with pronoun_before = false }, [Inline.Text word]
+      false, [Inline.Text word]
     | Phrase.Term t ->
-      let glossary, entry =
-        Glossary.intern state.tables.glossary (term_entry t)
+      let entry = term_entry t in
+      let pronoun_before, content =
+        segments ~followed_by_more ~pronoun_before (term_words t)
       in
-      let state = { state with tables = { state.tables with glossary } } in
-      let state, content = segments ~followed_by_more state (term_words t) in
-      state, [annotated (Annotation.Term entry) content]
+      pronoun_before, [annotated (Annotation.Term entry) content]
     | Phrase.Source { loc; content } ->
-      let state, content = segments ~followed_by_more state content in
-      state, [annotated (Annotation.Source loc) content]
-    | Phrase.Mention { span; name; case; form } -> (
-      let tables, entity =
-        match span with
-        | None -> state.tables, None
-        | Some span ->
-          let entities, entity =
-            Entities.intern state.tables.entities span
-          in
-          { state.tables with entities }, Some entity
+      let pronoun_before, content =
+        segments ~followed_by_more ~pronoun_before content
       in
+      pronoun_before, [annotated (Annotation.Source loc) content]
+    | Phrase.Mention { span; name; case; form } -> (
       let as_mention content =
-        match entity with
+        match span with
         | None -> content
         | Some entity ->
           [annotated (Annotation.Mention { entity; form }) content]
@@ -381,8 +443,7 @@ let realize_phrase ~term_entry ~term_words (tables : Tables.t)
           | Phrase.Subject -> "it", true
           | Phrase.Possessive -> "its", false
         in
-        ( { Phrase_state.tables; pronoun_before },
-          as_mention [Inline.Text word] )
+        pronoun_before, as_mention [Inline.Text word]
       | Form.Name ->
         let words = as_mention (List.map inline_of_word name) in
         let content =
@@ -390,27 +451,25 @@ let realize_phrase ~term_entry ~term_words (tables : Tables.t)
           | Phrase.Subject -> words
           | Phrase.Possessive -> words @ [Inline.Text "'s"]
         in
-        { Phrase_state.tables; pronoun_before = false }, content)
-  and segments ~followed_by_more (state : Phrase_state.t) segs :
-      Phrase_state.t * Inline.t list =
+        false, content)
+  and segments ~followed_by_more ~pronoun_before segs =
     match segs with
-    | [] -> state, []
+    | [] -> pronoun_before, []
     | seg :: rest ->
       let followed_by_more_here =
         match rest with
         | [] -> followed_by_more
         | _ :: _ -> true
       in
-      let state, realized =
-        segment ~followed_by_more:followed_by_more_here state seg
+      let pronoun_before, realized =
+        segment ~followed_by_more:followed_by_more_here ~pronoun_before seg
       in
-      let state, realized_rest = segments ~followed_by_more state rest in
-      state, realized @ realized_rest
+      let pronoun_before, realized_rest =
+        segments ~followed_by_more ~pronoun_before rest
+      in
+      pronoun_before, realized @ realized_rest
   in
-  let state, realized =
-    segments ~followed_by_more:false (Phrase_state.of_tables tables) phrase
-  in
-  state.tables, realized
+  snd (segments ~followed_by_more:false ~pronoun_before:false phrase)
 
 let capitalize_opening_word (content : Inline.t list) : Inline.t list =
   let rec capitalize ~in_code (inline : Inline.t) : Inline.t option =
@@ -464,50 +523,52 @@ let terminate_sentence (content : Inline.t list) : Inline.t list =
 let as_sentence (content : Inline.t list) : Inline.t list =
   terminate_sentence (capitalize_opening_word content)
 
-let realize ~loc ~term_entry ~term_words (plans : _ plan list) :
-    Diagnostic.t =
+let realize_blocks ~term_entry ~term_words (plans : _ plan list) :
+    Structured_diagnostic.Block.t list =
   let realize_phrase = realize_phrase ~term_entry ~term_words in
-  let realize_statement tables (s : _ Statement.t) =
+  let realize_statement (s : _ Statement.t) =
     match s.body with
-    | Fragment phrase -> realize_phrase tables phrase
+    | Fragment phrase -> realize_phrase phrase
     | Sentence { subject = _; main; clause } ->
-      let tables, main = realize_phrase tables main in
-      let tables, content =
+      let main = realize_phrase main in
+      let content =
         match clause with
-        | None -> tables, main
+        | None -> main
         | Some clause ->
           let separator =
             match clause with
             | Statement.Subordinate _ -> " "
             | Statement.Coordinate _ -> ", "
           in
-          let tables, realized =
-            realize_phrase tables (Statement.clause_phrase clause)
-          in
-          tables, main @ (Inline.Text separator :: realized)
+          let realized = realize_phrase (Statement.clause_phrase clause) in
+          main @ (Inline.Text separator :: realized)
       in
-      tables, as_sentence content
+      as_sentence content
   in
-  let rec block_of_plan tables (p : _ plan) : Tables.t * Block.t =
-    let tables, kind, content =
+  let rec block_of_plan (p : _ plan) =
+    let kind, content =
       match p.statement with
-      | None -> tables, Kind.Explanation, []
-      | Some s ->
-        let tables, content = realize_statement tables s in
-        tables, s.kind, content
+      | None -> Kind.Explanation, []
+      | Some s -> s.kind, realize_statement s
     in
-    let tables, children =
-      List.fold_left_map
-        (fun tables (relation, child) ->
-          let tables, block = block_of_plan tables child in
-          tables, (relation, block))
-        tables p.children
+    let children =
+      List.map
+        (fun (relation, child) -> relation, block_of_plan child)
+        p.children
     in
-    tables, { Block.kind; content; children }
+    { Structured_diagnostic.Block.kind; content; children }
   in
-  let tables, body = List.fold_left_map block_of_plan Tables.initial plans in
-  { Diagnostic.loc;
-    entities = tables.entities;
-    glossary = tables.glossary;
-    body
+  List.map block_of_plan plans
+
+let realize ~term_entry ~term_words ~loc (stories : _ story list) :
+    Structured_diagnostic.t =
+  { Structured_diagnostic.loc;
+    body = realize_blocks ~term_entry ~term_words stories
   }
+
+let rendered_children ~term_entry ~term_words (beat : _ beat) :
+    Structured_diagnostic.Block.t =
+  match realize_blocks ~term_entry ~term_words [Plan.group beat.children] with
+  | [block] -> block
+  | [] | _ :: _ :: _ ->
+    invalid_arg "Diagnostic_nlg.rendered_children: block count changed"
