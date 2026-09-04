@@ -968,8 +968,9 @@ module Sort = struct
            (strip_head_addressable s1)
            (strip_head_addressable s2)
     | Base b1, Base b2 -> if equal_base b1 b2 then true else false
-    | Product sorts1, Product sorts2 ->
-      List.for_all2 (equate ~allow_mutation) sorts1 sorts2
+    | Product sorts1, Product sorts2 -> (
+      try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
+      with Invalid_argument _ -> false)
     | Univar uv1, Univar uv2 ->
       if equal_univar_univar uv1 uv2 then true else false
     | _, (Base _ | Product _ | Univar _) -> false

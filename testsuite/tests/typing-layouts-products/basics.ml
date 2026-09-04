@@ -2613,8 +2613,20 @@ let bad (x : #(int * int)) : #(int * int * int) = magic_any x
 [%%expect{|
 external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
   [@@layout_poly]
-Uncaught exception: Invalid_argument("List.for_all2")
-
+Line 2, characters 50-61:
+2 | let bad (x : #(int * int)) : #(int * int * int) = magic_any x
+                                                      ^^^^^^^^^^^
+Error: This expression has type "('a : value_or_null & value_or_null)"
+       but an expression was expected of type "#(int * int * int)"
+       The layout of #(int * int * int) is
+           value non_pointer & value non_pointer & value non_pointer
+         because it is an unboxed tuple.
+       But the layout of #(int * int * int) must be a sublayout of
+           value & value
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
@@ -2622,6 +2634,18 @@ let bad (x : #(int# * int)) : #(int * int * int) = magic_any x
 [%%expect{|
 external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
   [@@layout_poly]
-Uncaught exception: Invalid_argument("List.for_all2")
-
+Line 2, characters 51-62:
+2 | let bad (x : #(int# * int)) : #(int * int * int) = magic_any x
+                                                       ^^^^^^^^^^^
+Error: This expression has type "('a : untagged_immediate & value_or_null)"
+       but an expression was expected of type "#(int * int * int)"
+       The layout of #(int * int * int) is
+           value non_pointer & value non_pointer & value non_pointer
+         because it is an unboxed tuple.
+       But the layout of #(int * int * int) must be a sublayout of
+           untagged_immediate & value
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+       Note: The layout of immediate is value non_pointer.
 |}]
