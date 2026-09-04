@@ -130,22 +130,9 @@ type prepare_to_rebuild_handlers_data =
     invariant_extra_params : Bound_parameters.t
   }
 
-type rebuilt_handler =
-  { handler : Rebuilt_expr.Continuation_handler.t;
-    handler_expr : Rebuilt_expr.t;
-    name_occurrences_of_handler : Name_occurrences.t;
-    cost_metrics_of_handler : Cost_metrics.t
-  }
+type rebuilt_handler = D.rebuilt_handler
 
-type rebuilt_handlers_group =
-  | Recursive of
-      { continuation_handlers : rebuilt_handler Continuation.Lmap.t;
-        invariant_params : Bound_parameters.t
-      }
-  | Non_recursive of
-      { cont : Continuation.t;
-        handler : rebuilt_handler
-      }
+type rebuilt_handlers_group = D.rebuilt_handlers_group
 
 type prepare_to_rebuild_body_data =
   { rebuild_body : expr_to_rebuild;
@@ -155,12 +142,7 @@ type prepare_to_rebuild_body_data =
     uenv_of_subsequent_exprs : UE.t
   }
 
-type rebuild_let_cont_data =
-  { handlers_from_the_inside_to_the_outside : rebuilt_handlers_group list;
-    name_occurrences_of_subsequent_exprs : Name_occurrences.t;
-    cost_metrics_of_subsequent_exprs : Cost_metrics.t;
-    uenv_of_subsequent_exprs : UE.t
-  }
+type rebuild_let_cont_data = D.rebuild_let_cont_data
 
 (* Helpers *)
 
@@ -417,7 +399,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   let name_occurrences_body = UA.name_occurrences uacc in
   let cost_metrics_of_body = UA.cost_metrics uacc in
   let rec rebuild_groups body name_occurrences_body cost_metrics_of_body uacc
-      groups =
+      (groups : rebuilt_handlers_group list) =
     match groups with
     | [] ->
       (* Everything has now been rebuilt.
@@ -511,7 +493,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
     | Recursive { continuation_handlers; invariant_params } :: groups ->
       let rec_handlers =
         Continuation.Lmap.map
-          (fun handler -> handler.handler)
+          (fun (handler : rebuilt_handler) -> handler.handler)
           continuation_handlers
       in
       let expr =
@@ -521,7 +503,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       in
       let name_occurrences =
         Continuation.Lmap.fold
-          (fun _ handler name_occurrences ->
+          (fun _ (handler : rebuilt_handler) name_occurrences ->
             NO.union name_occurrences
               (NO.increase_counts handler.name_occurrences_of_handler))
           continuation_handlers name_occurrences_body
@@ -534,7 +516,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       in
       let cost_metrics_of_handlers =
         Continuation.Lmap.fold
-          (fun _ handler cost_metrics ->
+          (fun _ (handler : rebuilt_handler) cost_metrics ->
             Cost_metrics.( + ) cost_metrics handler.cost_metrics_of_handler)
           continuation_handlers Cost_metrics.zero
       in
@@ -845,7 +827,7 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
     ~name_occurrences_of_subsequent_exprs ~cost_metrics_of_subsequent_exprs
     ~uenv_of_subsequent_exprs ~at_unit_toplevel ~original_invariant_params
     ~invariant_extra_params uacc ~after_rebuild
-    (groups_to_rebuild : handlers_to_rebuild_group list) rebuilt_groups =
+    (groups_to_rebuild : handlers_to_rebuild_group list) (rebuilt_groups : rebuilt_handlers_group list) =
   match groups_to_rebuild with
   | [] ->
     let data : prepare_to_rebuild_body_data =
