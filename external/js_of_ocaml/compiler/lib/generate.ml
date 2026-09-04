@@ -434,7 +434,6 @@ module Ctx = struct
     ; share : Share.t
     ; exported_runtime : (Code.Var.t * bool ref) option
     ; should_export : bool
-    ; effect_warning : bool ref
     ; trampolined_calls : Effects.trampolined_calls
     ; deadcode_sentinel : Var.t
     ; mutated_vars : Code.Var.Set.t Code.Addr.Map.t
@@ -444,7 +443,6 @@ module Ctx = struct
     }
 
   let initial
-      ~warn_on_unhandled_effect
       ~exported_runtime
       ~should_export
       ~deadcode_sentinel
@@ -461,7 +459,6 @@ module Ctx = struct
     ; share
     ; exported_runtime
     ; should_export
-    ; effect_warning = ref (not warn_on_unhandled_effect)
     ; trampolined_calls
     ; deadcode_sentinel
     ; mutated_vars
@@ -1840,14 +1837,6 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             assert (not (cps_transform ()));
             (* TODO: This is a temporary hack for the period when the
                [Effect] module is in [Stdlib], but no code is actually using it. *)
-(*
-            if not !(ctx.effect_warning)
-            then (
-              Warning.warn
-                `Effect_handlers_without_effect_backend
-                "your program contains effect handlers; you should probably run \
-                 js_of_ocaml with option '--effects=cps'@.";
-              ctx.effect_warning := true); *)
             let name = "jsoo_effect_not_supported" in
             let prim = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
             let* () = info ~need_loc:true (kind (Primitive.kind name)) in
@@ -2749,7 +2738,7 @@ let f
     ~trampolined_calls
     ~in_cps
     ~should_export
-    ~warn_on_unhandled_effect
+    ~warn_on_unhandled_effect:(_ : bool)
     ~deadcode_sentinel =
   let p = Structure.norm p in
   let bool_context = Bool_context.f p in
@@ -2762,7 +2751,6 @@ let f
   in
   let ctx =
     Ctx.initial
-      ~warn_on_unhandled_effect
       ~exported_runtime
       ~should_export
       ~deadcode_sentinel
