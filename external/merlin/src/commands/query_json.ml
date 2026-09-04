@@ -626,8 +626,8 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         @ (match i.target_loc with
           | Some loc -> [ ("decl", json_of_loc loc) ]
           | None -> [])
-        @ (match i.instance with
-          | Some instance -> [ ("instance", `String instance) ]
+        @ (match i.target_instance with
+          | Some target_instance -> [ ("instance", `String target_instance) ]
           | None -> [])
         @ (match i.implementation_uid with
           | Some uid -> [ ("uid", `String uid) ]
@@ -668,22 +668,23 @@ let json_of_response (type a) (query : a t) (response : a) : json =
           match family with
           | Some family -> [ ("family", `String family) ]
           | None -> [])
-      | Unresolved_implementation { target; witness; implementation; site } ->
+      | Unresolved_implementation
+          { target; target_instance; implementation; site } ->
         `Assoc
           ([ ("kind", `String "unresolved-implementation");
              ("target", `String target);
-             ("instance", `String witness);
+             ("instance", `String target_instance);
              ("implementation", `String implementation)
            ]
           @
           match site with
           | Some site -> [ ("site", `String site) ]
           | None -> [])
-      | Unresolved_check_site { target; witness; site } ->
+      | Unresolved_check_site { target; target_instance; site } ->
         `Assoc
           [ ("kind", `String "unresolved-check-site");
             ("target", `String target);
-            ("instance", `String witness);
+            ("instance", `String target_instance);
             ("site", `String site)
           ]
     in

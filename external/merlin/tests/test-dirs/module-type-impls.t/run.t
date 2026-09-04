@@ -156,6 +156,23 @@ module type.
   complete
   M 10:7 10:8 annotation
 
+An anonymous ascription checks its module members just like a named binding
+does.  The member [N] implements [S], not the containing structure.
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > 
+  > include (struct
+  >   module N = struct
+  >     type t = bool
+  >   end
+  > end : sig module N : S end)
+  > EOF
+  complete
+  N 6:9 6:10 annotation
+
 Including the result of a functor application combines include, application,
 projection, and alias contexts.
 
@@ -257,6 +274,55 @@ member to the replacement module type.
   complete
   Value 14:9 14:14 annotation
 
+Destructive type substitution removes a requirement of the original signature.
+A module checked against the resulting empty signature does not implement [S].
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > 
+  > module type Removed = S with type t := int
+  > 
+  > module Gone : Removed = struct end
+  > EOF
+  complete
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   val value : int
+  > end
+  > 
+  > module type Base = sig
+  >   include S
+  >   type t
+  > end
+  > 
+  > module type Removed = Base with type t := int
+  > 
+  > module M : Removed = struct
+  >   let value = 0
+  > end
+  > EOF
+  complete
+  M 12:7 12:8 annotation
+
+  $ impls_of S <<'EOF'
+  > module type S = sig val value : int end
+  > 
+  > module Outer = struct
+  >   module type Alias = S
+  >   module type Base = sig
+  >     include Alias
+  >     type t
+  >   end
+  >   module type Reduced = Base with type t := int
+  >   module M : Reduced = struct let value = 0 end
+  > end
+  > EOF
+  complete
+  M 10:9 10:10 annotation
+
 Repeated applications of an applicative functor exercise congruence and
 deduplication of application contexts.
 
@@ -329,6 +395,94 @@ query results.
   > EOF
   complete
   <anon> 5:42 7:3 annotation
+
+Passing a module to a functor checks its members against the parameter's
+signature.  [A.M] implements [S] even without a direct annotation on [M];
+[A] itself does not implement [S].
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > 
+  > module type Outer = sig
+  >   module M : S
+  > end
+  > 
+  > module A = struct
+  >   module M = struct
+  >     type t = int
+  >   end
+  > end
+  > 
+  > module F (X : Outer) = struct end
+  > 
+  > module R = F (A)
+  > EOF
+  complete
+  M 10:9 10:10 argument
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > 
+  > module type Outer = sig
+  >   module M : S
+  > end
+  > 
+  > module F (X : Outer) = struct end
+  > 
+  > module R = F (struct
+  >   module M = struct
+  >     type t = int
+  >   end
+  > end)
+  > EOF
+  complete
+  M 12:9 12:10 argument
+
+  $ impls_of S <<'EOF'
+  > module type S = sig val x : int end
+  > module type U = sig val y : bool end
+  > module A = struct module type T = S end
+  > module B = struct module type T = U end
+  > module F (X : sig module type T end) (Y : sig module M : X.T end) = struct end
+  > module Arg_a = struct module M = struct let x = 1 end end
+  > module Arg_b = struct module M = struct let y = true end end
+  > module First = F (A) (Arg_a)
+  > module Second = F (B) (Arg_b)
+  > EOF
+  partial
+  M 6:29 6:30 argument
+
+  $ $MERLIN single module-type-impls \
+  >   -index-file ./module-types.ocaml-index \
+  >   -filename ./main.ml < ./main.ml \
+  >   | print_results U
+  partial
+  M 7:29 7:30 argument
+
+A nested argument member implements [S] when its signature is reached through
+a module-type alias declared inside the parameter signature.  [A.N.M]
+implements [S]; neither [A] nor [A.N] does.
+
+  $ impls_of S <<'EOF'
+  > module type S = sig val x : int end
+  > module F (X : sig
+  >   module type T = sig module M : S end
+  >   module N : T
+  > end) = struct end
+  > module A = struct
+  >   module type T = sig module M : S end
+  >   module N = struct
+  >     module M = struct let x = 1 end
+  >   end
+  > end
+  > module R = F (A)
+  > EOF
+  complete
+  M 9:11 9:12 argument
 
 Packing and unpacking a module crosses the first-class module boundary.
 
@@ -529,6 +683,63 @@ the same implementation before the constrained signature is implemented.
   > EOF
   complete
   Concrete 5:7 5:15 annotation
+
+A [with module] constraint on a member does not make the containing module
+implement that member's type.  [Concrete] and [M.N] implement [S], but [M]
+does not provide the required type [t].
+
+  $ impls_of S <<'EOF'
+  > module type S = sig
+  >   type t
+  > end
+  > 
+  > module Concrete : S = struct
+  >   type t = int
+  > end
+  > 
+  > module type Outer = sig
+  >   module N : S
+  > end
+  > 
+  > module type Fixed = Outer with module N = Concrete
+  > 
+  > module M : Fixed = struct
+  >   module N = Concrete
+  > end
+  > EOF
+  complete
+  Concrete 5:7 5:15 annotation
+  N 16:9 16:10 annotation
+
+A [with module type] constraint determines the type implemented by a member
+whose annotation refers to that module type.  The constraint is specific to
+each instance: [A.M] implements [S], while [B.M] implements [U].
+
+  $ impls_of S <<'EOF'
+  > module type S = sig val x : int end
+  > module type U = sig val y : bool end
+  > module type Outer = sig
+  >   module type T
+  >   module M : T
+  > end
+  > module A : Outer with module type T = S = struct
+  >   module type T = S
+  >   module M = struct let x = 1 end
+  > end
+  > module B : Outer with module type T = U = struct
+  >   module type T = U
+  >   module M = struct let y = true end
+  > end
+  > EOF
+  complete
+  M 9:9 9:10 annotation
+
+  $ $MERLIN single module-type-impls \
+  >   -index-file ./module-types.ocaml-index \
+  >   -filename ./main.ml < ./main.ml \
+  >   | print_results U
+  complete
+  M 13:9 13:10 annotation
 
 Two signature includes form a diamond whose leaves independently refer to the
 same module type; the implementation relies on member pairing rather than
@@ -900,6 +1111,48 @@ buffer's [Container.Local] declaration.
   $ impls_of_module_type Local cont.mli Container.Local
   complete
   Impl 14:7 14:11 annotation
+
+A partial artifact has no facts channel.  Combining it with an artifact that
+has facts must not turn an unavailable answer into a complete empty answer.
+The availability is the same whether the artifacts are indexed separately
+or aggregated together.
+
+  $ cat > channel.ml <<'EOF'
+  > module type S = sig val x : int end
+  > EOF
+  $ cat > incomplete.ml <<'EOF'
+  > module M : Channel.S = struct let x = 1 end
+  > let broken : int = true
+  > EOF
+  $ $OCAMLC -bin-annot -c channel.ml
+  $ $OCAMLC -bin-annot -c incomplete.ml > incomplete.log 2>&1
+  [2]
+  $ ocaml-index aggregate channel.cmt -o channel.ocaml-index
+  $ ocaml-index aggregate incomplete.cmt -o incomplete.ocaml-index
+  $ $MERLIN single module-type-impls \
+  >   -index-file ./channel.ocaml-index \
+  >   -index-file ./incomplete.ocaml-index \
+  >   -filename ./channel.ml < ./channel.ml \
+  >   | print_results S
+  unavailable
+
+  $ ocaml-index aggregate channel.cmt incomplete.cmt -o combined.ocaml-index
+  $ $MERLIN single module-type-impls \
+  >   -index-file ./combined.ocaml-index \
+  >   -filename ./channel.ml < ./channel.ml \
+  >   | print_results S
+  unavailable
+
+A missing channel also survives merging existing indexes, with the missing
+channel first rather than last.
+
+  $ ocaml-index aggregate incomplete.ocaml-index channel.ocaml-index \
+  >   -o merged.ocaml-index
+  $ $MERLIN single module-type-impls \
+  >   -index-file ./merged.ocaml-index \
+  >   -filename ./channel.ml < ./channel.ml \
+  >   | print_results S
+  unavailable
 
 A name that is not a module-type declaration of the buffer selects nothing:
 the query only ever answers for the buffer's own declarations, identified by
