@@ -342,9 +342,11 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Block (Regular_block size)
+        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+            (* Extensible variants need an extra byte for constructor identity *)
+            Block (Regular_block (size + 1))
         | Record_float ->
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
