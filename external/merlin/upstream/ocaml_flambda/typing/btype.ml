@@ -998,43 +998,6 @@ module Jkind0 = struct
     let[@inline] set_crossing crossing t = { t with crossing }
     let[@inline] set_externality externality t = { t with externality }
 
-    let[@inline] set_max_in_set t max_axes =
-      let open Jkind_axis.Axis_set in
-      let[@inline] modal ax =
-        if mem max_axes (Modal ax)
-        then (Crossing.Per_axis.max [@inlined hint]) ax
-        else modal ax t
-      in
-      (* a little optimization *)
-      if is_empty max_axes then t else
-      let regionality = modal areality in
-      let linearity = modal linearity in
-      let uniqueness = modal uniqueness in
-      let portability = modal portability in
-      let contention = modal contention in
-      let forkable = modal forkable in
-      let yielding = modal yielding in
-      let statefulness = modal statefulness in
-      let visibility = modal visibility in
-      let staticity = modal staticity in
-      let externality =
-        if mem max_axes (Nonmodal Externality)
-        then Externality.max
-        else t.externality
-      in
-      let monadic =
-        Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-      in
-      let comonadic =
-        Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
-      in
-      let crossing : Mode.Crossing.t = { monadic; comonadic } in
-      {
-        crossing;
-        externality;
-      }
-
     let[@inline] set_min_in_set t min_axes =
       let open Jkind_axis.Axis_set in
       let modal ax =
@@ -2266,12 +2229,6 @@ module Jkind0 = struct
     let all_void_labels_with_updates lbls_updated =
       List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
 
-    let all_void_labels lbls =
-      List.for_all
-        (fun (lbl : label_declaration) ->
-           all_void_sort_option lbl.ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
         (fun ((lbl : label_declaration), ld_type, _sort) ->
@@ -2477,19 +2434,13 @@ module Jkind0 = struct
       (orphaned_type_var_list @ domain)
       (type_of_kind_list @ range)
 
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
+  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars
+      ~cstr_layouts cstrs =
     let base =
-      let all_args_void =
-        List.for_all
-          (fun cstr ->
-            match cstr.cd_args with
-            | Cstr_tuple args ->
-              List.for_all
-                (fun arg -> all_void_sort_option arg.ca_sort) args
-            | Cstr_record lbls -> all_void_labels lbls)
-          cstrs
+      let all_immediate =
+        Array.for_all cstr_layout_is_constant cstr_layouts
       in
-      if all_args_void
+      if all_immediate
       then (
         let has_args =
           List.exists

@@ -1060,6 +1060,9 @@ val load :
   addr:expression ->
   expression
 
+(** [store ~dbg memory_chunk init ~addr ~new_value] stores [new_value] at
+    [addr]. For integer chunks narrower than a word, [new_value] is simplified
+    with [low_bits] since only its low bits are stored. *)
 val store :
   dbg:Debuginfo.t ->
   memory_chunk ->

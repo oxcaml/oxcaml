@@ -35,9 +35,9 @@ type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
       (Exported_code.t
-      * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Slot_offsets.t)
+      * Flambda_cmx_format.raw option
+      * Exported_offsets.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -1247,21 +1247,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
-        if tag <> 0
+        if Lambda.is_uniform_block_shape shape
         then
-          (* There should not be any way to reach this from Ocaml code. *)
-          Misc.fatal_error
-            "Non-zero tag on empty block allocation in [Closure_conversion]"
+          register_const0 acc
+            (Static_const.block
+               (Tag.Scannable.create_exn tag)
+               Immutable Value_only [])
+            "empty_block"
         else
-          begin if Lambda.is_uniform_block_shape shape
-          then
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          else
-            Misc.fatal_error
-              "Unexpected empty mixed block in [Closure_conversion]"
-          end
+          Misc.fatal_error
+            "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
@@ -1321,7 +1316,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
+      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
+      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
@@ -4139,7 +4138,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
     ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region :
+    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections :
     mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
@@ -4210,6 +4209,9 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   if Option.is_some (Acc.top_closure_info acc)
   then
     Misc.fatal_error "Information on nested closures should be empty at the end";
+  let get_code_metadata code_id =
+    Code_id.Map.find code_id (Acc.code_map acc) |> Code.code_metadata
+  in
   let code_slot_offsets = Acc.code_slot_offsets acc in
   match mode with
   | Normal ->
@@ -4229,6 +4231,28 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         (Exported_code.mark_as_imported
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
+    let Slot_offsets.{ used_value_slots; exported_offsets } =
+      let used_slots =
+        let free_names = Acc.free_names acc in
+        Slot_offsets.
+          { function_slots_in_normal_projections =
+              Name_occurrences.function_slots_in_normal_projections free_names;
+            all_function_slots =
+              Name_occurrences.all_function_slots_at_normal_mode free_names;
+            value_slots_in_normal_projections =
+              Name_occurrences.value_slots_in_normal_projections free_names;
+            all_value_slots =
+              Name_occurrences.all_value_slots_at_normal_mode free_names
+          }
+      in
+      Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
+        ~used_slots
+    in
+    let reachable_names, cmx =
+      Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
+        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
+        ~used_value_slots ~sections all_code
+    in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
         ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
@@ -4236,10 +4260,5 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     { unit;
       code_slot_offsets;
-      metadata =
-        Classic
-          ( all_code,
-            symbols_approximations,
-            Acc.free_names acc,
-            Acc.slot_offsets acc )
+      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
     }

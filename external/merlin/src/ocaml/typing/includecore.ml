@@ -86,12 +86,18 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
     let c = child_close_over_coercion_opt id c in
     begin match Mode.Modality.to_const_opt moda1 with
     | None ->
-      (* [wrap_constraint_with_shape] invokes inclusion check with
-          identical modes and inferred modalities, which we workaround *)
+      (* Inferred modalities on the expected side arise only with both sides
+          physically equal: [wrap_constraint_with_shape] invokes the inclusion
+          check with identical modes, and expanding the same module alias on
+          both sides (see [try_modtypes]) can reach here with different modes.
+          Since the modalities coincide, children's modes are related whenever
+          the parents' are; if the parents' are not, defer to the per-item
+          checks, which take modalities and mode crossing into account. *)
       assert (moda0 == moda1);
-      Mode.Value.submode_exn m0 m1;
-      (* For children, we only check modality inclusion *)
-      Ok All
+      begin match Mode.Value.submode m0 m1 with
+      | Ok () -> Ok All
+      | Error _ -> Ok (Specific ((m0, c), m1))
+      end
     | Some moda1 ->
       let m0 = Mode.Modality.apply_left moda0 m0 in
       let m1 = Mode.Modality.Const.apply_right moda1 m1 in
@@ -417,6 +423,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -718,6 +726,14 @@ let report_constructor_mismatch first second decl env ppf err =
           but has layout any in %s?@]"
         (choose ord first second)
         (choose_other ord first second)
+  | Immediate_representation ord ->
+      pr "%s is annotated with %a and %s isn't."
+        (String.capitalize_ascii (choose ord first second))
+        Style.inline_code "[@immediate_all_void_constructor]"
+        (choose_other ord first second)
+  | Constructor_representation_shape_mismatch ->
+      pr "@[<hv>Their internal representations differ:@;\
+          This is likely caused by a layout mismatch in a later definition.@]"
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
@@ -1236,13 +1252,19 @@ module Variant_diffing = struct
     | None, None -> None
     | Some _, None -> Some (Fixed_representation First)
     | None, Some _ -> Some (Fixed_representation Second)
-    | Some _, Some _ ->
-        (* Currently the only way for the representations to be different but
-           the types the same is for the layout information to be different
-           between the two sides, which is only possible if the layout is
-           [any] on one side or the other. So if neither representation is
-           [None] then we must be okay. *)
-        None
+    | Some Constructor_immediate_all_void,
+      Some Constructor_immediate_all_void -> None
+    | Some Constructor_immediate_all_void, Some _ ->
+        Some (Immediate_representation First)
+    | Some _, Some Constructor_immediate_all_void ->
+        Some (Immediate_representation Second)
+    | Some shape1, Some shape2 ->
+        if equal_constructor_representation_up_to_scannable_axes shape1 shape2
+        then None
+        else
+          (* Analogous to where [find_mismatch_in_mixed_record_representations]
+             returns [Representation_shape_mismatch] *)
+          Some Constructor_representation_shape_mismatch
 
   let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
         shape1 shape2 =

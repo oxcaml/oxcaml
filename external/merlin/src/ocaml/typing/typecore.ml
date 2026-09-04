@@ -307,7 +307,6 @@ type error =
   | Submode_failed of Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Mode_mismatch of mode_mismatch_kind * Alloc.equate_error
   | Uncurried_function_escapes_comonadic of Alloc.Comonadic.error
   | Uncurried_function_escapes_locality
   | Function_returns_local
@@ -1546,6 +1545,8 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_undetermined | Record_variable _
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _)
+  (* Inline records are never immediate. *)
+  | Record_inlined (_, Constructor_immediate_all_void, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
@@ -3345,7 +3346,9 @@ type unrepresentable_arg =
 let instance_constructor_representation env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
-  | (Constructor_uniform_value | Constructor_mixed _) as shape ->
+  | (Constructor_uniform_value | Constructor_mixed _
+    | Constructor_immediate_all_void)
+    as shape ->
       begin match
         Misc.Stdlib.List.map_option
           (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
@@ -14358,22 +14361,6 @@ let report_error ~loc env =
         "@[This application is complete, but surplus arguments were provided afterwards.@ \
          When passing or calling %a values, extra arguments are passed in a separate application.@]"
          (Alloc.Const.print_axis ax) left
-  | Mode_mismatch (kind, (s, e)) ->
-      let Mode.Alloc.Error (ax, {left; right}) = Mode.Alloc.to_simple_error e in
-      let actual, expected =
-        match s with
-        | Left_le_right -> left, right
-        | Right_le_left -> right, left
-      in
-      let desc, desc_inf = match kind with
-        | Parameter -> "takes a parameter", "take a parameter"
-        | Return -> "has a return value", "have a return value"
-      in
-      Location.errorf ~loc
-        "@[This function %s which is %a,@ \
-        but was expected to %s which is %a.@]"
-        desc (Style.as_inline_code (Alloc.Const.print_axis ax)) actual
-        desc_inf (Style.as_inline_code (Alloc.Const.print_axis ax)) expected
   | Uncurried_function_escapes_comonadic e -> begin
       let Mode.Alloc.Comonadic.Error (ax, {left; right}) =
         Mode.Alloc.Comonadic.to_simple_error e

@@ -204,4 +204,42 @@ jobs:
             --model claude-fable-5
             --effort xhigh
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash"
-            --append-system-prompt "You do NOT have push access to this repository. Never attempt to create commits, branches, or pushes; they will fail. Propose all changes for humans to review and apply. For changes to lines that appear in the PR diff, post inline review comments containing GitHub suggestion blocks. For all other changes, including new files or lines outside the diff, mention you don't have write permission to the repo and instead include a complete unified diff in a fenced diff code block in your response comment, with paths relative to the repository root, so a maintainer can apply it with git apply."
+            --append-system-prompt "
+            Repository-specific overrides. These take precedence over the generic
+            instructions in the task prompt, which come from the GitHub Action and
+            were not written for this repository.
+
+            ENVIRONMENT. You are on a build machine, inside this
+            project's nix devShell (the same toolchain CI uses), with a 90-minute
+            budget. You have a complete build and test environment and full
+            permission to use it. Building the compiler and running tests here is
+            normal and expected, not out of scope: build with make -s
+            boot-compiler, and run the tests relevant to the change with make -s
+            test-one TEST=<dir/file.ml> or make -s test-one DIR=<dir>. Prefer
+            targeted tests over the full make -s test, unless the user indicates
+            otherwise. Do not claim you cannot build or test because of environment
+            limits or missing permissions; if a build or test actually fails,
+            report the real error output.
+
+            NO PUSH. The GitHub token in this job is read-only. The task prompt
+            tells you to commit and push your changes to the PR branch: ignore
+            every such instruction. Do not run git push or the git-push.sh
+            wrapper at all, not even to check; it will fail with 403. Do not
+            create commits or branches either; leave your changes in the working
+            tree so git diff shows them. This is the intended design, not a
+            limitation to work around or apologize for: do not list pushing as a
+            task, and do not describe the lack of push access as a failure.
+
+            HOW TO PROPOSE CHANGES. Humans apply your changes. For lines that
+            appear in the PR diff, post inline review comments containing GitHub
+            suggestion blocks via mcp__github_inline_comment__create_inline_comment.
+            You ARE allowed to create these inline comments; the task prompt's
+            rule about never creating new comments applies to top-level PR
+            comments, which you still deliver by updating your single tracking
+            comment. For everything else (new files, lines outside the diff),
+            include a complete unified diff in a fenced diff code block in your
+            tracking comment, with paths relative to the repository root, so a
+            maintainer can apply it with git apply. End your comment with a brief
+            note on how you validated the change: what you built and which tests
+            you ran.
+            "

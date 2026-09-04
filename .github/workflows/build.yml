@@ -85,7 +85,7 @@ jobs:
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
-            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml testsuite/tests/reaper/unboxed_closure_not_needed.ml'
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml'
 
           - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
@@ -219,14 +219,14 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,_'
             ocamlparam: 'reaper=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/cross_function_cse_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml testsuite/tests/flambda2/simplify/* testsuite/tests/flambda2/rec_info_alias/*.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml testsuite/tests/flambda2/simplify/*'
             sysdeps: gdb
 
           - name: reaper with local value slots
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
-            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/cross_function_cse_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/simplify/* testsuite/tests/flambda2/rec_info_alias/*.ml'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/simplify/*'
             sysdeps: gdb
 
           # Same as for the reaper, some tests rely on being able to enable or disable

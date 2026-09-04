@@ -78,6 +78,9 @@ type mixed_block_size = { size : int; value_prefix_len : int }
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
+  | Empty_block of { tag : int }
+  (** Distinct from [Regular_block], which always creates tag-0 blocks then
+      back-patches the header *)
   | Float_record of int
   | Lazy_block
   | Mixed_block of mixed_block_size
@@ -325,6 +328,11 @@ let compute_static_size lam =
     | Patomic_land_idx
     | Patomic_lor_idx
     | Patomic_lxor_idx
+    | Patomic_add_ptr
+    | Patomic_sub_ptr
+    | Patomic_land_ptr
+    | Patomic_lor_ptr
+    | Patomic_lxor_ptr
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -358,13 +366,16 @@ let compute_static_size lam =
         | Record_dummy _ ->
             Misc.fatal_error
               "size_of_primitive: unexpected dummy representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected immediate representation"
         | Record_undetermined | Record_variable _
         | Record_inlined (_, (Constructor_undetermined
                              | Constructor_variable _), _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
         end
-    | Pmakeblock (_, _, shape, _) ->
+    | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
@@ -378,7 +389,8 @@ let compute_static_size lam =
              | All_value -> List.length args
              | Shape shape -> all_value_mixed_block_size shape
            in
-           Block (Regular_block size)
+           if size = 0 then Block (Empty_block { tag })
+           else Block (Regular_block size)
          | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
@@ -478,6 +490,12 @@ let compute_static_size lam =
     | Patomic_compare_exchange_idx _
     | Patomic_compare_set_idx _
     | Patomic_fetch_add_idx
+    | Patomic_load_ptr _
+    | Patomic_set_ptr _
+    | Patomic_exchange_ptr _
+    | Patomic_compare_exchange_ptr _
+    | Patomic_compare_set_ptr _
+    | Patomic_fetch_add_ptr
     | Popaque _
     | Pdls_get
     | Ptls_get
@@ -1011,6 +1029,9 @@ let compile_alloc size =
   match size with
   | Regular_block size ->
       alloc alloc_prim [size]
+  | Empty_block { tag } ->
+      Lprim (Pmakeblock (tag, Immutable, All_value, Lambda.alloc_heap),
+             [], no_loc)
   | Float_record size ->
       alloc alloc_float_record_prim [size]
   | Lazy_block ->
@@ -1023,7 +1044,7 @@ let compile_alloc size =
 let compile_update size dummy newval =
   let prim, newval =
     match size with
-    | Regular_block _ | Float_record _ | Mixed_block _ ->
+    | Regular_block _ | Empty_block _ | Float_record _ | Mixed_block _ ->
       update_prim, newval
     | Lazy_block ->
       (* Consider the following example from Vincent Laviron:

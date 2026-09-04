@@ -84,13 +84,6 @@ val create :
   resolver:(Compilation_unit.t -> Serializable.t option) ->
   t
 
-(** Convert closure conversion approximations to a typing environment. *)
-val create_from_closure_conversion_approx :
-  machine_width:Target_system.Machine_width.t ->
-  resolver:(Compilation_unit.t -> Serializable.t option) ->
-  'a Value_approximation.t Symbol.Map.t ->
-  t
-
 val machine_width : t -> Target_system.Machine_width.t
 
 val is_bottom : t -> bool

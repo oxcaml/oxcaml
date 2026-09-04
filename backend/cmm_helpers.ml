@@ -994,6 +994,19 @@ let rec and_const e n dbg =
             match get_const y with
             | Some y -> and_const x (Nativeint.logand y n) dbg
             | None -> default ())
+          | Cop
+              ( (Caddi | Cor),
+                [Cop (Clsl, [x; Cconst_int (1, _)], _); Cconst_int (1, _)],
+                _ )
+            when Nativeint.logand n 1n = 1n ->
+            (* prefer [tag (x & n)] to [tag x & tag n] *)
+            incr_int
+              (Cop
+                 ( Clsl,
+                   [ and_const x (Nativeint.shift_right_logical n 1) dbg;
+                     Cconst_int (1, dbg) ],
+                   dbg ))
+              dbg
           | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
             let[@local] load memory_chunk =
               Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
@@ -1060,6 +1073,23 @@ and low_bits ~bits ~dbg x =
               | _ -> Misc.fatal_error "impossible")
             | _ -> x)))
       x
+
+(** [store ~dbg memory_chunk init ~addr ~new_value] stores [new_value] at
+    [addr]. Stores of integers narrower than a word only write the low bits of
+    [new_value], so we use [low_bits] to drop any operations that only affect
+    the high bits, e.g. sign extensions of small integers. *)
+let store ~dbg memory_chunk init ~addr ~new_value =
+  let new_value =
+    match (memory_chunk : memory_chunk) with
+    | Byte_unsigned | Byte_signed -> low_bits ~bits:8 ~dbg new_value
+    | Sixteen_unsigned | Sixteen_signed -> low_bits ~bits:16 ~dbg new_value
+    | Thirtytwo_unsigned | Thirtytwo_signed -> low_bits ~bits:32 ~dbg new_value
+    | Word_int | Word_mask | Word_val | Single _ | Double
+    | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+    | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+      new_value
+  in
+  Cop (Cstore (memory_chunk, init), [addr; new_value], dbg)
 
 let tag_int i dbg =
   match low_bits i ~bits:(arch_bits - 1) ~dbg with
@@ -1917,7 +1947,14 @@ let array_indexing ?typ log2size ptr ofs dbg =
       ( (Caddi | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) ->
-    Cop (add, [ptr; lsl_const c log2size dbg], dbg')
+    (* [c] is not necessarily sign-extended to [arch_bits - 1] bits. When
+       [log2size > 0], the left shift discards the top bit, so [c] can be used
+       directly. When [log2size = 0], [c] must be sign-extended; [untag_int]
+       takes care of this (and omits the extension when it can prove it
+       unnecessary). *)
+    if log2size = 0
+    then Cop (add, [ptr; untag_int ofs dbg], dbg')
+    else Cop (add, [ptr; lsl_const c log2size dbg], dbg')
   | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
     Cop
       ( add,
@@ -2270,11 +2307,9 @@ let unboxed_or_untagged_packed_array_set arr ~index ~new_value dbg
     ~log2_size_addr ~memory_chunk =
   bind "arr" arr (fun arr ->
       bind "index" index (fun index ->
-          bind "new_value" new_value (fun new_value ->
-              Cop
-                ( Cstore (memory_chunk, Assignment),
-                  [array_indexing log2_size_addr arr index dbg; new_value],
-                  dbg ))))
+          store ~dbg memory_chunk Assignment
+            ~addr:(array_indexing log2_size_addr arr index dbg)
+            ~new_value))
 
 let untagged_int8_array_set =
   unboxed_or_untagged_packed_array_set ~log2_size_addr:0
@@ -2349,9 +2384,8 @@ let set_field_unboxed ~dbg memory_chunk block ~index_in_words newval =
     let field_address =
       array_indexing log2_size_addr block index_in_words dbg
     in
-    let newval = low_bits newval ~dbg ~bits:(8 * size_in_bytes) in
     return_unit dbg
-      (Cop (Cstore (memory_chunk, Assignment), [field_address; newval], dbg))
+      (store ~dbg memory_chunk Assignment ~addr:field_address ~new_value:newval)
 
 (* String length *)
 
@@ -2601,7 +2635,7 @@ let memory_chunk_size_in_words_for_mixed_block = function
 let alloc_generic_set_fn block ofs newval memory_chunk dbg =
   let generic_case () =
     let addr = array_indexing log2_size_addr block ofs dbg in
-    Cop (Cstore (memory_chunk, Initialization), [addr; newval], dbg)
+    store ~dbg memory_chunk Initialization ~addr ~new_value:newval
   in
   match (memory_chunk : Cmm.memory_chunk) with
   | Word_val ->
@@ -2961,10 +2995,9 @@ let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
 let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
   then
-    Cop
-      ( Cstore (Sixteen_unsigned, Assignment),
-        [add_int_ptr ~ptr_out_of_heap ptr idx dbg; newval],
-        dbg )
+    store ~dbg Sixteen_unsigned Assignment
+      ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+      ~new_value:newval
   else
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
@@ -2973,17 +3006,15 @@ let unaligned_set_16 ~ptr_out_of_heap ptr idx newval dbg =
     let v2 = Cop (Cand, [newval; cconst_int 0xFF], dbg) in
     let b1, b2 = if Arch.big_endian then v1, v2 else v2, v1 in
     Csequence
-      ( Cop
-          ( Cstore (Byte_unsigned, Assignment),
-            [add_int_ptr ~ptr_out_of_heap ptr idx dbg; b1],
-            dbg ),
-        Cop
-          ( Cstore (Byte_unsigned, Assignment),
-            [ add_int_ptr ~ptr_out_of_heap
-                (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
-                (cconst_int 1) dbg;
-              b2 ],
-            dbg ) )
+      ( store ~dbg Byte_unsigned Assignment
+          ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+          ~new_value:b1,
+        store ~dbg Byte_unsigned Assignment
+          ~addr:
+            (add_int_ptr ~ptr_out_of_heap
+               (add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+               (cconst_int 1) dbg)
+          ~new_value:b2 )
 
 let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
@@ -3039,10 +3070,9 @@ let unaligned_load_32 ~ptr_out_of_heap ptr idx dbg =
 let unaligned_set_32 ~ptr_out_of_heap ptr idx newval dbg =
   if Arch.allow_unaligned_access
   then
-    Cop
-      ( Cstore (Thirtytwo_unsigned, Assignment),
-        [add_int_ptr ~ptr_out_of_heap ptr idx dbg; newval],
-        dbg )
+    store ~dbg Thirtytwo_unsigned Assignment
+      ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+      ~new_value:newval
   else
     let cconst_int i = Cconst_int (i, dbg) in
     let v1 =
@@ -3307,10 +3337,9 @@ let load_chunk ~ptr_out_of_heap chunk ptr idx dbg =
   Cop (mk_load_mut chunk, [add_int_ptr ~ptr_out_of_heap ptr idx dbg], dbg)
 
 let set_chunk ~ptr_out_of_heap chunk ptr idx newval dbg =
-  Cop
-    ( Cstore (chunk, Assignment),
-      [add_int_ptr ~ptr_out_of_heap ptr idx dbg; newval],
-      dbg )
+  store ~dbg chunk Assignment
+    ~addr:(add_int_ptr ~ptr_out_of_heap ptr idx dbg)
+    ~new_value:newval
 
 let unaligned_load_f32 = load_chunk (Single { reg = Float32 })
 
@@ -5205,9 +5234,6 @@ let probe ~dbg ~name ~handler_code_linkage_name ~enabled_at_init ~args =
 
 let load ~dbg memory_chunk mutability ~addr =
   Cop (Cload { memory_chunk; mutability; is_atomic = false }, [addr], dbg)
-
-let store ~dbg kind init ~addr ~new_value =
-  Cop (Cstore (kind, init), [addr; new_value], dbg)
 
 let direct_call ~dbg ty pos f_code_sym args =
   Cop

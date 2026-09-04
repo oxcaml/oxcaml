@@ -944,23 +944,28 @@ val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 let z, punned = 4, 5
 let x_must_be_even _ = assert false
 exception Odd
+type 'a t = T of 'a
 
 let x = (~x:1, ~y:2)
 let x = ((~x:1, ~y:2) [@test.attr])
 let _ = ( ~x: 5, 2, ~z, ~(punned:int))
 let (x : (x:int * y:int)) = (~x:1, ~y:2)
 let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
+let ~x:(T x), T y = ~x:(T 5), T 10
 
 [%%expect{|
 val z : int = 4
 val punned : int = 5
 val x_must_be_even : 'a -> 'b = <fun>
 exception Odd
+type 'a t = T of 'a
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : int = 5
+val y : int = 10
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =

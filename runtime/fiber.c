@@ -354,6 +354,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_top = NULL;
   stack->local_limit = 0;
   stack->dynamic = Val_null;
+  stack->is_task = false;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -994,6 +995,7 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
   new_stack->dynamic = old_stack->dynamic;
+  new_stack->is_task = old_stack->is_task;
 
   // Detach locals stack and dynamic bindings from old_stack
   old_stack->local_arenas = NULL;
@@ -1001,6 +1003,7 @@ int caml_try_realloc_stack(asize_t required_space)
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
   old_stack->dynamic = Val_null;
+  old_stack->is_task = false;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from

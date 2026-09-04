@@ -100,6 +100,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Mode.Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy

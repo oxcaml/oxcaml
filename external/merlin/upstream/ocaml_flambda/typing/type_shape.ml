@@ -373,6 +373,11 @@ module Type_decl_shape = struct
               args
           in
           Array.of_list lys
+        | Constructor_immediate_all_void ->
+          Misc.Stdlib.Array.of_list_map
+            (fun { Shape.field_name = _; field_uid = _; field_value = _, ly } ->
+              ly)
+            args
         | Constructor_undetermined | Constructor_variable _ ->
           Misc.fatal_error
             "Type_shape: unexpected variable constructor representation")
@@ -385,6 +390,7 @@ module Type_decl_shape = struct
     { Shape.name;
       constr_uid = Some cstr_args.cd_uid;
       kind = constructor_repr;
+      is_constant = Types.cstr_layout_is_constant arg_layout;
       args
     }
 
@@ -566,7 +572,7 @@ module Type_decl_shape = struct
         constrs
     | Variant constructors ->
       List.for_all
-        (fun { name = _; constr_uid = _; kind = _; args } ->
+        (fun { name = _; constr_uid = _; kind = _; is_constant = _; args } ->
           List.for_all
             (fun { field_name = _; field_uid = _; field_value = sh, _ } ->
               is_closed_type_shape sh)
