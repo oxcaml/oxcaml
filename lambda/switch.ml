@@ -965,7 +965,7 @@ let rec pkey chan  = function
     {cases = r ; actions = acts}
 
 
-  let do_zyva loc kind (low,high) arg cases actions =
+  let do_zyva ~force_table loc kind (low,high) arg cases actions =
     let old_ok = !ok_inter in
     ok_inter := (abs low <= inter_limit && abs high <= inter_limit) ;
     if !ok_inter <> old_ok then Hashtbl.clear t ;
@@ -977,7 +977,37 @@ let rec pkey chan  = function
   pcases stderr cases ;
   prerr_endline "" ;
 *)
-    let n_clusters,k = comp_clusters s in
+    let n_clusters,k =
+      match force_table with
+      | None -> comp_clusters s
+      | Some (lo, hi) ->
+        (* Merge every interval included in [lo, hi] (the range of the match
+           constants) into a single cluster, so that [Arg.make_switch] is
+           applied to the whole range, typically producing one jump table.
+           The intervals outside [lo, hi] (the unbounded default edges added
+           by [as_interval] when there is a default action) are kept as their
+           own clusters: they are handled by the enclosing range test.
+           Intervals cannot straddle [lo] or [hi], since intervals are split
+           at the constants' boundaries. *)
+        let len = Array.length cases in
+        let k = Array.make len 0 in
+        let n_clusters = ref 0 in
+        let cluster_start = ref (-1) in
+        for i = 0 to len - 1 do
+          let l, h, _ = cases.(i) in
+          if l >= lo && h <= hi then begin
+            if !cluster_start < 0 then begin
+              cluster_start := i ;
+              incr n_clusters
+            end ;
+            k.(i) <- !cluster_start
+          end else begin
+            k.(i) <- i ;
+            incr n_clusters
+          end
+        done ;
+        !n_clusters, k
+    in
     let clusters = make_clusters loc kind s n_clusters k in
     c_test kind {arg=arg ; off=0; loc} clusters
 
@@ -996,11 +1026,11 @@ let rec pkey chan  = function
     !handlers,actions
 
   (* Standard entry point. *)
-  let zyva loc kind lh arg cases actions =
+  let zyva ?force_table loc kind lh arg cases actions =
     assert (Array.length cases > 0) ;
     let actions = actions.act_get_shared () in
     let hs,actions = abstract_shared kind actions in
-    hs (do_zyva loc kind lh arg cases actions)
+    hs (do_zyva ~force_table loc kind lh arg cases actions)
 
   (* Generate code using test sequences only, not Arg.make_switch *)
   and test_sequence loc kind arg cases actions =

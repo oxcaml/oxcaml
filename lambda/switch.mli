@@ -139,6 +139,7 @@ module Make :
     sig
 (* Standard entry point, sharing is tracked *)
       val zyva :
+          ?force_table:(int * int) ->
           Arg.loc ->
           Arg.layout ->
           (int * int) ->

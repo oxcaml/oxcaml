@@ -20,7 +20,15 @@ open Lambda
 open Debuginfo.Scoped_location
 
 (* Entry points to match compiler *)
+(* Whether the dispatch on scrutinee values should follow the usual
+   heuristics, or be forced to a (dense) table when possible, as requested by
+   the [@table] attribute on a match expression. *)
+type table_dispatch =
+  | Use_heuristics
+  | Force_table
+
 val for_function:
+        ?table_dispatch:table_dispatch ->
         scopes:scopes ->
         arg_sort:Jkind.Sort.Const.t -> arg_layout:layout -> return_layout:layout ->
         Location.t -> int ref option -> lambda -> (pattern * lambda) list ->
@@ -39,6 +47,7 @@ val for_let:
         Location.t -> lambda -> Asttypes.mutable_flag -> pattern -> lambda ->
         lambda
 val for_multiple_match:
+        ?table_dispatch:table_dispatch ->
         scopes:scopes -> return_layout:layout -> Location.t ->
         (lambda * Jkind.Sort.Const.t * layout) list -> locality_mode ->
         (pattern * lambda) list -> partial ->

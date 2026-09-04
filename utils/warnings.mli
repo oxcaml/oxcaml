@@ -173,6 +173,7 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
+  | Match_table_unsupported of string       (* 222 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
