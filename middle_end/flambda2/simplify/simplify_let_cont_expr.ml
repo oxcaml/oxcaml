@@ -791,12 +791,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
   in
   D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_non_recursive_let_cont (after_rebuild_data, after_rebuild_single_non_recursive_let_cont))
 
-let rebuild_single_recursive_handler cont
-    (handler_to_rebuild : handler_to_rebuild) uacc k =
-  (* Clear existing name occurrences & cost metrics *)
-  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  let data : D.after_rebuild_single_recursive_let_cont_data = { cont; handler_to_rebuild; k } in
-  let after_rebuild_single_recursive_let_cont
+let after_rebuild_single_recursive_let_cont
     ({ cont; handler_to_rebuild; k } : D.after_rebuild_single_recursive_let_cont_data)
     handler uacc =
       let handler, uacc, free_names, cost_metrics =
@@ -840,7 +835,12 @@ let rebuild_single_recursive_handler cont
         }
       in
       k invariant_params rebuilt_handler uacc
-  in
+
+let rebuild_single_recursive_handler cont
+    (handler_to_rebuild : handler_to_rebuild) uacc k =
+  (* Clear existing name occurrences & cost metrics *)
+  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
+  let data : D.after_rebuild_single_recursive_let_cont_data = { cont; handler_to_rebuild; k } in
   D.apply_rebuild handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_recursive_let_cont (data, after_rebuild_single_recursive_let_cont))
 
 let rec rebuild_continuation_handlers_loop ~rebuild_body
