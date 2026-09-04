@@ -315,6 +315,15 @@ let
     hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
   });
 
+  menhirLibrariesSrc = pkgs.runCommand "menhir-${menhirVersion}-libraries-source" { } ''
+    cp -R ${menhirSrc} "$out"
+    chmod -R u+w "$out"
+    # Attach the deprecation to [reductions], not the surrounding signature.
+    substituteInPlace "$out/sdk/cmly_api.ml" \
+      --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
+        '[@@ocaml.deprecated "Please use [get_reductions]"]'
+  '';
+
   yojsonSrc = pkgs.runCommand "yojson-2.2.2-source" {
     src = pkgs.fetchurl {
       url = "https://github.com/ocaml-community/yojson/releases/download/2.2.2/yojson-2.2.2.tbz";
@@ -349,7 +358,7 @@ let
       SEDLEX_GEN_SRC = genSrc;
       JSOO_SEDLEX_SRC = sedlexSrc;
       JSOO_CMDLINER_SRC = cmdlinerSrc;
-      JSOO_MENHIR_SRC = menhirSrc;
+      JSOO_MENHIR_SRC = menhirLibrariesSrc;
       JSOO_YOJSON_SRC = yojsonSrc;
 
       nativeBuildInputs = [
@@ -476,7 +485,7 @@ stdenv.mkDerivation {
   SEDLEX_GEN_SRC = genSrc;
   JSOO_SEDLEX_SRC = sedlexSrc;
   JSOO_CMDLINER_SRC = cmdlinerSrc;
-  JSOO_MENHIR_SRC = menhirSrc;
+  JSOO_MENHIR_SRC = menhirLibrariesSrc;
   JSOO_YOJSON_SRC = yojsonSrc;
 
   enableParallelBuilding = true;
