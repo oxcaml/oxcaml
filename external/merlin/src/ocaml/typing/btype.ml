@@ -2222,16 +2222,6 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels lbls =
-      List.for_all
-        (fun { ld_sort; _ } -> all_void_sort_option ld_sort)
-        lbls
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
         (fun { ld_type; ld_modalities; _ } ->
@@ -2239,17 +2229,14 @@ module Jkind0 = struct
         lbls jkind
 
     let for_boxed_record lbls =
-      if all_void_labels lbls
-      then Builtin.immediate ~why:Empty_record
-      else
-        let base =
-          lbls
-          |> List.map (fun { ld_mutable; _ } -> ld_mutable)
-          |> List.fold_left combine_mutability Immutable
-          |> jkind_of_mutability ~why:Boxed_record
-          |> mark_best
-        in
-        add_labels_as_with_bounds lbls base
+      let base =
+        lbls
+        |> List.map (fun { ld_mutable; _ } -> ld_mutable)
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_record
+        |> mark_best
+      in
+      add_labels_as_with_bounds lbls base
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =

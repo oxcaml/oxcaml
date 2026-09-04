@@ -347,6 +347,15 @@ let compute_static_size lam =
             Block (Regular_block size)
         | Record_float ->
             Block (Float_record size)
+        | Record_inlined
+              (Ordinary { runtime_tag; _ },
+               Constructor_mixed shape,
+               Variant_boxed _)
+              when Mixed_product_bytes.types_shape_is_all_value shape ->
+            let size = all_value_mixed_block_size_types shape in
+            if size = 0
+            then Block (Empty_block { tag = runtime_tag })
+            else Block (Regular_block size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
