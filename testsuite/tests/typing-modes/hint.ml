@@ -1,4 +1,5 @@
 (* TEST
+    structured_diagnostics = "true";
     expect;
 *)
 
@@ -26,6 +27,16 @@ Error: The value "bar" is "nonportable"
        However, the value "bar" highlighted is expected to be "portable"
          because it is used inside the function at lines 9-10, characters 25-25
          which is expected to be "portable".
+|}, Structured{|
+- {:The value `bar`} is expected to be `portable`#.
+  ~- Because {*:it}'s used inside {:the function}.
+    ~- And {:the function} is expected to be `portable`#.
+- But {:the value `bar`} is `nonportable`#.
+  ~- Because {*:it} closes over {:the value `foo`}.
+    ~- And {:the function `foo`} is `nonportable`#.
+      ~- Because {*:it} closes over {:the value `x`}.
+        ~- And {:the value `x`} is used as `uncontended`#.
+          ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
 |}]
 
 
@@ -48,6 +59,16 @@ Error: The value "bar" is "nonportable"
        However, the value "bar" highlighted is expected to be "portable"
          because it is used inside the function at line 6, characters 25-47
          which is expected to be "portable".
+|}, Structured{|
+- {:The value `bar`} is expected to be `portable`#.
+  ~- Because {*:it}'s used inside {:the function}.
+    ~- And {:the function} is expected to be `portable`#.
+- But {:the value `bar`} is `nonportable`#.
+  ~- Because {*:it} closes over {:the value `foo`}.
+    ~- And {:the function `foo`} is `nonportable`#.
+      ~- Because {*:it} closes over {:the value `x`}.
+        ~- And {:the value `x`} is used as `uncontended`#.
+          ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
 |}]
 
 module M : sig
@@ -90,4 +111,16 @@ Error: Signature mismatch:
          because it contains a usage (of the value "x" at line 6, characters 17-18)
          which is expected to be "uncontended".
        However, the second is "portable".
+|}, Structured{|
+- {:The module} does not match its signature.
+  - {:`baz`} is expected to be `portable`#.
+    ~- Because {*:it}'s annotated [`@@ portable`#].
+  - But {*:it}'s `nonportable`#.
+    ~- Because {*:it} closes over {:the value `bar`}.
+      ~- And {:the function `bar`} is `nonportable`#.
+        ~- Because {*:it} closes over {:the value `foo`}.
+          ~- And {:the function `foo`} is `nonportable`#.
+            ~- Because {*:it} closes over {:the value `x`}.
+              ~- And {:the value `x`} is used as `uncontended`#.
+                ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
 |}]

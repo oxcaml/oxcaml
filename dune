@@ -45,6 +45,8 @@
 
 (copy_files# typing/*.ml{,i})
 
+(copy_files# diagnostics/*.ml{,i})
+
 (copy_files# bytecomp/*.ml{,i})
 
 (copy_files# driver/*.ml{,i})
@@ -201,8 +203,9 @@
   parsetree ; mli only file
   ;; DRIVER
   pparse
-  ;; TYPING
+  ;; DIAGNOSTICS
   structured_diagnostic
+  ;; TYPING
   ident
   global_module))
 
@@ -311,7 +314,14 @@
   cmt2annot
   out_type
   data_types
+  ;; DIAGNOSTICS
   diagnostic_nlg
+  diagnostic_term
+  module_diagnostics
+  kind_diagnostics
+  type_diagnostics
+  mode_diagnostics
+  diagnostics
   ; manual update: mli only files
   annot
   outcometree

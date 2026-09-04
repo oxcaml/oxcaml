@@ -39,8 +39,16 @@ let print_standard_library () =
   print_string Config.standard_library; print_newline();
   raise (Exit_with_status 0)
 
+let report_message ?usage message =
+  if !Clflags.structured_diagnostics then
+    Location.print_report Format.err_formatter (Location.errorf "%s" message)
+  else begin
+    prerr_endline message;
+    Option.iter (fun print_usage -> print_usage ()) usage
+  end
+
 let fatal err =
-  prerr_endline err;
+  report_message err;
   raise (Exit_with_status 2)
 
 let extract_output = function
@@ -882,7 +890,8 @@ let parse_arguments ?(current=ref 0) argv f program =
       |> String.split_on_char '\000'
       |> List.hd
       |> String.trim in
-      Printf.eprintf "%s\n%s\n" err_msg usage_msg;
+      report_message err_msg
+        ~usage:(fun () -> prerr_string (usage_msg ^ "\n"));
       raise (Exit_with_status 2)
     | Arg.Help msg ->
       let err_msg =
