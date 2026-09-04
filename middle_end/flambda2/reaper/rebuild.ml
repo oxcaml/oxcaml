@@ -1839,9 +1839,8 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
                else env.get_code_metadata code_id
              in
              { cost_metrics = Code_metadata.cost_metrics code_metadata;
-               params_arity =
-                 Flambda_arity.num_params
-                   (Code_metadata.params_arity code_metadata)
+               function_slot_size =
+                 Code_metadata.function_slot_size code_metadata
              })
            set_of_closures)
     in

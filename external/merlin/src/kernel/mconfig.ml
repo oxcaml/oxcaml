@@ -677,6 +677,8 @@ let ocaml_ignored_flags =
     "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
+    "-cfg-block-layout";
+    "-no-cfg-block-layout";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";

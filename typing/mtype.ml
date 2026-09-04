@@ -922,6 +922,8 @@ let lower_nongen nglev mty =
       | _ ->
           super.it_do_type_expr it ty
     in
-    let it = {super with it_do_type_expr} in
-    it.it_module_type it mty
+  let it_mode_expr m =
+    if not (Mode.Alloc.check_generic m) then Mode.Alloc.update_level nglev m in
+  let it = {super with it_do_type_expr; it_mode_expr} in
+  it.it_module_type it mty
   end

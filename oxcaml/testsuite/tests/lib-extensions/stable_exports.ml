@@ -9,7 +9,7 @@
 *)
 
 (* CR layouts: this test only runs on AMD64 because ARM64
-   does not support float32#. Split off the non-float32#
+   does not support float32_u. Split off the non-float32_u
    parts into a separate test that runs everywhere. *)
 
 open Stdlib_stable

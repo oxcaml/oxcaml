@@ -24,36 +24,29 @@ let transl_ret_mode = function
   | Locality.Const.Local -> maybe_alloc_stack
 
 let transl_locality_mode_l locality =
-  Locality.zap_to_floor locality |> transl_locality_mode
+  Locality.zap_to_floor_exn locality |> transl_locality_mode
 
 let transl_return_mode_l locality =
-  Locality.zap_to_floor locality |> transl_ret_mode
+  Locality.zap_to_floor_exn locality |> transl_ret_mode
 
-let transl_locality_mode_r locality =
+let transl_alloc_mode_l mode =
+  Typedtree.alloc_mode_l_zap_to_floor mode |> transl_locality_mode
+
+let transl_alloc_mode_r mode =
   (* r mode are for allocations; [optimise_allocations] should have pushed it
      to ceil and determined; here we push it again just to get the constant. *)
-  Locality.zap_to_ceil locality |> transl_locality_mode
+  Typedtree.alloc_mode_r_zap_to_ceil mode |> transl_locality_mode
 
 let transl_yielding_mode_l yielding =
-  match Yielding.zap_to_floor yielding with
+  match Yielding.zap_to_floor_exn yielding with
   | Yielding.Const.Unyielding -> Unyielding
   | Yielding.Const.Yielding -> May_yield
 
-let transl_alloc_mode_l mode =
-  (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_l
-
-let transl_alloc_mode_r mode =
-  (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_r
-
-let transl_alloc_mode (mode : Typedtree.alloc_mode) = transl_alloc_mode_r mode
-
 let transl_ret_mode mode =
-  Alloc.proj_comonadic Areality mode |> Locality.zap_to_floor |> transl_ret_mode
+  Typedtree.return_mode_zap_to_floor_exn mode |> transl_ret_mode
 
 let transl_modify_mode locality =
-  match Locality.zap_to_floor locality with
+  match Locality.zap_to_floor_exn locality with
   | Global -> modify_heap
   | Local -> modify_maybe_stack
 
@@ -75,4 +68,4 @@ let transl_staticity_mode = function
   | Staticity.Dynamic -> Dynamic
 
 let transl_staticity_mode_r staticity =
-  Staticity.zap_to_ceil staticity |> transl_staticity_mode
+  Staticity.zap_to_ceil_exn staticity |> transl_staticity_mode

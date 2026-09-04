@@ -86,11 +86,20 @@ type value =
       { upper : Asm_label.t;
         lower : Asm_label.t
       }
-  | Distance_between_labels_64_bit_with_offsets of
+  | Distance_between_labels_32_bit_with_offsets of
       { upper : Asm_label.t;
         upper_offset : Targetint.t;
         lower : Asm_label.t;
         lower_offset : Targetint.t
+      }
+  | Distance_between_label_and_symbol_32_bit of
+      { upper : Asm_label.t;
+        offset_upper : Targetint.t;
+        lower : Asm_symbol.t
+      }
+  | Distance_between_symbols_32_bit of
+      { upper : Asm_symbol.t;
+        lower : Asm_symbol.t
       }
 
 type t =
@@ -159,11 +168,17 @@ let print ppf { value; comment = _ } =
   | Distance_between_labels_64_bit { upper; lower } ->
     Format.fprintf ppf "%a - %a (64)" Asm_label.print upper Asm_label.print
       lower
-  | Distance_between_labels_64_bit_with_offsets
+  | Distance_between_labels_32_bit_with_offsets
       { upper; upper_offset; lower; lower_offset } ->
-    Format.fprintf ppf "(%a + %a) - (%a + %a) (64)" Asm_label.print upper
+    Format.fprintf ppf "(%a + %a) - (%a + %a) (32)" Asm_label.print upper
       Targetint.print upper_offset Asm_label.print lower Targetint.print
       lower_offset
+  | Distance_between_label_and_symbol_32_bit { upper; offset_upper; lower } ->
+    Format.fprintf ppf "(%a + %a) - %a (32)" Asm_label.print upper
+      Targetint.print offset_upper Asm_symbol.print lower
+  | Distance_between_symbols_32_bit { upper; lower } ->
+    Format.fprintf ppf "%a - %a (32)" Asm_symbol.print upper Asm_symbol.print
+      lower
 
 let flag_true ?comment () = { value = Flag_true; comment }
 
@@ -259,13 +274,23 @@ let distance_between_labels_32_bit ?comment ~upper ~lower () =
 let distance_between_labels_64_bit ?comment ~upper ~lower () =
   { value = Distance_between_labels_64_bit { upper; lower }; comment }
 
-let distance_between_labels_64_bit_with_offsets ?comment ~upper ~upper_offset
+let distance_between_labels_32_bit_with_offsets ?comment ~upper ~upper_offset
     ~lower ~lower_offset () =
   { value =
-      Distance_between_labels_64_bit_with_offsets
+      Distance_between_labels_32_bit_with_offsets
         { upper; upper_offset; lower; lower_offset };
     comment
   }
+
+let distance_between_label_and_symbol_32_bit ?comment ~upper ~offset_upper
+    ~lower () =
+  { value =
+      Distance_between_label_and_symbol_32_bit { upper; offset_upper; lower };
+    comment
+  }
+
+let distance_between_symbols_32_bit ?comment ~upper ~lower () =
+  { value = Distance_between_symbols_32_bit { upper; lower }; comment }
 
 let append_to_comment { value; comment } to_append =
   let comment =
@@ -326,10 +351,12 @@ let size { value; comment = _ } =
   | Offset_into_debug_abbrev _ ->
     Dwarf_int.size (Dwarf_int.zero ())
   | Distance_between_labels_16_bit _ -> Dwarf_int.two ()
-  | Distance_between_labels_32_bit _ -> Dwarf_int.four ()
-  | Distance_between_labels_64_bit _
-  | Distance_between_labels_64_bit_with_offsets _ ->
-    Dwarf_int.eight ()
+  | Distance_between_labels_32_bit _
+  | Distance_between_labels_32_bit_with_offsets _
+  | Distance_between_label_and_symbol_32_bit _
+  | Distance_between_symbols_32_bit _ ->
+    Dwarf_int.four ()
+  | Distance_between_labels_64_bit _ -> Dwarf_int.eight ()
 
 let emit ~asm_directives:_ { value; comment } =
   let width_for_ref_addr_or_sec_offset = !Dwarf_flags.gdwarf_format in
@@ -418,7 +445,12 @@ let emit ~asm_directives:_ { value; comment } =
     A.between_labels_32_bit ?comment ~upper ~lower ()
   | Distance_between_labels_64_bit { upper; lower } ->
     A.between_labels_64_bit ?comment ~upper ~lower ()
-  | Distance_between_labels_64_bit_with_offsets
+  | Distance_between_labels_32_bit_with_offsets
       { upper; upper_offset; lower; lower_offset } ->
-    A.between_labels_64_bit_with_offsets ?comment ~upper ~upper_offset ~lower
+    A.between_labels_32_bit_with_offsets ?comment ~upper ~upper_offset ~lower
       ~lower_offset ()
+  | Distance_between_label_and_symbol_32_bit { upper; offset_upper; lower } ->
+    A.between_symbol_in_current_unit_and_label_offset_32_bit ?comment ~upper
+      ~lower ~offset_upper ()
+  | Distance_between_symbols_32_bit { upper; lower } ->
+    A.between_symbols_in_current_unit_32_bit ?comment ~upper ~lower ()

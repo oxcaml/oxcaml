@@ -4,12 +4,12 @@
 
 [@@@ocaml.flambda_o3]
 
-external i63_to_i64 : int -> int64# =
+external i63_to_i64 : int -> int64_u =
   "%reinterpret_tagged_int63_as_unboxed_int64"
-external i64_to_i63 : int64# -> int =
+external i64_to_i63 : int64_u -> int =
   "%reinterpret_unboxed_int64_as_tagged_int63"
 
-external box_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
+external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
 
 (* List functions that can be unrolled *)
 

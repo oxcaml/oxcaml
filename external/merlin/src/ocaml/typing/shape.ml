@@ -600,6 +600,7 @@ and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
+    is_constant : bool;
     args : 'a constructor_argument list
   }
 
@@ -618,14 +619,14 @@ let poly_variant_constructors_map f pvs =
     (fun pv -> { pv with pv_constr_args = List.map f pv.pv_constr_args })
     pvs
 
-let constructor_map f { name; constr_uid; kind; args } =
+let constructor_map f { name; constr_uid; kind; is_constant; args } =
   let args =
     List.map
       (fun { field_name; field_uid; field_value } ->
         { field_name; field_uid; field_value = f field_value })
       args
   in
-  { name; constr_uid; kind; args }
+  { name; constr_uid; kind; is_constant; args }
 
 let constructors_map f = List.map (constructor_map f)
 
@@ -636,10 +637,11 @@ let equal_constructor_arguments eq
   eq field_value1 field_value2
 
 let equal_constructor eq
-    { name = name1; kind = kind1; args = args1 }
-    { name = name2; kind = kind2; args = args2 } =
+    { name = name1; kind = kind1; is_constant = is_constant1; args = args1 }
+    { name = name2; kind = kind2; is_constant = is_constant2; args = args2 } =
   String.equal name1 name2 &&
   Misc.Stdlib.Array.equal (Option.equal Layout.equal) kind1 kind2 &&
+  Bool.equal is_constant1 is_constant2 &&
   List.equal (equal_constructor_arguments eq) args1 args2
 
 let rec equal_desc0 d1 d2 =
@@ -922,7 +924,8 @@ and print_one_entry print_value ppf { field_name; field_uid; field_value } =
   | None -> Format.fprintf ppf "%a%a" print_value field_value print_uid_opt
       field_uid
 
-and print_constructor print_value ppf { name; constr_uid; kind = _; args } =
+and print_constructor print_value ppf
+    { name; constr_uid; kind = _; is_constant = _; args } =
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in

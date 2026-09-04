@@ -10,7 +10,7 @@
    currently loses the compile-time half of templates across items. *)
 
 external to_float : float# -> float = "%box_float"
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 
 module type S = sig val y : int end
 
@@ -20,7 +20,7 @@ end
 
 [%%expect{|
 external to_float : float# -> float = "%box_float"
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 module type S = sig val y : int end
 module type Id = sig val poly_ id : 'a -> 'a end
 |}]
