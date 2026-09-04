@@ -345,7 +345,8 @@ let compute_static_size lam =
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Block (Regular_block size)
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
-            (* Extensible variants use an extra word to identify the constructor *)
+            (* Extensible variants require an extra machine word
+               to identify a constructor. *)
             Block (Regular_block (size + 1))
         | Record_float ->
             Block (Float_record size)
