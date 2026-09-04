@@ -677,3 +677,65 @@ Error: The layout of type "r#" is value non_pointer & value non_pointer
          because of the definition of b at line 2, characters 0-28.
        Note: The layout of immediate is value non_pointer.
 |}]
+
+(*******************************************)
+(* Variance of unboxed versions of records *)
+
+(* CR rtjoa: The following declarations involving [mv#] should be rejected: an
+   unboxed version has the same variance as its boxed version, which is
+   invariant here due to the mutable field. Accepting them is unsound because
+   ['a mv# box] reduces to ['a mv]. *)
+
+type 'a mv = { mutable a : 'a }
+type +'a mv_u = 'a mv#
+[%%expect{|
+type 'a mv = { mutable a : 'a; }
+type 'a mv_u = 'a mv#
+|}]
+
+type ('a, 'b) mv2 = { mutable a : 'a; b : 'b }
+type (+'a, +'b) mv2_u = ('a, 'b) mv2#
+[%%expect{|
+type ('a, 'b) mv2 = { mutable a : 'a; b : 'b; }
+type ('a, 'b) mv2_u = ('a, 'b) mv2#
+|}]
+
+let f (x : [`A] mv#) = (x :> [`A | `B] mv#)
+[%%expect{|
+val f : [ `A ] mv# -> [ `A | `B ] mv# = <fun>
+|}]
+
+(* Recursive group: [s] uses [mv3#] while its variance is being computed *)
+type 'a mv3 = { mutable a : 'a }
+and +'b s = { s : 'b mv3# }
+[%%expect{|
+type 'a mv3 = { mutable a : 'a; }
+and 'b s = { s : 'b mv3#; }
+|}]
+
+(* Parameters only occurring in immutable fields may still be covariant *)
+type ('a, +'b) mv2_u' = ('a, 'b) mv2#
+[%%expect{|
+type ('a, 'b) mv2_u' = ('a, 'b) mv2#
+|}]
+
+(* Unboxed versions of immutable records are covariant *)
+type 'a imm = { a : 'a }
+type +'a imm_u = 'a imm#
+[%%expect{|
+type 'a imm = { a : 'a; }
+type 'a imm_u = 'a imm#
+|}]
+
+(* CR rtjoa: Unboxed versions of mutable records should have mutable fields, so
+   that this re-export is accepted (and so that their variance is computed
+   correctly, as tested above). *)
+type r = { mutable i : int }
+type u = r# = #{ mutable i : int }
+[%%expect{|
+type r = { mutable i : int; }
+Line 2, characters 17-32:
+2 | type u = r# = #{ mutable i : int }
+                     ^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be mutable
+|}]

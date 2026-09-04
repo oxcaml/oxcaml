@@ -1594,3 +1594,42 @@ Lines 10-12, characters 11-4:
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
 |}]
+
+(* Test 45: [box] of an unboxed version has the boxed version's variance *)
+
+(* CR rtjoa: The following declarations should be rejected: ['a t# box] reduces
+   to ['a t], which is invariant in ['a] due to the mutable field. Accepting
+   them is unsound. *)
+
+type 'a t = { mutable a : 'a }
+type +'a u = 'a t# box
+[%%expect{|
+type 'a t = { mutable a : 'a; }
+type 'a u = 'a t
+|}]
+
+type +'a v = 'a ref#
+[%%expect{|
+type 'a v = 'a ref#
+|}]
+
+module M : sig
+  type +'a u
+  val make : 'a -> 'a u
+  val get : 'a u -> 'a
+  val set : 'a u -> 'a -> unit
+end = struct
+  type 'a u = 'a t# box
+  let make a = { a }
+  let get u = u.a
+  let set u v = u.a <- v
+end
+[%%expect{|
+module M :
+  sig
+    type +'a u
+    val make : 'a -> 'a u
+    val get : 'a u -> 'a
+    val set : 'a u -> 'a -> unit
+  end
+|}]

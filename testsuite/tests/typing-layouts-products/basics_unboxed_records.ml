@@ -163,7 +163,10 @@ Error: This value is "local"
          Hint: Use exclave_ to return a local value.
 |}]
 
-(* Mutable fields are not allowed *)
+(* Mutable fields *)
+
+(* CR rtjoa: Mutable unboxed record fields should be accepted, and make the
+   type invariant in their type parameters. *)
 
 type mut = #{ mutable i : int }
 [%%expect{|
@@ -171,6 +174,43 @@ Line 1, characters 14-29:
 1 | type mut = #{ mutable i : int }
                   ^^^^^^^^^^^^^^^
 Error: Unboxed record labels cannot be mutable
+|}]
+
+type 'a mut2 = #{ mutable a : 'a }
+[%%expect{|
+Line 1, characters 18-32:
+1 | type 'a mut2 = #{ mutable a : 'a }
+                      ^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be mutable
+|}]
+
+(* This should stay rejected, but due to variance rather than mutability *)
+type +'a mut3 = #{ mutable a : 'a }
+[%%expect{|
+Line 1, characters 19-33:
+1 | type +'a mut3 = #{ mutable a : 'a }
+                       ^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be mutable
+|}]
+
+(* This should stay rejected: atomic fields make no sense without an address *)
+type at = #{ mutable i : int [@atomic] }
+[%%expect{|
+Line 1, characters 13-38:
+1 | type at = #{ mutable i : int [@atomic] }
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be mutable
+|}]
+
+(* Unboxed records are covariant in their (necessarily immutable) fields.
+   Variance of unboxed versions of mutable records is tested in
+   [basics_implicit_unboxed_records.ml]. *)
+
+type 'a imm = #{ a : 'a }
+type +'a imm_u = 'a imm
+[%%expect{|
+type 'a imm = #{ a : 'a; }
+type 'a imm_u = 'a imm
 |}]
 
 (*********************************)
