@@ -10,7 +10,9 @@
  (action
   (with-stdout-to
    %{target}
-   (run echo "let engine = \"%{env:WASM_ENGINE=node}\""))))
+   (progn
+    (run echo "let engine = \"%{env:WASM_ENGINE=node}\"")
+    (run echo "let profile = \"%{profile}\"")))))
 
 (executable
  (name quickjs_wrapper)
