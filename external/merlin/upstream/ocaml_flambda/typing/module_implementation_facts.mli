@@ -180,6 +180,8 @@ type t = private
     omissions : Omission_set.t
   }
 
+val empty : t
+
 val map_checks : t -> f:(Check.t -> Check.t) -> t
 
 val union : t -> t -> t
