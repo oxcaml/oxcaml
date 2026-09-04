@@ -123,7 +123,8 @@ let slots_to_be_built_for_set_of_closures ~db ~closure_function_decls
           ~function_slot_rewrites ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~value_slot_rewrites set )
 
-let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
+let compute ~free_names ~code_metadata ~closure_function_decls
+    ~get_code_metadata
     ({ db; unboxed_fields; changed_representation; _ } :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
@@ -198,13 +199,12 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
           built_value_slots
     }
   in
-  (* CR mvellacott: this uses the pre-reaper metadata, but function slots can be
-     shrunk by untupling. Once we pre-compute code metadata too, we should use
-     it here. *)
+  (* [To_cmm] checks the layout against the rewritten metadata, so take the
+     sizes from there. (Calling convention changes preserve the number of
+     parameter groups, so a slot never actually changes size.) *)
   let get_function_slot_size code_id =
-    match Code_id.Map.find_opt code_id code_deps with
-    | Some ({ function_slot_size; _ } : Traverse_acc.code_dep) ->
-      function_slot_size
+    match Code_id.Map.find_opt code_id code_metadata with
+    | Some metadata -> Code_metadata.function_slot_size metadata
     | None ->
       (* Imported code, which is only reached through its cmx. *)
       Code_metadata.function_slot_size (get_code_metadata code_id)

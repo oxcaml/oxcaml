@@ -475,7 +475,14 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                     only_full_applications || changed_calling_convention
                 }
             else
-              let code_metadata = env.get_code_metadata code_id in
+              (* The size must agree with the one
+                 [Analysis.compute_slot_offsets] used, which is that of the
+                 rewritten metadata for code of the current unit. *)
+              let code_metadata =
+                match Code_id.Map.find_opt code_id env.code_metadata with
+                | Some code_metadata -> code_metadata
+                | None -> env.get_code_metadata code_id
+              in
               Deleted
                 { function_slot_size =
                     Code_metadata.function_slot_size code_metadata;

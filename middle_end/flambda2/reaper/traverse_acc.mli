@@ -38,7 +38,6 @@ type code_dep =
     my_closure : Variable.t;
     return : Variable.t list;
     exn : Variable.t;
-    function_slot_size : int;
     is_tupled : bool;
     known_arity_call_witness : Code_id_or_name.t;
     unknown_arity_call_witnesses : Code_id_or_name.t list

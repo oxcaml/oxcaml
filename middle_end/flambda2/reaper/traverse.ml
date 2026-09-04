@@ -65,7 +65,6 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     | Check _ -> true
   in
   let is_tupled = Code.is_tupled code in
-  let function_slot_size = Code.function_slot_size code in
   let known_arity_call_witness =
     Acc.create_known_arity_call_witness acc code_id ~params ~returns:return ~exn
   in
@@ -76,7 +75,6 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let code_dep =
     { Traverse_acc.arity;
       result_arity;
-      function_slot_size;
       return;
       my_closure;
       exn;

@@ -27,10 +27,11 @@
 
 (** Compute the slot offsets of the sets of closures that will be built after
     rewriting. [free_names] are the free names of the whole compilation unit as
-    output by simplify. *)
+    output by simplify, and [code_metadata] is the output of
+    [Code_metadata_rewriter.rewrite]. *)
 val compute :
   free_names:Name_occurrences.t ->
-  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  code_metadata:Code_metadata.t Code_id.Map.t ->
   closure_function_decls:
     Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t ->
   get_code_metadata:(Code_id.t -> Code_metadata.t) ->
