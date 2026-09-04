@@ -365,6 +365,7 @@ type _ t =
   | Module_type_impls (* *) :
       Msource.position option
       -> Module_type_impls.response t
+  | Intf_weaknesses (* *) : Intf_weakness.code_action list t
   | Construct :
       Msource.position * [ `None | `Local ] option * int option
       -> (Location.t * string list) t
