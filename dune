@@ -63,6 +63,8 @@
 
 (copy_files# backend/cfg/*.ml{,i})
 
+(copy_files# backend/ssa/*.ml{,i})
+
 (copy_files# backend/debug/*.ml{,i})
 
 (copy_files# backend/debug/dwarf/dwarf_ocaml/*.ml{,i})
@@ -176,6 +178,7 @@
   doubly_linked_list
   file_sections
   lru
+  id_counter
   ;; PARSING
   location
   longident
@@ -654,6 +657,7 @@
   cfg
   cfg_available_regs
   cfg_colours
+  cfg_compare
   cfg_edge
   cfg_intf
   cfg_quick_hash
@@ -713,6 +717,14 @@
   ir_config_fingerprint
   linear_format
   cfg_format
+  ;; backend/ssa/
+  ssa
+  ssa_print
+  ssa_reducer
+  ssa_simplify
+  ssa_tail_call
+  ssa_of_cmm
+  cfg_of_ssa
   ;; backend/debug/
   available_ranges_vars
   compute_ranges

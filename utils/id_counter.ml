@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -25,31 +25,63 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Instruction selection, parameterised over the target machine. *)
+module type S = sig
+  type t = private int
 
-[@@@ocaml.warning "+a-40-41-42"]
+  type generator
 
-val which_parameter_of_provenance :
-  Backend_var.Provenance.t option -> int option
+  val create_generator : unit -> generator
 
-module Make (_ : Cfg_selectgen_target_intf.S) : sig
-  val emit_fundecl :
-    future_funcnames:Misc.Stdlib.String.Set.t ->
-    Cmm.fundecl ->
-    Cfg_with_layout.t
+  (** Return the generator's current ID and advance it. *)
+  val get_and_incr : generator -> t
 
-  val is_immediate : Operation.integer_operation -> int -> bool
+  (** A placeholder ID (-1), never returned by [get_and_incr]. *)
+  val dummy : t
 
-  val select_condition : Cmm.expression -> Operation.test * Cmm.expression
+  val equal : t -> t -> bool
 
-  val select_operation :
-    Cmm.operation ->
-    Cmm.expression list ->
-    Debuginfo.t ->
-    label_after:Label.t ->
-    Cfg.basic_or_terminator * Cmm.expression list
+  val compare : t -> t -> int
 
-  val effects_of : Cmm.expression -> Select_utils.Effect_and_coeffect.t
+  val hash : t -> int
 
-  val is_simple_expr : Cmm.expression -> bool
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
+
+  module Tbl : Hashtbl.S with type key = t
+end
+
+module Make () : S = struct
+  type t = int
+
+  type generator = { mutable next_id : int }
+
+  let create_generator () = { next_id = 0 }
+
+  let get_and_incr g =
+    let id = g.next_id in
+    g.next_id <- id + 1;
+    id
+
+  let dummy = -1
+
+  let equal = Int.equal
+
+  let compare = Int.compare
+
+  let hash = Fun.id
+
+  module Self = struct
+    type nonrec t = t
+
+    let equal = equal
+
+    let compare = compare
+
+    let hash = hash
+  end
+
+  module Set = Set.Make (Self)
+  module Map = Map.Make (Self)
+  module Tbl = Hashtbl.Make (Self)
 end
