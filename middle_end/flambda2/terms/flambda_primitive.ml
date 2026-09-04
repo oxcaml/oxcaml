@@ -1210,6 +1210,12 @@ let nullary_classify_for_printing p =
   | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
     Neither
 
+let free_names_nullary_primitive p =
+  match p with
+  | Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
+  | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ->
+    Name_occurrences.empty
+
 module Reinterpret_64_bit_word = struct
   type t =
     | Tagged_int63_as_unboxed_int64
@@ -2830,10 +2836,7 @@ let equal t1 t2 = compare t1 t2 = 0
 
 let free_names t =
   match t with
-  | Nullary
-      ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
-      | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax ) ->
-    Name_occurrences.empty
+  | Nullary prim -> free_names_nullary_primitive prim
   | Unary (prim, x0) ->
     Name_occurrences.union
       (free_names_unary_primitive prim)
@@ -3266,6 +3269,28 @@ module Without_args = struct
     | Quaternary prim -> print_quaternary_primitive ppf prim
     | Variadic prim -> print_variadic_primitive ppf prim
 
+  let equal (t1 : t) (t2 : t) =
+    match t1, t2 with
+    | Nullary prim1, Nullary prim2 -> equal_nullary_primitive prim1 prim2
+    | Unary prim1, Unary prim2 -> equal_unary_primitive prim1 prim2
+    | Binary prim1, Binary prim2 -> equal_binary_primitive prim1 prim2
+    | Ternary prim1, Ternary prim2 -> equal_ternary_primitive prim1 prim2
+    | Quaternary prim1, Quaternary prim2 ->
+      equal_quaternary_primitive prim1 prim2
+    | Variadic prim1, Variadic prim2 -> equal_variadic_primitive prim1 prim2
+    | ( (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _),
+        _ ) ->
+      false
+
+  let free_names (t : t) =
+    match t with
+    | Nullary prim -> free_names_nullary_primitive prim
+    | Unary prim -> free_names_unary_primitive prim
+    | Binary prim -> free_names_binary_primitive prim
+    | Ternary prim -> free_names_ternary_primitive prim
+    | Quaternary prim -> free_names_quaternary_primitive prim
+    | Variadic prim -> free_names_variadic_primitive prim
+
   let effects_and_coeffects (t : t) =
     match t with
     | Nullary prim -> effects_and_coeffects_of_nullary_primitive prim
@@ -3275,6 +3300,15 @@ module Without_args = struct
     | Quaternary prim -> effects_and_coeffects_of_quaternary_primitive prim
     | Variadic prim -> effects_and_coeffects_of_variadic_primitive prim
 end
+
+let without_args t : Without_args.t =
+  match t with
+  | Nullary prim -> Nullary prim
+  | Unary (prim, _) -> Unary prim
+  | Binary (prim, _, _) -> Binary prim
+  | Ternary (prim, _, _, _) -> Ternary prim
+  | Quaternary (prim, _, _, _, _) -> Quaternary prim
+  | Variadic (prim, _) -> Variadic prim
 
 let is_begin_or_end_region t =
   match t with
