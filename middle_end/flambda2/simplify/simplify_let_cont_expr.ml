@@ -644,33 +644,6 @@ let remove_params params free_names =
   ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
     ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
 
-let rebuild_single_non_recursive_handler ~at_unit_toplevel
-    ~is_single_inlinable_use ~original_invariant_params cont
-    (handler_to_rebuild : handler_to_rebuild) uacc k =
-  (* Clear existing name occurrences & cost metrics *)
-  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  let { is_exn_handler;
-        is_cold;
-        rewrite_ids;
-        params;
-        rebuild_handler;
-        extra_params_and_args;
-        invariant_extra_params_and_args
-      } =
-    handler_to_rebuild
-  in
-  (* In case the continuation was previously recursive, we make sure not to
-     forget the invariant original and extra params. *)
-  let params = Bound_parameters.append original_invariant_params params in
-  let extra_params_and_args =
-    EPA.concat ~inner:invariant_extra_params_and_args
-      ~outer:extra_params_and_args
-  in
-  let after_rebuild_data : D.after_rebuild_single_non_recursive_let_cont_data =
-    (* CR pchambart: probably should include handler_to_rebuild instead of recapturing everything *)
-    { cont; at_unit_toplevel; extra_params_and_args; rewrite_ids;
-      is_exn_handler; params; is_cold; is_single_inlinable_use; k; }
-  in
 let after_rebuild_single_non_recursive_let_cont
   ({ cont; at_unit_toplevel; extra_params_and_args; rewrite_ids; is_exn_handler; params; is_cold; is_single_inlinable_use; k; } : D.after_rebuild_single_non_recursive_let_cont_data)
     handler uacc =
@@ -788,6 +761,33 @@ let after_rebuild_single_non_recursive_let_cont
         }
       in
       k rebuilt_handler uacc
+
+let rebuild_single_non_recursive_handler ~at_unit_toplevel
+    ~is_single_inlinable_use ~original_invariant_params cont
+    (handler_to_rebuild : handler_to_rebuild) uacc k =
+  (* Clear existing name occurrences & cost metrics *)
+  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
+  let { is_exn_handler;
+        is_cold;
+        rewrite_ids;
+        params;
+        rebuild_handler;
+        extra_params_and_args;
+        invariant_extra_params_and_args
+      } =
+    handler_to_rebuild
+  in
+  (* In case the continuation was previously recursive, we make sure not to
+     forget the invariant original and extra params. *)
+  let params = Bound_parameters.append original_invariant_params params in
+  let extra_params_and_args =
+    EPA.concat ~inner:invariant_extra_params_and_args
+      ~outer:extra_params_and_args
+  in
+  let after_rebuild_data : D.after_rebuild_single_non_recursive_let_cont_data =
+    (* CR pchambart: probably should include handler_to_rebuild instead of recapturing everything *)
+    { cont; at_unit_toplevel; extra_params_and_args; rewrite_ids;
+      is_exn_handler; params; is_cold; is_single_inlinable_use; k; }
   in
   D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_non_recursive_let_cont (after_rebuild_data, after_rebuild_single_non_recursive_let_cont))
 
