@@ -462,9 +462,6 @@ jsoo-test: $(JSOO_BUILD_DEPS) out-channel-redirect-build qcheck-build
 	    @compiler/tests-wasm_of_ocaml/runtest-wasm \
 	    @lib/tests/runtest-js @lib/tests/runtest-wasm
 
-.PHONY: external-libs-build
-external-libs-build: ppxlib-build sedlex-build
-
 .PHONY: fmt
 fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
