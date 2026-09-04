@@ -5016,16 +5016,17 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
 
 let do_for_multiple_match ~scopes ~return_layout loc idl mode
     pat_act_list partial =
-  (* CR layouts v5: This function is called in cases where the scrutinee of a
-     match is a literal tuple (e.g., [match e1, e2, e3 with ...]).  The
-     typechecker treats the scrutinee here like any other tuple, so it's fine to
-     assume the whole thing and the elements have sort value.  That will change
-     when we allow non-values in structures. *)
   let repr = None in
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-    Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
+    let shape =
+      Array.of_list
+        (List.map
+           (fun (_, _, layout) -> Lambda.mixed_block_element_of_layout layout)
+           idl)
+    in
+    Lprim (Pmakeblock (0, Immutable, Shape shape, mode), param_lambda, sloc)
   in
   let input_args =
     { first = root_arg (Tuple arg) Strict
