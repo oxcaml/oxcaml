@@ -253,7 +253,8 @@ module Statement = struct
       Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
     | Bounded_loop (loop_var, times, stmt) ->
       let var = ident (Name.to_string loop_var) in
-      let_mutable loop_var (opaque_identity (int times))
+      let_mutable loop_var
+        (opaque_identity (int times))
         (Exp.while_
            (op ">" [var; int 0])
            (Exp.sequence (to_code stmt)
