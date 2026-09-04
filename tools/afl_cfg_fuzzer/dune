@@ -1,0 +1,9 @@
+(executable
+ (name afl_cfg_fuzzer)
+ (modes native)
+ (flags
+  (:standard -w +a-30-40-41-42))
+ (foreign_stubs
+  (language c)
+  (names afl_cfg_fuzzer_stubs))
+ (libraries ocamloptcomp))
