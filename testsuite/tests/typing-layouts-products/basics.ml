@@ -2604,3 +2604,24 @@ Error: The layout of type "t" is value non_pointer & value & value non_float
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
+
+(****************************************************)
+(* Test 24: Product layouts with mismatched arities *)
+
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+let bad (x : #(int * int)) : #(int * int * int) = magic_any x
+[%%expect{|
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
+  [@@layout_poly]
+Uncaught exception: Invalid_argument("List.for_all2")
+
+|}]
+
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+let bad (x : #(int# * int)) : #(int * int * int) = magic_any x
+[%%expect{|
+external magic_any : ('a : any) ('b : any). 'a -> 'b = "%identity"
+  [@@layout_poly]
+Uncaught exception: Invalid_argument("List.for_all2")
+
+|}]
