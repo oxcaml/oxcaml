@@ -149,10 +149,10 @@ let find_variant_with_null_payload cstrs =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_layouts, is_unboxed =
+  let cstr_layouts =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
-    | Variant_boxed x, _ -> x, false
+    | Variant_boxed x, _ -> x
     | Variant_unboxed, [{ cd_args }] ->
       (* CR layouts: It's tempting just to use [decl.type_jkind] here, instead
          of grabbing the jkind from the argument. However, doing so does not
@@ -167,11 +167,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Cstr_tuple [{ ca_sort = Some sort }]
       | Cstr_record [{ ld_sort = Some sort }] ->
         [| Cstr_layout_known
-             { shape = Constructor_uniform_value; sorts = [| sort |] } |],
-        true
+             { shape = Constructor_uniform_value; sorts = [| sort |] } |]
       | Cstr_tuple [{ ca_sort = None }]
       | Cstr_record [{ ld_sort = None }] ->
-        [| Cstr_layout_undetermined |], true
+        [| Cstr_layout_undetermined |]
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -185,10 +184,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
             { shape = Constructor_uniform_value; sorts = [| |] }
         | Variant_with_null_null (Some sort) ->
           Cstr_layout_known
-            { shape =
-                Constructor_mixed
-                  [| Types.mixed_block_element_of_const_sort sort |];
-              sorts = [| sort |] }
+            { shape = Constructor_immediate_all_void; sorts = [| sort |] }
         | Variant_with_null_payload
             { payload_arg = { ca_sort = Some sort; _ }; _ } ->
           Cstr_layout_known
@@ -201,27 +197,13 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
              recomputed after [update_decls_jkind] fills the sorts. *)
           Cstr_layout_undetermined
       in
-      Array.of_list (List.map layout cstrs), false
+      Array.of_list (List.map layout cstrs)
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
       (fun layout ->
-         let all_void =
-           match layout with
-           | Cstr_layout_undetermined ->
-             (* Someday we'll want to let a constructor be constant iff the type
-                argument is void (after all, [unit# option] is [bool]), but
-                we're not there yet. For now, assume [Some #()] (so to speak) is
-                an empty block, which is to say, assume that unknown sorts
-                aren't all void. *)
-             false
-           | Cstr_layout_known { sorts; _ } ->
-             Array.for_all Jkind_types.Sort.Const.all_void sorts
-         in
-         (* constant constructors are constructors of non-[@@unboxed] variants
-            with 0 bits of payload *)
-         let is_const = all_void && not is_unboxed in
+         let is_const = cstr_layout_is_constant layout in
          if is_const then incr num_consts else incr num_nonconsts;
          is_const)
       cstr_layouts

@@ -968,6 +968,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
           | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
@@ -989,39 +992,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
           | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (is_mutable, num_nodes_visited), fields
     in
-    let is_constant (cstr: Types.constructor_declaration) =
-      let all_void_opt sort =
-        match sort with
-        | Some sort -> Jkind.Sort.Const.all_void sort
-        | None ->
-          (* CR rtjoa: It's important to NOT treat constructors with
-             any-args-refined-to-void as constant, as those are represented as
-             blocks rather than immediates. This footgun should no longer exist
-             once we make all-void constructors no longer immediate. *)
-          false
-      in
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple args ->
-        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
-      | Cstr_record lbls ->
-        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
-    in
-    let rec mixed_block_shape_is_empty shape =
-      Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ mixed_block_element) =
-      match element with
-      | Product shape -> mixed_block_shape_is_empty shape
-      | _ -> false
-    in
     let num_nodes_visited, raw_kind =
-    if List.for_all is_constant cstrs then
+    if Array.for_all Types.cstr_layout_is_constant cstr_layouts then
       (num_nodes_visited, Pintval)
     else
       let _idx, result =
@@ -1032,53 +1013,34 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let ~variable_repr, cstr_shape_opt, constructor =
-              match cstr_layouts.(idx) with
-              | Cstr_layout_known { shape; _ } ->
-                ~variable_repr:false, Some shape, constructor
-              | Cstr_layout_undetermined ->
-                (match substitute_cd_args constructor.cd_args with
-                 | exception Ctype.Cannot_apply ->
-                   ~variable_repr:true, None, constructor
-                 | cd_args ->
-                   let cd_args, ~constant:_, repr, _arg_sorts =
-                     Typedecl.update_constructor_representation
-                       env loc cd_args ~is_extension_constructor:false
-                   in
-                   ~variable_repr:true, Result.to_option repr,
-                   { constructor with cd_args })
-            in
-            match cstr_shape_opt with
-            | None -> None
-            | Some cstr_shape ->
-                let (is_mutable, num_nodes_visited), fields =
-                  for_one_constructor constructor ~depth ~num_nodes_visited
-                    ~cstr_shape
-                in
-                if is_mutable then None
-                else match fields with
-                | Constructor_uniform xs
-                    when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape
-                         && not variable_repr ->
-                  (* CR rtjoa: We gate on [variable_repr] because it's important
-                     to NOT treat constructors with any-args-refined-to-void as
-                     constant, as those are represented as blocks rather than
-                     immediates. This footgun should no longer exist once we
-                     make all-void constructors no longer immediate. *)
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed _ | Constructor_uniform _ ->
-                  let non_consts =
-                    (next_tag, fields) :: non_consts
+            if Types.cstr_layout_is_constant cstr_layouts.(idx) then
+              Some (num_nodes_visited,
+                    next_const + 1, next_const :: consts, next_tag, non_consts)
+            else
+              let cstr_shape_opt, constructor =
+                match cstr_layouts.(idx) with
+                | Cstr_layout_known { shape; _ } -> Some shape, constructor
+                | Cstr_layout_undetermined ->
+                  (match substitute_cd_args constructor.cd_args with
+                   | exception Ctype.Cannot_apply -> None, constructor
+                   | cd_args ->
+                     let cd_args, ~constant:_, repr, _arg_sorts =
+                       Typedecl.update_constructor_representation
+                         env loc cd_args ~is_extension_constructor:false
+                     in
+                     Result.to_option repr, { constructor with cd_args })
+              in
+              match cstr_shape_opt with
+              | None -> None
+              | Some cstr_shape ->
+                  let (is_mutable, num_nodes_visited), fields =
+                    for_one_constructor constructor ~depth ~num_nodes_visited
+                      ~cstr_shape
                   in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
+                  if is_mutable then None
+                  else
+                    Some (num_nodes_visited, next_const, consts, next_tag + 1,
+                          (next_tag, fields) :: non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -1087,9 +1049,6 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
         | [] ->
-          (* CR rtjoa: An refined any-constructor shouldn't become constant.
-             This footgun should no longer exist once we make all-void
-             constructors no longer immediate. *)
           Misc.fatal_error "Typeopt.value_kind_variant: became all-constant"
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
@@ -1132,7 +1091,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed | Record_dummy _ | Record_undetermined
           | Record_variable _
           | Record_inlined (_, (Constructor_undetermined
-                               | Constructor_variable _), _) ->
+                               | Constructor_variable _
+                               | Constructor_immediate_all_void), _) ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)

@@ -357,5 +357,21 @@ let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
 done done done
 let _ = f_bigarray3_int32 bigarray3_int32
 
+type void_ty : void
+external unbox_unit : unit -> void_ty = "%unbox_unit"
+
+(* All-void constructors are tagged immediates with
+   [@immediate_all_void_constructor] and blocks without. *)
+type all_void_variant =
+  | Imm_void of void_ty [@immediate_all_void_constructor]
+  | Blk_void of void_ty
+  | Const
+  | Boxed of int
+
+let[@inline never] [@local never] f_all_void_variant (x : all_void_variant) = x
+let _ = f_all_void_variant (Imm_void (unbox_unit ()))
+let _ = f_all_void_variant (Blk_void (unbox_unit ()))
+let _ = f_all_void_variant Const
+let _ = f_all_void_variant (Boxed 42)
 
 (* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)

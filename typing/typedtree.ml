@@ -1597,6 +1597,8 @@ let label_sort (type rep)
     | Record_undetermined
     | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error "label_sort: unexpected undetermined representation"
+    | Record_inlined (_, Constructor_immediate_all_void, _) ->
+      Misc.fatal_error "label_sort: unexpected immediate representation"
     | Record_dummy _ ->
       Misc.fatal_error "label_sort: unexpected dummy representation"
     end
@@ -1623,6 +1625,9 @@ let finalized_label_sort (label : Data_types.label_description)
   | Record_inlined
       (_, (Constructor_undetermined | Constructor_variable _), _) ->
     Misc.fatal_error "finalized_label_sort: representation was not finalized"
+  | Record_inlined (_, Constructor_immediate_all_void, _) ->
+    Misc.fatal_error
+      "finalized_label_sort: unexpected immediate representation"
   | Record_dummy _ ->
     Misc.fatal_error "finalized_label_sort: unexpected dummy representation"
 
