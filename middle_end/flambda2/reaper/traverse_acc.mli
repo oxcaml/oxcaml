@@ -38,6 +38,7 @@ type code_dep =
     my_closure : Variable.t;
     return : Variable.t list;
     exn : Variable.t;
+    function_slot_size : int;
     is_tupled : bool;
     known_arity_call_witness : Code_id_or_name.t;
     unknown_arity_call_witnesses : Code_id_or_name.t list
@@ -241,3 +242,11 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+(** Record the function declaration a closure is bound to. *)
+val add_closure_function_decl :
+  t -> Name.t -> Function_declarations.code_id_in_function_declaration -> unit
+
+val get_closure_function_decls :
+  t ->
+  Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t

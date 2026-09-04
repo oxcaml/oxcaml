@@ -25,6 +25,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-let compute ~free_names:_ ~code_deps:_ ~get_code_metadata:_
-    (_ : Unboxing_analysis.result) : Slot_offsets.result =
+let compute ~free_names:_ ~code_deps:_ ~closure_function_decls:_
+    ~get_code_metadata:_ (_ : Unboxing_analysis.result) : Slot_offsets.result =
   Misc.fatal_error "Slot_offsets_analysis.compute is not implemented"

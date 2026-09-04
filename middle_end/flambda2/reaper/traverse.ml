@@ -65,6 +65,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     | Check _ -> true
   in
   let is_tupled = Code.is_tupled code in
+  let function_slot_size = Code.function_slot_size code in
   let known_arity_call_witness =
     Acc.create_known_arity_call_witness acc code_id ~params ~returns:return ~exn
   in
@@ -75,6 +76,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let code_dep =
     { Traverse_acc.arity;
       result_arity;
+      function_slot_size;
       return;
       my_closure;
       exn;
@@ -114,6 +116,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           (Function_slot.Map.find function_slot funs
             : Function_declarations.code_id_in_function_declaration)
         in
+        Acc.add_closure_function_decl acc name code_id;
         let code_id =
           match code_id with
           | Deleted _ -> Or_unknown.Unknown
@@ -831,7 +834,10 @@ type result =
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    closure_function_decls :
+      Function_declarations.code_id_in_function_declaration
+      Code_id_or_name.Map.t
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -892,5 +898,6 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc;
+    closure_function_decls = Acc.get_closure_function_decls acc
   }
