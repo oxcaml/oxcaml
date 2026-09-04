@@ -30,8 +30,8 @@ type after_rebuild =
       ('simplify_named_result after_rebuild_let_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) -> after_rebuild
   | After_rebuild_let_cont of after_rebuild_let_cont_data *
       (after_rebuild_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
-  | After_rebuild_single_non_recursive_let_cont of
-      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
+  | After_rebuild_single_non_recursive_let_cont of after_rebuild_single_non_recursive_let_cont_data *
+      (after_rebuild_single_non_recursive_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
   | After_rebuild_single_recursive_let_cont of
       (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
 
@@ -50,6 +50,18 @@ and after_rebuild_let_cont_data =
   (* CR pchambart: this one should be unboxed once rebuild is also defonctionnalized *)
   { rebuild_let_cont_data : rebuild_let_cont_data;
     after_rebuild : after_rebuild;
+  }
+
+and after_rebuild_single_non_recursive_let_cont_data =
+  { cont : Continuation.t;
+    at_unit_toplevel : bool;
+    extra_params_and_args : Continuation_extra_params_and_args.t;
+    rewrite_ids : Apply_cont_rewrite_id.Set.t;
+    is_exn_handler : bool;
+    params : Bound_parameters.t;
+    is_cold : bool;
+    is_single_inlinable_use : bool;
+    k : rebuilt_handler -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t;
   }
 
 type 'a rebuild = Rebuild of (Upwards_acc.t -> after_rebuild:after_rebuild -> 'a)
@@ -73,8 +85,8 @@ let apply_after_rebuild (after_rebuild : after_rebuild) expr uacc =
       after_rebuild data expr uacc
   | After_rebuild_let_cont (data, after_rebuild) ->
       after_rebuild data expr uacc
-  | After_rebuild_single_non_recursive_let_cont after_rebuild ->
-      after_rebuild expr uacc
+  | After_rebuild_single_non_recursive_let_cont (data, after_rebuild) ->
+      after_rebuild data expr uacc
   | After_rebuild_single_recursive_let_cont after_rebuild ->
       after_rebuild expr uacc
 

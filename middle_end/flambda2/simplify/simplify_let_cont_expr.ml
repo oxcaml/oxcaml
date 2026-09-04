@@ -666,7 +666,14 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
     EPA.concat ~inner:invariant_extra_params_and_args
       ~outer:extra_params_and_args
   in
-  D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_non_recursive_let_cont (fun handler uacc ->
+  let after_rebuild_data : D.after_rebuild_single_non_recursive_let_cont_data =
+    (* CR pchambart: probably should include handler_to_rebuild instead of recapturing everything *)
+    { cont; at_unit_toplevel; extra_params_and_args; rewrite_ids;
+      is_exn_handler; params; is_cold; is_single_inlinable_use; k; }
+  in
+let after_rebuild_single_non_recursive_let_cont
+  ({ cont; at_unit_toplevel; extra_params_and_args; rewrite_ids; is_exn_handler; params; is_cold; is_single_inlinable_use; k; } : D.after_rebuild_single_non_recursive_let_cont_data)
+    handler uacc =
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont at_unit_toplevel uacc handler
       in
@@ -780,7 +787,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           cost_metrics_of_handler = cost_metrics
         }
       in
-      k rebuilt_handler uacc))
+      k rebuilt_handler uacc
+  in
+  D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_non_recursive_let_cont (after_rebuild_data, after_rebuild_single_non_recursive_let_cont))
 
 let rebuild_single_recursive_handler cont
     (handler_to_rebuild : handler_to_rebuild) uacc k =
