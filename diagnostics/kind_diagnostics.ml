@@ -17,9 +17,8 @@ let crossing ~loc ~subject error =
   | axes ->
     let suffix = match axes with [_] -> " axis" | _ -> " axes" in
     Some
-      (Nlg.realize_without_terms
-         [ Nlg.story
-             ~claim:
+      [ Nlg.plain
+          ~claim:
                [ Nlg.ref_source loc
                    [ Nlg.txt
                        (subject ^ " does not cross the "
@@ -33,6 +32,6 @@ let crossing ~loc ~subject error =
                      " annotation claims a type's values may be used at the \
                       stronger mode on those axes, whatever mode they are held \
                       at" ] ]
-             () ])
+             () ]
 
 let diagnose (Crossing { loc; subject; error }) = crossing ~loc ~subject error
