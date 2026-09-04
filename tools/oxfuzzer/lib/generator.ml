@@ -47,7 +47,7 @@ end
 
 (* CR-someday hwasilewski: Move all constants, including probabilities, into
    Config. *)
-(* CR-someday hwasilewski: Make [Config] controlled by swarm testing. *)
+(* CR-soon hwasilewski: Make [Config] controlled by swarm testing. *)
 module Config = struct
   let max_function_count = 10
 
@@ -146,6 +146,22 @@ let record_complexity expr ~complexity =
   incr complexity;
   expr
 
+let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
+  let vars =
+    List.filter_map
+      (fun (name, vty) ->
+        match vty with Ty.Number nty -> Some (name, nty) | Ty.Bool -> None)
+      env.bindings
+  in
+  Gen.when_
+    (not (List.is_empty vars))
+    (fun () ->
+      let name, inner_ty = random_element st vars in
+      maybe_opaque st ~probability:Config.opaque_leaf_probability
+        (record_complexity
+           (Expr.Convert { from = inner_ty; to_ = nty; expr = Expr.Var name })
+           ~complexity))
+
 let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   let gen_const_int base =
     Gen.create (fun () ->
@@ -196,17 +212,6 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
     Gen.map const
       ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
   in
-  let gen_var nty =
-    let vars =
-      List.filter (fun (_, vty) -> Ty.equal (Ty.Number nty) vty) env.bindings
-    in
-    Gen.when_
-      (not (List.is_empty vars))
-      (fun () ->
-        let name, _ty = random_element st vars in
-        maybe_opaque st ~probability:Config.opaque_leaf_probability
-          (record_complexity (Expr.Var name) ~complexity))
-  in
   let gen_ty nty =
     Gen.run_exn
       (Gen.weighted st.random_state
@@ -224,7 +229,10 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
             expr = Expr.Bin_op { ty = Ty.Number inner_ty; op = binop; lhs; rhs }
           })
   in
-  let leaf = Gen.weighted st.random_state [2, gen_var nty; 1, gen_const nty] in
+  let leaf =
+    Gen.weighted st.random_state
+      [2, gen_numeric_var st env nty ~complexity; 1, gen_const nty]
+  in
   Gen.run_exn
     (Gen.weighted st.random_state
        [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env nty ~complexity])
@@ -285,7 +293,9 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
           let _callee_env, body = gen_fun_body st callee_env 0 in
           let result =
             with_expression_complexity (fun ~complexity ->
-                gen_number st callee_env return_ty ~complexity)
+                match gen_numeric_var st callee_env return_ty ~complexity with
+                | Some generate -> generate ()
+                | None -> gen_number st callee_env return_ty ~complexity)
           in
           let function_ =
             { Function.name; params; inline; body; return_ty; result }
@@ -316,9 +326,10 @@ and gen_bool (st : State.t) env ~complexity =
     then gen_binop op Ty.Bool gen_bool_arg
     else Gen.unavailable
   in
+  let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [ 5, gen_binop Bin_op.Eq (Ty.Number nty) gen_number_arg;
+       [ 5, gen_binop comparison (Ty.Number nty) gen_number_arg;
          1, gen_bool_binop Bin_op.Eq;
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or ])

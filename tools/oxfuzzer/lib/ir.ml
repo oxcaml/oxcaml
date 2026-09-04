@@ -164,6 +164,10 @@ module Bin_op = struct
     | Sub
     | Mul
     | Eq
+    | Lt
+    | Le
+    | Gt
+    | Ge
     | And
     | Or
 
@@ -176,19 +180,24 @@ module Bin_op = struct
       Misc.fatal_errorf
         "Bin_op.ops_for_ty: only numeric types allowed, but got Bool"
 
-  let to_code ty op =
-    let name = function
-      | Add -> "add"
-      | Sub -> "sub"
-      | Mul -> "mul"
-      | Eq -> "equal"
-      | And | Or -> assert false
+  let to_code ty binop lhs rhs =
+    let module_name =
+      match ty with
+      | Ty.Number nty -> NumberTy.to_module nty
+      | Ty.Bool -> "Bool"
     in
-    match ty, op with
-    | _, And -> ident "&&"
-    | _, Or -> ident "||"
-    | Ty.Number nty, op -> qualified_ident (NumberTy.to_module nty) (name op)
-    | Ty.Bool, op -> qualified_ident "Bool" (name op)
+    let call name = apply (qualified_ident module_name name) [lhs; rhs] in
+    match binop with
+    | Add -> call "add"
+    | Sub -> call "sub"
+    | Mul -> call "mul"
+    | Eq -> call "equal"
+    | Lt -> op "<" [call "compare"; int 0]
+    | Le -> op "<=" [call "compare"; int 0]
+    | Gt -> op ">" [call "compare"; int 0]
+    | Ge -> op ">=" [call "compare"; int 0]
+    | And -> op "&&" [lhs; rhs]
+    | Or -> op "||" [lhs; rhs]
 end
 
 module Expr = struct
@@ -227,8 +236,7 @@ module Expr = struct
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
-      Exp.apply (Bin_op.to_code ty op)
-        [Nolabel, to_code lhs; Nolabel, to_code rhs]
+      Bin_op.to_code ty op (to_code lhs) (to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
       let args =
