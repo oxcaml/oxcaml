@@ -100,7 +100,7 @@ def check_dependencies() -> None:
 Missing files:
 {formatted}
 
-From the compiler root, run:
+From the repository root, run:
   make compiler
 """)
 
