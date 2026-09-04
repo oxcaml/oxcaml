@@ -512,14 +512,11 @@ let format_structured_diagnostic ppf
     | Annotated { annotation; content } -> (match annotation with
       | Code -> Format.fprintf ppf "`%a`" render_inlines content
       | Source _ -> Format.fprintf ppf "[%a]" render_inlines content
-      | Mention { entity; form } ->
-        Format.fprintf ppf "{%d%s:%a}"
-          (Diagnostic.Entities.Id.to_int entity)
+      | Mention { entity = _; form } ->
+        Format.fprintf ppf "{%s:%a}"
           (match form with Name -> "" | Pronoun -> "*")
           render_inlines content
-      | Term term ->
-        Format.fprintf ppf "%a#%d" render_inlines content
-          (Diagnostic.Glossary.Id.to_int term))
+      | Term _ -> Format.fprintf ppf "%a#" render_inlines content)
   in
   let rec inlines_are_empty inlines =
     List.for_all inlines ~f:(fun (inline : Diagnostic.Inline.t) ->
@@ -553,20 +550,8 @@ let format_structured_diagnostic ppf
       Format.pp_print_cut ppf ();
       render_children ppf children
   in
-  let render_entity ppf (entity, (loc : Location.t)) =
-    Format.fprintf ppf "entity %d: %a"
-      (Diagnostic.Entities.Id.to_int entity) Location.print_loc loc
-  in
-  let render_entities ppf = function
-    | [] -> ()
-    | entities ->
-      Format.pp_print_cut ppf ();
-      Format.pp_print_cut ppf ();
-      render_list render_entity ppf entities
-  in
-  Format.fprintf ppf "@[<v 0>%a%a@]"
+  Format.fprintf ppf "@[<v 0>%a@]"
     (render_list (render_block ~relation:"")) diagnostic.body
-    render_entities (Diagnostic.Entities.to_list diagnostic.entities)
 
 let format_structured_output output =
   let diagnostics =
