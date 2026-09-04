@@ -79,12 +79,21 @@ module Bin_op : sig
     | Sub
     | Mul
     | Eq
+    | Lt
+    | Le
+    | Gt
+    | Ge
     | And
     | Or
 
   val ops_for_ty : Ty.t -> t list
 
-  val to_code : Ty.t -> t -> Parsetree.expression
+  val to_code :
+    Ty.t ->
+    t ->
+    Parsetree.expression ->
+    Parsetree.expression ->
+    Parsetree.expression
 end
 
 module Expr : sig
