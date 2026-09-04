@@ -28,43 +28,72 @@ val term : 'term -> 'term Phrase.segment
 
 val ref_source : Location.t -> 'term Phrase.segment list -> 'term Phrase.segment
 
+val ordinal : int -> string
+
+val longident_name : Longident.t -> string option
+
 type subject =
   { name : Phrase.word list;
     span : Location.t option
   }
 
+val subject : ?span:Location.t -> Phrase.word list -> subject
+
 val mention : case:Phrase.case -> subject -> _ Phrase.segment
 
 val pronoun : case:Phrase.case -> subject -> _ Phrase.segment
 
-module Statement : sig
-  type 'term clause =
-    | Subordinate of 'term Phrase.t
-    | Coordinate of 'term Phrase.t
+type 'term aside
 
-  type 'term t
-end
+type 'term beat
 
-type 'term plan =
-  { statement : 'term Statement.t option;
-    children : (Structured_diagnostic.Relation.t * 'term plan) list
-  }
+type 'term story = 'term beat
 
-val sentence :
-  ?kind:Structured_diagnostic.Kind.t ->
-  ?subject:subject ->
-  ?clause:'term Statement.clause ->
-  'term Phrase.t ->
-  'term Statement.t
+val note :
+  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term aside
 
-val fragment :
-  ?kind:Structured_diagnostic.Kind.t -> 'term Phrase.t -> 'term Statement.t
+val background : 'term Phrase.t -> 'term aside
 
-val pronominalize : 'term plan list -> 'term plan list
+val suggest : 'term Phrase.t -> 'term aside
+
+val claim :
+  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term beat
+
+val but :
+  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term beat
+
+val sub_claim :
+  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term aside
+
+val child : 'term beat -> 'term aside
+
+val story : 'term beat list -> 'term story
+
+val plain :
+  claim:'term Phrase.t ->
+  ?contrast:'term Phrase.t ->
+  ?background:'term Phrase.t list ->
+  ?suggestions:'term Phrase.t list ->
+  unit ->
+  'term story
+
+val beheaded : 'term beat -> 'term beat
+
+val reframe : 'term beat -> 'term story list -> 'term beat
+
+val pronominalize : 'term story list -> 'term story list
+
+val pronominalize_one : 'term story -> 'term story
 
 val realize :
-  loc:Location.t ->
-  term_entry:('term -> Structured_diagnostic.Glossary.Entry.t) ->
+  term_entry:('term -> Structured_diagnostic.Glossary_entry.t) ->
   term_words:('term -> 'term Phrase.t) ->
-  'term plan list ->
+  loc:Location.t ->
+  'term story list ->
   Structured_diagnostic.t
+
+val rendered_children :
+  term_entry:('term -> Structured_diagnostic.Glossary_entry.t) ->
+  term_words:('term -> 'term Phrase.t) ->
+  'term beat ->
+  Structured_diagnostic.Block.t
