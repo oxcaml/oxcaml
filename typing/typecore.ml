@@ -8144,11 +8144,23 @@ and type_expect_
       in
       begin match sifnot with
         None ->
-          let ifso =
-            type_expect env expected_mode sifso
-              (mk_expected ~explanation:If_no_else_branch Predef.type_unit) in
+          let ifso, ~unboxed =
+            type_if_no_else_branch ~ty_expected env expected_mode sifso
+          in
+          let ifnot =
+            if unboxed
+            then
+              Some
+                { exp_desc = Texp_unboxed_unit;
+                  exp_loc = Location.none; exp_extra = [];
+                  exp_type = instance Predef.type_unboxed_unit;
+                  exp_attributes = [];
+                  exp_env = env }
+            else
+              None
+          in
           rue {
-            exp_desc = Texp_ifthenelse(cond, ifso, None);
+            exp_desc = Texp_ifthenelse(cond, ifso, ifnot);
             exp_loc = loc; exp_extra = [];
             exp_type = ifso.exp_type;
             exp_attributes = sexp.pexp_attributes;
@@ -11313,6 +11325,26 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
             Expr_type_clash(err, None, Some sexp))));
     end
   end
+
+and type_if_no_else_branch ~ty_expected env expected_mode sexp =
+  let exp =
+    type_expect env expected_mode sexp
+      (mk_expected ~explanation:If_no_else_branch ty_expected)
+  in
+  let ty = expand_head env exp.exp_type in
+  let disambiguated_unit_ty, ~unboxed =
+    if is_unboxed_unit_type env ty then begin
+      check_disambiguation_principality ~loc:exp.exp_loc ~name:"unit#" ty;
+      instance Predef.type_unboxed_unit, ~unboxed:true
+    end else
+      instance Predef.type_unit, ~unboxed:false
+  in
+  with_explanation (Some If_no_else_branch) (fun () ->
+    try unify_var env ty_expected disambiguated_unit_ty
+    with Unify err ->
+      raise(Error(exp.exp_loc, env,
+        Expr_type_clash(err, None, Some sexp))));
+  exp, ~unboxed
 
 (* Most of the arguments are the same as [type_cases].
 
