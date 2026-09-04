@@ -117,7 +117,7 @@ let rewrite_module_facts ~root ~rewrite_root
     | Some _ ->
       let add_root_to_location loc = (add_root ~root { txt = (); loc }).loc in
       let rewrite_node : Node.t -> Node.t = function
-        | (Node.Uid _ | Node.Whole_unit _) as node -> node
+        | Node.Uid _ as node -> node
         | Node.Location (compilation_unit, loc) ->
           Node.Location (compilation_unit, add_root_to_location loc)
       in
@@ -129,7 +129,7 @@ let rewrite_module_facts ~root ~rewrite_root
 
 let merge_module_facts left right =
   match (left, right) with
-  | None, facts | facts, None -> facts
+  | None, _ | _, None -> None
   | Some left, Some right ->
     Some
       (link_module_facts
@@ -324,7 +324,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       stats = Stats.empty;
       root_directory = root;
       related_uids = Uid_map.empty ();
-      module_facts = None
+      module_facts = Some (link_module_facts Module_implementation_facts.empty)
     }
   in
   let final_index =
