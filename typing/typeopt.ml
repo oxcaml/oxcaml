@@ -756,18 +756,13 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited ~params:decl.type_params ~args
                          cstrs rep)
-        | Type_record
-            (_,
-             (Record_undetermined
-             | Record_inlined (_, Constructor_undetermined, _)),
-             _) ->
-          num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
-                         ~num_nodes_visited labels rep)
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         labels rep)
         | Type_record_unboxed_product
             (_, Record_unboxed_product_undetermined, _) ->
           num_nodes_visited, nullable Pgenval
@@ -1091,8 +1086,36 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     num_nodes_visited, non_nullable raw_kind
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
-      (labels : Types.label_declaration list) rep =
+      ~params ~args (labels : Types.label_declaration list) rep =
+  let recompute make_rep =
+    match
+      List.map (fun (label : Types.label_declaration) ->
+        { label with ld_type = Ctype.apply env params label.ld_type args })
+        labels
+    with
+    | exception Ctype.Cannot_apply ->
+        num_nodes_visited, non_nullable Pgenval
+    | labels ->
+        let types = List.map (fun label -> label.Types.ld_type) labels in
+        match Typedecl.compute_block_shape env types with
+        | None -> num_nodes_visited, non_nullable Pgenval
+        | Some shape ->
+            value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
+              ~params ~args labels (make_rep shape)
+  in
   match rep with
+  | Record_undetermined ->
+      recompute (function
+        | `Not_mixed -> Record_boxed
+        | `Mixed shape -> Record_mixed shape)
+  | Record_inlined (tag, Constructor_undetermined, vrep) ->
+      recompute (fun shape ->
+        let shape =
+          match shape with
+          | `Not_mixed -> Types.Constructor_uniform_value
+          | `Mixed shape -> Types.Constructor_mixed shape
+        in
+        Record_inlined (tag, shape, vrep))
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
          cmi, according to the comment on scrape_ty.  Reevaluate whether it's
@@ -1105,9 +1128,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_undetermined | Record_variable _
-  | Record_inlined (_, (Constructor_undetermined
-                       | Constructor_variable _), _) ->
+  | Record_variable _
+  | Record_inlined (_, Constructor_variable _, _) ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
