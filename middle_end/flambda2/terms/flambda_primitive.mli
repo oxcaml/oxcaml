@@ -545,6 +545,10 @@ type binary_float_arith_op =
   | Mul
   | Div
 
+type atomic_offset_units =
+  | Field_index
+  | Byte_offset
+
 (** Primitives taking exactly two arguments. *)
 type binary_primitive =
   | Block_set of
@@ -569,9 +573,9 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_load_field of Block_access_field_kind.t
+  | Atomic_load of atomic_offset_units * Block_access_field_kind.t
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
-     deleting [Atomic_load_field] *)
+     deleting [Atomic_load] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
   | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
@@ -599,10 +603,15 @@ type ternary_primitive =
           more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
-  | Atomic_field_int_arith of int_atomic_op
-  | Atomic_set_field of Block_access_field_kind.t * Alloc_mode.For_assignments.t
-  | Atomic_exchange_field of
-      Block_access_field_kind.t * Alloc_mode.For_assignments.t
+  | Atomic_int_arith of atomic_offset_units * int_atomic_op
+  | Atomic_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_exchange of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
   | Write_offset of
       Write_offset_kind.t
       * Flambda_kind.With_subkind.t
@@ -619,10 +628,13 @@ type ternary_primitive =
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =
-  | Atomic_compare_and_set_field of
-      Block_access_field_kind.t * Alloc_mode.For_assignments.t
-  | Atomic_compare_exchange_field of
-      { atomic_kind : Block_access_field_kind.t;
+  | Atomic_compare_and_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_compare_exchange of
+      { offset_units : atomic_offset_units;
+        atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
         args_kind : Block_access_field_kind.t;
             (** The kind of values which the compare-exchange operation is to be

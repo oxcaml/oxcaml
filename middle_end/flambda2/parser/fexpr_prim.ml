@@ -523,6 +523,9 @@ let reinterp_64bit_word =
         "int64_as_float64", Unboxed_int64_as_unboxed_float64;
         "float64_as_int64", Unboxed_float64_as_unboxed_int64 ]
 
+let atomic_offset_units =
+  D.constructor_flag P.["field", Field_index; "offset", Byte_offset]
+
 let int_atomic_op =
   D.constructor_flag
     P.
@@ -953,10 +956,11 @@ let duplicate_block =
     (fun _ (kind, alloc_region) -> P.Duplicate_block { kind; alloc_region })
 
 (* Binaries *)
-let atomic_load_field =
+let atomic_load =
   D.(
-    binary "%atomic_load_field" ~params:block_access_field_kind (fun _ kind ->
-        P.Atomic_load_field kind))
+    binary "%atomic_load"
+      ~params:(param2 atomic_offset_units block_access_field_kind)
+      (fun _ (offset_units, kind) -> P.Atomic_load (offset_units, kind)))
 
 let block_set =
   D.(
@@ -1220,22 +1224,29 @@ let array_set =
            k, sk))
     (fun _ (k, sk) -> P.Array_set (k, sk))
 
-let atomic_exchange_field =
+let atomic_exchange =
   D.(
-    ternary "%atomic_exchange_field"
-      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
-      (fun _ (a, mode) -> P.Atomic_exchange_field (a, mode)))
+    ternary "%atomic_exchange"
+      ~params:
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_exchange (offset_units, field_kind, mode)))
 
-let atomic_field_int_arith =
+let atomic_int_arith =
   D.(
-    ternary "%atomic_field_int_arith" ~params:int_atomic_op (fun _ o ->
-        P.Atomic_field_int_arith o))
+    ternary "%atomic_int_arith"
+      ~params:(param2 atomic_offset_units int_atomic_op)
+      (fun _ (offset_units, op) -> P.Atomic_int_arith (offset_units, op)))
 
-let atomic_set_field =
+let atomic_set =
   D.(
-    ternary "%atomic_set_field"
-      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
-      (fun _ (a, mode) -> P.Atomic_set_field (a, mode)))
+    ternary "%atomic_set"
+      ~params:
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_set (offset_units, field_kind, mode)))
 
 let bigarray_set =
   D.(
@@ -1266,19 +1277,25 @@ let write_offset =
       (fun _ (wok, kind, alloc_mode) -> P.Write_offset (wok, kind, alloc_mode)))
 
 (* Quaternaries *)
-let atomic_compare_and_set_field =
+let atomic_compare_and_set =
   D.(
-    quaternary "%atomic_compare_and_set_field"
-      ~params:(param2 block_access_field_kind alloc_mode_for_assignments)
-      (fun _ (a, mode) -> P.Atomic_compare_and_set_field (a, mode)))
-
-let atomic_compare_exchange_field =
-  D.(
-    quaternary "%atomic_compare_exchange_field"
+    quaternary "%atomic_compare_and_set"
       ~params:
-        (param3 block_access_field_kind block_access_field_kind
-           alloc_mode_for_assignments) (fun _ (atomic_kind, args_kind, mode) ->
-        P.Atomic_compare_exchange_field { atomic_kind; args_kind; mode }))
+        (param3 atomic_offset_units block_access_field_kind
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, field_kind, mode) ->
+        P.Atomic_compare_and_set (offset_units, field_kind, mode)))
+
+let atomic_compare_exchange =
+  D.(
+    quaternary "%atomic_compare_exchange"
+      ~params:
+        (param4 atomic_offset_units
+           (labeled "atomic_kind" block_access_field_kind)
+           (labeled "args_kind" block_access_field_kind)
+           alloc_mode_for_assignments)
+      (fun _ (offset_units, atomic_kind, args_kind, mode) ->
+        P.Atomic_compare_exchange { offset_units; atomic_kind; args_kind; mode }))
 
 (* Variadics *)
 let begin_region =
@@ -1382,7 +1399,7 @@ module OfFlambda = struct
 
   let binop env (op : P.binary_primitive) =
     match op with
-    | Atomic_load_field ak -> atomic_load_field env ak
+    | Atomic_load (offset_units, ak) -> atomic_load env (offset_units, ak)
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
     | Bigarray_load (d, k, l) -> bigarray_load env (d, k, l)
@@ -1403,9 +1420,12 @@ module OfFlambda = struct
   let ternop env (op : P.ternary_primitive) =
     match op with
     | Array_set (k, sk) -> array_set env (k, sk)
-    | Atomic_exchange_field (a, mode) -> atomic_exchange_field env (a, mode)
-    | Atomic_field_int_arith o -> atomic_field_int_arith env o
-    | Atomic_set_field (a, mode) -> atomic_set_field env (a, mode)
+    | Atomic_exchange (offset_units, a, mode) ->
+      atomic_exchange env (offset_units, a, mode)
+    | Atomic_int_arith (offset_units, o) ->
+      atomic_int_arith env (offset_units, o)
+    | Atomic_set (offset_units, a, mode) ->
+      atomic_set env (offset_units, a, mode)
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset (wok, kind, alloc_mode) ->
@@ -1413,10 +1433,10 @@ module OfFlambda = struct
 
   let quaternop env (op : P.quaternary_primitive) =
     match op with
-    | Atomic_compare_and_set_field (a, mode) ->
-      atomic_compare_and_set_field env (a, mode)
-    | Atomic_compare_exchange_field { atomic_kind; args_kind; mode } ->
-      atomic_compare_exchange_field env (atomic_kind, args_kind, mode)
+    | Atomic_compare_and_set (offset_units, a, mode) ->
+      atomic_compare_and_set env (offset_units, a, mode)
+    | Atomic_compare_exchange { offset_units; atomic_kind; args_kind; mode } ->
+      atomic_compare_exchange env (offset_units, atomic_kind, args_kind, mode)
 
   let varop env (op : P.variadic_primitive) =
     match op with
