@@ -84,11 +84,8 @@ module type Sort = sig
       | Product of t list
       | Univar of univar
       | Genvar of var
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
+          (** Generic sort variable. Instantiated to a concrete layout in during
+              slambda evaluation of templates. *)
       | Addressable of t
           (** Invariant: this constructor is never redundantly applied. I.e.,
               given [Addressable t], [not (is_surely_addressable t)] *)
@@ -257,9 +254,6 @@ module type Sort = sig
 
   val bits64 : t
 
-  (** Create a new sort variable that can be unified. *)
-  val new_var : level:int -> var
-
   val of_base : base -> t
 
   val of_const : Const.t -> t
@@ -291,35 +285,27 @@ module type Sort = sig
   (** Return a [Const.t] if the sort has no unset variables, or [None] *)
   val to_const_opt : t -> Const.t option
 
-  (** Like [default_to_scannable_and_get] but operates directly on a [var]. *)
-  val var_default_to_scannable_and_get : var -> Const.t
-
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
   type change
 
   val undo_change : change -> unit
 
-  (** Create a fresh polymorphic sort variable (level = [Ident.highest_scope]).
-  *)
+  val new_var : level:int -> var
+
+  (** Create a generic sort variable. *)
   val new_genvar : unit -> var
 
-  (** Create a polymorphic sort variable (level = [Ident.highest_scope]),
-      intended for saving to a cmi. *)
+  (** Create a generic sort variable for saving to a cmi. *)
   val new_genvar_for_cmi : unit -> var
 
-  (** Returns [true] iff the variable was created by {!new_genvar} or
-      {!new_genvar_for_cmi}. *)
+  (** Checks the variable is a generic sort variable. *)
   val is_genvar : var -> bool
 
   val reset_cmi_sort_id : unit -> unit
 
-  (** Get the concrete content of a variable. The returned sort must be
-      representable (including rigid sorts). *)
-  val get_representable_var : var -> t option
-
   (** [subst s t] applies the variable substitution [s] to [t], replacing each
-      [Var v] where [(v, t')] is in [subst] with [t']. *)
+      [Var v] where [(v, t')] is in [s] with [t']. *)
   val subst : (var * t) list -> t -> t
 
   (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
@@ -350,7 +336,7 @@ module type Sort = sig
   val generalize_with : (unit -> 'a) -> 'a * var list
 
   (** Generalize sort variables when in sort generalization context. Sets the
-      level of sort variables to Ident.highest_scope and accumulates them. This
+      level of sort variables to [generic_level] and accumulates them. This
       should be called from Ctype.generalize. Only has an effect when called
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
