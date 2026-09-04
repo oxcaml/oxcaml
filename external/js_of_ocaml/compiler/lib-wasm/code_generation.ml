@@ -40,6 +40,7 @@ type constant_global =
 type context =
   { constants : W.expression Var.Hashtbl.t
   ; mutable data_segments : string Var.Map.t
+  ; string_globals : Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Var.Map.t
   ; mutable other_fields : W.module_field list
   ; mutable imports : (Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
@@ -65,6 +66,7 @@ type context =
 let make_context ~value_type =
   { constants = Var.Hashtbl.create 128
   ; data_segments = Var.Map.empty
+  ; string_globals = String.Hashtbl.create 128
   ; constant_globals = Var.Map.empty
   ; other_fields = []
   ; imports = StringMap.empty
@@ -120,6 +122,12 @@ let expression_list f l =
 
 let register_data_segment x v st =
   st.context.data_segments <- Var.Map.add x v st.context.data_segments;
+  (), st
+
+let lookup_string_global s st = String.Hashtbl.find_opt st.context.string_globals s, st
+
+let register_string_global s x st =
+  String.Hashtbl.add st.context.string_globals s x;
   (), st
 
 let get_context st = st.context, st
@@ -949,7 +957,10 @@ let need_dummy_fun ~cps ~arity st =
            x)
   , st )
 
-let init_code context = instrs context.init_code
+(* Initialization code is accumulated in reverse execution order.
+   Consumers must reverse the list so that fragments run in registration
+   order *)
+let init_code context = instrs (List.rev context.init_code)
 
 let function_body ~context ~param_names ~body =
   let st = { var_count = 0; vars = Var.Map.empty; instrs = []; context } in
