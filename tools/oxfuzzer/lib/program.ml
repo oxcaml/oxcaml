@@ -187,8 +187,7 @@ let print_number nty e =
     (qualified_ident "Printf" "printf")
     [Exp.constant (Const.string fmt); arg]
 
-(* Whenever new libraries are added here, make sure `library_flags` from
-   `oxfuzzer.py` is also updated. *)
+(* Keep in sync with [LIBRARIES] in oxfuzzer.py. *)
 let libraries = ["stdlib_upstream_compatible"; "stdlib_stable"]
 
 let to_code
