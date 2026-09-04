@@ -15,7 +15,7 @@ let typecore_domain : Typecore.error -> Domain.t = function
   | Modalities_on_atomic_field _ ->
     Type
   | Block_index_modality_mismatch _ | Submode_failed _
-  | Curried_application_complete _ | Mode_mismatch _
+  | Curried_application_complete _
   | Uncurried_function_escapes_comonadic _ | Uncurried_function_escapes_locality
   | Tail_call_local_returning | Exclave_in_nontail_position
   | Exclave_returns_not_local | Always_heap_allocation _
@@ -108,8 +108,7 @@ let typedecl_domain : Typedecl.error -> Domain.t = function
   | Recursive_jkind_definition _ ->
     Kind
   | Local_not_enabled | Zero_alloc_attr_unsupported _
-  | Zero_alloc_attr_non_function | Zero_alloc_attr_bad_user_arity
-  | Missing_immediate_all_void_constructor_attribute _ ->
+  | Zero_alloc_attr_non_function | Zero_alloc_attr_bad_user_arity ->
     Attribute_or_extension
   | Repeated_parameter | Duplicate_constructor _ | Too_many_constructors
   | Duplicate_label _ | Recursive_abbrev _ | Cycle_in_def _
