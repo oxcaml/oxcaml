@@ -58,6 +58,15 @@ type my_closure_param_decision =
 
 val print_param_decision : Format.formatter -> param_decision -> unit
 
+(** The kinds of the parameters that remain after applying the given decisions,
+    in order: a kept parameter keeps its kind, a deleted one contributes nothing
+    and an unboxed one is replaced by the kinds of its fields. *)
+val unarized_kinds_of_param_decisions :
+  param_decision list -> Flambda_kind.With_subkind.t list
+
+(** [unarized_kinds_of_param_decisions] as a single unboxed product. *)
+val arity_of_param_decisions : param_decision list -> [`Complex] Flambda_arity.t
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;

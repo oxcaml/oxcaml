@@ -188,6 +188,27 @@ let print_param_decision ppf param_decision =
   | Unbox fields ->
     Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
+let unarized_kinds_of_param_decisions param_decisions =
+  List.fold_left
+    (fun acc param_decision ->
+      match param_decision with
+      | Delete -> acc
+      | Keep (_, kind) -> kind :: acc
+      | Unbox fields ->
+        Unboxed_fields.fold_with_kind
+          (fun kind _ acc -> Flambda_kind.With_subkind.anything kind :: acc)
+          fields acc)
+    [] param_decisions
+  |> List.rev
+
+let arity_of_param_decisions param_decisions =
+  Flambda_arity.(
+    create
+      [ Unboxed_product
+          (List.map
+             (fun k -> Component_for_creation.Singleton k)
+             (unarized_kinds_of_param_decisions param_decisions)) ])
+
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
     Format.fprintf ff "(fields %a) (size %d)"

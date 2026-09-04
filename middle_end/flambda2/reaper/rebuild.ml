@@ -181,25 +181,6 @@ let get_parameters_and_modes params_decisions_and_modes =
     [] params_decisions_and_modes
   |> List.rev |> List.split
 
-let get_arity params_decisions =
-  let arity =
-    List.fold_left
-      (fun acc param_decision ->
-        match (param_decision : Unboxing_analysis.param_decision) with
-        | Delete -> acc
-        | Keep (_, kind) -> kind :: acc
-        | Unbox fields ->
-          Unboxed_fields.fold_with_kind
-            (fun kind _ acc -> KS.anything kind :: acc)
-            fields acc)
-      [] params_decisions
-    |> List.rev
-  in
-  Flambda_arity.(
-    create
-      [ Unboxed_product
-          (List.map (fun k -> Component_for_creation.Singleton k) arity) ])
-
 let is_dead_var env v =
   match Variable.kind v with
   | Region | Rec_info -> false
@@ -1371,7 +1352,10 @@ let rebuild_apply env apply =
             Code_id.print code_id Apply.print apply
         | Some p -> p
       in
-      let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
+      let return_arity =
+        Flambda_arity.unarize_t
+          (Unboxing_analysis.arity_of_param_decisions return_decisions)
+      in
       let args = List.map fst (List.flatten args) in
       let make_apply ~continuation =
         Apply.create ~callee ~continuation exn_continuation ~args ~args_arity
@@ -2308,7 +2292,10 @@ and rebuild_function_params_and_body (env : env) res code_metadata
           Code_id.print code_id
       | Some p -> p
     in
-    let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
+    let result_arity =
+      Flambda_arity.unarize_t
+        (Unboxing_analysis.arity_of_param_decisions return_decisions)
+    in
     let code_metadata =
       Code_metadata.with_is_tupled false
         (Code_metadata.with_result_arity result_arity code_metadata)
