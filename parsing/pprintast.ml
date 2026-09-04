@@ -430,8 +430,43 @@ let string_loc ppf x = fprintf ppf "%s" x.txt
 let string_quot f x = pp f "`%a" ident_of_name x
 
 (* new mode and modality syntax *)
-let mode f { txt = Mode s; _ } =
-  pp_print_string f s
+let pp_mode_consts f consts =
+  pp_print_list ~pp_sep:(fun f () -> pp f " ")
+    (fun f c -> pp_print_string f c.txt) f consts
+
+let mode_bound sep f { bound_vars; bound_const } =
+  let pp_var f { elem_morph; elem_var; elem_mod } =
+    (match elem_morph with
+     | None -> pp f "'%s" elem_var.txt
+     | Some m -> pp f "%s('%s)" m.txt elem_var.txt);
+    match elem_mod with
+    | [] -> ()
+    | _ :: _ -> pp f " mod %a" pp_mode_consts elem_mod
+  in
+  let pp_vars = pp_print_list ~pp_sep:(fun f () -> pp f "%s" sep) pp_var in
+  match bound_vars, bound_const with
+  | vars, [] -> pp_vars f vars
+  | [], consts -> pp_mode_consts f consts
+  | vars, consts -> pp f "%a%s%a" pp_vars vars sep pp_mode_consts consts
+
+let mode_desc f m =
+  match m with
+  | Mode consts -> pp_mode_consts f consts
+  | Mode_var v -> pp f "'%s" v.txt
+  | Mode_bounds { upper; lower } -> (
+      let is_empty { bound_vars; bound_const } =
+        match bound_vars, bound_const with
+        | [], [] -> true
+        | _, _ -> false
+      in
+      match is_empty upper, is_empty lower with
+      | false, true -> pp f "[< %a]" (mode_bound " & ") upper
+      | true, false -> pp f "[> %a]" (mode_bound " | ") lower
+      | false, false ->
+          pp f "[< %a > %a]" (mode_bound " & ") upper (mode_bound " | ") lower
+      | true, true -> pp f "[]")
+
+let mode f { txt; _ } = mode_desc f txt
 
 let modes f m =
   pp_print_list ~pp_sep:(fun f () -> pp f " ") mode f m
