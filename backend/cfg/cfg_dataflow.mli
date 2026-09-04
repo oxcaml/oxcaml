@@ -45,16 +45,14 @@ module type Forward_S = sig
       fix-point has been reached and [Error _] otherwise, where the nested value
       is a map binding each label of the CFG to the domain value at the start of
       the corresponding block. The map has an entry for every block: entry
-      points are initially bound to [init], all other blocks to the domain's
-      [bot] value, and blocks never reached by the analysis keep their initial
-      binding. If [Error _] is returned then the contents of the map is not
-      guaranteed to be sound.
+      points are initially bound to [init] (entry points include all trap
+      handlers if [handlers_are_entry_points] is [true]), all other blocks to
+      the domain's [bot] value, and blocks never reached by the analysis keep
+      their initial binding.
 
       A fix-point is not reached if there is still pending work after
       [max_iteration] (defaulting to [max_int]) have been executed, an iteration
-      being the processing of one element from the working set. The [init] value
-      is the initial value of entry points: the entry block and, if
-      [handlers_are_entry_points] is [true], all trap handler blocks. *)
+      being the processing of one element from the working set. *)
   val run :
     Cfg.t ->
     ?max_iteration:int ->

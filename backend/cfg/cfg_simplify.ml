@@ -250,8 +250,6 @@ end = struct
             let b2_predecessors = Cfg.predecessor_labels b2_block in
             if
               (not (Label.equal b1_label cfg.entry_label))
-              (* the merge deletes `b2`, and the entry block must never be
-                 deleted (`cfg.entry_label` would be left dangling) *)
               && (not (Label.equal b2_label cfg.entry_label))
               && (not (Label.equal b1_label b2_label))
               && List.compare_length_with b2_predecessors 1 = 0
