@@ -6,49 +6,13 @@ module Location_key : sig
   val equal : t -> t -> bool
 end
 
-module Entities : sig
-  module Id : sig
-    type t
-
-    val to_int : t -> int
-  end
-
-  type t
-
-  val empty : t
-
-  val intern : t -> Location.t -> t * Id.t
-
-  val find : t -> Id.t -> Location.t option
-
-  val to_list : t -> (Id.t * Location.t) list
-end
-
-module Glossary : sig
-  module Entry : sig
-    type t =
-      { term : string;
-        category : string;
-        description : string;
-        url : string option
-      }
-  end
-
-  module Id : sig
-    type t
-
-    val to_int : t -> int
-  end
-
-  type t
-
-  val empty : t
-
-  val intern : t -> Entry.t -> t * Id.t
-
-  val find : t -> Id.t -> Entry.t option
-
-  val to_list : t -> (Id.t * Entry.t) list
+module Glossary_entry : sig
+  type t =
+    { term : string;
+      category : string;
+      description : string;
+      url : string option
+    }
 end
 
 module Form : sig
@@ -75,10 +39,10 @@ module Annotation : sig
     | Code
     | Source of Location.t
     | Mention of
-        { entity : Entities.Id.t;
+        { entity : Location.t;
           form : Form.t
         }
-    | Term of Glossary.Id.t
+    | Term of Glossary_entry.t
 end
 
 module Inline : sig
@@ -96,16 +60,14 @@ module Block : sig
       content : Inline.t list;
       children : (Relation.t * t) list
     }
+
+  val equal : t -> t -> bool
 end
 
 type t =
   { loc : Location.t;
-    title : string;
-    entities : Entities.t;
-    glossary : Glossary.t;
     body : Block.t list
   }
 
-val locations : t -> Inline.t list -> Location.t list
-
 val to_json : t -> string
+val of_json : string -> (t, string) result
