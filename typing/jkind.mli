@@ -104,6 +104,7 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
+    | Box of 'sort t * Scannable_axes.t  (** See [Jkind_types.Layout.t] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -123,11 +124,9 @@ module Layout : sig
 
   val is_surely_addressable_flat : Sort.Flat.t t -> bool
 
-  (** Updates the nullability on the layout's scannable axis. *)
-  val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
-
-  (** Updates the separability on the layout's scannable axis. *)
-  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
+  (** See [Jkind_types.Layout.Const.non_redundant_axes_of_box] *)
+  val non_redundant_axes_of_box_flat :
+    Sort.Flat.t t -> Scannable_axes.t -> string list
 
   module Debug_printers : sig
     val t :
@@ -337,6 +336,11 @@ module Builtin : sig
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
 
   val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
+
+  val scannable_with_separability :
+    Jkind_axis.Separability.t ->
+    why:History.scannable_creation_reason ->
+    'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
@@ -686,16 +690,15 @@ val apply_modality_l :
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
-(** Change a jkind to be appropriate for ['a or_null] based on passed ['a].
-    Adjusts nullability to be [Maybe_null], and separability to be
-    [Maybe_separable] if it is already [Separable]. If the jkind is already
-    [Maybe_null], fails. *)
+(** Given a kind [k], returns the kind of [(_ : k) or_null]. Fails if [or_null]
+    cannot always be applied. *)
 val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
 
-(** Change a jkind to be appropriate for an expectation of a type passed to the
-    [or_null] constructor. Adjusts nullability to be [Non_null], and
-    separability to be [Non_float] if it is demanded to be [Separable]. If the
-    jkind is already [Non_null], fails. *)
+(** When the type [t or_null] is constrained by kind [k], we use
+    [apply_or_null_r] to try to reduce this to a constraint on [t].
+
+    Concretely, [apply_or_null_r env k] produces a kind [k'] such that [t < k']
+    implies [t or_null < k]. Fails if no [or_null] type could have kind [k]. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
 (** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
