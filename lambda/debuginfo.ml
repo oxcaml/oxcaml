@@ -562,9 +562,13 @@ let to_structured_mangling_path ~name dbg :
     | item :: path -> item :: collapse_anonymous ~located_by_child:false path
   in
   (* Drop the suffix of partial applications and the innermost named function
-     (if any), then end the path with [name]. Using [name] preserves the stamps
-     it includes for uniqueness; we append it even after an innermost anonymous
-     function (which is kept for its position) so the stamps are not lost. *)
+     (if any), then end the path with [name], which is the name of the code
+     being mangled as seen by Flambda 2. It can differ from the innermost named
+     function in the scopes, e.g. for the unboxed variant of a function
+     ([f_unboxed]), and is appended even after an innermost anonymous function
+     (which is kept for its position). [name] is expected to be free of any
+     stamps: the uniqueness of the linkage name is ensured by the suffix that
+     [Code_id.create] appends to the mangled path. *)
   let rec drop_partials_and_adjust_function_name ~name
       (path : Compilation_unit.t Structured_mangling.path)
       =

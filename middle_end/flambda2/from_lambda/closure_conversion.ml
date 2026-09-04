@@ -3092,6 +3092,7 @@ let close_functions acc external_env ~current_alloc_region ~current_region
         let code_id =
           Code_id.create
             ~name:(Function_slot.to_string function_slot)
+            ~unstamped_name:(Function_slot.name function_slot)
             ~debug:function_dbg compilation_unit
         in
         Function_slot.Map.add function_slot code_id map)
