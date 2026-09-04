@@ -207,6 +207,26 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     let context = Context.Expr in
     ignore (Type_utils.type_in_env ~verbosity ~context env ppf source : bool);
     to_string ()
+  | Structured_errors ->
+    let errors = Mpipeline.typer_errors pipeline in
+    List.filter_map errors ~f:(fun exn ->
+        match Location.error_of_exn exn with
+        | Some (`Ok report) ->
+          let snap = Btype.snapshot () in
+          let result =
+            try Diagnostics.diagnostic_of_exception report exn with
+            | (Out_of_memory | Stack_overflow) as e ->
+              Btype.backtrack snap;
+              raise e
+            | diagnosis_exn ->
+              Logger.log ~section:"structured-errors" ~title:"diagnosis raised"
+                "%a: %s" Logger.exn diagnosis_exn
+                (Printexc.get_backtrace ());
+              None
+          in
+          Btype.backtrack snap;
+          result
+        | Some `Already_displayed | None -> None)
   | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
     let typer = Mpipeline.typer_result pipeline in
 

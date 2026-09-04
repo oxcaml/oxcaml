@@ -899,6 +899,15 @@ let all_commands =
         run buffer
           (Query_protocol.Mode_enclosing { position; override_verbosity = None })
       end;
+    command "structured-errors"
+      ~doc:
+        "Returns structured OxCaml-specific error data (currently: mode \
+         errors) for all errors in the buffer. Each result carries its \
+         reported span (the span diagnostics are reported at), so clients \
+         select by span as they do for regular diagnostics."
+      ~spec:[] ~default:() begin fun buffer () ->
+        run buffer Query_protocol.Structured_errors
+      end;
     command "type-expression"
       ~doc:
         "Returns the type of the expression when typechecked in the \
