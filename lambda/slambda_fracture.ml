@@ -375,7 +375,8 @@ let rec fracture_lam lambda : slambda =
                       [Lvar closure_id],
                       ktmpl_loc ),
                   lam ) ))
-          (0, fracture_dynamic body) env
+          (0, fracture_dynamic body)
+          env
       in
       let kind =
         match kind with
@@ -392,8 +393,8 @@ let rec fracture_lam lambda : slambda =
             }
       in
       let lf =
-        lfunction' ~kind ~params:(closure_param :: params) ~return ~body
-          ~attr ~loc
+        lfunction' ~kind ~params:(closure_param :: params) ~return ~body ~attr
+          ~loc
           ~mode:alloc_heap
             (* This closure has no free variables and will always be
                 statically allocated. alloc_heap is an safe choice. *)
