@@ -121,6 +121,8 @@ module Interval : sig
       mutable end_ : Point.t (* inclusive *)
     }
 
+  val is_dummy : t -> bool
+
   val overlap : t -> t -> bool
 
   val print : Format.formatter -> t -> unit
@@ -129,6 +131,8 @@ end = struct
     { mutable start : Point.t;
       mutable end_ : Point.t
     }
+
+  let is_dummy t = t.start == Point.dummy
 
   let overlap left right =
     Point.compare left.start right.end_ <= 0
@@ -246,16 +250,25 @@ with type slots := t = struct
     in
     Stack_class.Tbl.iter intervals ~f:(fun stack_class intervals ->
         Array.iteri intervals ~f:(fun slot_index interval ->
-            let buckets = Stack_class.Tbl.find buckets stack_class in
-            let bucket_index = ref 0 in
-            while
-              !bucket_index < Array.length buckets
-              && does_not_fit buckets.(!bucket_index) interval
-            do
-              incr bucket_index
-            done;
-            assert (!bucket_index < Array.length buckets);
-            Int.Tbl.replace buckets.(!bucket_index) slot_index interval));
+            (* Skip slots whose interval is still dummy: no CFG instruction
+               references them (typically the slot of a spill that
+               [Cfg_deadcode] removed once rematerialization replaced every
+               reload that would have read it). Bucketing them would inflate
+               [max_bucket_indices] in [optimize] and leave [num_stack_slots]
+               higher than the count of slots actually used. Orphan [Reg.t]s
+               pointing at such slots are skipped by [optimize]'s remap loop. *)
+            if not (Interval.is_dummy interval)
+            then (
+              let buckets = Stack_class.Tbl.find buckets stack_class in
+              let bucket_index = ref 0 in
+              while
+                !bucket_index < Array.length buckets
+                && does_not_fit buckets.(!bucket_index) interval
+              do
+                incr bucket_index
+              done;
+              assert (!bucket_index < Array.length buckets);
+              Int.Tbl.replace buckets.(!bucket_index) slot_index interval)));
     buckets
 
   let contains_empty t =
@@ -327,8 +340,23 @@ let optimize (t : t) (cfg_with_infos : Cfg_with_infos.t) : unit =
               let stack_class = Stack_class.of_machtype reg.typ in
               match Buckets.find_bucket buckets ~stack_class ~slot_index with
               | None ->
-                fatal "slot %d (stack_class=%a) is not in any of the buckets"
-                  slot_index Stack_class.print stack_class
+                (* A slot is in no bucket iff its interval is still dummy, i.e.
+                   no CFG instruction references it
+                   ([Buckets.build_from_intervals] skips such slots). This
+                   happens for the stack twin of a register whose spill
+                   [Cfg_deadcode] removed at the end of the split pass, once
+                   rematerialization had replaced every reload of the slot; the
+                   dangling [Stack (Local _)] location is then harmless because
+                   nothing reads it. Anything else would leave a register with a
+                   slot index that may lie outside the packed frame, so it is
+                   fatal. *)
+                let interval =
+                  (Stack_class.Tbl.find intervals stack_class).(slot_index)
+                in
+                if not (Interval.is_dummy interval)
+                then
+                  fatal "slot %d (stack_class=%a) is not in any of the buckets"
+                    slot_index Stack_class.print stack_class
               | Some bucket_index ->
                 if debug
                 then

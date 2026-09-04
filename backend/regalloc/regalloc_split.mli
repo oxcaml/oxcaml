@@ -22,5 +22,12 @@ type split_result =
 
     The algorithm is an adaptation of the one rewriting a CFG to put it in SSA
     form: we simply consider that new names are introduced at destruction
-    points. *)
-val split_live_ranges : Cfg_with_infos.t -> split_result
+    points.
+
+    When [description] is [Some _] (validation is enabled), the pre-split shape
+    of every rematerialized instruction is recorded with it (cf.
+    [Regalloc_validate.Description.record_rematerialization]). *)
+val split_live_ranges :
+  description:Regalloc_validate.Description.t option ->
+  Cfg_with_infos.t ->
+  split_result

@@ -228,7 +228,10 @@ let check =
         in
         match res with
         | Ok cfg ->
-          if cfg = after then () else Format.printf "Validation changed cfg"
+          (* Physical equality: [Regalloc_validate.test] returns the very CFG it
+             was given, and structural equality cannot be used because
+             instruction lists contain cycles. *)
+          if cfg == after then () else Format.printf "Validation changed cfg"
         | Error error ->
           Format.printf "Validation failed: %a" Regalloc_validate.Error.print
             error
@@ -427,54 +430,58 @@ let () =
     ~exp_err:
       ">> Fatal error: Register allocation changed existing instruction no. 23 \
        into a register allocation specific instruction"
-(*= CR xclerc for xclerc: same as above (polymorphic compare on values
-      with cycles).
-      let () =
-     check "Regalloc added non-regalloc specific instr"
-       (fun () ->
-         let templ, make_id = base_templ () in
-         let cfg1 = Cfg_desc.make_pre_regalloc templ in
-         let block = templ.&(add_label) in
-         let r = (List.hd block.body).res in
-         block.body
-           <- { desc = Op Move; id = make_id (); arg = r; res = r } :: block.body;
-         let cfg2 = Cfg_desc.make_post_regalloc templ in
-         cfg1, cfg2)
-       ~exp_std:"fatal exception raised when validating description"
-       ~exp_err:
-         ">> Fatal error: Register allocation added non-regalloc specific \
-          instruction no. 26"
-  *)
-(*= CR xclerc for xclerc: same as above (polymorphic compare on values
-     with cycles).
-     let () =
-       check "Regalloc added a 'goto' and a block"
-         (fun () ->
-           let templ, make_id = base_templ () in
-           let cfg1 = Cfg_desc.make_pre_regalloc templ in
-           let tmp_label = new_label 1 in
-           let templ =
-             { templ with
-               blocks =
-                 { start = tmp_label;
-                   exn = None;
-                   body = [];
-                   terminator =
-                     { desc = Always return_label;
-                       res = [||];
-                       arg = [||];
-                       id = make_id ()
-                     }
-                 }
-                 :: templ.blocks
-             }
-           in
-           templ.&(add_label).terminator.desc <- Always tmp_label;
-           let cfg2 = Cfg_desc.make_post_regalloc templ in
-           cfg1, cfg2)
-         ~exp_std:"" ~exp_err:""
-  *)
-[@@ocamlformat "wrap-comments=false"]
+
+let () =
+  (* An added [Move] is accepted (split inserts phi moves), and so is an added
+     rematerializable instruction (cf.
+     [Regalloc_split_utils.is_rematerializable_shape]); an [Intop] is
+     neither. *)
+  check "Regalloc added non-regalloc specific instr"
+    (fun () ->
+      let templ, make_id = base_templ () in
+      let cfg1 = Cfg_desc.make_pre_regalloc templ in
+      let block = templ.&(add_label) in
+      let r = (List.hd block.body).res in
+      block.body
+        <- { desc = Op (Intop Operation.Iadd);
+             id = make_id ();
+             arg = [| r.(0); r.(0) |];
+             res = r
+           }
+           :: block.body;
+      let cfg2 = Cfg_desc.make_post_regalloc templ in
+      cfg1, cfg2)
+    ~exp_std:"fatal exception raised when validating description"
+    ~exp_err:
+      ">> Fatal error: Register allocation added non-regalloc specific \
+       instruction no. 26"
+
+let () =
+  check "Regalloc added a 'goto' and a block"
+    (fun () ->
+      let templ, make_id = base_templ () in
+      let cfg1 = Cfg_desc.make_pre_regalloc templ in
+      let tmp_label = new_label 1 in
+      let templ =
+        { templ with
+          blocks =
+            { start = tmp_label;
+              exn = None;
+              body = [];
+              terminator =
+                { desc = Always return_label;
+                  res = [||];
+                  arg = [||];
+                  id = make_id ()
+                }
+            }
+            :: templ.blocks
+        }
+      in
+      templ.&(add_label).terminator.desc <- Always tmp_label;
+      let cfg2 = Cfg_desc.make_post_regalloc templ in
+      cfg1, cfg2)
+    ~exp_std:"" ~exp_err:""
 
 let () =
   check "Regalloc added a fallthrough block that goes to the wrong label"
@@ -563,9 +570,9 @@ let () =
       cfg1, cfg2)
     ~exp_std:"fatal exception raised when validating description"
     ~exp_err:
-      ">> Fatal error: The instruction's no. 12 successor id has changed. \
-       Before allocation: 11. After allocation (ignoring instructions added by \
-       allocation): 9."
+      ">> Fatal error: The instruction's no. 11 successor id has changed. \
+       Before allocation: 9. After allocation (ignoring instructions added by \
+       allocation): 12."
 
 let () =
   check "Regalloc added a loop"
@@ -622,16 +629,63 @@ let () =
        return, after: raise."
 
 let () =
+  (* Deleting a non-pure instruction (the [Prologue]) is always rejected. *)
   check "Deleted instruction"
+    (fun () ->
+      let templ, _ = base_templ () in
+      let cfg1 = Cfg_desc.make_pre_regalloc templ in
+      templ.&(entry_label).body <- List.tl templ.&(entry_label).body;
+      let cfg2 = Cfg_desc.make_post_regalloc templ in
+      cfg1, cfg2)
+    ~exp_std:"fatal exception raised when validating description"
+    ~exp_err:
+      ">> Fatal error: Instruction no. 25 was deleted by register allocator"
+
+let () =
+  (* Deleting a pure instruction whose result is live (the [Iadd] feeds the
+     return) is rejected at its effective successor, the terminator of
+     [add_label]. The equations alone would not notice: the result register is
+     also an argument at the same location, so the equation passes through. *)
+  check "Deleted pure instruction with live result"
     (fun () ->
       let templ, _ = base_templ () in
       let cfg1 = Cfg_desc.make_pre_regalloc templ in
       templ.&(add_label).body <- List.tl templ.&(add_label).body;
       let cfg2 = Cfg_desc.make_post_regalloc templ in
       cfg1, cfg2)
-    ~exp_std:"fatal exception raised when validating description"
-    ~exp_err:
-      ">> Fatal error: Instruction no. 8 was deleted by register allocator"
+    ~exp_std:
+      (Printf.sprintf
+         "Validation failed: CFG REGALLOC Check failed in instr 7:\n\
+          Instruction's description before allocation: goto 6\n\
+          Instruction's description after allocation: goto 6\n\
+          Message: Instruction no. 8 (intop + ) was deleted by register \
+          allocator but its result anon:I/36 is live\n\
+          Live equations for the normal successor: [anon:I/36=%s]"
+         (Regs.register_name Cmm.Int (P RBX)))
+    ~exp_err:""
+
+let () =
+  (* Deleting a pure instruction whose result is dead is accepted, as
+     [Cfg_deadcode] does at the end of the split pass. *)
+  check "Deleted pure instruction with dead result"
+    (fun () ->
+      let templ, make_id = base_templ () in
+      let block = templ.&(add_label) in
+      let add = block.!(0) in
+      (* [int.(4)] is not used anywhere else. *)
+      let dead : Basic.t =
+        { id = make_id ();
+          desc = Op (Intop Operation.Iadd);
+          arg = add.arg;
+          res = [| int.(4) |]
+        }
+      in
+      block.body <- dead :: block.body;
+      let cfg1 = Cfg_desc.make_pre_regalloc templ in
+      block.body <- List.tl block.body;
+      let cfg2 = Cfg_desc.make_post_regalloc templ in
+      cfg1, cfg2)
+    ~exp_std:"" ~exp_err:""
 
 let make_loop ~loop_loc_first n =
   let make_id =

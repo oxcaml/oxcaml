@@ -387,9 +387,10 @@ let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
 let prelude :
     (module Utils) ->
     on_fatal_callback:(unit -> unit) ->
+    description:Regalloc_validate.Description.t option ->
     Cfg_with_infos.t ->
     cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t =
- fun (module Utils) ~on_fatal_callback cfg_with_infos ->
+ fun (module Utils) ~on_fatal_callback ~description cfg_with_infos ->
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   on_fatal ~f:on_fatal_callback;
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
@@ -452,7 +453,8 @@ let prelude :
     then
       let { Regalloc_split.stack_slots; phi_moves } =
         Profile.record ~accumulate:true "split"
-          (fun () -> Regalloc_split.split_live_ranges cfg_with_infos)
+          (fun () ->
+            Regalloc_split.split_live_ranges ~description cfg_with_infos)
           ()
       in
       collect_cfg_infos cfg_with_layout, stack_slots, phi_moves

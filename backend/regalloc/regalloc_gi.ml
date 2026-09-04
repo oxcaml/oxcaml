@@ -258,13 +258,17 @@ let rec main : round:int -> flat:bool -> State.t -> Cfg_with_infos.t -> unit =
     | false -> if debug then log "(end of main)"
     | true -> main ~round:(succ round) ~flat state cfg_with_infos)
 
-let run : Cfg_with_infos.t -> Cfg_with_infos.t =
- fun cfg_with_infos ->
+let run :
+    description:Regalloc_validate.Description.t option ->
+    Cfg_with_infos.t ->
+    Cfg_with_infos.t =
+ fun ~description cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   let cfg_infos, stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
+      ~description
       ~on_fatal_callback:(fun () -> save_cfg "gi" cfg_with_layout)
       cfg_with_infos
   in

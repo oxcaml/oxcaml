@@ -267,7 +267,8 @@ let count_duplicate_spills_reloads_in_block (block : Cfg.basic_block) =
 type spills_reloads_moves =
   { spills : int;
     reloads : int;
-    moves : int
+    moves : int;
+    loads : int
   }
 
 let count_spills_reloads_moves (block : Cfg.basic_block) =
@@ -276,15 +277,18 @@ let count_spills_reloads_moves (block : Cfg.basic_block) =
     | Op Spill -> { acc with spills = acc.spills + 1 }
     | Op Reload -> { acc with reloads = acc.reloads + 1 }
     | Op Move -> { acc with moves = acc.moves + 1 }
+    | Op (Load _) -> { acc with loads = acc.loads + 1 }
     | _ -> acc
   in
-  DLL.fold_left ~f ~init:{ spills = 0; reloads = 0; moves = 0 } block.body
+  DLL.fold_left ~f
+    ~init:{ spills = 0; reloads = 0; moves = 0; loads = 0 }
+    block.body
 
 (** Returns all CFG counters that work on a single block and are summative over
     the blocks. *)
 let cfg_block_counters (block : Cfg.basic_block) =
   let dup_spills, dup_reloads = count_duplicate_spills_reloads_in_block block in
-  let { spills; reloads; moves } = count_spills_reloads_moves block in
+  let { spills; reloads; moves; loads } = count_spills_reloads_moves block in
   let instructions = DLL.length block.body + 1 in
   Profile.Counters.create ()
   |> Profile.Counters.set "block_duplicate_spill" dup_spills
@@ -294,6 +298,7 @@ let cfg_block_counters (block : Cfg.basic_block) =
   |> Profile.Counters.set "instruction" instructions
   |> Profile.Counters.set "block" 1
   |> Profile.Counters.set "move" moves
+  |> Profile.Counters.set "load" loads
 
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (cfg : Cfg.t) =
@@ -357,25 +362,27 @@ let block_layout ppf_dump cl =
     Cfg_block_layout.run cl;
     pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg "After cfg_block_layout" cl
 
-let register_allocator_gi cfg_with_infos =
-  cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
+let register_allocator_gi ~description cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_gi"
+    (Regalloc_gi.run ~description)
     cfg_with_infos
 
-let register_allocator_irc cfg_with_infos =
+let register_allocator_irc ~description cfg_with_infos =
   (* CR-soon xclerc for xclerc: we are mis-attributing the time to IRC even when
      we switch to linscan *)
   cfg_with_infos_profile ~accumulate:true "cfg_irc"
     (fun cfg_with_infos ->
-      match Regalloc_irc.run cfg_with_infos with
+      match Regalloc_irc.run ~description cfg_with_infos with
       | Some res -> res
-      | None -> Regalloc_ls.run cfg_with_infos)
+      | None -> Regalloc_ls.run ~description cfg_with_infos)
     cfg_with_infos
 
-let register_allocator_ls cfg_with_infos =
-  cfg_with_infos_profile ~accumulate:true "cfg_ls" Regalloc_ls.run
+let register_allocator_ls ~description cfg_with_infos =
+  cfg_with_infos_profile ~accumulate:true "cfg_ls"
+    (Regalloc_ls.run ~description)
     cfg_with_infos
 
-let register_allocator fd : Cfg_with_infos.t -> Cfg_with_infos.t =
+let register_allocator fd ~description : Cfg_with_infos.t -> Cfg_with_infos.t =
   (* First check for per-function regalloc attribute in codegen_options *)
   let rec find_regalloc_option = function
     | [] -> None
@@ -390,11 +397,11 @@ let register_allocator fd : Cfg_with_infos.t -> Cfg_with_infos.t =
   match (regalloc : Clflags.Register_allocator.t) with
   | Cfg ->
     if should_use_linscan fd
-    then register_allocator_ls
-    else register_allocator_irc
-  | Irc -> register_allocator_irc
-  | Ls -> register_allocator_ls
-  | Gi -> register_allocator_gi
+    then register_allocator_ls ~description
+    else register_allocator_irc ~description
+  | Irc -> register_allocator_irc ~description
+  | Ls -> register_allocator_ls ~description
+  | Gi -> register_allocator_gi ~description
 
 let available_regs ~stack_slots ~f x =
   (* Skip DWARF variable range generation for complicated functions to avoid
@@ -435,7 +442,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
         Regalloc_validate.Description.create
           (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       in
-      cfg_with_infos ++ register_allocator fd_cmm
+      cfg_with_infos
+      ++ register_allocator fd_cmm ~description:cfg_description
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description))
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run

@@ -264,19 +264,24 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     | false -> None
     | true -> Some (Regalloc_validate.Description.create cfg_with_layout)
   in
+  let description = Option.join cfg_description in
   let start_time = cpu_time () in
   let allocator = select_allocator config cfg_with_layout in
   let (_, rounds_ref) : Cfg_with_infos.t * int ref =
     match allocator with
-    | GI -> Regalloc_gi.run cfg_with_infos, Regalloc_gi.For_testing.rounds
+    | GI ->
+      ( Regalloc_gi.run ~description cfg_with_infos,
+        Regalloc_gi.For_testing.rounds )
     | IRC ->
-      begin match Regalloc_irc.run cfg_with_infos with
+      begin match Regalloc_irc.run ~description cfg_with_infos with
       | Some res -> res, Regalloc_irc.For_testing.rounds
       | None ->
         fatal "IRC allocator returned None (function %S is likely too complex)"
           (Cfg_with_layout.cfg cfg_with_layout).fun_name
       end
-    | LS -> Regalloc_ls.run cfg_with_infos, Regalloc_ls.For_testing.rounds
+    | LS ->
+      ( Regalloc_ls.run ~description cfg_with_infos,
+        Regalloc_ls.For_testing.rounds )
   in
   let end_time = cpu_time () in
   (match cfg_description with

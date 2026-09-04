@@ -42,10 +42,13 @@ val rewrite_gen :
   Reg.t list * Reg.t list * bool
 
 (* Runs the first steps common to register allocators, reinitializing registers,
-   checking preconditions, and collecting information from the CFG. *)
+   checking preconditions, and collecting information from the CFG.
+   [description] is the validator's description of the CFG, when validation is
+   enabled; the split pass records its rematerializations with it. *)
 val prelude :
   (module Utils) ->
   on_fatal_callback:(unit -> unit) ->
+  description:Regalloc_validate.Description.t option ->
   Cfg_with_infos.t ->
   cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t
 
