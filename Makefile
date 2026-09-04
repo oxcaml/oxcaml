@@ -236,6 +236,9 @@ CMDLINER_DIR := $(CURDIR)/_build/cmdliner
 MENHIR_DIR := $(CURDIR)/_build/menhir
 YOJSON_DIR := $(CURDIR)/_build/yojson
 JSOO_DIR := $(CURDIR)/_build/jsoo
+JSOO_TEST_DIR := $(CURDIR)/_build/jsoo-test
+OUT_CHANNEL_REDIRECT_DIR := $(CURDIR)/_build/out-channel-redirect
+QCHECK_DIR := $(CURDIR)/_build/qcheck
 
 OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
 PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
@@ -250,12 +253,15 @@ SEDLEX_LIB := $(SEDLEX_DIR)/install/default/lib
 CMDLINER_LIB := $(CMDLINER_DIR)/install/default/lib
 MENHIR_LIB := $(MENHIR_DIR)/install/default/lib
 YOJSON_LIB := $(YOJSON_DIR)/install/default/lib
+OUT_CHANNEL_REDIRECT_LIB := $(OUT_CHANNEL_REDIRECT_DIR)/install/default/lib
+QCHECK_LIB := $(QCHECK_DIR)/install/default/lib
 
 PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
 PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
 PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
 SEDLEX_OCAMLPATH := $(PPXLIB_OCAMLPATH):$(PPXLIB_LIB):$(SEQ_LIB):$(GEN_LIB)
 JSOO_OCAMLPATH := $(SEDLEX_OCAMLPATH):$(SEDLEX_LIB):$(CMDLINER_LIB):$(MENHIR_LIB):$(YOJSON_LIB)
+JSOO_TEST_OCAMLPATH := $(JSOO_OCAMLPATH):$(OUT_CHANNEL_REDIRECT_LIB):$(QCHECK_LIB)
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
@@ -416,6 +422,45 @@ jsoo-build: $(JSOO_BUILD_DEPS)
 	    compiler/bin-jsoo_minify/jsoo_minify.exe \
 	    compiler/bin-wasm_of_ocaml/wasm_of_ocaml.exe \
 	    compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
+
+.PHONY: out-channel-redirect-build
+out-channel-redirect-build: external-libs-compiler
+	env OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_OUT_CHANNEL_REDIRECT_SRC)" \
+	    --build-dir="$(OUT_CHANNEL_REDIRECT_DIR)" \
+	    --only-packages=out-channel-redirect @install
+
+.PHONY: qcheck-build
+qcheck-build: external-libs-compiler
+	env OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_QCHECK_SRC)" \
+	    --build-dir="$(QCHECK_DIR)" \
+	    --only-packages=qcheck-core @install
+
+.PHONY: jsoo-test
+jsoo-test: $(JSOO_BUILD_DEPS) out-channel-redirect-build qcheck-build
+	env $(PPXLIB_DUNE_ENV) \
+	  PROJECT_ROOT="$(JSOO_TEST_DIR)/default" \
+	  OCAMLPATH="$(JSOO_TEST_OCAMLPATH)" WASM_OF_OCAML=true \
+	  $(dune) build \
+	    --root=external/js_of_ocaml \
+	    --build-dir="$(JSOO_TEST_DIR)" \
+	    --profile=with-effects \
+	    --only-packages=js_of_ocaml,js_of_ocaml-compiler,js_of_ocaml-ppx,wasm_of_ocaml-compiler \
+	    @compiler/tests-compiler/runtest \
+	    @compiler/lib-runtime-files/tests/runtest \
+	    @compiler/tests-ppx-expect-light/runtest \
+	    @compiler/tests-ppx-expect-light/runtest-js \
+	    @compiler/tests-ppx-expect-light/runtest-wasm \
+	    @compiler/tests-jsoo/runtest \
+	    @compiler/tests-jsoo/runtest-js \
+	    @compiler/tests-jsoo/runtest-wasm \
+	    @compiler/tests-wasm_of_ocaml/runtest \
+	    @compiler/tests-wasm_of_ocaml/runtest-js \
+	    @compiler/tests-wasm_of_ocaml/runtest-wasm \
+	    @lib/tests/runtest-js @lib/tests/runtest-wasm
 
 .PHONY: external-libs-build
 external-libs-build: ppxlib-build sedlex-build
