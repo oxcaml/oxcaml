@@ -905,12 +905,8 @@ let all_commands =
          errors) for all errors in the buffer. Each result carries its \
          reported span (the span diagnostics are reported at), so clients \
          select by span as they do for regular diagnostics."
-      ~spec:
-        [ optional "-pronouns"
-            "<bool> Render repeated mentions as pronouns (default is true)"
-            (Marg.bool (fun pronouns _pronouns -> pronouns))
-        ] ~default:true begin fun buffer pronouns ->
-      run buffer (Query_protocol.Structured_errors { pronouns })
+      ~spec:[] ~default:() begin fun buffer () ->
+        run buffer Query_protocol.Structured_errors
       end;
     command "type-expression"
       ~doc:
