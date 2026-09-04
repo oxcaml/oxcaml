@@ -1787,7 +1787,7 @@ let fast_sub_of_sort_super : type r.
   | Types.Layout
       (Jkind_types.Layout.Sort (sub_sort, { nullability = _; separability = _ }))
     ->
-    if not (Jkind_types.Sort.equate sub_sort super_sort)
+    if not (Jkind_types.Sort.equate ~allow_mutation:true sub_sort super_sort)
     then false
     else fast_sub_of_value_sub (Jkind.Mod_bounds.to_axis_lattice mod_bounds) sub
   | Types.Layout _ | Types.Kconstr _ -> false
