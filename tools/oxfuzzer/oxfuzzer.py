@@ -78,13 +78,13 @@ class Toolchain:
     @property
     def configurations(self) -> tuple[Configuration, ...]:
         return (
-            Configuration(
-                name="ocamlc",
-                compiler=self.ocamlc,
-                # Use the runtime from `ocamlrun` created by `make install`.
-                flags=(*self.library_flags("cma"), "-use-runtime", str(self.ocamlrun)),
-                ocamllib=self.ocamllib,
-            ),
+            # Configuration(
+            #     name="ocamlc",
+            #     compiler=self.ocamlc,
+            #     # Use the runtime from `ocamlrun` created by `make install`.
+            #     flags=(*self.library_flags("cma"), "-use-runtime", str(self.ocamlrun)),
+            #     ocamllib=self.ocamllib,
+            # ),
             Configuration(
                 name="ocamlopt-O4",
                 compiler=self.ocamlopt,
