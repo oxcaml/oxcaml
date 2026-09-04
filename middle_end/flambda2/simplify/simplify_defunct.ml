@@ -1,6 +1,19 @@
 open! Flambda
 
-type 'a after_rebuild = After_rebuild of (Rebuilt_expr.t -> Upwards_acc.t -> 'a)
+type 'a after_rebuild =
+  | After_rebuild_id : (Rebuilt_expr.t * Upwards_acc.t) after_rebuild
+  | After_rebuild_let :
+      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) ->
+      (Rebuilt_expr.t * Upwards_acc.t) after_rebuild
+  | After_rebuild_let_cont :
+      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) ->
+      (Rebuilt_expr.t * Upwards_acc.t) after_rebuild
+  | After_rebuild_single_non_recursive_let_cont :
+      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) ->
+      (Rebuilt_expr.t * Upwards_acc.t) after_rebuild
+  | After_rebuild_single_recursive_let_cont :
+      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) ->
+      (Rebuilt_expr.t * Upwards_acc.t) after_rebuild
 
 type 'a rebuild = Rebuild of (Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a)
 
@@ -17,7 +30,15 @@ type simplify_expr = Flambda.Expr.t expr_simplifier
 
 let apply_after_rebuild (after_rebuild : 'a after_rebuild) expr uacc =
   match after_rebuild with
-  | After_rebuild after_rebuild ->
+  | After_rebuild_id ->
+      expr, uacc
+  | After_rebuild_let after_rebuild ->
+      after_rebuild expr uacc
+  | After_rebuild_let_cont after_rebuild ->
+      after_rebuild expr uacc
+  | After_rebuild_single_non_recursive_let_cont after_rebuild ->
+      after_rebuild expr uacc
+  | After_rebuild_single_recursive_let_cont after_rebuild ->
       after_rebuild expr uacc
 
 let apply_rebuild rebuild uacc ~after_rebuild =

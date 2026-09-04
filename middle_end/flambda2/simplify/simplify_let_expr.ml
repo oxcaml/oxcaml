@@ -447,7 +447,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
               ~lifted_constants_from_defining_expr ~at_unit_toplevel
               ~closure_info ~body uacc ~after_rebuild ~rewrite_id
           in
-          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild after_rebuild)
+          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let after_rebuild)
         in
         down_to_up dacc ~rebuild:(D.Rebuild rebuild)
       in
