@@ -640,6 +640,25 @@ let get_file_num ~file_emitter file_name =
     file_pos_nums := (file_name, file_num) :: !file_pos_nums;
     file_num
 
+(* The Apple assembler always builds DWARF-5 line tables. The line table header
+   contains a table of file names, and a ".file N" directive defines the entry
+   at index N of that table; so a "file number" is nothing more than an index
+   into the file name table. (".loc" directives, and attributes such as
+   DW_AT_decl_file, identify files by these indexes.) In DWARF-5 the table is
+   indexed from 0, rather than from 1 as in DWARF-4, and the entry at index 0 is
+   defined to name the compilation unit's primary source file. If no ".file 0"
+   directive is emitted, the assembler synthesizes the entry at index 0 by
+   duplicating the one at index 1, which both records the wrong primary source
+   file (the first file we register is the "none" placeholder; see
+   [Asm_directives.debug_header]) and causes DWARF verifiers to warn about the
+   duplicated entry. Emitting ".file 0" to name the real source file avoids both
+   problems. *)
+let register_primary_file ~file_emitter ~sourcefile =
+  if Config.asm_file0_supported
+  then (
+    file_emitter ~file_num:0 ~file_name:sourcefile;
+    file_pos_nums := (sourcefile, 0) :: !file_pos_nums)
+
 (* We only display .file if the file has not been seen before. We display .loc
    for every instruction. *)
 let emit_debug_info_gen ?discriminator dbg file_emitter loc_emitter =
@@ -698,6 +717,7 @@ module Dwarf_helpers = struct
         Asm_targets.Asm_directives_dwarf.build_asm_directives ()
       in
       let get_file_num = get_file_num ~file_emitter in
+      register_primary_file ~file_emitter ~sourcefile;
       Asm_targets.Asm_directives.debug_header ~get_file_num;
       let unit_name =
         (* CR lmaurer: This doesn't actually need to be an [Ident.t] *)
