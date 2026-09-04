@@ -371,6 +371,11 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
     ~init:data_flow
     ~f:(record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id)
 
+let after_rebuild_let D.{ simplify_named_result; removed_operations; lifted_constants_from_defining_expr; at_unit_toplevel; closure_info; after_rebuild; rewrite_id } body uacc =
+  rebuild_let simplify_named_result removed_operations
+    ~lifted_constants_from_defining_expr ~at_unit_toplevel
+    ~closure_info ~body uacc ~after_rebuild ~rewrite_id
+
 let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up bound_pattern ~body =
   let module L = Flambda.Let in
@@ -442,12 +447,11 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
          body. *)
       let down_to_up dacc ~rebuild:rebuild_body =
         let rebuild uacc ~after_rebuild =
-          let after_rebuild body uacc =
-            rebuild_let simplify_named_result removed_operations
-              ~lifted_constants_from_defining_expr ~at_unit_toplevel
-              ~closure_info ~body uacc ~after_rebuild ~rewrite_id
+          let after_rebuild_let_data : Simplify_named_result.t D.after_rebuild_let_data =
+            { simplify_named_result; removed_operations; lifted_constants_from_defining_expr;
+              at_unit_toplevel; closure_info; after_rebuild; rewrite_id }
           in
-          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let after_rebuild)
+          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let (after_rebuild_let_data, after_rebuild_let))
         in
         down_to_up dacc ~rebuild:(D.Rebuild rebuild)
       in
