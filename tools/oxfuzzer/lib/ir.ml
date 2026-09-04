@@ -239,11 +239,7 @@ module Expr = struct
       Bin_op.to_code ty op (to_code lhs) (to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
-      let args =
-        match args with
-        | [] -> [unit_]
-        | _ -> List.map to_code args
-      in
+      let args = match args with [] -> [unit_] | _ -> List.map to_code args in
       apply (ident (Name.to_string fun_name)) args
 end
 
@@ -325,7 +321,8 @@ module Function = struct
         params body
     in
     Str.value Nonrecursive
-      [ Vb.mk ~attrs:(Inline.to_attributes inline)
+      [ Vb.mk
+          ~attrs:(Inline.to_attributes inline)
           (Pat.var (loc name))
           (function_ function_params body) ]
 end

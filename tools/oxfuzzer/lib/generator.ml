@@ -37,12 +37,20 @@ module State = struct
     name
 end
 
+module Binding = struct
+  type t =
+    { name : Name.t;
+      ty : Ty.t;
+      is_mutable : bool
+    }
+end
+
 module Env = struct
-  type t = { bindings : (Name.t * Ty.t) list }
+  type t = { bindings : Binding.t list }
 
   let empty = { bindings = [] }
 
-  let extend t (name, ty) = { bindings = (name, ty) :: t.bindings }
+  let extend t binding = { bindings = binding :: t.bindings }
 end
 
 (* CR-someday hwasilewski: Move all constants, including probabilities, into
@@ -149,8 +157,8 @@ let record_complexity expr ~complexity =
 let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
   let vars =
     List.filter_map
-      (fun (name, vty) ->
-        match vty with Ty.Number nty -> Some (name, nty) | Ty.Bool -> None)
+      (fun { Binding.name; ty; _ } ->
+        match ty with Ty.Number nty -> Some (name, nty) | Ty.Bool -> None)
       env.bindings
   in
   Gen.when_
@@ -280,7 +288,9 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
             List.fold_left_map
               (fun env nty ->
                 let name = State.fresh st in
-                Env.extend env (name, Ty.Number nty), (name, Ty.Number nty))
+                ( Env.extend env
+                    { Binding.name; ty = Ty.Number nty; is_mutable = true },
+                  (name, Ty.Number nty) ))
               Env.empty parameter_types
           in
           let inline : Inline.t =
@@ -344,7 +354,9 @@ and gen_decl st env =
   let expr =
     maybe_opaque st ~probability:Config.opaque_initializer_probability expr
   in
-  let env = Env.extend env (name, Ty.Number nty) in
+  let env =
+    Env.extend env { Binding.name; ty = Ty.Number nty; is_mutable = true }
+  in
   env, (name, Ty.Number nty, expr)
 
 and gen_fun_body (st : State.t) (env : Env.t) depth =
@@ -357,11 +369,14 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
         let env, rest = gen env (remaining - 1) in
         env, Statement.sequence statement rest
       in
+      let mutable_bindings =
+        List.filter (fun binding -> binding.Binding.is_mutable) env.Env.bindings
+      in
       let gen_assign =
         Gen.when_
-          (not (List.is_empty env.Env.bindings))
+          (not (List.is_empty mutable_bindings))
           (fun () ->
-            let name, ty = random_element st env.Env.bindings in
+            let { Binding.name; ty; _ } = random_element st mutable_bindings in
             (* CR-soon hwasilewski: Add boolean variable generation. *)
             match ty with
             | Ty.Number nty ->
@@ -398,11 +413,18 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
                 (Expr.Const
                    (Number.Int (1 + Random.State.int st.random_state 3)))
             in
-            let _, inner = gen_fun_body st env (depth + 1) in
+            let loop_env =
+              Env.extend env
+                { Binding.name;
+                  ty = Ty.Number (NumberTy.boxed Int);
+                  is_mutable = false
+                }
+            in
+            let _, inner = gen_fun_body st loop_env (depth + 1) in
             continue env (Statement.Bounded_loop (name, times, inner)))
       in
       let gen_empty =
-        Gen.when_ (List.is_empty env.Env.bindings) (fun () ->
+        Gen.when_ (List.is_empty mutable_bindings) (fun () ->
             env, Statement.Seq [])
       in
       let allowed =
