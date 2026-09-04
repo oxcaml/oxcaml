@@ -567,7 +567,7 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
         data.handlers_from_the_inside_to_the_outside
     }
   in
-  rebuild_body uacc ~after_rebuild:(D.After_rebuild (rebuild_let_cont data ~after_rebuild))
+  D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild (rebuild_let_cont data ~after_rebuild))
 
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
@@ -678,7 +678,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
     EPA.concat ~inner:invariant_extra_params_and_args
       ~outer:extra_params_and_args
   in
-  rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
+  D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont at_unit_toplevel uacc handler
       in
@@ -798,7 +798,7 @@ let rebuild_single_recursive_handler cont
     (handler_to_rebuild : handler_to_rebuild) uacc k =
   (* Clear existing name occurrences & cost metrics *)
   let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
+  D.apply_rebuild handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont false uacc handler
       in
@@ -1311,7 +1311,7 @@ and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
             EPA.extra_params data.invariant_extra_params_and_args
         }
       in
-      down_to_up dacc ~rebuild:(prepare_to_rebuild_handlers data))
+      down_to_up dacc ~rebuild:(D.Rebuild (prepare_to_rebuild_handlers data)))
 
 and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
     ~consts_lifted_after_fork continuation_sort is_exn_handler_cont uses

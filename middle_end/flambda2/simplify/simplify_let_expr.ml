@@ -393,11 +393,11 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
        similar. To avoid this we don't traverse [body]. *)
     match simplify_named_result with
     | Invalid ->
-      down_to_up original_dacc ~rebuild:(fun uacc ~after_rebuild ->
+      down_to_up original_dacc ~rebuild:(D.Rebuild (fun uacc ~after_rebuild ->
           let uacc = UA.notify_removed ~operation:removed_operations uacc in
           EB.rebuild_invalid uacc
             (Defining_expr_of_let (bound_pattern, defining_expr))
-            ~after_rebuild)
+            ~after_rebuild))
     | Ok simplify_named_result ->
       let dacc = Simplify_named_result.dacc simplify_named_result in
       (* First accumulate variable, symbol and code ID usage information. *)
@@ -447,9 +447,9 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
               ~lifted_constants_from_defining_expr ~at_unit_toplevel
               ~closure_info ~body uacc ~after_rebuild ~rewrite_id
           in
-          rebuild_body uacc ~after_rebuild:(D.After_rebuild after_rebuild)
+          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild after_rebuild)
         in
-        down_to_up dacc ~rebuild
+        down_to_up dacc ~rebuild:(D.Rebuild rebuild)
       in
       simplify_expr dacc body ~down_to_up)
 

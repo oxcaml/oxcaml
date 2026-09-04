@@ -34,7 +34,7 @@ open! Flambda
 
 type 'a after_rebuild = 'a Simplify_defunct.after_rebuild
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild = 'a Simplify_defunct.rebuild
 
 (** [down_to_up] is the term-level continuation.
 

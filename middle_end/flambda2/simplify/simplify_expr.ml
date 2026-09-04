@@ -85,7 +85,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
           then UA.set_resimplify uacc
           else uacc
         in
-        rebuild uacc ~after_rebuild:(D.After_rebuild (fun expr uacc -> expr, uacc)))
+        D.apply_rebuild rebuild uacc ~after_rebuild:(D.After_rebuild (fun expr uacc -> expr, uacc)))
   in
   (* We don't check occurrences of variables or symbols here because the check
      required depends on whether we're dealing with a lambda or the whole
@@ -124,8 +124,8 @@ let rec simplify_expr dacc expr ~down_to_up =
   | Invalid { message } ->
     (* CR mshinwell: Make sure that a program can be simplified to just
        [Invalid]. *)
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-        EB.rebuild_invalid uacc (Message message) ~after_rebuild)
+    down_to_up dacc ~rebuild:(D.Rebuild (fun uacc ~after_rebuild ->
+        EB.rebuild_invalid uacc (Message message) ~after_rebuild))
 
 and simplify_function_body dacc expr ~return_continuation ~return_arity
     ~exn_continuation ~(loopify_state : Loopify_state.t) ~params

@@ -270,9 +270,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
           else uacc
         in
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild
+        D.apply_rebuild rebuild uacc ~after_rebuild
       in
-      down_to_up dacc ~rebuild
+      down_to_up dacc ~rebuild:(D.Rebuild rebuild)
     in
     simplify_expr dacc inlined ~down_to_up
   | Do_not_inline { erase_attribute } -> (
@@ -399,9 +399,9 @@ let simplify_direct_full_application ~simplify_expr dacc apply function_type
       in
       down_to_up dacc
         ~rebuild:
-          (rebuild_non_inlined_direct_full_application apply ~use_id
+          (D.Rebuild (rebuild_non_inlined_direct_full_application apply ~use_id
              ~exn_cont_use_id ~result_arity ~coming_from_indirect
-             ~callee's_code_metadata))
+             ~callee's_code_metadata)))
 
 (* CR mshinwell: need to work out what to do for local alloc transformations
    when there are zero args. *)
@@ -799,7 +799,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       expr, dacc
   in
   let down_to_up dacc ~rebuild =
-    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+    down_to_up dacc ~rebuild:(D.Rebuild (fun uacc ~after_rebuild ->
         let uacc =
           if coming_from_indirect
           then
@@ -810,7 +810,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         (* Increase the counter of calls as the apply has been replaced by an
            allocation of the partial set of closures. *)
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
-        rebuild uacc ~after_rebuild)
+        D.apply_rebuild rebuild uacc ~after_rebuild))
   in
   simplify_expr dacc expr ~down_to_up
 
@@ -830,15 +830,15 @@ let simplify_direct_over_application ~simplify_expr dacc apply ~down_to_up
             ~operation:Removed_operations.direct_call_of_indirect uacc
         else uacc
       in
-      rebuild uacc ~after_rebuild
+      D.apply_rebuild rebuild uacc ~after_rebuild
     in
-    down_to_up dacc ~rebuild
+    down_to_up dacc ~rebuild:(D.Rebuild rebuild)
   in
   simplify_expr dacc expr ~down_to_up
 
 let replace_apply_by_invalid dacc ~down_to_up reason =
-  down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
-      EB.rebuild_invalid uacc reason ~after_rebuild)
+  down_to_up dacc ~rebuild:(D.Rebuild (fun uacc ~after_rebuild ->
+      EB.rebuild_invalid uacc reason ~after_rebuild))
 
 let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
     ~(args_arity : [`Complex] Flambda_arity.t) =
@@ -942,8 +942,8 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
   in
   down_to_up dacc
     ~rebuild:
-      (rebuild_function_call_where_callee's_type_unavailable apply ~use_id
-         ~exn_cont_use_id)
+      (D.Rebuild (rebuild_function_call_where_callee's_type_unavailable apply ~use_id
+         ~exn_cont_use_id))
 
 let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_metadata_from_type
@@ -1206,7 +1206,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       let rebuild uacc ~after_rebuild =
         EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
       in
-      down_to_up dacc ~rebuild)
+      down_to_up dacc ~rebuild:(D.Rebuild rebuild))
 
 type ('a, 'b) simplify_apply_shared_result =
   | Ok of 'a
@@ -1322,8 +1322,8 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
   in
   down_to_up dacc
     ~rebuild:
-      (rebuild_non_ocaml_function_call apply ~use_id:(Some use_id)
-         ~exn_cont_use_id)
+      (D.Rebuild (rebuild_non_ocaml_function_call apply ~use_id:(Some use_id)
+         ~exn_cont_use_id))
 
 let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     =
@@ -1342,9 +1342,9 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     let down_to_up dacc ~rebuild =
       let rebuild uacc ~after_rebuild =
         let uacc = UA.notify_removed uacc ~operation in
-        rebuild uacc ~after_rebuild
+        D.apply_rebuild rebuild uacc ~after_rebuild
       in
-      down_to_up dacc ~rebuild
+      down_to_up dacc ~rebuild:(D.Rebuild rebuild)
     in
     simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
@@ -1386,7 +1386,7 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
       record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
     in
     down_to_up dacc
-      ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+      ~rebuild:(D.Rebuild (rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id))
   | Invalid ->
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
 
@@ -1454,7 +1454,7 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
     record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
   in
   down_to_up dacc
-    ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
+    ~rebuild:(D.Rebuild (rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id))
 
 let simplify_apply ~simplify_expr dacc apply ~down_to_up =
   match simplify_apply_shared dacc apply with

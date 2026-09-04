@@ -18,7 +18,7 @@ open Simplify_import
 
 type 'a after_rebuild = 'a Simplify_defunct.after_rebuild
 
-type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
+type 'a rebuild = 'a Simplify_defunct.rebuild
 
 type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
 

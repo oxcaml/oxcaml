@@ -1047,5 +1047,5 @@ let simplify_switch dacc switch ~down_to_up =
   in
   down_to_up dacc
     ~rebuild:
-      (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~dacc_before_switch)
+      (D.Rebuild (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+         ~dacc_before_switch))
