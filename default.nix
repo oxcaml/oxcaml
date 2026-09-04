@@ -353,10 +353,10 @@ let
         '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
   '';
 
-  mkExternalLibraries =
+  mkJsoo =
     oxcaml:
     stdenv.mkDerivation {
-      pname = "oxcaml-external-libs";
+      pname = "oxcaml-jsoo";
       inherit (oxcaml) version meta;
       inherit src;
 
@@ -371,6 +371,9 @@ let
       nativeBuildInputs = [
         dune
         oxcaml
+        menhir
+        pkgs.nodejs
+        pkgs.binaryen
       ];
 
       dontConfigure = true;
@@ -382,7 +385,7 @@ let
           REQUIRES_CONFIGURATION= \
           DUNE=${dune}/bin/dune \
           OXCAML_INSTALL=${oxcaml} \
-          external-libs-build
+          jsoo-build
         runHook postBuild
       '';
 
@@ -600,7 +603,6 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
-        make external-libs-build - Builds vendored external libraries depending on oxcaml
         make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml
         make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions
       ${merlinCommands}EOF
@@ -615,7 +617,7 @@ stdenv.mkDerivation {
       ocaml_5_4_0
       ocamlformat
       lldb
-      mkExternalLibraries
+      mkJsoo
       mkMerlinPackages
       ;
   };
