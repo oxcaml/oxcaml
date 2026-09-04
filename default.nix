@@ -327,6 +327,32 @@ let
         'let write_stringlit ob s = Buffer.add_string ob s'
   '';
 
+  outChannelRedirectSrc = pkgs.runCommand "out-channel-redirect-0.2-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/hhugo/out-channel-redirect/releases/download/0.2/out-channel-redirect-0.2.tbz";
+      hash = "sha256-rUJ+jdNv4YNHzEpXSvF3d+BlD1WFNF+rWCzu+xbuIZ4=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    substituteInPlace "$out/dune-project" \
+      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+  '';
+
+  qcheckSrc = pkgs.runCommand "qcheck-0.25-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/c-cube/qcheck/archive/v0.25.tar.gz";
+      hash = "sha512-oLV5HOoJ+Y8fFyIeYom4enocFq4cmvDC5b1qFw8s+HJ9ugdZp/2TLV1hfowkJWLWkYfH507v1SYrxf11oyJpng==";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    # Do not constrain the callback to Array.length's polymodal signature.
+    substituteInPlace "$out/src/core/QCheck.ml" \
+      --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
+        '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
+  '';
+
   mkExternalLibraries =
     oxcaml:
     stdenv.mkDerivation {
@@ -467,6 +493,8 @@ stdenv.mkDerivation {
   JSOO_CMDLINER_SRC = cmdlinerSrc;
   JSOO_MENHIR_SRC = menhirLibrariesSrc;
   JSOO_YOJSON_SRC = yojsonSrc;
+  JSOO_OUT_CHANNEL_REDIRECT_SRC = outChannelRedirectSrc;
+  JSOO_QCHECK_SRC = qcheckSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
@@ -574,6 +602,7 @@ stdenv.mkDerivation {
         make test-one TEST=...   - Run a single test
         make external-libs-build - Builds vendored external libraries depending on oxcaml
         make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml
+        make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions
       ${merlinCommands}EOF
     '';
 
