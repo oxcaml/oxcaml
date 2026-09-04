@@ -29,6 +29,7 @@
 *.byte
 *.tmpjs
 *.map
+!examples/boulderdash/maps/*.map
 
 # Wasm runtime: intermediate output of recompile-* aliases
 runtime/wasm/*.new.wasm
