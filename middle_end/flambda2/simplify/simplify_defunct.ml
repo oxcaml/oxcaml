@@ -62,6 +62,28 @@ and handlers_to_rebuild_group =
         is_single_inlinable_use : bool
       }
 
+and k1_data = {
+  rebuild_body:expr_to_rebuild;
+  name_occurrences_of_subsequent_exprs:Name_occurrences.t;
+  cost_metrics_of_subsequent_exprs:Cost_metrics.t;
+  uenv_of_subsequent_exprs:Upwards_env.t;
+  at_unit_toplevel:bool;
+  original_invariant_params:Bound_parameters.t;
+  invariant_extra_params:Bound_parameters.t;
+  after_rebuild:after_rebuild;
+  cont:Continuation.t;
+  groups_to_rebuild:handlers_to_rebuild_group list;
+  rebuilt_groups:rebuilt_handlers_group list;
+}
+
+and after_rebuild_single_non_recursive_let_cont_k =
+  | K1 of
+      k1_data *
+      (k1_data ->
+       rebuilt_handler ->
+       Upwards_acc.t ->
+       Rebuilt_expr.t * Upwards_acc.t)
+
 and after_rebuild_single_non_recursive_let_cont_data =
   { cont : Continuation.t;
     at_unit_toplevel : bool;
@@ -71,8 +93,7 @@ and after_rebuild_single_non_recursive_let_cont_data =
     params : Bound_parameters.t;
     is_cold : bool;
     is_single_inlinable_use : bool;
-    (* TODO *)
-    k : rebuilt_handler -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t;
+    k : after_rebuild_single_non_recursive_let_cont_k;
   }
 
 and after_rebuild_single_recursive_let_cont_data =
