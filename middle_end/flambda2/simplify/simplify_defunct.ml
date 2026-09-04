@@ -1,4 +1,5 @@
 open! Flambda
+module EPA = Continuation_extra_params_and_args
 
 type rebuilt_handler =
   { handler : Rebuilt_expr.Continuation_handler.t;
@@ -64,7 +65,21 @@ and after_rebuild_single_non_recursive_let_cont_data =
     k : rebuilt_handler -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t;
   }
 
-type 'a rebuild = Rebuild of (Upwards_acc.t -> after_rebuild:after_rebuild -> 'a)
+type expr_to_rebuild = (Rebuilt_expr.t * Upwards_acc.t) rebuild
+
+and handler_to_rebuild =
+  { params : Bound_parameters.t;
+    rebuild_handler : expr_to_rebuild;
+    is_exn_handler : bool;
+    is_cold : bool;
+    extra_params_and_args : EPA.t;
+    (* Note: EPA.extra_params invariant_extra_params_and_args should always be
+       equal to invariant_extra_params in stage4 *)
+    invariant_extra_params_and_args : EPA.t;
+    rewrite_ids : Apply_cont_rewrite_id.Set.t
+  }
+
+and 'a rebuild = Rebuild of (Upwards_acc.t -> after_rebuild:after_rebuild -> 'a)
 
 type ('a, 'b) down_to_up = Downwards_acc.t -> rebuild:'a rebuild -> 'b
 

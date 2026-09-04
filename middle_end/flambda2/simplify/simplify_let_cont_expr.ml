@@ -101,7 +101,7 @@ type after_downwards_traversal_of_body_and_handlers_data =
     handlers : handler_after_downwards_traversal Continuation.Map.t
   }
 
-type handler_to_rebuild =
+type handler_to_rebuild = D.handler_to_rebuild =
   { params : Bound_parameters.t;
     rebuild_handler : expr_to_rebuild;
     is_exn_handler : bool;
