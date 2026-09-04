@@ -85,7 +85,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
           then UA.set_resimplify uacc
           else uacc
         in
-        rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
+        rebuild uacc ~after_rebuild:(D.After_rebuild (fun expr uacc -> expr, uacc)))
   in
   (* We don't check occurrences of variables or symbols here because the check
      required depends on whether we're dealing with a lambda or the whole

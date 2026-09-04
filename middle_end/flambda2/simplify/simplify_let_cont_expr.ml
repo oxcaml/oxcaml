@@ -439,7 +439,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           uacc
       in
       let uacc = UA.with_uenv uacc data.uenv_of_subsequent_exprs in
-      after_rebuild body uacc
+      D.apply_after_rebuild after_rebuild body uacc
     | Non_recursive { cont; handler } :: groups ->
       let num_free_occurrences_of_cont_in_body =
         (* Note that this does not count uses in trap actions. If there are uses
@@ -567,7 +567,7 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
         data.handlers_from_the_inside_to_the_outside
     }
   in
-  rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
+  rebuild_body uacc ~after_rebuild:(D.After_rebuild (rebuild_let_cont data ~after_rebuild))
 
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
@@ -678,7 +678,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
     EPA.concat ~inner:invariant_extra_params_and_args
       ~outer:extra_params_and_args
   in
-  rebuild_handler uacc ~after_rebuild:(fun handler uacc ->
+  rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont at_unit_toplevel uacc handler
       in
@@ -792,13 +792,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           cost_metrics_of_handler = cost_metrics
         }
       in
-      k rebuilt_handler uacc)
+      k rebuilt_handler uacc))
 
 let rebuild_single_recursive_handler cont
     (handler_to_rebuild : handler_to_rebuild) uacc k =
   (* Clear existing name occurrences & cost metrics *)
   let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(fun handler uacc ->
+  handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(D.After_rebuild (fun handler uacc ->
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont false uacc handler
       in
@@ -839,7 +839,7 @@ let rebuild_single_recursive_handler cont
           cost_metrics_of_handler = cost_metrics
         }
       in
-      k invariant_params rebuilt_handler uacc)
+      k invariant_params rebuilt_handler uacc))
 
 let rec rebuild_continuation_handlers_loop ~rebuild_body
     ~name_occurrences_of_subsequent_exprs ~cost_metrics_of_subsequent_exprs

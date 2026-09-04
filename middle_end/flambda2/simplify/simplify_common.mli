@@ -32,7 +32,7 @@ open! Flambda
 
 (** [rebuild] and [after_rebuild] form the compiler-level continuation. *)
 
-type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
+type 'a after_rebuild = 'a Simplify_defunct.after_rebuild
 
 type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
 

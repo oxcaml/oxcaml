@@ -16,6 +16,7 @@
 
 open! Flambda.Import
 open! Simplify_import
+module D = Simplify_defunct
 
 let fail_if_probe apply =
   match Apply.probe apply with
@@ -209,7 +210,7 @@ let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
   let uacc, expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id result_arity apply
   in
-  after_rebuild expr uacc
+  D.apply_after_rebuild after_rebuild expr uacc
 
 type inlining_decision =
   | Do_not_inline of { erase_attribute : bool }
@@ -875,7 +876,7 @@ let rebuild_function_call_where_callee's_type_unavailable apply ~use_id
   let uacc, expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
   in
-  after_rebuild expr uacc
+  D.apply_after_rebuild after_rebuild expr uacc
 
 let simplify_function_call_where_callee's_type_unavailable dacc apply
     (call : Call_kind.Function_call.t) ~down_to_up =
@@ -1278,7 +1279,7 @@ let rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id uacc
   let uacc, expr =
     EB.rewrite_fixed_arity_apply uacc ~use_id (Apply.return_arity apply) apply
   in
-  after_rebuild expr uacc
+  D.apply_after_rebuild after_rebuild expr uacc
 
 let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~down_to_up =
   fail_if_probe apply;

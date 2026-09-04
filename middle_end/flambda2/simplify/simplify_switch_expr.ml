@@ -18,6 +18,7 @@ open! Simplify_import
 module TE = Flambda2_types.Typing_env
 module TI = Target_ocaml_int
 module Alias_set = TE.Alias_set
+module D = Simplify_defunct
 
 type alias_set =
   | Aliases of Alias_set.t
@@ -821,7 +822,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
           | None -> normal_case uacc))
   in
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
-  after_rebuild expr uacc
+  D.apply_after_rebuild after_rebuild expr uacc
 
 let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
   let shape = T.this_naked_immediate arm in

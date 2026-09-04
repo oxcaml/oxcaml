@@ -105,7 +105,7 @@ let rebuild_apply_cont apply_cont ~args ~rewrite_id uacc ~after_rebuild =
     let uacc =
       UA.add_free_names uacc free_names |> UA.add_cost_metrics cost_metrics
     in
-    after_rebuild expr uacc
+    D.apply_after_rebuild after_rebuild expr uacc
   in
   let apply_cont_to_expr apply_cont =
     (* Note that we call [UE.find_continuation] on the continuation after
