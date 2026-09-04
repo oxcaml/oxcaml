@@ -611,7 +611,14 @@ let rec read_args xs r = match xs,r with
     fatal_error "Parmatch.read_args"
 
 let set_args q r = match q with
-| {pat_desc = Tpat_tuple omegas}
+| {pat_desc = Tpat_tuple omegas} ->
+    let args,rest =
+      read_args (List.map (fun (_, pat, _) -> pat) omegas) r
+    in
+    make_pat
+      (Tpat_tuple
+        (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_unboxed_tuple omegas} ->
     let args,rest =
       read_args (List.map (fun (_, pat, _) -> pat) omegas) r
@@ -948,8 +955,6 @@ end
 (* These sorts and reprs should never be used (so we make them unlikely to be
    accidentally correct) *)
 
-let fake_sort = Jkind.Sort.of_base Bits16
-
 let fake_cstr_repr : constructor_representation =
   Constructor_mixed [| Float32 |]
 
@@ -1018,8 +1023,15 @@ let pats_of_type env ty =
   | Has_no_typedecl ->
       begin match get_desc (Ctype.expand_head env ty) with
         Ttuple tl ->
+          let sort =
+            (* CR zeisbach: trying to use a bogus sort will hit some sanity
+               check asserts. which contradicts that it "should never be used".
+               Though I still have to investigate why... *)
+            Jkind.Sort.new_var ~level:(Ctype.get_current_level ())
+            |> Jkind.Sort.of_var
+          in
           [make_pat
-             (Tpat_tuple (List.map (fun (lbl, _) -> lbl, omega, fake_sort) tl))
+             (Tpat_tuple (List.map (fun (lbl, _) -> lbl, omega, sort) tl))
              ty env]
       | _ -> [omega]
       end
