@@ -20,9 +20,7 @@ let code loopify(never) size(30) newer_version_of(f_0)
            let noteq = %tag_imm (prim) in
            cont k (noteq))
 in
-let $camlN_way_join_preserves_null__f_1 =
-  closure f_0_1 @f &toplevel.alloc_region
-in
+let $camlN_way_join_preserves_null__f_1 = closure f_0_1 @f &toplevel in
 let $camlN_way_join_preserves_null =
   Block 0 ($camlN_way_join_preserves_null__f_1)
 in

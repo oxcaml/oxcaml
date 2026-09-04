@@ -14,7 +14,7 @@ let code loopify(never) size(3) newer_version_of(do_stuff_0)
   cont k1 pop(regular k1) ($camlData_flow_exception_bug__Pmakeblock_2)
 in
 let $camlData_flow_exception_bug__do_stuff_3 =
-  closure do_stuff_0_1 @do_stuff &toplevel.alloc_region
+  closure do_stuff_0_1 @do_stuff &toplevel
 in
 let code loopify(never) size(20) newer_version_of(stuff_1)
       stuff_1_1 (env)
@@ -44,7 +44,7 @@ let code loopify(never) size(20) newer_version_of(stuff_1)
       cont k (region_return)
 in
 let $camlData_flow_exception_bug__stuff_4 =
-  closure stuff_1_1 @stuff &toplevel.alloc_region
+  closure stuff_1_1 @stuff &toplevel
 in
 let $camlData_flow_exception_bug =
   Block 0 ($camlData_flow_exception_bug__do_stuff_3,

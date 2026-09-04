@@ -41,8 +41,8 @@
    cont k1 (float_add)
  in
  let $camlTests7__empty_block_0 = Block 0 () in
- let f = closure f_0 @f &toplevel.alloc_region in
- let foo = closure foo_1 @foo &toplevel.alloc_region in
+ let f = closure f_0 @f &toplevel in
+ let foo = closure foo_1 @foo &toplevel in
  let Pmakeblock =
    %block.[`0`].`toplevel`
      ($camlTests7__empty_block_0,

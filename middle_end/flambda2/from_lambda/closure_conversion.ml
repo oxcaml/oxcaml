@@ -4138,8 +4138,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
-    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region :
+    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_alloc_region :
     mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
@@ -4147,14 +4146,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       (Flambda2_import.Symbol.for_compilation_unit compilation_unit)
   in
   let return_cont = Continuation.create ~sort:Toplevel_return () in
-  let env, toplevel_my_region =
-    Env.add_var_like env toplevel_my_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
-  let env, toplevel_my_ghost_region =
-    Env.add_var_like env toplevel_my_ghost_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
   let env, toplevel_my_alloc_region =
     Env.add_var_like env toplevel_my_alloc_region Not_user_visible
       Flambda_kind.With_subkind.region
@@ -4218,8 +4209,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
        offsets constraints accumulation is not needed in "normal" mode. *)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4231,8 +4221,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
     in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit;
       code_slot_offsets;

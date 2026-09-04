@@ -5,9 +5,7 @@
          : imm tagged =
    cont k1 (0)
  in
- let $camlUnboxed_closure_not_needed__s0 =
-   closure fn_3 @fn &toplevel.alloc_region
- in
+ let $camlUnboxed_closure_not_needed__s0 = closure fn_3 @fn &toplevel in
  let code inline(never) size(1)
        g_1 my_closure &my_alloc_region my_depth -> k1 * k2 : val =
    cont k1 ($camlUnboxed_closure_not_needed__s0)
@@ -34,12 +32,11 @@
  let  in
  let bind = %opaque (0) in
  let f_into_f_field_bind = bind in
- apply direct(g_1 &toplevel.alloc_region)  -> k2 * error
+ apply direct(g_1 &toplevel)  -> k2 * error
    where k2 (function_return_0_g_1 : val) =
      cont k1
    where k1 =
-     (apply direct(f_0 &toplevel.alloc_region)
-         (f_into_f_field_bind) -> k2 * error
+     (apply direct(f_0 &toplevel) (f_into_f_field_bind) -> k2 * error
         where k2 (function_return_0_f_0 : val) =
           cont k1
         where k1 =

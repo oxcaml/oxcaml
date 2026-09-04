@@ -27,6 +27,6 @@ let code loopify(never) size(41) newer_version_of(f_0)
       let Pfield = %block_load.[`0`] (t) in
       cont k (Pfield)
 in
-let $camlVariants__f_1 = closure f_0_1 @f &toplevel.alloc_region in
+let $camlVariants__f_1 = closure f_0_1 @f &toplevel in
 let $camlVariants = Block 0 ($camlVariants__f_1) in
 cont done ($camlVariants)
