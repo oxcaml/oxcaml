@@ -669,6 +669,12 @@ let ocaml_ignored_flags =
     "-no-llvm-backend";
     "-ddwarf-types";
     "-ocamlcfg";
+    "-cfg-eliminate-dead-code-validate";
+    "-no-cfg-eliminate-dead-code-validate";
+    "-cfg-dominators-validate";
+    "-no-cfg-dominators-validate";
+    "-cfg-liveness-validate";
+    "-no-cfg-liveness-validate";
     "-cfg-prologue-validate";
     "-no-cfg-prologue-validate";
     "-cfg-prologue-shrink-wrap";
