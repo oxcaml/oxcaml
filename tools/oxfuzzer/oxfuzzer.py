@@ -7,6 +7,7 @@ if sys.version_info < (3, 11):
 
 import asyncio
 import argparse
+import errno
 import os
 from pathlib import Path
 import platform
@@ -56,11 +57,12 @@ class Configuration:
 
 
 CONFIGURATIONS = [
-    # Configuration(
-    #     name="ocamlc",
-    #     compiler=OCAMLC,
-    #     flags=(*library_flags("cma")),
-    # ),
+    Configuration(
+        name="ocamlc",
+        compiler=OCAMLC,
+        # Use the runtime from `OCAMLRUN` created by `make install`.
+        flags=(*library_flags("cma"), "-use-runtime", str(OCAMLRUN)),
+    ),
     Configuration(
         name="ocamlopt-O4",
         compiler=OCAMLOPT,
@@ -205,13 +207,23 @@ async def compile(
 
 
 async def run(executable: Path) -> CommandResult:
-    return await run_command(
-        str(executable),
-        [],
-        cwd=executable.parent,
-        timeout_sec=RUN_TIMEOUT_SEC,
-        output_prefix=executable.parent / "run",
-    )
+    try:
+        return await run_command(
+            str(executable),
+            [],
+            cwd=executable.parent,
+            timeout_sec=RUN_TIMEOUT_SEC,
+            output_prefix=executable.parent / "run",
+        )
+    except OSError as error:
+        # The executable could not be started, report it with the shell's exit
+        # codes for "not found" (127) and "cannot execute" (126).
+        return CommandResult(
+            returncode=127 if error.errno == errno.ENOENT else 126,
+            stdout=b"",
+            stderr=f"{executable}: {error.strerror}\n".encode(),
+            timed_out=False,
+        )
 
 
 async def run_configuration(
@@ -323,29 +335,29 @@ class Stats:
             self.print_line()
 
 
-def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str:
+def command_output(command: Sequence[str], *, cwd: Path | None = None) -> str | None:
     try:
         completed = subprocess.run(
             command, cwd=cwd, capture_output=True, text=True, timeout=30
         )
     except (OSError, subprocess.TimeoutExpired):
-        return "unknown"
+        return None
     if completed.returncode != 0:
-        return "unknown"
+        return None
     return completed.stdout.strip()
 
 
 def source_revision() -> str:
     # We try to get both the git and hg revision as both may be potentially used.
     revision = command_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT)
-    if revision != "unknown":
+    if revision is not None:
         dirty = command_output(
             ["git", "status", "--porcelain", "--untracked-files=no"],
             cwd=REPOSITORY_ROOT,
         )
         return f"git {revision}{' (dirty)' if dirty else ''}"
     revision = command_output(["hg", "id", "-i"], cwd=REPOSITORY_ROOT)
-    if revision != "unknown":
+    if revision is not None:
         return f"hg {revision}"  # hg appends '+' itself when dirty.
     return "unknown"
 
@@ -358,8 +370,8 @@ def run_metadata(base_seed: int) -> str:
         f"platform: {platform.platform()}",
         f"python: {sys.version.split()[0]}",
         f"source revision: {source_revision()}",
-        f"ocamlopt version: {command_output([str(OCAMLOPT), '-version'])}",
-        f"ocamlc version: {command_output([str(OCAMLC), '-version'])}",
+        f"ocamlopt version: {command_output([str(OCAMLOPT), '-version']) or 'unknown'}",
+        f"ocamlc version: {command_output([str(OCAMLC), '-version']) or 'unknown'}",
         f"OCAMLLIB: {OCAMLLIB}",
         f"OCAMLPARAM: {os.environ.get('OCAMLPARAM', '(unset)')}",
         f"OCAMLRUNPARAM: {os.environ.get('OCAMLRUNPARAM', '(unset)')}",
