@@ -6461,8 +6461,7 @@ let split_function_ty
     register_closure_allocation ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
-    Locality.submode_exn ~pp:(loc, Function) Locality.local
-      (Alloc.proj_comonadic Areality closure_mode);
+    Locality.submode_exn ~pp:(loc, Function) Locality.local alloc_mode;
   let { ty = ty_fun; explanation }, loc_fun = in_function in
   let separate = !Clflags.principal || Env.has_local_constraints env in
   let { ty_arg; ty_ret; arg_mode; ret_mode } as filtered_arrow =
