@@ -230,7 +230,7 @@ module Module_type_impls = struct
   type implementation =
     { target : target;
       target_loc : Location.t option;
-      instance : string option;
+      target_instance : string option;
       implementation_uid : string option;
       implementation_name : string option;
       site : impl_site;
@@ -246,12 +246,12 @@ module Module_type_impls = struct
     | Omission of { family : string option; reason : string }
     | Unresolved_implementation of
         { target : string;
-          witness : string;
+          target_instance : string;
           implementation : string;
           site : string option
         }
     | Unresolved_check_site of
-        { target : string; witness : string; site : string }
+        { target : string; target_instance : string; site : string }
 
   type target_result =
     { target : string;
