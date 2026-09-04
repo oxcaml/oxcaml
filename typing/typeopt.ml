@@ -1087,6 +1087,11 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) rep =
+  value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+    ~params ~args labels rep
+
+and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args (labels : Types.label_declaration list) rep =
   let recompute make_rep =
     match
       List.map (fun (label : Types.label_declaration) ->
@@ -1100,8 +1105,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         match Typedecl.compute_block_shape env types with
         | None -> num_nodes_visited, non_nullable Pgenval
         | Some shape ->
-            value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
-              ~params ~args labels (make_rep shape)
+            value_kind_immutable_record env ~loc ~visited ~depth
+              ~num_nodes_visited ~params ~args labels (make_rep shape)
   in
   match rep with
   | Record_undetermined ->
@@ -1134,75 +1139,75 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
-      let is_mutable =
-        List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
-          labels
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ ->
+    let is_mutable =
+      List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
+        labels
+    in
+    if is_mutable then
+      num_nodes_visited, non_nullable Pgenval
+    else begin
+      let num_nodes_visited, fields =
+        match rep with
+        | Record_unboxed | Record_dummy _ | Record_undetermined
+        | Record_variable _
+        | Record_inlined (_, (Constructor_undetermined
+                             | Constructor_variable _
+                             | Constructor_immediate_all_void), _) ->
+            (* The outer match guards against this *)
+            assert false
+        | Record_inlined (_, Constructor_uniform_value, _)
+        | Record_boxed | Record_float | Record_ufloat ->
+            let num_nodes_visited, fields =
+              List.fold_left_map
+                (fun num_nodes_visited (label:Types.label_declaration) ->
+                  let num_nodes_visited = num_nodes_visited + 1 in
+                  let num_nodes_visited, field =
+                    (* We're using the `Pboxedfloatval` value kind for unboxed
+                      floats inside of records. This is kind of a lie, but
+                       that was already happening here due to the float record
+                      optimization. *)
+                    match rep with
+                    | Record_float | Record_ufloat ->
+                      num_nodes_visited,
+                      non_nullable (Pboxedfloatval Boxed_float64)
+                    | Record_inlined _ | Record_boxed ->
+                        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+                          label.ld_type
+                    | Record_mixed _ | Record_unboxed | Record_dummy _
+                    | Record_undetermined | Record_variable _ ->
+                        (* The outer match guards against this *)
+                        assert false
+                  in
+                  num_nodes_visited, field)
+                num_nodes_visited labels
+            in
+            num_nodes_visited, Constructor_uniform fields
+        | Record_inlined (_, Constructor_mixed shape, _)
+        | Record_mixed shape ->
+          let types = List.map (fun label -> label.Types.ld_type) labels in
+          value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+            ~shape (List.map (fun t -> Some t) types)
       in
-      if is_mutable then
-        num_nodes_visited, non_nullable Pgenval
-      else
-        let num_nodes_visited, fields =
-          match rep with
-          | Record_unboxed | Record_dummy _ | Record_undetermined
-          | Record_variable _
-          | Record_inlined (_, (Constructor_undetermined
-                               | Constructor_variable _
-                               | Constructor_immediate_all_void), _) ->
-              (* The outer match guards against this *)
-              assert false
-          | Record_inlined (_, Constructor_uniform_value, _)
-          | Record_boxed | Record_float | Record_ufloat ->
-              let num_nodes_visited, fields =
-                List.fold_left_map
-                  (fun num_nodes_visited (label:Types.label_declaration) ->
-                    let num_nodes_visited = num_nodes_visited + 1 in
-                    let num_nodes_visited, field =
-                      (* We're using the `Pboxedfloatval` value kind for unboxed
-                        floats inside of records. This is kind of a lie, but
-                         that was already happening here due to the float record
-                        optimization. *)
-                      match rep with
-                      | Record_float | Record_ufloat ->
-                        num_nodes_visited,
-                        non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed ->
-                          value_kind env ~loc ~visited ~depth ~num_nodes_visited
-                            label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_undetermined | Record_variable _ ->
-                          (* The outer match guards against this *)
-                          assert false
-                    in
-                    num_nodes_visited, field)
-                  num_nodes_visited labels
-              in
-              num_nodes_visited, Constructor_uniform fields
-          | Record_inlined (_, Constructor_mixed shape, _)
-          | Record_mixed shape ->
-            let types = List.map (fun label -> label.Types.ld_type) labels in
-            value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape (List.map (fun t -> Some t) types)
-        in
-        let non_consts =
-          match rep with
-          | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-            [runtime_tag, fields]
-          | Record_float | Record_ufloat ->
-            [ Obj.double_array_tag, fields ]
-          | Record_boxed ->
-            [0, fields]
-          | Record_inlined (Extension _, _, _) ->
-            [0, fields]
-          | Record_mixed _ ->
-            [0, fields]
-          | Record_unboxed -> assert false
-          | Record_inlined (Null, _, _) -> assert false
-          | Record_dummy _ -> assert false
-          | Record_undetermined | Record_variable _ -> assert false
-        in
-        (num_nodes_visited,
-         non_nullable (Pvariant { consts = []; non_consts }))
+      let non_consts =
+        match rep with
+        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
+          [runtime_tag, fields]
+        | Record_float | Record_ufloat ->
+          [ Obj.double_array_tag, fields ]
+        | Record_boxed ->
+          [0, fields]
+        | Record_inlined (Extension _, _, _) ->
+          [0, fields]
+        | Record_mixed _ ->
+          [0, fields]
+        | Record_unboxed -> assert false
+        | Record_inlined (Null, _, _) -> assert false
+        | Record_dummy _ -> assert false
+        | Record_undetermined | Record_variable _ -> assert false
+      in
+      (num_nodes_visited,
+       non_nullable (Pvariant { consts = []; non_consts }))
     end
 
 let value_kind env loc ty =
