@@ -886,8 +886,18 @@ and record_pattern ctxt f ~unboxed l closed =
 
 (** for special treatment of modes in labeled expressions *)
 and pattern2 ctxt f p =
-  match p.ppat_desc with
-  | Ppat_constraint(p, ct, m) ->
+  match p.ppat_desc, p.ppat_attributes with
+  | Ppat_constraint (inner, cty, modes), (_ :: _ as attrs) ->
+    let p_without_modes =
+      { p with ppat_desc = Ppat_constraint (inner, cty, []);
+               ppat_attributes = [] }
+    in
+    pp f "(%a)%a%a" (pattern2 ctxt) p_without_modes
+      (attributes ctxt) attrs optional_at_modes modes
+  | _, (_ :: _ as attrs) ->
+    pp f "(%a)%a" (pattern2 ctxt) {p with ppat_attributes=[]}
+      (attributes ctxt) attrs
+  | Ppat_constraint(p, ct, m), [] ->
     begin match ct with
     | Some ct ->
         pp f "@[<2>%a@;:@;%a@]"
@@ -898,14 +908,14 @@ and pattern2 ctxt f p =
         (simple_pattern ctxt) p
         optional_at_modes m
     end
-  | _ -> pattern1 ctxt f p
+  | _, [] -> pattern1 ctxt f p
 
 (** for special treatment of modes in labeled expressions *)
 and simple_pattern1 ctxt f p =
-  match p.ppat_desc with
-  | Ppat_constraint _ ->
+  match p.ppat_desc, p.ppat_attributes with
+  | Ppat_constraint _, [] | _, _ :: _ ->
       pp f "(%a)" (pattern2 ctxt) p
-  | _ -> simple_pattern ctxt f p
+  | _, [] -> simple_pattern ctxt f p
 
 and label_exp ctxt f (l,opt,p) =
   match l with
