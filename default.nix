@@ -287,6 +287,55 @@ let
     hash = "sha256-ur9y05F7hvcHiF8MVSjjbGP8y2mPS0bPK6tcfM3W2Eo=";
   });
 
+  genSrc = unpackSourceArchive "gen-1.1-source" (pkgs.fetchurl {
+    url = "https://github.com/c-cube/gen/archive/refs/tags/v1.1.tar.gz";
+    hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
+  });
+
+  sedlexSrc = pkgs.applyPatches {
+    name = "sedlex-3.7-source";
+    src = pkgs.fetchFromGitHub {
+      owner = "ocaml-community";
+      repo = "sedlex";
+      rev = "v3.7";
+      hash = "sha256-ucqrJkzS6cVogGUf1vU8oBpSryneMBqTjzxwsOi6Egs=";
+    };
+    # Adapt the ppx to the OxCaml parsetree (labeled tuples, function
+    # parameters) and mark generated code as ghost locations.
+    patches = [ ./external/patches/sedlex-oxcaml-syntax.patch ];
+    # Keep the release's opam metadata; the prepared source is read-only.
+    postPatch = ''
+      substituteInPlace dune-project \
+        --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+    '';
+  };
+
+  cmdlinerSrc = unpackSourceArchive "cmdliner-2.1.1-source" (pkgs.fetchurl {
+    url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
+    hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
+  });
+
+  yojsonSrc = pkgs.runCommand "yojson-2.2.2-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/ocaml-community/yojson/releases/download/2.2.2/yojson-2.2.2.tbz";
+      hash = "sha256-mr+tjJp51HI60vZEjmacHmjb/IfMVKG3wGSwyQkSxZU=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    # Keep the release's opam metadata; the prepared source is read-only.
+    substituteInPlace "$out/dune-project" \
+      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+    # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
+    substituteInPlace "$out/lib/write.ml" \
+      --replace-fail 'let write_intlit = Buffer.add_string' \
+        'let write_intlit ob s = Buffer.add_string ob s' \
+      --replace-fail 'let write_floatlit = Buffer.add_string' \
+        'let write_floatlit ob s = Buffer.add_string ob s' \
+      --replace-fail 'let write_stringlit = Buffer.add_string' \
+        'let write_stringlit ob s = Buffer.add_string ob s'
+  '';
+
   mkExternalLibraries =
     oxcaml:
     stdenv.mkDerivation {
@@ -297,6 +346,11 @@ let
       PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
       PPXLIB_SEXPLIB0_SRC = sexplib0Src;
       PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+      SEDLEX_GEN_SRC = genSrc;
+      JSOO_SEDLEX_SRC = sedlexSrc;
+      JSOO_CMDLINER_SRC = cmdlinerSrc;
+      JSOO_MENHIR_SRC = menhirSrc;
+      JSOO_YOJSON_SRC = yojsonSrc;
 
       nativeBuildInputs = [
         dune
@@ -419,6 +473,11 @@ stdenv.mkDerivation {
   PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
   PPXLIB_SEXPLIB0_SRC = sexplib0Src;
   PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
+  SEDLEX_GEN_SRC = genSrc;
+  JSOO_SEDLEX_SRC = sedlexSrc;
+  JSOO_CMDLINER_SRC = cmdlinerSrc;
+  JSOO_MENHIR_SRC = menhirSrc;
+  JSOO_YOJSON_SRC = yojsonSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
@@ -436,6 +495,8 @@ stdenv.mkDerivation {
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
+    pkgs.nodejs
+    pkgs.binaryen
     pkgs.rsync
     pkgs.which
     pkgs.parallel
