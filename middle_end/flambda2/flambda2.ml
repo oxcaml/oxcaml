@@ -95,30 +95,10 @@ type run_result =
     reachable_names : NO.t
   }
 
-let build_run_result unit ~free_names ~final_typing_env ~sections ~all_code
-    slot_offsets : run_result =
+let build_run_result unit ~final_typing_env ~sections ~all_code
+    ({ used_value_slots; exported_offsets } : Slot_offsets.result) : run_result
+    =
   let module_symbol = Flambda_unit.module_symbol unit in
-  let function_slots_in_normal_projections =
-    NO.function_slots_in_normal_projections free_names
-  in
-  let value_slots_in_normal_projections =
-    NO.value_slots_in_normal_projections free_names
-  in
-  let all_function_slots = NO.all_function_slots_at_normal_mode free_names in
-  let all_value_slots = NO.all_value_slots_at_normal_mode free_names in
-  let ({ used_value_slots; exported_offsets } : Slot_offsets.result) =
-    let used_slots : Slot_offsets.used_slots =
-      { function_slots_in_normal_projections;
-        all_function_slots;
-        value_slots_in_normal_projections;
-        all_value_slots
-      }
-    in
-    let get_code_metadata code_id =
-      Exported_code.find_exn all_code code_id |> Code_or_metadata.code_metadata
-    in
-    Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
-  in
   let reachable_names, cmx =
     Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
       ~used_value_slots ~exported_offsets ~sections all_code
@@ -131,6 +111,27 @@ type flambda_result =
     offsets : Exported_offsets.t;
     reachable_names : NO.t
   }
+
+let finalize_offsets ~free_names ~slot_offsets ~all_code =
+  let function_slots_in_normal_projections =
+    NO.function_slots_in_normal_projections free_names
+  in
+  let value_slots_in_normal_projections =
+    NO.value_slots_in_normal_projections free_names
+  in
+  let all_function_slots = NO.all_function_slots_at_normal_mode free_names in
+  let all_value_slots = NO.all_value_slots_at_normal_mode free_names in
+  let used_slots : Slot_offsets.used_slots =
+    { function_slots_in_normal_projections;
+      all_function_slots;
+      value_slots_in_normal_projections;
+      all_value_slots
+    }
+  in
+  let get_code_metadata code_id =
+    Exported_code.find_exn all_code code_id |> Code_or_metadata.code_metadata
+  in
+  Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
 
 let compilation_unit_callbacks = ref []
 
@@ -196,37 +197,25 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
-      let ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            last_pass_name ) =
+      let flambda, all_code, slot_offsets, final_typing_env, last_pass_name =
         if Flambda_features.enable_reaper ()
         then (
-          let flambda, free_names, all_code, slot_offsets, final_typing_env =
+          let flambda, all_code, slot_offsets, final_typing_env =
             Profile.record_call ~accumulate:true "reaper" (fun () ->
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-                  ~final_typing_env flambda)
+                  ~final_typing_env ~free_names flambda)
           in
           print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
           print_fexpr "reaper"
             (Flambda_features.dump_fexpr (This_pass "reaper"))
             ppf flambda;
           dump_fexpr_annot ~prefixname "reaper" flambda;
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            "reaper" ))
+          flambda, all_code, slot_offsets, final_typing_env, "reaper")
         else
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            last_pass_name )
+          let slot_offsets =
+            finalize_offsets ~free_names ~slot_offsets ~all_code
+          in
+          flambda, all_code, slot_offsets, final_typing_env, last_pass_name
       in
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
@@ -235,8 +224,8 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr Last_pass)
         ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-        build_run_result flambda ~free_names ~final_typing_env ~sections
-          ~all_code slot_offsets
+        build_run_result flambda ~final_typing_env ~sections ~all_code
+          slot_offsets
       in
       Compiler_hooks.execute Reaped_flambda2 flambda;
       flambda, exported_offsets, reachable_names, cmx, all_code

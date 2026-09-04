@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
+let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   let get_code_metadata code_id =
@@ -53,8 +53,11 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
         (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
       ~code_deps
   in
-  let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
-      =
+  let slot_offsets =
+    Slot_offsets_analysis.compute ~free_names ~code_deps ~get_code_metadata
+      solved_dep
+  in
+  let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
       ~fixed_arity_continuations ~continuation_info ~final_typing_env
       ~types_rewrite_context ~calling_convention_changes solved_dep
@@ -73,8 +76,4 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in
-  ( Flambda_unit.with_body unit body,
-    free_names,
-    all_code,
-    slot_offsets,
-    final_typing_env )
+  Flambda_unit.with_body unit body, all_code, slot_offsets, final_typing_env
