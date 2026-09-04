@@ -22,5 +22,6 @@ type error =
       { loc : Location.t;
         kind : [ `Conflict | `Not_a_tailcall ]
       }
+  | Unsafe_mode_crossing_on_invalid_type_kind of Location.t
 
-val diagnose : error -> Diagnostic_plan.t list
+val diagnose : error -> Diagnostic_term.t Diagnostic_nlg.story list

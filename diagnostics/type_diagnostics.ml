@@ -24,22 +24,13 @@ type error =
       { loc : Location.t;
         kind : [ `Conflict | `Not_a_tailcall ]
       }
-
-let rec longident_name (lid : Longident.t) =
-  match lid with
-  | Lident name -> Some name
-  | Ldot (prefix, name) ->
-    Option.map
-      (fun prefix -> prefix ^ "." ^ name.txt)
-      (longident_name prefix.txt)
-  | Lapply _ -> None
+  | Unsafe_mode_crossing_on_invalid_type_kind of Location.t
 
 let field_name field =
-  Option.value (longident_name field) ~default:"this field"
+  Option.value (Nlg.longident_name field) ~default:"this field"
 
-let story ~claim ?contrast ?(background = []) ?(suggestions = []) () =
-  Nlg.realize_without_terms
-    [Nlg.story ~claim ?contrast ~background ~suggestions ()]
+let story ~claim ?contrast ?background ?suggestions () =
+  [Nlg.plain ~claim ?contrast ?background ?suggestions ()]
 
 let diagnose = function
   | Atomic_field_must_be_mutable { loc; name } ->
@@ -168,3 +159,18 @@ let diagnose = function
               Nlg.txt " to ask for the optimisation only where it applies" ] ]
         ()
     end
+  | Unsafe_mode_crossing_on_invalid_type_kind loc ->
+    story
+      ~claim:
+        [ Nlg.ref_source loc [Nlg.txt "this declaration is marked "];
+          Nlg.code "[@@unsafe_allow_any_mode_crossing]" ]
+      ~contrast:
+        [ Nlg.txt
+            "but the attribute applies only to records, unboxed products and \
+             variants" ]
+      ~background:
+        [ [ Nlg.txt
+              "the attribute overrides the mode bounds computed from a type's \
+               fields or constructors; a type with neither has nothing to \
+               override" ] ]
+      ()
