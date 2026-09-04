@@ -204,3 +204,49 @@ select_equal:
   movq  %rbx, %rax
   ret
 |}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_match x g h =
+  match Builtins.select (Int64_u.equal x #0L) true false with
+  | true -> g #()
+  | false -> h #()
+[%%expect_asm X86_64{|
+select_and_match:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
+|}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_if x g h =
+  if Builtins.select (Int64_u.equal x #0L) true false then g #() else h #()
+[%%expect_asm X86_64{|
+select_and_if:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
+|}]
