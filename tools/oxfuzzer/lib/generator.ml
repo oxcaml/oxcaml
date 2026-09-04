@@ -190,6 +190,53 @@ let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
            (Expr.Convert { from = inner_ty; to_ = nty; expr = Expr.Var name })
            ~complexity))
 
+let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
+    ~random_bits =
+  let sign_bit = Int64.shift_left 1L (fraction_bits + exponent_bits) in
+  let min_normal = Int64.shift_left 1L fraction_bits in
+  let infinity =
+    Int64.shift_left (Int64.of_int ((1 lsl exponent_bits) - 1)) fraction_bits
+  in
+  let with_sign bits =
+    if Random.State.bool st.random_state
+    then Int64.logor sign_bit bits
+    else bits
+  in
+  let small =
+    Gen.create (fun () ->
+        let numerator = Random.State.int st.random_state 17 in
+        let exponent = -(Random.State.int st.random_state 5) in
+        let value = Float.ldexp (float_of_int numerator) exponent in
+        with_sign (bits_of_float value))
+  in
+  let boundary =
+    Gen.create (fun () ->
+        let powers =
+          List.map
+            (fun exponent -> bits_of_float (Float.ldexp 1. exponent))
+            [0; 7; 15; 31; Sys.int_size - 1; 63; fraction_bits + 1]
+        in
+        let bits =
+          random_element st (1L :: min_normal :: Int64.pred infinity :: powers)
+        in
+        let offset = random_int_in_range st ~min:(-1) ~max:1 in
+        with_sign (Int64.add bits (Int64.of_int offset)))
+  in
+  let special =
+    Gen.create (fun () ->
+        let payload =
+          if Random.State.bool st.random_state
+          then 0L
+          else
+            Int64.succ
+              (Random.State.int64 st.random_state (Int64.pred min_normal))
+        in
+        with_sign (Int64.logor infinity payload))
+  in
+  Gen.run_exn
+    (Gen.weighted st.random_state
+       [10, Gen.create random_bits; 5, small; 4, boundary; 1, special])
+
 let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   let gen_const_int base =
     Gen.create (fun () ->
@@ -212,14 +259,22 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   in
   let gen_const_float =
     Gen.create (fun () ->
-        (* CR-soon hwasilewski: Add a skewed distribution of floats similar to
-           [gen_const_int], emit NaNs with some probability. *)
-        let bits = Random.State.bits64 st.random_state in
+        let bits =
+          gen_float_bits st ~fraction_bits:52 ~exponent_bits:11
+            ~bits_of_float:Int64.bits_of_float
+            ~random_bits:(fun () -> Random.State.bits64 st.random_state)
+        in
         record_complexity (Expr.Const (Number.Float bits)) ~complexity)
   in
   let gen_const_float32 =
     Gen.create (fun () ->
-        let bits = Random.State.bits32 st.random_state in
+        let bits =
+          gen_float_bits st ~fraction_bits:23 ~exponent_bits:8
+            ~bits_of_float:(fun x -> Int64.of_int32 (Int32.bits_of_float x))
+            ~random_bits:(fun () ->
+              Int64.of_int32 (Random.State.bits32 st.random_state))
+          |> Int64.to_int32
+        in
         record_complexity (Expr.Const (Number.Float32 bits)) ~complexity)
   in
   let gen_const (nty : NumberTy.t) =
