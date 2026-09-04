@@ -201,7 +201,7 @@ let typecore_diagnostic report loc (error : Typecore.error) =
   | Invalid_unboxed_access _ | Block_access_bad_record _ | Optional_poly_param
   | Unboxed_int_literals_not_supported | Invalid_label_for_src_pos _
   | Nonoptional_call_pos_label _ | Unexpected_hole
-  | Let_poly_not_yet_implemented | Let_poly_not_syntactic_value
+  | Let_poly_not_yet_implemented | Let_poly_not_function
   | Layout_poly_inst_not_yet_supported _ | Function_type_escapes_partial_match _
   | Uncurried_function_escapes_locality ->
     None
