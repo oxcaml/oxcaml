@@ -2,6 +2,7 @@ module Name : sig
   type t
 
   val of_string : string -> t
+
   val to_string : t -> string
 end
 
@@ -18,8 +19,11 @@ module NumberTy : sig
       | Int8
 
     val all : t list
+
     val equal : t -> t -> bool
+
     val to_module : t -> string
+
     val is_floating_point : t -> bool
   end
 
@@ -29,12 +33,19 @@ module NumberTy : sig
     }
 
   val boxed : Base.t -> t
+
   val unboxed : Base.t -> t
+
   val equal : t -> t -> bool
+
   val to_module : t -> string
+
   val to_string : ?no_hash:bool -> t -> string
+
   val converter_name : from:t -> to_:t -> string
+
   val is_floating_point : t -> bool
+
   val all : t list
 end
 
@@ -50,6 +61,7 @@ module Number : sig
     | Int8 of int
 
   val of_integral_bits : NumberTy.Base.t -> int64 -> t
+
   val to_code : t -> Parsetree.expression
 end
 
@@ -71,6 +83,7 @@ module Bin_op : sig
     | Or
 
   val ops_for_ty : Ty.t -> t list
+
   val to_code : Ty.t -> t -> Parsetree.expression
 end
 
@@ -99,6 +112,7 @@ module Expr : sig
     from:NumberTy.t ->
     to_:NumberTy.t ->
     Parsetree.expression
+
   val to_code : t -> Parsetree.expression
 end
 
@@ -115,7 +129,9 @@ module Statement : sig
     Parsetree.expression ->
     Parsetree.expression ->
     Parsetree.expression
+
   val sequence : t -> t -> t
+
   val to_code : t -> Parsetree.expression
 end
 
