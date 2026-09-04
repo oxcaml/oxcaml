@@ -46,6 +46,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Is_closed_by (Monadic, co) -> co.closure, Close_over (Monadic, co)
       | Is_closed_by (Comonadic, co) -> co.closure, Close_over (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Parameter_to_argument (Comonadic, { parameter; callee }) ->
+        callee, Argument_to_parameter (Comonadic, { parameter; argument = pp })
+      | Argument_to_parameter (Monadic, { parameter; argument }) ->
+        argument, Parameter_to_argument (Monadic, { parameter; callee = pp })
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -74,6 +78,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Close_over (Monadic, co) -> co.closed, Is_closed_by (Monadic, co)
       | Close_over (Comonadic, co) -> co.closed, Is_closed_by (Comonadic, co)
       | Crossing -> pp, Crossing
+      | Parameter_to_argument (Monadic, { parameter; callee }) ->
+        callee, Argument_to_parameter (Monadic, { parameter; argument = pp })
+      | Argument_to_parameter (Comonadic, { parameter; argument }) ->
+        argument, Parameter_to_argument (Comonadic, { parameter; callee = pp })
       | Functor_to_parameter loc ->
         (loc, Functor), Parameter_to_functor (fst pp)
       | Parameter_to_functor loc ->
@@ -106,6 +114,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Application_to_functor loc -> Application_to_functor loc
+        | Parameter_to_argument (Monadic, x) ->
+          Parameter_to_argument (Monadic, x)
+        | Argument_to_parameter (Comonadic, x) ->
+          Argument_to_parameter (Comonadic, x)
         | Allocation_l loc -> Allocation_l loc
         | Allocation loc -> Allocation loc
         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
@@ -123,6 +135,10 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Parameter_to_argument (Comonadic, x) ->
+          Parameter_to_argument (Comonadic, x)
+        | Argument_to_parameter (Monadic, x) ->
+          Argument_to_parameter (Monadic, x)
         | Functor_to_application loc -> Functor_to_application loc
         | Allocation_r loc -> Allocation_r loc
         | Allocation loc -> Allocation loc
@@ -143,6 +159,14 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Crossing -> Crossing
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
+        | Parameter_to_argument (Comonadic, x) ->
+          Parameter_to_argument (Comonadic, x)
+        | Parameter_to_argument (Monadic, x) ->
+          Parameter_to_argument (Monadic, x)
+        | Argument_to_parameter (Comonadic, x) ->
+          Argument_to_parameter (Comonadic, x)
+        | Argument_to_parameter (Monadic, x) ->
+          Argument_to_parameter (Monadic, x)
         | Functor_to_application loc -> Functor_to_application loc
         | Application_to_functor loc -> Application_to_functor loc
         | Allocation_r loc -> Allocation_r loc
@@ -165,6 +189,14 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
         | Crossing -> Crossing
+        | Parameter_to_argument (Comonadic, x) ->
+          Parameter_to_argument (Comonadic, x)
+        | Parameter_to_argument (Monadic, x) ->
+          Parameter_to_argument (Monadic, x)
+        | Argument_to_parameter (Comonadic, x) ->
+          Argument_to_parameter (Comonadic, x)
+        | Argument_to_parameter (Monadic, x) ->
+          Argument_to_parameter (Monadic, x)
         | Functor_to_parameter p -> Functor_to_parameter p
         | Parameter_to_functor p -> Parameter_to_functor p
         | Functor_to_application loc -> Functor_to_application loc
@@ -210,6 +242,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Modality_annotation annotation -> Modality_annotation annotation
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -233,6 +266,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Modality_annotation annotation -> Modality_annotation annotation
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -262,6 +296,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Modality_annotation annotation -> Modality_annotation annotation
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -291,6 +326,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Modality_annotation annotation -> Modality_annotation annotation
     end)
   end
 end
@@ -4985,10 +5021,10 @@ module Report = struct
       Fmt.pp_print_string ppf
         "it is layout-polymorphic and being instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
-    | Contained_by c ->
+    | Contained_by c | Modality_annotation { contained_by = Some c; _ } ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
-    | Annotation _ ->
+    | Annotation _ | Modality_annotation { contained_by = None; _ } ->
       print_bug ~explanation:"Annotation should be printed by print_ahint" ()
         ppf
 
@@ -5064,6 +5100,7 @@ module Report = struct
     | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
       Some (print_is_contained_by ~fixpoint is_contained_by)
+    | Parameter_to_argument _ | Argument_to_parameter _ -> None
 
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
@@ -5184,6 +5221,9 @@ module Report = struct
     | Functor_to_application _ | Application_to_functor _ ->
       (* These morphisms should never be skipped *)
       ~is_skip:false, ~fixpoint
+    | Parameter_to_argument _ | Argument_to_parameter _ ->
+      if not (implements_identity src obj a b) then print_bug_stderr ();
+      ~is_skip:true, ~fixpoint
     | Skip | Crossing ->
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
@@ -5236,7 +5276,7 @@ module Report = struct
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
-    | Const (Annotation _) ->
+    | Const (Annotation _ | Modality_annotation { contained_by = None; _ }) ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
     | Irrelevant ->
@@ -7655,6 +7695,14 @@ let value_to_alloc_r2l { comonadic; monadic } =
   }
 
 module Modality = struct
+  let constant_hint ~annotations ~is_contained_by =
+    match annotations with
+    | [] -> Option.map (fun c -> Hint.Contained_by c) is_contained_by
+    | annotated_modes ->
+      Some
+        (Hint.Modality_annotation
+           { annotated_modes; contained_by = is_contained_by })
+
   (* Inferred modalities
 
       Similar to constant modalities, an inferred modality maps the mode of a
@@ -7765,11 +7813,12 @@ module Modality = struct
           Mode.join_const ?hint c (Mode.disallow_left x)
 
       let apply_left : type r.
+          ?annotations:(string * string Location.loc) list ->
           ?is_contained_by:Hint.is_contained_by ->
           t ->
           (allowed * r) Mode.t ->
           Mode.l =
-       fun ?is_contained_by t x ->
+       fun ?(annotations = []) ?is_contained_by t x ->
         match t with
         | Join_const c ->
           let morph_hint =
@@ -7778,9 +7827,7 @@ module Modality = struct
               is_contained_by
           in
           let morph_hint = Option.value ~default:Hint.Unknown morph_hint in
-          let hint =
-            Option.map (fun c -> Hint.Contained_by c) is_contained_by
-          in
+          let hint = constant_hint ~annotations ~is_contained_by in
           Mode.join
             [ Mode.disallow_right (Mode.of_const ?hint c);
               Mode.disallow_right (Mode.apply_hint morph_hint x) ]
@@ -7831,13 +7878,16 @@ module Modality = struct
         Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply_left : type r.
+        ?annotations:(string * string Location.loc) list ->
         ?is_contained_by:Hint.is_contained_by ->
         t ->
         (allowed * r) Mode.t ->
         Mode.l =
-     fun ?is_contained_by t x ->
+     fun ?annotations ?is_contained_by t x ->
       match t with
-      | Const c -> Const.apply_left ?is_contained_by c x |> Mode.disallow_right
+      | Const c ->
+        Const.apply_left ?annotations ?is_contained_by c x
+        |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
@@ -7943,11 +7993,12 @@ module Modality = struct
           Mode.meet_const ?hint c (Mode.disallow_right x)
 
       let apply_right : type l.
+          ?annotations:(string * string Location.loc) list ->
           ?is_contained_by:Hint.is_contained_by ->
           t ->
           (l * allowed) Mode.t ->
           Mode.r =
-       fun ?is_contained_by t x ->
+       fun ?(annotations = []) ?is_contained_by t x ->
         match t with
         | Meet_const c ->
           let morph_hint =
@@ -7956,9 +8007,7 @@ module Modality = struct
               is_contained_by
           in
           let morph_hint = Option.value ~default:Hint.Unknown morph_hint in
-          let hint =
-            Option.map (fun c -> Hint.Contained_by c) is_contained_by
-          in
+          let hint = constant_hint ~annotations ~is_contained_by in
           Mode.meet
             [ Mode.disallow_left (Mode.of_const ?hint c);
               Mode.disallow_left (Mode.apply_hint morph_hint x) ]
@@ -8146,13 +8195,31 @@ module Modality = struct
 
   type equate_error = equate_step * error
 
+  type annotation =
+    { bound : atom;
+      written : string Location.loc
+    }
+
+  let annotation_axis { bound = Atom (axis, _); _ } = Axis.P axis
+
+  let hint_annotations annotations =
+    List.map
+      (fun { bound = Atom (axis, mode); written } ->
+        Fmt.asprintf "%a" (Per_axis.print axis) mode, written)
+      annotations
+
   module Const = struct
     module Monadic = Monadic.Const
     module Comonadic = Comonadic.Const
 
-    type t = (Monadic.t, Comonadic.t) monadic_comonadic
+    type t =
+      { monadic : Monadic.t;
+        comonadic : Comonadic.t;
+        annotations : annotation list
+      }
 
-    let id = { monadic = Monadic.id; comonadic = Comonadic.id }
+    let id =
+      { monadic = Monadic.id; comonadic = Comonadic.id; annotations = [] }
 
     let is_id { monadic; comonadic } =
       Monadic.is_id monadic && Comonadic.is_id comonadic
@@ -8167,23 +8234,25 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply_left ?is_contained_by t { monadic; comonadic } =
-      let monadic = Monadic.apply_left ?is_contained_by t.monadic monadic in
+    let apply_left ?is_contained_by t
+        ({ monadic; comonadic } : _ Value.t) : Value.l =
+      let annotations = hint_annotations t.annotations in
+      let monadic =
+        Monadic.apply_left ~annotations ?is_contained_by t.monadic monadic
+      in
       let comonadic =
         Comonadic.apply_left ?is_contained_by t.comonadic comonadic
       in
       { monadic; comonadic }
 
-    let apply_right ?is_contained_by t { monadic; comonadic } =
+    let apply_right ?is_contained_by t
+        ({ monadic; comonadic } : _ Value.t) : Value.r =
+      let annotations = hint_annotations t.annotations in
       let monadic = Monadic.apply_right ?is_contained_by t.monadic monadic in
       let comonadic =
-        Comonadic.apply_right ?is_contained_by t.comonadic comonadic
+        Comonadic.apply_right ~annotations ?is_contained_by t.comonadic
+          comonadic
       in
-      { monadic; comonadic }
-
-    let concat ~then_ t =
-      let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
-      let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
       { monadic; comonadic }
 
     let proj (type a) (ax : a Axis.t) { monadic; comonadic } : a =
@@ -8191,10 +8260,50 @@ module Modality = struct
       | Monadic ax -> Monadic.proj ax monadic
       | Comonadic ax -> Comonadic.proj ax comonadic
 
-    let set (type a) (ax : a Axis.t) (a : a) { monadic; comonadic } : t =
+    let concat ~then_ t =
+      let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
+      let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
+      let composed = { monadic; comonadic; annotations = [] } in
+      let annotations =
+        List.fold_left
+          (fun kept ({ bound = Atom (axis, bound); _ } as annotation) ->
+            let result = proj axis composed in
+            if bound <> result || Per_axis.is_id axis result
+               || List.exists
+                    (fun previous ->
+                      Axis.compare (annotation_axis previous) (Axis.P axis) = 0)
+                    kept
+            then kept
+            else annotation :: kept)
+          [] (then_.annotations @ t.annotations)
+      in
+      { composed with annotations }
+
+    let set (type a) ?annotation (ax : a Axis.t) (a : a)
+        { monadic; comonadic; annotations } : t =
+      let annotations =
+        List.filter
+          (fun old -> Axis.compare (annotation_axis old) (Axis.P ax) <> 0)
+          annotations
+      in
+      let annotations =
+        match annotation with
+        | Some written when not (Per_axis.is_id ax a) ->
+          { bound = Atom (ax, a); written } :: annotations
+        | None | Some _ -> annotations
+      in
       match ax with
-      | Monadic ax -> { monadic = Monadic.set ax a monadic; comonadic }
-      | Comonadic ax -> { monadic; comonadic = Comonadic.set ax a comonadic }
+      | Monadic ax ->
+        { monadic = Monadic.set ax a monadic; comonadic; annotations }
+      | Comonadic ax ->
+        { monadic; comonadic = Comonadic.set ax a comonadic; annotations }
+
+    let annotation axis t =
+      List.find_opt
+        (fun annotation ->
+          Axis.compare (annotation_axis annotation) (Axis.P axis) = 0)
+        t.annotations
+      |> Option.map (fun annotation -> annotation.written)
 
     let diff t1 t2 =
       List.filter_map
@@ -8209,17 +8318,26 @@ module Modality = struct
       Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
   end
 
-  type t = (Monadic.t, Comonadic.t) monadic_comonadic
+  type t =
+    { monadic : Monadic.t;
+      comonadic : Comonadic.t;
+      annotations : annotation list
+    }
 
-  let undefined : t = { monadic = Undefined; comonadic = Undefined }
+  let undefined : t =
+    { monadic = Undefined; comonadic = Undefined; annotations = [] }
 
   let is_undefined : t -> bool = function
     | { monadic = Undefined; comonadic = Undefined } -> true
     | _ -> false
   [@@ocaml.warning "-4"]
 
-  let apply_left ?is_contained_by t { monadic; comonadic } =
-    let monadic = Monadic.apply_left ?is_contained_by t.monadic monadic in
+  let apply_left ?is_contained_by t
+      ({ monadic; comonadic } : _ Value.t) : Value.l =
+    let annotations = hint_annotations t.annotations in
+    let monadic =
+      Monadic.apply_left ~annotations ?is_contained_by t.monadic monadic
+    in
     let comonadic =
       Comonadic.apply_left ?is_contained_by t.comonadic comonadic
     in
@@ -8240,42 +8358,43 @@ module Modality = struct
   let print ppf ({ monadic; comonadic } : t) =
     Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
 
-  let infer ~md_mode ~mode : t =
+  let infer ~(md_mode : _ Value.t) ~(mode : _ Value.t) : t =
     let comonadic =
       Comonadic.infer ~md_mode:md_mode.comonadic ~mode:mode.comonadic
     in
     let monadic = Monadic.infer ~md_mode:md_mode.monadic ~mode:mode.monadic in
-    { monadic; comonadic }
+    { monadic; comonadic; annotations = [] }
 
-  let zap_to_id t =
+  let zap_to_id t : Const.t =
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_id comonadic in
     let monadic = Monadic.zap_to_id monadic in
-    { monadic; comonadic }
+    { monadic; comonadic; annotations = t.annotations }
 
-  let zap_to_floor t =
+  let zap_to_floor t : Const.t =
     let { monadic; comonadic } = t in
     let comonadic = Comonadic.zap_to_floor comonadic in
     let monadic = Monadic.zap_to_floor monadic in
-    { monadic; comonadic }
+    { monadic; comonadic; annotations = t.annotations }
 
-  let to_const_opt t =
+  let to_const_opt t : Const.t option =
     let { monadic; comonadic } = t in
     Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
         Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
-            Some { monadic; comonadic }))
+            Some
+              ({ monadic; comonadic; annotations = t.annotations } : Const.t)))
 
   let to_const_exn t = t |> to_const_opt |> Option.get
 
-  let of_const { monadic; comonadic } =
+  let of_const ({ monadic; comonadic; annotations } : Const.t) =
     let comonadic = Comonadic.of_const comonadic in
     let monadic = Monadic.of_const monadic in
-    { monadic; comonadic }
+    { monadic; comonadic; annotations }
 
   let max =
     let monadic = Monadic.max in
     let comonadic = Comonadic.max in
-    { monadic; comonadic }
+    { monadic; comonadic; annotations = [] }
 end
 
 module Crossing = struct
@@ -8593,7 +8712,7 @@ module Crossing = struct
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-  let modality m { monadic; comonadic } =
+  let modality (m : Modality.Const.t) { monadic; comonadic } =
     let monadic = Monadic.modality m.monadic monadic in
     let comonadic = Comonadic.modality m.comonadic comonadic in
     { monadic; comonadic }
@@ -8744,6 +8863,6 @@ module Crossing = struct
   let to_modality
       { monadic = Monadic.Modality monadic;
         comonadic = Comonadic.Modality comonadic
-      } =
-    { monadic; comonadic }
+      } : Modality.Const.t =
+    { monadic; comonadic; annotations = [] }
 end

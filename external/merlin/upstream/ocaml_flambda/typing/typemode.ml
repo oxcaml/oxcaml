@@ -454,10 +454,15 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
      - for the same axis, later modalities override earlier ones. *)
   let build atoms =
     List.fold_left
-      (fun m { txt = Atom (ax, a) as t; loc = _ } ->
-        let m = Const.set ax a m in
+      (fun m { txt = Atom (ax, a) as t; loc } ->
+        let annotation =
+          { Location.txt = Format_doc.asprintf "%a" (Per_axis.print ax) a;
+            loc
+          }
+        in
+        let m = Const.set ~annotation ax a m in
         List.fold_left
-          (fun m (Atom (ax, a)) -> Const.set ax a m)
+          (fun m (Atom (ax, a)) -> Const.set ~annotation ax a m)
           m (implied_modalities t))
       default
       (sort_dedup_modalities_with_locs atoms)
