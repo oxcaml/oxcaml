@@ -5,7 +5,7 @@ let seed : int option ref = ref None
 let speclist =
   [ ( "-seed",
       Arg.Int (fun n -> seed := Some n),
-      "<int> Random number generator initial seed (required)" ) ]
+      "<int>  Random number generator initial seed (required)" ) ]
 
 let () =
   Arg.parse speclist
