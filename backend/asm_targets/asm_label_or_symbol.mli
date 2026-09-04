@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,23 +12,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Either an assembly label or an assembly symbol. *)
+
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
-open Asm_targets
+type t =
+  | Label of Asm_label.t
+  | Symbol of Asm_symbol.t
 
-include Location_or_range_list_entry.Make (struct
-  module Payload = Counted_location_description
+val compare : t -> t -> int
 
-  let code_for_entry_kind (entry : _ Location_or_range_list_entry.entry) =
-    match entry with
-    (* DWARF-5 spec page 227. *)
-    | End_of_list -> 0x00
-    | Base_addressx _ -> 0x01
-    | Offset_pair_between_labels _ -> 0x04
-    | Base_address _ -> 0x06
-    | Start_end _ -> 0x07
-    | Start_length _ -> 0x08
+val equal : t -> t -> bool
 
-  let section : Asm_section.dwarf_section = Debug_loclists
-end)
+val hash : t -> int
+
+val print : Format.formatter -> t -> unit

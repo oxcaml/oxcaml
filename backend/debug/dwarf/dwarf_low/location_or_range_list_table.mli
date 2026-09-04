@@ -20,7 +20,9 @@
 open Asm_targets
 
 module Make (Location_or_range_list : sig
-  include Dwarf_emittable.S
+  type t
+
+  val emit : asm_directives:Asm_directives_dwarf.t -> t -> unit
 
   val section : Asm_section.dwarf_section
 end) : sig
@@ -45,5 +47,9 @@ end) : sig
 
   val base_addr : t -> Asm_label.t
 
-  include Dwarf_emittable.S with type t := t
+  (* Note that the sizes of these tables are not known at compile time (some
+     list entries have assembler-computed ULEB128 operands), so there is no
+     [size] function; the table lengths and offsets are computed by the
+     assembler. *)
+  val emit : asm_directives:Asm_directives_dwarf.t -> t -> unit
 end

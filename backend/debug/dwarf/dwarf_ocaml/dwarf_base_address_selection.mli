@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,23 +12,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-30-40-41-42"]
+(** Selection of the symbol from which the offsets in location and range list
+    entries are computed, together with any DWARF-4 base address selection entry
+    that must precede such entries. *)
 
-open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 open Asm_targets
 
-include Location_or_range_list_entry.Make (struct
-  module Payload = Counted_location_description
-
-  let code_for_entry_kind (entry : _ Location_or_range_list_entry.entry) =
-    match entry with
-    (* DWARF-5 spec page 227. *)
-    | End_of_list -> 0x00
-    | Base_addressx _ -> 0x01
-    | Offset_pair_between_labels _ -> 0x04
-    | Base_address _ -> 0x06
-    | Start_end _ -> 0x07
-    | Start_length _ -> 0x08
-
-  let section : Asm_section.dwarf_section = Debug_loclists
-end)
+val start_of_code_symbol_and_base_entries :
+  Dwarf_state.t ->
+  function_symbol:Asm_symbol.t ->
+  create_base_address_selection_entry:(base_address_symbol:Asm_symbol.t -> 'a) ->
+  Asm_symbol.t * 'a list

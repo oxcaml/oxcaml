@@ -72,7 +72,8 @@ val code_address_from_label_symbol_diff :
 val code_address_from_symbol_diff :
   ?comment:string -> upper:Asm_symbol.t -> lower:Asm_symbol.t -> unit -> t
 
-val code_address_from_symbol_plus_bytes : Asm_symbol.t -> Targetint.t -> t
+val code_address_from_label_or_symbol :
+  ?comment:string -> Asm_label_or_symbol.t -> t
 
 val offset_into_debug_info : ?comment:string -> Asm_label.t -> t
 
@@ -106,6 +107,11 @@ val distance_between_labels_32_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
 
 val distance_between_labels_64_bit :
+  ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
+
+(** As [distance_between_labels_32_bit] or [distance_between_labels_64_bit],
+    according to the current DWARF format. *)
+val distance_between_labels_format_width :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> t
 
 val distance_between_labels_32_bit_with_offsets :

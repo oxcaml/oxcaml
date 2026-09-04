@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -14,21 +14,23 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
-open Asm_targets
+type t =
+  | Label of Asm_label.t
+  | Symbol of Asm_symbol.t
 
-include Location_or_range_list_entry.Make (struct
-  module Payload = Counted_location_description
+let compare t1 t2 =
+  match t1, t2 with
+  | Label lbl1, Label lbl2 -> Asm_label.compare lbl1 lbl2
+  | Symbol sym1, Symbol sym2 -> Asm_symbol.compare sym1 sym2
+  | Label _, Symbol _ -> -1
+  | Symbol _, Label _ -> 1
 
-  let code_for_entry_kind (entry : _ Location_or_range_list_entry.entry) =
-    match entry with
-    (* DWARF-5 spec page 227. *)
-    | End_of_list -> 0x00
-    | Base_addressx _ -> 0x01
-    | Offset_pair_between_labels _ -> 0x04
-    | Base_address _ -> 0x06
-    | Start_end _ -> 0x07
-    | Start_length _ -> 0x08
+let equal t1 t2 = compare t1 t2 = 0
 
-  let section : Asm_section.dwarf_section = Debug_loclists
-end)
+let hash = function
+  | Label lbl -> Hashtbl.hash (0, Asm_label.hash lbl)
+  | Symbol sym -> Hashtbl.hash (1, Asm_symbol.hash sym)
+
+let print ppf = function
+  | Label lbl -> Asm_label.print ppf lbl
+  | Symbol sym -> Asm_symbol.print ppf sym
