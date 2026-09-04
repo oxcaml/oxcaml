@@ -46,14 +46,14 @@ let rec reduce_strengthen_lazy ~aliasable mty p =
     Mty_signature sg ->
       Some (Mty_signature(strengthen_lazy_sig ~aliasable sg p))
 
-  | Mty_functor(Named (Some param, arg, marg), res, mres)
+  | Mty_functor(Named (Some param, arg, expectation, marg), res, mres)
     when !Clflags.applicative_functors ->
-      Some (Mty_functor(Named (Some param, arg, marg),
+      Some (Mty_functor(Named (Some param, arg, expectation, marg),
         strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
-  | Mty_functor(Named (None, arg, marg), res, mres)
+  | Mty_functor(Named (None, arg, expectation, marg), res, mres)
     when !Clflags.applicative_functors ->
       let param = Ident.create_scoped ~scope:(Path.scope p) "Arg" in
-      Some (Mty_functor(Named (Some param, arg, marg),
+      Some (Mty_functor(Named (Some param, arg, expectation, marg),
         strengthen_lazy ~aliasable:false res (Papply(p, Pident param)), mres))
 
   | Mty_strengthen (mty,q,Not_aliasable) when aliasable ->
@@ -262,7 +262,7 @@ let rec expand_paths_lazy paths env =
   | Mty_functor (param,res,mres) ->
       let param, env = match param with
         Unit -> Unit, env
-      | Named (name,mty,mm) ->
+      | Named (name, mty, expectation, mm) ->
           let mty = expand_paths_lazy paths env mty in
           let mode = Mode.(alloc_as_value mm |> Value.disallow_right) in
           let env = match name with
@@ -271,7 +271,7 @@ let rec expand_paths_lazy paths env =
                   ~mode env
             | Some _ | None -> env
           in
-          Named (name, mty, mm), env
+          Named (name, mty, expectation, mm), env
       in
       let res = expand_paths_lazy paths env res in
       Mty_functor (param,res,mres)
@@ -505,7 +505,7 @@ let rec nondep_mty_with_presence env va ids pres mty =
       pres, mty
   | Mty_functor(Unit, res, mres) ->
       pres, Mty_functor(Unit, nondep_mty env va ids res, mres)
-  | Mty_functor(Named (param, arg, marg), res, mres) ->
+  | Mty_functor(Named (param, arg, expectation, marg), res, mres) ->
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
       let mode = Mode.(alloc_as_value marg |> Value.disallow_right) in
@@ -515,7 +515,8 @@ let rec nondep_mty_with_presence env va ids pres mty =
         | Some param -> Env.add_module ~arg:true param Mp_present arg ~mode env
       in
       let mty =
-        Mty_functor(Named (param, nondep_mty env var_inv ids arg, marg),
+        Mty_functor(Named (param, nondep_mty env var_inv ids arg, expectation,
+                           marg),
                     nondep_mty res_env va ids res, mres)
       in
       pres, mty
