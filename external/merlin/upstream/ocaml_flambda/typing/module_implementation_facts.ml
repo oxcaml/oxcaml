@@ -277,6 +277,13 @@ type t =
 
 type frozen = t
 
+let empty =
+  { checks = Check_set.empty;
+    dependencies = Dependency_set.empty;
+    equalities = Context_equality_set.empty;
+    omissions = Omission_set.empty
+  }
+
 let map_checks t ~f = { t with checks = Check_set.map f t.checks }
 
 let union left right =
@@ -491,6 +498,42 @@ let signature_index_of_module_type env (module_type : Types.module_type) =
   | Some signature -> index_of_signature signature
   | None -> empty_signature_index
 
+let constraint_removes_requirement env module_type (path, _, constraint_) =
+  let removes_item = function
+    | Types.Sig_type _, Twith_typesubst _
+    | Types.Sig_module _, Twith_modsubst _
+    | Types.Sig_modtype _, Twith_modtypesubst _
+    | Types.Sig_jkind _, Twith_jkindsubst _ ->
+      true
+    | _ -> false
+  in
+  let rec contains env module_type names =
+    match scraped_signature env module_type with
+    | None -> true
+    | Some signature ->
+      let env = Env.add_signature signature env in
+      List.exists
+        (fun item ->
+          match names, item with
+          | ( [name],
+              ( Types.Sig_type (id, _, _, _)
+              | Types.Sig_module (id, _, _, _, _)
+              | Types.Sig_modtype (id, _, _)
+              | Types.Sig_jkind (id, _, _) ) ) ->
+            String.equal name (Ident.name id) && removes_item (item, constraint_)
+          | name :: (_ :: _ as rest), Types.Sig_module (id, _, md, _, _) ->
+            String.equal name (Ident.name id) && contains env md.md_type rest
+          | _ -> false)
+        signature
+  in
+  match constraint_ with
+  | Twith_type _ | Twith_module _ | Twith_modtype _ | Twith_jkind _ -> false
+  | Twith_typesubst _ | Twith_modsubst _ | Twith_modtypesubst _
+  | Twith_jkindsubst _ -> (
+    match Path.flatten path with
+    | `Ok (root, names) -> contains env module_type (Ident.name root :: names)
+    | `Contains_apply -> true)
+
 let has_argument_members env (parameter_type : Types.module_type) =
   match scraped_signature env parameter_type with
   | Some signature ->
@@ -550,11 +593,24 @@ let named_modtype_uids env (module_type : Types.module_type) =
   Uid.Set.elements !uids
 
 let facts_of_tree compilation_unit artifact iterate =
+  let module Module_type_table = Hashtbl.Make (struct
+    type t = Typedtree.module_type
+
+    let equal left right = left == right
+
+    let hash module_type =
+      Hashtbl.hash (module_type.mty_uid, module_type.mty_loc)
+  end) in
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   let facts = Builder.create () in
   let module_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let modtype_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let modtype_declaration_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
+  let modtype_definitions : Typedtree.module_type Uid.Tbl.t =
+    Uid.Tbl.create 16
+  in
+  let resolved_module_type_keys = Module_type_table.create 16 in
+  let substituted_module_types = ref [] in
   let parameter_expectations : Uid.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let binding_expectations : Key.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let site_counter = ref 0 in
@@ -779,10 +835,43 @@ let facts_of_tree compilation_unit artifact iterate =
           add_omission ~affected:(Some key) ~source:None
             Omission.Reason.Unresolved_module_type)
       | None -> ())
-  and register_argument_members ~derived ~parameter_type env argument_source =
-    let rec walk ~source (parameter_type : Types.module_type) =
+  and add_module_member_check ~context ~kind ~site env implementation
+      (expectation : Types.module_declaration) =
+    let expectation_key =
+      Key.Named { context; family_uid = expectation.md_uid }
+    in
+    add_dependency ~derived:expectation_key
+      ~source:(Key.Anon expectation.md_uid) Dependency.Reason.Instance;
+    if Uid.for_actual_declaration expectation.md_uid
+    then add_check implementation expectation_key kind site;
+    let rec add_requirements visited module_type =
+      match declared_member_type_path module_type with
+      | None -> ()
+      | Some path -> (
+        match find_modtype env path with
+        | Some declaration when Uid.Set.mem declaration.mtd_uid visited -> ()
+        | Some declaration ->
+          (match key_of_modtype_path ~site env path with
+          | Some source ->
+            add_dependency ~derived:expectation_key ~source
+              Dependency.Reason.Interface
+          | None ->
+            add_omission ~affected:(Some expectation_key) ~source:None
+              Omission.Reason.Unresolved_module_type);
+          Option.iter
+            (add_requirements (Uid.Set.add declaration.mtd_uid visited))
+            declaration.mtd_type
+        | None ->
+          add_omission ~affected:(Some expectation_key) ~source:None
+            Omission.Reason.Unresolved_module_type)
+    in
+    add_requirements Uid.Set.empty expectation.md_type
+  and register_argument_members ~context ~derived ~parameter_type ~site env
+      argument_source =
+    let rec walk env ~context ~source (parameter_type : Types.module_type) =
       match scraped_signature env parameter_type with
       | Some signature ->
+        let env = Env.add_signature signature env in
         let source_index =
           match source with
           | `Path _ -> empty_signature_index
@@ -821,17 +910,24 @@ let facts_of_tree compilation_unit artifact iterate =
             | Module_member (name, declaration) -> (
               let member_source =
                 match source with
-                | `Path path -> Some (`Path (Path.Pdot (path, name)))
+                | `Path path ->
+                  let path = Path.Pdot (path, name) in
+                  Some (node_of_module_path env ~loc:site path, `Path path)
                 | `Type _ -> (
                   match
                     String_map.find_opt name source_index.module_members
                   with
-                  | Some member -> Some (`Type member.Types.md_type)
+                  | Some member ->
+                    Some (Node.Uid member.Types.md_uid, `Type member.md_type)
                   | None -> None)
               in
               match member_source with
-              | Some member_source ->
-                walk ~source:member_source declaration.md_type
+              | Some (implementation, member_source) ->
+                add_module_member_check ~context ~kind:Check.Kind.Argument ~site
+                  env implementation declaration;
+                walk env
+                  ~context:(Context.Proj (context, declaration.md_uid))
+                  ~source:member_source declaration.md_type
               | None ->
                 add_omission ~affected:(Some derived) ~source:None
                   Omission.Reason.Unresolved_module)
@@ -839,11 +935,12 @@ let facts_of_tree compilation_unit artifact iterate =
           signature
       | None -> ()
     in
-    walk ~source:argument_source parameter_type
+    walk env ~context ~source:argument_source parameter_type
   and emit_argument_check ~site ~anchor env ~parameter_type ~expectation
       ~functor_instance argument_node argument_source =
+    let context = lazy (anchor ()) in
     let instance_key uid =
-      let key = Key.Named { context = anchor (); family_uid = uid } in
+      let key = Key.Named { context = Lazy.force context; family_uid = uid } in
       (match expectation with
       | Some parameter_uid ->
         add_dependency ~derived:key ~source:(Key.Anon parameter_uid)
@@ -928,7 +1025,8 @@ let facts_of_tree compilation_unit artifact iterate =
     in
     match derived with
     | Some derived ->
-      register_argument_members ~derived ~parameter_type env argument_source
+      register_argument_members ~context:(Lazy.force context) ~derived
+        ~parameter_type ~site env argument_source
     | None -> ()
   and record_path_application ~site env functor_path argument_path =
     match find_normalized_module env functor_path with
@@ -1189,7 +1287,7 @@ let facts_of_tree compilation_unit artifact iterate =
       | Tmod_apply_unit _ | Tmod_constraint _ | Tmod_unpack _ ->
         None)
   in
-  let register_annotation_member_pairs uid (inner : module_expr)
+  let register_annotation_member_pairs ~context (inner : module_expr)
       (module_type : Typedtree.module_type) =
     let site = inner.mod_loc in
     let rec resolve_member visited env (member_type : Types.module_type) =
@@ -1220,8 +1318,9 @@ let facts_of_tree compilation_unit artifact iterate =
         | None -> `Other)
       | Types.Mty_functor _ -> `Other
     in
-    let rec pair_members visited env ~body_context ~annotation_context
-        (body_signature : Types.signature) (annotation : Types.signature) =
+    let rec pair_members visited env ~check_context ~body_context
+        ~annotation_context (body_signature : Types.signature)
+        (annotation : Types.signature) =
       let body_index = index_of_signature body_signature in
       let env = Env.add_signature body_signature env in
       let (_ : Env.t) =
@@ -1254,21 +1353,12 @@ let facts_of_tree compilation_unit artifact iterate =
                 when not
                        (Uid.equal body_declaration.Types.md_uid
                           declaration.md_uid) -> (
-                if Uid.for_actual_declaration declaration.md_uid
-                then
-                  add_check
-                    (if Uid.for_actual_declaration body_declaration.Types.md_uid
-                     then Node.Uid body_declaration.Types.md_uid
-                     else Node.Location (compilation_unit, site))
-                    (Key.Anon declaration.md_uid) Check.Kind.Annotation site;
-                (match declared_member_type_path declaration.Types.md_type with
-                | None -> ()
-                | Some path -> (
-                  match key_of_modtype_path ~site env path with
-                  | Some source ->
-                    add_dependency ~derived:(Key.Anon declaration.md_uid)
-                      ~source Dependency.Reason.Interface
-                  | None -> ()));
+                add_module_member_check ~context:check_context
+                  ~kind:Check.Kind.Annotation ~site env
+                  (if Uid.for_actual_declaration body_declaration.Types.md_uid
+                   then Node.Uid body_declaration.Types.md_uid
+                   else Node.Location (compilation_unit, site))
+                  declaration;
                 match resolve_member visited env declaration.Types.md_type with
                 | `Signature (visited, annotation_owner, annotation_members)
                   -> (
@@ -1290,8 +1380,11 @@ let facts_of_tree compilation_unit artifact iterate =
                         Context.Proj
                           (body_context, body_declaration.Types.md_uid)
                     in
-                    pair_members visited env ~body_context ~annotation_context
-                      body_members annotation_members
+                    pair_members visited env
+                      ~check_context:
+                        (Context.Proj (check_context, declaration.md_uid))
+                      ~body_context ~annotation_context body_members
+                      annotation_members
                   | `Abstract | `Unresolved | `Other ->
                     add_omission ~affected:None ~source:None
                       Omission.Reason.Unresolved_module)
@@ -1311,7 +1404,6 @@ let facts_of_tree compilation_unit artifact iterate =
     | Some annotation -> (
       match scraped_alias_signature inner.mod_env inner.mod_type with
       | Some body_signature ->
-        let context = module_context uid in
         let body_context =
           match path_of_module_expr inner with
           | Some path -> (
@@ -1320,8 +1412,8 @@ let facts_of_tree compilation_unit artifact iterate =
             | None -> context)
           | None -> context
         in
-        pair_members Uid.Set.empty module_type.mty_env ~body_context
-          ~annotation_context:context body_signature annotation
+        pair_members Uid.Set.empty module_type.mty_env ~check_context:context
+          ~body_context ~annotation_context:context body_signature annotation
       | None -> ())
     | None -> ()
   in
@@ -1329,7 +1421,8 @@ let facts_of_tree compilation_unit artifact iterate =
     match implementation.mod_desc with
     | Tmod_constraint (inner, _, Tmodtype_explicit (module_type, _), _) -> (
       register_functor_annotation inner module_type.mty_type;
-      register_annotation_member_pairs uid inner module_type;
+      register_annotation_member_pairs ~context:(module_context uid) inner
+        module_type;
       match register_binding_expectation uid implementation with
       | Some expectation ->
         mark_handled expectation inner.mod_loc;
@@ -1688,6 +1781,8 @@ let facts_of_tree compilation_unit artifact iterate =
             if not (handled expectation implementation.mod_loc)
             then begin
               register_functor_annotation implementation module_type.mty_type;
+              register_annotation_member_pairs ~context:(fresh_site ())
+                implementation module_type;
               add_check
                 (Node.Location (compilation_unit, module_expr.mod_loc))
                 expectation Check.Kind.Annotation implementation.mod_loc
@@ -1820,6 +1915,7 @@ let facts_of_tree compilation_unit artifact iterate =
           (match declaration.mtd_type with
           | None -> ()
           | Some body -> (
+            Uid.Tbl.replace modtype_definitions declaration.mtd_uid body;
             match body.mty_desc with
             | Tmty_ident (path, _) -> (
               match
@@ -1840,13 +1936,12 @@ let facts_of_tree compilation_unit artifact iterate =
       module_type =
         (fun iterator module_type ->
           let traverse () =
+            Module_type_table.replace resolved_module_type_keys module_type
+              (key_of_module_type module_type);
             let env = module_type.mty_env in
             let key = Key.Anon module_type.mty_uid in
             (match module_type.mty_desc with
-            | Tmty_ident (path, _) ->
-              ignore
-                (key_of_modtype_path ~site:module_type.mty_loc env path
-                  : Key.t option)
+            | Tmty_ident _ -> ()
             | Tmty_signature signature ->
               (* Record the containing module type's edges to its immediate
                  members here. The default iterator below still traverses the
@@ -1884,8 +1979,26 @@ let facts_of_tree compilation_unit artifact iterate =
                     ())
                 signature.sig_items
             | Tmty_with (base, constraints) ->
+              let preserves_base =
+                List.for_all
+                  (fun (_, _, constraint_) ->
+                    match constraint_ with
+                    | Twith_type _ | Twith_module _ | Twith_modtype _
+                    | Twith_jkind _ ->
+                      true
+                    | Twith_typesubst _ | Twith_modsubst _
+                    | Twith_modtypesubst _ | Twith_jkindsubst _ ->
+                      false)
+                  constraints
+              in
               add_dependency ~derived:key ~source:(key_of_module_type base)
-                Dependency.Reason.With_constraint;
+                (if preserves_base
+                 then Dependency.Reason.With_constraint
+                 else Dependency.Reason.Destructive_substitution);
+              if not preserves_base
+              then
+                substituted_module_types
+                  := (key, base, constraints) :: !substituted_module_types;
               let base_index =
                 lazy (signature_index_of_module_type env base.mty_type)
               in
@@ -1904,7 +2017,7 @@ let facts_of_tree compilation_unit artifact iterate =
                       Dependency.Reason.Destructive_substitution
                   | Twith_module (rhs, _) | Twith_modsubst (rhs, _) -> (
                     add_subject_expectation_edges key ~site:lid.loc env
-                      Dependency.Reason.With_constraint rhs;
+                      Dependency.Reason.Interface_member rhs;
                     match
                       signature_component env ~prefix_indexes
                         (Lazy.force base_index) component
@@ -1996,6 +2109,55 @@ let facts_of_tree compilation_unit artifact iterate =
     }
   in
   iterate iterator;
+  let add_preserved_requirements (derived, base, constraints) =
+    let rec visit visited constraints (module_type : Typedtree.module_type) =
+      let env = module_type.mty_env in
+      match
+        Module_type_table.find_opt resolved_module_type_keys module_type
+      with
+      | None ->
+        add_omission ~affected:(Some derived) ~source:None
+          Omission.Reason.Unresolved_module_type
+      | Some source -> (
+        if
+          not
+            (List.exists
+               (constraint_removes_requirement env module_type.mty_type)
+               constraints)
+        then add_dependency ~derived ~source Dependency.Reason.With_constraint
+        else
+          let unresolved () =
+            add_omission ~affected:(Some derived) ~source:(Key.family source)
+              Omission.Reason.Unresolved_module_type
+          in
+          match module_type.mty_desc with
+          | Tmty_ident (path, _) -> (
+            match find_modtype env path with
+            | Some declaration
+              when not (Uid.Set.mem declaration.mtd_uid visited) -> (
+              match
+                Uid.Tbl.find_opt modtype_definitions declaration.mtd_uid
+              with
+              | Some body ->
+                visit (Uid.Set.add declaration.mtd_uid visited) constraints body
+              | None -> unresolved ())
+            | Some _ | None -> unresolved ())
+          | Tmty_signature signature ->
+            List.iter
+              (fun item ->
+                match item.sig_desc with
+                | Tsig_include (include_, _) ->
+                  visit visited constraints include_.incl_mod
+                | _ -> ())
+              signature.sig_items
+          | Tmty_with (base, inner_constraints) ->
+            visit visited (inner_constraints @ constraints) base
+          | Tmty_strengthen (base, _, _) -> visit visited constraints base
+          | Tmty_typeof _ | Tmty_alias _ | Tmty_functor _ -> unresolved ())
+    in
+    visit Uid.Set.empty constraints base
+  in
+  List.iter add_preserved_requirements !substituted_module_types;
   facts, fun uid -> Uid.Tbl.find_opt modtype_declaration_contexts uid
 
 let interface_check ~impl ~expectation =
