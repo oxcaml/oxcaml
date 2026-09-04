@@ -1424,8 +1424,7 @@ let transl_modalities ?(default_modalities = Mode.Modality.Const.id)
       ~allow_redundant_staticity
       ~default:default_modalities ~maturity:Stable modalities
 
-let apply_pmd_modalities env ~default_modalities pmd_modalities mty =
-  let modalities = transl_modalities ~default_modalities pmd_modalities in
+let apply_pmd_modalities env modalities mty =
   (*
   Workaround for pmd_modalities
 
@@ -2047,15 +2046,18 @@ let mksig desc env loc =
 
 (* let signature sg = List.map (fun item -> item.sig_type) sg *)
 
-let rec transl_modtype env smty =
+let rec transl_modtype_with_modalities modalities env smty =
   Builtin_attributes.warning_scope smty.pmty_attributes
-    (fun () -> transl_modtype_aux env smty)
+    (fun () -> transl_modtype_aux modalities env smty)
+
+and transl_modtype env smty =
+  transl_modtype_with_modalities Mode.Modality.Const.id env smty
 
 and transl_modtype_functor_arg env sarg =
   let mty = transl_modtype env sarg in
   {mty with mty_type = Mtype.scrape_for_functor_arg env mty.mty_type}
 
-and transl_modtype_aux env smty =
+and transl_modtype_aux inherited_modalities env smty =
   let loc = smty.pmty_loc in
   match smty.pmty_desc with
     Pmty_ident lid ->
@@ -2068,7 +2070,7 @@ and transl_modtype_aux env smty =
         smty.pmty_attributes
   | Pmty_signature ssg ->
       Env.check_no_open_quotations loc env Env.Sig_qt;
-      let sg = transl_signature env ssg in
+      let sg = transl_signature ~inherited_modalities env ssg in
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
@@ -2128,7 +2130,7 @@ and transl_modtype_aux env smty =
   | Pmty_strengthen (mty, mod_id) ->
       Language_extension.assert_enabled ~loc:smty.pmty_loc
         Module_strengthening ();
-      let tmty = transl_modtype_aux env mty in
+      let tmty = transl_modtype_aux inherited_modalities env mty in
       let path, md, _ =
         Env.lookup_module ~use:false ~loc:mod_id.loc mod_id.txt env
       in
@@ -2207,7 +2209,8 @@ and add_implicit_jkinds env attrs =
   in
   List.fold_left register_default env attrs
 
-and transl_signature ?(interface_toplevel = false) env
+and transl_signature ?(interface_toplevel = false)
+      ?(inherited_modalities = Mode.Modality.Const.id) env
       {psg_items; psg_modalities; psg_loc} =
   let names = Signature_names.create () in
 
@@ -2221,11 +2224,23 @@ and transl_signature ?(interface_toplevel = false) env
       psg_modalities
   in
 
+  let inherit_modalities modalities =
+    Mode.Modality.Const.concat ~then_:modalities.moda_modalities
+      inherited_modalities
+  in
+
   let transl_include ~loc env sig_acc sincl modalities =
     let smty = sincl.pincl_mod in
+    let modalities =
+      transl_modalities
+        ~default_modalities:sig_modalities.moda_modalities
+        modalities
+    in
     let tmty =
       Builtin_attributes.warning_scope sincl.pincl_attributes
-        (fun () -> transl_modtype env smty)
+        (fun () ->
+          transl_modtype_with_modalities (inherit_modalities modalities)
+            env smty)
     in
     let mty = tmty.mty_type in
     let scope = Ctype.create_scope () in
@@ -2250,11 +2265,6 @@ and transl_signature ?(interface_toplevel = false) env
         incl_kind, sg
       | Structure ->
         Tincl_structure, extract_sig env smty.pmty_loc mty
-    in
-    let modalities =
-      transl_modalities
-        ~default_modalities:sig_modalities.moda_modalities
-        modalities
     in
     let recursive =
       not @@ Builtin_attributes.has_attribute "no_recursive_modalities"
@@ -2290,7 +2300,9 @@ and transl_signature ?(interface_toplevel = false) env
         let (tdesc, _, newenv) =
           Typedecl.transl_value_decl env loc sdesc
             ~modal:(Sig_value
-              (Value.disallow_right md_mode, sig_modalities.moda_modalities))
+              { md_mode = Value.disallow_right md_mode;
+                sig_modalities = sig_modalities.moda_modalities;
+                inherited_modalities })
             ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
@@ -2361,15 +2373,19 @@ and transl_signature ?(interface_toplevel = false) env
         mksig (Tsig_exception ext) env loc, [tsg], newenv
     | Psig_module pmd ->
         let scope = Ctype.create_scope () in
+        let modalities =
+          transl_modalities
+            ~default_modalities:sig_modalities.moda_modalities
+            pmd.pmd_modalities
+        in
         let tmty =
           Builtin_attributes.warning_scope pmd.pmd_attributes
-            (fun () -> transl_modtype env pmd.pmd_type)
+            (fun () ->
+              transl_modtype_with_modalities (inherit_modalities modalities)
+                env pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities
-            env
-            ~default_modalities:sig_modalities.moda_modalities
-            pmd.pmd_modalities tmty.mty_type
+          apply_pmd_modalities env modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
         let pres =
@@ -2460,6 +2476,7 @@ and transl_signature ?(interface_toplevel = false) env
           transl_recmodule_modtypes
             env
             ~sig_modalities:sig_modalities.moda_modalities
+            ~inherited_modalities
             sdecls in
         let decls =
           List.filter_map (fun (md, _, uid, _) ->
@@ -2633,7 +2650,8 @@ and transl_modtype_decl_aux env
   in
   newenv, mtd, decl
 
-and transl_recmodule_modtypes env ~sig_modalities sdecls =
+and transl_recmodule_modtypes env ~sig_modalities ~inherited_modalities
+      sdecls =
   let make_env curr =
     List.fold_left (fun env (id_shape, _, md, mode, _, _) ->
       let mode = Option.map (fun m -> m.mode_modes) mode in
@@ -2646,13 +2664,20 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
   let transition env_c curr =
     List.map2
       (fun (pmd, _) (id_shape, id_loc, md, mmode, _, _) ->
+        let modalities =
+          transl_modalities ~default_modalities:sig_modalities
+            pmd.pmd_modalities
+        in
         let tmty =
           Builtin_attributes.warning_scope pmd.pmd_attributes
-            (fun () -> transl_modtype env_c pmd.pmd_type)
+            (fun () ->
+              transl_modtype_with_modalities
+                (Mode.Modality.Const.concat ~then_:modalities.moda_modalities
+                   inherited_modalities)
+                env_c pmd.pmd_type)
         in
         let mty_type, md_modalities =
-          apply_pmd_modalities env ~default_modalities:sig_modalities
-            pmd.pmd_modalities tmty.mty_type
+          apply_pmd_modalities env modalities tmty.mty_type
         in
         let tmty = {tmty with mty_type} in
         let md =
@@ -2690,10 +2715,13 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
+         let modalities =
+           transl_modalities ~default_modalities:sig_modalities
+             pmd.pmd_modalities
+         in
          let md_type, md_modalities =
           approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type
-          |> apply_pmd_modalities env ~default_modalities:sig_modalities
-              pmd.pmd_modalities
+          |> apply_pmd_modalities env modalities
          in
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
          let md =
@@ -4019,6 +4047,7 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let (decls, newenv) =
           transl_recmodule_modtypes env
             ~sig_modalities:Mode.Modality.Const.id
+            ~inherited_modalities:Mode.Modality.Const.id
             (List.map (fun (name, smty, smode, _smodl, attrs, loc) ->
                  ({pmd_name=name; pmd_type=smty;
                    pmd_attributes=attrs; pmd_loc=loc; pmd_modalities=[]}
