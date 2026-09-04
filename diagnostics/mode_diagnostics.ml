@@ -263,6 +263,7 @@ module Meaning = struct
     | Nothing_to_say
     | Unexplained
     | User_annotation of Location.t
+    | User_modality_annotation of string Location.loc
     | Capture of Mode.Hint.closure_details
     | Signature_argument of argument_requirement
     | Fact of fact
@@ -301,6 +302,14 @@ module Meaning = struct
       Signature_argument { parameter; callee; argument = s.pinpoint }
     | Hint_chain.Morph (Argument_to_parameter (_, { parameter; argument })) ->
       Signature_argument { parameter; callee = s.pinpoint; argument }
+    | Hint_chain.Const
+        (Modality_annotation { annotated_modes; contained_by }) -> (
+      match List.assoc_opt (Step_mode.name s.mode) annotated_modes with
+      | Some written -> User_modality_annotation written
+      | None -> (
+        match contained_by with
+        | Some containing -> Reroute (Contained_by containing)
+        | None -> Unexplained))
     | Hint_chain.Const Unknown -> Unexplained
     | Hint_chain.Const (Annotation { written_modes; _ }) -> (
       let mode_name = Step_mode.name s.mode in
@@ -379,7 +388,8 @@ let rec normalize ~source (chain : Hint_chain.t) : Hint_chain.t =
     | Reroute
         ( Partial_application_capture | Contains _ | Contained_by _
         | Shared_staticity _ | Functor_application _ | Functor_applied_at _ )
-    | Unexplained | User_annotation _ | Capture _ | Signature_argument _
+    | Unexplained | User_annotation _
+    | User_modality_annotation _ | Capture _ | Signature_argument _
     | Fact _ ->
       s :: rest
     end
@@ -400,7 +410,8 @@ module Message = struct
   let is_informative (t : t) =
     match t.meaning with
     | Nothing_to_say | Unexplained -> false
-    | User_annotation _ | Capture _ | Signature_argument _ | Fact _ | Reroute _
+    | User_annotation _
+    | User_modality_annotation _ | Capture _ | Signature_argument _ | Fact _ | Reroute _
       ->
       true
 end
@@ -685,6 +696,7 @@ let capture_use_of_next (m : Message.t) (next : Message.t) =
     then Some closed
     else None
   | Capture _ | Nothing_to_say | Unexplained | User_annotation _
+  | User_modality_annotation _
   | Signature_argument _ | Fact _ | Reroute _ ->
     None
 
@@ -825,7 +837,7 @@ let cause_sentences ~source ~(subject : subject) ?next (m : Message.t) =
     in
     match m.meaning with
     | Nothing_to_say -> None
-    | Unexplained | User_annotation _ -> None
+    | Unexplained | User_annotation _ | User_modality_annotation _ -> None
     | Capture { closure; closed } ->
       if same_chars (fst m.pinpoint) (fst closed)
       then begin
@@ -921,7 +933,8 @@ let cause_sentences ~source ~(subject : subject) ?next (m : Message.t) =
     in
     about_subject (Nlg.mention ~case:Subject subject :: located specific)
     :: Option.to_list (Option.map statement general)
-  | Nothing_to_say | Unexplained | User_annotation _ -> []
+  | Nothing_to_say | Unexplained | User_annotation _
+  | User_modality_annotation _ -> []
   | Capture _ | Signature_argument _ | Fact _ | Reroute _ ->
     Option.to_list (Option.map statement (single_cause ()))
 
@@ -1006,7 +1019,8 @@ end
 let message_is_closure (m : Message.t) =
   match m.meaning with
   | Capture _ -> true
-  | Nothing_to_say | Unexplained | User_annotation _ | Signature_argument _
+  | Nothing_to_say | Unexplained | User_annotation _
+  | User_modality_annotation _ | Signature_argument _
   | Fact _ | Reroute _ ->
     false
 
@@ -1014,7 +1028,8 @@ let chain_is_understood (chain : Message.t list) =
   List.for_all
     (fun (m : Message.t) ->
       match m.meaning with
-      | Nothing_to_say | Unexplained | User_annotation _ | Capture _ | Fact _
+      | Nothing_to_say | Unexplained | User_annotation _
+      | User_modality_annotation _ | Capture _ | Fact _
       | Signature_argument _ ->
         true
       | Reroute _ -> false)
@@ -1028,7 +1043,8 @@ let message_mutable_access ~access:wanted (m : Message.t) :
   match m.meaning with
   | Fact (Mutable_access { part; access }) ->
     if Access.equal access wanted then Some part else None
-  | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+  | Fact _ | Nothing_to_say | Unexplained | User_annotation _
+  | User_modality_annotation _ | Capture _
   | Signature_argument _ | Reroute _ ->
     None
 
@@ -1045,7 +1061,8 @@ let terminal_mutable_read chain =
 let message_is_region_escape (m : Message.t) =
   match m.meaning with
   | Fact fact -> Meaning.is_region_escape fact
-  | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+  | Nothing_to_say | Unexplained | User_annotation _
+  | User_modality_annotation _ | Capture _
   | Signature_argument _ | Reroute _ ->
     false
 
@@ -1152,7 +1169,8 @@ let plan_suggestions ~(expected : Message.t list) :
     | (origin : Message.t) :: _ ->
       begin match origin.meaning with
       | Fact Function_return_default -> true
-      | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+      | Fact _ | Nothing_to_say | Unexplained | User_annotation _
+      | User_modality_annotation _ | Capture _
       | Signature_argument _ | Reroute _ ->
         false
       end
@@ -1207,7 +1225,7 @@ let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
 let signature_origin (origin : Message.t) (next : Message.t) :
     argument_requirement option =
   match origin.meaning with
-  | Unexplained | User_annotation _ ->
+  | Unexplained | User_annotation _ | User_modality_annotation _ ->
     begin match next.meaning with
     | Signature_argument fa ->
       if
@@ -1215,7 +1233,8 @@ let signature_origin (origin : Message.t) (next : Message.t) :
         || same_chars (fst origin.pinpoint) (fst fa.argument)
       then Some fa
       else None
-    | Nothing_to_say | Unexplained | User_annotation _ | Capture _ | Fact _
+    | Nothing_to_say | Unexplained | User_annotation _
+    | User_modality_annotation _ | Capture _ | Fact _
     | Reroute _ ->
       None
     end
@@ -1271,7 +1290,8 @@ let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
       cause_sentences ~source
         ~subject:(subject_of_pinpoint ~source m.pinpoint)
         ~next m
-    | Nothing_to_say | Unexplained | User_annotation _ | Fact _ | Reroute _ ->
+    | Nothing_to_say | Unexplained | User_annotation _
+    | User_modality_annotation _ | Fact _ | Reroute _ ->
       let subject = subject_of_pinpoint ~source m.pinpoint in
       cause_sentences ~source ~subject ~next m
       @ [expectation_sentence ~therefore:true subject m.mode]
@@ -1302,6 +1322,13 @@ let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
                  Nlg.mention ~case:Subject subject;
                  txt " to be " ]
              @ described_mode_segments description origin.mode)) ]
+    | User_modality_annotation annotation ->
+      [ sentence ?subject:(sentence_subject subject)
+          (phrase
+             [ Nlg.mention ~case:Subject subject;
+               copula;
+               txt " annotated ";
+               ref_source annotation.loc [code ("@@ " ^ annotation.txt)] ]) ]
     | User_annotation annotation ->
       [ sentence ?subject:(sentence_subject subject)
           (phrase
@@ -1351,7 +1378,8 @@ let plan_expected ~source ~axis_mode ~description (chain : Message.t list) =
         let argument = subject_of_pinpoint ~source fa.argument in
         let annotation_spans =
           match origin.meaning with
-          | User_annotation annotation -> [annotation]
+          | User_annotation annotation
+        | User_modality_annotation { loc = annotation; _ } -> [annotation]
           | Unexplained -> []
           | Nothing_to_say | Capture _ | Signature_argument _ | Fact _
           | Reroute _ ->
@@ -1427,7 +1455,8 @@ let plan_actual ~source ~description ~bound ~subject_override
       in
       let annotation (m : Message.t) =
         match m.meaning with
-        | User_annotation loc -> Some loc
+        | User_annotation loc
+        | User_modality_annotation { loc; _ } -> Some loc
         | Nothing_to_say | Unexplained | Capture _ | Signature_argument _
         | Fact _ | Reroute _ ->
           explicit_mode_annotation_before_loc ~source
@@ -1436,20 +1465,26 @@ let plan_actual ~source ~description ~bound ~subject_override
       let mode_sentence ?(prefix = "") ?(explicit_subject = false)
           ?(bound = Bound.Exact) (subject : subject) (m : Message.t) =
         let predicate =
-          match annotation m, (bound : Bound.t) with
-          | Some loc, Exact ->
-            [ ref_source loc
-                (copula :: txt " annotated as "
-                :: described_mode_segments description m.mode) ]
-          | Some loc, Loosened ->
-            copula
-            :: txt (" " ^ Bound.comparative bound ~side:Actual)
-            :: ref_source loc [txt "the annotated "]
-            :: described_mode_segments description m.mode
-          | None, (Exact | Loosened) ->
-            copula
-            :: txt (" " ^ Bound.comparative bound ~side:Actual)
-            :: described_mode_segments description m.mode
+          match m.meaning, (bound : Bound.t) with
+          | User_modality_annotation written, Exact ->
+            [ copula;
+              txt " annotated ";
+              ref_source written.loc [code ("@@ " ^ written.txt)] ]
+          | _ -> (
+            match annotation m, (bound : Bound.t) with
+            | Some loc, Exact ->
+              [ ref_source loc
+                  (copula :: txt " annotated as "
+                  :: described_mode_segments description m.mode) ]
+            | Some loc, Loosened ->
+              copula
+              :: txt (" " ^ Bound.comparative bound ~side:Actual)
+              :: ref_source loc [txt "the annotated "]
+              :: described_mode_segments description m.mode
+            | None, (Exact | Loosened) ->
+              copula
+              :: txt (" " ^ Bound.comparative bound ~side:Actual)
+              :: described_mode_segments description m.mode)
         in
         let subject_segments, sentence_subject =
           if explicit_subject
@@ -1472,7 +1507,8 @@ let plan_actual ~source ~description ~bound ~subject_override
             ||
             match m.meaning with
             | Signature_argument _ -> true
-            | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+            | Nothing_to_say | Unexplained | User_annotation _
+            | User_modality_annotation _ | Capture _
             | Fact _ | Reroute _ ->
               false
           in
@@ -1649,7 +1685,7 @@ let plan_origin_lift ~source ~anchor_loc ~signature_modality
           ]
       | None -> Lift []
       end
-    | User_annotation _ -> No_lift
+    | User_annotation _ | User_modality_annotation _ -> No_lift
     | Nothing_to_say | Capture _ | Signature_argument _ | Fact _ | Reroute _ ->
       No_lift
     end
@@ -1660,7 +1696,8 @@ let plan_origin_lift ~source ~anchor_loc ~signature_modality
     | Some ({ callee; _ } as fa) ->
       let annotation_spans =
         match origin.meaning with
-        | User_annotation annotation -> [annotation]
+        | User_annotation annotation
+        | User_modality_annotation { loc = annotation; _ } -> [annotation]
         | Nothing_to_say | Unexplained | Capture _ | Signature_argument _
         | Fact _ | Reroute _ ->
           []
@@ -2557,7 +2594,8 @@ module Inclusion = struct
             field_leaves ~orientation changes
           | Includecore.(
               ( Type _ | Arity | Kind _ | Explicit_return_type _
-              | Fixed_representation _ )) ->
+              | Fixed_representation _ | Immediate_representation _
+              | Constructor_representation_shape_mismatch )) ->
             []
           end
         | Diffing_with_keys.Change (Name _)
@@ -2589,8 +2627,9 @@ module Inclusion = struct
                  umc.Types.unsafe_with_bounds)
           in
           let expected_only, actual_only, differing =
-            crossing_bounds_difference expected.Types.unsafe_mod_bounds
-              got.Types.unsafe_mod_bounds
+            crossing_bounds_difference
+              expected.Types.unsafe_mod_bounds.Types.crossing
+              got.Types.unsafe_mod_bounds.Types.crossing
           in
           Bounds_differ
             { expected_only;
@@ -2843,7 +2882,8 @@ module Inclusion = struct
         | Includecore.Inline_record changes -> field_leaves ~orientation changes
         | Includecore.(
             ( Type _ | Arity | Kind _ | Explicit_return_type _
-            | Fixed_representation _ )) ->
+            | Fixed_representation _ | Immediate_representation _
+              | Constructor_representation_shape_mismatch )) ->
           []
       in
       match leaves_ with
@@ -3665,48 +3705,6 @@ let diagnose_typecore request ~loc ~env err =
       (Mode.Alloc.fold_error ~init:[] ~step:fold_step
          (loc, Mode.Hint.Expression)
          e)
-  | Typecore.Mode_mismatch (kind, (step, e)) ->
-    let subject_override : subject option =
-      match kind with
-      | Typecore.Parameter ->
-        Some (subject ~span:loc [Phrase.Text "this function's parameter"])
-      | Typecore.Return ->
-        Some (subject ~span:loc [Phrase.Text "this function's return value"])
-    in
-    let axes =
-      Mode.Alloc.fold_error ~init:[] ~step:fold_step
-        (loc, Mode.Hint.Expression)
-        e
-    in
-    let axes =
-      match (step : Mode.equate_step) with
-      | Left_le_right -> axes
-      | Right_le_left ->
-        List.map
-          (fun (a : Hint_chain.t Mode.folded_axis) ->
-            { Mode.actual = a.expected;
-              expected = a.actual;
-              actual_mode = a.expected_mode;
-              expected_mode = a.actual_mode;
-              actual_loosened = a.expected_loosened;
-              expected_loosened = a.actual_loosened
-            })
-          axes
-    in
-    let informative chain =
-      List.exists Message.is_informative (Message.of_chain ~source chain)
-    in
-    let axes =
-      match
-        List.filter
-          (fun (a : Hint_chain.t Mode.folded_axis) ->
-            informative a.actual || informative a.expected)
-          axes
-      with
-      | [] -> axes
-      | axes -> axes
-    in
-    mode_stories request ?subject_override axes
   | Typecore.Uncurried_function_escapes_comonadic e ->
     let subject_override : subject option =
       Some
