@@ -1,5 +1,0 @@
-(tests
- (names test_gc)
- (libraries)
- (flags -w -69)
- (modes js wasm))
