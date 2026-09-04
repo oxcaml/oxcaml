@@ -104,6 +104,9 @@ val with_slot_offsets : t -> Slot_offsets.t Or_unknown.t -> t
 
 val required_names : t -> Name.Set.t
 
+(** See [Flow_types.Data_flow_result.required_names_for_phantom_lets]. *)
+val required_names_for_phantom_lets : t -> Name.Set.t
+
 val reachable_code_ids : t -> Flow_types.Reachable_code_ids.t Or_unknown.t
 
 val continuation_param_aliases : t -> Flow_types.Alias_result.t

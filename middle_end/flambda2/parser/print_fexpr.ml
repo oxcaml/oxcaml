@@ -513,7 +513,9 @@ let prim ppf ((op, args) : prim) =
     (simple_args ~space:Before ~omit_if_empty:false)
     args
 
-let parameter ppf { param; kind = k } = kinded_variable ppf (param, k)
+let parameter ppf { param; kind = k; needed_by_phantom_let } =
+  if needed_by_phantom_let then Format.fprintf ppf "np ";
+  kinded_variable ppf (param, k)
 
 let kinded_parameters ~space ppf = function
   | [] -> ()
@@ -771,15 +773,20 @@ and switch_case ppf (v, c) =
   Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
 
 and let_expr scope ppf : let_ -> unit = function
-  | { bindings = first :: rest; body; value_slots = ces } ->
-    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%t %a =@ %a@]"
-      Flambda_colours.expr_keyword Flambda_colours.pop variable first.var named
-      first.defining_expr;
+  | { bindings = first :: rest; body; value_slots = ces; is_phantom } ->
+    let binding_var ppf ({ var; needed_by_phantom_let; _ } : let_binding) =
+      if needed_by_phantom_let then Format.fprintf ppf "np ";
+      variable ppf var
+    in
+    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%s%t %a =@ %a@]"
+      Flambda_colours.expr_keyword
+      (if is_phantom then " phantom" else "")
+      Flambda_colours.pop binding_var first named first.defining_expr;
     List.iter
-      (fun ({ var; defining_expr } : let_binding) ->
+      (fun ({ defining_expr; _ } as binding : let_binding) ->
         Format.fprintf ppf "@ @[<hv2>%tand%t %a =@ %a@]"
-          Flambda_colours.expr_keyword Flambda_colours.pop variable var named
-          defining_expr)
+          Flambda_colours.expr_keyword Flambda_colours.pop binding_var binding
+          named defining_expr)
       rest;
     Format.fprintf ppf "%a@ %tin%t@]@ %a@]"
       (value_slots Flambda_colours.expr_keyword)

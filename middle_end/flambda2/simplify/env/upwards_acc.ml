@@ -170,6 +170,9 @@ let with_slot_offsets t slot_offsets = { t with slot_offsets }
 
 let required_names t = t.flow_result.data_flow_result.required_names
 
+let required_names_for_phantom_lets t =
+  t.flow_result.data_flow_result.required_names_for_phantom_lets
+
 let reachable_code_ids t = t.flow_result.data_flow_result.reachable_code_ids
 
 let continuation_param_aliases t = t.flow_result.aliases_result

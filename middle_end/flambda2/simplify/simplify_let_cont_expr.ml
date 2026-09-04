@@ -514,17 +514,27 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           (fun handler -> handler.handler)
           continuation_handlers
       in
-      let expr =
-        RE.create_recursive_let_cont
-          (UA.are_rebuilding_terms uacc)
-          ~invariant_params rec_handlers ~body
-      in
       let name_occurrences =
         Continuation.Lmap.fold
           (fun _ handler name_occurrences ->
             NO.union name_occurrences
               (NO.increase_counts handler.name_occurrences_of_handler))
           continuation_handlers name_occurrences_body
+      in
+      (* The invariant parameters of the group are marked here, since they are
+         shared between the handlers. Their occurrences have already been
+         removed from the handlers' recorded name occurrences, but the
+         transitive requirement set consulted by
+         [Expr_builder.promote_params_needed_by_phantom_lets] does not depend on
+         the occurrences. *)
+      let invariant_params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc invariant_params
+          ~free_names:name_occurrences
+      in
+      let expr =
+        RE.create_recursive_let_cont
+          (UA.are_rebuilding_terms uacc)
+          ~invariant_params rec_handlers ~body
       in
       let name_occurrences =
         Continuation.Lmap.fold
@@ -719,6 +729,10 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
         add_phantom_params_bindings uacc handler new_phantom_params
       in
       let free_names = remove_params new_phantom_params free_names in
+      let params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc params
+          ~free_names
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
@@ -822,6 +836,13 @@ let rebuild_single_recursive_handler cont
       let free_names = remove_params new_phantom_params free_names in
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
+      in
+      (* Invariant parameters are not marked here: they are shared between the
+         handlers of a recursive group, so the marking happens once, at the
+         point where the whole group is rebuilt. *)
+      let variant_params =
+        Expr_builder.promote_params_needed_by_phantom_lets uacc variant_params
+          ~free_names
       in
       let cont_handler =
         RE.Continuation_handler.create

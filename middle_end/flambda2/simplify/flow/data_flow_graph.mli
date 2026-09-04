@@ -25,8 +25,16 @@ val create :
   code_age_relation:Code_age_relation.t ->
   used_value_slots:Name_occurrences.t Or_unknown.t ->
   code_ids_to_never_delete:Code_id.Set.t ->
+  generate_phantom_lets:bool ->
   Flow_types.Continuation_info.t Continuation.Map.t ->
   t
 
 (** Run the required names analysis *)
 val required_names : t -> Flow_types.Data_flow_result.t
+
+(** The names that the debugger may need to locate in order to display the
+    values of variables described by phantom lets: the transitive closure of the
+    name dependency graph (including the edges from continuation parameters to
+    their arguments) from the user-visible variables. See
+    [Flow_types.Data_flow_result.required_names_for_phantom_lets]. *)
+val required_names_for_phantom_lets : t -> Name.Set.t
