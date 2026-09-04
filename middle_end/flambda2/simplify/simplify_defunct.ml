@@ -33,8 +33,8 @@ type after_rebuild =
       (after_rebuild_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
   | After_rebuild_single_non_recursive_let_cont of after_rebuild_single_non_recursive_let_cont_data *
       (after_rebuild_single_non_recursive_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
-  | After_rebuild_single_recursive_let_cont of
-      (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
+  | After_rebuild_single_recursive_let_cont of after_rebuild_single_recursive_let_cont_data *
+      (after_rebuild_single_recursive_let_cont_data -> Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t)
 
 and 'simplify_named_result after_rebuild_let_data = {
   simplify_named_result : 'simplify_named_result;
@@ -62,10 +62,18 @@ and after_rebuild_single_non_recursive_let_cont_data =
     params : Bound_parameters.t;
     is_cold : bool;
     is_single_inlinable_use : bool;
+    (* TODO *)
     k : rebuilt_handler -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t;
   }
 
-type expr_to_rebuild = (Rebuilt_expr.t * Upwards_acc.t) rebuild
+and after_rebuild_single_recursive_let_cont_data =
+  { cont : Continuation.t;
+    handler_to_rebuild : handler_to_rebuild;
+    (* TODO *)
+    k : Bound_parameters.t -> rebuilt_handler -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t;
+  }
+
+and expr_to_rebuild = (Rebuilt_expr.t * Upwards_acc.t) rebuild
 
 and handler_to_rebuild =
   { params : Bound_parameters.t;
@@ -102,8 +110,8 @@ let apply_after_rebuild (after_rebuild : after_rebuild) expr uacc =
       after_rebuild data expr uacc
   | After_rebuild_single_non_recursive_let_cont (data, after_rebuild) ->
       after_rebuild data expr uacc
-  | After_rebuild_single_recursive_let_cont after_rebuild ->
-      after_rebuild expr uacc
+  | After_rebuild_single_recursive_let_cont (data, after_rebuild) ->
+      after_rebuild data expr uacc
 
 let apply_rebuild rebuild uacc ~after_rebuild =
   match rebuild with
