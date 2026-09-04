@@ -292,6 +292,19 @@ module For_allocations = struct
         | Some region -> Local { alloc_region = current_alloc_region; region }
         | None -> Misc.fatal_error "Local allocation without a region")
 
+  let map_alloc_region t ~f =
+    match t with
+    | Heap { alloc_region } ->
+      let alloc_region' = f alloc_region in
+      if alloc_region == alloc_region'
+      then t
+      else Heap { alloc_region = alloc_region' }
+    | Local { alloc_region; region } ->
+      let alloc_region' = f alloc_region in
+      if alloc_region == alloc_region'
+      then t
+      else Local { alloc_region = alloc_region'; region }
+
   let free_names t =
     match t with
     | Heap { alloc_region } ->

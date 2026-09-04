@@ -9,14 +9,15 @@
     (let untagged = %untag_imm (Pisint) in
      switch untagged
        | 0 -> k4
-       | 1 -> k1 (0))
+       | 1 -> k1 close[normal] my_alloc_region (0))
       where k4 =
         cont k3)
      where k3 =
        let `*match*_1` = %block_load.[`0`] (`*match*`) in
        let Pfield = %block_load.[`1`] (`*match*_1`) in
        let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-       apply &my_alloc_region c (Pfield_1, Pfield) -> k1 * k2
+       apply &my_alloc_region [close close close close]
+         c (Pfield_1, Pfield) -> k1 * k2
  in
  let code size(7)
        create_1 (_arity : imm tagged)
@@ -24,14 +25,14 @@
          -> k1 * k2
          : val =
    let Pmakeblock = %block.mut.[`0`].my_alloc_region (0) in
-   cont k1 (Pmakeblock)
+   cont k1 close[normal] my_alloc_region (Pmakeblock)
  in
  let code size(1)
        fn_2 (param_unboxed0, param_unboxed1)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : imm tagged =
-   cont k1 (0)
+   cont k1 close[normal] my_alloc_region (0)
  in
  let $camlDirect_app_parameter_kind_check_classic__s0 =
    closure send_0 @send &toplevel.alloc_region
@@ -48,10 +49,20 @@
    closure fn_2 @fn &toplevel.alloc_region
  in
  (let inlined_dbg = %inlined_apply () in
-  let Pmakeblock = %block.mut.[`0`].`toplevel` (0) in
-  cont k2 (Pmakeblock))
+  let my_alloc_region =
+    %new_alloc_region.[`normal`[`forward`, transfer], `exn`[`close`,
+      transfer], `notrace`[`close`, transfer], div[`close`, transfer]]
+      (toplevel.alloc_region)
+  in
+  let Pmakeblock = %block.mut.[`0`].my_alloc_region (0) in
+  cont k2 close[normal] my_alloc_region (Pmakeblock))
    where k2 (apply_result : val) =
      let inlined_dbg = %inlined_apply () in
+     let my_alloc_region =
+       %new_alloc_region.[`normal`[`forward`, transfer], `exn`[`close`,
+         transfer], `notrace`[`close`, transfer], div[`close`, transfer]]
+         (toplevel.alloc_region)
+     in
      let c = $camlDirect_app_parameter_kind_check_classic__s2 in
      let t = apply_result in
      let `*match*` = %block_load.mut.[`0`] (t) in
@@ -60,16 +71,19 @@
        (let untagged = %untag_imm (Pisint) in
         switch untagged
           | 0 -> k3
-          | 1 -> k1 (0))
+          | 1 -> k1 close[normal] my_alloc_region (0))
          where k3 =
            cont k2)
         where k2 =
           let `*match*_1` = %block_load.[`0`] (`*match*`) in
           let Pfield = %block_load.[`1`] (`*match*_1`) in
           let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-          apply &toplevel.alloc_region c (Pfield_1, Pfield) -> k1 * error)
+          apply &my_alloc_region [close close close close]
+            c (Pfield_1, Pfield) -> k1 * error)
    where k1 (`*match*` : imm tagged) =
-     cont k ($camlDirect_app_parameter_kind_check_classic__s3))
+     cont k
+            close[normal] toplevel.alloc_region
+            ($camlDirect_app_parameter_kind_check_classic__s3))
   where k define_root_symbol (module_block) =
     let field_0 = 0 in
     let field_1 = $camlDirect_app_parameter_kind_check_classic__s0 in

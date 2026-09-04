@@ -42,12 +42,13 @@ let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
         -> k * k1
         : imm tagged =
   let arg = %array_load ($camlTOP2__switch_block_3, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP2__match_tagged_immediate_2 =
   closure match_tagged_immediate_0_1 @match_tagged_immediate
     &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP2 = Block 0 ($camlTOP2__match_tagged_immediate_2) in
 cont done ($camlTOP2)
 |}]
@@ -75,12 +76,13 @@ let code loopify(never) size(2) newer_version_of(match_naked_immediate_1)
         -> k * k1
         : imm =
   let arg = %array_load.`int` ($camlTOP4__switch_block_8, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP4__match_naked_immediate_7 =
   closure match_naked_immediate_1_1 @match_naked_immediate
     &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP4 = Block 0 ($camlTOP4__match_naked_immediate_7) in
 cont done ($camlTOP4)
 |}]
@@ -111,11 +113,12 @@ let code loopify(never) size(2) newer_version_of(match_naked_float_2)
         -> k * k1
         : float =
   let arg = %array_load.`float` ($camlTOP5__switch_block_12, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP5__match_naked_float_11 =
   closure match_naked_float_2_1 @match_naked_float &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_11) in
 cont done ($camlTOP5)
 |}]
@@ -146,11 +149,12 @@ let code loopify(never) size(3) newer_version_of(match_naked_float32_3)
         -> k * k1
         : float32 =
   let arg = %array_load.`float32` ($camlTOP6__switch_block_16, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP6__match_naked_float32_15 =
   closure match_naked_float32_3_1 @match_naked_float32 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_15) in
 cont done ($camlTOP6)
 |}]
@@ -176,11 +180,12 @@ let code loopify(never) size(3) newer_version_of(match_naked_int32_4)
         -> k * k1
         : int32 =
   let arg = %array_load.`int32` ($camlTOP7__switch_block_20, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP7__match_naked_int32_19 =
   closure match_naked_int32_4_1 @match_naked_int32 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_19) in
 cont done ($camlTOP7)
 |}]
@@ -206,11 +211,12 @@ let code loopify(never) size(2) newer_version_of(match_naked_int64_5)
         -> k * k1
         : int64 =
   let arg = %array_load.`int64` ($camlTOP8__switch_block_24, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP8__match_naked_int64_23 =
   closure match_naked_int64_5_1 @match_naked_int64 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_23) in
 cont done ($camlTOP8)
 |}]
@@ -236,12 +242,13 @@ let code loopify(never) size(2) newer_version_of(match_naked_nativeint_6)
         -> k * k1
         : nativeint =
   let arg = %array_load.`nativeint` ($camlTOP9__switch_block_28, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP9__match_naked_nativeint_27 =
   closure match_naked_nativeint_6_1 @match_naked_nativeint
     &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP9 = Block 0 ($camlTOP9__match_naked_nativeint_27) in
 cont done ($camlTOP9)
 |}]
@@ -268,11 +275,12 @@ let code loopify(never) size(3) newer_version_of(match_naked_int8_7)
         -> k * k1
         : int8 =
   let arg = %array_load.`int8` ($camlTOP10__switch_block_32, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP10__match_naked_int8_31 =
   closure match_naked_int8_7_1 @match_naked_int8 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP10 = Block 0 ($camlTOP10__match_naked_int8_31) in
 cont done ($camlTOP10)
 |}]
@@ -298,11 +306,12 @@ let code loopify(never) size(3) newer_version_of(match_naked_int16_8)
         -> k * k1
         : int16 =
   let arg = %array_load.`int16` ($camlTOP11__switch_block_36, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP11__match_naked_int16_35 =
   closure match_naked_int16_8_1 @match_naked_int16 &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP11 = Block 0 ($camlTOP11__match_naked_int16_35) in
 cont done ($camlTOP11)
 |}]
@@ -337,11 +346,12 @@ let code loopify(never) size(2) newer_version_of(match_symbol_9)
         -> k * k1
         : val =
   let arg = %array_load ($camlTOP12__switch_block_43, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP12__match_symbol_42 =
   closure match_symbol_9_1 @match_symbol &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP12 = Block 0 ($camlTOP12__match_symbol_42) in
 cont done ($camlTOP12)
 |}]
@@ -381,12 +391,13 @@ let code loopify(never) size(2) newer_version_of(match_symbol_or_tagged_immediat
         -> k * k1
         : [ 0 |1 | 0 of imm tagged |1 of val ] =
   let arg = %array_load ($camlTOP14__switch_block_50, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP14__match_symbol_or_tagged_immediate_49 =
   closure match_symbol_or_tagged_immediate_10_1
     @match_symbol_or_tagged_immediate &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP14 = Block 0 ($camlTOP14__match_symbol_or_tagged_immediate_49) in
 cont done ($camlTOP14)
 |}]
@@ -423,12 +434,13 @@ let code loopify(never) size(2) newer_version_of(match_symbol_tagged_or_null_11)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
   let arg = %array_load ($camlTOP15__switch_block_56, t) in
-  cont k (arg)
+  cont k close[normal] my_alloc_region (arg)
 in
 let $camlTOP15__match_symbol_tagged_or_null_55 =
   closure match_symbol_tagged_or_null_11_1 @match_symbol_tagged_or_null
     &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTOP15 = Block 0 ($camlTOP15__match_symbol_tagged_or_null_55) in
 cont done ($camlTOP15)
 |}]

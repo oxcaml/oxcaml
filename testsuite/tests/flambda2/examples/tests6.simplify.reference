@@ -1,2 +1,3 @@
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests6 = Block 0 (45) in
 cont done ($camlTests6)

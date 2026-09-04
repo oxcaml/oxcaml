@@ -30,7 +30,8 @@ let code loopify(never) size(59) newer_version_of(f_2)
       let Pfield = %block_load.[`1`] ($Value_slot_b.camlValue_slot_b) in
       cont k2 (Pfield)
     where k2 (g : val) =
-      (apply &my_alloc_region inlined(always) g (3) -> k2 * k1
+      (apply &my_alloc_region inlined(always) [forward close close close]
+         g (3) -> k2 * k1
          where k2 (`*match*` : [ 0 of imm tagged * imm tagged ]) =
            let x = %block_load.[`0`] (`*match*`) in
            ((let prim = %phys_eq (x, 0) in
@@ -41,15 +42,23 @@ let code loopify(never) size(59) newer_version_of(f_2)
                  let prim_1 = %phys_eq (x, 1) in
                  switch prim_1
                    | 0 ->
-                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_7)
+                     k1
+                       pop(regular k1)
+                       close[exn] my_alloc_region
+                       ($camlValue_slot_c__Pmakeblock_7)
                    | 1 -> k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (`*match*`) in
                 let prim = %phys_eq (Pfield, 3) in
                 switch prim
-                  | 0 -> k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock_9)
-                  | 1 -> k (0)))
+                  | 0 ->
+                    k1
+                      pop(regular k1)
+                      close[exn] my_alloc_region
+                      ($camlValue_slot_c__Pmakeblock_9)
+                  | 1 -> k close[normal] my_alloc_region (0)))
 in
 let $camlValue_slot_c__f_10 = closure f_2_1 @f &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlValue_slot_c = Block 0 ($camlValue_slot_c__f_10) in
 cont done ($camlValue_slot_c)

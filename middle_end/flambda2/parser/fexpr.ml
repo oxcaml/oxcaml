@@ -213,6 +213,7 @@ type simple =
   | Var of variable
   | Symbol of symbol
   | Const of const
+  | Region of region
   | Coerce of simple * coercion
 
 type cont_extra_arg = simple * kind_with_subkind
@@ -305,6 +306,7 @@ type apply =
     args : simple list;
     call_kind : call_kind;
     alloc_mode : region alloc_mode_for_applications;
+    alloc_checks : Alloc_checks.t;
     arities : function_arities option;
     inlined : inlined_attribute option;
     inlining_state : inlining_state option
@@ -312,9 +314,16 @@ type apply =
 
 type size = int
 
+type check_action =
+  | Close_alloc_region of
+      { exit : Check_action.close_alloc_region_type;
+        region : region
+      }
+
 type apply_cont =
   { cont : continuation;
     trap_action : trap_action option;
+    check_actions : check_action list;
     args : simple list
   }
 

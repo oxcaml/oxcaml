@@ -1085,6 +1085,43 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        by completely removing it (replacing by unit). *)
     Misc.fatal_error
       "[Lifused] should have been removed by [Simplif.simplify_lets]"
+  (* In the future, there should be a Lzero_alloc constructor for zero-alloc on
+   * expressions. It should work like this:
+   *
+   * | Lzero_alloc { attr; body } ->
+   *   let actions action ~strict =
+   *     if strict then
+   *       { normal = action; exn = action; notrace = action; div = action }
+   *     else
+   *       { normal = action;
+   *         exn = Flambda_primitive.Transfer;
+   *         notrace = action;
+   *         div = Flambda_primitive.Transfer
+   *       }
+   *   in
+   *   let actions = match attr with
+   *     | Default_zero_alloc ->
+   *       actions Transfer ~strict:true
+   *     (* CR ncourant: [Check.custom_error_msg] and
+   *      [Assume.never_returns_normally]/[Assume.never_raises] are currently
+   *      ignored. *)
+   *     | Check { strict; _ } ->
+   *       actions Check ~strict
+   *     | Assume { strict; _ } ->
+   *       actions Discard ~strict
+   *   in
+   *   let alloc_region = Ident.create_local "zero_alloc_region" in
+   *   let layout = Lambda.layout_of_lambda body in
+   *   (* Insert a let-cont to make the delimitation of the zero_alloc region
+   *      easier. With [maybe_insert_let_cont], this never breaks tail calls. *)
+   *   maybe_insert_let_cont "zero_alloc_region_return" layout k acc env ccenv
+   *     (fun acc env ccenv normal_continuation ->
+   *       CC.close_new_alloc_region acc ccenv ~alloc_region ~actions
+   *         ~normal_continuation ~exn_continuation:k_exn
+   *         ~body:(fun acc ccenv ->
+   *           let env = Env.entering_alloc_region env alloc_region in
+   *           cps_tail acc env ccenv body normal_continuation k_exn))
+   *)
   | Lregion (body, _) when not (Flambda_features.stack_allocation_enabled ()) ->
     cps acc env ccenv body k k_exn
   | Lexclave body ->
@@ -1636,7 +1673,34 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
   let body acc ccenv =
     let ccenv = CCenv.set_path_to_root ccenv loc in
     let ccenv = CCenv.set_not_at_toplevel ccenv in
-    cps_tail acc new_env ccenv body body_cont body_exn_cont
+    let close_zero_alloc_region ~action ~strict =
+      let alloc_region = Ident.create_local "zero_alloc_region" in
+      let new_env = Env.entering_alloc_region new_env alloc_region in
+      let actions : Flambda_primitive.alloc_check_actions =
+        if strict
+        then { normal = action; exn = action; notrace = action; div = action }
+        else
+          { normal = action;
+            exn = Flambda_primitive.Transfer;
+            notrace = action;
+            div = Flambda_primitive.Transfer
+          }
+      in
+      CC.close_new_alloc_region acc ccenv ~alloc_region ~actions
+        ~normal_continuation:body_cont ~exn_continuation:body_exn_cont
+        ~body:(fun acc ccenv ->
+          cps_tail acc new_env ccenv body body_cont body_exn_cont)
+    in
+    match attr.zero_alloc with
+    | Default_zero_alloc ->
+      cps_tail acc new_env ccenv body body_cont body_exn_cont
+    (* CR ncourant: [Check.custom_error_msg] and
+       [Assume.never_returns_normally]/[Assume.never_raises] are currently
+       ignored. *)
+    | Check { strict; _ } ->
+      close_zero_alloc_region ~action:Flambda_primitive.Check ~strict
+    | Assume { strict; _ } ->
+      close_zero_alloc_region ~action:Flambda_primitive.Discard ~strict
   in
   Function_decl.create ~let_rec_ident:(Some fid) ~let_rec_uid:fuid
     ~function_slot ~kind ~params ~params_arity ~removed_params ~return

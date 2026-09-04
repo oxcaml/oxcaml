@@ -66,6 +66,25 @@ val unit_toplevel_exn_continuation : t -> Continuation.t
 
 val unit_toplevel_alloc_region : t -> Variable.t
 
+(** Allocation regions whose [New_alloc_region] binding has been removed by
+    simplification, mapped to their parent region and the Forward/Close flags
+    they were created with. *)
+val removed_alloc_regions : t -> (Variable.t * Alloc_checks.t) Variable.Map.t
+
+val add_removed_alloc_region :
+  t -> Variable.t -> parent:Variable.t -> checks:Alloc_checks.t -> t
+
+val find_removed_alloc_region :
+  t -> Variable.t -> (Variable.t * Alloc_checks.t) option
+
+(** Rename the regions and parents of [removed_alloc_regions]. Used when lifting
+    a continuation: regions defined between the join point and the lifted
+    continuation's definition become lifted parameters, which are renamed to
+    fresh variables; the corresponding entries must follow that renaming so that
+    the lifted handler's uses of those parameters still find the Forward/Close
+    flags of the original regions. *)
+val rename_removed_alloc_regions : t -> Renaming.t -> t
+
 val increment_continuation_scope : t -> t
 
 val bump_current_level_scope : t -> t

@@ -13,9 +13,9 @@
 (data
  int 21500
  "camlInvalid__invalid_9":
- string "(Defining_expr_of_let (bound_pattern prim/111N)
+ string "(Defining_expr_of_let (bound_pattern prim/113N)
  (defining_expr
-  (((Array_load Naked_floats Naked_floats Mutable) t2/107UV 0)
+  (((Array_load Naked_floats Naked_floats Mutable) t2/109UV 0)
    invalid.ml:29,2--23)))"
  skip 7
  byte 7)
@@ -62,7 +62,7 @@
         G:"camlInvalid__check_0_3_code" Pmakearray/0
         L:"camlInvalid__empty_array_2" int))
    (invalid
-     "(Defining_expr_of_let (bound_pattern prim/111N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/107UV 0)\n   invalid.ml:29,2--23)))"
+     "(Defining_expr_of_let (bound_pattern prim/113N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/109UV 0)\n   invalid.ml:29,2--23)))"
      L:"camlInvalid__invalid_9")) )
 
 (function no_cse reduce_code_size linscan camlInvalid__entry () : val

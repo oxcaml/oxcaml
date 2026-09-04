@@ -55,6 +55,7 @@ val create :
   return_arity:[`Unarized] Flambda_arity.t ->
   call_kind:Call_kind.t ->
   return_mode:Alloc_mode.For_applications.t ->
+  alloc_checks:Alloc_checks.t ->
   Debuginfo.t ->
   inlined:Inlined_attribute.t ->
   inlining_state:Inlining_state.t ->
@@ -88,6 +89,8 @@ val call_kind : t -> Call_kind.t
 
 val return_mode : t -> Alloc_mode.For_applications.t
 
+val alloc_checks : t -> Alloc_checks.t
+
 (** Where to send the result of the application. *)
 val continuation : t -> Result_continuation.t
 
@@ -115,6 +118,13 @@ val with_exn_continuation : t -> Exn_continuation.t -> t
 
 (** Change the arguments of an application *)
 val with_args : t -> Simple.t list -> args_arity:[`Complex] Flambda_arity.t -> t
+
+(** Change the allocation mode and allocation checks of an application. *)
+val with_return_mode_and_checks :
+  t ->
+  return_mode:Alloc_mode.For_applications.t ->
+  alloc_checks:Alloc_checks.t ->
+  t
 
 (** Change the call kind of an application. *)
 val with_call_kind : t -> Call_kind.t -> t

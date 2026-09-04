@@ -440,6 +440,7 @@ and subst_apply env apply =
   let args = List.map (subst_simple env) (Apply_expr.args apply) in
   let call_kind = subst_call_kind env (Apply_expr.call_kind apply) in
   let return_mode = Apply_expr.return_mode apply in
+  let alloc_checks = Apply_expr.alloc_checks apply in
   let dbg = Apply_expr.dbg apply in
   let inlined = Apply_expr.inlined apply in
   let inlining_state = Apply_expr.inlining_state apply in
@@ -448,16 +449,17 @@ and subst_apply env apply =
   let args_arity = Apply_expr.args_arity apply in
   let return_arity = Apply_expr.return_arity apply in
   Apply_expr.create ~callee ~continuation exn_continuation ~args ~call_kind
-    ~return_mode dbg ~inlined ~inlining_state ~probe:None ~position
-    ~relative_history ~args_arity ~return_arity
+    ~return_mode ~alloc_checks dbg ~inlined ~inlining_state ~probe:None
+    ~position ~relative_history ~args_arity ~return_arity
   |> Expr.create_apply
 
 and subst_apply_cont env apply_cont =
   let trap_action = Apply_cont_expr.trap_action apply_cont in
+  let check_actions = Apply_cont_expr.check_actions apply_cont in
   let cont = Apply_cont_expr.continuation apply_cont in
   let args = List.map (subst_simple env) (Apply_cont_expr.args apply_cont) in
   let dbg = Apply_cont_expr.debuginfo apply_cont in
-  Apply_cont_expr.create ?trap_action cont ~args ~dbg
+  Apply_cont_expr.create ?trap_action ~check_actions cont ~args ~dbg
 
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
@@ -1062,8 +1064,9 @@ let apply_exprs env apply1 apply2 : Expr.t Comparison.t =
             ~continuation:(Apply.continuation apply1)
             (Apply.exn_continuation apply1)
             ~args:args1' ~call_kind:call_kind1'
-            ~return_mode:(Apply.return_mode apply1) (Apply.dbg apply1)
-            ~inlined:(Apply.inlined apply1)
+            ~return_mode:(Apply.return_mode apply1)
+            ~alloc_checks:(Apply.alloc_checks apply1)
+            (Apply.dbg apply1) ~inlined:(Apply.inlined apply1)
             ~inlining_state:(Apply.inlining_state apply1)
             ~probe:None ~position:(Apply.position apply1)
             ~relative_history:(Apply_expr.relative_history apply1)
@@ -1081,11 +1084,14 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
     (Format.pp_print_option Trap_action.print)
     (Apply_cont.trap_action apply_cont1)
     (Apply_cont.trap_action apply_cont2);
+  let check_actions1 = Apply_cont.check_actions apply_cont1 in
+  let check_actions2 = Apply_cont.check_actions apply_cont2 in
   if
     Option.compare Trap_action.compare
       (Apply_cont.trap_action apply_cont1)
       (Apply_cont.trap_action apply_cont2)
     = 0
+    && Misc.Stdlib.List.equal Check_action.equal check_actions1 check_actions2
     && Continuation.equal
          (Apply_cont.continuation apply_cont1)
          (Apply_cont.continuation apply_cont2)
@@ -1094,6 +1100,7 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
     |> Comparison.map ~f:(fun args1' ->
         Apply_cont.create
           ?trap_action:(Apply_cont.trap_action apply_cont1)
+          ~check_actions:check_actions1
           (Apply_cont.continuation apply_cont1)
           ~args:args1'
           ~dbg:(Apply_cont.debuginfo apply_cont1))

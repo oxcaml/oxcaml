@@ -20,9 +20,15 @@ type t
 
 val print : Format.formatter -> t -> unit
 
-val create : params:Bound_parameters.t -> Continuation.t -> Simple.t list -> t
+val create :
+  params:Bound_parameters.t ->
+  check_actions:Check_action.t list ->
+  Continuation.t ->
+  Simple.t list ->
+  t
 
-val apply : t -> Simple.t list -> Continuation.t * Simple.t list
+val apply :
+  t -> Simple.t list -> Continuation.t * Simple.t list * Check_action.t list
 
 val continuation : t -> Continuation.t
 

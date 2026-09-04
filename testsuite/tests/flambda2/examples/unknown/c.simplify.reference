@@ -7,8 +7,9 @@ let code loopify(never) size(9) newer_version_of(neg_0)
   let prim = %unbox_num.`float` (x) in
   let prim_1 = %ufloat_arith.neg (prim) in
   let float_neg = %box_num.`float`.my_alloc_region (prim_1) in
-  cont k (float_neg)
+  cont k close[normal] my_alloc_region (float_neg)
 in
 let $camlC__neg_1 = closure neg_0_1 @neg &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlC = Block 0 ($camlC__neg_1) in
 cont done ($camlC)

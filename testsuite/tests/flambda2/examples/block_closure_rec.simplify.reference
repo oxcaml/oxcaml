@@ -8,7 +8,8 @@ and code rec loopify(never) size(8) newer_version_of(foo_0)
       (3505894,
        $camlBlock_closure_rec__foo_1 ~ depth my_depth -> succ my_depth)
   in
-  cont k (Pmakeblock)
+  cont k close[normal] my_alloc_region (Pmakeblock)
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlBlock_closure_rec = Block 0 ($camlBlock_closure_rec__foo_1) in
 cont done ($camlBlock_closure_rec)

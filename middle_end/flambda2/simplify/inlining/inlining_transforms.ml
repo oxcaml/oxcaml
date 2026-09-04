@@ -18,11 +18,13 @@ open! Simplify_import
 module DA = Downwards_acc
 module DE = Downwards_env
 module FT = Flambda2_types.Function_type
+module P = Flambda_primitive
 module VB = Bound_var
 
-let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
-    ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation =
+let make_inlined_body ~callee ~called_code_id ~region_inlined_into ~unroll_to
+    ~params ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
+    ~exn_continuation ~return_continuation ~apply_exn_continuation
+    ~apply_return_continuation ~alloc_checks =
   let callee, rec_info =
     match callee with
     | None ->
@@ -78,10 +80,27 @@ let make_inlined_body ~callee ~called_code_id ~unroll_to ~params ~args
       ~body ~free_names_of_body:Unknown
     |> Expr.create_let
   in
-  Inlining_helpers.make_inlined_body ~callee ~called_code_id ~params ~args
-    ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body ~exn_continuation
-    ~return_continuation ~apply_exn_continuation ~apply_return_continuation
-    ~bind_params ~bind_depth ~apply_renaming:Expr.apply_renaming
+  let bind_alloc_region ~my_alloc_region ~alloc_region ~alloc_checks ~body =
+    let bound =
+      Bound_pattern.singleton
+        (VB.create my_alloc_region Flambda_debug_uid.none Name_mode.normal)
+    in
+    let alloc_checks =
+      P.alloc_region_checks_with_action alloc_checks ~action:P.Transfer
+    in
+    Let.create bound
+      (Named.create_prim
+         (P.Unary (New_alloc_region alloc_checks, Simple.var alloc_region))
+         Debuginfo.none)
+      ~body ~free_names_of_body:Unknown
+    |> Expr.create_let
+  in
+  Inlining_helpers.make_inlined_body ~callee ~called_code_id
+    ~region_inlined_into ~params ~args ~my_closure ~my_alloc_mode ~my_depth
+    ~rec_info ~body ~exn_continuation ~return_continuation
+    ~apply_exn_continuation ~apply_return_continuation ~alloc_checks
+    ~bind_params ~bind_depth ~bind_alloc_region
+    ~apply_renaming:Expr.apply_renaming
 
 let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
     ~apply_return_continuation ~result_arity ~make_inlined_body =
@@ -165,6 +184,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
             ~params:(Bound_parameters.to_list params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~rec_info ~body
             ~exn_continuation ~return_continuation
+            ~alloc_checks:(Apply.alloc_checks apply)
         in
         let expr =
           match Exn_continuation.extra_args apply_exn_continuation with

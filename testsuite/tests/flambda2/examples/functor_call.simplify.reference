@@ -6,7 +6,7 @@ let code inline(always) loopify(never) size(5) newer_version_of(test_2)
         : imm tagged =
   let prim = %int_comp.gt (x, 0) in
   let int_greaterthan = %tag_imm (prim) in
-  cont k (int_greaterthan)
+  cont k close[normal] my_alloc_region (int_greaterthan)
 in
 let $camlFunctor_call__test_4 = closure test_2_1 @test &toplevel.alloc_region
 in
@@ -21,7 +21,7 @@ let code loopify(done) size(16) newer_version_of(foo_1_1)
       let prim = %int_comp.gt (x_1, 0) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (x_1)
+         | 1 -> k close[normal] my_alloc_region (x_1)
          where k2 =
            let int_add = %int_barith.add (x_1, 1) in
            cont `self` (int_add))
@@ -30,6 +30,7 @@ let $camlFunctor_call__foo_6 =
   closure foo_1 @foo &toplevel.alloc_region
   with { X = $camlFunctor_call__Pmakeblock_5 }
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlFunctor_call =
   Block 0 ($camlFunctor_call__Pmakeblock_5, $camlFunctor_call__foo_6)
 in

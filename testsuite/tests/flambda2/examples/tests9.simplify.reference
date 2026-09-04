@@ -27,7 +27,7 @@ let code loopify(done) size(16) newer_version_of(length_aux_0)
       let prim = %is_int (param_1) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (len_1)
+         | 1 -> k close[normal] my_alloc_region (len_1)
          where k2 =
            let Pfield = %block_load.[`1`] (param_1) in
            let int_add = %int_barith.add (len_1, 1) in
@@ -41,7 +41,7 @@ let code loopify(never) size(4) newer_version_of(length_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(length_aux_0_1 &my_alloc_region)
+  apply direct(length_aux_0_1 &my_alloc_region) [close close close close]
     ($camlTests9__length_aux_3 : _ -> imm tagged) (0, l) -> k * k1
 in
 let $camlTests9__length_4 = closure length_1_1 @length &toplevel.alloc_region
@@ -60,7 +60,7 @@ let code loopify(done) size(22) newer_version_of(rev_append_2)
       let prim = %is_int (l1_1) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (l2_1)
+         | 1 -> k close[normal] my_alloc_region (l2_1)
          where k2 =
            let Pfield = %block_load.[`0`] (l1_1) in
            let Pmakeblock = %block.[`0`].my_alloc_region (Pfield, l2_1) in
@@ -83,12 +83,16 @@ let code loopify(done) size(28) newer_version_of(chop_3)
       let prim = %phys_eq (k_1, 0) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (l_1)
+         | 1 -> k close[normal] my_alloc_region (l_1)
          where k2 =
            let prim_1 = %is_int (l_1) in
            (switch prim_1
               | 0 -> k2
-              | 1 -> k1 pop(regular k1) ($camlTests9__Pmakeblock_2)
+              | 1 ->
+                k1
+                  pop(regular k1)
+                  close[exn] my_alloc_region
+                  ($camlTests9__Pmakeblock_2)
               where k2 =
                 let Pfield = %block_load.[`1`] (l_1) in
                 let int_sub = %int_barith.sub (k_1, 1) in
@@ -115,6 +119,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
          | 1 -> k3
          where k3 =
            apply direct(rev_append_2_1 &my_alloc_region)
+                  [close close close close]
              ($camlTests9__rev_append_5
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                (l2_1, accu_1)
@@ -126,6 +131,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
               | 1 -> k3
               where k3 =
                 apply direct(rev_append_2_1 &my_alloc_region)
+                       [close close close close]
                   ($camlTests9__rev_append_5
                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                     (l1_1, accu_1)
@@ -135,7 +141,8 @@ let code loopify(done) size(90) newer_version_of(rev_merge_5)
                 let h2 = %block_load.[`0`] (l2_1) in
                 let t1 = %block_load.[`1`] (l1_1) in
                 let h1 = %block_load.[`0`] (l1_1) in
-                (apply &my_alloc_region cmp (h1, h2) -> k2 * k1
+                (apply &my_alloc_region [forward close close close]
+                   cmp (h1, h2) -> k2 * k1
                    where k2 (c : imm tagged) =
                      let prim_2 = %phys_eq (c, 0) in
                      (switch prim_2
@@ -182,6 +189,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
          | 1 -> k3
          where k3 =
            apply direct(rev_append_2_1 &my_alloc_region)
+                  [close close close close]
              ($camlTests9__rev_append_5
               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                (l2_1, accu_1)
@@ -193,6 +201,7 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
               | 1 -> k3
               where k3 =
                 apply direct(rev_append_2_1 &my_alloc_region)
+                       [close close close close]
                   ($camlTests9__rev_append_5
                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                     (l1_1, accu_1)
@@ -202,7 +211,8 @@ let code loopify(done) size(90) newer_version_of(rev_merge_rev_6)
                 let h2 = %block_load.[`0`] (l2_1) in
                 let t1 = %block_load.[`1`] (l1_1) in
                 let h1 = %block_load.[`0`] (l1_1) in
-                (apply &my_alloc_region cmp (h1, h2) -> k2 * k1
+                (apply &my_alloc_region [forward close close close]
+                   cmp (h1, h2) -> k2 * k1
                    where k2 (c : imm tagged) =
                      let prim_2 = %phys_eq (c, 0) in
                      (switch prim_2
@@ -268,7 +278,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                            let x3 = %block_load.[`0`] (`*match*_1`) in
                            let x2 = %block_load.[`0`] (`*match*`) in
                            let x1 = %block_load.[`0`] (l) in
-                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
+                           (apply &my_alloc_region
+                                   [forward close close close]
+                              cmp (x1, x2) -> k4 * k1
                               where k4 (c : imm tagged) =
                                 let prim_5 = %phys_eq (c, 0) in
                                 (switch prim_5
@@ -276,6 +288,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                    | 1 -> k5
                                    where k5 =
                                      (apply &my_alloc_region
+                                             [forward close close close]
                                         cmp (x2, x3) -> k5 * k1
                                         where k5 (c_1 : imm tagged) =
                                           let prim_6 = %phys_eq (c_1, 0) in
@@ -287,7 +300,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                  %block.[`0`].my_alloc_region
                                                    (x2, 0)
                                                in
-                                               cont k (Pmakeblock)
+                                               cont k
+                                                      close[normal] my_alloc_region
+                                                      (Pmakeblock)
                                              where k5 =
                                                let prim_7 =
                                                  %int_comp.gt (c_1, 0)
@@ -304,7 +319,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                       %block.[`0`].my_alloc_region
                                                         (x2, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k5 =
                                                     let Pmakeblock =
                                                       %block.[`0`].my_alloc_region
@@ -314,7 +331,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                       %block.[`0`].my_alloc_region
                                                         (x3, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1))))
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1))))
                                    where k4 =
                                      let prim_6 = %int_comp.gt (c, 0) in
                                      (switch prim_6
@@ -322,6 +341,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                         | 1 -> k5
                                         where k5 =
                                           (apply &my_alloc_region
+                                                  [forward close close close]
                                              cmp (x2, x3) -> k5 * k1
                                              where k5 (c_1 : imm tagged) =
                                                let prim_7 = %phys_eq (c_1, 0)
@@ -338,7 +358,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                       %block.[`0`].my_alloc_region
                                                         (x1, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k5 =
                                                     let prim_8 =
                                                       %int_comp.gt (c_1, 0)
@@ -361,10 +383,12 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                               Pmakeblock_1)
                                                          in
                                                          cont k
+                                                                close[normal] my_alloc_region
                                                                 (Pmakeblock_2)
                                                        where k5 =
                                                          (apply
                                                                  &my_alloc_region
+                                                                 [forward close close close]
                                                             cmp
                                                               (x1, x3)
                                                               -> k5 * k1
@@ -392,6 +416,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                    in
                                                                    cont 
                                                                    k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_1)
                                                                  where 
                                                                    k5 =
@@ -420,6 +445,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)
                                                                     where 
                                                                     k5 =
@@ -439,9 +465,11 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)))))))
                                         where k4 =
                                           (apply &my_alloc_region
+                                                  [forward close close close]
                                              cmp (x1, x3) -> k4 * k1
                                              where k4 (c_1 : imm tagged) =
                                                let prim_7 = %phys_eq (c_1, 0)
@@ -458,7 +486,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                       %block.[`0`].my_alloc_region
                                                         (x2, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k4 =
                                                     let prim_8 =
                                                       %int_comp.gt (c_1, 0)
@@ -481,10 +511,12 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                               Pmakeblock_1)
                                                          in
                                                          cont k
+                                                                close[normal] my_alloc_region
                                                                 (Pmakeblock_2)
                                                        where k4 =
                                                          (apply
                                                                  &my_alloc_region
+                                                                 [forward close close close]
                                                             cmp
                                                               (x2, x3)
                                                               -> k4 * k1
@@ -512,6 +544,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                    in
                                                                    cont 
                                                                    k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_1)
                                                                  where 
                                                                    k4 =
@@ -540,6 +573,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)
                                                                     where 
                                                                     k4 =
@@ -559,6 +593,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2))))))))))))))
      where k3 =
        let prim_1 = %is_int (l) in
@@ -574,7 +609,8 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                where k3 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
+                 (apply &my_alloc_region [forward close close close]
+                    cmp (x1, x2) -> k3 * k1
                     where k3 (c : imm tagged) =
                       let prim_3 = %phys_eq (c, 0) in
                       (switch prim_3
@@ -584,7 +620,7 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                            let Pmakeblock =
                              %block.[`0`].my_alloc_region (x1, 0)
                            in
-                           cont k (Pmakeblock)
+                           cont k close[normal] my_alloc_region (Pmakeblock)
                          where k3 =
                            let prim_4 = %int_comp.gt (c, 0) in
                            (switch prim_4
@@ -598,7 +634,9 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                   %block.[`0`].my_alloc_region
                                     (x1, Pmakeblock)
                                 in
-                                cont k (Pmakeblock_1)
+                                cont k
+                                       close[normal] my_alloc_region
+                                       (Pmakeblock_1)
                               where k3 =
                                 let Pmakeblock =
                                   %block.[`0`].my_alloc_region (x1, 0)
@@ -607,29 +645,34 @@ let code rec loopify(never) size(588) newer_version_of(rev_sort_8)
                                   %block.[`0`].my_alloc_region
                                     (x2, Pmakeblock)
                                 in
-                                cont k (Pmakeblock_1)))))))
+                                cont k
+                                       close[normal] my_alloc_region
+                                       (Pmakeblock_1)))))))
     where k2 =
       let n1 = %int_shift.asr (n, 1i) in
       let n2 = %int_barith.sub (n, n1) in
-      (apply direct(chop_3_1 &my_alloc_region)
+      (apply direct(chop_3_1 &my_alloc_region) [forward close close close]
          ($camlTests9__chop_6
           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
            (n1, l)
            -> k2 * k1
          where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
            (apply direct(sort_7_1 &my_alloc_region)
+                   [forward close close close]
               (sort ~ depth my_depth -> succ my_depth
                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                 (n1, l)
                 -> k2 * k1
               where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                 (apply direct(sort_7_1 &my_alloc_region)
+                        [forward close close close]
                    (sort ~ depth my_depth -> succ my_depth
                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                      (n2, l2)
                      -> k2 * k1
                    where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                      apply direct(rev_merge_5_1 &my_alloc_region)
+                            [close close close close]
                        (rev_merge
                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                          (s1, s2, 0)
@@ -674,7 +717,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                            let x3 = %block_load.[`0`] (`*match*_1`) in
                            let x2 = %block_load.[`0`] (`*match*`) in
                            let x1 = %block_load.[`0`] (l) in
-                           (apply &my_alloc_region cmp (x1, x2) -> k4 * k1
+                           (apply &my_alloc_region
+                                   [forward close close close]
+                              cmp (x1, x2) -> k4 * k1
                               where k4 (c : imm tagged) =
                                 let prim_5 = %phys_eq (c, 0) in
                                 (switch prim_5
@@ -682,6 +727,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                    | 1 -> k5
                                    where k5 =
                                      (apply &my_alloc_region
+                                             [forward close close close]
                                         cmp (x2, x3) -> k5 * k1
                                         where k5 (c_1 : imm tagged) =
                                           let prim_6 = %phys_eq (c_1, 0) in
@@ -693,7 +739,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                  %block.[`0`].my_alloc_region
                                                    (x2, 0)
                                                in
-                                               cont k (Pmakeblock)
+                                               cont k
+                                                      close[normal] my_alloc_region
+                                                      (Pmakeblock)
                                              where k5 =
                                                let prim_7 =
                                                  %int_comp.lt (c_1, 0)
@@ -710,7 +758,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                       %block.[`0`].my_alloc_region
                                                         (x2, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k5 =
                                                     let Pmakeblock =
                                                       %block.[`0`].my_alloc_region
@@ -720,7 +770,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                       %block.[`0`].my_alloc_region
                                                         (x3, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1))))
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1))))
                                    where k4 =
                                      let prim_6 = %int_comp.lt (c, 0) in
                                      (switch prim_6
@@ -728,6 +780,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                         | 1 -> k5
                                         where k5 =
                                           (apply &my_alloc_region
+                                                  [forward close close close]
                                              cmp (x2, x3) -> k5 * k1
                                              where k5 (c_1 : imm tagged) =
                                                let prim_7 = %phys_eq (c_1, 0)
@@ -744,7 +797,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                       %block.[`0`].my_alloc_region
                                                         (x1, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k5 =
                                                     let prim_8 =
                                                       %int_comp.lt (c_1, 0)
@@ -767,10 +822,12 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                               Pmakeblock_1)
                                                          in
                                                          cont k
+                                                                close[normal] my_alloc_region
                                                                 (Pmakeblock_2)
                                                        where k5 =
                                                          (apply
                                                                  &my_alloc_region
+                                                                 [forward close close close]
                                                             cmp
                                                               (x1, x3)
                                                               -> k5 * k1
@@ -798,6 +855,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                    in
                                                                    cont 
                                                                    k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_1)
                                                                  where 
                                                                    k5 =
@@ -826,6 +884,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)
                                                                     where 
                                                                     k5 =
@@ -845,9 +904,11 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)))))))
                                         where k4 =
                                           (apply &my_alloc_region
+                                                  [forward close close close]
                                              cmp (x1, x3) -> k4 * k1
                                              where k4 (c_1 : imm tagged) =
                                                let prim_7 = %phys_eq (c_1, 0)
@@ -864,7 +925,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                       %block.[`0`].my_alloc_region
                                                         (x2, Pmakeblock)
                                                     in
-                                                    cont k (Pmakeblock_1)
+                                                    cont k
+                                                           close[normal] my_alloc_region
+                                                           (Pmakeblock_1)
                                                   where k4 =
                                                     let prim_8 =
                                                       %int_comp.lt (c_1, 0)
@@ -887,10 +950,12 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                               Pmakeblock_1)
                                                          in
                                                          cont k
+                                                                close[normal] my_alloc_region
                                                                 (Pmakeblock_2)
                                                        where k4 =
                                                          (apply
                                                                  &my_alloc_region
+                                                                 [forward close close close]
                                                             cmp
                                                               (x2, x3)
                                                               -> k4 * k1
@@ -918,6 +983,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                    in
                                                                    cont 
                                                                    k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_1)
                                                                  where 
                                                                    k4 =
@@ -946,6 +1012,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2)
                                                                     where 
                                                                     k4 =
@@ -965,6 +1032,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                                                     in
                                                                     cont 
                                                                     k
+                                                                    close[normal] my_alloc_region
                                                                     (Pmakeblock_2))))))))))))))
      where k3 =
        let prim_1 = %is_int (l) in
@@ -980,7 +1048,8 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                where k3 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
+                 (apply &my_alloc_region [forward close close close]
+                    cmp (x1, x2) -> k3 * k1
                     where k3 (c : imm tagged) =
                       let prim_3 = %phys_eq (c, 0) in
                       (switch prim_3
@@ -990,7 +1059,7 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                            let Pmakeblock =
                              %block.[`0`].my_alloc_region (x1, 0)
                            in
-                           cont k (Pmakeblock)
+                           cont k close[normal] my_alloc_region (Pmakeblock)
                          where k3 =
                            let prim_4 = %int_comp.lt (c, 0) in
                            (switch prim_4
@@ -1004,7 +1073,9 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                   %block.[`0`].my_alloc_region
                                     (x1, Pmakeblock)
                                 in
-                                cont k (Pmakeblock_1)
+                                cont k
+                                       close[normal] my_alloc_region
+                                       (Pmakeblock_1)
                               where k3 =
                                 let Pmakeblock =
                                   %block.[`0`].my_alloc_region (x1, 0)
@@ -1013,29 +1084,34 @@ and code rec loopify(never) size(588) newer_version_of(sort_7)
                                   %block.[`0`].my_alloc_region
                                     (x2, Pmakeblock)
                                 in
-                                cont k (Pmakeblock_1)))))))
+                                cont k
+                                       close[normal] my_alloc_region
+                                       (Pmakeblock_1)))))))
     where k2 =
       let n1 = %int_shift.asr (n, 1i) in
       let n2 = %int_barith.sub (n, n1) in
-      (apply direct(chop_3_1 &my_alloc_region)
+      (apply direct(chop_3_1 &my_alloc_region) [forward close close close]
          ($camlTests9__chop_6
           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
            (n1, l)
            -> k2 * k1
          where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
            (apply direct(rev_sort_8_1 &my_alloc_region)
+                   [forward close close close]
               (rev_sort ~ depth my_depth -> succ my_depth
                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                 (n1, l)
                 -> k2 * k1
               where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                 (apply direct(rev_sort_8_1 &my_alloc_region)
+                        [forward close close close]
                    (rev_sort ~ depth my_depth -> succ my_depth
                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                      (n2, l2)
                      -> k2 * k1
                    where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
                      apply direct(rev_merge_rev_6_1 &my_alloc_region)
+                            [close close close close]
                        (rev_merge_rev
                         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                          (s1, s2, 0)
@@ -1064,14 +1140,15 @@ let code loopify(never) size(1411) newer_version_of(sort_uniq_4)
   }
   in
   apply direct(length_aux_0_1 &my_alloc_region) inlining_state(depth(10))
+         [forward close close close]
     ($camlTests9__length_aux_3 : _ -> imm tagged) (0, l) -> k2 * k1
     where k2 (len : imm tagged) =
       let prim = %int_comp.lt (len, 2) in
       (switch prim
          | 0 -> k2
-         | 1 -> k (l)
+         | 1 -> k close[normal] my_alloc_region (l)
          where k2 =
-           apply direct(sort_7_1 &my_alloc_region)
+           apply direct(sort_7_1 &my_alloc_region) [close close close close]
              (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                (len, l)
                -> k * k1)
@@ -1105,7 +1182,8 @@ let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
                where k3 =
                  let x2 = %block_load.[`0`] (`*match*`) in
                  let x1 = %block_load.[`0`] (l) in
-                 (apply &my_alloc_region cmp (x1, x2) -> k3 * k1
+                 (apply &my_alloc_region [forward close close close]
+                    cmp (x1, x2) -> k3 * k1
                     where k3 (c : imm tagged) =
                       let prim_3 = %int_comp.lt (c, 0) in
                       (switch prim_3
@@ -1115,14 +1193,14 @@ let code rec loopify(never) size(77) newer_version_of(rev_sort_11)
                            let Pmakeblock =
                              %block.[`0`].my_alloc_region (x1, 0)
                            in
-                           cont k (Pmakeblock)
+                           cont k close[normal] my_alloc_region (Pmakeblock)
                          where k3 =
                            let Pmakeblock =
                              %block.[`0`].my_alloc_region (x2, 0)
                            in
-                           cont k (Pmakeblock))))))
+                           cont k close[normal] my_alloc_region (Pmakeblock))))))
     where k2 =
-      apply direct(sort_10_1 &my_alloc_region)
+      apply direct(sort_10_1 &my_alloc_region) [close close close close]
         (sort ~ depth my_depth -> succ my_depth
          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
           (n, l)
@@ -1134,7 +1212,7 @@ and code rec loopify(never) size(5) newer_version_of(sort_10)
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
   let rev_sort = %project_function_slot.[sort_1].[rev_sort_1] (my_closure) in
-  apply direct(rev_sort_11_1 &my_alloc_region)
+  apply direct(rev_sort_11_1 &my_alloc_region) [close close close close]
     (rev_sort ~ depth my_depth -> succ my_depth
      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
       (n, l)
@@ -1149,10 +1227,11 @@ let code loopify(never) size(98) newer_version_of(foo_9)
   and rev_sort = closure rev_sort_11_1 @rev_sort_1 &my_alloc_region
   with { cmp_3 = cmp }
   in
-  apply direct(sort_10_1 &my_alloc_region)
+  apply direct(sort_10_1 &my_alloc_region) [close close close close]
     (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) (42, l) -> k * k1
 in
 let $camlTests9__foo_8 = closure foo_9_1 @foo &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests9 =
   Block 0 ($camlTests9__length_aux_3,
            $camlTests9__length_4,
