@@ -2365,6 +2365,14 @@ let rec params_are_distinct_generic_tvars seen = function
     && not (List.exists (eq_type param) seen)
     && params_are_distinct_generic_tvars (param :: seen) rest
 
+(* Some of the logic below comes from inlining [subst] (as called by [apply])
+   and specializing it to applying a single [params -> args] substitution to a
+   list of [bodies] in one pass: the abbreviation and level bookkeeping, the
+   instancing of the parameters and bodies, and the unification of the
+   instanced parameters against the arguments. On top of that, when the
+   parameters are distinct generic type variables, unification cannot fail, so
+   the fast path skips it and redirects each parameter directly to its
+   argument during copying. *)
 let apply_list env params bodies args =
   match bodies with
   | [] -> []
