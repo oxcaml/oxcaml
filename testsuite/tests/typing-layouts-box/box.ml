@@ -1606,15 +1606,24 @@ type 'a mut = { mutable a : 'a; }
 type 'a imm = { i : 'a; }
 |}]
 
-(* CR rtjoa: The coercions below are unsound and wrongly accepted. *)
 let bad (x : [ `A ] mut) = (x : [ `A ] mut# box :> [ `A | `B ] mut# box)
 [%%expect{|
-val bad : [ `A ] mut -> [ `A | `B ] mut = <fun>
+Line 1, characters 27-72:
+1 | let bad (x : [ `A ] mut) = (x : [ `A ] mut# box :> [ `A | `B ] mut# box)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `A ] mut# box" = "[ `A ] mut" is not a subtype of
+         "[ `A | `B ] mut# box" = "[ `A | `B ] mut"
+       The first variant type does not allow tag(s) "`B"
 |}]
 
 let bad_ref (x : [ `A ] ref) = (x : [ `A ] ref# box :> [ `A | `B ] ref# box)
 [%%expect{|
-val bad_ref : [ `A ] ref -> [ `A | `B ] ref = <fun>
+Line 1, characters 31-76:
+1 | let bad_ref (x : [ `A ] ref) = (x : [ `A ] ref# box :> [ `A | `B ] ref# box)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `A ] ref# box" = "[ `A ] ref" is not a subtype of
+         "[ `A | `B ] ref# box" = "[ `A | `B ] ref"
+       The first variant type does not allow tag(s) "`B"
 |}]
 
 (* Immutable records keep their covariance through [box]. *)

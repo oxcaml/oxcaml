@@ -1381,17 +1381,26 @@ type 'a co = 'a iarray#
    mutable fields, like the boxed version: since ['a mut# box] reduces to
    ['a mut], any variance of [mut#] leaks to [mut] through the covariant
    [box]. *)
-(* CR rtjoa: The declarations below are wrongly accepted. *)
 type 'a mut = { mutable a : 'a }
 type +'a bad = 'a mut#
 [%%expect{|
 type 'a mut = { mutable a : 'a; }
-type 'a bad = 'a mut#
+Line 2, characters 0-22:
+2 | type +'a bad = 'a mut#
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 type +'a bad = 'a ref#
 [%%expect{|
-type 'a bad = 'a ref#
+Line 1, characters 0-22:
+1 | type +'a bad = 'a ref#
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 (* The variance must be shared within the fixpoint computing it, so that a
@@ -1399,8 +1408,12 @@ type 'a bad = 'a ref#
 type 'a mut2 = { mutable a : 'a }
 and +'a bad = 'a mut2#
 [%%expect{|
-type 'a mut2 = { mutable a : 'a; }
-and 'a bad = 'a mut2#
+Line 2, characters 0-22:
+2 | and +'a bad = 'a mut2#
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 (* Same for unboxed versions created by with constraints, whether the type in
@@ -1411,7 +1424,12 @@ module F (X : S_mut) = struct type +'a bad = 'a X.t# end
 [%%expect{|
 module type S_abstract = sig type 'a t end
 module type S_mut = sig type 'a t = 'a mut end
-module F : functor (X : S_mut) -> sig type 'a bad = 'a X.t# end
+Line 3, characters 30-52:
+3 | module F (X : S_mut) = struct type +'a bad = 'a X.t# end
+                                  ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 module type S_record = sig type 'a t = { mutable a : 'a } end
@@ -1420,7 +1438,12 @@ module F2 (X : S_mut_record) = struct type +'a bad = 'a X.t# end
 [%%expect{|
 module type S_record = sig type 'a t = { mutable a : 'a; } end
 module type S_mut_record = sig type 'a t = 'a mut = { mutable a : 'a; } end
-module F2 : functor (X : S_mut_record) -> sig type 'a bad = 'a X.t# end
+Line 3, characters 38-60:
+3 | module F2 (X : S_mut_record) = struct type +'a bad = 'a X.t# end
+                                          ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 (* The parameters of [array#] and [iarray#] have separability mode [Ind], like
