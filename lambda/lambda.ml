@@ -1681,7 +1681,6 @@ let layout_list =
             Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_optional_arg = nullable_value Pgenval
 let layout_variant_arg = nullable_value Pgenval
