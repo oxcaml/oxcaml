@@ -1001,22 +1001,8 @@ let print_report ppf report = print_report_with_exn ppf None report
 type error = report
 type delayed_msg = unit -> Fmt.t option
 
-<<<<<<< Merlin:ggray.diagnostics-publish-integration
-let report_error ppf err =
-  print_report ppf err
-
 let mkerror loc sub source footnote txt =
   { kind = Report_error; main = { loc; txt }; sub; source; footnote=footnote () }
-||||||| Compiler:last-imported
-let report_error ppf err =
-  print_report ppf err
-
-let mkerror loc sub footnote txt =
-  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
-=======
-let mkerror loc sub footnote txt =
-  { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
->>>>>>> Compiler:HEAD
 
 let errorf ?(loc = none) ?(sub = []) ?(source=Typer)
     ?(footnote=Fun.const None) =
