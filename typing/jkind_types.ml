@@ -924,7 +924,7 @@ module Sort = struct
 
   let rec constrain_addressable ~allow_mutation : t -> bool = function
     | Addressable _ -> true
-    | Base b -> if base_is_addressable b then true else false
+    | Base b -> base_is_addressable b
     | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
     | Univar _ -> false
     | Var v -> (
@@ -962,17 +962,16 @@ module Sort = struct
          Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
          We could unify ['var = bits8] or ['var = bits8 addressable], but
          neither is more general. *)
-      constrain_addressable ~allow_mutation:true s1
-      && constrain_addressable ~allow_mutation:true s2
+      constrain_addressable ~allow_mutation s1
+      && constrain_addressable ~allow_mutation s2
       && equate ~allow_mutation
            (strip_head_addressable s1)
            (strip_head_addressable s2)
-    | Base b1, Base b2 -> if equal_base b1 b2 then true else false
+    | Base b1, Base b2 -> equal_base b1 b2
     | Product sorts1, Product sorts2 -> (
       try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
       with Invalid_argument _ -> false)
-    | Univar uv1, Univar uv2 ->
-      if equal_univar_univar uv1 uv2 then true else false
+    | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
     | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
