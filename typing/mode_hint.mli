@@ -109,6 +109,13 @@ type annotation =
     written_modes : string Location.loc list
   }
 
+type modality_annotation =
+  { annotated_modes : (string * string Location.loc) list;
+        (** Each bound's mode name and the written modality that imposed it.
+            Implied bounds point to the annotation that implies them. *)
+    contained_by : is_contained_by option
+  }
+
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
 printed. *)
@@ -143,6 +150,7 @@ type 'd const =
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
   | Annotation : annotation -> ('l * 'r) const
+  | Modality_annotation : modality_annotation -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
