@@ -159,6 +159,13 @@ val has_source_query : Datalog.database -> Code_id_or_name.t -> bool
 val code_id_actually_directly_called :
   Datalog.database -> Name.t -> Code_id.Set.t Or_unknown.t
 
+val code_id_of_closure_name :
+  Datalog.database -> Code_id_or_name.t -> Code_id.t option
+
+(** The [my_closure] variable of the function body with the given code id, as
+    recorded by the traversal. [None] if the code was not traversed. *)
+val my_closure_of_code_id : Datalog.database -> Code_id.t -> Variable.t option
+
 val arguments_used_by_known_arity_call :
   Datalog.database -> Code_id_or_name.t -> 'a list -> ('a * keep_or_delete) list
 
