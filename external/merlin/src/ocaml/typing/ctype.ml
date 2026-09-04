@@ -4816,7 +4816,7 @@ and mcomp_tuple_description type_pairs env =
     match x, y with
     | {ca_type=ty1; ca_modalities=gf1; _} :: xs, {ca_type=ty2; ca_modalities=gf2} :: ys ->
       mcomp type_pairs env ty1 ty2;
-      if gf1 = gf2
+      if Result.is_ok (Modality.Const.equate gf1 gf2)
       then iter xs ys
       else raise Incompatible
     | [], [] -> ()
@@ -4831,7 +4831,8 @@ and mcomp_record_description type_pairs env =
         mcomp type_pairs env l1.ld_type l2.ld_type;
         if Ident.name l1.ld_id = Ident.name l2.ld_id &&
            l1.ld_mutable = l2.ld_mutable &&
-           l1.ld_modalities = l2.ld_modalities
+           Result.is_ok
+             (Modality.Const.equate l1.ld_modalities l2.ld_modalities)
         then iter xs ys
         else raise Incompatible
     | [], [] -> ()
