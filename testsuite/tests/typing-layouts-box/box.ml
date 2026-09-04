@@ -1594,3 +1594,31 @@ Lines 10-12, characters 11-4:
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
 |}]
+
+(* Test 45: [t# box] reduces to [t], so the unboxed version of a record with
+   mutable fields must be invariant like the boxed version; otherwise a
+   coercion through [box] changes the type of a mutable field in place. *)
+
+type 'a mut = { mutable a : 'a }
+type 'a imm = { i : 'a }
+[%%expect{|
+type 'a mut = { mutable a : 'a; }
+type 'a imm = { i : 'a; }
+|}]
+
+(* CR rtjoa: The coercions below are unsound and wrongly accepted. *)
+let bad (x : [ `A ] mut) = (x : [ `A ] mut# box :> [ `A | `B ] mut# box)
+[%%expect{|
+val bad : [ `A ] mut -> [ `A | `B ] mut = <fun>
+|}]
+
+let bad_ref (x : [ `A ] ref) = (x : [ `A ] ref# box :> [ `A | `B ] ref# box)
+[%%expect{|
+val bad_ref : [ `A ] ref -> [ `A | `B ] ref = <fun>
+|}]
+
+(* Immutable records keep their covariance through [box]. *)
+let ok (x : [ `A ] imm) = (x : [ `A ] imm# box :> [ `A | `B ] imm# box)
+[%%expect{|
+val ok : [ `A ] imm -> [ `A | `B ] imm = <fun>
+|}]

@@ -1377,6 +1377,52 @@ type +'a co = 'a iarray#
 type 'a co = 'a iarray#
 |}]
 
+(* The unboxed version of a record is invariant in parameters only used in
+   mutable fields, like the boxed version: since ['a mut# box] reduces to
+   ['a mut], any variance of [mut#] leaks to [mut] through the covariant
+   [box]. *)
+(* CR rtjoa: The declarations below are wrongly accepted. *)
+type 'a mut = { mutable a : 'a }
+type +'a bad = 'a mut#
+[%%expect{|
+type 'a mut = { mutable a : 'a; }
+type 'a bad = 'a mut#
+|}]
+
+type +'a bad = 'a ref#
+[%%expect{|
+type 'a bad = 'a ref#
+|}]
+
+(* The variance must be shared within the fixpoint computing it, so that a
+   recursive use sees the final variance. *)
+type 'a mut2 = { mutable a : 'a }
+and +'a bad = 'a mut2#
+[%%expect{|
+type 'a mut2 = { mutable a : 'a; }
+and 'a bad = 'a mut2#
+|}]
+
+(* Same for unboxed versions created by with constraints, whether the type in
+   the signature is abstract or a record. *)
+module type S_abstract = sig type 'a t end
+module type S_mut = S_abstract with type 'a t = 'a mut
+module F (X : S_mut) = struct type +'a bad = 'a X.t# end
+[%%expect{|
+module type S_abstract = sig type 'a t end
+module type S_mut = sig type 'a t = 'a mut end
+module F : functor (X : S_mut) -> sig type 'a bad = 'a X.t# end
+|}]
+
+module type S_record = sig type 'a t = { mutable a : 'a } end
+module type S_mut_record = S_record with type 'a t = 'a mut
+module F2 (X : S_mut_record) = struct type +'a bad = 'a X.t# end
+[%%expect{|
+module type S_record = sig type 'a t = { mutable a : 'a; } end
+module type S_mut_record = sig type 'a t = 'a mut = { mutable a : 'a; } end
+module F2 : functor (X : S_mut_record) -> sig type 'a bad = 'a X.t# end
+|}]
+
 (* The parameters of [array#] and [iarray#] have separability mode [Ind], like
    [array]'s: an existential under them needn't be separable. (Cf. the abstract
    type in hash_types-flat-float-array.ml, whose parameter gets the worst-case
