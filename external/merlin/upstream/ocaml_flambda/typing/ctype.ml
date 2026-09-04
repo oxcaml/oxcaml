@@ -2357,6 +2357,14 @@ let apply ?(use_current_level = false) env params body args =
   with
     Cannot_subst -> raise Cannot_apply
 
+let rec params_are_distinct_generic_tvars seen = function
+  | [] -> true
+  | param :: rest ->
+    is_Tvar param
+    && get_level param = generic_level
+    && not (List.exists (eq_type param) seen)
+    && params_are_distinct_generic_tvars (param :: seen) rest
+
 let apply_list env params bodies args =
   match bodies with
   | [] -> []
@@ -2365,13 +2373,26 @@ let apply_list env params bodies args =
     simple_abbrevs := Mnil;
     with_level ~level:generic_level begin fun () ->
       abbreviations := ref Mnil;
-      let (params', bodies') = instance_parameterized_types params bodies in
-      abbreviations := ref Mnil;
-      let uenv = Expression {env; in_subst = true} in
-      try
-        List.iter2 (!unify_var' uenv) params' args;
+      if params_are_distinct_generic_tvars [] params then begin
+        let bodies' =
+          For_copy.with_scope (fun copy_scope ->
+            List.iter2
+              (fun param arg ->
+                For_copy.redirect_desc copy_scope param (Tsubst (arg, None)))
+              params args;
+            List.map (copy copy_scope) bodies)
+        in
+        abbreviations := ref Mnil;
         bodies'
-      with Unify _ -> raise Cannot_apply
+      end else begin
+        let (params', bodies') = instance_parameterized_types params bodies in
+        abbreviations := ref Mnil;
+        let uenv = Expression {env; in_subst = true} in
+        try
+          List.iter2 (!unify_var' uenv) params' args;
+          bodies'
+        with Unify _ -> raise Cannot_apply
+      end
     end
 
                               (****************************)
