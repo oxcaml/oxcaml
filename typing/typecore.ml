@@ -3415,9 +3415,7 @@ and type_pat_aux
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
   let type_tuple_pat spl closed =
-    (* CR zeisbach: delete this once they are actually factored properly *)
-    (* CR layouts v5: consider sharing code with [type_unboxed_tuple_pat] below
-       when we allow non-values in boxed tuples. *)
+    (* CR zeisbach: refactor this properly *)
     assert (closed = Open || List.length spl >= 2);
     Option.iter
       (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
@@ -10503,6 +10501,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               type_option_none env (instance (tpoly_get_mono ty_arg))
                 sarg.pexp_loc
             in
+            (* CR zeisbach: is there a bug here or is this comment stale? *)
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
             make_args ((l, Arg (ty, Jkind.Sort.scannable)) :: args) ty_fun
@@ -10885,7 +10884,7 @@ and type_application env app_loc expected_mode position_and_mode
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
-  (* CR layouts v5: consider sharing code with [type_unboxed_tuple] below when
+  (* CR zeisbach: consider sharing code with [type_unboxed_tuple] below when
      we allow non-values in boxed tuples. *)
   let arity = List.length sexpl in
   assert (arity >= 2);
@@ -10900,13 +10899,11 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     |> apply_right_is_contained_by
       {containing = Tuple; container = (loc, Expression)}
   in
-  (* CR layouts v5: non-values in tuples *)
   let unify_as_tuple ty_expected =
     let labels_types_and_sorts =
       List.map (fun (label, _) ->
         let jkind, sort =
-          (* CR zeisbach: give this the actually correct `why` *)
-          Jkind.of_new_sort_var ~why:Unboxed_tuple_element
+          Jkind.of_new_sort_var ~why:Tuple_element
             ~level:(Ctype.get_current_level ())
         in
         label, newgenvar jkind, sort)

@@ -948,8 +948,6 @@ end
 (* These sorts and reprs should never be used (so we make them unlikely to be
    accidentally correct) *)
 
-(* CR zeisbach: check how this prints out to ensure that it doesn't leak sorts
-   into error messages for non-exhaustivity / refutation *)
 let fake_sort = Jkind.Sort.of_base Bits16
 
 let fake_cstr_repr : constructor_representation =

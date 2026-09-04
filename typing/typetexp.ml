@@ -1543,7 +1543,6 @@ and transl_type_aux_tuple env ~loc ~policy ~row_context stl =
       stl
   in
   (*= List.iter (fun (_, {ctyp_type; ctyp_loc}) ->
-    (* CR layouts v5: remove value requirement *)
     match
       constrain_type_jkind env ctyp_type (Jkind.Builtin.value_or_null ~why:Tuple_element)
     with
