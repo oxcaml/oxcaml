@@ -23,6 +23,7 @@ type constant_global
 type context =
   { constants : Wasm_ast.expression Code.Var.Hashtbl.t
   ; mutable data_segments : string Code.Var.Map.t
+  ; string_globals : Code.Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Code.Var.Map.t
   ; mutable other_fields : Wasm_ast.module_field list
   ; mutable imports : (Code.Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
@@ -38,6 +39,7 @@ type context =
   ; mutable dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable init_code : Wasm_ast.instruction list
+        (** Initialization code, stored in reverse execution order *)
   ; mutable fragments : Javascript.expression StringMap.t
   ; mutable globalized_variables : Code.Var.Set.t
   ; value_type : Wasm_ast.value_type
@@ -233,7 +235,13 @@ val register_global :
 
 val get_global : Code.Var.t -> Wasm_ast.expression option t
 
+val global_is_constant : Code.Var.t -> bool t
+
 val register_data_segment : Code.Var.t -> string -> unit t
+
+val lookup_string_global : string -> Code.Var.t option t
+
+val register_string_global : string -> Code.Var.t -> unit t
 
 val register_init_code : unit t -> unit t
 
