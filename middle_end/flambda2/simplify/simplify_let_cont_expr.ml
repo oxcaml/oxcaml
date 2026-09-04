@@ -113,7 +113,7 @@ type handler_to_rebuild = D.handler_to_rebuild =
     rewrite_ids : Apply_cont_rewrite_id.Set.t
   }
 
-type handlers_to_rebuild_group =
+type handlers_to_rebuild_group = D.handlers_to_rebuild_group =
   | Recursive of
       { rebuild_continuation_handlers : handler_to_rebuild Continuation.Map.t }
   | Non_recursive of

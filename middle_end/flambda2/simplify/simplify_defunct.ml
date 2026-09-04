@@ -53,6 +53,15 @@ and after_rebuild_let_cont_data =
     after_rebuild : after_rebuild;
   }
 
+and handlers_to_rebuild_group =
+  | Recursive of
+      { rebuild_continuation_handlers : handler_to_rebuild Continuation.Map.t }
+  | Non_recursive of
+      { cont : Continuation.t;
+        handler : handler_to_rebuild;
+        is_single_inlinable_use : bool
+      }
+
 and after_rebuild_single_non_recursive_let_cont_data =
   { cont : Continuation.t;
     at_unit_toplevel : bool;
