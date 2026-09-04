@@ -1984,23 +1984,24 @@ and transl_tupled_function
                    Argument should be a tuple, but couldn't get the kinds"
         in
         let tparams =
-          List.map2 (fun kind (_, fld_pat, sort) ->
+          List.map2 (fun layout (_, fld_pat, sort) ->
               let debug_uid =
                 Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
               in
+              let sort = Jkind.Sort.default_for_transl_and_get sort in
               add_type_shapes_of_param ~env:first_case.c_lhs.pat_env
                 ~uid:debug_uid
-                ~sort:(Jkind.Sort.default_for_transl_and_get sort)
-                ~type_expr:fld_pat.pat_type;
-              {
-                name = Ident.create_local "param";
-                debug_uid;
-                layout = kind;
-                attributes = Lambda.default_param_attribute;
-                mode = alloc_heap
-              }) layouts pl
+                ~sort ~type_expr:fld_pat.pat_type;
+              ({
+                 name = Ident.create_local "param";
+                 debug_uid;
+                 layout;
+                 attributes = Lambda.default_param_attribute;
+                 mode = alloc_heap
+               }, sort, layout)) layouts pl
         in
-        let params = List.map (fun p -> p.name) tparams in
+        let params = List.map (fun (p, s, l) -> (p.name, s, l)) tparams in
+        let lparams = List.map (fun (p, _, _) -> p) tparams in
         let body =
           Matching.for_tupled_function ~scopes ~return_layout loc params
             (transl_tupled_cases ~scopes return_layout pats_expr_list) partial
@@ -2008,7 +2009,7 @@ and transl_tupled_function
         let region = region || not (may_allocate_in_region body) in
         add_type_shapes_of_cases cases;
         Some
-          ((Tupled, tparams, return_layout, region, return_mode), body)
+          ((Tupled, lparams, return_layout, region, return_mode), body)
     with Matching.Cannot_flatten -> None
       end
   | _ -> None

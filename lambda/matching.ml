@@ -2485,6 +2485,7 @@ let get_pat_args_tuple arity p rem =
   | { pat_desc = Tpat_tuple args } -> (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
+(* CR zeisbach: maybe this is a place to deduplicate code. *)
 let get_pat_args_unboxed_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
@@ -2492,25 +2493,42 @@ let get_pat_args_unboxed_tuple arity p rem =
     (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
-let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
+let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
-  let arity = Patterns.Head.arity head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
   let binding_kind = add_barrier_to_let_kind ubr Alias in
-  let rec make_args pos =
-    if pos >= arity then
-      rem
-    else
-      {
-        arg = Lprim (Pfield (pos, Pointer, sem), [ arg ], loc);
-        binding_kind;
-        mut = compose_mut mut Immutable;
-        sort = Jkind.Sort.Const.for_tuple_element;
-        layout = layout_tuple_element;
-      } :: make_args (pos + 1)
+  let shape =
+    List.map (fun (_, sort) ->
+      let sort = Jkind.Sort.default_for_transl_and_get sort in
+      sort,
+      Typeopt.layout_of_sort (Scoped_location.to_location loc) sort
+    ) shape
   in
-  make_args 0
+  let read =
+    let block_shape =
+      Array.of_list
+        (List.map (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
+          shape)
+    in
+    (* CR zeisbach: it is sad that we yet again have to compute this. especially
+       since the computation here and in translcore (and elsewhere) could
+       potentially get out-of-sync. this should probably be at least factored
+       into a helper, and we can potentially store more info somewhere... *)
+    (* check if we are in a mixed tuple. *)
+    if Mixed_product_bytes.shape_is_all_value block_shape
+    then fun pos -> Pfield (pos, Pointer, sem)
+    else fun pos -> Pmixedfield ([pos], block_shape, sem)
+  in
+  List.mapi (fun pos (sort, layout) ->
+    {
+      arg = Lprim (read pos, [ arg ], loc);
+      binding_kind;
+      mut = compose_mut mut Immutable;
+      sort;
+      layout;
+    }) shape
+  @ rem
 
 let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
@@ -2534,10 +2552,10 @@ let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
     }) shape
   @ rem
 
-let divide_tuple ~scopes head ctx pm =
+let divide_tuple ~scopes head shape ctx pm =
   let arity = Patterns.Head.arity head in
   divide_line (Context.specialize head)
-    (get_expr_args_tuple ~scopes)
+    (get_expr_args_tuple ~scopes shape)
     (get_pat_args_tuple arity)
     head ctx pm
 
@@ -4475,9 +4493,9 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_test
             divide_unboxed_bool
             (combine_unboxed_bool value_kind ploc arg arg_partial)
-      | Tuple _ ->
+      | Tuple shape ->
           compile_no_test
-            (divide_tuple ~scopes ph)
+            (divide_tuple ~scopes ph shape)
             Context.combine
       | Unboxed_tuple shape ->
           compile_no_test
@@ -4779,13 +4797,14 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
         List.fold_left2
-          (fun acc (_, pat) lam ->
-             collect Jkind.Sort.Const.for_tuple_element acc pat lam)
+          (fun acc (_, pat, sort) lam ->
+             collect (Jkind.Sort.default_for_transl_and_get sort) acc pat lam)
           acc patl lams
     | Tpat_tuple patl, Lconst (Const_block (_, scl)) ->
         opt := true;
-        let collect_const acc (_, pat) sc =
-          collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)
+        let collect_const acc (_, pat, sort) sc =
+          collect
+            (Jkind.Sort.default_for_transl_and_get sort) acc pat (Lconst sc)
         in
         List.fold_left2 collect_const acc patl scl
     | _ ->
@@ -4906,9 +4925,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
-  let args = List.map (fun id ->
-    root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element
-      layout_tuple_element
+  let args = List.map (fun (id, sort, layout) ->
+    root_arg (Lvar id) Strict sort layout
   ) paraml in
   let handler =
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
