@@ -107,7 +107,7 @@ val rebuild_invalid :
   Upwards_acc.t ->
   Flambda.Invalid.t ->
   after_rebuild:
-    (Rebuilt_expr.t * Upwards_acc.t) D.after_rebuild ->
+    D.after_rebuild ->
   Rebuilt_expr.t * Upwards_acc.t
 
 (** Handling of the rewriting of continuation use sites. *)

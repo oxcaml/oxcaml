@@ -16,7 +16,7 @@
 
 open Simplify_import
 
-type 'a after_rebuild = 'a Simplify_defunct.after_rebuild
+type after_rebuild = Simplify_defunct.after_rebuild
 
 type 'a rebuild = 'a Simplify_defunct.rebuild
 
