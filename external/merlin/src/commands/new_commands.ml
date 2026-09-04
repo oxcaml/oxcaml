@@ -127,6 +127,75 @@ let all_commands =
       ~default:() begin fun buffer () ->
         run buffer Query_protocol.Holes
       end;
+    command "module-type-impls"
+      ~spec:
+        [ optional "-position"
+            "<position> Answer only for the innermost module-type declaration \
+             enclosing this position"
+            (marg_position (fun pos _ -> Some pos))
+        ]
+      ~doc:
+        "The modules that must implement each module-type declaration of the \
+         buffer, computed from the compiler facts in the configured indexes. A \
+         module implements the target when the type it was checked against \
+         reaches the target purely through requirement-carrying relations \
+         (ascription, functor arguments, packing, aliases, includes, with \
+         constraints, substitutions, strengthening, module type of, and \
+         application instances); a unit whose interface includes the target \
+         implements it and is reported as the '(interface)' row. Modules \
+         related to the target only definitionally are not implementers: \
+         declaring the target, being paired with its own interface \
+         declaration, providing it as an equal member, or producing it as a \
+         functor result do not qualify. With '-position <position>', the \
+         response is restricted to the single module-type declaration \
+         enclosing that position, and it is an error when no module-type \
+         declaration of the buffer encloses it. The response is:\n\n\
+         ```javascript\n\
+         {\n\
+         'targets' : [\n\
+         {\n\
+         'target'  : string,\n\
+         'decl'    : { 'file', 'start', 'end' },\n\
+         'status'  : 'complete' | 'partial' | 'unavailable',\n\
+         'reasons' : [ { 'kind' : string, ... } ]\n\
+         }\n\
+         ],\n\
+         'implementations' : [\n\
+         {\n\
+         'target'     : string,\n\
+         // 'decl' is omitted for the '(interface)' target\n\
+         'decl'       : { 'file', 'start', 'end' },\n\
+         // 'instance' is omitted for the '(interface)' target\n\
+         'instance'   : string,\n\
+         'file'       : string,\n\
+         'start'      : position,\n\
+         'end'        : position,\n\
+         'kind'       : 'unit' | 'annotations',\n\
+         // 'check' is omitted for the '(interface)' target\n\
+         'check'      : 'annotation' | 'argument' | 'package' | 'interface',\n\
+         // 'check-site' is omitted when the check has no recorded site\n\
+         'check-site' : { 'file', 'start', 'end' }\n\
+         }\n\
+         ]\n\
+         }\n\
+         ```\n\n\
+         Reason kinds: 'no-index-files', 'facts-channel-absent', 'omission' \
+         (with 'reason' and optional 'family'), 'unresolved-implementation' \
+         (with 'target', 'instance', 'implementation' and optional 'site') \
+         when a matching implementation could not be resolved to a source \
+         location, and 'unresolved-check-site' (with 'target', 'instance' and \
+         'site') when a recorded check site could not be resolved; neither \
+         matches nor recorded sites are ever silently dropped, and a match \
+         whose implementation and recorded site both fail to resolve reports \
+         both reasons.\n\n\
+         Each target has its own status. 'complete' requires the facts channel \
+         to be present with no omission scoped to that declaration, and every \
+         matching implementation and recorded check site resolved; 'partial' \
+         carries the reasons; 'unavailable' means no usable facts channel was \
+         configured or loaded, which is distinct from a complete empty result."
+      ~default:None begin fun buffer position ->
+      run buffer (Query_protocol.Module_type_impls position)
+      end;
     command "construct"
       ~spec:
         [ arg "-position" "<position> Position where construct should happen"

@@ -592,6 +592,72 @@ The type is described in another file, and the result will be the following obje
 }
 ```
 
+### `module-type-impls -position <position>`
+
+	-position <position>  Answer only for the innermost module-type declaration
+	                      enclosing this position (optional; without it, every
+	                      module-type declaration of the buffer is a target)
+
+The modules that must *implement* each targeted module-type declaration,
+computed from the compiler facts recorded in the configured indexes.  A module
+implements the target when the type it was checked against reaches the target
+purely through requirement-carrying relations: direct ascription, functor
+arguments, first-class module packing and unpacking, alias chains, `include`,
+`with` constraints, destructive substitution, strengthening, `module type of`,
+and functor-application instances.  A unit whose interface *includes* the
+target implements it too, and is reported as the `(interface)` row.
+
+Modules related to the target only definitionally are not implementers and are
+not returned: the unit or module that declares the target, an `.ml` definition
+paired with the target's own `.mli` declaration, a module ascribed to a
+signature that merely provides the target (or members of the target's type) as
+members, and a functor ascribed to a functor type whose result is the target.
+
+```javascript
+{
+  'targets' : [
+    {
+      'target'  : string,
+      'decl'    : { 'file', 'start', 'end' },
+      'status'  : 'complete' | 'partial' | 'unavailable',
+      'reasons' : [ { 'kind' : string, ... } ]
+    }
+  ],
+  'implementations' : [
+    {
+      'target'     : string,
+      // 'decl' is omitted for the '(interface)' target
+      'decl'       : { 'file', 'start', 'end' },
+      // 'instance' is omitted for the '(interface)' target
+      'instance'   : string,
+      'file'       : string,
+      'start'      : position,
+      'end'        : position,
+      'kind'       : 'unit' | 'annotations',
+      // 'check' is omitted for the '(interface)' target
+      'check'      : 'annotation' | 'argument' | 'package' | 'interface',
+      // 'check-site' is omitted when the check has no recorded site
+      'check-site' : { 'file', 'start', 'end' }
+    }
+  ]
+}
+```
+
+Reason kinds: `no-index-files`, `facts-channel-absent`, `omission` (with
+`reason` and optional `family`),
+`unresolved-implementation` (with `target`, `instance`, `implementation` and
+optional `site`) when a matching implementation could not be resolved to a source
+location, and `unresolved-check-site` (with `target`, `instance` and `site`)
+when a recorded check site could not be resolved; neither matches nor recorded
+sites are ever silently dropped, and a match whose implementation and recorded
+site both fail to resolve reports both reasons.
+
+Each target has its own status. `complete` requires the facts channel to be
+present with no omission scoped to that declaration, and every matching
+implementation and recorded check site resolved; `partial` carries the reasons;
+`unavailable` means no usable facts channel was configured or loaded, which is
+distinct from a complete empty result.
+
 ### `signature-help -position <position>`
 
 	-position <position>  The position where to request additional information for signature help
