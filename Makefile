@@ -232,6 +232,9 @@ PPXLIB_JANE_DIR := $(CURDIR)/_build/ppxlib-jane
 SEQ_DIR := $(CURDIR)/_build/seq
 GEN_DIR := $(CURDIR)/_build/gen
 SEDLEX_DIR := $(CURDIR)/_build/sedlex
+CMDLINER_DIR := $(CURDIR)/_build/cmdliner
+MENHIR_DIR := $(CURDIR)/_build/menhir
+YOJSON_DIR := $(CURDIR)/_build/yojson
 
 OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
 PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
@@ -242,6 +245,10 @@ PPXLIB_JANE_LIB := $(PPXLIB_JANE_DIR)/install/default/lib
 PPXLIB_LIB := $(PPXLIB_DIR)/install/default/lib
 SEQ_LIB := $(SEQ_DIR)/install/default/lib
 GEN_LIB := $(GEN_DIR)/install/default/lib
+SEDLEX_LIB := $(SEDLEX_DIR)/install/default/lib
+CMDLINER_LIB := $(CMDLINER_DIR)/install/default/lib
+MENHIR_LIB := $(MENHIR_DIR)/install/default/lib
+YOJSON_LIB := $(YOJSON_DIR)/install/default/lib
 
 PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
 PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
@@ -354,6 +361,40 @@ sedlex-build: ppxlib-build gen-build
 	    --build-dir="$(SEDLEX_DIR)" \
 	    --only-packages=sedlex \
 	    --ignore-promoted-rules \
+	    @install
+
+# Cmdliner ships a Make build, not a Dune project. Copy its read-only source
+# into the build tree and build only the library with its upstream Makefile.
+.PHONY: cmdliner-build
+cmdliner-build: external-libs-compiler
+	rm -rf "$(CMDLINER_DIR)/source"
+	mkdir -p "$(CMDLINER_DIR)/source"
+	cp -R "$(JSOO_CMDLINER_SRC)/." "$(CMDLINER_DIR)/source/"
+	chmod -R u+w "$(CMDLINER_DIR)/source"
+	env -u OCAMLFIND_TOOLCHAIN OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(MAKE) -C "$(CMDLINER_DIR)/source" \
+	    PREFIX="$(CMDLINER_DIR)/install/default" \
+	    LIBDIR="$(CMDLINER_LIB)/cmdliner" \
+	    build-byte build-native build-native-dynlink \
+	    install-common install-srcs install-byte install-native \
+	    install-native-dynlink
+
+.PHONY: menhir-libs-build
+menhir-libs-build: external-libs-compiler
+	env OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_MENHIR_SRC)" \
+	    --build-dir="$(MENHIR_DIR)" \
+	    --only-packages=menhirLib,menhirSdk \
+	    @install
+
+.PHONY: yojson-build
+yojson-build: external-libs-compiler seq-build
+	env OCAMLPATH="$(SEQ_LIB)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_YOJSON_SRC)" \
+	    --build-dir="$(YOJSON_DIR)" \
+	    --only-packages=yojson \
 	    @install
 
 .PHONY: external-libs-build
