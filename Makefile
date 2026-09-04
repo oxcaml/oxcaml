@@ -233,6 +233,12 @@ STDLIB_SHIMS_DIR := $(CURDIR)/_build/stdlib-shims
 PPXLIB_AST_DIR := $(CURDIR)/_build/ppxlib-ast
 PPXLIB_DIR := $(CURDIR)/_build/ppxlib
 PPXLIB_JANE_DIR := $(CURDIR)/_build/ppxlib-jane
+SEQ_DIR := $(CURDIR)/_build/seq
+GEN_DIR := $(CURDIR)/_build/gen
+SEDLEX_DIR := $(CURDIR)/_build/sedlex
+CMDLINER_DIR := $(CURDIR)/_build/cmdliner
+MENHIR_DIR := $(CURDIR)/_build/menhir
+YOJSON_DIR := $(CURDIR)/_build/yojson
 
 OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
 PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
@@ -240,10 +246,18 @@ SEXPLIB0_LIB := $(SEXPLIB0_DIR)/install/default/lib
 STDLIB_SHIMS_LIB := $(STDLIB_SHIMS_DIR)/install/default/lib
 PPXLIB_AST_LIB := $(PPXLIB_AST_DIR)/install/default/lib
 PPXLIB_JANE_LIB := $(PPXLIB_JANE_DIR)/install/default/lib
+PPXLIB_LIB := $(PPXLIB_DIR)/install/default/lib
+SEQ_LIB := $(SEQ_DIR)/install/default/lib
+GEN_LIB := $(GEN_DIR)/install/default/lib
+SEDLEX_LIB := $(SEDLEX_DIR)/install/default/lib
+CMDLINER_LIB := $(CMDLINER_DIR)/install/default/lib
+MENHIR_LIB := $(MENHIR_DIR)/install/default/lib
+YOJSON_LIB := $(YOJSON_DIR)/install/default/lib
 
 PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
 PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
 PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
+SEDLEX_OCAMLPATH := $(PPXLIB_OCAMLPATH):$(PPXLIB_LIB):$(SEQ_LIB):$(GEN_LIB)
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
@@ -257,10 +271,11 @@ external-libs-compiler:
 	@mkdir -p "$(CURDIR)/_build"
 	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || $(MAKE) _install
 
-# ppx_derivers, sexplib0 and stdlib-shims are not part of this repository.
-# The nix devShell and the nix derivations provide their sources via the
-# PPXLIB_*_SRC variables.
-NIX_SOURCE_VARS := PPXLIB_PPX_DERIVERS_SRC PPXLIB_SEXPLIB0_SRC PPXLIB_STDLIB_SHIMS_SRC
+# ppx_derivers, sexplib0, stdlib-shims, gen, sedlex, cmdliner, menhir and
+# yojson are not part of this repository. The nix devShell and the nix
+# derivations provide their sources via the *_SRC variables.
+NIX_SOURCE_VARS := PPXLIB_PPX_DERIVERS_SRC PPXLIB_SEXPLIB0_SRC PPXLIB_STDLIB_SHIMS_SRC \
+  SEDLEX_GEN_SRC JSOO_SEDLEX_SRC JSOO_CMDLINER_SRC JSOO_MENHIR_SRC JSOO_YOJSON_SRC
 
 .PHONY: check-nix-sources
 check-nix-sources:
@@ -359,8 +374,74 @@ ppxlib-build: ppxlib-jane-build
 	    --only-packages=ppxlib \
 	    @install
 
+# The "seq" findlib package is a compatibility shim: Seq has been part of the
+# stdlib since OCaml 4.07, so opam only installs an empty META for it. gen
+# still lists it as a dependency, so provide the same empty META here.
+.PHONY: seq-build
+seq-build:
+	@mkdir -p "$(SEQ_LIB)/seq"
+	@printf '%s\n' \
+	  'requires = ""' \
+	  'version = "[distributed with OCaml 4.07 or above]"' \
+	  > "$(SEQ_LIB)/seq/META"
+
+.PHONY: gen-build
+gen-build: check-nix-sources external-libs-compiler seq-build
+	env OCAMLPATH="$(SEQ_LIB)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(SEDLEX_GEN_SRC)" \
+	    --build-dir="$(GEN_DIR)" \
+	    --only-packages=gen \
+	    @install
+
+# --ignore-promoted-rules keeps dune from regenerating the release's
+# unicode.ml, which would require downloading the Unicode data files.
+.PHONY: sedlex-build
+sedlex-build: check-nix-sources ppxlib-build gen-build
+	env OCAMLPATH="$(SEDLEX_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_SEDLEX_SRC)" \
+	    --build-dir="$(SEDLEX_DIR)" \
+	    --only-packages=sedlex \
+	    --ignore-promoted-rules \
+	    @install
+
+# Cmdliner ships a Make build, not a Dune project. Copy its read-only source
+# into the build tree and build only the library with its upstream Makefile.
+.PHONY: cmdliner-build
+cmdliner-build: check-nix-sources external-libs-compiler
+	rm -rf "$(CMDLINER_DIR)/source"
+	mkdir -p "$(CMDLINER_DIR)/source"
+	cp -R "$(JSOO_CMDLINER_SRC)/." "$(CMDLINER_DIR)/source/"
+	chmod -R u+w "$(CMDLINER_DIR)/source"
+	env -u OCAMLFIND_TOOLCHAIN OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(MAKE) -C "$(CMDLINER_DIR)/source" \
+	    PREFIX="$(CMDLINER_DIR)/install/default" \
+	    LIBDIR="$(CMDLINER_LIB)/cmdliner" \
+	    build-byte build-native build-native-dynlink \
+	    install-common install-srcs install-byte install-native \
+	    install-native-dynlink
+
+.PHONY: menhir-libs-build
+menhir-libs-build: check-nix-sources external-libs-compiler
+	env OCAMLPATH= $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_MENHIR_SRC)" \
+	    --build-dir="$(MENHIR_DIR)" \
+	    --only-packages=menhirLib,menhirSdk \
+	    @install
+
+.PHONY: yojson-build
+yojson-build: check-nix-sources external-libs-compiler seq-build
+	env OCAMLPATH="$(SEQ_LIB)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(JSOO_YOJSON_SRC)" \
+	    --build-dir="$(YOJSON_DIR)" \
+	    --only-packages=yojson \
+	    @install
+
 .PHONY: external-libs-build
-external-libs-build: ppxlib-build
+external-libs-build: ppxlib-build sedlex-build
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
