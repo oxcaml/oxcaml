@@ -99,15 +99,7 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
-(* Update the representation of a constructor whose representation at
-   declaration time was [None] because it has an argument of kind [any]. *)
-val update_constructor_representation:
-    Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
-    loc:Location.t -> is_extension_constructor:bool ->
-    (Types.constructor_representation, unrepresentable_constructor) Result.t
-
-(* Same as above, but also computes sorts of arguments *)
-val update_constructor_representation_and_arg_sorts :
+val update_constructor_representation :
   Env.t -> Location.t -> Types.constructor_arguments ->
   is_extension_constructor:bool ->
   Types.constructor_arguments * constant:bool *
@@ -117,13 +109,33 @@ val update_constructor_representation_and_arg_sorts :
 type unrepresentable_record =
   | Unrepresentable_field of string
 
-(* Update the representation of a record whose representation at declaration
-   time was variable because it has a field of kind [any] *)
-val update_record_representation:
+(* Instantiate the representation of a record whose representation at
+   declaration time was undetermined because it has a field of kind [any] *)
+val instance_record_representation:
     why:Jkind_intf.History.concrete_creation_reason -> old_repres:'rep ->
     Env.t -> Location.t -> 'rep Data_types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    (Jkind.sort list * 'rep, unrepresentable_record) Result.t
+    'rep
+
+(* Finalize variable (inlined) record representations, defaulting any unfilled
+   sorts. This should not be called until the end of typechecking. *)
+val finalize_record_representation:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation
+
+(* As [finalize_record_representation], also returning the fields' (now
+   defaulted) sorts if the representation was variable. [None] means the
+   representation was already final, so the field sorts are on the
+   declaration ([lbl_sort]). *)
+val finalize_record_representation_and_sorts:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation
+    * variable_sorts:Jkind.Sort.Const.t array option
+
+(* As [finalize_record_representation], for [Constructor_variable]. *)
+val finalize_constructor_representation:
+    Env.t -> Location.t -> Types.constructor_representation ->
+    Types.constructor_representation
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
@@ -252,6 +264,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute

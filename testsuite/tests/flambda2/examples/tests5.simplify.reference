@@ -1,7 +1,7 @@
 let code g_1 deleted and code f_0 deleted in
-let $camlTests5__f_2 =
+let $camlTests5__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
-and $camlTests5__g_3 =
+and $camlTests5__g_2 =
   closure g_1_1 @g &toplevel.alloc_region
 and code rec loopify(never) size(18) newer_version_of(g_1)
       g_1_1 (y : imm tagged)
@@ -15,7 +15,7 @@ and code rec loopify(never) size(18) newer_version_of(g_1)
     where k2 =
       let int_sub = %int_barith.sub (y, 1) in
       apply direct(f_0_1 &my_alloc_region)
-        ($camlTests5__f_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged
+        ($camlTests5__f_1 ~ depth my_depth -> succ my_depth : _ -> imm tagged
          )
           (int_sub)
           -> k * k1
@@ -31,10 +31,10 @@ and code rec loopify(never) size(18) newer_version_of(f_0)
     where k2 =
       let int_sub = %int_barith.sub (x, 1) in
       apply direct(g_1_1 &my_alloc_region)
-        ($camlTests5__g_3 ~ depth my_depth -> succ my_depth : _ -> imm tagged
+        ($camlTests5__g_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged
          )
           (int_sub)
           -> k * k1
 in
-let $camlTests5 = Block 0 ($camlTests5__f_2, $camlTests5__g_3) in
+let $camlTests5 = Block 0 ($camlTests5__f_1, $camlTests5__g_2) in
 cont done ($camlTests5)

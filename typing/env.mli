@@ -285,7 +285,7 @@ type lookup_error =
     (* CR modes: merge into mode error hints. *)
   | Local_value_used_in_exclave of Mode.Hint.pinpoint_desc
   | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
-  | No_unboxed_version of Longident.t * type_declaration
+  | No_unboxed_version of Longident.t * type_declaration * string option
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
   | Incompatible_stage of Longident.t * Location.t * stage * Location.t * stage
@@ -641,6 +641,14 @@ val save_signature_with_imports:
         (* Arguments: signature, module name, module kind,
            file name, imported units with their CRCs. *)
 
+(** See [Persistent_env.find_import]. *)
+val find_import:
+  chain:Compilation_unit.Name.t list ->
+  Compilation_unit.Name.t ->
+  Compilation_unit.t option
+  * Global_module.Parameter_name.t list
+  * Signature_with_global_bindings.t
+
 (* Register a module as a parameter to this unit. *)
 val register_parameter: Global_module.Parameter_name.t -> unit
 
@@ -704,6 +712,12 @@ type error =
   | Incomplete_instantiation of { unset_param : Global_module.Parameter_name.t; }
   | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
+  | Cmi_not_found of
+      { modname : Compilation_unit.Name.t;
+        chain : Compilation_unit.Name.t list;
+            (** Dependency chain leading to [modname], in reversed order
+                (most-recent loader first). *)
+      }
 
 exception Error of error
 

@@ -1282,23 +1282,28 @@ let rebuild_apply env apply =
                a dummy value would then be further used in a later simplify pass
                to refine the call kind and produce an invalid. *)
             rewrite_simple_opt env (Apply.callee apply) )
-        | Some (Unbox_my_closure fields) ->
-          let callee =
-            match Apply.callee apply with
-            | None ->
-              Misc.fatal_errorf "No callee for apply %a with unboxed closure"
-                Apply.print apply
-            | Some callee -> callee
-          in
-          if not (simple_is_unboxable env callee)
-          then
-            Misc.fatal_errorf
-              "Callee is not unboxable in apply %a with unboxed closure"
-              Apply.print apply;
-          (* The unboxed fields of the closure are passed at the front of the
-             first argument group, in the same order as the parameters
-             introduced in [rebuild_function_params_and_body]. *)
-          get_args_with_kinds env [Unbox fields] [callee], None
+        | Some (Unbox_my_closure fields) -> (
+          match Apply.callee apply with
+          | None ->
+            (* The callee can be erased only if the function does not use its
+               closure, so the set of unboxed fields is normally empty here, and
+               there are no fields to bind. *)
+            if not (Field.Map.is_empty fields)
+            then
+              Misc.fatal_errorf
+                "No callee for apply %a with non-empty unboxed closure"
+                Apply.print apply;
+            [], None
+          | Some callee ->
+            if not (simple_is_unboxable env callee)
+            then
+              Misc.fatal_errorf
+                "Callee is not unboxable in apply %a with unboxed closure"
+                Apply.print apply;
+            (* The unboxed fields of the closure are passed at the front of the
+               first argument group, in the same order as the parameters
+               introduced in [rebuild_function_params_and_body]. *)
+            get_args_with_kinds env [Unbox fields] [callee], None)
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
@@ -1839,9 +1844,8 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
                else env.get_code_metadata code_id
              in
              { cost_metrics = Code_metadata.cost_metrics code_metadata;
-               params_arity =
-                 Flambda_arity.num_params
-                   (Code_metadata.params_arity code_metadata)
+               function_slot_size =
+                 Code_metadata.function_slot_size code_metadata
              })
            set_of_closures)
     in

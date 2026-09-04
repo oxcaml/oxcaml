@@ -6,12 +6,10 @@ name: Nix Flake Actions
 on:
   push:
     branches:
-      - main
       - '*microbranch'
     tags:
       - '*'
   pull_request:
-  merge_group:
 
 permissions: {}
 
@@ -26,10 +24,10 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
         with:
           # Pin to nix 2.33.0; later versions of nix cause out of memory issues
           # on darwin
@@ -40,6 +38,25 @@ jobs:
           set -Eeuo pipefail
           echo -n 'matrix=' >> "$GITHUB_OUTPUT"
           nix eval --json '.#githubActions.matrix' | tee -a "$GITHUB_OUTPUT"
+
+  # The `oxcaml` cachix cache is a CI-only optimization, NOT a
+  # distribution channel: internal builds are always from source, and
+  # nothing outside GitHub CI should consume these binaries. Do not add
+  # the cache as a substituter in flake.nix or otherwise encourage
+  # non-CI use. The cache is disposable: if it is ever suspect, wipe it
+  # and CI falls back to building from source.
+  #
+  # This workflow builds untrusted refs only -- PRs (same-repo or fork)
+  # and non-main pushes such as microbranches and tags -- and must run
+  # without the cache write token in the job at all: `nix build`
+  # executes build scripts controlled by that code, and unreviewed code
+  # must never be able to populate a cache that later CI runs consume.
+  # Trusted refs (main and the merge queue) are built with the write
+  # token by nix-github-actions-trusted.yml instead; the trusted/
+  # untrusted split is done at the trigger level (rather than with
+  # job-level `if:` on twin jobs) so that neither workflow ever carries
+  # a skipped matrix job, whose display name would show up as a
+  # placeholder check with the unexpanded "matrix.name" template.
 
   nix-build:
     name: ${{ matrix.name }} (${{ matrix.system }})
@@ -53,48 +70,21 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
         with:
           # Pin to nix 2.33.0; later versions of nix cause out of memory issues
           # on darwin
           install_url: https://releases.nixos.org/nix/nix-2.33.0/install
 
-      # The `oxcaml` cachix cache is a CI-only optimization, NOT a
-      # distribution channel: internal builds are always from source, and
-      # nothing outside GitHub CI should consume these binaries. Do not add
-      # the cache as a substituter in flake.nix or otherwise encourage
-      # non-CI use. The cache is disposable: if it is ever suspect, wipe it
-      # and CI falls back to building from source.
-      #
-      # The two mutually exclusive steps below configure the cache for
-      # reading on every event, but only hand the write token to builds of
-      # trusted refs (post-merge and merge-queue). PR builds -- same-repo
-      # or fork -- must run without the token in the job at all: `nix
-      # build` executes build scripts controlled by the PR, and unreviewed
-      # code must never be able to populate a cache that later CI runs
-      # consume.
-
-      - name: Set up cache (read-only; PR builds)
-        if: github.event_name == 'pull_request'
+      - name: Set up cache (read-only)
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           # Public caches are readable without credentials.
           name: oxcaml
 
-      - name: Set up cache (read/write; trusted refs)
-        if: github.event_name == 'push' || github.event_name == 'merge_group'
-        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
-        with:
-          name: oxcaml
-          # A GitHub environment would add little here: the cachix cache is a
-          # disposable CI-only artifact store, not a deployment target. The
-          # write token is already withheld from PR builds by the `if:` above
-          # (only post-merge and merge-queue runs receive it), so untrusted
-          # code can never reach this secret.
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }} # zizmor: ignore[secrets-outside-env]
       - env:
           ATTR: ${{ matrix.attr }}
         run: nix build -L ".#$ATTR"

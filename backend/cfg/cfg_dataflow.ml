@@ -168,6 +168,9 @@ module Make_dataflow (D : Dataflow_direction_S) :
     in
     let i = ref 0 in
     let int_min (i1 : int) (i2 : int) : int = if i1 < i2 then i1 else i2 in
+    (* CR-soon xclerc for xclerc: [strong_connect] recurses non-tail, with depth
+       up to the number of blocks, so a very large/deep CFG could overflow the
+       stack; consider an explicit work stack. *)
     let rec strong_connect v =
       assert (not (Label.Tbl.mem mapping v));
       incr i;
@@ -546,6 +549,11 @@ module Backward (D : Domain_S) (T : Backward_transfer with type domain = D.t) :
       (a, error) Dataflow_result.t =
    fun cfg ?(max_iteration = max_int) ?(exnescape = D.bot) ~init ~map context ->
     let store_instr = match map with Block -> false | Both | Instr -> true in
+    (* CR-soon xlerc for xclerc: [init] seeds the [normal] component of *every*
+       block here, unlike [Forward] which only seeds entry points, so a
+       non-[bot] [init] would over-approximate every block. All current callers
+       pass [bot] and put boundary conditions in the transfer functions; the
+       backward [run] in the .mli does not document this. *)
     let init b =
       Some
         { normal = init;

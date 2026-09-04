@@ -34,6 +34,28 @@ let set_raw_type_expr p = raw_type_expr := p
 
 module Nonempty_list = Misc.Nonempty_list
 
+module Bounds_mask = struct
+  type t = Axis_lattice.t
+
+  let bot = Axis_lattice.bot
+
+  let join = Axis_lattice.join
+
+  let meet = Axis_lattice.meet
+
+  let residual = Axis_lattice.co_sub
+
+  let le = Axis_lattice.leq
+
+  let of_axis_set = Axis_lattice.of_axis_set
+
+  let equal = Axis_lattice.equal
+
+  let is_empty t = Axis_lattice.equal t Axis_lattice.bot
+
+  let print ppf t = Format.pp_print_string ppf (Axis_lattice.to_string t)
+end
+
 (* A *sort* is the information the middle/back ends need to be able to
    compile a manipulation (storing, passing, etc) of a runtime value. *)
 module Sort = Jkind_types.Sort
@@ -116,6 +138,7 @@ module Layout = struct
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
 
   module Const = struct
     include Jkind_types.Layout.Const
@@ -124,9 +147,10 @@ module Layout = struct
       match s with
       | Base b -> Static.of_base b sa
       | Product consts ->
-        Product (List.map (fun s -> of_sort_const s sa) consts)
-      | Univar uv -> Univar uv
-      | Genvar v -> Genvar v
+        product (List.map (fun s -> of_sort_const s sa) consts)
+      | Univar uv -> univar uv
+      | Genvar v -> genvar v
+      | Addressable s -> addressable (of_sort_const s sa)
 
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
@@ -140,7 +164,9 @@ module Layout = struct
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
       | Genvar v1, Genvar v2 -> v1 == v2
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Addressable c1, Addressable c2 -> equal_up_to_scannable_axes c1 c2
+      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
+        false
 
     (* Compute how to print the layout [scannable sa] *)
     let format_scannable_layout ~include_redundant_scannable_axes
@@ -201,6 +227,7 @@ module Layout = struct
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
         | Genvar v -> Sort.to_string_genvar v
+        | Addressable t -> to_string true t ^ " addressable"
       in
       to_string false t
 
@@ -214,11 +241,13 @@ module Layout = struct
       match t with
       | Base _ | Any _ | Univar _ | Genvar _ -> false
       | Product ts -> List.exists (has_component ~component) ts
+      | Addressable t -> has_component ~component t
 
     let rec has_genvar = function
       | Genvar _ -> true
       | Product ts -> List.exists has_genvar ts
       | Base _ | Any _ | Univar _ -> false
+      | Addressable t -> has_genvar t
 
     module Debug_printers = struct
       open Format
@@ -243,6 +272,7 @@ module Layout = struct
              ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
              (t format_sort))
           ts
+      | Addressable t' -> fprintf ppf "Addressable (%a)" (t format_sort) t'
   end
 
   let rec get : Sort.t t -> Sort.Flat.t t =
@@ -259,11 +289,13 @@ module Layout = struct
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
       | Univar x -> Sort (Univar x, sa)
+      | Addressable s -> Addressable (flatten_sort s sa)
     in
     function
     | Any sa -> Any sa
     | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)
+    | Addressable t -> Addressable (get t)
 
   let sort_equal_result ~allow_mutation result =
     match (result : Sort.equate_result) with
@@ -274,6 +306,48 @@ module Layout = struct
     | Equal_no_mutation | Equal_mutated_first | Equal_mutated_second
     | Equal_mutated_both ->
       true
+
+  let sort_constrain_result result =
+    match (result : Sort.constrain_addressable_result) with
+    | Not_known_addressable -> false
+    | Addressable_no_mutation | Addressable_mutated -> true
+
+  let rec strip_head_addressable : Sort.t t -> Sort.t t = function
+    | Addressable t -> strip_head_addressable t
+    | Sort (s, sa) as t ->
+      let s' = Sort.strip_head_addressable s in
+      if s' == s then t else Sort (s', sa)
+    | (Any _ | Product _) as t -> t
+
+  (* [constrain_below_addressable t] constrains [t < t addressable] *)
+  let rec constrain_below_addressable ~allow_mutation : Sort.t t -> bool =
+    function
+    | Any _ -> false
+    | Addressable _ -> true
+    | Sort (s, _) ->
+      sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
+    | Product ts ->
+      List.for_all (constrain_below_addressable ~allow_mutation) ts
+
+  (* [constrain_above_addressable t] constrains [t addressable < t].
+     This differs from [constrain_below_addressable] only for kinds containing
+     [any]. *)
+  let rec constrain_above_addressable ~allow_mutation : Sort.t t -> bool =
+    function
+    | Any _ -> true
+    | Addressable _ -> true
+    | Sort (s, _) ->
+      sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
+    | Product ts ->
+      List.for_all (constrain_above_addressable ~allow_mutation) ts
+
+  let rec is_surely_addressable_flat : Sort.Flat.t t -> bool = function
+    | Addressable _ -> true
+    | Any _ -> false
+    | Sort (Sort.Flat.Base b, _) -> Sort.base_is_addressable b
+    | Sort ((Sort.Flat.Var _ | Sort.Flat.Genvar _ | Sort.Flat.Univar _), _) ->
+      false
+    | Product ts -> List.for_all is_surely_addressable_flat ts
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
@@ -300,19 +374,30 @@ module Layout = struct
     | Product ts1, Product ts2 ->
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
+    | Addressable l1, Addressable l2 ->
+      (* Incomplete; see [Sort.equate_sort_addressable]. *)
+      equate_or_equal ~allow_mutation
+        (strip_head_addressable l1)
+        (strip_head_addressable l2)
+    | Addressable l1, ((Any _ | Sort _ | Product _) as t2)
+    | ((Any _ | Sort _ | Product _) as t2), Addressable l1 ->
+      constrain_below_addressable ~allow_mutation t2
+      && equate_or_equal ~allow_mutation (Addressable l1) (Addressable t2)
     | (Any _ | Sort _ | Product _), _ -> false
 
-  let get_root_scannable_axes : _ t -> Scannable_axes.t option = function
+  let rec get_root_scannable_axes : _ t -> Scannable_axes.t option = function
     | Any sa -> Some sa
     | Sort (b, sa) -> if Sort.is_scannable_or_var b then Some sa else None
     | Product _ -> None
+    | Addressable t -> get_root_scannable_axes t
 
-  let is_scannable_or_var : _ t -> bool = function
+  let rec is_scannable_or_var : _ t -> bool = function
     | Any _ -> false
     | Sort (b, _) -> Sort.is_scannable_or_var b
     | Product _ -> false
+    | Addressable t -> is_scannable_or_var t
 
-  let set_root_nullability t nullability =
+  let rec set_root_nullability t nullability =
     match t with
     | Any sa -> Any { sa with nullability }
     | Sort (b, sa) ->
@@ -320,8 +405,9 @@ module Layout = struct
       then Sort (b, { sa with nullability })
       else t
     | Product _ -> t
+    | Addressable t' -> Addressable (set_root_nullability t' nullability)
 
-  let set_root_separability t separability =
+  let rec set_root_separability t separability =
     match t with
     | Any sa -> Any { sa with separability }
     | Sort (b, sa) ->
@@ -329,17 +415,35 @@ module Layout = struct
       then Sort (b, { sa with separability })
       else t
     | Product _ -> t
+    | Addressable t' -> Addressable (set_root_separability t' separability)
 
   (* only meets at the root, meaning products are left unchanged. *)
-  let meet_root_scannable_axes t sa =
+  let rec meet_root_scannable_axes t sa =
     match t with
     | Any sa' -> Any (Scannable_axes.meet sa sa')
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
+    | Addressable t' -> Addressable (meet_root_scannable_axes t' sa)
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
+      | Addressable l1, Addressable l2 ->
+        (* Incomplete; see [Sort.equate_sort_addressable]. *)
+        sub (strip_head_addressable l1) (strip_head_addressable l2)
+      | Addressable l1, Any _ ->
+        (* Instead of [l1 addressable < any], we solve [l1 < any]
+           except return [Less] when the latter would return [Equal],
+           as [any] is strictly above every addressable layout. *)
+        Misc.Le_result.combine (sub (strip_head_addressable l1) t2) Less
+      | Addressable _, (Sort _ | Product _) ->
+        if constrain_above_addressable ~allow_mutation:true t2
+        then sub t1 (Addressable t2)
+        else Not_le
+      | (Any _ | Sort _ | Product _), Addressable _ ->
+        if constrain_below_addressable ~allow_mutation:true t1
+        then sub (Addressable t1) t2
+        else Not_le
       | Any sa1, Any sa2 -> Scannable_axes.less_or_equal sa1 sa2
       | Sort (sort, sa1), Any sa2 ->
         (* CR layouts-scannable: If [sort] has not been filled and
@@ -395,6 +499,17 @@ module Layout = struct
     match t1, t2 with
     | _, Any sa2 -> Some (meet_root_scannable_axes t1 sa2)
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
+    | Addressable l1, Addressable l2 ->
+      (* The meet of two addressable layouts is addressable. Incomplete; see
+         [Sort.equate_sort_addressable]. *)
+      Option.map
+        (fun l -> Addressable l)
+        (intersection (strip_head_addressable l1) (strip_head_addressable l2))
+    | Addressable l1, ((Sort _ | Product _) as t2)
+    | ((Sort _ | Product _) as t2), Addressable l1 ->
+      if constrain_above_addressable ~allow_mutation:true t2
+      then intersection (Addressable l1) (Addressable t2)
+      else None
     | Sort (s1, sa1), Sort (s2, sa2) ->
       if Sort.equate s1 s2
       then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
@@ -408,10 +523,11 @@ module Layout = struct
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
-    | Any sa -> Any sa
+    | Any sa -> Const.any sa
     | Sort (s, sa) ->
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
-    | Product p -> Product (List.map default_to_scannable_and_get p)
+    | Product p -> Const.product (List.map default_to_scannable_and_get p)
+    | Addressable t -> Const.addressable (default_to_scannable_and_get t)
 
   let format ppf layout =
     let pp_string_list ppf lst =
@@ -430,11 +546,18 @@ module Layout = struct
         | Var _ ->
           let sort_var_str = Fmt.asprintf "%a" Sort.format s in
           pp_string_list ppf (sort_var_str :: Scannable_axes.to_string_list sa)
-        (* definitely never scannable *)
-        | Base _ | Product _ | Univar _ -> Fmt.fprintf ppf "%a" Sort.format s)
+        | Addressable s -> pp_element ~nested ppf (Addressable (Sort (s, sa)))
+        | Product _ when nested -> Fmt.fprintf ppf "(%a)" Sort.format s
+        | Base _ | Product _ | Univar _ ->
+          (* Scannable axes aren't relevant in these cases *)
+          Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      | Addressable t ->
+        if constrain_below_addressable ~allow_mutation:false t
+        then pp_element ~nested ppf t
+        else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
     in
     pp_element ~nested:false ppf layout
 
@@ -442,6 +565,7 @@ module Layout = struct
     | Sort (sort, _) -> Sort.generalize ~current_level sort
     | Product layouts -> List.iter (generalize ~current_level) layouts
     | Any _ -> ()
+    | Addressable t -> generalize ~current_level t
 end
 
 module Externality = Externality
@@ -557,6 +681,28 @@ module Mod_bounds = struct
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)
 
+  let saturated_mask t mask =
+    if Bounds_mask.equal mask Axis_lattice.bot
+    then Bounds_mask.bot
+    else Bounds_mask.meet (to_axis_lattice t) mask
+
+  let mask_of_externality externality =
+    to_axis_lattice (create Crossing.max ~externality)
+
+  let relax_by_mask_r t mask =
+    if Bounds_mask.equal mask Axis_lattice.top
+    then t
+    else if Bounds_mask.equal mask Axis_lattice.bot
+    then max
+    else Axis_lattice.imply mask (to_axis_lattice t) |> of_axis_lattice
+
+  let is_max_within_mask t mask =
+    if Bounds_mask.equal mask Axis_lattice.bot
+    then true
+    else if Bounds_mask.equal mask Axis_lattice.top
+    then is_max t
+    else Bounds_mask.le mask (saturated_mask t mask)
+
   let to_mode_crossing t = crossing t
 end
 
@@ -566,25 +712,19 @@ module With_bounds = struct
   module Type_info = struct
     include With_bounds_type_info
 
-    let print ppf { relevant_axes } =
+    let print ppf { bounds_mask } =
       let open Format in
-      fprintf ppf "@[{ relevant_axes = %a }@]" Axis_set.print relevant_axes
+      fprintf ppf "@[{ bounds_mask = %a }@]" Bounds_mask.print bounds_mask
 
-    let axes_ignored_by_modalities ~mod_bounds
-        ~type_info:{ relevant_axes = explicit_relevant_axes } =
-      (* Axes that are max are implicitly relevant. ie, including or excluding an
-         axis from the set of relevant axes is semantically equivalent if the mod-
-         bound on that axis is max.
+    let printable_bounds_mask ~mod_bounds
+        ~type_info:{ bounds_mask = explicit_bounds_mask } =
+      (* Contributions covered by direct bounds can be restored for printing. *)
+      Mod_bounds.to_axis_lattice mod_bounds
+      |> Bounds_mask.join explicit_bounds_mask
 
-         Note that this mostly matters because we mark axes as /not/ explicitly relevant
-         on types when the axis is max, for performance reasons - but we don't want to
-         print constant modalities for those axes!
-      *)
-      let implicit_relevant_axes = Mod_bounds.get_max_axes mod_bounds in
-      let relevant_axes =
-        Axis_set.union explicit_relevant_axes implicit_relevant_axes
-      in
-      Axis_set.complement relevant_axes
+    let has_non_id_modalities ~mod_bounds ~type_info =
+      let bounds_mask = printable_bounds_mask ~mod_bounds ~type_info in
+      not (Bounds_mask.equal bounds_mask Axis_lattice.top)
   end
 
   let to_best_eff_map = function
@@ -648,13 +788,41 @@ module With_bounds = struct
       With_bounds (With_bounds_types.singleton type_expr type_info)
     | With_bounds bounds -> With_bounds (add_bound type_expr type_info bounds)
 
+  let modalities_of_bounds_mask bounds_mask =
+    let modal_modality =
+      bounds_mask |> Axis_lattice.to_mode_crossing |> Crossing.to_modality
+    in
+    let externality = Axis_lattice.externality bounds_mask in
+    let nonmodal_axes =
+      if Externality.equal externality Externality.max
+      then []
+      else [Fmt.asprintf "%a" Externality.print externality]
+    in
+    modal_modality, nonmodal_axes
+
+  let format_bounds_mask ppf bounds_mask =
+    let modal_modality, nonmodal_axes = modalities_of_bounds_mask bounds_mask in
+    let modal_axes =
+      Modality.Const.diff Modality.Const.id modal_modality
+      |> List.map (fun (Modality.Atom (axis, modality)) ->
+          Fmt.asprintf "%a" (Modality.Per_axis.print axis) modality)
+    in
+    match modal_axes @ nonmodal_axes with
+    | [] -> ()
+    | axes ->
+      Fmt.fprintf ppf " @@@@ %a"
+        Fmt.(pp_print_list ~pp_sep:pp_print_space pp_print_string)
+        axes
+
   let format (type l r) ppf (t : (l * r) t) =
     match t with
     | No_with_bounds -> ()
     | With_bounds wbs ->
-      let type_exprs =
+      let bounds =
         wbs |> With_bounds_types.to_seq
-        |> Seq.map (fun (ty, _) -> Fmt.asprintf "%a" !print_type_expr ty)
+        |> Seq.map (fun (ty, ({ bounds_mask } : With_bounds_type_info.t)) ->
+            Fmt.asprintf "with %a%a" !print_type_expr ty format_bounds_mask
+              bounds_mask)
         |> List.of_seq
         (* HACK: we pre-format the types as strings so we so we can sort them
            lexicographically, because otherwise the order of printed [with]s is
@@ -667,8 +835,8 @@ module With_bounds = struct
       in
       Fmt.(
         fprintf ppf "%a"
-          (pp_print_list (fun ppf -> fprintf ppf "with@ %s"))
-          type_exprs)
+          (pp_print_list ~pp_sep:pp_print_space pp_print_string)
+          bounds)
 
   let to_seq (type l r) (t : (l * r) t) =
     match t with
@@ -686,13 +854,13 @@ type jkind_context =
   }
 
 module Base = struct
+  let kconstr_strings p sa (op : Jkind_types.Kind_operator.t) =
+    let op_strs = match op with Id -> [] | Addressable -> ["addressable"] in
+    Path.name p :: (Scannable_axes.to_string_list sa @ op_strs)
+
   let to_string layout_to_string = function
     | Layout l -> layout_to_string l
-    | Kconstr (p, sa) -> (
-      match Scannable_axes.to_string_list sa with
-      | [] -> Path.name p
-      | _ :: _ as sa_strs ->
-        Printf.sprintf "%s %s" (Path.name p) (String.concat " " sa_strs))
+    | Kconstr (p, sa, op) -> String.concat " " (kconstr_strings p sa op)
 
   (* This is only correct on bases that have been fully expanded or that come
      from the output of [Base.expand_until_comparable]. See comment on
@@ -700,12 +868,15 @@ module Base = struct
   let sub_expanded base1 base2 =
     match base1, base2 with
     | Layout l1, Layout l2 -> Layout.sub l1 l2
-    | Kconstr (k1, sa1), Kconstr (k2, sa2) when Path.same k1 k2 -> (
+    | Kconstr (k1, sa1, op1), Kconstr (k2, sa2, op2)
+      when Path.same k1 k2 && Jkind_types.Kind_operator.equal op1 op2 -> (
       match Scannable_axes.less_or_equal sa1 sa2 with
       | Equal -> Sub_result.Equal
       | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
-    | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+    | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
+    | ( Kconstr (_, sa_k, Addressable),
+        Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
       match Scannable_axes.less_or_equal sa_k sa_any with
       | Equal | Less -> Sub_result.Less
       | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -720,29 +891,31 @@ module Base = struct
     | Kconstr _, Kconstr _ -> true
     | Kconstr _, Layout (Layout.Any _) -> true
     | Layout (Layout.Any _), Kconstr _ -> true
+    | Kconstr (_, _, Addressable), Layout (Layout.Addressable (Layout.Any _))
+    | Layout (Layout.Addressable (Layout.Any _)), Kconstr (_, _, Addressable) ->
+      true
     | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
 
   let map_layout ~f b =
-    match b with Layout l -> Layout (f l) | Kconstr (p, sa) -> Kconstr (p, sa)
+    match b with
+    | Layout l -> Layout (f l)
+    | Kconstr (p, sa, op) -> Kconstr (p, sa, op)
 
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
-    | Kconstr (p, sa) -> (
-      let sa_strs = Scannable_axes.to_string_list sa in
-      match sa_strs with
-      | [] -> Format.fprintf ppf "%s" (Path.name p)
-      | _ :: _ ->
-        Format.fprintf ppf "%s %s" (Path.name p) (String.concat " " sa_strs))
+    | Kconstr (p, sa, op) ->
+      Format.fprintf ppf "%s" (String.concat " " (kconstr_strings p sa op))
 
   let expand_once (type a) env (t : a jkind_base) :
       Layout.Const.t jkind_base option =
     match t with
     | Layout _ -> None
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind p env with
       | (exception Not_found) | { jkind_manifest = None; _ } -> None
       | { jkind_manifest = Some { base; _ }; _ } ->
+        let base = Jkind0.Base_and_axes.apply_operator base op in
         Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
@@ -775,16 +948,20 @@ module Base = struct
   let rec expand_until_comparable env t1 t2 =
     match t1, t2 with
     | Layout _, Layout _ -> Some (t1, t2)
-    | Kconstr (p1, _), Kconstr (p2, _) when Path.same p1 p2 -> Some (t1, t2)
+    | Kconstr (p1, _, _), Kconstr (p2, _, _) when Path.same p1 p2 ->
+      Some (t1, t2)
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | Some (t1, t2) -> expand_until_comparable env t1 t2
       | None -> (
         (* Stuck on an abstract [Kconstr] with no manifest. [sub_expanded] can
            still decide [Kconstr _, Layout (Any _)] via the stored [sa] upper
-           bound; other stuck cases fail. *)
+           bound and addressability operator; other stuck cases fail. *)
         match t1, t2 with
-        | Kconstr _, Layout (Layout.Any _) -> Some (t1, t2)
+        | Kconstr _, Layout (Layout.Any _)
+        | ( Kconstr (_, _, Addressable),
+            Layout (Layout.Addressable (Layout.Any _)) ) ->
+          Some (t1, t2)
         | _ -> None))
 end
 
@@ -813,21 +990,23 @@ module Base_and_axes = struct
       (l * r) jkind_const_desc expand_result =
     match t.base with
     | Layout _ -> Not_expanded
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind p env with
       | exception Not_found -> Missing_cmi p
       | { jkind_manifest = None; _ } -> Not_expanded
       | { jkind_manifest = Some ({ with_bounds = No_with_bounds; _ } as jkind);
           _
         } ->
+        let base = apply_operator jkind.base op in
         let mod_bounds = Mod_bounds.meet t.mod_bounds jkind.mod_bounds in
         if
-          With_bounds.is_empty t.with_bounds
+          base == jkind.base
+          && With_bounds.is_empty t.with_bounds
           && Mod_bounds.equal mod_bounds jkind.mod_bounds
           &&
           let sa_won't_strengthen_jkind =
             match jkind.base with
-            | Kconstr (_, sa') -> Scannable_axes.le sa' sa
+            | Kconstr (_, sa', _) -> Scannable_axes.le sa' sa
             | Layout l -> (
               match Layout.Const.get_root_scannable_axes l with
               | None -> true
@@ -840,7 +1019,7 @@ module Base_and_axes = struct
           Expanded jkind
         else
           Expanded
-            { base = meet_scannable_axes jkind.base sa;
+            { base = meet_scannable_axes base sa;
               mod_bounds;
               with_bounds = t.with_bounds
             })
@@ -892,10 +1071,8 @@ module Base_and_axes = struct
      abstract, we may need to keep them in case the base is later filled in with
      a kind that crosses.
 
-     At each step during normalization, before expanding a type, [map_type_info]
-     is used to map the type-info for the type being expanded. The type can be
-     prevented from being expanded by mapping the relevant axes to an empty
-     set. [map_type_info] is used by sub_jkind_l to remove irrelevant axes.
+     Mapping a type's relevant bounds to [bot] prevents its expansion.
+     [sub_jkind_l] uses [map_type_info] to remove irrelevant bounds.
 
      The [skip_axes] argument says which axes we can skip normalizing along. The
      behavior of this function for these axes is undefined; do *not* look at the
@@ -912,11 +1089,6 @@ module Base_and_axes = struct
       (_, l * r) base_and_axes * Fuel_status.t =
    fun ~context ~mode ~skip_axes ~previously_ran_out_of_fuel ?map_type_info env
        t ->
-    (* DEBUGGING
-       Format.printf "@[normalize: %a@;  relevant_axes: %a@]@;"
-         With_bounds.debug_print t.with_bounds Jkind_axis.Axis_set.print
-         relevant_axes;
-    *)
     let t = fully_expand_aliases env t in
     let t_has_abstract_base =
       (* If the kind's base is abstract, optimization that skip axes where the
@@ -935,8 +1107,8 @@ module Base_and_axes = struct
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _
       when (not t_has_abstract_base)
-           && Mod_bounds.is_max_within_set t.mod_bounds
-                (Axis_set.complement skip_axes) ->
+           && Mod_bounds.is_max_within_mask t.mod_bounds
+                (Bounds_mask.of_axis_set (Axis_set.complement skip_axes)) ->
       { t with with_bounds = No_with_bounds }, Sufficient_fuel
     | _ ->
       (* Sadly, it seems hard (impossible?) to be sure to expand all types
@@ -983,15 +1155,10 @@ module Base_and_axes = struct
             seen_args : type_expr list;
                 (** The arguments the type constructor was most recently seen
                     with. *)
-            relevant_axes_when_seen : Axis_set.t
-                (** The axes that were relevant when the type constructor was
-                    most recently seen. *)
+            bounds_mask_when_seen : Bounds_mask.t
           }
 
-        type seen_row_var =
-          { relevant_axes_when_seen : Axis_set.t
-                (** The axes that were relevant when the row var was seen. *)
-          }
+        type seen_row_var = { bounds_mask_when_seen : Bounds_mask.t }
         [@@unboxed]
 
         type t =
@@ -1006,7 +1173,7 @@ module Base_and_axes = struct
           | Skip  (** skip reducing this type, but otherwise continue *)
           | Continue of
               { ctl : t;
-                skippable_axes : Axis_set.t
+                skippable_bounds : Bounds_mask.t
               }  (** continue, with a new [t] *)
 
         let initial_fuel_per_ty =
@@ -1078,18 +1245,18 @@ module Base_and_axes = struct
            cutting off the recursion, it continues until it runs out of fuel.
         *)
 
-        let rec check ~relevant_axes
+        let rec check ~bounds_mask
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tmod (ty, _) -> check ~relevant_axes t ty
-          | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
+          | Tmod (ty, _) -> check ~bounds_mask t ty
+          | Tpoly (ty, _) | Trepr (ty, _) -> check ~bounds_mask t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then
               Continue
                 { ctl = { t with tuple_fuel = tuple_fuel - 1 };
-                  skippable_axes = Axis_set.empty
+                  skippable_bounds = Bounds_mask.bot
                 }
             else Stop { t with fuel_status = Ran_out_of_fuel }
           | Tconstr (p, args, _) -> (
@@ -1102,13 +1269,13 @@ module Base_and_axes = struct
                         Path.Map.add p
                           { fuel = initial_fuel_per_ty;
                             seen_args = args;
-                            relevant_axes_when_seen = relevant_axes
+                            bounds_mask_when_seen = bounds_mask
                           }
                           seen_constrs
                     };
-                  skippable_axes = Axis_set.empty
+                  skippable_bounds = Bounds_mask.bot
                 }
-            | Some { fuel; seen_args; relevant_axes_when_seen } ->
+            | Some { fuel; seen_args; bounds_mask_when_seen } ->
               let args_equal =
                 List.for_all2
                   (fun ty1 ty2 ->
@@ -1116,12 +1283,12 @@ module Base_and_axes = struct
                       (Transient_expr.repr ty2))
                   seen_args args
               in
-              let skippable_axes =
+              let skippable_bounds =
                 if args_equal && not (context.is_abstract p)
-                then relevant_axes_when_seen
-                else Axis_set.empty
+                then bounds_mask_when_seen
+                else Bounds_mask.bot
               in
-              if Axis_set.is_subset relevant_axes skippable_axes
+              if Bounds_mask.le bounds_mask skippable_bounds
               then Skip
               else if fuel > 0
               then
@@ -1132,33 +1299,31 @@ module Base_and_axes = struct
                           Path.Map.add p
                             { fuel = fuel - 1;
                               seen_args = args;
-                              relevant_axes_when_seen =
-                                (* Even if we can't skip the type, if the args match
-                                   the most recently seen args, we can merge the
-                                   relevant axes with the ones seen previously since
-                                   we have now seen the types under all of these
-                                   axes. *)
+                              bounds_mask_when_seen =
+                                (* Matching arguments let us join relevance:
+                                   their subtrees have been visited under both
+                                   masks. *)
                                 (if args_equal
                                  then
-                                   Axis_set.union relevant_axes
-                                     relevant_axes_when_seen
-                                 else relevant_axes)
+                                   Bounds_mask.join bounds_mask
+                                     bounds_mask_when_seen
+                                 else bounds_mask)
                             }
                             seen_constrs
                       };
-                    skippable_axes
+                    skippable_bounds
                   }
               else Stop { t with fuel_status = Ran_out_of_fuel })
           | Tvariant _ ->
             let row_var_id = get_id (Btype.proxy ty) in
-            let { relevant_axes_when_seen } =
+            let { bounds_mask_when_seen } =
               Numbers.Int.Map.find_opt row_var_id seen_row_vars
               |> Option.value
-                   ~default:{ relevant_axes_when_seen = Axis_set.empty }
+                   ~default:{ bounds_mask_when_seen = Bounds_mask.bot }
             in
             (* For our purposes, row variables are like constructors with no arguments,
                so if we saw one already, we don't need to expand it again. *)
-            if Axis_set.is_subset relevant_axes relevant_axes_when_seen
+            if Bounds_mask.le bounds_mask bounds_mask_when_seen
             then Skip
             else
               Continue
@@ -1166,13 +1331,12 @@ module Base_and_axes = struct
                     { t with
                       seen_row_vars =
                         Numbers.Int.Map.add row_var_id
-                          { relevant_axes_when_seen =
-                              Axis_set.union relevant_axes_when_seen
-                                relevant_axes
+                          { bounds_mask_when_seen =
+                              Bounds_mask.join bounds_mask_when_seen bounds_mask
                           }
                           seen_row_vars
                     };
-                  skippable_axes = relevant_axes_when_seen
+                  skippable_bounds = bounds_mask_when_seen
                 }
           (* CR metaprogramming jbachurski: Since quotes/splices inherit
              (quoted/spliced) with-bounds from their operand, they do not
@@ -1184,11 +1348,11 @@ module Base_and_axes = struct
                do not have with_bounds *)
             (* CR layouts v2.8: Some of these might get with-bounds someday. We
                should double-check before we're done that they haven't. *)
-            Continue { ctl = t; skippable_axes = Axis_set.empty }
+            Continue { ctl = t; skippable_bounds = Bounds_mask.bot }
           | Tlink _ | Tsubst _ ->
             Misc.fatal_error "Tlink or Tsubst in normalize"
       end in
-      let rec loop (ctl : Loop_control.t) bounds_so_far relevant_axes :
+      let rec loop (ctl : Loop_control.t) bounds_so_far bounds_mask :
           (type_expr * With_bounds_type_info.t) list ->
           Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
         function
@@ -1196,7 +1360,7 @@ module Base_and_axes = struct
         | [] -> bounds_so_far, No_with_bounds, ctl
         | _
           when (not t_has_abstract_base)
-               && Mod_bounds.is_max_within_set bounds_so_far relevant_axes ->
+               && Mod_bounds.is_max_within_mask bounds_so_far bounds_mask ->
           (* CR layouts v2.8: we can do better by early-terminating on a per-axis
              basis *)
           ( bounds_so_far,
@@ -1209,105 +1373,49 @@ module Base_and_axes = struct
             | None -> ti
             | Some map_type_info -> map_type_info ty ti
           in
-          (* We don't care about axes that are already max because they can't get
-             any better or worse. By ignoring them, we may be able to terminate
-             early.
-
-             We also don't care about axes that aren't in [relevant_axes]. *)
-          let relevant_axes_for_ty =
+          let bounds_mask_for_ty =
             let from_ti =
               if t_has_abstract_base
-              then ti.relevant_axes
+              then ti.bounds_mask
               else
-                Axis_set.diff ti.relevant_axes
-                  (Mod_bounds.get_max_axes bounds_so_far)
+                Bounds_mask.residual ti.bounds_mask
+                  (Mod_bounds.saturated_mask bounds_so_far ti.bounds_mask)
             in
-            Axis_set.intersection from_ti relevant_axes
+            Bounds_mask.meet from_ti bounds_mask
           in
-          match Axis_set.is_empty relevant_axes_for_ty with
-          | true ->
-            (* If [ty] is not relevant to any axes, then we can safely drop it and
-               thereby avoid doing the work of expanding it. *)
-            loop ctl bounds_so_far relevant_axes bs
+          match Bounds_mask.is_empty bounds_mask_for_ty with
+          | true -> loop ctl bounds_so_far bounds_mask bs
           | false -> (
-            let join_bounds b1 b2 ~relevant_axes =
-              let value_for_axis (type a) ~(axis : a Axis.t) : a =
-                if Axis_set.mem relevant_axes axis
-                then
-                  (Per_axis.join [@inlined hint]) axis (Mod_bounds.get ~axis b1)
-                    (Mod_bounds.get ~axis b2)
-                else Mod_bounds.get ~axis b1
-              in
-              let monadic =
-                Mod_bounds.Crossing.Monadic.create
-                  ~uniqueness:
-                    (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-                  ~contention:
-                    (value_for_axis ~axis:(Modal (Monadic Contention)))
-                  ~visibility:
-                    (value_for_axis ~axis:(Modal (Monadic Visibility)))
-                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
-              in
-              let comonadic =
-                Mod_bounds.Crossing.Comonadic.create
-                  ~regionality:
-                    (value_for_axis ~axis:(Modal (Comonadic Areality)))
-                  ~linearity:
-                    (value_for_axis ~axis:(Modal (Comonadic Linearity)))
-                  ~portability:
-                    (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
-                  ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-                  ~statefulness:
-                    (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
-              in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
-              Mod_bounds.create crossing
-                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
-            in
             match get_desc ty with
             | Tmod (ty, mod_bounds) ->
-              let axes_not_constrained_by_mod =
-                Mod_bounds.get_max_axes mod_bounds
+              let bounds_mask_for_inner =
+                Bounds_mask.meet bounds_mask_for_ty
+                  (Mod_bounds.to_axis_lattice mod_bounds)
               in
-              let axes_constrained_by_mod =
-                Axis_set.diff relevant_axes_for_ty axes_not_constrained_by_mod
-              in
-              let bounds_so_far =
-                join_bounds bounds_so_far mod_bounds
-                  ~relevant_axes:axes_constrained_by_mod
-              in
-              let relevant_axes_for_inner =
-                Axis_set.intersection relevant_axes_for_ty
-                  axes_not_constrained_by_mod
-              in
-              if Axis_set.is_empty relevant_axes_for_inner
-              then loop ctl bounds_so_far relevant_axes bs
+              if Bounds_mask.is_empty bounds_mask_for_inner
+              then loop ctl bounds_so_far bounds_mask bs
               else
                 let ti : With_bounds_type_info.t =
-                  { relevant_axes = relevant_axes_for_inner }
+                  { bounds_mask = bounds_mask_for_inner }
                 in
-                loop ctl bounds_so_far relevant_axes ((ty, ti) :: bs)
+                loop ctl bounds_so_far bounds_mask ((ty, ti) :: bs)
             | _ -> (
               let found_jkind_for_ty ctl b_upper_bounds b_with_bounds quality
-                  skippable_axes :
+                  skippable_bounds :
                   Mod_bounds.t * (l * disallowed) with_bounds * Loop_control.t =
-                let relevant_axes_for_ty =
-                  Axis_set.diff relevant_axes_for_ty skippable_axes
+                let bounds_mask_for_ty =
+                  Bounds_mask.residual bounds_mask_for_ty skippable_bounds
                 in
                 match quality, mode, t_has_abstract_base with
                 | Best, _, _ | Not_best, Ignore_best, false -> (
-                  (* The relevant axes are the intersection of the relevant axes within our
-                   branch of the with-bounds tree, and the relevant axes on this
-                   particular with-bound *)
                   let bounds_so_far =
-                    join_bounds bounds_so_far b_upper_bounds
-                      ~relevant_axes:relevant_axes_for_ty
+                    Mod_bounds.join bounds_so_far
+                      (Mod_bounds.apply_mask b_upper_bounds bounds_mask_for_ty)
                   in
                   (* Descend into the with-bounds of each of our with-bounds types'
                     with-bounds *)
                   let bounds_so_far, nested_with_bounds, ctl =
-                    loop ctl bounds_so_far relevant_axes_for_ty
+                    loop ctl bounds_so_far bounds_mask_for_ty
                       (With_bounds.to_list b_with_bounds)
                   in
                   match ctl.fuel_status, mode with
@@ -1321,7 +1429,7 @@ module Base_and_axes = struct
                      Ideally, this whole problem goes away once we rethink fuel.
                   *)
                     let bounds, bs', ctl =
-                      loop ctl bounds_so_far relevant_axes bs
+                      loop ctl bounds_so_far bounds_mask bs
                     in
                     bounds, With_bounds.join nested_with_bounds bs', ctl
                   | Ran_out_of_fuel, Require_best ->
@@ -1333,28 +1441,26 @@ module Base_and_axes = struct
                    local. Bizarre. Investigate. *)
                   let bounds_so_far, (bs' : (l * disallowed) With_bounds.t), ctl
                       =
-                    loop ctl bounds_so_far relevant_axes bs
+                    loop ctl bounds_so_far bounds_mask bs
                   in
                   ( bounds_so_far,
-                    With_bounds.add ty
-                      { relevant_axes = relevant_axes_for_ty }
-                      bs',
+                    With_bounds.add ty { bounds_mask = bounds_mask_for_ty } bs',
                     ctl )
               in
               match
-                Loop_control.check ~relevant_axes:relevant_axes_for_ty ctl ty
+                Loop_control.check ~bounds_mask:bounds_mask_for_ty ctl ty
               with
               | Stop ctl -> (
                 match mode with
                 | Ignore_best ->
                   (* out of fuel, so assume [ty] has the worst possible bounds. *)
                   found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                    Axis_set.empty [@nontail]
+                    Bounds_mask.bot [@nontail]
                 | Require_best ->
                   (* See Note [Ran out of fuel when requiring best]. *)
                   Mod_bounds.max, No_with_bounds, ctl)
-              | Skip -> loop ctl bounds_so_far relevant_axes bs (* skip [b] *)
-              | Continue { ctl; skippable_axes } -> (
+              | Skip -> loop ctl bounds_so_far bounds_mask bs
+              | Continue { ctl; skippable_bounds } -> (
                 match context.jkind_of_type ty with
                 | Some b_jkind ->
                   let b_jkind_jkind =
@@ -1362,14 +1468,14 @@ module Base_and_axes = struct
                     fully_expand_aliases env b_jkind.jkind
                   in
                   (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
-                     b_jkind_jkind.with_bounds b_jkind.quality skippable_axes
+                     b_jkind_jkind.with_bounds b_jkind.quality skippable_bounds
                    [@nontail])
                 | None ->
                   (* kind of b is not principally known, so we treat it as having
                    the max bound (only along the axes we care about for this
                    type!) *)
                   found_jkind_for_ty ctl Mod_bounds.max No_with_bounds Not_best
-                    skippable_axes [@nontail]))))
+                    skippable_bounds [@nontail]))))
       in
       let mod_bounds = Mod_bounds.set_max_in_set t.mod_bounds skip_axes in
       let mod_bounds, with_bounds, ctl =
@@ -1377,7 +1483,7 @@ module Base_and_axes = struct
         | No_with_bounds -> mod_bounds, No_with_bounds, Loop_control.starting
         | With_bounds _ ->
           (loop Loop_control.starting mod_bounds
-             (Axis_set.complement skip_axes)
+             (Bounds_mask.of_axis_set (Axis_set.complement skip_axes))
              (With_bounds.to_list t.with_bounds)
             : _ * (_ * r) with_bounds * _)
       in
@@ -1441,7 +1547,7 @@ module Jkind_desc = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
 
   let unsafely_set_bounds env t ~from =
     let from = Base_and_axes.fully_expand_aliases env from in
@@ -1481,9 +1587,10 @@ module Jkind_desc = struct
     | Layout l1, Layout l2 ->
       Layout.equate_or_equal ~allow_mutation l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
-    | Kconstr (p1, sa1), Kconstr (p2, sa2)
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
+           && Jkind_types.Kind_operator.equal op1 op2
            && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
       true
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
@@ -1570,11 +1677,21 @@ module Jkind_desc = struct
       match Layout.intersection l1 l2 with
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
-    | Kconstr (p1, sa1), Kconstr (p2, sa2) when Path.same p1 p2 ->
-      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2))
-    | Kconstr (p, sa_k), Layout (Layout.Any sa_any)
-    | Layout (Layout.Any sa_any), Kconstr (p, sa_k) ->
-      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any))
+    | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
+      when Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2 ->
+      make_intersection (Kconstr (p1, Scannable_axes.meet sa1 sa2, op1))
+    | Kconstr (p, sa_k, op), Layout (Layout.Any sa_any)
+    | Layout (Layout.Any sa_any), Kconstr (p, sa_k, op) ->
+      make_intersection (Kconstr (p, Scannable_axes.meet sa_k sa_any, op))
+    | ( Kconstr (p, sa_k, Addressable),
+        Layout (Layout.Addressable (Layout.Any sa_any)) )
+    | ( Layout (Layout.Addressable (Layout.Any sa_any)),
+        Kconstr (p, sa_k, Addressable) ) ->
+      make_intersection
+        (Kconstr
+           ( p,
+             Scannable_axes.meet sa_k sa_any,
+             Jkind_types.Kind_operator.Addressable ))
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> Unknown
@@ -1586,12 +1703,16 @@ module Jkind_desc = struct
     | Some (t1, t2) -> (
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub l1 l2
-      | Kconstr (_, sa1), Kconstr (_, sa2) -> (
+      | Kconstr (_, sa1, op1), Kconstr (_, sa2, op2)
+        when Jkind_types.Kind_operator.equal op1 op2 -> (
         match Scannable_axes.less_or_equal sa1 sa2 with
         | Equal -> Sub_result.Equal
         | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
-      | Kconstr (_, sa_k), Layout (Layout.Any sa_any) -> (
+      | Kconstr _, Kconstr _ -> Sub_result.Not_le [Layout_disagreement]
+      | Kconstr (_, sa_k, _), Layout (Layout.Any sa_any)
+      | ( Kconstr (_, sa_k, Addressable),
+          Layout (Layout.Addressable (Layout.Any sa_any)) ) -> (
         match Scannable_axes.less_or_equal sa_k sa_any with
         | Equal | Less -> Sub_result.Less
         | Not_le -> Sub_result.Not_le [Layout_disagreement])
@@ -1686,7 +1807,7 @@ module Const = struct
   let get_scannable_axes_of_fully_expanded jk =
     match jk.base with
     | Layout l -> Layout.Const.get_root_scannable_axes l
-    | Kconstr (_, sa) -> Some sa
+    | Kconstr (_, sa, _) -> Some sa
 
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
@@ -1697,13 +1818,15 @@ module Const = struct
    fun env t ->
     match t.base with
     | Layout l -> Ok l
-    | Kconstr (p, sa) -> (
+    | Kconstr (p, sa, op) -> (
       match Env.find_jkind_expansion p env with
       | exception Not_found -> Error p
       | jkind ->
-        (* Propagate the scannable axes upper bound. *)
+        (* Apply the pending addressability operator and propagate the scannable
+           axes upper bound. *)
+        let base = Base_and_axes.apply_operator jkind.base op in
         let jkind =
-          { jkind with base = Base_and_axes.meet_scannable_axes jkind.base sa }
+          { jkind with base = Base_and_axes.meet_scannable_axes base sa }
         in
         get_layout_result env jkind)
 
@@ -1728,7 +1851,7 @@ module Const = struct
   end = struct
     type printable_jkind =
       { base : string;
-        scannable_axes : string list;
+        operators : string list;  (** Scannable axes and [addressable] *)
         modal_bounds : string list;
         printable_with_bounds :
           (Outcometree.out_type * Outcometree.out_modality list) list
@@ -1795,21 +1918,6 @@ module Const = struct
       | Some base, Some actual ->
         Scannable_axes.to_string_list_diff ~base actual
 
-    let modalities_of_ignored_axes axes_to_ignore =
-      (* The modality is constant along axes to ignore and id along others *)
-      List.fold_left
-        (fun (modal_modality, nonmodal_axes) (Axis.Pack axis) ->
-          match axis with
-          | Modal axis -> (
-            match axis, Crossing.Per_axis.min axis with
-            | Monadic ax, Modality t ->
-              Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
-            | Comonadic ax, Modality t ->
-              Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
-          | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
-        (Modality.Const.id, [])
-        (Axis_set.to_list axes_to_ignore)
-
     (** Write [actual] in terms of [base] *)
     let convert_with_base (type l r) env ~verbosity ~(base : Builtin.t)
         (actual : (l * r) t) =
@@ -1824,11 +1932,19 @@ module Const = struct
         Base_and_axes.fully_expand_aliases_const env base.jkind
       in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
-      let matching_layouts =
+      let matching_layouts, addressable =
         match base_jkind.base, actual.base with
-        | Kconstr (p1, _), Kconstr (p2, _) -> Path.same p1 p2
-        | Layout l1, Layout l2 -> Layout.Const.equal_up_to_scannable_axes l1 l2
-        | (Kconstr _ | Layout _), _ -> false
+        | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
+          Path.same p1 p2 && Jkind_types.Kind_operator.equal op1 op2, false
+        | Layout l1, Layout l2 -> (
+          if Layout.Const.equal_up_to_scannable_axes l1 l2
+          then true, false
+          else
+            match l2 with
+            | Addressable l2 ->
+              Layout.Const.equal_up_to_scannable_axes l1 l2, true
+            | Any _ | Base _ | Product _ | Univar _ | Genvar _ -> false, false)
+        | (Kconstr _ | Layout _), _ -> false, false
       in
       let scannable_axes =
         get_scannable_axes_diff
@@ -1856,43 +1972,38 @@ module Const = struct
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
             (fun (_, type_info) out_type ->
-              let axes_ignored_by_modalities =
-                With_bounds.Type_info.axes_ignored_by_modalities
+              let bounds_mask =
+                With_bounds.Type_info.printable_bounds_mask
                   ~mod_bounds:actual.mod_bounds ~type_info
               in
               let modal_modality, nonmodal_axes =
-                modalities_of_ignored_axes axes_ignored_by_modalities
+                With_bounds.modalities_of_bounds_mask bounds_mask
               in
               let modal =
                 !outcometree_of_modalities Types.Immutable modal_modality
               in
-              let nonmodal =
-                List.map
-                  (fun (Axis.Pack axis) ->
-                    Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
-                  nonmodal_axes
-              in
-              out_type, modal @ nonmodal)
+              out_type, modal @ nonmodal_axes)
             with_bounds otys
       in
       match matching_layouts, modal_bounds, scannable_axes with
       | true, Some modal_bounds, Some scannable_axes ->
         Some
           { base = base.name;
-            scannable_axes;
+            operators =
+              (scannable_axes @ if addressable then ["addressable"] else []);
             modal_bounds;
             printable_with_bounds
           }
       | false, _, _ | _, None, _ | _, _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds and
-        scannable axes to print *)
+        operators to print *)
     let rec select_simplest = function
       | a :: b :: tl ->
         let simpler =
           if
-            List.length a.modal_bounds + List.length a.scannable_axes
-            < List.length b.modal_bounds + List.length b.scannable_axes
+            List.length a.modal_bounds + List.length a.operators
+            < List.length b.modal_bounds + List.length b.operators
           then a
           else b
         in
@@ -1920,7 +2031,7 @@ module Const = struct
           |> select_simplest
         | Expanded | Expanded_with_all_mod_bounds -> None
       in
-      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
+      let { base; operators; modal_bounds; printable_with_bounds } =
         match simplest with
         | Some simplest -> simplest
         | None -> (
@@ -1976,7 +2087,7 @@ module Const = struct
                layout matches and the modal bounds are all max *)
             Option.get out_jkind_verbose)
       in
-      let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
+      let base = Outcometree.Ojkind_const_abbreviation (base, operators) in
       (* Add on [mod] bounds, if there are any *)
       let base =
         if modal_bounds = []
@@ -2021,6 +2132,18 @@ module Const = struct
       Option.map (Location.map (fun x -> Separability x))
   end
 
+  module Kind_operator = struct
+    type t =
+      | Scannable_axis of Scannable_axis.t
+      | Addressable
+  end
+
+  let warn_redundant_kind_modifier ~loc (base, rev_axes) =
+    Location.prerr_warning loc
+      (Warnings.Redundant_kind_modifier
+         (Format.asprintf "%a%s" Pprintast.jkind_annotation base
+            (String.concat "" (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+
   let apply_scannable_axis ?prior_annot ~warn env
       (axis : Scannable_axis.t Location.loc option) t =
     match axis with
@@ -2029,18 +2152,14 @@ module Const = struct
       let update_sa sa =
         let sa' = Scannable_axis.lower_axes sa axis in
         (match prior_annot with
-        | Some (base, rev_axes) when warn && Scannable_axes.equal sa sa' ->
-          Location.prerr_warning loc
-            (Warnings.Redundant_kind_modifier
-               (Format.asprintf "%a%s" Pprintast.jkind_annotation base
-                  (String.concat ""
-                     (List.rev_map (fun axis -> " " ^ axis) rev_axes))))
+        | Some prior_annot when warn && Scannable_axes.equal sa sa' ->
+          warn_redundant_kind_modifier ~loc prior_annot
         | _ -> ());
         sa'
       in
       let t = Base_and_axes.fully_expand_aliases_const env t in
       match t.base with
-      | Kconstr (p, sa) -> { t with base = Kconstr (p, update_sa sa) }
+      | Kconstr (p, sa, op) -> { t with base = Kconstr (p, update_sa sa, op) }
       | Layout layout -> (
         match Layout.Const.get_root_scannable_axes layout with
         | None -> t
@@ -2050,6 +2169,23 @@ module Const = struct
               Layout
                 (Layout.Const.set_root_scannable_axes layout (update_sa sa))
           }))
+
+  let apply_addressable ?prior_annot ~warn ~loc env t =
+    let t = Base_and_axes.fully_expand_aliases_const env t in
+    match t.base with
+    | Layout layout ->
+      (match prior_annot with
+      | Some prior_annot when warn && Layout.Const.is_surely_addressable layout
+        ->
+        warn_redundant_kind_modifier ~loc prior_annot
+      | _ -> ());
+      { t with base = Layout (Layout.Const.addressable layout) }
+    | Kconstr (p, sa, op) ->
+      (match op, prior_annot with
+      | Addressable, Some prior_annot when warn ->
+        warn_redundant_kind_modifier ~loc prior_annot
+      | (Id | Addressable), _ -> ());
+      { t with base = Kconstr (p, sa, Jkind_types.Kind_operator.Addressable) }
 
   let warn_ignored_kind_modifier ~loc env base base_jkind sa_annot =
     if
@@ -2085,23 +2221,29 @@ module Const = struct
     let layouts, mod_bounds, with_bounds =
       List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
     in
-    { base = Layout (Layout.Const.Product (List.rev layouts));
+    { base = Layout (Layout.Const.product (List.rev layouts));
       mod_bounds;
       with_bounds
     }
 
-  let transl_scannable_axis ({ txt; loc } : string Location.loc) =
+  let transl_kind_operator ({ txt; loc } : string Location.loc) :
+      Kind_operator.t Location.loc =
+    let scannable_axis axis = Kind_operator.Scannable_axis axis in
     match txt with
     | "non_pointer" ->
-      Location.mkloc (Scannable_axis.Separability Non_pointer) loc
+      Location.mkloc (scannable_axis (Separability Non_pointer)) loc
     | "non_pointer64" ->
-      Location.mkloc (Scannable_axis.Separability Non_pointer64) loc
-    | "non_float" -> Location.mkloc (Scannable_axis.Separability Non_float) loc
-    | "separable" -> Location.mkloc (Scannable_axis.Separability Separable) loc
+      Location.mkloc (scannable_axis (Separability Non_pointer64)) loc
+    | "non_float" ->
+      Location.mkloc (scannable_axis (Separability Non_float)) loc
+    | "separable" ->
+      Location.mkloc (scannable_axis (Separability Separable)) loc
     | "maybe_separable" ->
-      Location.mkloc (Scannable_axis.Separability Maybe_separable) loc
-    | "non_null" -> Location.mkloc (Scannable_axis.Nullability Non_null) loc
-    | "maybe_null" -> Location.mkloc (Scannable_axis.Nullability Maybe_null) loc
+      Location.mkloc (scannable_axis (Separability Maybe_separable)) loc
+    | "non_null" -> Location.mkloc (scannable_axis (Nullability Non_null)) loc
+    | "maybe_null" ->
+      Location.mkloc (scannable_axis (Nullability Maybe_null)) loc
+    | "addressable" -> Location.mkloc Kind_operator.Addressable loc
     | _ -> raise ~loc (Unknown_kind_modifier txt)
 
   let rec of_user_written_annotation_unchecked_level : type l r.
@@ -2135,20 +2277,40 @@ module Const = struct
            (Scannable_axis.annot_of_nullability_annot nullability)
       |> apply_scannable_axis ~warn env
            (Scannable_axis.annot_of_separability_annot separability)
-    | Pjk_operator (base, sa_annot) ->
+    | Pjk_operator (base, op_annot) ->
       let base_jkind =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
           env context base
       in
-      if warn then warn_ignored_kind_modifier ~loc env base base_jkind sa_annot;
+      let ops =
+        List.map (fun name -> name, transl_kind_operator name) op_annot
+      in
+      (if warn
+       then
+         let sa_annot =
+           List.filter_map
+             (fun (name, (op : Kind_operator.t Location.loc)) ->
+               match op.txt with
+               | Kind_operator.Scannable_axis _ -> Some name
+               | Kind_operator.Addressable -> None)
+             ops
+         in
+         warn_ignored_kind_modifier ~loc env base base_jkind sa_annot);
       let jkind, _ =
         List.fold_left
-          (fun (jkind, rev_axes) axis ->
-            ( apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
-                (Some (transl_scannable_axis axis))
-                jkind,
-              axis.Location.txt :: rev_axes ))
-          (base_jkind, []) sa_annot
+          (fun (jkind, rev_axes) ((name : string Location.loc), op) ->
+            let jkind =
+              match (op : Kind_operator.t Location.loc) with
+              | { txt = Scannable_axis axis; loc } ->
+                apply_scannable_axis ~prior_annot:(base, rev_axes) ~warn env
+                  (Some (Location.mkloc axis loc))
+                  jkind
+              | { txt = Addressable; loc } ->
+                apply_addressable ~prior_annot:(base, rev_axes) ~warn ~loc env
+                  jkind
+            in
+            jkind, name.txt :: rev_axes)
+          (base_jkind, []) ops
       in
       jkind
     | Pjk_product ts ->
@@ -2173,22 +2335,21 @@ module Const = struct
           let modality, externality =
             Typemode.transl_with_bound_modifiers modalities
           in
-          let relevant_axes =
-            let axes = Mod_bounds.relevant_axes_of_modality ~modality in
+          let bounds_mask =
+            let bounds = Mod_bounds.mask_of_modality ~modality in
             match externality with
-            | None -> axes
+            | None -> bounds
             | Some ext ->
               let is_top =
                 Per_axis.le (Nonmodal Externality) Externality.max ext
               in
               if is_top
-              then axes
-              else Axis_set.remove axes (Nonmodal Externality)
+              then bounds
+              else Bounds_mask.meet bounds (Mod_bounds.mask_of_externality ext)
           in
           { base = base.base;
             mod_bounds = base.mod_bounds;
-            with_bounds =
-              With_bounds.add type_ { relevant_axes } base.with_bounds
+            with_bounds = With_bounds.add type_ { bounds_mask } base.with_bounds
           }
         | Overapproximate_to_top ->
           (* A with-bound weakens the mod-bounds, so a safe approximation is to
@@ -2197,11 +2358,12 @@ module Const = struct
           let base =
             match expanded.base with
             | Layout _ as b -> b
-            | Kconstr (_, sa) ->
+            | Kconstr (_, sa, op) ->
               (* However, we can't raise the mod-bounds of a truly-abstract
                  [Kconstr] because its mod-bounds can be further narrowed by
-                 substitution. Instead, we approximate the layout as [any]. *)
-              Layout (Layout.Const.Any sa)
+                 substitution. Instead, we approximate the layout as [any] (with
+                 the same scannable axes/addressability). *)
+              Base_and_axes.apply_operator (Layout (Layout.Const.any sa)) op
           in
           { base;
             mod_bounds = Mod_bounds.max;
@@ -2233,6 +2395,7 @@ module Const = struct
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
       | Base (Void, _) -> Stable
+      | Addressable l -> scan_layout l
     in
     match jkind.base with
     | Kconstr _ -> Language_extension.Stable
@@ -2281,12 +2444,20 @@ module Desc = struct
            Fmt.pp_print_string)
           ppf
           (sort_var_str :: Scannable_axes.to_string_list sa)
-      (* Analyze a product before calling [get_const]: the machinery in
-         [Const.format] works better for atomic layouts, not products. *)
+      (* Analyze structure (products and addressability) before calling
+         [get_const]: the machinery in [Const.format] works better for atomic
+         layouts. *)
       | Layout (Product lays) ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
           (List.map (fun layout -> { desc with base = Layout layout }) lays)
+      | Layout (Addressable lay) ->
+        if Layout.is_surely_addressable_flat lay
+        then format_desc ~nested ppf { desc with base = Layout lay }
+        else
+          Fmt.fprintf ppf "%a addressable"
+            (fun ppf -> format_desc ~nested:true ppf)
+            { desc with base = Layout lay }
       | Layout _ | Kconstr _ -> (
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c
@@ -2318,6 +2489,7 @@ let rec instance_layout : Sort.t Layout.t -> Sort.t Layout.t = function
   | Sort (s, sa) -> Sort (Sort.instance s, sa)
   | Product ls -> Product (List.map instance_layout ls)
   | Any _ as l -> l
+  | Addressable l -> Addressable (instance_layout l)
 
 let instance jkind =
   match jkind.jkind.base with
@@ -2424,8 +2596,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
   let jkind = type_jkind_purely ty in
   let with_bounds_types =
-    let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
-    With_bounds_types.singleton ty { relevant_axes }
+    let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+    With_bounds_types.singleton ty { bounds_mask }
   in
   fresh_jkind_poly
     { base = jkind.jkind.base;
@@ -2579,11 +2751,12 @@ let extract_layout : 'l 'r. _ -> ('l * 'r) jkind -> _ =
   (* Don't use [fully_expand_aliases] to avoid computing anything on bounds *)
   match t.jkind.base with
   | Layout l -> Ok l
-  | Kconstr (p, sa) -> (
+  | Kconstr (p, sa, op) -> (
     match Env.find_jkind_expansion p env with
     | exception Not_found -> Error p
     | jkind ->
       Const.get_layout_result env jkind
+      |> Result.map (fun l -> Layout.Const.apply_operator l op)
       |> Result.map Layout.of_const
       |> Result.map (fun l -> Layout.meet_root_scannable_axes l sa))
 
@@ -2620,6 +2793,8 @@ let sort_option_of_jkind env (t : jkind_l) : sort option =
       match Misc.Stdlib.List.map_option sort_of_layout ls with
       | None -> None
       | Some sorts -> Some (Sort.Product sorts))
+    | Addressable l ->
+      Option.map (fun s -> Sort.Addressable s) (sort_of_layout l)
   in
   match extract_layout env t with
   | Ok layout -> sort_of_layout layout
@@ -2662,7 +2837,7 @@ let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
   Mod_bounds.crossing mod_bounds
 
 let to_unsafe_mode_crossing jkind =
-  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
+  { unsafe_mod_bounds = jkind.jkind.mod_bounds;
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
@@ -2693,26 +2868,19 @@ let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
 let apply_modality_l modality jk =
-  let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
-  let mod_bounds =
-    Mod_bounds.set_min_in_set jk.jkind.mod_bounds
-      (Axis_set.complement relevant_axes)
-  in
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
   let with_bounds =
     With_bounds.map
-      (fun ti ->
-        { relevant_axes = Axis_set.intersection ti.relevant_axes relevant_axes })
+      (fun ti -> { bounds_mask = Bounds_mask.meet ti.bounds_mask bounds_mask })
       jk.jkind.with_bounds
   in
   { jk with jkind = { jk.jkind with mod_bounds; with_bounds } }
   |> disallow_right
 
 let apply_modality_r modality jk =
-  let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
-  let mod_bounds =
-    Mod_bounds.set_max_in_set jk.jkind.mod_bounds
-      (Axis_set.complement relevant_axes)
-  in
+  let bounds_mask = Mod_bounds.mask_of_modality ~modality in
+  let mod_bounds = Mod_bounds.relax_by_mask_r jk.jkind.mod_bounds bounds_mask in
   { jk with jkind = { jk.jkind with mod_bounds } } |> disallow_left
 
 let apply_or_null_l env jkind =
@@ -2787,30 +2955,41 @@ let get_annotation jk = jk.annotation
 
 let decompose_product env jk =
   let mk_jkind layout = set_layout jk layout in
-  let deal_with_sort : Sort.t -> _ = function
+  let rec deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
     | Product sorts ->
-      Some
-        (List.map
-           (fun sort -> mk_jkind (Sort (sort, Scannable_axes.max)))
-           sorts)
+      Some (List.map (fun sort -> Layout.Sort (sort, Scannable_axes.max)) sorts)
+    | Addressable s ->
+      (* Given a kind [jk] which should equal [k_0 & k_1 & ...] (e.g. for an
+         unboxed tuple/record being inspected in [Ctype.constrain_type_jkind]),
+         [decompose_product] tries to return the list of [k_i]s.
+
+         When [jk = _ addressable], the only way for [k_0 & k_1 & ...] to equal
+         [jk] is for each component to be addressable. *)
+      Option.map (List.map (fun l -> Layout.Addressable l)) (deal_with_sort s)
     | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
   match extract_layout env jk with
   | Error _ -> None
-  | Ok layout -> (
-    match layout with
-    | Any _ -> None
-    | Product layouts ->
-      (* CR layouts v7.1: The histories here are wrong (we are giving each
-         component the history of the whole product).  They don't show up in
-         errors, so it's fine for now, but we'll probably need to fix this as
-         part of improving errors around products. A couple options: re-work the
-         relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
-         introduce product histories. *)
-      Some (List.map mk_jkind layouts)
-    | Sort (s, _) -> deal_with_sort (Sort.get s))
+  | Ok layout ->
+    let rec deal_with_layout : _ Layout.t -> _ = function
+      | Any _ -> None
+      | Addressable l ->
+        (* see [deal_with_sort] *)
+        Option.map
+          (List.map (fun l -> Layout.Addressable l))
+          (deal_with_layout l)
+      | Product layouts -> Some layouts
+      | Sort (s, _) -> deal_with_sort (Sort.get s)
+    in
+    (* CR layouts v7.1: The histories here are wrong (we are giving each
+       component the history of the whole product).  They don't show up in
+       errors, so it's fine for now, but we'll probably need to fix this as
+       part of improving errors around products. A couple options: re-work
+       the relevant bits of [Ctype.type_jkind_sub] to just work on layouts,
+       or introduce product histories. *)
+    Option.map (List.map mk_jkind) (deal_with_layout layout)
 
 (*********************************)
 (* pretty printing *)
@@ -3339,11 +3518,8 @@ module Violation = struct
         let jkind_has_modalities jkind =
           List.exists
             (fun (_, type_info) ->
-              let axes_ignored_by_modalities =
-                With_bounds.Type_info.axes_ignored_by_modalities
-                  ~mod_bounds:jkind.jkind.mod_bounds ~type_info
-              in
-              not (Axis_set.is_empty axes_ignored_by_modalities))
+              With_bounds.Type_info.has_non_id_modalities
+                ~mod_bounds:jkind.jkind.mod_bounds ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in
         jkind_has_modalities sub || jkind_has_modalities super
@@ -3365,19 +3541,40 @@ module Violation = struct
                         relevant *)
                   []
                 | false ->
+                  let axis_mask =
+                    Bounds_mask.of_axis_set (Axis_set.singleton axis)
+                  in
                   With_bounds.to_list jkind.with_bounds
                   |> List.filter_map
-                       (fun
-                         (ty, ({ relevant_axes } : With_bounds_type_info.t)) ->
-                         match Axis_set.mem relevant_axes axis with
-                         | true -> Some (!outcometrees_of_types [ty])
-                         | false -> None)
+                       (fun (ty, ({ bounds_mask } : With_bounds_type_info.t)) ->
+                         let axis_bounds =
+                           Bounds_mask.meet bounds_mask axis_mask
+                         in
+                         if Bounds_mask.is_empty axis_bounds
+                         then None
+                         else
+                           let other_axes =
+                             Bounds_mask.residual Axis_lattice.top axis_mask
+                           in
+                           let modal_modality, nonmodal_axes =
+                             Bounds_mask.join axis_bounds other_axes
+                             |> With_bounds.modalities_of_bounds_mask
+                           in
+                           let modalities =
+                             !outcometree_of_modalities Types.Immutable
+                               modal_modality
+                             @ nonmodal_axes
+                           in
+                           Some
+                             (List.map
+                                (fun ty -> ty, modalities)
+                                (!outcometrees_of_types [ty])))
                   |> List.flatten
               in
               let ojkind =
                 List.fold_left
-                  (fun acc with_bound ->
-                    Outcometree.Ojkind_const_with (acc, with_bound, []))
+                  (fun acc (with_bound, modalities) ->
+                    Outcometree.Ojkind_const_with (acc, with_bound, modalities))
                   (Outcometree.Ojkind_const_mod
                      (None, [Fmt.asprintf "%a" (Per_axis.print axis) mod_bound]))
                   with_bounds
@@ -3563,10 +3760,22 @@ module Violation = struct
       | Sort (Univar _, _) | Sort (Genvar _, _) -> false
       | Product layouts -> List.exists has_sort_var_layout layouts
       | Sort (Base _, _) | Any _ -> false
+      | Addressable layout -> has_sort_var_layout layout
     in
     let has_sort_var : Sort.Flat.t Layout.t jkind_base -> bool = function
       | Kconstr _ -> false
       | Layout l -> has_sort_var_layout l
+    in
+    (* CR box: This, and other logic such as handling the message for
+       [print_as_value_layout], could likely be folded into
+       [categorize_mismatch] to reduce duplication. *)
+    let layout_to_requirement (base : Sort.Flat.t Layout.t jkind_base) =
+      if has_sort_var base
+      then
+        match base with
+        | Layout (Layout.Addressable _) -> Some "addressable"
+        | Kconstr _ | Layout _ -> Some "representable"
+      else None
     in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
     let format_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
@@ -3579,14 +3788,16 @@ module Violation = struct
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
     let subjkind_format verb k2 =
-      if has_sort_var (get k2).base
-      then dprintf "%s representable" verb
-      else if print_as_value_layout
-      then
-        (* avoid printing "a sublayout of a value layout" *)
-        dprintf "%s@ a value layout" verb
-      else
-        dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
+      let base = (get k2).base in
+      match layout_to_requirement base with
+      | Some requirement -> dprintf "%s %s" verb requirement
+      | None ->
+        if print_as_value_layout
+        then
+          (* avoid printing "a sublayout of a value layout" *)
+          dprintf "%s@ a value layout" verb
+        else
+          dprintf "%s a sub%s of@ %a" verb layout_or_kind format_base_or_kind k2
     in
     let Pack_jkind k1, Pack_jkind k2, fmt_k1, fmt_k2, missing_cmis =
       match t with
@@ -3629,16 +3840,18 @@ module Violation = struct
     if display_histories
     then
       let connective =
-        if has_sort_var (get k2).base
-        then dprintf "be representable"
-        else if print_as_value_layout
-        then dprintf "be@ a value layout"
-        else
-          match t.violation with
-          | Not_a_subjkind _ ->
-            dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
-          | No_intersection _ ->
-            dprintf "overlap with@ %a" format_base_or_kind k2
+        let base = (get k2).base in
+        match layout_to_requirement base with
+        | Some requirement -> dprintf "be %s" requirement
+        | None -> (
+          if print_as_value_layout
+          then dprintf "be@ a value layout"
+          else
+            match t.violation with
+            | Not_a_subjkind _ ->
+              dprintf "be a sub%s of@ %a" layout_or_kind format_base_or_kind k2
+            | No_intersection _ ->
+              dprintf "overlap with@ %a" format_base_or_kind k2)
       in
       fprintf ppf "@[<v>%a@;%a@]"
         (Format_history.format_history
@@ -3854,6 +4067,46 @@ let sub_layout_or_error ~context env t1 t2 =
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
+let direct_bounds_for_type ~context env ty =
+  match context.jkind_of_type ty with
+  | None -> Axis_lattice.top
+  | Some ty_jkind -> (
+    let ty_jkind = Base_and_axes.fully_expand_aliases env ty_jkind.jkind in
+    match ty_jkind.base, ty_jkind.with_bounds with
+    | Layout _, No_with_bounds -> Mod_bounds.to_axis_lattice ty_jkind.mod_bounds
+    | (Layout _ | Kconstr _), With_bounds _ | Kconstr _, No_with_bounds ->
+      (* Only a concrete kind without with-bounds has complete direct bounds. *)
+      Axis_lattice.top)
+
+let equal_unsafe_mode_crossing ~type_equal ~context env umc1 umc2 =
+  Mod_bounds.equal umc1.unsafe_mod_bounds umc2.unsafe_mod_bounds
+  &&
+  let direct_bounds = Mod_bounds.to_axis_lattice umc1.unsafe_mod_bounds in
+  let wb1 = With_bounds.to_best_eff_map umc1.unsafe_with_bounds in
+  let wb2 = With_bounds.to_best_eff_map umc2.unsafe_with_bounds in
+  (* Best-effort maps may contain equivalent keys. Aggregate them after capping
+     each occurrence by the bound type's direct bounds. *)
+  let bounds_mask_for_type ty bounds =
+    With_bounds_types.to_seq bounds
+    |> Seq.fold_left
+         (fun bounds_mask (ty', (info : With_bounds_type_info.t)) ->
+           if type_equal ty ty'
+           then
+             Bounds_mask.join bounds_mask
+               (Bounds_mask.meet info.bounds_mask
+                  (direct_bounds_for_type ~context env ty'))
+           else bounds_mask)
+         Bounds_mask.bot
+    |> fun bounds_mask -> Bounds_mask.residual bounds_mask direct_bounds
+  in
+  let same_bounds_mask ty =
+    Bounds_mask.equal
+      (bounds_mask_for_type ty wb1)
+      (bounds_mask_for_type ty wb2)
+  in
+  With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb1
+  && With_bounds_types.for_all (fun ty _info -> same_bounds_mask ty) wb2
+
 let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
     =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
@@ -3898,30 +4151,17 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
     let right_bounds_seq = right_bounds |> With_bounds_types.to_seq in
     let sub, _ =
       (* MB_EXPAND_L *)
-      (* Here we progressively expand types on the left.
-
-         Every time we see a type [ty] on the left, we first look to see if [ty]
-         occurs on the right. If it does, then we can skip* [ty]. There is an *
-         on skip because we can actually only skip on a per-axis basis - if [ty]
-         is relevant only along the portability axis on the right, then [ty] is
-         no longer relevant to portability on the left, but it is still relevant
-         to all other axes. So really, we subtract the axes that are relevant to
-         the right from the axes that are relevant to the left.  We can also
-         skip [ty] on any axes that are max on the right since anything is <=
-         max. Hence, we can also subtract [axes_max_on_right].
-
-         After finding which axes [ty] is relevant along, we lookup [ty]'s jkind
-         and join it with the [mod_bounds] along the relevant axes. *)
-      (* [Jkind_desc.map_normalize] handles the stepping, jkind lookups, and
-         joining.  [map_type_info] handles looking for [ty] on the right and
-         removing irrelevant axes. *)
+      (* Expand left-side types only along bounds not covered by an equivalent
+         right-side occurrence or saturated by the right direct bounds. *)
       Base_and_axes.normalize env sub_jkind ~skip_axes:axes_max_on_right
         ~previously_ran_out_of_fuel:sub.ran_out_of_fuel_during_normalize
         ~context ~mode:Ignore_best
-        ~map_type_info:(fun ty { relevant_axes = left_relevant_axes } ->
-          let right_relevant_axes =
-            (* Look for [ty] on the right. There may be multiple occurrences of
-               it on the right; if so, we union together the relevant axes. *)
+        ~map_type_info:(fun ty { bounds_mask = left_bounds_mask } ->
+          let direct_bounds_for_type = direct_bounds_for_type ~context env ty in
+          let left_bounds_mask =
+            Bounds_mask.meet left_bounds_mask direct_bounds_for_type
+          in
+          let right_bounds_mask =
             right_bounds_seq
             (* CR layouts v2.8: maybe it's worth memoizing using a best-effort
                type map? Internal ticket 5086. *)
@@ -3929,13 +4169,21 @@ let sub_jkind_l ~type_equal ~context ?(allow_any_crossing = false) env sub super
                  (fun acc (ty2, ti) ->
                    match type_equal ty ty2 with
                    | true ->
-                     Axis_set.union acc ti.With_bounds_type_info.relevant_axes
+                     Bounds_mask.join acc ti.With_bounds_type_info.bounds_mask
                    | false -> acc)
-                 Axis_set.empty
+                 Bounds_mask.bot
+            |> Bounds_mask.meet direct_bounds_for_type
+          in
+          let saturated_by_right_direct_bounds =
+            Mod_bounds.saturated_mask best_super.mod_bounds left_bounds_mask
+          in
+          let remaining_bounds_mask =
+            Bounds_mask.residual left_bounds_mask
+              (Bounds_mask.join right_bounds_mask
+                 saturated_by_right_direct_bounds)
           in
           (* MB_WITH : drop types from the left that appear on the right *)
-          { relevant_axes = Axis_set.diff left_relevant_axes right_relevant_axes
-          })
+          { bounds_mask = remaining_bounds_mask })
     in
     match sub with
     | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
@@ -3979,10 +4227,12 @@ let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
 
 let has_layout_any env jkind =
-  match extract_layout env jkind with
-  | Ok (Any _) -> true
-  | Ok _ -> false
-  | Error _ -> false
+  let rec is_any : _ Layout.t -> bool = function
+    | Any _ -> true
+    | Addressable l -> is_any l
+    | Sort _ | Product _ -> false
+  in
+  match extract_layout env jkind with Ok l -> is_any l | Error _ -> false
 
 let is_value_for_printing ~ignore_null env { jkind; _ } =
   let env =

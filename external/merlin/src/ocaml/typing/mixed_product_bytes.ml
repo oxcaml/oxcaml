@@ -21,6 +21,10 @@ let rec count_types_element (elt : Types.mixed_block_element) : t =
   | Product elts ->
     Array.fold_left (fun acc e -> add acc (count_types_element e)) zero elts
   | Void -> zero
+  | Addressable elt ->
+    (* CR box: This may have to be updated once addressability affects boxed
+       representations *)
+    count_types_element elt
 
 let count_types_shape shape =
   Array.fold_left (fun acc elt -> add acc (count_types_element elt)) zero shape

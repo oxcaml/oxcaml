@@ -486,4 +486,12 @@ val of_path :
   find_shape:(Sig_component_kind.t -> Ident.t -> t) ->
   namespace:Sig_component_kind.t -> Path.t -> t
 
+(** [set_uid t uid] sets [uid] on the outermost node of [t], replacing any
+    uid already present. Declaration shapes must carry the declaration's own
+    uid at the top: manifests such as [type t = unit] otherwise retain the
+    uid of the expanded right-hand side (here the [unit] predef), which
+    breaks uid-based tooling (e.g. occurrence indexing, which filters
+    predef uids). *)
+val set_uid : t -> Uid.t -> t
+
 val set_uid_if_none : t -> Uid.t -> t

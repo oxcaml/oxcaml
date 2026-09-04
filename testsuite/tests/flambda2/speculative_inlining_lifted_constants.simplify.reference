@@ -8,12 +8,12 @@ let code loopify(never) size(8) newer_version_of(f_0)
   let Pmakeblock = %block.[`0`].my_alloc_region (x, x) in
   cont k (Pmakeblock)
 in
-let $camlSpeculative_inlining_lifted_constants__f_2 =
+let $camlSpeculative_inlining_lifted_constants__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
 let zero = %opaque (0) in
 apply direct(f_0_1 &toplevel.alloc_region)
-  ($camlSpeculative_inlining_lifted_constants__f_2
+  ($camlSpeculative_inlining_lifted_constants__f_1
    : _ -> [ 0 of imm tagged * imm tagged ])
     (zero)
     -> k * error
@@ -31,14 +31,14 @@ apply direct(f_0_1 &toplevel.alloc_region)
           ($camlSpeculative_inlining_lifted_constants__v1_3)
       in
       apply direct(f_0_1 &my_alloc_region)
-        ($camlSpeculative_inlining_lifted_constants__f_2
+        ($camlSpeculative_inlining_lifted_constants__f_1
          : _ -> [ 0 of imm tagged * imm tagged ])
           (one_1)
           -> k * k1
       with { one = one }
     in
     let $camlSpeculative_inlining_lifted_constants =
-      Block 0 ($camlSpeculative_inlining_lifted_constants__f_2,
+      Block 0 ($camlSpeculative_inlining_lifted_constants__f_1,
                zero,
                v0,
                one,

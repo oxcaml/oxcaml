@@ -99,31 +99,45 @@ module Unboxed_or_untagged_array_tags = struct
     | _ -> unboxed_float32_array_one_tag
 end
 
-let check_equal_1 name f1 f2 arg1 =
-  let r1 = f1 arg1 in
-  let r2 = f2 arg1 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+(* The non-engine implementations of the helpers checked by [check_equal_*]
+   below do not handle [Cphantom_let] or [Cname_for_debugger], whereas the
+   [Cmm_peephole_engine] versions skip over such constructs, re-placing them
+   around any rewritten result. In the presence of these constructs the results
+   of the two implementations may therefore differ legitimately, in which case
+   the engine's result is used without checking. *)
+let check_equal_1 name f ~engine arg1 =
+  let r = f arg1 in
+  let r_engine = engine arg1 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_3 name f1 f2 arg1 arg2 arg3 =
-  let r1 = f1 arg1 arg2 arg3 in
-  let r2 = f2 arg1 arg2 arg3 in
-  if P.Cmm_comparator.equivalent r1 r2
-  then r1
+let check_equal_3 name f ~engine arg1 arg2 arg3 =
+  let r = f arg1 arg2 arg3 in
+  let r_engine = engine arg1 arg2 arg3 in
+  if P.Cmm_comparator.equivalent r r_engine
+  then r
+  else if
+    contains_debug_only_constructs r || contains_debug_only_constructs r_engine
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r1
-      Printcmm.expression r2
+    Misc.fatal_errorf "Mismatch on %s:@ %a@ vs@ %a" name Printcmm.expression r
+      Printcmm.expression r_engine
 
-let check_equal_int_1 name f1 f2 arg1 =
-  let r1 : int = f1 arg1 in
-  let r2 = f2 arg1 in
-  if r1 = r2
-  then r1
+let check_equal_int_1 name f ~engine arg1 =
+  let r : int = f arg1 in
+  let r_engine = engine arg1 in
+  if r = r_engine
+  then r
+  else if contains_debug_only_constructs arg1
+  then r_engine
   else
-    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r1 r2
+    Misc.fatal_errorf "Mismatch on %s:@ %d@ vs@ %d@ Arg is %a" name r r_engine
       Printcmm.expression arg1
 
 let arch_bits = Arch.size_int * 8
@@ -565,7 +579,7 @@ let rec add_const' arg const dbg =
               }
           => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
 
-let add_const = check_equal_3 "add_const" add_const add_const'
+let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
 
 let incr_int c dbg = add_const c 1 dbg
 
@@ -595,7 +609,7 @@ let rec add_int' arg1 arg2 dbg =
           ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun env ->
             add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
 
-let add_int = check_equal_3 "add_int" add_int add_int'
+let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
 
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -626,7 +640,7 @@ let rec sub_int' arg1 arg2 dbg =
           ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
             add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
 
-let sub_int = check_equal_3 "sub_int" sub_int sub_int'
+let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
@@ -695,7 +709,7 @@ let rec max_signed_bit_length' e =
 
 let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
-    max_signed_bit_length'
+    ~engine:max_signed_bit_length'
 
 let rec ignore_low_bit_int = function
   | Cop
@@ -731,7 +745,8 @@ let rec ignore_low_bit_int' arg =
       => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
-  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int ignore_low_bit_int'
+  check_equal_1 "ignore_low_bit_int" ignore_low_bit_int
+    ~engine:ignore_low_bit_int'
 
 let[@inline] get_const = function
   | Cconst_int (i, _) -> Some (Nativeint.of_int i)
@@ -791,40 +806,6 @@ let rec or_const e n dbg =
             | Some y -> or_const x (Nativeint.logor y n) dbg)
           | _ -> default ()))
 
-let rec and_const e n dbg =
-  match n with
-  | 0n -> replace e ~with_:(Cconst_int (0, dbg))
-  | -1n -> e
-  | n ->
-    map_tail1 e ~f:(fun e ->
-        match get_const e with
-        | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
-        | None -> (
-          let[@local] default () =
-            let e =
-              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
-            in
-            (* prefer putting constants on the right *)
-            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
-          in
-          match e with
-          | Cop (Cand, [x; y], dbg) -> (
-            match get_const y with
-            | Some y -> and_const x (Nativeint.logand y n) dbg
-            | None -> default ())
-          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
-            let[@local] load memory_chunk =
-              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
-            in
-            match memory_chunk, n with
-            | (Byte_signed | Byte_unsigned), 0xffn -> load Byte_unsigned
-            | (Sixteen_signed | Sixteen_unsigned), 0xffffn ->
-              load Sixteen_unsigned
-            | (Thirtytwo_signed | Thirtytwo_unsigned), 0xffff_ffffn ->
-              load Thirtytwo_unsigned
-            | _ -> default ())
-          | _ -> default ()))
-
 let xor_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
@@ -840,14 +821,6 @@ let or_int c1 c2 dbg =
       | None, Some c2 -> or_const c1 c2 dbg
       | Some c1, None -> or_const c2 c1 dbg
       | None, None -> Cop (Cor, [c1; c2], dbg))
-
-let and_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match get_const c1, get_const c2 with
-      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
-      | None, Some c2 -> and_const c1 c2 dbg
-      | Some c1, None -> and_const c2 c1 dbg
-      | None, None -> Cop (Cand, [c1; c2], dbg))
 
 let rec lsr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -995,10 +968,57 @@ let get_const_bitmask = function
     Some (x, Nativeint.of_int mask)
   | _ -> None
 
+let rec and_const e n dbg =
+  match n with
+  | 0n -> replace e ~with_:(Cconst_int (0, dbg))
+  | -1n -> e
+  | n ->
+    map_tail1 e ~f:(fun e ->
+        match get_const e with
+        | Some e -> natint_const_untagged dbg (Nativeint.logand e n)
+        | None -> (
+          let[@local] default () =
+            let e =
+              if Nativeint.logand n 1n = 0n then ignore_low_bit_int e else e
+            in
+            let e =
+              low_bits
+                ~bits:(arch_bits - Misc.count_leading_zeroes_nativeint n)
+                ~dbg e
+            in
+            (* prefer putting constants on the right *)
+            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+          in
+          match e with
+          | Cop (Cand, [x; y], dbg) -> (
+            match get_const y with
+            | Some y -> and_const x (Nativeint.logand y n) dbg
+            | None -> default ())
+          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) -> (
+            let[@local] load memory_chunk =
+              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            in
+            match memory_chunk, n with
+            | (Byte_signed | Byte_unsigned), 0xffn -> load Byte_unsigned
+            | (Sixteen_signed | Sixteen_unsigned), 0xffffn ->
+              load Sixteen_unsigned
+            | (Thirtytwo_signed | Thirtytwo_unsigned), 0xffff_ffffn ->
+              load Thirtytwo_unsigned
+            | _ -> default ())
+          | _ -> default ()))
+
+and and_int c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match get_const c1, get_const c2 with
+      | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
+      | None, Some c2 -> and_const c1 c2 dbg
+      | Some c1, None -> and_const c2 c1 dbg
+      | None, None -> Cop (Cand, [c1; c2], dbg))
+
 (** [low_bits ~bits x] is a (potentially simplified) value which agrees with x
     on at least the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask],
     where [mask] is a bitmask of the low [bits] bits . *)
-let rec low_bits ~bits ~dbg x =
+and low_bits ~bits ~dbg x =
   assert (bits > 0);
   if bits >= arch_bits
   then x
@@ -1897,7 +1917,14 @@ let array_indexing ?typ log2size ptr ofs dbg =
       ( (Caddi | Cor),
         [Cop (Clsl, [c; Cconst_int (1, _)], _); Cconst_int (1, _)],
         dbg' ) ->
-    Cop (add, [ptr; lsl_const c log2size dbg], dbg')
+    (* [c] is not necessarily sign-extended to [arch_bits - 1] bits. When
+       [log2size > 0], the left shift discards the top bit, so [c] can be used
+       directly. When [log2size = 0], [c] must be sign-extended; [untag_int]
+       takes care of this (and omits the extension when it can prove it
+       unnecessary). *)
+    if log2size = 0
+    then Cop (add, [ptr; untag_int ofs dbg], dbg')
+    else Cop (add, [ptr; lsl_const c log2size dbg], dbg')
   | Cop (Caddi, [c; Cconst_int (n, _)], dbg') when log2size = 0 ->
     Cop
       ( add,

@@ -759,18 +759,23 @@ extern _Atomic uintnat caml_verb_gc;
 
 #define CAML_GC_MSG_ANY (-1)
 
-/* output message if caml_verb_gc includes any bits in `category`. */
+/* always output message */
 
-void caml_gc_message (int category, const char *, ...)
+void caml_gc_message (const char *, ...)
 #if __has_attribute(format) || defined(__GNUC__)
-  __attribute__ ((format (printf, 2, 3)))
+  __attribute__ ((format (printf, 1, 2)))
 #endif
 ;
 
-/* Short-hand for calls to `caml_gc_message` */
+/* output message if caml_verb_gc includes any bits in `category`. */
 
-#define CAML_GC_MESSAGE(category, ...) \
-    caml_gc_message(CAML_GC_MSG_ ## category, __VA_ARGS__)
+#define CAML_GC_MESSAGE(category, ...)                                     \
+  do {                                                                     \
+    if ((atomic_load_relaxed(&caml_verb_gc) &                              \
+        CAML_GC_MSG_ ## category) != 0)                                    \
+        caml_gc_message(__VA_ARGS__);                                      \
+  } while(0)
+
 
 /* Output message if CAML_GC_MSG_DEBUG is set */
 

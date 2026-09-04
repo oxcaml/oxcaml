@@ -85,8 +85,10 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  (** The with-bound contributes the meet of the type's modal and externality
+      bounds and [bounds_mask]. On each axis, [top] preserves the type's bound,
+      [bot] ignores it, and a middle element caps its contribution there. *)
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end
@@ -414,7 +416,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -892,7 +895,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -947,6 +950,7 @@ and mixed_block_element =
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 
@@ -986,16 +990,21 @@ and record_representation =
      until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
-  | Record_variable
+  | Record_undetermined
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
-     [any]. The actual representation is decided at construction sites. *)
+     [any]. When typing uses, this is replaced by [Record_variable]. *)
+  | Record_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Record_undetermined] becomes after typechecking a use of the record.
+     In translation, this refines to [Record_{boxed,mixed}]. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  | Record_unboxed_product_variable
-  (* Counterpart of [Record_variable] for unboxed product records that have at
-     least one field of layout [any]. *)
+  | Record_unboxed_product_undetermined
+  (* Counterpart of [Record_undetermined] for unboxed records. When typing uses,
+     this is replaced by [Record_unboxed_product_variable].*)
+  | Record_unboxed_product_variable of Jkind_types.Sort.t array
+  (* Counterpart of [Record_variable] for unboxed records. *)
 
 and variant_representation =
   | Variant_unboxed
@@ -1019,10 +1028,10 @@ and cstr_layout =
            [Constructor_mixed] if the inlined record has any unboxed fields.
         *)
       }
-  | Cstr_layout_variable
+  | Cstr_layout_undetermined
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
-     typedecl time. Counterpart of [Record_variable] for variants. *)
+     typedecl time. Counterpart of [Record_undetermined] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
@@ -1036,9 +1045,13 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
-  | Constructor_variable
+  | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
+  | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Constructor_undetermined] becomes after typechecking a use of the
+     constructor. Like [Record_variable], only ever appears in the typedtree,
+     never in a type declaration. *)
 
 and label_declaration =
   {
@@ -1362,10 +1375,6 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
-
-val equal_unsafe_mode_crossing :
-  type_equal:(type_expr -> type_expr -> bool) ->
-  unsafe_mode_crossing -> unsafe_mode_crossing -> bool
 
 (**** Utilities for backtracking ****)
 

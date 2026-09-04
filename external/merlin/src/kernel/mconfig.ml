@@ -611,6 +611,7 @@ let ocaml_ignored_flags =
     "-fno-simd-regalloc";
     "-fclmul";
     "-fno-clmul";
+    "-fcssc";
     "-no-auto-include-otherlibs";
     "-fbmi2";
     "-fno-bmi2";
@@ -676,6 +677,8 @@ let ocaml_ignored_flags =
     "-no-omit-leaf-frame-pointers";
     "-cfg-merge-blocks";
     "-no-cfg-merge-blocks";
+    "-cfg-block-layout";
+    "-no-cfg-block-layout";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";
@@ -763,6 +766,7 @@ let ocaml_ignored_flags =
     "-fno-trap-notes";
     "-ftrap-notes";
     "-function-sections";
+    "-functorize";
     "-gdwarf-may-alter-codegen-experimental";
     "-gno-dwarf-may-alter-codegen-experimental";
     "-gno-startup";
@@ -872,7 +876,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-cms-files-per-unit";
     "-name-mangling-scheme";
     "-gdwarf-config-max-cms-files-per-variable";
-    "-gdwarf-config-max-type-to-shape-depth";
+    "-type-to-shape-max-depth";
     "-gdwarf-config-max-shape-reduce-steps-per-variable";
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";

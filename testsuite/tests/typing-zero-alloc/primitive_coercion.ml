@@ -33,7 +33,7 @@ end
 Line 2, characters 39-49:
 2 |   val add : int32 -> int32 -> int32 [@@zero_alloc]
                                            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP2.Allocating_primitive.(partial) (camlTOP2__fn[:4,2--55]_2_1_code).
+Error: Annotation check for zero_alloc failed on function TOP2.Allocating_primitive.(partial) (camlTOP2__fn[:4,2--55]_1_1_code).
 Line 4, characters 2-55:
 4 |   external add : int32 -> int32 -> int32 = "%int32_add"
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -49,7 +49,7 @@ end
 Line 2, characters 39-49:
 2 |   val add : float -> float -> float [@@zero_alloc]
                                            ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP3.Allocating_c_stub.(partial) (camlTOP3__fn[:4,2--59]_4_2_code).
+Error: Annotation check for zero_alloc failed on function TOP3.Allocating_c_stub.(partial) (camlTOP3__fn[:4,2--59]_2_2_code).
 Line 4, characters 2-59:
 4 |   external add : float -> float -> float = "caml_add_float"
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -93,7 +93,7 @@ end
 Line 2, characters 43-53:
 2 |   val float_to_int64 : float32 -> int64 [@@zero_alloc]
                                                ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP6.Allocating_builtin.(partial) (camlTOP6__fn[:4,2--113]_12_6_code).
+Error: Annotation check for zero_alloc failed on function TOP6.Allocating_builtin.(partial) (camlTOP6__fn[:4,2--113]_6_6_code).
 Lines 4-5, characters 2-66:
 4 | ..external float_to_int64 : float32 -> int64 =
 5 |     "" "caml_float32_to_int64" [@@builtin] [@@unboxed] [@@noalloc]
@@ -109,7 +109,7 @@ end
 Line 2, characters 34-44:
 2 |   val equal : 'a -> 'a -> bool [@@zero_alloc]
                                       ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP7.Primitive_could_be_made_non_allocating_with_constraint.(partial) (camlTOP7__fn[:4,2--46]_14_7_code).
+Error: Annotation check for zero_alloc failed on function TOP7.Primitive_could_be_made_non_allocating_with_constraint.(partial) (camlTOP7__fn[:4,2--46]_7_7_code).
 Line 4, characters 2-46:
 4 |   external equal : 'a -> 'a -> bool = "%equal"
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

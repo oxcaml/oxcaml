@@ -33,6 +33,8 @@
   unix)
  (modules genprintval_native opttoploop opttopdirs topmain))
 
+(copy_files ../topmain.mli)
+
 (rule
  (targets genprintval_native.ml)
  (deps ../genprintval.ml)

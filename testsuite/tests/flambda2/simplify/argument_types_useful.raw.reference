@@ -1,4 +1,4 @@
-let $camlArgument_types_useful__first_const = Block 0 () in
+let $camlArgument_types_useful__first_const_0 = Block 0 () in
 (let code size(4)
        unbox_int_and_add_one_0 (param : [ 0 of imm tagged ])
          my_closure &my_alloc_region my_depth

@@ -24,7 +24,7 @@ module Pat = struct
     (* The level we use here isn't important - the constructed type is just used for
        printing and is never unified. *)
     let sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ()) in
-    let mode = Mode.Value.newvar () in
+    let mode = Mode.Value.newvar (Ctype.get_current_level ()) in
     let pat_desc =
       Tpat_var
         { id = Ident.create_local str.Asttypes.txt;
@@ -44,7 +44,7 @@ module Pat = struct
     }
 
   let record ?(loc = Location.none) pat_env pat_type lst closed_flag =
-    let pat_desc = Tpat_record (lst, Fixed, Record_boxed, closed_flag) in
+    let pat_desc = Tpat_record (lst, Record_boxed, closed_flag) in
     { pat_desc;
       pat_loc = loc;
       pat_extra;
@@ -56,6 +56,17 @@ module Pat = struct
 
   let tuple ?(loc = Location.none) pat_env pat_type lst =
     let pat_desc = Tpat_tuple lst in
+    { pat_desc;
+      pat_loc = loc;
+      pat_extra;
+      pat_attributes;
+      pat_type;
+      pat_env;
+      pat_unique_barrier = Unique_barrier.not_computed ()
+    }
+
+  let unboxed_tuple ?(loc = Location.none) pat_env pat_type lst =
+    let pat_desc = Tpat_unboxed_tuple lst in
     { pat_desc;
       pat_loc = loc;
       pat_extra;

@@ -54,7 +54,7 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   in
   let compilation_unit_header_label = Asm_label.create (DWARF Debug_info) in
   let value_type_proto_die =
-    if !Dwarf_flags.restrict_to_upstream_dwarf
+    if !Clflags.restrict_to_upstream_dwarf
     then None
     else
       Some
@@ -66,14 +66,24 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
                DAH.create_byte_size_exn ~byte_size:Arch.size_addr ]
            ())
   in
+  let imm_or_ptr_enums =
+    (* As for [value_type_proto_die]: created eagerly, and only when generating
+       full DWARF. *)
+    if !Clflags.restrict_to_upstream_dwarf
+    then None
+    else
+      Some
+        (Dwarf_type.create_imm_or_ptr_enum_dies
+           ~parent_proto_die:compilation_unit_proto_die)
+  in
   let debug_loc_table = Debug_loc_table.create () in
   let debug_ranges_table = Debug_ranges_table.create () in
   let address_table = Address_table.create () in
   let location_list_table = Location_list_table.create () in
   let state =
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
-      ~code_layout debug_loc_table debug_ranges_table address_table
-      location_list_table ~get_file_num:get_file_id ~sourcefile
+      ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
+      address_table location_list_table ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
@@ -99,12 +109,12 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
   if
     not
       (!Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
+      && ((not !Clflags.restrict_to_upstream_dwarf)
          || !Dwarf_flags.dwarf_inlined_frames))
   then { fun_end_label; fundecl }
   else
     let available_ranges_vars, fundecl =
-      if not !Dwarf_flags.restrict_to_upstream_dwarf
+      if not !Clflags.restrict_to_upstream_dwarf
       then
         Profile.record "debug_available_ranges_vars"
           (fun fundecl -> Available_ranges_vars.create ~ppf_dump fundecl)
@@ -160,7 +170,9 @@ let emit_stats_file t =
     Json.object_
       [ Json.field "compilation_parameters"
           (Json.object_
-             [ Json.field "gdwarf_config_shape_reduce_depth"
+             [ Json.field "type_to_shape_max_depth"
+                 (Json.option Json.int !Clflags.type_to_shape_max_depth);
+               Json.field "gdwarf_config_shape_reduce_depth"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_shape_reduce_depth);
                Json.field "gdwarf_config_shape_eval_depth"
@@ -171,9 +183,6 @@ let emit_stats_file t =
                Json.field "gdwarf_config_max_cms_files_per_variable"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_max_cms_files_per_variable);
-               Json.field "gdwarf_config_max_type_to_shape_depth"
-                 (Json.option Json.int
-                    !Clflags.gdwarf_config_max_type_to_shape_depth);
                Json.field "gdwarf_config_max_shape_reduce_steps_per_variable"
                  (Json.option Json.int
                     !Clflags.gdwarf_config_max_shape_reduce_steps_per_variable);

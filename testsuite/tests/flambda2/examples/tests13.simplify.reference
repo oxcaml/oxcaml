@@ -9,7 +9,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,31--43]_3`)
         -> k * k1 =
   cont k (x)
 in
-let $`camlTests13__fn[tests13.ml:30,31--43]_8` =
+let $`camlTests13__fn[tests13.ml:30,31--43]_3` =
   closure `fn[tests13.ml:30,31--43]_3_1` @`fn[tests13.ml:30,31--43]`
     &toplevel.alloc_region
 in
@@ -20,7 +20,7 @@ let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:30,44--59]_2`)
         : [ 0 | 0 of val * val ] =
   cont k (0)
 in
-let $`camlTests13__fn[tests13.ml:30,44--59]_7` =
+let $`camlTests13__fn[tests13.ml:30,44--59]_2` =
   closure `fn[tests13.ml:30,44--59]_2_1` @`fn[tests13.ml:30,44--59]`
     &toplevel.alloc_region
 in
@@ -37,8 +37,8 @@ let code loopify(never) size(10) newer_version_of(`fn[tests13.ml:27,2--118]_1`)
   let Popaque = %opaque (j) in
   apply &my_alloc_region inlined(never)
     map_foo
-      ($`camlTests13__fn[tests13.ml:30,31--43]_8`,
-       $`camlTests13__fn[tests13.ml:30,44--59]_7`,
+      ($`camlTests13__fn[tests13.ml:30,31--43]_3`,
+       $`camlTests13__fn[tests13.ml:30,44--59]_2`,
        0)
       -> k * k1
 in
@@ -49,11 +49,11 @@ let code loopify(never) size(1) newer_version_of(`fn[tests13.ml:41,15--28]_5`)
         : [ 0 | 0 of val * val ] =
   cont k (0)
 in
-let $`camlTests13__fn[tests13.ml:41,15--28]_10` =
+let $`camlTests13__fn[tests13.ml:41,15--28]_5` =
   closure `fn[tests13.ml:41,15--28]_5_1` @`fn[tests13.ml:41,15--28]`
     &toplevel.alloc_region
 in
-let $camlTests13__map_foo_9 =
+let $camlTests13__map_foo_4 =
   closure map_foo_4_1 @map_foo &toplevel.alloc_region
 and code rec loopify(never) size(77) newer_version_of(map_foo_4)
       map_foo_4_1 (f : val, seq : val, param : imm tagged)
@@ -79,7 +79,7 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
                  with {
                    i = 10;
                    map_foo =
-                     $camlTests13__map_foo_9 ~ depth my_depth -> succ my_depth
+                     $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
                  }
                  in
                  cont k2 (`fn[tests13.ml:27,2--118]`)
@@ -90,7 +90,7 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
                  with {
                    i = 20;
                    map_foo =
-                     $camlTests13__map_foo_9 ~ depth my_depth -> succ my_depth
+                     $camlTests13__map_foo_4 ~ depth my_depth -> succ my_depth
                  }
                  in
                  cont k2 (`fn[tests13.ml:27,2--118]`))
@@ -104,7 +104,7 @@ and code rec loopify(never) size(77) newer_version_of(map_foo_4)
                           let Pmakeblock =
                             %block.[`0`].my_alloc_region
                               (apply_result,
-                               $`camlTests13__fn[tests13.ml:41,15--28]_10`)
+                               $`camlTests13__fn[tests13.ml:41,15--28]_5`)
                           in
                           cont k (Pmakeblock)))))
 and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
@@ -114,9 +114,9 @@ and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
   let Popaque = %opaque (23) in
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
          inlining_state(depth(1))
-    $camlTests13__map_foo_9 ~ depth do_not_inline -> do_not_inline
-      ($`camlTests13__fn[tests13.ml:30,31--43]_8`,
-       $`camlTests13__fn[tests13.ml:30,44--59]_7`,
+    $camlTests13__map_foo_4 ~ depth do_not_inline -> do_not_inline
+      ($`camlTests13__fn[tests13.ml:30,31--43]_3`,
+       $`camlTests13__fn[tests13.ml:30,44--59]_2`,
        0)
       -> k * k1
 and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
@@ -126,11 +126,11 @@ and code loopify(never) size(4) newer_version_of(`fn[tests13.ml:27,2--118]_1_1`)
   let Popaque = %opaque (13) in
   apply direct(map_foo_4_1 &my_alloc_region) inlined(never)
          inlining_state(depth(1))
-    $camlTests13__map_foo_9 ~ depth do_not_inline -> do_not_inline
-      ($`camlTests13__fn[tests13.ml:30,31--43]_8`,
-       $`camlTests13__fn[tests13.ml:30,44--59]_7`,
+    $camlTests13__map_foo_4 ~ depth do_not_inline -> do_not_inline
+      ($`camlTests13__fn[tests13.ml:30,31--43]_3`,
+       $`camlTests13__fn[tests13.ml:30,44--59]_2`,
        0)
       -> k * k1
 in
-let $camlTests13 = Block 0 ($camlTests13__map_foo_9) in
+let $camlTests13 = Block 0 ($camlTests13__map_foo_4) in
 cont done ($camlTests13)

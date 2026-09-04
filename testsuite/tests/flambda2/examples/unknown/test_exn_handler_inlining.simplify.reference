@@ -6,7 +6,7 @@ let code loopify(never) size(1) newer_version_of(id_0)
       id_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (x)
 in
-let $camlTest_exn_handler_inlining__id_4 =
+let $camlTest_exn_handler_inlining__id_1 =
   closure id_0_1 @`id` &toplevel.alloc_region
 in
 let code loopify(never) size(19) newer_version_of(p_2)
@@ -23,10 +23,10 @@ let code loopify(never) size(19) newer_version_of(p_2)
       cont k (Popaque)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
-      let Popaque = %opaque ($camlTest_exn_handler_inlining__id_4) in
+      let Popaque = %opaque ($camlTest_exn_handler_inlining__id_1) in
       apply &my_alloc_region Popaque (Pfield) -> k * k1
 in
-let $camlTest_exn_handler_inlining__p_6 =
+let $camlTest_exn_handler_inlining__p_3 =
   closure p_2_1 @p &toplevel.alloc_region
 in
 let code loopify(never) size(4) newer_version_of(g_1)
@@ -35,12 +35,12 @@ let code loopify(never) size(4) newer_version_of(g_1)
         -> k * k1
         : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
   apply direct(p_2_1 &my_alloc_region)
-    ($camlTest_exn_handler_inlining__p_6
+    ($camlTest_exn_handler_inlining__p_3
      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
       (y)
       -> k * k1
 in
-let $camlTest_exn_handler_inlining__g_5 =
+let $camlTest_exn_handler_inlining__g_2 =
   closure g_1_1 @g &toplevel.alloc_region
 in
 let code loopify(never) size(18) newer_version_of(f_3)
@@ -55,7 +55,7 @@ let code loopify(never) size(18) newer_version_of(f_3)
       (cont k6 push(k5)
          where k6 =
            (apply direct(p_2_1 &my_alloc_region) inlining_state(depth(10))
-              ($camlTest_exn_handler_inlining__p_6
+              ($camlTest_exn_handler_inlining__p_3
                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
                 (c_unboxed0)
                 -> k6 * k5
@@ -74,12 +74,12 @@ let code loopify(never) size(18) newer_version_of(f_3)
       let unit_1 = %end_try_ghost_region (try_ghost_region) in
       cont k (c_unboxed0_1)
 in
-let $camlTest_exn_handler_inlining__f_7 =
+let $camlTest_exn_handler_inlining__f_4 =
   closure f_3_1 @f &toplevel.alloc_region
 in
 let $camlTest_exn_handler_inlining =
-  Block 0 ($camlTest_exn_handler_inlining__id_4,
-           $camlTest_exn_handler_inlining__g_5,
-           $camlTest_exn_handler_inlining__f_7)
+  Block 0 ($camlTest_exn_handler_inlining__id_1,
+           $camlTest_exn_handler_inlining__g_2,
+           $camlTest_exn_handler_inlining__f_4)
 in
 cont done ($camlTest_exn_handler_inlining)

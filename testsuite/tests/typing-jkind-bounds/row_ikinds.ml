@@ -326,6 +326,8 @@ type t3 : value non_float mod everything with [ `A of string] t1 = C of string  
    ikinds regression vs non-ikinds.
    Internal ticket 6481. *)
 [%%expect{|
+type t3 = C of string
+|}, Principal{|
 Line 1, characters 0-78:
 1 | type t3 : value non_float mod everything with [ `A of string] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -356,6 +358,8 @@ type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] 
    ikinds regression vs non-ikinds.
    Internal ticket 6481. *)
 [%%expect{|
+type t3 = C of string
+|}, Principal{|
 Line 1, characters 0-96:
 1 | type t3 : value non_float mod everything with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

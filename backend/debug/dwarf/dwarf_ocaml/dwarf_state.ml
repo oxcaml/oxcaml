@@ -75,6 +75,14 @@ module Die_gen_ctx = struct
 
     let get_opt rec_env ~de_bruijn_index =
       RS.DeBruijn_env.get_opt (value rec_env) ~de_bruijn_index
+
+    let truncate table rec_env ~depth =
+      (* The length test is purely an optimization, avoiding an intern-table
+         probe: re-interning an unchanged environment would return the same
+         canonical element (see [Hash_consed.S.create]). *)
+      if RS.DeBruijn_env.length (value rec_env) <= depth
+      then rec_env
+      else modify table rec_env (fun env -> RS.DeBruijn_env.truncate env ~depth)
   end
 
   module Cache = struct
@@ -133,26 +141,78 @@ module Die_gen_ctx = struct
       String.Tbl.add t name (runtime_shape, reference)
   end
 
+  (* The per-compilation-unit DIEs for the enumerations distinguishing
+     immediates from pointers, whose contents do not depend on the type being
+     described: one variant with named enumerators, one with unnamed ones. Like
+     the "ocaml_value" fallback DIE, they are created eagerly in [Dwarf.create],
+     and only when generating full DWARF. *)
+  type imm_or_ptr_enums =
+    { named : Proto_die.t;
+      unnamed : Proto_die.t
+    }
+
   type t =
     { cache : Cache.t;
       name_cache : Name_cache.t;
-      rec_env_table : Rec_var_env.table
+      rec_env_table : Rec_var_env.table;
+      (* The empty environment, interned once in [rec_env_table] so that
+         restricting a cache key for a closed shape (the overwhelmingly common
+         case) does not involve an intern-table lookup. *)
+      empty_rec_env : Rec_var_env.t;
+      imm_or_ptr_enums : imm_or_ptr_enums option
     }
 
-  let create ~initial_size =
+  let create ~initial_size ~imm_or_ptr_enums =
+    let rec_env_table = Rec_var_env.create_table ~initial_size in
     { cache = Cache.create ~initial_size;
       name_cache = Name_cache.create ~initial_size;
-      rec_env_table = Rec_var_env.create_table ~initial_size
+      rec_env_table;
+      empty_rec_env = Rec_var_env.empty rec_env_table;
+      imm_or_ptr_enums
     }
-
-  let cache t = t.cache
 
   let name_cache t = t.name_cache
 
-  let empty_rec_env t = Rec_var_env.empty t.rec_env_table
+  let imm_or_ptr_enums t =
+    match t.imm_or_ptr_enums with
+    | Some enums -> enums
+    | None ->
+      Misc.fatal_error
+        "Immediate-or-pointer enumeration DIEs are only created when \
+         generating full DWARF"
+
+  let imm_or_ptr_enum_named t = (imm_or_ptr_enums t).named
+
+  let imm_or_ptr_enum_unnamed t = (imm_or_ptr_enums t).unnamed
+
+  let empty_rec_env t = t.empty_rec_env
 
   let push_rec_binder t rec_env ref =
     Rec_var_env.push t.rec_env_table rec_env ref
+
+  (* Restrict [rec_env] to the binders a shape with the given [free_depth] can
+     actually reference, so that cache keys do not distinguish environment
+     entries the generated DWARF cannot depend on. The [free_depth = 0] case
+     (closed shapes, the overwhelmingly common one) is only a compile-time
+     optimization on top: truncating to depth zero would yield the same interned
+     environment, but returning the precomputed empty environment saves the
+     intern-table round trip. *)
+  let restrict_rec_env t rec_env ~free_depth =
+    if free_depth = 0
+    then t.empty_rec_env
+    else Rec_var_env.truncate t.rec_env_table rec_env ~depth:free_depth
+
+  (* The restriction of the environment happens inside these two functions,
+     rather than at the call sites, so that it is impossible to consult or seed
+     the cache with an over-wide key (which would silently reintroduce
+     duplicated DWARF type descriptions). *)
+  let find_cached_die t ~inp ~rec_env =
+    let rec_env = restrict_rec_env t rec_env ~free_depth:(RS.free_depth inp) in
+    Cache.find t.cache ~inp ~rec_env
+
+  let add_cached_die t ~inp ~rec_env ~outp =
+    let rec_env = restrict_rec_env t rec_env ~free_depth:(RS.free_depth inp) in
+    Cache.add t.cache ~inp ~rec_env ~outp
 end
 
 type t =
@@ -174,8 +234,8 @@ type t =
   }
 
 let create ~compilation_unit_header_label ~compilation_unit_proto_die
-    ~code_layout debug_loc_table debug_ranges_table address_table
-    location_list_table ~get_file_num ~sourcefile =
+    ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
+    address_table location_list_table ~get_file_num ~sourcefile =
   { compilation_unit_header_label;
     compilation_unit_proto_die;
     code_layout;
@@ -191,7 +251,7 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
     complex_shape_cache = Complex_shape.Shape_cache.create ~initial_size:100;
     eval_context =
       Type_shape.Evaluated_shape.Eval_context.create ~initial_size:256;
-    die_gen_ctx = Die_gen_ctx.create ~initial_size:256
+    die_gen_ctx = Die_gen_ctx.create ~initial_size:256 ~imm_or_ptr_enums
   }
 
 let compilation_unit_header_label t = t.compilation_unit_header_label
