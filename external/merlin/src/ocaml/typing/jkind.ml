@@ -297,21 +297,6 @@ module Layout = struct
     | Product ts -> Product (List.map get ts)
     | Addressable t -> Addressable (get t)
 
-  let sort_equal_result ~allow_mutation result =
-    match (result : Sort.equate_result) with
-    | (Equal_mutated_first | Equal_mutated_second | Equal_mutated_both)
-      when not allow_mutation ->
-      Misc.fatal_errorf "Jkind.equal: Performed unexpected mutation"
-    | Unequal -> false
-    | Equal_no_mutation | Equal_mutated_first | Equal_mutated_second
-    | Equal_mutated_both ->
-      true
-
-  let sort_constrain_result result =
-    match (result : Sort.constrain_addressable_result) with
-    | Not_known_addressable -> false
-    | Addressable_no_mutation | Addressable_mutated -> true
-
   let rec strip_head_addressable : Sort.t t -> Sort.t t = function
     | Addressable t -> strip_head_addressable t
     | Sort (s, sa) as t ->
@@ -324,8 +309,7 @@ module Layout = struct
     function
     | Any _ -> false
     | Addressable _ -> true
-    | Sort (s, _) ->
-      sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
     | Product ts ->
       List.for_all (constrain_below_addressable ~allow_mutation) ts
 
@@ -336,8 +320,7 @@ module Layout = struct
     function
     | Any _ -> true
     | Addressable _ -> true
-    | Sort (s, _) ->
-      sort_constrain_result (Sort.constrain_addressable ~allow_mutation s)
+    | Sort (s, _) -> Sort.constrain_addressable ~allow_mutation s
     | Product ts ->
       List.for_all (constrain_above_addressable ~allow_mutation) ts
 
@@ -352,7 +335,7 @@ module Layout = struct
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
     | Sort (s1, sa1), Sort (s2, sa2) ->
-      sort_equal_result ~allow_mutation (Sort.equate_tracking_mutation s1 s2)
+      Sort.equate ~allow_mutation s1 s2
       &&
       if
         Sort.is_scannable_or_var s1
@@ -366,6 +349,8 @@ module Layout = struct
       then Scannable_axes.equal sa1 sa2
       else true
     | Product ts, Sort (sort, _) | Sort (sort, _), Product ts -> (
+      (* CR-someday jbachurski: This might mutate [sort] even if
+         [allow_mutation] is [false]. *)
       match Sort.decompose_into_product sort (List.length ts) with
       | None -> false
       | Some sorts ->
@@ -375,7 +360,7 @@ module Layout = struct
       List.equal (equate_or_equal ~allow_mutation) ts1 ts2
     | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
     | Addressable l1, Addressable l2 ->
-      (* Incomplete; see [Sort.equate_sort_addressable]. *)
+      (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
       equate_or_equal ~allow_mutation
         (strip_head_addressable l1)
         (strip_head_addressable l2)
@@ -429,7 +414,7 @@ module Layout = struct
     let rec sub t1 t2 : Misc.Le_result.t =
       match t1, t2 with
       | Addressable l1, Addressable l2 ->
-        (* Incomplete; see [Sort.equate_sort_addressable]. *)
+        (* Incomplete; see the [Addressable] cases in [Sort.equate]. *)
         sub (strip_head_addressable l1) (strip_head_addressable l2)
       | Addressable l1, Any _ ->
         (* Instead of [l1 addressable < any], we solve [l1 < any]
@@ -458,7 +443,7 @@ module Layout = struct
       | Product _, Any _ -> Less
       | Any _, _ -> Not_le
       | Sort (s1, sa1), Sort (s2, sa2) ->
-        if Sort.equate s1 s2
+        if Sort.equate ~allow_mutation:true s1 s2
         then
           if Sort.is_scannable_or_var s1
           then Scannable_axes.less_or_equal sa1 sa2
@@ -501,7 +486,7 @@ module Layout = struct
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Addressable l1, Addressable l2 ->
       (* The meet of two addressable layouts is addressable. Incomplete; see
-         [Sort.equate_sort_addressable]. *)
+         the [Addressable] cases in [Sort.equate]. *)
       Option.map
         (fun l -> Addressable l)
         (intersection (strip_head_addressable l1) (strip_head_addressable l2))
@@ -511,7 +496,7 @@ module Layout = struct
       then intersection (Addressable l1) (Addressable t2)
       else None
     | Sort (s1, sa1), Sort (s2, sa2) ->
-      if Sort.equate s1 s2
+      if Sort.equate ~allow_mutation:true s1 s2
       then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
       else None
     | Product ts1, Product ts2 ->
