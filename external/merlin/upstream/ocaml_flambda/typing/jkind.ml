@@ -2617,12 +2617,14 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
-let for_unboxed_record_with_updates lbls =
+let for_unboxed_record lbls =
   let open Types in
   let tys_modalities =
-    List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
+    List.map
+      (fun ({ ld_type; ld_modalities; _ }, _layout) -> ld_type, ld_modalities)
+      lbls
   in
-  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
+  let layouts = List.map (fun (_lbl, layout) -> layout) lbls in
   Builtin.product ~why:Unboxed_record tys_modalities layouts
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
