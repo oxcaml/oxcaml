@@ -297,9 +297,7 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
         simples
     in
     let[@local] create_lookup_table static_const =
-      let symbol =
-        Symbol.manufacture (Current_unit.get_cu_exn ()) "switch_block"
-      in
+      let symbol = Symbol.manufacture (Current_unit.get_cu_exn ()) name in
       let dacc_before_switch =
         match static_const with
         | None -> dacc_before_switch
