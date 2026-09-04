@@ -81,6 +81,9 @@ module Bin_op : sig
     | Bit_and
     | Bit_or
     | Bit_xor
+    | Shift_left
+    | Shift_right
+    | Shift_right_logical
     | Eq
     | Lt
     | Le

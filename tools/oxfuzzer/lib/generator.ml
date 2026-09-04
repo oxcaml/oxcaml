@@ -154,6 +154,26 @@ let record_complexity expr ~complexity =
   incr complexity;
   expr
 
+(* CR-soon hwasilewski: Add general expressions for shift counts. *)
+let gen_shift_count (st : State.t) (nty : NumberTy.t) ~complexity =
+  let width =
+    match nty.base with
+    | Int -> Sys.int_size
+    | Nativeint -> Sys.word_size
+    | Int64 -> 64
+    | Int32 -> 32
+    | Int16 -> 16
+    | Int8 -> 8
+    | Float | Float32 ->
+      Misc.fatal_errorf "gen_shift_count: expected an integral type"
+  in
+  let count =
+    if Random.State.bool st.random_state
+    then random_element st [0; 1; width - 2; width - 1]
+    else Random.State.int st.random_state width
+  in
+  record_complexity (Expr.Const (Number.Int count)) ~complexity
+
 let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
   let vars =
     List.filter_map
@@ -230,7 +250,14 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
         let inner_ty = gen_ty nty in
         let binop = random_element st (Bin_op.ops_for_ty (Ty.Number inner_ty)) in
         let lhs = gen_number st env inner_ty ~complexity in
-        let rhs = gen_number st env inner_ty ~complexity in
+        let rhs =
+          match binop with
+          | Bin_op.Shift_left
+          | Bin_op.Shift_right
+          | Bin_op.Shift_right_logical ->
+            gen_shift_count st inner_ty ~complexity
+          | _ -> gen_number st env inner_ty ~complexity
+        in
         Expr.Convert
           { from = inner_ty;
             to_ = nty;
