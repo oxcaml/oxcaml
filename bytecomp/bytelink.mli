@@ -36,7 +36,7 @@ type error =
   | Not_an_object_file of filepath
   | Wrong_object_name of filepath
   | Symbol_error of filepath * Symtable.error
-  | Inconsistent_import of Compilation_unit.Name.t * filepath * filepath
+  | Inconsistent_import of Compilation_unit_intf.t * filepath * filepath
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath

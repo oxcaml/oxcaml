@@ -22,9 +22,7 @@ module DC = Dynlink_common
 module DT = Dynlink_types
 
 let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
-  let crc = Import_info.crc import in
-  name, crc
+  Import_info.Intf.name import, Import_info.Intf.crc import
 
 module Bytecode = struct
   type filename = string
@@ -88,14 +86,12 @@ module Bytecode = struct
   let num_globals_inited () =
     failwith "Should never be called for bytecode dynlink"
 
-  let assume_no_prefix modname =
-    Compilation_unit.create Compilation_unit.Prefix.empty modname
-
   let fold_initial_units ~init ~f =
     Array.fold_left (fun acc import ->
-        let modname = Import_info.name import in
-        let crc = Import_info.crc import in
-        let cu = assume_no_prefix modname in
+        let name = Import_info.Intf.name import in
+        let sym = Compilation_unit_intf.to_string name in
+        let crc = Import_info.Intf.crc import in
+        let cu = Compilation_unit.of_intf_assume_no_prefix_no_args name in
         let defined =
           Symtable.is_defined_in_global_map !default_global_map
             (Glob_compunit cu)
@@ -104,12 +100,12 @@ module Bytecode = struct
           if defined then Some (None, DT.Loaded)
           else None
         in
-        let compunit = modname |> Compilation_unit.Name.to_string in
         let defined_symbols =
-          if defined then [compunit]
+          if defined then [sym]
           else []
         in
-        f acc ~compunit ~interface:crc ~implementation ~defined_symbols)
+        f acc ~intf:name ~impl:(Some sym) ~interface:crc ~implementation
+          ~defined_symbols)
       init
       !default_crcs
 
@@ -236,8 +232,8 @@ module Bytecode = struct
 
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
     let cu =
-      Compilation_unit.Name.of_string bytecode_or_asm_symbol
-      |> assume_no_prefix
+      Compilation_unit.create Compilation_unit.Prefix.empty
+        (Compilation_unit.Name.of_string bytecode_or_asm_symbol)
     in
     match Symtable.get_global_value (Glob_compunit cu) with
     | exception _ -> None

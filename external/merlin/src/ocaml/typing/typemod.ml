@@ -28,6 +28,7 @@ let () = Includemod_errorprinter.register ()
 
 module Sig_component_kind = Shape.Sig_component_kind
 module String = Misc.Stdlib.String
+module CUI = Compilation_unit_intf
 
 type hiding_error =
   | Illegal_shadowing of {
@@ -531,7 +532,9 @@ let rec instance_name ~loc env syntax =
            value = instance_name ~loc env value })
       args
   in
-  match Global_module.Name.create head args with
+  match
+    Global_module.Name.create (CUI.of_string head) args
+  with
   | Ok name -> name
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
@@ -4758,7 +4761,8 @@ let type_implementation target modulename initial_env ast =
             Unit_info.Artifact.filename compiled_intf_file
           in
           let global_name =
-            Compilation_unit.to_global_name_without_prefix modulename
+            Global_module.Name.create_no_args
+              (Unit_info.Artifact.intf compiled_intf_file)
           in
           let dclsig, staticity =
             Env.read_signature global_name compiled_intf_file
@@ -4851,7 +4855,7 @@ let type_implementation target modulename initial_env ast =
           let shape = Shape_reduce.local_reduce Env.empty shape in
           let alerts = Builtin_attributes.alerts_of_str ~mark:true ast in
           if not !Clflags.dont_write_files then begin
-            let name = Compilation_unit.name modulename in
+            let name = Unit_info.intf target in
             let kind =
               Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
             in
@@ -4955,7 +4959,7 @@ let functorize_signature ~params ~modules : Types.signature =
       (fun (p_name, param_id) body ->
         let impl, param_params, (swg : Signature_with_global_bindings.t) =
           Env.find_import ~chain:[]
-            (Compilation_unit.Name.of_parameter_name p_name)
+            (p_name : Global_module.Parameter_name.t :> CUI.t)
         in
         assert (Option.is_none impl);
         assert (List.is_empty param_params);
@@ -5009,7 +5013,7 @@ let functorize_interface initial_env ~params ~module_sigs unit_info
   let sg = functorize_signature ~params ~modules:module_sigs in
   Ident.reinit ();
   if not !Clflags.dont_write_files then begin
-    let name = Compilation_unit.name modulename in
+    let name = Unit_info.intf unit_info in
     let kind =
       Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
     in
@@ -5065,7 +5069,10 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
         let cmi_artifact =
           Unit_info.Artifact.from_filename ~for_pack_prefix cmi_file
         in
-        let name = Compilation_unit.to_global_name_without_prefix modulename in
+        let name =
+          Global_module.Name.create_no_args
+            (Unit_info.Artifact.intf cmi_artifact)
+        in
         let dclsig, staticity = Env.read_signature name cmi_artifact in
         let cc, _shape =
           let modes =
@@ -5079,7 +5086,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
         save_cmt_cms None;
         cc
     | None ->
-        let name = Compilation_unit.name modulename in
+        let name = Unit_info.intf unit_info in
         let kind =
           Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = None }
         in
@@ -5096,7 +5103,7 @@ let package_signatures units =
   let units_with_ids =
     List.map
       (fun (name, sg) ->
-        let name = name |> Compilation_unit.Name.to_string in
+        let name = name |> CUI.to_string in
         let oldid = Ident.create_persistent name in
         let newid = Ident.create_local name in
         (oldid, newid, sg))
@@ -5131,9 +5138,8 @@ let package_units initial_env objfiles target_cmi modulename =
       (fun f ->
          let for_pack_prefix = Compilation_unit.to_prefix modulename in
          let artifact = Unit_info.Artifact.from_filename ~for_pack_prefix f in
-         let modname = Unit_info.Artifact.modname artifact in
          let global_name =
-           Compilation_unit.to_global_name_without_prefix modname
+           Global_module.Name.create_no_args (Unit_info.Artifact.intf artifact)
          in
          let sg, _ =
            Env.read_signature global_name (Unit_info.companion_cmi artifact)
@@ -5142,7 +5148,7 @@ let package_units initial_env objfiles target_cmi modulename =
             not(Mtype.no_code_needed_sig (Lazy.force Env.initial) sg)
          then raise(Error(Location.none, Env.empty,
                           Implementation_is_required f));
-         Compilation_unit.name modname, sg)
+         Unit_info.Artifact.intf artifact, sg)
       objfiles in
   (* Compute signature of packaged unit *)
   Ident.reinit();
@@ -5151,7 +5157,7 @@ let package_units initial_env objfiles target_cmi modulename =
   let pack_uid = Uid.of_compilation_unit_id modulename in
   let shape =
     List.fold_left (fun map (name, _sg) ->
-      let name = Compilation_unit.Name.to_string name in
+      let name = CUI.to_string name in
       let id = Ident.create_persistent name in
       Shape.Map.add_module map id (Shape.for_persistent_unit name)
     ) Shape.Map.empty units
@@ -5165,7 +5171,9 @@ let package_units initial_env objfiles target_cmi modulename =
       raise(Error(Location.in_file mli, Env.empty,
                   Interface_not_compiled mli))
     end;
-    let name = Compilation_unit.to_global_name_without_prefix modulename in
+    let name =
+      Global_module.Name.create_no_args (Unit_info.Artifact.intf target_cmi)
+    in
     let dclsig, staticity = Env.read_signature name target_cmi in
     (* [-pack] is a corner case feature that doesn't support staticity, so the
        packed [.mli] should not carry a file-level [@@ static]/[@@ dynamic]. *)
@@ -5191,11 +5199,11 @@ let package_units initial_env objfiles target_cmi modulename =
     cc
   end else begin
     (* Determine imports *)
-    let unit_names = List.map fst units in
+    let unit_intfs = List.map fst units in
     let imports =
       List.filter (fun import ->
-          let name = Import_info.name import in
-          not (List.mem name unit_names))
+          let name = Import_info.Intf.name import in
+          not (List.exists (CUI.equal name) unit_intfs))
         (Env.imports()) in
     (* Write packaged signature *)
     if not !Clflags.dont_write_files then begin
@@ -5203,7 +5211,7 @@ let package_units initial_env objfiles target_cmi modulename =
         (* Packs aren't supported as arguments *)
         None
       in
-      let name = Compilation_unit.name modulename in
+      let name = Unit_info.Artifact.intf target_cmi in
       let kind = Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for } in
       let cmi =
         Env.save_signature_with_imports ~alerts:Misc.Stdlib.String.Map.empty
