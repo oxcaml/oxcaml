@@ -573,6 +573,7 @@ stdenv.mkDerivation {
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
         make external-libs-build - Builds vendored external libraries depending on oxcaml
+        make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml
       ${merlinCommands}EOF
     '';
 
