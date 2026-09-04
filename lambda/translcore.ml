@@ -1926,48 +1926,71 @@ and transl_tupled_function
             (fun {c_lhs; c_guard; c_rhs} ->
               (Matching.flatten_pattern size c_lhs, c_guard, c_rhs))
             cases in
-        let tuple_value_kinds arg_layout =
+        let tuple_layouts arg_layout =
           match arg_layout with
           | Pvalue {
               nullable = Non_nullable;
               raw_kind = Pvariant { consts = [];
                                non_consts = [0, Constructor_uniform kinds] }} ->
-              (* CR layouts v5: to change when we have non-value tuple
-                 elements. *)
-              Some kinds
+              Some (List.map (fun vk -> Pvalue vk) kinds)
+              (* CR zeisbach: we would like this to handle the Constructor_mixed
+                 case too (arising from mixed tuples), but the backend does not
+                 yet support that. So, we stick with None. *)
           | _ -> None
         in
-        let value_kinds =
+        let layouts =
           if cases_are_partial_gadt_match cases partial
           then
             (* Under a partial GADT match, we can't rely on the pattern's
                types as the caller can still pass a missing constructor, so we
-               compute kinds from the function's own type instead. *)
+               compute layouts from the function's own type instead. *)
             let fun_arg_ty, _ = split_fun_ty fun_ty in
             (match
-               tuple_value_kinds (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
+               tuple_layouts (layout_of_fun_arg_ty fun_arg_ty loc arg_sort)
              with
-             | Some kinds -> kinds
-             | None -> List.init size (fun _ -> Lambda.generic_value))
+             | Some layouts -> layouts
+             | None ->
+                 (* CR zeisbach: This line is very suspicious and probably a bug
+                    becuase (a) the pattern sorts may not be trustworthy due to
+                    partial GADT match, and (b) defaulting to scannable also is
+                    suspicious. BUT, I want to try it first, then write a bug,
+                    then debug it.
+
+                    One potential fix is to check the sorts in pl to be value,
+                    but that might also be broken. Another might be to
+                    accumulate a bit of information about the pattern while
+                    type-checking to convey sort information *)
+                 (* CR zeisbach: actually this will give us some things that
+                    aren't values, which will fatal error later. So we should
+                    probably just be checking for values initially. I still want
+                    to try to play around with this version a little, though. *)
+                 List.map
+                   (fun (_, _, sort) ->
+                      layout_of_sort loc
+                        (Jkind.Sort.default_for_transl_and_get sort))
+                   pl)
           else
             match
-              Option.bind (join_layout_of_cases arg_sort cases)
-                tuple_value_kinds
+              Option.bind (join_layout_of_cases arg_sort cases) tuple_layouts
             with
-            | Some kinds -> kinds
+            | Some layouts -> layouts
             | None ->
+                (* CR zeisbach: ok yeah we definitely are going to hit this
+                   case because we don't handle the stuff above properly. *)
+                (* CR zeisbach: this also gets hit when we have a Pgenval from
+                   typeopt seeing a non-representable layout... *)
                 Misc.fatal_error
                   "Translcore.transl_tupled_function: \
                    Argument should be a tuple, but couldn't get the kinds"
         in
-        let kinds = List.map (fun vk -> Pvalue vk) value_kinds in
         let tparams =
-          List.map2 (fun kind (_, fld_pat) ->
+          List.map2 (fun kind (_, fld_pat, sort) ->
               let debug_uid =
                 Typecore.create_uid_for_pattern_kind Value_pattern_in_argument
               in
               add_type_shapes_of_param ~env:first_case.c_lhs.pat_env
-                ~uid:debug_uid ~sort:Jkind.Sort.Const.for_tuple_element
+                ~uid:debug_uid
+                ~sort:(Jkind.Sort.default_for_transl_and_get sort)
                 ~type_expr:fld_pat.pat_type;
               {
                 name = Ident.create_local "param";
@@ -1975,7 +1998,7 @@ and transl_tupled_function
                 layout = kind;
                 attributes = Lambda.default_param_attribute;
                 mode = alloc_heap
-              }) kinds pl
+              }) layouts pl
         in
         let params = List.map (fun p -> p.name) tparams in
         let body =
