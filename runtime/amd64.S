@@ -804,7 +804,9 @@ CFI_STARTPROC
            in practice this seems most unlikely.  The current situation will
            suffice as this patch is only a temporary measure in any case. */
         SWITCH_OCAML_TO_C
-        CHECK_STACK_ALIGNMENT; jmp GCALL(caml_raise_stack_overflow)
+    /* Enter the C function, using [call] to ensure stack alignment. This
+       call never returns. */
+        C_call  (GCALL(caml_raise_stack_overflow))
 CFI_ENDPROC
 END_FUNCTION(caml_raise_stack_overflow_nat)
 
