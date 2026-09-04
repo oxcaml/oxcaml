@@ -1345,23 +1345,66 @@ module Constant = struct
           (Const_named ("str_" ^ s), W.StructNew (ty, [ AnyConvertExtern (GlobalGet x) ]))
     | String s ->
         let* ty = Type.string_type in
-        if String.length s >= string_length_threshold
-        then
-          let name = Code.Var.fresh_n "string" in
-          let* () = register_data_segment name s in
-          return
-            ( Mutated
-            , W.ArrayNewData
-                (ty, name, Const (I32 0l), Const (I32 (Int32.of_int (String.length s))))
-            )
-        else
-          let l =
-            String.fold_right
-              ~f:(fun c r -> W.Const (I32 (Int32.of_int (Char.code c))) :: r)
-              s
-              ~init:[]
-          in
-          return (Const_named ("str_" ^ s), W.ArrayNewFixed (ty, l))
+        (* Equal string constants are interned. *)
+        let* interned = lookup_string_global s in
+        let fixed_or_data, mutated_or_const = 
+         (* For [String.length s > threshold] strings, since [array.new_data] is not a 
+            constant expression, the global is mutable at the Wasm level and 
+            written once by initialization code; it is nonetheless registered as 
+            constant. 
+
+            This is sound as long as string constants are never mutated, which they 
+            shouldn't be in OCaml code due to strings being immutable in OCaml. *)
+          match String.length s >= string_length_threshold with
+          | true -> `Data, Mutated
+          | false -> `Fixed, Const
+        in 
+        (match interned with
+         | Some x -> return (mutated_or_const, W.GlobalGet x)
+         | None ->
+           let* x =
+             match fixed_or_data with 
+             | `Data ->
+               let segment = Code.Var.fresh_n "string" in
+               let* () = register_data_segment segment s in
+               let x = Code.Var.fresh_n "string" in
+               let* () = 
+                 register_global
+                   ~constant:true
+                   x
+                   { mut = true; typ = Type.value }
+                   (W.RefI31 (Const (I32 0l)))
+               in
+               let* () =
+                 register_init_code
+                   (instr
+                      (W.GlobalSet
+                         ( x
+                         , W.ArrayNewData
+                             ( ty
+                             , segment
+                             , Const (I32 0l)
+                             , Const (I32 (Int32.of_int (String.length s))) ) )))
+               in
+               return x
+             | `Fixed ->
+               let l =
+                 String.fold_right
+                   ~f:(fun c r -> W.Const (I32 (Int32.of_int (Char.code c))) :: r)
+                   s
+                   ~init:[]
+               in
+               let x = Code.Var.fresh_n ("str_" ^ s) in
+               let* () =
+                 register_global
+                   x
+                   { mut = false; typ = Type.value }
+                   (W.ArrayNewFixed (ty, l))
+               in
+               return x
+           in 
+           let* () = register_string_global s x in
+           return (mutated_or_const, W.GlobalGet x))
     | Float f ->
         let* ty = Type.float_type in
         return (Const, W.StructNew (ty, [ Const (F64 (Int64.float_of_bits f)) ]))
@@ -1413,12 +1456,20 @@ module Constant = struct
     | NativeInt i when unboxed -> return (W.Const (I32 (Targetnativeint.to_int32 i)))
     | _ -> (
         let* const, c = translate_rec c in
-        match const with
-        | Const ->
+        let* already_stored_in_const_global = 
+          match c with
+          | W.GlobalGet var -> global_is_constant var
+          | _ -> return false
+        in 
+        if already_stored_in_const_global 
+        then return c
+          else (
+          match const with
+          | Const -> 
             let* b = is_small_constant c in
             if b then return c else store_in_global c
-        | Const_named name -> store_in_global ~name c
-        | Mutated ->
+          | Const_named name -> store_in_global ~name c
+          | Mutated ->
             let name = Code.Var.fresh_n "const" in
             let* () =
               register_global
@@ -1428,7 +1479,7 @@ module Constant = struct
                 (W.RefI31 (Const (I32 0l)))
             in
             let* () = register_init_code (instr (W.GlobalSet (name, c))) in
-            return (W.GlobalGet name))
+            return (W.GlobalGet name)))
 end
 
 module Closure = struct
