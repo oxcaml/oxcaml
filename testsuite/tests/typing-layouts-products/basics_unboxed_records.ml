@@ -165,44 +165,40 @@ Error: This value is "local"
 
 (* Mutable fields *)
 
-(* CR rtjoa: Mutable unboxed record fields should be accepted, and make the
-   type invariant in their type parameters. *)
+(* Mutable fields are accepted, though there is no way to mutate them: an
+   unboxed record is a copy without identity. *)
 
 type mut = #{ mutable i : int }
 [%%expect{|
-Line 1, characters 14-29:
-1 | type mut = #{ mutable i : int }
-                  ^^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+type mut = #{ mutable i : int; }
 |}]
 
 type 'a mut2 = #{ mutable a : 'a }
 [%%expect{|
-Line 1, characters 18-32:
-1 | type 'a mut2 = #{ mutable a : 'a }
-                      ^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+type 'a mut2 = #{ mutable a : 'a; }
 |}]
 
-(* This should stay rejected, but due to variance rather than mutability *)
+(* Mutable fields make the type invariant in their type parameters *)
 type +'a mut3 = #{ mutable a : 'a }
 [%%expect{|
-Line 1, characters 19-33:
+Line 1, characters 0-35:
 1 | type +'a mut3 = #{ mutable a : 'a }
-                       ^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
-(* This should stay rejected: atomic fields make no sense without an address *)
+(* Atomic fields are rejected: there is no address to synchronize on *)
 type at = #{ mutable i : int [@atomic] }
 [%%expect{|
 Line 1, characters 13-38:
 1 | type at = #{ mutable i : int [@atomic] }
                  ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unboxed record labels cannot be mutable
+Error: Unboxed record labels cannot be atomic
 |}]
 
-(* Unboxed records are covariant in their (necessarily immutable) fields.
+(* Unboxed records are covariant in their immutable fields.
    Variance of unboxed versions of mutable records is tested in
    [basics_implicit_unboxed_records.ml]. *)
 
