@@ -26,20 +26,12 @@
 (rule
  (targets opnames.h)
  (deps
-  instruct.h
-  ../../stdlib/StdlibModules
-  ../../Makefile.upstream
-  ../../Makefile.common
-  ../../Makefile.config
-  ../../Makefile.build_config
-  ../../Makefile.config_if_required
-  ../../Makefile.best_binaries
-  ../../Makefile.menhir
-  ../../.depend.menhir
-  ../../Makefile.dev
-  ../../config.status)
+  (:h instruct.h))
  (action
-  (run make -s -f Makefile.upstream -C ../.. COMPUTE_DEPS=false runtime/caml/opnames.h)))
+  (with-stdout-to
+   %{targets}
+   (bash
+    "tr -d '\\r' < %{h} | sed -e '/\\/\\*/d' -e '/^#/d' -e 's/enum /static char * names_of_/' -e 's/{$/[] = {/' -e 's/\\([[:upper:]][[:upper:]_0-9]*\\)/\"\\1\"/g'"))))
 
 (rule
  (targets version.h)

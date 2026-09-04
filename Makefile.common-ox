@@ -76,6 +76,10 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
+    ; runtime_stamp.sexp holds a dummy -I flag embedding a hash of the
+    ; runtime and stdlib link inputs (see update_runtime_stamp), so that
+    ; executables are relinked when those change.
+    (link_flags (:standard (:include %{project_root}/runtime_stamp.sexp)))
     $(ENV_VARS)))))
 endef
 
@@ -97,6 +101,23 @@ boot-compiler: _build/_bootinstall
 boot-runtest: boot-compiler
 	$(dune) build $(ws_boot) $(coverage_dune_flags) --force $(runtest_targets)
 
+# The main workspace's executables link against the runtime and stdlib in
+# _build/runtime_stdlib_install, which dune does not track.  Their link_flags
+# include runtime_stamp.sexp (see dune_main_context), so refreshing its
+# contents whenever the link inputs change makes dune relink them.
+define update_runtime_stamp
+	@stamp=$$(find _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib \
+	    \( -name '*.a' -o -name '*.cma' -o -name '*.cmxa' \
+	       -o -name '*.cmx' -o -name '*.o' \) -print \
+	  | LC_ALL=C sort | xargs cat | cksum | cut -d' ' -f1); \
+	echo "( -I .runtime-stamp-$$stamp )" > runtime_stamp.sexp.tmp; \
+	if cmp -s runtime_stamp.sexp.tmp runtime_stamp.sexp; then \
+	  rm -f runtime_stamp.sexp.tmp; \
+	else \
+	  mv runtime_stamp.sexp.tmp runtime_stamp.sexp; \
+	fi
+endef
+
 runtime-stdlib: boot-compiler
 	$(dune) build $(ws_runstd) --only-package=ocaml_runtime_stdlib @install
 	rm -rf _build/runtime_stdlib_install
@@ -108,6 +129,7 @@ runtime-stdlib: boot-compiler
 # Dune will look here if the system compiler is OCaml 5 instead.
 	@mkdir -p _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/
 	@touch _build/runtime_stdlib_install/lib/ocaml_runtime_stdlib/dynlink/dynlink.cmxa
+	$(update_runtime_stamp)
 
 # This target is a polling version of "make runtime-stdlib"
 .PHONY: runtime-stdlib-hacking
@@ -177,7 +199,7 @@ runtest-dwarf: compiler
 duneconf/boot.ws: export contents = $(dune_boot_context)
 duneconf/runtime_stdlib.ws: export contents = $(dune_runtime_stdlib_context)
 duneconf/main.ws: export contents = $(dune_main_context)
-duneconf/%.ws:
+duneconf/%.ws: Makefile.common-ox
 	echo "$$contents" > $@
 
 # We need to disable ocaml/otherlibs when compiling with coverage, because we
@@ -212,6 +234,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	echo '( $(OC_CFLAGS) )' > oc_cflags.sexp
 	echo '( $(subst -I $(ROOTDIR)/,-I $(CURDIR)/,$(OC_CPPFLAGS)) )' > oc_cppflags.sexp
 	echo '( $(SHAREDLIB_CFLAGS) )' > sharedlib_cflags.sexp
+	test -f runtime_stamp.sexp || echo '( )' > runtime_stamp.sexp
 
 # _build/_bootinstall: a minimal install directory for the boot compiler,
 # which is placed on PATH for subsequent builds

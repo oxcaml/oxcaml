@@ -1,0 +1,24 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                     Nick Barnes, Jane Street Europe                    *
+;*                                                                        *
+;*   Copyright 2026 Jane Street Group LLC                                 *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+; Generates the rules that build the runtime, dynamically included by
+; runtime/dune.  (dune requires the generating rule to live outside the
+; including directory's subtree, hence this location.)
+
+(rule
+ (targets runtime_rules.inc)
+ (deps runtime_build_flags.sh)
+ (action
+  (with-stdout-to runtime_rules.inc
+   (run %{dep:gen_runtime_rules.sh}))))

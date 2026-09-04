@@ -1,0 +1,50 @@
+# @configure_input@
+
+#**************************************************************************
+#*                                                                        *
+#*                                 OCaml                                  *
+#*                                                                        *
+#*                     Nick Barnes, Jane Street Europe                    *
+#*                                                                        *
+#*   Copyright 2026 Jane Street Group LLC                                 *
+#*                                                                        *
+#*   All rights reserved.  This file is distributed under the terms of    *
+#*   the GNU Lesser General Public License version 2.1, with the          *
+#*   special exception on linking described in the file LICENSE.          *
+#*                                                                        *
+#**************************************************************************
+
+# Configuration for building the runtime with dune: sourced by
+# gen_runtime_rules.sh.  This carries the same values that the make
+# build gets from Makefile.config and Makefile.build_config.
+
+CC='@CC@'
+CFLAGS='@CFLAGS@'
+CPPFLAGS='@CPPFLAGS@'
+OC_CFLAGS='@oc_cflags@'
+OC_NATIVE_CFLAGS='@oc_native_cflags@'
+# The counterpart of OC_INCLUDES in Makefile.build_config: build_runtime.sh
+# runs in the runtime directory itself.
+OC_CPPFLAGS='-I . @oc_cppflags@'
+OC_NATIVE_CPPFLAGS='-I . @oc_native_cppflags@'
+SHAREDLIB_CFLAGS='@sharedlib_cflags@'
+INTEL_JCC_BUG_CFLAGS='@intel_jcc_bug_cflags@'
+NO_PARTIAL_INLINING_CFLAGS='@no_partial_inlining_cflags@'
+WITH_ADDRESS_SANITIZER='@address_sanitizer@'
+ASPP='@ASPP@'
+MKEXE='@mkexe_exp@'
+MKEXEDEBUGFLAG='@mkexedebugflag@'
+MKDLL='@mkdll_exp@'
+AR='@AR@'
+BYTECCLIBS='@zstd_libs@ @cclibs@'
+NATIVECCLIBS='@cclibs@'
+INSTRUMENTED_RUNTIME_LIBS='@instrumented_runtime_libs@'
+ENCODE_C_LITERAL='@encode_C_literal@'
+HOST='@host@'
+UNIX_OR_WIN32='@unix_or_win32@'
+RUNTIME_ASM_OBJECTS='@runtime_asm_objects@'
+TSAN_NATIVE_RUNTIME_C_SOURCES='@tsan_native_runtime_c_sources@'
+prefix="@prefix@"
+exec_prefix="@exec_prefix@"
+LIBDIR="@libdir@"
+STUBLIBDIR="$LIBDIR/stublibs"
