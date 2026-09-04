@@ -235,6 +235,7 @@ SEDLEX_DIR := $(CURDIR)/_build/sedlex
 CMDLINER_DIR := $(CURDIR)/_build/cmdliner
 MENHIR_DIR := $(CURDIR)/_build/menhir
 YOJSON_DIR := $(CURDIR)/_build/yojson
+JSOO_DIR := $(CURDIR)/_build/jsoo
 
 OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
 PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
@@ -254,18 +255,24 @@ PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLI
 PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
 PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
 SEDLEX_OCAMLPATH := $(PPXLIB_OCAMLPATH):$(PPXLIB_LIB):$(SEQ_LIB):$(GEN_LIB)
+JSOO_OCAMLPATH := $(SEDLEX_OCAMLPATH):$(SEDLEX_LIB):$(CMDLINER_LIB):$(MENHIR_LIB):$(YOJSON_LIB)
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
 PPXLIB_DUNE_ENV = \
   PATH="$(OXCAML_INSTALL)/bin:$(PATH)" \
   OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
+  OCAMLFIND_CONF=/dev/null \
   DUNE_CACHE=disabled
 
 .PHONY: external-libs-compiler
+# Refresh the local compiler, but never rebuild an externally supplied install.
+ifeq ($(abspath $(OXCAML_INSTALL)),$(CURDIR)/_install)
+external-libs-compiler: _install
+endif
 external-libs-compiler:
 	@mkdir -p "$(CURDIR)/_build"
-	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || $(MAKE) _install
+	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt"
 
 .PHONY: ocaml-compiler-libs-build
 ocaml-compiler-libs-build: external-libs-compiler
@@ -396,6 +403,19 @@ yojson-build: external-libs-compiler seq-build
 	    --build-dir="$(YOJSON_DIR)" \
 	    --only-packages=yojson \
 	    @install
+
+JSOO_BUILD_DEPS := sedlex-build cmdliner-build menhir-libs-build yojson-build
+
+.PHONY: jsoo-build
+jsoo-build: $(JSOO_BUILD_DEPS)
+	env OCAMLPATH="$(JSOO_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/js_of_ocaml \
+	    --build-dir="$(JSOO_DIR)" \
+	    compiler/bin-js_of_ocaml/js_of_ocaml.exe \
+	    compiler/bin-jsoo_minify/jsoo_minify.exe \
+	    compiler/bin-wasm_of_ocaml/wasm_of_ocaml.exe \
+	    compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
 
 .PHONY: external-libs-build
 external-libs-build: ppxlib-build sedlex-build
