@@ -1068,7 +1068,7 @@ let build_other_constrs env p =
   let open Patterns.Head in
   match p.pat_desc with
   | Construct ({ cstr_tag = Extension _ }, _, _) -> extra_pat
-  | Construct ({ cstr_tag = Ordinary _} as c, _, _) ->
+  | Construct ({ cstr_tag = Ordinary _ | Null } as c, _, _) ->
       let constr = { p with pat_desc = c } in
       let get_constr q =
         match q.pat_desc with
