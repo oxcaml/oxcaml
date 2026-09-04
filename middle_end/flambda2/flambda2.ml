@@ -128,10 +128,11 @@ let finalize_offsets ~free_names ~slot_offsets ~all_code =
       all_value_slots
     }
   in
-  let get_code_metadata code_id =
-    Exported_code.find_exn all_code code_id |> Code_or_metadata.code_metadata
+  let get_function_slot_size code_id =
+    Exported_code.find_exn all_code code_id
+    |> Code_or_metadata.code_metadata |> Code_metadata.function_slot_size
   in
-  Slot_offsets.finalize_offsets slot_offsets ~get_code_metadata ~used_slots
+  Slot_offsets.finalize_offsets slot_offsets ~get_function_slot_size ~used_slots
 
 let compilation_unit_callbacks = ref []
 
