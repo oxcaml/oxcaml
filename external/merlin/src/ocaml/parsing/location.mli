@@ -331,6 +331,10 @@ val best_toplevel_printer: unit -> report_printer
 val print_report: formatter -> report -> unit
 (** Display an error or warning report. *)
 
+type emitter = formatter -> exn option -> report -> unit
+
+val set_emitter : emitter -> unit
+
 val report_printer: (unit -> report_printer) ref
 (** Hook for redefining the printer of reports.
 

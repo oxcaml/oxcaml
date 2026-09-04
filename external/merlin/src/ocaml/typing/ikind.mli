@@ -29,6 +29,9 @@ type subjkind_error =
 
 val subjkind_error_printing_env : subjkind_error -> Env.t option
 
+val subjkind_error_violating_axes :
+  subjkind_error -> Jkind_axis.Axis.packed list
+
 val report_subjkind_error_with_offender :
   offender:(Format_doc.formatter -> unit) ->
   Env.t ->
