@@ -166,6 +166,9 @@ module Bin_op = struct
     | Bit_and
     | Bit_or
     | Bit_xor
+    | Shift_left
+    | Shift_right
+    | Shift_right_logical
     | Eq
     | Lt
     | Le
@@ -176,7 +179,9 @@ module Bin_op = struct
 
   let num_binops = [Add; Sub; Mul]
 
-  let integral_binops = num_binops @ [Bit_and; Bit_or; Bit_xor]
+  let integral_binops =
+    num_binops
+    @ [Bit_and; Bit_or; Bit_xor; Shift_left; Shift_right; Shift_right_logical]
 
   let ops_for_ty (ty : Ty.t) =
     match ty with
@@ -200,6 +205,9 @@ module Bin_op = struct
     | Bit_and -> call "logand"
     | Bit_or -> call "logor"
     | Bit_xor -> call "logxor"
+    | Shift_left -> call "shift_left"
+    | Shift_right -> call "shift_right"
+    | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
