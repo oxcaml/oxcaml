@@ -50,18 +50,21 @@ file the module type is declared in:
   $ ocaml-index aggregate *.cms *.cmsi -o .merlin-index
 
   $ $MERLIN single intf-weaknesses -index-file .merlin-index \
-  > -filename ./hof_intf.ml < ./hof_intf.ml | jq -r '.value[].intf_file' \
+  > -filename ./hof_intf.ml < ./hof_intf.ml | revert-newlines \
+  > | jq -r '.value[].intf_file' \
   > | sed "s|.*/||"
   hof_intf.ml
 
-The atoms the implementations agree on are kept and the ones they do not are
-dropped: the callback is strengthened to [local], and [once] — which only
-[hof_once] supports — does not appear. How a suggestion is rendered in full is
+The callback-argument edit at line 2, column 22 keeps [local], which both
+implementations support, but not [once], which only [hof_once] supports.
+How a suggestion is rendered in full is
 pinned by the single-implementation tests; what this pins is which atoms
 survive the merge.
 
   $ $MERLIN single intf-weaknesses -index-file .merlin-index \
-  > -filename ./hof_intf.ml < ./hof_intf.ml | jq -r '.value[].edits[].new_text' \
+  > -filename ./hof_intf.ml < ./hof_intf.ml | revert-newlines \
+  > | jq -r '.value[].edits[]
+  >   | select(.start.line == 2 and .start.col == 22) | .new_text' \
   > | grep -o -E '\b(local|once)\b' | sort -u
   local
 
