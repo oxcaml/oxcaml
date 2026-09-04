@@ -1,13 +1,9 @@
 (******************************************************************************
- *                             flambda-backend                                *
- *                                                                            *
- *             Nathanaëlle Courant, Pierre Chambart, OCamlPro                 *
- *                        Mark Shinwell, Jane Street                          *
+ *                                  OxCaml                                    *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024--2025 OCamlPro SAS                                      *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -29,23 +25,16 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type result = private
-  { body : Flambda.Expr.t;
-    all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
-  }
-
-val rebuild :
-  machine_width:Target_system.Machine_width.t ->
-  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-  ordered_code_ids:Code_id.t array ->
-  continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
-  fixed_arity_continuations:Continuation.Set.t ->
+(** The code metadata of the code of the current compilation unit, as it will be
+    after rewriting: the calling convention changes are applied and the result
+    types rewritten. The cost metrics and the inlining decision are left as they
+    were, since they depend on the size of the rebuilt body; [Rebuild] updates
+    them. *)
+val rewrite :
+  final_typing_env:Typing_env.t option ->
+  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
   types_rewrite_context:Types_rewriter.rewrite_context ->
   calling_convention_changes:Unboxing_analysis.calling_convention_changes ->
-  code_metadata:Code_metadata.t Code_id.Map.t ->
+  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   Unboxing_analysis.result ->
-  (Code_id.t -> Code_metadata.t) ->
-  Rev_expr.t ->
-  Rev_expr.rev_code Code_id.Map.t ->
-  result
+  Code_metadata.t Code_id.Map.t
