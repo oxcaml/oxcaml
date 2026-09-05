@@ -356,6 +356,15 @@
               expression (extensions.ml[27,631+25]..[27,631+26])
                 Pexp_hole          ]
     ]
+  structure_item (extensions.ml[29,660+0]..[29,660+20])
+    Pstr_extension "foo"
+    [
+      structure_item (extensions.ml[29,660+7]..[29,660+19])
+        Pstr_module
+        "M" (extensions.ml[29,660+14]..[29,660+15])
+          module_expr (extensions.ml[29,660+18]..[29,660+19])
+            Pmod_hole
+    ]
 ]
 
 File "extensions.ml", line 9, characters 3-6:

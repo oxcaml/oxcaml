@@ -601,6 +601,7 @@ and add_module_expr bv modl =
       add_expr bv e
   | Pmod_extension e ->
       handle_extension e
+  | Pmod_hole -> ()
   | Pmod_instance instance ->
       add_instance bv instance
 
