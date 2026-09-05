@@ -383,7 +383,7 @@ module type Ast_builder = sig
 
   module Default : S_with_explicit_loc
 
-  module Make (Loc : sig
+  module Make (_ : sig
       val loc : Location.t
     end) : S_with_implicit_loc
 
