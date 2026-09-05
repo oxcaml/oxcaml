@@ -177,7 +177,7 @@ let rec traverse var_depth (program, functions) pc depth limit =
                 let program =
                   Subst.Excluding_Binders.cont (Subst.from_map s) pc' program
                 in
-                let f' = try Var.Map.find f s with Not_found -> Var.fork f in
+                let f' = Var.Map.find_opt f s |> Option.value ~default:(Var.fork f) in
                 let s = Var.Map.bindings (Var.Map.remove f s) in
                 let f'' = Var.fork f in
                 if debug ()
@@ -198,7 +198,8 @@ let rec traverse var_depth (program, functions) pc depth limit =
                   }
                 in
                 let functions =
-                  Let (f'', Closure (List.map s ~f:snd, (pc'', []), None)) :: functions
+                  Let (f'', Closure (List.map s ~f:snd, (pc'', []), (None, None)))
+                  :: functions
                 in
                 let rem', st = rewrite_body false (program, functions) rem in
                 ( Let (f, Apply { f = f''; args = List.map ~f:fst s; exact = true })
@@ -225,15 +226,16 @@ let rec traverse var_depth (program, functions) pc depth limit =
     program.blocks
     (program, functions)
 
-let f program =
+let f p =
   let t = Timer.make () in
   let nv = Var.count () in
   let var_depth = Array.make nv (-1) in
-  let program, functions =
+  let p, functions =
     let threshold = Config.Param.lambda_lifting_threshold () in
     let baseline = Config.Param.lambda_lifting_baseline () in
-    traverse var_depth (program, []) program.start 0 (baseline + threshold)
+    traverse var_depth (p, []) p.start 0 (baseline + threshold)
   in
   assert (List.is_empty functions);
   if Debug.find "times" () then Format.eprintf "  lambda lifting: %a@." Timer.print t;
-  program
+  Code.invariant p;
+  p

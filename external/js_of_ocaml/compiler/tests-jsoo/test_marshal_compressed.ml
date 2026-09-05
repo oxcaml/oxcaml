@@ -16,7 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
-(*
+
+(* Compressed marshaling requires OCaml 5.1.1 and is not available under
+   OxCaml. *)
+[@@@if ocaml_version >= (5, 1, 1) && not oxcaml]
+
 let%expect_test _ =
   let data =
     "\132\149\166\189\r\022\206\021\001\147F\137d(\181/\253\000Xm\000\0000\n\
@@ -24,7 +28,9 @@ let%expect_test _ =
   in
   let s =
     if Compression.compression_supported
-    then Marshal.from_string data 0
+    then (
+      assert (Marshal.data_size (Bytes.of_string data) 0 = 19);
+      Marshal.from_string data 0)
     else String.make 10000 'c'
   in
   Printf.printf "%s ... (%d)\n" (String.sub s 0 20) (String.length s);
@@ -41,4 +47,4 @@ let%expect_test _ =
   in
   close_in ch;
   Printf.printf "%s ... (%d)\n" (String.sub s 0 20) (String.length s);
-  [%expect {| cccccccccccccccccccc ... (10000) |}] *)
+  [%expect {| cccccccccccccccccccc ... (10000) |}]

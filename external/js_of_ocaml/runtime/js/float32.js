@@ -1,4 +1,3 @@
-
 /*
     32-bit floats are represented as javascript numbers, i.e. 64-bit floats.
     Each operation is performed in 64-bit precision and then rounded to the
@@ -13,461 +12,515 @@
 */
 
 //Provides: caml_float_of_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_float_of_float32(x) {
-    return x;
+  return x;
 }
 
 //Provides: caml_float32_of_float const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_float32_of_float(x) {
-    return Math.fround(x);
+  return Math.fround(x);
 }
 
 //Provides: caml_float32_of_int const
-//Alias: caml_float32_of_int32
-//Alias: caml_float32_of_nativeint
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_float32_of_int(x) {
-    return Math.fround(x);
+  return Math.fround(x);
 }
 
 //Provides: caml_int_of_float32 const
-//Alias: caml_int32_of_float32
-//Alias: caml_nativeint_of_float32
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_int_of_float32(x) {
-    return x | 0;
+  return x | 0;
 }
 
 //Provides: caml_float32_of_bits_bytecode const
 //Requires: caml_int32_float_of_bits
-let caml_float32_of_bits_bytecode = caml_int32_float_of_bits
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_float32_of_bits_bytecode = caml_int32_float_of_bits;
 
 //Provides: caml_float32_to_bits_bytecode const
 //Requires: caml_int32_bits_of_float
-let caml_float32_to_bits_bytecode = caml_int32_bits_of_float
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_float32_to_bits_bytecode = caml_int32_bits_of_float;
 
 //Provides: caml_float32_of_int64_bytecode const
 //Requires: caml_int64_to_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_float32_of_int64_bytecode(x) {
-    return Math.fround(caml_int64_to_float(x));
+  return Math.fround(caml_int64_to_float(x));
 }
 
 //Provides: caml_float32_to_int64_bytecode const
 //Requires: caml_int64_of_float
-let caml_float32_to_int64_bytecode = caml_int64_of_float
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_float32_to_int64_bytecode = caml_int64_of_float;
 
 //Provides: caml_float32_of_string (const)
-//Requires: caml_float_of_string
+//Requires: caml_parse_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_float32_of_string(x) {
-    return Math.fround(caml_float_of_string(x));
+  return Math.fround(caml_parse_float(x, "float32_of_string"));
 }
 
 //Provides: caml_format_float32 const
 //Requires: caml_format_float
-let caml_format_float32 = caml_format_float
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_format_float32 = caml_format_float;
 
 //Provides: caml_float32_compare const
 //Requires: caml_float_compare
-let caml_float32_compare = caml_float_compare
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_float32_compare = caml_float_compare;
 
 //Provides: caml_add_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_add_float32(x, y) {
-    return Math.fround(x + y);
+  return Math.fround(x + y);
 }
 
 //Provides: caml_sub_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sub_float32(x, y) {
-    return Math.fround(x - y);
+  return Math.fround(x - y);
 }
 
 //Provides: caml_mul_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_mul_float32(x, y) {
-    return Math.fround(x * y);
+  return Math.fround(x * y);
 }
 
 //Provides: caml_div_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_div_float32(x, y) {
-    return Math.fround(x / y);
+  return Math.fround(x / y);
 }
 
 //Provides: caml_fmod_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_fmod_float32_bytecode(x, y) {
-    return Math.fround(x % y);
+  return Math.fround(x % y);
 }
 
 //Provides: caml_neg_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_neg_float32(x) {
-    return -x; // Result is exact
+  return -x; // Result is exact
 }
 
 //Provides: caml_abs_float32 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_abs_float32(x) {
-    return Math.abs(x); // Result is exact
+  return Math.abs(x); // Result is exact
 }
 
 //Provides: caml_modf_float32 const
 //Requires: caml_modf_float
-let caml_modf_float32 = caml_modf_float // Result is exact
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_modf_float32 = caml_modf_float; // Result is exact
 
 //Provides: caml_acos_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_acos_float32_bytecode(x) {
-    return Math.fround(Math.acos(x));
+  return Math.fround(Math.acos(x));
 }
 
 //Provides: caml_asin_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_asin_float32_bytecode(x) {
-    return Math.fround(Math.asin(x));
+  return Math.fround(Math.asin(x));
 }
 
 //Provides: caml_atan_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_atan_float32_bytecode(x) {
-    return Math.fround(Math.atan(x));
+  return Math.fround(Math.atan(x));
 }
 
 //Provides: caml_atan2_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_atan2_float32_bytecode(x, y) {
-    return Math.fround(Math.atan2(x, y));
+  return Math.fround(Math.atan2(x, y));
 }
 
 //Provides: caml_ceil_float32_bytecode const
+//Alias: caml_simd_float32_round_pos_inf_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_ceil_float32_bytecode(x) {
-    return Math.fround(Math.ceil(x));
+  return Math.fround(Math.ceil(x));
 }
 
 //Provides: caml_cos_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_cos_float32_bytecode(x) {
-    return Math.fround(Math.cos(x));
+  return Math.fround(Math.cos(x));
 }
 
 //Provides: caml_exp_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_exp_float32_bytecode(x) {
-    return Math.fround(Math.exp(x));
+  return Math.fround(Math.exp(x));
 }
 
 //Provides: caml_floor_float32_bytecode const
+//Alias: caml_simd_float32_round_neg_inf_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_floor_float32_bytecode(x) {
-    return Math.fround(Math.floor(x));
+  return Math.fround(Math.floor(x));
 }
 
 //Provides: caml_log_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_log_float32_bytecode(x) {
-    return Math.fround(Math.log(x));
+  return Math.fround(Math.log(x));
 }
 
 //Provides: caml_power_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_power_float32_bytecode(x, y) {
-    return Math.fround(Math.pow(x, y));
+  return Math.fround(Math.pow(x, y));
 }
 
 //Provides: caml_sin_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sin_float32_bytecode(x) {
-    return Math.fround(Math.sin(x));
+  return Math.fround(Math.sin(x));
 }
 
 //Provides: caml_sqrt_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sqrt_float32_bytecode(x) {
-    return Math.fround(Math.sqrt(x));
+  return Math.fround(Math.sqrt(x));
 }
 
 //Provides: caml_tan_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_tan_float32_bytecode(x) {
-    return Math.fround(Math.tan(x));
+  return Math.fround(Math.tan(x));
 }
 
 //Provides: caml_nextafter_float32_bytecode const
 //Requires: caml_int32_bits_of_float, caml_int32_float_of_bits
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_nextafter_float32_bytecode(x, y) {
-    if (isNaN(x) || isNaN(y)) return NaN;
-    if (x == y) return y;
-    if (x == 0) {
-        if (y < 0)
-            return -Math.pow(2, -149)
-        else
-            return Math.pow(2, -149)
-    }
-    var bits = caml_int32_bits_of_float(x);
-    if ((x < y) == (x > 0))
-        bits = bits + 1
-    else
-        bits = bits - 1
-    return caml_int32_float_of_bits(bits);
+  if (Number.isNaN(x) || Number.isNaN(y)) return Number.NaN;
+  if (x === y) return y;
+  if (x === 0) {
+    if (y < 0) return -Math.pow(2, -149);
+    else return Math.pow(2, -149);
+  }
+  var bits = caml_int32_bits_of_float(x);
+  if (x < y === x > 0) bits++;
+  else bits--;
+  return caml_int32_float_of_bits(bits);
 }
 
 //Provides: caml_trunc_float32_bytecode const
+//Alias: caml_simd_float32_round_towards_zero_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_trunc_float32_bytecode(x) {
-    return Math.fround(Math.trunc(x));
+  return Math.fround(Math.trunc(x));
 }
 
 //Provides: caml_classify_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_classify_float32_bytecode(x) {
-    if (isFinite(x)) {
-        if (Math.abs(x) >= 1.1754943508222875e-38) return 0;
-        if (x != 0) return 1;
-        return 2;
-    }
-    return isNaN(x) ? 4 : 3;
+  if (Number.isFinite(x)) {
+    if (Math.abs(x) >= 1.1754943508222875e-38) return 0;
+    if (x !== 0) return 1;
+    return 2;
+  }
+  return Number.isNaN(x) ? 4 : 3;
 }
 
 //Provides: caml_ldexp_float32_bytecode const
 //Requires: caml_ldexp_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_ldexp_float32_bytecode(x, y) {
-    return Math.fround(caml_ldexp_float(x, y));
+  return Math.fround(caml_ldexp_float(x, y));
 }
 
 //Provides: caml_frexp_float32 const
 //Requires: caml_frexp_float
-let caml_frexp_float32 = caml_frexp_float // Result is exact
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_frexp_float32 = caml_frexp_float; // Result is exact
 
 //Provides: caml_copysign_float32_bytecode const
 //Requires: caml_copysign_float
-let caml_copysign_float32_bytecode = caml_copysign_float // Result is exact
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_copysign_float32_bytecode = caml_copysign_float; // Result is exact
 
 //Provides: caml_signbit_float32_bytecode const
 //Requires: caml_signbit_float
-let caml_signbit_float32_bytecode = caml_signbit_float
+//Version: >= 5.2, < 5.3
+//OxCaml
+const caml_signbit_float32_bytecode = caml_signbit_float;
 
 //Provides: caml_expm1_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_expm1_float32_bytecode(x) {
-    return Math.fround(Math.expm1(x));
+  return Math.fround(Math.expm1(x));
 }
 
 //Provides: caml_exp2_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_exp2_float32_bytecode(x) {
-    return Math.fround(Math.pow(2, x));
+  return Math.fround(Math.pow(2, x));
 }
 
 //Provides: caml_log1p_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_log1p_float32_bytecode(x) {
-    return Math.fround(Math.log1p(x));
+  return Math.fround(Math.log1p(x));
 }
 
 //Provides: caml_log2_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_log2_float32_bytecode(x) {
-    return Math.fround(Math.log2(x));
+  return Math.fround(Math.log2(x));
 }
 
 //Provides: caml_hypot_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_hypot_float32_bytecode(x, y) {
-    return Math.fround(Math.hypot(x, y));
+  return Math.fround(Math.hypot(x, y));
 }
 
 //Provides: caml_log10_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_log10_float32_bytecode(x) {
-    return Math.fround(Math.log10(x));
+  return Math.fround(Math.log10(x));
 }
 
 //Provides: caml_cosh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_cosh_float32_bytecode(x) {
-    return Math.fround(Math.cosh(x));
+  return Math.fround(Math.cosh(x));
 }
 
 //Provides: caml_acosh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_acosh_float32_bytecode(x) {
-    return Math.fround(Math.acosh(x));
+  return Math.fround(Math.acosh(x));
 }
 
 //Provides: caml_sinh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sinh_float32_bytecode(x) {
-    return Math.fround(Math.sinh(x));
+  return Math.fround(Math.sinh(x));
 }
 
 //Provides: caml_asinh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_asinh_float32_bytecode(x) {
-    return Math.fround(Math.asinh(x));
+  return Math.fround(Math.asinh(x));
 }
 
 //Provides: caml_tanh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_tanh_float32_bytecode(x) {
-    return Math.fround(Math.tanh(x));
+  return Math.fround(Math.tanh(x));
 }
 
 //Provides: caml_atanh_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_atanh_float32_bytecode(x) {
-    return Math.fround(Math.atanh(x));
+  return Math.fround(Math.atanh(x));
 }
 
 //Provides: caml_round_float32_bytecode const
 //Requires: caml_round_float
+//Alias: caml_simd_float32_round_current_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_round_float32_bytecode(x) {
-    return Math.fround(caml_round_float(x));
+  return Math.fround(caml_round_float(x));
 }
 
 //Provides: caml_cbrt_float32_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_cbrt_float32_bytecode(x) {
-    return Math.fround(Math.cbrt(x));
+  return Math.fround(Math.cbrt(x));
 }
 
 //Provides: caml_erf_float32_bytecode const
 //Requires: caml_erf_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_erf_float32_bytecode(x) {
-    return Math.fround(caml_erf_float(x));
+  return Math.fround(caml_erf_float(x));
 }
 
 //Provides: caml_erfc_float32_bytecode const
 //Requires: caml_erfc_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_erfc_float32_bytecode(x) {
-    return Math.fround(caml_erfc_float(x));
+  return Math.fround(caml_erfc_float(x));
 }
 
 //Provides: caml_fma_float32_bytecode const
 //Requires: caml_fma_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_fma_float32_bytecode(x, y, z) {
-    return Math.fround(caml_fma_float(x, y, z));
+  return Math.fround(caml_fma_float(x, y, z));
 }
 
 //Provides: caml_simd_float32_min_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
+// Mirrors x86 MINSS: returns y when the comparison fails (NaN or equal,
+// including ±0), unlike Math.min which propagates NaN and treats -0 < +0.
 function caml_simd_float32_min_bytecode(x, y) {
-    return x < y ? x : y;
+  return x < y ? x : y;
 }
 
 //Provides: caml_simd_float32_max_bytecode const
+//Version: >= 5.2, < 5.3
+//OxCaml
+// Mirrors x86 MAXSS; see caml_simd_float32_min_bytecode.
 function caml_simd_float32_max_bytecode(x, y) {
-    return x > y ? x : y;
+  return x > y ? x : y;
 }
 
 //Provides: caml_simd_cast_float32_int64_bytecode const
-//Requires: caml_int64_of_float, caml_round_float32_bytecode
+//Requires: caml_int64_of_float
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_simd_cast_float32_int64_bytecode(x) {
-    return caml_int64_of_float(caml_round_float32_bytecode(x));
+  return caml_int64_of_float(Math.round(x));
 }
-
-//Provides: caml_simd_float32_round_current_bytecode const
-//Requires: caml_round_float32_bytecode
-function caml_simd_float32_round_current_bytecode(x) {
-    return caml_round_float32_bytecode(x);
-}
-
-//Provides: caml_simd_float32_round_neg_inf_bytecode const
-function caml_simd_float32_round_neg_inf_bytecode(x) {
-    return Math.fround(Math.floor(x));
-}
-
-//Provides: caml_simd_float32_round_pos_inf_bytecode const
-function caml_simd_float32_round_pos_inf_bytecode(x) {
-    return Math.fround(Math.ceil(x));
-}
-
-//Provides: caml_simd_float32_round_towards_zero_bytecode const
-function caml_simd_float32_round_towards_zero_bytecode(x) {
-    return Math.fround(Math.trunc(x));
-}
-
-//Provides: caml_make_unboxed_float32_vect_bytecode const (const)
-//Requires: caml_make_float_vect
-let caml_make_unboxed_float32_vect_bytecode = caml_make_float_vect
-
-//Provides: caml_ba_float32_get_1
-//Requires: caml_ba_get_1
-let caml_ba_float32_get_1 = caml_ba_get_1
-
-//Provides: caml_ba_float32_get_2
-//Requires: caml_ba_get_2
-let caml_ba_float32_get_2 = caml_ba_get_2
-
-//Provides: caml_ba_float32_get_3
-//Requires: caml_ba_get_3
-let caml_ba_float32_get_3 = caml_ba_get_3
-
-//Provides: caml_ba_float32_set_1
-//Requires: caml_ba_set_1
-let caml_ba_float32_set_1 = caml_ba_set_1
-
-//Provides: caml_ba_float32_set_2
-//Requires: caml_ba_set_2
-let caml_ba_float32_set_2 = caml_ba_set_2
-
-//Provides: caml_ba_float32_set_3
-//Requires: caml_ba_set_3
-let caml_ba_float32_set_3 = caml_ba_set_3
 
 //Provides: caml_ba_uint8_getf32
-//Alias: caml_ba_uint8_getf32_indexed_by_int32
-//Alias: caml_ba_uint8_getf32_indexed_by_nativeint
-//Requires: caml_ba_uint8_get32, caml_int32_float_of_bits
-function caml_ba_uint8_getf32(ba, i0) {
-    return caml_int32_float_of_bits(caml_ba_uint8_get32(ba, i0));
+//Requires: caml_ba_uint8_get32, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_ba_uint8_getf32(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_ba_uint8_get32(ba, i));
 }
 
-//Provides: caml_ba_uint8_getf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_getf32
-function caml_ba_uint8_getf32_indexed_by_int64(ba, i) {
-  return caml_ba_uint8_getf32(ba, caml_checked_int64_to_int(i))
+//Provides: caml_ba_uint8_getf32u
+//Requires: caml_ba_uint8_get32u, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_ba_uint8_getf32u(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_ba_uint8_get32u(ba, i));
 }
 
 //Provides: caml_ba_uint8_setf32
-//Alias: caml_ba_uint8_setf32_indexed_by_int32
-//Alias: caml_ba_uint8_setf32_indexed_by_nativeint
-//Requires: caml_ba_uint8_set32, caml_int32_bits_of_float
-function caml_ba_uint8_setf32(ba, i0, v) {
-    return caml_ba_uint8_set32(ba, i0, caml_int32_bits_of_float(v));
+//Requires: caml_ba_uint8_set32, caml_float32_to_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_ba_uint8_setf32(ba, i, v) {
+  return caml_ba_uint8_set32(ba, i, caml_float32_to_bits_bytecode(v));
 }
 
-//Provides: caml_ba_uint8_setf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_setf32
-function caml_ba_uint8_setf32_indexed_by_int64(ba, i, v) {
-  return caml_ba_uint8_setf32(ba, caml_checked_int64_to_int(i), v)
+//Provides: caml_ba_uint8_setf32u
+//Requires: caml_ba_uint8_set32u, caml_float32_to_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_ba_uint8_setf32u(ba, i, v) {
+  return caml_ba_uint8_set32u(ba, i, caml_float32_to_bits_bytecode(v));
 }
 
 //Provides: caml_string_getf32
-//Alias: caml_string_getf32_indexed_by_int32
-//Alias: caml_string_getf32_indexed_by_nativeint
-//Requires: caml_string_get32, caml_int32_float_of_bits
-function caml_string_getf32(s, i) {
-    return caml_int32_float_of_bits(caml_string_get32(s, i));
+//Requires: caml_string_get32, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_string_getf32(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_string_get32(ba, i));
 }
 
-//Provides: caml_string_getf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_string_getf32
-function caml_string_getf32_indexed_by_int64(s, i) {
-  return caml_string_getf32(s, caml_checked_int64_to_int(i))
+//Provides: caml_string_getf32u
+//Requires: caml_string_get32u, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_string_getf32u(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_string_get32u(ba, i));
 }
 
 //Provides: caml_bytes_getf32
-//Alias: caml_bytes_getf32_indexed_by_int32
-//Alias: caml_bytes_getf32_indexed_by_nativeint
-//Requires: caml_bytes_get32, caml_int32_float_of_bits
-function caml_bytes_getf32(s, i) {
-    return caml_int32_float_of_bits(caml_bytes_get32(s, i));
+//Requires: caml_bytes_get32, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_bytes_getf32(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_bytes_get32(ba, i));
 }
 
-//Provides: caml_bytes_getf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_getf32
-function caml_bytes_getf32_indexed_by_int64(s, i) {
-  return caml_bytes_getf32(s, caml_checked_int64_to_int(i))
+//Provides: caml_bytes_getf32u
+//Requires: caml_bytes_get32u, caml_float32_of_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_bytes_getf32u(ba, i) {
+  return caml_float32_of_bits_bytecode(caml_bytes_get32u(ba, i));
 }
 
 //Provides: caml_bytes_setf32
-//Alias: caml_bytes_setf32_indexed_by_int32
-//Alias: caml_bytes_setf32_indexed_by_nativeint
-//Requires: caml_bytes_set32, caml_int32_bits_of_float
-function caml_bytes_setf32(s, i, f32) {
-    return caml_bytes_set32(s, i, caml_int32_bits_of_float(f32));
+//Requires: caml_bytes_set32, caml_float32_to_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_bytes_setf32(ba, i, v) {
+  return caml_bytes_set32(ba, i, caml_float32_to_bits_bytecode(v));
 }
 
-//Provides: caml_bytes_setf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_bytes_setf32
-function caml_bytes_setf32_indexed_by_int64(s, i, f32) {
-  return caml_bytes_setf32(s, caml_checked_int64_to_int(i), f32)
-}
-
-//Provides: caml_string_setf32
-//Alias: caml_string_setf32_indexed_by_int32
-//Alias: caml_string_setf32_indexed_by_nativeint
-//Requires: caml_failwith
-//If: js-string
-function caml_string_setf32(s, i, f32) {
-    caml_failwith("caml_string_setf32");
-}
-
-//Provides: caml_string_setf32
-//Alias: caml_string_setf32_indexed_by_int32
-//Alias: caml_string_setf32_indexed_by_nativeint
-//Requires: caml_bytes_setf32
-//If: !js-string
-function caml_string_setf32(s, i, f32) {
-    return caml_bytes_setf32(s, i, f32);
-}
-
-//Provides: caml_string_setf32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_string_setf32
-function caml_string_setf32_indexed_by_int64(s, i, f32) {
-  return caml_string_setf32(s, caml_checked_int64_to_int(i), f32)
+//Provides: caml_bytes_setf32u
+//Requires: caml_bytes_set32u, caml_float32_to_bits_bytecode
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_bytes_setf32u(ba, i, v) {
+  return caml_bytes_set32u(ba, i, caml_float32_to_bits_bytecode(v));
 }

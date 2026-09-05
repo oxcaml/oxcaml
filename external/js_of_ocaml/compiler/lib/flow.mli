@@ -45,8 +45,6 @@ module Info : sig
   val update_def : t -> Code.Var.t -> Code.expr -> unit
 
   val possibly_mutable : t -> Code.Var.t -> bool
-
-  val info_defs_length : t -> int
 end
 
 val get_approx :
@@ -69,3 +67,14 @@ val the_block_contents_of : Info.t -> Code.prim_arg -> Code.Var.t array option
 val the_int : Info.t -> Code.prim_arg -> Targetint.t option
 
 val f : Code.program -> Code.program * Info.t
+
+val the_shape_of :
+     return_values:Code.Var.Set.t Code.Var.Map.t
+  -> pure:Pure_fun.t
+  -> blocks:bool
+  -> Info.t
+  -> (Code.Var.t -> Shape.t) * (Code.Var.t -> Shape.t -> unit)
+(** Returns [(get, set)] where [get x] computes the shape of variable [x]
+    and [set x s] injects a shape for [x] into the internal cache (used to
+    register shapes of fresh variables introduced by specialization).
+    Results are memoized across calls to [get]. *)

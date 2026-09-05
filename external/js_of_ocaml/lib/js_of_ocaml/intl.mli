@@ -20,7 +20,7 @@
 (** Internationalization API
 
     A code example:
-{[
+{@ocaml[
 
 open Js;;
 
@@ -42,12 +42,8 @@ then (
 
     (* Note: the exact output may be browser-dependent *)
     let letterSort lang letters =
-      letters##sort
-        (wrap_callback (fun a b ->
-             let collator =
-               new%js Intl.collator_constr (def (array [| lang |])) undefined
-             in
-             Js.float (float_of_int (collator##.compare a b))));
+      let collator = new%js Intl.collator_constr (def (array [| lang |])) undefined in
+      ignore (letters##sort (wrap_callback (fun a b -> collator##.compare a b)));
       letters
     in
     let a = jas [| "a"; "z"; "ä" |] in
@@ -72,7 +68,9 @@ then (
 
     let firstAlphabetical locale letter1 letter2 =
       let collator = new%js Intl.collator_constr (def (array [| locale |])) undefined in
-      if collator##.compare letter1 letter2 > 0 then letter1 else letter2
+      if Js.float_of_number (collator##.compare letter1 letter2) > 0.
+      then letter1
+      else letter2
     in
     fc (firstAlphabetical (string "de") (string "z") (string "ä"));
     fc (firstAlphabetical (string "sv") (string "z") (string "ä"));
@@ -82,8 +80,7 @@ then (
       new%js Intl.collator_constr (def (jas [| "de-u-co-phonebk" |])) undefined
     in
     let a =
-      a##sort
-        (wrap_callback (fun v1 v2 -> Js.float (float_of_int (collator##.compare v1 v2))))
+      a##sort (wrap_callback (fun v1 v2 -> collator##.compare v1 v2))
     in
     fc (a##join (string ", "));
 
@@ -94,7 +91,9 @@ then (
     let collator = new%js Intl.collator_constr (def (jas [| "fr" |])) (def options) in
     let s = string "congres" in
     let matches =
-      a##filter (wrap_callback (fun v _ _ -> bool (collator##.compare v s = 0)))
+      a##filter
+        (wrap_callback (fun v _ _ ->
+             bool (Js.float_of_number (collator##.compare v s) = 0.)))
     in
     fc (matches##join (string ", "));
 
@@ -345,10 +344,17 @@ then (
     fc
       (intl##._PluralRules##supportedLocalesOf
          (jas [| "ban"; "id-u-co-pinyin"; "de-ID" |])
-         (def options))
+         (def options));
+
+    let options = Intl.RelativeTimeFormat.options () in
+    let () = options##.numeric := def (string "auto") in
+    let () = options##.style := def (string "short") in
+    let th_rtf = new%js Intl.relativeTimeFormat_constr (def (jas [| "th-TH" |])) (def options) in
+    fc (th_rtf##format (number_of_float (-1.)) (string "day"));
   with Error err -> Console.console##debug (string (string_of_error err)))
 else Console.console##debug (string "Intl is not supported!")
 ]}
+
     @see <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl> for API documentation.
     @see <https://www.ecma-international.org/ecma-402/1.0/> for the ECMAScript specification. *)
 
@@ -403,7 +409,8 @@ module Collator : sig
   val options : unit -> options Js.t
 
   class type t = object
-    method compare : (Js.js_string Js.t -> Js.js_string Js.t -> int) Js.readonly_prop
+    method compare :
+      (Js.js_string Js.t -> Js.js_string Js.t -> Js.number_t) Js.readonly_prop
 
     method resolvedOptions : unit -> resolved_options Js.t Js.meth
   end
@@ -627,6 +634,49 @@ module PluralRules : sig
   end
 end
 
+module RelativeTimeFormat : sig
+  include Shared
+
+  class type resolved_options = object
+    method locale : Js.js_string Js.t Js.readonly_prop
+
+    method style : Js.js_string Js.t Js.readonly_prop
+
+    method numberingSystem : Js.js_string Js.t Js.readonly_prop
+
+    method numeric : Js.js_string Js.t Js.readonly_prop
+  end
+
+  class type options = object
+    method localeMatcher : Js.js_string Js.t Js.prop
+
+    method numberingSystem : Js.js_string Js.t Js.optdef Js.prop
+
+    method style : Js.js_string Js.t Js.optdef Js.prop
+
+    method numeric : Js.js_string Js.t Js.optdef Js.prop
+  end
+
+  val options : unit -> options Js.t
+
+  class type format_part = object
+    method _type : Js.js_string Js.t Js.readonly_prop
+
+    method unit : Js.js_string Js.t Js.optdef Js.readonly_prop
+
+    method _value : Js.js_string Js.t Js.readonly_prop
+  end
+
+  class type t = object
+    method format : Js.number Js.t -> Js.js_string Js.t -> Js.js_string Js.t Js.meth
+
+    method formatToParts :
+      Js.number Js.t -> Js.js_string Js.t -> format_part Js.t Js.js_array Js.t Js.meth
+
+    method resolvedOptions : unit -> resolved_options Js.t Js.meth
+  end
+end
+
 class type intl = object
   method _Collator : Collator._object Js.t Js.readonly_prop
 
@@ -635,6 +685,8 @@ class type intl = object
   method _NumberFormat : NumberFormat._object Js.t Js.readonly_prop
 
   method _PluralRules : PluralRules._object Js.t Js.readonly_prop
+
+  method _RelativeTimeFormat : RelativeTimeFormat._object Js.t Js.readonly_prop
 
   method getCanonicalLocales :
     Js.js_string Js.t Js.js_array Js.t -> Js.js_string Js.t Js.js_array Js.t Js.meth
@@ -664,6 +716,12 @@ val pluralRules_constr :
   (   Js.js_string Js.t Js.js_array Js.t Js.optdef
    -> PluralRules.options Js.t Js.optdef
    -> PluralRules.t Js.t)
+  Js.constr
+
+val relativeTimeFormat_constr :
+  (   Js.js_string Js.t Js.js_array Js.t Js.optdef
+   -> RelativeTimeFormat.options Js.t Js.optdef
+   -> RelativeTimeFormat.t Js.t)
   Js.constr
 
 val is_supported : unit -> bool

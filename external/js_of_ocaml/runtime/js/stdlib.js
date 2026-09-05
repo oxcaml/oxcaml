@@ -239,6 +239,18 @@ function caml_named_value(nm) {
 //Provides: caml_global_data
 var caml_global_data = [0];
 
+//Provides: caml_link_info
+var caml_link_info = {};
+
+//Provides: caml_set_link_info
+//Requires: caml_link_info
+function caml_set_link_info(info) {
+  caml_link_info.sections = info[1];
+  caml_link_info.symbols = info[2];
+  caml_link_info.prim_count = info[3];
+  caml_link_info.aliases = info[4];
+}
+
 //Provides: caml_build_symbols
 //Requires: caml_jsstring_of_string
 function caml_build_symbols(symb) {
@@ -246,9 +258,12 @@ function caml_build_symbols(symb) {
   var max = -1;
   if (symb) {
     for (var i = 1; i < symb.length; i++) {
+      var gn = symb[i][1];
+      var is_predef = gn[0];
+      var name = caml_jsstring_of_string(gn[1]);
       var idx = symb[i][2];
       max = Math.max(max, idx);
-      r[caml_jsstring_of_string(symb[i][1])] = idx;
+      r[is_predef ? "predef:" + name : name] = idx;
     }
   }
   r.next_idx = max + 1;
@@ -256,38 +271,76 @@ function caml_build_symbols(symb) {
 }
 
 //Provides: jsoo_toplevel_reloc
-var jsoo_toplevel_reloc = undefined;
+var jsoo_toplevel_reloc;
 
-//Provides: caml_register_global (const, shallow, const)
+//Provides: caml_register_global_by_index (shallow, const)
+//Requires: caml_global_data
+function caml_register_global_by_index(v, idx) {
+  caml_global_data[idx + 1] = v;
+}
+
+//Provides: caml_register_global (shallow, const)
 //Requires: caml_global_data, caml_callback, caml_build_symbols
-//Requires: caml_failwith
+//Requires: caml_link_info
 //Requires: jsoo_toplevel_reloc
-function caml_register_global(n, v, name_opt) {
-  if (name_opt) {
-    var name = name_opt;
-    if (jsoo_toplevel_reloc) {
-      n = caml_callback(jsoo_toplevel_reloc, [name]);
-    } else if (caml_global_data.symbols) {
-      if (!caml_global_data.symidx) {
-        caml_global_data.symidx = caml_build_symbols(caml_global_data.symbols);
-      }
-      var nid = caml_global_data.symidx[name];
-      if (nid >= 0) n = nid;
-      else {
-        // The unit is unknown, this can happen when dynlinking a precompiled js,
-        // let's allocate a fresh idx.
-        var n = caml_global_data.symidx.next_idx++;
-        caml_global_data.symidx[name] = n;
-      }
+function caml_register_global(v, name) {
+  if (jsoo_toplevel_reloc) {
+    var n = caml_callback(jsoo_toplevel_reloc, [[0, name]]);
+    caml_global_data[n + 1] = v;
+  } else if (caml_link_info.symbols) {
+    if (!caml_link_info.symidx) {
+      caml_link_info.symidx = caml_build_symbols(caml_link_info.symbols);
     }
+    var nid = caml_link_info.symidx[name];
+    if (nid === undefined) {
+      // The unit is unknown, this can happen when dynlinking a precompiled js,
+      // let's allocate a fresh idx.
+      nid = caml_link_info.symidx.next_idx++;
+      caml_link_info.symidx[name] = nid;
+    }
+    caml_global_data[nid + 1] = v;
   }
-  caml_global_data[n + 1] = v;
-  if (name_opt) caml_global_data[name_opt] = v;
+  caml_global_data[name] = v;
+}
+
+//Provides: caml_register_global_predef (shallow, const)
+//Requires: caml_global_data, caml_callback, caml_build_symbols
+//Requires: caml_link_info
+//Requires: jsoo_toplevel_reloc
+function caml_register_global_predef(v, name) {
+  var key = "predef:" + name;
+  if (jsoo_toplevel_reloc) {
+    var n = caml_callback(jsoo_toplevel_reloc, [[1, name]]);
+    caml_global_data[n + 1] = v;
+  } else if (caml_link_info.symbols) {
+    if (!caml_link_info.symidx) {
+      caml_link_info.symidx = caml_build_symbols(caml_link_info.symbols);
+    }
+    var nid = caml_link_info.symidx[key];
+    if (nid === undefined) {
+      nid = caml_link_info.symidx.next_idx++;
+      caml_link_info.symidx[key] = nid;
+    }
+    caml_global_data[nid + 1] = v;
+  }
+  caml_global_data[key] = v;
+}
+
+//Provides: caml_get_global (mutable)
+//Requires: caml_global_data
+function caml_get_global(name) {
+  return caml_global_data[name];
+}
+
+//Provides: caml_get_global_predef (mutable)
+//Requires: caml_global_data
+function caml_get_global_predef(name) {
+  return caml_global_data["predef:" + name];
 }
 
 //Provides: caml_get_global_data mutable
 //Requires: caml_global_data
-function caml_get_global_data() {
+function caml_get_global_data(_unit) {
   return caml_global_data;
 }
 
@@ -297,6 +350,14 @@ function caml_is_printable(c) {
 }
 
 //Provides: caml_maybe_print_stats
-function caml_maybe_print_stats(unit) {
+function caml_maybe_print_stats(_unit) {
   return 0;
+}
+
+//Provides: caml_with_async_exns
+//Requires: caml_callback
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_with_async_exns(body_callback) {
+  return caml_callback(body_callback, [0]);
 }

@@ -28,7 +28,7 @@ let cps_transform () =
   match Config.effects () with
   | `Cps | `Double_translation -> true
   | `Disabled -> false
-  | `Jspi -> assert false
+  | `Jspi | `Native -> assert false
 
 open Code
 module J = Javascript
@@ -105,23 +105,35 @@ module Share = struct
     }
 
   let add_byte_string s t =
-    let n = try StringMap.find s t.byte_strings with Not_found -> 0 in
-    { t with byte_strings = StringMap.add s (n + 1) t.byte_strings }
+    { t with
+      byte_strings =
+        StringMap.update s (fun n -> Some (Option.value ~default:0 n + 1)) t.byte_strings
+    }
 
   let add_utf_string s t =
-    let n = try StringMap.find s t.utf_strings with Not_found -> 0 in
-    { t with utf_strings = StringMap.add s (n + 1) t.utf_strings }
+    { t with
+      utf_strings =
+        StringMap.update s (fun n -> Some (Option.value ~default:0 n + 1)) t.utf_strings
+    }
 
   let add_prim s t =
-    let n = try StringMap.find s t.prims with Not_found -> 0 in
-    if n < 0 then t else { t with prims = StringMap.add s (n + 1) t.prims }
+    { t with
+      prims =
+        StringMap.update
+          s
+          (function
+            | Some n when n < 0 -> Some n
+            | opt -> Some (Option.value ~default:0 opt + 1))
+          t.prims
+    }
 
   let add_special_prim_if_exists s t =
     if Primitive.exists s then { t with prims = StringMap.add s (-1) t.prims } else t
 
   let add_apply i t =
-    let n = try AppMap.find i t.applies with Not_found -> 0 in
-    { t with applies = AppMap.add i (n + 1) t.applies }
+    { t with
+      applies = AppMap.update i (fun n -> Some (Option.value ~default:0 n + 1)) t.applies
+    }
 
   let add_code_string s share =
     let share =
@@ -182,7 +194,7 @@ module Share = struct
                     if Primitive.exists name then add_prim name share else share
                   in
                   share
-              | Let (_, Prim (Extern name, args)) ->
+              | Let (_, Prim (Extern (name, _), args)) ->
                   let name = Primitive.resolve name in
                   let share =
                     if Primitive.exists name then add_prim name share else share
@@ -215,80 +227,78 @@ module Share = struct
     if not t.alias_strings
     then gen s
     else
-      try
-        let c = StringMap.find s t.count.byte_strings in
-        if c > 1
-        then (
-          try J.EVar (StringMap.find s t.vars.byte_strings)
-          with Not_found ->
-            let x = Var.fresh_n (Printf.sprintf "cst_%s" s) in
-            let v = J.V x in
-            t.vars <- { t.vars with byte_strings = StringMap.add s v t.vars.byte_strings };
-            J.EVar v)
-        else gen s
-      with Not_found -> gen s
+      match StringMap.find_opt s t.count.byte_strings with
+      | None | Some 1 -> gen s
+      | Some _ -> (
+          match StringMap.find_opt s t.vars.byte_strings with
+          | Some v -> J.EVar v
+          | None ->
+              let x = Var.fresh_n (Printf.sprintf "cst_%s" s) in
+              let v = J.V x in
+              t.vars <-
+                { t.vars with byte_strings = StringMap.add s v t.vars.byte_strings };
+              J.EVar v)
 
   let get_utf_string gen s t =
     if not t.alias_strings
     then gen s
     else
-      try
-        let c = StringMap.find s t.count.utf_strings in
-        if c > 1
-        then (
-          try J.EVar (StringMap.find s t.vars.utf_strings)
-          with Not_found ->
-            let x = Var.fresh_n (Printf.sprintf "cst_%s" s) in
-            let v = J.V x in
-            t.vars <- { t.vars with utf_strings = StringMap.add s v t.vars.utf_strings };
-            J.EVar v)
-        else gen s
-      with Not_found -> gen s
+      match StringMap.find_opt s t.count.utf_strings with
+      | None | Some 1 -> gen s
+      | Some _ -> (
+          match StringMap.find_opt s t.vars.utf_strings with
+          | Some v -> J.EVar v
+          | None ->
+              let x = Var.fresh_n (Printf.sprintf "cst_%s" s) in
+              let v = J.V x in
+              t.vars <- { t.vars with utf_strings = StringMap.add s v t.vars.utf_strings };
+              J.EVar v)
 
   let get_prim gen s t =
     let s = Primitive.resolve s in
     if not t.alias_prims
     then gen s
     else
-      try
-        let c = StringMap.find s t.count.prims in
-        if c > 1 || c = -1
-        then (
-          try J.EVar (StringMap.find s t.vars.prims)
-          with Not_found ->
-            let x = Var.fresh_n s in
-            let v = J.V x in
-            t.vars <- { t.vars with prims = StringMap.add s v t.vars.prims };
-            J.EVar v)
-        else gen s
-      with Not_found -> gen s
+      match StringMap.find_opt s t.count.prims with
+      | None -> gen s
+      | Some c when c > 1 || c = -1 -> (
+          match StringMap.find_opt s t.vars.prims with
+          | Some v -> J.EVar v
+          | None ->
+              let x = Var.fresh () in
+              Var.set_name x ~generated:false s;
+              let v = J.V x in
+              t.vars <- { t.vars with prims = StringMap.add s v t.vars.prims };
+              J.EVar v)
+      | Some _ -> gen s
 
   let get_apply gen desc t =
     if not t.alias_apply
     then gen desc
     else
-      try J.EVar (AppMap.find desc t.vars.applies)
-      with Not_found ->
-        let x =
-          let { arity; exact; trampolined; in_cps } = desc in
-          Var.fresh_n
-            (Printf.sprintf
-               "caml_%scall%d"
-               (match exact, trampolined, in_cps with
-               | true, false, false -> assert false (* inlined *)
-               | true, false, true -> "exact_cps_"
-               | true, true, false -> "exact_trampoline_"
-               | false, false, true ->
-                   assert false (* CPS functions are always trampolined *)
-               | false, false, false -> ""
-               | false, true, false -> "trampoline_"
-               | false, true, true -> "trampoline_cps_"
-               | true, true, true -> "exact_trampoline_cps_")
-               arity)
-        in
-        let v = J.V x in
-        t.vars <- { t.vars with applies = AppMap.add desc v t.vars.applies };
-        J.EVar v
+      match AppMap.find_opt desc t.vars.applies with
+      | Some v -> J.EVar v
+      | None ->
+          let x =
+            let { arity; exact; trampolined; in_cps } = desc in
+            Var.fresh_n
+              (Printf.sprintf
+                 "caml_%scall%d"
+                 (match exact, trampolined, in_cps with
+                 | true, false, false -> assert false (* inlined *)
+                 | true, false, true -> "exact_cps_"
+                 | true, true, false -> "exact_trampoline_"
+                 | false, false, true ->
+                     assert false (* CPS functions are always trampolined *)
+                 | false, false, false -> ""
+                 | false, true, false -> "trampoline_"
+                 | false, true, true -> "trampoline_cps_"
+                 | true, true, true -> "exact_trampoline_cps_")
+                 arity)
+          in
+          let v = J.V x in
+          t.vars <- { t.vars with applies = AppMap.add desc v t.vars.applies };
+          J.EVar v
 end
 
 module Ctx = struct
@@ -300,20 +310,22 @@ module Ctx = struct
     ; should_export : bool
     ; effect_warning : bool ref
     ; trampolined_calls : Effects.trampolined_calls
-    ; deadcode_sentinal : Var.t
+    ; deadcode_sentinel : Var.t
     ; mutated_vars : Code.Var.Set.t Code.Addr.Map.t
     ; freevars : Code.Var.Set.t Code.Addr.Map.t
     ; in_cps : Effects.in_cps
+    ; bool_context : Bool_context.t
     }
 
   let initial
       ~warn_on_unhandled_effect
       ~exported_runtime
       ~should_export
-      ~deadcode_sentinal
+      ~deadcode_sentinel
       ~mutated_vars
       ~freevars
       ~in_cps
+      ~bool_context
       blocks
       live
       trampolined_calls
@@ -325,10 +337,11 @@ module Ctx = struct
     ; should_export
     ; effect_warning = ref (not warn_on_unhandled_effect)
     ; trampolined_calls
-    ; deadcode_sentinal
+    ; deadcode_sentinel
     ; mutated_vars
     ; freevars
     ; in_cps
+    ; bool_context
     }
 end
 
@@ -337,6 +350,35 @@ type edge_kind =
   | Exit_loop of bool ref
   | Exit_switch of bool ref
   | Forward
+  (* Branch target reached through a flat dispatch loop: assign the
+     selector variable the given case index and [continue] the loop. *)
+  | Dispatch of Code.Var.t * int
+
+(* The label for an unlabelled [break]/[continue] reaching [(pc, l)]: [None]
+   when it can be omitted, otherwise [Some l] -- in which case [used] is set,
+   so the target construct is emitted carrying its label.
+
+   An unlabelled jump lands on the innermost enclosing construct that captures
+   it, so the label can be omitted exactly when that construct is the target
+   itself -- i.e. nothing capturing lies in between. [continue] is captured
+   only by loops ([Loop], [Exit_loop], [Dispatch]); [break] also by switches
+   ([Exit_switch]). Labelled blocks ([Forward]) capture neither. *)
+let branch_label kind pc l used scope_stack =
+  let rec can_skip = function
+    | [] -> assert false
+    | (_, (_, _, Forward)) :: rem -> can_skip rem
+    | (_, (_, _, Exit_switch _)) :: rem
+      when match kind with
+           | `Continue -> true
+           | `Break -> false -> can_skip rem
+    | (pc', (l', _, (Loop | Exit_loop _ | Exit_switch _ | Dispatch _))) :: rem ->
+        J.Label.equal l' l && (pc = pc' || can_skip rem)
+  in
+  if can_skip scope_stack
+  then None
+  else (
+    used := true;
+    Some l)
 
 let var x = J.EVar (J.V x)
 
@@ -372,7 +414,10 @@ let plus_int x y =
   | J.ENum x, J.ENum y -> J.ENum (J.Num.add x y)
   | x, y -> J.EBin (J.Plus, x, y)
 
-let bool e = J.ECond (e, one, zero)
+let maybe_bool ctx x e =
+  if Bool_context.is_bool_context_only ctx.Ctx.bool_context x
+  then e
+  else J.ECond (e, one, zero)
 
 (****)
 
@@ -426,17 +471,30 @@ let (e, expr_queue) = ... in
 flush_queue expr_queue e
 *)
 
-let const_p = 0, Var.Set.empty
+type prop' =
+  | Const
+  | Mutable
+  | Mutator
+  | Flush
 
-let mutable_p = 1, Var.Set.empty
+type prop = prop' * Code.Var.Set.t
 
-let mutator_p = 2, Var.Set.empty
+let max_prop' a b =
+  match a, b with
+  | Flush, _ | _, Flush -> Flush
+  | Mutator, _ | _, Mutator -> Mutator
+  | Mutable, _ | _, Mutable -> Mutable
+  | Const, Const -> Const
 
-let flush_p = 3, Var.Set.empty
+let const_p = Const, Var.Set.empty
 
-let or_p (p, s1) (q, s2) = max p q, Var.Set.union s1 s2
+and mutable_p = Mutable, Var.Set.empty
 
-let is_mutable (p, _) = p >= fst mutable_p
+and mutator_p = Mutator, Var.Set.empty
+
+and flush_p = Flush, Var.Set.empty
+
+let or_p (p, s1) (q, s2) = max_prop' p q, Var.Set.union s1 s2
 
 let kind k =
   match k with
@@ -476,9 +534,9 @@ let rec constant_rec ~ctx x level instrs =
       let p =
         Share.get_prim (runtime_fun ctx) "caml_int64_create_lo_mi_hi" ctx.Ctx.share
       in
-      let lo = int (Int64.to_int i land 0xffffff)
-      and mi = int (Int64.to_int (Int64.shift_right i 24) land 0xffffff)
-      and hi = int (Int64.to_int (Int64.shift_right i 48) land 0xffff) in
+      let lo = int (Int64.to_int (Int64.logand i 0xffffffL))
+      and mi = int (Int64.to_int (Int64.logand (Int64.shift_right i 24) 0xffffffL))
+      and hi = int (Int64.to_int (Int64.logand (Int64.shift_right i 48) 0xffffL)) in
       J.call p [ lo; mi; hi ] J.N, instrs
   | Tuple (tag, a, _) -> (
       let constant_max_depth = Config.Param.constant_max_depth () in
@@ -524,72 +582,166 @@ let rec constant_rec ~ctx x level instrs =
           Mlvalue.Block.make ~tag ~args:l, instrs)
   | Int i -> targetint i, instrs
   | Int32 i | NativeInt i -> targetint (Targetint.of_int32_exn i), instrs
-  | Null -> s_var "null", instrs
+  | Null_ -> s_var "null", instrs
 
 let constant ~ctx x level =
   let expr, instr = constant_rec ~ctx x level [] in
   expr, List.rev instr
 
-type queue_elt =
-  { prop : int
-  ; ce : J.expression
-  ; loc : J.location option
-  ; deps : Code.Var.Set.t
-  }
+module Q : sig
+  type queue
 
-let access_queue ~live queue x =
-  let idx = Var.idx x in
-  if idx < Array.length live && Array.unsafe_get live idx = 1
-  then
-    match
-      List.find_map queue ~f:(fun (x', elt) ->
-          if Code.Var.equal x x' then Some elt else None)
-    with
-    | Some elt ->
-        let[@tail_mod_cons] rec clean x = function
-          | [] -> []
-          | ((v, _) as hd) :: rem -> if Code.Var.equal v x then rem else hd :: clean x rem
-        in
-        ((elt.prop, elt.deps), elt.ce, elt.loc), clean x queue
-    | None -> ((fst const_p, Code.Var.Set.singleton x), var x, None), queue
-  else ((fst const_p, Code.Var.Set.singleton x), var x, None), queue
+  val access_queue :
+    live:int array -> queue -> Var.t -> (prop * J.expression * J.location option) * queue
 
-let access_queue_loc ~ctx queue loc' x =
-  let (prop, c, loc), queue = access_queue ~live:ctx.Ctx.live queue x in
-  (prop, c, Option.value ~default:loc' loc), queue
+  val access_queue_loc :
+       ctx:Ctx.t
+    -> queue
+    -> J.location
+    -> Var.t
+    -> (prop * J.expression * J.location) * queue
 
-let should_flush (cond, _) prop = cond <> fst const_p && cond + prop >= fst flush_p
+  val enqueue :
+       queue
+    -> prop
+    -> Var.t
+    -> J.expression
+    -> J.location
+    -> J.location option
+    -> J.statement_list
+    -> J.statement_list * queue
 
-let flush_queue expr_queue prop loc (l : J.statement_list) =
-  let instrs, expr_queue =
-    if fst prop >= fst flush_p
-    then expr_queue, []
-    else List.partition ~f:(fun (_, elt) -> should_flush prop elt.prop) expr_queue
-  in
-  let instrs =
-    List.map instrs ~f:(fun (x, elt) ->
-        let loc = Option.value ~default:loc elt.loc in
-        J.variable_declaration [ J.V x, (elt.ce, loc) ], loc)
-  in
-  List.rev_append instrs l, expr_queue
+  val flush_queue :
+       queue
+    -> prop
+    -> J.location
+    -> J.statement_list
+    -> (J.statement * J.location) list * queue
 
-let flush_all expr_queue loc l = fst (flush_queue expr_queue flush_p loc l)
+  val flush_all :
+    queue -> J.location -> J.statement_list -> (J.statement * J.location) list
 
-let enqueue expr_queue prop x ce flush_loc expr_loc acc =
-  let instrs, expr_queue =
-    if Config.Flag.compact ()
+  val empty : queue
+
+  val is_empty : queue -> bool
+end = struct
+  type elt =
+    { prop : prop'
+    ; ce : J.expression
+    ; loc : J.location option
+    ; deps : Code.Var.Set.t
+    ; rank : int
+    }
+
+  type queue =
+    { map : elt Var.Map.t
+    ; muts : Var.Set.t
+    ; rank : int
+    }
+
+  let empty = { map = Var.Map.empty; muts = Var.Set.empty; rank = 0 }
+
+  let is_empty t = Var.Map.is_empty t.map
+
+  let access_queue ~live queue x =
+    let idx = Var.idx x in
+    if idx < Array.length live && Array.unsafe_get live idx = 1
     then
-      if is_mutable prop
-      then flush_queue expr_queue prop flush_loc acc
-      else acc, expr_queue
-    else flush_queue expr_queue flush_p flush_loc acc
-  in
-  let prop, deps = prop in
-  instrs, (x, { prop; deps; ce; loc = expr_loc }) :: expr_queue
+      match Var.Map.find_opt x queue.map with
+      | None -> ((Const, Code.Var.Set.singleton x), var x, None), queue
+      | Some { prop; deps; ce; loc; rank = _ } ->
+          ( ((prop, deps), ce, loc)
+          , { map = Var.Map.remove x queue.map
+            ; muts =
+                (match prop with
+                | Const -> queue.muts
+                | _ -> Var.Set.remove x queue.muts)
+            ; rank = queue.rank
+            } )
+    else ((Const, Code.Var.Set.singleton x), var x, None), queue
 
-type queue = (Var.t * queue_elt) list
+  let access_queue_loc ~ctx queue loc' x =
+    let (prop, c, loc), queue = access_queue ~live:ctx.Ctx.live queue x in
+    (prop, c, Option.value ~default:loc' loc), queue
 
-type prop = int * Code.Var.Set.t
+  let flush_queue queue prop loc (l : J.statement_list) =
+    let instrs, queue =
+      let prop = fst prop in
+      match prop with
+      | Const -> [], queue
+      | Flush -> Var.Map.bindings queue.map, empty
+      | Mutable ->
+          let flush = ref [] in
+          let muts =
+            Var.Set.filter
+              (fun x ->
+                let elt = Var.Map.find x queue.map in
+                match elt.prop with
+                | Mutator | Flush ->
+                    flush := (x, elt) :: !flush;
+                    false
+                | _ -> true)
+              queue.muts
+          in
+          ( !flush
+          , { muts
+            ; map =
+                List.fold_left !flush ~init:queue.map ~f:(fun acc (x, _) ->
+                    Var.Map.remove x acc)
+            ; rank = queue.rank
+            } )
+      | Mutator ->
+          let flush = ref [] in
+          let muts = Var.Set.empty in
+          Var.Set.iter
+            (fun x ->
+              let elt = Var.Map.find x queue.map in
+              assert (
+                match elt.prop with
+                | Mutator | Mutable | Flush -> true
+                | Const -> false);
+              flush := (x, elt) :: !flush)
+            queue.muts;
+          ( !flush
+          , { muts
+            ; map = Var.Set.fold (fun x acc -> Var.Map.remove x acc) queue.muts queue.map
+            ; rank = queue.rank
+            } )
+    in
+    let instrs =
+      List.stable_sort
+        ~cmp:(fun (_, ({ rank = a; _ } : elt)) (_, { rank = b; _ }) -> compare b a)
+        instrs
+    in
+    let instrs =
+      List.map instrs ~f:(fun (x, elt) ->
+          let loc = Option.value ~default:loc elt.loc in
+          J.variable_declaration [ J.V x, (elt.ce, loc) ], loc)
+    in
+    List.rev_append instrs l, queue
+
+  let flush_all queue loc l = fst (flush_queue queue flush_p loc l)
+
+  let enqueue queue prop x ce flush_loc expr_loc acc =
+    let instrs, queue =
+      if Config.Flag.compact ()
+      then
+        match fst prop with
+        | Mutable | Mutator | Flush -> flush_queue queue prop flush_loc acc
+        | Const -> acc, queue
+      else flush_queue queue flush_p flush_loc acc
+    in
+    let rank = queue.rank in
+    let prop, deps = prop in
+    ( instrs
+    , { map = Var.Map.add x { prop; deps; ce; loc = expr_loc; rank } queue.map
+      ; muts =
+          (match prop with
+          | Const -> queue.muts
+          | _ -> Var.Set.add x queue.muts)
+      ; rank = rank + 1
+      } )
+end
 
 module Expr_builder : sig
   type 'a t
@@ -606,23 +758,24 @@ module Expr_builder : sig
 
   val statement_loc : J.location -> J.location t
 
-  val flush_all : queue -> J.location -> J.statement_list t -> J.statement_list
+  val flush_all : Q.queue -> J.location -> J.statement_list t -> J.statement_list
 
-  val flush_queue : queue -> J.location -> J.statement_list t -> J.statement_list * queue
+  val flush_queue :
+    Q.queue -> J.location -> J.statement_list t -> J.statement_list * Q.queue
 
   val enqueue :
-       queue
+       Q.queue
     -> Var.t
     -> J.location
     -> (J.expression * J.statement_list) t
-    -> J.statement_list * queue
+    -> J.statement_list * Q.queue
 
-  val get : queue -> J.location -> 'a t -> 'a * J.location * queue
+  val get : Q.queue -> J.location -> 'a t -> 'a * J.location * Q.queue
 
   val list_map : ('a -> 'b t) -> 'a list -> 'b list t
 end = struct
   type state =
-    { queue : queue
+    { queue : Q.queue
     ; prop : prop
     ; need_loc : bool
     ; loc : J.location option
@@ -641,7 +794,7 @@ end = struct
     (), { st with prop = or_p st.prop prop; need_loc = need_loc || st.need_loc }
 
   let access ~ctx x st =
-    let (prop, c, loc), queue = access_queue ~live:ctx.Ctx.live st.queue x in
+    let (prop, c, loc), queue = Q.access_queue ~live:ctx.Ctx.live st.queue x in
     ( c
     , { st with
         prop = or_p st.prop prop
@@ -671,11 +824,11 @@ end = struct
 
   let flush_queue queue loc instrs =
     let v, { queue; prop; _ } = instrs (initial_state queue) in
-    flush_queue queue prop loc v
+    Q.flush_queue queue prop loc v
 
   let flush_all queue loc instrs =
     let v, { queue; _ } = instrs (initial_state queue) in
-    flush_all queue loc v
+    Q.flush_all queue loc v
 
   let enqueue queue x flush_loc expr =
     let (ce, instrs), { queue; prop; loc; need_loc } = expr (initial_state queue) in
@@ -684,7 +837,7 @@ end = struct
       | None when need_loc -> Some flush_loc
       | _ -> loc
     in
-    enqueue queue prop x ce flush_loc expr_loc instrs
+    Q.enqueue queue prop x ce flush_loc expr_loc instrs
 
   let get queue loc' x =
     let x, { queue; loc; _ } = x (initial_state queue) in
@@ -908,18 +1061,28 @@ let parallel_renaming ctx loc back_edge params args continuation queue =
     let l = visit_all params args in
     (* if not back_edge
      * then assert (Poly.equal l (List.rev_map2 params args ~f:(fun a b -> a, b))); *)
+    let params_set =
+      List.fold_left params ~init:Var.Set.empty ~f:(fun s x -> Var.Set.add x s)
+    in
     let queue, before, renaming, _ =
       List.fold_left
         l
         ~init:(queue, [], [], Code.Var.Set.empty)
         ~f:(fun (queue, before, renaming, seen) (y, x) ->
-          let ((_, deps_x), cx, locx), queue = access_queue_loc ~ctx queue loc x in
-          let seen' = Code.Var.Set.add y seen in
+          let ((_, deps_x), cx, locx), queue = Q.access_queue_loc ~ctx queue loc x in
+          (* Only track params in [seen], not fresh temps introduced by [visit].
+             Fresh temps are safe to read after being written. *)
+          let seen' = if Var.Set.mem y params_set then Var.Set.add y seen else seen in
           if not Code.Var.Set.(is_empty (inter seen deps_x))
           then
             let () = assert back_edge in
             let before = (J.variable_declaration [ J.V x, (cx, locx) ], locx) :: before in
             let renaming = (y, J.EVar (J.V x)) :: renaming in
+            queue, before, renaming, seen'
+          else if back_edge && not (Var.Set.mem y params_set)
+          then
+            (* Fresh temp introduced by [visit]: emit [var y = cx] directly *)
+            let before = (J.variable_declaration [ J.V y, (cx, locx) ], locx) :: before in
             queue, before, renaming, seen'
           else
             let renaming = (y, cx) :: renaming in
@@ -958,7 +1121,7 @@ let apply_fun_raw =
             (* Effects enabled, CPS version, not single-version *)
             J.EDot (f, J.ANormal, cps_field)
         | `Cps | `Double_translation | `Disabled -> f
-        | `Jspi -> assert false
+        | `Jspi | `Native -> assert false
       in
       (* We skip the arity check when we know that we have the right
          number of parameters, since this test is expensive. *)
@@ -985,7 +1148,7 @@ let apply_fun_raw =
                  (match Config.effects () with
                  | `Double_translation when cps -> "caml_call_gen_cps"
                  | `Double_translation | `Cps | `Disabled -> "caml_call_gen"
-                 | `Jspi -> assert false))
+                 | `Jspi | `Native -> assert false))
               [ f; J.array params ]
               J.N )
     in
@@ -1001,7 +1164,7 @@ let apply_fun_raw =
                 [ apply ~cps:false f (fst (List.take (n - 1) params)) ]
                 J.N )
       | `Double_translation | `Cps | `Disabled -> apply ~cps f params
-      | `Jspi -> assert false
+      | `Jspi | `Native -> assert false
     in
     if trampolined
     then (
@@ -1143,7 +1306,6 @@ let register_bin_math_prim name prim =
       J.call (J.dot (s_var "Math") prim) [ cx; cy ] loc)
 
 let _ =
-  register_un_prim "%identity" `Pure (fun cx _ -> cx);
   register_un_prim_ctx "%caml_format_int_special" `Pure (fun ctx cx loc ->
       let s = J.EBin (J.Plus, str_js_utf8 "", cx) in
       ocaml_string ~ctx ~loc s);
@@ -1163,14 +1325,16 @@ let _ =
     ; "caml_int32_to_float"
     ; "caml_nativeint_of_int"
     ; "caml_nativeint_to_int"
-    ; "caml_checked_nativeint_to_int"
-    ; "caml_checked_int32_to_int"
     ; "caml_nativeint_to_int32"
     ; "caml_nativeint_of_int32"
     ; "caml_nativeint_to_float"
     ; "caml_float_of_int"
     ]
     `Pure
+    (fun cx _ -> cx);
+  register_un_prims
+    [ "caml_checked_nativeint_to_int"; "caml_checked_int32_to_int" ]
+    `Mutator
     (fun cx _ -> cx);
   register_bin_prims
     [ "%int_add"; "caml_int32_add"; "caml_nativeint_add" ]
@@ -1225,22 +1389,6 @@ let _ =
     [ "%int_neg"; "caml_int32_neg"; "caml_nativeint_neg" ]
     `Pure
     (fun cx _ -> to_int (J.EUn (J.Neg, cx)));
-  register_bin_prim "caml_eq_float" `Pure (fun cx cy _ ->
-      bool (J.EBin (J.EqEqEq, cx, cy)));
-  register_bin_prim "caml_neq_float" `Pure (fun cx cy _ ->
-      bool (J.EBin (J.NotEqEq, cx, cy)));
-  register_bin_prim "caml_ge_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cy, cx)));
-  register_bin_prim "caml_le_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cx, cy)));
-  register_bin_prim "caml_gt_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cy, cx)));
-  register_bin_prim "caml_lt_float" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cx, cy)));
-  register_bin_prim "caml_eq_float32" `Pure (fun cx cy _ ->
-      bool (J.EBin (J.EqEq, cx, cy)));
-  register_bin_prim "caml_neq_float32" `Pure (fun cx cy _ ->
-      bool (J.EBin (J.NotEq, cx, cy)));
-  register_bin_prim "caml_ge_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cy, cx)));
-  register_bin_prim "caml_le_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Le, cx, cy)));
-  register_bin_prim "caml_gt_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cy, cx)));
-  register_bin_prim "caml_lt_float32" `Pure (fun cx cy _ -> bool (J.EBin (J.Lt, cx, cy)));
   register_bin_prim "caml_add_float" `Pure (fun cx cy _ -> J.EBin (J.Plus, cx, cy));
   register_bin_prim "caml_sub_float" `Pure (fun cx cy _ -> J.EBin (J.Minus, cx, cy));
   register_bin_prim "caml_mul_float" `Pure (fun cx cy _ -> J.EBin (J.Mul, cx, cy));
@@ -1257,8 +1405,10 @@ let _ =
     ]
     `Mutator
     (fun cx cy cz _ -> J.EBin (J.Eq, Mlvalue.Array.field cx cy, cz));
-  register_un_prims [ "caml_alloc_dummy"; "caml_alloc_dummy_float" ] `Pure (fun _ _ ->
-      J.array []);
+  register_un_prims
+    [ "caml_alloc_dummy"; "caml_alloc_dummy_float"; "caml_alloc_dummy_mixed" ]
+    `Pure
+    (fun _ _ -> J.array []);
   register_un_prims
     [ "caml_int_of_float"
     ; "caml_int32_of_float"
@@ -1293,15 +1443,7 @@ let _ =
   register_bin_prim "caml_js_get" `Mutator (fun cx cy _ -> J.EAccess (cx, ANormal, cy));
   register_bin_prim "caml_js_delete" `Mutator (fun cx cy _ ->
       J.EUn (J.Delete, J.EAccess (cx, ANormal, cy)));
-  register_bin_prim "caml_js_equals" `Mutable (fun cx cy _ ->
-      bool (J.EBin (J.EqEq, cx, cy)));
-  register_bin_prim "caml_js_strict_equals" `Mutable (fun cx cy _ ->
-      bool (J.EBin (J.EqEqEq, cx, cy)));
-  register_bin_prim "caml_js_instanceof" `Mutator (fun cx cy _ ->
-      bool (J.EBin (J.InstanceOf, cx, cy)));
-  register_un_prim "caml_js_typeof" `Mutator (fun cx _ -> J.EUn (J.Typeof, cx));
-  register_un_prim "caml_with_async_exns" `Mutator (fun closure loc ->
-      J.call closure [ int 0 ] loc)
+  register_un_prim "caml_js_typeof" `Mutator (fun cx _ -> J.EUn (J.Typeof, cx))
 
 (****)
 (* when raising ocaml exception and [improved_stacktrace] is enabled,
@@ -1332,7 +1474,7 @@ let remove_unused_tail_args ctx exact trampolined args =
   then
     let has_unused_tail_args =
       List.fold_left
-        ~f:(fun _ x -> Var.equal x ctx.Ctx.deadcode_sentinal)
+        ~f:(fun _ x -> Var.equal x ctx.Ctx.deadcode_sentinel)
         ~init:false
         args
     in
@@ -1341,12 +1483,14 @@ let remove_unused_tail_args ctx exact trampolined args =
       List.fold_right
         ~f:(fun x args ->
           match args with
-          | [] when Var.equal x ctx.Ctx.deadcode_sentinal -> []
+          | [] when Var.equal x ctx.Ctx.deadcode_sentinel -> []
           | _ -> x :: args)
         ~init:[]
         args
     else args
   else args
+
+let keep_name x = not (Code.Var.generated_name x)
 
 let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t =
   let open Expr_builder in
@@ -1367,7 +1511,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             let cx =
               match cx with
               | J.EVar (J.V v) ->
-                  if Var.equal v ctx.deadcode_sentinal
+                  if Var.equal v ctx.deadcode_sentinel
                   then J.ElementHole
                   else J.Element cx
               | _ -> J.Element cx
@@ -1385,7 +1529,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
       let* cx = access ~ctx x in
       let* () = info mutable_p in
       return (Mlvalue.Block.field cx n, [])
-  | Closure (args, ((pc, _) as cont), cloc) ->
+  | Closure (args, ((pc, _) as cont), (_, cloc)) ->
       let loc = source_location cloc in
       let fv = Addr.Map.find pc ctx.freevars in
       let clo = compile_closure ctx cont cloc in
@@ -1394,13 +1538,13 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
           ( None
           , J.fun_ (List.map args ~f:(fun v -> J.V v)) (Js_simpl.function_body clo) loc )
       in
-      let* () = info (fst const_p, fv) in
+      let* () = info (Const, fv) in
       return (clo, [])
   | Constant c -> return (constant ~ctx c level)
   | Special (Alias_prim name) ->
       let prim = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
       return (prim, [])
-  | Prim (Extern "debugger", _) ->
+  | Prim (Extern ("debugger", _), _) ->
       let ins =
         if Config.Flag.debugger () then J.Debugger_statement else J.Empty_statement
       in
@@ -1408,7 +1552,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
   | Prim (p, l) ->
       let* res =
         match p, l with
-        | Vectlength, [ x ] ->
+        | Vectlength _, [ x ] ->
             let* cx = access' ~ctx x in
             return (Mlvalue.Array.length cx)
         | Array_get, [ x; y ] ->
@@ -1416,8 +1560,8 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             let* cy = access' ~ctx y in
             let* () = info mutable_p in
             return (Mlvalue.Array.field cx cy)
-        | Extern "caml_js_var", [ Pc (String nm) ]
-        | Extern ("caml_js_expr" | "caml_pure_js_expr"), [ Pc (String nm) ] -> (
+        | Extern ("caml_js_var", _), [ Pc (String nm) ]
+        | Extern (("caml_js_expr" | "caml_pure_js_expr"), _), [ Pc (String nm) ] -> (
             try
               let pos =
                 match loc with
@@ -1448,27 +1592,38 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
                    | Some s -> Printf.sprintf ", file %S" s)
                    pi.Parse_info.line
                    pi.Parse_info.col))
-        | Extern "%js_array", l ->
+        | Extern ("caml_jsoo_runtime_value", _), [ Pc (String nm) ] when J.is_ident nm ->
+            let prim = Share.get_prim (runtime_fun ctx) nm ctx.Ctx.share in
+            return prim
+        | Extern ("caml_jsoo_runtime_value", _), [ (Pc _ | Pv _) ] ->
+            failwith
+              (Printf.sprintf
+                 "%sJsoo_runtime.Js.runtime_value expects a string literal."
+                 (match (loc : J.location) with
+                 | Pi { name = Some name; col; line; _ } ->
+                     Printf.sprintf "%s:%d:%d: " name line col
+                 | Pi _ | N | U -> ""))
+        | Extern ("%js_array", _), l ->
             let* args = list_map (fun x -> access' ~ctx x) l in
             return (J.array args)
-        | Extern "%caml_js_opt_call", f :: o :: l ->
+        | Extern ("%caml_js_opt_call", _), f :: o :: l ->
             let* () = info ~need_loc:true mutator_p in
             let* cf = access' ~ctx f in
             let* co = access' ~ctx o in
             let* args = list_map (fun x -> access' ~ctx x) l in
             return (J.call (J.dot cf (Utf8_string.of_string_exn "call")) (co :: args) loc)
-        | Extern "%caml_js_opt_fun_call", f :: l ->
+        | Extern ("%caml_js_opt_fun_call", _), f :: l ->
             let* () = info ~need_loc:true mutator_p in
             let* cf = access' ~ctx f in
             let* args = list_map (fun x -> access' ~ctx x) l in
             return (J.call cf args loc)
-        | Extern "%caml_js_opt_meth_call", o :: Pc (NativeString (Utf m)) :: l ->
+        | Extern ("%caml_js_opt_meth_call", _), o :: Pc (NativeString (Utf m)) :: l ->
             let* () = info ~need_loc:true mutator_p in
             let* co = access' ~ctx o in
             let* args = list_map (fun x -> access' ~ctx x) l in
             return (J.call (J.dot co m) args loc)
-        | Extern "%caml_js_opt_meth_call", _ -> assert false
-        | Extern "%caml_js_opt_new", c :: l ->
+        | Extern ("%caml_js_opt_meth_call", _), _ -> assert false
+        | Extern ("%caml_js_opt_new", _), c :: l ->
             let* () = info ~need_loc:true mutator_p in
             let* cc = access' ~ctx c in
             let* args =
@@ -1479,18 +1634,19 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
                 l
             in
             return (J.ENew (cc, (if List.is_empty args then None else Some args), loc))
-        | Extern "caml_js_get", [ Pv o; Pc (NativeString (Utf f)) ] when J.is_ident' f ->
+        | Extern ("caml_js_get", _), [ Pv o; Pc (NativeString (Utf f)) ]
+          when J.is_ident' f ->
             let* co = access ~ctx o in
             let* () = info mutable_p in
             return (J.dot co f)
-        | Extern "caml_js_set", [ Pv o; Pc (NativeString (Utf f)); v ] when J.is_ident' f
-          ->
+        | Extern ("caml_js_set", _), [ Pv o; Pc (NativeString (Utf f)); v ]
+          when J.is_ident' f ->
             let* co = access ~ctx o in
             let* cv = access' ~ctx v in
             let* () = info mutator_p in
             return (J.EBin (J.Eq, J.dot co f, cv))
-        | Extern "caml_js_delete", [ Pv o; Pc (NativeString (Utf f)) ] when J.is_ident' f
-          ->
+        | Extern ("caml_js_delete", _), [ Pv o; Pc (NativeString (Utf f)) ]
+          when J.is_ident' f ->
             let* co = access ~ctx o in
             let* () = info mutator_p in
             return (J.EUn (J.Delete, J.dot co f))
@@ -1502,7 +1658,7 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
            | Extern "caml_js_delete", [ _; Pc (String _) ] -> assert false
            ]}
         *)
-        | Extern "%caml_js_opt_object", fields ->
+        | Extern ("%caml_js_opt_object", _), fields ->
             let rec build_fields l =
               match l with
               | [] -> return []
@@ -1515,7 +1671,8 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
             in
             let* fields = build_fields fields in
             return (J.EObj fields)
-        | Extern "caml_alloc_dummy_function", [ _; size ] ->
+        | Extern ("caml_alloc_dummy_function", _), [ _; size ] ->
+            (* Removed in Ocaml 5.2 *)
             let* i =
               let* cx = access' ~ctx size in
               return
@@ -1535,31 +1692,37 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
               J.EFun (Some f, J.fun_ args [ J.Return_statement (Some call, J.N), J.N ] J.N)
             in
             return e
-        | Extern "caml_alloc_dummy_function", _ -> assert false
-        | Extern ("%resume" | "%perform" | "%reperform"), _ ->
+        | Extern ("caml_alloc_dummy_function", _), _ -> assert false
+        | ( Extern
+              ( ( "%resume"
+                | "%perform"
+                | "%reperform"
+                | "%with_stack"
+                | "%with_stack_bind" )
+              , _ )
+          , _ ) ->
             assert (not (cps_transform ()));
-            (* CR-soon mshinwell: This is a temporary hack for the period when the
-               [Effect] module is in [Stdlib], but no code is actually using it. *)
-            (*
             if not !(ctx.effect_warning)
             then (
-              warn
-                "Warning: your program contains effect handlers; you should probably run \
+              Warning.warn
+                `Effect_handlers_without_effect_backend
+                "your program contains effect handlers; you should probably run \
                  js_of_ocaml with option '--effects=cps'@.";
-              ctx.effect_warning := true); *)
+              ctx.effect_warning := true);
             let name = "jsoo_effect_not_supported" in
             let prim = Share.get_prim (runtime_fun ctx) name ctx.Ctx.share in
             let* () = info ~need_loc:true (kind (Primitive.kind name)) in
             return (J.call prim [] loc)
-        | Extern "caml_string_notequal", [ a; b ] when Config.Flag.use_js_string () ->
+        | Extern ("caml_string_notequal", _), [ a; b ] when Config.Flag.use_js_string ()
+          ->
             let* cx = access' ~ctx a in
             let* cy = access' ~ctx b in
-            return (bool (J.EBin (J.NotEqEq, cx, cy)))
-        | Extern "caml_string_equal", [ a; b ] when Config.Flag.use_js_string () ->
+            return (maybe_bool ctx x (J.EBin (J.NotEqEq, cx, cy)))
+        | Extern ("caml_string_equal", _), [ a; b ] when Config.Flag.use_js_string () ->
             let* cx = access' ~ctx a in
             let* cy = access' ~ctx b in
-            return (bool (J.EBin (J.EqEqEq, cx, cy)))
-        | Extern "caml_string_concat", [ a; b ] when Config.Flag.use_js_string () ->
+            return (maybe_bool ctx x (J.EBin (J.EqEqEq, cx, cy)))
+        | Extern ("caml_string_concat", _), [ a; b ] when Config.Flag.use_js_string () ->
             let* ca = access' ~ctx a in
             let* cb = access' ~ctx b in
             let rec add ca cb =
@@ -1568,7 +1731,49 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
               | _ -> J.EBin (J.Plus, ca, cb)
             in
             return (add ca cb)
-        | Extern name_orig, l -> (
+        | Extern (("caml_eq_float" | "caml_eq_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.EqEqEq, cx, cy)))
+        | Extern (("caml_neq_float" | "caml_neq_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.NotEqEq, cx, cy)))
+        | Extern (("caml_ge_float" | "caml_ge_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.Le, cy, cx)))
+        | Extern (("caml_le_float" | "caml_le_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.Le, cx, cy)))
+        | Extern (("caml_gt_float" | "caml_gt_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.Lt, cy, cx)))
+        | Extern (("caml_lt_float" | "caml_lt_float32"), _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            return (maybe_bool ctx x (J.EBin (J.Lt, cx, cy)))
+        | Extern ("caml_is_null", _), [ a ] ->
+            let* cx = access' ~ctx a in
+            return (maybe_bool ctx x (J.EBin (EqEqEq, cx, s_var "null")))
+        | Extern ("caml_js_equals", _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            let* () = info mutable_p in
+            return (maybe_bool ctx x (J.EBin (J.EqEq, cx, cy)))
+        | Extern ("caml_js_strict_equals", _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            let* () = info mutable_p in
+            return (maybe_bool ctx x (J.EBin (J.EqEqEq, cx, cy)))
+        | Extern ("caml_js_instanceof", _), [ a; b ] ->
+            let* cx = access' ~ctx a in
+            let* cy = access' ~ctx b in
+            let* () = info mutator_p in
+            return (maybe_bool ctx x (J.EBin (J.InstanceOf, cx, cy)))
+        | Extern (name_orig, _), l -> (
             let name = Primitive.resolve name_orig in
             match internal_prim name with
             | Some f -> f name l ctx loc
@@ -1582,30 +1787,30 @@ let rec translate_expr ctx loc x e level : (_ * J.statement_list) Expr_builder.t
         | Not, [ x ] ->
             let* cx = access' ~ctx x in
             return (J.EBin (J.Minus, one, cx))
-        | Lt, [ x; y ] ->
-            let* cx = access' ~ctx x in
+        | Lt, [ y; z ] ->
             let* cy = access' ~ctx y in
-            return (bool (J.EBin (J.LtInt, cx, cy)))
-        | Le, [ x; y ] ->
-            let* cx = access' ~ctx x in
+            let* cz = access' ~ctx z in
+            return (maybe_bool ctx x (J.EBin (J.LtInt, cy, cz)))
+        | Le, [ y; z ] ->
             let* cy = access' ~ctx y in
-            return (bool (J.EBin (J.LeInt, cx, cy)))
-        | Eq, [ x; y ] ->
-            let* cx = access' ~ctx x in
+            let* cz = access' ~ctx z in
+            return (maybe_bool ctx x (J.EBin (J.LeInt, cy, cz)))
+        | Eq, [ y; z ] ->
             let* cy = access' ~ctx y in
-            return (bool (J.EBin (J.EqEqEq, cx, cy)))
-        | Neq, [ x; y ] ->
-            let* cx = access' ~ctx x in
+            let* cz = access' ~ctx z in
+            return (maybe_bool ctx x (J.EBin (J.EqEqEq, cy, cz)))
+        | Neq, [ y; z ] ->
             let* cy = access' ~ctx y in
-            return (bool (J.EBin (J.NotEqEq, cx, cy)))
-        | IsInt, [ x ] ->
-            let* cx = access' ~ctx x in
-            return (bool (Mlvalue.is_immediate cx))
-        | Ult, [ x; y ] ->
-            let* cx = access' ~ctx x in
+            let* cz = access' ~ctx z in
+            return (maybe_bool ctx x (J.EBin (J.NotEqEq, cy, cz)))
+        | IsInt, [ y ] ->
             let* cy = access' ~ctx y in
-            return (bool (J.EBin (J.LtInt, unsigned cx, unsigned cy)))
-        | (Vectlength | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult), _ ->
+            return (maybe_bool ctx x (Mlvalue.is_immediate cy))
+        | Ult, [ y; z ] ->
+            let* cy = access' ~ctx y in
+            let* cz = access' ~ctx z in
+            return (maybe_bool ctx x (J.EBin (J.LtInt, unsigned cy, unsigned cz)))
+        | (Vectlength _ | Array_get | Not | IsInt | Eq | Neq | Lt | Le | Ult), _ ->
             assert false
       in
       return (res, [])
@@ -1623,16 +1828,6 @@ and translate_instr ctx expr_queue loc instr =
          return [ J.Expression_statement (J.EBin (J.Eq, J.EVar (J.V x), cy)), loc ])
   | Let (x, e) -> (
       let e' = translate_expr ctx loc x e 0 in
-      let keep_name x =
-        match Code.Var.get_name x with
-        | None -> false
-        | Some "" -> false
-        | Some s ->
-            (* "switcher" is emitted by the OCaml compiler when compiling
-               pattern matching, it does not help much to keep it in the
-               generated js, let's drop it *)
-            (not (generated_name s)) && not (String.starts_with s ~prefix:"jsoo_")
-      in
       match ctx.Ctx.live.(Var.idx x), e with
       | 0, _ ->
           (* deadcode is off *)
@@ -1642,11 +1837,11 @@ and translate_instr ctx expr_queue loc instr =
             (let* ce, instrs = e' in
              let* loc = statement_loc loc in
              return (instrs @ [ J.Expression_statement ce, loc ]))
+      | 1, Constant (Int _ | Int32 _ | NativeInt _ | Float _) ->
+          enqueue expr_queue x loc e'
       | 1, _
         when Config.Flag.compact () && ((not (Config.Flag.pretty ())) || not (keep_name x))
         -> enqueue expr_queue x loc e'
-      | 1, Constant (Int _ | Int32 _ | NativeInt _ | Float _) ->
-          enqueue expr_queue x loc e'
       | _ ->
           flush_queue
             expr_queue
@@ -1673,10 +1868,11 @@ and translate_instr ctx expr_queue loc instr =
          let expr = Mlvalue.Block.field cx 0 in
          let expr' =
            match n with
+           | 0 -> expr (* no-op, but shouldn't happen in practice *)
            | 1 -> J.EUn (J.IncrA, expr)
            | -1 -> J.EUn (J.DecrA, expr)
-           | n when n < 0 (* *) -> J.EBin (J.MinusEq, expr, int (-n))
-           | n (*   n > 0    *) -> J.EBin (J.PlusEq, expr, int n)
+           | n when n < 0 -> J.EBin (J.MinusEq, expr, int (-n))
+           | n (* n > 0 *) -> J.EBin (J.PlusEq, expr, int n)
          in
          let* () = info mutator_p in
          let* loc = statement_loc loc in
@@ -1717,10 +1913,10 @@ and translate_instrs_rev (ctx : Ctx.t) loc expr_queue instrs acc_rev muts_map =
       let muts_map_l =
         Code.Var.Set.elements muts
         |> List.map ~f:(fun x ->
-               ( x
-               , match Code.Var.Map.find_opt x old_muts_map with
-                 | None -> Code.Var.fork x
-                 | Some x' -> x' ))
+            ( x
+            , match Code.Var.Map.find_opt x old_muts_map with
+              | None -> Code.Var.fork x
+              | Some x' -> x' ))
       in
       let muts_map =
         List.fold_left muts_map_l ~init:old_muts_map ~f:(fun acc (x, x') ->
@@ -1751,7 +1947,7 @@ and translate_instrs_rev (ctx : Ctx.t) loc expr_queue instrs acc_rev muts_map =
           Code.Var.Set.fold
             (fun v (expr_queue, vars, lets) ->
               assert (not (Code.Var.Set.mem v names));
-              let (px, cx, locx), expr_queue = access_queue_loc ~ctx expr_queue loc v in
+              let (px, cx, locx), expr_queue = Q.access_queue_loc ~ctx expr_queue loc v in
               let flushed = Code.Var.Set.(equal (snd px) (singleton v)) in
               match
                 ( flushed
@@ -1794,7 +1990,7 @@ and translate_instrs_rev (ctx : Ctx.t) loc expr_queue instrs acc_rev muts_map =
               | [ i ] -> mut_rec, i :: st_rev, expr_queue
               | [] ->
                   let (_px, cx, locx), expr_queue =
-                    access_queue_loc ~ctx expr_queue loc x'
+                    Q.access_queue_loc ~ctx expr_queue loc x'
                   in
                   ( mut_rec
                   , (J.variable_declaration [ J.V x', (cx, locx) ], locx) :: st_rev
@@ -1821,17 +2017,17 @@ and translate_instrs (ctx : Ctx.t) loc expr_queue instrs =
   loc, List.rev st_rev, expr_queue
 
 (* Compile loops. *)
-and compile_block st loc queue (pc : Addr.t) scope_stack ~fall_through =
+and compile_block st loc (queue : Q.queue) (pc : Addr.t) scope_stack ~fall_through =
   if
-    (not (List.is_empty queue))
+    (not (Q.is_empty queue))
     && (Structure.is_loop_header st.structure pc
        ||
        (* Do not inline expressions across block boundaries when --no-inline is used
               Single-stepping in the debugger should work better this way (fixes #290). *)
        not (Config.Flag.inline ()))
   then
-    let never, code = compile_block st loc [] pc scope_stack ~fall_through in
-    never, flush_all queue loc code
+    let never, code = compile_block st loc Q.empty pc scope_stack ~fall_through in
+    never, Q.flush_all queue loc code
   else
     match Structure.is_loop_header st.structure pc with
     | false -> compile_block_no_loop st loc queue pc scope_stack ~fall_through
@@ -1892,7 +2088,7 @@ and compile_block_no_loop st loc queue (pc : Addr.t) ~fall_through scope_stack =
     Structure.get_edges st.dom pc
     |> Addr.Set.elements
     |> List.filter ~f:(fun pc' ->
-           nbbranch pc' >= 2 || Structure.is_merge_node st.structure pc')
+        nbbranch pc' >= 2 || Structure.is_merge_node st.structure pc')
     |> Structure.sort_in_post_order st.structure
   in
   let rec loop ~scope_stack ~fall_through l =
@@ -1903,12 +2099,107 @@ and compile_block_no_loop st loc queue (pc : Addr.t) ~fall_through scope_stack =
         let used = ref false in
         let scope_stack = (x, (l, used, Forward)) :: scope_stack in
         let _never_inner, inner = loop ~scope_stack ~fall_through:(Block x) xs in
-        let never, code = compile_block st loc [] x scope_stack ~fall_through in
+        let never, code = compile_block st loc Q.empty x scope_stack ~fall_through in
         match !used with
         | true -> never, [ J.Labelled_statement (l, (J.Block inner, J.N)), J.N ] @ code
         | false -> never, inner @ code)
   in
-  let never_after, after = loop ~scope_stack ~fall_through new_scopes in
+  let never_after, after =
+    if List.length new_scopes > Config.Param.merge_node_max ()
+    then
+      (* Too many sibling merge-node targets: a tower of nested labelled
+         blocks would nest as deep as [new_scopes], which overflows some JS
+         engine parsers (#2122). Emit a flat selector-driven dispatch loop
+         instead, whose statement-nesting depth is constant. A branch to a
+         target [x_i] becomes [sel = i; continue L]; a branch to the join
+         becomes [break L].
+
+         The cases are laid out in the same textual order as the nested
+         scheme (the dispatch, then the targets in reverse), and each is
+         compiled with the textually-next case as its fall-through. A branch
+         to that next case is then elided and falls through in the [switch]
+         instead of routing through the loop, exactly as it would fall through
+         in the nested scheme. *)
+      let sel = Code.Var.fresh () in
+      let l = J.Label.fresh () in
+      let used = ref false in
+      (* Set when some case breaks to the join, i.e. exits the loop. *)
+      let exit_branch_used = ref false in
+      (* case 0 is the dispatch itself, the targets are cases 1..n *)
+      let indexed = List.mapi new_scopes ~f:(fun i x -> succ i, x) in
+      let scope_stack =
+        List.fold_left indexed ~init:scope_stack ~f:(fun ss (c, x) ->
+            (x, (l, used, Dispatch (sel, c))) :: ss)
+      in
+      let scope_stack =
+        match fall_through with
+        | Block fpc -> (fpc, (l, used, Exit_loop exit_branch_used)) :: scope_stack
+        | Return -> scope_stack
+      in
+      (* Targets are emitted in reverse so that each one falls through to the
+         previous target, and the first target ([x_1]) falls through to the
+         join. *)
+      let ordered = List.rev indexed in
+      let dispatch_fall_through =
+        match ordered with
+        | (_, x) :: _ -> Block x
+        | [] -> fall_through
+      in
+      let _dispatch_never, dispatch_code =
+        compile_conditional
+          st
+          queue
+          ~fall_through:dispatch_fall_through
+          loc
+          block.branch
+          scope_stack
+      in
+      (* Returns the cases together with the [never] of the last case ([x_1]),
+         whose fall-through is the join: it is [false] exactly when control can
+         fall off the bottom of the [switch]. *)
+      let rec scope_cases = function
+        | [] -> [], true
+        | (c, x) :: rest -> (
+            let fall_through =
+              match rest with
+              | (_, x') :: _ -> Block x'
+              | [] -> fall_through
+            in
+            let never, code = compile_block st loc Q.empty x scope_stack ~fall_through in
+            let cases, last_never = scope_cases rest in
+            ( (int c, code) :: cases
+            , match rest with
+              | [] -> never
+              | _ :: _ -> last_never ))
+      in
+      let scope_cases, last_case_never = scope_cases ordered in
+      let cases = (int 0, dispatch_code) :: scope_cases in
+      let switch = J.Switch_statement (var sel, cases, None, []), loc in
+      (* The construct only falls through to the join in two ways: a case falls
+         off the bottom of the [switch] (governed by [last_case_never]), or a
+         case breaks out ([exit_branch_used]). *)
+      let never_after = (not !exit_branch_used) && last_case_never in
+      (* A target that falls off its case lands on the next case; the dispatch
+         and the join exit the loop. The trailing [break] (unlabelled: it sits
+         in the loop body, after the [switch]) catches a case that falls through
+         to the join, and is also the loop exit reached by an unlabelled break
+         out of the [switch]. It is unreachable -- and nothing relies on it --
+         exactly when [never_after] holds, so it can then be dropped. It must
+         not be labelled with [l], as [l] is only emitted when a branch actually
+         routes through the loop ([!used]). *)
+      let body =
+        if never_after
+        then Js_simpl.block [ switch ]
+        else Js_simpl.block [ switch; J.Break_statement None, J.N ]
+      in
+      let for_loop = J.For_statement (J.Left None, None, None, body), loc in
+      let for_loop =
+        if !used then J.Labelled_statement (l, for_loop), J.N else for_loop
+      in
+      let decl = J.variable_declaration [ J.V sel, (int 0, J.N) ], J.N in
+      never_after, [ decl; for_loop ]
+    else loop ~scope_stack ~fall_through new_scopes
+  in
   never_after, seq @ after
 
 and compile_decision_tree kind st scope_stack loc_before cx loc_after dtree ~fall_through
@@ -1927,7 +2218,9 @@ and compile_decision_tree kind st scope_stack loc_before cx loc_after dtree ~fal
                 ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
                 (fun fmt pc -> Format.fprintf fmt "%d" pc))
             l;
-        let never, code = compile_branch st loc_after [] cont scope_stack ~fall_through in
+        let never, code =
+          compile_branch st loc_after Q.empty cont scope_stack ~fall_through
+        in
         if debug () then Format.eprintf "}@]@;";
         never, code
     | DTree.If (cond, cont1, cont2) ->
@@ -2025,7 +2318,7 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
         let instrs =
           let* cx = access ~ctx x in
           let return_expr =
-            if Var.equal st.ctx.deadcode_sentinal x then None else Some cx
+            if Var.equal st.ctx.deadcode_sentinel x then None else Some cx
           in
           let loc' =
             match cx with
@@ -2053,16 +2346,18 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
         let e_opt =
           if st.ctx.Ctx.should_export then Some (s_var Global_constant.exports) else None
         in
-        true, flush_all queue loc [ J.Return_statement (e_opt, loc), loc ]
+        true, Q.flush_all queue loc [ J.Return_statement (e_opt, loc), loc ]
     | Branch cont -> compile_branch st loc queue cont scope_stack ~fall_through
     | Pushtrap (c1, x, e1) ->
-        let never_body, body = compile_branch st J.N [] c1 scope_stack ~fall_through in
+        let never_body, body =
+          compile_branch st J.N Q.empty c1 scope_stack ~fall_through
+        in
         if debug () then Format.eprintf "@,}@]@,@[<hv 2>catch {@;";
         let exn_var, never_handler, handler =
           match st.ctx.Ctx.live.(Var.idx x) with
           | 0 ->
               let never_handler, handler =
-                compile_branch st J.U [] e1 scope_stack ~fall_through
+                compile_branch st J.U Q.empty e1 scope_stack ~fall_through
               in
               x, never_handler, handler
           | n ->
@@ -2080,8 +2375,9 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
                 if List.mem ~eq:Var.equal x (snd e1)
                 then (
                   assert (n = 1);
-                  enqueue [] const_p x wrapped_exn J.U None [])
-                else [ J.variable_declaration [ J.V x, (wrapped_exn, J.U) ], J.N ], []
+                  Q.enqueue Q.empty const_p x wrapped_exn J.U None [])
+                else
+                  [ J.variable_declaration [ J.V x, (wrapped_exn, J.U) ], J.N ], Q.empty
               in
               let never_handler, handler =
                 compile_branch st J.U queue e1 scope_stack ~fall_through
@@ -2089,15 +2385,15 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
               handler_var, never_handler, instrs @ handler
         in
         ( never_body && never_handler
-        , flush_all
+        , Q.flush_all
             queue
             loc
             [ ( J.Try_statement (body, Some (Some (J.param' (J.V exn_var)), handler), None)
               , loc )
             ] )
     | Poptrap cont ->
-        let never, code = compile_branch st J.N [] cont scope_stack ~fall_through in
-        never, flush_all queue loc code
+        let never, code = compile_branch st J.N Q.empty cont scope_stack ~fall_through in
+        never, Q.flush_all queue loc code
     | Cond (x, c1, c2) ->
         let cx, loc_before, queue =
           Expr_builder.get queue loc (Expr_builder.access ~ctx x)
@@ -2115,7 +2411,7 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
             loc
             (DTree.build_if c1 c2)
         in
-        never, flush_all queue loc_before b
+        never, Q.flush_all queue loc_before b
     | Switch (x, a1) ->
         let cx, loc_before, queue =
           Expr_builder.get queue loc (Expr_builder.access ~ctx x)
@@ -2133,7 +2429,7 @@ and compile_conditional st queue ~fall_through loc last scope_stack : _ * _ =
             loc
             (DTree.build_switch a1)
         in
-        never, flush_all queue loc_before code
+        never, Q.flush_all queue loc_before code
   in
   (if debug ()
    then
@@ -2165,62 +2461,53 @@ and compile_branch st loc queue ((pc, _) as cont) scope_stack ~fall_through : bo
         match fall_through with
         | Block pc' -> pc' = pc
         | Return -> false
-      then false, flush_all queue loc []
+      then false, Q.flush_all queue loc []
       else
         match scope with
         | Some (l, used, Loop) ->
             (* Loop back to the beginning of the loop using continue.
                We can skip the label if we're not inside a nested loop. *)
-            let rec can_skip_label scope_stack =
-              match scope_stack with
-              | [] -> assert false
-              | (_, (_, _, (Forward | Exit_switch _))) :: rem -> can_skip_label rem
-              | (pc', (l', _, (Loop | Exit_loop _))) :: rem ->
-                  J.Label.equal l' l && (pc = pc' || can_skip_label rem)
-            in
-            let label =
-              if can_skip_label scope_stack
-              then None
-              else (
-                used := true;
-                Some l)
-            in
+            let label = branch_label `Continue pc l used scope_stack in
             if debug ()
             then
               if Option.is_none label
               then Format.eprintf "continue;@,"
               else Format.eprintf "continue (%d);@," pc;
-            true, flush_all queue loc [ J.Continue_statement label, J.N ]
+            true, Q.flush_all queue loc [ J.Continue_statement label, J.N ]
         | Some (l, used, (Exit_loop branch_used | Exit_switch branch_used)) ->
             (* Break out of a loop or switch (using Break)
                We can skip the label if we're not inside a nested loop or switch.
             *)
             branch_used := true;
-            let rec can_skip_label scope_stack =
-              match scope_stack with
-              | [] -> assert false
-              | (_, (_, _, Forward)) :: rem -> can_skip_label rem
-              | (pc', (l', _, (Loop | Exit_loop _ | Exit_switch _))) :: rem ->
-                  J.Label.equal l' l && (pc = pc' || can_skip_label rem)
-            in
-            let label =
-              if can_skip_label scope_stack
-              then None
-              else (
-                used := true;
-                Some l)
-            in
+            let label = branch_label `Break pc l used scope_stack in
             if debug ()
             then
               if Option.is_none label
               then Format.eprintf "break;@,"
               else Format.eprintf "break (%d);@," pc;
-            true, flush_all queue loc [ J.Break_statement label, J.N ]
+            true, Q.flush_all queue loc [ J.Break_statement label, J.N ]
         | Some (l, used, Forward) ->
             (* break outside a labelled statement. The label is mandatory in this case. *)
             if debug () then Format.eprintf "(br %d)@;" pc;
             used := true;
-            true, flush_all queue loc [ J.Break_statement (Some l), J.N ]
+            true, Q.flush_all queue loc [ J.Break_statement (Some l), J.N ]
+        | Some (l, used, Dispatch (sel, k)) ->
+            (* Reach the target through the enclosing dispatch loop: select the
+               corresponding case and loop back. As for [Loop], the label can be
+               skipped when the dispatch loop is the innermost enclosing loop. *)
+            let label = branch_label `Continue pc l used scope_stack in
+            if debug ()
+            then
+              if Option.is_none label
+              then Format.eprintf "(dispatch %d -> %d) continue;@," pc k
+              else Format.eprintf "(dispatch %d -> %d) continue (%d);@," pc k pc;
+            ( true
+            , Q.flush_all
+                queue
+                loc
+                [ J.Expression_statement (J.EBin (J.Eq, var sel, int k)), loc
+                ; J.Continue_statement label, J.N
+                ] )
         | None -> compile_block st loc queue pc scope_stack ~fall_through)
 
 and compile_closure ctx (pc, args) (cloc : Parse_info.t option) =
@@ -2235,7 +2522,7 @@ and compile_closure ctx (pc, args) (cloc : Parse_info.t option) =
     | _ -> J.U
   in
   let _never, res =
-    compile_branch st start_loc [] (pc, args) scope_stack ~fall_through:Return
+    compile_branch st start_loc Q.empty (pc, args) scope_stack ~fall_through:Return
   in
   if Addr.Set.cardinal !(st.visited_blocks) <> Addr.Set.cardinal current_blocks
   then (
@@ -2257,15 +2544,15 @@ let generate_shared_value ctx =
   let strings =
     ( J.variable_declaration
         ((match ctx.Ctx.exported_runtime with
-         | None -> []
-         | Some (_, { contents = false }) -> []
-         | Some (v, _) ->
-             [ ( J.V v
-               , ( J.dot
-                     (s_var Global_constant.global_object)
-                     (Utf8_string.of_string_exn "jsoo_runtime")
-                 , J.U ) )
-             ])
+           | None -> []
+           | Some (_, { contents = false }) -> []
+           | Some (v, _) ->
+               [ ( J.V v
+                 , ( J.dot
+                       (s_var Global_constant.global_object)
+                       (Utf8_string.of_string_exn "jsoo_runtime")
+                   , J.U ) )
+               ])
         @ List.map
             (StringMap.bindings ctx.Ctx.share.Share.vars.Share.byte_strings)
             ~f:(fun (s, v) -> v, (str_js_byte s, J.U))
@@ -2305,7 +2592,9 @@ let f
     ~in_cps
     ~should_export
     ~warn_on_unhandled_effect
-    ~deadcode_sentinal =
+    ~deadcode_sentinel =
+  let p = Structure.norm p in
+  let bool_context = Bool_context.f p in
   let mutated_vars = Freevars.f_mutable p in
   let freevars = Freevars.f p in
   let t' = Timer.make () in
@@ -2318,10 +2607,11 @@ let f
       ~warn_on_unhandled_effect
       ~exported_runtime
       ~should_export
-      ~deadcode_sentinal
+      ~deadcode_sentinel
       ~mutated_vars
       ~freevars
       ~in_cps
+      ~bool_context
       p.blocks
       live_vars
       trampolined_calls
@@ -2334,4 +2624,25 @@ let f
 let init () =
   String.Hashtbl.iter
     (fun name (k, _) -> Primitive.register name k None None)
-    internal_primitives
+    internal_primitives;
+  (* Register prims that are handled directly in translate_expr
+     (with maybe_bool) rather than through internal_primitives *)
+  List.iter
+    [ "caml_eq_float"
+    ; "caml_neq_float"
+    ; "caml_ge_float"
+    ; "caml_le_float"
+    ; "caml_gt_float"
+    ; "caml_lt_float"
+    ; "caml_eq_float32"
+    ; "caml_neq_float32"
+    ; "caml_ge_float32"
+    ; "caml_le_float32"
+    ; "caml_gt_float32"
+    ; "caml_lt_float32"
+    ; "caml_is_null"
+    ]
+    ~f:(fun name -> Primitive.register name `Pure None None);
+  List.iter [ "caml_js_equals"; "caml_js_strict_equals" ] ~f:(fun name ->
+      Primitive.register name `Mutable None None);
+  Primitive.register "caml_js_instanceof" `Mutator None None
