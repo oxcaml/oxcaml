@@ -47,6 +47,7 @@ type forbidden_modality_kind =
 type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
+  | Forbidden_externality : 'a annot_type * string -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
 
 exception Error of Location.t * error
@@ -225,12 +226,21 @@ let apply_mode_implications (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
+let reject_externality ~loc annot_type text (atom : Mode.Alloc.atom) =
+  match atom with
+  | Atom (Comonadic Externality, _) ->
+    raise (Error (loc, Forbidden_externality (annot_type, text)))
+  | _ -> ()
+
 let transl_mode_annots annots =
   let annots =
     List.map
       (fun { txt = Parsetree.Mode txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try { txt = Mode_axis_pair.of_string txt; loc }
+        try
+          let atom = Mode_axis_pair.of_string txt in
+          reject_externality ~loc Mode txt atom;
+          { txt = atom; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
       annots
@@ -259,13 +269,15 @@ let mode_annot_to_modality_annot mode_annot =
       | Monadic ax -> Atom (Monadic ax, Join_const mode))
     mode_annot
 
-let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
+let transl_modality ~allow_externality ~maturity
+    { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let mode =
     try Mode_axis_pair.(of_string modality)
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
+  if not allow_externality then reject_externality ~loc Modality modality mode;
   let mode_annot = { txt = mode; loc } in
   mode_annot_to_modality_annot mode_annot
 
@@ -424,14 +436,14 @@ let transl_modality_atoms ~warn_redundant ~default ~loc ~annot_type
   enforce_forbidden_modalities annot_type ~loc modalities;
   modalities
 
-let transl_modalities_with_default ?(allow_redundant_staticity = false)
-    ~maturity ~default annots =
+let transl_modalities_with_default_internal ~allow_externality
+    ?(allow_redundant_staticity = false) ~maturity ~default annots =
   let modalities_loc =
     match List.map (fun { loc; _ } -> loc) annots with
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
-  let annots = List.map (transl_modality ~maturity) annots in
+  let annots = List.map (transl_modality ~allow_externality ~maturity) annots in
   let open Modality in
   (* - default is applied before explicit modalities.
      - explicit modalities can override default.
@@ -483,6 +495,11 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
+let transl_modalities_with_default ?allow_redundant_staticity ~maturity ~default
+    annots =
+  transl_modalities_with_default_internal ~allow_externality:false
+    ?allow_redundant_staticity ~maturity ~default annots
+
 let mutable_modalities mut =
   mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
 
@@ -506,8 +523,8 @@ let sort_dedup_modalities modalities =
 let untransl_modalities t = List.map untransl_modality t.moda_desc
 
 let transl_with_bound_modifiers annots =
-  (transl_modalities_with_default ~maturity:Stable ~default:Modality.Const.id
-     annots)
+  (transl_modalities_with_default_internal ~allow_externality:true
+     ~maturity:Stable ~default:Modality.Const.id annots)
     .moda_modalities
 
 let transl_alloc_mode annots =
@@ -704,6 +721,11 @@ let report_error ppf =
   | Forbidden_modality (annot_type, Global_and_unique) ->
     fprintf ppf "The %a %a can't be used together with %a" print_annot_type
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
+  | Forbidden_externality (annot_type, modifier) ->
+    fprintf ppf
+      "Externality %a cannot currently be annotated as a %a.@ It is supported \
+       in kind modifiers and@ with-bound modalities."
+      Misc.Style.inline_code modifier print_annot_type annot_type
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
 
