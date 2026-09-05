@@ -272,12 +272,27 @@ Line 3, characters 34-35:
 Error: The value "x" has type "r#" but an expression was expected of type "r2#"
 |}]
 
-(* Mutable fields imply modalities *)
+(* Unboxed versions of mutable records have mutable fields *)
 type r = { i : int ; mutable s : string }
-type u = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+type u = r# = #{ i : int ; mutable s : string }
 [%%expect{|
 type r = { i : int; mutable s : string; }
-type u = r# = #{ i : int; s : string @@ global many dynamic; }
+type u = r# = #{ i : int; mutable s : string; }
+|}]
+
+(* An immutable field doesn't match, even with the modalities that [mutable]
+   implies *)
+type u' = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+[%%expect{|
+Line 1, characters 0-82:
+1 | type u' = r# = #{ i : int ; s : string @@ global many aliased unyielding dynamic }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "r#"
+       Fields do not match:
+         "mutable s : string;"
+       is not the same as:
+         "s : string @@ global many dynamic;"
+       The original is mutable and this is not.
 |}]
 
 (*******************)

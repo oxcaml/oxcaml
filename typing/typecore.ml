@@ -1953,7 +1953,8 @@ and build_as_type_and_mode_extra env p ~mode : _ -> _ * _ = function
 
 and build_as_type_aux (env : Env.t) p ~mode =
   let build_as_type env p = fst (build_as_type_and_mode env p ~mode) in
-  let build_record_as_type lpl =
+  let build_record_as_type (type rep) (record_form : rep record_form)
+      (lpl : (_ * rep gen_label_description * _) list) =
     let lbl = snd3 (List.hd lpl) in
     if lbl.lbl_private = Private then p.pat_type, mode else
     (* The jkind here is filled in via unification with [ty_res] in
@@ -1964,11 +1965,19 @@ and build_as_type_aux (env : Env.t) p ~mode =
         RAE: why? It looks fine as-is. *)
     let ty = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in
     let ppl = List.map (fun (_, l, p) -> l.lbl_pos, p) lpl in
-    let do_label lbl =
+    let do_label (lbl : rep gen_label_description) =
       let _, ty_arg, ty_res = instance_label ~fixed:false lbl in
       unify_pat env {p with pat_type = ty} ty_res;
+      let mutability_refinable =
+        (* A mutable boxed field may be overwritten, so its current contents
+           can't refine the type. An unboxed record is an unaliased copy, so
+           its fields can't change. *)
+        match record_form with
+        | Legacy -> lbl.lbl_mut = Immutable
+        | Unboxed_product -> true
+      in
       let refinable =
-        lbl.lbl_mut = Immutable && List.mem_assoc lbl.lbl_pos ppl &&
+        mutability_refinable && List.mem_assoc lbl.lbl_pos ppl &&
         match get_desc lbl.lbl_arg with Tpoly _ -> false | _ -> true in
       if refinable then begin
         let arg = List.assoc lbl.lbl_pos ppl in
@@ -2028,8 +2037,9 @@ and build_as_type_aux (env : Env.t) p ~mode =
                          ~name:None ~fixed:None ~closed:false))
       in
       ty, mode
-  | Tpat_record (lpl,_,_) -> build_record_as_type lpl
-  | Tpat_record_unboxed_product (lpl,_,_) -> build_record_as_type lpl
+  | Tpat_record (lpl,_,_) -> build_record_as_type Legacy lpl
+  | Tpat_record_unboxed_product (lpl,_,_) ->
+      build_record_as_type Unboxed_product lpl
   | Tpat_or(p1, p2, row) ->
       begin match row with
         None ->
@@ -3555,9 +3565,14 @@ and type_pat_aux
         let ty_arg =
           solve_Ppat_record_field loc penv label label_lid
             record_ty record_form in
-        check_project_mutability ~loc ~env:!!penv
-          (Record_field label.lbl_name)
-          label.lbl_mut alloc_mode.mode;
+        (* Unboxed record fields can't be mutated, so mutability imposes no
+           mode constraints. *)
+        (match record_form with
+         | Legacy ->
+           check_project_mutability ~loc ~env:!!penv
+             (Record_field label.lbl_name)
+             label.lbl_mut alloc_mode.mode
+         | Unboxed_product -> ());
         let is_contained_by : Mode.Hint.is_contained_by =
           { containing = Record (label.lbl_name, Modality);
             container = (loc, Pattern) }
@@ -5368,11 +5383,13 @@ let rec is_nonexpansive exp =
         fields
       && is_nonexpansive_opt (Option.map Misc.fst3 extended_expression)
   | Texp_record_unboxed_product { fields; extended_expression } ->
+      (* Unlike for boxed records, mutable fields don't make the expression
+         expansive: an unboxed record has no identity, so no mutation can be
+         observed through any copy of it. *)
       Array.for_all
-        (fun (lbl, _sort, definition) ->
+        (fun (_lbl, _sort, definition) ->
            match definition with
-           | Overridden (_, exp) ->
-               lbl.lbl_mut = Immutable && is_nonexpansive exp
+           | Overridden (_, exp) -> is_nonexpansive exp
            | Kept _ -> true)
         fields
       && is_nonexpansive_opt (Option.map fst extended_expression)
@@ -6962,8 +6979,13 @@ and type_expect_
           None, expected_mode
       in
       let type_label_exp overwrite ((_, label, _) as x) =
-        check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
-          ~modalities:label.lbl_modalities record_mode;
+        (* Unboxed record fields can't be mutated, so mutability imposes no
+           mode constraints. *)
+        (match record_form with
+         | Legacy ->
+           check_construct_mutability ~loc ~env label.lbl_mut ~ty:label.lbl_arg
+             ~modalities:label.lbl_modalities record_mode
+         | Unboxed_product -> ());
         let is_contained_by : Mode.Hint.is_contained_by =
           { containing = Record (label.lbl_name, Modality);
             container = (loc, Expression) }
@@ -7020,8 +7042,11 @@ and type_expect_
               unify_exp_types record_loc env ty_arg1 ty_arg2;
               with_explanation (fun () ->
                 unify_exp_types record_loc env (instance ty_expected) ty_res2);
-              check_project_mutability ~loc:extended_expr_loc ~env
-                (Record_field lbl.lbl_name) lbl.lbl_mut mode;
+              (match record_form with
+               | Legacy ->
+                 check_project_mutability ~loc:extended_expr_loc ~env
+                   (Record_field lbl.lbl_name) lbl.lbl_mut mode
+               | Unboxed_product -> ());
               forbid_atomic_in_record_update extended_expr_loc env lbl;
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
@@ -7032,8 +7057,11 @@ and type_expect_
                   ~modalities:lbl.lbl_modalities mode
               in
               let mode = cross_left env lbl.lbl_arg mode in
-              check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
-                ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
+              (match record_form with
+               | Legacy ->
+                 check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
+                   ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode
+               | Unboxed_product -> ());
               let is_contained_by : Mode.Hint.is_contained_by =
                 { containing = Record (lbl.lbl_name, Modality);
                   container = (record_loc, Expression) }
@@ -7863,9 +7891,6 @@ and type_expect_
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
           Unboxed_product lid
       in
-      if Types.is_mutable label.lbl_mut then
-        fatal_error
-          "Typecore.type_expect_: unboxed record labels are never mutable";
       let is_contained_by : Mode.Hint.is_contained_by =
         { containing = Record (label.lbl_name, Modality);
           container = (record.exp_loc, Expression) }

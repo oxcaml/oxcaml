@@ -1101,24 +1101,18 @@ let label_mutability_contribution (ctx : Solver.ctx)
       (fun () -> "mutable fields")
       (Ldd.const Axis_lattice.mutable_data)
 
+(* [consider_mutability] is false for unboxed records: their values are copies,
+   so a mutable field carries no operational meaning and doesn't affect the
+   kind. *)
 let sum_record_label_contributions ~(ctx : Solver.ctx) ~(base : Ldd.node)
-    ~(payload_kind : Types.type_expr -> Ldd.node)
-    ~(validate_label : Types.label_declaration -> unit)
+    ~(payload_kind : Types.type_expr -> Ldd.node) ~(consider_mutability : bool)
     (lbls : Types.label_declaration list) : Ldd.node =
   Ldd.sum lbls ~base ~f:(fun (lbl : Types.label_declaration) ->
-      validate_label lbl;
       let mask = Axis_lattice.mask_of_modality lbl.ld_modalities in
-      Ldd.join
-        (label_mutability_contribution ctx lbl)
-        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
-
-let no_validation (_ : Types.label_declaration) = ()
-
-let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
-  match lbl.ld_mutable with
-  | Immutable -> ()
-  | Mutable _ ->
-    failwith "ikind: mutable fields in unboxed records are not supported"
+      let payload = Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type) in
+      if consider_mutability
+      then Ldd.join (label_mutability_contribution ctx lbl) payload
+      else payload)
 
 let decl_base_provenance (ctx : Solver.ctx) source poly =
   Solver.with_provenance_text ctx (fun () -> source) poly
@@ -1278,7 +1272,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
       in
       sum_record_label_contributions ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~validate_label:no_validation lbls
+        ~consider_mutability:true lbls
     | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
       let base =
         Ldd.const Axis_lattice.immediate
@@ -1286,7 +1280,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
       in
       sum_record_label_contributions ~ctx ~base
         ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
-        ~validate_label:validate_immutable_unboxed_label lbls
+        ~consider_mutability:false lbls
     | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
       (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
          captured by its constructors: nullability/separability and
@@ -1330,7 +1324,7 @@ let type_decl_rhs_kind_poly (ctx : Solver.ctx) (decl : Types.type_declaration) :
               Ldd.meet (Ldd.const mask) (payload_kind arg.ca_type))
         | Types.Cstr_record lbls ->
           sum_record_label_contributions ~ctx ~base:Ldd.bot ~payload_kind
-            ~validate_label:no_validation lbls
+            ~consider_mutability:true lbls
       in
       Ldd.sum cstrs ~base ~f:constructor_contrib)
 
