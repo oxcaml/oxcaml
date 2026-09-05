@@ -552,7 +552,6 @@ module Layout = struct
     | Addressable t -> generalize ~current_level t
 end
 
-module Externality = Externality
 module Nullability = Nullability
 
 module History = struct
@@ -603,21 +602,15 @@ module Mod_bounds = struct
 
   let less_or_equal t1 t2 =
     let[@inline] modal_less_or_equal ax : Sub_result.t =
-      let a = t1 |> crossing |> (Crossing.proj [@inlined hint]) ax in
-      let b = t2 |> crossing |> (Crossing.proj [@inlined hint]) ax in
+      let a = t1 |> (Crossing.proj [@inlined hint]) ax in
+      let b = t2 |> (Crossing.proj [@inlined hint]) ax in
       match
         ( (Crossing.Per_axis.le [@inlined hint]) ax a b,
           (Crossing.Per_axis.le [@inlined hint]) ax b a )
       with
       | true, true -> Equal
       | true, false -> Less
-      | false, _ -> Not_le [Axis_disagreement (Pack (Modal ax))]
-    in
-    let[@inline] axis_less_or_equal ~le ~axis a b : Sub_result.t =
-      match le a b, le b a with
-      | true, true -> Equal
-      | true, false -> Less
-      | false, _ -> Not_le [Axis_disagreement axis]
+      | false, _ -> Not_le [Axis_disagreement (Pack ax)]
     in
     Sub_result.combine (modal_less_or_equal (Comonadic Areality))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Uniqueness))
@@ -629,25 +622,18 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Staticity))
-    @@ axis_less_or_equal ~le:Externality.le ~axis:(Pack (Nonmodal Externality))
-         (externality t1) (externality t2)
+    @@ modal_less_or_equal (Comonadic Externality)
 
-  let[@inline] get (type a) ~(axis : a Axis.t) t : a =
-    match axis with
-    | Modal ax -> t |> crossing |> (Crossing.proj [@inlined hint]) ax
-    | Nonmodal Externality -> externality t
+  let[@inline] get ~axis t = Crossing.proj axis t
 
   (** Get all axes that are set to max *)
   let get_max_axes t =
-    let[@inline] add_if b ax axis_set =
-      if b then Axis_set.add axis_set ax else axis_set
-    in
     let[@inline] add_crossing_if ax axis_set =
       if
         Crossing.Per_axis.(
           (le [@inlined hint]) ax ((max [@inlined hint]) ax)
-            ((Crossing.proj [@inlined hint]) ax (crossing t)))
-      then Axis_set.add axis_set (Modal ax)
+            ((Crossing.proj [@inlined hint]) ax t))
+      then Axis_set.add axis_set ax
       else axis_set
     in
     Axis_set.empty
@@ -661,11 +647,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
     |> add_crossing_if (Monadic Staticity)
-    |> add_if
-         (Externality.le Externality.max (externality t))
-         (Nonmodal Externality)
-
-  let to_mode_crossing t = crossing t
+    |> add_crossing_if (Comonadic Externality)
 end
 
 module With_bounds = struct
@@ -1393,30 +1375,22 @@ module Base_and_axes = struct
               in
               let monadic =
                 Mod_bounds.Crossing.Monadic.create
-                  ~uniqueness:
-                    (value_for_axis ~axis:(Modal (Monadic Uniqueness)))
-                  ~contention:
-                    (value_for_axis ~axis:(Modal (Monadic Contention)))
-                  ~visibility:
-                    (value_for_axis ~axis:(Modal (Monadic Visibility)))
-                  ~staticity:(value_for_axis ~axis:(Modal (Monadic Staticity)))
+                  ~uniqueness:(value_for_axis ~axis:(Monadic Uniqueness))
+                  ~contention:(value_for_axis ~axis:(Monadic Contention))
+                  ~visibility:(value_for_axis ~axis:(Monadic Visibility))
+                  ~staticity:(value_for_axis ~axis:(Monadic Staticity))
               in
               let comonadic =
                 Mod_bounds.Crossing.Comonadic.create
-                  ~regionality:
-                    (value_for_axis ~axis:(Modal (Comonadic Areality)))
-                  ~linearity:
-                    (value_for_axis ~axis:(Modal (Comonadic Linearity)))
-                  ~portability:
-                    (value_for_axis ~axis:(Modal (Comonadic Portability)))
-                  ~forkable:(value_for_axis ~axis:(Modal (Comonadic Forkable)))
-                  ~yielding:(value_for_axis ~axis:(Modal (Comonadic Yielding)))
-                  ~statefulness:
-                    (value_for_axis ~axis:(Modal (Comonadic Statefulness)))
+                  ~regionality:(value_for_axis ~axis:(Comonadic Areality))
+                  ~linearity:(value_for_axis ~axis:(Comonadic Linearity))
+                  ~portability:(value_for_axis ~axis:(Comonadic Portability))
+                  ~externality:(value_for_axis ~axis:(Comonadic Externality))
+                  ~forkable:(value_for_axis ~axis:(Comonadic Forkable))
+                  ~yielding:(value_for_axis ~axis:(Comonadic Yielding))
+                  ~statefulness:(value_for_axis ~axis:(Comonadic Statefulness))
               in
-              let crossing : Mod_bounds.Crossing.t = { monadic; comonadic } in
-              Mod_bounds.create crossing
-                ~externality:(value_for_axis ~axis:(Nonmodal Externality))
+              ({ monadic; comonadic } : Mod_bounds.Crossing.t)
             in
             match get_desc ty with
             | Tmod (ty, mod_bounds) ->
@@ -1517,7 +1491,7 @@ module Base_and_axes = struct
                   let skippable_axes =
                     match b_jkind_jkind.base with
                     | Layout l when Layout.crosses_externality l ->
-                      Axis_set.add skippable_axes (Nonmodal Externality)
+                      Axis_set.add skippable_axes (Comonadic Externality)
                     | Layout _ | Kconstr _ -> skippable_axes
                   in
                   (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
@@ -1847,7 +1821,7 @@ let axes_crossed_by_layout env ty =
   let jkind = !estimate_type_jkind env ty in
   match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
   | Layout l when Layout.crosses_externality l ->
-    Axis_set.singleton (Nonmodal Externality)
+    Axis_set.singleton (Comonadic Externality)
   | Layout _ | Kconstr _ -> Axis_set.empty
 
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
@@ -1945,31 +1919,21 @@ module Const = struct
       | Not_le _ -> None
       | Equal -> Some Mod_bounds.max
       | Less ->
-        let crossing_base = Mod_bounds.crossing base in
-        let crossing_actual = Mod_bounds.crossing actual in
         let crossing_diff =
           List.fold_left
             (fun acc value_ax ->
               let (Crossing.Axis.P ax) =
                 value_ax |> Modality.Axis.of_value |> Crossing.Axis.of_modality
               in
-              let base_value = Crossing.proj ax crossing_base in
-              let actual_value = Crossing.proj ax crossing_actual in
+              let base_value = Crossing.proj ax base in
+              let actual_value = Crossing.proj ax actual in
               (* [le] here implies equality. *)
               if Crossing.Per_axis.le ax base_value actual_value
               then acc
               else Crossing.set ax actual_value acc)
             Crossing.max Value.Axis.all
         in
-        let externality =
-          if
-            Externality.equal
-              (Mod_bounds.externality base)
-              (Mod_bounds.externality actual)
-          then Externality.max
-          else Mod_bounds.externality actual
-        in
-        Some (Mod_bounds.create crossing_diff ~externality)
+        Some crossing_diff
 
     let get_modal_bounds ~verbosity ~(base : Mod_bounds.t)
         (actual : Mod_bounds.t) =
@@ -2000,16 +1964,12 @@ module Const = struct
     let modalities_of_ignored_axes axes_to_ignore =
       (* The modality is constant along axes to ignore and id along others *)
       List.fold_left
-        (fun (modal_modality, nonmodal_axes) (Axis.Pack axis) ->
-          match axis with
-          | Modal axis -> (
-            match axis, Crossing.Per_axis.min axis with
-            | Monadic ax, Modality t ->
-              Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
-            | Comonadic ax, Modality t ->
-              Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
-          | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
-        (Modality.Const.id, [])
+        (fun modality (Axis.Pack axis) ->
+          match axis, Crossing.Per_axis.min axis with
+          | Monadic ax, Modality t -> Modality.Const.set (Monadic ax) t modality
+          | Comonadic ax, Modality t ->
+            Modality.Const.set (Comonadic ax) t modality)
+        Modality.Const.id
         (Axis_set.to_list axes_to_ignore)
 
     (** Write [actual] in terms of [base] *)
@@ -2072,19 +2032,13 @@ module Const = struct
                   ~axes_crossed_by_layout:(axes_crossed_by_layout env ty)
                   ~type_info
               in
-              let modal_modality, nonmodal_axes =
+              let modal_modality =
                 modalities_of_ignored_axes axes_ignored_by_modalities
               in
               let modal =
                 !outcometree_of_modalities Types.Immutable modal_modality
               in
-              let nonmodal =
-                List.map
-                  (fun (Axis.Pack axis) ->
-                    Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
-                  nonmodal_axes
-              in
-              out_type, modal @ nonmodal)
+              out_type, modal)
             with_bounds otys
       in
       match matching_layouts, modal_bounds, scannable_axes with
@@ -2434,21 +2388,8 @@ module Const = struct
         match transl_type with
         | Transl_type transl_type ->
           let type_ = transl_type type_ in
-          let modality, externality =
-            Typemode.transl_with_bound_modifiers modalities
-          in
-          let relevant_axes =
-            let axes = Mod_bounds.relevant_axes_of_modality ~modality in
-            match externality with
-            | None -> axes
-            | Some ext ->
-              let is_top =
-                Per_axis.le (Nonmodal Externality) Externality.max ext
-              in
-              if is_top
-              then axes
-              else Axis_set.remove axes (Nonmodal Externality)
-          in
+          let modality = Typemode.transl_with_bound_modifiers modalities in
+          let relevant_axes = Mod_bounds.relevant_axes_of_modality ~modality in
           { base = base.base;
             mod_bounds = base.mod_bounds;
             with_bounds =
@@ -2717,9 +2658,7 @@ let for_boxed_tuple elts =
     (Builtin.immutable_data ~why:Tuple |> mark_best)
 
 let for_open_boxed_row =
-  let mod_bounds =
-    Mod_bounds.create Crossing.max ~externality:Externality.max
-  in
+  let mod_bounds = Crossing.max in
   fresh_jkind
     { base =
         Layout
@@ -2800,8 +2739,7 @@ let for_object =
           (Sort
              ( Base Scannable,
                { nullability = Non_null; separability = Non_float } ));
-      mod_bounds =
-        Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
+      mod_bounds = { comonadic; monadic };
       with_bounds = No_with_bounds
     }
     ~annotation:None ~why:(Value_creation Object)
@@ -2934,24 +2872,21 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
       "Jkind.get_mod_crossing: violated Ignore_best normalize invariant."
 
 let get_mode_crossing (type l r) ~context env (jk : (l * r) jkind) =
-  let mod_bounds =
-    get_mod_bounds ~context ~skip_axes:Axis_set.all_nonmodal_axes env jk
-  in
-  Mod_bounds.crossing mod_bounds
+  get_mod_bounds ~context ~skip_axes:Axis_set.empty env jk
 
 let to_unsafe_mode_crossing jkind =
-  { unsafe_mod_bounds = Mod_bounds.to_mode_crossing jkind.jkind.mod_bounds;
+  { unsafe_mod_bounds = jkind.jkind.mod_bounds;
     unsafe_with_bounds = jkind.jkind.with_bounds
   }
 
 let all_except_externality =
-  Axis_set.singleton (Nonmodal Externality) |> Axis_set.complement
+  Axis_set.singleton (Comonadic Externality) |> Axis_set.complement
 
 let get_externality_upper_bound ~context env jk =
   let mod_bounds =
     get_mod_bounds ~context ~skip_axes:all_except_externality env jk
   in
-  Mod_bounds.get mod_bounds ~axis:(Nonmodal Externality)
+  Mod_bounds.externality mod_bounds
 
 let set_externality_upper_bound jk externality_upper_bound =
   { jk with

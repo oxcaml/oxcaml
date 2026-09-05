@@ -1786,7 +1786,7 @@ let fast_sub_of_sort_sub : type r.
     Axis_lattice.leq sub_lat super_lat
 
 let fast_sub_of_any_super : type r.
-    Types.mod_bounds -> (Allowance.allowed * r) Types.jkind -> bool =
+    Mode.Crossing.t -> (Allowance.allowed * r) Types.jkind -> bool =
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
@@ -1798,7 +1798,7 @@ let fast_sub_of_any_super : type r.
 
 let fast_sub_of_sort_super : type r.
     Jkind_types.Sort.t ->
-    Types.mod_bounds ->
+    Mode.Crossing.t ->
     (Allowance.allowed * r) Types.jkind ->
     bool =
  fun super_sort mod_bounds sub ->

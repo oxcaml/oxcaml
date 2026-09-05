@@ -57,6 +57,8 @@ val create :
   externality:Jkind_axis.Externality.t ->
   t
 
+val of_mode_crossing : Mode.Crossing.t -> t
+
 val areality : t -> Mode.Regionality.Const.t
 
 val linearity : t -> Mode.Linearity.Const.t

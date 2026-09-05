@@ -6293,29 +6293,31 @@ let zap_modalities_to_floor_if_modes_enabled_at level =
 (** The mode crossing of the memory block of a structure. *)
 let mode_crossing_structure_memaddr =
   Mode.Crossing.create
-    ~uniqueness:false
-    ~contention:true
-    ~visibility:true
     ~regionality:false
     ~linearity:true
+    ~uniqueness:false
     ~portability:true
+    ~contention:true
+    ~externality:false
     ~forkable:true
     ~yielding:true
     ~statefulness:true
+    ~visibility:true
     ~staticity:false
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
   Mode.Crossing.create
-    ~uniqueness:true
-    ~contention:true
-    ~visibility:true
     ~regionality:false
     ~linearity:false
+    ~uniqueness:true
     ~portability:false
+    ~contention:true
+    ~externality:false
     ~forkable:false
     ~yielding:false
     ~statefulness:false
+    ~visibility:true
     ~staticity:false
 
 (** The mode crossing of any module. *)

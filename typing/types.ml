@@ -132,11 +132,6 @@ let mutable_mode m0 : _ Mode.Value.t =
 
 (* Type expressions for the core language *)
 
-type mod_bounds =
-  { crossing : Mode.Crossing.t;
-    externality: Jkind_axis.Externality.t;
-  }
-
 module With_bounds_type_info = struct
   type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
 
@@ -162,7 +157,7 @@ and type_desc =
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
-  | Tmod of type_expr * mod_bounds
+  | Tmod of type_expr * Mode.Crossing.t
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
@@ -261,7 +256,7 @@ and 'layout jkind_base =
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
-    mod_bounds : mod_bounds;
+    mod_bounds : Mode.Crossing.t;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r

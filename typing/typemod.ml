@@ -122,6 +122,8 @@ let register_allocation loc : Alloc.lr * Value.lr =
       { Alloc.Const.max with areality = Global }
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
+  Externality.submode_err (loc, Structure) Externality.legacy
+    (Alloc.proj_comonadic Externality alloc_mode);
   let closed_over_mode =
     alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
   in
@@ -184,6 +186,11 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
     [Diff] modality in [mode.ml]. *)
     let mode' = md_mode |> apply_is_contained_by ~loc_md item in
     Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
+    (* Ordinary module fields never infer an externality modality. We weaken
+       their exposed mode here, before uses or [module type of] fix it. *)
+    Externality.equate_err pp
+      (Value.proj_comonadic Externality md_mode)
+      (Value.proj_comonadic Externality mode);
     Mode.Modality.infer ~md_mode ~mode
 
 (** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
