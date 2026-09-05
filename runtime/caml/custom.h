@@ -17,6 +17,9 @@
 #define CAML_CUSTOM_H
 
 
+#include "config.h"
+#include "misc.h"
+#include "domain_state.h"
 #include "mlvalues.h"
 
 struct custom_fixed_length {

@@ -17,6 +17,7 @@
 #ifndef CAML_FLOAT32_H
 #define CAML_FLOAT32_H
 
+#include "misc.h"
 #include "mlvalues.h"
 
 #define Float32_val(v) (*((float *)Data_custom_val(v)))

@@ -27,7 +27,6 @@
 #include "caml/fiber.h"
 #include "caml/finalise.h"
 #include "caml/gc.h"
-#include "caml/gc_ctrl.h"
 #include "caml/globroots.h"
 #include "caml/major_gc.h"
 #include "caml/memory.h"
@@ -40,7 +39,6 @@
 #include "caml/shared_heap.h"
 #include "caml/signals.h"
 #include "caml/sizeclasses.h"
-#include "caml/startup_aux.h"
 #include "caml/weak.h"
 
 struct generic_table CAML_TABLE_STRUCT(char);

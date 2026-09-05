@@ -17,17 +17,14 @@
 
 /* The bytecode interpreter */
 #include <stdio.h>
-#include "caml/alloc.h"
 #include "caml/backtrace.h"
 #include "caml/callback.h"
-#include "caml/codefrag.h"
 #include "caml/debugger.h"
 #include "caml/fail.h"
 #include "caml/fix_code.h"
 #include "caml/instrtrace.h"
 #include "caml/instruct.h"
 #include "caml/interp.h"
-#include "caml/major_gc.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
@@ -36,8 +33,6 @@
 #include "caml/fiber.h"
 #include "caml/dynamic.h"
 #include "caml/domain.h"
-#include "caml/globroots.h"
-#include "caml/startup.h"
 #include "caml/startup_aux.h"
 
 /* Registers for the abstract machine:

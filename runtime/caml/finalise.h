@@ -20,6 +20,9 @@
 
 #include "roots.h"
 #include "domain.h"
+#include "config.h"
+#include "domain_state.h"
+#include "mlvalues.h"
 
 struct final {
   value fun;

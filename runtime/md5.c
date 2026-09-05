@@ -22,7 +22,6 @@
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/io.h"
-#include "caml/reverse.h"
 
 /* MD5 message digest */
 

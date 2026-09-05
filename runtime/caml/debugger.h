@@ -22,6 +22,7 @@
 
 #include "misc.h"
 #include "mlvalues.h"
+#include "config.h"
 
 CAMLextern int caml_debugger_in_use;
 CAMLextern int caml_debugger_fork_mode; /* non-zero for parent */

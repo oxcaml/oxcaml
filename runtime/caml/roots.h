@@ -20,6 +20,9 @@
 
 #include "misc.h"
 #include "domain.h"
+#include "domain_state.h"
+#include "mlvalues.h"
+#include "tsan.h"
 
 typedef enum {
   SCANNING_ONLY_YOUNG_VALUES = 1, // action is a no-op outside the minor heap
