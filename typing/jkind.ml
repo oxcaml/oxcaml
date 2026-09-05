@@ -349,6 +349,12 @@ module Layout = struct
       false
     | Product ts -> List.for_all is_surely_addressable_flat ts
 
+  let rec crosses_externality : Sort.t t -> bool = function
+    | Any _ -> false
+    | Sort (s, _) -> Sort.crosses_externality s
+    | Product ts -> List.for_all crosses_externality ts
+    | Addressable t -> crosses_externality t
+
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
     | Sort (s1, sa1), Sort (s2, sa2) ->
@@ -719,14 +725,17 @@ module With_bounds = struct
       let open Format in
       fprintf ppf "@[{ bounds_mask = %a }@]" Bounds_mask.print bounds_mask
 
-    let printable_bounds_mask ~mod_bounds
+    let printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout
         ~type_info:{ bounds_mask = explicit_bounds_mask } =
       (* Contributions covered by direct bounds can be restored for printing. *)
       Mod_bounds.to_axis_lattice mod_bounds
       |> Bounds_mask.join explicit_bounds_mask
+      |> Bounds_mask.join bounds_crossed_by_layout
 
-    let has_non_id_modalities ~mod_bounds ~type_info =
-      let bounds_mask = printable_bounds_mask ~mod_bounds ~type_info in
+    let has_non_id_modalities ~mod_bounds ~bounds_crossed_by_layout ~type_info =
+      let bounds_mask =
+        printable_bounds_mask ~mod_bounds ~bounds_crossed_by_layout ~type_info
+      in
       not (Bounds_mask.equal bounds_mask Axis_lattice.top)
   end
 
@@ -1027,16 +1036,46 @@ module Base_and_axes = struct
               with_bounds = t.with_bounds
             })
 
+  let refresh_layout_implied_crossing_mod_bounds ~crosses_externality l
+      mod_bounds =
+    match Mod_bounds.externality mod_bounds with
+    | Externality.External -> mod_bounds
+    | Externality.External64 | Externality.Internal ->
+      if crosses_externality l
+      then Mod_bounds.set_externality Externality.External mod_bounds
+      else mod_bounds
+
+  let refresh_layout_implied_crossing ~crosses_externality
+      ({ base; mod_bounds; _ } as t) =
+    match base with
+    | Kconstr _ -> t
+    | Layout l ->
+      let mod_bounds' =
+        refresh_layout_implied_crossing_mod_bounds ~crosses_externality l
+          mod_bounds
+      in
+      if mod_bounds' == mod_bounds
+      then t
+      else { t with mod_bounds = mod_bounds' }
+
+  let refresh_layout_implied_crossing_const t =
+    refresh_layout_implied_crossing
+      ~crosses_externality:Layout.Const.crosses_externality t
+
+  let refresh_layout_implied_crossing_desc t =
+    refresh_layout_implied_crossing
+      ~crosses_externality:Layout.crosses_externality t
+
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
-    | Not_expanded -> t
-    | Missing_cmi _ -> t
+    | Not_expanded -> refresh_layout_implied_crossing_const t
+    | Missing_cmi _ -> refresh_layout_implied_crossing_const t
     | Expanded t -> fully_expand_aliases_const env t
 
   let fully_expand_aliases env t : _ jkind_desc =
     match expand_base_once_const env t with
-    | Not_expanded -> t
-    | Missing_cmi _ -> t
+    | Not_expanded -> refresh_layout_implied_crossing_desc t
+    | Missing_cmi _ -> refresh_layout_implied_crossing_desc t
     | Expanded t ->
       let const = fully_expand_aliases_const env t in
       jkind_desc_of_const const
@@ -1492,6 +1531,14 @@ module Base_and_axes = struct
                     (* must expand aliases before trusting b_jkind's mod_bounds *)
                     fully_expand_aliases env b_jkind.jkind
                   in
+                  let skippable_bounds =
+                    match b_jkind_jkind.base with
+                    | Layout l when Layout.crosses_externality l ->
+                      Bounds_mask.join skippable_bounds
+                        (Bounds_mask.of_axis_set
+                           (Axis_set.singleton (Nonmodal Externality)))
+                    | Layout _ | Kconstr _ -> skippable_bounds
+                  in
                   (found_jkind_for_ty ctl b_jkind_jkind.mod_bounds
                      b_jkind_jkind.with_bounds b_jkind.quality skippable_bounds
                    [@nontail])
@@ -1514,7 +1561,8 @@ module Base_and_axes = struct
       let normalized_t : (_, l * r) base_and_axes =
         match mode, ctl.fuel_status with
         | Require_best, Sufficient_fuel | Ignore_best, _ ->
-          { t with mod_bounds; with_bounds }
+          refresh_layout_implied_crossing_desc
+            { t with mod_bounds; with_bounds }
         | Require_best, Ran_out_of_fuel ->
           (* Note [Ran out of fuel when requiring best]
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1609,8 +1657,12 @@ module Jkind_desc = struct
     in
     match base1, base2 with
     | Layout l1, Layout l2 ->
+      let refresh l mod_bounds =
+        Base_and_axes.refresh_layout_implied_crossing_mod_bounds
+          ~crosses_externality:Layout.crosses_externality l mod_bounds
+      in
       Layout.equate_or_equal ~allow_mutation l1 l2
-      && Mod_bounds.equal mod_bounds1 mod_bounds2
+      && Mod_bounds.equal (refresh l1 mod_bounds1) (refresh l2 mod_bounds2)
     | Kconstr (p1, sa1, op1), Kconstr (p2, sa2, op2)
       when Path.same p1 p2
            && Scannable_axes.equal sa1 sa2
@@ -1634,6 +1686,15 @@ module Jkind_desc = struct
     let bases = Base.sub_expanded base1 base2 in
     match with_bounds1 with
     | No_with_bounds ->
+      let bounds1 =
+        (* [Base.sub_expanded] may have just filled sort variables on the left,
+           revealing a layout with a lower implied externality bound. *)
+        match base1 with
+        | Layout l ->
+          Base_and_axes.refresh_layout_implied_crossing_mod_bounds
+            ~crosses_externality:Layout.crosses_externality l bounds1
+        | Kconstr _ -> bounds1
+      in
       let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
       Sub_result.combine bases bounds
     | With_bounds _ -> (
@@ -1803,6 +1864,18 @@ module Context_with_transl = struct
     | Right_jkind ctx -> ctx
     | Left_jkind (_, ctx) -> ctx
 end
+
+let estimate_type_jkind : (Env.t -> type_expr -> jkind_l) ref =
+  ref (fun _ _ -> assert false)
+
+let set_estimate_type_jkind f = estimate_type_jkind := f
+
+let bounds_crossed_by_layout env ty =
+  let jkind = !estimate_type_jkind env ty in
+  match (Base_and_axes.fully_expand_aliases env jkind.jkind).base with
+  | Layout l when Layout.crosses_externality l ->
+    Bounds_mask.of_axis_set (Axis_set.singleton (Nonmodal Externality))
+  | Layout _ | Kconstr _ -> Bounds_mask.bot
 
 (* CR layouts v2.8: This should sometimes be for type schemes, not types
    (which print weak variables like ['_a] correctly), but this works better
@@ -2004,10 +2077,12 @@ module Const = struct
         | with_bounds ->
           let otys = !outcometrees_of_types (List.map fst with_bounds) in
           List.map2
-            (fun (_, type_info) out_type ->
+            (fun (ty, type_info) out_type ->
               let bounds_mask =
                 With_bounds.Type_info.printable_bounds_mask
-                  ~mod_bounds:actual.mod_bounds ~type_info
+                  ~mod_bounds:actual.mod_bounds
+                  ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                  ~type_info
               in
               let modal_modality, nonmodal_axes =
                 With_bounds.modalities_of_bounds_mask bounds_mask
@@ -3524,7 +3599,7 @@ module Violation = struct
     | Layout
     | Kind
 
-  let report_reason ppf violation =
+  let report_reason env ppf violation =
     (* Print out per-axis information about why the error occurred. This only
        happens when modalities are printed because the errors are simple enough
        when there are no modalities that it makes the error unnecessarily noisy.
@@ -3550,9 +3625,11 @@ module Violation = struct
       let has_modalities =
         let jkind_has_modalities jkind =
           List.exists
-            (fun (_, type_info) ->
+            (fun (ty, type_info) ->
               With_bounds.Type_info.has_non_id_modalities
-                ~mod_bounds:jkind.jkind.mod_bounds ~type_info)
+                ~mod_bounds:jkind.jkind.mod_bounds
+                ~bounds_crossed_by_layout:(bounds_crossed_by_layout env ty)
+                ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in
         jkind_has_modalities sub || jkind_has_modalities super
@@ -3903,7 +3980,7 @@ module Violation = struct
       fprintf ppf "@[<hov 2>%s%a has %t,@ which %t.@]" preamble pp_former former
         fmt_k1 fmt_k2;
     report_missing_cmis ppf missing_cmis;
-    report_reason ppf t.violation;
+    report_reason env ppf t.violation;
     (* otherwise, we get notes for layout abbreviations that get omitted. *)
     report_layout_notes env ppf t.violation mismatch_type ~print_as_value_layout;
     if not !Clflags.ikinds then report_fuel ppf t.violation
