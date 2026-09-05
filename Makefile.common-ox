@@ -292,8 +292,35 @@ _install: compiler duneconf/merlin_install.ws
 	# assembled) and fold it into the install.
 	$(dune) build $(ws_merlin) \
           --only-packages=merlin,merlin-lib,dot-merlin-reader,ocaml-index \
-          @install
+		  @install external/csexp/src/merlin_csexp.cma \
+          external/csexp/src/merlin_csexp.cmxa
 	$(cpl) _build/install/merlin_install/bin/* _install/bin/
+	mkdir -p _install/lib/ocaml/stublibs
+	$(cpl) _build/install/merlin_install/lib/stublibs/* \
+          _install/lib/ocaml/stublibs/
+	mkdir -p _install/lib/ocaml/merlin
+	$(cpl) -R _build/install/merlin_install/lib/merlin-lib/* \
+          _install/lib/ocaml/merlin/
+	rm -f _install/lib/ocaml/merlin/META _install/lib/ocaml/merlin/dune-package \
+          _install/lib/ocaml/merlin/opam
+	echo 'directory = "merlin"' > _install/lib/ocaml/META.merlin-lib
+	sed -e 's/\bcsexp\b/merlin-lib.merlin_csexp/g' \
+          _build/install/merlin_install/lib/merlin-lib/META \
+          >> _install/lib/ocaml/META.merlin-lib
+	# Bundle csexp in with Merlin since it is a dependency. (Although yojson is
+	# a Merlin dependency as well, it is only depended on by the statically
+	# linked binaries and not any of the libraries, so it does not need to be
+	# included.)
+	mkdir -p _install/lib/ocaml/merlin/merlin_csexp
+	$(cpl) _build/merlin_install/external/csexp/src/merlin_csexp.cma \
+          _build/merlin_install/external/csexp/src/merlin_csexp.cmxa \
+          _build/merlin_install/external/csexp/src/merlin_csexp.a \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmi \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/byte/merlin_csexp.cmti \
+          _build/merlin_install/external/csexp/src/.merlin_csexp.objs/native/merlin_csexp.cmx \
+          _install/lib/ocaml/merlin/merlin_csexp/
+	printf '\npackage "merlin_csexp" (\n  directory = "merlin_csexp"\n  description = ""\n  archive(byte) = "merlin_csexp.cma"\n  archive(native) = "merlin_csexp.cmxa"\n)\n' \
+          >> _install/lib/ocaml/META.merlin-lib
 
 # Copy _install to the final install directory (no-op if they are the same)
 install: _install
