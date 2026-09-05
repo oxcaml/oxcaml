@@ -2072,12 +2072,11 @@ module Element_repr = struct
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
       | Addressable layout ->
         Option.map (fun t -> Addressable t) (layout_to_t layout)
-      | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
-      | Genvar _ -> None
+      | Univar _ | Genvar _ -> None
       in
       Option.bind layout layout_to_t
 
-  let mixed_product_shape_known loc ts kind =
+  let mixed_product_shape_known ts =
     let mixed =
       let rec is_mixed_element : t -> bool = function
         | Unboxed_element _ | Void -> true
@@ -2086,20 +2085,23 @@ module Element_repr = struct
       in
       List.exists (fun (t, _) -> is_mixed_element t) ts
     in
-    if not mixed then `Not_mixed else begin
+    if not mixed then `Not_mixed else
       let shape =
         List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
       in
+      `Mixed shape
+
+  let check_mixed_product_shape loc shape kind =
+    match shape with
+    | `Not_mixed -> ()
+    | `Mixed shape ->
       (* All-value/void shapes will compile to uniform blocks, so the
          scannable prefix length limit doesn't apply. *)
       let mpb = Mixed_product_bytes.count_types_shape shape in
       if not (Mixed_product_bytes.all_value mpb)
       then
         assert_mixed_product_support loc kind
-          ~value_prefix_len:
-            (Mixed_product_bytes.value_prefix_len mpb);
-      `Mixed shape
-    end
+          ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
 
   type unrepresentable_element =
     Unrepresentable_element of int
@@ -2113,8 +2115,21 @@ module Element_repr = struct
            | None -> Error (Unrepresentable_element i))
         ts
     in
-    Result.map (fun ts -> mixed_product_shape_known loc ts kind) ts
+    Result.map (fun ts ->
+      let shape = mixed_product_shape_known ts in
+      check_mixed_product_shape loc shape kind;
+      shape) ts
 end
+
+let compute_block_shape env types =
+  let ts =
+    Misc.Stdlib.List.map_option (fun ty ->
+      let jkind = Ctype.type_jkind env ty in
+      Option.map (fun repr -> repr, ty)
+        (Element_repr.classify env ty jkind ~default_to_scannable:false))
+      types
+  in
+  Option.map Element_repr.mixed_product_shape_known ts
 
 type unrepresentable_constructor =
   | Unrepresentable_argument of int
@@ -2564,16 +2579,12 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
       (* Optimization: the other branch would also compute [`Not_mixed] *)
       `Not_mixed
     else
-      let ts =
-        Array.to_list sorts_and_types
-        |> List.map (fun (_sort, ty) ->
-             Element_repr.classify env ty (Ctype.type_jkind env ty)
-               ~default_to_scannable:false,
-             ty)
-      in
-      match Element_repr.mixed_product_shape loc ts kind with
-      | Ok shape -> shape
-      | Error (Element_repr.Unrepresentable_element _) ->
+      let types = Array.to_list sorts_and_types |> List.map snd in
+      match compute_block_shape env types with
+      | Some shape ->
+          Element_repr.check_mixed_product_shape loc shape kind;
+          shape
+      | None ->
           Misc.fatal_error
             "Typedecl.finalize_instantiated_shape: unrepresentable element, \
              but typechecking succeeded"
