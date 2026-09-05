@@ -47,7 +47,7 @@ features.
 Compilation
 -----------
 
-Dependencies: `ocamlfind`, `yojson` >= 2.0.0, `dune` >= 2.7.
+Dependencies: `yojson` >= 2.0.0, `dune` >= 2.7.
 
 ```shell
 dune build -p dot-merlin-reader,merlin
