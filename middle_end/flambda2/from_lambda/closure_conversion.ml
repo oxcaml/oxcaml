@@ -4245,8 +4245,11 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
               Name_occurrences.all_value_slots_at_normal_mode free_names
           }
       in
-      Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
-        ~used_slots
+      let get_function_slot_size code_id =
+        Code_metadata.function_slot_size (get_code_metadata code_id)
+      in
+      Slot_offsets.finalize_offsets (Acc.slot_offsets acc)
+        ~get_function_slot_size ~used_slots
     in
     let reachable_names, cmx =
       Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
