@@ -229,6 +229,9 @@ STDLIB_SHIMS_DIR := $(CURDIR)/_build/stdlib-shims
 PPXLIB_AST_DIR := $(CURDIR)/_build/ppxlib-ast
 PPXLIB_DIR := $(CURDIR)/_build/ppxlib
 PPXLIB_JANE_DIR := $(CURDIR)/_build/ppxlib-jane
+SEQ_DIR := $(CURDIR)/_build/seq
+GEN_DIR := $(CURDIR)/_build/gen
+SEDLEX_DIR := $(CURDIR)/_build/sedlex
 
 OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
 PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
@@ -236,10 +239,14 @@ SEXPLIB0_LIB := $(SEXPLIB0_DIR)/install/default/lib
 STDLIB_SHIMS_LIB := $(STDLIB_SHIMS_DIR)/install/default/lib
 PPXLIB_AST_LIB := $(PPXLIB_AST_DIR)/install/default/lib
 PPXLIB_JANE_LIB := $(PPXLIB_JANE_DIR)/install/default/lib
+PPXLIB_LIB := $(PPXLIB_DIR)/install/default/lib
+SEQ_LIB := $(SEQ_DIR)/install/default/lib
+GEN_LIB := $(GEN_DIR)/install/default/lib
 
 PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
 PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
 PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
+SEDLEX_OCAMLPATH := $(PPXLIB_OCAMLPATH):$(PPXLIB_LIB):$(SEQ_LIB):$(GEN_LIB)
 
 OXCAML_INSTALL ?= $(CURDIR)/_install
 
@@ -317,8 +324,40 @@ ppxlib-build: ppxlib-jane-build
 	    --only-packages=ppxlib \
 	    @install
 
+# The "seq" findlib package is a compatibility shim: Seq has been part of the
+# stdlib since OCaml 4.07, so opam only installs an empty META for it. gen
+# still lists it as a dependency, so provide the same empty META here.
+.PHONY: seq-build
+seq-build:
+	@mkdir -p "$(SEQ_LIB)/seq"
+	@printf '%s\n' \
+	  'requires = ""' \
+	  'version = "[distributed with OCaml 4.07 or above]"' \
+	  > "$(SEQ_LIB)/seq/META"
+
+.PHONY: gen-build
+gen-build: external-libs-compiler seq-build
+	env OCAMLPATH="$(SEQ_LIB)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(SEDLEX_GEN_SRC)" \
+	    --build-dir="$(GEN_DIR)" \
+	    --only-packages=gen \
+	    @install
+
+# --ignore-promoted-rules keeps dune from regenerating the checked-in
+# unicode.ml, which would require downloading the Unicode data files.
+.PHONY: sedlex-build
+sedlex-build: ppxlib-build gen-build
+	env OCAMLPATH="$(SEDLEX_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/sedlex \
+	    --build-dir="$(SEDLEX_DIR)" \
+	    --only-packages=sedlex \
+	    --ignore-promoted-rules \
+	    @install
+
 .PHONY: external-libs-build
-external-libs-build: ppxlib-build
+external-libs-build: ppxlib-build sedlex-build
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
