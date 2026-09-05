@@ -101,7 +101,7 @@ type after_downwards_traversal_of_body_and_handlers_data =
     handlers : handler_after_downwards_traversal Continuation.Map.t
   }
 
-type handler_to_rebuild =
+type handler_to_rebuild = D.handler_to_rebuild =
   { params : Bound_parameters.t;
     rebuild_handler : expr_to_rebuild;
     is_exn_handler : bool;
@@ -113,7 +113,7 @@ type handler_to_rebuild =
     rewrite_ids : Apply_cont_rewrite_id.Set.t
   }
 
-type handlers_to_rebuild_group =
+type handlers_to_rebuild_group = D.handlers_to_rebuild_group =
   | Recursive of
       { rebuild_continuation_handlers : handler_to_rebuild Continuation.Map.t }
   | Non_recursive of
@@ -130,22 +130,9 @@ type prepare_to_rebuild_handlers_data =
     invariant_extra_params : Bound_parameters.t
   }
 
-type rebuilt_handler =
-  { handler : Rebuilt_expr.Continuation_handler.t;
-    handler_expr : Rebuilt_expr.t;
-    name_occurrences_of_handler : Name_occurrences.t;
-    cost_metrics_of_handler : Cost_metrics.t
-  }
+type rebuilt_handler = D.rebuilt_handler
 
-type rebuilt_handlers_group =
-  | Recursive of
-      { continuation_handlers : rebuilt_handler Continuation.Lmap.t;
-        invariant_params : Bound_parameters.t
-      }
-  | Non_recursive of
-      { cont : Continuation.t;
-        handler : rebuilt_handler
-      }
+type rebuilt_handlers_group = D.rebuilt_handlers_group
 
 type prepare_to_rebuild_body_data =
   { rebuild_body : expr_to_rebuild;
@@ -155,12 +142,7 @@ type prepare_to_rebuild_body_data =
     uenv_of_subsequent_exprs : UE.t
   }
 
-type rebuild_let_cont_data =
-  { handlers_from_the_inside_to_the_outside : rebuilt_handlers_group list;
-    name_occurrences_of_subsequent_exprs : Name_occurrences.t;
-    cost_metrics_of_subsequent_exprs : Cost_metrics.t;
-    uenv_of_subsequent_exprs : UE.t
-  }
+type rebuild_let_cont_data = D.rebuild_let_cont_data
 
 (* Helpers *)
 
@@ -417,7 +399,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   let name_occurrences_body = UA.name_occurrences uacc in
   let cost_metrics_of_body = UA.cost_metrics uacc in
   let rec rebuild_groups body name_occurrences_body cost_metrics_of_body uacc
-      groups =
+      (groups : rebuilt_handlers_group list) =
     match groups with
     | [] ->
       (* Everything has now been rebuilt.
@@ -439,7 +421,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           uacc
       in
       let uacc = UA.with_uenv uacc data.uenv_of_subsequent_exprs in
-      after_rebuild body uacc
+      D.apply_after_rebuild after_rebuild body uacc
     | Non_recursive { cont; handler } :: groups ->
       let num_free_occurrences_of_cont_in_body =
         (* Note that this does not count uses in trap actions. If there are uses
@@ -511,7 +493,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
     | Recursive { continuation_handlers; invariant_params } :: groups ->
       let rec_handlers =
         Continuation.Lmap.map
-          (fun handler -> handler.handler)
+          (fun (handler : rebuilt_handler) -> handler.handler)
           continuation_handlers
       in
       let expr =
@@ -521,7 +503,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       in
       let name_occurrences =
         Continuation.Lmap.fold
-          (fun _ handler name_occurrences ->
+          (fun _ (handler : rebuilt_handler) name_occurrences ->
             NO.union name_occurrences
               (NO.increase_counts handler.name_occurrences_of_handler))
           continuation_handlers name_occurrences_body
@@ -534,7 +516,7 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
       in
       let cost_metrics_of_handlers =
         Continuation.Lmap.fold
-          (fun _ handler cost_metrics ->
+          (fun _ (handler : rebuilt_handler) cost_metrics ->
             Cost_metrics.( + ) cost_metrics handler.cost_metrics_of_handler)
           continuation_handlers Cost_metrics.zero
       in
@@ -548,6 +530,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
   rebuild_groups body name_occurrences_body cost_metrics_of_body uacc
     data.handlers_from_the_inside_to_the_outside
 
+let after_rebuild_let_cont D.{ rebuild_let_cont_data; after_rebuild } =
+  rebuild_let_cont rebuild_let_cont_data ~after_rebuild
+
 let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
     ~after_rebuild =
   (* At this point all handlers have been rebuild and added to the upwards
@@ -558,7 +543,7 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
      stage for the reconstruction of the let cont expressions. *)
   let uacc = UA.clear_cost_metrics (UA.clear_name_occurrences uacc) in
   let rebuild_body = data.rebuild_body in
-  let data : rebuild_let_cont_data =
+  let rebuild_let_cont_data : rebuild_let_cont_data =
     { name_occurrences_of_subsequent_exprs =
         data.name_occurrences_of_subsequent_exprs;
       cost_metrics_of_subsequent_exprs = data.cost_metrics_of_subsequent_exprs;
@@ -567,7 +552,10 @@ let prepare_to_rebuild_body (data : prepare_to_rebuild_body_data) uacc
         data.handlers_from_the_inside_to_the_outside
     }
   in
-  rebuild_body uacc ~after_rebuild:(rebuild_let_cont data ~after_rebuild)
+  let after_rebuild_let_cont_data : D.after_rebuild_let_cont_data =
+    { rebuild_let_cont_data; after_rebuild }
+  in
+  D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let_cont (after_rebuild_let_cont_data, after_rebuild_let_cont))
 
 let add_lets_around_handler cont at_unit_toplevel uacc handler =
   let Flow_types.Alias_result.{ continuation_parameters; _ } =
@@ -656,29 +644,9 @@ let remove_params params free_names =
   ListLabels.fold_left (Bound_parameters.to_list params) ~init:free_names
     ~f:(fun free_names param -> NO.remove_var free_names ~var:(BP.var param))
 
-let rebuild_single_non_recursive_handler ~at_unit_toplevel
-    ~is_single_inlinable_use ~original_invariant_params cont
-    (handler_to_rebuild : handler_to_rebuild) uacc k =
-  (* Clear existing name occurrences & cost metrics *)
-  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  let { is_exn_handler;
-        is_cold;
-        rewrite_ids;
-        params;
-        rebuild_handler;
-        extra_params_and_args;
-        invariant_extra_params_and_args
-      } =
-    handler_to_rebuild
-  in
-  (* In case the continuation was previously recursive, we make sure not to
-     forget the invariant original and extra params. *)
-  let params = Bound_parameters.append original_invariant_params params in
-  let extra_params_and_args =
-    EPA.concat ~inner:invariant_extra_params_and_args
-      ~outer:extra_params_and_args
-  in
-  rebuild_handler uacc ~after_rebuild:(fun handler uacc ->
+let after_rebuild_single_non_recursive_let_cont
+  ({ cont; at_unit_toplevel; extra_params_and_args; rewrite_ids; is_exn_handler; params; is_cold; is_single_inlinable_use; k; } : D.after_rebuild_single_non_recursive_let_cont_data)
+    handler uacc =
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont at_unit_toplevel uacc handler
       in
@@ -792,13 +760,43 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
           cost_metrics_of_handler = cost_metrics
         }
       in
-      k rebuilt_handler uacc)
+      (* CR pchambart: k1 doesn't have to be threaded thought this value,
+         it would be available if we added a few more 'let rec' *) 
+      let K1 (k1_data, k1) = k in
+      k1 k1_data rebuilt_handler uacc
 
-let rebuild_single_recursive_handler cont
+let rebuild_single_non_recursive_handler ~at_unit_toplevel
+    ~is_single_inlinable_use ~original_invariant_params cont
     (handler_to_rebuild : handler_to_rebuild) uacc k =
   (* Clear existing name occurrences & cost metrics *)
   let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
-  handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(fun handler uacc ->
+  let { is_exn_handler;
+        is_cold;
+        rewrite_ids;
+        params;
+        rebuild_handler;
+        extra_params_and_args;
+        invariant_extra_params_and_args
+      } =
+    handler_to_rebuild
+  in
+  (* In case the continuation was previously recursive, we make sure not to
+     forget the invariant original and extra params. *)
+  let params = Bound_parameters.append original_invariant_params params in
+  let extra_params_and_args =
+    EPA.concat ~inner:invariant_extra_params_and_args
+      ~outer:extra_params_and_args
+  in
+  let after_rebuild_data : D.after_rebuild_single_non_recursive_let_cont_data =
+    (* CR pchambart: probably should include handler_to_rebuild instead of recapturing everything *)
+    { cont; at_unit_toplevel; extra_params_and_args; rewrite_ids;
+      is_exn_handler; params; is_cold; is_single_inlinable_use; k; }
+  in
+  D.apply_rebuild rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_non_recursive_let_cont (after_rebuild_data, after_rebuild_single_non_recursive_let_cont))
+
+let after_rebuild_single_recursive_let_cont
+    ({ cont; handler_to_rebuild; k } : D.after_rebuild_single_recursive_let_cont_data)
+    handler uacc =
       let handler, uacc, free_names, cost_metrics =
         add_lets_around_handler cont false uacc handler
       in
@@ -839,13 +837,20 @@ let rebuild_single_recursive_handler cont
           cost_metrics_of_handler = cost_metrics
         }
       in
-      k invariant_params rebuilt_handler uacc)
+      k invariant_params rebuilt_handler uacc
+
+let rebuild_single_recursive_handler cont
+    (handler_to_rebuild : handler_to_rebuild) uacc k =
+  (* Clear existing name occurrences & cost metrics *)
+  let uacc = UA.clear_name_occurrences (UA.clear_cost_metrics uacc) in
+  let data : D.after_rebuild_single_recursive_let_cont_data = { cont; handler_to_rebuild; k } in
+  D.apply_rebuild handler_to_rebuild.rebuild_handler uacc ~after_rebuild:(D.After_rebuild_single_recursive_let_cont (data, after_rebuild_single_recursive_let_cont))
 
 let rec rebuild_continuation_handlers_loop ~rebuild_body
     ~name_occurrences_of_subsequent_exprs ~cost_metrics_of_subsequent_exprs
     ~uenv_of_subsequent_exprs ~at_unit_toplevel ~original_invariant_params
     ~invariant_extra_params uacc ~after_rebuild
-    (groups_to_rebuild : handlers_to_rebuild_group list) rebuilt_groups =
+    (groups_to_rebuild : handlers_to_rebuild_group list) (rebuilt_groups : rebuilt_handlers_group list) =
   match groups_to_rebuild with
   | [] ->
     let data : prepare_to_rebuild_body_data =
@@ -859,15 +864,10 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
     prepare_to_rebuild_body data uacc ~after_rebuild
   | Non_recursive { cont; handler; is_single_inlinable_use }
     :: groups_to_rebuild ->
+    let k1_data : D.k1_data = { rebuild_body; name_occurrences_of_subsequent_exprs; cost_metrics_of_subsequent_exprs; uenv_of_subsequent_exprs; at_unit_toplevel; original_invariant_params; invariant_extra_params; after_rebuild; groups_to_rebuild; cont; rebuilt_groups } in
     rebuild_single_non_recursive_handler ~at_unit_toplevel
       ~original_invariant_params ~is_single_inlinable_use cont handler uacc
-      (fun rebuilt_handler uacc ->
-        rebuild_continuation_handlers_loop ~rebuild_body
-          ~name_occurrences_of_subsequent_exprs
-          ~cost_metrics_of_subsequent_exprs ~uenv_of_subsequent_exprs
-          ~at_unit_toplevel ~original_invariant_params ~invariant_extra_params
-          uacc ~after_rebuild groups_to_rebuild
-          (Non_recursive { cont; handler = rebuilt_handler } :: rebuilt_groups))
+      (K1 (k1_data, k1))
   | Recursive { rebuild_continuation_handlers } :: groups_to_rebuild ->
     (* Common setup for recursive handlers: add rewrites; for now: always add
        params (ignore alias analysis) *)
@@ -923,6 +923,14 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
           (Recursive
              { continuation_handlers = rebuilt_handlers; invariant_params }
           :: rebuilt_groups))
+
+and k1 ({ rebuild_body; name_occurrences_of_subsequent_exprs; cost_metrics_of_subsequent_exprs; uenv_of_subsequent_exprs; at_unit_toplevel; original_invariant_params; invariant_extra_params; after_rebuild; groups_to_rebuild; cont; rebuilt_groups } : D.k1_data) rebuilt_handler uacc =
+        rebuild_continuation_handlers_loop ~rebuild_body
+          ~name_occurrences_of_subsequent_exprs
+          ~cost_metrics_of_subsequent_exprs ~uenv_of_subsequent_exprs
+          ~at_unit_toplevel ~original_invariant_params ~invariant_extra_params
+          uacc ~after_rebuild groups_to_rebuild
+          (Non_recursive { cont; handler = rebuilt_handler } :: rebuilt_groups)
 
 let prepare_to_rebuild_handlers (data : prepare_to_rebuild_handlers_data) uacc
     ~after_rebuild =
@@ -1311,7 +1319,7 @@ and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
             EPA.extra_params data.invariant_extra_params_and_args
         }
       in
-      down_to_up dacc ~rebuild:(prepare_to_rebuild_handlers data))
+      down_to_up dacc ~rebuild:(D.Rebuild (prepare_to_rebuild_handlers data)))
 
 and prepare_dacc_for_handlers dacc ~replay ~env_at_fork ~params ~is_recursive
     ~consts_lifted_after_fork continuation_sort is_exn_handler_cont uses

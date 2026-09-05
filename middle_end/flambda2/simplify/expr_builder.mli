@@ -24,6 +24,7 @@
     rather than using this module. *)
 
 open! Flambda.Import
+module D := Simplify_defunct
 
 val create_let_binding :
   Upwards_acc.t ->
@@ -106,7 +107,7 @@ val rebuild_invalid :
   Upwards_acc.t ->
   Flambda.Invalid.t ->
   after_rebuild:
-    (Rebuilt_expr.t -> Upwards_acc.t -> Rebuilt_expr.t * Upwards_acc.t) ->
+    D.after_rebuild ->
   Rebuilt_expr.t * Upwards_acc.t
 
 (** Handling of the rewriting of continuation use sites. *)

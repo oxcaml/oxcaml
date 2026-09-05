@@ -24,6 +24,7 @@ module UA = Upwards_acc
 module UE = Upwards_env
 module DA = Downwards_acc
 module VB = Bound_var
+module D = Simplify_defunct
 
 type binding_to_place =
   | Keep_binding of
@@ -530,7 +531,7 @@ let bind_let_conts uacc ~body new_handlers =
     ~f:(fun (uacc, body) new_let_cont -> bind_let_cont uacc body new_let_cont)
 
 let rebuild_invalid uacc reason ~after_rebuild =
-  after_rebuild (RE.create_invalid reason) uacc
+  D.apply_after_rebuild after_rebuild (RE.create_invalid reason) uacc
 
 type rewrite_apply_cont_result =
   | Invalid of { message : string }
