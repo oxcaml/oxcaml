@@ -1,0 +1,167 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"good-practices"}< Good practices}{%html: </div><div>%}{%html: </div></div>%}
+
+{0 Examples}
+
+This section is here to allow viewing complete examples of PPXs written using [ppxlib] directly in the documentation. However, they are not "complete" in the sense that the overall organization, such as the [dune] files, is not included.
+
+In order to see a fully working complete example of a PPX written using [ppxlib], that you can compile, modify and test, go to the {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples}examples} folder of ppxlib sources.
+
+{1 [ppx_deriving_accesors]}
+
+The fully complete, ready-to-compile [ppx_deriving_accesors] example is accessible in [ppxlib]'s {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples/simple-deriver}sources}.
+
+This deriver will generate accessors for record fields, from the record type
+definition.
+
+For example, this code:
+
+{@ocaml[
+type t =
+  { a : string
+  ; b : int
+  }
+  [@@deriving accessors]
+]}
+
+will generate the following, appended after the type definition:
+
+{@ocaml[
+let a x = x.a
+let b x = x.b
+]}
+
+The entire code is:
+
+{@ocaml[
+open Ppxlib
+module List = ListLabels
+open Ast_builder.Default
+
+let accessor_impl (ld : label_declaration) =
+  let loc = ld.pld_loc in
+  pstr_value ~loc Nonrecursive
+    [
+      {
+        pvb_pat = ppat_var ~loc ld.pld_name;
+        pvb_expr =
+          pexp_fun ~loc Nolabel None
+            (ppat_var ~loc { loc; txt = "x" })
+            (pexp_field ~loc
+               (pexp_ident ~loc { loc; txt = lident "x" })
+               { loc; txt = lident ld.pld_name.txt });
+        pvb_attributes = [];
+        pvb_loc = loc;
+      };
+    ]
+
+let accessor_intf ~ptype_name (ld : label_declaration) =
+  let loc = ld.pld_loc in
+  psig_value ~loc
+    {
+      pval_name = ld.pld_name;
+      pval_type =
+        ptyp_arrow ~loc Nolabel
+          (ptyp_constr ~loc { loc; txt = lident ptype_name.txt } [])
+          ld.pld_type;
+      pval_attributes = [];
+      pval_loc = loc;
+      pval_prim = [];
+    }
+
+let generate_impl ~ctxt (_rec_flag, type_declarations) =
+  let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+  List.map type_declarations ~f:(fun (td : type_declaration) ->
+      match td with
+      | {
+       ptype_kind = Ptype_abstract | Ptype_variant _ | Ptype_open;
+       ptype_loc;
+       _;
+      } ->
+          let ext =
+            Location.error_extensionf ~loc:ptype_loc
+              "Cannot derive accessors for non record types"
+          in
+          [ Ast_builder.Default.pstr_extension ~loc ext [] ]
+      | { ptype_kind = Ptype_record fields; _ } ->
+          List.map fields ~f:accessor_impl)
+  |> List.concat
+
+let generate_intf ~ctxt (_rec_flag, type_declarations) =
+  let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+  List.map type_declarations ~f:(fun (td : type_declaration) ->
+      match td with
+      | {
+       ptype_kind = Ptype_abstract | Ptype_variant _ | Ptype_open;
+       ptype_loc;
+       _;
+      } ->
+          let ext =
+            Location.error_extensionf ~loc:ptype_loc
+              "Cannot derive accessors for non record types"
+          in
+          [ Ast_builder.Default.psig_extension ~loc ext [] ]
+      | { ptype_kind = Ptype_record fields; ptype_name; _ } ->
+          List.map fields ~f:(accessor_intf ~ptype_name))
+  |> List.concat
+
+let impl_generator = Deriving.Generator.V2.make_noarg generate_impl
+let intf_generator = Deriving.Generator.V2.make_noarg generate_intf
+
+let my_deriver =
+  Deriving.add "accessors" ~str_type_decl:impl_generator
+    ~sig_type_decl:intf_generator
+]}
+
+{1 [ppx_get_env]}
+
+The fully complete, ready-to-compile [ppx_get_env] example is accessible in [ppxlib]'s {{:https://github.com/ocaml-ppx/ppxlib/tree/main/examples/simple-extension-rewriter}sources}.
+
+A PPX rewriter that will expand [[%get_env "SOME_ENV_VAR"]] into the value of the
+env variable [SOME_ENV_VAR] at compile time, as a string.
+
+E.g., assuming we set [MY_VAR="foo"], it will turn:
+
+{@ocaml[
+let () = print_string [%get_env "foo"]
+]}```
+
+into:
+
+{@ocaml[
+let () = print_string "foo"
+]}
+
+
+Note that this is just a toy example, and we actually advise against this
+type of PPX that has side effects or relies heavily on the file system or [env]
+variables, unless you absolutely you know what you're doing.
+
+In this case, it won't work well with Dune, since Dune won't know
+about the dependency on the env variables specified in the extension's payload.
+
+The entire code is:
+
+{@ocaml[
+open Ppxlib
+
+let expand ~ctxt env_var =
+  let loc = Expansion_context.Extension.extension_point_loc ctxt in
+  match Sys.getenv env_var with
+  | value -> Ast_builder.Default.estring ~loc value
+  | exception Not_found ->
+      let ext =
+        Location.error_extensionf ~loc "The environment variable %s is unbound"
+          env_var
+      in
+      Ast_builder.Default.pexp_extension ~loc ext
+
+let my_extension =
+  Extension.V3.declare "get_env" Extension.Context.expression
+    Ast_pattern.(single_expr_payload (estring __))
+    expand
+
+let rule = Ppxlib.Context_free.Rule.extension my_extension
+let () = Driver.register_transformation ~rules:[ rule ] "get_env"
+]}
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"good-practices"}< Good practices}{%html: </div><div>%}{%html: </div></div>%}
