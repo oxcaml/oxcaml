@@ -2,4 +2,5 @@
  (names gen_ast_pattern gen_ast_builder)
  (flags
   (:standard -safe-string))
- (libraries ppxlib_ast ppxlib_jane astlib ppxlib_traverse_builtins stdppx stdlib-shims))
+ (libraries ppxlib_ast.ast ppxlib_jane ppxlib_ast.astlib
+  ppxlib_ast.traverse_builtins ppxlib_ast.stdppx stdlib-shims))
