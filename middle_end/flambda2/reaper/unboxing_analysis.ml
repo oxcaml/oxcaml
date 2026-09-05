@@ -209,6 +209,8 @@ let to_change_representation_tbl =
 
 let to_change_representation x = to_change_representation_tbl % [x]
 
+let no_lambda_lifting = Oxcaml_args.Extra_options.bool __LOC__ "reaper-no-lambda-lifting"
+
 let datalog_rules =
   saturate_in_order
     [ (* If any usage is possible, do not change the representation. Note that
@@ -409,6 +411,12 @@ let datalog_rules =
            !!Field.code_id_of_call_witness
            ~from:codeid;
          cannot_change_calling_convention codeid ]
+       ==> cannot_unbox0 x);
+      (* If [-X reaper-no-lambda-lifting=1], prevent unboxing a closure that is called *)
+      (let$ [x; call_witness] = ["x"; "call_witness"] in
+       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
+         has_usage call_witness;
+         filter (fun [] -> no_lambda_lifting ()) [] ]
        ==> cannot_unbox0 x);
       (* An allocation that is one of the results of a function can only be
          unboxed if the function's calling conventation can be changed. *)
