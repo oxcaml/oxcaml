@@ -20,7 +20,7 @@ open Datalog_imports
 type vm_action =
   | Unless :
       ('t, 'k, 'v) Trie.is_trie
-      * 't Channel.receiver
+      * 't Or_null_receiver.t
       * 'k Or_null_receiver.hlist
       * string
       * string list
@@ -55,7 +55,7 @@ let unless_eq repr cell1 cell2 =
 let filter f args = VM_action (Filter (f, args.values, args.names))
 
 type binder =
-  | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.sender -> binder
+  | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.or_null_sender -> binder
 
 type actions = { mutable rev_actions : action list }
 
@@ -212,9 +212,7 @@ let add_iterator context id =
   iterators
 
 let add_naive_binder context id =
-  let send_trie, recv_trie =
-    Channel.create (Trie.empty (Table.Id.is_trie id))
-  in
+  let send_trie, recv_trie = Channel.create_or_null Or_null.null in
   add_binder context.naive_binders (Bind_table (id, send_trie));
   recv_trie
 
@@ -351,7 +349,7 @@ let create ?(calls = []) ?output context =
 
 let bind_table (Bind_table (id, handler)) database =
   let table = Table.Map.get id database in
-  Channel.send handler table;
+  Channel.send_or_null handler (Or_null.this table);
   not (Trie.is_empty (Table.Id.is_trie id) table)
 
 let bind_table_list binders database =
@@ -362,8 +360,8 @@ let bind_cursor cursor ?(callback = ignore) db =
   bind_table_list cursor.cursor_naive_binders db;
   cursor.callback := callback
 
-let unbind_table (Bind_table (id, handler)) =
-  Channel.send handler (Trie.empty (Table.Id.is_trie id))
+let unbind_table (Bind_table (_id, handler)) =
+  Channel.send_or_null handler Or_null.null
 
 let unbind_table_list binders = List.iter unbind_table binders
 
@@ -378,11 +376,13 @@ let with_bound_cursor ?callback cursor db f =
 
 let evaluate = function
   | Unless (is_trie, cell, args, _cell_name, _args_names) ->
+    let value = Channel.recv_or_null cell in
+    let value =
+      match value with Null -> Misc.fatal_error "???" | This value -> value
+    in
     if
       Or_null.is_this
-        (Trie.find_or_null is_trie
-           (Or_null_receiver.recv_hlist args)
-           (Channel.recv cell))
+        (Trie.find_or_null is_trie (Or_null_receiver.recv_hlist args) value)
     then Virtual_machine.Skip
     else Virtual_machine.Accept
   | Unless_eq (cell1, cell2, _cell1_name, _cell2_name, repr) ->

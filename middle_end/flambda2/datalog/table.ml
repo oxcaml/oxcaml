@@ -113,9 +113,9 @@ module Id = struct
     | Some Equal -> t
     | None -> Misc.fatal_error "Inconsistent type for uid."
 
-  let create_iterator { is_trie; default_value; name; _ } =
-    let send_trie, recv_trie = Channel.create (Trie.empty is_trie) in
-    let send_value, recv_value = Channel.create default_value in
+  let create_iterator { is_trie; name; _ } =
+    let send_trie, recv_trie = Channel.create_or_null Or_null.null in
+    let send_value, recv_value = Channel.create_or_null Or_null.null in
     let iterator = Trie.Iterator.create is_trie recv_trie send_value in
     let rec get_names : type a. a Trie.Iterator.hlist -> int -> string list =
      fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->

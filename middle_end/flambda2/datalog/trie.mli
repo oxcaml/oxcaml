@@ -72,5 +72,8 @@ module Iterator : sig
       The [output] reference is set to the corresponding value when [accept] is
       called on the last iterator. *)
   val create :
-    ('m, 'k, 'v) is_trie -> 'm Channel.receiver -> 'v Channel.sender -> 'k hlist
+    ('m, 'k, 'v) is_trie ->
+    'm Channel.or_null_receiver ->
+    'v Channel.or_null_sender ->
+    'k hlist
 end
