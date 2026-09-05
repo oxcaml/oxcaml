@@ -21,17 +21,17 @@
 open! Stdlib
 
 (** Unboxed processor-native integers.  This file primarily duplicates
-    functionality from the [Nativeint] module, but for [nativeint_u].
+    functionality from the [Nativeint] module, but for [nativeint#].
 
-   This module provides operations on the type [nativeint_u] of
+   This module provides operations on the type [nativeint#] of
    unboxed signed 32-bit integers (on 32-bit platforms) or
    unboxed signed 64-bit integers (on 64-bit platforms).
    This integer type has exactly the same width as that of a
    pointer type in the C compiler.  All arithmetic operations over
-   [nativeint_u] are wrapping, not truncating.
+   [nativeint#] are wrapping, not truncating.
 *)
 
-type t = nativeint_u
+type t = nativeint#
 (** An alias for the type of unboxed native integers. *)
 
 (* CR layouts v2.1: add back this comment to the above when we support
@@ -39,15 +39,15 @@ type t = nativeint_u
 
     Literals for unboxed native integers are prefixed by # and suffixed by n:
     {[
-     let zero: nativeint_u = #0n
-     let one: nativeint_u = #1n
-     let m_one: nativeint_u = #-1n
+     let zero: nativeint# = #0n
+     let one: nativeint# = #1n
+     let m_one: nativeint# = #-1n
     ]}
 *)
 
 (* Unboxed-specific stuff at the top. *)
 external to_nativeint : t -> (nativeint[@local_opt]) = "%box_nativeint" [@@warning "-187"]
-(** Box a [nativeint_u] *)
+(** Box a [nativeint#] *)
 
 external of_nativeint : (nativeint[@local_opt]) -> t =
   "%unbox_nativeint" [@@warning "-187"]
@@ -58,16 +58,16 @@ external of_nativeint : (nativeint[@local_opt]) -> t =
 
 (* CR layouts v5: add back all the commented-out values in this module when we
    support [word]s in structures.  This includes constants (e.g., [zero] and
-   [one]) and functions that return things like [nativeint_u] (e.g.,
+   [one]) and functions that return things like [nativeint#] (e.g.,
    [of_string_opt]). *)
 
-(* val zero : nativeint_u
+(* val zero : nativeint#
  * (** The unboxed native integer 0.*)
  *
- * val one : nativeint_u
+ * val one : nativeint#
  * (** The unboxed native integer 1.*)
  *
- * val minus_one : nativeint_u
+ * val minus_one : nativeint#
  * (** The unboxed native integer -1.*) *)
 
 val neg : t -> t
@@ -120,12 +120,12 @@ val size : int
 (** The size in bits of an unboxed native integer.  This is equal to [32]
    on a 32-bit platform and to [64] on a 64-bit platform. *)
 
-(* val max_int : nativeint_u
+(* val max_int : nativeint#
  * (** The greatest representable unboxed native integer,
  *    either 2{^31} - 1 on a 32-bit platform,
  *    or 2{^63} - 1 on a 64-bit platform. *)
  *
- * val min_int : nativeint_u
+ * val min_int : nativeint#
  * (** The smallest representable unboxed native integer,
  *    either -2{^31} on a 32-bit platform,
  *    or -2{^63} on a 64-bit platform. *) *)
@@ -164,10 +164,10 @@ val shift_right_logical : t -> int -> t
 
 val of_int : int -> t
 (** Convert the given integer (type [int]) to an unboxed native integer
-   (type [nativeint_u]). *)
+   (type [nativeint#]). *)
 
 val to_int : t -> int
-(** Convert the given unboxed native integer (type [nativeint_u]) to an
+(** Convert the given unboxed native integer (type [nativeint#]) to an
    integer (type [int]).  The high-order bit is lost during
    the conversion. *)
 
@@ -197,11 +197,11 @@ val to_int32 : t -> int32
    i.e. the top 32 bits are lost.  On 32-bit platforms,
    the conversion is exact. *)
 
-val of_int32_u : int32_u -> t
+val of_int32_u : int32# -> t
 (** Convert the given unboxed 32-bit integer (type [int32])
    to an unboxed native integer. *)
 
-val to_int32_u : t -> int32_u
+val to_int32_u : t -> int32#
 (** Convert the given unboxed native integer to an unboxed
    32-bit integer (type [int32]).  On 64-bit platforms,
    the 64-bit unboxed native integer is taken modulo 2{^32},

@@ -29,7 +29,7 @@ module type Id = sig
 end
 
 module Make_id () : Id = struct
-  type t = int64_u
+  type t = int64#
   let null = #0L
   let gen () = #1234L
   let validate _id = true

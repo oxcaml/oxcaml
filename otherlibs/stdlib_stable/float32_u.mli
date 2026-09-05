@@ -21,7 +21,7 @@
 open! Stdlib
 
 (** Unboxed 32-bit floating-point arithmetic.  This file primarily duplicates
-    functionality from the [Float32] module, but for [float32_u].
+    functionality from the [Float32] module, but for [float32#].
 
     OCaml's 32-bit floating-point numbers follow the
     IEEE 754 standard, using single precision (32 bits) numbers.
@@ -35,7 +35,7 @@ open! Stdlib
     ([+.], [-.], [*.], [/.]) with [nan] as an argument return [nan], ...
 *)
 
-type t = float32_u
+type t = float32#
 (** An alias for the type of unboxed 32-bit floating-point numbers. *)
 
 (* CR layouts v5: add back all the constants in this module (e.g., [zero] and
@@ -43,7 +43,7 @@ type t = float32_u
 
 (* Unboxed-specific stuff at the top. *)
 external to_float32 : t -> (float32[@local_opt]) = "%box_float32"
-(** Box a [float32_u] *)
+(** Box a [float32#] *)
 
 external of_float32 : (float32[@local_opt]) -> t = "%unbox_float32"
 (** Unbox a boxed [float32] *)
@@ -136,10 +136,10 @@ val to_int : t -> int
     The result is unspecified if the argument is [nan] or falls outside the
     range of representable integers. *)
 
-val of_int64 : int64_u -> t
+val of_int64 : int64# -> t
 (** Convert the given 64-bit integer to the nearest representable 32-bit float. *)
 
-val to_int64 : t -> int64_u
+val to_int64 : t -> int64#
 (** Convert the given 32-bit float to a 64-bit integer,
     discarding the fractional part (truncate towards 0).
     If the truncated floating-point number is outside the range
@@ -152,12 +152,12 @@ val of_float : float# -> t
 val to_float : t -> float#
 (** Convert a 32-bit float to a 64-bit float. *)
 
-val of_bits : int32_u -> t
+val of_bits : int32# -> t
 (** Convert a 32-bit integer to a 32-bit float, preserving the value's
     bit pattern.
     The amd64 OxCaml compiler translates this call to MOVD. *)
 
-val to_bits : t -> int32_u
+val to_bits : t -> int32#
 (** Convert a 32-bit float to a 32-bit integer, preserving the value's
     bit pattern.
     The amd64 OxCaml compiler translates this call to MOVD. *)
@@ -392,67 +392,66 @@ val max_num : t -> t -> t
     missing values.  If both [x] and [y] are [nan] [nan] is returned.
     Moreover [max_num #-0.s #+0.s = #+0.s] *)
 
-val iround_current : t -> int64_u
-(** Rounds a [float32_u] to an [int64_u] using the current rounding mode. The
-    default rounding mode on amd64 is "round half to even", and we expect that
-    no program will change the mode. The default mode may differ on other
-    platforms.
+val iround_current : t -> int64#
+(** Rounds a [float32#] to an [int64#] using the current rounding mode. The default
+    rounding mode on amd64 is "round half to even", and we expect that no
+    program will change the mode. The default mode may differ on other platforms.
     If the argument is NaN or infinite or if the rounded value cannot be
     represented, then the result is unspecified.
     The amd64 OxCaml compiler translates this call to CVTSS2SI. *)
 
 val round_current : t -> t
-(** Rounds a [float32_u] to an integer [float32_u] using the current rounding
-    mode. The default rounding mode on amd64 is "round half to even", and we
+(** Rounds a [float32#] to an integer [float32#] using the current rounding mode.
+    The default rounding mode on amd64 is "round half to even", and we
     expect that no program will change the mode. The default mode may differ
     on other platforms.
     The amd64 OxCaml compiler translates this call to ROUNDSS. *)
 
 val round_down : t -> t
-(** Rounds a [float32_u] down to the next integer [float32_u] toward negative
-    infinity. The amd64 OxCaml compiler translates this call to ROUNDSS.*)
+(** Rounds a [float32#] down to the next integer [float32#] toward negative infinity.
+    The amd64 OxCaml compiler translates this call to ROUNDSS.*)
 
 val round_up : t -> t
-(** Rounds a [float32_u] up to the next integer [float32_u] toward positive
-    infinity. The amd64 OxCaml compiler translates this call to ROUNDSS.*)
+(** Rounds a [float32#] up to the next integer [float32#] toward positive infinity.
+    The amd64 OxCaml compiler translates this call to ROUNDSS.*)
 
 val round_towards_zero : t -> t
-(** Rounds a [float32_u] to the next integer [float32_u] toward zero.
+(** Rounds a [float32#] to the next integer [float32#] toward zero.
     The amd64 OxCaml compiler translates this call to ROUNDSS.*)
 
 (* CR layouts v5: add back hash when we deal with the ad-hoc polymorphic
    functions. *)
 
 module Bytes : sig
-  val get : bytes -> pos:int -> float32_u
+  val get : bytes -> pos:int -> float32#
   (** [get b ~pos] loads a float32 from [b] at an offset of [pos] bytes.
 
       @raise Invalid_argument
       if [pos] is outside the range 0 to [length b - 4]. *)
 
-  val unsafe_get : bytes -> pos:int -> float32_u
+  val unsafe_get : bytes -> pos:int -> float32#
   (** [unsafe_get b ~pos] loads a float32 from [b] at an offset of [pos] bytes.
       Does not check that [pos] is a valid offset. *)
 
-  val set : bytes -> pos:int -> float32_u -> unit
+  val set : bytes -> pos:int -> float32# -> unit
   (** [set b ~pos f] stores a float32 to [b] at an offset of [pos] bytes.
 
       @raise Invalid_argument
       if [pos] is outside the range 0 to [length b - 4]. *)
 
-  val unsafe_set : bytes -> pos:int -> float32_u -> unit
+  val unsafe_set : bytes -> pos:int -> float32# -> unit
   (** [unsafe_set b ~pos f] stores a float32 to [b] at an offset of [pos] bytes.
       Does not check that [pos] is a valid offset. *)
 end
 
 module String : sig
-  val get : string -> pos:int -> float32_u
+  val get : string -> pos:int -> float32#
   (** [get s ~pos] loads a float32 from [s] at an offset of [pos] bytes.
 
       @raise Invalid_argument
       if [pos] is outside the range 0 to [length s - 4]. *)
 
-  val unsafe_get : string -> pos:int -> float32_u
+  val unsafe_get : string -> pos:int -> float32#
   (** [unsafe_get s ~pos] loads a float32 from [s] at an offset of [pos] bytes.
       Does not check that [pos] is a valid offset. *)
 end
@@ -462,24 +461,23 @@ module Bigstring : sig
 
   type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
-  external get : t -> pos:int -> float32_u = "%caml_bigstring_getf32#"
+  external get : t -> pos:int -> float32# = "%caml_bigstring_getf32#"
   (** [get b ~pos] loads a float32 from [b] at an offset of [pos] bytes.
 
       @raise Invalid_argument
       if [pos] is outside the range 0 to [length b - 4]. *)
 
-  external unsafe_get : t -> pos:int -> float32_u = "%caml_bigstring_getf32u#"
+  external unsafe_get : t -> pos:int -> float32# = "%caml_bigstring_getf32u#"
   (** [unsafe_get b ~pos] loads a float32 from [b] at an offset of [pos] bytes.
       Does not check that [pos] is a valid offset. *)
 
-  external set : t -> pos:int -> float32_u -> unit = "%caml_bigstring_setf32#"
+  external set : t -> pos:int -> float32# -> unit = "%caml_bigstring_setf32#"
   (** [set b ~pos f] stores a float32 to [b] at an offset of [pos] bytes.
 
       @raise Invalid_argument
       if [pos] is outside the range 0 to [length b - 4]. *)
 
-  external unsafe_set : t -> pos:int -> float32_u -> unit
-    = "%caml_bigstring_setf32u#"
+  external unsafe_set : t -> pos:int -> float32# -> unit = "%caml_bigstring_setf32u#"
   (** [unsafe_set b ~pos f] stores a float32 to [b] at an offset of [pos] bytes.
       Does not check that [pos] is a valid offset. *)
 end
@@ -488,7 +486,7 @@ module Bigarray : sig
     open Bigarray
 
     module Array1 : sig
-      val get : ('a, float32_elt, 'c) Array1.t -> int -> float32_u
+      val get : ('a, float32_elt, 'c) Array1.t -> int -> float32#
       (** [Array1.get a x], or alternatively [a.{x}],
           returns the element of [a] at index [x].
           [x] must be greater or equal than [0] and strictly less than
@@ -496,27 +494,27 @@ module Bigarray : sig
           [x] must be greater or equal than [1] and less or equal than
           [Array1.dim a].  Otherwise, [Invalid_argument] is raised. *)
 
-      val set : ('a, float32_elt, 'c) Array1.t -> int -> float32_u -> unit
+      val set : ('a, float32_elt, 'c) Array1.t -> int -> float32# -> unit
       (** [Array1.set a x v], also written [a.{x} <- v],
           stores the value [v] at index [x] in [a].
           [x] must be inside the bounds of [a] as described in
           {!Bigarray.Array1.get};
           otherwise, [Invalid_argument] is raised. *)
 
-      val unsafe_get : ('a, float32_elt, 'c) Array1.t -> int -> float32_u
+      val unsafe_get : ('a, float32_elt, 'c) Array1.t -> int -> float32#
       (** Like {!Bigarray.Array1.get}, but bounds checking is not always performed.
           Use with caution and only when the program logic guarantees that
           the access is within bounds. *)
 
       val unsafe_set :
-        ('a, float32_elt, 'c) Array1.t -> int -> float32_u -> unit
+        ('a, float32_elt, 'c) Array1.t -> int -> float32# -> unit
       (** Like {!Bigarray.Array1.set}, but bounds checking is not always performed.
           Use with caution and only when the program logic guarantees that
           the access is within bounds. *)
     end
 
     module Array2 : sig
-      val get : ('a, float32_elt, 'c) Array2.t -> int -> int -> float32_u
+      val get : ('a, float32_elt, 'c) Array2.t -> int -> int -> float32#
       (** [Array2.get a x y], also written [a.{x,y}],
         returns the element of [a] at coordinates ([x], [y]).
         [x] and [y] must be within the bounds
@@ -524,7 +522,7 @@ module Bigarray : sig
         otherwise, [Invalid_argument] is raised. *)
 
       val set :
-        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32_u -> unit
+        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32# -> unit
       (** [Array2.set a x y v], or alternatively [a.{x,y} <- v],
         stores the value [v] at coordinates ([x], [y]) in [a].
         [x] and [y] must be within the bounds of [a],
@@ -532,19 +530,19 @@ module Bigarray : sig
         otherwise, [Invalid_argument] is raised. *)
 
       val unsafe_get :
-        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32_u
+        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32#
       (** Like {!Bigarray.Array2.get}, but bounds checking is not always
           performed. *)
 
       val unsafe_set :
-        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32_u -> unit
+        ('a, float32_elt, 'c) Array2.t -> int -> int -> float32# -> unit
       (** Like {!Bigarray.Array2.set}, but bounds checking is not always
           performed. *)
     end
 
     module Array3 : sig
       val get :
-        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32_u
+        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32#
       (** [Array3.get a x y z], also written [a.{x,y,z}],
           returns the element of [a] at coordinates ([x], [y], [z]).
           [x], [y] and [z] must be within the bounds of [a],
@@ -552,7 +550,7 @@ module Bigarray : sig
           otherwise, [Invalid_argument] is raised. *)
 
       val set :
-        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32_u -> unit
+        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32# -> unit
       (** [Array3.set a x y v], or alternatively [a.{x,y,z} <- v],
           stores the value [v] at coordinates ([x], [y], [z]) in [a].
           [x], [y] and [z] must be within the bounds of [a],
@@ -560,12 +558,12 @@ module Bigarray : sig
           otherwise, [Invalid_argument] is raised. *)
 
       val unsafe_get :
-        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32_u
+        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32#
       (** Like {!Bigarray.Array3.get}, but bounds checking is not always
           performed. *)
 
       val unsafe_set :
-        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32_u -> unit
+        ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32# -> unit
       (** Like {!Bigarray.Array3.set}, but bounds checking is not always
           performed. *)
     end

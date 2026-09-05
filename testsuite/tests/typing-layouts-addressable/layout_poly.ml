@@ -25,16 +25,16 @@ type b8 : bits8
 (* Usable at addressable kinds *)
 let f (x : string) = id_addressable x
 
-let g (x : int64_u) = id_addressable x
+let g (x : int64#) = id_addressable x
 
 let h (x : b8a) = id_addressable x
 
-let i (x : #(int64_u * string)) = id_addressable x
+let i (x : #(int64# * string)) = id_addressable x
 [%%expect{|
 val f : string -> string = <fun>
-val g : int64_u -> int64_u = <fun>
+val g : int64# -> int64# = <fun>
 val h : b8a -> b8a = <fun>
-val i : #(int64_u * string) -> #(int64_u * string) = <fun>
+val i : #(int64# * string) -> #(int64# * string) = <fun>
 |}]
 
 (* Rejected at unaddressable kinds *)
@@ -90,9 +90,9 @@ Error: The value "x" has type "#(float# * string)"
 (* We can constrain an unfilled variable to always be addressable *)
 let ok64 x =
   let _ = id_addressable x in
-  (x : int64_u)
+  (x : int64#)
 [%%expect{|
-val ok64 : int64_u -> int64_u = <fun>
+val ok64 : int64# -> int64# = <fun>
 |}]
 
 let bad x =
@@ -125,9 +125,9 @@ external magic_to_addressable : ('a : any) ('b : any addressable). 'a -> 'b
   = "%identity" [@@layout_poly]
 |}]
 
-let ok (x : int64_u) : int64_u = magic_to_addressable x
+let ok (x : int64#) : int64# = magic_to_addressable x
 [%%expect{|
-val ok : int64_u -> int64_u = <fun>
+val ok : int64# -> int64# = <fun>
 |}]
 
 (* The shared sort is [bits8]; [b8a]'s kind [bits8 addressable] satisfies the
@@ -155,11 +155,11 @@ Error: This expression has type "('a : bits8 addressable)"
 
 (* The sort really is shared between ['a] and ['b]: the argument sets it to
    [bits64], which does not unify with [b8a]'s [bits8 addressable] *)
-let bad (x : int64_u) : b8a = magic_to_addressable x
+let bad (x : int64#) : b8a = magic_to_addressable x
 [%%expect{|
-Line 1, characters 30-52:
-1 | let bad (x : int64_u) : b8a = magic_to_addressable x
-                                  ^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 29-51:
+1 | let bad (x : int64#) : b8a = magic_to_addressable x
+                                 ^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a : bits64)"
        but an expression was expected of type "b8a"
        The layout of b8a is bits8 addressable

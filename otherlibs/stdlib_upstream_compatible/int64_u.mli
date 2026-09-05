@@ -21,16 +21,16 @@
 open! Stdlib
 
 (** Unboxed 64-bit integers.  This file primarily duplicates
-    functionality from the [Int64] module, but for [int64_u].
+    functionality from the [Int64] module, but for [int64#].
 
-   This module provides operations on the type [int64_u] of
+   This module provides operations on the type [int64#] of
    unboxed signed 64-bit integers.  Unlike the built-in [int] type,
-   the type [int64_u] is guaranteed to be exactly 64-bit wide on all
-   platforms.  All arithmetic operations over [int64_u] are wrapping, not
+   the type [int64#] is guaranteed to be exactly 64-bit wide on all
+   platforms.  All arithmetic operations over [int64#] are wrapping, not
    truncating.
 *)
 
-type t = int64_u
+type t = int64#
 (** An alias for the type of unboxed 64-bit integers. *)
 
 (* CR layouts v2.1: add back this comment to the above when we support
@@ -38,15 +38,15 @@ type t = int64_u
 
     Literals for unboxed 64-bit integers are prefixed by # and suffixed by L:
     {[
-     let zero: int64_u = #0L
-     let one: int64_u = #1L
-     let m_one: int64_u = #-1L
+     let zero: int64# = #0L
+     let one: int64# = #1L
+     let m_one: int64# = #-1L
     ]}
 *)
 
 (* Unboxed-specific stuff at the top. *)
 external to_int64 : t -> (int64[@local_opt]) = "%box_int64" [@@warning "-187"]
-(** Box a [int64_u] *)
+(** Box a [int64#] *)
 
 external of_int64 : (int64[@local_opt]) -> t = "%unbox_int64" [@@warning "-187"]
 (** Unbox a boxed [int64] *)
@@ -56,16 +56,16 @@ external of_int64 : (int64[@local_opt]) -> t = "%unbox_int64" [@@warning "-187"]
 
 (* CR layouts v5: add back all the commented-out values in this module when we
    support [bits64]s in structures.  This includes constants (e.g., [zero] and
-   [one]) and functions that return things like [int64_u] (e.g.,
+   [one]) and functions that return things like [int64#] (e.g.,
    [of_string_opt]). *)
 
-(* val zero : int64_u
+(* val zero : int64#
  * (** The unboxed 64-bit integer 0.*)
  *
- * val one : int64_u
+ * val one : int64#
  * (** The unboxed 64-bit integer 1.*)
  *
- * val minus_one : int64_u
+ * val minus_one : int64#
  * (** The unboxed 64-bit integer -1.*) *)
 
 val neg : t -> t
@@ -112,10 +112,10 @@ val pred : t -> t
 val abs : t -> t
 (** Return the absolute value of its argument. *)
 
-(* val max_int : int64_u
+(* val max_int : int64#
  * (** The greatest representable unboxed 64-bit integer, 2{^63} - 1. *)
  *
- * val min_int : int64_u
+ * val min_int : int64#
  * (** The smallest representable unboxed 64-bit integer, -2{^63}. *)
  *)
 
@@ -150,10 +150,10 @@ val shift_right_logical : t -> int -> t
 
 val of_int : int -> t
 (** Convert the given integer (type [int]) to an unboxed 64-bit integer
-   (type [int64_u]). *)
+   (type [int64#]). *)
 
 val to_int : t -> int
-(** Convert the given unboxed 64-bit integer (type [int64_u]) to an
+(** Convert the given unboxed 64-bit integer (type [int64#]) to an
    integer (type [int]).  On 64-bit platforms, the 64-bit integer
    is taken modulo 2{^63}, i.e. the high-order bit is lost
    during the conversion.  On 32-bit platforms, the 64-bit integer
@@ -187,30 +187,30 @@ val to_int32 : t -> int32
 
 val of_nativeint : nativeint -> t
 (** Convert the given native integer (type [nativeint])
-   to an unboxed 64-bit integer (type [int64_u]). *)
+   to an unboxed 64-bit integer (type [int64#]). *)
 
 val to_nativeint : t -> nativeint
-(** Convert the given unboxed 64-bit integer (type [int64_u]) to a
+(** Convert the given unboxed 64-bit integer (type [int64#]) to a
    native integer.  On 32-bit platforms, the 64-bit integer
    is taken modulo 2{^32}.  On 64-bit platforms,
    the conversion is exact. *)
 
-val of_int32_u : int32_u -> t
+val of_int32_u : int32# -> t
 (** Convert the given unboxed 32-bit integer (type [int32])
    to an unboxed 64-bit integer (type [int64]). *)
 
-val to_int32_u : t -> int32_u
+val to_int32_u : t -> int32#
 (** Convert the given unboxed 64-bit integer (type [int64]) to an
    unboxed 32-bit integer (type [int32]).  The 64-bit integer
    is taken modulo 2{^32}, i.e. the top 32 bits are lost
    during the conversion.  *)
 
-val of_nativeint_u : nativeint_u -> t
+val of_nativeint_u : nativeint# -> t
 (** Convert the given unboxed native integer (type [nativeint])
-   to an unboxed 64-bit integer (type [int64_u]). *)
+   to an unboxed 64-bit integer (type [int64#]). *)
 
-val to_nativeint_u : t -> nativeint_u
-(** Convert the given unboxed 64-bit integer (type [int64_u]) to an
+val to_nativeint_u : t -> nativeint#
+(** Convert the given unboxed 64-bit integer (type [int64#]) to an
    unboxed native integer.  On 32-bit platforms, the 64-bit integer
    is taken modulo 2{^32}.  On 64-bit platforms,
    the conversion is exact. *)
@@ -248,7 +248,7 @@ val bits_of_float : float -> t
 val float_of_bits : t -> float
 (** Return the floating-point number whose internal representation,
    according to the IEEE 754 floating-point 'double format' bit layout,
-   is the given [int64_u]. *)
+   is the given [int64#]. *)
 
 val compare: t -> t -> int
 (** The comparison function for unboxed 64-bit integers, with the same

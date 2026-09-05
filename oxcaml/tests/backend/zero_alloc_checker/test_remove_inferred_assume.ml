@@ -48,12 +48,12 @@ end = struct
 
 end
 module Int64_u : sig
-  type t = int64_u
+  type t = int64#
 
   val to_int_exn : t -> int
 
 end = struct
-  type t = int64_u
+  type t = int64#
 
   external to_int64 : t -> (int64[@local_opt]) = "%box_int64"
 

@@ -103,18 +103,18 @@
 - : <[float#]> expr = <[-#1.5]>
 |}];;
 
-(* float32_u *)
+(* float32# *)
 <[ #0.s ]>
 [%%expect {|
-- : <[float32_u]> expr = <[#0.s]>
+- : <[float32#]> expr = <[#0.s]>
 |}];;
 <[ #1.5s ]>
 [%%expect {|
-- : <[float32_u]> expr = <[#1.5s]>
+- : <[float32#]> expr = <[#1.5s]>
 |}];;
 <[ -#1.5s ]>
 [%%expect {|
-- : <[float32_u]> expr = <[-#1.5s]>
+- : <[float32#]> expr = <[-#1.5s]>
 |}];;
 
 (* int8 *)
@@ -229,44 +229,44 @@
 - : <[int16#]> expr = <[-#32768S]>
 |}];;
 
-(* int32_u *)
+(* int32# *)
 <[ #0l ]>
 [%%expect {|
-- : <[int32_u]> expr = <[#0l]>
+- : <[int32#]> expr = <[#0l]>
 |}];;
 <[ #2147483647l ]>
 [%%expect {|
-- : <[int32_u]> expr = <[#2147483647l]>
+- : <[int32#]> expr = <[#2147483647l]>
 |}];;
 <[ -#2147483648l ]>
 [%%expect {|
-- : <[int32_u]> expr = <[-#2147483648l]>
+- : <[int32#]> expr = <[-#2147483648l]>
 |}];;
 
-(* int64_u *)
+(* int64# *)
 <[ #0L ]>
 [%%expect {|
-- : <[int64_u]> expr = <[#0L]>
+- : <[int64#]> expr = <[#0L]>
 |}];;
 <[ #9223372036854775807L ]>
 [%%expect {|
-- : <[int64_u]> expr = <[#9223372036854775807L]>
+- : <[int64#]> expr = <[#9223372036854775807L]>
 |}];;
 <[ -#9223372036854775808L ]>
 [%%expect {|
-- : <[int64_u]> expr = <[-#9223372036854775808L]>
+- : <[int64#]> expr = <[-#9223372036854775808L]>
 |}];;
 
-(* nativeint_u *)
+(* nativeint# *)
 <[ #0n ]>
 [%%expect {|
-- : <[nativeint_u]> expr = <[#0n]>
+- : <[nativeint#]> expr = <[#0n]>
 |}];;
 <[ #1n ]>
 [%%expect {|
-- : <[nativeint_u]> expr = <[#1n]>
+- : <[nativeint#]> expr = <[#1n]>
 |}];;
 <[ -#1n ]>
 [%%expect {|
-- : <[nativeint_u]> expr = <[-#1n]>
+- : <[nativeint#]> expr = <[-#1n]>
 |}];;

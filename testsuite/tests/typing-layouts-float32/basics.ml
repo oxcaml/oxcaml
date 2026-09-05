@@ -8,28 +8,28 @@
 
 (* This file contains typing tests for the layout [float32].
 
-   Runtime tests for the type [float32_u] can be found in the [unboxed_float] and
-   [alloc] tests in this directory.  The type [float32_u] here is used as a
+   Runtime tests for the type [float32#] can be found in the [unboxed_float] and
+   [alloc] tests in this directory.  The type [float32#] here is used as a
    convenient example of a concrete [float32] type in some tests, but its
    behavior isn't the primary purpose of this test. *)
 
 type t_float32 : float32
 type ('a : float32) t_float32_id = 'a
-external of_f32 : float32_u -> t_float32 = "%opaque"
+external of_f32 : float32# -> t_float32 = "%opaque"
 
 (*********************************)
 (* Test 1: The identity function *)
 
 let f1_1 (x : t_float32) = x;;
 let f1_2 (x : 'a t_float32_id) = x;;
-let f1_3 (x : float32_u) = x;;
+let f1_3 (x : float32#) = x;;
 [%%expect{|
 type t_float32 : float32
 type ('a : float32) t_float32_id = 'a
-external of_f32 : float32_u -> t_float32 = "%opaque"
+external of_f32 : float32# -> t_float32 = "%opaque"
 val f1_1 : t_float32 -> t_float32 = <fun>
 val f1_2 : ('a : float32). 'a t_float32_id -> 'a t_float32_id = <fun>
-val f1_3 : float32_u -> float32_u = <fun>
+val f1_3 : float32# -> float32# = <fun>
 |}];;
 
 (*****************************************)
@@ -42,13 +42,13 @@ let f2_2 (x : 'a t_float32_id) =
   let y = x in
   y;;
 
-let f2_3 (x : float32_u) =
+let f2_3 (x : float32#) =
   let y = x in
   y;;
 [%%expect{|
 val f2_1 : t_float32 -> t_float32 = <fun>
 val f2_2 : ('a : float32). 'a t_float32_id -> 'a t_float32_id = <fun>
-val f2_3 : float32_u -> float32_u = <fun>
+val f2_3 : float32# -> float32# = <fun>
 |}];;
 
 (**********************************)
@@ -62,13 +62,13 @@ val x3_1 : t_float32 = <abstr>
 let x3_2_1 : 'a t_float32_id = #42.0s;;
 let x3_2_2 : 'a t_float32_id = of_f32 #42.0s;;
 [%%expect{|
-val x3_2_1 : float32_u t_float32_id = <abstr>
+val x3_2_1 : float32# t_float32_id = <abstr>
 val x3_2_2 : t_float32 t_float32_id = <abstr>
 |}];;
 
-let x3_3 : float32_u = #42.0s;;
+let x3_3 : float32# = #42.0s;;
 [%%expect{|
-val x3_3 : float32_u = <abstr>
+val x3_3 : float32# = <abstr>
 |}];;
 
 module M3_4 = struct
@@ -79,12 +79,12 @@ module M3_4 : sig val x : t_float32 end
 |}];;
 
 module M3_5 = struct
-  let f (x : float32_u) = x
+  let f (x : float32#) = x
 
   let y = f #42.0s
 end
 [%%expect{|
-module M3_5 : sig val f : float32_u -> float32_u val y : float32_u end
+module M3_5 : sig val f : float32# -> float32# val y : float32# end
 |}];;
 
 (*************************************)
@@ -116,16 +116,16 @@ Error: The value "x" has type "'a t_float32_id" = "('a : float32)"
          because it's the type of a tuple element.
 |}];;
 
-let f4_3 (x : float32_u) = x, false;;
+let f4_3 (x : float32#) = x, false;;
 [%%expect{|
-Line 1, characters 27-28:
-1 | let f4_3 (x : float32_u) = x, false;;
-                               ^
-Error: The value "x" has type "float32_u" but an expression was expected of type
+Line 1, characters 26-27:
+1 | let f4_3 (x : float32#) = x, false;;
+                              ^
+Error: The value "x" has type "float32#" but an expression was expected of type
          "('a : value_or_null)"
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
+       The layout of float32# is float32
+         because it is the unboxed version of the primitive type float32.
+       But the layout of float32# must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -141,15 +141,15 @@ Error: Tuple element types must have layout value.
          because it's the type of a tuple element.
 |}];;
 
-type t4_5 = int * float32_u;;
+type t4_5 = int * float32#;;
 [%%expect{|
-Line 1, characters 18-27:
-1 | type t4_5 = int * float32_u;;
-                      ^^^^^^^^^
+Line 1, characters 18-26:
+1 | type t4_5 = int * float32#;;
+                      ^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "float32_u" is float32
-         because it is the primitive type float32_u.
-       But the layout of "float32_u" must be a value layout
+       The layout of "float32#" is float32
+         because it is the unboxed version of the primitive type float32.
+       But the layout of "float32#" must be a value layout
          because it's the type of a tuple element.
 |}];;
 
@@ -244,24 +244,24 @@ Error: Layout mismatch in final type declaration consistency check.
        the declaration where this error is reported.
 |}];;
 
-type ('a : float32) t5_12 = {x : 'a; y : float32_u};;
+type ('a : float32) t5_12 = {x : 'a; y : float32#};;
 [%%expect{|
-type ('a : float32) t5_12 = { x : 'a; y : float32_u; }
+type ('a : float32) t5_12 = { x : 'a; y : float32#; }
 |}];;
 
-type ('a : float32) t5_13 = {x : 'a; y : float32_u};;
+type ('a : float32) t5_13 = {x : 'a; y : float32#};;
 [%%expect{|
-type ('a : float32) t5_13 = { x : 'a; y : float32_u; }
+type ('a : float32) t5_13 = { x : 'a; y : float32#; }
 |}];;
 
-type 'a t5_14 = {x : 'a; y : float32_u};;
+type 'a t5_14 = {x : 'a; y : float32#};;
 [%%expect{|
-type 'a t5_14 = { x : 'a; y : float32_u; }
+type 'a t5_14 = { x : 'a; y : float32#; }
 |}];;
 
-type ufref = { mutable contents : float32_u };;
+type ufref = { mutable contents : float32# };;
 [%%expect{|
-type ufref = { mutable contents : float32_u; }
+type ufref = { mutable contents : float32#; }
 |}];;
 
 (**************************************************)
@@ -279,9 +279,9 @@ module type S6_2 = sig val x : 'a t_float32_id end
 module type S6_2 = sig val x : ('a : float32). 'a t_float32_id end
 |}];;
 
-module type S6_3 = sig val x : float32_u end
+module type S6_3 = sig val x : float32# end
 [%%expect{|
-module type S6_3 = sig val x : float32_u end
+module type S6_3 = sig val x : float32# end
 |}];;
 
 
@@ -313,16 +313,16 @@ Error: The value "x" has type "'a t_float32_id" = "('a : float32)"
          because it's the type of the field of a polymorphic variant.
 |}];;
 
-let f7_3 (x : float32_u) = `A x;;
+let f7_3 (x : float32#) = `A x;;
 [%%expect{|
-Line 1, characters 30-31:
-1 | let f7_3 (x : float32_u) = `A x;;
-                                  ^
-Error: The value "x" has type "float32_u" but an expression was expected of type
+Line 1, characters 29-30:
+1 | let f7_3 (x : float32#) = `A x;;
+                                 ^
+Error: The value "x" has type "float32#" but an expression was expected of type
          "('a : value_or_null)"
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
+       The layout of float32# is float32
+         because it is the unboxed version of the primitive type float32.
+       But the layout of float32# must be a value layout
          because it's the type of the field of a polymorphic variant.
 |}];;
 
@@ -355,13 +355,13 @@ Error: Polymorphic variant constructor argument types must have layout value.
 
 let make_t_float32 () : t_float32 = assert false
 let make_t_float32_id () : 'a t_float32_id = assert false
-let make_floatu () : float32_u = assert false
+let make_floatu () : float32# = assert false
 
 let id_value x = x;;
 [%%expect{|
 val make_t_float32 : unit -> t_float32 = <fun>
 val make_t_float32_id : ('a : float32). unit -> 'a t_float32_id = <fun>
-val make_floatu : unit -> float32_u = <fun>
+val make_floatu : unit -> float32# = <fun>
 val id_value : 'a -> 'a = <fun>
 |}];;
 
@@ -396,11 +396,11 @@ let x8_3 = id_value (make_floatu ());;
 Line 1, characters 20-36:
 1 | let x8_3 = id_value (make_floatu ());;
                         ^^^^^^^^^^^^^^^^
-Error: This expression has type "float32_u"
+Error: This expression has type "float32#"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
+       The layout of float32# is float32
+         because it is the unboxed version of the primitive type float32.
+       But the layout of float32# must be a value layout
          because of the definition of id_value at line 5, characters 13-18.
 |}];;
 
@@ -420,7 +420,7 @@ val twice :
   <fun>
 val f9_1 : unit -> t_float32 t_float32_id = <fun>
 val f9_2 : ('a : float32). unit -> 'a t_float32_id = <fun>
-val f9_3 : unit -> float32_u t_float32_id = <fun>
+val f9_3 : unit -> float32# t_float32_id = <fun>
 |}];;
 
 (**************************************************)
@@ -436,11 +436,11 @@ val f9_3 : unit -> float32_u t_float32_id = <fun>
      true for [@untagged].
 *)
 
-external f10_1 : int -> bool -> float32_u = "foo";;
+external f10_1 : int -> bool -> float32# = "foo";;
 [%%expect{|
-Line 1, characters 0-49:
-1 | external f10_1 : int -> bool -> float32_u = "foo";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-48:
+1 | external f10_1 : int -> bool -> float32# = "foo";;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The native code version of the primitive is mandatory
        for types with non-value layouts.
 |}];;
@@ -462,51 +462,51 @@ Line 1, characters 0-60:
 Error: Cannot use "float" in conjunction with types of non-value layouts.
 |}];;
 
-external f10_4 : int -> float32_u -> float32  = "foo" "bar" "float";;
+external f10_4 : int -> float32# -> float32  = "foo" "bar" "float";;
 [%%expect{|
-Line 1, characters 0-67:
-1 | external f10_4 : int -> float32_u -> float32  = "foo" "bar" "float";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-66:
+1 | external f10_4 : int -> float32# -> float32  = "foo" "bar" "float";;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Cannot use "float" in conjunction with types of non-value layouts.
 |}];;
 
-external f10_5 : float32_u -> bool -> string  = "foo" "bar" "float";;
+external f10_5 : float32# -> bool -> string  = "foo" "bar" "float";;
 [%%expect{|
-Line 1, characters 0-67:
-1 | external f10_5 : float32_u -> bool -> string  = "foo" "bar" "float";;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Line 1, characters 0-66:
+1 | external f10_5 : float32# -> bool -> string  = "foo" "bar" "float";;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Cannot use "float" in conjunction with types of non-value layouts.
 |}];;
 
-external f10_6 : (float32_u[@unboxed]) -> bool -> string  = "foo" "bar";;
+external f10_6 : (float32#[@unboxed]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-external f10_6 : float32_u -> bool -> string = "foo" "bar"
+external f10_6 : float32# -> bool -> string = "foo" "bar"
 |}];;
 
-external f10_7 : string -> (float32_u[@unboxed])  = "foo" "bar";;
+external f10_7 : string -> (float32#[@unboxed])  = "foo" "bar";;
 [%%expect{|
-external f10_7 : string -> float32_u = "foo" "bar"
+external f10_7 : string -> float32# = "foo" "bar"
 |}];;
 
-external f10_8 : float -> float32_u  = "foo" "bar" [@@unboxed];;
+external f10_8 : float -> float32#  = "foo" "bar" [@@unboxed];;
 [%%expect{|
-external f10_8 : (float [@unboxed]) -> float32_u = "foo" "bar"
+external f10_8 : (float [@unboxed]) -> float32# = "foo" "bar"
 |}];;
 
-external f10_9 : (float32_u[@untagged]) -> bool -> string  = "foo" "bar";;
+external f10_9 : (float32#[@untagged]) -> bool -> string  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 18-27:
-1 | external f10_9 : (float32_u[@untagged]) -> bool -> string  = "foo" "bar";;
-                      ^^^^^^^^^
+Line 1, characters 18-26:
+1 | external f10_9 : (float32#[@untagged]) -> bool -> string  = "foo" "bar";;
+                      ^^^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
 
-external f10_10 : string -> (float32_u[@untagged])  = "foo" "bar";;
+external f10_10 : string -> (float32#[@untagged])  = "foo" "bar";;
 [%%expect{|
-Line 1, characters 29-38:
-1 | external f10_10 : string -> (float32_u[@untagged])  = "foo" "bar";;
-                                 ^^^^^^^^^
+Line 1, characters 29-37:
+1 | external f10_10 : string -> (float32#[@untagged])  = "foo" "bar";;
+                                 ^^^^^^^^
 Error: Don't know how to untag this type. Only "int", and
        other immediate types can be untagged.
 |}];;
@@ -526,11 +526,11 @@ Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
 
-type t11_1 += B of float32_u;;
+type t11_1 += B of float32#;;
 [%%expect{|
-Line 1, characters 14-28:
-1 | type t11_1 += B of float32_u;;
-                  ^^^^^^^^^^^^^^
+Line 1, characters 14-27:
+1 | type t11_1 += B of float32#;;
+                  ^^^^^^^^^^^^^
 Error: Extensible types can't have fields of unboxed type.
        Consider wrapping the unboxed fields in a record.
 |}]
@@ -628,27 +628,27 @@ Error: Variables bound in a class must have layout value.
          because it's the type of a class field.
 |}];;
 
-class type c12_6 = object method x : float32_u end;;
+class type c12_6 = object method x : float32# end;;
 [%%expect{|
-Line 1, characters 26-46:
-1 | class type c12_6 = object method x : float32_u end;;
-                              ^^^^^^^^^^^^^^^^^^^^
-Error: The method "x" has type "float32_u" but is expected to have type
+Line 1, characters 26-45:
+1 | class type c12_6 = object method x : float32# end;;
+                              ^^^^^^^^^^^^^^^^^^^
+Error: The method "x" has type "float32#" but is expected to have type
          "('a : value)"
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
+       The layout of float32# is float32
+         because it is the unboxed version of the primitive type float32.
+       But the layout of float32# must be a value layout
          because it's the type of an object field.
 |}];;
 
-class type c12_7 = object val x : float32_u end
+class type c12_7 = object val x : float32# end
 [%%expect{|
-Line 1, characters 26-43:
-1 | class type c12_7 = object val x : float32_u end
-                              ^^^^^^^^^^^^^^^^^
+Line 1, characters 26-42:
+1 | class type c12_7 = object val x : float32# end
+                              ^^^^^^^^^^^^^^^^
 Error: Variables bound in a class must have layout value.
        The layout of x is float32
-         because it is the primitive type float32_u.
+         because it is the unboxed version of the primitive type float32.
        But the layout of x must be a value layout
          because it's the type of an instance variable.
 |}];;
@@ -782,9 +782,9 @@ Error: The value "x" has type "t_float32" but an expression was expected of type
 
 module FU = struct
 
-  external of_float32 : (float32[@local_opt]) -> float32_u = "%unbox_float32"
+  external of_float32 : (float32[@local_opt]) -> float32# = "%unbox_float32"
 
-  external to_float32 : float32_u -> (float32[@local_opt]) = "%box_float32"
+  external to_float32 : float32# -> (float32[@local_opt]) = "%box_float32"
 
   external sub :
   (float32[@local_opt]) -> (float32[@local_opt]) -> (float32[@local_opt])
@@ -799,7 +799,7 @@ module FU = struct
   let[@inline always] add x y = of_float32 (add (to_float32 x) (to_float32 y))
 end
 
-type t14_1 = { x : float32_u; y : float32_u }
+type t14_1 = { x : float32#; y : float32# }
 
 (* pattern matching *)
 let f14_1 {x;y} = FU.sub x y
@@ -814,7 +814,7 @@ let f14_2 ({y;_} as r) = FU.sub r.x y
 
 let sum14_2 = FU.to_float32 (f14_1 r14)
 
-type t14_2 = { mutable a : float32_u; b : float32_u; mutable c : float32_u }
+type t14_2 = { mutable a : float32#; b : float32#; mutable c : float32# }
 
 let f14_3 ({b; c; _} as r) =
   (* pure record update *)
@@ -842,20 +842,19 @@ let f14_4 r =
 [%%expect{|
 module FU :
   sig
-    external of_float32 : (float32 [@local_opt]) -> float32_u
+    external of_float32 : (float32 [@local_opt]) -> float32#
       = "%unbox_float32"
-    external to_float32 : float32_u -> (float32 [@local_opt])
-      = "%box_float32"
-    val sub : float32_u -> float32_u -> float32_u
-    val add : float32_u -> float32_u -> float32_u
+    external to_float32 : float32# -> (float32 [@local_opt]) = "%box_float32"
+    val sub : float32# -> float32# -> float32#
+    val add : float32# -> float32# -> float32#
   end
-type t14_1 = { x : float32_u; y : float32_u; }
-val f14_1 : t14_1 -> float32_u = <fun>
+type t14_1 = { x : float32#; y : float32#; }
+val f14_1 : t14_1 -> float32# = <fun>
 val r14 : t14_1 = {x = <abstr>; y = <abstr>}
 val sum14_1 : float32 = 0.420000076s
-val f14_2 : t14_1 -> float32_u = <fun>
+val f14_2 : t14_1 -> float32# = <fun>
 val sum14_2 : float32 = 0.420000076s
-type t14_2 = { mutable a : float32_u; b : float32_u; mutable c : float32_u; }
+type t14_2 = { mutable a : float32#; b : float32#; mutable c : float32#; }
 val f14_3 : t14_2 -> t14_2 = <fun>
 val a : float32 = -16.8999996s
 val b : float32 = -0.419999987s
@@ -863,5 +862,5 @@ val c : float32 = 27.7000008s
 val a' : float32 = 42.s
 val b' : float32 = 20.s
 val c' : float32 = 3.0999999s
-val f14_4 : t14_1 -> float32_u = <fun>
+val f14_4 : t14_1 -> float32# = <fun>
 |}]
