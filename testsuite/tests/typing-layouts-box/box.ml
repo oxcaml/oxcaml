@@ -655,7 +655,7 @@ Error: The constant "42l" has type "int32" but an expression was expected of typ
          "'a box"
 |}]
 
-(* Test 26: Subtyping with polymorphic variants and box *)
+(* Test 26: No subtyping through [box]: it is invariant *)
 
 type ab = [ `A | `B ]
 type a  = [ `A ];;
@@ -664,19 +664,21 @@ type ab = [ `A | `B ]
 type a = [ `A ]
 |}]
 
-let coerce_box (x : a box) : ab box = (x :> ab box);;
+let widen_box (x : a box) : ab box = (x :> ab box);;
 [%%expect{|
-val coerce_box : a box -> ab box = <fun>
+Line 1, characters 37-50:
+1 | let widen_box (x : a box) : ab box = (x :> ab box);;
+                                         ^^^^^^^^^^^^^
+Error: Type "a box" = "[ `A ] box" is not a subtype of "ab box" = "[ `A | `B ] box"
+       The first variant type does not allow tag(s) "`B"
 |}]
 
-(* Also test the other direction fails *)
-let coerce_box_fail (x : ab box) : a box = (x :> a box);;
+let narrow_box (x : ab box) : a box = (x :> a box);;
 [%%expect{|
-Line 1, characters 43-55:
-1 | let coerce_box_fail (x : ab box) : a box = (x :> a box);;
-                                               ^^^^^^^^^^^^
+Line 1, characters 38-50:
+1 | let narrow_box (x : ab box) : a box = (x :> a box);;
+                                          ^^^^^^^^^^^^
 Error: Type "ab box" = "[ `A | `B ] box" is not a subtype of "a box" = "[ `A ] box"
-       Type "ab" = "[ `A | `B ]" is not a subtype of "a" = "[ `A ]"
        The second variant type does not allow tag(s) "`B"
 |}]
 
@@ -828,12 +830,17 @@ let obj_box_eq (x : obj box) (y : obj box) = x = y;;
 val obj_box_eq : obj box -> obj box -> bool = <fun>
 |}]
 
-(* Object subtyping is preserved through [box] *)
+(* Object subtyping does not extend through [box] *)
 type obj_more = < m : int; n : int >
 let widen (x : obj_more box) = (x :> obj box);;
 [%%expect{|
 type obj_more = < m : int; n : int >
-val widen : obj_more box -> obj box = <fun>
+Line 2, characters 31-45:
+2 | let widen (x : obj_more box) = (x :> obj box);;
+                                   ^^^^^^^^^^^^^^
+Error: Type "obj_more box" = "< m : int; n : int > box" is not a subtype of
+         "obj box" = "< m : int > box"
+       The second object type has no method "n"
 |}]
 
 (* Test 32: Box creates an unboxed version *)
@@ -1516,14 +1523,27 @@ Error: Signature mismatch:
        Type "'a box" is not compatible with type "'c"
 |}]
 
-(* [box] is covariant *)
+(* [box] is invariant *)
 module M : sig
   type +'a t
 end = struct
   type 'a t = 'a box
 end
 [%%expect{|
-module M : sig type +'a t end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t = 'a box
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = 'a box end
+       is not included in
+         sig type +'a t end
+       Type declarations do not match:
+         type 'a t = 'a box
+       is not included in
+         type +'a t
+       Their variances do not agree.
 |}]
 
 (* [box] can reduce [moregen]s via unboxing - [int * string < 'a box] *)
@@ -1553,7 +1573,22 @@ end = struct
   let f : (local_ string -> unit) box = Obj.magic ()
 end
 [%%expect{|
-module M : sig val f : (string -> unit) box end
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let f : (local_ string -> unit) box = Obj.magic ()
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : (string @ local -> unit) box end
+       is not included in
+         sig val f : (string -> unit) box end
+       Values do not match:
+         val f : (string @ local -> unit) box
+       is not included in
+         val f : (string -> unit) box
+       The type "(string @ local -> unit) box" is not compatible with the type
+         "(string -> unit) box"
+       Type "string @ local -> unit" is not compatible with type "string -> unit"
 |}]
 
 (* Test 43: Type equality checks with [box] *)
@@ -1611,7 +1646,12 @@ type 'a t = { mutable a : 'a }
 type +'a bad = 'a t# box;;
 [%%expect{|
 type 'a t = { mutable a : 'a; }
-type 'a bad = 'a t
+Line 2, characters 0-24:
+2 | type +'a bad = 'a t# box;;
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 type base = < m : int >
@@ -1620,7 +1660,12 @@ let leak (x : derived t# box) = (x :> base t# box);;
 [%%expect{|
 type base = < m : int >
 type derived = < m : int; n : int >
-val leak : derived t -> base t = <fun>
+Line 3, characters 32-50:
+3 | let leak (x : derived t# box) = (x :> base t# box);;
+                                    ^^^^^^^^^^^^^^^^^^
+Error: Type "derived t# box" = "derived t" is not a subtype of
+         "base t# box" = "base t"
+       The second object type has no method "n"
 |}]
 
 (* Test 46: [box] of an immutable type's unboxed version *)
@@ -1629,12 +1674,22 @@ type 'a imm = { a : 'a }
 type +'a imm_box = 'a imm# box;;
 [%%expect{|
 type 'a imm = { a : 'a; }
-type 'a imm_box = 'a imm
+Line 2, characters 0-30:
+2 | type +'a imm_box = 'a imm# box;;
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
 |}]
 
 let widen_imm (x : derived imm# box) = (x :> base imm# box);;
 [%%expect{|
-val widen_imm : derived imm -> base imm = <fun>
+Line 1, characters 39-59:
+1 | let widen_imm (x : derived imm# box) = (x :> base imm# box);;
+                                           ^^^^^^^^^^^^^^^^^^^^
+Error: Type "derived imm# box" = "derived imm" is not a subtype of
+         "base imm# box" = "base imm"
+       The second object type has no method "n"
 |}]
 
 (* An annotation reduces [imm# box] to [imm], recovering its variance *)
