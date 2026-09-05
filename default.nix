@@ -182,12 +182,20 @@ let
       merlinSrc = "${src}/external/merlin";
 
       packages = rec {
+        # The vendored csexp (external/csexp), which is used by Merlin.
+        merlin-csexp = buildDunePackage {
+          pname = "csexp";
+          version = "dev";
+          src = "${src}/external/csexp";
+          duneVersion = "3";
+        };
+
         merlin-lib = buildDunePackage {
           pname = "merlin-lib";
           version = "dev";
           src = merlinSrc;
           duneVersion = "3";
-          propagatedBuildInputs = [ ocamlPackages.csexp ];
+          propagatedBuildInputs = [ merlin-csexp ];
           checkInputs = [ ocamlPackages.alcotest ];
           doCheck = true;
         };
@@ -242,10 +250,8 @@ let
           passthru = {
             devBuildInputs = [
               ocamlPackages.alcotest
-              ocamlPackages.csexp
               ocamlPackages.menhirLib
               ocamlPackages.menhirSdk
-              ocamlPackages.yojson
             ];
             devNativeBuildInputs = [
               ocamlPackages.menhir
