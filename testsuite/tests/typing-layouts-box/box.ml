@@ -1546,6 +1546,16 @@ end
 module M : sig val unbox : #(int * string) -> int * string end
 |}]
 
+(* Modes under [box] in signature inclusion *)
+module M : sig
+  val f : (string -> unit) box
+end = struct
+  let f : (local_ string -> unit) box = Obj.magic ()
+end
+[%%expect{|
+module M : sig val f : (string -> unit) box end
+|}]
+
 (* Test 43: Type equality checks with [box] *)
 
 (* trivial *)
@@ -1593,4 +1603,43 @@ Lines 10-12, characters 11-4:
 12 | end)
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
+|}]
+
+(* Test 45: [box] of a mutable type's unboxed version. See oxcaml/oxcaml#7137 *)
+
+type 'a t = { mutable a : 'a }
+type +'a bad = 'a t# box;;
+[%%expect{|
+type 'a t = { mutable a : 'a; }
+type 'a bad = 'a t
+|}]
+
+type base = < m : int >
+type derived = < m : int; n : int >
+let leak (x : derived t# box) = (x :> base t# box);;
+[%%expect{|
+type base = < m : int >
+type derived = < m : int; n : int >
+val leak : derived t -> base t = <fun>
+|}]
+
+(* Test 46: [box] of an immutable type's unboxed version *)
+
+type 'a imm = { a : 'a }
+type +'a imm_box = 'a imm# box;;
+[%%expect{|
+type 'a imm = { a : 'a; }
+type 'a imm_box = 'a imm
+|}]
+
+let widen_imm (x : derived imm# box) = (x :> base imm# box);;
+[%%expect{|
+val widen_imm : derived imm -> base imm = <fun>
+|}]
+
+(* An annotation reduces [imm# box] to [imm], recovering its variance *)
+let widen_imm_reduced (x : derived imm# box) : base imm# box =
+  ((x : derived imm) :> base imm);;
+[%%expect{|
+val widen_imm_reduced : derived imm -> base imm = <fun>
 |}]
