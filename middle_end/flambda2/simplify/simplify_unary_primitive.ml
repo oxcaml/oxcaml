@@ -324,6 +324,65 @@ module Unary_int_arith_naked_int32 = Unary_int_arith (A.For_int32s)
 module Unary_int_arith_naked_int64 = Unary_int_arith (A.For_int64s)
 module Unary_int_arith_naked_nativeint = Unary_int_arith (A.For_nativeints)
 
+module Unary_bit_counting (I : A.Int_number_kind) = struct
+  let simplify (op : P.unary_int_bit_counting_op) dacc ~original_term ~arg:_
+      ~arg_ty ~result_var =
+    match I.unboxed_prover (DA.typing_env dacc) arg_ty with
+    | Known_result ints ->
+      assert (not (I.Num.Set.is_empty ints));
+      let f =
+        match op with
+        | Leading_zeros -> I.Num.leading_zeros
+        | Trailing_zeros -> I.Num.trailing_zeros
+        | Popcount -> I.Num.popcount
+      in
+      let ty =
+        (* Bit-counting primitives return naked immediates, except small
+           integers that return at their own kind. *)
+        match I.standard_int_kind with
+        | Tagged_immediate | Naked_immediate | Naked_int32 | Naked_int64
+        | Naked_nativeint ->
+          let machine_width = DE.machine_width (DA.denv dacc) in
+          let possible_results =
+            I.Num.Set.fold
+              (fun int acc ->
+                Target_ocaml_int.Set.add
+                  (Target_ocaml_int.of_int machine_width (f int))
+                  acc)
+              ints Target_ocaml_int.Set.empty
+          in
+          T.these_naked_immediates possible_results
+        | Naked_int8 ->
+          let module Int8 = Numeric_types.Int8 in
+          I.Num.Set.fold
+            (fun int acc -> Int8.Set.add (Int8.of_int (f int)) acc)
+            ints Int8.Set.empty
+          |> T.these_naked_int8s
+        | Naked_int16 ->
+          let module Int16 = Numeric_types.Int16 in
+          I.Num.Set.fold
+            (fun int acc -> Int16.Set.add (Int16.of_int (f int)) acc)
+            ints Int16.Set.empty
+          |> T.these_naked_int16s
+      in
+      let dacc = DA.add_variable dacc result_var ty in
+      SPR.create original_term ~try_reify:true dacc
+    | Need_meet ->
+      let kind = Named.kind original_term in
+      SPR.create_unknown dacc ~result_var kind ~original_term
+    | Invalid -> SPR.create_invalid dacc
+end
+
+module Unary_bit_counting_tagged_immediate =
+  Unary_bit_counting (A.For_tagged_immediates)
+module Unary_bit_counting_naked_immediate =
+  Unary_bit_counting (A.For_naked_immediates)
+module Unary_bit_counting_naked_int8 = Unary_bit_counting (A.For_int8s)
+module Unary_bit_counting_naked_int16 = Unary_bit_counting (A.For_int16s)
+module Unary_bit_counting_naked_int32 = Unary_bit_counting (A.For_int32s)
+module Unary_bit_counting_naked_int64 = Unary_bit_counting (A.For_int64s)
+module Unary_bit_counting_naked_nativeint = Unary_bit_counting (A.For_nativeints)
+
 module Make_simplify_int_conv (N : A.Number_kind) = struct
   let simplify ~(dst : K.Standard_int_or_float.t) dacc ~original_term ~arg
       ~arg_ty ~result_var =
@@ -1039,6 +1098,15 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
       | Naked_int32 -> Unary_int_arith_naked_int32.simplify op
       | Naked_int64 -> Unary_int_arith_naked_int64.simplify op
       | Naked_nativeint -> Unary_int_arith_naked_nativeint.simplify op)
+    | Int_bit_counting (kind, op) -> (
+      match kind with
+      | Tagged_immediate -> Unary_bit_counting_tagged_immediate.simplify op
+      | Naked_immediate -> Unary_bit_counting_naked_immediate.simplify op
+      | Naked_int8 -> Unary_bit_counting_naked_int8.simplify op
+      | Naked_int16 -> Unary_bit_counting_naked_int16.simplify op
+      | Naked_int32 -> Unary_bit_counting_naked_int32.simplify op
+      | Naked_int64 -> Unary_bit_counting_naked_int64.simplify op
+      | Naked_nativeint -> Unary_bit_counting_naked_nativeint.simplify op)
     | Float_arith (Float64, op) -> simplify_float_arith_op op
     | Float_arith (Float32, op) -> simplify_float32_arith_op op
     | Num_conv { src; dst } -> (
