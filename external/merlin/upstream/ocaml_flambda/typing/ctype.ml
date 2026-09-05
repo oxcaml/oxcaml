@@ -1767,6 +1767,13 @@ let instance_parameterized_type ?keep_names sch_args sch =
     (ty_args, ty)
   )
 
+let instance_parameterized_types sch_args schs =
+  For_copy.with_scope (fun copy_scope ->
+    let ty_args = List.map (fun t -> copy copy_scope t) sch_args in
+    let tys = List.map (fun t -> copy copy_scope t) schs in
+    (ty_args, tys)
+  )
+
 let instance_parameterized_kind args jkind =
   For_copy.with_scope (fun copy_scope ->
     let ty_args = List.map (fun t -> copy copy_scope t) args in
@@ -2349,6 +2356,52 @@ let apply ?(use_current_level = false) env params body args =
     subst env level Public (ref Mnil) None params args body
   with
     Cannot_subst -> raise Cannot_apply
+
+let rec params_are_distinct_generic_tvars seen = function
+  | [] -> true
+  | param :: rest ->
+    is_Tvar param
+    && get_level param = generic_level
+    && not (List.exists (eq_type param) seen)
+    && params_are_distinct_generic_tvars (param :: seen) rest
+
+(* Some of the logic below comes from inlining [subst] (as called by [apply])
+   and specializing it to applying a single [params -> args] substitution to a
+   list of [bodies] in one pass: the abbreviation and level bookkeeping, the
+   instancing of the parameters and bodies, and the unification of the
+   instanced parameters against the arguments. On top of that, when the
+   parameters are distinct generic type variables, unification cannot fail, so
+   the fast path skips it and redirects each parameter directly to its
+   argument during copying. *)
+let apply_list env params bodies args =
+  match bodies with
+  | [] -> []
+  | _ :: _ ->
+    if List.length params <> List.length args then raise Cannot_apply;
+    simple_abbrevs := Mnil;
+    with_level ~level:generic_level begin fun () ->
+      abbreviations := ref Mnil;
+      if params_are_distinct_generic_tvars [] params then begin
+        let bodies' =
+          For_copy.with_scope (fun copy_scope ->
+            List.iter2
+              (fun param arg ->
+                For_copy.redirect_desc copy_scope param (Tsubst (arg, None)))
+              params args;
+            List.map (copy copy_scope) bodies)
+        in
+        abbreviations := ref Mnil;
+        bodies'
+      end else begin
+        let (params', bodies') = instance_parameterized_types params bodies in
+        abbreviations := ref Mnil;
+        let uenv = Expression {env; in_subst = true} in
+        try
+          List.iter2 (!unify_var' uenv) params' args;
+          bodies'
+        with Unify _ -> raise Cannot_apply
+      end
+    end
 
                               (****************************)
                               (*  Abbreviation expansion  *)
