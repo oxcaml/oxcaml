@@ -282,6 +282,9 @@ void caml_stop_all_domains(void);
    caml_init_domains(). Returns whether all resources could be released. */
 bool caml_free_domains(void);
 
+/* Called at Caml exit if caml_verb_gc has STATS set */
+void caml_domain_report_stats(void);
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_DOMAIN_H */

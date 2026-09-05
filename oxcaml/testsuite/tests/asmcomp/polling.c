@@ -15,6 +15,12 @@ CAMLprim value request_minor_gc(value v) {
     good.
   */
   Caml_state->young_limit = (uintnat)Caml_state->young_end;
+#ifdef FAULTING_POLLS
+  /* Faulting polls do not test young_limit; arm the poll
+     trigger as interrupt_domain_local would. */
+  atomic_store_relaxed(&Caml_state->poll_trigger,
+                       (uintnat)caml_poll_trigger_page);
+#endif
 
   return Val_unit;
 }
