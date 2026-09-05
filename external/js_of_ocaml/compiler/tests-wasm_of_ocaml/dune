@@ -45,3 +45,6 @@
  (wasm_of_ocaml
   (compilation_mode whole_program)
   (flags :standard)))
+
+(cram
+ (deps %{bin:wasm_of_ocaml}))

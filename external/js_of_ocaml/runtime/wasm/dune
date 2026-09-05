@@ -29,6 +29,27 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=jspi
+   --disable=portable-int
+   --disable=wasi
+   --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
+   %{target}
+   c:c-impl.wasm
+   %{read-lines:args})))
+
+(rule
+ (target runtime-jspi-portable-int.wasm)
+ (deps
+  binaryen-version-check
+  args
+  c-impl.wasm
+  (glob_files *.wat))
+ (action
+  (run
+   ../../compiler/bin-wasm_of_ocaml/wasmoo_link_wasm.exe
+   --binaryen=-g
+   --binaryen-opt=-O3
+   --set=effects=jspi
+   --enable=portable-int
    --disable=wasi
    --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
    %{target}
@@ -48,6 +69,7 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=cps
+   --disable=portable-int
    --disable=wasi
    --allowed-imports=bindings,Math,js,wasm:js-string,wasm:text-encoder,wasm:text-decoder
    %{target}
@@ -66,6 +88,7 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=disabled
+   --disable=portable-int
    --enable=wasi
    --allowed-imports=wasi_snapshot_preview1,OCaml
    %{target}
@@ -84,6 +107,7 @@
    --binaryen=-g
    --binaryen-opt=-O3
    --set=effects=cps
+   --disable=portable-int
    --enable=wasi
    %{target}
    libc:libc.wasm

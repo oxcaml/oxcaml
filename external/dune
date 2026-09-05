@@ -1,4 +1,7 @@
 (env
  (_ (flags (:standard -no-principal -w -69-70))))
 
-(vendored_dirs gc-timings js_of_ocaml memtrace ocaml-jit owee ppxlib ppxlib_jane sedlex)
+(vendored_dirs gc-timings memtrace ocaml-jit owee ppxlib ppxlib_jane sedlex)
+
+; js_of_ocaml is built with its own Dune root via make jsoo-build.
+(data_only_dirs js_of_ocaml)
