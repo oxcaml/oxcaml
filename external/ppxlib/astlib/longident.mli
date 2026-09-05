@@ -1,7 +1,8 @@
 (** Long identifiers, used in parsetrees. *)
 
 (** The long identifier type *)
-type t = Ocaml_common.Longident.t =
+type t =
+  (*IF_NOT_AT_LEAST 504 Ocaml_common.Longident.t = *)
   | Lident of string
   | Ldot of t * string
   | Lapply of t * t
