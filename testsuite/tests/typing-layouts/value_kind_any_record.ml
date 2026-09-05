@@ -11,35 +11,59 @@ type ('a : any) t = { x : 'a; y : int; }
 
 let ints (r : int t) = r
 [%%expect{|
-(let (ints = (function {nlocal = 0} r r))
+(let
+  (ints =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       : (consts ()) (non_consts ([0: value<int>, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "ints" ints))
 val ints : int t -> int t = <fun>
 |}]
 
 let floats (r : float t) = r
 [%%expect{|
-(let (floats = (function {nlocal = 0} r r))
+(let
+  (floats =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: value<float>, value<int>]))>]
+       : (consts ()) (non_consts ([0: value<float>, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "floats" floats))
 val floats : float t -> float t = <fun>
 |}]
 
 let unboxed_floats (r : float# t) = r
 [%%expect{|
-(let (unboxed_floats = (function {nlocal = 0} r r))
+(let
+  (unboxed_floats =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: float64, value<int>]))>]
+       : (consts ()) (non_consts ([0: float64, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "unboxed_floats" unboxed_floats))
 val unboxed_floats : float# t -> float# t = <fun>
 |}]
 
 let products (r : #(int * float#) t) = r
 [%%expect{|
-(let (products = (function {nlocal = 0} r r))
+(let
+  (products =
+     (function {nlocal = 0}
+       r[value<
+          (consts ())
+           (non_consts ([0: product value<int>, float64, value<int>]))>]
+       : (consts ())
+          (non_consts ([0: product value<int>, float64, value<int>]))
+       r))
   (apply (field_imm 1 (global Toploop!)) "products" products))
 val products : #(int * float#) t -> #(int * float#) t = <fun>
 |}]
 
 let voids (r : unit# t) = r
 [%%expect{|
-(let (voids = (function {nlocal = 0} r r))
+(let
+  (voids =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: product , value<int>]))>]
+       : (consts ()) (non_consts ([0: product , value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "voids" voids))
 val voids : unit# t -> unit# t = <fun>
 |}]
@@ -60,14 +84,22 @@ type ('a : any) single = { field : 'a; }
 (* Refining [any] to [float] does not produce a flat float record. *)
 let boxed_floats (r : float single) = r
 [%%expect{|
-(let (boxed_floats = (function {nlocal = 0} r r))
+(let
+  (boxed_floats =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: value<float>]))>]
+       : (consts ()) (non_consts ([0: value<float>])) r))
   (apply (field_imm 1 (global Toploop!)) "boxed_floats" boxed_floats))
 val boxed_floats : float single -> float single = <fun>
 |}]
 
 let all_void (r : unit# single) = r
 [%%expect{|
-(let (all_void = (function {nlocal = 0} r r))
+(let
+  (all_void =
+     (function {nlocal = 0}
+       r[value<(consts ()) (non_consts ([0: product ]))>]
+       : (consts ()) (non_consts ([0: product ])) r))
   (apply (field_imm 1 (global Toploop!)) "all_void" all_void))
 val all_void : unit# single -> unit# single = <fun>
 |}]
