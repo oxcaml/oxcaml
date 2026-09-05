@@ -153,7 +153,7 @@ type constant =
   | Int of Targetint.t
   | Int32 of Int32.t  (** Only produced when compiling to WebAssembly. *)
   | Int64 of Int64.t
-  | NativeInt of Int32.t  (** Only produced when compiling to WebAssembly. *)
+  | NativeInt of Targetnativeint.t
   | Tuple of int * constant array * array_or_not
   | Null_
 
@@ -188,11 +188,26 @@ type field_type =
   | Non_float
   | Float
 
+type yielding_kind =
+  | Unyielding
+  | May_yield
+  | Unknown
+
 type expr =
   | Apply of
       { f : Var.t
       ; args : Var.t list
       ; exact : bool (* if true, then # of arguments = # of parameters *)
+      ; yielding : yielding_kind
+        (* if [Unyielding], the OCaml compiler has proven that this call cannot
+           perform an effect that would capture the current continuation
+           (see [Instruct.Event_unyielding_call]). It is thus safe to call
+           the direct-style version of the function even in CPS context.
+           [May_yield] is always a sound default. The flag applies only to this
+           call; it says nothing about the call's result (which may be a
+           closure that yields when later applied).
+           [Unknown] is used for calls emitted by passes that run after
+           [Partial_cps_analysis], which fails if it encounters [Unknown]. *)
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type

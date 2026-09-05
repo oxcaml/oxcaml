@@ -23,6 +23,7 @@ type constant_global
 type context =
   { constants : Wasm_ast.expression Code.Var.Hashtbl.t
   ; mutable data_segments : string Code.Var.Map.t
+  ; string_globals : Code.Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Code.Var.Map.t
   ; mutable other_fields : Wasm_ast.module_field list
   ; mutable imports : (Code.Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
@@ -38,6 +39,7 @@ type context =
   ; mutable dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable cps_dummy_funs : Code.Var.t Stdlib.IntMap.t
   ; mutable init_code : Wasm_ast.instruction list
+        (** Initialization code, stored in reverse execution order *)
   ; mutable fragments : Javascript.expression StringMap.t
   ; mutable globalized_variables : Code.Var.Set.t
   ; value_type : Wasm_ast.value_type
@@ -103,6 +105,66 @@ module Arith : sig
   val uge : expression -> expression -> expression
 
   val eqz : expression -> expression
+end
+
+module Arith64 : sig
+  val const : int64 -> expression
+
+  val ( + ) : expression -> expression -> expression
+
+  val ( - ) : expression -> expression -> expression
+
+  val ( * ) : expression -> expression -> expression
+
+  val ( / ) : expression -> expression -> expression
+
+  val ( mod ) : expression -> expression -> expression
+
+  val ( lsl ) : expression -> expression -> expression
+
+  val ( lsr ) : expression -> expression -> expression
+
+  val ( asr ) : expression -> expression -> expression
+
+  val ( land ) : expression -> expression -> expression
+
+  val ( lor ) : expression -> expression -> expression
+
+  val ( lxor ) : expression -> expression -> expression
+
+  val ( < ) : expression -> expression -> expression
+
+  val ( <= ) : expression -> expression -> expression
+
+  val ( = ) : expression -> expression -> expression
+
+  val ( <> ) : expression -> expression -> expression
+
+  val ult : expression -> expression -> expression
+
+  val uge : expression -> expression -> expression
+
+  val eqz : expression -> expression
+
+  val lt_i32 : expression -> expression -> expression
+
+  val le_i32 : expression -> expression -> expression
+
+  val eq_i32 : expression -> expression -> expression
+
+  val ne_i32 : expression -> expression -> expression
+
+  val eqz_i32 : expression -> expression
+
+  val ult_i32 : expression -> expression -> expression
+
+  val uge_i32 : expression -> expression -> expression
+
+  val to_i32 : expression -> expression
+
+  val of_i32_s : expression -> expression
+
+  val of_i32_u : expression -> expression
 end
 
 val cast : ?nullable:bool -> Wasm_ast.heap_type -> expression -> expression
@@ -173,7 +235,13 @@ val register_global :
 
 val get_global : Code.Var.t -> Wasm_ast.expression option t
 
+val global_is_constant : Code.Var.t -> bool t
+
 val register_data_segment : Code.Var.t -> string -> unit t
+
+val lookup_string_global : string -> Code.Var.t option t
+
+val register_string_global : string -> Code.Var.t -> unit t
 
 val register_init_code : unit t -> unit t
 

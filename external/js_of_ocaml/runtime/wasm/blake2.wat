@@ -16,21 +16,45 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+   (@if $portable-int
+   (@then
+      (import "portableint" "int_val_32_exn"
+         (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
+   ))
 (@if (>= $ocaml_version (5 2 0))
 (@then
-   (import "blake2" "blake2_memory" (memory 1))
-   (import "blake2" "blake2_state_buf" (func $state_buf (result i32)))
-   (import "blake2" "blake2_key_buf"   (func $key_buf   (result i32)))
-   (import "blake2" "blake2_out_buf"   (func $out_buf   (result i32)))
-   (import "blake2" "blake2_chunk_buf" (func $chunk_buf (result i32)))
-   (import "blake2" "blake2_chunk_buf_size"
-      (func $chunk_buf_size (result i32)))
-   (import "blake2" "blake2_init"
-      (func $blake2_init (param i32 i32)))
-   (import "blake2" "blake2_update"
-      (func $blake2_update (param i32)))
-   (import "blake2" "blake2_finalize"
-      (func $blake2_finalize (param i32)))
+   ;; The buffers and algorithm primitives come from the single C module that
+   ;; owns the linear memory: c-impl.wasm ("c") for the non-wasi runtime, the
+   ;; combined libc.wasm ("libc") for wasi.
+   (@if $wasi
+   (@then
+      (import "libc" "memory" (memory $memory 1))
+      (import "libc" "blake2_state_buf" (func $state_buf (result i32)))
+      (import "libc" "blake2_key_buf"   (func $key_buf   (result i32)))
+      (import "libc" "blake2_out_buf"   (func $out_buf   (result i32)))
+      (import "libc" "blake2_chunk_buf" (func $chunk_buf (result i32)))
+      (import "libc" "blake2_chunk_buf_size"
+         (func $chunk_buf_size (result i32)))
+      (import "libc" "blake2_init"
+         (func $blake2_init (param i32 i32)))
+      (import "libc" "blake2_update"
+         (func $blake2_update (param i32)))
+      (import "libc" "blake2_finalize"
+         (func $blake2_finalize (param i32))))
+   (@else
+      (import "c" "memory" (memory $memory 1))
+      (import "c" "blake2_state_buf" (func $state_buf (result i32)))
+      (import "c" "blake2_key_buf"   (func $key_buf   (result i32)))
+      (import "c" "blake2_out_buf"   (func $out_buf   (result i32)))
+      (import "c" "blake2_chunk_buf" (func $chunk_buf (result i32)))
+      (import "c" "blake2_chunk_buf_size"
+         (func $chunk_buf_size (result i32)))
+      (import "c" "blake2_init"
+         (func $blake2_init (param i32 i32)))
+      (import "c" "blake2_update"
+         (func $blake2_update (param i32)))
+      (import "c" "blake2_finalize"
+         (func $blake2_finalize (param i32)))))
 
    (type $bytes (array (mut i8)))
 
@@ -49,7 +73,7 @@
       (block $done
          (loop $cont
             (br_if $done (i32.eq (local.get $i) (local.get $len)))
-            (i32.store8
+            (i32.store8 $memory
                (i32.add (local.get $dst) (local.get $i))
                (array.get_u $bytes (local.get $src)
                   (i32.add (local.get $src_ofs) (local.get $i))))
@@ -66,7 +90,7 @@
             (br_if $done (i32.eq (local.get $i) (local.get $len)))
             (array.set $bytes (local.get $dst)
                (i32.add (local.get $dst_ofs) (local.get $i))
-               (i32.load8_u
+               (i32.load8_u $memory
                   (i32.add (local.get $src) (local.get $i))))
             (local.set $i (i32.add (local.get $i) (i32.const 1)))
             (br $cont))))
@@ -134,10 +158,21 @@
          (local.get $hashlen))
       (local.get $output))
 
+   (@string $blake2_create "Digest.BLAKE2.create")
+   (@string $blake2_update "Digest.BLAKE2.update")
+   (@string $blake2_final "Digest.BLAKE2.final")
+   (@string $blake2_string "Digest.BLAKE2.string")
+
    (func (export "caml_blake2_create")
       (param $hashlen (ref eq)) (param $key (ref eq)) (result (ref eq))
       (call $do_create
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $hashlen)
+               (global.get $blake2_create)))
+         (@else
          (i31.get_u (ref.cast (ref i31) (local.get $hashlen)))
+         ))
          (ref.cast (ref $bytes) (local.get $key))))
 
    (func (export "caml_blake2_update")
@@ -146,23 +181,48 @@
       (call $do_update
          (ref.cast (ref $bytes) (local.get $ctx))
          (ref.cast (ref $bytes) (local.get $buf))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $ofs) (global.get $blake2_update)))
+         (@else
          (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
+         ))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $len) (global.get $blake2_update)))
+         (@else
          (i31.get_u (ref.cast (ref i31) (local.get $len))))
+         ))
       (ref.i31 (i32.const 0)))
 
    (func (export "caml_blake2_final")
       (param $ctx (ref eq)) (param $hashlen (ref eq)) (result (ref eq))
+      (@if $portable-int
+      (@then
+         (call $do_final
+            (ref.cast (ref $bytes) (local.get $ctx))
+            (call $int_val_32_exn (local.get $hashlen)
+               (global.get $blake2_final))))
+      (@else
       (call $do_final
          (ref.cast (ref $bytes) (local.get $ctx))
          (i31.get_u (ref.cast (ref i31) (local.get $hashlen)))))
+      ))
 
    (func (export "caml_blake2_string") (export "caml_blake2_bytes")
       (param $hashlen (ref eq)) (param $key (ref eq)) (param $buf (ref eq))
       (param $ofs (ref eq)) (param $len (ref eq)) (result (ref eq))
       (local $state (ref $bytes))
       (local $hl i32)
+      (@if $portable-int
+      (@then
+         (local.set $hl
+            (call $int_val_32_exn (local.get $hashlen)
+               (global.get $blake2_string))))
+      (@else
       (local.set $hl
          (i31.get_u (ref.cast (ref i31) (local.get $hashlen))))
+      ))
       (local.set $state
          (call $do_create
             (local.get $hl)
@@ -170,8 +230,18 @@
       (call $do_update
          (local.get $state)
          (ref.cast (ref $bytes) (local.get $buf))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $ofs) (global.get $blake2_string)))
+         (@else
          (i31.get_u (ref.cast (ref i31) (local.get $ofs)))
+         ))
+         (@if $portable-int
+         (@then
+            (call $int_val_32_exn (local.get $len) (global.get $blake2_string)))
+         (@else
          (i31.get_u (ref.cast (ref i31) (local.get $len))))
+         ))
       (call $do_final (local.get $state) (local.get $hl)))
 ))
 )

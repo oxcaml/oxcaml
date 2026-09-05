@@ -197,11 +197,16 @@ module Fragment = struct
     ; deprecated : string option
     }
 
+  let oxcaml = true [@@if oxcaml]
+
+  let oxcaml = false [@@if not oxcaml]
+
   let allowed_flags =
     List.fold_left
       ~f:(fun m (k, v) -> StringMap.add k v m)
       ~init:StringMap.empty
       [ "js-string", Config.Flag.use_js_string
+      ; ("oxcaml", fun () -> oxcaml)
       ; ( "effects"
         , fun () ->
             match Config.effects () with
@@ -217,6 +222,7 @@ module Fragment = struct
             match Config.target () with
             | `JavaScript -> false
             | `Wasm -> true )
+      ; "portable-int", Config.Flag.portable_int
       ]
 
   type t =

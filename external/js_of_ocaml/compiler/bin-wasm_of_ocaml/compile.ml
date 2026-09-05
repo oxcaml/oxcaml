@@ -30,16 +30,19 @@ let debug_wat = Debug.find "wat"
 
 let () = Sys.catch_break true
 
-let update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content sourcemap_file =
-  if Option.is_some sourcemap_root || not sourcemap_don't_inline_content
-  then (
-    let open Source_map in
+let update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content ~wasm_file sourcemap_file =
+  (let open Source_map in
     let source_map =
       match Source_map.of_file sourcemap_file with
       | Index _ -> assert false
       | Standard sm -> sm
     in
     assert (List.is_empty (Option.value source_map.sources_content ~default:[]));
+    let source_map =
+      Wasm_source_map.add_function_start_mappings
+        ~function_offsets:(Link.Wasm_binary.function_start_offsets ~file:wasm_file)
+        source_map
+    in
     (* Add source file contents to source map *)
     let sources_content =
       if sourcemap_don't_inline_content
@@ -89,6 +92,7 @@ let preprocessor_variables () =
            | `Double_translation -> assert false)
         |> Build_info.string_of_effects_backend) )
   ; "wasi", Wat_preprocess.Bool (Config.Flag.wasi ())
+  ; "portable-int", Wat_preprocess.Bool (Config.Flag.portable_int ())
   ]
 
 let with_runtime_files ~runtime_wasm_files f =
@@ -124,10 +128,9 @@ let build_runtime ~runtime_file =
             ; file = module_name ^ ".wat"
             ; source = Contents contents
             })
-          ((if Config.Flag.wasi ()
-            then ("libc", Runtime_files.wasi_libc) :: Runtime_files.wat_files
-            else Runtime_files.wat_files)
-          @ Runtime_files.wasm_files)
+          (if Config.Flag.wasi ()
+           then ("libc", Runtime_files.wasi_libc) :: Runtime_files.wat_files
+           else Runtime_files.wat_files @ Runtime_files.wasm_files)
       in
       Runtime.build
         ~link_options:[ "-g" ]
@@ -203,7 +206,11 @@ let link_and_optimize
       ();
     if binaryen_times () then Format.eprintf "  binaryen opt: %a@." Timer.print t;
     Option.iter
-      ~f:(update_sourcemap ~sourcemap_root ~sourcemap_don't_inline_content)
+      ~f:
+        (update_sourcemap
+           ~sourcemap_root
+           ~sourcemap_don't_inline_content
+           ~wasm_file:output_file)
       opt_sourcemap_file;
     primitives
   in
@@ -395,6 +402,7 @@ let run
     ; output_file
     ; enable_source_maps
     ; params
+    ; static_env
     ; include_dirs
     ; sourcemap_root
     ; sourcemap_don't_inline_content
@@ -407,8 +415,8 @@ let run
     ; export_file
     ; fs_files
     } =
-  Config.set_target `Wasm;
   Jsoo_cmdline.Arg.eval common;
+  Config.set_target `Wasm;
   Config.set_effects_backend effects;
   Jsoo_cmdline.Build_config.process
     `Wasm
@@ -434,6 +442,7 @@ let run
   let output_file = fst output_file in
   if debug_mem () then Debug.start_profiling output_file;
   List.iter params ~f:(fun (s, v) -> Config.Param.set s v);
+  List.iter static_env ~f:(fun (s, v) -> Eval.set_static_env s v);
   let t = Timer.make () in
   let include_dirs =
     List.filter_map (include_dirs @ [ "+stdlib/" ]) ~f:(fun d -> Findlib.find [] d)
@@ -571,6 +580,7 @@ let run
        in
        let ch = open_in_bin input_file in
        let res = Parse_bytecode.from_channel ch in
+       Gc.compact ();
        let include_dirs = Filename.dirname input_file :: include_dirs in
        res, ch, (fun () -> close_in ch), include_dirs
      in
@@ -585,6 +595,7 @@ let run
            cmo
            ic
        in
+       Gc.compact ();
        let cmi_files =
          if include_cmis
          then
@@ -631,6 +642,17 @@ let run
            ~input_file
            ~output_file:tmp_wasm_file
            ();
+         Option.iter opt_tmp_map_file ~f:(fun map_file ->
+             match Source_map.of_file map_file with
+             | Index _ -> ()
+             | Standard sm ->
+                 let sm =
+                   Wasm_source_map.add_function_start_mappings
+                     ~function_offsets:
+                       (Link.Wasm_binary.function_start_offsets ~file:tmp_wasm_file)
+                     sm
+                 in
+                 Source_map.to_file ~rewrite_paths:false (Standard sm) map_file);
          { Link.unit_name; unit_info; fragments }, shapes
        in
        cont unit_data unit_name tmp_wasm_file opt_tmp_map_file shapes cmi_files
@@ -649,6 +671,7 @@ let run
              ~debug:need_debug
              ic
          in
+         Gc.compact ();
          if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
          let embedded_files =
            let cmi_files =

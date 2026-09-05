@@ -40,6 +40,7 @@ type constant_global =
 type context =
   { constants : W.expression Var.Hashtbl.t
   ; mutable data_segments : string Var.Map.t
+  ; string_globals : Var.t String.Hashtbl.t
   ; mutable constant_globals : constant_global Var.Map.t
   ; mutable other_fields : W.module_field list
   ; mutable imports : (Var.t * Wasm_ast.import_desc) StringMap.t StringMap.t
@@ -65,6 +66,7 @@ type context =
 let make_context ~value_type =
   { constants = Var.Hashtbl.create 128
   ; data_segments = Var.Map.empty
+  ; string_globals = String.Hashtbl.create 128
   ; constant_globals = Var.Map.empty
   ; other_fields = []
   ; imports = StringMap.empty
@@ -120,6 +122,12 @@ let expression_list f l =
 
 let register_data_segment x v st =
   st.context.data_segments <- Var.Map.add x v st.context.data_segments;
+  (), st
+
+let lookup_string_global s st = String.Hashtbl.find_opt st.context.string_globals s, st
+
+let register_string_global s x st =
+  String.Hashtbl.add st.context.string_globals s x;
   (), st
 
 let get_context st = st.context, st
@@ -425,6 +433,153 @@ module Arith = struct
     match n with
     | W.RefI31 (Const (I32 n)) -> return (W.Const (I32 (wrap31 n)))
     | _ -> return (W.I31Get (S, n))
+end
+
+module Arith64 = struct
+  let binary op e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 op, e, e'))
+
+  let const n = return (W.Const (I64 n))
+
+  let ( + ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return
+      (match e, e' with
+      | W.BinOp (I64 Add, e1, W.Const (I64 n)), W.Const (I64 n') ->
+          let n'' = Int64.add n n' in
+          if Int64.equal n'' 0L
+          then e1
+          else W.BinOp (I64 Add, e1, W.Const (I64 (Int64.add n n')))
+      | W.Const (I64 n), W.Const (I64 n') -> W.Const (I64 (Int64.add n n'))
+      | W.Const (I64 0L), _ -> e'
+      | _, W.Const (I64 0L) -> e
+      | W.Const _, _ -> W.BinOp (I64 Add, e', e)
+      | _ -> W.BinOp (I64 Add, e, e'))
+
+  let ( - ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return
+      (match e, e' with
+      | W.BinOp (I64 Add, e1, W.Const (I64 n)), W.Const (I64 n') ->
+          let n'' = Int64.sub n n' in
+          if Int64.equal n'' 0L then e1 else W.BinOp (I64 Add, e1, W.Const (I64 n''))
+      | W.Const (I64 n), W.Const (I64 n') -> W.Const (I64 (Int64.sub n n'))
+      | _, W.Const (I64 n) ->
+          if Int64.equal n 0L then e else W.BinOp (I64 Add, e, W.Const (I64 (Int64.neg n)))
+      | _ -> W.BinOp (I64 Sub, e, e'))
+
+  let ( * ) = binary Mul
+
+  let ( / ) = binary (Div S)
+
+  let ( mod ) = binary (Rem S)
+
+  let ( lsl ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return
+      (match e, e' with
+      | W.Const (I64 n), W.Const (I64 n') when Int64.(n' < 63L) ->
+          W.Const (I64 (Int64.shift_left n (Int64.to_int n')))
+      | _, W.Const (I64 0L) -> e
+      | _ -> W.BinOp (I64 Shl, e, e'))
+
+  let ( lsr ) = binary (Shr U)
+
+  let ( asr ) = binary (Shr S)
+
+  let ( land ) = binary And
+
+  let ( lor ) = binary Or
+
+  let ( lxor ) = binary Xor
+
+  (* Comparisons returning I64 (for OCaml int results) *)
+  let ( < ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 (Lt S), e, e')))
+
+  let ( <= ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 (Le S), e, e')))
+
+  let ( = ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 Eq, e, e')))
+
+  let ( <> ) e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 Ne, e, e')))
+
+  let ult e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 (Lt U), e, e')))
+
+  let uge e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.I64ExtendI32 (U, BinOp (I64 (Ge U), e, e')))
+
+  let eqz e =
+    let* e = e in
+    return (W.I64ExtendI32 (U, UnOp (I64 Eqz, e)))
+
+  (* Comparisons returning I32 (for Wasm control flow: Br_if, If) *)
+  let lt_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Lt S), e, e'))
+
+  let le_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Le S), e, e'))
+
+  let eq_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 Eq, e, e'))
+
+  let ne_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 Ne, e, e'))
+
+  let eqz_i32 e =
+    let* e = e in
+    return (W.UnOp (I64 Eqz, e))
+
+  let ult_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Lt U), e, e'))
+
+  let uge_i32 e e' =
+    let* e = e in
+    let* e' = e' in
+    return (W.BinOp (I64 (Ge U), e, e'))
+
+  (* Width conversions *)
+  let to_i32 e =
+    let* e = e in
+    return (W.I32WrapI64 e)
+
+  let of_i32_s e =
+    let* e = e in
+    return (W.I64ExtendI32 (S, e))
+
+  let of_i32_u e =
+    let* e = e in
+    return (W.I64ExtendI32 (U, e))
 end
 
 let is_small_constant e =
@@ -802,7 +957,10 @@ let need_dummy_fun ~cps ~arity st =
            x)
   , st )
 
-let init_code context = instrs context.init_code
+(* Initialization code is accumulated in reverse execution order.
+   Consumers must reverse the list so that fragments run in registration
+   order *)
+let init_code context = instrs (List.rev context.init_code)
 
 let function_body ~context ~param_names ~body =
   let st = { var_count = 0; vars = Var.Map.empty; instrs = []; context } in

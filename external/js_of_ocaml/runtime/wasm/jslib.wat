@@ -16,6 +16,11 @@
 ;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 (module
+   (@if $portable-int
+   (@then
+      (import "portableint" "bool_val"
+         (func $bool_val (param (ref eq)) (result i32)))
+   ))
    (type $bytes (array (mut i8)))
 
 (@if (not $wasi)
@@ -26,6 +31,7 @@
    (import "bindings" "identity" (func $to_int32 (param anyref) (result i32)))
    (import "bindings" "identity" (func $from_int32 (param i32) (result anyref)))
    (import "bindings" "from_bool" (func $from_bool (param i32) (result anyref)))
+   (import "bindings" "eval" (func $eval (param anyref) (result anyref)))
    (import "bindings" "get"
       (func $get (param (ref extern)) (param anyref) (result anyref)))
    (import "bindings" "set"
@@ -83,6 +89,11 @@
       (func $wrap_fun_arguments (param anyref) (result anyref)))
    (import "fail" "caml_failwith_tag"
       (func $caml_failwith_tag (result (ref eq))))
+   (@if $portable-int
+   (@then
+      (import "portableint" "int_val_32_exn"
+         (func $int_val_32_exn (param (ref eq)) (param (ref eq)) (result i32)))
+   ))
    (import "fail" "javascript_exception"
       (tag $javascript_exception (param externref)))
    (import "stdlib" "caml_named_value"
@@ -104,10 +115,18 @@
       (func $caml_copy_int32 (param i32) (result (ref eq))))
    (import "int32" "Int32_val"
       (func $Int32_val (param (ref eq)) (result i32)))
-   (import "int32" "caml_copy_nativeint"
+   (@if $portable-int
+   (@then
+      (import "nativeint" "caml_copy_nativeint"
+         (func $caml_copy_nativeint (param i64) (result (ref eq))))
+      (import "nativeint" "Nativeint_val"
+         (func $Nativeint_val (param (ref eq)) (result i64))))
+   (@else
+   (import "nativeint" "caml_copy_nativeint"
       (func $caml_copy_nativeint (param i32) (result (ref eq))))
-   (import "int32" "Nativeint_val"
+   (import "nativeint" "Nativeint_val"
       (func $Nativeint_val (param (ref eq)) (result i32)))
+   ))
 
    (type $block (array (mut (ref eq))))
    (type $float (struct (field $f f64)))
@@ -135,6 +154,18 @@
       (ref.i31 (call $strict_equals
                   (call $unwrap (local.get $v1)) (call $unwrap (local.get $v2)))))
 
+   (export "caml_pure_js_expr" (func $caml_js_expr))
+   (export "caml_js_var" (func $caml_js_expr))
+   (export "caml_js_eval_string" (func $caml_js_expr))
+   (func $caml_js_expr (export "caml_js_expr")
+      (param (ref eq)) (result (ref eq))
+      (local $s (ref $bytes))
+      (local.set $s (ref.cast (ref $bytes) (local.get 0)))
+      (return_call $wrap
+         (call $eval
+             (call $jsstring_of_bytes
+                (local.get $s)))))
+
    (func (export "caml_js_global") (param (ref eq)) (result (ref eq))
       (call $wrap (global.get $global_this)))
 
@@ -152,7 +183,11 @@
 
    (func (export "caml_js_from_bool") (param $v (ref eq)) (result (ref eq))
       (struct.new $js
+         (@if $portable-int
+         (@then (call $from_bool (call $bool_val (local.get $v))))
+         (@else
          (call $from_bool (i31.get_s (ref.cast (ref i31) (local.get $v))))))
+         ))
 
    (func (export "caml_js_to_int32") (param $v (ref eq)) (result (ref eq))
       (return_call $caml_copy_int32
@@ -162,11 +197,24 @@
       (return_call $wrap (call $from_int32 (call $Int32_val (local.get $v)))))
 
    (func (export "caml_js_to_nativeint") (param $v (ref eq)) (result (ref eq))
+      (@if $portable-int
+      (@then
+         (return_call $caml_copy_nativeint
+            (i64.extend_i32_s (call $to_int32 (call $unwrap (local.get $v))))))
+      (@else
       (return_call $caml_copy_nativeint
          (call $to_int32 (call $unwrap (local.get $v)))))
+      ))
 
    (func (export "caml_js_from_nativeint") (param $v (ref eq)) (result (ref eq))
+      (@if $portable-int
+      (@then
+         (return_call $wrap
+            (call $from_int32 (i32.wrap_i64 (call $Nativeint_val (local.get $v))))))
+      (@else
       (return_call $wrap (call $from_int32 (call $Nativeint_val (local.get $v)))))
+      ))
+
 
   (func (export "caml_js_pure_expr")
      (param $f (ref eq)) (result (ref eq))
@@ -388,8 +436,11 @@
    (func (export "caml_js_wrap_callback_strict")
       (param $n (ref eq)) (param $f (ref eq)) (result (ref eq))
       (return_call $wrap
+         ;; Callback arity, a small constant; always an [i31].
+         ;; lint-ignore-start manual-portability-handling-unsafe
          (call $wrap_callback_strict
             (i31.get_u (ref.cast (ref i31) (local.get $n))) (local.get $f))))
+         ;; lint-ignore-end manual-portability-handling-unsafe
 
    (func (export "caml_js_wrap_callback_unsafe")
       (param $f (ref eq)) (result (ref eq))
@@ -406,8 +457,11 @@
    (func (export "caml_js_wrap_meth_callback_strict")
       (param $n (ref eq)) (param $f (ref eq)) (result (ref eq))
       (return_call $wrap
+         ;; Callback arity, a small constant; always an [i31].
+         ;; lint-ignore-start manual-portability-handling-unsafe
          (call $wrap_meth_callback_strict
             (i31.get_u (ref.cast (ref i31) (local.get $n))) (local.get $f))))
+         ;; lint-ignore-end manual-portability-handling-unsafe
 
    (func (export "caml_js_wrap_meth_callback_unsafe")
       (param $f (ref eq)) (result (ref eq))
@@ -474,8 +528,20 @@
          (struct.new $js
             (call $jsstring_of_subbytes
                (ref.cast (ref $bytes) (local.get $s))
+               (@if $portable-int
+               (@then
+                  (call $int_val_32_exn (local.get $i)
+                     (global.get $jsstring_of_substring)))
+               (@else
                (i31.get_u (ref.cast (ref i31) (local.get $i)))
+               ))
+               (@if $portable-int
+               (@then
+                  (call $int_val_32_exn (local.get $l)
+                     (global.get $jsstring_of_substring)))
+               (@else
                (i31.get_u (ref.cast (ref i31) (local.get $l)))))))
+               ))
 
    (func $caml_jsbytes_of_bytes (export "caml_jsbytes_of_string")
       (param $vs (ref eq)) (result (ref eq))
@@ -635,6 +701,8 @@
                      (local.get $l)))
                (br $loop))))
       (local.get $l))
+
+   (@string $jsstring_of_substring "caml_jsstring_of_substring")
 
    (@string $jsError "jsError")
 
