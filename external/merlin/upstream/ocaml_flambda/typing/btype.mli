@@ -756,10 +756,6 @@ module Jkind0 : sig
 
     val for_boxed_record : label_declaration list -> jkind_l
 
-    val for_boxed_record_with_updates :
-      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
-      jkind_l
-
     (* Shared type-level implementation of Steps B1-B4 from
        Note [With-bounds for GADTs].  Callers choose the projection target via
        [projected_params]: declaration parameters for boxed GADTs, or the
