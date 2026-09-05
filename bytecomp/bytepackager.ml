@@ -247,7 +247,6 @@ let build_global_target ~ppf_dump oc ~packed_compilation_unit state members
 let package_object_files ~ppf_dump files target coercion =
   let targetfile = Unit_info.Artifact.filename target in
   let packed_compilation_unit = Unit_info.Artifact.modname target in
-  let packed_compilation_unit_name = CU.name packed_compilation_unit in
   let members =
     map_left_right (read_member_info ~packed_compilation_unit) files
   in
@@ -307,14 +306,17 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let pos_final = pos_out oc in
     let imports =
-      let unit_names = List.map (fun m -> CU.name m.pm_packed_name) members in
+      let unit_names = List.map (fun m -> m.pm_packed_name) members in
       List.filter
-        (fun import -> not (List.mem (Import_info.name import) unit_names))
+        (fun import ->
+          match Import_info.Intf.view import with
+          | Parameter _ -> true
+          | Normal (cu, _) | Alias cu -> not (List.mem cu unit_names))
         (Bytelink.extract_crc_interfaces())
     in
     let import_info_for_the_pack_itself =
-      let crc = Env.crc_of_unit packed_compilation_unit_name in
-      Import_info.create packed_compilation_unit_name
+      let crc = Env.crc_of_unit packed_compilation_unit in
+      Import_info.create packed_compilation_unit
         ~crc_with_unit:(Some (packed_compilation_unit, crc))
     in
     let format : Lambda.main_module_block_format =

@@ -21,7 +21,7 @@ let get_module_info comp_unit =
   let cmx_name = Compilation_unit.name comp_unit in
   (* Typing information for predefined exceptions should be populated directly
      by the callee. *)
-  if Compilation_unit.Name.equal cmx_name Compilation_unit.Name.predef_exn
+  if Compilation_unit.equal comp_unit Compilation_unit.predef_exn
   then
     Misc.fatal_error
       "get_global_info is not for use with predefined exception compilation \

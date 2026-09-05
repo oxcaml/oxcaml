@@ -83,7 +83,7 @@ let check_uniqueness_of_merged (type v) l1 l2 =
   | () -> Ok ()
   | exception Found_duplicate dup -> Error dup
 
-module Name : sig
+module Name_unprefixed : sig
   type t = private
     { head : string;
       args : argument list
@@ -190,6 +190,57 @@ end = struct
   let to_string = Fmt.asprintf "%a" print
 end
 
+module Name = struct
+  type t =
+    | With_prefix of string list * string
+    | Without_prefix of Name_unprefixed.t
+
+  let head = function
+    | With_prefix (_, name) -> name
+    | Without_prefix (name : Name_unprefixed.t) -> name.head
+
+  let to_name_exn = function
+    | With_prefix (prefix, name) ->
+      Misc.fatal_errorf "Unexpected pack prefix in %s"
+        (String.concat "." (prefix @ [name]))
+    | Without_prefix name -> name
+
+  let of_parameter_name param =
+    Without_prefix (Name_unprefixed.of_parameter_name param)
+
+  let doc_print ppf = function
+    | With_prefix (prefix, name) ->
+      Fmt.fprintf ppf "%s" (String.concat "." (prefix @ [name]))
+    | Without_prefix name -> Name_unprefixed.print ppf name
+
+  include Identifiable.Make (struct
+    type nonrec t = t
+
+    let compare t1 t2 =
+      match t1, t2 with
+      | With_prefix (prefix1, name1), With_prefix (prefix2, name2) ->
+        (match List.compare String.compare prefix1 prefix2 with
+         | 0 -> String.compare name1 name2
+         | c -> c)
+      | Without_prefix name1, Without_prefix name2 ->
+        Name_unprefixed.compare name1 name2
+      | With_prefix _, Without_prefix _ -> -1
+      | Without_prefix _, With_prefix _ -> 1
+
+    let equal t1 t2 = compare t1 t2 = 0
+
+    let print ppf t = Fmt.compat doc_print ppf t
+
+    let output = Misc.output_of_doc_print doc_print
+
+    let hash = Hashtbl.hash
+  end)
+
+  let print = doc_print
+
+  let to_string = Fmt.asprintf "%a" print
+end
+
 module T0 : sig
   type t = private
     { head : string;
@@ -214,6 +265,8 @@ module T0 : sig
     string -> argument list -> hidden_args:Parameter_name.t list -> t
 
   val to_name : t -> Name.t
+
+  val unprefixed_name : t -> Name_unprefixed.t
 
   val unsafe_create_unchecked :
     string -> argument list -> hidden_args:argument list -> t
@@ -312,14 +365,20 @@ end = struct
     { head; visible_args; hidden_args }
 
   (* CR-someday lmaurer: Should try and make this unnecessary or at least cheap.
-     Could do it by making [Name.t] an unboxed existential so that converting from
-     [t] is the identity. Or just have [Name.t] wrap [t] and ignore [hidden_args]. *)
-  let rec to_name { head; visible_args; hidden_args = _ } : Name.t =
+     Could do it by making [Name_unprefixed.t] an unboxed existential so that
+     converting from [t] is the identity. Or just have [Name_unprefixed.t]
+     wrap [t] and ignore [hidden_args]. *)
+  let rec unprefixed_name { head; visible_args; hidden_args = _ }
+      : Name_unprefixed.t =
     (* Safe because we already checked the names in this exact argument list *)
-    Name.unsafe_create_unchecked head (List.map arg_to_name visible_args)
+    Name_unprefixed.unsafe_create_unchecked head
+      (List.map arg_to_name visible_args)
 
-  and arg_to_name ({ param = name; value } : argument) : Name.argument =
-    { param = name; value = to_name value }
+  and arg_to_name ({ param = name; value } : argument)
+      : Name_unprefixed.argument =
+    { param = name; value = unprefixed_name value }
+
+  let to_name t = Name.Without_prefix (unprefixed_name t)
 end
 
 include T0

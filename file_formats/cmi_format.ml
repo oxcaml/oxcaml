@@ -23,9 +23,9 @@ type pers_flags =
 type kind =
   | Normal of {
       cmi_impl : Compilation_unit.t;
-      cmi_arg_for : Global_module.Parameter_name.t option;
+      cmi_arg_for : Compilation_unit.Intf.t option;
     }
-  | Parameter
+  | Parameter of Compilation_unit.Intf.t
 
 type error =
   | Not_an_interface of filepath
@@ -61,7 +61,6 @@ module Serialized = Types.Make_wrapped(struct type 'a t = int end)
 type crcs = Import_info.t array  (* smaller on disk than using a list *)
 type flags = pers_flags list
 type header = {
-    header_name : Compilation_unit.Name.t;
     header_kind : kind;
     header_globals : Global_module.With_precision.t array;
     header_sign : Serialized.signature * Mode.Staticity.Const.t;
@@ -69,7 +68,6 @@ type header = {
 }
 
 type 'sg cmi_infos_generic = {
-    cmi_name : Compilation_unit.Name.t;
     cmi_kind : kind;
     cmi_globals : Global_module.With_precision.t array;
     cmi_sign : 'sg * Mode.Staticity.Const.t;
@@ -167,7 +165,6 @@ let input_cmi_lazy ic =
   let data_len = Bytes.get_int64_ne (read_bytes 8) 0 |> Int64.to_int in
   let data = read_bytes data_len in
   let {
-      header_name = name;
       header_kind = kind;
       header_globals = globals;
       header_sign = (sign, staticity);
@@ -177,7 +174,6 @@ let input_cmi_lazy ic =
   let flags = (input_value ic : flags) in
   (* CR ocaml 5 compressed-marshal mshinwell: upstream uses [Compression] *)
   {
-      cmi_name = name;
       cmi_kind = kind;
       cmi_globals = globals;
       cmi_sign = (deserialize data sign, staticity);
@@ -237,7 +233,6 @@ let output_cmi filename oc cmi =
   Out_channel.seek oc val_pos;
   output_value oc
     {
-      header_name = cmi.cmi_name;
       header_kind = cmi.cmi_kind;
       header_globals = cmi.cmi_globals;
       header_sign = (sign, staticity);
@@ -247,10 +242,8 @@ let output_cmi filename oc cmi =
   let crc = Digest.file filename in
   let my_info =
     match cmi.cmi_kind with
-    | Normal { cmi_impl } ->
-      Import_info.Intf.create_normal cmi.cmi_name cmi_impl ~crc
-    | Parameter ->
-      Import_info.Intf.create_parameter cmi.cmi_name ~crc
+    | Normal { cmi_impl; _ } -> Import_info.Intf.create_normal cmi_impl ~crc
+    | Parameter intf -> Import_info.Intf.create_parameter intf ~crc
   in
   let crcs = Array.append [| my_info |] cmi.cmi_crcs in
   output_value oc (crcs : crcs);

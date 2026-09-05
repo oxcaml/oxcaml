@@ -1,0 +1,3 @@
+File "main.ml", line 1:
+Error: Wrong file naming: dep.cmi contains the compiled interface for
+       Pack.Dep when Dep was expected

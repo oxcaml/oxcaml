@@ -65,10 +65,14 @@ end) : S = struct
            Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
         let cmis = Array.of_list cmis in
         let cmxs = Array.of_list cmxs in
-        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
+        let cmi_key import : (Compilation_unit.t, Compilation_unit.Intf.t) Either.t =
+          match Import_info.Intf.view import with
+          | Normal (cu, _) | Alias cu -> Left cu
+          | Parameter (intf, _) -> Right intf
+        in
+        let cmi_index = Hashtbl.create 42 in
         Array.iteri
-          (fun i import ->
-            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+          (fun i import -> Hashtbl.add cmi_index (cmi_key import) i)
           cmis;
         let cmx_index = Compilation_unit.Tbl.create 42 in
         Array.iteri
@@ -78,11 +82,11 @@ end) : S = struct
         let quoted_cmi =
           List.fold_left
             (fun quoted_cmi (unit, _crc) ->
-              Compilation_unit.Name.Set.add_seq
+              Compilation_unit.Set.add_seq
                 (List.to_seq unit.ui_quoted_cmi)
                 quoted_cmi)
-            Compilation_unit.Name.Set.empty descr_list
-          |> Compilation_unit.Name.Set.elements |> Array.of_list
+            Compilation_unit.Set.empty descr_list
+          |> Compilation_unit.Set.elements |> Array.of_list
         in
         let quoted_cmx =
           List.fold_left
@@ -94,10 +98,10 @@ end) : S = struct
           |> Compilation_unit.Set.elements |> Array.of_list
         in
         let quoted_cmi_index =
-          Compilation_unit.Name.Tbl.create (Array.length quoted_cmi)
+          Compilation_unit.Tbl.create (Array.length quoted_cmi)
         in
         Array.iteri
-          (fun i cu -> Compilation_unit.Name.Tbl.add quoted_cmi_index cu i)
+          (fun i cu -> Compilation_unit.Tbl.add quoted_cmi_index cu i)
           quoted_cmi;
         let quoted_cmx_index =
           Compilation_unit.Tbl.create (Array.length quoted_cmx)
@@ -124,14 +128,13 @@ end) : S = struct
                 li_force_link = unit.ui_force_link || !Clflags.link_everything;
                 li_imports_cmi =
                   mk_bitmap cmis cmi_index unit.ui_imports_cmi
-                    ~find:Compilation_unit.Name.Tbl.find
-                    ~get_name:Import_info.name;
+                    ~find:Hashtbl.find ~get_name:cmi_key;
                 li_imports_cmx =
                   mk_bitmap cmxs cmx_index unit.ui_imports_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
                 li_quoted_cmi =
                   mk_bitmap quoted_cmi quoted_cmi_index unit.ui_quoted_cmi
-                    ~find:Compilation_unit.Name.Tbl.find ~get_name:Fun.id;
+                    ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
                 li_quoted_cmx =
                   mk_bitmap quoted_cmx quoted_cmx_index unit.ui_quoted_cmx
                     ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;

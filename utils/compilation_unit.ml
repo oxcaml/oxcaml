@@ -35,27 +35,25 @@ module Name : sig
 
   include Identifiable.S with type t := t
 
-  val dummy : t
-
   val predef_exn : t
 
   val of_string : string -> t
 
   val to_string : t -> string
 
-  val of_head_of_global_name : Global_module.Name.t -> t
+  val of_head_of_global_name : Global_module.Name_unprefixed.t -> t
 
   val of_parameter_name : Global_module.Parameter_name.t -> t
-
-  val to_global_name : t -> Global_module.Name.t
 
   val to_parameter_name : t -> Global_module.Parameter_name.t
 
   val check_as_path_component : t -> unit
 
-  val print_as_inline_code : Fmt.formatter -> t -> unit
+  val doc_print : Fmt.formatter -> t -> unit
 
   val print : Fmt.formatter -> t -> unit
+
+  val print_as_inline_code : Fmt.formatter -> t -> unit
 end = struct
   (* Be VERY careful changing this. Anything not equivalent to [string] will
      require bumping magic numbers due to changes in file formats, in addition
@@ -80,8 +78,6 @@ end = struct
     let output = Misc.output_of_doc_print doc_print
   end)
 
-  let print = doc_print
-
   let isupper chr = Char.equal (Char.uppercase_ascii chr) chr
 
   let of_string str =
@@ -89,12 +85,11 @@ end = struct
     then raise (Error (Bad_compilation_unit_name str))
     else str
 
-  let of_head_of_global_name (name : Global_module.Name.t) = of_string name.head
+  let of_head_of_global_name (name : Global_module.Name_unprefixed.t) =
+    of_string name.head
 
   let of_parameter_name (name : Global_module.Parameter_name.t) =
     of_string (Global_module.Parameter_name.to_string name)
-
-  let to_global_name t = Global_module.Name.create_no_args t
 
   let to_parameter_name t = Global_module.Parameter_name.of_string t
 
@@ -108,13 +103,21 @@ end = struct
       || String.contains t '.'
     then raise (Error (Bad_compilation_unit_name t))
 
-  let dummy = "*dummy*"
-
   let predef_exn = "*predef*"
 
   let to_string t = t
 
   let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)
+
+  let print = doc_print
+end
+
+module Intf = struct
+  include Name
+
+  let of_name t = t
+
+  let to_name t = t
 end
 
 module Prefix : sig
@@ -145,7 +148,7 @@ end = struct
   let doc_print ppf p =
     Fmt.pp_print_list
       ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf ".")
-      Name.print ppf p
+      Name.doc_print ppf p
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -219,15 +222,11 @@ module T0 : sig
 
   val instance_arguments : t -> argument list
 
-  val to_global_name : t -> Global_module.Name.t option
-
-  val to_global_name_exn : t -> Global_module.Name.t
-
-  val to_global_name_without_prefix : t -> Global_module.Name.t
+  val to_global_name : t -> Global_module.Name.t
 
   val create_full : Prefix.t -> Name.t -> argument list -> t
 
-  val of_global_name : Global_module.Name.t -> t
+  val of_global_name : Global_module.Name_unprefixed.t -> t
 
   val compare : t -> t -> int
 end = struct
@@ -249,10 +248,10 @@ end = struct
         { name : Name.t;
           for_pack_prefix : Prefix.t
         }
-    | Global of Global_module.Name.t
+    | Global of Global_module.Name_unprefixed.t
 
   (* type t = Bare_name of Name.t [@@unboxed] | With_prefix of with_prefix |
-     Global of Global_module.Name.t *)
+     Global of Global_module.Name_unprefixed.t *)
   and t = Obj.t
 
   (* Some manual inlining is done here to ensure good performance under
@@ -266,14 +265,14 @@ end = struct
 
   let of_full full : t = Obj.repr (full : full)
 
-  let of_global_name (glob : Global_module.Name.t) =
+  let of_global_name (glob : Global_module.Name_unprefixed.t) =
     match glob with
     | { head; args = [] } -> of_plain_name (Name.of_string head)
     | _ -> of_full (Global glob)
 
   let convert_arguments l =
     ListLabels.map
-      ~f:(fun ({ param; value } : Global_module.Name.argument) ->
+      ~f:(fun ({ param; value } : Global_module.Name_unprefixed.argument) ->
         { param = Name.of_parameter_name param; value = of_global_name value })
       l
 
@@ -363,7 +362,7 @@ end = struct
     if is_plain_name t
     then
       let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
+      Global_module.Name_unprefixed.create_no_args (Name.to_string name)
     else
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
@@ -371,22 +370,22 @@ end = struct
         raise (Error (Packed_instance { name = name |> Name.to_string }))
       | Global glob -> glob
 
-  let to_global_name t =
-    try Some (to_global_name_exn t) with Error (Packed_instance _) -> None
-
-  let to_global_name_without_prefix t =
+  let to_global_name t : Global_module.Name.t =
     if is_plain_name t
     then
       let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
+      Without_prefix
+        (Global_module.Name_unprefixed.create_no_args (Name.to_string name))
     else
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
-      | With_prefix { name; _ } ->
-        Global_module.Name.create_no_args (Name.to_string name)
-      | Global glob -> glob
+      | With_prefix { name; for_pack_prefix } ->
+        With_prefix
+          (List.map Name.to_string (Prefix.to_list for_pack_prefix),
+           Name.to_string name)
+      | Global glob -> Without_prefix glob
 
-  let of_global_name (name : Global_module.Name.t) =
+  let of_global_name (name : Global_module.Name_unprefixed.t) =
     match name with
     | { head; args = [] } -> of_plain_name (head |> Name.of_string)
     | _ -> of_full (Global name)
@@ -415,13 +414,13 @@ end = struct
       let head = Name.to_string name in
       let arguments =
         ListLabels.map
-          ~f:(fun { param; value } : Global_module.Name.argument ->
+          ~f:(fun { param; value } : Global_module.Name_unprefixed.argument ->
             { param = Name.to_parameter_name param;
               value = to_global_name_exn value
             })
           arguments
       in
-      of_full (Global (Global_module.Name.create_exn head arguments))
+      of_full (Global (Global_module.Name_unprefixed.create_exn head arguments))
     else of_full (With_prefix { for_pack_prefix; name })
 end
 
@@ -459,7 +458,7 @@ let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)
   then
     Misc.fatal_errorf_doc "of_complete_global_exn@ %a" Global_module.print glob;
-  of_global_name (glob |> Global_module.to_name)
+  of_global_name (glob |> Global_module.unprefixed_name)
 
 let dummy = create Prefix.empty (Name.of_string "*none*")
 
@@ -475,17 +474,20 @@ let with_for_pack_prefix t for_pack_prefix =
 
 let is_packed t = not (Prefix.is_empty (for_pack_prefix t))
 
+let prefixed_name_of_global ~impl global : Global_module.Name.t =
+  if is_packed impl then to_global_name impl else Global_module.to_name global
+
 let rec doc_print ppf t =
   let { for_pack_prefix; name; arguments } = descr t in
   let () =
     if Prefix.is_empty for_pack_prefix
-    then Fmt.fprintf ppf "%a" Name.print name
-    else Fmt.fprintf ppf "%a.%a" Prefix.print for_pack_prefix Name.print name
+    then Fmt.fprintf ppf "%a" Name.doc_print name
+    else Fmt.fprintf ppf "%a.%a" Prefix.print for_pack_prefix Name.doc_print name
   in
   ListLabels.iter ~f:(print_arg ppf) arguments
 
 and print_arg ppf { param; value } =
-  Fmt.fprintf ppf "[%a:%a]" Name.print param doc_print value
+  Fmt.fprintf ppf "[%a:%a]" Name.doc_print param doc_print value
 
 include Identifiable.Make (struct
   type nonrec t = t
@@ -683,7 +685,7 @@ let which_cmx_file desired_comp_unit ~accessed_by : t =
        especially here. *)
     create (ListLabels.rev prefix_rev |> Prefix.of_list) name
 
-let print_name ppf t = Fmt.fprintf ppf "%a" Name.print (name t)
+let print_name ppf t = Fmt.fprintf ppf "%a" Name.doc_print (name t)
 
 let to_global_ident_for_bytecode t =
   Ident.create_persistent (full_path_as_string t)
@@ -692,11 +694,11 @@ let print_debug ppf t =
   let name = name t in
   let for_pack_prefix = for_pack_prefix t in
   if Prefix.is_empty for_pack_prefix
-  then Fmt.fprintf ppf "@[<hov 1>(@[<hov 1>(id@ %a)@])@]" Name.print name
+  then Fmt.fprintf ppf "@[<hov 1>(@[<hov 1>(id@ %a)@])@]" Name.doc_print name
   else
     Fmt.fprintf ppf
       "@[<hov 1>(@[<hov 1>(for_pack_prefix@ %a)@]@;@[<hov 1>(name@ %a)@]"
-      Prefix.print for_pack_prefix Name.print name
+      Prefix.print for_pack_prefix Name.doc_print name
 
 let print_as_inline_code = Misc.Style.as_inline_code print
 

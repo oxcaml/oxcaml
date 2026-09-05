@@ -62,7 +62,7 @@ type unit_infos =
                                   (* Interfaces imported *)
     ui_imports_cmx: Import_info.t list;
                                   (* Infos imported *)
-    mutable ui_quoted_cmi: Compilation_unit.Name.t list;
+    mutable ui_quoted_cmi: Compilation_unit.t list;
                                   (* Interfaces that are used in quotes *)
     mutable ui_quoted_cmx: Compilation_unit.t list;
                                   (* Implementations that are used in quotes *)
@@ -88,7 +88,7 @@ type unit_infos_raw =
     uir_arg_descr: Lambda.arg_descr option;
     uir_imports_cmi: Import_info.t array;
     uir_imports_cmx: Import_info.t array;
-    uir_quoted_cmi: Compilation_unit.Name.t array;
+    uir_quoted_cmi: Compilation_unit.t array;
     uir_quoted_cmx: Compilation_unit.t array;
     uir_format: Lambda.main_module_block_format;
     uir_generic_fns: generic_fns;
@@ -122,7 +122,7 @@ type lib_unit_info =
 type library_infos =
   { lib_imports_cmi: Import_info.t array;
     lib_imports_cmx: Import_info.t array;
-    lib_quoted_cmi: Compilation_unit.Name.t array;
+    lib_quoted_cmi: Compilation_unit.t array;
     lib_quoted_cmx: Compilation_unit.t array;
     lib_units: lib_unit_info list;
     lib_generic_fns: generic_fns;

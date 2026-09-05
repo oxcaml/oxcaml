@@ -22,7 +22,12 @@ module DC = Dynlink_common
 module DT = Dynlink_types
 
 let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
+  let name =
+    match Import_info.Intf.view import with
+    | Normal (cu, _) | Alias cu -> Compilation_unit.full_path_as_string cu
+    | Parameter (intf, _) ->
+      Compilation_unit.Intf.to_name intf |> Compilation_unit.Name.to_string
+  in
   let crc = Import_info.crc import in
   name, crc
 
@@ -93,18 +98,23 @@ module Bytecode = struct
 
   let fold_initial_units ~init ~f =
     Array.fold_left (fun acc import ->
-        let modname = Import_info.name import in
         let crc = Import_info.crc import in
-        let cu = assume_no_prefix modname in
-        let defined =
-          Symtable.is_defined_in_global_map !default_global_map
-            (Glob_compunit cu)
+        let defined, compunit =
+          match Import_info.Intf.view import with
+          | Normal (cu, _) | Alias cu ->
+            Symtable.is_defined_in_global_map !default_global_map
+              (Glob_compunit cu),
+            Compilation_unit.full_path_as_string cu
+          | Parameter (intf, _) ->
+            (* A parameter has no implementation *)
+            false,
+            Compilation_unit.Intf.to_name intf
+            |> Compilation_unit.Name.to_string
         in
         let implementation =
           if defined then Some (None, DT.Loaded)
           else None
         in
-        let compunit = modname |> Compilation_unit.Name.to_string in
         let defined_symbols =
           if defined then [compunit]
           else []
