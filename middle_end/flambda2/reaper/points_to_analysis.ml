@@ -781,12 +781,14 @@ let get_fields_usage_of_constructors :
          | None, Some m -> Some (Or_unknown.Known m))
        out1 out2)
 
-type set_of_closures_def =
+type 'a set_of_closures_def =
   | Not_a_set_of_closures
-  | Set_of_closures of (Function_slot.t * Code_id_or_name.t) list
+  | Set_of_closures of 'a
 
 let get_set_of_closures_def :
-    Datalog.database -> Code_id_or_name.t -> set_of_closures_def =
+    Datalog.database ->
+    Code_id_or_name.t ->
+    (Function_slot.t * Code_id_or_name.t) list set_of_closures_def =
   let q =
     query
       (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
@@ -800,6 +802,58 @@ let get_set_of_closures_def :
           (Field.must_be_function_slot f, y) :: l)
     in
     match l with [] -> Not_a_set_of_closures | _ :: _ -> Set_of_closures l
+
+type function_and_value_slots =
+  { function_slots : (Function_slot.t * Code_id_or_name.t) list;
+    value_slots : (Value_slot.t * Code_id_or_name.t) list
+  }
+
+let get_set_of_closures_def_with_value_slots :
+    Datalog.database ->
+    Code_id_or_name.t ->
+    function_and_value_slots set_of_closures_def =
+  let q =
+    query
+      (let^$ [x], [relation; y] = ["x"], ["relation"; "y"] in
+       [ constructor ~base:x relation ~from:y;
+         when1
+           (fun field ->
+             Field.is_function_slot field || Field.is_value_slot field)
+           relation ]
+       =>? [relation; y])
+  in
+  fun db v ->
+    let function_slots, value_slots =
+      Cursor.fold_with_parameters q [v] db ~init:([], [])
+        ~f:(fun [field; y] (function_slots, value_slots) ->
+          match Field.view field with
+          | Function_slot function_slot ->
+            (function_slot, y) :: function_slots, value_slots
+          | Value_slot value_slot ->
+            function_slots, (value_slot, y) :: value_slots
+          | Block _ | Call_witness _ | Is_int | Get_tag | Boxed_number _
+          | Return_of_call _ | Code_id_of_call_witness ->
+            (* Excluded by the filter in the query above. *)
+            Misc.fatal_errorf
+              "[get_set_of_closures_def_with_value_slots] found unexpected \
+               field %a"
+              Field.print field)
+    in
+    match function_slots with
+    | [] -> Not_a_set_of_closures
+    | _ :: _ -> Set_of_closures { function_slots; value_slots }
+
+let all_closure_names : Datalog.database -> Code_id_or_name.Set.t =
+  let q =
+    query
+      (let$ [x; relation; y] = ["x"; "relation"; "y"] in
+       [ constructor ~base:x relation ~from:y;
+         when1 Field.is_function_slot relation ]
+       =>? [x])
+  in
+  fun db ->
+    Datalog.Cursor.fold q db ~init:Code_id_or_name.Set.empty ~f:(fun [x] acc ->
+        Code_id_or_name.Set.add x acc)
 
 let any_usage_query =
   let^? [x], [] = ["x"], [] in
@@ -994,6 +1048,67 @@ let code_id_actually_directly_called db closure =
                    Name.print name)
            in
            Code_id.Set.add codeid acc))
+
+let code_id_of_closure_name_query =
+  query
+    (let^$ [closure], [witness; code_id] =
+       ["closure"], ["witness"; "code_id"]
+     in
+     [ constructor ~base:closure !!Field.known_arity_call_witness ~from:witness;
+       constructor ~base:witness !!Field.code_id_of_call_witness ~from:code_id
+     ]
+     =>? [code_id])
+
+let code_id_of_closure_name db closure =
+  Cursor.fold_with_parameters code_id_of_closure_name_query [closure] db
+    ~init:None ~f:(fun [code_id_or_name] acc ->
+      Code_id_or_name.pattern_match' code_id_or_name
+        ~code_id:(fun code_id ->
+          match acc with
+          | None -> Some code_id
+          | Some other_code_id ->
+            if Code_id.equal code_id other_code_id
+            then acc
+            else
+              Misc.fatal_errorf
+                "[code_id_of_closure_name] found two code ids (%a and %a) for \
+                 %a"
+                Code_id.print code_id Code_id.print other_code_id
+                Code_id_or_name.print closure)
+        ~name:(fun _name -> acc))
+
+let my_closure_of_code_id_query =
+  query
+    (let^$ [code_id], [my_closure] = ["code_id"], ["my_closure"] in
+     [code_id_my_closure ~code_id ~my_closure] =>? [my_closure])
+
+let my_closure_of_code_id db code_id =
+  let code_id = Code_id_or_name.code_id code_id in
+  Cursor.fold_with_parameters my_closure_of_code_id_query [code_id] db
+    ~init:None ~f:(fun [my_closure] acc ->
+      let my_closure =
+        Code_id_or_name.pattern_match' my_closure
+          ~code_id:(fun _ ->
+            Misc.fatal_errorf "[my_closure_of_code_id] %a is not a variable"
+              Code_id_or_name.print my_closure)
+          ~name:(fun name ->
+            Name.pattern_match name
+              ~var:(fun var -> var)
+              ~symbol:(fun _ ->
+                Misc.fatal_errorf "[my_closure_of_code_id] %a is not a variable"
+                  Code_id_or_name.print my_closure))
+      in
+      match acc with
+      | None -> Some my_closure
+      | Some other_my_closure ->
+        if Variable.equal my_closure other_my_closure
+        then acc
+        else
+          Misc.fatal_errorf
+            "[my_closure_of_code_id] found two my_closure variables (%a and \
+             %a) for %a"
+            Variable.print my_closure Variable.print other_my_closure
+            Code_id_or_name.print code_id)
 
 type sources =
   | Any_source

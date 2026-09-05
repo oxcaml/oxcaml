@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
+let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   let get_code_metadata code_id =
@@ -30,7 +30,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
           fixed_arity_continuations;
           continuation_info;
           code_deps;
-          all_sets_of_closures
+          all_sets_of_closures;
+          closure_function_decls
         } =
     Traverse.run unit
   in
@@ -47,11 +48,25 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   let types_rewrite_context =
     Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
   in
-  let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
-      =
+  let calling_convention_changes =
+    Unboxing_analysis.compute_calling_convention_changes solved_dep
+      ~rewrite_kind_with_subkind:
+        (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~code_deps
+  in
+  let code_metadata =
+    Code_metadata_rewriter.rewrite ~final_typing_env ~get_code_metadata
+      ~types_rewrite_context ~calling_convention_changes ~code_deps solved_dep
+  in
+  let slot_offsets =
+    Slot_offsets_analysis.compute ~free_names ~code_metadata
+      ~closure_function_decls ~get_code_metadata solved_dep
+  in
+  let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
-      ~fixed_arity_continuations ~continuation_info ~final_typing_env
-      ~types_rewrite_context solved_dep get_code_metadata toplevel_expr code
+      ~fixed_arity_continuations ~continuation_info ~types_rewrite_context
+      ~calling_convention_changes ~code_metadata solved_dep get_code_metadata
+      toplevel_expr code
   in
   let all_code =
     Exported_code.add_code
@@ -66,8 +81,4 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in
-  ( Flambda_unit.with_body unit body,
-    free_names,
-    all_code,
-    slot_offsets,
-    final_typing_env )
+  Flambda_unit.with_body unit body, all_code, slot_offsets, final_typing_env

@@ -37,13 +37,14 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
+  let result_arity = Code.result_arity code in
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarized_components result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -73,6 +74,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   in
   let code_dep =
     { Traverse_acc.arity;
+      result_arity;
       return;
       my_closure;
       exn;
@@ -112,6 +114,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           (Function_slot.Map.find function_slot funs
             : Function_declarations.code_id_in_function_declaration)
         in
+        Acc.add_closure_function_decl acc name code_id;
         let code_id =
           match code_id with
           | Deleted _ -> Or_unknown.Unknown
@@ -825,7 +828,10 @@ type result =
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    closure_function_decls :
+      Function_declarations.code_id_in_function_declaration
+      Code_id_or_name.Map.t
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -886,5 +892,6 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc;
+    closure_function_decls = Acc.get_closure_function_decls acc
   }

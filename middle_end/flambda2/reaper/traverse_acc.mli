@@ -33,6 +33,7 @@ type continuation_info =
 *)
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list;
@@ -240,3 +241,11 @@ val add_set_of_closures :
 
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+(** Record the function declaration a closure is bound to. *)
+val add_closure_function_decl :
+  t -> Name.t -> Function_declarations.code_id_in_function_declaration -> unit
+
+val get_closure_function_decls :
+  t ->
+  Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t

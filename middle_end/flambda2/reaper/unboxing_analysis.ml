@@ -170,6 +170,45 @@ type changed_representation =
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
 
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
+let print_param_decision ppf param_decision =
+  match param_decision with
+  | Keep (v, kind) ->
+    Format.fprintf ppf "Keep (%a, %a)" Variable.print v
+      Flambda_kind.With_subkind.print kind
+  | Delete -> Format.fprintf ppf "Delete"
+  | Unbox fields ->
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
+
+let unarized_kinds_of_param_decisions param_decisions =
+  List.fold_left
+    (fun acc param_decision ->
+      match param_decision with
+      | Delete -> acc
+      | Keep (_, kind) -> kind :: acc
+      | Unbox fields ->
+        Unboxed_fields.fold_with_kind
+          (fun kind _ acc -> Flambda_kind.With_subkind.anything kind :: acc)
+          fields acc)
+    [] param_decisions
+  |> List.rev
+
+let arity_of_param_decisions param_decisions =
+  Flambda_arity.(
+    create
+      [ Unboxed_product
+          (List.map
+             (fun k -> Component_for_creation.Singleton k)
+             (unarized_kinds_of_param_decisions param_decisions)) ])
+
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
     Format.fprintf ff "(fields %a) (size %d)"
@@ -506,6 +545,12 @@ type result =
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
+type calling_convention_changes =
+  { my_closure_decisions : my_closure_param_decision Code_id.Map.t;
+    function_params_to_keep : param_decision list Code_id.Map.t;
+    function_return_decision : param_decision list Code_id.Map.t
+  }
+
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
@@ -589,6 +634,15 @@ let query_dominated_by =
   query
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
+
+let cannot_change_calling_convention_query =
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
+
+let cannot_change_calling_convention uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let perform_analysis0 db ~stats =
   let db =
@@ -785,11 +839,83 @@ let perform_analysis db ~stats =
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let cannot_change_calling_convention_query =
-  let^? [x], [] = ["x"], [] in
-  [cannot_change_calling_convention x]
+let compute_calling_convention_changes uses ~rewrite_kind_with_subkind
+    ~code_deps =
+  let get_unboxed_fields cn =
+    Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  in
+  let is_var_used var =
+    match Variable.kind var with
+    | Region | Rec_info -> true
+    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
+  in
+  let should_keep_function_param code_id =
+    if cannot_change_calling_convention uses code_id
+    then (
+      fun var kind ->
+        assert (Option.is_none (get_unboxed_fields (Code_id_or_name.var var)));
+        Keep (var, kind))
+    else
+      fun param kind ->
+        match get_unboxed_fields (Code_id_or_name.var param) with
+        | None -> if is_var_used param then Keep (param, kind) else Delete
+        | Some fields -> Unbox fields
+  in
+  let function_params_to_keep =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.code_dep) ->
+        let kinds = Flambda_arity.unarize code_dep.arity in
+        List.map2 (should_keep_function_param code_id) code_dep.params kinds)
+      code_deps
+  in
+  let my_closure_decisions =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.code_dep) ->
+        let unboxed_fields =
+          get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
+        in
+        match unboxed_fields with
+        | None -> Keep_my_closure
+        | Some unboxed_fields ->
+          if cannot_change_calling_convention uses code_id
+          then
+            Misc.fatal_errorf
+              "For code_id %a, we cannot change calling convention but closure \
+               is expected to be unboxed"
+              Code_id.print code_id;
+          Unbox_my_closure unboxed_fields)
+      code_deps
+  in
+  let function_return_decision =
+    Code_id.Map.mapi
+      (fun code_id (code_dep : Traverse_acc.code_dep) ->
+        let result_kinds =
+          Flambda_arity.unarized_components code_dep.result_arity
+        in
+        if cannot_change_calling_convention uses code_id
+        then
+          List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
+        else
+          (* Format.eprintf "DIRECT: %a@." Code_id.print code_id; *)
+          List.map2
+            (fun v kind ->
+              match get_unboxed_fields (Code_id_or_name.var v) with
+              | None ->
+                let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                (* TODO: fix this, needs the mapping between code ids of
+                   functions and their return continuations *)
+                if true || is_var_used v then Keep (v, kind) else Delete
+              | Some fields -> Unbox fields)
+            code_dep.return result_kinds)
+      code_deps
+  in
+  { my_closure_decisions; function_params_to_keep; function_return_decision }
 
-let cannot_change_calling_convention uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+let my_closure_decision t code_id =
+  Code_id.Map.find_opt code_id t.my_closure_decisions
+
+let function_params_to_keep t code_id =
+  Code_id.Map.find_opt code_id t.function_params_to_keep
+
+let function_return_decision t code_id =
+  Code_id.Map.find_opt code_id t.function_return_decision
