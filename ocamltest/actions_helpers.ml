@@ -255,13 +255,28 @@ let run
       else (Result.fail_with_reason reason, env)
     end
 
-let run_program =
+(* Any extra OCAMLRUNPARAM components given by -runparam are appended
+   here, for this action only, rather than in the initial environment:
+   the compilers and other tools run without them. *)
+let run_program log env =
+  let env =
+    if Options.runparam = "" then env
+    else begin
+      let existing =
+        Environments.safe_lookup Ocaml_variables.ocamlrunparam env in
+      let value =
+        if existing = "" then Options.runparam
+        else existing ^ "," ^ Options.runparam in
+      Environments.add Ocaml_variables.ocamlrunparam value env
+    end
+  in
   run
     "Running program"
     true
     false
     Builtin_variables.program
     (Some Builtin_variables.arguments)
+    log env
 
 let run_script log env =
   let response_file = Filename.temp_file "ocamltest-" ".response" in
