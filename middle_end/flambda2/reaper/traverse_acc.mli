@@ -33,6 +33,7 @@ type continuation_info =
 *)
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list;

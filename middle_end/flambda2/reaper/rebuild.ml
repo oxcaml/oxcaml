@@ -40,26 +40,9 @@ module P = Flambda_primitive
 module RE = Rebuilt_expr
 module SC = Static_const
 
-type param_decision =
-  | Keep of Variable.t * KS.t
-  | Delete
-  | Unbox of Variable.t Unboxed_fields.t
-
-type my_closure_param_decision =
-  | Keep_my_closure
-  | Unbox_my_closure of Variable.t Unboxed_fields.t
-
 (* CR sspies: Throughout this file, we create bound paramters and variables
    without corresponding debugging uids. Does it make sense to properly
    propagate debugging uids there? If so, where should they come from? *)
-
-let print_param_decision ppf param_decision =
-  match param_decision with
-  | Keep (v, kind) ->
-    Format.fprintf ppf "Keep (%a, %a)" Variable.print v KS.print kind
-  | Delete -> Format.fprintf ppf "Delete"
-  | Unbox fields ->
-    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 type should_preserve_direct_calls =
   | Yes
@@ -69,17 +52,14 @@ type should_preserve_direct_calls =
 type env =
   { machine_width : Target_system.Machine_width.t;
     uses : Unboxing_analysis.result;
+    calling_convention_changes : Unboxing_analysis.calling_convention_changes;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
-    cont_params_to_keep : param_decision list Continuation.Map.t;
-    should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
-    (* TODO same here *)
-    my_closure_decisions : my_closure_param_decision Code_id.Map.t;
-    function_params_to_keep : param_decision list Code_id.Map.t;
-    should_keep_function_param :
-      Code_id.t -> Variable.t -> KS.t -> param_decision;
-    function_return_decision : param_decision list Code_id.Map.t;
+    cont_params_to_keep :
+      Unboxing_analysis.param_decision list Continuation.Map.t;
+    should_keep_param :
+      Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
@@ -92,7 +72,9 @@ type rebuild_result =
     code_ids_to_remember : Code_id.Set.t
   }
 
-let freshen_decisions = function
+let freshen_decisions :
+    Unboxing_analysis.param_decision -> Unboxing_analysis.param_decision =
+  function
   | Delete -> Delete
   | Keep (v, kind) -> Keep (Variable.rename v, kind)
   | Unbox fields ->
@@ -170,7 +152,7 @@ let get_simple_changed_repr env simple =
 let get_parameters params_decisions =
   List.fold_left
     (fun acc param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (var, kind) ->
         Bound_parameter.create var kind Flambda_debug_uid.none :: acc
@@ -186,7 +168,7 @@ let get_parameters params_decisions =
 let get_parameters_and_modes params_decisions_and_modes =
   List.fold_left
     (fun acc (param_decision, mode) ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (var, kind) ->
         (Bound_parameter.create var kind Flambda_debug_uid.none, mode) :: acc
@@ -204,7 +186,7 @@ let get_arity params_decisions =
   let arity =
     List.fold_left
       (fun acc param_decision ->
-        match param_decision with
+        match (param_decision : Unboxing_analysis.param_decision) with
         | Delete -> acc
         | Keep (_, kind) -> kind :: acc
         | Unbox fields ->
@@ -364,7 +346,7 @@ let rewrite_simple_opt (env : env) = function
 let get_args env params_decisions args =
   List.fold_left2
     (fun acc arg param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep _ -> rewrite_simple env arg :: acc
       | Unbox fields ->
@@ -378,7 +360,7 @@ let get_args env params_decisions args =
 let get_args_with_kinds env params_decisions args =
   List.fold_left2
     (fun acc arg param_decision ->
-      match param_decision with
+      match (param_decision : Unboxing_analysis.param_decision) with
       | Delete -> acc
       | Keep (_, kind) -> (rewrite_simple env arg, kind) :: acc
       | Unbox fields ->
@@ -816,7 +798,7 @@ let rewrite_apply_cont_expr env ac =
           (Format.pp_print_list ~pp_sep:Format.pp_print_space Simple.print)
           args
           (Format.pp_print_list ~pp_sep:Format.pp_print_space
-             print_param_decision)
+             Unboxing_analysis.print_param_decision)
           args_to_keep;
         Printexc.raise_with_backtrace Misc.Fatal_error bt
     in
@@ -847,13 +829,17 @@ let make_apply_wrapper env
           match rev_args_or_invalid with
           | Invalid -> Invalid
           | Ok (i, rev_args) -> (
-            match apply_decision, func_decision with
+            match
+              ( (apply_decision : Unboxing_analysis.param_decision),
+                (func_decision : Unboxing_analysis.param_decision) )
+            with
             | Unbox _, (Keep _ | Delete) | (Keep _ | Delete), Unbox _ ->
               let[@inline] error () =
                 Misc.fatal_errorf
                   "Inconsistent apply (%a) and func (%a) decisions:@ %a@."
-                  print_param_decision apply_decision print_param_decision
-                  func_decision Apply.print apply
+                  Unboxing_analysis.print_param_decision apply_decision
+                  Unboxing_analysis.print_param_decision func_decision
+                  Apply.print apply
               in
               (* let direct_or_indirect = match Apply.call_kind apply with |
                  Function { function_call = Direct _; _ } -> error () | Function
@@ -1104,10 +1090,7 @@ let decide_whether_apply_needs_calling_convention_change env apply =
     match Code_id.Map.find_opt code_id env.code_deps with
     | None -> Not_changing_calling_convention, call_kind
     | Some _ ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      if cannot_change_calling_convention
+      if Analysis.cannot_change_calling_convention env.uses code_id
       then Not_changing_calling_convention, call_kind
       else Changing_calling_convention code_id, call_kind)
 
@@ -1161,7 +1144,7 @@ let rebuild_apply env apply =
               Flambda_colours.error Flambda_colours.pop Exn_continuation.print
               exn_continuation
               (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                 print_param_decision)
+                 Unboxing_analysis.print_param_decision)
               args_to_keep;
             Printexc.raise_with_backtrace Misc.Fatal_error bt
           (* with Not_found -> (* Not defined in cont_params_to_keep *)
@@ -1259,7 +1242,8 @@ let rebuild_apply env apply =
         let func_decisions =
           List.map
             (fun kind ->
-              Keep (Variable.create "function_return" (KS.kind kind), kind))
+              Unboxing_analysis.Keep
+                (Variable.create "function_return" (KS.kind kind), kind))
             (Flambda_arity.unarized_components return_arity)
         in
         make_apply_wrapper env make_apply (Apply.continuation apply)
@@ -1269,7 +1253,10 @@ let rebuild_apply env apply =
          code_id Apply.print apply; *)
       let original_callee = Apply.callee apply in
       let args_from_unboxed_callee, callee =
-        match Code_id.Map.find_opt code_id env.my_closure_decisions with
+        match
+          Unboxing_analysis.my_closure_decision env.calling_convention_changes
+            code_id
+        with
         | None ->
           Misc.fatal_errorf
             "No my_closure_decisions found for code id %a in direct apply \
@@ -1301,7 +1288,10 @@ let rebuild_apply env apply =
           get_args_with_kinds env [Unbox fields] [callee], None
       in
       let params_decisions =
-        match Code_id.Map.find_opt code_id env.function_params_to_keep with
+        match
+          Unboxing_analysis.function_params_to_keep
+            env.calling_convention_changes code_id
+        with
         | None ->
           Misc.fatal_errorf
             "No parameter decisions found for code id %a in direct apply \
@@ -1355,7 +1345,7 @@ let rebuild_apply env apply =
                (fun ppf param_decisions ->
                  Format.fprintf ppf "@[(%a)@]"
                    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                      print_param_decision)
+                      Unboxing_analysis.print_param_decision)
                    param_decisions))
             params_decisions;
           Printexc.raise_with_backtrace Misc.Fatal_error bt
@@ -1379,7 +1369,16 @@ let rebuild_apply env apply =
         Flambda_arity.create (List.map components_for args)
       in
       let return_decisions =
-        Code_id.Map.find code_id env.function_return_decision
+        match
+          Unboxing_analysis.function_return_decision
+            env.calling_convention_changes code_id
+        with
+        | None ->
+          Misc.fatal_errorf
+            "No return decisions found for code id %a in direct apply rewrite \
+             of@ %a"
+            Code_id.print code_id Apply.print apply
+        | Some p -> p
       in
       let return_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
       let args = List.map fst (List.flatten args) in
@@ -2176,10 +2175,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
          [rebuild_function_params_and_body]"
         Code_id.print code_id
     | Some code_dep ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      ( (if cannot_change_calling_convention
+      ( (if Analysis.cannot_change_calling_convention env.uses code_id
          then Not_changing_calling_convention
          else Changing_calling_convention code_id),
         code_dep.params,
@@ -2233,18 +2229,38 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                   List.map (fun p -> p, Points_to_analysis.Keep) results_vars )
               | Changing_calling_convention code_id ->
                 let return_decisions =
-                  Code_id.Map.find code_id env.function_return_decision
+                  match
+                    Unboxing_analysis.function_return_decision
+                      env.calling_convention_changes code_id
+                  with
+                  | None ->
+                    Misc.fatal_errorf
+                      "No return decisions found for code id %a in \
+                       [rebuild_function_params_and_body]"
+                      Code_id.print code_id
+                  | Some p -> p
                 in
                 let params_decision =
-                  Code_id.Map.find code_id env.function_params_to_keep
+                  match
+                    Unboxing_analysis.function_params_to_keep
+                      env.calling_convention_changes code_id
+                  with
+                  | None ->
+                    Misc.fatal_errorf
+                      "No parameter decisions found for code id %a in \
+                       [rebuild_function_params_and_body]"
+                      Code_id.print code_id
+                  | Some p -> p
                 in
                 ( List.map2
-                    (fun p -> function
+                    (fun p decision ->
+                      match (decision : Unboxing_analysis.param_decision) with
                       | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
                       | Delete -> p, Points_to_analysis.Delete)
                     params_vars params_decision,
                   List.map2
-                    (fun p -> function
+                    (fun p decision ->
+                      match (decision : Unboxing_analysis.param_decision) with
                       | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
                       | Delete -> p, Points_to_analysis.Delete)
                     results_vars return_decisions )
@@ -2281,10 +2297,28 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       res )
   | Changing_calling_convention code_id ->
     let return_decisions =
-      Code_id.Map.find code_id env.function_return_decision
+      match
+        Unboxing_analysis.function_return_decision
+          env.calling_convention_changes code_id
+      with
+      | None ->
+        Misc.fatal_errorf
+          "No return decisions found for code id %a in \
+           [rebuild_function_params_and_body]"
+          Code_id.print code_id
+      | Some p -> p
     in
     let params_decision =
-      Code_id.Map.find code_id env.function_params_to_keep
+      match
+        Unboxing_analysis.function_params_to_keep env.calling_convention_changes
+          code_id
+      with
+      | None ->
+        Misc.fatal_errorf
+          "No parameter decisions found for code id %a in \
+           [rebuild_function_params_and_body]"
+          Code_id.print code_id
+      | Some p -> p
     in
     let result_arity = Flambda_arity.unarize_t (get_arity return_decisions) in
     let code_metadata =
@@ -2293,8 +2327,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     in
     let params_decision =
       List.map2
-        (fun decision param ->
-          match decision with
+        (fun decision param : Unboxing_analysis.param_decision ->
+          match (decision : Unboxing_analysis.param_decision) with
           | Delete -> Delete
           | Unbox _ ->
             Unbox
@@ -2305,7 +2339,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
         params_decision
         (Bound_parameters.to_list params)
     in
-    let my_closure_decision, code_metadata =
+    let (my_closure_decision : Unboxing_analysis.param_decision), code_metadata
+        =
       match
         (* TODO move that in the decisions There should be a single record field
            with all the decisions for return params and closure *)
@@ -2459,98 +2494,9 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
-    (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
-  let should_keep_function_param code_id =
-    let cannot_change_calling_convention =
-      Analysis.cannot_change_calling_convention solved_dep code_id
-    in
-    if cannot_change_calling_convention
-    then (
-      fun var kind ->
-        assert (
-          Option.is_none
-            (Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
-        Keep (var, kind))
-    else
-      fun param kind ->
-        match
-          Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var param)
-        with
-        | None ->
-          let is_var_used =
-            raw_is_var_used solved_dep param (K.With_subkind.kind kind)
-          in
-          if is_var_used then Keep (param, kind) else Delete
-        | Some fields -> Unbox fields
-  in
-  let function_params_to_keep =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let kinds = Flambda_arity.unarize code_dep.arity in
-        List.map2 (should_keep_function_param code_id) code_dep.params kinds)
-      code_deps
-  in
-  let my_closure_decisions =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let unboxed_fields =
-          Analysis.get_unboxed_fields solved_dep
-            (Code_id_or_name.var code_dep.my_closure)
-        in
-        match unboxed_fields with
-        | None -> Keep_my_closure
-        | Some unboxed_fields ->
-          if Analysis.cannot_change_calling_convention solved_dep code_id
-          then
-            Misc.fatal_errorf
-              "For code_id %a, we cannot change calling convention but closure \
-               is expected to be unboxed"
-              Code_id.print code_id;
-          Unbox_my_closure unboxed_fields)
-      code_deps
-  in
-  let should_keep_function_param code_id =
-    match Code_id.Map.find_opt code_id code_deps with
-    | None -> fun var kind -> Keep (var, kind)
-    | Some _ -> should_keep_function_param code_id
-  in
-  let function_return_decision =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let cannot_change_calling_convention =
-          Analysis.cannot_change_calling_convention solved_dep code_id
-        in
-        let metadata = get_code_metadata code_id in
-        let result_kinds =
-          Flambda_arity.unarized_components
-            (Code_metadata.result_arity metadata)
-        in
-        if cannot_change_calling_convention
-        then
-          List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
-        else
-          (* Format.eprintf "DIRECT: %a@." Code_id.print code_id; *)
-          List.map2
-            (fun v kind ->
-              match
-                Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var v)
-              with
-              | None ->
-                let is_var_used =
-                  raw_is_var_used solved_dep v (K.With_subkind.kind kind)
-                in
-                let kind =
-                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-                    (Name.var v) kind
-                in
-                (* TODO: fix this, needs the mapping between code ids of
-                   functions and their return continuations *)
-                if true || is_var_used then Keep (v, kind) else Delete
-              | Some fields -> Unbox fields)
-            code_dep.return result_kinds)
-      code_deps
-  in
-  let should_keep_param cont param kind =
+    ~calling_convention_changes (solved_dep : Analysis.result) get_code_metadata
+    toplevel_expr code =
+  let should_keep_param cont param kind : Unboxing_analysis.param_decision =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
     in
@@ -2591,14 +2537,11 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
   let env =
     { machine_width;
       uses = solved_dep;
+      calling_convention_changes;
       code_deps;
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
-      my_closure_decisions;
-      function_params_to_keep;
-      should_keep_function_param;
-      function_return_decision;
       should_preserve_direct_calls;
       old_typing_env = final_typing_env;
       inside_code_definition = false;
