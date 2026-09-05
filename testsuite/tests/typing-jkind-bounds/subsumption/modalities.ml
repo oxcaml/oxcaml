@@ -471,7 +471,7 @@ Error: This value is "contended"
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
-(* Non-modal axis: external_ in with-bounds *)
+(* Modal axis: external_ in with-bounds *)
 
 (* [value mod portable external_ with 'a @@ external_]
   always crosses externality, but crosses [portable] with ['a] *)

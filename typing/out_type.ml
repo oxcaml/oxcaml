@@ -1361,7 +1361,7 @@ let tree_of_modes (modes : Mode.Alloc.Const.t) =
     in
 
     let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
-    { diff with forkable; yielding; contention; portability }
+    { diff with externality = None; forkable; yielding; contention; portability }
   in
   (* Step 2: Print the modes *)
   List.filter_map

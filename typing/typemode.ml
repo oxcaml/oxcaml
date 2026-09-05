@@ -47,6 +47,7 @@ type forbidden_modality_kind =
 type error =
   | Forbidden_modality : 'a annot_type * forbidden_modality_kind -> error
   | Duplicated_axis : 'a annot_type * 'a -> error
+  | Forbidden_externality : 'a annot_type * string -> error
   | Unrecognized_modifier : 'a annot_type * string -> error
 
 exception Error of Location.t * error
@@ -69,6 +70,9 @@ module Mode_axis_pair = struct
       Atom (Monadic ax, a)
     in
     match[@warning "-18"] s with
+    | "internal" -> comonadic Externality Internal
+    | "external64" -> comonadic Externality External64
+    | "external_" -> comonadic Externality External
     | "local" -> comonadic Areality Local
     (* "regional" is not supported *)
     | "global" -> comonadic Areality Global
@@ -112,34 +116,15 @@ module Modality_axis_pair = struct
     | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode)
 end
 
-module Nonmodal_axis_pair = struct
-  type t = P : 'a Axis.Nonmodal.t * 'a -> t
-
-  let of_string s : t =
-    match[@warning "-18"] s with
-    | "internal" -> P (Externality, Internal)
-    | "external64" -> P (Externality, External64)
-    | "external_" -> P (Externality, External)
-    | _ -> raise Not_found
-end
-
-module Nonmodal_bounds = struct
+module Scannable_bounds = struct
   type t =
-    { externality : Externality.t Location.loc option;
-      (* CR layouts-scannable: This is a temporary hack to support the previous
+    { (* CR layouts-scannable: This is a temporary hack to support the previous
          syntax. The location is not being used for anything currently. *)
       nullability : Nullability.t Location.loc option;
       separability : Separability.t Location.loc option
     }
 
-  let empty = { externality = None; nullability = None; separability = None }
-
-  let get (type a) (ax : a Axis.Nonmodal.t) (t : t) : a Location.loc option =
-    match ax with Externality -> t.externality
-
-  let set (type a) (ax : a Axis.Nonmodal.t) (v : a Location.loc option) (t : t)
-      : t =
-    match ax with Externality -> { t with externality = v }
+  let empty = { nullability = None; separability = None }
 
   let meet_nullability t (nullability : Nullability.t loc) =
     match t.nullability with
@@ -241,12 +226,21 @@ let apply_mode_implications (annots : Alloc.Const.Option.t) =
   in
   { annots with forkable; yielding; contention; portability }
 
+let reject_externality ~loc annot_type text (atom : Mode.Alloc.atom) =
+  match atom with
+  | Atom (Comonadic Externality, _) ->
+    raise (Error (loc, Forbidden_externality (annot_type, text)))
+  | _ -> ()
+
 let transl_mode_annots annots =
   let annots =
     List.map
       (fun { txt = Parsetree.Mode txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try { txt = Mode_axis_pair.of_string txt; loc }
+        try
+          let atom = Mode_axis_pair.of_string txt in
+          reject_externality ~loc Mode txt atom;
+          { txt = atom; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
       annots
@@ -275,13 +269,15 @@ let mode_annot_to_modality_annot mode_annot =
       | Monadic ax -> Atom (Monadic ax, Join_const mode))
     mode_annot
 
-let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
+let transl_modality ~allow_externality ~maturity
+    { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let mode =
     try Mode_axis_pair.(of_string modality)
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
+  if not allow_externality then reject_externality ~loc Modality modality mode;
   let mode_annot = { txt = mode; loc } in
   mode_annot_to_modality_annot mode_annot
 
@@ -440,14 +436,14 @@ let transl_modality_atoms ~warn_redundant ~default ~loc ~annot_type
   enforce_forbidden_modalities annot_type ~loc modalities;
   modalities
 
-let transl_modalities_with_default ?(allow_redundant_staticity = false)
-    ~maturity ~default annots =
+let transl_modalities_with_default_internal ~allow_externality
+    ?(allow_redundant_staticity = false) ~maturity ~default annots =
   let modalities_loc =
     match List.map (fun { loc; _ } -> loc) annots with
     | [] -> Location.none
     | _ :: _ as locs -> Location.merge locs
   in
-  let annots = List.map (transl_modality ~maturity) annots in
+  let annots = List.map (transl_modality ~allow_externality ~maturity) annots in
   let open Modality in
   (* - default is applied before explicit modalities.
      - explicit modalities can override default.
@@ -499,6 +495,11 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
+let transl_modalities_with_default ?allow_redundant_staticity ~maturity ~default
+    annots =
+  transl_modalities_with_default_internal ~allow_externality:false
+    ?allow_redundant_staticity ~maturity ~default annots
+
 let mutable_modalities mut =
   mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
 
@@ -522,24 +523,9 @@ let sort_dedup_modalities modalities =
 let untransl_modalities t = List.map untransl_modality t.moda_desc
 
 let transl_with_bound_modifiers annots =
-  let modal_annots, externality =
-    List.fold_left
-      (fun (modal_annots, externality)
-           ({ txt = Parsetree.Modality modality; loc } as annot) ->
-        match Modality_axis_pair.of_string modality with
-        | Atom (_, _) -> annot :: modal_annots, externality
-        | exception Not_found -> (
-          match Nonmodal_axis_pair.of_string modality with
-          | P (Externality, (value : Externality.t)) -> modal_annots, Some value
-          | exception Not_found ->
-            raise (Error (loc, Unrecognized_modifier (Modality, modality)))))
-      ([], None) annots
-  in
-  let modality =
-    (transl_modalities ~maturity:Stable Immutable (List.rev modal_annots))
-      .moda_modalities
-  in
-  modality, externality
+  (transl_modalities_with_default_internal ~allow_externality:true
+     ~maturity:Stable ~default:Modality.Const.id annots)
+    .moda_modalities
 
 let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
@@ -554,10 +540,10 @@ let everything_modality =
     (fun acc -> function
       | Value.Axis.P (Monadic Staticity) -> acc
       | Value.Axis.P (Comonadic axis) -> (
-        match Per_axis.min (Modal (Comonadic axis)) with
+        match Per_axis.min (Comonadic axis) with
         | Modality value -> Modality.Const.set (Comonadic axis) value acc)
       | Value.Axis.P (Monadic axis) -> (
-        match Per_axis.min (Modal (Monadic axis)) with
+        match Per_axis.min (Monadic axis) with
         | Modality value -> Modality.Const.set (Monadic axis) value acc))
     Modality.Const.id Value.Axis.all
 
@@ -573,78 +559,58 @@ let transl_mod_bounds ?(warn = true) annots =
         Modality.Axis.P ax = Modality.Axis.P ax2)
       atoms
   in
+  let raise_dup loc axis =
+    raise (Error (loc, Duplicated_axis (Modifier, axis)))
+  in
   let raise_dup_modal loc (Modality.Atom (ax, _)) =
     match[@warning "-18"] ax with
-    | Comonadic ax ->
-      raise (Error (loc, Duplicated_axis (Modifier, Modal (Comonadic ax))))
-    | Monadic ax ->
-      raise (Error (loc, Duplicated_axis (Modifier, Modal (Monadic ax))))
+    | Comonadic ax -> raise_dup loc (Axis.Comonadic ax)
+    | Monadic ax -> raise_dup loc (Axis.Monadic ax)
   in
-  let transl_nonmodal_modifier ~loc txt nonmodal =
-    match Nonmodal_axis_pair.of_string txt with
-    | P (type a) ((ax, mode) : a Axis.Nonmodal.t * a) ->
-      let axis = Axis.Nonmodal ax in
-      let is_top = Per_axis.(le axis (max axis) mode) in
-      if is_top && warn
-      then
-        Location.prerr_warning loc
-          (Warnings.Redundant_modifier
-             { modifier = txt; reason = Default_bound });
-      if Option.is_some (Nonmodal_bounds.get ax nonmodal)
-      then raise (Error (loc, Duplicated_axis (Modifier, axis)));
-      Nonmodal_bounds.set ax (Some { txt = mode; loc }) nonmodal
-    | exception Not_found -> (
-      match txt with
-      (* CR layouts-scannable: This should be removed once the new syntax for
+  let transl_scannable_modifier ~loc txt scannable =
+    match txt with
+    (* CR layouts-scannable: This should be removed once the new syntax for
          separability is adopted. There is no warning raised currently for dupes
          because the warnings would be reported 3 times. If this is fixed before
          the syntax is deprecated, dupes really should raise warnings! *)
-      | "non_pointer" ->
-        Nonmodal_bounds.meet_separability nonmodal { txt = Non_pointer; loc }
-      | "non_pointer64" ->
-        Nonmodal_bounds.meet_separability nonmodal { txt = Non_pointer64; loc }
-      | "non_float" ->
-        Nonmodal_bounds.meet_separability nonmodal { txt = Non_float; loc }
-      | "separable" ->
-        Nonmodal_bounds.meet_separability nonmodal { txt = Separable; loc }
-      | "maybe_separable" ->
-        Nonmodal_bounds.meet_separability nonmodal
-          { txt = Maybe_separable; loc }
-      | "non_null" ->
-        Nonmodal_bounds.meet_nullability nonmodal { txt = Non_null; loc }
-      | "maybe_null" ->
-        Nonmodal_bounds.meet_nullability nonmodal { txt = Maybe_null; loc }
-      | "everything" ->
-        if Option.is_some (Nonmodal_bounds.get Externality nonmodal)
-        then
-          raise
-            (Error
-               ( loc,
-                 Duplicated_axis
-                   (Modifier, Axis.Nonmodal Axis.Nonmodal.Externality) ));
-        Nonmodal_bounds.set Externality
-          (Some { txt = Externality.min; loc })
-          nonmodal
-      | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
+    | "non_pointer" ->
+      Scannable_bounds.meet_separability scannable { txt = Non_pointer; loc }
+    | "non_pointer64" ->
+      Scannable_bounds.meet_separability scannable { txt = Non_pointer64; loc }
+    | "non_float" ->
+      Scannable_bounds.meet_separability scannable { txt = Non_float; loc }
+    | "separable" ->
+      Scannable_bounds.meet_separability scannable { txt = Separable; loc }
+    | "maybe_separable" ->
+      Scannable_bounds.meet_separability scannable
+        { txt = Maybe_separable; loc }
+    | "non_null" ->
+      Scannable_bounds.meet_nullability scannable { txt = Non_null; loc }
+    | "maybe_null" ->
+      Scannable_bounds.meet_nullability scannable { txt = Maybe_null; loc }
+    | "everything" -> scannable
+    | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt)))
   in
   (* [everything] specifies every modal axis except staticity, so it conflicts
      with any non-staticity modal modifier on either side. *)
   let is_staticity (Modality.Atom (ax, _)) =
     match[@warning "-18"] ax with Monadic Staticity -> true | _ -> false
   in
-  let nonmodal, base_modality, modal_atoms =
+  let scannable, base_modality, modal_atoms =
     List.fold_left
-      (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
+      (fun (scannable, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc }
+         ->
         match Modality_axis_pair.of_string txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
           then raise_dup_modal loc atom;
-          nonmodal, base, { txt = atom; loc } :: atoms, seen_ev
+          scannable, base, { txt = atom; loc } :: atoms, seen_ev
         | exception Not_found ->
-          let nonmodal = transl_nonmodal_modifier ~loc txt nonmodal in
+          let scannable = transl_scannable_modifier ~loc txt scannable in
           let base, seen_ev =
             if String.equal txt "everything"
             then (
+              if seen_ev then raise_dup loc (Axis.Comonadic Areality);
               (match
                  List.find_opt
                    (fun { Location.txt = atom; _ } -> not (is_staticity atom))
@@ -655,12 +621,12 @@ let transl_mod_bounds ?(warn = true) annots =
               everything_modality, true)
             else base, seen_ev
           in
-          nonmodal, base, atoms, seen_ev)
-      (Nonmodal_bounds.empty, Modality.Const.id, [], false)
+          scannable, base, atoms, seen_ev)
+      (Scannable_bounds.empty, Modality.Const.id, [], false)
       annots
-    |> fun (nm, base, atoms, _) ->
+    |> fun (scannable, base, atoms, _) ->
     (* axes listed in the order of implication. *)
-    nm, base, sort_dedup_modalities_with_locs (List.rev atoms)
+    scannable, base, sort_dedup_modalities_with_locs (List.rev atoms)
   in
   let warn_redundant loc (Modality.Atom (ax, a)) ~reason =
     if warn
@@ -673,13 +639,8 @@ let transl_mod_bounds ?(warn = true) annots =
     transl_modality_atoms ~warn_redundant ~default:base_modality ~loc:bounds_loc
       ~annot_type:Modifier modal_atoms
   in
-  let open Jkind.Mod_bounds in
-  let externality =
-    Option.fold ~some:Location.get_txt ~none:Externality.max
-      nonmodal.externality
-  in
-  let crossing = Crossing.modality modality Crossing.max in
-  create crossing ~externality, (nonmodal.nullability, nonmodal.separability)
+  ( Crossing.modality modality Crossing.max,
+    (scannable.nullability, scannable.separability) )
 
 let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
     =
@@ -688,8 +649,7 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
      annotations, e.g. [aliased forkable unyielding] for [global].
      [untransl_mod_bounds] relies on those implications being present in order
      to omit the implied modes when printing, so close the bounds first. *)
-  let crossing = Jkind.Mod_bounds.crossing bounds in
-  let modality = Crossing.to_modality crossing in
+  let modality = Crossing.to_modality bounds in
   let annotated = Modality.Const.diff Modality.Const.id modality in
   let implied = List.concat_map implied_modalities annotated in
   let axis_is_explicit ax =
@@ -700,23 +660,19 @@ let close_implied_mod_bounds (bounds : Jkind.Mod_bounds.t) : Jkind.Mod_bounds.t
     | Ok () -> false
     | Error _ -> true
   in
-  let crossing =
-    List.fold_left
-      (fun crossing (Modality.Atom (ax, a)) ->
-        (* As in [transl_mod_bounds], an explicit bound on an axis wins over
-           a bound implied by another axis. *)
-        if axis_is_explicit ax
-        then crossing
-        else
-          Crossing.modality (Modality.Const.set ax a Modality.Const.id) crossing)
-      crossing implied
-  in
-  Jkind.Mod_bounds.set_crossing crossing bounds
+  List.fold_left
+    (fun crossing (Modality.Atom (ax, a)) ->
+      (* As in [transl_mod_bounds], an explicit bound on an axis wins over
+         a bound implied by another axis. *)
+      if axis_is_explicit ax
+      then crossing
+      else
+        Crossing.modality (Modality.Const.set ax a Modality.Const.id) crossing)
+    bounds implied
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     Parsetree.modes =
-  let crossing = Jkind.Mod_bounds.crossing bounds in
-  let modality = Crossing.to_modality crossing in
+  let modality = Crossing.to_modality bounds in
   let least_modalities =
     least_modalities ~include_implied:verbose ~mut:Immutable modality
   in
@@ -750,24 +706,8 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
           Some { Location.txt = Parsetree.Mode s; loc = Location.none })
       Value.Axis.all
   in
-  let nonmodal_annots, top_nonmodal_annots =
-    let open Jkind.Mod_bounds in
-    let mk_annot top print value =
-      let only_when_verbose = value = top in
-      let s = Format_doc.asprintf "%a" print value in
-      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
-        only_when_verbose )
-    in
-    [mk_annot Externality.max Externality.print (externality bounds)]
-    |> List.partition_map (fun (annot, only_when_verbose) ->
-        match only_when_verbose with false -> Left annot | true -> Right annot)
-  in
-  let verbose_annots =
-    match verbose with
-    | true -> top_modality_annots () @ top_nonmodal_annots
-    | false -> []
-  in
-  modality_annots @ nonmodal_annots @ verbose_annots
+  let verbose_annots = if verbose then top_modality_annots () else [] in
+  modality_annots @ verbose_annots
 
 (* Error reporting *)
 
@@ -781,6 +721,11 @@ let report_error ppf =
   | Forbidden_modality (annot_type, Global_and_unique) ->
     fprintf ppf "The %a %a can't be used together with %a" print_annot_type
       annot_type Misc.Style.inline_code "global" Misc.Style.inline_code "unique"
+  | Forbidden_externality (annot_type, modifier) ->
+    fprintf ppf
+      "Externality %a cannot currently be annotated as a %a.@ It is supported \
+       in kind modifiers and@ with-bound modalities."
+      Misc.Style.inline_code modifier print_annot_type annot_type
   | Unrecognized_modifier (annot_type, modifier) ->
     fprintf ppf "Unrecognized %a %s." print_annot_type annot_type modifier
 

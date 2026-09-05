@@ -25,12 +25,12 @@ end
 
 (** The jkind axis of Externality *)
 module Externality : sig
-  type t =
+  type t = Mode.Externality.Const.t =
     | External
     | External64
     | Internal
 
-  include Axis_ops with type t := t
+  include Mode_intf.Lattice with type t := t
 
   val upper_bound_if_is_always_gc_ignorable : unit -> t
 end
@@ -58,14 +58,13 @@ module Separability : sig
 end
 
 module Axis : sig
-  module Nonmodal : sig
-    type 'a t = Externality : Externality.t t
-  end
-
-  (** Represents an axis of a jkind *)
-  type 'a t =
-    | Modal : 'a Mode.Crossing.Axis.t -> 'a t
-    | Nonmodal : 'a Nonmodal.t -> 'a t
+  type 'a t = 'a Mode.Crossing.Axis.t =
+    | Monadic :
+        'a Mode.Value.Monadic.Axis.t
+        -> 'a Mode.Crossing.Monadic.Atom.t t
+    | Comonadic :
+        'a Mode.Value.Comonadic.Axis.t
+        -> 'a Mode.Crossing.Comonadic.Atom.t t
 
   type packed = Pack : 'a t -> packed [@@unboxed]
 
@@ -116,12 +115,6 @@ module Axis_set : sig
 
   (** A set of all axes *)
   val all : t
-
-  (** A set of all modal axes *)
-  val all_modal_axes : t
-
-  (** A set of all nonmodal axes *)
-  val all_nonmodal_axes : t
 
   val print : Format.formatter -> t -> unit
 end

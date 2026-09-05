@@ -31,9 +31,6 @@
    9. Staticity (monadic): Dynamic -> Static
    10. Externality: External -> External64 -> Internal
 
-   Axes 0-9 are modal axes (affect mode-crossing).
-   Axis 10 is the only non-modal axis (externality).
-
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
 
@@ -62,17 +59,17 @@ let axis_shapes =
   Array.map
     (fun (Pack axis) ->
       match axis with
-      | Modal (Comonadic Areality) -> Chain3
-      | Modal (Monadic Uniqueness) -> Chain2
-      | Modal (Comonadic Linearity) -> Chain2
-      | Modal (Monadic Contention) -> Diamond4
-      | Modal (Comonadic Portability) -> Diamond4
-      | Modal (Comonadic Forkable) -> Chain2
-      | Modal (Comonadic Yielding) -> Chain2
-      | Modal (Comonadic Statefulness) -> Diamond4
-      | Modal (Monadic Visibility) -> Diamond4
-      | Modal (Monadic Staticity) -> Chain2
-      | Nonmodal Externality -> Chain3)
+      | Comonadic Areality -> Chain3
+      | Monadic Uniqueness -> Chain2
+      | Comonadic Linearity -> Chain2
+      | Monadic Contention -> Diamond4
+      | Comonadic Portability -> Diamond4
+      | Comonadic Forkable -> Chain2
+      | Comonadic Yielding -> Chain2
+      | Comonadic Statefulness -> Diamond4
+      | Monadic Visibility -> Diamond4
+      | Monadic Staticity -> Chain2
+      | Comonadic Externality -> Chain3)
     axis_by_number
 
 let num_axes = Array.length axis_shapes
@@ -211,17 +208,14 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
 let relevant_axes_of_modality (modality : Mode.Modality.Const.t) :
     Jkind_axis.Axis_set.t =
   Jkind_axis.Axis_set.create ~f:(fun ~axis:(Jkind_axis.Axis.Pack axis) ->
-      match axis with
-      | Modal axis ->
-        let (Mode.Modality.Axis.P axis_for_modality) =
-          Mode.Crossing.Axis.(P axis |> to_modality)
-        in
-        let modality_on_axis =
-          Mode.Modality.Const.proj axis_for_modality modality
-        in
-        not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
-      | Nonmodal Externality -> true)
+      let (Mode.Modality.Axis.P axis_for_modality) =
+        Mode.Crossing.Axis.(P axis |> to_modality)
+      in
+      let modality_on_axis =
+        Mode.Modality.Const.proj axis_for_modality modality
+      in
+      not
+        (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis))
 
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
@@ -449,6 +443,9 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
       ~portability:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (portability x)))
+      ~externality:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const (externality x)))
       ~forkable:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (forkable x)))
@@ -470,6 +467,29 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
   |> set_statefulness statefulness
   |> set_visibility visibility |> set_staticity staticity
   |> set_externality externality
+
+let of_mode_crossing (crossing : Mode.Crossing.t) =
+  let create_lattice = create in
+  let open Mode.Crossing in
+  let monadic axis =
+    let (Monadic.Atom.Modality (Mode.Modality.Monadic.Atom.Join_const c)) =
+      proj (Axis.Monadic axis) crossing
+    in
+    c
+  in
+  let comonadic axis =
+    let (Comonadic.Atom.Modality (Mode.Modality.Comonadic.Atom.Meet_const c)) =
+      proj (Axis.Comonadic axis) crossing
+    in
+    c
+  in
+  let open Mode.Axis in
+  create_lattice ~areality:(comonadic Areality) ~linearity:(comonadic Linearity)
+    ~uniqueness:(monadic Uniqueness) ~portability:(comonadic Portability)
+    ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
+    ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
+    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
+    ~externality:(comonadic Externality)
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
