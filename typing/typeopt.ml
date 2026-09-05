@@ -1087,8 +1087,15 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) rep =
-  value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
-    ~params ~args labels rep
+  let is_mutable =
+    List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
+      labels
+  in
+  if is_mutable then
+    num_nodes_visited, non_nullable Pgenval
+  else
+    value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args labels rep
 
 and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) rep =
@@ -1139,14 +1146,7 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
-  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ ->
-    let is_mutable =
-      List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
-        labels
-    in
-    if is_mutable then
-      num_nodes_visited, non_nullable Pgenval
-    else begin
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
       let num_nodes_visited, fields =
         match rep with
         | Record_unboxed | Record_dummy _ | Record_undetermined
