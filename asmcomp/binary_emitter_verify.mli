@@ -27,9 +27,10 @@
 
 (** Verification of binary emitter output against system assembler output.
 
-    This module compares the section contents produced by the binary emitter
-    (saved in .binary-sections/ directories) against the corresponding sections
-    extracted from object files produced by the system assembler. *)
+    This module compares the sections produced by the binary emitter (saved in
+    .binary-sections/ directories) against the corresponding sections extracted
+    from object files produced by the system assembler. The exact comparison
+    depends on [comparison_mode]. *)
 
 type section_mismatch =
   { section_name : string;
@@ -56,8 +57,28 @@ type mismatch =
         actual : int
       }
   | Relocation of relocation_mismatch
+  | Instruction of
+      { section_name : string;
+        index : int;
+        assembler : string;
+        binary_emitter : string
+      }
+  | Instruction_count of
+      { section_name : string;
+        assembler : int;
+        binary_emitter : int
+      }
   | Missing_section of string
   | Missing_binary_sections_dir of string
+
+type comparison_mode =
+  | Exact  (** Byte-exact section comparison, including relocations. *)
+  | Disassembly
+      (** Disassemble text sections using objdump and compare instruction text.
+          The [.data] section is still compared byte-for-byte, but other
+          non-text sections are not compared. This tolerates text encoding
+          differences that produce the same decoded instructions, and relocation
+          checks are skipped in this mode. *)
 
 type result =
   | Match of
@@ -66,14 +87,21 @@ type result =
       }
   | Mismatch of mismatch
   | Object_file_error of string
+  | Error of string
 
 (** Compare binary emitter output against assembled object file.
 
+    @param comparison_mode
+      Controls how sections are compared. [Exact] reports any byte or relocation
+      difference. [Disassembly] compares text sections through objdump-based
+      instruction text, while still requiring equal text sizes and exact
+      non-text bytes.
     @param unix The Unix module (as first-class module)
     @param obj_file Path to the .o file produced by the system assembler
     @param binary_sections_dir Path to the .binary-sections/ directory
     @return Comparison result *)
 val compare :
+  comparison_mode:comparison_mode ->
   (module Compiler_owee.Unix_intf.S) ->
   obj_file:string ->
   binary_sections_dir:string ->
