@@ -472,7 +472,7 @@ module Solver = struct
       | None ->
         let expand : type b.
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+            Mode.Crossing.t * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
           let unresolved_base =
             match jkind_desc.base with
@@ -485,7 +485,7 @@ module Solver = struct
       | Some env ->
         let rec expand : type b.
             (b, l * r) Types.base_and_axes ->
-            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+            Mode.Crossing.t * (l * r) Types.with_bounds * Path.t option =
          fun jkind_desc ->
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
@@ -526,7 +526,7 @@ module Solver = struct
    fun ctx jkind_desc ->
     let mod_bounds, unresolved_base =
       let rec expand : type b.
-          (b, l * r) Types.base_and_axes -> Types.mod_bounds * Path.t option =
+          (b, l * r) Types.base_and_axes -> Mode.Crossing.t * Path.t option =
        fun jkind_desc ->
         match ctx.env with
         | None ->
@@ -1757,7 +1757,7 @@ let fast_sub_of_value_sub : type r.
     Axis_lattice.leq sub_lat super_lat
 
 let fast_sub_of_any_super : type r.
-    Types.mod_bounds -> (Allowance.allowed * r) Types.jkind -> bool =
+    Mode.Crossing.t -> (Allowance.allowed * r) Types.jkind -> bool =
  fun mod_bounds sub ->
   match sub.jkind.base with
   | Types.Layout
@@ -1768,7 +1768,7 @@ let fast_sub_of_any_super : type r.
 
 let fast_sub_of_sort_super : type r.
     Jkind_types.Sort.t ->
-    Types.mod_bounds ->
+    Mode.Crossing.t ->
     (Allowance.allowed * r) Types.jkind ->
     bool =
  fun super_sort mod_bounds sub ->

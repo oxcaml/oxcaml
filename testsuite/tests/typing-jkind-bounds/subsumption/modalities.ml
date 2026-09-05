@@ -516,7 +516,7 @@ module Incomparable_middle_bounds_with_constrained_parameter :
   sig type ('a : value mod shared) t : value mod contended end
 |}]
 
-(* Non-modal axis: external_ in with-bounds *)
+(* Externality modalities in with-bounds *)
 
 module External64_with_bound_is_middle : sig
   type ('a : value mod external64) t : value mod external_
