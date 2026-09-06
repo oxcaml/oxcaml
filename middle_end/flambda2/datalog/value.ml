@@ -44,3 +44,6 @@ let compare_repr : type a. a repr -> a -> a -> int =
 
 let print_repr : type a. a repr -> Format.formatter -> a -> unit =
  fun (Int_repr { print }) ppf x -> print ppf x
+
+let must_be_int_repr : type a. a repr -> (a, int) Type.eq =
+ fun (Int_repr _) -> Equal

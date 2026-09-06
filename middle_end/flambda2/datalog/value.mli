@@ -38,3 +38,5 @@ val equal_repr : 'a repr -> 'a -> 'a -> bool
 val compare_repr : 'a repr -> 'a -> 'a -> int
 
 val print_repr : 'a repr -> Format.formatter -> 'a -> unit
+
+val must_be_int_repr : 'a repr -> ('a, int) Type.eq

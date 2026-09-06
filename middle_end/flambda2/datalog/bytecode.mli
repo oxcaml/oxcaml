@@ -28,60 +28,77 @@
 
 open Datalog_imports
 
-type t
-
-val print : Format.formatter -> t -> unit
-
-val run : t -> unit
-
-type _ builder
-
-val build : nil builder -> t
-
-val break : int -> 'a builder
-
-val for_in :
-  'a Value.repr with_name ->
-  'a Trie.Iterator.t list with_names ->
-  ('a Channel.or_null_receiver -> ('a -> 'b) builder) ->
-  'b builder
-
-val if_in :
-  'a Channel.or_null_receiver with_name ->
-  'a Trie.Iterator.t list with_names ->
-  'b builder ->
-  'b builder
-
-val unless :
-  ('t, 'k, 'v) Trie.is_trie ->
-  't Channel.or_null_receiver with_name ->
-  'k Or_null_receiver.hlist with_names ->
-  'a builder ->
-  'a builder
-
-val unless_eq :
-  'a Value.repr ->
-  'a Or_null_receiver.t with_name ->
-  'a Or_null_receiver.t with_name ->
-  'b builder ->
-  'b builder
-
-val filter :
-  ('a Constant.hlist -> bool) ->
-  'a Or_null_receiver.hlist with_names ->
-  'b builder ->
-  'b builder
-
 type bindings_ref
-
-val call :
-  (bindings_ref -> 'a Constant.hlist -> unit) with_name ->
-  'a Or_null_receiver.hlist with_names ->
-  'b builder ->
-  'b builder
 
 type bindings
 
 val print_bindings : Format.formatter -> bindings -> unit
 
 val get_bindings : bindings_ref -> bindings
+
+module Make (Iterator : Leapfrog.Iterator) : sig
+  type t
+
+  val print : Format.formatter -> t -> unit
+
+  val run : t -> unit
+
+  type assembler
+
+  (** [for_in var iterator body] repeats the [body] for each value provided by
+      the [iterator].
+
+      {b Note}: This creates a new scope that can be exited (shortcutting any
+      later iterations) using [break]. *)
+  val for_in :
+    'a Value.repr with_name ->
+    'a Iterator.t list with_names ->
+    ('a Or_null_receiver.t -> assembler) ->
+    assembler
+
+  (** [break n] breaks out of the [n] innermost loops (created with [for_in]).
+
+      {b Note}: [break 0] is a no-op. *)
+  val break : int -> assembler
+
+  (** [if_in key iterators body] executes body if [key] is in the intersection
+      of the [iterators]. *)
+  val if_in :
+    'a Or_null_receiver.t with_name ->
+    'a Iterator.t list with_names ->
+    assembler ->
+    assembler
+
+  val if_not_in :
+    ('t, 'k, _) Trie.is_trie ->
+    't Or_null_receiver.t with_name ->
+    'k Or_null_receiver.hlist with_names ->
+    assembler ->
+    assembler
+
+  val if_not_equal :
+    'v Value.repr ->
+    'v Or_null_receiver.t with_name ->
+    'v Or_null_receiver.t with_name ->
+    assembler ->
+    assembler
+
+  (** [if_ fn args body] executes [body] if [fn] holds for the current values of
+      [args] and does nothing otherwise. *)
+  val if_ :
+    ('a Constant.hlist -> bool) with_name ->
+    'a Or_null_receiver.hlist with_names ->
+    assembler ->
+    assembler
+
+  val call_with_bindings :
+    (bindings_ref -> 'b Constant.hlist -> unit) with_name ->
+    'b Or_null_receiver.hlist with_names ->
+    assembler
+
+  val ( ++ ) : assembler -> assembler -> assembler
+
+  val list : assembler list -> assembler
+
+  val assemble : assembler -> t
+end

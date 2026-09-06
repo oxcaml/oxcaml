@@ -60,7 +60,7 @@ type ('k, 'v) relation =
   | Distinct : 'k Value.repr -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
   | Callback_with_bindings :
-      (Executor.bindings_ref -> 'k Constant.hlist -> unit) * string
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
 
 type atom = Atom : ('k, 'v) relation * 'k Term.hlist -> atom
@@ -82,7 +82,7 @@ val filter :
 
 val callback_with_bindings :
   name:string ->
-  (Executor.bindings_ref -> 'k Constant.hlist -> unit) ->
+  (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) ->
   'k Term.hlist ->
   atom
 
