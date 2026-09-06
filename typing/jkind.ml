@@ -4024,19 +4024,23 @@ module Violation = struct
           becomes [float64 </= a value layout].
 
        2. When we have a box layout but expected a non-box, we hide the box on
-          the *left* (but still print its scannable axes).
+          the *left* (but still print its scannable axes), whether the
+          mismatch is in the layout or in the rest of the kind.
 
           E.g.,   [bits8 box </= word]
-          becomes [value non_pointer </= word]. *)
+          becomes [value non_pointer </= word], and
+                  [immediate box mod immutable </= value mod global]
+          becomes [immutable_data </= value mod global]. *)
+    let offending_display l1 l2 =
+      match l1, l2 with
+      | Layout.Box _, Layout.(Any _ | Sort _ | Product _ | Addressable _) ->
+        Offending_box_as_scannable_bound
+      | Layout.Box _, Layout.Box _
+      | Layout.(Any _ | Sort _ | Product _ | Addressable _), _ ->
+        Offending_exactly
+    in
     let layout_mismatch l1 l2 =
-      let display1 =
-        match l1, l2 with
-        | Layout.Box _, Layout.(Any _ | Sort _ | Product _ | Addressable _) ->
-          Offending_box_as_scannable_bound
-        | Layout.Box _, Layout.Box _
-        | Layout.(Any _ | Sort _ | Product _ | Addressable _), _ ->
-          Offending_exactly
-      in
+      let display1 = offending_display l1 l2 in
       let display2 =
         if
           (not (Layout.is_scannable_or_var l1)) && Layout.is_scannable_or_var l2
@@ -4052,7 +4056,7 @@ module Violation = struct
         match t.violation with
         | Not_a_subjkind _ ->
           if Sub_result.is_le (Layout.sub l1 l2)
-          then Kind, Offending_exactly, Expected_exactly
+          then Kind, offending_display l1 l2, Expected_exactly
           else layout_mismatch l1 l2
         | No_intersection _ -> layout_mismatch l1 l2)
       | Kconstr _, Layout (Layout.Any _) ->
@@ -4109,20 +4113,34 @@ module Violation = struct
       else None
     in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
-    let format_base_or_kind (type l r) ~as_printed ppf (jkind : (l * r) jkind) =
+    let format_base_or_kind (type l r) ~display ppf (jkind : (l * r) jkind) =
       match mismatch_type with
-      | Kind -> fprintf ppf "%t%a" indent (format env) jkind
+      | Kind ->
+        let jkind =
+          match display with
+          | Offending_exactly -> jkind
+          | Offending_box_as_scannable_bound -> (
+            let desc = Base_and_axes.fully_expand_aliases env jkind.jkind in
+            match desc.base with
+            | Layout l ->
+              { jkind with
+                jkind = { desc with base = Layout (offending_layout display l) }
+              }
+            | Kconstr _ -> jkind)
+        in
+        fprintf ppf "%t%a" indent (format env) jkind
       | Layout -> (
         (* We're printing an error about layouts - try to expand. *)
         match extract_layout env jkind with
-        | Ok l -> fprintf ppf "%t%a" indent Layout.format (as_printed l)
+        | Ok l ->
+          fprintf ppf "%t%a" indent Layout.format (offending_layout display l)
         | Error p -> fprintf ppf "the abstract kind %s" (Path.name p))
     in
     let format_first_base_or_kind ppf k1 =
-      format_base_or_kind ~as_printed:(offending_layout display1) ppf k1
+      format_base_or_kind ~display:display1 ppf k1
     in
     let format_base_or_kind ppf k2 =
-      format_base_or_kind ~as_printed:Fun.id ppf k2
+      format_base_or_kind ~display:Offending_exactly ppf k2
     in
     (* [first_layout_intro] follows "The layout of t is";
        [first_layout_format] follows "t has" *)

@@ -40,7 +40,7 @@ Error: Signature mismatch:
          type t : immediate box
        is not included in
          type t : value non_float mod contended
-       The kind of the first is immediate box
+       The kind of the first is mutable_data
          because of the definition of t at line 4, characters 2-24.
        But the kind of the first must be a subkind of
            value non_float mod contended
@@ -66,7 +66,7 @@ Error: Signature mismatch:
          type t : immediate box
        is not included in
          type t : value non_float mod external_
-       The kind of the first is immediate box
+       The kind of the first is mutable_data
          because of the definition of t at line 4, characters 2-24.
        But the kind of the first must be a subkind of
            value non_float mod external_
@@ -92,7 +92,7 @@ Error: Signature mismatch:
          type t : immediate box
        is not included in
          type t : value non_float mod global
-       The kind of the first is immediate box
+       The kind of the first is mutable_data
          because of the definition of t at line 4, characters 2-24.
        But the kind of the first must be a subkind of
            value non_float mod global
@@ -120,7 +120,7 @@ Error: Signature mismatch:
          type t : value box
        is not included in
          type t : value non_float mod portable
-       The kind of the first is value box
+       The kind of the first is value non_float
          because of the definition of t at line 4, characters 2-20.
        But the kind of the first must be a subkind of
            value non_float mod portable
@@ -198,7 +198,7 @@ Error: Signature mismatch:
          type t : (bits64 mod everything) box
        is not included in
          type t : value non_float mod contended
-       The kind of the first is (bits64 mod everything) box
+       The kind of the first is mutable_data
          because of the definition of t at line 4, characters 2-38.
        But the kind of the first must be a subkind of
            value non_float mod contended
@@ -224,7 +224,7 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) t" should be an instance of type
          "('a : value mod portable)"
-       The kind of (int -> int) t is value non_float box
+       The kind of (int -> int) t is value non_float
          because of the definition of t at line 1, characters 0-40.
        But the kind of (int -> int) t must be a subkind of value mod portable
          because of the definition of port_req at line 1, characters 0-39.
@@ -235,7 +235,7 @@ Line 2, characters 10-15:
               ^^^^^
 Error: This type "int t" should be an instance of type
          "('a : value mod portable)"
-       The kind of int t is mutable_data box with int
+       The kind of int t is mutable_data with int
          because of the definition of t at line 1, characters 0-40.
        But the kind of int t must be a subkind of value mod portable
          because of the definition of port_req at line 1, characters 0-39.
@@ -251,7 +251,7 @@ Line 2, characters 11-16:
                ^^^^^
 Error: This type "int t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t is mutable_data box
+       The kind of int t is mutable_data
          because of the definition of t at line 1, characters 0-40.
        But the kind of int t must be a subkind of value mod contended
          because of the definition of cont_req at line 1, characters 0-40.
@@ -262,7 +262,7 @@ Line 2, characters 11-16:
                ^^^^^
 Error: This type "int t" should be an instance of type
          "('a : value mod contended)"
-       The kind of int t is mutable_data box with int
+       The kind of int t is mutable_data with int
          because of the definition of t at line 1, characters 0-40.
        But the kind of int t must be a subkind of value mod contended
          because of the definition of cont_req at line 1, characters 0-40.
@@ -279,7 +279,7 @@ Line 3, characters 11-12:
 3 | type bad = t ext_req
                ^
 Error: This type "t" should be an instance of type "('a : value mod external_)"
-       The kind of t is immediate box
+       The kind of t is mutable_data
          because of the definition of t at line 1, characters 0-22.
        But the kind of t must be a subkind of value mod external_
          because of the definition of ext_req at line 2, characters 0-39.
