@@ -429,6 +429,7 @@ let rec subst_patt initial ~by patt =
       { patt with pat_desc = Tpat_array (m, sort, List.map lst ~f) }
     | Tpat_or (p1, p2, row) ->
       { patt with pat_desc = Tpat_or (f p1, f p2, row) }
+    | Tpat_modality p -> { patt with pat_desc = Tpat_modality (f p) }
     | Tpat_lazy p -> { patt with pat_desc = Tpat_lazy (f p) }
 
 let rec rm_sub patt sub =
@@ -477,6 +478,7 @@ let rec rm_sub patt sub =
     if p1 == sub then p2
     else if p2 == sub then p1
     else { patt with pat_desc = Tpat_or (f p1, f p2, row) }
+  | Tpat_modality p -> { patt with pat_desc = Tpat_modality (f p) }
   | Tpat_lazy p -> { patt with pat_desc = Tpat_lazy (f p) }
 
 let rec qualify_constructors ~unmangling_tables f pat =
@@ -575,7 +577,8 @@ let find_branch patterns sub =
       | Tpat_unboxed_bool _ | Tpat_unboxed_unit | Tpat_fun_layout _ -> false
       | Tpat_alias { pattern = p; _ }
       | Tpat_variant (_, Some p, _)
-      | Tpat_lazy p -> is_sub_patt p ~sub
+      | Tpat_lazy p
+      | Tpat_modality p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
         List.exists lst ~f:(fun (_lbl, p) -> is_sub_patt ~sub p)
       | Tpat_unboxed_tuple lst ->
@@ -658,7 +661,7 @@ module Conv = struct
         mkpat (Ppat_var nm)
       | Tpat_any | Tpat_var _ | Tpat_fun_layout _ -> mkpat Ppat_any
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
-      | Tpat_alias { pattern = p; _ } -> loop p
+      | Tpat_alias { pattern = p; _ } | Tpat_modality p -> loop p
       | Tpat_tuple lst ->
         let lst = List.map ~f:(fun (lbl, p) -> (lbl, loop p)) lst in
         mkpat (Ppat_tuple (lst, Closed))

@@ -6969,7 +6969,6 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
-<<<<<<< Merlin:pr7096-merlin-import
 let create_merlin_type_error_node loc env ty_expected ~attributes =
     { exp_desc =
         Texp_ident
@@ -6999,10 +6998,6 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
       exp_attributes = attributes;
     }
 
-let add_zero_alloc_attribute expr attributes =
-||||||| Compiler:last-imported
-let add_zero_alloc_attribute expr attributes =
-=======
 let rec eliminate_modal_head env exp mode =
   match Modality_elaboration.outer_layer ~loc:exp.exp_loc env exp.exp_type with
   | None -> exp, mode
@@ -7022,7 +7017,6 @@ let eliminate_modal_callee env exp mode =
     result, mode
 
 let rec add_zero_alloc_attribute expr attributes =
->>>>>>> Compiler:HEAD
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
     | Check { strict; loc = _} ->
@@ -7920,7 +7914,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
-<<<<<<< Merlin:pr7096-merlin-import
+      let exp = rue exp in
       let () =
         try submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode
         with exn ->
@@ -7941,12 +7935,6 @@ and type_expect_
               exp_env = env;
             }
       in
-||||||| Compiler:last-imported
-      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
-=======
-      let exp = rue exp in
-      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
->>>>>>> Compiler:HEAD
       check_tail_call_local_returning loc env ap_mode pm;
       exp
       end
@@ -8652,17 +8640,9 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, met) ->
-<<<<<<< Merlin:pr7096-merlin-import
-    submode ~loc ~env Mode.Value.legacy expected_mode;
     let obj = type_exp env mode_legacy e in
     let pm = position_and_mode env expected_mode sexp in
     begin try
-||||||| Compiler:last-imported
-      submode ~loc ~env Mode.Value.legacy expected_mode;
-      let pm = position_and_mode env expected_mode sexp in
-=======
-      let pm = position_and_mode env expected_mode sexp in
->>>>>>> Compiler:HEAD
       let (obj,meth,typ) =
         with_local_level_generalize_structure_if_principal
           ~before_generalize:(fun (_, _, typ) -> generalize_structure typ)

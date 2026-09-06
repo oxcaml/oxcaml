@@ -23,6 +23,7 @@ module Mode_info = struct
     let ({ areality;
            portability;
            contention;
+           externality = _;
            visibility;
            statefulness;
            uniqueness;

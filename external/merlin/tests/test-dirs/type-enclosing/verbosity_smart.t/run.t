@@ -47,7 +47,7 @@ In the tests below we see the different behavior of verbosity = 0 and = "smart"
           "line": 13,
           "col": 9
         },
-        "type": "sig val u : unit end",
+        "type": "sig val u : unit @@ stateless end",
         "tail": "no"
       },
       {
@@ -59,7 +59,7 @@ In the tests below we see the different behavior of verbosity = 0 and = "smart"
           "line": 13,
           "col": 13
         },
-        "type": "sig val u : unit end",
+        "type": "sig val u : unit @@ stateless end",
         "tail": "no"
       }
     ],

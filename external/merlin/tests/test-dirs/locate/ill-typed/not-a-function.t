@@ -42,7 +42,7 @@ When some typing error happens
 
 Merlin is still able to inspect part of the ill-typed tree
   $ $MERLIN single type-enclosing -position 8:25 \
-  > -filename ill.ml <ill.ml | jq '.value[0]'
+  > -filename ill.ml <ill.ml | revert-newlines | jq '.value[0]'
   {
     "start": {
       "line": 8,
