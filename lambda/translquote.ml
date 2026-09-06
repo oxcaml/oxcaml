@@ -2473,6 +2473,7 @@ let rec with_new_idents_pat pat =
     List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
+  | Tpat_modality pat -> with_new_idents_pat pat
   | Tpat_lazy pat -> with_new_idents_pat pat
   | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
@@ -2505,6 +2506,7 @@ let rec without_idents_pat pat =
     List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_record_unboxed_product (lbl_pats, _, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
+  | Tpat_modality pat -> without_idents_pat pat
   | Tpat_lazy pat -> without_idents_pat pat
   | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
@@ -2860,6 +2862,9 @@ and quote_value_pattern ~scopes p =
         match closed with Asttypes.Closed -> true | Asttypes.Open -> false
       in
       Pat.unboxed_record loc lbl_pats closed
+    | Tpat_modality _ ->
+      Location.raise_errorf ~loc:(to_location loc)
+        "First-class modality patterns are not supported in quotations"
     | Tpat_lazy pat ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.lazy_ loc pat
@@ -3759,6 +3764,9 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       Exp_desc.pack loc (quote_module_exp ~transl stage loc env m)
     | Texp_unreachable -> Exp_desc.unreachable
     | Texp_src_pos -> Exp_desc.src_pos
+    | Texp_modality _ ->
+      Location.raise_errorf ~loc:loc'
+        "First-class modality conversions are not supported in quotations"
     | Texp_exclave e ->
       Exp_desc.exclave loc (quote_expression ~scopes ~transl stage e)
     | Texp_extension_constructor (_, path) ->

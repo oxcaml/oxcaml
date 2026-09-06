@@ -451,6 +451,7 @@ let rec transl_exp ~scopes layout e =
    We give it f's scope.
 *)
 and transl_exp1 ~scopes ~in_new_scope layout e =
+  let e = Typedtree.modality_expression_head e in
   let eval_once =
     (* Whether classes for immediate objects must be cached *)
     match e.exp_desc with
@@ -461,6 +462,15 @@ and transl_exp1 ~scopes ~in_new_scope layout e =
   Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope layout) e
 
 and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
+  let e =
+    match e.exp_desc with
+    | Texp_apply (funct, args, position, mode, yielding, zero_alloc) ->
+        let head = Typedtree.modality_expression_head funct in
+        if head == funct then e else
+          { e with exp_desc =
+              Texp_apply (head, args, position, mode, yielding, zero_alloc) }
+    | _ -> e
+  in
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
       transl_ident (of_location ~scopes e.exp_loc)
@@ -1333,18 +1343,17 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_pack modl ->
       let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
       !transl_module ~scopes:mod_scopes Tcoerce_none None modl
-  | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
-                 loc) ->
-      assert_failed loc ~scopes e
   | Texp_assert (cond, loc) ->
-      if !Clflags.noassert
-      then lambda_unit
-      else begin
-        Lifthenelse
-          (transl_exp ~scopes Lambda.layout_bool cond,
-           lambda_unit,
-           assert_failed loc ~scopes e,
-           Lambda.layout_unit)
+      begin match (Typedtree.modality_expression_head cond).exp_desc with
+      | Texp_construct(_, {cstr_name="false"}, _, _, _) ->
+          assert_failed loc ~scopes e
+      | _ when !Clflags.noassert -> lambda_unit
+      | _ ->
+          Lifthenelse
+            (transl_exp ~scopes Lambda.layout_bool cond,
+             lambda_unit,
+             assert_failed loc ~scopes e,
+             Lambda.layout_unit)
       end
   | Texp_lazy e ->
       (* when e needs no computation (constants, identifiers, ...), we
@@ -1584,6 +1593,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             [], of_location ~scopes e.exp_loc)
     else
       lambda_unit
+  | Texp_modality child ->
+      transl_exp1 ~scopes ~in_new_scope layout child
   | Texp_exclave e ->
     let l = transl_exp ~scopes layout e in
     if Config.stack_allocation then Lexclave l
@@ -1910,14 +1921,19 @@ and transl_tupled_function
         Some (case, [], fp_partial, fp_mode.mode_modes, fp_sort)
     | _ -> None
   in
+  let eligible_cases =
+    Option.map
+      (fun ((first_case, _, _, _, _) as cases) ->
+        (Patterns.General.view first_case.c_lhs).pat_desc, cases)
+      eligible_cases
+  in
   (* Cases can be eligible for flattening if they belong to the only param
      (whose alloc mode must be global) and the function itself is global. It may
      actually be sound to tuplify locally-allocated functions, but we haven't
      thought it through. *)
   match eligible_cases with
   | Some
-      (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
-       rest_cases, partial, arg_mode, arg_sort)
+      (`Tuple pl, (first_case, rest_cases, partial, arg_mode, arg_sort))
     when is_alloc_heap mode
       && is_alloc_heap (transl_alloc_mode_l arg_mode)
       && !Clflags.native_code

@@ -296,6 +296,7 @@
   typedecl
   typeopt
   value_rec_check
+  modality_elaboration
   typecore
   solver_intf
   solver

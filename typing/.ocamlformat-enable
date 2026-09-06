@@ -40,3 +40,5 @@ signature_with_global_bindings.mli
 zero_alloc.ml
 zero_alloc.mli
 ikinds/*
+modality_elaboration.ml
+modality_elaboration.mli

@@ -547,6 +547,9 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_array %a\n" fmt_mutable_mode_flag am;
       line i ppf "%a\n" fmt_sort arg_sort;
       list i pattern ppf l;
+  | Tpat_modality p ->
+      line i ppf "Tpat_modality\n";
+      pattern i ppf p;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
       pattern i ppf p;
@@ -893,6 +896,9 @@ and expression i ppf x =
       expression i ppf handler;
   | Texp_probe_is_enabled {name} ->
       line i ppf "Texp_probe_is_enabled \"%s\"\n" name;
+  | Texp_modality e ->
+      line i ppf "Texp_modality\n";
+      expression i ppf e;
   | Texp_exclave (e) ->
       line i ppf "Texp_exclave";
       expression i ppf e;

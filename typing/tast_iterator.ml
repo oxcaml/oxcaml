@@ -317,6 +317,7 @@ let pat
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
+  | Tpat_modality p -> sub.pat sub p
   | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
@@ -518,6 +519,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub e
   | Texp_probe {handler;_} -> sub.expr sub handler
   | Texp_probe_is_enabled _ -> ()
+  | Texp_modality exp -> sub.expr sub exp
   | Texp_exclave exp -> sub.expr sub exp
   | Texp_src_pos -> ()
   | Texp_overwrite(exp1, exp2) ->
