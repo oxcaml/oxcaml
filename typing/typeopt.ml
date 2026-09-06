@@ -51,17 +51,19 @@ exception Error of Location.t * error
 (* CR external-mode: Don't disregard modalities when using [scrape_ty] to reason
    about the runtime properties of a type - in particular, in
    [maybe_pointer_ty], when checking whether a type crosses externality. *)
-let scrape_ty env ty =
+let rec scrape_ty env ty =
   let ty =
     match get_desc ty with
     | Tpoly(ty, _) -> ty
     | _ -> ty
   in
   match get_desc ty with
+  | Tmod (ty, _) -> scrape_ty env ty
   | Tconstr _
   | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.expand_head_opt env ty in
       begin match get_desc ty with
+      | Tmod (ty, _) -> scrape_ty env ty
       | Tconstr (p, _, _) ->
           begin match find_unboxed_type (Env.find_type p env) with
           | Some _ -> begin
@@ -211,9 +213,8 @@ let rec classify ~classify_product env ty layout : _ classification =
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
   else match get_desc ty with
-  | Tvar _ | Tunivar _ | Tof_kind _ ->
+  | Tvar _ | Tunivar _ | Tof_kind _ | Tmod _ ->
       Any
-  | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -883,7 +884,6 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
-        | Tmod _ -> Misc.fatal_error "Typeopt: unexpected Tmod"
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()
@@ -901,7 +901,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
                because [scrape_ty] looks though them. *)
             unknown ()
           end
-        | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
+        | Tmod _ | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
         | Tquote _ | Tsplice _ | Tquote_eval _ | Tof_kind _ | Tbox _ ->
           unknown ()

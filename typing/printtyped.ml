@@ -435,6 +435,10 @@ let rec core_type i ppf x =
   | Ttyp_open (path, _mod_ident, t) ->
       line i ppf "Ttyp_open %a\n" fmt_path path;
       core_type i ppf t
+  | Ttyp_modality (t, m) ->
+      line i ppf "Ttyp_modality\n";
+      core_type i ppf t;
+      modalities i ppf m
   | Ttyp_quote t ->
       line i ppf "Ttyp_quote\n";
       core_type i ppf t

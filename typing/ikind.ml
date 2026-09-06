@@ -618,10 +618,10 @@ module Solver = struct
       self_provenance (Ldd.meet (rigid ctx ty) (ckind_of_jkind child_ctx jkind))
     | Types.Tconstr (path, args, _abbrev_memo) ->
       constr ~self_provenance ~arg_ctx:child_ctx ctx path args
-    | Types.Tmod (ty, mod_bounds) ->
+    | Types.Tmod (ty, modality) ->
       Ldd.meet
         (kind ~use_tables:true ctx ty)
-        (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+        (Ldd.const (Axis_lattice.mask_of_modality modality))
     | Types.Ttuple elts ->
       (* Boxed tuples: immutable_data base + per-element contributions
          under id modality. *)

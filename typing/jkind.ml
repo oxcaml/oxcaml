@@ -1382,10 +1382,10 @@ module Base_and_axes = struct
           | true -> loop ctl bounds_so_far bounds_mask bs
           | false -> (
             match get_desc ty with
-            | Tmod (ty, mod_bounds) ->
+            | Tmod (ty, modality) ->
               let bounds_mask_for_inner =
                 Bounds_mask.meet bounds_mask_for_ty
-                  (Mod_bounds.to_axis_lattice mod_bounds)
+                  (Mod_bounds.mask_of_modality ~modality)
               in
               if Bounds_mask.is_empty bounds_mask_for_inner
               then loop ctl bounds_so_far bounds_mask bs

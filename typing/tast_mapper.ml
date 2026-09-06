@@ -1087,6 +1087,8 @@ let typ sub x =
     | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
+    | Ttyp_modality (t, m) ->
+        Ttyp_modality (sub.typ sub t, sub.modalities sub m)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
   in

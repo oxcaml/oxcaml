@@ -2317,7 +2317,9 @@ module Jkind0 = struct
               let projected_param =
                 if Mod_bounds.is_max jkind.jkind.mod_bounds
                 then projected_param
-                else newgenty (Tmod (projected_param, jkind.jkind.mod_bounds))
+                else newgenty
+                    (Tmod (projected_param,
+                           Mode.Crossing.to_modality jkind.jkind.mod_bounds))
               in
               res_arg :: domain, projected_param :: range,
               TypeSet.add res_arg seen

@@ -2644,7 +2644,9 @@ let type_for_annotation ~env ~loc typ =
         | Tconstr (p, tyl, _) ->
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
-        | Tmod _ -> fatal_errorf "Translquote: unexpected Tmod"
+        | Tmod _ ->
+          Location.raise_errorf ~loc
+            "First-class modality types are not supported in quotations"
         | Tobject (fields, _) ->
           let Out_type.{ fields; open_row } =
             Out_type.tree_of_typobject_repr fields
@@ -3017,6 +3019,9 @@ and quote_core_type ~scopes ty =
         tpt_cstrs
     in
     Type.package loc mod_type with_types |> Type.wrap
+  | Ttyp_modality _ ->
+    Location.raise_errorf ~loc:(to_location loc)
+      "First-class modality types are not supported in quotations"
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
   | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."

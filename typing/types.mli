@@ -207,14 +207,11 @@ and type_desc =
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
 
-  | Tmod of type_expr * Mode.Crossing.t
-  (** [Tmod (t, bounds)] ==> [t @@ bounds]
-      The type [t] with its mode crossing bounded by [bounds]. This is a
-      transparent wrapper: it constrains mode crossing only, and erases at
-      runtime. The unboxing and kind-computation paths look through it to [t],
-      as they do for [Tpoly]; generic structural traversals rebuild it; the
-      leaf consumers that classify a type's runtime representation raise,
-      since a [Tmod] is not expected to reach them. *)
+  | Tmod of type_expr * Mode.Modality.Const.t
+  (** [Tmod (t, modality)] represents [(t @@ modality)]. It is an injective
+      type constructor with the payload's runtime representation. Nested and
+      identity wrappers remain distinct, even when their mode guarantees agree.
+      Kind computation applies the modality without changing type identity. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]

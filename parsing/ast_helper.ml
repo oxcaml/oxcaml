@@ -80,6 +80,7 @@ module Typ = struct
   let package ?loc ?attrs a = mk ?loc ?attrs (Ptyp_package a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
+  let modality ?loc ?attrs t m = mk ?loc ?attrs (Ptyp_modality (t, m))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
   let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
   let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
@@ -143,6 +144,8 @@ module Typ = struct
             Ptyp_package (loop_package_type ptyp)
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
+        | Ptyp_modality (core_type, modalities) ->
+            Ptyp_modality (loop core_type, modalities)
         | Ptyp_quote core_type ->
             Ptyp_quote (loop core_type)
         | Ptyp_splice core_type ->

@@ -772,6 +772,9 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_open (_, mod_ident, t) ->
       iter_loc_lid sub mod_ident;
       sub.typ sub t
+  | Ttyp_modality (t, m) ->
+      sub.typ sub t;
+      sub.modalities sub m
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
