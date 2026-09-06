@@ -360,6 +360,8 @@ module Compat
   | ((Tpat_any|Tpat_var _),_)
   | (_,(Tpat_any|Tpat_var _)) -> true
 (* Structural induction *)
+  | Tpat_modality p, _ -> compat p q
+  | _, Tpat_modality q -> compat p q
   | Tpat_alias { pattern = p; _ },_      -> compat p q
   | _,Tpat_alias { pattern = q; _ }      -> compat p q
   | Tpat_or (p1,p2,_),_ ->
@@ -621,7 +623,8 @@ let rec read_args xs r = match xs,r with
 | _,_ ->
     fatal_error "Parmatch.read_args"
 
-let set_args q r = match q with
+let rec set_args q r = match q with
+| {pat_desc = Tpat_modality p} -> set_args p r
 | {pat_desc = Tpat_tuple lbls_omegas} ->
     let lbls, omegas = List.split lbls_omegas in
     let args, rest = read_args omegas r in
@@ -702,7 +705,8 @@ let set_args q r = match q with
  *)
 let simplify_head_pat ~add_column p ps k =
   let rec simplify_head_pat p ps k =
-    match Patterns.General.(view p |> strip_vars).pat_desc with
+    let p = Patterns.General.(view p |> strip_vars) in
+    match p.pat_desc with
     | `Or (p1,p2,_) -> simplify_head_pat p1 ps (simplify_head_pat p2 ps k)
     | #Patterns.Simple.view as view ->
        add_column (Patterns.Head.deconstruct { p with pat_desc = view }) ps k
@@ -1301,6 +1305,7 @@ let rec has_instance p = match p.pat_desc with
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_unboxed_unit
   | Tpat_fun_layout _
   | Tpat_unboxed_bool _ | Tpat_variant (_,None,_) -> true
+  | Tpat_modality p
   | Tpat_alias { pattern = p; _ } | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
   | Tpat_construct (_,_,_,ps, _) ->
@@ -1349,7 +1354,8 @@ let rec satisfiable pss qs = match pss with
     match qs with
     | [] -> false
     | q::qs ->
-       match Patterns.General.(view q |> strip_vars).pat_desc with
+       let q = Patterns.General.(view q |> strip_vars) in
+       match q.pat_desc with
        | `Or(q1,q2,_) ->
           satisfiable pss (q1::qs) || satisfiable pss (q2::qs)
        | `Any ->
@@ -1400,7 +1406,8 @@ let rec list_satisfying_vectors pss qs =
       match qs with
       | [] -> []
       | q :: qs ->
-         match Patterns.General.(view q |> strip_vars).pat_desc with
+         let q = Patterns.General.(view q |> strip_vars) in
+         match q.pat_desc with
          | `Or(q1,q2,_) ->
             list_satisfying_vectors pss (q1::qs) @
             list_satisfying_vectors pss (q2::qs)
@@ -1476,7 +1483,9 @@ let rec do_match pss qs = match qs with
     | []::_ -> true
     | _ -> false
     end
-| q::qs -> match Patterns.General.(view q |> strip_vars).pat_desc with
+| q::qs ->
+  let q = Patterns.General.(view q |> strip_vars) in
+  match q.pat_desc with
   | `Or (q1,q2,_) ->
       do_match pss (q1::qs) || do_match pss (q2::qs)
   | `Any ->
@@ -1764,6 +1773,7 @@ let is_var_column rs =
 (* Standard or-args for left-to-right matching *)
 let rec or_args p = match p.pat_desc with
 | Tpat_or (p1,p2,_) -> p1,p2
+| Tpat_modality p -> or_args p
 | Tpat_alias { pattern = p; _ }  -> or_args p
 | _                 -> assert false
 
@@ -1866,7 +1876,8 @@ let rec every_satisfiables pss qs = match qs.active with
           Used
     end
 | q::rem ->
-    begin match Patterns.General.(view q |> strip_vars).pat_desc with
+    let q = Patterns.General.(view q |> strip_vars) in
+    begin match q.pat_desc with
     | `Any ->
         if is_var_column pss then
           (* forget about ``all-variable''  columns now *)
@@ -1944,6 +1955,8 @@ and every_both pss qs q1 q2 =
 let rec le_pat p q =
   match (p.pat_desc, q.pat_desc) with
   | (Tpat_var _|Tpat_any),_ -> true
+  | Tpat_modality p, _ -> le_pat p q
+  | _, Tpat_modality q -> le_pat p q
   | Tpat_alias { pattern = p; _ }, _ -> le_pat p q
   | _, Tpat_alias { pattern = q; _ } -> le_pat p q
   | Tpat_constant(c1), Tpat_constant(c2) -> const_compare c1 c2 = 0
@@ -2007,6 +2020,8 @@ let get_mins le ps =
 *)
 
 let rec lub p q = match p.pat_desc,q.pat_desc with
+| Tpat_modality p, _ -> lub p q
+| _, Tpat_modality q -> lub p q
 | Tpat_alias { pattern = p; _ },_      -> lub p q
 | _,Tpat_alias { pattern = q; _ }      -> lub p q
 | (Tpat_any|Tpat_var _),_ -> q
@@ -2252,6 +2267,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
     List.fold_left
       (fun r (_, _, p) -> collect_paths_from_pat r p)
       r lps
+| Tpat_modality p
 | Tpat_variant (_, Some p, _) | Tpat_alias { pattern = p; _ } ->
     collect_paths_from_pat r p
 | Tpat_or (p1,p2,_) ->
@@ -2399,6 +2415,7 @@ let inactive ~partial pat =
             List.for_all (fun (_, p) -> loop p) ps
         | Tpat_array (Immutable, _, ps) ->
             List.for_all (fun p -> loop p) ps
+        | Tpat_modality p
         | Tpat_alias { pattern = p; _ } | Tpat_variant (_, Some p, _) ->
             loop p
         | Tpat_record (ldps,_,_) ->
@@ -2527,7 +2544,8 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
-    match (Patterns.General.view p).pat_desc with
+    let p = Patterns.General.view p in
+    match p.pat_desc with
     | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
     | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _, _) ->

@@ -1984,6 +1984,7 @@ let conjuncts_pattern_match l =
 
 let rec pattern_match_tuple pat values =
   match pat.pat_desc with
+  | Tpat_modality child -> pattern_match_tuple child values
   | Tpat_or (pat0, pat1, _) ->
     Unique_barrier.enable pat.pat_unique_barrier;
     let ext0, uf0 = pattern_match_tuple pat0 values in
@@ -2033,7 +2034,9 @@ let rec pattern_match_tuple pat values =
 and pattern_match_barrier pat paths : UF.t =
   let loc = pat.pat_loc in
   let occ = Occurrence.mk loc in
-  Unique_barrier.enable pat.pat_unique_barrier;
+  (match pat.pat_desc with
+  | Tpat_modality _ -> ()
+  | _ -> Unique_barrier.enable pat.pat_unique_barrier);
   let no_memory_access () =
     ignore (Unique_barrier.resolve pat.pat_unique_barrier);
     UF.unused
@@ -2047,6 +2050,7 @@ and pattern_match_barrier pat paths : UF.t =
     Paths.mark_aliased occ reason paths
   in
   match pat.pat_desc with
+  | Tpat_modality _ -> UF.unused
   | Tpat_or _ -> no_memory_access ()
   | Tpat_any -> no_memory_access ()
   | Tpat_var _ -> no_memory_access ()
@@ -2091,6 +2095,7 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
   let uf_read = pattern_match_barrier pat paths in
   let ext, uf_pats =
     match pat.pat_desc with
+    | Tpat_modality child -> pattern_match_single child paths
     | Tpat_or (pat0, pat1, _) ->
       let ext0, uf0 = pattern_match_single pat0 paths in
       let ext1, uf1 = pattern_match_single pat1 paths in
@@ -2350,6 +2355,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_ident _ as exp_desc ->
     let value, uf = check_uniqueness_exp_desc_as_value ienv ~loc exp_desc in
     UF.seq uf (Value.mark_maybe_unique value)
+  | Texp_modality child -> check_uniqueness_exp ~overwrite ienv child
   | Texp_apply_layout (exp, _) -> check_uniqueness_exp ~overwrite:None ienv exp
   | Texp_constant _ -> UF.unused
   | Texp_let (_, vbs, body) ->
@@ -2657,7 +2663,7 @@ let rec check_uniqueness_exp_desc ~borrows ~overwrite (ienv : Ienv.t) ~loc :
   | Texp_overwrite (e1, e2) ->
     let value, uf = check_uniqueness_exp_as_value ienv e1 in
     let uf_tag =
-      match e2.exp_desc with
+      match (Typedtree.modality_expression_head e2).exp_desc with
       | Texp_construct (lbl, cd, _, _, _) ->
         Value.overwrite_tag { tag = cd.cstr_tag; name_for_error = lbl } value
       | Texp_record _ | Texp_tuple _ -> UF.unused
@@ -2705,6 +2711,7 @@ and check_uniqueness_exp ~borrows ~overwrite (ienv : Ienv.t) exp : UF.t =
     needed *)
 and check_uniqueness_exp_desc_as_value ~borrows ienv ~loc : _ -> Value.t * UF.t
     = function
+  | Texp_modality child -> check_uniqueness_exp_as_value ~borrows ienv child
   | Texp_ident { path; unique_use; _ } ->
     let occ = Occurrence.mk loc in
     let value =
@@ -2794,6 +2801,7 @@ and check_uniqueness_exp_as_value ~borrows (ienv : Ienv.t) exp : Value.t * UF.t
 (** take typed expression, do some parsing and returns [value_to_match] *)
 and check_uniqueness_exp_desc_for_match ~borrows ienv ~loc :
     _ -> value_to_match * UF.t = function
+  | Texp_modality child -> check_uniqueness_exp_for_match ~borrows ienv child
   | Texp_tuple (es, _) ->
     let values, ufs =
       List.split

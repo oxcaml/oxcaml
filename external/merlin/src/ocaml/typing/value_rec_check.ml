@@ -146,7 +146,8 @@ let classify_expression : Typedtree.expression -> sd =
   *)
   let rec classify_expression env e : sd =
     match e.exp_desc with
-    | Texp_apply_layout (exp, _) -> classify_expression env exp
+    | Texp_apply_layout (exp, _) | Texp_modality exp ->
+        classify_expression env exp
     (* binding and variable cases *)
     | Texp_let (rec_flag, vb, e) ->
         let env = classify_value_bindings rec_flag env vb in
@@ -1088,6 +1089,7 @@ let rec expression : Typedtree.expression -> term_judg =
     | Texp_probe {handler} ->
       expression handler << Dereference
     | Texp_probe_is_enabled _ -> empty
+    | Texp_modality e -> expression e
     | Texp_exclave e -> expression e
     | Texp_src_pos -> empty
     | Texp_typed_hole -> empty
@@ -1538,7 +1540,8 @@ and is_destructuring_pattern : type k . k general_pattern -> bool =
     | Tpat_any -> false
     | Tpat_var _ -> false
     | Tpat_fun_layout _ -> false
-    | Tpat_alias { pattern = pat; _ } -> is_destructuring_pattern pat
+    | Tpat_alias { pattern = pat; _ } | Tpat_modality pat ->
+        is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true
     | Tpat_unboxed_bool _ -> true

@@ -214,6 +214,8 @@ module T = struct
         package ~loc ~attrs (sub.package_type sub ptyp)
     | Ptyp_open (mod_ident, t) ->
         open_ ~loc ~attrs (map_loc_lid sub mod_ident) (sub.typ sub t)
+    | Ptyp_modality (t, m) ->
+        modality ~loc ~attrs (sub.typ sub t) (sub.modalities sub m)
     | Ptyp_quote t ->
         quote ~loc ~attrs (sub.typ sub t)
     | Ptyp_splice t ->

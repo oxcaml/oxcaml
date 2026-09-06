@@ -376,6 +376,8 @@ and 'k pattern_desc =
       value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
+  | Tpat_modality :
+      value general_pattern -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)
@@ -749,6 +751,7 @@ and expression_desc =
         (** let open[!] M in e *)
   | Texp_probe of { name:string; handler:expression; enabled_at_init:bool }
   | Texp_probe_is_enabled of { name:string }
+  | Texp_modality of expression
   | Texp_exclave of expression
   | Texp_src_pos
     (* A source position value which has been automatically inferred, either
@@ -1339,6 +1342,7 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_modality of core_type * modalities
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
@@ -1604,6 +1608,12 @@ type item_declaration =
     declarations in signatures and their definitions in implementations. *)
 
 (* Auxiliary functions over the a.s.t. *)
+
+(** Inspect the actual operand through implicit modality nodes. The view keeps
+    its payload type and combines outer attributes/extras exactly once without
+    modifying the original expression graph. An ordinary expression is returned
+    unchanged. *)
+val modality_expression_head : expression -> expression
 
 (** [as_computation_pattern p] is a computation pattern with description
     [Tpat_value p], which enforces a correct placement of pat_attributes

@@ -833,9 +833,9 @@ let mode_lazy expected_mode =
       expected_mode
   in
   let mode_crossing =
-    Crossing.create ~linearity:true ~portability:true
-      ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
-      ~visibility:false ~forkable:false ~yielding:false ~staticity:false
+    Crossing.create ~regionality:false ~linearity:true ~uniqueness:false
+      ~portability:true ~contention:false ~externality:false ~forkable:false
+      ~yielding:false ~statefulness:false ~visibility:false ~staticity:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -886,6 +886,7 @@ tail-call. Returns [expected_mode] and [Value.lr] which are backed by the same
 mode variable. We encode extra position information in the former. We need the
 latter to the both left and right mode because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
+  let funct = Typedtree.modality_expression_head funct in
   let vmode , _ =
     Value.newvar_below
       (Ctype.get_current_level ()) (alloc_as_value marg)
@@ -1010,6 +1011,8 @@ let create_allocation_mode_r mode =
 
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
+  Externality.submode_err (loc, Allocation) Externality.legacy
+    (Value.proj_comonadic Externality mode);
   let alloc_mode = create_allocation_mode_r (value_to_alloc_r2g mode) in
   register_allocation_mode alloc_mode;
   (* We must apply each morphism separately so that their hints correspond to
@@ -1033,6 +1036,8 @@ let register_closure_allocation (mode : Value.r) ~loc
     Alloc.newvar_below (Ctype.get_current_level ())
       (value_to_alloc_r2g ~allocation mode)
   in
+  Externality.submode_err (loc, Function) Externality.legacy
+    (Alloc.proj_comonadic Externality mode);
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode, _ = Locality.newvar_below 0 locality_mode in
   let closed_over_mode =
@@ -2177,7 +2182,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
   | Tpat_any | Tpat_var _ | Tpat_fun_layout _
-  | Tpat_array _ | Tpat_lazy _ ->
+  | Tpat_array _ | Tpat_lazy _ | Tpat_modality _ ->
       p.pat_type, mode
 
 (* Returns [None] when the representation cannot be determined from the
@@ -3582,6 +3587,23 @@ and type_pat_aux
   = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
         expected_ty sort ->
   assert (penv.in_counterexample = false);
+  match Modality_elaboration.pattern_elimination ~loc:sp.ppat_loc !!penv
+          ~expected:expected_ty sp.ppat_desc with
+  | Some layer ->
+      let alloc_mode =
+        Modality.Const.apply_left layer.modality alloc_mode.mode
+        |> simple_pat_mode
+      in
+      let child =
+        type_pat_aux tps Value ~no_existentials ~alloc_mode ~mutable_flag
+          ~penv sp layer.payload sort
+      in
+      let pat = rp (Modality_elaboration.pattern ~ty:layer.wrapper child) in
+      begin match category with
+      | Value -> pat
+      | Computation -> rcp (pure Computation pat)
+      end
+  | None ->
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) =
     type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
   in
@@ -4626,6 +4648,16 @@ let enter_nonsplit_or info =
 let rec check_counter_example_pat
     ~info ~(penv : Pattern_env.t) type_pat_state tp expected_ty k =
   assert (penv.in_counterexample = true);
+  match Modality_elaboration.outer_layer !!penv expected_ty with
+  | Some layer ->
+      let tp =
+        match tp.pat_desc with
+        | Tpat_modality child -> child
+        | _ -> { tp with pat_type = layer.payload }
+      in
+      check_counter_example_pat ~info ~penv type_pat_state tp layer.payload
+        (fun child -> k (Modality_elaboration.pattern ~ty:layer.wrapper child))
+  | None ->
   let check_rec ?(info=info) ?(penv=penv) =
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
@@ -4684,7 +4716,8 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ }
+  | Tpat_modality p -> check_rec ~info p expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -4903,11 +4936,12 @@ let rec final_subexpression exp =
   | Texp_letmodule (_, _, _, _, e)
   | Texp_letexception (_, e)
   | Texp_open (_, e)
+  | Texp_modality e
     -> final_subexpression e
   | _ -> exp
 
 let is_prim ~name funct =
-  match funct.exp_desc with
+  match (Typedtree.modality_expression_head funct).exp_desc with
   | Texp_ident { desc = {val_kind=Val_prim{Primitive.prim_name; _}};
                  kind = Id_prim _; _ } ->
       prim_name = name
@@ -5428,6 +5462,8 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Ctype.get_current_level ()) (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
+             Externality.submode_err (loc, Function) Externality.legacy
+               (Alloc.proj_comonadic Externality mode_cls);
              let mode_closure =
                create_allocation_mode_r mode_cls
              in
@@ -5470,7 +5506,7 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
 
 let rec is_nonexpansive exp =
   match exp.exp_desc with
-  | Texp_apply_layout (e, _) -> is_nonexpansive e
+  | Texp_apply_layout (e, _) | Texp_modality e -> is_nonexpansive e
   | Texp_ident _
   | Texp_constant _
   | Texp_unboxed_unit
@@ -5675,6 +5711,7 @@ let maybe_expansive e = not (is_nonexpansive e)
     and only syntactic values should return [false]. **)
 let rec maybe_computation exp =
   match exp.exp_desc with
+  | Texp_modality child -> maybe_computation child
   (* Return [false] for syntactic values *)
   | Texp_ident _ ->
     false
@@ -6168,7 +6205,7 @@ let check_partial_application ~statement exp =
                 List.iter (fun {c_rhs; _} -> check c_rhs) eff_cases
             | Texp_ifthenelse (_, e1, Some e2) ->
                 check e1; check e2
-            | Texp_apply_layout (e, _) -> check e
+            | Texp_apply_layout (e, _) | Texp_modality e -> check e
             | Texp_let (_, _, e) | Texp_letmutable(_, e)
             | Texp_sequence (_, _, e) | Texp_open (_, e)
             | Texp_letexception (_, e) | Texp_letmodule (_, _, _, _, e)
@@ -6204,6 +6241,7 @@ let pattern_needs_partial_application_check p =
     | Tpat_exception _ -> true
     | Tpat_or (p1, p2, _) -> check p1 && check p2
     | Tpat_value p -> check (p :> value general_pattern)
+    | Tpat_modality p -> check p
     | _ -> false
   in
   check p
@@ -6931,6 +6969,7 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
   in
   attrs, pat_mode, env_alloc_mode, exp_mode, spat
 
+<<<<<<< Merlin:pr7096-merlin-import
 let create_merlin_type_error_node loc env ty_expected ~attributes =
     { exp_desc =
         Texp_ident
@@ -6961,6 +7000,29 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
     }
 
 let add_zero_alloc_attribute expr attributes =
+||||||| Compiler:last-imported
+let add_zero_alloc_attribute expr attributes =
+=======
+let rec eliminate_modal_head env exp mode =
+  match Modality_elaboration.outer_layer ~loc:exp.exp_loc env exp.exp_type with
+  | None -> exp, mode
+  | Some layer ->
+      let exp =
+        Modality_elaboration.expression ~ty:layer.payload exp |> re
+      in
+      let mode = Modality.Const.apply_left layer.modality mode in
+      eliminate_modal_head env exp mode
+
+let eliminate_modal_callee env exp mode =
+  let result, crossed_mode =
+    eliminate_modal_head env exp (Value.disallow_right mode)
+  in
+  if result == exp then exp, mode else
+    let mode, _ = Value.newvar_above (get_current_level ()) crossed_mode in
+    result, mode
+
+let rec add_zero_alloc_attribute expr attributes =
+>>>>>>> Compiler:HEAD
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
     | Check { strict; loc = _} ->
@@ -6974,6 +7036,9 @@ let add_zero_alloc_attribute expr attributes =
     | Default_zero_alloc -> assert false
   in
   match expr.exp_desc with
+  | Texp_modality child ->
+      let child = add_zero_alloc_attribute child attributes in
+      { expr with exp_desc = Texp_modality child }
   | Texp_function fn ->
     let default_arity = function_arity fn.params fn.body in
     let za =
@@ -7033,15 +7098,57 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)
     env (expected_mode : expected_mode) sexp ty_expected_explained =
+  match Modality_elaboration.introduction ~loc:sexp.pexp_loc env
+          ~expected:ty_expected_explained.ty sexp.pexp_desc with
+  | Some layer ->
+      let expected_mode =
+        mode_morph (Modality.Const.apply_right layer.modality) expected_mode
+      in
+      let child =
+        type_expect_ ~recarg ~overwrite env expected_mode sexp
+          { ty_expected_explained with ty = layer.payload }
+      in
+      re (Modality_elaboration.expression ~ty:layer.wrapper child)
+  | None ->
   let { ty = ty_expected; explanation } = ty_expected_explained in
   let loc = sexp.pexp_loc in
   (* Record the expression type before unifying it with the expected type *)
   let with_explanation = with_explanation explanation in
   (* Unify the result with [ty_expected], enforcing the current level *)
-  let rue exp =
+  let unify_result expected exp =
     with_explanation (fun () ->
-      unify_exp ~sexp env (re exp) (instance ty_expected));
+      unify_exp ~sexp env (re exp) (instance expected));
     exp
+  in
+  let rue = unify_result ty_expected in
+  let rec prepare_modal_result expected_mode actual expected =
+    match Modality_elaboration.plan ~loc env ~actual ~expected with
+    | Equal ->
+        expected_mode, unify_result expected
+    | Introduce layer ->
+        let payload_mode =
+          mode_morph (Modality.Const.apply_right layer.modality)
+            expected_mode
+        in
+        let source_mode, finish =
+          prepare_modal_result payload_mode actual layer.payload
+        in
+        source_mode,
+        (fun exp ->
+          re (Modality_elaboration.expression ~ty:layer.wrapper (finish exp)))
+    | Eliminate layer ->
+        let payload_mode, finish =
+          prepare_modal_result expected_mode layer.payload expected
+        in
+        let source_mode = Value.newvar (get_current_level ()) in
+        submode ~loc ~env
+          (Modality.Const.apply_left layer.modality source_mode) payload_mode;
+        mode_morph (fun _ -> Value.disallow_left source_mode) expected_mode,
+        (fun exp ->
+          finish (re (Modality_elaboration.expression ~ty:layer.payload exp)))
+  in
+  let prepare_result expected_mode actual =
+    prepare_modal_result expected_mode actual ty_expected
   in
   let type_expect_record (type rep) ~overwrite (record_form : rep record_form)
         (lid_sexp_list: (Longident.t loc * Parsetree.expression) list)
@@ -7063,7 +7170,7 @@ and type_expect_
                 exp, mode
               end
             in
-            Some (exp, Mode.Value.disallow_right mode)
+            Some (eliminate_modal_head env exp (Value.disallow_right mode))
       in
       let ty_record, expected_type =
         let extract_record loc ty other_form_error not_a_record_error =
@@ -7415,8 +7522,13 @@ and type_expect_
   match sexp.pexp_desc with
   | Pexp_ident lid ->
       let path, actual_mode, layout_args, desc, kind =
-        type_ident env ~recarg lid
+        with_local_level_generalize_structure_if_principal
+          ~before_generalize:(fun (_, _, _, desc, _) ->
+            generalize_structure desc.val_type)
+          (fun () -> type_ident env ~recarg lid)
       in
+      let expected_mode, finish =
+        prepare_result expected_mode desc.val_type in
       let exp_desc =
         match desc.val_kind with
         | Val_ivar (_, cl_num) ->
@@ -7463,15 +7575,19 @@ and type_expect_
               staticity = proj_staticity (as_single_mode expected_mode);
               mode = actual_mode }
       in
-      let exp = rue {
+      let exp = {
         exp_desc; exp_loc = loc; exp_extra = [];
         exp_type = desc.val_type;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
+      let exp =
+        if List.is_empty layout_args then exp
+        else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
+      in
+      let exp = finish exp in
       submode ~loc ~env actual_mode expected_mode;
-      if List.is_empty layout_args then exp
-      else { exp with exp_desc = Texp_apply_layout (exp, layout_args) }
+      exp
   | Pexp_constant({pconst_desc = Pconst_string (str, _, _); _} as cst) -> (
     let cst = constant_or_raise env loc cst in
     (* Terrible hack for format strings *)
@@ -7703,17 +7819,7 @@ and type_expect_
       check_dynamic (loc, Expression) (Always_dynamic Application)
         expected_mode;
       let pm = position_and_mode env expected_mode sexp in
-      let funct_mode =
-        match pm.apply_position with
-        | Tail ->
-          let mode, _ =
-            Value.(newvar_below (get_current_level ())
-              (of_const ~hint_comonadic:Tailcall_function
-                { Const.max with areality = Regional }))
-          in
-          mode
-        | Nontail | Default -> Value.newvar (get_current_level ())
-      in
+      let funct_mode = Value.newvar (get_current_level ()) in
       let funct_expected_mode = mode_default funct_mode in
       let outer_level = get_current_level () in
       let outer_level_var () =
@@ -7744,9 +7850,10 @@ and type_expect_
             ~before_generalize:generalize_structure_exp
             (fun () -> type_exp env funct_expected_mode sfunct)
         in
+        let funct, mode = eliminate_modal_callee env funct funct_mode in
         let ty = instance funct.exp_type in
         let rt = wrap_trace_gadt_instances env (ret_tvar TypeSet.empty) ty in
-        rt, funct
+        rt, funct, mode
       in
       let type_sfunct_args sfunct extra_args =
         match sfunct.pexp_desc with
@@ -7755,9 +7862,9 @@ and type_expect_
         | _ ->
            type_sfunct sfunct, extra_args
       in
-      let (rt, funct), sargs =
-        let rt, funct = type_sfunct sfunct in
-        match funct.exp_desc, sargs with
+      let (rt, funct, funct_mode), sargs =
+        let rt, funct, funct_mode = type_sfunct sfunct in
+        match (Typedtree.modality_expression_head funct).exp_desc, sargs with
         | Texp_ident { desc = {val_kind = Val_prim {prim_name = "%revapply"};
                                val_type};
                        kind = Id_prim _; _ },
@@ -7772,10 +7879,18 @@ and type_expect_
           when check_apply_prim_type Apply val_type ->
             type_sfunct_args actual_sfunct [Nolabel, sarg]
         | _ ->
-            (rt, funct), sargs
+            (rt, funct, funct_mode), sargs
       in
-      let (args, ty_ret, mode_ret, pm, ap_yielding) =
+      let args, ty_ret, mode_ret, pm, ap_yielding =
         type_application env loc expected_mode pm funct funct_mode sargs rt
+      in
+      let expected_mode, rue =
+        if List.exists
+             (fun (_, arg, _) ->
+               match arg with Omitted _ -> true | Arg _ -> false)
+             args
+        then expected_mode, rue
+        else prepare_result expected_mode ty_ret
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
@@ -7787,24 +7902,25 @@ and type_expect_
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
       let funct =
-        match List.exists (fun (_, _, sch) -> Option.is_some sch) args with
-        | true ->
+        if List.exists (fun (_, _, sch) -> Option.is_some sch) args then
           let params = List.map (fun (lbl, _, sch) -> (lbl, sch)) args in
           let ti = Polymorphic_parameter (Arrow params) in
           { funct with
             exp_extra = (Texp_inspected_type ti, loc, []) :: funct.exp_extra }
-        | false -> funct
+        else funct
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
-      let exp = rue {
+      let exp = {
         exp_desc = Texp_apply(funct, args, pm.apply_position,
                     Typedtree.create_return_mode ap_mode,
                     ap_yielding, zero_alloc);
-        exp_loc = loc; exp_extra;
+        exp_loc = loc;
+        exp_extra;
         exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
       in
+<<<<<<< Merlin:pr7096-merlin-import
       let () =
         try submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode
         with exn ->
@@ -7825,6 +7941,12 @@ and type_expect_
               exp_env = env;
             }
       in
+||||||| Compiler:last-imported
+      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
+=======
+      let exp = rue exp in
+      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
+>>>>>>> Compiler:HEAD
       check_tail_call_local_returning loc env ap_mode pm;
       exp
       end
@@ -8029,6 +8151,7 @@ and type_expect_
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord Legacy
           lid
       in
+      let expected_mode, rue = prepare_result expected_mode ty_arg in
       check_project_mutability ~loc:record.exp_loc ~env
         (Record_field label.lbl_name) label.lbl_mut mode;
       let is_contained_by : Mode.Hint.is_contained_by =
@@ -8101,6 +8224,7 @@ and type_expect_
         solve_Pexp_field ~label_usage:Env.Projection loc env sexp srecord
           Unboxed_product lid
       in
+      let expected_mode, rue = prepare_result expected_mode ty_arg in
       if Types.is_mutable label.lbl_mut then
         fatal_error
           "Typecore.type_expect_: unboxed record labels are never mutable";
@@ -8455,7 +8579,11 @@ and type_expect_
       }
   | Pexp_constraint (sarg, Some sty, []) ->
       let (ty, exp_extra) = type_constraint env sty Mode.Alloc.Const.legacy in
-      let ty' = instance ty in
+      let ty' =
+        with_local_level_generalize_structure_if_principal
+          ~before_generalize:generalize_structure (fun () -> instance ty)
+      in
+      let expected_mode, rue = prepare_result expected_mode ty' in
       let error_message_attr_opt =
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
       let explanation = Option.map (fun msg -> Error_message_attr msg)
@@ -8482,10 +8610,14 @@ and type_expect_
         in
         type_constraint env sty alloc_mode
       in
+      let ty' =
+        with_local_level_generalize_structure_if_principal
+          ~before_generalize:generalize_structure (fun () -> instance ty)
+      in
+      let expected_mode, rue = prepare_result expected_mode ty' in
       let expected_mode =
         type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
       in
-      let ty' = instance ty in
       let error_message_attr_opt =
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
       let explanation = Option.map (fun msg -> Error_message_attr msg)
@@ -8520,10 +8652,17 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, met) ->
+<<<<<<< Merlin:pr7096-merlin-import
     submode ~loc ~env Mode.Value.legacy expected_mode;
     let obj = type_exp env mode_legacy e in
     let pm = position_and_mode env expected_mode sexp in
     begin try
+||||||| Compiler:last-imported
+      submode ~loc ~env Mode.Value.legacy expected_mode;
+      let pm = position_and_mode env expected_mode sexp in
+=======
+      let pm = position_and_mode env expected_mode sexp in
+>>>>>>> Compiler:HEAD
       let (obj,meth,typ) =
         with_local_level_generalize_structure_if_principal
           ~before_generalize:(fun (_, _, typ) -> generalize_structure typ)
@@ -8551,6 +8690,8 @@ and type_expect_
         | _ ->
             assert false
       in
+      let expected_mode, rue = prepare_result expected_mode typ in
+      submode ~loc ~env Mode.Value.legacy expected_mode;
       let obj =
         { obj with exp_extra = Option.to_list obj_extra @ obj.exp_extra}
       in
@@ -8634,7 +8775,6 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_override lst ->
-      submode ~loc ~env Value.legacy expected_mode;
       let _ =
        List.fold_right
         (fun (lab, _) l ->
@@ -8653,6 +8793,8 @@ and type_expect_
       with
         (_, {val_type = self_ty; val_kind = Val_self (sign, _, vars, _)}),
         (path_self, _) ->
+          let expected_mode, rue = prepare_result expected_mode self_ty in
+          submode ~loc ~env Value.legacy expected_mode;
           let type_override (lab, snewval) =
             begin try
               let id = Vars.find lab.txt vars in
@@ -8750,7 +8892,7 @@ and type_expect_
           (mk_expected ~explanation:Assert_condition Predef.type_bool)
       in
       let exp_type =
-        match cond.exp_desc with
+        match (Typedtree.modality_expression_head cond).exp_desc with
         | Texp_construct(_, {cstr_name="false"}, _, _, _) ->
             instance ty_expected
         | _ ->
@@ -8931,7 +9073,6 @@ and type_expect_
           (fun () -> type_expect env expected_mode e ty_expected_explained)
       end
   | Pexp_letop{ let_ = slet; ands = sands; body = sbody } ->
-      submode ~loc ~env Value.legacy expected_mode;
       let rec loop spat_acc ty_acc ty_acc_sort sands =
         match sands with
         | [] -> spat_acc, ty_acc, ty_acc_sort
@@ -9026,7 +9167,9 @@ and type_expect_
         Texp_letop{let_; ands; param; param_debug_uid; param_sort; body;
                    body_sort; partial}
       in
-      rue { exp_desc = desc;
+      let expected_mode, finish = prepare_result expected_mode ty_result in
+      submode ~loc ~env Value.legacy expected_mode;
+      finish { exp_desc = desc;
             exp_loc = sexp.pexp_loc;
             exp_extra = [];
             exp_type = instance ty_result;
@@ -9202,8 +9345,10 @@ and type_expect_
       | Texp_src_pos -> always_static Src_pos
       | Texp_unboxed_unit -> always_static Unboxed_unit
       | Texp_unboxed_bool _ -> always_static Unboxed_bool
-      | Texp_apply({ exp_desc =
-          Texp_ident { desc = {val_kind = Val_prim _}; _ }}, _, _, _, _, _)
+      | Texp_apply(funct, _, _, _, _, _)
+        when (match (Typedtree.modality_expression_head funct).exp_desc with
+          | Texp_ident { desc = {val_kind = Val_prim _}; _ } -> true
+          | _ -> false)
           (* [stack_ (prim foo)] will be checked by [transl_primitive_application]. *)
           (* CR zqian: Move/Copy [Lambda.primitive_may_allocate] to [typing], then we can
           check primitive allocation here, and also improve the logic in [type_ident]. *)
@@ -9243,7 +9388,15 @@ and type_expect_
         (* CR uniqueness: this could be the jkind of exp2 *)
         mk_expected (newvar (Jkind.for_non_float ~why:Boxed_record))
       in
-      let exp1 = type_expect ~recarg env (mode_default cell_mode) exp1 cell_type in
+      let required_cell_mode = mode_default cell_mode in
+      let source_mode = Value.newvar (get_current_level ()) in
+      let exp1 =
+        type_expect ~recarg env (mode_default source_mode) exp1 cell_type
+      in
+      let exp1, cell_mode =
+        eliminate_modal_head env exp1 (Value.disallow_right source_mode)
+      in
+      submode ~loc:exp1.exp_loc ~env cell_mode required_cell_mode;
       let new_fields_mode =
         (* The newly-written fields have to be global to avoid heap-to-stack pointers.
            We enforce that here, by asking the allocation to be global.
@@ -10434,6 +10587,9 @@ and type_label_access
          type_expect ~recarg:Allowed env (mode_default mode) srecord
            (mk_expected (newvar record_jkind)))
   in
+  let record, mode =
+    eliminate_modal_head env record (Value.disallow_right mode)
+  in
   let ty_exp = record.exp_type in
   let expected_type =
     match extract_concrete_record record_form env ty_exp with
@@ -10916,10 +11072,9 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
     Some (safe_expect, lv) ->
       (* apply omittable arguments when expected type is "" *)
       (* we must be very careful about not breaking the semantics *)
-      let exp_mode, _ =
-        Value.newvar_below
-          (get_current_level ()) (as_single_mode mode)
-      in
+      (* The inferred callable may need modal elimination before its mode
+         can be checked against the expected bare function. *)
+      let exp_mode = Value.newvar (get_current_level ()) in
       let texp =
         with_local_level_generalize_structure_if_principal
           ~before_generalize:generalize_structure_exp
@@ -10932,6 +11087,10 @@ and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sa
             let expected_mode = {expected_mode with position = RNontail} in
             type_exp ~overwrite env expected_mode sarg)
       in
+      let texp, exp_mode =
+        eliminate_modal_callee env texp exp_mode
+      in
+      submode ~loc:sarg.pexp_loc ~env ~reason:Other exp_mode mode;
       let rec make_args args ty_fun =
         match get_desc (expand_head env ty_fun) with
         | Tarrow ((l,_marg,_mret),ty_arg,ty_fun,_) when is_optional l ->
@@ -11215,6 +11374,19 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
 
 and type_application env app_loc expected_mode position_and_mode
       funct funct_mode sargs ret_tvar =
+  let sargs =
+    List.map (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
+  in
+  let check_callee_mode funct funct_mode position_and_mode =
+    match position_and_mode.apply_position with
+    | Nontail | Default -> ()
+    | Tail ->
+        let mode =
+          Value.of_const ~hint_comonadic:Tailcall_function
+            { Value.Const.max with areality = Regional }
+        in
+        submode ~loc:funct.exp_loc ~env funct_mode (mode_default mode)
+  in
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -11222,7 +11394,8 @@ and type_application env app_loc expected_mode position_and_mode
   in
   match sargs with
   | (* Special case for ignore: avoid discarding warning *)
-    [Parsetree.Nolabel, sarg] when is_ignore funct ->
+    [Nolabel, sarg] when is_ignore funct ->
+      check_callee_mode funct funct_mode position_and_mode;
       let {ty_arg; arg_mode; ty_ret; ret_mode} =
         with_local_level_generalize_structure_if_principal
           ~before_generalize:(fun { ty_ret; _ } ->
@@ -11254,7 +11427,7 @@ and type_application env app_loc expected_mode position_and_mode
           not tvar &&
           let labels = List.filter (fun l -> not (is_omittable l)) ls in
           List.length labels = List.length sargs &&
-          List.for_all (fun (l,_) -> l = Parsetree.Nolabel) sargs &&
+          List.for_all (fun (l,_) -> l = Nolabel) sargs &&
           List.exists (fun l -> l <> Nolabel) labels &&
           (Location.prerr_warning
              funct.exp_loc
@@ -11264,18 +11437,14 @@ and type_application env app_loc expected_mode position_and_mode
            true)
         end
       in
-      let ty_ret, mode_ret, args, position_and_mode, ap_yielding =
-        with_local_level_generalize_structure_if_principal
-          ~before_generalize:(fun (ty_ret, _, _, _, _) ->
-            generalize_structure ty_ret)
+      with_local_level_generalize_structure_if_principal
+        ~before_generalize:(fun (_, ty_ret, _, _, _) ->
+          generalize_structure ty_ret)
           begin fun () ->
           (* Consider for example the application
                [f n]
              with
                [f : a:bar -> ?opt:baz -> int -> unit] *)
-          let sargs = List.map
-            (fun (label, e) -> Typetexp.transl_label_from_expr label e) sargs
-          in
           let ty_ret, mode_ret, untyped_args =
             collect_apply_args env funct ignore_labels ty (instance ty)
               (value_to_alloc_r2l funct_mode) sargs ret_tvar
@@ -11287,8 +11456,11 @@ and type_application env app_loc expected_mode position_and_mode
                       (Nolabel, Arg (Known_arg n))]] *)
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
-            if partial_app then position_and_mode_default else position_and_mode
+            if partial_app then
+              position_and_mode_default
+            else position_and_mode
           in
+          check_callee_mode funct funct_mode position_and_mode;
           let args =
             List.mapi (fun index arg ->
                 type_apply_arg env ~app_loc ~funct ~index
@@ -11330,10 +11502,8 @@ and type_application env app_loc expected_mode position_and_mode
              [args] becomes [(Label "a", Omitted ());
                              (Optional "opt", Arg None);
                              (Nolabel, Arg n)] *)
-          ty_ret, mode_ret, args, position_and_mode, ap_yielding
+          args, ty_ret, mode_ret, position_and_mode, ap_yielding
         end
-      in
-      args, ty_ret, mode_ret, position_and_mode, ap_yielding
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
@@ -12409,7 +12579,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
       if is_lpoly then
         List.iter (fun (exp, _) ->
-          match exp.exp_desc with
+          match (Typedtree.modality_expression_head exp).exp_desc with
           | Texp_function _ -> ()
           | _ -> raise (Error (exp.exp_loc, env, Let_poly_not_function))
         ) exp_list;
@@ -13161,7 +13331,12 @@ and type_comprehension_iterator
 
 (* Typing of method call *)
 and type_send env loc explanation e met =
-  let obj = type_exp env mode_object e in
+  let source_mode = Value.newvar (get_current_level ()) in
+  let obj = type_exp env (mode_default source_mode) e in
+  let obj, mode =
+    eliminate_modal_head env obj (Value.disallow_right source_mode)
+  in
+  submode ~loc:e.pexp_loc ~env mode mode_object;
   let (meth, typ) =
     match obj.exp_desc with
     | Texp_ident { desc = {val_kind = Val_self(sign, meths, _, _)}; _ } ->

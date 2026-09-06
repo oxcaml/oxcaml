@@ -681,6 +681,8 @@ and core_type1 ctxt f x =
         pp f "@[<hov2>(module@ %a)@]" (package_type ctxt) pck_ty
     | Ptyp_open(li, ct) ->
        pp f "@[<hov2>%a.(%a)@]" value_longident_loc li (core_type ctxt) ct
+    | Ptyp_modality (t, m) ->
+        pp f "@[<hov2>(%a@ %@%@@ %a)@]" (core_type ctxt) t modalities m
     | Ptyp_quote t ->
         pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
     | Ptyp_splice t ->

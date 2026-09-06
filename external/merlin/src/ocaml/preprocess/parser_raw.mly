@@ -5092,6 +5092,8 @@ tuple_type:
 delimited_type_supporting_local_open:
   | LPAREN type_ = core_type RPAREN
       { type_ }
+  | LPAREN type_ = core_type modalities = atat_modalities_expr RPAREN
+      { mktyp ~loc:$sloc (Ptyp_modality (type_, modalities)) }
   | LPAREN MODULE ext_attrs = ext_attributes package_type = package_type_ RPAREN
       { mktyp_attrs ~loc:$sloc (Ptyp_package package_type) ext_attrs }
   | mktyp(
