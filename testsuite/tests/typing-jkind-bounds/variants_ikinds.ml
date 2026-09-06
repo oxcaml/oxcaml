@@ -621,18 +621,7 @@ let () =
 let () =
   cross_contended func;
   cross_nonnull func
-(* CR layouts v2.8: fix in principal case. Internal ticket 5111 *)
 [%%expect {|
-|}, Principal{|
-Line 2, characters 13-16:
-2 |   cross_many int;
-                 ^^^
-Error: The value "int" has type "int t" but an expression was expected of type
-         "('a : value mod many)"
-       The kind of int t is immutable_data with int
-         because of the definition of t at line 1, characters 0-21.
-       But the kind of int t must be a subkind of value mod many
-         because of the definition of cross_many at line 11, characters 49-60.
 |}]
 
 let () = cross_aliased int
@@ -643,16 +632,6 @@ Line 1, characters 23-26:
 Error: The value "int" has type "int t" but an expression was expected of type
          "('a : value mod aliased)"
        The kind of int t is immutable_data
-         because of the definition of t at line 1, characters 0-21.
-       But the kind of int t must be a subkind of value mod aliased
-         because of the definition of cross_aliased at line 8, characters 55-66.
-|}, Principal{|
-Line 1, characters 23-26:
-1 | let () = cross_aliased int
-                           ^^^
-Error: The value "int" has type "int t" but an expression was expected of type
-         "('a : value mod aliased)"
-       The kind of int t is immutable_data with int
          because of the definition of t at line 1, characters 0-21.
        But the kind of int t must be a subkind of value mod aliased
          because of the definition of cross_aliased at line 8, characters 55-66.
@@ -670,17 +649,6 @@ Error: The value "func" has type "(unit -> unit) t"
        But the kind of (unit -> unit) t must be a subkind of
            value mod portable
          because of the definition of cross_portable at line 10, characters 57-68.
-|}, Principal{|
-Line 1, characters 24-28:
-1 | let () = cross_portable func
-                            ^^^^
-Error: The value "func" has type "(unit -> unit) t"
-       but an expression was expected of type "('a : value mod portable)"
-       The kind of (unit -> unit) t is immutable_data with unit -> unit
-         because of the definition of t at line 1, characters 0-21.
-       But the kind of (unit -> unit) t must be a subkind of
-           value mod portable
-         because of the definition of cross_portable at line 10, characters 57-68.
 |}]
 
 let () = cross_external func
@@ -691,17 +659,6 @@ Line 1, characters 24-28:
 Error: The value "func" has type "(unit -> unit) t"
        but an expression was expected of type "('a : value mod external_)"
        The kind of (unit -> unit) t is value non_float mod immutable
-         because of the definition of t at line 1, characters 0-21.
-       But the kind of (unit -> unit) t must be a subkind of
-           value mod external_
-         because of the definition of cross_external at line 13, characters 58-69.
-|}, Principal{|
-Line 1, characters 24-28:
-1 | let () = cross_external func
-                            ^^^^
-Error: The value "func" has type "(unit -> unit) t"
-       but an expression was expected of type "('a : value mod external_)"
-       The kind of (unit -> unit) t is immutable_data with unit -> unit
          because of the definition of t at line 1, characters 0-21.
        But the kind of (unit -> unit) t must be a subkind of
            value mod external_
@@ -1014,21 +971,9 @@ and 'a t2 = Base of 'a | T1 of 'a t1
 
 type 'a t = Degen of ('a * 'a) t | Leaf
 let f (x : int t) = cross_portable x
-(* CR layouts v2.8: This should be accepted, but still fails in principal mode. *)
 [%%expect {|
 type 'a t = Degen of ('a * 'a) t | Leaf
 val f : int t -> unit = <fun>
-|}, Principal{|
-type 'a t = Degen of ('a * 'a) t | Leaf
-Line 2, characters 35-36:
-2 | let f (x : int t) = cross_portable x
-                                       ^
-Error: The value "x" has type "int t" but an expression was expected of type
-         "('a : value mod portable)"
-       The kind of int t is immutable_data with (int * int) t
-         because of the definition of t at line 1, characters 0-39.
-       But the kind of int t must be a subkind of value mod portable
-         because of the definition of cross_portable at line 10, characters 57-68.
 |}]
 
 module M : sig type t end = struct type t = int end
@@ -1038,16 +983,4 @@ let f (x : M.t many) = cross_contended x
 module M : sig type t end
 type 'a many = Foo of ('a * 'a) many | Leaf
 val f : M.t many -> unit = <fun>
-|}, Principal{|
-module M : sig type t end
-type 'a many = Foo of ('a * 'a) many | Leaf
-Line 3, characters 39-40:
-3 | let f (x : M.t many) = cross_contended x
-                                           ^
-Error: The value "x" has type "M.t many" but an expression was expected of type
-         "('a : value mod contended)"
-       The kind of M.t many is immutable_data with (M.t * M.t) many
-         because of the definition of many at line 2, characters 0-43.
-       But the kind of M.t many must be a subkind of value mod contended
-         because of the definition of cross_contended at line 9, characters 59-70.
 |}]

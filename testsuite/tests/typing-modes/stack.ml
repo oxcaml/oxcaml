@@ -234,9 +234,9 @@ Error: This value is "local" because it is "stack_"-allocated.
 let f () =
     (stack_ fun x -> x) 42
 [%%expect{|
-Line 2, characters 4-23:
+Line 2, characters 12-22:
 2 |     (stack_ fun x -> x) 42
-        ^^^^^^^^^^^^^^^^^^^
+                ^^^^^^^^^^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is the function in a tail call.
