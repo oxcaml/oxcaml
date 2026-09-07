@@ -19,7 +19,7 @@ Static data:
   Cross_module_static_lib_body0[
     Cross_module_static_lib/id/0;
     Cross_module_static_lib/pair/1;
-    Cross_module_static_lib_calls0[ (missing); ];
+    (missing);
     Cross_module_static_lib/counted_id/2;
   ]
   (Cross_module_static_lib/counted_id/2

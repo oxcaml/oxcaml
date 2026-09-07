@@ -653,7 +653,7 @@ and fracture_prim lambda prim args loc =
   | Pgetglobal (cu, Static) ->
     check_arity ~arity:0;
     SLhalves { sval_comptime = SLglobal cu; sval_runtime = lambda }
-  | Pmakeblock _ ->
+  | Pmakeblock (_, (Immutable | Immutable_unique), _, _) ->
     let rec fracture_make_block unchanged i args_c args_r = function
       | [] ->
         SLhalves
@@ -673,7 +673,7 @@ and fracture_prim lambda prim args loc =
     (* Bind the fields in reverse because Lprim(Pmakeblock) evaluates its arguments in
        reverse order. *)
     fracture_make_block true (List.length args - 1) [] [] (List.rev args)
-  | Pfield (pos, _ptr, _sem) ->
+  | Pfield (pos, _ptr, Reads_agree) ->
     let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
@@ -681,7 +681,7 @@ and fracture_prim lambda prim args loc =
             sval_runtime =
               (if arg_r == arg then lambda else Lprim (prim, [arg_r], loc))
           })
-  | Pmixedfield (path, _shape, _sem) ->
+  | Pmixedfield (path, _shape, Reads_agree) ->
     let arg = match args with [arg] -> arg | _ -> wrong_arity ~expected:1 in
     slet_local "arg" arg (fun arg_c arg_r ->
         SLhalves
@@ -693,10 +693,15 @@ and fracture_prim lambda prim args loc =
   (* Dynamic output *)
   | Pbytes_to_string | Pbytes_of_string | Pignore
   | Pgetglobal (_, Dynamic)
-  | Pgetpredef _ | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pgetpredef _
+  | Pmakeblock (_, Mutable, _, _)
+  | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pfield (_, _, Reads_vary)
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
-  | Pduprecord _ | Pmake_unboxed_product _ | Punboxed_product_field _
+  | Pufloatfield _
+  | Pmixedfield (_, _, Reads_vary)
+  | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _ | Pduprecord _
+  | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pmake_idx_mixed_field _
   | Pmake_idx_array _ | Pidx_deepen _ | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
