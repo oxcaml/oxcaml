@@ -41,6 +41,7 @@
 
 (rule
  (targets menhirLib.ml menhirLib.mli)
+ (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
  (mode promote)
  (action
   (progn
