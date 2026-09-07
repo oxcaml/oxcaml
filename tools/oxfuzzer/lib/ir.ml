@@ -266,7 +266,13 @@ module Statement = struct
     | Seq of t list
     | If of Expr.t * t * t
     | Let_mutable of Name.t * Expr.t * t
-    | Bounded_loop of Name.t * Expr.t * t
+    | Bounded_loop of
+        { var : Name.t;
+          init : Expr.t;
+          bound : Expr.t;
+          stride : int;
+          body : t
+        }
 
   let let_mutable name expr body =
     Exp.let_ Mutable Nonrecursive
@@ -280,15 +286,19 @@ module Statement = struct
   let rec to_code : t -> Parsetree.expression = function
     | Assign (name, expr) ->
       Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
-    | Bounded_loop (loop_var, times, stmt) ->
-      let var = ident (Name.to_string loop_var) in
-      let_mutable loop_var (Expr.to_code times)
-        (Exp.while_
-           (op ">" [var; int 0])
-           (Exp.sequence (to_code stmt)
-              (Exp.setinstvar
-                 (Name.to_string loop_var |> loc)
-                 (op "-" [var; int 1]))))
+    | Bounded_loop { var; init; bound; stride; body } ->
+      if stride = 0 then Misc.fatal_errorf "Bounded_loop: zero stride";
+      let name = Name.to_string var in
+      let bound_name = name ^ "_bound" in
+      let comparison = if stride > 0 then "<=" else ">=" in
+      let_mutable var (Expr.to_code init)
+        (Exp.let_ Immutable Nonrecursive
+           [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
+           (Exp.while_
+              (op comparison [ident name; ident bound_name])
+              (Exp.sequence (to_code body)
+                 (Exp.setinstvar (loc name)
+                    (op "+" [ident name; int stride])))))
     | Let_mutable (name, expr, body) ->
       let_mutable name (Expr.to_code expr) (to_code body)
     | Seq statements ->

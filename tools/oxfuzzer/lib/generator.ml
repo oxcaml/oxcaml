@@ -65,6 +65,10 @@ module Config = struct
 
   let max_block_depth = 4
 
+  let max_loop_stride = 8
+
+  let max_loop_offset = 16
+
   let max_expression_complexity = 20
 
   let toplevel_var_count = 5
@@ -490,10 +494,23 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
       let gen_bounded_loop =
         Gen.create (fun () ->
             let name = State.fresh st in
-            let times =
+            let times = 1 + Random.State.int st.random_state 3 in
+            let scale =
+              random_int_in_range st ~min:1 ~max:Config.max_loop_stride
+            in
+            let scale =
+              if Random.State.bool st.random_state then scale else -scale
+            in
+            let offset =
+              random_int_in_range st ~min:(-Config.max_loop_offset)
+                ~max:Config.max_loop_offset
+            in
+            let transform value =
+              Expr.Const (Number.Int ((scale * value) + offset))
+            in
+            let init =
               maybe_opaque st ~probability:Config.opaque_loop_bound_probability
-                (Expr.Const
-                   (Number.Int (1 + Random.State.int st.random_state 3)))
+                (transform times)
             in
             let loop_env =
               Env.extend env
@@ -503,7 +520,14 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
                 }
             in
             let _, inner = gen_fun_body st loop_env (depth + 1) in
-            continue env (Statement.Bounded_loop (name, times, inner)))
+            continue env
+              (Statement.Bounded_loop
+                 { var = name;
+                   init;
+                   bound = transform 1;
+                   stride = -scale;
+                   body = inner
+                 }))
       in
       let gen_empty =
         Gen.when_ (List.is_empty mutable_bindings) (fun () ->
