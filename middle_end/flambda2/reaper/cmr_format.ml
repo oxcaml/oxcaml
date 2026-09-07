@@ -24,6 +24,21 @@ type t =
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
+(* CR mvellacott: Every type comes with a cache of its free names. If the cache
+   is empty, [With_cached_free_names.apply_renaming] tries to fill it by
+   traversing the type, which errors at import time because it looks up
+   pre-renaming hashcons IDs. The current fix is to make sure we always populate
+   the cache before deserialising. In the future, it would be nice to make that
+   function more robust instead. *)
+
+let fill_free_names_cache_for_exported_code code =
+  ignore (Exported_code.free_function_slots_and_value_slots code)
+
+let fill_free_names_cache_for_typing_env env =
+  ignore (Typing_env.Serializable.free_function_slots_and_value_slots env)
+
+let fill_free_names_cache_for_type ty = ignore (Flambda2_types.free_names ty)
+
 module All_code_with_sections = struct
   type t =
     { all_code : Exported_code.raw;
@@ -46,6 +61,7 @@ module All_code_with_sections = struct
       Exported_code.prepare_for_export all_code ~reachable_names:all_names
         ~used_value_slots ~canonicalise
     in
+    fill_free_names_cache_for_exported_code all_code;
     let ids_for_export = Exported_code.ids_for_export all_code in
     let sections_builder = File_sections.Builder.create 0 in
     let all_code =
@@ -134,7 +150,9 @@ end = struct
         let env, canonicalise =
           Typing_env.Pre_serializable.create typing_env ~used_value_slots
         in
-        Some (Typing_env.Serializable.create_without_pruning env), canonicalise
+        let env = Typing_env.Serializable.create_without_pruning env in
+        fill_free_names_cache_for_typing_env env;
+        Some env, canonicalise
     in
     (* Code metadata is stored twice ([all_code] and [rebuild_data]); both must
        have their types canonicalised. [unit_metadata] doesn't have types, so
@@ -147,8 +165,12 @@ end = struct
        types so that they are consistent. *)
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.map_result_types rebuild_data ~f:(fun ty ->
-          Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
-            ~used_value_slots ~canonicalise)
+          let ty =
+            Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
+              ~used_value_slots ~canonicalise
+          in
+          fill_free_names_cache_for_type ty;
+          ty)
     in
     (* Must happen after any identifiers change, in particular, after
        canonicalisation. *)
