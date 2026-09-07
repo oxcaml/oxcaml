@@ -2,3 +2,8 @@
  (applies_to erroneous-config quoting load-config)
  (enabled_if
   (<> %{os_type} Win32)))
+
+; Jane Street disabled tests -- it uses findlib, which we don't support.
+(cram
+  (enabled_if false)
+  (applies_to erroneous-config))
