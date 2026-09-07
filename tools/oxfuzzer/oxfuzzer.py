@@ -734,6 +734,8 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         args.seed if args.seed is not None else random.SystemRandom().getrandbits(62)
     )
     print(f"seed: {base_seed}", file=sys.stderr)
+    print(f"iterations: {args.iterations}", file=sys.stderr)
+    print(f"revision: {source_revision()}", file=sys.stderr)
     args.output.mkdir(parents=True, exist_ok=True)
     toolchain_dir = Path(tempfile.mkdtemp(
         prefix="toolchain-", dir=args.output.resolve()
