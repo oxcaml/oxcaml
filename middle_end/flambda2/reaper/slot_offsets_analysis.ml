@@ -176,9 +176,24 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
   let built_value_slots =
     Value_slot.Set.union_list (List.map snd set_slots_to_be_built)
   in
-  (* [To_cmm] needs offsets for both slots of a projection but the graph records
-     only the accessed one, so use simplify's output free names: a safe
-     over-approximation, missing only the fresh slots, which the unions add. *)
+  (* [free_names] comes from simplify, so it doesn't know about fresh value
+     slots introduced by representation changes. Collect the fresh slots so we
+     can include them as used. *)
+  let fresh_value_slots =
+    Code_id_or_name.Map.fold
+      (fun _ (repr, _) fresh_value_slots ->
+        match (repr : Unboxing_analysis.changed_representation) with
+        | Block_representation _ -> fresh_value_slots
+        | Closure_representation (value_slot_rewrites, _, _) ->
+          Unboxed_fields.fold_with_kind
+            (fun _kind value_slot acc -> Value_slot.Set.add value_slot acc)
+            value_slot_rewrites fresh_value_slots)
+      changed_representation Value_slot.Set.empty
+  in
+  (* Projections have an accessed slot and a slot used as a base for accessing.
+     [To_cmm] needs offsets for both slots, but the graph records only the
+     accessed one, so liveness is taken as simplify's free names plus the fresh
+     value slots. *)
   let used_slots : Slot_offsets.used_slots =
     { function_slots_in_normal_projections =
         Function_slot.Set.union
@@ -191,7 +206,7 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
       value_slots_in_normal_projections =
         Value_slot.Set.union
           (Name_occurrences.value_slots_in_normal_projections free_names)
-          built_value_slots;
+          fresh_value_slots;
       all_value_slots =
         Value_slot.Set.union
           (Name_occurrences.all_value_slots_at_normal_mode free_names)
