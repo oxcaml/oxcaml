@@ -15,7 +15,11 @@
 
 type result = Unboxing_analysis.result
 
-val fixpoint : Global_flow_graph.graph -> result
+type mode = Unboxing_analysis.mode
+
+val fixpoint : mode:mode -> Global_flow_graph.graph -> result
+
+val mode : result -> mode
 
 val get_unboxed_fields :
   result -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

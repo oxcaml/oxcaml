@@ -600,11 +600,16 @@ let datalog_rules =
        [has_usage x; ~~(cannot_change_representation x); ~~(to_unbox x)]
        ==> to_change_representation x) ]
 
+type mode =
+  | Full
+  | Dce_only
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    mode : mode
   }
 
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
@@ -691,7 +696,7 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let perform_analysis db ~stats =
+let perform_analysis0 db ~stats =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -884,14 +889,19 @@ let perform_analysis db ~stats =
             !changed_representation;
         unboxed, !changed_representation)
   in
-  if
-    Flambda_features.reaper_unbox ()
-    && Flambda_features.reaper_change_calling_conventions ()
-  then { db; unboxed_fields = unboxed; changed_representation }
-  else
+  { db; unboxed_fields = unboxed; changed_representation; mode = Full }
+
+let perform_analysis ~mode db ~stats =
+  match mode with
+  | Full
+    when Flambda_features.reaper_unbox ()
+         && Flambda_features.reaper_change_calling_conventions () ->
+    perform_analysis0 db ~stats
+  | Full | Dce_only ->
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
-      changed_representation = Code_id_or_name.Map.empty
+      changed_representation = Code_id_or_name.Map.empty;
+      mode
     }
 
 let cannot_change_calling_convention_query =
@@ -899,6 +909,11 @@ let cannot_change_calling_convention_query =
   [cannot_change_calling_convention x]
 
 let cannot_change_calling_convention uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+  match uses.mode with
+  | Dce_only -> true
+  | Full ->
+    (not (Flambda_features.reaper_change_calling_conventions ()))
+    || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+    || cannot_change_calling_convention_query
+         [Code_id_or_name.code_id v]
+         uses.db

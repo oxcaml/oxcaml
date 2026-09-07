@@ -261,8 +261,12 @@ end = struct
     }
 
   let create
-      ({ db; unboxed_fields; changed_representation } :
+      ({ db; unboxed_fields; changed_representation; mode } :
         Unboxing_analysis.result) =
+    (match mode with
+    | Unboxing_analysis.Dce_only -> ()
+    | Unboxing_analysis.Full ->
+      Misc.fatal_error "LTO only supports DCE-restriction solutions, got full.");
     let solution_tables = Solution_tables.of_database db in
     let ids = Solution_tables.ids_for_export solution_tables in
     let ids =
@@ -316,7 +320,11 @@ end = struct
       Unboxing_analysis.changed_representation_apply_renaming
         changed_representation renaming ~rename_field
     in
-    { db; unboxed_fields; changed_representation }
+    { db;
+      unboxed_fields;
+      changed_representation;
+      mode = Unboxing_analysis.Dce_only
+    }
 end
 
 module File_contents = struct

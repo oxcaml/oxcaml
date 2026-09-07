@@ -2275,8 +2275,23 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
+    let free_names_of_body =
+      match Analysis.mode env.uses with
+      | Analysis.Full -> body.free_names
+      | Analysis.Dce_only ->
+        (* Whether the compiled function takes the closure parameter is part of
+           the calling convention, so don't change it.
+           [Function_params_and_body.create] decides this based on
+           [free_names_of_body], so we have to make sure that answer agrees with
+           what's recorded in code metadata. *)
+        if Code_metadata.is_my_closure_used code_metadata
+        then
+          Name_occurrences.add_variable body.free_names my_closure
+            Name_mode.normal
+        else body.free_names
+    in
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
-        params ~body:body.expr ~free_names_of_body:(Known body.free_names)
+        params ~body:body.expr ~free_names_of_body:(Known free_names_of_body)
         ~my_closure ~my_alloc_mode ~my_depth,
       code_metadata,
       res )
@@ -2376,15 +2391,21 @@ and rebuild_function_params_and_body (env : env) res code_metadata
 and rebuild_code env res
     ({ params_and_body; code_metadata; free_names_of_params_and_body = _ } :
       Rev_expr.rev_code) =
-  let is_my_closure_used = is_var_used env params_and_body.my_closure in
   let code_metadata =
-    if
-      Bool.equal is_my_closure_used
-        (Code_metadata.is_my_closure_used code_metadata)
-    then code_metadata
-    else (
-      assert (not is_my_closure_used);
-      Code_metadata.with_is_my_closure_used is_my_closure_used code_metadata)
+    match Analysis.mode env.uses with
+    | Analysis.Dce_only ->
+      (* We cannot change [is_my_closure_used] in DCE mode because it's part of
+         the calling convention. *)
+      code_metadata
+    | Analysis.Full ->
+      let is_my_closure_used = is_var_used env params_and_body.my_closure in
+      if
+        Bool.equal is_my_closure_used
+          (Code_metadata.is_my_closure_used code_metadata)
+      then code_metadata
+      else (
+        assert (not is_my_closure_used);
+        Code_metadata.with_is_my_closure_used is_my_closure_used code_metadata)
   in
   let params_and_body, code_metadata, res =
     rebuild_function_params_and_body env res code_metadata params_and_body

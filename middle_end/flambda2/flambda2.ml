@@ -430,7 +430,10 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   in
   (* CR mvellacott: split the resulting solution into per-compilation-unit
      portions. *)
-  let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
+  let solution =
+    Flambda2_reaper.Reaper.Staged.solve ~mode:Flambda2_reaper.Analysis.Dce_only
+      combined_graph
+  in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~solution
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width

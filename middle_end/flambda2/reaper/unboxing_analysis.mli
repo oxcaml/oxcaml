@@ -47,11 +47,26 @@ type changed_representation =
       * Function_slot.t Function_slot.Map.t
       * Function_slot.t
 
+(* CR mvellacott: In the future we hope to lift the DCE restriction on LTO,
+   which may allow us to get rid of this [mode] type. *)
+
+(** In [Full] mode, the Reaper may unbox values, change the representation of
+    blocks and closures, and change calling conventions.
+
+    In [Dce_only] mode it only makes liveness decisions: dead code is deleted
+    and dead values are poisoned in place, but no representation or calling
+    convention changes. This is used for LTO, where changing representations and
+    calling conventions requires more care. *)
+type mode =
+  | Full
+  | Dce_only
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    mode : mode
   }
 
 val pp_result : Format.formatter -> result -> unit
@@ -90,4 +105,4 @@ val cannot_change_calling_convention_table :
 val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  mode:mode -> Datalog.database -> stats:Datalog.Schedule.stats -> result

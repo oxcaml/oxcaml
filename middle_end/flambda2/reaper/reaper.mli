@@ -30,7 +30,8 @@ module Staged : sig
   val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t
 
   (** Run Reaper analysis for a compilation unit producing a Reaper solution. *)
-  val solve : Global_flow_graph.graph -> Unboxing_analysis.result
+  val solve :
+    mode:Analysis.mode -> Global_flow_graph.graph -> Unboxing_analysis.result
 
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
       with dead code removed. *)

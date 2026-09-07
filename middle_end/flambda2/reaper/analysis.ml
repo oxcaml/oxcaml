@@ -20,17 +20,21 @@ open Unboxing_analysis
 
 type result = Unboxing_analysis.result
 
-let fixpoint (graph : Global_flow_graph.graph) =
+type mode = Unboxing_analysis.mode
+
+let fixpoint ~mode (graph : Global_flow_graph.graph) =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
   let db = Points_to_analysis.perform_analysis datalog ~stats in
-  let result = Unboxing_analysis.perform_analysis db ~stats in
+  let result = Unboxing_analysis.perform_analysis ~mode db ~stats in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
   result
+
+let mode (uses : result) = uses.mode
 
 let get_unboxed_fields uses cn =
   Code_id_or_name.Map.find_opt cn uses.unboxed_fields

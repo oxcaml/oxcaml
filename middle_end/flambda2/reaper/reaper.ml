@@ -180,10 +180,10 @@ module Staged = struct
     in
     deps, rebuild_data
 
-  let solve deps =
+  let solve ~mode deps =
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps)
+          Analysis.fixpoint ~mode deps)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
@@ -245,7 +245,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
   let deps, traverse_rebuild = Staged.traverse unit in
-  let solved_dep = Staged.solve deps in
+  let solved_dep = Staged.solve ~mode:Analysis.Full deps in
   let unit_metadata = Flambda_unit.metadata unit in
   Staged.rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
     ~cmx_loader ~all_code ~final_typing_env
