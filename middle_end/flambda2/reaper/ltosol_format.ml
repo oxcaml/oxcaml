@@ -97,34 +97,34 @@ end = struct
        [Datalog.get_table] returns for missing tables. This is not
        straightforward because the solve code relies on getting empty results
        for tables that have no facts yet. *)
-    Datalog.set_table Global_flow_graph.constructor constructor
-    @@ Datalog.set_table Global_flow_graph.parameter parameter
-    @@ Datalog.set_table Global_flow_graph.code_id_my_closure code_id_my_closure
-    @@ Datalog.set_table Global_flow_graph.any_usage any_usage
-    @@ Datalog.set_table Global_flow_graph.any_source any_source
-    @@ Datalog.set_table Points_to_analysis.Relations.usages_table usages
-    @@ Datalog.set_table Points_to_analysis.Relations.sources_table sources
-    @@ Datalog.set_table Points_to_analysis.Relations.rev_accessor_table
+    Datalog.empty
+    |> Datalog.set_table Global_flow_graph.constructor constructor
+    |> Datalog.set_table Global_flow_graph.parameter parameter
+    |> Datalog.set_table Global_flow_graph.code_id_my_closure code_id_my_closure
+    |> Datalog.set_table Global_flow_graph.any_usage any_usage
+    |> Datalog.set_table Global_flow_graph.any_source any_source
+    |> Datalog.set_table Points_to_analysis.Relations.usages_table usages
+    |> Datalog.set_table Points_to_analysis.Relations.sources_table sources
+    |> Datalog.set_table Points_to_analysis.Relations.rev_accessor_table
          rev_accessor
-    @@ Datalog.set_table Points_to_analysis.Relations.has_usage_table has_usage
-    @@ Datalog.set_table Points_to_analysis.Relations.has_source_table
+    |> Datalog.set_table Points_to_analysis.Relations.has_usage_table has_usage
+    |> Datalog.set_table Points_to_analysis.Relations.has_source_table
          has_source
-    @@ Datalog.set_table
+    |> Datalog.set_table
          Points_to_analysis.Relations.field_of_constructor_is_used_tbl
          field_of_constructor_is_used
-    @@ Datalog.set_table
+    |> Datalog.set_table
          Points_to_analysis.Relations.field_of_constructor_is_used_top_table
          field_of_constructor_is_used_top
-    @@ Datalog.set_table
+    |> Datalog.set_table
          Points_to_analysis.Relations.field_of_constructor_is_used_as_table
          field_of_constructor_is_used_as
-    @@ Datalog.set_table
+    |> Datalog.set_table
          Points_to_analysis.Relations.allocation_point_dominator_table
          allocation_point_dominator
-    @@ Datalog.set_table
+    |> Datalog.set_table
          Unboxing_analysis.cannot_change_calling_convention_table
          cannot_change_calling_convention
-    @@ Datalog.empty
 
   let ids_for_export
       ({ constructor;
