@@ -543,7 +543,11 @@ let rec fracture_lam lambda : slambda =
           let kind =
             match kind, mode with
             | Curried { nlocal }, Alloc_local -> Curried { nlocal = nlocal + 1 }
-            | _ -> kind
+            | Curried _, Alloc_heap -> kind
+            | Tupled, _ ->
+              Misc.fatal_error
+                "Tupled template functions are not supported, functors should \
+                 always be curried"
           in
           SLhalves
             { sval_comptime = body_c;

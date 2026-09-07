@@ -1288,31 +1288,36 @@ let layout env loc sort ty =
 
 let layout_of_ident env ident =
   let path = Path.Pident ident in
-  match Env.find_module path env with
-  | _ -> Some layout_any_value
+  match Env.find_value path env with
+  | value_desc ->
+    let { val_type; val_kind; val_loc; _ } =
+      Subst.Lazy.force_value_description value_desc
+    in
+    begin match val_kind with
+    | Val_reg sort | Val_mut (_, sort) ->
+      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout env val_loc const_sort val_type in
+      Some layout
+    | Val_prim _ -> None
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some layout_any_value
+    end
   | exception Not_found ->
-    match Env.find_class path env with
-    | _ -> Some Lambda.layout_class
+    match Env.find_module path env with
+    | _ -> Some layout_module
     | exception Not_found ->
-      match Env.find_value path env with
-      | exception Not_found ->
-        (match Translobj.layout_of_ident ident with
-         | Some _ as layout -> layout
-         | None ->
-           Misc.fatal_errorf "Failed to find value_desc for %a"
-             Ident.print ident)
-      | value_desc ->
-        let { val_type; val_kind; val_loc; _ } =
-          Subst.Lazy.force_value_description value_desc
-        in
-        match val_kind with
-        | Val_reg sort | Val_mut (_, sort) ->
-          let const_sort = Jkind.Sort.default_for_transl_and_get sort in
-          let layout = layout env val_loc const_sort val_type in
-          Some layout
-        | Val_prim _ -> None
-        | Val_ivar _ | Val_self _ | Val_anc _ ->
-          Some layout_any_value
+      match Env.find_ident_constructor ident env with
+      | { cstr_tag = Extension _ } -> Some layout_extensible_variant_constructor
+      | _ | exception Not_found ->
+        match Env.find_class path env with
+        | _ -> Some Lambda.layout_class
+        | exception Not_found ->
+            (match Translobj.layout_of_ident ident with
+            | Some _ as layout -> layout
+            | None ->
+              Misc.fatal_errorf "Failed to find value_desc for %a"
+                Ident.print ident)
+
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

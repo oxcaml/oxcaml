@@ -370,7 +370,12 @@ module Ctx = struct
         Ident.Tbl.replace t.instantiated_templates name None;
         let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
         Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
-        t.instantiations <- (name, slv_runtime) :: t.instantiations;
+        let instantiation =
+          Lambda.subst
+            (fun _ _ env -> env)
+            ~freshen_bound_variables:true Ident.Map.empty slv_runtime
+        in
+        t.instantiations <- (name, instantiation) :: t.instantiations;
         slv_comptime
         end
     in

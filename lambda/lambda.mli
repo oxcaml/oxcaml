@@ -1316,6 +1316,7 @@ val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
 val layout_list : layout
+val layout_extensible_variant_constructor : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout

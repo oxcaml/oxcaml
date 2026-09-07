@@ -1,6 +1,7 @@
 (* TEST
  flags = "-extension layout_poly_alpha";
- expect.opt;
+ { expect.opt; }
+ { expect; }
 *)
 
 (* Tests for *applications* of static functors: instantiation of the
@@ -197,6 +198,17 @@ val r10i : int = 8
 val r10f : float = 8.
 |}]
 
+(* The same static functor composed with itself: the argument of the outer
+   application is the result of an inner application of the same functor. *)
+let r10s =
+  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
+  let module F (M : Id @ static) = struct let i = M.id 9 end in
+  let module R = F (Wrap (Wrap (struct let poly_ id x = x end))) in
+  R.i
+[%%expect{|
+val r10s : int = 9
+|}]
+
 (* A static functor applied inside another static functor's body. *)
 let (r11i, r11f) =
   let module F (M : Id @ static) = struct
@@ -325,6 +337,18 @@ Uncaught exception: Misc.Fatal_error
 
 |}]
 
+(* Capture an exception constructor from the enclosing scope. *)
+let k7 =
+  let exception Boom of int in
+  let module K (M : Id @ static) = struct
+    let i = try raise (Boom (M.id 71)) with Boom n -> n | _ -> 0
+  end in
+  let module R = K (struct let poly_ id x = x end) in
+  R.i
+[%%expect{|
+val k7 : int = 71
+|}]
+
 (* A static parameter followed by a dynamic one. *)
 
 let (d1i, d1f) =
@@ -378,6 +402,56 @@ let g1 =
   R.i
 [%%expect{|
 >> Fatal error: Slambda eval doesn't support partial or over application of functors.
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Recursive functor *)
+module rec F12 : (functor (X : Id @ static) -> Id @ static) @ static =
+  functor (X : Id @ static) -> struct
+    let poly_ id x = M12.id x
+  end
+and M12 : Id @ static = struct
+  module Y = F12 (M12)
+  let poly_ id x = Y.id x
+end
+[%%expect{|
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Recursive first-class functor *)
+module type F =
+  functor (X : sig end @ static) -> sig
+      val f : unit -> int
+    end
+
+let rec p13 =
+  (module functor (X : sig end @ static) -> struct
+    let f () = ignore p13; 1
+  end : F)
+[%%expect{|
+module type F = functor (X : sig end @ static) -> sig val f : unit -> int end
+>> Fatal error: letrec: poly_ not supported
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* A static functor taking another static functor as its argument *)
+module type IdF = functor (M : Id @ static) -> Id @ static
+let (h2i, h2f) =
+  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
+  let module Apply (G : IdF @ static) = struct
+    module W = G (struct let poly_ id x = x end)
+    let i = W.id 43
+    let f = to_float (W.id #43.0)
+  end in
+  let module R = Apply (Wrap) in
+  (R.i, R.f)
+[%%expect{|
+module type IdF = functor (M : Id @ static) -> Id @ static
+>> Fatal error: Slambda_types.symbol_arg_of_value: unexpected closure
 Uncaught exception: Misc.Fatal_error
 
 |}]
