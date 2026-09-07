@@ -261,8 +261,8 @@ let changed_representation_apply_renaming changed_representation renaming
     ~rename_field =
   let rename_id = Renaming.apply_code_id_or_name renaming in
   let rename_repr (repr : changed_representation) : changed_representation =
-    (* Ints, block access kinds and slots are structural data, not hashconsed
-       identifiers, so they are not renamed. *)
+    (* [size], [function_slots], [current_function_slot] and the leaves of the
+       [tree]s do not contain hashcons IDs so don't need renaming. *)
     match repr with
     | Block_representation (tree, size) ->
       Block_representation
