@@ -20,6 +20,11 @@ depends: [
   "menhirLib"
   "menhirSdk"
   "yojson" {>= "2.1"}
+  # merlin dependencies
+  "conf-jq"
+  "odoc"
+  "csexp" {>= "1.5.1"}
+  "alcotest" {>= "1.3.0" }
 ]
 build: []
 install: []
