@@ -1,0 +1,39 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper";
+ flambda2;
+ setup-simple-build-env;
+ {
+   fexpr with dump-simplify;
+ }{
+   ocamlopt_flags += " -dflambda-invariants";
+   fexpr with dump-simplify;
+ }
+*)
+
+(* [f] is live, but [d] occurs only in the coercion of a synthetic value slot.
+   The join of distinct depths prevents [d] from simplifying to a constant. That
+   slot must be dropped before [d] is removed; the plain one and the site
+   remain. *)
+
+let code inline(never) size(10) helper (x : val) specialised { x = plain_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(30) outer (f : val, b : imm tagged)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let d0 = rec_info 0 in
+  let d1 = rec_info 1 in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> join (d0)
+    | 1 -> join (d1)
+  where join (d : rec_info) =
+    let site = closure specialisation_site helper &my_alloc_region
+      synthetic { plain_slot = f; coerced_slot = f ~ depth d -> 0 }
+    in
+    apply direct(helper &my_alloc_region) (f) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_coercion_hint = Block 0 ($outer) in
+cont done ($camlSpecialised_params_coercion_hint)

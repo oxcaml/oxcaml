@@ -1,0 +1,20 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-raw, dump-simplify;
+*)
+
+(* The projection syntax omits the kind, so it must reuse the declared float
+   kind. *)
+let code size(1) f (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let c = closure f &toplevel with { s : float = 1.0 } in
+let v = %project_value_slot.[f].[s] (c) in
+let equal = %float_comp.eq (v, 1.0) in
+let result = %tag_imm (equal) in
+let $camlProject_unboxed_value_slot = Block 0 (result) in
+cont done ($camlProject_unboxed_value_slot)

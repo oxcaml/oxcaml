@@ -703,7 +703,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
           Function_params_and_body.create ~return_continuation
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
             remaining_params ~body ~my_closure ~my_alloc_mode ~my_depth
-            ~free_names_of_body:Unknown
+            ~free_names_of_body:Unknown ~specialised_params:Variable.Map.empty
         in
         let name =
           Function_slot.to_string callee's_function_slot ^ "_partial"
@@ -760,7 +760,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             applied_values
           |> Value_slot.Map.of_list
         in
-        ( Set_of_closures.create ~value_slots function_decls,
+        ( Set_of_closures.create ~is_specialisation_site:false
+            ~synthetic_value_slots:Value_slot.Map.empty ~value_slots
+            function_decls,
           new_closure_alloc_mode,
           dacc,
           code_id,
@@ -1455,7 +1457,80 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
   down_to_up dacc
     ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
 
+(* Redirect a callee-less direct call to a specialised version of the code whose
+   assumptions its arguments satisfy (see
+   [Downwards_env.Code_specialisation]). *)
+let redirect_direct_call_to_specialised_code denv apply =
+  match Apply.callee apply, Apply.call_kind apply with
+  | None, Function { function_call = Direct code_id } -> (
+    match DE.find_code_specialisations denv code_id with
+    | [] -> apply
+    | _ :: _ as specialisations -> (
+      let typing_env = DE.typing_env denv in
+      let canonical simple =
+        if TE.mem_simple ~min_name_mode:NM.in_types typing_env simple
+        then
+          match
+            TE.get_canonical_simple_exn ~min_name_mode:NM.in_types typing_env
+              simple
+          with
+          | simple -> Some (Simple.without_coercion simple)
+          | exception Not_found -> None
+        else None
+      in
+      let assumption_holds arg assumption =
+        match assumption with
+        | None -> true
+        | Some (_value_slot, simple) -> (
+          match canonical arg, canonical simple with
+          | Some arg, Some simple -> Simple.equal arg simple
+          | None, _ | _, None -> false)
+      in
+      let args = Apply.args apply in
+      let assumptions_hold
+          ({ new_code_id = _; assumptions } : DE.Code_specialisation.t) =
+        List.compare_lengths args assumptions = 0
+        && List.for_all2 assumption_holds args assumptions
+      in
+      let num_assumptions
+          ({ new_code_id = _; assumptions } : DE.Code_specialisation.t) =
+        List.length (List.filter Option.is_some assumptions)
+      in
+      (* Prefer the most specialised candidate; the candidates are in reverse
+         order of recording, so the most recent wins ties. *)
+      let best =
+        List.fold_left
+          (fun best specialisation ->
+            if not (assumptions_hold specialisation)
+            then best
+            else
+              match best with
+              | Some best
+                when num_assumptions best >= num_assumptions specialisation ->
+                Some best
+              | Some _ | None -> Some specialisation)
+          None specialisations
+      in
+      match best with
+      | None -> apply
+      | Some { new_code_id; assumptions = _ } ->
+        (match DE.find_code_metadata_exn denv new_code_id with
+        | exception Not_found ->
+          Misc.fatal_errorf
+            "Code ID %a, the specialisation of %a, is not in scope for:@ %a"
+            Code_id.print new_code_id Code_id.print code_id Apply.print apply
+        | _code_metadata -> ());
+        Apply.with_call_kind apply (Call_kind.direct_function_call new_code_id))
+    )
+  | Some _, _
+  | ( None,
+      ( Function
+          { function_call = Indirect_known_arity _ | Indirect_unknown_arity }
+      | Method _ | C_call _ | Effect _ ) ) ->
+    apply
+
 let simplify_apply ~simplify_expr dacc apply ~down_to_up =
+  let apply = redirect_direct_call_to_specialised_code (DA.denv dacc) apply in
   match simplify_apply_shared dacc apply with
   | Invalid args_arity ->
     replace_apply_by_invalid dacc ~down_to_up

@@ -19,7 +19,10 @@ module type S = sig
 
   module Lmap : Lmap.S with type key = t
 
+  (** A synthetic slot (see [Set_of_closures.synthetic_value_slots]) is never
+      allocated in a closure, and so never has an offset. *)
   val create :
+    ?is_synthetic:bool ->
     Compilation_unit.t ->
     name:string ->
     is_always_immediate:bool ->
@@ -41,6 +44,8 @@ module type S = sig
   val kind : t -> Flambda_kind.t
 
   val is_always_immediate : t -> bool
+
+  val is_synthetic : t -> bool
 
   val rename : t -> t
 end

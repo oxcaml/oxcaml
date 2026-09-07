@@ -1,0 +1,98 @@
+(* TEST
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants -dflow -dfexpr";
+ flambda2;
+ native-compiler;
+ setup-simple-build-env;
+ program = "${ocamlsrcdir}/testsuite/tools/fexprc";
+ arguments = "-dcanonical-ids ${ocamlopt_flags} ${test_file}";
+ output = "site-liveness-check.output";
+ stdout = "site-liveness.output";
+ stderr = "site-liveness.output";
+ script = "sh ${test_source_directory}/check-specialisation-site-liveness.sh site-liveness.output";
+ {
+   run;
+   stdout = "${output}";
+   stderr = "${output}";
+   script;
+ }{
+   ocamlopt_flags += " -g -flambda2-expert-phantom-lets";
+   run;
+   stdout = "${output}";
+   stderr = "${output}";
+   script;
+ }
+*)
+
+(* Debug-only roots and code dependencies must not make sites live. Check
+   the site-liveness result: fexpr dumps omit binding modes. *)
+let $phantom_value = Block 0 (0) in
+let $live_value = Block 0 (1) in
+let code inline(never) size(10) live_helper (x : val)
+      specialised { x = live_hint }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let unused = $phantom_value in
+  cont k (x)
+in
+let code inline(never) size(10) dead_helper (x : val)
+      specialised { x = dead_hint }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) dead_helper_symbol (x : val)
+      specialised { x = symbol_hint }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) g (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(dead_helper_symbol &my_alloc_region) (0) -> k * e
+in
+(* A stub keeps the same code ID in both sites, exposing a direct phantom
+   code dependency as well as the phantom symbol dependency through [g]. *)
+let code inline(never) size(10) stub dead_helper_code (x : val)
+      specialised { x = code_hint }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) wrap (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let unused_g = closure g &my_alloc_region in
+  let unused_site =
+    closure specialisation_site dead_helper_code &my_alloc_region
+      synthetic { code_hint = 0 }
+  in
+  cont k (x)
+in
+let code size(30) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let symbol_site =
+    closure specialisation_site dead_helper_symbol &my_alloc_region
+      synthetic { symbol_hint = 0 }
+  in
+  let code_site =
+    closure specialisation_site dead_helper_code &my_alloc_region
+      synthetic { code_hint = 0 }
+  in
+  let wrap = closure wrap &my_alloc_region in
+  apply direct(wrap &my_alloc_region) wrap (x) -> k * e
+in
+(* [dead_hint] is only reachable through [live_helper]'s phantom alias; the
+   others are genuinely live. *)
+let code size(30) live_outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let live_site =
+    closure specialisation_site live_helper &my_alloc_region
+      synthetic { dead_hint = $phantom_value; live_hint = $live_value }
+  in
+  let dead_site =
+    closure specialisation_site dead_helper &my_alloc_region
+      synthetic { dead_hint = $phantom_value }
+  in
+  apply direct(live_helper &my_alloc_region) ($live_value) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $live_outer = closure live_outer &toplevel in
+let $camlSpecialised_params_phantom_site =
+  Block 0 ($outer, $live_outer, $live_value)
+in
+cont done ($camlSpecialised_params_phantom_site)

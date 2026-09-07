@@ -1,0 +1,46 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+*)
+
+(* [bridge] has no assumptions of its own, but its empty site must redirect
+   calls through the specialised [first], whose callback is inlined. *)
+
+let code inline(always) size(5) square (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let r = %int_barith.`mul` (x, x) in
+  cont k (r)
+in
+let $square = closure square &toplevel in
+let code inline(never) size(10) first (f : val, x : val)
+      specialised { f = f_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+(* Root the generic code independently: Fexpr's raw code metadata omits the
+   body dependencies of the unsimplified bridge. *)
+let code inline(never) size(5) fallback (f : val, x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(first &my_alloc_region) (f, x) -> k * e
+in
+let $fallback = closure fallback &toplevel in
+let code inline(never) size(10) bridge (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(first &my_alloc_region) ($square, x) -> k * e
+in
+let code size(30) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let a = closure specialisation_site first &my_alloc_region
+    synthetic { f_slot = $square }
+  in
+  let b = closure specialisation_site bridge &my_alloc_region in
+  apply direct(bridge &my_alloc_region) (x) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_empty_bridge =
+  Block 0 ($outer, $fallback, $square)
+in
+cont done ($camlSpecialised_params_empty_bridge)

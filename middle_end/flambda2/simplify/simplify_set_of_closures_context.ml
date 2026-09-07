@@ -23,6 +23,7 @@ type t =
     closure_bound_names_inside_functions_all_sets :
       Bound_name.t Function_slot.Map.t list;
     old_to_new_code_ids_all_sets : Code_id.t Code_id.Map.t;
+    code_specialisations : DE.Code_specialisation.t Code_id.Map.t;
     previously_free_depth_variables : Variable.Set.t
   }
 
@@ -52,6 +53,7 @@ let create_for_static_stub dacc ~all_code ~simplify_function_body =
     dacc_inside_functions;
     closure_bound_names_inside_functions_all_sets = [];
     old_to_new_code_ids_all_sets = Code_id.Map.empty;
+    code_specialisations = Code_id.Map.empty;
     previously_free_depth_variables = Variable.Set.empty
   }
 
@@ -62,6 +64,8 @@ let dacc_prior_to_sets t = t.dacc_prior_to_sets
 let dacc_inside_functions t = t.dacc_inside_functions
 
 let old_to_new_code_ids_all_sets t = t.old_to_new_code_ids_all_sets
+
+let code_specialisations t = t.code_specialisations
 
 let closure_bound_names_inside_functions_all_sets t =
   t.closure_bound_names_inside_functions_all_sets
@@ -256,6 +260,85 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
         else denv)
     old_to_new_code_ids_all_sets denv
 
+(* Compute once the assumptions used both to simplify the new versions of the
+   code and to guard the redirection of callee-less calls (see
+   [Simplify_apply_expr.redirect_direct_call_to_specialised_code]). *)
+let compute_code_specialisations denv ~all_sets_of_closures
+    ~synthetic_value_slots_all_sets ~old_to_new_code_ids_all_sets =
+  let assumptions_for_code old_code_id ~synthetic_value_slots =
+    let code = Code_or_metadata.get_code (DE.find_code_exn denv old_code_id) in
+    Function_params_and_body.pattern_match (Code.params_and_body code)
+      ~f:(fun
+          ~return_continuation:_
+          ~exn_continuation:_
+          params
+          ~body:_
+          ~my_closure:_
+          ~is_my_closure_used:_
+          ~my_alloc_mode:_
+          ~my_depth:_
+          ~free_names_of_body:_
+          ~specialised_params
+        ->
+        List.map
+          (fun param ->
+            match
+              Variable.Map.find_opt
+                (Bound_parameter.var param)
+                specialised_params
+            with
+            | None -> None
+            | Some value_slot -> (
+              match
+                Value_slot.Map.find_opt value_slot synthetic_value_slots
+              with
+              | None -> None
+              | Some simple -> Some (value_slot, simple)))
+          (Bound_parameters.to_list params))
+  in
+  List.fold_left2
+    (fun code_specialisations (set_of_closures, _alloc_mode)
+         synthetic_value_slots ->
+      let is_specialisation_site =
+        Set_of_closures.is_specialisation_site set_of_closures
+      in
+      if
+        Value_slot.Map.is_empty synthetic_value_slots
+        && not is_specialisation_site
+      then code_specialisations
+      else
+        List.fold_left
+          (fun code_specialisations old_code_id ->
+            match
+              Code_id.Map.find_opt old_code_id old_to_new_code_ids_all_sets
+            with
+            | None -> code_specialisations
+            | Some new_code_id ->
+              let assumptions =
+                assumptions_for_code old_code_id ~synthetic_value_slots
+              in
+              (* A marked site's code can use other specialisations in scope
+                 even without assumptions of its own. Keep that candidate;
+                 candidates with more matching assumptions take precedence. *)
+              if
+                List.for_all Option.is_none assumptions
+                && not is_specialisation_site
+              then code_specialisations
+              else
+                Code_id.Map.add old_code_id
+                  ({ new_code_id; assumptions } : DE.Code_specialisation.t)
+                  code_specialisations)
+          code_specialisations
+          (Function_declarations.code_ids
+             (Set_of_closures.function_decls set_of_closures)))
+    Code_id.Map.empty all_sets_of_closures synthetic_value_slots_all_sets
+
+let record_code_specialisations code_specialisations denv =
+  Code_id.Map.fold
+    (fun old_code_id code_specialisation denv ->
+      DE.add_code_specialisation denv ~old_code_id code_specialisation)
+    code_specialisations denv
+
 let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
     ~value_slot_types_all_sets =
   (* The purpose of the code below is to compute the set of depth variables that
@@ -322,7 +405,8 @@ let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
     denv_inside_functions, free_depth_variables
 
 let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
-    ~closure_bound_names_all_sets ~value_slot_types_all_sets =
+    ~closure_bound_names_all_sets ~value_slot_types_all_sets
+    ~synthetic_value_slots_all_sets ~synthetic_value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
     DE.enter_set_of_closures denv
@@ -332,11 +416,24 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     |> DE.set_rebuild_terms
   in
   let denv_inside_functions, previously_free_depth_variables =
+    (* The contents of the synthetic value slots end up in the functions'
+       environments too, via the equations on the specialised parameters. *)
+    let value_slot_types_all_sets =
+      List.map2
+        (fun value_slot_types synthetic_value_slot_types ->
+          Value_slot.Map.disjoint_union value_slot_types
+            synthetic_value_slot_types)
+        value_slot_types_all_sets synthetic_value_slot_types_all_sets
+    in
     compute_and_erase_depth_variables ~typing_env:(DE.typing_env denv)
       ~denv_inside_functions ~value_slot_types_all_sets
   in
   let old_to_new_code_ids_all_sets =
     compute_old_to_new_code_ids_all_sets denv ~all_sets_of_closures
+  in
+  let code_specialisations =
+    compute_code_specialisations denv ~all_sets_of_closures
+      ~synthetic_value_slots_all_sets ~old_to_new_code_ids_all_sets
   in
   let ( closure_bound_names_inside_functions_all_sets,
         closure_types_inside_functions_all_sets ) =
@@ -351,12 +448,14 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     |> bind_closure_types_inside_functions
          ~closure_bound_names_inside_functions_all_sets
          ~closure_types_inside_functions_all_sets
+    |> record_code_specialisations code_specialisations
     |> DA.with_denv dacc_prior_to_sets
   in
   { dacc_prior_to_sets;
     dacc_inside_functions;
     closure_bound_names_inside_functions_all_sets;
     old_to_new_code_ids_all_sets;
+    code_specialisations;
     simplify_function_body;
     previously_free_depth_variables
   }

@@ -43,10 +43,8 @@ module Acc : sig
       continuation handler. *)
   val exit_continuation : Continuation.t -> t -> t
 
-  (** Record that the current expression defines some lifted constants; this is
-      not liked to the current continuation. Note: this should only be called at
-      top-level, where the constants will be placed, and not from the fonction
-      where the constants come from. *)
+  (** Record lifted constants independently of the current continuation. May be
+      called inside closures. *)
   val record_lifted_constants : Lifted_constant_state.t -> t -> t
 
   (** That variable is defined in the current handler *)
@@ -107,11 +105,13 @@ module Acc : sig
 end
 
 module Analysis : sig
-  (** Perform flow analysis *)
+  (** Perform flow analysis. [is_toplevel] means lexically outside any closure,
+      including during speculative inlining there. *)
   val analyze :
     ?speculative:bool ->
     ?print_name:string ->
     machine_width:Target_system.Machine_width.t ->
+    is_toplevel:bool ->
     return_continuation:Continuation.t ->
     exn_continuation:Continuation.t ->
     code_age_relation:Code_age_relation.t ->

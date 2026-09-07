@@ -150,19 +150,17 @@ let log_comp c f e1 e2 =
     log_rel f e1 rel e2
 
 module Env = struct
-  (* We rely on unification for function slots and value slots, so for those,
-   * we need to keep a map both ways so that we know whether a given (say)
-   * function slot in the right-hand term has already been mapped to something
-   * different.  In contrast, we expect to have already seen a symbol or code
-   * id at its binding site, so if it's not in the map we know straight away
-   * something's wrong. *)
+  (* Slot unification needs maps in both directions to enforce bijections.
+     Symbols and code IDs are paired at their bindings, which may be visited
+     after their uses. *)
   type t =
     { mutable symbols : Symbol.t Symbol.Map.t;
       mutable code_ids : Code_id.t Code_id.Map.t;
       mutable function_slots : Function_slot.t Function_slot.Map.t;
       mutable function_slots_rev : Function_slot.t Function_slot.Map.t;
       mutable value_slots : Value_slot.t Value_slot.Map.t;
-      mutable value_slots_rev : Value_slot.t Value_slot.Map.t
+      mutable value_slots_rev : Value_slot.t Value_slot.Map.t;
+      mutable finalise_ambiguous_slots : bool
     }
 
   let create () =
@@ -171,8 +169,21 @@ module Env = struct
       function_slots = Function_slot.Map.empty;
       function_slots_rev = Function_slot.Map.empty;
       value_slots = Value_slot.Map.empty;
-      value_slots_rev = Value_slot.Map.empty
+      value_slots_rev = Value_slot.Map.empty;
+      finalise_ambiguous_slots = false
     }
+
+  let size t =
+    Symbol.Map.cardinal t.symbols
+    + Code_id.Map.cardinal t.code_ids
+    + Function_slot.Map.cardinal t.function_slots
+    + Function_slot.Map.cardinal t.function_slots_rev
+    + Value_slot.Map.cardinal t.value_slots
+    + Value_slot.Map.cardinal t.value_slots_rev
+
+  let finalise_ambiguous_slots t = t.finalise_ambiguous_slots <- true
+
+  let can_pair_ambiguous_slots t = t.finalise_ambiguous_slots
 
   let add_symbol t symbol1 symbol2 =
     t.symbols <- Symbol.Map.add symbol1 symbol2 t.symbols
@@ -183,13 +194,13 @@ module Env = struct
   let add_function_slot t function_slot1 function_slot2 =
     t.function_slots
       <- Function_slot.Map.add function_slot1 function_slot2 t.function_slots;
-    t.function_slots
+    t.function_slots_rev
       <- Function_slot.Map.add function_slot2 function_slot1
            t.function_slots_rev
 
   let add_value_slot t value_slot1 value_slot2 =
     t.value_slots <- Value_slot.Map.add value_slot1 value_slot2 t.value_slots;
-    t.value_slots
+    t.value_slots_rev
       <- Value_slot.Map.add value_slot2 value_slot1 t.value_slots_rev
 
   let find_symbol t sym = Symbol.Map.find_opt sym t.symbols
@@ -271,14 +282,18 @@ let subst_func_decls env decls =
 
 let subst_set_of_closures env set =
   let decls = subst_func_decls env (Set_of_closures.function_decls set) in
-  let value_slots =
-    Set_of_closures.value_slots set
-    |> Value_slot.Map.bindings
+  let subst_slots slots =
+    Value_slot.Map.bindings slots
     |> List.map (fun (var, simple) ->
         subst_value_slot env var, subst_simple env simple)
     |> Value_slot.Map.of_list
   in
-  Set_of_closures.create ~value_slots decls
+  Set_of_closures.create
+    ~is_specialisation_site:(Set_of_closures.is_specialisation_site set)
+    ~synthetic_value_slots:
+      (subst_slots (Set_of_closures.synthetic_value_slots set))
+    ~value_slots:(subst_slots (Set_of_closures.value_slots set))
+    decls
 
 let subst_rec_info_expr _env ri =
   (* Only depth variables can occur in [Rec_info_expr], and we only mess with
@@ -395,10 +410,15 @@ and subst_params_and_body env params_and_body =
         ~my_alloc_mode
         ~my_depth
         ~free_names_of_body
+        ~specialised_params
       ->
       let body = subst_expr env body in
+      let specialised_params =
+        Variable.Map.map (subst_value_slot env) specialised_params
+      in
       Function_params_and_body.create ~return_continuation ~exn_continuation
-        params ~body ~my_closure ~my_alloc_mode ~free_names_of_body ~my_depth)
+        params ~body ~my_closure ~my_alloc_mode ~free_names_of_body ~my_depth
+        ~specialised_params)
 
 and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
   match let_cont_expr with
@@ -579,17 +599,49 @@ let function_slots env function_slot1 function_slot2 :
       Equivalent)
 
 let value_slots env value_slot1 value_slot2 : Value_slot.t Comparison.t =
-  match Env.find_value_slot env value_slot1 with
-  | Some value_slot ->
-    if Value_slot.equal value_slot value_slot2
-    then Equivalent
-    else Different { approximant = value_slot }
-  | None -> (
-    match Env.find_value_slot_rev env value_slot2 with
-    | Some _ -> Different { approximant = value_slot1 }
-    | None ->
-      Env.add_value_slot env value_slot1 value_slot2;
-      Equivalent)
+  if
+    not
+      (Flambda_kind.equal
+         (Value_slot.kind value_slot1)
+         (Value_slot.kind value_slot2)
+      && Bool.equal
+           (Value_slot.is_synthetic value_slot1)
+           (Value_slot.is_synthetic value_slot2))
+  then Different { approximant = subst_value_slot env value_slot1 }
+  else
+    match Env.find_value_slot env value_slot1 with
+    | Some value_slot ->
+      if Value_slot.equal value_slot value_slot2
+      then Equivalent
+      else Different { approximant = value_slot }
+    | None -> (
+      match Env.find_value_slot_rev env value_slot2 with
+      | Some _ -> Different { approximant = value_slot1 }
+      | None ->
+        Env.add_value_slot env value_slot1 value_slot2;
+        Equivalent)
+
+let specialised_params env params1 params2 :
+    Value_slot.t Variable.Map.t Comparison.t =
+  let ok = ref true in
+  let approximant =
+    Variable.Map.merge
+      (fun _param slot1 slot2 ->
+        match slot1, slot2 with
+        | None, None -> None
+        | None, Some _ ->
+          ok := false;
+          None
+        | Some slot1, None ->
+          ok := false;
+          Some (subst_value_slot env slot1)
+        | Some slot1, Some slot2 ->
+          Some
+            (value_slots env slot1 slot2
+            |> Comparison.chain ~ok ~if_equivalent:slot2))
+      params1 params2
+  in
+  if !ok then Equivalent else Different { approximant }
 
 let coercions _env coercion1 coercion2 : Coercion.t Comparison.t =
   (* Coercions only contain variables, not symbols, so we can just compare *)
@@ -761,62 +813,106 @@ let function_decls env
   | Deleted _, Code_id _ | Code_id _, Deleted _ ->
     Different { approximant = () }
 
-(** Match up equal elements in two lists and iterate through both of them, using
-    [f] analogously to [Map.S.merge] *)
-let iter2_merged l1 l2 ~compare ~f =
-  let l1 = List.sort compare l1 in
-  let l2 = List.sort compare l2 in
+(** Iterate over equal-key groups, using [] for missing groups. *)
+let iter2_merged_groups l1 l2 ~compare ~f =
+  let rec take_equal elt acc = function
+    | next :: rest when compare elt next = 0 ->
+      take_equal elt (next :: acc) rest
+    | rest -> List.rev acc, rest
+  in
   let rec go l1 l2 =
     match l1, l2 with
     | [], [] -> ()
-    | a1 :: l1, [] ->
-      f (Some a1) None;
-      go l1 []
-    | [], a2 :: l2 ->
-      f None (Some a2);
-      go [] l2
-    | a1 :: l1, a2 :: l2 -> (
+    | a1 :: rest1, [] ->
+      let group1, rest1 = take_equal a1 [a1] rest1 in
+      f group1 [];
+      go rest1 []
+    | [], a2 :: rest2 ->
+      let group2, rest2 = take_equal a2 [a2] rest2 in
+      f [] group2;
+      go [] rest2
+    | a1 :: rest1, a2 :: rest2 -> (
       match compare a1 a2 with
       | 0 ->
-        f (Some a1) (Some a2);
-        go l1 l2
+        let group1, rest1 = take_equal a1 [a1] rest1 in
+        let group2, rest2 = take_equal a2 [a2] rest2 in
+        f group1 group2;
+        go rest1 rest2
       | c when c < 0 ->
-        f (Some a1) None;
-        go l1 (a2 :: l2)
+        let group1, rest1 = take_equal a1 [a1] rest1 in
+        f group1 [];
+        go rest1 l2
       | _ ->
-        f None (Some a2);
-        go (a1 :: l1) l2)
+        let group2, rest2 = take_equal a2 [a2] rest2 in
+        f [] group2;
+        go l1 rest2)
   in
-  go l1 l2
+  go (List.stable_sort compare l1) (List.stable_sort compare l2)
 
 let sets_of_closures env set1 set2 : Set_of_closures.t Comparison.t =
-  (* Need to do unification on value slots and function slots, we we're going to
-   * invert both maps, figuring the value slots with the same value should be
-   * the same.  There is a risk that two value slots will be mapped to the
-   * same value, but that should be rare.  Later, we'll do something
-   * similar (and less worrisome) with function slots. *)
   let value_slots_by_value set =
     Value_slot.Map.bindings (Set_of_closures.value_slots set)
+    @ Value_slot.Map.bindings (Set_of_closures.synthetic_value_slots set)
     |> List.map (fun (var, value) ->
-        Value_slot.kind var, subst_simple env value, var)
+        ( Value_slot.is_synthetic var,
+          Value_slot.kind var,
+          subst_simple env value,
+          var ))
   in
   (* We want to process the whole map to find new correspondences between
    * value slots, so we need to remember whether we've found any mismatches *)
-  let ok = ref true in
+  let ok =
+    ref
+      (Bool.equal
+         (Set_of_closures.is_specialisation_site set1)
+         (Set_of_closures.is_specialisation_site set2))
+  in
   let () =
-    let compare (kind1, value1, _var1) (kind2, value2, _var2) =
-      let c = Flambda_kind.compare kind1 kind2 in
-      if c = 0 then Simple.compare value1 value2 else c
+    let compare (synthetic1, kind1, value1, _var1)
+        (synthetic2, kind2, value2, _var2) =
+      let c = Bool.compare synthetic1 synthetic2 in
+      if c <> 0
+      then c
+      else
+        let c = Flambda_kind.compare kind1 kind2 in
+        if c = 0 then Simple.compare value1 value2 else c
     in
-    iter2_merged (value_slots_by_value set1) (value_slots_by_value set2)
-      ~compare ~f:(fun elt1 elt2 ->
-        match elt1, elt2 with
-        | None, None -> ()
-        | Some _, None | None, Some _ -> ok := false
-        | Some (_kind1, _value1, var1), Some (_kind2, _value2, var2) -> (
-          match value_slots env var1 var2 with
-          | Equivalent -> ()
-          | Different { approximant = _ } -> ok := false))
+    let slots1 = value_slots_by_value set1 in
+    let slots2 = value_slots_by_value set2 in
+    let unmapped_slots find_slot slots other_slots =
+      let other_slots =
+        List.map (fun ((_, _, _, slot) as elt) -> slot, elt) other_slots
+        |> Value_slot.Map.of_list
+      in
+      List.filter
+        (fun ((_, _, _, slot) as elt) ->
+          match find_slot env slot with
+          | None -> true
+          | Some other_slot ->
+            (match Value_slot.Map.find_opt other_slot other_slots with
+            | Some other_elt when compare elt other_elt = 0 -> ()
+            | Some _ | None -> ok := false);
+            false)
+        slots
+    in
+    (* Uses may distinguish equal-valued slots. Check existing pairs, including
+       missing partners, before inferring new correspondences. *)
+    let unmapped_slots1 = unmapped_slots Env.find_value_slot slots1 slots2 in
+    let unmapped_slots2 =
+      unmapped_slots Env.find_value_slot_rev slots2 slots1
+    in
+    iter2_merged_groups unmapped_slots1 unmapped_slots2 ~compare
+      ~f:(fun group1 group2 ->
+        if List.compare_lengths group1 group2 <> 0
+        then ok := false
+        else if List.length group1 = 1 || Env.can_pair_ambiguous_slots env
+        then
+          List.iter2
+            (fun (_, _, _, var1) (_, _, _, var2) ->
+              match value_slots env var1 var2 with
+              | Equivalent -> ()
+              | Different { approximant = _ } -> ok := false)
+            group1 group2)
   in
   let function_slots_and_fun_decls_by_code_id set =
     let map = Function_declarations.funs (Set_of_closures.function_decls set) in
@@ -1233,15 +1329,19 @@ and codes env (code1 : Code.t) (code2 : Code.t) =
           params
           ~body1
           ~body2
+          ~specialised_params1
+          ~specialised_params2
           ~my_closure
           ~my_alloc_mode
           ~my_depth
         ->
-        exprs env body1 body2
-        |> Comparison.map ~f:(fun body1' ->
+        pairs ~f1:specialised_params ~f2:exprs env
+          (specialised_params1, body1)
+          (specialised_params2, body2)
+        |> Comparison.map ~f:(fun (specialised_params, body) ->
             Function_params_and_body.create ~return_continuation
-              ~exn_continuation params ~body:body1' ~my_closure ~my_alloc_mode
-              ~my_depth ~free_names_of_body:Unknown))
+              ~exn_continuation params ~body ~my_closure ~my_alloc_mode
+              ~my_depth ~free_names_of_body:Unknown ~specialised_params))
   in
   pairs ~f1:bodies
     ~f2:(options ~f:code_ids ~subst:subst_code_id)
@@ -1388,7 +1488,20 @@ let flambda_units u1 u2 =
   let env = Env.create () in
   let body1 = Expr.apply_renaming (Flambda_unit.body u1) (mk_renaming u1) in
   let body2 = Expr.apply_renaming (Flambda_unit.body u2) (mk_renaming u2) in
-  exprs env body1 body2
+  (* Resolve correspondences discovered after their uses before pairing slots
+     that remain indistinguishable. Recompare originals, not approximants. *)
+  let rec compare_until_stable () =
+    let size = Env.size env in
+    let comparison = exprs env body1 body2 in
+    if Env.size env > size
+    then compare_until_stable ()
+    else if not (Env.can_pair_ambiguous_slots env)
+    then (
+      Env.finalise_ambiguous_slots env;
+      compare_until_stable ())
+    else comparison
+  in
+  compare_until_stable ()
   |> Comparison.map ~f:(fun body ->
       let module_symbol = Flambda_unit.module_symbol u1 in
       Flambda_unit.create ~return_continuation:ret_cont

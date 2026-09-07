@@ -1,0 +1,49 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -dflambda-invariants";
+ flambda2;
+ native-compiler;
+ setup-simple-build-env;
+ {
+   ocamlopt_flags += " -no-flambda2-reaper";
+   program = "${ocamlsrcdir}/testsuite/tools/fexprc";
+   arguments = "-dcanonical-ids -dflambda -color never ${ocamlopt_flags} ${test_file}";
+   output = "dead-sibling-check.output";
+   stdout = "dead-sibling.output";
+   stderr = "dead-sibling.output";
+   run;
+   stdout = "${output}";
+   stderr = "${output}";
+   script = "sh ${test_source_directory}/check-specialisation-deleted-sibling.sh dead-sibling.output sibling";
+   script;
+ }{
+   ocamlopt_flags += " -flambda2-reaper -no-reaper-local-fields";
+   fexpr;
+ }{
+   ocamlopt_flags += " -flambda2-reaper -reaper-local-fields";
+   fexpr;
+ }
+*)
+
+(* The redirected call keeps the site, but not [dead]'s code. Its [Deleted]
+   declaration preserves the slot and binder. Check the final raw Flambda:
+   the fexpr printer does not support deleted function declarations. *)
+
+let code inline(never) size(10) live (x : val) specialised { x = x_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) dead (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(30) outer (y : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let a = closure specialisation_site live &my_alloc_region
+    synthetic { x_slot = 0 }
+  and b = closure specialisation_site dead &my_alloc_region in
+  apply direct(live &my_alloc_region) (0) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_dead_sibling = Block 0 ($outer) in
+cont done ($camlSpecialised_params_dead_sibling)

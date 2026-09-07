@@ -262,8 +262,29 @@ module Acc = struct
       } )
 end
 
+let convert_value_slots ?(is_synthetic = false) env
+    (value_slots : Fexpr.value_slots) =
+  let convert ({ var; value; kind } : Fexpr.one_value_slot) =
+    let kind =
+      match kind with
+      | None -> Flambda_kind.value
+      | Some naked_number_kind -> Flambda_kind.naked_number naked_number_kind
+    in
+    let value_slot = fresh_or_existing_value_slot ~is_synthetic ~kind env var in
+    value_slot, simple env value
+  in
+  List.fold_left
+    (fun slots (element : Fexpr.one_value_slot) ->
+      let value_slot, value = convert element in
+      if is_synthetic && Value_slot.Map.mem value_slot slots
+      then
+        Misc.fatal_errorf "Synthetic value slot %s is defined more than once"
+          element.var.txt;
+      Value_slot.Map.add value_slot value slots)
+    Value_slot.Map.empty value_slots
+
 let set_of_closures env fun_decls value_slots =
-  let fun_decls : Function_declarations.t =
+  let fun_decls_flambda : Function_declarations.t =
     let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
         Function_slot.t * Code_id.t =
       let code_id = find_code_id env fun_decl.code_id in
@@ -281,30 +302,28 @@ let set_of_closures env fun_decls value_slots =
            Code_id { code_id; only_full_applications = false })
     |> Function_declarations.create
   in
-  let value_slots = Option.value value_slots ~default:[] in
-  let value_slots : Simple.t Value_slot.Map.t =
-    let convert ({ var; value; kind } : Fexpr.one_value_slot) =
-      let kind =
-        match kind with
-        | None -> Flambda_kind.value
-        | Some naked_number_kind -> Flambda_kind.naked_number naked_number_kind
-      in
-      let value_slot = fresh_or_existing_value_slot env var kind in
-      if not (Flambda_kind.equal (Value_slot.kind value_slot) kind)
-      then
-        (* This can happen if an occurrence of the value slot, such as a
-           projection (which assumes kind [Value], see [Fexpr_prim]), was
-           encountered before this definition. *)
-        Misc.fatal_errorf
-          "Value slot %s: kind %a does not match kind %a of a previous \
-           occurrence of this slot"
-          var.txt Flambda_kind.print kind Flambda_kind.print
-          (Value_slot.kind value_slot);
-      value_slot, simple env value
-    in
-    List.map convert value_slots |> Value_slot.Map.of_list
+  let synthetic_value_slots =
+    List.fold_left
+      (fun slots (fun_decl : Fexpr.fun_decl) ->
+        match fun_decl.synthetic_value_slots with
+        | None -> slots
+        | Some elements ->
+          Value_slot.Map.disjoint_union slots
+            (convert_value_slots ~is_synthetic:true env elements))
+      Value_slot.Map.empty fun_decls
   in
-  Set_of_closures.create ~value_slots fun_decls
+  let value_slots =
+    convert_value_slots env (Option.value value_slots ~default:[])
+  in
+  let is_specialisation_site =
+    List.exists
+      (fun (decl : Fexpr.fun_decl) -> decl.is_specialisation_site)
+      fun_decls
+  in
+  if is_specialisation_site && not (Value_slot.Map.is_empty value_slots)
+  then Misc.fatal_error "A specialisation site cannot have runtime value slots";
+  Set_of_closures.create ~is_specialisation_site ~synthetic_value_slots
+    ~value_slots fun_decls_flambda
 
 let apply_cont env acc ({ cont; args; trap_action } : Fexpr.apply_cont) =
   let trap_action : Trap_action.t option =
@@ -372,6 +391,13 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     let is_phantom = Name_mode.is_phantom name_mode in
     let acc = Acc.add_set_of_closures_offsets ~is_phantom acc soc in
     let alloc_mode = alloc_mode_for_allocations env alloc in
+    (match alloc_mode with
+    | Heap _ -> ()
+    | Local _ ->
+      if Set_of_closures.is_specialisation_site soc
+      then
+        Misc.fatal_error
+          "A specialisation site must have heap allocation mode (one region)");
     let named = Flambda.Named.create_set_of_closures ~alloc_mode soc in
     let acc, body = expr env acc body in
     let let_expr =
@@ -704,6 +730,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               is_my_closure_used,
               acc ) =
           let { Fexpr.params;
+                specialised_params;
                 closure_var;
                 region_vars;
                 depth_var;
@@ -760,16 +787,44 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           let acc = Acc.push_closure_info acc ~code_id in
           let acc, body = expr env acc body in
           let _closure_info, acc = Acc.pop_closure_info acc in
+          let specialised_params =
+            List.fold_left
+              (fun specialised_params ((param : Fexpr.variable), slot) ->
+                let var = find_var env param in
+                let kind =
+                  match
+                    List.find_opt
+                      (fun bp -> Variable.equal (Bound_parameter.var bp) var)
+                      params
+                  with
+                  | Some bp ->
+                    Flambda_kind.With_subkind.kind (Bound_parameter.kind bp)
+                  | None ->
+                    Misc.fatal_errorf
+                      "Specialised parameter %s is not a parameter of the code"
+                      param.txt
+                in
+                let slot =
+                  fresh_or_existing_value_slot ~is_synthetic:true ~kind env slot
+                in
+                if Variable.Map.mem var specialised_params
+                then
+                  Misc.fatal_errorf
+                    "Specialised parameter %s is given more than once" param.txt;
+                Variable.Map.add var slot specialised_params)
+              Variable.Map.empty specialised_params
+          in
           let params_and_body =
             Flambda.Function_params_and_body.create ~return_continuation
               ~exn_continuation
               (Bound_parameters.create params)
               ~body ~my_closure ~my_alloc_mode ~my_depth
-              ~free_names_of_body:Unknown
+              ~free_names_of_body:Unknown ~specialised_params
           in
           let free_names =
             (* CR mshinwell: This needs fixing XXX *)
-            Name_occurrences.empty
+            Flambda.Function_params_and_body.free_names_of_specialised_params
+              specialised_params
           in
           ( params,
             params_and_body,

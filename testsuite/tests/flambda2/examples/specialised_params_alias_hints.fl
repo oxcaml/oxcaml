@@ -1,0 +1,70 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ {
+   fexpr with dump-simplify;
+ }{
+   ocamlopt_flags += " -g -flambda2-expert-phantom-lets";
+   fexpr with dump-simplify;
+ }
+*)
+
+(* Flow turns [g_alias] into a let binding. Its hint must survive, and both
+   callee-less calls must use the code belonging to the site. *)
+
+let code inline(never) size(10) helper (f : val, x : val)
+      specialised { f = f_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+let code size(30) live_alias (g : val, n : imm tagged, x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  (cont loop (g, n, x)
+    where rec loop (g_alias : val, i : imm tagged, value : val) =
+      (let site =
+        closure specialisation_site helper &my_alloc_region
+          synthetic { f_slot = g_alias }
+      in
+      let stop = %int_comp.`le` (i, 0) in
+      switch stop
+        | 0 -> next
+        | 1 -> finish
+        where next =
+          ((apply direct(helper &my_alloc_region) (g_alias, value)
+              -> after_call * e)
+            where after_call (result : val) =
+              let pred = %int_barith.`sub` (i, 1) in
+              cont loop (g_alias, pred, result))
+        where finish =
+          apply direct(helper &my_alloc_region) (g_alias, value) -> k * e))
+in
+
+(* [captured] is both a phantom/debug root and live in other continuations.
+   Its allocation and slot must survive in both builds. *)
+
+let code inline(never) size(1) keep_arg (p : val, x : val)
+      specialised { p = captured_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (p)
+in
+let code size(30) live_root (x : val, n : imm tagged)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let site =
+    closure specialisation_site keep_arg &my_alloc_region
+      synthetic { captured_slot = captured }
+  in
+  let stop = %int_comp.`le` (n, 0) in
+  (switch stop
+    | 0 -> via_call
+    | 1 -> directly
+    where via_call =
+      apply direct(keep_arg &my_alloc_region) (captured, x) -> k * e
+    where directly = cont k (captured))
+in
+let $live_alias = closure live_alias &toplevel in
+let $live_root = closure live_root &toplevel in
+let $camlSpecialised_params_alias_hints = Block 0 ($live_alias, $live_root) in
+cont done ($camlSpecialised_params_alias_hints)

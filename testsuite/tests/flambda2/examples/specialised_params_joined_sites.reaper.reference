@@ -1,0 +1,44 @@
+let code square deleted in
+let code square_1 deleted in
+let  in
+let code double deleted in
+let code double_1 deleted in
+let  in
+let code helper deleted in
+let code map deleted in
+let code inline(never) loopify(never) size(3) newer_version_of(helper)
+      helper_1 (f : val, x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let r = %int_barith.add (x, x) in
+  cont k (r)
+in
+let code inline(never) loopify(never) size(5) newer_version_of(helper)
+      helper_2 (f : val, x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let r = %int_barith.mul (x, x) in
+  cont k (r)
+in
+let code loopify(never) size(25) newer_version_of(map)
+      map_1 (b : val, x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let c1 = closure specialisation_site helper_2 @helper_1 &my_alloc_region in
+  let c2 = closure specialisation_site helper_1 @helper &my_alloc_region in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> k1 (c1)
+    | 1 -> k1 (c2)
+    where k1 (p : val) =
+      apply &my_alloc_region
+        (p : val * val -> val)
+          (poison.val.reaper_unused_argument, x)
+          -> k * e
+in
+let $map = closure map_1 @map &toplevel in
+let $camlSpecialised_params_joined_sites = Block 0 ($map) in
+cont done ($camlSpecialised_params_joined_sites)

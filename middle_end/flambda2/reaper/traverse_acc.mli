@@ -239,5 +239,20 @@ val sort_code_ids : t -> Code_id.t array
 val add_set_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t -> unit
 
+type dynamic_set_of_closures = private
+  { representative : Variable.t;  (** The first variable of this binding. *)
+    set_of_closures : Rev_expr.rev_set_of_closures
+  }
+
+(** The sets of closures bound by [Let], indexed by each of their bound
+    variables. Siblings share a representative, distinct from other bindings
+    even when they use the same function slots. *)
+type dynamic_sets_of_closures = dynamic_set_of_closures Variable.Map.t
+
+val add_dynamic_set_of_closures :
+  t -> bound_vars:Variable.t list -> Rev_expr.rev_set_of_closures -> unit
+
+val dynamic_sets_of_closures : t -> dynamic_sets_of_closures
+
 val get_all_sets_of_closures :
   t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list

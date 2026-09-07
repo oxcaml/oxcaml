@@ -44,6 +44,13 @@ type apply_dep =
     apply_call_witness : Code_id_or_name.t
   }
 
+type dynamic_set_of_closures =
+  { representative : Variable.t;
+    set_of_closures : Rev_expr.rev_set_of_closures
+  }
+
+type dynamic_sets_of_closures = dynamic_set_of_closures Variable.Map.t
+
 type closure_dep =
   { let_bound_name_of_the_closure : Name.t;
     closure_code_id : Code_id.t;
@@ -60,7 +67,8 @@ type t =
     mutable continuation_info : continuation_info Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
     mutable all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    mutable dynamic_sets_of_closures : dynamic_sets_of_closures
   }
 
 let code_deps t = t.code_deps
@@ -74,7 +82,8 @@ let create () =
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
     set_of_closures_graph = Code_id.Map.empty;
-    all_sets_of_closures = []
+    all_sets_of_closures = [];
+    dynamic_sets_of_closures = Variable.Map.empty
   }
 
 (* CR-someday ncourant: it would be great if we kept constants and symbols from
@@ -444,16 +453,21 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   apply
 
 let record_set_of_closures_deps_one_closure t
-    { let_bound_name_of_the_closure = name;
+    { let_bound_name_of_the_closure = closure_name;
       closure_code_id = code_id;
       only_full_applications = _
     } =
-  let name = Code_id_or_name.name name in
+  let name = Code_id_or_name.name closure_name in
   (* CR ncourant: use only_full_applications; not done here to avoid conflicts
      in code that will be rewritten for unbox-fv-closures anyway. *)
   match find_code_dep t code_id with
   | None ->
-    assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
+    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    then
+      Misc.fatal_errorf
+        "Missing dependencies for code %a of closure %a (definition %s)"
+        Code_id.print code_id Name.print closure_name
+        (if Code_id.Map.mem code_id t.code then "traversed" else "not traversed");
     (* The code comes from another compilation unit, so we don't know what
        happens once it is applied. As such, it must cause the whole block to
        escape. *)
@@ -485,6 +499,19 @@ let record_set_of_closures_deps t =
 
 let add_set_of_closures t set_of_closures =
   t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures
+
+let add_dynamic_set_of_closures t ~bound_vars set_of_closures =
+  match bound_vars with
+  | [] -> ()
+  | representative :: _ ->
+    let set = { representative; set_of_closures } in
+    List.iter
+      (fun var ->
+        t.dynamic_sets_of_closures
+          <- Variable.Map.add var set t.dynamic_sets_of_closures)
+      bound_vars
+
+let dynamic_sets_of_closures t = t.dynamic_sets_of_closures
 
 let deps t ~all_constants =
   List.iter

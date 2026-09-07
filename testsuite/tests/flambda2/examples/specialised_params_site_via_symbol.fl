@@ -1,0 +1,49 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+*)
+
+(* [outer] calls [wrap], which returns a lifted [g] closure calling [helper].
+   The empty site must survive the code -> symbol -> code path. The unused copy
+   of this chain must not keep [dead_site] alive. *)
+
+let code inline(never) size(10) helper (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) g (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(helper &my_alloc_region) (x) -> k * e
+in
+let code inline(never) size(10) wrap (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let g = closure g &my_alloc_region in
+  cont k (g)
+in
+let code inline(never) size(10) unused_helper (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10) unused_g (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(unused_helper &my_alloc_region) (x) -> k * e
+in
+let code inline(never) size(10) unused_wrap (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let g = closure unused_g &my_alloc_region in
+  cont k (g)
+in
+let code size(30) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let site = closure specialisation_site helper &my_alloc_region in
+  let dead_site = closure specialisation_site unused_helper &my_alloc_region in
+  let unused = closure unused_wrap &my_alloc_region in
+  let wrap = closure wrap &my_alloc_region in
+  apply direct(wrap &my_alloc_region) wrap (x) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_site_via_symbol = Block 0 ($outer) in
+cont done ($camlSpecialised_params_site_via_symbol)

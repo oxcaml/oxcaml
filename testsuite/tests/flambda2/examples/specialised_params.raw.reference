@@ -1,0 +1,33 @@
+let code size(10)
+      square (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  let r = %int_barith.mul (x, x) in
+  cont k (r)
+in
+let $square = closure square &toplevel in
+let code rec size(50)
+      loop (f : val, l : val) specialised { f = f_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let prim = %is_int (l) in
+  switch prim
+    | 0 -> k_cons
+    | 1 -> k (0)
+    where k_cons =
+      ((let x = %block_load.[`0`] (l) in
+        apply &my_alloc_region f (x) -> k_y * e)
+         where k_y (y) =
+           ((let xs = %block_load.[`1`] (l) in
+             apply direct(loop &my_alloc_region)  (f, xs) -> k_ys * e)
+              where k_ys (ys) =
+                let block = %block.[`0`].my_alloc_region (y, ys) in
+                cont k (block)))
+in
+let code size(20)
+      map (l : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  let site = closure loop &my_alloc_region synthetic { f_slot = $square } in
+  apply direct(loop &my_alloc_region) site ($square, l) -> k * e
+in
+let $map = closure map &toplevel in
+let $camlSpecialised_params = Block 0 ($map) in
+cont done ($camlSpecialised_params)

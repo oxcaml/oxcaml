@@ -228,7 +228,8 @@ let value_slots env map =
       { Fexpr.var; value; kind })
     (map |> Value_slot.Map.bindings)
 
-let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
+let function_declaration env code_id function_slot alloc ~is_specialisation_site
+    ~synthetic_value_slots : Fexpr.fun_decl =
   let code_id = Env.find_code_id_exn env code_id in
   let function_slot = Env.translate_function_slot env function_slot in
   (* Omit the function slot when possible *)
@@ -237,13 +238,32 @@ let function_declaration env code_id function_slot alloc : Fexpr.fun_decl =
     then None
     else Some function_slot
   in
-  { code_id; function_slot; alloc }
+  let synthetic_value_slots =
+    match value_slots env synthetic_value_slots with
+    | [] -> None
+    | elts -> Some elts
+  in
+  { code_id;
+    is_specialisation_site;
+    function_slot;
+    alloc;
+    synthetic_value_slots
+  }
 
 let set_of_closures env sc alloc =
   let fun_decls =
-    List.map
-      (fun (function_slot, fun_decl) ->
-        function_declaration env fun_decl function_slot alloc)
+    (* Set-level annotations are printed on the first function. *)
+    List.mapi
+      (fun i (function_slot, fun_decl) ->
+        let synthetic_value_slots =
+          if i = 0
+          then Set_of_closures.synthetic_value_slots sc
+          else Value_slot.Map.empty
+        in
+        function_declaration env fun_decl function_slot alloc
+          ~is_specialisation_site:
+            (i = 0 && Set_of_closures.is_specialisation_site sc)
+          ~synthetic_value_slots)
       (Set_of_closures.function_decls sc
       |> Function_declarations.funs_in_order
       |> Function_slot.Lmap.map (function
@@ -463,6 +483,7 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
               ~my_alloc_mode
               ~my_depth
               ~free_names_of_body:_
+              ~specialised_params
               :
               Fexpr.params_and_body
             ->
@@ -493,9 +514,17 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
                 Maybe_alloc_stack { alloc_region; region; ghost_region }, env
             in
             let depth_var, env = Env.bind_var env my_depth in
+            let specialised_params =
+              List.map
+                (fun (param, value_slot) ->
+                  ( Env.find_var_exn env param,
+                    Env.translate_value_slot env value_slot ))
+                (Variable.Map.bindings specialised_params)
+            in
             let body = expr env body in
             (* CR-someday lmaurer: Omit exn_cont, closure_var if not used *)
             { params;
+              specialised_params;
               ret_cont;
               exn_cont;
               closure_var;
@@ -834,6 +863,7 @@ module Iter = struct
               ~my_alloc_mode:_
               ~my_depth:_
               ~free_names_of_body:_
+              ~specialised_params:_
             -> expr f_c f_s body))
       ~deleted_code:(fun () code_id -> f_c ~id:code_id None)
       ~set_of_closures:(fun () ~closure_symbols set_of_closures ->

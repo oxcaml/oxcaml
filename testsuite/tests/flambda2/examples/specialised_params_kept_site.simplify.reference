@@ -1,0 +1,47 @@
+let code inline(never) size(10)
+      helper (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(10)
+      helper2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code map deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(helper)
+      helper_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) loopify(never) size(1) newer_version_of(helper2)
+      helper2_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) loopify(never) size(1) newer_version_of(helper)
+      helper_2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) loopify(never) size(1) newer_version_of(helper2)
+      helper2_2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code loopify(never) size(22) newer_version_of(map)
+      map_1 (b : val, x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let c1 = closure specialisation_site helper_2 @helper &my_alloc_region
+  and c1b = closure helper2_2 @helper2 &my_alloc_region
+  in
+  let c2 = closure specialisation_site helper_1 @helper &my_alloc_region
+  and c2b = closure helper2_1 @helper2 &my_alloc_region
+  in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> k1 (c1)
+    | 1 -> k1 (c2)
+    where k1 (p : val) =
+      let h2 = %project_function_slot.[helper].[helper2] (p) in
+      apply &my_alloc_region h2 (x) -> k * e
+in
+let $map = closure map_1 @map &toplevel in
+let $camlSpecialised_params_kept_site = Block 0 ($map) in
+cont done ($camlSpecialised_params_kept_site)

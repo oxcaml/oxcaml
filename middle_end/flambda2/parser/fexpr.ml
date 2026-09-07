@@ -364,9 +364,12 @@ and named =
 
 and fun_decl =
   { code_id : code_id;
+    is_specialisation_site : bool;
     function_slot : function_slot option (* defaults to same name as code id *);
-    alloc : alloc_mode_for_allocations
+    alloc : alloc_mode_for_allocations;
         (* alloc mode for set of closures (ignored except on first binding) *)
+    synthetic_value_slots : value_slots option
+        (* of the whole set; collected across its function declarations *)
   }
 
 and let_cont =
@@ -420,6 +423,8 @@ and code_size = int
 
 and params_and_body =
   { params : kinded_parameter list;
+    specialised_params : (variable * value_slot) list;
+        (* parameters equal to the given synthetic value slots *)
     closure_var : variable;
     region_vars : variable alloc_mode_for_applications;
     depth_var : variable;

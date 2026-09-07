@@ -99,6 +99,15 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   if never_delete then Acc.add_any_usage acc (Code_id_or_name.code_id code_id);
   Acc.add_code_dep acc code_id code_dep
 
+let rev_set_of_closures set_of_closures : rev_set_of_closures =
+  { function_decls = Set_of_closures.function_decls set_of_closures;
+    value_slots = Set_of_closures.value_slots set_of_closures;
+    synthetic_value_slots =
+      Set_of_closures.synthetic_value_slots set_of_closures;
+    is_specialisation_site =
+      Set_of_closures.is_specialisation_site set_of_closures
+  }
+
 let record_set_of_closures_deps denv names_and_function_slots set_of_closures
     acc : unit =
   (* Here and later in [traverse_call_kind], some dependencies are not
@@ -129,14 +138,17 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
   Acc.add_set_of_closures acc names_and_code_ids;
   Function_slot.Lmap.iter
     (fun _function_slot function_slot_name ->
-      Value_slot.Map.iter
-        (fun value_slot simple ->
-          let from = Acc.simple_to_node acc ~denv simple in
-          Acc.add_constructor_dep acc
-            ~base:(Code_id_or_name.name function_slot_name)
-            (Field.value_slot value_slot)
-            ~from)
+      let add_value_slot_dep value_slot simple =
+        let from = Acc.simple_to_node acc ~denv simple in
+        Acc.add_constructor_dep acc
+          ~base:(Code_id_or_name.name function_slot_name)
+          (Field.value_slot value_slot)
+          ~from
+      in
+      Value_slot.Map.iter add_value_slot_dep
         (Set_of_closures.value_slots set_of_closures);
+      (* No dependencies for synthetic value slots: their contents must not
+         escape with the closure, nor be kept alive by it. *)
       Function_slot.Lmap.iter
         (fun function_slot name ->
           Acc.add_constructor_dep acc
@@ -256,28 +268,29 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
 
 let traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
     set_of_closures =
+  let bound_vars =
+    match bound_pattern with
+    | Set_of_closures set -> List.map Bound_var.var set
+    | Static _ | Singleton _ ->
+      Misc.fatal_errorf
+        "Expected [Set_of_closures] bound pattern in \
+         [traverse_set_of_closures], got %a"
+        Bound_pattern.print bound_pattern
+  in
   let names_and_function_slots =
-    let bound_vars =
-      match bound_pattern with
-      | Set_of_closures set -> set
-      | Static _ | Singleton _ ->
-        Misc.fatal_errorf
-          "Expected [Set_of_closures] bound pattern in \
-           [traverse_set_of_closures], got %a"
-          Bound_pattern.print bound_pattern
-    in
     let funs =
       Function_declarations.funs_in_order
         (Set_of_closures.function_decls set_of_closures)
     in
     Function_slot.Lmap.of_list
       (List.map2
-         (fun function_slot bound_var ->
-           function_slot, Name.var (Bound_var.var bound_var))
+         (fun function_slot var -> function_slot, Name.var var)
          (Function_slot.Lmap.keys funs)
          bound_vars)
   in
-  record_set_of_closures_deps denv names_and_function_slots set_of_closures acc
+  record_set_of_closures_deps denv names_and_function_slots set_of_closures acc;
+  Acc.add_dynamic_set_of_closures acc ~bound_vars
+    (rev_set_of_closures set_of_closures)
 
 let traverse_static_set_of_closures denv acc ~closure_symbols set_of_closures =
   let names_and_function_slots =
@@ -543,15 +556,10 @@ let rec traverse_let denv acc let_expr : rev_expr =
     default_bp (fun to_ ->
         Acc.add_alias acc ~to_ ~from:(Acc.simple_to_node acc ~denv s))
   | Rec_info _ -> default acc);
-  let make_set_of_closures set_of_closures =
-    let function_decls = Set_of_closures.function_decls set_of_closures in
-    let value_slots = Set_of_closures.value_slots set_of_closures in
-    { function_decls; value_slots }
-  in
   let named : rev_named =
     match defining_expr with
     | Set_of_closures (set_of_closures, alloc_mode) ->
-      Set_of_closures (make_set_of_closures set_of_closures, alloc_mode)
+      Set_of_closures (rev_set_of_closures set_of_closures, alloc_mode)
     | Static_consts group ->
       let bound_static =
         match bound_pattern with
@@ -574,8 +582,7 @@ let rec traverse_let denv acc let_expr : rev_expr =
             Code :: rev_group)
           ~deleted_code:(fun rev_group _ -> Deleted_code :: rev_group)
           ~set_of_closures:(fun rev_group ~closure_symbols:_ set_of_closures ->
-            Static_const
-              (Set_of_closures (make_set_of_closures set_of_closures))
+            Static_const (Set_of_closures (rev_set_of_closures set_of_closures))
             :: rev_group)
           ~block_like:(fun rev_group _symbol static_const ->
             Static_const (Other static_const) :: rev_group)
@@ -708,14 +715,16 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
         ~my_alloc_mode
         ~my_depth
         ~free_names_of_body:_
+        ~specialised_params
       ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_alloc_mode ~my_depth
-        ~le_monde_exterieur ~all_constants)
+        ~le_monde_exterieur ~all_constants ~specialised_params)
 
 and traverse_function_params_and_body acc code_id code ~return_continuation
     ~exn_continuation params ~body ~my_closure ~my_alloc_mode
-    ~le_monde_exterieur ~all_constants ~my_depth : rev_code =
+    ~le_monde_exterieur ~all_constants ~my_depth ~specialised_params : rev_code
+    =
   let code_metadata = Code.code_metadata code in
   let free_names_of_params_and_body = Code0.free_names code in
   (* Note: this significantly degrades the analysis on code being checked by the
@@ -804,7 +813,8 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       body;
       my_closure;
       my_alloc_mode;
-      my_depth
+      my_depth;
+      specialised_params
     }
   in
   { params_and_body; code_metadata; free_names_of_params_and_body }
@@ -827,7 +837,8 @@ type result =
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    dynamic_sets_of_closures : Acc.dynamic_sets_of_closures
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -888,5 +899,6 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc;
+    dynamic_sets_of_closures = Acc.dynamic_sets_of_closures acc
   }

@@ -1,0 +1,65 @@
+let code helper deleted in
+let code live_alias deleted in
+let code keep_arg deleted in
+let code live_root deleted in
+let code inline(never) loopify(never) size(6) newer_version_of(helper)
+      helper_1 (f : val, x : val) specialised { f = f_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+let code loopify(never) size(30) newer_version_of(live_alias)
+      live_alias_1 (g : val, n : imm tagged, x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont loop (n, x)
+    where rec loop (i : imm tagged, value : val) =
+      let g_alias = g in
+      let site =
+        closure specialisation_site helper_1 @helper &my_alloc_region
+          synthetic { f_slot = g_alias }
+      in
+      let stop = %int_comp.le (i, 0) in
+      (switch stop
+         | 0 -> next
+         | 1 -> finish
+         where next =
+           (apply direct(helper_1 &my_alloc_region)
+               (g_alias, value) -> after_call * e
+              where after_call (result : val) =
+                let pred = %int_barith.sub (i, 1) in
+                cont loop (pred, result))
+         where finish =
+           apply direct(helper_1 &my_alloc_region)  (g_alias, value) -> k * e)
+in
+let $live_alias = closure live_alias_1 @live_alias &toplevel in
+let code inline(never) loopify(never) size(1) newer_version_of(keep_arg)
+      keep_arg_1 (p : val, x : val) specialised { p = captured_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (p)
+in
+let code loopify(never) size(23) newer_version_of(live_root)
+      live_root_1 (x : val, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let site =
+    closure specialisation_site keep_arg_1 @keep_arg &my_alloc_region
+      synthetic { captured_slot = captured }
+  in
+  let stop = %int_comp.le (n, 0) in
+  switch stop
+    | 0 -> via_call
+    | 1 -> k (captured)
+    where via_call =
+      apply direct(keep_arg_1 &my_alloc_region)  (captured, x) -> k * e
+in
+let $live_root = closure live_root_1 @live_root &toplevel in
+let $camlSpecialised_params_alias_hints = Block 0 ($live_alias, $live_root)
+in
+cont done ($camlSpecialised_params_alias_hints)

@@ -46,6 +46,12 @@ val archive_data : t -> t
     structure. *)
 val add_archive_data_items : t -> Cmm.data_item list -> t
 
+(** Archive the data of a specialisation site (a closed set of closures, so
+    pointing only to code). Unlike ordinary data it is emitted only if the
+    resulting Cmm refers to one of its symbols or one of them is global, and it
+    gets no GC roots. *)
+val add_specialisation_site_data : t -> Cmm.data_item list -> t
+
 (** Update the current data part of the result structure. *)
 val update_data : t -> (Cmm.data_item list -> Cmm.data_item list) -> t
 
@@ -74,6 +80,7 @@ type result = private
     functions : Cmm.phrase list
   }
 
-(** Archive the current data and then return the translated data present in the
-    given result structure. *)
-val to_cmm : t -> result
+(** Archive the current data and return the translated data. [extra_phrases] are
+    scanned for references that keep specialisation-site data, but are not
+    returned. *)
+val to_cmm : t -> extra_phrases:Cmm.phrase list -> result

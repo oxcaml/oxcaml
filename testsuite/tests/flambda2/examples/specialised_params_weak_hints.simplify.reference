@@ -1,0 +1,45 @@
+let code metadata_only deleted in
+let code live_helper deleted in
+let code mutable_alias deleted in
+let code loopify(never) size(1) newer_version_of(metadata_only)
+      metadata_only_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (x)
+in
+let $metadata_only = closure metadata_only_1 @metadata_only &toplevel in
+let code live_helper_1 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(live_helper_1)
+      live_helper_2 (v : val, w : val) specialised { w = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (v)
+in
+let code loopify(never) size(21) newer_version_of(mutable_alias)
+      mutable_alias_1 (x : val, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont loop (n, x)
+    where rec loop (i : imm tagged, r_0) =
+      let site =
+        closure specialisation_site live_helper_2 @live_helper
+          &my_alloc_region synthetic { x_slot = x }
+      in
+      let stop = %int_comp.le (i, 0) in
+      (switch stop
+         | 0 -> next
+         | 1 -> finish
+         where next =
+           let pred = %int_barith.sub (i, 1) in
+           cont loop (pred, i)
+         where finish =
+           apply direct(live_helper_2 &my_alloc_region)  (r_0, x) -> k * e)
+in
+let $mutable_alias = closure mutable_alias_1 @mutable_alias &toplevel in
+let $camlSpecialised_params_weak_hints =
+  Block 0 ($metadata_only, $mutable_alias)
+in
+cont done ($camlSpecialised_params_weak_hints)

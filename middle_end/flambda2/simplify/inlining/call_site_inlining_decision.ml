@@ -88,11 +88,19 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
            and used_value slots is available (for the whole compilation unit).
            Thus we here provide empty/dummy values for the used_value_slots and
            code_age_relation, and ignore the reachable_code_id part of the
-           data_flow analysis. *)
+           data_flow analysis. Specialisation sites use
+           [Flow_types.Specialisation_site_info] instead. *)
+        let is_toplevel =
+          match
+            Closure_info.in_or_out_of_closure (DE.closure_info (DA.denv dacc))
+          with
+          | Not_in_a_closure -> true
+          | In_a_closure -> false
+        in
         let flow_result =
           Flow.Analysis.analyze data_flow ~speculative:true
             ~print_name:"speculative" ~code_age_relation:Code_age_relation.empty
-            ~used_value_slots:Unknown
+            ~is_toplevel ~used_value_slots:Unknown
             ~code_ids_to_never_delete:Code_id.Set.empty
             ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation:function_return_cont

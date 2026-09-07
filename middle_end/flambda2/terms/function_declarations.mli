@@ -47,6 +47,9 @@ val funs : t -> code_id_in_function_declaration Function_slot.Map.t
     originally given. *)
 val funs_in_order : t -> code_id_in_function_declaration Function_slot.Lmap.t
 
+(** The code IDs of the functions that have not been deleted, in order. *)
+val code_ids : t -> Code_id.t list
+
 (** [find f t] raises [Not_found] if [f] is not in [t]. *)
 val find : t -> Function_slot.t -> code_id_in_function_declaration
 

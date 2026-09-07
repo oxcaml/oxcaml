@@ -48,6 +48,28 @@ module Disable_inlining = struct
     | Do_not_disable_inlining -> Format.fprintf ppf "Do_not_disable_inlining"
 end
 
+module Code_specialisation = struct
+  type t =
+    { new_code_id : Code_id.t;
+      assumptions : (Value_slot.t * Simple.t) option list
+    }
+
+  let print_assumption ppf assumption =
+    match assumption with
+    | None -> Format.pp_print_string ppf "_"
+    | Some (value_slot, simple) ->
+      Format.fprintf ppf "@[<hov 1>(%a@ =@ %a)@]" Value_slot.print value_slot
+        Simple.print simple
+
+  let print ppf { new_code_id; assumptions } =
+    Format.fprintf ppf
+      "@[<hov 1>(@[<hov 1>(new_code_id@ %a)@]@ @[<hov 1>(assumptions@ \
+       (%a))@])@]"
+      Code_id.print new_code_id
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_assumption)
+      assumptions
+end
+
 type t =
   { round : int;
     machine_width : Target_system.Machine_width.t;
@@ -95,13 +117,14 @@ type t =
         (* This cost is the number of parameters that would have to be created
            if we lifted all continuations that are defined in the current
            continuation's handler. *)
-    has_seen_a_non_liftable_continuation : bool
+    has_seen_a_non_liftable_continuation : bool;
         (* This flag is used to mark as non-liftable any continuation that is
            bound after a non-liftable continuation, since any continuation bound
            after a non-liftable continuation may refer to it.
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
+    code_specialisations : Code_specialisation.t list Code_id.Map.t
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
@@ -116,6 +139,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 loopify_state; replay_history; specialization_cost; defined_variables_by_scope;
                 lifted = _; cost_of_lifting_continuations_out_of_current_one;
                 has_seen_a_non_liftable_continuation; join_analysis;
+                code_specialisations;
               } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(round@ %d)@]@ \
@@ -142,7 +166,8 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(join_analysis@ %a)@]@ \
       @[<hov 1>(defined_variables_by_scope@ %a)@]@ \
       @[<hov 1>(cost_of_lifting_continuation_out_of_current_one %d)@]@ \
-      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]\
+      @[<hov 1>(has_seen_a_non_liftable_continuation %b)@]@ \
+      @[<hov 1>(code_specialisations@ %a)@]\
       )@]"
     round
     Target_system.Machine_width.print machine_width
@@ -170,6 +195,12 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
     has_seen_a_non_liftable_continuation
+    (Code_id.Map.print (fun ppf specialisations ->
+         Format.fprintf ppf "@[<hov 1>(%a)@]"
+           (Format.pp_print_list ~pp_sep:Format.pp_print_space
+              Code_specialisation.print)
+           specialisations))
+    code_specialisations
 
 let define_continuations ~can_be_lifted t conts =
   let replay_history =
@@ -254,7 +285,8 @@ let create ~round ~machine_width ~(resolver : resolver)
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
     has_seen_a_non_liftable_continuation = false;
-    join_analysis = None
+    join_analysis = None;
+    code_specialisations = Code_id.Map.empty
   }
 
 let all_code t = t.all_code
@@ -345,7 +377,8 @@ let enter_set_of_closures
       lifted = _;
       cost_of_lifting_continuations_out_of_current_one = _;
       has_seen_a_non_liftable_continuation = _;
-      join_analysis = _
+      join_analysis = _;
+      code_specialisations
     } =
   { machine_width;
     round;
@@ -374,7 +407,8 @@ let enter_set_of_closures
     defined_variables_by_scope = [Lifted_cont_params.empty];
     lifted = Variable.Set.empty;
     cost_of_lifting_continuations_out_of_current_one = 0;
-    has_seen_a_non_liftable_continuation = false
+    has_seen_a_non_liftable_continuation = false;
+    code_specialisations
   }
 
 let define_symbol t sym kind =
@@ -825,6 +859,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
       denv_for_join.cost_of_lifting_continuations_out_of_current_one;
     has_seen_a_non_liftable_continuation =
       denv_for_join.has_seen_a_non_liftable_continuation;
+    code_specialisations = denv_for_join.code_specialisations;
     (* For the following fields, both denvs should have the same value of these
        fields *)
     round = denv.round;
@@ -837,3 +872,18 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     get_imported_code = denv.get_imported_code;
     loopify_state = denv.loopify_state
   }
+
+let add_code_specialisation t ~old_code_id specialisation =
+  let code_specialisations =
+    Code_id.Map.update old_code_id
+      (function
+        | None -> Some [specialisation]
+        | Some specialisations -> Some (specialisation :: specialisations))
+      t.code_specialisations
+  in
+  { t with code_specialisations }
+
+let find_code_specialisations t code_id =
+  match Code_id.Map.find_opt code_id t.code_specialisations with
+  | None -> []
+  | Some specialisations -> specialisations

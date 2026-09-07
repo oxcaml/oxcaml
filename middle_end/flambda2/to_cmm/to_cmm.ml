@@ -134,8 +134,10 @@ let unit0 ~offsets ~all_code ~reachable_names flambda_unit =
     C.cfunction
       (C.fundecl entry_sym [] body fun_codegen dbg Default_poll Cmm.typ_val)
   in
-  let { R.data_items; gc_roots; functions } = R.to_cmm res in
-  let _res, cmm_helpers_data = flush_cmm_helpers_state res in
+  let res, cmm_helpers_data = flush_cmm_helpers_state res in
+  let { R.data_items; gc_roots; functions } =
+    R.to_cmm res ~extra_phrases:(entry :: cmm_helpers_data)
+  in
   let gc_root_data = C.gc_root_table gc_roots in
   (gc_root_data :: data_items) @ cmm_helpers_data @ functions @ [entry]
 

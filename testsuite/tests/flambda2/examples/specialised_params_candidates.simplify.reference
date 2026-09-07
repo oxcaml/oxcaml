@@ -1,0 +1,44 @@
+let code inline(never) size(10)
+      helper (p : val, q : val) specialised { q = q_slot; p = p_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let r = %int_barith.mul (p, q) in
+  cont k (r)
+in
+let code outer deleted in
+let code inline(never) loopify(never) size(5) newer_version_of(helper)
+      helper_1 (p : val, q : val) specialised { q = q_slot; p = p_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let r = %int_barith.mul (2, q) in
+  cont k (r)
+in
+let code inline(never) loopify(never) size(1) newer_version_of(helper)
+      helper_2 (p : val, q : val) specialised { q = q_slot; p = p_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (6)
+in
+let code loopify(never) size(17) newer_version_of(outer)
+      outer_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  let both =
+    closure specialisation_site helper_2 @helper &my_alloc_region
+      synthetic { p_slot = 2; q_slot = 3 }
+  in
+  let p_only =
+    closure specialisation_site helper_1 @helper &my_alloc_region
+      synthetic { p_slot = 2 }
+  in
+  apply direct(helper_2 &my_alloc_region)  (2, 3) -> k_both * e
+    where k_both (a : val) =
+      (apply direct(helper_1 &my_alloc_region)  (2, x) -> k_p * e
+         where k_p (b : val) =
+           let sum = %int_barith.add (a, b) in
+           cont k (sum))
+in
+let $outer = closure outer_1 @outer &toplevel in
+let $camlSpecialised_params_candidates = Block 0 ($outer) in
+cont done ($camlSpecialised_params_candidates)

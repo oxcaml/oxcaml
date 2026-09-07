@@ -107,7 +107,65 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                         Simplified_named.create ~machine_width
                           (Named.create_prim prim dbg)
                     }))
-            | Simple _ | Set_of_closures _ | Rec_info _ -> binding))
+            | Set_of_closures (set, _)
+              when Set_of_closures.is_specialisation_site set -> (
+              match Closure_info.in_or_out_of_closure closure_info with
+              | Not_in_a_closure ->
+                (* Nothing simplifies the toplevel of the unit again. *)
+                let simplified_defining_expr =
+                  Simplified_named.filter_synthetic_value_slots
+                    simplified_defining_expr ~f:(fun _ -> false)
+                in
+                let simplified_defining_expr =
+                  match UA.reachable_code_ids uacc with
+                  | Unknown -> simplified_defining_expr
+                  | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
+                    let denv = DA.denv (UA.creation_dacc uacc) in
+                    Simplified_named.mark_unused_functions_as_deleted
+                      simplified_defining_expr ~live_code_ids
+                      ~find_code_metadata:(DE.find_code_metadata_exn denv)
+                in
+                Keep_binding { kept_binding with simplified_defining_expr }
+              | In_a_closure ->
+                let { Flow_types.Specialisation_site_info
+                      .names_available_for_hints;
+                      live_code_ids
+                    } =
+                  UA.specialisation_site_info uacc
+                in
+                let { Flow_types.Mutable_unboxing_result.unboxed_vars; _ } =
+                  UA.mutable_unboxing_result uacc
+                in
+                let simplified_defining_expr =
+                  Simplified_named.filter_synthetic_value_slots
+                    simplified_defining_expr ~f:(fun simple ->
+                      Name_occurrences.fold_names (Simple.free_names simple)
+                        ~init:true ~f:(fun available name ->
+                          available
+                          && Name.Set.mem name names_available_for_hints
+                          &&
+                          match Name.must_be_var_opt name with
+                          | None -> true
+                          | Some var -> not (Variable.Set.mem var unboxed_vars)))
+                in
+                (* Keep dead siblings' slots and binders for imported layouts
+                   and phantom uses. Leave an entirely dead site for ordinary
+                   deletion or phantom handling below. *)
+                let simplified_defining_expr =
+                  if
+                    List.exists
+                      (fun code_id -> Code_id.Set.mem code_id live_code_ids)
+                      (Function_declarations.code_ids
+                         (Set_of_closures.function_decls set))
+                  then
+                    let denv = DA.denv (UA.creation_dacc uacc) in
+                    Simplified_named.mark_unused_functions_as_deleted
+                      simplified_defining_expr ~live_code_ids
+                      ~find_code_metadata:(DE.find_code_metadata_exn denv)
+                  else simplified_defining_expr
+                in
+                Keep_binding { kept_binding with simplified_defining_expr })
+            | Simple _ | Rec_info _ | Set_of_closures _ -> binding))
         bindings
     in
     (* Phantom let creation *)
@@ -181,18 +239,40 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                 in
                 not is_used, is_used
             in
-            let must_be_kept_for_its_effects =
-              is_end_region_for_used_region
+            let is_live_specialisation_site =
+              match
+                defining_expr, Closure_info.in_or_out_of_closure closure_info
+              with
+              | Set_of_closures (set, _), In_a_closure
+                when Set_of_closures.is_specialisation_site set ->
+                let { Flow_types.Specialisation_site_info.live_code_ids;
+                      names_available_for_hints = _
+                    } =
+                  UA.specialisation_site_info uacc
+                in
+                (* Even an empty site can specialise its callees using other
+                   sites in scope when the enclosing code is inlined. *)
+                List.exists
+                  (fun code_id -> Code_id.Set.mem code_id live_code_ids)
+                  (Function_declarations.code_ids
+                     (Set_of_closures.function_decls set))
+              | ( ( Set_of_closures _ | Simple _ | Prim _ | Static_consts _
+                  | Rec_info _ ),
+                  (In_a_closure | Not_in_a_closure) ) ->
+                false
+            in
+            let must_be_kept =
+              is_end_region_for_used_region || is_live_specialisation_site
               || (not is_end_region_for_unused_region)
                  && not (Named.at_most_generative_effects defining_expr)
             in
-            if must_be_kept_for_its_effects
+            if must_be_kept
             then (
               if not (Name_mode.is_normal declared_name_mode)
               then
                 Misc.fatal_errorf
                   "Cannot [Let]-bind non-normal variable(s) to a [Named] that \
-                   has more than generative effects:@ %a@ =@ %a"
+                   cannot be deleted:@ %a@ =@ %a"
                   Bound_pattern.print bound_vars Named.print defining_expr;
               binding_to_place)
             else
@@ -352,19 +432,11 @@ let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     Flow.Acc.record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
       ~simplified_defining_expr data_flow
 
-let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
+let update_data_flow dacc ~lifted_constants_from_defining_expr
     simplify_named_result ~rewrite_id data_flow =
   let data_flow =
-    match Closure_info.in_or_out_of_closure closure_info with
-    | In_a_closure ->
-      (* The dependency information for lifted constants (stored in [Data_flow])
-         is only required at the point when the constants are placed. That
-         always happens at toplevel, never inside closures -- so we don't need
-         to do anything here. *)
+    Flow.Acc.record_lifted_constants lifted_constants_from_defining_expr
       data_flow
-    | Not_in_a_closure ->
-      Flow.Acc.record_lifted_constants lifted_constants_from_defining_expr
-        data_flow
   in
   ListLabels.fold_left
     (Simplify_named_result.bindings_to_place simplify_named_result)
@@ -432,7 +504,7 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
       let dacc =
         DA.map_flow_acc dacc
           ~f:
-            (update_data_flow dacc closure_info ~rewrite_id
+            (update_data_flow dacc ~rewrite_id
                ~lifted_constants_from_defining_expr simplify_named_result)
       in
       let at_unit_toplevel = DE.at_unit_toplevel (DA.denv dacc) in

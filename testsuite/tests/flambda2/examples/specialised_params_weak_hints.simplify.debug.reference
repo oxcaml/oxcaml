@@ -1,0 +1,64 @@
+let code inline_helper deleted in
+let code metadata_only deleted in
+let code live_helper deleted in
+let code mutable_alias deleted in
+let code inline(always) loopify(never) size(1) newer_version_of(inline_helper)
+      inline_helper_1 (p : val, x : val) specialised { p = p_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (x)
+in
+let code loopify(never) size(1) newer_version_of(metadata_only)
+      metadata_only_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let site =
+    closure specialisation_site inline_helper_1 @inline_helper
+      &my_alloc_region
+  in
+  let my_closure_1 = site in
+  let p = captured in
+  let x_1 = x in
+  cont k (x)
+in
+let $metadata_only = closure metadata_only_1 @metadata_only &toplevel in
+let code inline(never) loopify(never) size(1) newer_version_of(live_helper)
+      live_helper_1 (v : val, w : val) specialised { w = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (v)
+in
+let code loopify(never) size(32) newer_version_of(mutable_alias)
+      mutable_alias_1 (x : val, n : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let r = %block.mut.[`0`].my_alloc_region (x) in
+  cont loop (r, n)
+    where rec(r_1) loop (i : imm tagged) =
+      let r_alias = r_1 in
+      let site =
+        closure specialisation_site live_helper_1 @live_helper
+          &my_alloc_region synthetic { x_slot = x; removed_slot = r_alias }
+      in
+      let stop = %int_comp.le (i, 0) in
+      (switch stop
+         | 0 -> next
+         | 1 -> finish
+         where next =
+           let set = %block_set.[`0`] (r_alias, i) in
+           let pred = %int_barith.sub (i, 1) in
+           cont loop (r_1, pred)
+         where finish =
+           let value = %block_load.mut.[`0`] (r_alias) in
+           apply direct(live_helper_1 &my_alloc_region)  (value, x) -> k * e)
+in
+let $mutable_alias = closure mutable_alias_1 @mutable_alias &toplevel in
+let $camlSpecialised_params_weak_hints =
+  Block 0 ($metadata_only, $mutable_alias)
+in
+cont done ($camlSpecialised_params_weak_hints)

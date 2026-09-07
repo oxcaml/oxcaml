@@ -40,6 +40,7 @@ type result = private
 val rebuild :
   machine_width:Target_system.Machine_width.t ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  dynamic_sets_of_closures:Traverse_acc.dynamic_sets_of_closures ->
   ordered_code_ids:Code_id.t array ->
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->

@@ -879,11 +879,9 @@ let untag_immediate =
   D.(unary "%untag_imm" ~params:param0 (fun _ () -> P.Untag_immediate))
 
 let project_value_slot =
-  (* CR mshinwell: support non-value kinds in the projection syntax. Note that
-     if the value slot's definition (in a "with" clause, where kinds are
-     supported) has already been parsed, the slot registered under this name
-     will have the correct kind and the kind here is ignored. *)
-  let kind = Flambda_kind.value in
+  (* CR mshinwell: support non-value kinds in the projection syntax. For now,
+     reuse the kind of an already-declared slot, or assume [Value] if its
+     definition has not been parsed yet. *)
   D.(
     unary "%project_value_slot"
       ~params:
@@ -895,8 +893,7 @@ let project_value_slot =
                 Flambda_to_fexpr_commons.Env.translate_function_slot env pf))
            (maps (positional string)
               ~from:(fun env vs ->
-                Fexpr_to_flambda_commons.fresh_or_existing_value_slot env vs
-                  kind)
+                Fexpr_to_flambda_commons.fresh_or_existing_value_slot env vs)
               ~to_:(fun env vs ->
                 Flambda_to_fexpr_commons.Env.translate_value_slot env vs)))
       (fun _ (project_from, value_slot) ->

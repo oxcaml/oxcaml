@@ -81,6 +81,75 @@ let create_with_known_free_names ~machine_width ~find_code_characteristics
   in
   { named = simplified_named; cost_metrics; free_names }
 
+let filter_synthetic_value_slots t ~f =
+  match t.named with
+  | Simple _ | Prim _ | Rec_info _ -> t
+  | Set_of_closures (set, alloc_mode) ->
+    let synthetic_value_slots = Set_of_closures.synthetic_value_slots set in
+    let synthetic_value_slots' =
+      Value_slot.Map.filter (fun _ simple -> f simple) synthetic_value_slots
+    in
+    if
+      Value_slot.Map.cardinal synthetic_value_slots'
+      = Value_slot.Map.cardinal synthetic_value_slots
+    then t
+    else
+      let set =
+        Set_of_closures.with_value_slots set
+          ~value_slots:(Set_of_closures.value_slots set)
+          ~synthetic_value_slots:synthetic_value_slots'
+      in
+      let named = Set_of_closures (set, alloc_mode) in
+      { t with named; free_names = Named.free_names (to_named named) }
+
+let mark_unused_functions_as_deleted t ~live_code_ids ~find_code_metadata =
+  match t.named with
+  | Simple _ | Prim _ | Rec_info _ -> t
+  | Set_of_closures (set, alloc_mode) ->
+    if not (Set_of_closures.is_specialisation_site set)
+    then
+      Misc.fatal_errorf "Not a specialisation site:@ %a" Set_of_closures.print
+        set;
+    let changed = ref false in
+    let function_decls =
+      Function_slot.Lmap.map
+        (fun (decl : Function_declarations.code_id_in_function_declaration) ->
+          match decl with
+          | Deleted _ -> decl
+          | Code_id { code_id; only_full_applications = _ } ->
+            if Code_id.Set.mem code_id live_code_ids
+            then decl
+            else (
+              changed := true;
+              let metadata = find_code_metadata code_id in
+              Function_declarations.Deleted
+                { function_slot_size = Code_metadata.function_slot_size metadata;
+                  dbg = Code_metadata.dbg metadata
+                }))
+        (Function_declarations.funs_in_order
+           (Set_of_closures.function_decls set))
+    in
+    if not !changed
+    then t
+    else
+      let set =
+        Set_of_closures.create
+          ~is_specialisation_site:(Set_of_closures.is_specialisation_site set)
+          ~value_slots:(Set_of_closures.value_slots set)
+          ~synthetic_value_slots:(Set_of_closures.synthetic_value_slots set)
+          (Function_declarations.create function_decls)
+      in
+      let named = Set_of_closures (set, alloc_mode) in
+      let cost_metrics =
+        Cost_metrics.set_of_closures set
+          ~find_code_characteristics:(fun code_id ->
+            let metadata = find_code_metadata code_id in
+            { Cost_metrics.cost_metrics = Code_metadata.cost_metrics metadata;
+              function_slot_size = Code_metadata.function_slot_size metadata
+            })
+      in
+      { named; cost_metrics; free_names = Named.free_names (to_named named) }
+
 let print ppf { named; _ } = Named.print ppf (to_named named)
 
 let cost_metrics { cost_metrics; _ } = cost_metrics

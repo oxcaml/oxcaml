@@ -22,7 +22,8 @@ type result =
     continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    dynamic_sets_of_closures : Traverse_acc.dynamic_sets_of_closures
   }
 
 val run : Flambda_unit.t -> result

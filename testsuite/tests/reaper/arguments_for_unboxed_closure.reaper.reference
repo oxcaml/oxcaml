@@ -12,6 +12,10 @@ in
 let code inline(never) loopify(never) size(7) newer_version_of(u_4)
       u_4_1
         (u_into_my_closure_field_g_field_y, u_into_my_closure_field_g_field_x)
+        specialised {
+          u_into_my_closure_field_g_field_x = g_field_x;
+          u_into_my_closure_field_g_field_y = g_field_y
+        }
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -36,7 +40,9 @@ let $camlArguments_for_unboxed_closure__unused_3 =
   closure unused_3_1 @unused &toplevel
 in
 let code loopify(never) size(9) newer_version_of(g_1)
-      g_1_1 (g_into_my_closure_field_x, h : val)
+      g_1_1
+        (g_into_my_closure_field_x, h : val)
+        specialised { g_into_my_closure_field_x = x }
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -46,7 +52,7 @@ let code loopify(never) size(9) newer_version_of(g_1)
       let int_add = %int_barith.add (x, apply_result) in
       cont k (int_add)
 in
-let code loopify(never) size(13) newer_version_of(f_0)
+let code loopify(never) size(29) newer_version_of(f_0)
       f_0_1 (x : imm tagged, y : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -54,13 +60,25 @@ let code loopify(never) size(13) newer_version_of(f_0)
   let `region` = %begin_region () in
   let g_into_g_field_x = x in
   let g_into_g_field_y = y in
+  let g =
+    closure specialisation_site g_1_1 @g &my_alloc_region synthetic { x = x }
+  in
   let u_into_u_field_g_field_x = g_into_g_field_x in
   let u_into_u_field_g_field_y = g_into_g_field_y in
+  let u =
+    closure specialisation_site u_4_1 @u &my_alloc_region
+      synthetic {
+        g_field_x = g_into_g_field_x;
+        g_field_y = g_into_g_field_y
+      }
+  in
   apply direct(u_4_1 &my_alloc_region)
-     (u_into_u_field_g_field_y, u_into_u_field_g_field_x) -> k2 * k1
+    (u : _ -> imm tagged)
+      (u_into_u_field_g_field_y, u_into_u_field_g_field_x)
+      -> k2 * k1
     where k2 (apply_result : imm tagged) =
       (apply direct(g_1_1 &my_alloc_region) inlined(never)
-         
+         (g : _ -> imm tagged)
            (g_into_g_field_x, $camlArguments_for_unboxed_closure__unused_3)
            -> k2 * k1
          where k2 (apply_result_1 : imm tagged) =

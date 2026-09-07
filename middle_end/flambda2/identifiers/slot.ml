@@ -20,6 +20,7 @@ module type S = sig
   module Lmap : Lmap.S with type key = t
 
   val create :
+    ?is_synthetic:bool ->
     Compilation_unit.t ->
     name:string ->
     is_always_immediate:bool ->
@@ -42,6 +43,8 @@ module type S = sig
 
   val is_always_immediate : t -> bool
 
+  val is_synthetic : t -> bool
+
   val rename : t -> t
 end
 
@@ -54,7 +57,8 @@ end) : S = struct
       name_stamp : int;
           (** [name_stamp]s are unique within any given compilation unit. *)
       kind : Flambda_kind.t;
-      is_always_immediate : bool
+      is_always_immediate : bool;
+      is_synthetic : bool
     }
 
   module Self = Container_types.Make (struct
@@ -65,13 +69,15 @@ end) : S = struct
            name = _;
            name_stamp = name_stamp1;
            kind = _;
-           is_always_immediate = _
+           is_always_immediate = _;
+           is_synthetic = _
          } as t1)
         ({ compilation_unit = compilation_unit2;
            name = _;
            name_stamp = name_stamp2;
            kind = _;
-           is_always_immediate = _
+           is_always_immediate = _;
+           is_synthetic = _
          } as t2) =
       if t1 == t2
       then 0
@@ -94,8 +100,9 @@ end) : S = struct
         Format.fprintf ppf "%a.%s/%d"
           (Format_doc.compat Compilation_unit.print)
           t.compilation_unit t.name t.name_stamp;
-      Format.fprintf ppf " @<1>\u{2237} %a%s" Flambda_kind.print t.kind
-        (if t.is_always_immediate then "(immediate)" else "");
+      Format.fprintf ppf " @<1>\u{2237} %a%s%s" Flambda_kind.print t.kind
+        (if t.is_always_immediate then "(immediate)" else "")
+        (if t.is_synthetic then "(synthetic)" else "");
       Format.fprintf ppf ")%t@]" Flambda_colours.pop
   end)
 
@@ -114,12 +121,14 @@ end) : S = struct
     incr next_stamp;
     stamp
 
-  let create compilation_unit ~name ~is_always_immediate kind =
+  let create ?(is_synthetic = false) compilation_unit ~name ~is_always_immediate
+      kind =
     { compilation_unit;
       name;
       name_stamp = get_next_stamp ();
       kind;
-      is_always_immediate
+      is_always_immediate;
+      is_synthetic
     }
 
   let get_compilation_unit t = t.compilation_unit
@@ -138,6 +147,8 @@ end) : S = struct
   let kind t = t.kind
 
   let is_always_immediate t = t.is_always_immediate
+
+  let is_synthetic t = t.is_synthetic
 
   let rename t = { t with name_stamp = get_next_stamp () }
 end
