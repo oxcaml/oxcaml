@@ -196,9 +196,9 @@ let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
   let rec rename_tree tree =
     Field.Map.fold
       (fun fld u new_tree ->
-        Field.Map.add (rename_field fld) (rename_u u) new_tree)
+        Field.Map.add (rename_field fld) (rename_unboxed_fields u) new_tree)
       tree Field.Map.empty
-  and rename_u (u : _ Unboxed_fields.u) : _ Unboxed_fields.u =
+  and rename_unboxed_fields (u : _ Unboxed_fields.u) : _ Unboxed_fields.u =
     match u with
     | Not_unboxed x -> Not_unboxed (rename_leaf x)
     | Unboxed tree -> Unboxed (rename_tree tree)
@@ -207,8 +207,10 @@ let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
 
 let unboxed_fields_ids_for_export unboxed_fields ids =
   let rec add_tree tree ids =
-    Field.Map.fold (fun (_ : Field.t) u ids -> add_u u ids) tree ids
-  and add_u (u : _ Unboxed_fields.u) ids =
+    Field.Map.fold
+      (fun (_ : Field.t) u ids -> add_unboxed_fields u ids)
+      tree ids
+  and add_unboxed_fields (u : _ Unboxed_fields.u) ids =
     match u with
     | Not_unboxed var -> Ids_for_export.add_variable ids var
     | Unboxed tree -> add_tree tree ids
