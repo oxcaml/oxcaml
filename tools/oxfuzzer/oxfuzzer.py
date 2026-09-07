@@ -88,13 +88,30 @@ class Toolchain:
             Configuration(
                 name="ocamlopt-O4",
                 compiler=self.ocamlopt,
-                flags=(*self.library_flags("cmxa"), "-O4"),
+                flags=(
+                    *self.library_flags("cmxa"),
+                    "-O4",
+                    "-flambda2-result-types-all-functions",
+                    "-flambda2-expert-can-inline-recursive-functions",
+                    "-flambda2-match-in-match",
+                    "-flambda2-join-algorithm", "n-way",
+                    "-experimental-optimizations",
+                    "-caml-apply-inline-fast-path",
+                ),
                 ocamllib=self.ocamllib,
             ),
             Configuration(
                 name="ocamlopt-Oclassic",
                 compiler=self.ocamlopt,
-                flags=(*self.library_flags("cmxa"), "-Oclassic"),
+                flags=(
+                    *self.library_flags("cmxa"),
+                    "-Oclassic",
+                    "-inline", "0",
+                    "-no-cfg-peephole-optimize",
+                    "-no-cfg-value-propagation",
+                    "-no-cfg-prologue-shrink-wrap",
+                    "-regalloc", "ls",
+                ),
                 ocamllib=self.ocamllib,
             ),
         )
