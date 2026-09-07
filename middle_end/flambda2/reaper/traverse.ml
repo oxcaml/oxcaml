@@ -75,6 +75,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let code_dep =
     { Traverse_acc.arity;
       result_arity;
+      code_metadata = Code.code_metadata code;
       return;
       my_closure;
       exn;
@@ -807,7 +808,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       my_depth
     }
   in
-  { params_and_body; code_metadata; free_names_of_params_and_body }
+  { params_and_body; free_names_of_params_and_body }
 
 and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   match Expr.descr expr with
