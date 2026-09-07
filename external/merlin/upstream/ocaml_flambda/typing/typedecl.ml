@@ -197,14 +197,6 @@ let check_or_null_decl bad sdecl =
 
 let check_or_null_constructors bad = function
   | [c1; c2] ->
-    let check_no_gadt ({ pcd_res; _ } : Parsetree.constructor_declaration) =
-      match pcd_res with
-      | None -> ()
-      | Some _ ->
-        bad "GADT constructors are not supported with [@@or_null]"
-    in
-    check_no_gadt c1;
-    check_no_gadt c2;
     let check_args ({ pcd_args; _ } : Parsetree.constructor_declaration) =
       match pcd_args with
       | Pcstr_tuple [] | Pcstr_tuple [_] -> ()
@@ -1072,7 +1064,10 @@ let transl_declaration env sdecl (id, uid) =
         Jkind.Builtin.value ~why:Default_type_jkind
       | Ptype_variant scstrs ->
         if or_null then check_or_null_variant_shape sdecl scstrs;
-        if List.exists (fun cstr -> cstr.pcd_res <> None) scstrs then begin
+        let has_gadt =
+          List.exists (fun cstr -> cstr.pcd_res <> None) scstrs
+        in
+        if has_gadt then begin
           match cstrs with
             [] -> ()
           | (_,_,loc)::_ ->
@@ -1132,9 +1127,9 @@ let transl_declaration env sdecl (id, uid) =
                payload constrained - in [update_decl_jkind], where the
                argument sorts of ordinary variants are computed too. Here
                we only need a jkind for the temporary environment:
-               [value_or_null], bounded by the arguments of both
-               constructors, is correct whichever way the classification
-               goes. *)
+               [value_or_null] is correct whichever way the classification
+               goes. For non-GADTs its bounds can already mention the
+               arguments of both constructors. *)
             let unary_args =
               List.filter_map
                 (fun (cstr : Types.constructor_declaration) ->
@@ -1152,12 +1147,19 @@ let transl_declaration env sdecl (id, uid) =
               bad_or_null_payload_count sdecl.ptype_loc
             | _ :: _ -> ()
             end;
-            Variant_with_null,
-            Btype.Jkind0.for_variant_with_null_result path
-              (List.map
-                 (fun (arg : Types.constructor_argument) ->
-                    arg.ca_modalities, arg.ca_type)
-                 unary_args)
+            let jkind =
+              if has_gadt then
+                (* Can't mention constructor-local variables, approximate
+                   and compute later. *)
+                Jkind.Builtin.value_or_null ~why:(Or_null_payload path)
+              else
+                Btype.Jkind0.for_variant_with_null_result path
+                  (List.map
+                     (fun (arg : Types.constructor_argument) ->
+                        arg.ca_modalities, arg.ca_type)
+                     unary_args)
+            in
+            Variant_with_null, jkind
           end
           else if unbox then
             Variant_unboxed,
@@ -2669,6 +2671,18 @@ let rec update_decl_jkind env dpath decl =
           (Jkind.sort_option_of_jkind env jkind)
           Jkind.Sort.get_concrete_defaulting_to_scannable
       in
+      let project cstr_res ty =
+        let substs =
+          Btype.Jkind0.gadt_payload_subst
+            ~projected_params:decl.type_params ~cstr_res ~payload_tys:[ty]
+            ~get_free_vars:(Ctype.free_variable_set_of_list env)
+        in
+        match substs with
+        | [] -> ty
+        | _ ->
+          let params, args = List.split substs in
+          Ctype.apply env params ty args
+      in
       let cstrs =
         List.map
           (fun (cstr : Types.constructor_declaration) ->
@@ -2681,7 +2695,9 @@ let rec update_decl_jkind env dpath decl =
                  | Some sort when Jkind.Sort.Const.all_void sort ->
                    (* The null constructor. *)
                    begin match !null_payload with
-                   | None -> null_payload := Some (ca_modalities, ca_type)
+                   | None ->
+                     null_payload :=
+                       Some (ca_modalities, project cstr.cd_res ca_type)
                    | Some _ -> bad_or_null_payload_count loc
                    end;
                    Some sort
@@ -2690,7 +2706,9 @@ let rec update_decl_jkind env dpath decl =
                    constrain_or_null_payload ~env ~path:dpath ca_type ca_loc;
                    let jkind = Ctype.type_jkind env ca_type in
                    begin match !payload with
-                   | None -> payload := Some (jkind, ca_modalities, ca_type)
+                   | None ->
+                     payload :=
+                       Some (jkind, ca_modalities, project cstr.cd_res ca_type)
                    | Some _ -> bad_or_null_payload_count loc
                    end;
                    sort_of_jkind jkind

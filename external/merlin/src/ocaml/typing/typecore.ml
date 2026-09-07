@@ -339,7 +339,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
-  | Let_poly_not_syntactic_value
+  | Let_poly_not_function
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Useless_lpoly
 
@@ -1307,6 +1307,11 @@ let is_iarray_type env ty =
   | Tconstr(path, [_], _) -> Path.same path Predef.path_iarray
   | _ -> false
 
+let is_unboxed_unit_type env ty =
+  match get_desc (expand_head env ty) with
+  | Tconstr(path, [], _) -> Path.same path Predef.path_unboxed_unit
+  | _ -> false
+
 let protect_expansion env ty =
   if Env.has_local_constraints env then generic_instance ty else ty
 
@@ -1572,6 +1577,11 @@ let check_index_not_to_poly_field ~env ba uas =
     (fun (Uaccess_unboxed_field (lid, label, _)) -> check lid label.lbl_arg)
     uas
 
+let check_disambiguation_principality ~loc ~name ty =
+  if not (is_principal ty) then
+    Location.prerr_warning loc
+      (not_principal "this type-based %s disambiguation" name)
+
 (* Represents information about an array type inferred using type-directed
    disambiguation. *)
 type array_info =
@@ -1580,9 +1590,7 @@ type array_info =
 
 let disambiguate_array_literal ~loc env expected_ty =
   let return (ty_elt : (type_expr * Jkind.sort) option) (mut : mutable_flag) =
-    if not (is_principal expected_ty) then
-      Location.prerr_warning loc
-        (not_principal "this type-based array disambiguation");
+    check_disambiguation_principality ~loc ~name:"array" expected_ty;
     { ty_elt; mut }
   in
   if is_floatarray_type env expected_ty then
@@ -5758,38 +5766,6 @@ let rec maybe_computation exp =
     -> true
   | Texp_typed_hole -> false
 
-(* Returns true if, for every [Texp_ident x] occurring in the expression,
-   the comonadic axes of the expression are weaker (higher) than [x].
-   Conservative: may return false when the condition holds. *)
-let rec check_captures_comonadic env (exp : expression) =
-  let check e = check_captures_comonadic env e in
-  let fail () =
-    raise (Error (exp.exp_loc, env, Let_poly_not_syntactic_value))
-  in
-  match exp.exp_desc with
-  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _
-  | Texp_function _ -> ()
-  | Texp_construct (_, _, _, args, _) ->
-    List.iter (fun (_, e) -> check e) args
-  | Texp_variant (_, None) -> ()
-  | Texp_variant (_, Some (e, _)) -> check e
-  | Texp_tuple (args, _) ->
-    List.iter (fun (_, e) -> check e) args
-  | Texp_unboxed_tuple args ->
-    List.iter (fun (_, e, _) -> check e) args
-  | Texp_record { fields; extended_expression = None; _ } ->
-    Array.iter (fun (_, _, def) ->
-      match def with
-      | Kept _ -> assert false
-      | Overridden (_, e) -> check e) fields
-  | Texp_record_unboxed_product { fields; extended_expression = None; _ } ->
-    Array.iter (fun (_, _, def) ->
-      match def with
-      | Kept _ -> assert false
-      | Overridden (_, e) -> check e) fields
-  | Texp_apply_layout (e, _) | Texp_exclave e -> check e
-  | _ -> fail ()
-
 let annotate_recursive_bindings env valbinds =
   let ids = let_bound_idents valbinds in
   List.map
@@ -6113,7 +6089,6 @@ let check_statement exp =
   | Tconstr (p, _, _) when Path.same p Predef.path_unit
                         || Path.same p Predef.path_unboxed_unit ->
     ()
-  (* CR layouts v5: when we have unboxed unit, add a case here for it *)
   | Tvar _ -> ()
   | _ ->
       let rec loop {exp_loc; exp_desc; exp_extra; _} =
@@ -11708,22 +11683,22 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
     | _ -> false
   in
   let expected_ty, sort =
-    if !Clflags.strict_sequence then
-      (* CR layouts v5: when we have unboxed unit, allow it for -strict-sequence
-         *)
-      instance Predef.type_unit, Jkind.Sort.scannable
-    else begin
-      (* We're requiring the statement to have a representable jkind.  But that
-         doesn't actually rule out things like "assert false"---we'll just end
-         up getting a sort variable for its jkind. *)
-      (* CR layouts v10: Abstract jkinds will introduce cases where we really
-         have [any] and can't get a sort here. *)
-      new_rep_var ~why:Statement ()
-    end
+    (* We're requiring the statement to have a representable jkind.  But that
+       doesn't actually rule out things like "assert false"---we'll just end
+       up getting a sort variable for its jkind. *)
+    (* CR layouts v10: Abstract jkinds will introduce cases where we really
+       have [any] and can't get a sort here. *)
+    new_rep_var ~why:Statement ()
   in
   (* Raise the current level to detect non-returning functions *)
   with_local_level_generalize
-    (fun () -> type_exp env (mode_max_with_position position) sexp, sort)
+    (fun () ->
+       let exp =
+         with_local_level_generalize_structure_if_principal
+           (fun () -> type_exp env (mode_max_with_position position) sexp)
+           ~before_generalize:generalize_structure_exp
+       in
+       exp, sort)
   ~before_generalize: begin fun (exp, _sort) ->
     let subexp = final_subexpression exp in
     let ty = expand_head env exp.exp_type in
@@ -11734,10 +11709,21 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
       Location.prerr_warning
         subexp.exp_loc
         Warnings.Nonreturning_statement;
-    if !Clflags.strict_sequence then
+    if !Clflags.strict_sequence then begin
+      let disambiguated_unit_ty =
+        if is_unboxed_unit_type env ty then begin
+          check_disambiguation_principality ~loc:exp.exp_loc ~name:"unit#" ty;
+          instance Predef.type_unboxed_unit
+        end else
+          instance Predef.type_unit
+      in
+      begin
+        try unify_var env expected_ty disambiguated_unit_ty
+        with Unify _ -> assert false
+      end;
       with_explanation explanation (fun () ->
         unify_exp ~sexp env exp expected_ty)
-    else begin
+    end else begin
       if not !has_errors then check_partial_application ~statement:true exp;
       with_explanation explanation (fun () ->
         try unify_var env ty expected_ty
@@ -12423,7 +12409,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (List.map2 (fun (attrs, _, _, _, _) (e, _) -> attrs, e) spatl exp_list);
       if is_lpoly then
         List.iter (fun (exp, _) ->
-          check_captures_comonadic env exp
+          match exp.exp_desc with
+          | Texp_function _ -> ()
+          | _ -> raise (Error (exp.exp_loc, env, Let_poly_not_function))
         ) exp_list;
       (mode_pat_typ_list, exp_list, new_env, mvs, sorts,
        List.map (fun pv -> { pv with pv_type = instance pv.pv_type}) pvs)
@@ -14524,10 +14512,10 @@ let report_error ~loc env =
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
-  | Let_poly_not_syntactic_value ->
+  | Let_poly_not_function ->
       Location.errorf ~loc
         "This expression is not allowed in a %a definition;@ \
-         it must be a function, constructor, tuple, record, or constant."
+         it must be a function."
         Style.inline_code "let poly_"
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with
