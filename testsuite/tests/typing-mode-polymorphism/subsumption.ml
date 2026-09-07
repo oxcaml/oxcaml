@@ -531,3 +531,35 @@ end
 module Self_simplified_self :
   sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
 |}]
+
+module Foo = struct
+  module F (X : sig type t val consume : t @ local -> unit end) = struct
+    let f x () = X.consume x
+  end
+  module M = F(struct type t = string let consume (x @ local) = () end)
+  module Check : sig val f : string @ local -> unit -> unit end = M
+end
+[%%expect{|
+Line 6, characters 66-67:
+6 |   module Check : sig val f : string @ local -> unit -> unit end = M
+                                                                      ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f :
+             string @ [< global many read_write] ->
+             unit @ 'm -> unit @ [> dynamic]
+         end
+       is not included in
+         sig val f : string @ local -> unit -> unit end
+       Values do not match:
+         val f :
+           string @ [< global many read_write] ->
+           unit @ 'm -> unit @ [> dynamic]
+       is not included in
+         val f : string @ local -> unit -> unit
+       The type
+         "string @ [< global many read_write] ->
+         unit @ [> dynamic] -> unit @ [< global > dynamic]"
+       is not compatible with the type "string @ local -> unit -> unit"
+|}]
