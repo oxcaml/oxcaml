@@ -1268,7 +1268,7 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
-type ('a : value mod everything non_float) t = 'a
+type ('a : (value mod everything) non_float) t = 'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global) t = 'a
@@ -1805,11 +1805,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : value_or_null mod everything end
        is not included in
-         sig type 'a t : value_or_null mod everything separable end
+         sig type 'a t : (value_or_null mod everything) separable end
        Type declarations do not match:
          type 'a t : value_or_null mod everything
        is not included in
-         type 'a t : value_or_null mod everything separable
+         type 'a t : (value_or_null mod everything) separable
        The layout of the first is value_or_null
          because of the definition of t at line 4, characters 2-42.
        But the layout of the first must be a sublayout of value_maybe_null

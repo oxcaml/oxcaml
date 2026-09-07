@@ -14,9 +14,10 @@ type t : any addressable
 type t : any addressable
 |}]
 
+(* CR-someday rtjoa: This [mod external_] is redundant *)
 type t : (bits8 & bits16) addressable
 [%%expect{|
-type t : (bits8 & bits16) addressable
+type t : (bits8 & bits16) addressable mod external_
 |}]
 
 type t : bits8 addressable & bits16
@@ -89,6 +90,33 @@ Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
 type t : bits8 addressable & bits16 addressable
+|}]
+
+type t : (any mod portable) addressable addressable
+[%%expect{|
+Line 1, characters 40-51:
+1 | type t : (any mod portable) addressable addressable
+                                            ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "(any mod portable) addressable".
+
+type t : any addressable mod portable
+|}]
+
+(* Mod bounds print after the addressable operator *)
+type t : bits8 addressable mod portable
+[%%expect{|
+type t : bits8 addressable mod portable
+|}]
+
+type t : any addressable mod portable
+[%%expect{|
+type t : any addressable mod portable
+|}]
+
+type t : (bits8 & bits16) addressable mod portable
+[%%expect{|
+type t : (bits8 & bits16) addressable mod portable external_
 |}]
 
 (**** Equalities: [k addressable = k] for addressable [k] ****)
@@ -628,11 +656,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig type t : (bits8 & bits8) addressable end
+         sig type t : (bits8 & bits8) addressable mod external_ end
        is not included in
          sig type t : bits8 addressable & bits8 addressable end
        Type declarations do not match:
-         type t : (bits8 & bits8) addressable
+         type t : (bits8 & bits8) addressable mod external_
        is not included in
          type t : bits8 addressable & bits8 addressable
        The layout of the first is (bits8 & bits8) addressable
@@ -656,11 +684,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t : bits8 addressable & bits8 addressable end
        is not included in
-         sig type t : (bits8 & bits8) addressable end
+         sig type t : (bits8 & bits8) addressable mod external_ end
        Type declarations do not match:
          type t : bits8 addressable & bits8 addressable
        is not included in
-         type t : (bits8 & bits8) addressable
+         type t : (bits8 & bits8) addressable mod external_
        The layout of the first is bits8 addressable & bits8 addressable
          because of the definition of t at line 4, characters 2-48.
        But the layout of the first must be a sublayout of
@@ -779,20 +807,20 @@ type ('a : any non_null addressable) refined = 'a req
    [addressable] is not ignored *)
 type t : bits8 addressable non_null
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 27-35:
 1 | type t : bits8 addressable non_null
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                               ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
 
 type t : bits8 non_null addressable
 [%%expect{|
-Line 1, characters 9-35:
+Line 1, characters 15-23:
 1 | type t : bits8 non_null addressable
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_null" have no effect on the kind "bits8".
+                   ^^^^^^^^
+Warning 184 [ignored-kind-modifier]: The kind modifier "non_null" has no effect on the kind "bits8".
 
 type t : bits8 addressable
 |}]
@@ -808,7 +836,7 @@ type t : value mod portable
    so a made-addressable product can be unpacked into C stub arguments. *)
 type tup : (bits8 & bits16) addressable
 [%%expect{|
-type tup : (bits8 & bits16) addressable
+type tup : (bits8 & bits16) addressable mod external_
 |}]
 
 external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
