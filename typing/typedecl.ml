@@ -1736,16 +1736,19 @@ let narrow_to_manifest_jkind env loc path decl =
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
         (match
-           Ikind.check_type_expr_bound
-             ~origin:(Format.asprintf
-                        "typedecl:manifest_vs_decl %a"
-                        Location.print_loc decl.type_loc)
-             ~type_equal
-             ~context
-             env
-             ~ty
-             ~actual:manifest_jkind
-             ~bound:decl.type_jkind
+           Ctype.check_decl_jkind_l env ~path decl ~bound:decl.type_jkind
+             manifest_jkind
+             ~sub:(fun actual ->
+               Ikind.check_type_expr_bound
+                 ~origin:(Format.asprintf
+                            "typedecl:manifest_vs_decl %a"
+                            Location.print_loc decl.type_loc)
+                 ~type_equal
+                 ~context
+                 env
+                 ~ty
+                 ~actual
+                 ~bound:decl.type_jkind)
          with
          | Ok () -> ()
          | Error v ->
@@ -2440,7 +2443,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       List.map
         (fun jkind ->
             match Jkind.extract_layout env jkind with
-            | Ok layout -> layout
+            | Ok layout -> Jkind.Layout.scannable_bound layout
             | Error _ -> Jkind.Layout.Any Jkind_types.Scannable_axes.max)
         jkinds
     in
@@ -2450,7 +2453,12 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           let lbls_with_sorts =
             List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
           in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
+          let jkind = Jkind.for_boxed_record_with_updates lbls_with_sorts in
+          if record_gets_unboxed_version (List.map fst lbls) rep
+          then
+            Jkind.set_layout jkind
+              (Jkind.layout_for_boxed_block (field_layouts ()))
+          else jkind
       | Unboxed_product ->
         let lbls_with_layouts =
           List.map2
@@ -2897,8 +2905,10 @@ let rec update_decl_jkind env dpath decl =
      jkinds in transl_declaration]) *)
   let context = Ctype.mk_jkind_context_always_principal env in
   match
-    Jkind.sub_layout_or_error ~context
-      env new_decl.type_jkind decl.type_jkind
+    Ctype.check_decl_jkind_l env ~path:dpath decl ~bound:decl.type_jkind
+      new_decl.type_jkind
+      ~sub:(fun estimate ->
+        Jkind.sub_layout_or_error ~context env estimate decl.type_jkind)
   with
   | Ok () -> new_decl
   | Error err ->
@@ -3714,6 +3724,8 @@ let normalize_decl_jkinds env decls =
       let context = Ctype.mk_jkind_context_always_principal env in
       let type_equal = Ctype.type_equal env in
       match
+        Ctype.check_decl_jkind_l env ~path decl ~bound:original_decl.type_jkind
+          decl.type_jkind ~sub:(fun actual ->
         (* CR layouts v2.8: Consider making a function that doesn't compute
            histories for this use-case, which doesn't need it. *)
         Ikind.check_type_decl_bound
@@ -3726,8 +3738,8 @@ let normalize_decl_jkinds env decls =
           ~allow_any_crossing
           env
           ~decl
-          ~actual:decl.type_jkind
-          ~bound:original_decl.type_jkind
+          ~actual
+          ~bound:original_decl.type_jkind)
       with
       | Ok _ ->
         if allow_any_crossing then

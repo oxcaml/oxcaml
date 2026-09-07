@@ -770,9 +770,11 @@ val type_jkind_and_sort :
    but correct: they are used to implement the module inclusion check, where
    we can be sure that the l-jkind has no undetermined variables. *)
 val check_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
+  Env.t -> path:Path.t -> type_declaration -> jkind_l ->
+  (unit, Ikind.subjkind_error) result
 val constrain_decl_jkind :
-  Env.t -> type_declaration -> jkind_l -> (unit, Ikind.subjkind_error) result
+  Env.t -> path:Path.t -> type_declaration -> jkind_l ->
+  (unit, Ikind.subjkind_error) result
 
 (* Compare two types for equality, with no renaming. This is useful for
    the [type_equal] function that must be passed to certain jkind functions. *)
@@ -780,6 +782,15 @@ val type_equal: Env.t -> type_expr -> type_expr -> bool
 
 val check_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
+
+(** [check_decl_jkind_l env ~path decl ~bound ~sub estimate] is [sub estimate],
+    except that when it fails and [estimate]'s layout is not below [bound]'s,
+    the layout is checked through the declaration's type ([constrain_type_jkind]
+    looks into boxes, tuples and records as far as [bound] asks) and [sub]
+    decides the rest on [estimate] with [bound]'s layout. *)
+val check_decl_jkind_l :
+  Env.t -> path:Path.t -> type_declaration -> bound:jkind_l ->
+  sub:(jkind_l -> (unit, 'e) result) -> jkind_l -> (unit, 'e) result
 val constrain_type_jkind :
   Env.t -> type_expr -> ('l * allowed) jkind -> (unit, Jkind.Violation.t) result
 

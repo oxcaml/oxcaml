@@ -560,8 +560,16 @@ val for_or_null_variant :
   payload_jkind:Types.jkind_l ->
   (Types.jkind_l, unit) result
 
-(** Choose an appropriate jkind for a boxed tuple type. *)
-val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
+(** The jkind of a boxed tuple. Without [component_layouts] the layout is
+    [any box], which [Ctype.constrain_type_jkind] refines on demand. *)
+val for_boxed_tuple :
+  component_layouts:Sort.t Layout.t list option ->
+  (string option * Types.type_expr) list ->
+  Types.jkind_l
+
+(** The layout of a boxed block (record or tuple) whose unboxed version is the
+    product of [component_layouts]. *)
+val layout_for_boxed_block : Sort.t Layout.t list -> Sort.t Layout.t
 
 (** Choose an appropriate jkind for a row type. *)
 val for_boxed_row : Types.row_desc -> Types.jkind_l

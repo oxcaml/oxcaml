@@ -3150,7 +3150,19 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
   match get_desc ty with
   | Tvar { jkind } -> Jkind.disallow_right jkind
   | Tarrow _ -> Jkind.for_arrow
-  | Ttuple elts -> Jkind.for_boxed_tuple elts
+  | Ttuple elts ->
+    let component_layouts =
+      if expand_components
+      then
+        let visited = [get_id ty] in
+        Some
+          (List.map
+             (fun (_, ty) ->
+                estimate_type_layout ~expand_components env ~visited ty)
+             elts)
+      else None
+    in
+    Jkind.for_boxed_tuple ~component_layouts elts
   | Tunboxed_tuple ltys ->
       let tys = List.map snd ltys in
       estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds env
@@ -3271,7 +3283,7 @@ and estimate_unboxed_product_jkind
   Jkind.Builtin.product ~why tys_modalities layouts
 (* The layout of a block component. A component that is itself a box is a
    pointer: a scannable sort with the axes its contents imply, no deeper
-   ([constrain_type_jkind] looks below a box on demand). [visited] guards
+   ([constrain_type_jkind] looks below a block on demand). [visited] guards
    against cyclic types under [-rectypes]: a type recursively containing
    itself approximates to [any]. *)
 and estimate_type_layout ~expand_components env ~visited ty
@@ -3541,7 +3553,15 @@ let constrain_type_jkind ~fixed env ty jkind =
                                 (ty's_jkind, jkind, sub_failure_reasons)))
                       | Ok jkind ->
                       match Jkind.extract_layout env ty's_jkind with
-                      | Ok (Any _) ->
+                      | Ok (Product _ | Box _) ->
+                        (* In this case, there's nothing to gain by
+                           re-estimating: either it's already a product and we
+                           will successfully recurse into it, or it's not a
+                           product and (because it's not [any]) re-estimating
+                           won't change that. *)
+                        loop ~fuel ~expanded:false env unwrapped_ty.ty
+                          ty's_jkind jkind
+                      | Ok (Any _ | Sort _ | Addressable _) | Error _ ->
                         (* We re-estimate in this case rather than reuse the
                            components of [ty's_jkind] because an unboxed record
                            with an [any] field has a product-of-[any]s kind on
@@ -3551,16 +3571,11 @@ let constrain_type_jkind ~fixed env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
+                        (* Likewise, a block component is stored as a scannable
+                           sort ([estimate_type_layout]); re-estimating reveals
+                           its box. *)
                         estimate_jkind_and_loop ~fuel ~expanded:false env
-                          unwrapped_ty.ty jkind
-                      | _ ->
-                        (* In this case, there's nothing to gain by
-                           re-estimating: either it's already a product and we
-                           will successfully recurse into it, or it's not a
-                           product and (because it's not [any]) re-estimating
-                           won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
-                          ty's_jkind jkind)
+                          unwrapped_ty.ty jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
                if List.for_all Result.is_ok results
@@ -3689,6 +3704,11 @@ let constrain_type_jkind ~fixed env ty jkind =
               end
             | _ -> error ()
           in
+          let unboxed ~fuel =
+            match unbox_ty env ty with
+            | Some contents -> box ~fuel contents
+            | None -> error ()
+          in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
@@ -3701,10 +3721,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                  Error (Jkind.Violation.of_ ~context ~missing_cmi:path env
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
-               | Final_result ->
-                 Error
-                   (Jkind.Violation.of_ ~context env
-                      (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
+               | Final_result -> unboxed ~fuel:(fuel - 1)
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
                  estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
@@ -3721,7 +3738,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
               mk_unwrapped_type_expr ty) ltys)
-          | Tbox contents -> box ~fuel contents
+          | Ttuple (_ :: _) | Tbox _ -> unboxed ~fuel
           | _ -> error ()
   and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
@@ -3741,6 +3758,34 @@ let constrain_type_jkind ~fixed env ty jkind =
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
 
 let () = Jkind.set_estimate_type_jkind estimate_type_jkind
+
+(* [sub estimate] checks [decl]'s estimated jkind against the l-bound [bound].
+   If that fails and the estimate's layout is not below [bound]'s, the layout
+   is checked through the declaration's type instead ([constrain_type_jkind]
+   looks into boxes, tuples and records as far as [bound] asks), and [sub]
+   then decides the bounds on the estimate carrying [bound]'s layout; the
+   estimate's bounds do not depend on how deep its layout was computed. *)
+let check_decl_jkind_l env ~path decl ~bound ~sub estimate =
+  match sub estimate with
+  | Ok () -> Ok ()
+  | Error _ as err -> (
+    match Jkind.extract_layout env bound, Jkind.extract_layout env estimate with
+    | Ok bound_layout, Ok layout
+      when not (Jkind.Sub_result.is_le (Jkind.Layout.sub layout bound_layout))
+      ->
+      let ty =
+        match decl.type_manifest with
+        | Some ty -> ty
+        | None -> newgenty (Tconstr (path, decl.type_params, ref Mnil))
+      in
+      let layout_bound =
+        Jkind.set_layout (Jkind.Builtin.any ~why:Dummy_jkind) bound_layout
+      in
+      begin match constrain_type_jkind ~fixed:true env ty layout_bound with
+      | Ok () -> sub (Jkind.set_layout estimate bound_layout)
+      | Error _ -> err
+      end
+    | _ -> err)
 
 let type_jkind_and_sort ~why ~fixed env ty =
   let jkind, sort = Jkind.of_new_sort_var ~level:!current_level ~why in
@@ -8933,7 +8978,7 @@ let print_global_state fmt global_state =
 let type_equal env ty1 ty2 = is_equal env false [ty1] [ty2]
 let () = type_equal' := type_equal
 
-let check_decl_jkind env decl jkind =
+let check_decl_jkind env ~path decl jkind =
   (* CR layouts v2.8: This could use an algorithm like [constrain_type_jkind]
      to expand only as much as needed, but the l/l subtype algorithm is tricky,
      and so we leave this optimization for later. Internal ticket 5114. *)
@@ -8972,29 +9017,23 @@ let check_decl_jkind env decl jkind =
       Jkind.for_abbreviation ~type_jkind_purely ~modality inner_ty
     | _ -> decl.type_jkind
   in
-  match
+  let sub origin estimate =
     Ikind.sub_jkind_l
       ~origin:
-        (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
-      ~type_equal ~context env decl_jkind jkind
-  with
-  | Ok () -> Ok ()
-  | Error _ as err ->
-    match decl.type_manifest with
-    | None -> err
-    | Some ty ->
-      let ty_jkind = type_jkind env ty in
-      match
-        Ikind.sub_jkind_l
-          ~origin:
-            (Format.asprintf "ctype:manifest %a"
-               Location.print_loc decl.type_loc)
-          ~type_equal ~context env ty_jkind jkind
-      with
-      | Ok () -> Ok ()
-      | Error _ as err -> err
+        (Format.asprintf "ctype:%s %a" origin Location.print_loc decl.type_loc)
+      ~type_equal ~context env estimate jkind
+  in
+  let check = check_decl_jkind_l env ~path decl ~bound:jkind in
+  match decl.type_manifest with
+  | None -> check ~sub:(sub "decl") decl_jkind
+  | Some ty -> (
+    match sub "decl" decl_jkind with
+    | Ok () -> Ok ()
+    | Error _ ->
+      (* The manifest's own kind can be more precise than the stored one. *)
+      check ~sub:(sub "manifest") (type_jkind env ty))
 
-let constrain_decl_jkind env decl jkind =
+let constrain_decl_jkind env ~path decl jkind =
   (* CR layouts v2.8: This will need to be deeply reimplemented. Internal
      ticket 5115. *)
   match Jkind.try_allow_r jkind with
@@ -9002,7 +9041,7 @@ let constrain_decl_jkind env decl jkind =
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
   | None ->
-    check_decl_jkind env decl jkind
+    check_decl_jkind env ~path decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in

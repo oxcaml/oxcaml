@@ -24,7 +24,7 @@ type t : value mod contended = { mutable contents : string }
 [@@unsafe_allow_any_mode_crossing]
 let f (x : t @ contended) = use_uncontended x
 [%%expect{|
-type t : value non_float mod contended = { mutable contents : string; }
+type t : value non_float box mod contended = { mutable contents : string; }
 [@@unsafe_allow_any_mode_crossing]
 val f : t @ contended -> t = <fun>
 |}]
@@ -74,10 +74,8 @@ and s = t require_f64
 type 'a t : value mod contended with 'a = { mutable contents : 'a }
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
-type 'a t
-  : value non_float mod contended with 'a = {
-  mutable contents : 'a;
-} [@@unsafe_allow_any_mode_crossing]
+type 'a t : value box mod contended with 'a = { mutable contents : 'a; }
+[@@unsafe_allow_any_mode_crossing]
 |}]
 
 (* Abstract types in signatures should work with the unsafe kind *)
@@ -136,13 +134,16 @@ end
 [%%expect{|
 module M1 :
   sig
-    type t : value non_float mod contended = { mutable contents : string; }
+    type t
+      : value non_float box mod contended = {
+      mutable contents : string;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M2 :
   sig
     type t
-      : value non_float mod contended =
+      : value non_float box mod contended =
       M1.t = {
       mutable contents : string;
     }
@@ -164,7 +165,7 @@ end
 module Private :
   sig
     type t
-      : value non_float mod contended = private {
+      : value non_float box mod contended = private {
       mutable contents : string;
     }
     [@@unsafe_allow_any_mode_crossing]
@@ -202,10 +203,13 @@ end
 [%%expect{|
 module M :
   sig
-    type t1 : value non_float mod contended = { mutable contents : string; }
+    type t1
+      : value non_float box mod contended = {
+      mutable contents : string;
+    }
     [@@unsafe_allow_any_mode_crossing]
     type t2
-      : value non_float mod contended = private {
+      : value non_float box mod contended = private {
       mutable contents : string;
     }
     [@@unsafe_allow_any_mode_crossing]
@@ -234,13 +238,16 @@ Error: Signature mismatch:
          sig type t = { mutable x : int; } end
        is not included in
          sig
-           type t : value non_float mod contended = { mutable x : int; }
+           type t
+             : value non_pointer box mod contended = {
+             mutable x : int;
+           }
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
          type t = { mutable x : int; }
        is not included in
-         type t : value non_float mod contended = { mutable x : int; }
+         type t : value non_pointer box mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        the second has [@@unsafe_allow_any_mode_crossing], but the first does not
@@ -259,7 +266,7 @@ module _ = (M : S)
 [%%expect{|
 module type S =
   sig
-    type t : value non_float mod contended = { mutable x : int; }
+    type t : value non_pointer box mod contended = { mutable x : int; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M : sig type t = { mutable x : int; } end
@@ -274,7 +281,7 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = M.t = { mutable x : int; }
        is not included in
-         type t : value non_float mod contended = { mutable x : int; }
+         type t : value non_pointer box mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        the second has [@@unsafe_allow_any_mode_crossing], but the first does not
@@ -309,24 +316,27 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            type t
-             : value non_float mod portable contended = {
+             : value non_pointer box mod portable contended = {
              mutable x : int;
            }
            [@@unsafe_allow_any_mode_crossing]
          end
        is not included in
          sig
-           type t : value non_float mod contended = { mutable x : int; }
+           type t
+             : value non_pointer box mod contended = {
+             mutable x : int;
+           }
            [@@unsafe_allow_any_mode_crossing]
          end
        Type declarations do not match:
          type t
-           : value non_float mod portable contended = {
+           : value non_pointer box mod portable contended = {
            mutable x : int;
          }
        [@@unsafe_allow_any_mode_crossing]
        is not included in
-         type t : value non_float mod contended = { mutable x : int; }
+         type t : value non_pointer box mod contended = { mutable x : int; }
        [@@unsafe_allow_any_mode_crossing]
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
@@ -350,7 +360,7 @@ end
 module A : sig type t : value mod global many portable external_ end
 module B :
   sig
-    type t : value non_float mod portable contended = { a : A.t; }
+    type t : value box mod portable contended = { a : A.t; }
     [@@unsafe_allow_any_mode_crossing]
     val a : t -> A.t
   end
@@ -430,8 +440,10 @@ type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
 type ('a, 'b) bad_reexport_2 : immutable_data with 'a = ('a, 'b) arity_2 = { x : 'a }
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
-type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a; }
-[@@unsafe_allow_any_mode_crossing]
+type ('a, 'b) arity_2
+  : (value mod everything) box mod immutable with 'b = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
 Lines 4-5, characters 0-34:
 4 | type ('a, 'b) bad_reexport_2 : immutable_data with 'a = ('a, 'b) arity_2 = { x : 'a }
 5 | [@@unsafe_allow_any_mode_crossing]
@@ -470,30 +482,28 @@ type 'a unsafe_externality_saturated_reexport
 [@@unsafe_allow_any_mode_crossing]
 
 [%%expect{|
-type 'a unsafe_saturated
-  : value non_float mod shared with 'a = {
-  mutable x : 'a;
-} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated : value box mod shared with 'a = { mutable x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
 type 'a unsafe_saturated_reexport
-  : value non_float mod shared with 'a =
+  : value box mod shared with 'a =
   'a unsafe_saturated = {
   mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type ('a : value mod shared) unsafe_parameter_saturated
-  : immutable_data with 'a = {
+  : (value mod everything) box mod immutable with 'a = {
   mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type ('a : value mod shared) unsafe_parameter_saturated_reexport
-  : immutable_data with 'a @@ shared =
+  : (value mod everything) box mod immutable with 'a @@ shared =
   'a unsafe_parameter_saturated = {
   mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type 'a unsafe_externality_saturated
-  : value non_float mod shared with 'a = {
+  : value box mod shared with 'a = {
   mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
 type 'a unsafe_externality_saturated_reexport
-  : value non_float mod shared with 'a =
+  : value box mod shared with 'a =
   'a unsafe_externality_saturated = {
   mutable x : 'a;
 } [@@unsafe_allow_any_mode_crossing]
@@ -517,13 +527,14 @@ type unsafe_middle_reexport
 type unsafe_middle_payload
 type unsafe_middle_alias = unsafe_middle_payload
 type unsafe_middle_original
-  : immutable_data
+  : (value mod everything) box
+      mod immutable
       with unsafe_middle_alias @@ corrupted
       with unsafe_middle_payload @@ shared = {
   mutable x : unsafe_middle_payload;
 } [@@unsafe_allow_any_mode_crossing]
 type unsafe_middle_reexport
-  : immutable_data with unsafe_middle_payload =
+  : (value mod everything) box mod immutable with unsafe_middle_payload =
   unsafe_middle_original = {
   mutable x : unsafe_middle_payload;
 } [@@unsafe_allow_any_mode_crossing]
@@ -537,8 +548,10 @@ type 'a unsafe_corrupted
 [@@unsafe_allow_any_mode_crossing]
 
 [%%expect{|
-type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a; }
-[@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_shared
+  : (value mod everything) box mod immutable with 'a @@ shared = {
+  x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
 Lines 4-6, characters 0-34:
 4 | type 'a unsafe_corrupted
 5 |   : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
@@ -606,56 +619,50 @@ end
 type (_, _) eq = Refl : ('a, 'a) eq
 module M1 :
   sig
-    type 'a t : value non_float mod contended = { x : 'a; }
+    type 'a t : value box mod contended = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M2 :
   sig
-    type 'a t : value non_float mod contended = { x : 'a; }
+    type 'a t : value box mod contended = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M3 :
   sig
-    type 'a t : value non_float mod portable = { x : 'a; }
+    type 'a t : value box mod portable = { x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M4 :
   sig
-    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
+    type 'a t : value box mod contended with 'a = { mutable x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M5 :
   sig
-    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
+    type 'a t : value box mod contended with 'a = { mutable x : 'a; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M6 :
   sig
-    type 'a t : immutable_data with 'a = { mutable x : 'a; }
+    type 'a t
+      : (value mod everything) box mod immutable with 'a = {
+      mutable x : 'a;
+    }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M7 :
   sig
-    type ('a, 'b) t
-      : value non_float mod contended with 'a = {
-      mutable x : 'b;
-    }
+    type ('a, 'b) t : value box mod contended with 'a = { mutable x : 'b; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M8 :
   sig
-    type ('a, 'b) t
-      : value non_float mod contended with 'a = {
-      mutable x : 'b;
-    }
+    type ('a, 'b) t : value box mod contended with 'a = { mutable x : 'b; }
     [@@unsafe_allow_any_mode_crossing]
   end
 module M9 :
   sig
-    type ('a, 'b) t
-      : value non_float mod contended with 'b = {
-      mutable x : 'b;
-    }
+    type ('a, 'b) t : value box mod contended with 'b = { mutable x : 'b; }
     [@@unsafe_allow_any_mode_crossing]
   end
 |}]
@@ -719,7 +726,7 @@ type t : value mod contended = { mutable i : int }
 [@@unsafe_allow_any_mode_crossing]
 and s : value mod contended = { t : t } [@@unboxed]
 [%%expect{|
-type t : value non_float mod contended = { mutable i : int; }
+type t : value non_pointer box mod contended = { mutable i : int; }
 [@@unsafe_allow_any_mode_crossing]
 and s = { t : t; } [@@unboxed]
 |}]
