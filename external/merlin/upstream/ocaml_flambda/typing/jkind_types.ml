@@ -922,208 +922,61 @@ module Sort = struct
   (***********************)
   (* equality *)
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
-
-  let swap_equate_result = function
-    | Equal_mutated_first -> Equal_mutated_second
-    | Equal_mutated_second -> Equal_mutated_first
-    | (Unequal | Equal_no_mutation | Equal_mutated_both) as r -> r
-
-  let combine_equate_results r1 r2 =
-    match r1, r2 with
-    | Unequal, _ | _, Unequal -> Unequal
-    | Equal_no_mutation, r | r, Equal_no_mutation -> r
-    | Equal_mutated_both, _ | _, Equal_mutated_both -> Equal_mutated_both
-    | Equal_mutated_first, Equal_mutated_first -> Equal_mutated_first
-    | Equal_mutated_second, Equal_mutated_second -> Equal_mutated_second
-    | Equal_mutated_first, Equal_mutated_second
-    | Equal_mutated_second, Equal_mutated_first ->
-      Equal_mutated_both
-
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
-
-  let combine_constrain_addressable_results r1 r2 =
-    match r1, r2 with
-    | Not_known_addressable, _ | _, Not_known_addressable ->
-      Not_known_addressable
-    | Addressable_mutated, _ | _, Addressable_mutated -> Addressable_mutated
-    | Addressable_no_mutation, Addressable_no_mutation ->
-      Addressable_no_mutation
-
-  let rec constrain_addressable ~allow_mutation :
-      t -> constrain_addressable_result = function
-    | Addressable _ -> Addressable_no_mutation
-    | Base b ->
-      if base_is_addressable b
-      then Addressable_no_mutation
-      else Not_known_addressable
-    | Product ts ->
-      List.fold_left
-        (fun acc t ->
-          match acc with
-          | Not_known_addressable -> Not_known_addressable
-          | (Addressable_mutated | Addressable_no_mutation) as acc ->
-            combine_constrain_addressable_results acc
-              (constrain_addressable ~allow_mutation t))
-        Addressable_no_mutation ts
-    | Univar _ -> Not_known_addressable
+  let rec constrain_addressable ~allow_mutation : t -> bool = function
+    | Addressable _ -> true
+    | Base b -> base_is_addressable b
+    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
+    | Univar _ -> false
     | Var v -> (
       match v.contents with
       | Some s -> constrain_addressable ~allow_mutation s
-      | None when is_rigidvar v -> Not_known_addressable
-      | None when not allow_mutation -> Not_known_addressable
+      | None when is_rigidvar v -> false
+      | None when not allow_mutation -> false
       | None ->
         set v (Some (Addressable (of_var (new_var ~level:level_fresh))));
-        Addressable_mutated)
+        true)
 
-  let is_surely_addressable t =
-    match constrain_addressable ~allow_mutation:false t with
-    | Not_known_addressable -> false
-    | Addressable_no_mutation | Addressable_mutated -> true
+  let is_surely_addressable = constrain_addressable ~allow_mutation:false
 
-  let[@inline] sorts_of_product s =
-    (* In the equate functions, it's useful to pass around lists of sorts inside
-       the product constructor they came from to avoid re-allocating it if we
-       end up wanting to store it in a variable. We could probably eliminate the
-       use of this by collapsing a bunch of the functions below into each other,
-       but that would be much less readable. *)
-    match s with
-    | Product sorts -> sorts
-    | Var _ | Base _ | Univar _ | Addressable _ ->
-      Misc.fatal_error "Jkind_types.sorts_of_product"
-
-  let rec equate_sort_sort s1 s2 =
-    match s1 with
-    | Base b1 -> swap_equate_result (equate_sort_base s2 b1)
-    | Var v1 -> equate_var_sort v1 s2
-    | Product _ -> swap_equate_result (equate_sort_product s2 s1)
-    | Univar uv1 -> swap_equate_result (equate_sort_univar s2 uv1)
-    | Addressable arg1 -> swap_equate_result (equate_sort_addressable s2 arg1)
-
-  and equate_sort_base s1 b2 =
-    match s1 with
-    | Base b1 -> if equal_base b1 b2 then Equal_no_mutation else Unequal
-    | Var v1 -> equate_var_base v1 b2
-    | Addressable _ -> equate_sort_sort s1 (Static.T.of_base b2)
-    | Product _ | Univar _ -> Unequal
-
-  and equate_sort_univar s1 uv2 =
-    match s1 with
-    | Univar uv1 ->
-      if equal_univar_univar uv1 uv2 then Equal_no_mutation else Unequal
-    | Base _ | Product _ | Addressable _ -> Unequal
-    | Var v1 -> equate_var_univar v1 uv2
-
-  and equate_var_univar v1 uv2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_univar s1 uv2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Some (Univar uv2));
-      Equal_mutated_first
-
-  and equate_var_base v1 b2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_base s1 b2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Static.T_option.of_base b2);
-      Equal_mutated_first
-
-  and equate_var_sort v1 s2 =
-    match s2 with
-    | Base b2 -> equate_var_base v1 b2
-    | Var v2 -> equate_var_var v1 v2
-    | Product _ -> equate_var_product v1 s2
-    | Univar uv2 -> equate_var_univar v1 uv2
-    | Addressable arg2 -> equate_sort_addressable (of_var v1) arg2
-
-  and equate_var_var v1 v2 =
-    if v1.id = v2.id (* equal id means physical equality *)
-    then Equal_no_mutation
-    else
-      match v1.contents, v2.contents with
-      | Some s1, _ -> swap_equate_result (equate_var_sort v2 s1)
-      | _, Some s2 -> equate_var_sort v1 s2
-      | None, None when not @@ is_rigidvar v1 ->
-        set v1 (Some (of_var v2));
-        Equal_mutated_first
-      | None, None when not @@ is_rigidvar v2 ->
-        set v2 (Some (of_var v1));
-        Equal_mutated_second
-      | None, None -> Unequal
-
-  and equate_var_product v1 s2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_product s1 s2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
+  let rec equate ~allow_mutation s1 s2 =
+    match s1, s2 with
+    | Var v1, Var v2 when v1.id = v2.id -> true
+    | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
+    | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
+    | Var ({ contents = None } as v1), _
+      when (not (is_rigidvar v1)) && allow_mutation ->
       set v1 (Some s2);
-      Equal_mutated_first
-
-  and equate_sort_product s1 s2 =
-    match s1 with
-    | Base _ | Univar _ -> Unequal
-    | Product sorts1 ->
-      let sorts2 = sorts_of_product s2 in
-      equate_sorts sorts1 sorts2
-    | Var v1 -> equate_var_product v1 s2
-    | Addressable _ -> equate_sort_sort s1 s2
-
-  and equate_sort_addressable s1 arg2 =
-    (* We currently solve [s1 = arg2 addressable] by (incompletely) reducing it
-       to solving [s1 = s1 addressable] and [s1 = arg2].
-
-       There is no complete solution as long as sort variables only support
-       unification. For example, if [s1 = 'var addressable] and [arg2 = bits8],
-       we could unify ['var = bits8] or ['var = bits8 addressable], and neither
-       is strictly better. *)
-    match constrain_addressable ~allow_mutation:true s1 with
-    | Not_known_addressable -> Unequal
-    | Addressable_no_mutation ->
-      equate_sort_sort (strip_head_addressable s1) (strip_head_addressable arg2)
-    | Addressable_mutated ->
-      combine_equate_results Equal_mutated_first
-        (equate_sort_sort
-           (strip_head_addressable s1)
-           (strip_head_addressable arg2))
-
-  and equate_sorts sorts1 sorts2 =
-    let rec go sorts1 sorts2 acc =
-      match sorts1, sorts2 with
-      | [], [] -> acc
-      | sort1 :: sorts1, sort2 :: sorts2 -> (
-        match equate_sort_sort sort1 sort2 with
-        | Unequal -> Unequal
-        | r -> go sorts1 sorts2 (combine_equate_results acc r))
-      | _, _ -> assert false
-    in
-    if List.compare_lengths sorts1 sorts2 = 0
-    then go sorts1 sorts2 Equal_no_mutation
-    else Unequal
-
-  let equate_tracking_mutation = equate_sort_sort
-
-  (* Don't expose whether or not mutation happened; we just need that for
-     [Jkind] *)
-  let equate s1 s2 =
-    match equate_tracking_mutation s1 s2 with
-    | Unequal -> false
-    | Equal_mutated_first | Equal_mutated_second | Equal_no_mutation
-    | Equal_mutated_both ->
       true
+    | _, Var ({ contents = None } as v2)
+      when (not (is_rigidvar v2)) && allow_mutation ->
+      set v2 (Some s1);
+      true
+    | Var _, _ | _, Var _ ->
+      (* rigid *)
+      false
+    | Addressable _, _ | _, Addressable _ ->
+      (* We reduce the problem to [s1 addressable = s2 addressable], since if
+         one side is addressable, then the other is too. At this point we
+         proceed by proving [s1 = s2], which is incomplete:
+
+         Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
+         We could unify ['var = bits8] or ['var = bits8 addressable], but
+         neither is more general. *)
+      constrain_addressable ~allow_mutation s1
+      && constrain_addressable ~allow_mutation s2
+      && equate ~allow_mutation
+           (strip_head_addressable s1)
+           (strip_head_addressable s2)
+    | Base b1, Base b2 -> equal_base b1 b2
+    | Product sorts1, Product sorts2 -> (
+      try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
+      with Invalid_argument _ -> false)
+    | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
+    | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
     let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
-    if equate t (Product ts) then Some ts else None
+    if equate ~allow_mutation:true t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
 

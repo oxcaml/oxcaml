@@ -266,9 +266,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  (** This checks for equality, and sets any variables to make two sorts equal,
-      if possible *)
-  val equate : t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> bool
 
   val format : Format_doc.formatter -> t -> unit
 
