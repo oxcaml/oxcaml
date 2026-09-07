@@ -72,6 +72,11 @@ type ('a : any) r2 = { x : 'a; y : int }
 type ('a : any) r2 = { x : 'a; y : int; }
 |}]
 
+let poly_ pass (_ : 'a) (r : 'a r2) = r
+[%%expect{|
+val poly_ pass : 'a -> 'a r2 -> 'a r2 = <lpoly>
+|}]
+
 (* With a field that is certainly a runtime value, it is instead the
    representation error that is reported. *)
 let poly_ mk2 v = { x = v; y = 1 }
