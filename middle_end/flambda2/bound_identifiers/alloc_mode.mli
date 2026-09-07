@@ -106,6 +106,10 @@ module For_allocations : sig
     current_region:Variable.t option ->
     t
 
+  (** Apply [f] to the allocation region, leaving any stack allocation region
+      unchanged. *)
+  val map_alloc_region : t -> f:(Variable.t -> Variable.t) -> t
+
   include Contains_names.S with type t := t
 
   include Contains_ids.S with type t := t

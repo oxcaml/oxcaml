@@ -99,6 +99,10 @@ let arg_kind_mismatch prim arg_tys_with_expected_kinds =
 
 let simplify_primitive dacc (prim : P.t) dbg ~result_var =
   let min_name_mode = Bound_var.name_mode result_var in
+  let prim =
+    P.map_alloc_regions prim
+      ~f:(Simplify_common.simplify_alloc_region (DA.denv dacc))
+  in
   match prim with
   | Nullary prim' ->
     Simplify_nullary_primitive.simplify_nullary_primitive dacc prim prim' dbg

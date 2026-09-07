@@ -6,10 +6,11 @@ let code loopify(never) size(4) newer_version_of(main_0)
         : imm tagged =
   let prim = %is_null (x) in
   let tagged_scrutinee = %tag_imm (prim) in
-  cont k (tagged_scrutinee)
+  cont k close[normal] my_alloc_region (tagged_scrutinee)
 in
 let $camlN_way_join_null__main_1 =
   closure main_0_1 @main &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlN_way_join_null = Block 0 ($camlN_way_join_null__main_1) in
 cont done ($camlN_way_join_null)

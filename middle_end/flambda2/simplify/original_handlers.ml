@@ -55,13 +55,12 @@ let can_be_lifted = function
   | Non_recursive { can_be_lifted; _ } -> can_be_lifted
   | Recursive { can_be_lifted; _ } -> can_be_lifted
 
-let add_params_to_lift t params_to_lift =
-  let lifted_params, renaming = Lifted_cont_params.rename params_to_lift in
+let add_params_to_lift t lifted_params ~renaming =
   let[@inline] fail () =
     Misc.fatal_errorf
       "Cannot add lifted params to a continuation that already has lifted \
-       params:@ params_to_lift=%a@ t=%a"
-      Lifted_cont_params.print params_to_lift print t
+       params:@ lifted_params=%a@ t=%a"
+      Lifted_cont_params.print lifted_params print t
   in
   match t with
   | Recursive

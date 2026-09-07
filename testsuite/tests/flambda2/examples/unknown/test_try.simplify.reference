@@ -22,5 +22,7 @@ let try_ghost_region = %begin_try_ghost_region () in
           let unit_1 = %end_try_ghost_region (try_ghost_region_1) in
           cont k)
        where k =
+         let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region)
+         in
          let $camlTest_try = Block 0 () in
          cont done ($camlTest_try))

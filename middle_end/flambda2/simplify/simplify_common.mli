@@ -170,3 +170,30 @@ val add_symbol_projection :
   projection_bound_to:Bound_var.t ->
   kind:Flambda_kind.With_subkind.t ->
   Downwards_acc.t
+
+(** Canonicalise an allocation region (following aliases). *)
+val canonicalize_alloc_region : Downwards_env.t -> Variable.t -> Variable.t
+
+(** Rewrite check actions that refer to allocation regions removed by
+    simplification: actions closing such a region at an exit whose creation flag
+    was [Close] are retargeted to the parent region; those at exits whose
+    creation flag was [Forward] are deleted. *)
+val rewrite_check_actions_for_removed_alloc_regions :
+  Downwards_env.t -> Check_action.t list -> Check_action.t list
+
+(** Simplify an allocation region: canonicalise it (following aliases) and, if
+    its [New_alloc_region] binding was removed by simplification, replace it by
+    its parent region. This must be applied to every allocation region embedded
+    in a term being simplified, so that no occurrence of a removed region
+    remains in the simplified term. The regions taken as arguments by
+    [New_alloc_region] and [Close_alloc_region] are instead dealt with by the
+    simplifiers of these primitives, which take the Forward/Close flags of the
+    removed region into account. *)
+val simplify_alloc_region : Downwards_env.t -> Variable.t -> Variable.t
+
+(** Apply [simplify_alloc_region] to the allocation region of the given
+    allocation mode. *)
+val simplify_alloc_mode :
+  Downwards_env.t ->
+  Alloc_mode.For_allocations.t ->
+  Alloc_mode.For_allocations.t

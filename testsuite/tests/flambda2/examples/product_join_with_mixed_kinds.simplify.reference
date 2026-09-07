@@ -21,11 +21,12 @@ let code loopify(never) size(34) newer_version_of(f_0)
       cont k2 (Pmakefloatblock)
     where k2 (x_1 : val) =
       let Pmakeblock = %block.[`0`].my_alloc_region (x_1, 0) in
-      cont k (Pmakeblock)
+      cont k close[normal] my_alloc_region (Pmakeblock)
 in
 let $camlProduct_join_with_mixed_kinds__f_1 =
   closure f_0_1 @f &toplevel.alloc_region
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlProduct_join_with_mixed_kinds =
   Block 0 ($camlProduct_join_with_mixed_kinds__f_1)
 in

@@ -94,7 +94,7 @@ let add_invalid_continuation t cont arity =
 let continuation_arity t cont =
   find_continuation t cont |> Continuation_in_env.arity
 
-let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
+let add_continuation_shortcut t cont ~params ~shortcut_to ~args ~check_actions =
   if Continuation.Map.mem shortcut_to t.continuation_shortcuts
   then
     Misc.fatal_errorf
@@ -109,7 +109,9 @@ let add_continuation_shortcut t cont ~params ~shortcut_to ~args =
       Continuation.print cont Continuation.print shortcut_to Continuation.print
       (Continuation_shortcut.continuation existing_shortcut)
   | Null ->
-    let shortcut = Continuation_shortcut.create ~params shortcut_to args in
+    let shortcut =
+      Continuation_shortcut.create ~params ~check_actions shortcut_to args
+    in
     (* For now we keep the pre-existing check for aliases, but ideally we should
        check that the arities match after applying the substitution. However it
        seems like we should have a more general mechanism for checking arities

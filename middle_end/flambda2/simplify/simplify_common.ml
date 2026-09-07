@@ -153,6 +153,20 @@ let split_direct_over_application apply ~callee's_code_id
             ~ghost_region )
       | Maybe_alloc_stack _ -> None, apply_alloc_mode)
   in
+  let alloc_checks = Apply.alloc_checks apply in
+  let ( inner_apply_alloc_checks,
+        outer_apply_alloc_checks,
+        needs_close_alloc_region ) =
+    match alloc_checks.normal with
+    | Forward -> alloc_checks, alloc_checks, false
+    | Close ->
+      let forward_checks =
+        { alloc_checks with normal = Alloc_checks.Forward }
+      in
+      if Option.is_some needs_region
+      then forward_checks, forward_checks, true
+      else forward_checks, alloc_checks, false
+  in
   let perform_over_application =
     let continuation =
       (* If there is no need for a new region, then the second (over)
@@ -171,8 +185,8 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:remaining_args ~args_arity:remaining_arity
       ~return_arity:(Apply.return_arity apply)
       ~call_kind:Call_kind.indirect_function_call_unknown_arity
-      ~return_mode:outer_apply_alloc_mode (Apply.dbg apply)
-      ~inlined:(Apply.inlined apply)
+      ~return_mode:outer_apply_alloc_mode ~alloc_checks:outer_apply_alloc_checks
+      (Apply.dbg apply) ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -246,6 +260,27 @@ let split_direct_over_application apply ~callee's_code_id
         NO.add_variable call_return_continuation_free_names region
           Name_mode.normal
       in
+      let handler_expr, handler_expr_free_names =
+        if needs_close_alloc_region
+        then
+          let alloc_region =
+            Alloc_mode.For_applications.alloc_region (Apply.return_mode apply)
+          in
+          ( Let.create
+              (Bound_pattern.singleton
+                 (Bound_var.create
+                    (Variable.create "unit" K.value)
+                    Flambda_debug_uid.none Name_mode.normal))
+              (Named.create_prim
+                 (Unary (Close_alloc_region Normal, Simple.var alloc_region))
+                 (Apply.dbg apply))
+              ~body:handler_expr
+              ~free_names_of_body:(Known handler_expr_free_names)
+            |> Expr.create_let,
+            NO.add_variable handler_expr_free_names alloc_region
+              Name_mode.normal )
+        else handler_expr, handler_expr_free_names
+      in
       let handler =
         Continuation_handler.create
           (Bound_parameters.create over_application_results)
@@ -294,8 +329,8 @@ let split_direct_over_application apply ~callee's_code_id
       ~args:first_args ~args_arity:callee's_params_arity
       ~return_arity:(Code_metadata.result_arity callee's_code_metadata)
       ~call_kind:(Call_kind.direct_function_call callee's_code_id)
-      ~return_mode:inner_apply_alloc_mode (Apply.dbg apply)
-      ~inlined:(Apply.inlined apply)
+      ~return_mode:inner_apply_alloc_mode ~alloc_checks:inner_apply_alloc_checks
+      (Apply.dbg apply) ~inlined:(Apply.inlined apply)
       ~inlining_state:(Apply.inlining_state apply)
       ~probe:(Apply.probe apply) ~position:(Apply.position apply)
       ~relative_history:(Apply.relative_history apply)
@@ -472,3 +507,51 @@ let add_symbol_projection dacc ~projected_from projection ~projection_bound_to
         let var = Bound_var.var projection_bound_to in
         DA.map_denv dacc ~f:(fun denv -> DE.add_symbol_projection denv var proj))
       ~var:(fun _ ~coercion:_ -> dacc)
+
+let canonicalize_alloc_region denv region =
+  match
+    TE.get_canonical_simple_exn (DE.typing_env denv) ~min_name_mode:NM.normal
+      (Simple.var region)
+  with
+  | exception Not_found -> region
+  | simple -> (
+    match Simple.must_be_var simple with
+    | Some (region, _coercion) -> region
+    | None ->
+      Misc.fatal_errorf
+        "Canonical simple of allocation region %a is not a variable:@ %a"
+        Variable.print region Simple.print simple)
+
+let rewrite_check_actions_for_removed_alloc_regions denv check_actions =
+  let removed = DE.removed_alloc_regions denv in
+  List.filter_map
+    (fun (check_action : Check_action.t) ->
+      match check_action with
+      | Close_alloc_region { region; exit } -> (
+        let region = canonicalize_alloc_region denv region in
+        match Variable.Map.find_opt region removed with
+        | None -> Some (Check_action.Close_alloc_region { region; exit })
+        | Some (parent, flags) -> (
+          match
+            Check_action.alloc_check_for_close_alloc_region_type flags exit
+          with
+          | Close ->
+            Some (Check_action.Close_alloc_region { region = parent; exit })
+          | Forward -> None)))
+    check_actions
+
+(* This must be applied to every allocation region embedded in a term being
+   simplified (allocating primitives, sets of closures), so that no occurrence
+   of a removed region remains in the simplified term. The regions taken as
+   arguments by [New_alloc_region] and [Close_alloc_region] are instead dealt
+   with by the simplifiers of these primitives, which take the Forward/Close
+   flags of the removed region into account. *)
+let simplify_alloc_region denv region =
+  let region = canonicalize_alloc_region denv region in
+  match DE.find_removed_alloc_region denv region with
+  | None -> region
+  | Some (parent, _flags) -> parent
+
+let simplify_alloc_mode denv alloc_mode =
+  Alloc_mode.For_allocations.map_alloc_region alloc_mode
+    ~f:(simplify_alloc_region denv)

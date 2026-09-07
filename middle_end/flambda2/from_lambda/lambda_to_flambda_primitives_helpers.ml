@@ -129,6 +129,9 @@ let print_list_of_lists_of_simple_or_prim ppf simple_or_prim_list_list =
 
 let raise_exn_for_failure acc ~dbg exn_cont exn_bucket =
   let exn_handler = Exn_continuation.exn_handler exn_cont in
+  let check_actions =
+    Acc.raise_check_actions acc ~raise_kind:L.Raise_regular exn_handler
+  in
   let trap_action =
     Trap_action.Pop { exn_handler; raise_kind = Some Regular }
   in
@@ -141,7 +144,8 @@ let raise_exn_for_failure acc ~dbg exn_cont exn_bucket =
     exn_bucket :: extra_args
   in
   let acc, apply_cont =
-    Apply_cont_with_acc.create acc ~trap_action exn_handler ~args ~dbg
+    Apply_cont_with_acc.create acc ~trap_action ~check_actions exn_handler ~args
+      ~dbg
   in
   Expr_with_acc.create_apply_cont acc apply_cont
 

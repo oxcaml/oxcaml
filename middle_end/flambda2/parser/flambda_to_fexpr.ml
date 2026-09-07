@@ -1,11 +1,6 @@
 open! Flambda.Import
 open Flambda_to_fexpr_commons
 
-let name env n =
-  Name.pattern_match n
-    ~var:(fun v : Fexpr.name -> Var (Env.find_var_exn env v))
-    ~symbol:(fun s : Fexpr.name -> Symbol (Env.find_symbol_exn env s))
-
 let float32 f = f |> Numeric_types.Float32_by_bit_pattern.to_float
 
 let float f = f |> Numeric_types.Float_by_bit_pattern.to_float
@@ -173,7 +168,12 @@ let simple env s =
   Simple.pattern_match s
     ~name:(fun n ~coercion:co : Fexpr.simple ->
       let s : Fexpr.simple =
-        match name env n with Var v -> Var v | Symbol s -> Symbol s
+        Name.pattern_match n
+          ~var:(fun v : Fexpr.simple ->
+            match Env.find_toplevel_region env v with
+            | Some r -> Region r
+            | None -> Var (Env.find_var_exn env v))
+          ~symbol:(fun s : Fexpr.simple -> Symbol (Env.find_symbol_exn env s))
       in
       if Coercion.is_id co
       then s
@@ -697,6 +697,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       | Never_inlined -> Some Never_inlined
   in
   let inlining_state = inlining_state (Apply_expr.inlining_state app) in
+  let alloc_checks = Apply_expr.alloc_checks app in
   Apply
     { func;
       continuation;
@@ -704,6 +705,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       args;
       call_kind;
       alloc_mode;
+      alloc_checks;
       inlined;
       inlining_state;
       arities
@@ -727,8 +729,16 @@ and apply_cont env app_cont : Fexpr.apply_cont =
           let exn_handler = Env.find_continuation_exn env exn_handler in
           Pop { exn_handler; raise_kind })
   in
+  let check_actions =
+    List.map
+      (fun (action : Check_action.t) : Fexpr.check_action ->
+        match action with
+        | Close_alloc_region { exit; region } ->
+          Close_alloc_region { exit; region = Env.find_region_exn env region })
+      (Apply_cont_expr.check_actions app_cont)
+  in
   let args = List.map (simple env) (Apply_cont_expr.args app_cont) in
-  { cont; trap_action; args }
+  { cont; trap_action; check_actions; args }
 
 and switch_expr env switch : Fexpr.expr =
   let scrutinee = simple env (Switch_expr.scrutinee switch) in

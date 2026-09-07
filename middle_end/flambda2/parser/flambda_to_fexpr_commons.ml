@@ -170,6 +170,8 @@ module Env : sig
 
   val find_continuation_exn : t -> Continuation.t -> Fexpr.continuation
 
+  val find_toplevel_region : t -> Variable.t -> Fexpr.region option
+
   val find_region_exn : t -> Variable.t -> Fexpr.region
 
   val translate_function_slot : t -> Function_slot.t -> Fexpr.function_slot
@@ -369,17 +371,18 @@ end = struct
   let find_continuation_exn t c =
     Continuation_name_map.find_exn t.continuations c
 
+  let find_toplevel_region t r =
+    List.find_map
+      (function
+        | Some region, result ->
+          if Variable.equal region r then Some result else None
+        | None, _ -> None)
+      [ t.toplevel_alloc_region, Fexpr.Toplevel_alloc_region;
+        t.toplevel_region, Fexpr.Toplevel_region;
+        t.toplevel_ghost_region, Fexpr.Toplevel_ghost_region ]
+
   let find_region_exn t r : Fexpr.region =
-    match
-      List.find_map
-        (function
-          | Some region, result ->
-            if Variable.equal region r then Some result else None
-          | None, _ -> None)
-        [ t.toplevel_alloc_region, Fexpr.Toplevel_alloc_region;
-          t.toplevel_region, Fexpr.Toplevel_region;
-          t.toplevel_ghost_region, Fexpr.Toplevel_ghost_region ]
-    with
+    match find_toplevel_region t r with
     | Some result -> result
     | None -> Named (find_var_exn t r)
 

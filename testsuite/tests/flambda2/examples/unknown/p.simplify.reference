@@ -7,14 +7,14 @@ let code inline(never) loopify(never) size(1) newer_version_of(foo_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  cont k (0)
+  cont k close[normal] my_alloc_region (0)
 in
 let $camlP__foo_1 = closure foo_0_1 @foo &toplevel.alloc_region in
 let code loopify(never) size(1) newer_version_of(`fn[p.ml:11,19--31]_2`)
       `fn[p.ml:11,19--31]_2_1` (x)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  cont k (x)
+  cont k close[normal] my_alloc_region (x)
 in
 let $`camlP__fn[p.ml:11,19--31]_3` =
   closure `fn[p.ml:11,19--31]_2_1` @`fn[p.ml:11,19--31]`
@@ -25,7 +25,7 @@ let code loopify(never) size(4) newer_version_of(bar_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  apply direct(foo_0_1 &my_alloc_region)
+  apply direct(foo_0_1 &my_alloc_region) [close close close close]
     ($camlP__foo_1 : _ -> imm tagged)
       ($`camlP__fn[p.ml:11,19--31]_3`, oc, z)
       -> k * k1
@@ -34,10 +34,12 @@ let $camlP__bar_2 = closure bar_1_1 @bar &toplevel.alloc_region in
 let code loopify(never) size(4) newer_version_of(f_3)
       f_3_1 (z) my_closure &my_alloc_region my_depth -> k * k1 : imm tagged =
   apply direct(foo_0_1 &my_alloc_region) inlining_state(depth(10))
+         [close close close close]
     ($camlP__foo_1 : _ -> imm tagged)
       ($`camlP__fn[p.ml:11,19--31]_3`, 0, z)
       -> k * k1
 in
 let $camlP__f_4 = closure f_3_1 @f &toplevel.alloc_region in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlP = Block 0 ($camlP__foo_1, $camlP__bar_2, $camlP__f_4) in
 cont done ($camlP)

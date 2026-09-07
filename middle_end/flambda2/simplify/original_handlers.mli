@@ -37,4 +37,7 @@ val bound_continuations : t -> Continuation.t list
 
 val can_be_lifted : t -> bool
 
-val add_params_to_lift : t -> Lifted_cont_params.t -> t
+(** Record [lifted_params] (as returned by [Lifted_cont_params.rename], together
+    with [renaming], which maps the original variables to the fresh lifted
+    parameters) on the given handlers, applying [renaming] to them. *)
+val add_params_to_lift : t -> Lifted_cont_params.t -> renaming:Renaming.t -> t

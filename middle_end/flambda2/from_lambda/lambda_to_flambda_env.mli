@@ -216,3 +216,5 @@ val region_closure_continuation :
   t -> Region_stack_element.t -> region_closure_continuation
 
 val current_alloc_region : t -> Ident.t
+
+val entering_alloc_region : t -> Ident.t -> t

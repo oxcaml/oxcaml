@@ -44,6 +44,7 @@ val add_continuation_shortcut :
   params:Bound_parameters.t ->
   shortcut_to:Continuation.t ->
   args:Simple.t list ->
+  check_actions:Check_action.t list ->
   t
 
 val add_linearly_used_inlinable_continuation :

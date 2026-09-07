@@ -25,6 +25,7 @@ val make_inlined_body :
   my_depth:Variable.t ->
   rec_info:Rec_info_expr.t ->
   body:'expr_with_acc ->
+  alloc_checks:Alloc_checks.t ->
   exn_continuation:Continuation.t ->
   return_continuation:Continuation.t ->
   apply_exn_continuation:Continuation.t ->
@@ -37,6 +38,12 @@ val make_inlined_body :
   bind_depth:
     (my_depth:Variable.t ->
     rec_info:Rec_info_expr.t ->
+    body:'expr_with_acc ->
+    'expr_with_acc) ->
+  bind_alloc_region:
+    (my_alloc_region:Variable.t ->
+    alloc_region:Variable.t ->
+    alloc_checks:Alloc_checks.t ->
     body:'expr_with_acc ->
     'expr_with_acc) ->
   apply_renaming:('expr_with_acc -> Renaming.t -> 'expr_with_acc) ->

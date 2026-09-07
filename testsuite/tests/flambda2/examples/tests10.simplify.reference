@@ -11,7 +11,8 @@ and code rec loopify(never) size(8) newer_version_of(f_0)
       ($camlTests10__f_1 ~ depth my_depth -> succ my_depth,
        $camlTests10__f_1 ~ depth my_depth -> succ my_depth)
   in
-  cont k (Pmakeblock)
+  cont k close[normal] my_alloc_region (Pmakeblock)
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests10 = Block 0 ($camlTests10__f_1) in
 cont done ($camlTests10)

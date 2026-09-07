@@ -233,6 +233,19 @@ let add_used_in_current_handler name_occurrences t =
       in
       { elt with used_in_handler })
 
+let add_check_actions check_actions t =
+  match check_actions with
+  | [] -> t
+  | _ :: _ ->
+    let free_names =
+      List.fold_left
+        (fun free_names check_action ->
+          Name_occurrences.union free_names
+            (Check_action.free_names check_action))
+        Name_occurrences.empty check_actions
+    in
+    add_used_in_current_handler free_names t
+
 let add_apply_conts ~result_cont ~exn_cont ~result_arity t =
   update_top_of_stack ~t ~f:(fun elt ->
       let add_func_result cont rewrite_id ~result_arity ~extra_args

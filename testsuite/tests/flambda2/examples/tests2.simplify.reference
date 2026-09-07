@@ -8,18 +8,19 @@ and code rec loopify(never) size(21) newer_version_of(f_0)
         : imm tagged =
   let prim = %int_comp.gt (x, 0) in
   switch prim
-    | 0 -> k (42)
+    | 0 -> k close[normal] my_alloc_region (42)
     | 1 -> k2
     where k2 =
       ((let int_sub = %int_barith.sub (x, 1) in
-        apply direct(f_0_1 &my_alloc_region)
+        apply direct(f_0_1 &my_alloc_region) [forward close close close]
           ($camlTests2__f_1 ~ depth my_depth -> succ my_depth
            : _ -> imm tagged)
             (int_sub)
             -> k2 * k1)
          where k2 (apply_result : imm tagged) =
            let int_add = %int_barith.add (1, apply_result) in
-           cont k (int_add))
+           cont k close[normal] my_alloc_region (int_add))
 in
+let `unit` = %close_alloc_region.[`normal`] (toplevel.alloc_region) in
 let $camlTests2 = Block 0 ($camlTests2__f_1, 47) in
 cont done ($camlTests2)

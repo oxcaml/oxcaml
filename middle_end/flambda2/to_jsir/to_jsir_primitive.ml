@@ -321,6 +321,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     in
     let var = Jsir.Var.fresh () in
     Some var, env, To_jsir_result.add_instr_exn res (Let (var, expr))
+  | Close_alloc_region _ | New_alloc_region _ -> no_op ~env ~res
 
 let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
   let use_prim' prim = use_prim' ~env ~res prim [x; y] in
