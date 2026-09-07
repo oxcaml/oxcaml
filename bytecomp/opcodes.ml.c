@@ -2,10 +2,9 @@
 /*                                                                        */
 /*                                 OCaml                                  */
 /*                                                                        */
-/*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           */
+/*                 David Allsopp, OCaml Labs, Cambridge.                  */
 /*                                                                        */
-/*   Copyright 1996 Institut National de Recherche en Informatique et     */
-/*     en Automatique.                                                    */
+/*   Copyright 2021 David Allsopp Ltd.                                    */
 /*                                                                        */
 /*   All rights reserved.  This file is distributed under the terms of    */
 /*   the GNU Lesser General Public License version 2.1, with the          */
@@ -13,22 +12,12 @@
 /*                                                                        */
 /**************************************************************************/
 
-/* The instruction set. */
+#define CAML_INTERNALS
+#include "caml/opcodes.h"
 
-#ifndef CAML_INSTRUCT_H
-#define CAML_INSTRUCT_H
+#define OPCODE_CONSTANT(name) \
+let op ## name = opFIRST_UNIMPLEMENTED_OP \
+let opFIRST_UNIMPLEMENTED_OP = op ## name + 1
 
-#ifdef CAML_INTERNALS
-
-#include "opcodes.h"
-
-#define OPCODE_ENTRY(name) name,
-enum instructions {
-  CAML_ZINC_OPCODES(OPCODE_ENTRY)
-  FIRST_UNIMPLEMENTED_OP
-};
-#undef OPCODE_ENTRY
-
-#endif /* CAML_INTERNALS */
-
-#endif /* CAML_INSTRUCT_H */
+let opFIRST_UNIMPLEMENTED_OP = 0
+CAML_ZINC_OPCODES(OPCODE_CONSTANT)
