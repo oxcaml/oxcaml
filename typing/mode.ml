@@ -7438,38 +7438,42 @@ module Value_with (Areality : Areality) = struct
 
   let add_covariant_to_zap_scope { monadic; comonadic } scope =
     let comonadic_upper =
-      Comonadic.Guts.get_floor comonadic |> Comonadic.of_const
+      lazy (Comonadic.Guts.get_floor comonadic |> Comonadic.of_const)
     in
-    let monadic_upper = Monadic.Guts.get_floor monadic |> Monadic.of_const in
+    let monadic_upper =
+      lazy (Monadic.Guts.get_floor monadic |> Monadic.of_const)
+    in
     Monadic.iter_covariant monadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
           Z.add_zap_to_floor_to_zap_scope id (Z.morph_key_mon morph)
-            (Z.Pmon (Monadic.join [monadic_upper; m]))
+            (Z.Pmon (Monadic.join [Lazy.force monadic_upper; m]))
             scope);
     Comonadic.iter_covariant comonadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
           Z.add_zap_to_floor_to_zap_scope id (Z.morph_key_co morph)
-            (Z.Pco (Comonadic.join [comonadic_upper; m]))
+            (Z.Pco (Comonadic.join [Lazy.force comonadic_upper; m]))
             scope)
 
   let add_contravariant_to_zap_scope { monadic; comonadic } scope =
     let comonadic_upper =
-      Comonadic.Guts.get_ceil comonadic |> Comonadic.of_const
+      lazy (Comonadic.Guts.get_ceil comonadic |> Comonadic.of_const)
     in
-    let monadic_lower = Monadic.Guts.get_ceil monadic |> Monadic.of_const in
+    let monadic_lower =
+      lazy (Monadic.Guts.get_ceil monadic |> Monadic.of_const)
+    in
     Monadic.iter_contravariant monadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
           Z.add_zap_to_ceil_to_zap_scope id (Z.morph_key_mon morph)
-            (Z.Pmon (Monadic.meet [monadic_lower; m]))
+            (Z.Pmon (Monadic.meet [Lazy.force monadic_lower; m]))
             scope);
     Comonadic.iter_contravariant comonadic (fun ~id ~level ~morph m ->
         if level <> generic_level
         then
           Z.add_zap_to_ceil_to_zap_scope id (Z.morph_key_co morph)
-            (Z.Pco (Comonadic.meet [comonadic_upper; m]))
+            (Z.Pco (Comonadic.meet [Lazy.force comonadic_upper; m]))
             scope)
 
   let add_mode_to_zap_scope ~arg m { visible } = visible := (arg, m) :: !visible
