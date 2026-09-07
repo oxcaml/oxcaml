@@ -462,11 +462,13 @@ and subst_apply_cont env apply_cont =
 and subst_switch env switch =
   let scrutinee = subst_simple env (Switch_expr.scrutinee switch) in
   let arms =
-    Target_ocaml_int.Map.map_sharing (subst_apply_cont env)
+    Targetint_32_64.Map.map_sharing (subst_apply_cont env)
       (Switch_expr.arms switch)
   in
   Expr.create_switch
-    (Switch_expr.create ~condition_dbg:Debuginfo.none ~scrutinee ~arms)
+    (Switch_expr.create ~condition_dbg:Debuginfo.none
+       ~scrutinee_kind:(Switch_expr.scrutinee_kind switch)
+       ~scrutinee ~arms)
 
 module Comparator = struct
   type 'a t = Env.t -> 'a -> 'a -> 'a Comparison.t
@@ -1100,25 +1102,33 @@ let apply_cont_exprs env apply_cont1 apply_cont2 : Apply_cont.t Comparison.t =
   else Different { approximant = subst_apply_cont env apply_cont1 }
 
 let switch_exprs env switch1 switch2 : Expr.t Comparison.t =
-  let compare_arms env arms1 arms2 =
-    lists
-      ~f:
-        (pairs
-           ~f1:(Comparator.of_predicate Target_ocaml_int.equal)
-           ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
-      ~subst:(fun env (target_imm, apply_cont) ->
-        target_imm, subst_apply_cont env apply_cont)
-      ~subst_snd:true env
-      (Target_ocaml_int.Map.bindings arms1)
-      (Target_ocaml_int.Map.bindings arms2)
-    |> Comparison.map ~f:Target_ocaml_int.Map.of_list
-  in
-  pairs ~f1:compare_arms ~f2:simple_exprs ~subst2:subst_simple env
-    (Switch.arms switch1, Switch.scrutinee switch1)
-    (Switch.arms switch2, Switch.scrutinee switch2)
-  |> Comparison.map ~f:(fun (arms, scrutinee) ->
-      Expr.create_switch
-        (Switch.create ~condition_dbg:Debuginfo.none ~scrutinee ~arms))
+  let scrutinee_kind = Switch.scrutinee_kind switch1 in
+  if
+    not
+      (Flambda_kind.Standard_int.equal scrutinee_kind
+         (Switch.scrutinee_kind switch2))
+  then Different { approximant = subst_expr env (Expr.create_switch switch1) }
+  else
+    let compare_arms env arms1 arms2 =
+      lists
+        ~f:
+          (pairs
+             ~f1:(Comparator.of_predicate Targetint_32_64.equal)
+             ~f2:apply_cont_exprs ~subst2:subst_apply_cont)
+        ~subst:(fun env (discriminant, apply_cont) ->
+          discriminant, subst_apply_cont env apply_cont)
+        ~subst_snd:true env
+        (Targetint_32_64.Map.bindings arms1)
+        (Targetint_32_64.Map.bindings arms2)
+      |> Comparison.map ~f:Targetint_32_64.Map.of_list
+    in
+    pairs ~f1:compare_arms ~f2:simple_exprs ~subst2:subst_simple env
+      (Switch.arms switch1, Switch.scrutinee switch1)
+      (Switch.arms switch2, Switch.scrutinee switch2)
+    |> Comparison.map ~f:(fun (arms, scrutinee) ->
+        Expr.create_switch
+          (Switch.create ~condition_dbg:Debuginfo.none ~scrutinee_kind
+             ~scrutinee ~arms))
 
 let rec exprs env e1 e2 : Expr.t Comparison.t =
   log Expr.print e1 e2 (fun () ->

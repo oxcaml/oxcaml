@@ -506,9 +506,8 @@ let traverse_apply_cont denv acc apply_cont : rev_expr =
 let traverse_switch denv acc switch : rev_expr =
   let expr = Switch switch in
   Acc.add_cond_any_usage acc ~denv (Switch_expr.scrutinee switch);
-  Target_ocaml_int.Map.iter
-    (fun _ apply_cont -> apply_cont_deps denv acc apply_cont)
-    (Switch_expr.arms switch);
+  Switch_expr.iter switch ~f:(fun _ apply_cont ->
+      apply_cont_deps denv acc apply_cont);
   { expr; holed_expr = Env.parent denv }
 
 let traverse_invalid denv _acc ~message =

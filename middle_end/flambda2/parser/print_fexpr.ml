@@ -717,9 +717,9 @@ let rec expr scope ppf = function
   | Let_symbol l ->
     parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
         let_symbol_expr scope ppf l)
-  | Switch { scrutinee; cases } ->
-    Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
-      Flambda_colours.pop simple scrutinee
+  | Switch { scrutinee_kind; scrutinee; cases } ->
+    Format.fprintf ppf "@[<v 2>%tswitch%t %a%a%a@]" Flambda_colours.expr_keyword
+      Flambda_colours.pop switch_scrutinee_kind scrutinee_kind simple scrutinee
       (pp_list ~sep:"" switch_case)
       cases
     (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
@@ -769,6 +769,16 @@ and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
 
 and switch_case ppf (v, c) =
   Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
+
+and switch_scrutinee_kind ppf (kind : Flambda_kind.Standard_int.t) =
+  match kind with
+  | Naked_immediate -> ()
+  | Tagged_immediate -> Format.pp_print_string ppf "imm tagged "
+  | Naked_int8 -> Format.pp_print_string ppf "int8 "
+  | Naked_int16 -> Format.pp_print_string ppf "int16 "
+  | Naked_int32 -> Format.pp_print_string ppf "int32 "
+  | Naked_int64 -> Format.pp_print_string ppf "int64 "
+  | Naked_nativeint -> Format.pp_print_string ppf "nativeint "
 
 and let_expr scope ppf : let_ -> unit = function
   | { bindings = first :: rest; body; value_slots = ces } ->

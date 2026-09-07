@@ -2119,11 +2119,11 @@ and rebuild_expr (env : env) (res : rebuild_result)
         RE.from_expr ~expr ~free_names ~code_size:(Code_size.apply_cont ac))
     | Switch switch ->
       let arms =
-        Target_ocaml_int.Map.filter_map
+        Targetint_32_64.Map.filter_map
           (fun _ -> rewrite_apply_cont_expr env)
           (Switch_expr.arms switch)
       in
-      if Target_ocaml_int.Map.is_empty arms
+      if Targetint_32_64.Map.is_empty arms
       then
         RE.from_expr
           ~expr:(Expr.create_invalid Zero_switch_arms)
@@ -2132,6 +2132,7 @@ and rebuild_expr (env : env) (res : rebuild_result)
         let switch =
           Switch_expr.create
             ~condition_dbg:(Switch_expr.condition_dbg switch)
+            ~scrutinee_kind:(Switch_expr.scrutinee_kind switch)
               (* Scrutinee should never need rewriting, do it anyway for
                  completeness *)
             ~scrutinee:(rewrite_simple env (Switch_expr.scrutinee switch))

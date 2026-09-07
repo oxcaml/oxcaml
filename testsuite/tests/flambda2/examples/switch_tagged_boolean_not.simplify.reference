@@ -1,0 +1,16 @@
+let code f_0 deleted in
+let code loopify(never) size(2) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let not_scrutinee = %boolean_not (x) in
+  cont k (not_scrutinee)
+in
+let $camlSwitch_tagged_boolean_not__f =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let $camlSwitch_tagged_boolean_not =
+  Block 0 ($camlSwitch_tagged_boolean_not__f)
+in
+cont done ($camlSwitch_tagged_boolean_not)

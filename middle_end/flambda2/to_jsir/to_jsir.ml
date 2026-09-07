@@ -615,10 +615,18 @@ and switch ~env ~res e =
   let scrutinee, res =
     To_jsir_shared.simple ~env ~res (Switch_expr.scrutinee e)
   in
+  (match Switch_expr.scrutinee_kind e with
+  | Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32
+  | Naked_nativeint ->
+    (* All of these kinds are represented as JavaScript numbers. *)
+    ()
+  | Naked_int64 ->
+    Misc.fatal_errorf "Switches on naked int64 values are not supported:@ %a"
+      Switch_expr.print e);
   let arms = Switch_expr.arms e in
-  let domain = Target_ocaml_int.Map.keys arms in
-  let min = Target_ocaml_int.Set.min_elt domain |> Target_ocaml_int.to_int in
-  let max = Target_ocaml_int.Set.max_elt domain |> Target_ocaml_int.to_int in
+  let domain = Targetint_32_64.Map.keys arms in
+  let min = Targetint_32_64.Set.min_elt domain |> Targetint_32_64.to_int in
+  let max = Targetint_32_64.Set.max_elt domain |> Targetint_32_64.to_int in
   (* Flambda2 allows the domain to be arbitrary non-negative subsets of
      targetint, whereas JSIR requires [0..n].
 
@@ -628,7 +636,7 @@ and switch ~env ~res e =
   let res, arms =
     Array.fold_left_map
       (fun res i ->
-        let apply_cont = Target_ocaml_int.Map.find_opt i arms in
+        let apply_cont = Targetint_32_64.Map.find_opt i arms in
         let last, res =
           match apply_cont with
           | Some apply_cont -> apply_cont0 ~env ~res apply_cont
@@ -644,7 +652,7 @@ and switch ~env ~res e =
           let res = To_jsir_result.end_block_with_last_exn res last in
           res, (addr, []))
       res
-      (Array.init (max + 1) (Target_ocaml_int.of_int Thirty_two_no_gc_tag_bit))
+      (Array.init (max + 1) (Targetint_32_64.of_int Thirty_two_no_gc_tag_bit))
   in
   let last : Jsir.last =
     match Array.length arms with

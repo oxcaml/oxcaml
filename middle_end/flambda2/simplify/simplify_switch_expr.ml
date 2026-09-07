@@ -78,7 +78,7 @@ let find_all_aliases env arg =
       | None -> find_all_aliases ())
     arg
 
-let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
+let rebuild_arm uacc ~discriminant_width arm (action, use_id, arity, env_at_use)
     ( new_let_conts,
       arms,
       (mergeable_arms : mergeable_arms),
@@ -144,7 +144,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
          like those in id_switch.ml can be simplified by only using
          [mergeable_arms]. Then remove [identity_arms]. *)
       let maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms =
-        let arms = TI.Map.add arm action arms in
+        let arms = Targetint_32_64.Map.add arm action arms in
         (* Check to see if this arm may be merged with others. *)
         if Option.is_some (Apply_cont.trap_action action)
         then new_let_conts, arms, Not_mergeable, identity_arms, not_arms
@@ -188,26 +188,33 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
         let[@inline always] const arg =
           match Reg_width_const.descr arg with
           | Tagged_immediate arg ->
-            if TI.equal arm arg
+            let arg =
+              Targetint_32_64.of_int64 discriminant_width (TI.to_int64 arg)
+            in
+            if Targetint_32_64.equal arm arg
             then
-              let identity_arms = TI.Map.add arm action identity_arms in
+              let identity_arms =
+                Targetint_32_64.Map.add arm action identity_arms
+              in
               maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
             else
-              let machine_width = UE.machine_width (UA.uenv uacc) in
+              let zero = Targetint_32_64.zero discriminant_width in
+              let one = Targetint_32_64.one discriminant_width in
               if
-                TI.equal arm (TI.bool_true machine_width)
-                && TI.equal arg (TI.bool_false machine_width)
-                || TI.equal arm (TI.bool_false machine_width)
-                   && TI.equal arg (TI.bool_true machine_width)
+                (Targetint_32_64.equal arm one && Targetint_32_64.equal arg zero)
+                || Targetint_32_64.equal arm zero
+                   && Targetint_32_64.equal arg one
               then
-                let not_arms = TI.Map.add arm action not_arms in
+                let not_arms = Targetint_32_64.Map.add arm action not_arms in
                 maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
               else maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
           | Poison (Value, _) ->
             (* Poison can both be considered as an identity and as a not arm,
                depending on what's best for us. *)
-            let identity_arms = TI.Map.add arm action identity_arms in
-            let not_arms = TI.Map.add arm action not_arms in
+            let identity_arms =
+              Targetint_32_64.Map.add arm action identity_arms
+            in
+            let not_arms = Targetint_32_64.Map.add arm action not_arms in
             maybe_mergeable ~mergeable_arms ~identity_arms ~not_arms
           | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
           | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
@@ -221,7 +228,7 @@ let rebuild_arm uacc arm (action, use_id, arity, env_at_use)
   | New_wrapper new_let_cont ->
     let new_let_conts = new_let_cont :: new_let_conts in
     let action = Apply_cont.goto new_let_cont.cont in
-    let arms = TI.Map.add arm action arms in
+    let arms = Targetint_32_64.Map.add arm action arms in
     new_let_conts, arms, Not_mergeable, identity_arms, not_arms
 
 let filter_and_choose_alias required_names alias_set =
@@ -275,8 +282,8 @@ type lookup_table_fields =
 (* Recognise sufficiently-large Switch expressions where all of the arms provide
    a single argument to a unique destination. These expressions can be compiled
    using lookup tables, which dramatically reduces code size. *)
-let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
-    ~arms =
+let recognize_switch_with_single_arg_to_same_destination0 dbg
+    ~discriminant_width ~arms =
   let check_arm discr dest dest_and_args_rev_and_expected_discr =
     let dest' = AC.continuation dest in
     match dest_and_args_rev_and_expected_discr with
@@ -286,7 +293,7 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
       | Some expected_dest when not (Continuation.equal dest' expected_dest) ->
         (* All arms must go to the same continuation. *)
         None
-      | _ when not (TI.equal discr expected_discr) ->
+      | _ when not (Targetint_32_64.equal discr expected_discr) ->
         (* Discriminants must be 0..(num_arms-1) (note that it is possible to
            have Switches that do not satisfy this criterion in Flambda 2). *)
         None
@@ -302,10 +309,13 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
             (* Aliases should have been followed by now. *)
             None
           else
-            let expected_discr = TI.add (TI.one machine_width) expected_discr in
+            let expected_discr = Targetint_32_64.succ expected_discr in
             Some (Some dest', arg :: args_rev, expected_discr)))
   in
-  match TI.Map.fold check_arm arms (Some (None, [], TI.zero machine_width)) with
+  match
+    Targetint_32_64.Map.fold check_arm arms
+      (Some (None, [], Targetint_32_64.zero discriminant_width))
+  with
   | None | Some (None, _, _) | Some (_, [], _) -> None
   | Some (Some dest, args_rev, _) -> (
     let args : Simple.t list = List.rev args_rev in
@@ -395,14 +405,14 @@ let recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
         | Naked_mask -> single_kind Naked_masks Naked_masks)
       | Region | Rec_info -> None)
 
-let recognize_switch_with_single_arg_to_same_destination dbg machine_width ~arms
-    =
+let recognize_switch_with_single_arg_to_same_destination dbg ~discriminant_width
+    ~arms =
   (* Switch must be large enough. *)
-  if TI.Map.cardinal arms < 3
+  if Targetint_32_64.Map.cardinal arms < 3
   then None
   else
-    recognize_switch_with_single_arg_to_same_destination0 dbg machine_width
-      ~arms
+    recognize_switch_with_single_arg_to_same_destination0 dbg
+      ~discriminant_width ~arms
 
 (* Tiny DSL to preserve sanity while rebuilding expressions. *)
 
@@ -437,6 +447,41 @@ let return ~added_code_size ~free_names expr uacc ~dacc_before_switch:_ =
   expr, uacc
 
 let run uacc ~dacc_before_switch k = k uacc ~dacc_before_switch
+
+(* Convert the scrutinee to an integer of kind [dst], reusing an existing
+   binding of the converted value (found via CSE) if there is one. *)
+let convert_scrutinee ~(scrutinee_kind : K.Standard_int.t)
+    ~(dst : K.Standard_int.t) scrutinee dbg k =
+  let prim : P.t option =
+    match scrutinee_kind, dst with
+    | Naked_immediate, Tagged_immediate ->
+      Some (Unary (Tag_immediate, scrutinee))
+    | Tagged_immediate, Naked_immediate ->
+      Some (Unary (Untag_immediate, scrutinee))
+    | ( ( Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
+        | Naked_int32 | Naked_int64 | Naked_nativeint ),
+        ( Tagged_immediate | Naked_immediate | Naked_int8 | Naked_int16
+        | Naked_int32 | Naked_int64 | Naked_nativeint ) ) ->
+      if K.Standard_int.equal scrutinee_kind dst
+      then None
+      else
+        let src = K.Standard_int_or_float.of_standard_int scrutinee_kind in
+        let dst = K.Standard_int_or_float.of_standard_int dst in
+        Some (Unary (Num_conv { src; dst }, scrutinee))
+  in
+  match prim with
+  | None -> k scrutinee
+  | Some prim ->
+    let name =
+      match dst with
+      | Tagged_immediate -> "tagged_scrutinee"
+      | Naked_immediate -> "untagged_scrutinee"
+      | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64 | Naked_nativeint
+        ->
+        "converted_scrutinee"
+    in
+    let$ converted = bound_prim name (K.Standard_int.to_kind dst) prim dbg in
+    k converted
 
 let fields_to_simples dbg simples =
   List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
@@ -497,7 +542,8 @@ let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
       P.Array_kind.print array_kind Debuginfo.print_compact dbg
 
 let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~(lookup_table_fields : lookup_table_fields) dbg =
+    ~scrutinee_kind ~scrutinee ~dest
+    ~(lookup_table_fields : lookup_table_fields) dbg =
   let rebuilding = UA.are_rebuilding_terms uacc in
   let block_sym =
     Symbol.manufacture (Current_unit.get_cu_exn ()) "switch_block"
@@ -544,50 +590,50 @@ let rebuild_switch_with_single_arg_to_same_destination uacc ~dacc_before_switch
   (* CR mshinwell: consider sharing the constants *)
   let block = Simple.symbol block_sym in
   run uacc ~dacc_before_switch
-    (let$ tagged_scrutinee =
-       bound_prim "tagged_scrutinee" K.value
-         (P.Unary (Tag_immediate, scrutinee))
-         dbg
-     in
-     let load_from_block_prim : P.t =
-       Binary
-         ( Array_load (array_kind, array_load_kind, Immutable),
-           block,
-           tagged_scrutinee )
-     in
-     let load_from_block = Named.create_prim load_from_block_prim dbg in
-     let arg_var = Variable.create "arg" loaded_kind in
-     let arg_var_duid = Flambda_debug_uid.none in
-     let arg = Simple.var arg_var in
-     (* Note that, unlike for the untagging of normal Switch scrutinees, there's
+    (convert_scrutinee ~scrutinee_kind ~dst:Tagged_immediate scrutinee dbg
+       (fun tagged_scrutinee ->
+         let load_from_block_prim : P.t =
+           Binary
+             ( Array_load (array_kind, array_load_kind, Immutable),
+               block,
+               tagged_scrutinee )
+         in
+         let load_from_block = Named.create_prim load_from_block_prim dbg in
+         let arg_var = Variable.create "arg" loaded_kind in
+         let arg_var_duid = Flambda_debug_uid.none in
+         let arg = Simple.var arg_var in
+         (* Note that, unlike for the untagging of normal Switch scrutinees, there's
         no problem with CSE and Data_flow here. The reason is that in this case
         the generated primitive always names a fresh variable, so it will never
         be eligible for CSE. *)
-     (* CR mshinwell: we could probably expose the actual integer counts of
+         (* CR mshinwell: we could probably expose the actual integer counts of
         continuations in [Name_occurrences] and then try to inline out [dest].
         This might happen anyway in the backend though so this probably isn't
         that important for now. *)
-     let apply_cont = Apply_cont.create dest ~args:[arg] ~dbg in
-     let free_names_of_body = Apply_cont.free_names apply_cont in
-     let expr =
-       let body = RE.create_apply_cont apply_cont in
-       let bound = BPt.singleton (BV.create arg_var arg_var_duid NM.normal) in
-       RE.create_let rebuilding bound load_from_block ~body ~free_names_of_body
-     in
-     let extra_free_names =
-       NO.union
-         (Named.free_names load_from_block)
-         (NO.remove_var free_names_of_body ~var:arg_var)
-     in
-     let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
-     let added_code_size =
-       Code_size.( + )
-         (Code_size.prim ~machine_width load_from_block_prim)
-         (Code_size.apply_cont apply_cont)
-     in
-     (* CR mshinwell: it seems we need to fix [Cost_metrics] so we can note that
-        we have *added* operations here (load). *)
-     return ~added_code_size ~free_names:extra_free_names expr)
+         let apply_cont = Apply_cont.create dest ~args:[arg] ~dbg in
+         let free_names_of_body = Apply_cont.free_names apply_cont in
+         let expr =
+           let body = RE.create_apply_cont apply_cont in
+           let bound =
+             BPt.singleton (BV.create arg_var arg_var_duid NM.normal)
+           in
+           RE.create_let rebuilding bound load_from_block ~body
+             ~free_names_of_body
+         in
+         let extra_free_names =
+           NO.union
+             (Named.free_names load_from_block)
+             (NO.remove_var free_names_of_body ~var:arg_var)
+         in
+         let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
+         let added_code_size =
+           Code_size.( + )
+             (Code_size.prim ~machine_width load_from_block_prim)
+             (Code_size.apply_cont apply_cont)
+         in
+         (* CR mshinwell: it seems we need to fix [Cost_metrics] so we can note
+            that we have *added* operations here (load). *)
+         return ~added_code_size ~free_names:extra_free_names expr))
 
 let recognize_affine_switch_to_same_destination machine_width consts =
   match consts with
@@ -608,7 +654,7 @@ type affine_immediate_kind =
   | Naked
 
 let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-    ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg =
+    ~scrutinee_kind ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg =
   (* We are creating the following fragment: *)
   (* let scaled = x * slope in
    * let final = scaled + offset in
@@ -633,22 +679,31 @@ let rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
   run ~dacc_before_switch uacc
     (match (immediate_kind : affine_immediate_kind) with
     | Naked ->
-      rebuild_affine_expr scrutinee K.naked_immediate
-        K.Standard_int.Naked_immediate Reg_width_const.naked_immediate
+      convert_scrutinee ~scrutinee_kind ~dst:Naked_immediate scrutinee dbg
+        (fun scrutinee ->
+          rebuild_affine_expr scrutinee K.naked_immediate
+            K.Standard_int.Naked_immediate Reg_width_const.naked_immediate)
     | Tagged ->
-      let$ tagged_scrutinee =
-        bound_prim "tagged_scrutinee" K.value
-          (P.Unary (Tag_immediate, scrutinee))
-          dbg
-      in
-      rebuild_affine_expr tagged_scrutinee K.value
-        K.Standard_int.Tagged_immediate Reg_width_const.tagged_immediate)
+      convert_scrutinee ~scrutinee_kind ~dst:Tagged_immediate scrutinee dbg
+        (fun scrutinee ->
+          rebuild_affine_expr scrutinee K.value K.Standard_int.Tagged_immediate
+            Reg_width_const.tagged_immediate))
 
-let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
+let rebuild_switch ~arms ~condition_dbg ~scrutinee_kind ~scrutinee ~scrutinee_ty
     ~dacc_before_switch uacc ~after_rebuild =
+  let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
+  let discriminant_width =
+    Switch.discriminant_width scrutinee_kind ~machine_width
+  in
   let new_let_conts, arms, mergeable_arms, identity_arms, not_arms =
-    TI.Map.fold (rebuild_arm uacc) arms
-      ([], TI.Map.empty, No_arms, TI.Map.empty, TI.Map.empty)
+    Targetint_32_64.Map.fold
+      (rebuild_arm uacc ~discriminant_width)
+      arms
+      ( [],
+        Targetint_32_64.Map.empty,
+        No_arms,
+        Targetint_32_64.Map.empty,
+        Targetint_32_64.Map.empty )
   in
   let switch_merged =
     match mergeable_arms with
@@ -664,34 +719,38 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
       else None
   in
   let switch_is_identity =
-    let arm_discrs = TI.Map.keys arms in
-    let identity_arms_discrs = TI.Map.keys identity_arms in
-    if not (TI.Set.equal arm_discrs identity_arms_discrs)
+    let arm_discrs = Targetint_32_64.Map.keys arms in
+    let identity_arms_discrs = Targetint_32_64.Map.keys identity_arms in
+    if not (Targetint_32_64.Set.equal arm_discrs identity_arms_discrs)
     then None
     else
-      TI.Map.data identity_arms
+      Targetint_32_64.Map.data identity_arms
       |> List.map Apply_cont.continuation
       |> Continuation.Set.of_list |> Continuation.Set.get_singleton
   in
-  let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
   let switch_is_boolean_not =
-    let arm_discrs = TI.Map.keys arms in
-    let not_arms_discrs = TI.Map.keys not_arms in
+    let arm_discrs = Targetint_32_64.Map.keys arms in
+    let not_arms_discrs = Targetint_32_64.Map.keys not_arms in
+    let all_bools =
+      Targetint_32_64.Set.of_list
+        [ Targetint_32_64.zero discriminant_width;
+          Targetint_32_64.one discriminant_width ]
+    in
     if
-      (not (TI.Set.equal arm_discrs (TI.all_bools machine_width)))
-      || not (TI.Set.equal arm_discrs not_arms_discrs)
+      (not (Targetint_32_64.Set.equal arm_discrs all_bools))
+      || not (Targetint_32_64.Set.equal arm_discrs not_arms_discrs)
     then None
     else
-      TI.Map.data not_arms
+      Targetint_32_64.Map.data not_arms
       |> List.map Apply_cont.continuation
       |> Continuation.Set.of_list |> Continuation.Set.get_singleton
   in
   let switch_is_single_arg_to_same_destination =
     recognize_switch_with_single_arg_to_same_destination condition_dbg
-      machine_width ~arms
+      ~discriminant_width ~arms
   in
   let body, uacc =
-    if TI.Map.cardinal arms < 1
+    if Targetint_32_64.Map.cardinal arms < 1
     then
       let uacc = UA.notify_removed ~operation:Removed_operations.branch uacc in
       RE.create_invalid Zero_switch_arms, uacc
@@ -702,12 +761,12 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
            should not count them in the number of removed operations: these
            branches wouldn't have been taken during execution anyway. *)
         let expr, uacc =
-          EB.create_switch uacc ~condition_dbg ~scrutinee ~arms
+          EB.create_switch uacc ~condition_dbg ~scrutinee_kind ~scrutinee ~arms
         in
         if
           Flambda_features.check_invariants ()
           && Simple.is_const scrutinee
-          && TI.Map.cardinal arms > 1
+          && Targetint_32_64.Map.cardinal arms > 1
         then
           Misc.fatal_errorf
             "[Switch] with constant scrutinee (type: %a) should have been \
@@ -722,7 +781,7 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
         | None -> normal_case0 uacc
         | Some (dest, lookup_table_fields) -> (
           let try_affine immediate_kind consts =
-            assert (List.length consts = TI.Map.cardinal arms);
+            assert (List.length consts = Targetint_32_64.Map.cardinal arms);
             Option.map
               (fun (offset, slope) -> immediate_kind, offset, slope)
               (recognize_affine_switch_to_same_destination machine_width consts)
@@ -756,10 +815,12 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
           match affine with
           | None ->
             rebuild_switch_with_single_arg_to_same_destination uacc
-              ~dacc_before_switch ~scrutinee ~dest ~lookup_table_fields dbg
+              ~dacc_before_switch ~scrutinee_kind ~scrutinee ~dest
+              ~lookup_table_fields dbg
           | Some (immediate_kind, offset, slope) ->
             rebuild_affine_switch_to_same_destination uacc ~dacc_before_switch
-              ~scrutinee ~dest ~offset ~slope ~immediate_kind dbg)
+              ~scrutinee_kind ~scrutinee ~dest ~offset ~slope ~immediate_kind
+              dbg)
       in
       match switch_merged with
       | Some (dest, args) ->
@@ -781,19 +842,16 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
             UA.notify_removed ~operation:Removed_operations.branch uacc
           in
           run uacc ~dacc_before_switch
-            (let$ tagged_scrutinee =
-               bound_prim "tagged_scrutinee" K.value
-                 (P.Unary (Tag_immediate, scrutinee))
-                 dbg
-             in
-             let apply_cont =
-               Apply_cont.create dest ~args:[tagged_scrutinee] ~dbg
-             in
-             let expr = RE.create_apply_cont apply_cont in
-             return
-               ~added_code_size:(Code_size.apply_cont apply_cont)
-               ~free_names:(Apply_cont.free_names apply_cont)
-               expr)
+            (convert_scrutinee ~scrutinee_kind ~dst:Tagged_immediate scrutinee
+               dbg (fun tagged_scrutinee ->
+                 let apply_cont =
+                   Apply_cont.create dest ~args:[tagged_scrutinee] ~dbg
+                 in
+                 let expr = RE.create_apply_cont apply_cont in
+                 return
+                   ~added_code_size:(Code_size.apply_cont apply_cont)
+                   ~free_names:(Apply_cont.free_names apply_cont)
+                   expr))
         | None -> (
           match switch_is_boolean_not with
           | Some dest ->
@@ -801,30 +859,31 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
               UA.notify_removed ~operation:Removed_operations.branch uacc
             in
             run uacc ~dacc_before_switch
-              (let$ tagged_scrutinee =
-                 bound_prim "tagged_scrutinee" K.value
-                   (P.Unary (Tag_immediate, scrutinee))
-                   dbg
-               in
-               let$ not_scrutinee =
-                 bound_prim "not_scrutinee" K.value
-                   (P.Unary (Boolean_not, tagged_scrutinee))
-                   dbg
-               in
-               let apply_cont =
-                 Apply_cont.create dest ~args:[not_scrutinee] ~dbg
-               in
-               let free_names = Apply_cont.free_names apply_cont in
-               let added_code_size = Code_size.apply_cont apply_cont in
-               return ~added_code_size ~free_names
-                 (RE.create_apply_cont apply_cont))
+              (convert_scrutinee ~scrutinee_kind ~dst:Tagged_immediate scrutinee
+                 dbg (fun tagged_scrutinee ->
+                   let$ not_scrutinee =
+                     bound_prim "not_scrutinee" K.value
+                       (P.Unary (Boolean_not, tagged_scrutinee))
+                       dbg
+                   in
+                   let apply_cont =
+                     Apply_cont.create dest ~args:[not_scrutinee] ~dbg
+                   in
+                   let free_names = Apply_cont.free_names apply_cont in
+                   let added_code_size = Code_size.apply_cont apply_cont in
+                   return ~added_code_size ~free_names
+                     (RE.create_apply_cont apply_cont)))
           | None -> normal_case uacc))
   in
   let uacc, expr = EB.bind_let_conts uacc ~body new_let_conts in
   after_rebuild expr uacc
 
-let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
-  let shape = T.this_naked_immediate arm in
+let simplify_arm ~machine_width ~scrutinee_kind ~typing_env_at_use ~scrutinee_ty
+    arm action (arms, dacc) =
+  let shape =
+    T.type_for_const
+      (Switch.const_of_discriminant ~machine_width scrutinee_kind arm)
+  in
   match T.meet typing_env_at_use scrutinee_ty shape with
   | Bottom -> arms, dacc
   | Ok (_meet_ty, env_at_use) ->
@@ -856,7 +915,9 @@ let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
              (Apply_cont.continuation action)
              args)
     in
-    let arms = TI.Map.add arm (action, rewrite_id, arity, env_at_use) arms in
+    let arms =
+      Targetint_32_64.Map.add arm (action, rewrite_id, arity, env_at_use) arms
+    in
     arms, dacc
 
 let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
@@ -1017,13 +1078,17 @@ let simplify_switch dacc switch ~down_to_up =
   in
   let dacc_before_switch = dacc in
   let typing_env_at_use = DA.typing_env dacc in
+  let scrutinee_kind = Switch.scrutinee_kind switch in
+  let machine_width = DE.machine_width (DA.denv dacc) in
   let arms, dacc =
-    TI.Map.fold
-      (simplify_arm ~typing_env_at_use ~scrutinee_ty)
-      (Switch.arms switch) (TI.Map.empty, dacc)
+    Targetint_32_64.Map.fold
+      (simplify_arm ~machine_width ~scrutinee_kind ~typing_env_at_use
+         ~scrutinee_ty)
+      (Switch.arms switch)
+      (Targetint_32_64.Map.empty, dacc)
   in
   let dacc =
-    if TI.Map.cardinal arms <= 1
+    if Targetint_32_64.Map.cardinal arms <= 1
     then dacc
     else
       DA.map_flow_acc dacc
@@ -1046,5 +1111,5 @@ let simplify_switch dacc switch ~down_to_up =
   in
   down_to_up dacc
     ~rebuild:
-      (rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
-         ~dacc_before_switch)
+      (rebuild_switch ~arms ~condition_dbg ~scrutinee_kind ~scrutinee
+         ~scrutinee_ty ~dacc_before_switch)

@@ -1,0 +1,26 @@
+let code size(50)
+      f_0 (x : int16, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  switch int16 x
+    | -1 -> k2
+    | 0 -> k3
+    | 7 -> k4
+    where k2 =
+      let a = %int_barith.add (y, 1) in
+      cont k (a)
+    where k3 =
+      let a = %int_barith.mul (y, 2) in
+      cont k (a)
+    where k4 =
+      let a = %int_barith.sub (y, 3) in
+      cont k (a)
+in
+let $camlSwitch_naked_int16_dispatch__f =
+  closure f_0 @f &toplevel.alloc_region
+in
+let $camlSwitch_naked_int16_dispatch =
+  Block 0 ($camlSwitch_naked_int16_dispatch__f)
+in
+cont done ($camlSwitch_naked_int16_dispatch)

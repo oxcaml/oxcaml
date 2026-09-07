@@ -1,0 +1,27 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-raw, dump-simplify;
+*)
+
+(* A switch on a naked int32 whose arms all pass an affine function of the
+   discriminant to the same continuation is rewritten to arithmetic on the
+   scrutinee, converted to a tagged immediate. *)
+
+let code size(50) f_0
+      (x : int32)
+      my_closure &my_alloc_region my_depth
+      -> k * k1
+      : imm tagged =
+  switch int32 x
+    | 0 -> k (10)
+    | 1 -> k (20)
+    | 2 -> k (30)
+    | 3 -> k (40)
+in
+let $camlSwitch_naked_int32_affine__f = closure f_0 @f &toplevel.alloc_region in
+let $camlSwitch_naked_int32_affine =
+  Block 0 ($camlSwitch_naked_int32_affine__f)
+in
+cont done ($camlSwitch_naked_int32_affine)

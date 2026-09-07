@@ -1938,9 +1938,13 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
   let untagged_scrutinee' =
     VB.create untagged_scrutinee untagged_scrutinee_duid Name_mode.normal
   in
+  let machine_width = Acc.machine_width acc in
   let known_const_scrutinee =
     match find_value_approximation_through_symbol acc env scrutinee with
-    | Value_approximation.Value_const c -> Reg_width_const.is_tagged_immediate c
+    | Value_approximation.Value_const c ->
+      Option.map
+        (Target_ocaml_int.to_targetint machine_width)
+        (Reg_width_const.is_tagged_immediate c)
     | _ -> None
   in
   let untag =
@@ -1956,7 +1960,7 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
           Apply_cont_with_acc.create acc ?trap_action ~args_approx cont ~args
             ~dbg
         in
-        acc, (Target_ocaml_int.of_int (Acc.machine_width acc) case, action))
+        acc, (Targetint_32_64.of_int machine_width case, action))
       acc sw.consts
   in
   match arms, sw.failaction with
@@ -1972,7 +1976,9 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
         (Binary
            ( Int_comp (Naked_immediate, Yielding_bool Eq),
              Simple.var untagged_scrutinee,
-             Simple.const (Reg_width_const.naked_immediate case) ))
+             Simple.const
+               (Reg_width_const.naked_immediate
+                  (Target_ocaml_int.of_targetint machine_width case)) ))
         condition_dbg
     in
     let comparison_result = Variable.create "eq" K.naked_immediate in
@@ -1988,7 +1994,6 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     let acc, switch =
       let scrutinee = Simple.var comparison_result in
       let acc, action = action acc in
-      let machine_width = Acc.machine_width acc in
       Expr_with_acc.create_switch acc
         (Switch.if_then_else ~machine_width ~condition_dbg ~scrutinee
            ~if_true:action ~if_false:default_action)
@@ -2004,12 +2009,12 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
   | _, _ ->
     let acc, arms =
       match sw.failaction with
-      | None -> acc, Target_ocaml_int.Map.of_list arms
+      | None -> acc, Targetint_32_64.Map.of_list arms
       | Some (default, dbg, trap_action, args) ->
         Numeric_types.Int.Set.fold
           (fun case (acc, cases) ->
-            let case = Target_ocaml_int.of_int (Acc.machine_width acc) case in
-            if Target_ocaml_int.Map.mem case cases
+            let case = Targetint_32_64.of_int machine_width case in
+            if Targetint_32_64.Map.mem case cases
             then acc, cases
             else
               let acc, args = find_simples acc env args in
@@ -2017,16 +2022,16 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
               let default acc =
                 Apply_cont_with_acc.create acc ?trap_action default ~args ~dbg
               in
-              acc, Target_ocaml_int.Map.add case default cases)
+              acc, Targetint_32_64.Map.add case default cases)
           (Numeric_types.Int.zero_to_n (sw.numconsts - 1))
-          (acc, Target_ocaml_int.Map.of_list arms)
+          (acc, Targetint_32_64.Map.of_list arms)
     in
-    if Target_ocaml_int.Map.is_empty arms
+    if Targetint_32_64.Map.is_empty arms
     then Expr_with_acc.create_invalid acc Zero_switch_arms
     else
       let scrutinee = Simple.var untagged_scrutinee in
       let acc, body =
-        match Target_ocaml_int.Map.get_singleton arms with
+        match Targetint_32_64.Map.get_singleton arms with
         | Some (_discriminant, action) ->
           let acc, action = action acc in
           Expr_with_acc.create_apply_cont acc action
@@ -2034,17 +2039,18 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
           match known_const_scrutinee with
           | None ->
             let acc, arms =
-              Target_ocaml_int.Map.fold
+              Targetint_32_64.Map.fold
                 (fun case action (acc, arms) ->
                   let acc, arm = action acc in
-                  acc, Target_ocaml_int.Map.add case arm arms)
+                  acc, Targetint_32_64.Map.add case arm arms)
                 arms
-                (acc, Target_ocaml_int.Map.empty)
+                (acc, Targetint_32_64.Map.empty)
             in
             Expr_with_acc.create_switch acc
-              (Switch.create ~condition_dbg ~scrutinee ~arms)
+              (Switch.create ~condition_dbg ~scrutinee_kind:Naked_immediate
+                 ~scrutinee ~arms)
           | Some case -> (
-            match Target_ocaml_int.Map.find case arms acc with
+            match Targetint_32_64.Map.find case arms acc with
             | acc, action -> Expr_with_acc.create_apply_cont acc action
             | exception Not_found ->
               Expr_with_acc.create_invalid acc Zero_switch_arms))

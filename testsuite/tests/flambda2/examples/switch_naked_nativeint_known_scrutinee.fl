@@ -1,0 +1,28 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-raw, dump-simplify;
+*)
+
+(* A switch on a naked nativeint whose value is known is replaced by the
+   matching arm. *)
+
+let code size(50) f_0
+      (y : imm tagged)
+      my_closure &my_alloc_region my_depth
+      -> k * k1
+      : imm tagged =
+  let x = 3n in
+  switch nativeint x
+    | 2 -> k (0)
+    | 3 -> k (y)
+    | 4 -> k (1)
+in
+let $camlSwitch_naked_nativeint_known_scrutinee__f =
+  closure f_0 @f &toplevel.alloc_region
+in
+let $camlSwitch_naked_nativeint_known_scrutinee =
+  Block 0 ($camlSwitch_naked_nativeint_known_scrutinee__f)
+in
+cont done ($camlSwitch_naked_nativeint_known_scrutinee)

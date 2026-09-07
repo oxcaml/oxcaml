@@ -734,19 +734,14 @@ and switch_expr env switch : Fexpr.expr =
   let scrutinee = simple env (Switch_expr.scrutinee switch) in
   let cases =
     List.map
-      (fun (imm, app_cont) ->
-        let tag =
-          (* TODO: machine_width should be passed through properly here *)
-          let machine_width = Target_system.Machine_width.Sixty_four in
-          imm
-          |> Target_ocaml_int.to_targetint machine_width
-          |> Targetint_32_64.to_int
-        in
+      (fun (discriminant, app_cont) ->
+        let tag = Targetint_32_64.to_int discriminant in
         let app_cont = apply_cont env app_cont in
         tag, Fexpr.Named_cont app_cont)
-      (Switch_expr.arms switch |> Target_ocaml_int.Map.bindings)
+      (Switch_expr.arms switch |> Targetint_32_64.Map.bindings)
   in
-  Switch { scrutinee; cases }
+  Switch
+    { scrutinee_kind = Switch_expr.scrutinee_kind switch; scrutinee; cases }
 
 and invalid_expr _env ~message : Fexpr.expr = Invalid { message }
 

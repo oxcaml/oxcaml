@@ -1,0 +1,15 @@
+let code size(50)
+      f_0 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  switch imm tagged x
+    | 0 -> k (1)
+    | 1 -> k (0)
+in
+let $camlSwitch_tagged_boolean_not__f = closure f_0 @f &toplevel.alloc_region
+in
+let $camlSwitch_tagged_boolean_not =
+  Block 0 ($camlSwitch_tagged_boolean_not__f)
+in
+cont done ($camlSwitch_tagged_boolean_not)

@@ -594,6 +594,11 @@ let translate_apply env res apply =
 
 (* Helpers for the translation of [Switch] expressions. *)
 
+(* Switches whose discriminants span a range at least this wide are compiled to
+   decision trees rather than tables. *)
+let max_switch_table_size =
+  Targetint_32_64.of_int Target_system.Machine_width.Sixty_four (1 lsl 16)
+
 (* Helpers for translating [Apply_cont] expressions *)
 
 (* Exception continuations always receive the exception value in their first
@@ -1243,62 +1248,69 @@ and apply_cont env res apply_cont =
 
 and switch env res switch =
   let scrutinee = Switch.scrutinee switch in
+  let scrutinee_kind = Switch.scrutinee_kind switch in
   let dbg = Env.add_inlined_debuginfo env (Switch.condition_dbg switch) in
   let To_cmm_env.
         { env;
           res;
           expr =
-            { cmm = untagged_scrutinee_cmm;
-              free_vars = scrutinee_free_vars;
-              effs = _
-            }
+            { cmm = scrutinee_cmm; free_vars = scrutinee_free_vars; effs = _ }
         } =
     C.simple ~dbg env res scrutinee
   in
   let arms = Switch.arms switch in
-  (* For binary switches, which can be translated to an if-then-else, it can be
-     interesting for the scrutinee to be tagged (particularly for switches
-     coming from a source level if-then-else on booleans) as that way the
-     translation can use 2 instructions instead of 3.
-
-     However, this is only useful to do if the tagged expression is smaller then
-     the untagged one (which is not always true due to arithmetic
-     simplifications performed by Cmm_helpers).
-
-     Additionally for switches with more than 2 arms, not untagging and
-     adjusting the switch to work on tagged integers might be worse. The
-     discriminants of the arms might not be successive machine integers anymore,
-     thus preventing the use of a table. Alternatively it might not be worth it
-     given the already high number of instructions needed for big switches (but
-     this might be debatable for small switches with 3 to 5 arms). *)
+  let num_arms = Targetint_32_64.Map.cardinal arms in
+  (* The scrutinee is turned into a machine integer to be compared against the
+     discriminants, which may need to be tagged to match. *)
   let scrutinee, must_tag_discriminant =
-    match Target_ocaml_int.Map.cardinal arms with
-    | 2 -> (
+    match (scrutinee_kind : K.Standard_int.t), num_arms with
+    | Tagged_immediate, 2 ->
+      (* For binary switches, which can be translated to an if-then-else,
+         comparing the tagged scrutinee against tagged discriminants avoids an
+         untagging operation. *)
+      scrutinee_cmm, true
+    | Tagged_immediate, _ ->
+      (* For switches with more than 2 arms, not untagging and adjusting the
+         switch to work on tagged integers might be worse. The discriminants of
+         the arms might not be successive machine integers anymore, thus
+         preventing the use of a table. Alternatively it might not be worth it
+         given the already high number of instructions needed for big switches
+         (but this might be debatable for small switches with 3 to 5 arms). *)
+      C.untag_int scrutinee_cmm dbg, false
+    | Naked_immediate, 2 -> (
+      (* For binary switches, it can be interesting for the scrutinee to be
+         tagged (particularly for switches coming from a source level
+         if-then-else on booleans) as that way the translation can use 2
+         instructions instead of 3.
+
+         However, this is only useful to do if the tagged expression is smaller
+         then the untagged one (which is not always true due to arithmetic
+         simplifications performed by Cmm_helpers). *)
       match Env.extra_info env scrutinee with
-      | None -> untagged_scrutinee_cmm, false
+      | None -> scrutinee_cmm, false
       | Some (Untag tagged_scrutinee_cmm) ->
         let size_untagged =
-          Option.value
-            (C.cmm_arith_size untagged_scrutinee_cmm)
-            ~default:max_int
+          Option.value (C.cmm_arith_size scrutinee_cmm) ~default:max_int
         in
         let size_tagged =
           Option.value (C.cmm_arith_size tagged_scrutinee_cmm) ~default:max_int
         in
         if size_tagged < size_untagged
         then tagged_scrutinee_cmm, true
-        else untagged_scrutinee_cmm, false)
-    | _ -> untagged_scrutinee_cmm, false
+        else scrutinee_cmm, false)
+    | ( ( Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64
+        | Naked_nativeint ),
+        _ ) ->
+      (* Naked integers narrower than a machine word are kept sign-extended, so
+         they can be compared directly against the (sign-extended)
+         discriminants. *)
+      scrutinee_cmm, false
   in
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-  let prepare_discriminant ~must_tag d =
-    let machine_width = Target_system.Machine_width.Sixty_four in
-    let targetint_d = Target_ocaml_int.to_targetint machine_width d in
-    Targetint_32_64.to_int_checked machine_width
-      (if must_tag then C.tag_targetint targetint_d else targetint_d)
-  in
-  let make_arm ~must_tag_discriminant env res (d, action) =
-    let d = prepare_discriminant ~must_tag:must_tag_discriminant d in
+  let machine_width = Target_system.Machine_width.Sixty_four in
+  let zero = Targetint_32_64.zero machine_width in
+  let make_arm env res (d, action) =
+    let d = if must_tag_discriminant then C.tag_targetint d else d in
     let cmm_action, action_free_vars, action_symbol_inits, res =
       apply_cont env res action
     in
@@ -1309,68 +1321,52 @@ and switch env res switch =
         Env.add_inlined_debuginfo env (Apply_cont.debuginfo action) ),
       res )
   in
-  match Target_ocaml_int.Map.cardinal arms with
+  match num_arms with
   (* Binary case: if-then-else *)
-  | 2 -> (
-    let aux = make_arm ~must_tag_discriminant env in
-    let first_arm, res = aux res (Target_ocaml_int.Map.min_binding arms) in
-    let second_arm, res = aux res (Target_ocaml_int.Map.max_binding arms) in
-    match first_arm, second_arm with
+  | 2 ->
+    let (d1, action1, free_vars1, inits1, dbg1), res =
+      make_arm env res (Targetint_32_64.Map.min_binding arms)
+    in
+    let (d2, action2, free_vars2, inits2, dbg2), res =
+      make_arm env res (Targetint_32_64.Map.max_binding arms)
+    in
+    let free_vars =
+      Backend_var.Set.union scrutinee_free_vars
+        (Backend_var.Set.union free_vars1 free_vars2)
+    in
+    (* See comment below about symbol inits and branches *)
+    let symbol_inits = Env.Symbol_inits.merge inits1 inits2 in
     (* These switches are actually if-then-elses. On such switches,
        transl_switch_clambda will introduce a let-binding of the scrutinee
        before creating an if-then-else, introducing an indirection that might
        prevent some optimizations performed by Selectgen/Emit when the condition
        is inlined in the if-then-else. Instead we use [C.ite]. *)
-    | ( (0, else_, else_free_vars, else_inits, else_dbg),
-        (_, then_, then_free_vars, then_inits, then_dbg) )
-    | ( (_, then_, then_free_vars, then_inits, then_dbg),
-        (0, else_, else_free_vars, else_inits, else_dbg) ) ->
-      let free_vars =
-        Backend_var.Set.union scrutinee_free_vars
-          (Backend_var.Set.union else_free_vars then_free_vars)
-      in
-      (* See comment below about symbol inits and branches *)
-      let symbol_inits = Env.Symbol_inits.merge then_inits else_inits in
-      let cmm, free_vars, symbol_inits =
-        wrap
-          (C.ite ~dbg scrutinee ~then_dbg ~then_ ~else_dbg ~else_)
-          free_vars symbol_inits
-      in
-      cmm, free_vars, symbol_inits, res
-    (* Similar case to the previous but none of the arms match 0, so we have to
-       generate an equality test, and make sure it is inside the condition to
-       ensure Selectgen and Emit can take advantage of it. *)
-    | ( (x, if_x, if_x_free_vars, if_x_symbol_inits, if_x_dbg),
-        (_, if_not, if_not_free_vars, if_not_symbol_inits, if_not_dbg) ) ->
-      let free_vars =
-        Backend_var.Set.union scrutinee_free_vars
-          (Backend_var.Set.union if_x_free_vars if_not_free_vars)
-      in
-      let expr =
+    let expr =
+      if Targetint_32_64.equal d1 zero
+      then
+        C.ite ~dbg scrutinee ~then_dbg:dbg2 ~then_:action2 ~else_dbg:dbg1
+          ~else_:action1
+      else if Targetint_32_64.equal d2 zero
+      then
+        C.ite ~dbg scrutinee ~then_dbg:dbg1 ~then_:action1 ~else_dbg:dbg2
+          ~else_:action2
+      else
+        (* Neither of the arms matches 0, so we have to generate an equality
+           test, and make sure it is inside the condition to ensure Selectgen
+           and Emit can take advantage of it. *)
         C.ite ~dbg
-          (C.eq ~dbg (C.int ~dbg x) scrutinee)
-          ~then_dbg:if_x_dbg ~then_:if_x ~else_dbg:if_not_dbg ~else_:if_not
-      in
-      (* See comment below about symbol inits and branches *)
-      let symbol_inits =
-        Env.Symbol_inits.merge if_x_symbol_inits if_not_symbol_inits
-      in
-      let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
-      cmm, free_vars, symbol_inits, res)
+          (C.eq ~dbg (C.targetint ~dbg d1) scrutinee)
+          ~then_dbg:dbg1 ~then_:action1 ~else_dbg:dbg2 ~else_:action2
+    in
+    let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
+    cmm, free_vars, symbol_inits, res
   (* General case *)
   | n ->
-    (* transl_switch_clambda expects an [index] array such that index.(d) is the
-       index in [cases] of the expression to execute when [e] matches [d]. *)
-    let max_d, _ = Target_ocaml_int.Map.max_binding arms in
-    let m = prepare_discriminant ~must_tag:must_tag_discriminant max_d in
-    let cases = Array.make (n + 1) None in
-    let index = Array.make (m + 1) n in
-    let _, res, free_vars, symbol_inits =
-      Target_ocaml_int.Map.fold
-        (fun discriminant action (i, res, free_vars, symbol_inits) ->
-          let (d, cmm_action, action_free_vars, action_symbol_inits, _dbg), res
-              =
-            make_arm ~must_tag_discriminant env res (discriminant, action)
+    let arms_rev, res, free_vars, symbol_inits =
+      Targetint_32_64.Map.fold
+        (fun discriminant action (arms_rev, res, free_vars, symbol_inits) ->
+          let ((_, _, action_free_vars, action_symbol_inits, _) as arm), res =
+            make_arm env res (discriminant, action)
           in
           (* Note about symbol inits and branches: symbol allocation can occur
              in branches of a switch/ite, e.g. if there are two branches and one
@@ -1384,26 +1380,90 @@ and switch env res switch =
             Env.Symbol_inits.merge symbol_inits action_symbol_inits
           in
           let free_vars = Backend_var.Set.union free_vars action_free_vars in
-          cases.(i) <- Some cmm_action;
-          index.(d) <- i;
-          i + 1, res, free_vars, symbol_inits)
+          arm :: arms_rev, res, free_vars, symbol_inits)
         arms
-        (0, res, scrutinee_free_vars, Env.Symbol_inits.empty)
+        ([], res, scrutinee_free_vars, Env.Symbol_inits.empty)
     in
-    let needs_unreachable = Array.exists (fun idx -> Int.equal idx n) index in
-    let cases, res =
-      match needs_unreachable with
-      | false -> Array.sub cases 0 n, res
-      | true ->
-        let unreachable, res =
-          C.invalid res ~message:"unreachable switch case"
+    (* The arms are sorted by increasing discriminant. *)
+    let arms = Array.of_list (List.rev arms_rev) in
+    let discriminant (d, _, _, _, _) = d in
+    let min_d = discriminant arms.(0) in
+    let max_d = discriminant arms.(n - 1) in
+    (* [transl_switch_clambda] expects an [index] array such that [index.(d)] is
+       the index in [cases] of the expression to execute when the scrutinee
+       matches [d]. The discriminants must therefore be small non-negative
+       integers: if they are not, but they still lie in a sufficiently narrow
+       range, the smallest of them is subtracted from the scrutinee first.
+       Otherwise a binary decision tree of comparisons is used instead. *)
+    let fits_in_table d =
+      (* Checks that [0 <= d < max_table_size]. *)
+      Targetint_32_64.unsigned_compare d max_switch_table_size < 0
+    in
+    let table_offset =
+      if Targetint_32_64.compare min_d zero >= 0 && fits_in_table max_d
+      then Some zero
+      else if fits_in_table (Targetint_32_64.sub max_d min_d)
+      then Some min_d
+      else None
+    in
+    let expr, res =
+      match table_offset with
+      | Some offset ->
+        let scrutinee =
+          if Targetint_32_64.equal offset zero
+          then scrutinee
+          else C.sub_int scrutinee (C.targetint ~dbg offset) dbg
         in
-        cases.(n) <- Some unreachable;
-        cases, res
-    in
-    (* CR-someday poechsel: Put a more precise value kind here *)
-    let expr =
-      C.transl_switch_clambda dbg scrutinee index (Array.map Option.get cases)
+        let index_of d =
+          Targetint_32_64.to_int (Targetint_32_64.sub d offset)
+        in
+        let cases = Array.make (n + 1) None in
+        let index = Array.make (index_of max_d + 1) n in
+        Array.iteri
+          (fun i (d, cmm_action, _, _, _) ->
+            cases.(i) <- Some cmm_action;
+            index.(index_of d) <- i)
+          arms;
+        let needs_unreachable =
+          Array.exists (fun idx -> Int.equal idx n) index
+        in
+        let cases, res =
+          match needs_unreachable with
+          | false -> Array.sub cases 0 n, res
+          | true ->
+            let unreachable, res =
+              C.invalid res ~message:"unreachable switch case"
+            in
+            cases.(n) <- Some unreachable;
+            cases, res
+        in
+        (* CR-someday poechsel: Put a more precise value kind here *)
+        ( C.transl_switch_clambda dbg scrutinee index
+            (Array.map Option.get cases),
+          res )
+      | None ->
+        (* The scrutinee is guaranteed to match one of the arms, so the leaves
+           of the tree need no further tests. *)
+        let expr =
+          C.bind "switcher" scrutinee (fun scrutinee ->
+              let rec tree lo hi =
+                if lo = hi
+                then
+                  let _, cmm_action, _, _, action_dbg = arms.(lo) in
+                  cmm_action, action_dbg
+                else
+                  let mid = (lo + hi) / 2 in
+                  let then_, then_dbg = tree lo mid in
+                  let else_, else_dbg = tree (mid + 1) hi in
+                  let bound = C.targetint ~dbg (discriminant arms.(mid + 1)) in
+                  ( C.ite ~dbg
+                      (C.lt ~dbg scrutinee bound)
+                      ~then_dbg ~then_ ~else_dbg ~else_,
+                    dbg )
+              in
+              fst (tree 0 (n - 1)))
+        in
+        expr, res
     in
     let cmm, free_vars, symbol_inits = wrap expr free_vars symbol_inits in
     cmm, free_vars, symbol_inits, res
