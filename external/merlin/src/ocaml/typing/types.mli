@@ -85,8 +85,8 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The with-bound contributes the meet of the type's modal and externality
-      bounds and [bounds_mask]. On each axis, [top] preserves the type's bound,
+  (** The with-bound contributes the meet of the type's modal bounds and
+      [bounds_mask]. On each axis, [top] preserves the type's bound,
       [bot] ignores it, and a middle element caps its contribution there. *)
   type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
@@ -207,14 +207,11 @@ and type_desc =
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
 
-  | Tmod of type_expr * mod_bounds
-  (** [Tmod (t, bounds)] ==> [t @@ bounds]
-      The type [t] with its mode crossing bounded by [bounds]. This is a
-      transparent wrapper: it constrains mode crossing only, and erases at
-      runtime. The unboxing and kind-computation paths look through it to [t],
-      as they do for [Tpoly]; generic structural traversals rebuild it; the
-      leaf consumers that classify a type's runtime representation raise,
-      since a [Tmod] is not expected to reach them. *)
+  | Tmod of type_expr * Mode.Modality.Const.t
+  (** [Tmod (t, modality)] represents [(t @@ modality)]. It is an injective
+      type constructor with the payload's runtime representation. Nested and
+      identity wrappers remain distinct, even when their mode guarantees agree.
+      Kind computation applies the modality without changing type identity. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
@@ -402,12 +399,6 @@ and jkind_history =
 (** The types within the with-bounds of a jkind *)
 and with_bounds_types
 
-(** The mod bounds of a jkind *)
-and mod_bounds =
-  { crossing : Mode.Crossing.t;
-    externality: Jkind_axis.Externality.t;
-  }
-
 and 'd with_bounds =
   | No_with_bounds : ('l * 'r) with_bounds
   | With_bounds
@@ -421,7 +412,7 @@ and 'layout jkind_base =
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
-    mod_bounds : mod_bounds;
+    mod_bounds : Mode.Crossing.t;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
@@ -895,7 +886,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : mod_bounds
+  { unsafe_mod_bounds : Mode.Crossing.t
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 

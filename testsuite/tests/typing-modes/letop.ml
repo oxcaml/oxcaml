@@ -89,13 +89,13 @@ Error: This value is "local" but is expected to be "global".
 let foo () =
     portable_use (
         let* a = Some (fun x -> x) in
-        fun x -> x
+        Some a
     )
 [%%expect{|
 Lines 2-5, characters 17-5:
 2 | .................(
 3 |         let* a = Some (fun x -> x) in
-4 |         fun x -> x
+4 |         Some a
 5 |     )
 Error: This value is "nonportable" but is expected to be "portable".
 |}]

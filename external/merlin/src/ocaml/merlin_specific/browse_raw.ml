@@ -392,7 +392,8 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
   | Tpat_alias { pattern = p; _ }
   | Tpat_variant (_, Some p, _)
   | Tpat_lazy p
-  | Tpat_exception p -> of_pattern p
+  | Tpat_exception p
+  | Tpat_modality p -> of_pattern p
   | Tpat_value p -> of_pattern (p :> value general_pattern)
   | Tpat_tuple ps -> list_fold (fun (_lbl, p) -> of_pattern p) ps
   | Tpat_unboxed_tuple ps -> list_fold (fun (_lbl, p, _sort) -> of_pattern p) ps
@@ -571,7 +572,7 @@ let rec of_expression_desc loc = function
   | Texp_hole _ -> id_fold
   | Texp_quote exp -> of_expression exp
   | Texp_splice exp -> of_expression exp
-  | Texp_apply_layout (exp, _) -> of_expression exp
+  | Texp_apply_layout (exp, _) | Texp_modality exp -> of_expression exp
 
 (* We should consider taking into account param.fp_loc at some point, as it
    allows us to respond with the *parameter*'s type (as opposed to the
@@ -697,6 +698,8 @@ and of_signature_item_desc = function
 
 and of_core_type_desc = function
   | Ttyp_var (_, jkind) -> of_jkind_annotation_opt jkind
+  | Ttyp_modality (ct, modalities) ->
+    of_core_type ct ** of_modalities modalities
   | Ttyp_call_pos -> id_fold
   | Ttyp_of_kind jkind -> of_jkind_annotation jkind
   | Ttyp_open (_, _, ct) -> of_core_type ct

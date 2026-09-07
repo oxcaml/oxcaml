@@ -237,6 +237,10 @@ let rec core_type i ppf x =
   | Ptyp_open (mod_ident, t) ->
       line i ppf "Ptyp_open \"%a\"\n" fmt_longident_loc mod_ident;
       core_type i ppf t
+  | Ptyp_modality (t, m) ->
+      line i ppf "Ptyp_modality\n";
+      core_type i ppf t;
+      modalities i ppf m
   | Ptyp_quote t ->
       line i ppf "Ptyp_quote\n";
       core_type i ppf t

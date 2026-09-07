@@ -69,12 +69,14 @@ let rec batch_add_subst args vals subst =
 (* Expand a type, looking through ordinary synonyms, private synonyms,
    links, and [@@unboxed] types. The returned type will therefore be none
    of these cases (except in case of missing cmis). *)
-let scrape_ty env ty =
+let rec scrape_ty env ty =
   let ty = match get_desc ty with Tpoly (ty, _) -> ty | _ -> ty in
   match get_desc ty with
+  | Tmod (ty, _) -> scrape_ty env ty
   | Tconstr _ -> (
     let ty' = Ctype.expand_head_opt env ty in
     match get_desc ty' with
+    | Tmod (ty, _) -> scrape_ty env ty
     | Tconstr (p, _, _) -> (
       match find_unboxed_type (Env.find_type p env) with
       | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
@@ -104,9 +106,7 @@ let classify env ty : classification =
   then Int
   else
     match get_desc ty with
-    | Tvar _ | Tunivar _ -> Any
-    | Tmod _ ->
-      Misc.fatal_error "Vicuna_traverse_typed_tree.classify: unexpected Tmod"
+    | Tvar _ | Tunivar _ | Tmod _ -> Any
     | Tconstr (p, _args, _abbrev) -> (
       if Path.same p Predef.path_float
       then Float
@@ -182,8 +182,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
   in
   let scty = scrape_ty env ty in
   match get_desc scty with
-  | Tmod _ ->
-    Misc.fatal_error "Vicuna_traverse_typed_tree.value_kind: unexpected Tmod"
+  | Tmod _ -> Value
   | Tconstr (p, _, _) when Path.same p Predef.path_int -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_char -> Imm
   | Tconstr (p, _, _) when Path.same p Predef.path_unit -> Imm

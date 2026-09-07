@@ -344,6 +344,12 @@ let jkind_declaration _sub decl =
     pjkind_loc = decl.jkind_jkind.jkind_loc }
 
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
+  match pat.pat_desc with
+  | Tpat_modality child ->
+    sub.pat sub {child with
+      pat_extra = pat.pat_extra @ child.pat_extra;
+      pat_attributes = pat.pat_attributes @ child.pat_attributes}
+  | _ ->
   let loc = sub.location sub pat.pat_loc in
   (* todo: fix attributes on extras *)
   let attrs = sub.attributes sub pat.pat_attributes in
@@ -432,6 +438,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
+    | Tpat_modality p -> (sub.pat sub p).ppat_desc
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
@@ -540,6 +547,7 @@ let label : Types.arg_label -> Parsetree.arg_label = function
 let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 
 let expression sub exp =
+  let exp = T.modality_expression_head exp in
   let loc = sub.location sub exp.exp_loc in
   let attrs = sub.attributes sub exp.exp_attributes in
   let desc =
@@ -826,6 +834,7 @@ let expression sub exp =
                      , [])
                ; pstr_loc = loc
                }]))
+    | Texp_modality child -> (sub.expr sub child).pexp_desc
     | Texp_exclave exp ->
         Pexp_apply ({
         pexp_desc =
@@ -1142,6 +1151,8 @@ let core_type sub ct =
         Ptyp_poly (bound_vars, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
+    | Ttyp_modality (t, m) ->
+        Ptyp_modality (sub.typ sub t, Typemode.untransl_modalities m)
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
     | Ttyp_repr (list, ct) ->

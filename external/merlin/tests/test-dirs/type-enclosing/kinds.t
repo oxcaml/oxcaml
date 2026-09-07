@@ -98,3 +98,20 @@ Module types
     type t_tuple = int * string
   end
 
+First-class modality types, conversions and patterns
+
+  $ cat > modal.ml <<'EOF'
+  > type wrapped = (string @@ global)
+  > let unwrap (x : wrapped) : string = x
+  > let pair (((x, y) as p) : ((int * int) @@ global)) = x + y, p
+  > let partial (f : x:int -> y:int -> int) =
+  >   ((f ~y:2 : x:int -> int) : (_ @@ global))
+  > EOF
+  $ $MERLIN single errors -filename modal.ml < modal.ml | jq -c '.value'
+  []
+  $ $MERLIN single type-enclosing -position 1:17 -filename modal.ml < modal.ml | revert-newlines | jq -c '[.value[].type]'
+  ["type string : immutable_data","string","(string @@ global)","type wrapped = (string @@ global)"]
+  $ $MERLIN single type-enclosing -position 2:36 -filename modal.ml < modal.ml | revert-newlines | jq -c '[.value[].type]'
+  ["wrapped","wrapped","string","wrapped -> string"]
+  $ $MERLIN single type-enclosing -position 3:12 -filename modal.ml < modal.ml | revert-newlines | jq -c '[.value[].type]'
+  ["int","int * int","(int * int @@ global)","(int * int @@ global)","(int * int @@ global) -> int * (int * int @@ global)"]

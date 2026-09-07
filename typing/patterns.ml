@@ -98,7 +98,7 @@ module General = struct
   ]
   type pattern = view pattern_data
 
-  let view_desc = function
+  let rec view_desc = function
     | Tpat_any ->
        `Any
     | Tpat_var { id; name = str; uid; sort; mode } ->
@@ -129,10 +129,13 @@ module General = struct
        `Record_unboxed_product (fields, repr, closed)
     | Tpat_array (am, arg_sort, ps) -> `Array (am, arg_sort, ps)
     | Tpat_or (p, q, row_desc) -> `Or (p, q, row_desc)
+    | Tpat_modality p -> view_desc p.pat_desc
     | Tpat_lazy p -> `Lazy p
 
-  let view p : pattern =
-    { p with pat_desc = view_desc p.pat_desc }
+  let rec view p : pattern =
+    match p.pat_desc with
+    | Tpat_modality child -> view child
+    | _ -> { p with pat_desc = view_desc p.pat_desc }
 
   let erase_desc = function
     | `Any -> Tpat_any

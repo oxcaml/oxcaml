@@ -93,6 +93,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
     end
   in
   match v.pat_desc with
+  | Tpat_modality child -> pretty_val ppf child
   | Tpat_any -> fprintf ppf "_"
   | Tpat_var { id = x; _ } -> fprintf ppf "%s" (Ident.name x)
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)

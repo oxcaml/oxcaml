@@ -390,6 +390,7 @@ let pat
     | Tpat_fun_layout { id; name; uid; sort; mode; lpoly; env_alloc_mode } ->
         Tpat_fun_layout { id; name = map_loc sub name; uid; sort; mode;
                           lpoly; env_alloc_mode }
+    | Tpat_modality p -> Tpat_modality (sub.pat sub p)
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -743,6 +744,7 @@ let expr sub x =
     | Texp_probe {name; handler; enabled_at_init;} ->
       Texp_probe {name; handler = sub.expr sub handler; enabled_at_init}
     | Texp_probe_is_enabled _ as e -> e
+    | Texp_modality exp -> Texp_modality (sub.expr sub exp)
     | Texp_exclave exp ->
         Texp_exclave (sub.expr sub exp)
     | Texp_src_pos -> Texp_src_pos
@@ -1089,6 +1091,8 @@ let typ sub x =
     | Ttyp_newlayout (vars, ct) -> Ttyp_newlayout (vars, sub.typ sub ct)
     | Ttyp_of_kind jkind ->
         Ttyp_of_kind (sub.jkind_annotation sub jkind)
+    | Ttyp_modality (t, m) ->
+        Ttyp_modality (sub.typ sub t, sub.modalities sub m)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
   in

@@ -168,6 +168,9 @@ module T = struct
     | Ptyp_open (mod_ident, t) ->
         iter_loc_lid sub mod_ident;
         sub.typ sub t
+    | Ptyp_modality (t, m) ->
+        sub.typ sub t;
+        sub.modalities sub m
     | Ptyp_quote t -> sub.typ sub t
     | Ptyp_splice t -> sub.typ sub t
     | Ptyp_of_kind jkind ->

@@ -51,7 +51,7 @@ With index 0 only the first type is shown:
           "line": 2,
           "col": 8
         },
-        "type": "sig val x : unit val y : unit end",
+        "type": "sig val x : unit @@ stateless val y : unit @@ stateless end",
         "tail": "no"
       },
       {

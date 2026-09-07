@@ -132,11 +132,6 @@ let mutable_mode m0 : _ Mode.Value.t =
 
 (* Type expressions for the core language *)
 
-type mod_bounds =
-  { crossing : Mode.Crossing.t;
-    externality: Jkind_axis.Externality.t;
-  }
-
 module With_bounds_type_info = struct
   type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
@@ -162,7 +157,7 @@ and type_desc =
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
-  | Tmod of type_expr * mod_bounds
+  | Tmod of type_expr * Mode.Modality.Const.t
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
   | Tquote of type_expr
@@ -261,7 +256,7 @@ and 'layout jkind_base =
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
-    mod_bounds : mod_bounds;
+    mod_bounds : Mode.Crossing.t;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
@@ -481,7 +476,7 @@ and type_decl_kind =
   (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : mod_bounds
+  { unsafe_mod_bounds : Mode.Crossing.t
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -1460,9 +1455,9 @@ let best_effort_compare_type_expr te1 te2 =
         if p = 0
         then List.compare (aux (depth + 1)) args1 args2
         else p
-      | Tmod (t1, mod_bounds1), Tmod (t2, mod_bounds2) ->
+      | Tmod (t1, modality1), Tmod (t2, modality2) ->
         let c = aux (depth + 1) t1 t2 in
-        if c = 0 then Stdlib.compare mod_bounds1 mod_bounds2 else c
+        if c = 0 then Stdlib.compare modality1 modality2 else c
       | Tpoly (t1, ts1), Tpoly (t2, ts2) ->
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)

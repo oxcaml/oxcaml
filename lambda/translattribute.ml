@@ -562,6 +562,7 @@ let add_unbox_return_attribute expr loc attributes =
 
 (* Get the [@inlined] attribute payload (or default if not present). *)
 let get_inlined_attribute e =
+  let e = Typedtree.modality_expression_head e in
   let attr = find_attribute is_inlined_attribute e.exp_attributes in
   parse_inlined_attribute attr
 
@@ -584,10 +585,12 @@ let get_inlined_attribute_on_module e =
   get e
 
 let get_specialised_attribute e =
+  let e = Typedtree.modality_expression_head e in
   let attr = find_attribute is_specialised_attribute e.exp_attributes in
   parse_specialise_attribute attr
 
 let get_tailcall_attribute e =
+  let e = Typedtree.modality_expression_head e in
   let attr = find_attribute is_tailcall_attribute e.exp_attributes in
   match attr with
   | None -> Default_tailcall

@@ -2769,8 +2769,7 @@ let rec extract_concrete_typedecl env ty =
           end
       end
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
-  | Tmod _ ->
-    Misc.fatal_error "Ctype.extract_concrete_typedecl: unexpected Tmod"
+  | Tmod (ty, _) -> extract_concrete_typedecl env ty
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl (incr_stage env) ty
   | Tsplice ty -> extract_concrete_typedecl (decr_stage env) ty
@@ -2944,8 +2943,8 @@ let unbox_once env ty =
       { ty = instance_poly_for_jkind univars ty
       ; modality = Mode.Modality.Const.id
       ; or_null = None }
-  | Tmod (ty, _) ->
-    Stepped { ty; modality = Mode.Modality.Const.id; or_null = None }
+  | Tmod (ty, modality) ->
+    Stepped { ty; modality; or_null = None }
   | _ -> Final_result
 
 let contained_without_boxing env ty =
@@ -3003,7 +3002,10 @@ let contained_without_boxing env ty =
    we eventually bottom out at a missing cmi file, or otherwise. *)
 let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
   match get_desc ty with
-  | Tmod (ty, _) ->
+  | Tmod (payload, wrapper) ->
+    let ty_prev = if eq_type ty_prev ty then payload else ty_prev in
+    let ty = payload in
+    let modality = Mode.Modality.Const.concat modality ~then_:wrapper in
     (* Mode bounds do not affect the runtime representation, so [Tmod]
        wrappers are transparent here, at no fuel cost. In particular a [Tmod]
        must never be returned from this function: it carries no definition, so
@@ -3017,6 +3019,10 @@ let rec get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel =
     (* We use expand_head_opt version of expand_head to get access
        to the manifest type of private abbreviations. *)
     let ty = expand_head_opt env ty in
+    match get_desc ty with
+    | Tmod _ ->
+      get_unboxed_type_representation ~modality ~or_null env ty_prev ty fuel
+    | _ ->
     match unbox_once env { ty; modality; or_null } with
     | Stepped { ty = ty2; modality = modality2; or_null = or_null2 } ->
       let modality = Mode.Modality.Const.concat modality ~then_:modality2 in
@@ -3223,20 +3229,11 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
        a [Missing_cmi]. Internal ticket 5109. *)
     | Cannot_subst | Not_found -> Jkind.Builtin.any ~why:(Missing_cmi p)
     end
-  | Tmod (ty, mod_bounds) ->
+  | Tmod (ty, modality) ->
     let jkind =
       estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty
     in
-    if ignore_mod_bounds
-    then jkind
-    else
-      { jkind with
-        jkind =
-          { jkind.jkind with
-            mod_bounds =
-              Jkind0.Mod_bounds.meet jkind.jkind.mod_bounds mod_bounds
-          }
-      }
+    if ignore_mod_bounds then jkind else Jkind.apply_modality_l modality jkind
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
    (* CR quoted-kinds jbachurski: These quote/splice the jkind. *)
@@ -3405,6 +3402,10 @@ let constrain_type_jkind ~fixed env ty jkind =
            ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
+
+    | Tmod (payload, modality) ->
+      estimate_jkind_and_loop ~fuel ~expanded:false env payload
+        (Jkind.apply_modality_r modality jkind)
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
@@ -3919,6 +3920,8 @@ let rec occur_rec env visited allow_recursive parents ty0 ty =
         with Cannot_expand ->
           raise Occur
         end
+    | Tmod (payload, _) ->
+        occur_rec env visited allow_recursive parents ty0 payload
     | Tobject _ | Tvariant _ ->
         ()
     | _ ->
@@ -3990,6 +3993,10 @@ let rec local_non_recursive_abbrev ~allow_rec strict visited env p ty =
               local_non_recursive_abbrev ~allow_rec strict visited env p ty)
             params args
         end
+    | Tmod (payload, _) ->
+        (* A modality does not guard a recursive abbreviation. *)
+        local_non_recursive_abbrev ~allow_rec strict (get_id ty :: visited)
+          env p payload
     | Tobject _ | Tvariant _ when not strict ->
         ()
     | _ ->
@@ -4604,6 +4611,9 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs (decr_stage env) t1 t2
         | (Tquote_eval t1, Tquote_eval t2, _, _) ->
             mcomp type_pairs (incr_stage env) t1 t2
+        | (Tmod (t1, m1), Tmod (t2, m2), _, _)
+          when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+            mcomp type_pairs env t1 t2
         | (Tbox t1, Tbox t2, _, _) ->
             mcomp type_pairs env t1 t2
         | (Tbox t, _, _, _) when is_unboxable_ty env t2' ->
@@ -5293,6 +5303,9 @@ and unify3 uenv t1 t1' t2 t2' =
           | false, false -> link_commu ~inside:c1 c2
           | true, true -> ()
           end
+      | (Tmod (t1, m1), Tmod (t2, m2))
+        when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+          unify uenv t1 t2
       | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
@@ -6412,29 +6425,31 @@ let zap_modalities_to_floor_if_modes_enabled_at level =
 (** The mode crossing of the memory block of a structure. *)
 let mode_crossing_structure_memaddr =
   Mode.Crossing.create
-    ~uniqueness:false
-    ~contention:true
-    ~visibility:true
     ~regionality:false
     ~linearity:true
+    ~uniqueness:false
     ~portability:true
+    ~contention:true
+    ~externality:false
     ~forkable:true
     ~yielding:true
     ~statefulness:true
+    ~visibility:true
     ~staticity:false
 
 (** The mode crossing of a functor. *)
 let mode_crossing_functor =
   Mode.Crossing.create
-    ~uniqueness:true
-    ~contention:true
-    ~visibility:true
     ~regionality:false
     ~linearity:false
+    ~uniqueness:true
     ~portability:false
+    ~contention:true
+    ~externality:false
     ~forkable:false
     ~yielding:false
     ~statefulness:false
+    ~visibility:true
     ~staticity:false
 
 (** The mode crossing of any module. *)
@@ -6645,6 +6660,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tmod (t1, m1), Tmod (t2, m2))
+            when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
@@ -7162,6 +7180,9 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst
                 (incr_stage env) ~do_jkind_check t1 t2
+          | (Tmod (t1, m1), Tmod (t2, m2))
+            when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true
           | (Tbox t1, Tbox t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
@@ -8095,6 +8116,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec (decr_stage env) trace t1 t2 cstrs
     | (Tquote_eval t1, Tquote_eval t2) ->
          subtype_rec (incr_stage env) trace t1 t2 cstrs
+    | (Tmod (t1, m1), Tmod (t2, m2))
+      when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+        subtype_rec env (Subtype.Diff {got = t1; expected = t2} :: trace)
+          t1 t2 cstrs
     | (Tbox t1, Tbox t2) ->
          subtype_rec
            env

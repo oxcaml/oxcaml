@@ -29,6 +29,7 @@ let let_bound_vars bindings =
       | Tpat_var { id; name; _ } | Tpat_fun_layout { id; name; _ } ->
         Some (id, name)
       | Typedtree.Tpat_any
+      | Typedtree.Tpat_modality _
       | Typedtree.Tpat_alias _
       | Typedtree.Tpat_constant _
       | Typedtree.Tpat_tuple _

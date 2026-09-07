@@ -10,7 +10,7 @@
         "line": 5,
         "col": 9
       },
-      "type": "sig val y : int end",
+      "type": "sig val y : int @@ stateless end",
       "tail": "no"
     },
     {

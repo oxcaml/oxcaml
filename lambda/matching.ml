@@ -223,6 +223,7 @@ end = struct
 
   let rec simpl_under_orpat p =
     match p.pat_desc with
+    | Tpat_modality child -> simpl_under_orpat child
     | Tpat_any
     | Tpat_var _ ->
         p
@@ -2311,8 +2312,9 @@ let divide_var ctx pm =
 
 (* Matching and forcing a lazy value *)
 
-let get_pat_args_lazy p rem =
+let rec get_pat_args_lazy p rem =
   match p with
+  | {pat_desc = Tpat_modality child} -> get_pat_args_lazy child rem
   | { pat_desc = Tpat_any } -> Patterns.omega :: rem
   | { pat_desc = Tpat_lazy arg } -> arg :: rem
   | _ -> assert false
@@ -4782,6 +4784,7 @@ let rec map_return f = function
 let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
   let rec collect pat_sort acc pat lam =
     match (pat.pat_desc, lam) with
+    | Tpat_modality child, _ -> collect pat_sort acc child lam
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
         List.fold_left2
@@ -4821,8 +4824,11 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
   in
   List.fold_left push_sublet exit rev_sublets
 
-let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
+let rec for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag
+    pat body =
   match pat.pat_desc with
+  | Tpat_modality child ->
+      for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag child body
   | Tpat_any ->
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
@@ -4922,8 +4928,9 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
       (Context.start (List.length paraml)) pm
   )
 
-let flatten_pattern size p =
+let rec flatten_pattern size p =
   match p.pat_desc with
+  | Tpat_modality child -> flatten_pattern size child
   | Tpat_tuple args -> List.map snd args
   | Tpat_any -> Patterns.omegas size
   | _ -> raise Cannot_flatten

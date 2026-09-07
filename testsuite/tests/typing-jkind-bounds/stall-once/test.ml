@@ -29,25 +29,6 @@ val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 let f (t : int list list list t) = require_portable t
 [%%expect {|
 val f : int list list list t -> unit = <fun>
-|}, Principal{|
-Line 1, characters 52-53:
-1 | let f (t : int list list list t) = require_portable t
-                                                        ^
-Error: The value "t" has type "int list list list t"
-       but an expression was expected of type "('a : value mod portable)"
-       The kind of int list list list t is
-           immutable_data
-             with int list list list
-             with int list list list list list list list list list list list list list
-                    @@
-                    portable
-         because of the definition of t at lines 1-4, characters 0-3.
-       But the kind of int list list list t must be a subkind of
-           value mod portable
-         because of the definition of require_portable at line 5, characters 21-56.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with int list list list ≰ mod portable
 |}]
 
 (* Test the same scenario, except it requires remembering that we ran out of
@@ -65,22 +46,4 @@ val require_portable : ('a : value mod portable). 'a -> unit = <fun>
 let f (t : int list list list Foo.t) = require_portable t
 [%%expect {|
 val f : int list list list Foo.t -> unit = <fun>
-|}, Principal{|
-Line 1, characters 56-57:
-1 | let f (t : int list list list Foo.t) = require_portable t
-                                                            ^
-Error: The value "t" has type "int list list list Foo.t"
-       but an expression was expected of type "('a : value mod portable)"
-       The kind of int list list list Foo.t is
-           immutable_data
-             with int list list list
-             with int list list list list list list list list list list list list list
-                    @@
-                    portable.
-       But the kind of int list list list Foo.t must be a subkind of
-           value mod portable
-         because of the definition of require_portable at line 2, characters 21-56.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with int list list list ≰ mod portable
 |}]

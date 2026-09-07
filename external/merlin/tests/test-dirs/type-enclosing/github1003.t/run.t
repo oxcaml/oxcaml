@@ -39,7 +39,7 @@
         "line": 5,
         "col": 12
       },
-      "type": "sig val foo : int end",
+      "type": "sig val foo : int @@ stateless end",
       "tail": "no"
     },
     {

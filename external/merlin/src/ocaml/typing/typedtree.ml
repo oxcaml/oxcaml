@@ -267,6 +267,8 @@ and 'k pattern_desc =
       value pattern_desc
   | Tpat_array :
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
+  | Tpat_modality :
+      value general_pattern -> value pattern_desc
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -443,6 +445,7 @@ and expression_desc =
   | Texp_open of open_declaration * expression
   | Texp_probe of { name:string; handler:expression; enabled_at_init:bool; }
   | Texp_probe_is_enabled of { name:string }
+  | Texp_modality of expression
   | Texp_exclave of expression
   | Texp_src_pos
   | Texp_overwrite of expression * expression
@@ -908,6 +911,7 @@ and core_type_desc =
   | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
+  | Ttyp_modality of core_type * modalities
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
@@ -1143,6 +1147,15 @@ type item_declaration =
 
 (* Auxiliary functions over the a.s.t. *)
 
+let rec modality_expression_head exp =
+  match exp.exp_desc with
+  | Texp_modality child ->
+      modality_expression_head
+        { child with
+          exp_attributes = exp.exp_attributes @ child.exp_attributes;
+          exp_extra = exp.exp_extra @ child.exp_extra }
+  | _ -> exp
+
 let as_computation_pattern (p : pattern) : computation general_pattern =
   {
     pat_desc = Tpat_value p;
@@ -1173,6 +1186,7 @@ let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   | Tpat_record _ -> Value
   | Tpat_record_unboxed_product _ -> Value
   | Tpat_array _ -> Value
+  | Tpat_modality _ -> Value
   | Tpat_lazy _ -> Value
   | Tpat_any -> Value
   | Tpat_var _ -> Value
@@ -1208,6 +1222,7 @@ let shallow_iter_pattern_desc
   | Tpat_record_unboxed_product (lbl_pat_list, _, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
+  | Tpat_modality p -> f.f p
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
@@ -1242,6 +1257,7 @@ let shallow_map_pattern_desc
       Tpat_construct (lid, c, r, List.map (fun (s, p) -> s, f.f p) pats, ty)
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
+  | Tpat_modality p -> Tpat_modality (f.f p)
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
@@ -1366,6 +1382,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
+      | Tpat_modality p -> loop f p
       | Tpat_lazy p | Tpat_exception p -> loop f p
       | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
         ()

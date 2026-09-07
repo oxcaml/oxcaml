@@ -96,6 +96,8 @@ module Typ :
       (str * jkind_annotation option) list -> core_type -> core_type
     val package: ?loc:loc -> ?attrs:attrs -> package_type -> core_type
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
+    val modality :
+      ?loc:loc -> ?attrs:attrs -> core_type -> modalities -> core_type
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type

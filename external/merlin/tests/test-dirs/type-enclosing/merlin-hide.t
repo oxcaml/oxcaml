@@ -20,7 +20,7 @@ accessible:
           "line": 5,
           "col": 3
         },
-        "type": "sig val x : int end",
+        "type": "sig val x : int @@ stateless end",
         "tail": "no"
       },
       {
@@ -32,7 +32,7 @@ accessible:
           "line": 5,
           "col": 3
         },
-        "type": "sig val x : int end",
+        "type": "sig val x : int @@ stateless end",
         "tail": "no"
       }
     ],
