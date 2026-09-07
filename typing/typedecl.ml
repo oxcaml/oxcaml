@@ -2025,7 +2025,8 @@ module Element_repr = struct
         |> Option.map (fun ts -> Unboxed_element (Product (Array.of_list ts)))
       | Addressable layout ->
         Option.map (fun t -> Addressable t) (layout_to_t layout)
-      | Univar _ | Genvar _ -> None
+      | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
+      | Genvar _ -> None
       in
       Option.bind layout layout_to_t
 
