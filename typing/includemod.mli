@@ -175,6 +175,7 @@ val modes_toplevel : modes
 (* Typechecking *)
 
 val modtypes:
+  ?self_check:bool ->
   loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion
 

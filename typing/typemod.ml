@@ -3611,7 +3611,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                     raise (Error(app_loc, env, error))
             in
             begin match
-              Includemod.modtypes ~loc:app_loc ~mark:false env
+              Includemod.modtypes ~self_check:true ~loc:app_loc ~mark:false env
                 mty_res nondep_mty
                 ~modes:(Specific ((mm_res, None), mm_res))
             with
