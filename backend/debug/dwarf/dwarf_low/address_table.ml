@@ -44,15 +44,10 @@ module Entry = struct
   end)
 end
 
-type entry_and_soc_symbol =
-  { entry : Entry.t;
-    start_of_code_symbol : Asm_symbol.t
-  }
-
 type t =
   { base_addr : Asm_label.t;
     mutable next_index : Address_index.t;
-    mutable table : entry_and_soc_symbol Address_index.Map.t;
+    mutable table : Entry.t Address_index.Map.t;
     mutable rev_table : Address_index.t Entry.Map.t
   }
 
@@ -63,14 +58,13 @@ let create () =
     rev_table = Entry.Map.empty
   }
 
-let add ?(adjustment = 0) t ~start_of_code_symbol addr =
+let add ?(adjustment = 0) t addr =
   let entry : Entry.t = { addr; adjustment } in
   match Entry.Map.find entry t.rev_table with
   | exception Not_found ->
     let index = t.next_index in
     t.next_index <- Address_index.succ index;
     t.rev_table <- Entry.Map.add entry index t.rev_table;
-    let entry : entry_and_soc_symbol = { entry; start_of_code_symbol } in
     t.table <- Address_index.Map.add index entry t.table;
     index
   | index -> index
@@ -90,11 +84,15 @@ let size t =
     (Initial_length.size initial_length)
     (Initial_length.to_dwarf_int initial_length)
 
-let entry_to_dwarf_value (entry : entry_and_soc_symbol) =
-  let adjustment = Targetint.of_int_exn entry.entry.adjustment in
-  Dwarf_value.code_address_from_label_symbol_diff ~comment:"ending address"
-    ~upper:entry.entry.addr ~lower:entry.start_of_code_symbol
-    ~offset_upper:adjustment ()
+let entry_to_dwarf_value (entry : Entry.t) =
+  (* DWARF-5 spec section 7.27: the entries in [.debug_addr] are relocatable
+     absolute addresses, not offsets from a base. *)
+  match entry.adjustment with
+  | 0 -> Dwarf_value.code_address_from_label ~comment:"address" entry.addr
+  | adjustment ->
+    Dwarf_value.code_address_from_label_plus_offset ~comment:"address"
+      entry.addr
+      ~offset_in_bytes:(Targetint.of_int_exn adjustment)
 
 let emit ~asm_directives t =
   Initial_length.emit ~asm_directives (initial_length t);

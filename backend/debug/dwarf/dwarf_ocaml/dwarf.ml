@@ -80,10 +80,12 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   let debug_ranges_table = Debug_ranges_table.create () in
   let address_table = Address_table.create () in
   let location_list_table = Location_list_table.create () in
+  let range_list_table = Range_list_table.create () in
   let state =
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
       ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
-      address_table location_list_table ~get_file_num:get_file_id ~sourcefile
+      address_table location_list_table range_list_table
+      ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
@@ -208,7 +210,17 @@ let emit t ~binary_backend_available =
     (DS.compilation_unit_proto_die t.state)
     ~code_layout:(DS.code_layout t.state)
     ~ranges:(DS.function_ranges t.state)
-    ~debug_ranges_table:(DS.debug_ranges_table t.state);
+    ~debug_ranges_table:(DS.debug_ranges_table t.state)
+    ~range_list_table:(DS.range_list_table t.state);
+  (match !Dwarf_flags.gdwarf_version with
+  | Four -> ()
+  | Five ->
+    (* Address indices (e.g. in location and range list entries) are resolved
+       via the compilation unit's [DW_AT_addr_base]. *)
+    Proto_die.add_or_replace_attribute_value
+      (DS.compilation_unit_proto_die t.state)
+      (DAH.create_addr_base
+         (Address_table.base_addr (DS.address_table t.state))));
   Dwarf_world.emit ~asm_directives:t.asm_directives
     ~compilation_unit_proto_die:(DS.compilation_unit_proto_die t.state)
     ~compilation_unit_header_label:(DS.compilation_unit_header_label t.state)
@@ -216,6 +228,7 @@ let emit t ~binary_backend_available =
     ~debug_ranges_table:(DS.debug_ranges_table t.state)
     ~address_table:(DS.address_table t.state)
     ~location_list_table:(DS.location_list_table t.state)
+    ~range_list_table:(DS.range_list_table t.state)
     ~binary_backend_available;
   if !Dwarf_flags.ddwarf_metrics then emit_stats_file t
 

@@ -43,7 +43,8 @@ let compile_unit_proto_die_without_code_ranges ~sourcefile ~unit_name =
   Proto_die.create ~parent:None ~tag:Compile_unit ~attribute_values ()
 
 let code_ranges_attributes ~code_layout
-    ~(ranges : Dwarf_state.function_range list) ~debug_ranges_table =
+    ~(ranges : Dwarf_state.function_range list) ~debug_ranges_table
+    ~range_list_table =
   (* Use DW_AT_ranges for non-contiguous ranges. For function sections, each
      function is in a different section, so we need base address selection
      entries to switch the base. For contiguous code, we can use a simpler
@@ -52,30 +53,50 @@ let code_ranges_attributes ~code_layout
   | Dwarf_state.Continuous_code_section { code_begin; code_end } ->
     [ DAH.create_low_pc_from_symbol code_begin;
       DAH.create_high_pc_from_symbol ~low_pc:code_begin code_end ]
-  | Dwarf_state.Function_sections ->
-    let range_list_entries =
-      List.concat_map
-        (fun (range : Dwarf_state.function_range) ->
-          [ Dwarf_4_range_list_entry.create_base_address_selection_entry
-              ~base_address_symbol:range.function_symbol;
-            Dwarf_4_range_list_entry.create_range_list_entry
-              ~start_of_code_symbol:range.function_symbol
-              ~first_address_when_in_scope:range.start_label
-              ~first_address_when_not_in_scope:range.end_label
-              ~first_address_when_not_in_scope_offset:
-                range.offset_past_end_label ])
-        ranges
-    in
-    let range_list = Dwarf_4_range_list.create ~range_list_entries in
-    let ranges_attr =
-      Debug_ranges_table.insert debug_ranges_table ~range_list
-    in
-    [ranges_attr]
+  | Dwarf_state.Function_sections -> (
+    match !Dwarf_flags.gdwarf_version with
+    | Four ->
+      let range_list_entries =
+        List.concat_map
+          (fun (range : Dwarf_state.function_range) ->
+            [ Dwarf_4_range_list_entry.create_base_address_selection_entry
+                ~base_address_symbol:range.function_symbol;
+              Dwarf_4_range_list_entry.create_range_list_entry
+                ~start_of_code_symbol:range.function_symbol
+                ~first_address_when_in_scope:range.start_label
+                ~first_address_when_not_in_scope:range.end_label
+                ~first_address_when_not_in_scope_offset:
+                  range.offset_past_end_label ])
+          ranges
+      in
+      let range_list = Dwarf_4_range_list.create ~range_list_entries in
+      let ranges_attr =
+        Debug_ranges_table.insert debug_ranges_table ~range_list
+      in
+      [ranges_attr]
+    | Five ->
+      let range_list =
+        List.fold_left
+          (fun range_list (range : Dwarf_state.function_range) ->
+            let entry : Range_list_entry.entry =
+              Start_end
+                { start_inclusive = range.start_label;
+                  end_exclusive = range.end_label;
+                  end_adjustment =
+                    Option.value range.offset_past_end_label ~default:0;
+                  payload = ()
+                }
+            in
+            Range_list.add range_list (Range_list_entry.create entry))
+          (Range_list.create ()) ranges
+      in
+      [DAH.create_ranges (Range_list_table.add range_list_table range_list)])
 
 let add_code_ranges_to_compile_unit_proto_die die ~code_layout ~ranges
-    ~debug_ranges_table =
+    ~debug_ranges_table ~range_list_table =
   let address_attributes =
     code_ranges_attributes ~code_layout ~ranges ~debug_ranges_table
+      ~range_list_table
   in
   List.iter
     (fun attr -> Proto_die.add_or_replace_attribute_value die attr)
