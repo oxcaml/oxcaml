@@ -1646,10 +1646,11 @@ let modtypes_consistency ~loc env mty1 mty2 =
   | Ok _ -> ()
   | Error reason -> raise (Error (env, Error.(In_Module_type reason)))
 
-let modtypes ~loc env ~mark ~modes mty1 mty2 =
+let modtypes ?(self_check = false) ~loc env ~mark ~modes mty1 mty2 =
   let direction = Directionality.unknown ~mark in
+  let core = if self_check then core_inclusion_self_check else core_inclusion in
   match
-    modtypes ~core:core_inclusion ~direction ~loc env Subst.identity
+    modtypes ~core ~direction ~loc env Subst.identity
       ~modes mty1 mty2 Shape.dummy_mod
   with
   | Ok (cc, _) -> cc

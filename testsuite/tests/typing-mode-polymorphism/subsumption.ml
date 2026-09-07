@@ -540,26 +540,19 @@ module Foo = struct
   module Check : sig val f : string @ local -> unit -> unit end = M
 end
 [%%expect{|
-Line 6, characters 66-67:
-6 |   module Check : sig val f : string @ local -> unit -> unit end = M
-                                                                      ^
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f :
-             string @ [< global many read_write] ->
-             unit @ 'm -> unit @ [> dynamic]
-         end
-       is not included in
-         sig val f : string @ local -> unit -> unit end
-       Values do not match:
-         val f :
-           string @ [< global many read_write] ->
-           unit @ 'm -> unit @ [> dynamic]
-       is not included in
-         val f : string @ local -> unit -> unit
-       The type
-         "string @ [< global many read_write] ->
-         unit @ [> dynamic] -> unit @ [< global > dynamic]"
-       is not compatible with the type "string @ local -> unit -> unit"
+module Foo :
+  sig
+    module F :
+      functor (X : sig type t val consume : t @ local -> unit end) ->
+        sig
+          val f :
+            X.t @ [< many read_write] -> unit @ 'm -> unit @ [> dynamic]
+        end
+    module M :
+      sig
+        val f :
+          string @ [< many read_write] -> unit @ 'm -> unit @ [> dynamic]
+      end
+    module Check : sig val f : string @ local -> unit -> unit end
+  end
 |}]
