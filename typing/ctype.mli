@@ -729,17 +729,19 @@ val contained_without_boxing : Env.t -> type_expr -> type_expr list
 val estimate_type_jkind : Env.t ->  type_expr -> jkind_l
 
 (* Get the jkind of a type, expanding it and looking through [[@@unboxed]]
-   types. *)
-val type_jkind : Env.t -> type_expr -> jkind_l
+   types. [mod_bounds_only] promises that only the result's mod- and
+   with-bounds are consumed, so its layout may be estimated cheaply. *)
+val type_jkind : ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l
 
 (* Get the jkind of a type, dropping any changes to types caused by
    expansion. *)
-val type_jkind_purely : Env.t -> type_expr -> jkind_l
+val type_jkind_purely : ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l
 
 (* Like [type_jkind_purely], but returns [None] if the type is not
    principally known. Useful to instantiate [jkind_of_type] in various
    functions exported by [Jkind]. *)
-val type_jkind_purely_if_principal : Env.t -> type_expr -> jkind_l option
+val type_jkind_purely_if_principal :
+  ?mod_bounds_only:bool -> Env.t -> type_expr -> jkind_l option
 
 (* Helper functions for creating jkind contexts *)
 val mk_jkind_context :

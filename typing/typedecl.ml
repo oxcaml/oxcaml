@@ -3695,7 +3695,8 @@ let normalize_decl_jkinds env decls =
       decl.type_unboxed_version
     in
     let normalization_context =
-      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+      Ctype.mk_jkind_context env (fun ty ->
+        Some (Ctype.type_jkind ~mod_bounds_only:true env ty))
     in
     let normalized_jkind =
       Jkind.normalize
