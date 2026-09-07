@@ -9,7 +9,8 @@
 (env (_
  (binaries
   merlin-wrapper ocamlc-wrapper dune-wrapper revert-newlines
-  (test-dirs/extract_ranges/extract_ranges.exe as extract_ranges))
+  (test-dirs/extract_ranges/extract_ranges.exe as extract_ranges)
+  (test-dirs/show_location/show_location.exe as show_location))
  (env-vars
   (MERLIN merlin-wrapper)
   (OCAMLC ocamlc-wrapper)
@@ -29,6 +30,7 @@
   %{bin:dot-merlin-reader}
   %{bin:revert-newlines}
   %{bin:extract_ranges}
+  %{bin:show_location}
   (env_var MERLIN_TEST_OCAML_VERSION)))
 
 (cram
