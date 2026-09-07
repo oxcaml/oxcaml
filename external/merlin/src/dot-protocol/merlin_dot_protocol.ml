@@ -28,6 +28,7 @@
 
 open Merlin_utils.Std
 open Merlin_utils.Std.Result
+module Csexp = Merlin_csexp
 
 module Directive = struct
   type include_path =

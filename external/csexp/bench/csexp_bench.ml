@@ -6,7 +6,7 @@ module Sexp = struct
     | List of t list
 end
 
-module Csexp = Csexp.Make (Sexp)
+module Csexp = Merlin_csexp.Make (Sexp)
 
 let atom = Sexp.Atom (String.make 128 'x')
 

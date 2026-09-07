@@ -1,6 +1,6 @@
 (** The indexer's binary *)
 
-open Lib
+open Merlin_ocaml_index
 
 let usage_msg =
   "ocaml-index [COMMAND] [-verbose] <file1> [<file2>] ... -o <output>"
