@@ -148,13 +148,16 @@ end
 module Ty = struct
   type t =
     | Number of NumberTy.t
+    | Array of NumberTy.t * int list
     | Bool
 
   let equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
+    | Array (l, ls), Array (r, rs) ->
+      NumberTy.equal l r && List.equal Int.equal ls rs
     | Bool, Bool -> true
-    | (Number _ | Bool), _ -> false
+    | (Number _ | Array _ | Bool), _ -> false
 end
 
 module Bin_op = struct
@@ -187,15 +190,15 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool ->
-      Misc.fatal_errorf
-        "Bin_op.ops_for_ty: only numeric types allowed, but got Bool"
+    | Bool | Array _ ->
+      Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop lhs rhs =
     let module_name =
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
+      | Ty.Array _ -> Misc.fatal_errorf "Bin_op.to_code: unexpected array"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
     match binop with
@@ -224,6 +227,12 @@ module Expr = struct
   type t =
     | Const of Number.t
     | Var of Name.t
+    | Array_literal of t list
+    | Array_make of
+        { dimensions : int list;
+          init : t
+        }
+    | Array_get of Name.t * t list
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -250,6 +259,24 @@ module Expr = struct
     | Const n -> Number.to_code n
     | Var name ->
       Exp.ident { Location.txt = Longident.Lident name; loc = Location.none }
+    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
+    | Array_make { dimensions; init } ->
+      let init_name = "array_initial_value" in
+      let rec make = function
+        | [] -> Misc.fatal_errorf "Array_make: no dimensions"
+        | [size] -> apply (ident "array_make") [int size; ident init_name]
+        | size :: rest ->
+          apply
+            (qualified_ident "Array" "init")
+            [int size; function_ [value_param (Pat.any ())] (make rest)]
+      in
+      Exp.let_ Immutable Nonrecursive
+        [Vb.mk (Pat.var (loc init_name)) (to_code init)]
+        (make dimensions)
+    | Array_get (name, indices) ->
+      List.fold_left
+        (fun array index -> apply (ident "array_get") [array; to_code index])
+        (ident (Name.to_string name)) indices
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
@@ -263,6 +290,7 @@ end
 module Statement = struct
   type t =
     | Assign of Name.t * Expr.t
+    | Array_set of Name.t * Expr.t list * Expr.t
     | Seq of t list
     | If of Expr.t * t * t
     | Let_mutable of Name.t * Expr.t * t
@@ -286,6 +314,16 @@ module Statement = struct
   let rec to_code : t -> Parsetree.expression = function
     | Assign (name, expr) ->
       Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
+    | Array_set (name, indices, value) ->
+      let rec set array = function
+        | [] -> Misc.fatal_errorf "Array_set: no indices"
+        | [index] ->
+          apply (ident "array_set")
+            [array; Expr.to_code index; Expr.to_code value]
+        | index :: rest ->
+          set (apply (ident "array_get") [array; Expr.to_code index]) rest
+      in
+      set (ident (Name.to_string name)) indices
     | Bounded_loop { var; init; bound; stride; body } ->
       if stride = 0 then Misc.fatal_errorf "Bounded_loop: zero stride";
       let name = Name.to_string var in
