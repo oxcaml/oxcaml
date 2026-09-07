@@ -85,8 +85,9 @@ val place_lifted_constants :
 val create_switch :
   Upwards_acc.t ->
   condition_dbg:Debuginfo.t ->
+  scrutinee_kind:Flambda_kind.Standard_int.t ->
   scrutinee:Simple.t ->
-  arms:Apply_cont.t Target_ocaml_int.Map.t ->
+  arms:Apply_cont.t Targetint_32_64.Map.t ->
   Rebuilt_expr.t * Upwards_acc.t
 
 type new_let_cont =

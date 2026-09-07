@@ -329,7 +329,8 @@ type expr =
   | Apply of apply
   | Apply_cont of apply_cont
   | Switch of
-      { scrutinee : simple;
+      { scrutinee_kind : Flambda_kind.Standard_int.t;
+        scrutinee : simple;
         cases : (int * apply_or_inlined_cont) list
       }
   | Invalid of { message : string }

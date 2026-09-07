@@ -1,0 +1,16 @@
+let code f_0 deleted in
+let code loopify(never) size(2) newer_version_of(f_0)
+      f_0_1 (x : int64)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let tagged_scrutinee = %num_conv.[`int64`].[tagged_imm] (x) in
+  cont k (tagged_scrutinee)
+in
+let $camlSwitch_naked_int64_identity__f =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let $camlSwitch_naked_int64_identity =
+  Block 0 ($camlSwitch_naked_int64_identity__f)
+in
+cont done ($camlSwitch_naked_int64_identity)

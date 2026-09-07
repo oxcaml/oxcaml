@@ -432,10 +432,22 @@ switch_case:
 switch:
   | option(PIPE); cs = separated_list(PIPE, switch_case) { cs }
 ;
+
+switch_scrutinee_kind:
+  | KWD_IMM; KWD_TAGGED { Flambda_kind.Standard_int.Tagged_immediate }
+  | KWD_IMM { Flambda_kind.Standard_int.Naked_immediate }
+  | KWD_INT8 { Flambda_kind.Standard_int.Naked_int8 }
+  | KWD_INT16 { Flambda_kind.Standard_int.Naked_int16 }
+  | KWD_INT32 { Flambda_kind.Standard_int.Naked_int32 }
+  | KWD_INT64 { Flambda_kind.Standard_int.Naked_int64 }
+  | KWD_NATIVEINT { Flambda_kind.Standard_int.Naked_nativeint }
+;
 naked_number_kind:
   | KWD_IMM { Naked_immediate }
   | KWD_FLOAT { Naked_float }
   | KWD_FLOAT32 { Naked_float32 }
+  | KWD_INT8 { Naked_int8 }
+  | KWD_INT16 { Naked_int16 }
   | KWD_INT32 { Naked_int32 }
   | KWD_INT64 { Naked_int64 }
   | KWD_NATIVEINT { Naked_nativeint }
@@ -557,8 +569,13 @@ atomic_body:
 
 inlined_expr:
   | a = atomic_expr { a }
-  | KWD_SWITCH; scrutinee = simple; cases = switch
-    { Switch {scrutinee; cases} }
+  | KWD_SWITCH; scrutinee_kind = option(switch_scrutinee_kind);
+    scrutinee = simple; cases = switch
+    { let scrutinee_kind =
+        Option.value scrutinee_kind
+          ~default:Flambda_kind.Standard_int.Naked_immediate
+      in
+      Switch {scrutinee_kind; scrutinee; cases} }
 ;
 
 atomic_expr:

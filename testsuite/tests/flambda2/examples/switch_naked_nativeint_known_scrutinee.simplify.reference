@@ -1,0 +1,15 @@
+let code f_0 deleted in
+let code loopify(never) size(1) newer_version_of(f_0)
+      f_0_1 (y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (y)
+in
+let $camlSwitch_naked_nativeint_known_scrutinee__f =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let $camlSwitch_naked_nativeint_known_scrutinee =
+  Block 0 ($camlSwitch_naked_nativeint_known_scrutinee__f)
+in
+cont done ($camlSwitch_naked_nativeint_known_scrutinee)

@@ -1,0 +1,18 @@
+let code f_0 deleted in
+let code loopify(never) size(8) newer_version_of(f_0)
+      f_0_1 (x : int32)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let tagged_scrutinee = %num_conv.[`int32`].[tagged_imm] (x) in
+  let scaled_arg = %int_barith.mul (tagged_scrutinee, 10) in
+  let final_arg = %int_barith.add (scaled_arg, 10) in
+  cont k (final_arg)
+in
+let $camlSwitch_naked_int32_affine__f =
+  closure f_0_1 @f &toplevel.alloc_region
+in
+let $camlSwitch_naked_int32_affine =
+  Block 0 ($camlSwitch_naked_int32_affine__f)
+in
+cont done ($camlSwitch_naked_int32_affine)

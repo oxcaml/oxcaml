@@ -459,7 +459,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
   | Apply_cont ac ->
     let acc, ac = apply_cont env acc ac in
     acc, Flambda.Expr.create_apply_cont ac
-  | Switch { scrutinee; cases } ->
+  | Switch { scrutinee_kind; scrutinee; cases } ->
     let (acc, build_let_ks), arms =
       List.fold_left_map
         (fun (acc, build_let_ks) (case, apply) ->
@@ -469,7 +469,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
                available *)
             let acc, apply = apply_cont env acc apply in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) )
+              (Targetint_32_64.of_int machine_width case, apply) )
           | Inlined_goto body ->
             let (acc : Acc.t), build_let, (apply : Apply_cont_expr.t) =
               inlined_goto env acc body
@@ -479,14 +479,14 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
               build_let_ks acc let_k
             in
             ( (acc, build_let_ks),
-              (Target_ocaml_int.of_int machine_width case, apply) ))
+              (Targetint_32_64.of_int machine_width case, apply) ))
         (acc, fun acc e -> acc, e)
         cases
     in
-    let arms = Target_ocaml_int.Map.of_list arms in
+    let arms = Targetint_32_64.Map.of_list arms in
     build_let_ks acc
     @@ Flambda.Expr.create_switch
-         (Flambda.Switch.create ~condition_dbg:Debuginfo.none
+         (Flambda.Switch.create ~condition_dbg:Debuginfo.none ~scrutinee_kind
             ~scrutinee:(simple env scrutinee) ~arms)
   | Let_symbol { bindings; value_slots; body } ->
     (* Desugar the abbreviated form for a single set of closures *)
