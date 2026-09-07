@@ -138,7 +138,13 @@ module Statement : sig
     | Seq of t list
     | If of Expr.t * t * t
     | Let_mutable of Name.t * Expr.t * t
-    | Bounded_loop of Name.t * Expr.t * t
+    | Bounded_loop of
+        { var : Name.t;
+          init : Expr.t;
+          bound : Expr.t;
+          stride : int;
+          body : t
+        }
 
   val let_mutable :
     Name.t ->
