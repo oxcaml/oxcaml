@@ -32,14 +32,6 @@ module String : sig
   include Heterogenous_list.S with type 'a t := string
 end
 
-type bindings
-
-type bindings_ref
-
-val get_bindings : bindings_ref -> bindings
-
-val print_bindings : Format.formatter -> bindings -> unit
-
 (** The type [('p, 'v) program] is the type of programs returning values of type
     ['v] with parameters ['p].
 
@@ -88,7 +80,7 @@ val filter :
 type callback
 
 val create_callback_with_bindings :
-  (bindings_ref -> 'a Constant.hlist -> unit) ->
+  (Executor.bindings_ref -> 'a Constant.hlist -> unit) ->
   name:string ->
   'a Term.hlist ->
   callback

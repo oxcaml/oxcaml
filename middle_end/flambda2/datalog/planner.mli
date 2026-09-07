@@ -1,11 +1,10 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Basile Clément, OCamlPro                             *
+ *                        Basile Clément, OCamlPro                            *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 OCamlPro                                                *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2024 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -27,20 +26,36 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type _ repr =
-  | Int_repr : { print : Format.formatter -> int -> unit } -> int repr
+open Datalog_imports
+open Lang
 
-include Heterogenous_list.Make (struct
-  type 'a t = 'a repr
-end)
+type 'k column_iterator =
+  | Column_iterator :
+      ('t, 'k, 'v) Column.id * 't variable * 'v variable
+      -> 'k column_iterator
 
-let int_repr ~print = Int_repr { print }
+type stage =
+  | Join_stage : 'k variable * 'k column_iterator list -> stage
+  | Seek_stage : 'k term * 'k column_iterator list -> stage
+  | Check_stage : atom -> stage
 
-let equal_repr : type a. a repr -> a -> a -> bool =
- fun (Int_repr _) x1 x2 -> Int.equal x1 x2
+type bound_table =
+  | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
-let compare_repr : type a. a repr -> a -> a -> int =
- fun (Int_repr _) x1 x2 -> Int.compare x1 x2
+type ('p, 'v) plan =
+  { tables : bound_table iarray;
+    parameters : 'p Variable.hlist;
+    input_stages : stage iarray;
+    num_existentials : int;
+    output_atoms : atom iarray;
+    callback : ('v Constant.hlist -> unit) ref
+  }
 
-let print_repr : type a. a repr -> Format.formatter -> a -> unit =
- fun (Int_repr { print }) ppf x -> print ppf x
+val print_plan : Format.formatter -> ('p, 'v) plan -> unit
+
+val plan_rule :
+  ?callback:('v Constant.hlist -> unit) ref ->
+  'p Variable.hlist ->
+  Variable.t_ list ->
+  rule ->
+  ('p, 'v) plan

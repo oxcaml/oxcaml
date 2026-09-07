@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Datalog_imports
-
 module Type : sig
   type (_, _) eq = Equal : ('a, 'a) eq
 end
@@ -48,6 +46,8 @@ module Id : sig
 
   val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
 
+  val default_value : ('t, 'k, 'v) t -> 'v
+
   val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
 
   val has_provenance : ('t, 'k, 'v) t -> bool
@@ -60,12 +60,6 @@ module Id : sig
     columns:('t, 'k, 'v) Column.hlist ->
     default_value:'v ->
     ('t, 'k, 'v) t
-
-  val create_iterator :
-    ('t, 'k, 'v) t ->
-    't Or_null_sender.t
-    * 'k Trie.Iterator.hlist with_names
-    * 'v Or_null_receiver.t
 end
 
 module Map : sig

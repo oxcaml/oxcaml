@@ -1,11 +1,10 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Basile Clément, OCamlPro                             *
+ *                        Basile Clément, OCamlPro                            *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 OCamlPro                                                *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2024 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -27,20 +26,62 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type _ repr =
-  | Int_repr : { print : Format.formatter -> int -> unit } -> int repr
+open Datalog_imports
 
-include Heterogenous_list.Make (struct
-  type 'a t = 'a repr
-end)
+type t
 
-let int_repr ~print = Int_repr { print }
+val print : Format.formatter -> t -> unit
 
-let equal_repr : type a. a repr -> a -> a -> bool =
- fun (Int_repr _) x1 x2 -> Int.equal x1 x2
+val run : t -> unit
 
-let compare_repr : type a. a repr -> a -> a -> int =
- fun (Int_repr _) x1 x2 -> Int.compare x1 x2
+type _ builder
 
-let print_repr : type a. a repr -> Format.formatter -> a -> unit =
- fun (Int_repr { print }) ppf x -> print ppf x
+val build : nil builder -> t
+
+val break : int -> 'a builder
+
+val for_in :
+  'a Value.repr with_name ->
+  'a Trie.Iterator.t list with_names ->
+  ('a Channel.or_null_receiver -> ('a -> 'b) builder) ->
+  'b builder
+
+val if_in :
+  'a Channel.or_null_receiver with_name ->
+  'a Trie.Iterator.t list with_names ->
+  'b builder ->
+  'b builder
+
+val unless :
+  ('t, 'k, 'v) Trie.is_trie ->
+  't Channel.or_null_receiver with_name ->
+  'k Or_null_receiver.hlist with_names ->
+  'a builder ->
+  'a builder
+
+val unless_eq :
+  'a Value.repr ->
+  'a Or_null_receiver.t with_name ->
+  'a Or_null_receiver.t with_name ->
+  'b builder ->
+  'b builder
+
+val filter :
+  ('a Constant.hlist -> bool) ->
+  'a Or_null_receiver.hlist with_names ->
+  'b builder ->
+  'b builder
+
+type bindings_ref
+
+val call :
+  (bindings_ref -> 'a Constant.hlist -> unit) with_name ->
+  'a Or_null_receiver.hlist with_names ->
+  'b builder ->
+  'b builder
+
+type bindings
+
+val print_bindings : Format.formatter -> bindings -> unit
+
+val get_bindings : bindings_ref -> bindings
