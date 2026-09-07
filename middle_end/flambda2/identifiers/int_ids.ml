@@ -520,18 +520,26 @@ module Variable = struct
 
     let hash = Id.hash
 
-    let print ppf t =
+    let print_with_visibility_suffix suffix ppf t =
       let cu = compilation_unit t in
       if Compilation_unit.equal cu (Current_unit.get_cu_exn ())
-      then
-        Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
-          (if user_visible t then "UV" else "N")
+      then Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t) suffix
       else
         Format.fprintf ppf "%a.%s/%d%s"
           (Format_doc.compat Compilation_unit.print)
-          cu (name t) (name_stamp t)
-          (if user_visible t then "UV" else "N")
+          cu (name t) (name_stamp t) suffix
+
+    let print ppf t =
+      print_with_visibility_suffix (if user_visible t then "UV" else "N") ppf t
   end
+
+  (* For the use of [Bound_var] and [Bound_parameter], whose binders can be
+     marked as needed by phantom lets; such variables print as "NP" instead of
+     "N", or "UVP" instead of "UV". *)
+  let print_as_needed_by_phantom_let ppf t =
+    T0.print_with_visibility_suffix
+      (if user_visible t then "UVP" else "NP")
+      ppf t
 
   include T0
 

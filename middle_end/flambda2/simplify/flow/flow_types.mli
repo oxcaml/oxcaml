@@ -142,6 +142,12 @@ module Data_flow_result : sig
     { required_names : Name.Set.t;
           (** The set of all variables that are in fact used to compute the
               returned value of the function being analyzed. *)
+      required_names_for_phantom_lets : Name.Set.t;
+          (** The names that the debugger may need to locate in order to display
+              the values of variables described by phantom lets: the transitive
+              closure of the name dependency graph (including the edges from
+              continuation parameters to their arguments) from the user-visible
+              variables. Empty unless phantom lets are being generated. *)
       reachable_code_ids : Reachable_code_ids.t Or_unknown.t
     }
 

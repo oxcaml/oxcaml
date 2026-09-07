@@ -1,0 +1,55 @@
+let code iter_0 deleted in
+let $camlNp_loop_cycle__const_block_0 = Block 0 (1, 2) in
+let code test_1 deleted in
+let code inline(never) loopify(always) size(26) newer_version_of(iter_0)
+      iter_0_1 (fuel : imm tagged, state : [ 0 of imm tagged * imm tagged ])
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let field_at_use = %block_load.tag[`0`].`size`[`2`].[`0`] (state) in
+   let field_at_use_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (state) in
+   cont `self` (fuel, field_at_use_1, field_at_use))
+    where rec `self`
+                (fuel_1 : imm tagged, np unboxed_field_1, np unboxed_field_0) =
+      let `region` = %begin_region () in
+      let prim = %phys_eq (fuel_1, 0) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let int_add = %int_barith.add (unboxed_field_0, unboxed_field_1)
+           in
+           let `unit` = %end_region (`region`) in
+           cont k (int_add)
+         where k2 =
+           let phantom pair =
+             %block.[`0`].my_alloc_region.local[`region`]
+               (unboxed_field_0, unboxed_field_0)
+           in
+           let t = %int_barith.add (unboxed_field_0, unboxed_field_0) in
+           let np int_sub = %int_barith.sub (fuel_1, 1) in
+           let `unit` = %end_region (`region`) in
+           cont `self` (int_sub, t, unboxed_field_1))
+in
+let $camlNp_loop_cycle__iter_1 =
+  closure iter_0_1 @iter &toplevel.alloc_region
+in
+let phantom iter = $camlNp_loop_cycle__iter_1 in
+let code loopify(never) size(4) newer_version_of(test_1)
+      test_1_1 (fuel : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(iter_0_1 &my_alloc_region)
+    ($camlNp_loop_cycle__iter_1 : _ -> imm tagged)
+      (fuel, $camlNp_loop_cycle__const_block_0)
+      -> k * k1
+in
+let $camlNp_loop_cycle__test_2 =
+  closure test_1_1 @test &toplevel.alloc_region
+in
+let phantom test = $camlNp_loop_cycle__test_2 in
+let $camlNp_loop_cycle =
+  Block 0 ($camlNp_loop_cycle__iter_1, $camlNp_loop_cycle__test_2)
+in
+cont done ($camlNp_loop_cycle)

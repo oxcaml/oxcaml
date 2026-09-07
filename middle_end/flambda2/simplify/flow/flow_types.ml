@@ -247,17 +247,25 @@ end
 module Data_flow_result = struct
   type t =
     { required_names : Name.Set.t;
+      required_names_for_phantom_lets : Name.Set.t;
+          (** The names that the debugger may need to locate in order to display
+              the values of variables described by phantom lets: the transitive
+              closure of the name dependency graph (including the edges from
+              continuation parameters to their arguments) from the user-visible
+              variables. Empty unless phantom lets are being generated. *)
       reachable_code_ids : Reachable_code_ids.t Or_unknown.t
     }
 
   let[@ocamlformat "disable"] print ppf
-      { required_names; reachable_code_ids; } =
+      { required_names; required_names_for_phantom_lets; reachable_code_ids; } =
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(required_names@ %a)@]@ \
+         @[<hov 1>(required_names_for_phantom_lets@ %a)@]@ \
          @[<hov 1>(reachable_code_ids@ %a)@]@ \
        )@]"
     Name.Set.print required_names
+    Name.Set.print required_names_for_phantom_lets
     (Or_unknown.print Reachable_code_ids.print) reachable_code_ids
 end
 

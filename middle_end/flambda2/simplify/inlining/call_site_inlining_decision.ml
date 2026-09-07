@@ -95,6 +95,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
             ~used_value_slots:Unknown
             ~code_ids_to_never_delete:Code_id.Set.empty
             ~specialization_map:(DA.specialization_map dacc)
+            ~generate_phantom_lets:false
             ~return_continuation:function_return_cont
             ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
             ~machine_width:(DE.machine_width (DA.denv dacc))

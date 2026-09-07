@@ -202,7 +202,8 @@ type coercion =
 
 type kinded_parameter =
   { param : variable;
-    kind : kind_with_subkind option
+    kind : kind_with_subkind option;
+    needed_by_phantom_let : bool
   }
 
 type name =
@@ -350,11 +351,13 @@ and one_value_slot =
 and let_ =
   { bindings : let_binding list;
     value_slots : value_slots option;
-    body : expr
+    body : expr;
+    is_phantom : bool
   }
 
 and let_binding =
   { var : variable;
+    needed_by_phantom_let : bool;
     defining_expr : named
   }
 

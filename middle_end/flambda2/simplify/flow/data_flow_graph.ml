@@ -22,6 +22,7 @@ type t =
     code_id_to_code_id : Code_id.Set.t Code_id.Map.t;
     unconditionally_used : Name.Set.t;
     code_id_unconditionally_used : Code_id.Set.t;
+    phantom_roots : Name.Set.t;
     is_toplevel : bool
   }
 
@@ -62,6 +63,7 @@ module Reachable = struct
         then
           T.Data_flow_result.
             { required_names = name_enqueued;
+              required_names_for_phantom_lets = Name.Set.empty;
               reachable_code_ids =
                 Known
                   T.Reachable_code_ids.
@@ -74,7 +76,10 @@ module Reachable = struct
             older_enqueued name_queue name_enqueued
       else
         T.Data_flow_result.
-          { required_names = name_enqueued; reachable_code_ids = Unknown }
+          { required_names = name_enqueued;
+            required_names_for_phantom_lets = Name.Set.empty;
+            reachable_code_ids = Unknown
+          }
     | src ->
       let name_enqueued =
         Name_Name_Edge.push ~src name_enqueued name_queue t.name_to_name
@@ -153,7 +158,8 @@ let empty code_age_relation is_toplevel ~code_ids_to_never_delete =
     code_id_to_name = Code_id.Map.empty;
     code_id_to_code_id = Code_id.Map.empty;
     unconditionally_used = Name.Set.empty;
-    code_id_unconditionally_used = code_ids_to_never_delete
+    code_id_unconditionally_used = code_ids_to_never_delete;
+    phantom_roots = Name.Set.empty
   }
 
 let print ppf
@@ -164,14 +170,15 @@ let print ppf
       code_id_to_code_id;
       code_age_relation;
       unconditionally_used;
-      code_id_unconditionally_used
+      code_id_unconditionally_used;
+      phantom_roots
     } =
   Format.fprintf ppf
     "@[<hov 1>(@[<hov 1>(is_toplevel %b)@]@ @[<hov 1>(code_age_relation@ \
      %a)@]@ @[<hov 1>(name_to_name@ %a)@]@ @[<hov 1>(name_to_code_id@ %a)@]@ \
      @[<hov 1>(code_id_to_name@ %a)@]@ @[<hov 1>(code_id_to_code_id@ %a)@]@ \
      @[<hov 1>(unconditionally_used@ %a)@]@ @[<hov \
-     1>(code_id_unconditionally_used@ %a)@])@]"
+     1>(code_id_unconditionally_used@ %a)@]@ @[<hov 1>(phantom_roots@ %a)@])@]"
     is_toplevel Code_age_relation.print code_age_relation
     (Name.Map.print Name.Set.print)
     name_to_name
@@ -181,7 +188,7 @@ let print ppf
     code_id_to_name
     (Code_id.Map.print Code_id.Set.print)
     code_id_to_code_id Name.Set.print unconditionally_used Code_id.Set.print
-    code_id_unconditionally_used
+    code_id_unconditionally_used Name.Set.print phantom_roots
 
 (* *)
 let fold_name_occurrences name_occurrences ~init ~names ~code_ids =
@@ -248,7 +255,7 @@ let add_name_occurrences name_occurrences
   { t with unconditionally_used; code_id_unconditionally_used }
 
 let add_continuation_info map ~return_continuation ~exn_continuation
-    ~used_value_slots _
+    ~used_value_slots ~generate_phantom_lets _
     T.Continuation_info.
       { apply_cont_args;
         (* CR pchambart: properly follow dependencies in exception extra args.
@@ -258,17 +265,39 @@ let add_continuation_info map ~return_continuation ~exn_continuation
         bindings;
         direct_aliases;
         mutable_let_prims_rev;
-        defined = _;
+        defined;
         code_ids;
         value_slots;
         continuation = _;
         recursive = _;
         is_exn_handler = _;
         parent_continuation = _;
-        params = _
+        params
       } t =
   (* Add the vars used in the handler *)
   let t = add_name_occurrences used_in_handler t in
+  (* Record the roots of [required_names_for_phantom_lets] (see below): the
+     user-visible variables. They are the ultimate origins of phantom lets:
+     bindings are only phantomised when user visible, or when referenced by the
+     defining expression of another phantom let. (CR mshinwell: phantom lets
+     already present in the input term -- for example on a second round of
+     simplification -- are not themselves treated as roots here; the variables
+     they reference directly are still marked via the phantom-occurrence check
+     during rebuilding, but requirement chains that pass through loop arguments
+     and are rooted only at such phantom lets would be missed.) *)
+  let t =
+    if not generate_phantom_lets
+    then t
+    else
+      let add_root t var =
+        if Variable.user_visible var
+        then
+          { t with phantom_roots = Name.Set.add (Name.var var) t.phantom_roots }
+        else t
+      in
+      let t = Variable.Set.fold (fun var t -> add_root t var) defined t in
+      List.fold_left add_root t (Bound_parameters.vars params)
+  in
   (* Add the dependencies created by closures vars in envs *)
   let is_value_slot_used =
     match (used_value_slots : _ Or_unknown.t) with
@@ -412,7 +441,7 @@ let add_continuation_info map ~return_continuation ~exn_continuation
     apply_cont_args t
 
 let create ~return_continuation ~exn_continuation ~code_age_relation
-    ~used_value_slots ~code_ids_to_never_delete map =
+    ~used_value_slots ~code_ids_to_never_delete ~generate_phantom_lets map =
   (* Build the dependencies using the regular params and args of continuations,
      and the let-bindings in continuations handlers. *)
   let is_toplevel =
@@ -423,7 +452,7 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
   let t =
     Continuation.Map.fold
       (add_continuation_info map ~return_continuation ~exn_continuation
-         ~used_value_slots)
+         ~used_value_slots ~generate_phantom_lets)
       map
       (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
   in
@@ -437,6 +466,7 @@ let required_names
        code_id_to_code_id = _;
        unconditionally_used;
        code_id_unconditionally_used;
+       phantom_roots = _;
        is_toplevel
      } as t) =
   let name_queue = Queue.create () in
@@ -449,3 +479,24 @@ let required_names
       code_id_unconditionally_used;
   Reachable.reachable_names t code_id_queue code_id_unconditionally_used
     Code_id.Set.empty name_queue unconditionally_used
+
+(* The transitive closure, over the name dependency graph (which includes the
+   edges from continuation parameters to the arguments provided for them, hence
+   a fixed point for the cycles created by recursive continuations), of the
+   user-visible variables. To display a phantom variable the debugger evaluates
+   its defining expression, which may require locating variables whose own
+   values must in turn be recovered from their defining expressions or, for
+   parameters, from the arguments they were passed. *)
+let required_names_for_phantom_lets ({ phantom_roots; _ } as t) =
+  let name_queue = Queue.create () in
+  Name.Set.iter (fun v -> Queue.push v name_queue) phantom_roots;
+  let rec loop enqueued =
+    match Queue.take name_queue with
+    | exception Queue.Empty -> enqueued
+    | src ->
+      let enqueued =
+        Reachable.Name_Name_Edge.push ~src enqueued name_queue t.name_to_name
+      in
+      loop enqueued
+  in
+  loop phantom_roots
