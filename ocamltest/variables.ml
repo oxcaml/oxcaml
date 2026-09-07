@@ -62,6 +62,19 @@ let register_variable variable =
   then raise (Variable_already_registered variable.variable_name)
   else Hashtbl.add variables variable.variable_name variable
 
+type snapshot = (string, t) Hashtbl.t
+
+let snapshot () = Hashtbl.copy variables
+
+let restore s =
+  Hashtbl.reset variables;
+  Hashtbl.iter (Hashtbl.add variables) s
+
+let union snapshots =
+  let u = Hashtbl.create 10 in
+  List.iter (Hashtbl.iter (Hashtbl.replace u)) snapshots;
+  u
+
 let find_variable variable_name =
   try Some (Hashtbl.find variables variable_name)
   with Not_found -> None
