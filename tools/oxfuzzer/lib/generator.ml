@@ -90,8 +90,6 @@ module Config = struct
 
   let max_loop_offset = 16
 
-  let max_expression_complexity = 20
-
   let toplevel_var_count = 5
 
   let max_array_dimensions = 3
@@ -176,23 +174,14 @@ let random_number_ty st = random_element st NumberTy.all
 let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
 
-let with_expression_complexity f = f ~complexity:(ref 0)
-
 let with_probability (st : State.t) ~probability =
   Random.State.int st.random_state 100 < probability
 
 let maybe_opaque st ~probability expr =
   if with_probability st ~probability then Expr.Opaque expr else expr
 
-let can_recurse ~complexity =
-  !complexity + 2 <= Config.max_expression_complexity
-
-let record_complexity expr ~complexity =
-  incr complexity;
-  expr
-
 (* CR-soon hwasilewski: Add general expressions for shift counts. *)
-let gen_shift_count (st : State.t) (nty : NumberTy.t) ~complexity =
+let gen_shift_count (st : State.t) (nty : NumberTy.t) =
   let width =
     match nty.base with
     | Int -> Sys.int_size
@@ -209,7 +198,7 @@ let gen_shift_count (st : State.t) (nty : NumberTy.t) ~complexity =
     then random_element st [0; 1; width - 2; width - 1]
     else Random.State.int st.random_state width
   in
-  record_complexity (Expr.Const (Number.Int count)) ~complexity
+  Expr.Const (Number.Int count)
 
 let gen_array_dimensions st =
   let dimensions =
@@ -258,7 +247,7 @@ let gen_array_index st (env : Env.t) size =
 let gen_array_indices st env dimensions =
   List.map (gen_array_index st env) dimensions
 
-let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
+let gen_numeric_var (st : State.t) (env : Env.t) nty =
   let vars =
     List.filter_map
       (fun { Binding.name; ty; _ } ->
@@ -277,9 +266,7 @@ let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
     (fun () ->
       let inner_ty, generate = random_element st vars in
       maybe_opaque st ~probability:Config.opaque_leaf_probability
-        (record_complexity
-           (Expr.Convert { from = inner_ty; to_ = nty; expr = generate () })
-           ~complexity))
+        (Expr.Convert { from = inner_ty; to_ = nty; expr = generate () }))
 
 let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     ~random_bits =
@@ -296,7 +283,7 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
   let small =
     Gen.create (fun () ->
         let numerator = Random.State.int st.random_state 17 in
-        let exponent = -(Random.State.int st.random_state 5) in
+        let exponent = -Random.State.int st.random_state 5 in
         let value = Float.ldexp (float_of_int numerator) exponent in
         with_sign (bits_of_float value))
   in
@@ -328,7 +315,7 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     (Gen.weighted st.random_state
        [10, Gen.create random_bits; 5, small; 4, boundary; 1, special])
 
-let gen_numeric_const (st : State.t) (nty : NumberTy.t) ~complexity =
+let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
   let gen_const_int base =
     Gen.create (fun () ->
         let small ~min ~max =
@@ -344,18 +331,16 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) ~complexity =
                  2, Gen.create (fun () -> Random.State.bits64 st.random_state)
                  (* CR-soon hwasilewski: Add max_int and min_int. *) ])
         in
-        record_complexity
-          (Expr.Const (Number.of_integral_bits base bits))
-          ~complexity)
+        Expr.Const (Number.of_integral_bits base bits))
   in
   let gen_const_float =
     Gen.create (fun () ->
         let bits =
           gen_float_bits st ~fraction_bits:52 ~exponent_bits:11
-            ~bits_of_float:Int64.bits_of_float
-            ~random_bits:(fun () -> Random.State.bits64 st.random_state)
+            ~bits_of_float:Int64.bits_of_float ~random_bits:(fun () ->
+              Random.State.bits64 st.random_state)
         in
-        record_complexity (Expr.Const (Number.Float bits)) ~complexity)
+        Expr.Const (Number.Float bits))
   in
   let gen_const_float32 =
     Gen.create (fun () ->
@@ -366,7 +351,7 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) ~complexity =
               Int64.of_int32 (Random.State.bits32 st.random_state))
           |> Int64.to_int32
         in
-        record_complexity (Expr.Const (Number.Float32 bits)) ~complexity)
+        Expr.Const (Number.Float32 bits))
   in
   let gen_const (nty : NumberTy.t) =
     let boxed =
@@ -395,9 +380,7 @@ let gen_array st env nty dimensions =
     let pool =
       List.init
         (random_int_in_range st ~min:1 ~max:(max 1 (count / 2)))
-        (fun _ ->
-          with_expression_complexity (fun ~complexity ->
-              Gen.run_exn (gen_numeric_const st nty ~complexity)))
+        (fun _ -> Gen.run_exn (gen_numeric_const st nty))
     in
     let rec literal = function
       | [] -> random_element st pool
@@ -407,31 +390,31 @@ let gen_array st env nty dimensions =
     literal dimensions
   else
     let init =
-      with_expression_complexity (fun ~complexity ->
-          match gen_numeric_var st env nty ~complexity with
-          | Some generate -> generate ()
-          | None -> Gen.run_exn (gen_numeric_const st nty ~complexity))
+      match gen_numeric_var st env nty with
+      | Some generate -> generate ()
+      | None -> Gen.run_exn (gen_numeric_const st nty)
     in
     Expr.Array_make { dimensions; init }
 
-let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
+let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   let gen_ty nty =
     Gen.run_exn
       (Gen.weighted st.random_state
          [1, Gen.create (fun () -> random_number_ty st); 3, Gen.return nty])
   in
   let gen_binop nty =
-    Gen.when_ (can_recurse ~complexity) (fun () ->
+    Gen.create (fun () ->
         let inner_ty = gen_ty nty in
-        let binop = random_element st (Bin_op.ops_for_ty (Ty.Number inner_ty)) in
-        let lhs = gen_number st env inner_ty ~complexity in
+        let binop =
+          random_element st (Bin_op.ops_for_ty (Ty.Number inner_ty))
+        in
+        let lhs = gen_number st env inner_ty in
         let rhs =
           match binop with
-          | Bin_op.Shift_left
-          | Bin_op.Shift_right
-          | Bin_op.Shift_right_logical ->
-            gen_shift_count st inner_ty ~complexity
-          | _ -> gen_number st env inner_ty ~complexity
+          | Bin_op.Shift_left | Bin_op.Shift_right | Bin_op.Shift_right_logical
+            ->
+            gen_shift_count st inner_ty
+          | _ -> gen_number st env inner_ty
         in
         Expr.Convert
           { from = inner_ty;
@@ -441,24 +424,21 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   in
   let leaf =
     Gen.weighted st.random_state
-      [ 2, gen_numeric_var st env nty ~complexity;
-        1, gen_numeric_const st nty ~complexity ]
+      [2, gen_numeric_var st env nty; 1, gen_numeric_const st nty]
   in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env nty ~complexity])
+       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env nty])
 
-and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
-  if
-    (not (can_recurse ~complexity))
-    || not (State.can_create_function st ~max:Config.max_function_count)
+and gen_fun_call (st : State.t) caller_env return_ty =
+  if not (State.can_create_function st ~max:Config.max_function_count)
   then Gen.unavailable
   else
     let gen_arguments params =
       List.map
         (fun (_, ty) ->
           match ty with
-          | Ty.Number nty -> gen_number st caller_env nty ~complexity
+          | Ty.Number nty -> gen_number st caller_env nty
           (* CR-soon hwasilewski: add bool arguments *)
           | Ty.Bool -> assert false
           | Ty.Array _ ->
@@ -468,13 +448,11 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
     let call_existing_function () =
       let function_ = random_element st st.top_level_functions in
       let args = gen_arguments function_.params in
-      record_complexity
-        (Expr.Convert
-           { expr = Expr.Call_toplevel { fun_name = function_.name; args };
-             from = function_.return_ty;
-             to_ = return_ty
-           })
-        ~complexity
+      Expr.Convert
+        { expr = Expr.Call_toplevel { fun_name = function_.name; args };
+          from = function_.return_ty;
+          to_ = return_ty
+        }
     in
     let existing_function =
       Gen.when_
@@ -507,10 +485,9 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
           let result =
-            with_expression_complexity (fun ~complexity ->
-                match gen_numeric_var st callee_env return_ty ~complexity with
-                | Some generate -> generate ()
-                | None -> gen_number st callee_env return_ty ~complexity)
+            match gen_numeric_var st callee_env return_ty with
+            | Some generate -> generate ()
+            | None -> gen_number st callee_env return_ty
           in
           let function_ =
             { Function.name; params; inline; body; return_ty; result }
@@ -520,27 +497,21 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
              added to [st.top_level_functions]. This means that functions are
              topologically sorted by construction. *)
           st.top_level_functions <- function_ :: st.top_level_functions;
-          record_complexity
-            (Expr.Call_toplevel { fun_name = name; args })
-            ~complexity)
+          Expr.Call_toplevel { fun_name = name; args })
     in
     Gen.weighted st.random_state [2, existing_function; 1, new_function]
 
-and gen_bool (st : State.t) env ~complexity =
+and gen_bool (st : State.t) env =
   let gen_binop op arg_ty gen_arg =
     Gen.create (fun () ->
-        let lhs = gen_arg ~complexity in
-        let rhs = gen_arg ~complexity in
+        let lhs = gen_arg () in
+        let rhs = gen_arg () in
         Expr.Bin_op { ty = arg_ty; op; lhs; rhs })
   in
   let nty = random_number_ty st in
-  let gen_number_arg ~complexity = gen_number st env nty ~complexity in
-  let gen_bool_arg ~complexity = gen_bool st env ~complexity in
-  let gen_bool_binop op =
-    if can_recurse ~complexity
-    then gen_binop op Ty.Bool gen_bool_arg
-    else Gen.unavailable
-  in
+  let gen_number_arg () = gen_number st env nty in
+  let gen_bool_arg () = gen_bool st env in
+  let gen_bool_binop op = gen_binop op Ty.Bool gen_bool_arg in
   let comparison = random_element st Bin_op.[Eq; Lt; Le; Gt; Ge] in
   Gen.run_exn
     (Gen.weighted st.random_state
@@ -557,10 +528,7 @@ and gen_decl st env =
     then
       let dimensions = gen_array_dimensions st in
       Ty.Array (nty, dimensions), gen_array st env nty dimensions
-    else
-      ( Ty.Number nty,
-        with_expression_complexity (fun ~complexity ->
-            gen_number st env nty ~complexity) )
+    else Ty.Number nty, gen_number st env nty
   in
   let expr =
     maybe_opaque st ~probability:Config.opaque_initializer_probability expr
@@ -594,27 +562,20 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let nty, assign =
               (* CR-soon hwasilewski: Add boolean variable generation. *)
               match ty with
-              | Ty.Number nty ->
-                nty, (fun expr -> Statement.Assign (name, expr))
+              | Ty.Number nty -> nty, fun expr -> Statement.Assign (name, expr)
               | Ty.Array (nty, dimensions) ->
                 let indices = gen_array_indices st env dimensions in
-                nty, (fun expr -> Statement.Array_set (name, indices, expr))
+                nty, fun expr -> Statement.Array_set (name, indices, expr)
               | Bool ->
                 Misc.fatal_errorf
                   "gen_fun_body.gen_assign: unexpected variable of type bool"
             in
-            let expr =
-              with_expression_complexity (fun ~complexity ->
-                  gen_number st env nty ~complexity)
-            in
+            let expr = gen_number st env nty in
             continue env (assign expr))
       in
       let gen_if =
         Gen.create (fun () ->
-            let condition =
-              with_expression_complexity (fun ~complexity ->
-                  gen_bool st env ~complexity)
-            in
+            let condition = gen_bool st env in
             let _env_l, left = gen_fun_body st env (depth + 1) in
             let _env_r, right = gen_fun_body st env (depth + 1) in
             continue env (Statement.If (condition, left, right)))
