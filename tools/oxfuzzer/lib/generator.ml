@@ -45,12 +45,33 @@ module Binding = struct
     }
 end
 
+module Loop_variable = struct
+  type t =
+    { name : Name.t;
+      lower_bound : int;
+      upper_bound : int
+    }
+end
+
 module Env = struct
-  type t = { bindings : Binding.t list }
+  type t =
+    { bindings : Binding.t list;
+      loop_variables : Loop_variable.t list
+    }
 
-  let empty = { bindings = [] }
+  let empty = { bindings = []; loop_variables = [] }
 
-  let extend t binding = { bindings = binding :: t.bindings }
+  let extend t binding = { t with bindings = binding :: t.bindings }
+
+  let extend_loop t ({ Loop_variable.name; _ } as loop_variable) =
+    let t =
+      extend t
+        { Binding.name;
+          ty = Ty.Number (NumberTy.boxed Int);
+          is_mutable = false
+        }
+    in
+    { t with loop_variables = loop_variable :: t.loop_variables }
 end
 
 (* CR-someday hwasilewski: Move all constants, including probabilities, into
@@ -73,7 +94,19 @@ module Config = struct
 
   let toplevel_var_count = 5
 
+  let max_array_dimensions = 3
+
+  let max_array_axis_size = 10
+
+  let max_array_elements = 256
+
   (* Percentages. *)
+  let array_probability = 25
+
+  let array_literal_probability = 50
+
+  let bounded_index_probability = 75
+
   let opaque_initializer_probability = 50
 
   let opaque_leaf_probability = 5
@@ -178,20 +211,74 @@ let gen_shift_count (st : State.t) (nty : NumberTy.t) ~complexity =
   in
   record_complexity (Expr.Const (Number.Int count)) ~complexity
 
+let gen_array_dimensions st =
+  let dimensions =
+    random_int_in_range st ~min:1 ~max:Config.max_array_dimensions
+  in
+  let rec sizes remaining budget =
+    if remaining = 0
+    then []
+    else
+      let size =
+        random_int_in_range st ~min:1
+          ~max:(min Config.max_array_axis_size budget)
+      in
+      size :: sizes (remaining - 1) (budget / size)
+  in
+  sizes dimensions Config.max_array_elements
+
+let gen_array_index st (env : Env.t) size =
+  let variables =
+    List.filter
+      (fun { Loop_variable.lower_bound; upper_bound; _ } ->
+        upper_bound - lower_bound < size)
+      env.loop_variables
+  in
+  if
+    (not (List.is_empty variables))
+    && with_probability st ~probability:Config.bounded_index_probability
+  then
+    let { Loop_variable.name; lower_bound; upper_bound } =
+      random_element st variables
+    in
+    let offset =
+      random_int_in_range st ~min:(-lower_bound) ~max:(size - 1 - upper_bound)
+    in
+    if offset = 0
+    then Expr.Var name
+    else
+      Expr.Bin_op
+        { ty = Ty.Number (NumberTy.boxed Int);
+          op = Bin_op.Add;
+          lhs = Expr.Var name;
+          rhs = Expr.Const (Number.Int offset)
+        }
+  else Expr.Const (Number.Int (random_int_in_range st ~min:0 ~max:(size - 1)))
+
+let gen_array_indices st env dimensions =
+  List.map (gen_array_index st env) dimensions
+
 let gen_numeric_var (st : State.t) (env : Env.t) nty ~complexity =
   let vars =
     List.filter_map
       (fun { Binding.name; ty; _ } ->
-        match ty with Ty.Number nty -> Some (name, nty) | Ty.Bool -> None)
+        match ty with
+        | Ty.Number nty -> Some (nty, fun () -> Expr.Var name)
+        | Ty.Array (nty, dimensions) ->
+          Some
+            ( nty,
+              fun () ->
+                Expr.Array_get (name, gen_array_indices st env dimensions) )
+        | Ty.Bool -> None)
       env.bindings
   in
   Gen.when_
     (not (List.is_empty vars))
     (fun () ->
-      let name, inner_ty = random_element st vars in
+      let inner_ty, generate = random_element st vars in
       maybe_opaque st ~probability:Config.opaque_leaf_probability
         (record_complexity
-           (Expr.Convert { from = inner_ty; to_ = nty; expr = Expr.Var name })
+           (Expr.Convert { from = inner_ty; to_ = nty; expr = generate () })
            ~complexity))
 
 let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
@@ -241,7 +328,7 @@ let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     (Gen.weighted st.random_state
        [10, Gen.create random_bits; 5, small; 4, boundary; 1, special])
 
-let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
+let gen_numeric_const (st : State.t) (nty : NumberTy.t) ~complexity =
   let gen_const_int base =
     Gen.create (fun () ->
         let small ~min ~max =
@@ -299,6 +386,35 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
     Gen.map const
       ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
   in
+  gen_const nty
+
+let gen_array st env nty dimensions =
+  if with_probability st ~probability:Config.array_literal_probability
+  then
+    let count = List.fold_left ( * ) 1 dimensions in
+    let pool =
+      List.init
+        (random_int_in_range st ~min:1 ~max:(max 1 (count / 2)))
+        (fun _ ->
+          with_expression_complexity (fun ~complexity ->
+              Gen.run_exn (gen_numeric_const st nty ~complexity)))
+    in
+    let rec literal = function
+      | [] -> random_element st pool
+      | size :: rest ->
+        Expr.Array_literal (List.init size (fun _ -> literal rest))
+    in
+    literal dimensions
+  else
+    let init =
+      with_expression_complexity (fun ~complexity ->
+          match gen_numeric_var st env nty ~complexity with
+          | Some generate -> generate ()
+          | None -> Gen.run_exn (gen_numeric_const st nty ~complexity))
+    in
+    Expr.Array_make { dimensions; init }
+
+let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   let gen_ty nty =
     Gen.run_exn
       (Gen.weighted st.random_state
@@ -325,7 +441,8 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) ~complexity =
   in
   let leaf =
     Gen.weighted st.random_state
-      [2, gen_numeric_var st env nty ~complexity; 1, gen_const nty]
+      [ 2, gen_numeric_var st env nty ~complexity;
+        1, gen_numeric_const st nty ~complexity ]
   in
   Gen.run_exn
     (Gen.weighted st.random_state
@@ -343,7 +460,9 @@ and gen_fun_call (st : State.t) caller_env return_ty ~complexity =
           match ty with
           | Ty.Number nty -> gen_number st caller_env nty ~complexity
           (* CR-soon hwasilewski: add bool arguments *)
-          | Ty.Bool -> assert false)
+          | Ty.Bool -> assert false
+          | Ty.Array _ ->
+            Misc.fatal_errorf "gen_arguments: unexpected array parameter")
         params
     in
     let call_existing_function () =
@@ -433,17 +552,21 @@ and gen_bool (st : State.t) env ~complexity =
 and gen_decl st env =
   let name = State.fresh st in
   let nty = random_number_ty st in
-  let expr =
-    with_expression_complexity (fun ~complexity ->
-        gen_number st env nty ~complexity)
+  let ty, expr =
+    if with_probability st ~probability:Config.array_probability
+    then
+      let dimensions = gen_array_dimensions st in
+      Ty.Array (nty, dimensions), gen_array st env nty dimensions
+    else
+      ( Ty.Number nty,
+        with_expression_complexity (fun ~complexity ->
+            gen_number st env nty ~complexity) )
   in
   let expr =
     maybe_opaque st ~probability:Config.opaque_initializer_probability expr
   in
-  let env =
-    Env.extend env { Binding.name; ty = Ty.Number nty; is_mutable = true }
-  in
-  env, (name, Ty.Number nty, expr)
+  let env = Env.extend env { Binding.name; ty; is_mutable = true } in
+  env, (name, ty, expr)
 
 and gen_fun_body (st : State.t) (env : Env.t) depth =
   let stmt_count = 1 + Random.State.int st.random_state 4 in
@@ -456,24 +579,35 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
         env, Statement.sequence statement rest
       in
       let mutable_bindings =
-        List.filter (fun binding -> binding.Binding.is_mutable) env.Env.bindings
+        List.filter
+          (fun (binding : Binding.t) ->
+            match binding.Binding.ty with
+            | Ty.Array _ -> true
+            | Ty.Number _ | Ty.Bool -> binding.is_mutable)
+          env.Env.bindings
       in
       let gen_assign =
         Gen.when_
           (not (List.is_empty mutable_bindings))
           (fun () ->
             let { Binding.name; ty; _ } = random_element st mutable_bindings in
-            (* CR-soon hwasilewski: Add boolean variable generation. *)
-            match ty with
-            | Ty.Number nty ->
-              let expr =
-                with_expression_complexity (fun ~complexity ->
-                    gen_number st env nty ~complexity)
-              in
-              continue env (Statement.Assign (name, expr))
-            | Bool ->
-              Misc.fatal_errorf
-                "gen_fun_body.gen_assign: unexpected variable of type bool")
+            let nty, assign =
+              (* CR-soon hwasilewski: Add boolean variable generation. *)
+              match ty with
+              | Ty.Number nty ->
+                nty, (fun expr -> Statement.Assign (name, expr))
+              | Ty.Array (nty, dimensions) ->
+                let indices = gen_array_indices st env dimensions in
+                nty, (fun expr -> Statement.Array_set (name, indices, expr))
+              | Bool ->
+                Misc.fatal_errorf
+                  "gen_fun_body.gen_assign: unexpected variable of type bool"
+            in
+            let expr =
+              with_expression_complexity (fun ~complexity ->
+                  gen_number st env nty ~complexity)
+            in
+            continue env (assign expr))
       in
       let gen_if =
         Gen.create (fun () ->
@@ -505,18 +639,17 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
               random_int_in_range st ~min:(-Config.max_loop_offset)
                 ~max:Config.max_loop_offset
             in
-            let transform value =
-              Expr.Const (Number.Int ((scale * value) + offset))
-            in
+            let initial_value = (scale * times) + offset in
+            let bound_value = scale + offset in
             let init =
               maybe_opaque st ~probability:Config.opaque_loop_bound_probability
-                (transform times)
+                (Expr.Const (Number.Int initial_value))
             in
             let loop_env =
-              Env.extend env
-                { Binding.name;
-                  ty = Ty.Number (NumberTy.boxed Int);
-                  is_mutable = false
+              Env.extend_loop env
+                { Loop_variable.name;
+                  lower_bound = min initial_value bound_value;
+                  upper_bound = max initial_value bound_value
                 }
             in
             let _, inner = gen_fun_body st loop_env (depth + 1) in
@@ -524,7 +657,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
               (Statement.Bounded_loop
                  { var = name;
                    init;
-                   bound = transform 1;
+                   bound = Expr.Const (Number.Int bound_value);
                    stride = -scale;
                    body = inner
                  }))

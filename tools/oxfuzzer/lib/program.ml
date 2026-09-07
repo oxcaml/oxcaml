@@ -190,6 +190,40 @@ let print_number nty e =
 (* Keep in sync with [LIBRARIES] in oxfuzzer.py. *)
 let libraries = ["stdlib_upstream_compatible"; "stdlib_stable"]
 
+let array_primitives =
+  let open Parsetree in
+  let any =
+    { pjka_loc = Location.none;
+      pjka_desc = Pjk_abbreviation (lid "any")
+    }
+  in
+  let separable =
+    { pjka_loc = Location.none;
+      pjka_desc = Pjk_mod (any, [loc (Mode "separable")])
+    }
+  in
+  let a = Typ.var "a" None in
+  let array = Typ.constr (lid "array") [a] in
+  let int = Typ.constr (lid "int") [] in
+  let unit = Typ.constr (lid "unit") [] in
+  let external_ name primitive args result =
+    let typ =
+      List.fold_right
+        (fun arg result -> Typ.arrow Nolabel arg result [] [])
+        args result
+    in
+    Str.primitive
+      (Val.mk
+         ~attrs:[Attr.mk (loc "layout_poly") (PStr [])]
+         ~prim:[primitive] (loc name)
+         (Typ.poly [loc "a", Some separable] typ))
+  in
+  [ external_ "array_make" "%makearray_dynamic" [int; a] array;
+    external_ "array_get" "%array_safe_get" [array; int] a;
+    external_ "array_set" "%array_safe_set" [array; int; a] unit;
+    external_ "array_length" "%array_length" [array] int
+  ]
+
 let to_code
     { functions; toplevel_decls = decls; toplevel_statement = statement } =
   let opens =
@@ -201,9 +235,21 @@ let to_code
   let print_decl (name, ty, _expr) =
     match ty with
     | Ty.Number nty -> print_number nty (ident (Name.to_string name))
-    | _ ->
-      Misc.fatal_errorf
-        "Program.to_code: only numeric types allowed in toplevel declarations"
+    | Ty.Array (nty, dimensions) ->
+      let rec print_elements depth dimensions array =
+        match dimensions with
+        | [] -> print_number nty array
+        | _ :: rest ->
+          let index = Name.to_string name ^ "_print_" ^ string_of_int depth in
+          Exp.for_ (Pat.var (loc index)) (int 0)
+            (op "-" [apply (ident "array_length") [array]; int 1])
+            Upto
+            (print_elements (depth + 1) rest
+               (apply (ident "array_get") [array; ident index]))
+      in
+      print_elements 0 dimensions (ident (Name.to_string name))
+    | Ty.Bool ->
+      Misc.fatal_errorf "Program.to_code: boolean declarations unsupported"
   in
   let body =
     Exp.sequence
@@ -226,8 +272,8 @@ let to_code
   in
   let run = Str.eval (Exp.apply (ident "main") [Nolabel, unit_]) in
   let structure =
-    opens @ conversions @ integral_bounds @ [canonicalize_nan]
-    @ float_to_integral_conversions
+    opens @ array_primitives @ conversions @ integral_bounds
+    @ [canonicalize_nan] @ float_to_integral_conversions
     @ List.map Function.to_code functions
     @ [main; run]
   in

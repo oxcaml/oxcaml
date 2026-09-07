@@ -68,6 +68,7 @@ end
 module Ty : sig
   type t =
     | Number of NumberTy.t
+    | Array of NumberTy.t * int list
     | Bool
 
   val equal : t -> t -> bool
@@ -106,6 +107,12 @@ module Expr : sig
   type t =
     | Const of Number.t
     | Var of Name.t
+    | Array_literal of t list
+    | Array_make of
+        { dimensions : int list;
+          init : t
+        }
+    | Array_get of Name.t * t list
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -135,6 +142,7 @@ end
 module Statement : sig
   type t =
     | Assign of Name.t * Expr.t
+    | Array_set of Name.t * Expr.t list * Expr.t
     | Seq of t list
     | If of Expr.t * t * t
     | Let_mutable of Name.t * Expr.t * t
