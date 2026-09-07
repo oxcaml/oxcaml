@@ -1,0 +1,61 @@
+let code build_0 deleted in
+let code get_x1_1 deleted in
+let code get_x2_2 deleted in
+let code get_x3_3 deleted in
+let code roundtrip_4 deleted in
+let code loopify(never) size(9) newer_version_of(build_0)
+      build_0_1 (s : val, f : float, i : int32)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * float * int32 ] =
+  let Pmakeblock = %block.mixed.`0`.`1`.[`float`, `int32`] (s, f, i) in
+  cont k (Pmakeblock)
+in
+let $camlMixed_record__build_5 = closure build_0_1 @build in
+let code loopify(never) size(2) newer_version_of(get_x1_1)
+      get_x1_1_1 (t : [ 0 of val * float * int32 ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmixedfield = %block_load.mixed.`1`.[`float`, `int32`].[`0`] (t) in
+  cont k (Pmixedfield)
+in
+let $camlMixed_record__get_x1_6 = closure get_x1_1_1 @get_x1 in
+let code loopify(never) size(2) newer_version_of(get_x2_2)
+      get_x2_2_1 (t : [ 0 of val * float * int32 ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float =
+  let Pmixedfield =
+    %block_load.mixed.`float`.`1`.[`float`, `int32`].[`1`] (t)
+  in
+  cont k (Pmixedfield)
+in
+let $camlMixed_record__get_x2_7 = closure get_x2_2_1 @get_x2 in
+let code loopify(never) size(2) newer_version_of(get_x3_3)
+      get_x3_3_1 (t : [ 0 of val * float * int32 ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : int32 =
+  let Pmixedfield =
+    %block_load.mixed.`int32`.`1`.[`float`, `int32`].[`2`] (t)
+  in
+  cont k (Pmixedfield)
+in
+let $camlMixed_record__get_x3_8 = closure get_x3_3_1 @get_x3 in
+let code loopify(never) size(1) newer_version_of(roundtrip_4)
+      roundtrip_4_1 (s : val, f : float, i : int32)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float =
+  cont k (f)
+in
+let $camlMixed_record__roundtrip_9 = closure roundtrip_4_1 @roundtrip in
+let $camlMixed_record =
+  Block 0 ($camlMixed_record__build_5,
+           $camlMixed_record__get_x1_6,
+           $camlMixed_record__get_x2_7,
+           $camlMixed_record__get_x3_8,
+           $camlMixed_record__roundtrip_9)
+in
+cont done ($camlMixed_record)

@@ -1,0 +1,22 @@
+let code f_0 deleted in
+let code g_1 deleted in
+let code loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, 3) in
+  cont k (int_add)
+in
+let $camlInline_fold__f_2 = closure f_0_1 @f in
+let code loopify(never) size(1) newer_version_of(g_1)
+      g_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (7)
+in
+let $camlInline_fold__g_3 = closure g_1_1 @g in
+let $camlInline_fold = Block 0 ($camlInline_fold__f_2, $camlInline_fold__g_3)
+in
+cont done ($camlInline_fold)

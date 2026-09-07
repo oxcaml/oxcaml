@@ -1,0 +1,78 @@
+(data global "camlBlock_set_barrier__gc_roots": int 0)
+(data
+ int 3840
+ global "camlBlock_set_barrier":
+ addr G:"camlBlock_set_barrier__setfst_3"
+ addr G:"camlBlock_set_barrier__setref_4"
+ addr G:"camlBlock_set_barrier__shape_5")
+(data
+ int 3063
+ global "camlBlock_set_barrier__shape_5":
+ addr G:"camlBlock_set_barrier__shape_2_5_code"
+ int 108086391056891909)
+(data
+ int 3840
+ "camlBlock_set_barrier__switch_block65":
+ addr L:"camlBlock_set_barrier__immstring29"
+ addr L:"camlBlock_set_barrier__immstring31"
+ addr L:"camlBlock_set_barrier__immstring33")
+(data
+ int 4087
+ global "camlBlock_set_barrier__setref_4":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlBlock_set_barrier__setref_1_4_code")
+(data
+ int 4087
+ global "camlBlock_set_barrier__setfst_3":
+ addr G:"caml_curry2"
+ int 180143985094819847
+ addr G:"camlBlock_set_barrier__setfst_0_3_code")
+(data
+ int 2044
+ "camlBlock_set_barrier__immstring33":
+ string "two"
+ skip 4
+ byte 4)
+(data
+ int 2044
+ "camlBlock_set_barrier__immstring31":
+ string "one"
+ skip 4
+ byte 4)
+(data
+ int 2044
+ "camlBlock_set_barrier__immstring29":
+ string "zero"
+ skip 3
+ byte 3)
+(data
+ int 2044
+ "camlBlock_set_barrier__immstring26":
+ string "many"
+ skip 3
+ byte 3)
+(function{block_set_barrier.ml:11,26-50}
+ camlBlock_set_barrier__setfst_0_3_code (r/0: val v/0: int) : int
+ (let Psetfield/0 (seq (store int r/0 v/0) 1) 1) )
+
+(function{block_set_barrier.ml:12,26-53}
+ camlBlock_set_barrier__setref_1_4_code (r/1: val s/0: val) : int
+ (let
+   Psetfield/1
+     (seq
+       (extcall "caml_modify"{block_set_barrier.ml:12,47-53} r/1 s/0 ->unit)
+       1)
+   1) )
+
+(function{block_set_barrier.ml:14,25-105}
+ camlBlock_set_barrier__shape_2_5_code (n/0: int) : val
+ (if (<u 5 n/0) L:"camlBlock_set_barrier__immstring26"
+   (load_mut val
+     (+a (+a L:"camlBlock_set_barrier__switch_block65" (<< n/0 2)) -4))) )
+
+(function no_cse reduce_code_size linscan camlBlock_set_barrier__entry
+     () : val
+ (catch (exit 9 G:"camlBlock_set_barrier") with(9 *ret*/0: val) 1) )
+
+(data)

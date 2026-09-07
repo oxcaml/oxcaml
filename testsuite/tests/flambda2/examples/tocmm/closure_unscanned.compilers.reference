@@ -1,0 +1,39 @@
+(data global "camlClosure_unscanned__gc_roots": int 0)
+(data
+ int 1792
+ global "camlClosure_unscanned":
+ addr G:"camlClosure_unscanned__make_3")
+(data
+ int 3063
+ global "camlClosure_unscanned__make_3":
+ addr G:"camlClosure_unscanned__make_0_3_code"
+ int 108086391056891909)
+(function{closure_unscanned.ml:19,24-153}
+ camlClosure_unscanned__make_0_3_code (n/0: int) : val
+ (let
+   *set_of_closures*/0
+     (alloc{closure_unscanned.ml:20,15-55} 6391
+       L:"camlClosure_unscanned__odd_2_5_code" 72057594037927949 3321
+       L:"camlClosure_unscanned__even_1_4_code" 108086391056891911 n/0)
+   (alloc{closure_unscanned.ml:22,2-13} 2048 (+v *set_of_closures*/0 24)
+     *set_of_closures*/0)) )
+
+(function{closure_unscanned.ml:20,15-55} camlClosure_unscanned__even_1_4_code
+     (x/0: int my_closure/0: val) : int
+ (if (== x/0 1) (+ (<< (== (load val (+a my_closure/0 16)) 1) 1) 1)
+   (app{closure_unscanned.ml:20,44-55}
+     L:"camlClosure_unscanned__odd_2_5_code" (+ x/0 -2) (+v my_closure/0 -24)
+     int)) )
+
+(function{closure_unscanned.ml:21,10-52} camlClosure_unscanned__odd_2_5_code
+     (x/1: int my_closure/1: val) : int
+ (if (== x/1 1) (+ (<< (!= (load val (+a my_closure/1 40)) 1) 1) 1)
+   (app{closure_unscanned.ml:21,40-52}
+     L:"camlClosure_unscanned__even_1_4_code" (+ x/1 -2) (+v my_closure/1 24)
+     int)) )
+
+(function no_cse reduce_code_size linscan camlClosure_unscanned__entry
+     () : val
+ (catch (exit 8 G:"camlClosure_unscanned") with(8 *ret*/0: val) 1) )
+
+(data)
