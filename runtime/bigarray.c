@@ -1209,23 +1209,35 @@ static void caml_ba_update_proxy(struct caml_ba_array * b1,
                                  struct caml_ba_array * b2)
 {
   struct caml_ba_proxy * proxy;
+  _Atomic(struct caml_ba_proxy *) * b1_proxy =
+    (_Atomic(struct caml_ba_proxy *) *)&b1->proxy;
+  struct caml_ba_proxy * existing;
   /* Nothing to do for un-managed arrays */
   if ((b1->flags & CAML_BA_MANAGED_MASK) == CAML_BA_EXTERNAL) return;
-  if (b1->proxy != NULL) {
+  existing = atomic_load_acquire(b1_proxy);
+  if (existing != NULL) {
     /* If b1 is already a proxy for a larger array, increment refcount of
        proxy */
-    b2->proxy = b1->proxy;
-    (void)caml_atomic_counter_incr(&b1->proxy->refcount);
+    b2->proxy = existing;
+    (void)caml_atomic_counter_incr(&existing->refcount);
   } else {
-    /* Otherwise, create proxy and attach it to both b1 and b2 */
+    /* Otherwise, create proxy and attempt to attach it to b1 and b2.
+       Another domain may race to install a proxy on b1, so install
+       atomically with a CAS and back out our allocation if we lose. */
     proxy = malloc(sizeof(struct caml_ba_proxy));
     if (proxy == NULL) caml_raise_out_of_memory();
     caml_atomic_counter_init(&proxy->refcount, 2);
     /* initial refcount: 2 = original array + sub array */
     proxy->data = b1->data;
     proxy->size = caml_ba_byte_size(b1);
-    b1->proxy = proxy;
-    b2->proxy = proxy;
+    if (atomic_compare_exchange_strong(b1_proxy, &existing, proxy)) {
+      b2->proxy = proxy;
+    } else {
+      /* Lost the race: another domain installed [existing] on b1. */
+      free(proxy);
+      b2->proxy = existing;
+      (void)caml_atomic_counter_incr(&existing->refcount);
+    }
   }
 }
 

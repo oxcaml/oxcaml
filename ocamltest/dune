@@ -38,7 +38,7 @@
    +a-40-41-42-44-70
    -cclib
    "-I../runtime"))
- (libraries ocamlcommon)
+ (libraries ocamlfrontend)
  ; This executable is built using the *system* compiler, so we can't use
  ; our own otherlibs/unix/, and neither can we depend on the "unix" library
  ; or this same one will be used.

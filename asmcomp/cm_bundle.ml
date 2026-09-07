@@ -91,7 +91,8 @@ let cmx_bundle ~quoted_cmx =
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
           uir_sections_length = total_length;
-          uir_external_symbols = Array.of_list info.ui_external_symbols
+          uir_external_symbols = Array.of_list info.ui_external_symbols;
+          uir_static_data = info.ui_static_data
         }
       in
       raw_info, serialized_sections)

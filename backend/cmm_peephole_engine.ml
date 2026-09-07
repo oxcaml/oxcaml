@@ -167,6 +167,7 @@ let match_clauses_in_order ~default ~matches clauses expr =
     | Cphantom_let (phantom_var, defining_expr, expr) ->
       let env = Env.register_phantom_let env ~phantom_var ~defining_expr in
       match_one_pattern env pat expr
+    | Cname_for_debugger (_, body) -> match_one_pattern env pat body
     | _ -> (
       match pat, expr with
       | Any v, expr -> Some (Env.add env v expr)
@@ -289,6 +290,7 @@ module Cmm_comparator = struct
     | Cconst_vec128 (v1, _), Cconst_vec128 (v2, _) -> equal_vec128_bits v1 v2
     | Cconst_vec256 (v1, _), Cconst_vec256 (v2, _) -> equal_vec256_bits v1 v2
     | Cconst_vec512 (v1, _), Cconst_vec512 (v2, _) -> equal_vec512_bits v1 v2
+    | Cconst_mask (n1, _), Cconst_mask (n2, _) -> Int64.equal n1 n2
     | Cconst_symbol (s1, _), Cconst_symbol (s2, _) -> equal_symbol s1 s2
     | Cvar v1, Cvar v2 -> V.equal v1 v2
     | Clet (v1, def1, body1), Clet (v2, def2, body2) ->
@@ -299,6 +301,8 @@ module Cmm_comparator = struct
       V.equal (VP.var v1) (VP.var v2)
       && Option.equal equal_phantom_defining_expr def1 def2
       && equivalent body1 body2
+    | Cname_for_debugger (v1, e1), Cname_for_debugger (v2, e2) ->
+      V.equal (VP.var v1) (VP.var v2) && equivalent e1 e2
     | Ctuple t1, Ctuple t2 -> List.equal equivalent t1 t2
     | Cop (op1, args1, _), Cop (op2, args2, _) ->
       equal_operation op1 op2 && List.equal equivalent args1 args2
@@ -359,11 +363,12 @@ module Cmm_comparator = struct
         | Cconst_vec128 (_, _)
         | Cconst_vec256 (_, _)
         | Cconst_vec512 (_, _)
+        | Cconst_mask (_, _)
         | Cconst_symbol (_, _)
         | Cvar _
         | Clet (_, _, _)
         | Cphantom_let (_, _, _)
-        | Ctuple _
+        | Cname_for_debugger _ | Ctuple _
         | Cop (_, _, _)
         | Csequence (_, _)
         | Cifthenelse (_, _, _, _, _, _)

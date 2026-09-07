@@ -16,11 +16,15 @@ open Mode
 
 val transl_locality_mode_l : (allowed * 'r) Locality.t -> Lambda.locality_mode
 
-val transl_alloc_mode_l : (allowed * 'r) Alloc.t -> Lambda.locality_mode
+val transl_yielding_mode_l : (allowed * 'r) Yielding.t -> Lambda.yielding_kind
 
-val transl_alloc_mode_r : ('l * allowed) Alloc.t -> Lambda.locality_mode
+val transl_return_mode_l : (allowed * 'r) Locality.t -> Lambda.return_mode
 
-val transl_alloc_mode : Typedtree.alloc_mode -> Lambda.locality_mode
+val transl_alloc_mode_l : Typedtree.alloc_mode_l -> Lambda.locality_mode
+
+val transl_alloc_mode_r : Typedtree.alloc_mode_r -> Lambda.locality_mode
+
+val transl_ret_mode : Typedtree.return_mode -> Lambda.return_mode
 
 val transl_modify_mode : (allowed * 'r) Locality.t -> Lambda.modify_mode
 

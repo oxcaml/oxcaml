@@ -185,8 +185,12 @@
 Caml_inline void write_barrier(
   value obj, intnat field, value old_val, value new_val)
 {
-  /* HACK: can't assert when get old C-api style pointers
-    CAMLassert (Is_block(obj)); */
+  /*
+    Here we'd like to assert:
+      CAMLassert (Is_block(obj));
+      CAMLassert (Color_val(obj) != NOT_MARKABLE);
+    but can't because [obj] may be a pointer to the middle of a block
+  */
 
   if (!Is_young(obj)) {
 
@@ -334,11 +338,33 @@ CAMLprim value caml_atomic_load (value ref)
 }
 
 
+/* [write_barrier] and several other functions in this file ([caml_modify],
+   [caml_atomic_exchange_field], etc.) each have two variants:
+
+   1. write_barrier - [obj] must be heap allocated
+   2. write_barrier_local - [obj] can be allocated on either stack or heap
+
+   In general, the local versions are used by mutations generated from OCaml
+   code where the value being modified may be locally allocated. */
+Caml_inline void write_barrier_local(
+  value obj, intnat field, value old_val, value new_val)
+{
+  if (Color_val(obj) == NOT_MARKABLE) {
+    /* This function should not be used on external values, except in safe
+       contexts where only immediate values are involved
+       (cf. [caml_modify_local]). */
+    CAMLassert(caml_is_stack(obj)
+      || (!Is_block(old_val) && !Is_block(new_val)));
+  } else {
+    write_barrier(obj, field, old_val, new_val);
+  }
+}
+
+
 /* stores are implemented as exchanges */
-CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
+static value atomic_exchange_field (value obj, intnat field, value v)
 {
   value ret;
-  intnat field = Long_val(vfield);
   if (caml_domain_alone()) {
     ret = Field(obj, field);
     Field(obj, field) = v;
@@ -348,7 +374,25 @@ CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
     ret = atomic_exchange(&Op_atomic_val(obj)[field], v);
     atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
   }
+  return ret;
+}
+
+CAMLprim value caml_atomic_exchange_field (value obj, value vfield, value v)
+{
+  intnat field = Long_val(vfield);
+  value ret;
+  CAMLassert(Color_val(obj) != NOT_MARKABLE);
+  ret = atomic_exchange_field(obj, field, v);
   write_barrier(obj, field, ret, v);
+  return ret;
+}
+
+CAMLprim value caml_atomic_exchange_field_local (value obj, value vfield,
+                                                 value v)
+{
+  intnat field = Long_val(vfield);
+  value ret = atomic_exchange_field(obj, field, v);
+  write_barrier_local(obj, field, ret, v);
   return ret;
 }
 
@@ -369,28 +413,51 @@ CAMLprim value caml_atomic_set(value ref, value v)
   return caml_atomic_set_field(ref, Val_long(0), v);
 }
 
-CAMLprim value caml_atomic_compare_exchange_field (
-  value obj, value vfield, value oldv, value newv)
+static value atomic_compare_exchange_field (
+  value obj, intnat field, value oldv, value newv, int* success)
 {
-  intnat field = Long_val(vfield);
   if (caml_domain_alone()) {
     value* p = &Op_val(obj)[field];
     if (*p == oldv) {
       *p = newv;
-      write_barrier(obj, field, oldv, newv);
+      *success = 1;
       return oldv;
     } else {
+      *success = 0;
       return *p;
     }
   } else {
     atomic_value* p = &Op_atomic_val(obj)[field];
-    int cas_ret = atomic_compare_exchange_strong(p, &oldv, newv);
+    *success = atomic_compare_exchange_strong(p, &oldv, newv);
     atomic_thread_fence(memory_order_release); /* generates `dmb ish` on Arm64*/
-    if (cas_ret) {
-      write_barrier(obj, field, oldv, newv);
-    }
     return oldv;
   }
+}
+
+CAMLprim value caml_atomic_compare_exchange_field (
+  value obj, value vfield, value oldv, value newv)
+{
+  intnat field = Long_val(vfield);
+  int success;
+  value ret;
+  CAMLassert(Color_val(obj) != NOT_MARKABLE);
+  ret = atomic_compare_exchange_field(obj, field, oldv, newv, &success);
+  if (success) {
+    write_barrier(obj, field, ret, newv);
+  }
+  return ret;
+}
+
+CAMLprim value caml_atomic_compare_exchange_field_local (
+  value obj, value vfield, value oldv, value newv)
+{
+  intnat field = Long_val(vfield);
+  int success;
+  value ret = atomic_compare_exchange_field(obj, field, oldv, newv, &success);
+  if (success) {
+    write_barrier_local(obj, field, ret, newv);
+  }
+  return ret;
 }
 
 CAMLprim value caml_atomic_compare_exchange (value ref, value oldv, value newv)
@@ -402,6 +469,17 @@ CAMLprim value caml_atomic_cas_field(
   value obj, value vfield, value oldv, value newv)
 {
   if (caml_atomic_compare_exchange_field(obj, vfield, oldv, newv) == oldv) {
+    return Val_true;
+  } else {
+    return Val_false;
+  }
+}
+
+CAMLprim value caml_atomic_cas_field_local(
+  value obj, value vfield, value oldv, value newv)
+{
+  if (caml_atomic_compare_exchange_field_local(obj, vfield, oldv, newv)
+      == oldv) {
     return Val_true;
   } else {
     return Val_false;
@@ -721,6 +799,33 @@ void caml_region_end(caml_region_t r)
   Caml_state->local_sp = r;
 }
 
+/* If direct allocations since the last major slice exceed this
+   * percentage of the minor heap size, request a major
+   * slice. Prevents major collection starvation when allocation is
+   * dominated by major-heap direct allocation. */
+
+#define DIRECT_WORDS_REQUEST_PERCENT 20
+
+static void update_direct_words(caml_domain_state *dom_st, mlsize_t whsize)
+{
+  caml_update_major_allocated_words(dom_st, whsize, 1 /* direct */);
+  if (dom_st->allocated_words_direct >
+      dom_st->minor_heap_wsz / 100 * DIRECT_WORDS_REQUEST_PERCENT) {
+    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
+    caml_request_major_slice(1);
+  }
+}
+
+void caml_add_blocks_to_heap(void *base, size_t size,
+                             void (*free_callback)(void *, size_t))
+{
+  Caml_check_caml_state();
+  struct caml_heap_state *local = Caml_state->shared_heap;
+  caml_add_extent(local, base, size, free_callback);
+
+  update_direct_words(Caml_state, Wsize_bsize(size));
+}
+
 Caml_inline value alloc_shr(mlsize_t wosize, tag_t tag, reserved_t reserved,
                             int noexc)
 {
@@ -735,12 +840,7 @@ Caml_inline value alloc_shr(mlsize_t wosize, tag_t tag, reserved_t reserved,
       return (value)NULL;
   }
 
-  caml_update_major_allocated_words(
-    dom_st, Whsize_wosize(wosize), 1 /* direct */);
-  if (dom_st->allocated_words_direct > dom_st->minor_heap_wsz / 5) {
-    CAML_EV_COUNTER (EV_C_REQUEST_MAJOR_ALLOC_SHR, 1);
-    caml_request_major_slice(1);
-  }
+  update_direct_words(dom_st, Whsize_wosize(wosize));
 
 #ifdef DEBUG
   if (Scannable_tag(tag)) {

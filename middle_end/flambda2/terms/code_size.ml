@@ -146,7 +146,7 @@ let unbox_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       1 (* 1 load *)
     | Naked_int64 when Target_system.Machine_width.is_32_bit machine_width ->
       4 (* 2 Cadda + 2 loads *)
@@ -160,7 +160,7 @@ let box_number ~machine_width kind =
   else
     match (kind : Flambda_kind.Boxable_number.t) with
     | Naked_float | Naked_float32 | Naked_vec128 | Naked_vec256 | Naked_vec512
-      ->
+    | Naked_mask ->
       alloc_size (* 1 alloc *)
     | Naked_int32 when not (Target_system.Machine_width.is_32_bit machine_width)
       ->
@@ -173,7 +173,7 @@ let block_load (kind : Flambda_primitive.Block_access_kind.t) =
 let array_load (kind : Flambda_primitive.Array_load_kind.t) =
   match kind with
   | Immediates -> 1 (* cadda + load *)
-  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints | Naked_masks
   | Gc_ignorable_values | Values ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
@@ -197,7 +197,8 @@ let array_set (kind : Flambda_primitive.Array_set_kind.t) =
   | Values (Assignment Heap) -> does_not_need_caml_c_call_extcall_size
   | Values (Assignment Local | Initialization) -> 1
   | Gc_ignorable_values -> 1
-  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints ->
+  | Immediates | Naked_floats | Naked_ints | Naked_int64s | Naked_nativeints
+  | Naked_masks ->
     1
   | Naked_float32s | Naked_int8s | Naked_int16s | Naked_int32s | Naked_vec128s
   | Naked_vec256s | Naked_vec512s ->
@@ -231,6 +232,7 @@ let string_or_bigstring_load ~machine_width kind width =
     | One_twenty_eight _ -> 2 (* add, load (alignment handled explicitly) *)
     | Two_fifty_six _ -> 2 (* add, load (alignment handled explicitly) *)
     | Five_twelve _ -> 2 (* add, load (alignment handled explicitly) *)
+    | Mask -> 2 (* add, load *)
   in
   start_address_load + elt_load
 
@@ -410,7 +412,7 @@ let unary_prim_size ~machine_width prim =
     | Array_kind
         ( Immediates | Values | Gc_ignorable_values | Naked_floats
         | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-        | Naked_vec512s | Unboxed_product _ ) ->
+        | Naked_vec512s | Naked_masks | Unboxed_product _ ) ->
       array_length_size
     | Array_kind
         (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
@@ -475,7 +477,7 @@ let binary_prim_size ~machine_width prim =
     binary_float_comp_primitive width cmp
   | Float_comp (_width, Yielding_int_like_compare_functions ()) -> 8
   | Bigarray_get_alignment _ -> 3 (* load data + add index + and *)
-  | Atomic_load_field _ -> 1
+  | Atomic_load _ -> 1
   | Poke _ -> 1
   | Read_offset _ -> 1
 
@@ -488,19 +490,30 @@ let ternary_prim_size ~machine_width prim =
     5 (* ~ 3 block_load + 2 block_set *)
   | Bigarray_set (_dims, _kind, _layout) -> 2
   (* ~ 1 block_load + 1 block_set *)
-  | Atomic_field_int_arith _ -> 1
-  | Atomic_set_field _ -> 1
-  | Atomic_exchange_field Immediate -> 1
-  | Atomic_exchange_field Any_value -> does_not_need_caml_c_call_extcall_size
+  | Atomic_int_arith _ -> 1
+  | Atomic_set _ -> 1
+  | Atomic_exchange (_, Immediate, (Heap | Local)) -> 1
+  | Atomic_exchange (_, Any_value, (Heap | Local)) ->
+    does_not_need_caml_c_call_extcall_size
   | Write_offset _ -> 1
 
 let quaternary_prim_size prim =
   match (prim : Flambda_primitive.quaternary_primitive) with
-  | Atomic_compare_and_set_field Immediate -> 3
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Immediate } ->
+  | Atomic_compare_and_set (_, Immediate, (Heap | Local)) -> 3
+  | Atomic_compare_exchange
+      { offset_units = _;
+        atomic_kind = _;
+        args_kind = Immediate;
+        mode = Heap | Local
+      } ->
     1
-  | Atomic_compare_and_set_field Any_value
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind = Any_value } ->
+  | Atomic_compare_and_set (_, Any_value, (Heap | Local))
+  | Atomic_compare_exchange
+      { offset_units = _;
+        atomic_kind = _;
+        args_kind = Any_value;
+        mode = Heap | Local
+      } ->
     does_not_need_caml_c_call_extcall_size
 
 let block num_fields = alloc_size + num_fields

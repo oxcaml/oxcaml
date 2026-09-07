@@ -53,6 +53,11 @@ val create : Asm_section.t -> t
 (** Create an integer-valued label. The int must be positive. *)
 val create_int : Asm_section.t -> int -> t
 
+(** A label rendered as an "l"-prefixed private symbol ("l_caml<n>"). On Mach-O
+    these survive into the object symbol table (unlike "L" temporaries), so they
+    can anchor relocations; the linker strips them. *)
+val create_private_int : Asm_section.t -> int -> t
+
 (** Create a textual label. The supplied name must not require escaping. *)
 val create_string : Asm_section.t -> string -> t
 

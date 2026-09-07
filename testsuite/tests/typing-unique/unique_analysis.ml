@@ -40,7 +40,7 @@ val branching : 'a @ unique -> 'a = <fun>
    Therefore, in the rest we will only constrain uniqueness *)
 let branching (x @ once) = (if true then x else x : @ unique)
 [%%expect{|
-val branching : 'a @ unique once -> 'a @ once = <fun>
+val branching : 'a @ once unique -> 'a @ once = <fun>
 |}]
 
 let branching b =

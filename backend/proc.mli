@@ -58,7 +58,7 @@ val loc_exn_bucket : Reg.t
 val max_arguments_for_tailcalls : int
 
 (* Registers destroyed by operations *)
-val destroyed_at_raise : Reg.t array
+val destroyed_at_raise : unit -> Reg.t array
 
 val destroyed_at_reloadretaddr : Reg.t array
 

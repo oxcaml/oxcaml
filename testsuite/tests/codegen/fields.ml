@@ -173,7 +173,7 @@ do_ignore:
 
 (* Records with unboxed fields *)
 
-type unboxed_int64 = { a : int; b : int64#; c : int }
+type unboxed_int64 = { a : int; b : int64_u; c : int }
 
 let get_unboxed_int64 (r : unboxed_int64) = r.b
 [%%expect_asm X86_64{|
@@ -205,7 +205,7 @@ get_after_float:
   ret
 |}]
 
-type unboxed_int32 = { i : int32#; j : int }
+type unboxed_int32 = { i : int32_u; j : int }
 
 let get_unboxed_int32 (r : unboxed_int32) = r.i
 [%%expect_asm X86_64{|
@@ -214,7 +214,7 @@ get_unboxed_int32:
   ret
 |}]
 
-type mutable_unboxed = { mutable p : int64#; q : int }
+type mutable_unboxed = { mutable p : int64_u; q : int }
 
 let get_mut_unboxed (r : mutable_unboxed) = r.p
 [%%expect_asm X86_64{|
@@ -223,9 +223,29 @@ get_mut_unboxed:
   ret
 |}]
 
-let set_mut_unboxed (r : mutable_unboxed) (v : int64#) = r.p <- v
+let set_mut_unboxed (r : mutable_unboxed) (v : int64_u) = r.p <- v
 [%%expect_asm X86_64{|
 set_mut_unboxed:
+  movq  %rbx, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* The immediate of a store is never negated, so the full signed 32-bit range
+   applies: -0x8000_0000 is stored directly, while -0x8000_0001 must be
+   materialized in a register first. *)
+let set_mut_unboxed_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000000L
+[%%expect_asm X86_64{|
+set_mut_unboxed_min_int32:
+  movq  $-2147483648, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+let set_mut_unboxed_below_min_int32 (r : mutable_unboxed) = r.p <- -#0x80000001L
+[%%expect_asm X86_64{|
+set_mut_unboxed_below_min_int32:
+  movabsq $-2147483649, %rbx
   movq  %rbx, 8(%rax)
   movl  $1, %eax
   ret

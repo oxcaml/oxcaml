@@ -28,8 +28,6 @@
 
 open Std
 
-let last_location = ref Location.none
-
 let { Logger.log } = Logger.for_section "locate"
 
 type config =
@@ -542,6 +540,20 @@ let reroot_build_dir ~root path =
     let sep = Printf.sprintf "%c" sep in
     Filename.concat root (String.concat ~sep l)
 
+let sourcefile_for_ppx_sourcefile file =
+  match file |> String.split_on_char ~sep:'.' |> List.rev with
+  | ext :: "pp" :: rev_path -> (
+    (* If the source file was a post-processed file (.pp.mli?), use the
+          regular .mli? file for locate. *)
+    let file = ext :: rev_path |> List.rev |> String.concat ~sep:"." in
+    match
+      Misc.exact_file_exists ~dirname:(Filename.dirname file)
+        ~basename:(Filename.basename file)
+    with
+    | true -> Some file
+    | false -> None)
+  | _ -> None
+
 let move_to (config : Mconfig.t) filename artifact =
   let digest =
     (* [None] only for packs, and we wouldn't have a trie if the cmt was for a
@@ -559,23 +571,9 @@ let move_to (config : Mconfig.t) filename artifact =
       | None -> sourcefile_in_builddir
       | Some root -> reroot_build_dir ~root sourcefile_in_builddir
     in
-    match
-      sourcefile_in_builddir |> String.split_on_char ~sep:'.' |> List.rev
-    with
-    | ext :: "pp" :: rev_path -> (
-      (* If the source file was a post-processed file (.pp.mli?), use the
-         regular .mli? file for locate. *)
-      let sourcefile_in_builddir =
-        ext :: rev_path |> List.rev |> String.concat ~sep:"."
-      in
-      match
-        Misc.exact_file_exists
-          ~dirname:(Filename.dirname sourcefile_in_builddir)
-          ~basename:(Filename.basename sourcefile_in_builddir)
-      with
-      | true -> Digest.file sourcefile_in_builddir
-      | false -> Option.get (Artifact.source_digest artifact))
-    | _ -> Option.get (Artifact.source_digest artifact)
+    match sourcefile_for_ppx_sourcefile sourcefile_in_builddir with
+    | Some raw_src -> Digest.file raw_src
+    | None -> Option.get (Artifact.source_digest artifact)
   in
   File_switching.move_to ~digest filename
 
@@ -1155,10 +1153,16 @@ let from_string ~config ~env ~local_defs ~pos ?let_pun_behavior
   in
   Option.value_map ~f:from_lid ~default:(`Not_found (path, None)) lid
 
-let doc_from_uid ~config ~loc uid =
-  begin match uid with
-  | (Shape.Uid.Item { comp_unit; _ } | Shape.Uid.Compilation_unit comp_unit)
-    when not (Misc_utils.is_current_unit comp_unit) ->
+let doc_from_uid ~config ~loc (uid : Shape.Uid.t) =
+  let rec get_comp_unit uid =
+    match (uid : Shape.Uid.t) with
+    | Item { comp_unit; _ } | Compilation_unit comp_unit -> Some comp_unit
+    | Unboxed_version uid -> get_comp_unit uid
+    | Internal | Predef _ -> None
+  in
+  let comp_unit = get_comp_unit uid in
+  match comp_unit with
+  | Some comp_unit when not (Misc_utils.is_current_unit comp_unit) ->
     log ~title:"get_doc"
       "the doc (%a) you're looking for is in another\n\
       \      compilation unit (%s)"
@@ -1175,33 +1179,33 @@ let doc_from_uid ~config ~loc uid =
     end
   | _ ->
     (* Uid based search doesn't works in the current CU since Merlin's parser
-         does not attach doc comments to the typedtree *)
+       does not attach doc comments to the typedtree *)
     `Found_loc loc
-  end
 
-let doc_from_comment_list ~after_only ~buffer_comments loc =
+let doc_from_comment_list ~buffer_source ~after_only ~buffer_comments loc =
   (* When the doc we look for is in the current buffer or if search by uid
      has failed we use an alternative heuristic since Merlin's pure parser
      does not poulates doc attributes in the typedtree. *)
-  let comments =
+  let comments, source =
     match File_switching.where_am_i () with
     | None ->
       log ~title:"get_doc" "Using reader's comment (current buffer)";
-      buffer_comments
+      (buffer_comments, Some buffer_source)
     | Some cmt_path ->
       log ~title:"get_doc" "File switching: actually in %s" cmt_path;
       let artifact = Artifact.read cmt_path in
-      Artifact.comments artifact
+      (* [source] is the current buffer's text; it does not match the file
+         these comments come from. *)
+      (Artifact.comments artifact, None)
   in
   log ~title:"get_doc" "%a" Logger.fmt (fun fmt ->
-      Format.fprintf fmt "looking around %a inside: [\n" Location.print_loc
-        !last_location;
+      Format.fprintf fmt "looking around %a inside: [\n" Location.print_loc loc;
       List.iter comments ~f:(fun (c, l) ->
           Format.fprintf fmt "  (%S, %a);\n" c Location.print_loc l);
       Format.fprintf fmt "]\n");
-  match Ocamldoc.associate_comment ~after_only comments loc !last_location with
-  | None, _ -> `No_documentation
-  | Some doc, _ -> `Found doc
+  match Ocamldoc.associate_comments ~source ~after_only comments loc with
+  | None -> `No_documentation
+  | Some doc -> `Found doc
 
 (* Get doc relies on different heuristics depending on the situation:
    - First it locates the declaration.
@@ -1211,10 +1215,9 @@ let doc_from_comment_list ~after_only ~buffer_comments loc =
      - else a lookup is performed in the [uid_to_decl] table
    - If the uid-based search failed we fallback on the [doc_from_comment_list]
      heuristic that uses location to select comments in a list. *)
-let get_doc ~config:mconfig ~env ~local_defs ~comments ~pos =
+let get_doc ~buffer_source ~config:mconfig ~env ~local_defs ~comments ~pos =
   File_switching.reset ();
   fun path ->
-    let_ref last_location Location.none @@ fun () ->
     let config = { mconfig; ml_or_mli = `MLI; traverse_aliases = true } in
     let doc_from_uid_result =
       match path with
@@ -1253,22 +1256,27 @@ let get_doc ~config:mconfig ~env ~local_defs ~comments ~pos =
           | Typedtree.Constructor _ | Label _ -> true
           | _ -> false
         in
-        doc_from_comment_list ~after_only ~buffer_comments:comments loc.loc)
+        doc_from_comment_list ~buffer_source ~after_only
+          ~buffer_comments:comments loc.loc)
     | `Found_loc loc ->
       (* based on https://v2.ocaml.org/manual/doccomments.html#ss:label-comments: *)
       let browse = Mbrowse.of_typedtree local_defs in
-      let _, deepest_before =
-        Mbrowse.(leaf_node @@ deepest_before loc.Location.loc_start [ browse ])
+      (* We inspect the browse tree at the loc of the delcaration to figure out what kind
+         of declaration it is. Note that the head of the browse tree might be a node
+         inside the declaration rather than the declaration itself. *)
+      let declaration =
+        Mbrowse.deepest_before loc.Location.loc_start [ browse ]
+        |> List.map ~f:snd
       in
       let after_only =
-        begin match deepest_before with
-        | Browse_raw.Constructor_declaration _ -> true
-        (* The remaining `true` cases are currently not reachable *)
-        | Label_declaration _ | Record_field _ | Row_field _ -> true
+        match declaration with
+        | Constructor_declaration _ :: _ -> true
+        | Core_type _ :: Constructor_declaration _ :: _ -> true
+        | Core_type _ :: Core_type _ :: Label_declaration _ :: _ -> true
         | _ -> false
-        end
       in
-      doc_from_comment_list ~after_only ~buffer_comments:comments loc
+      doc_from_comment_list ~buffer_source ~after_only ~buffer_comments:comments
+        loc
     | `Builtin _ ->
       begin match path with
       | `User_input path -> `Builtin path

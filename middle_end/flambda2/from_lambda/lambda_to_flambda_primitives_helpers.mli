@@ -88,6 +88,11 @@ val bind_recs :
   (Acc.t -> Flambda.Named.t list -> Expr_with_acc.t) ->
   Expr_with_acc.t
 
+(** Returns the appropriate [Block_access_field_kind.t] for accessing field
+    element with given value kind. *)
+val block_access_field_kind_of_value_kind :
+  Lambda.value_kind -> Flambda_primitive.Block_access_field_kind.t
+
 (** Returns the appropriate [Block_access_kind.t] for accessing a field of a
     mixed block element. *)
 val block_access_kind_of_mixed_field_element :

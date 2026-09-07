@@ -8,8 +8,13 @@ name: coverage-linux
 
 on:
   workflow_dispatch:
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 jobs:
   noop:
+    name: no-op
     runs-on: ubuntu-latest
     steps:
       - name: No-op step

@@ -5,12 +5,12 @@
     | 1 -> k2)
    where k2 =
      apply direct(f_0 &toplevel.alloc_region) inlined(always)
-       ($Value_slot_use_a.camlValue_slot_use_a__f_2 : _ -> val)
+       ($Value_slot_use_a.camlValue_slot_use_a__f_3 : _ -> val)
          (0)
          -> k * error
    where k1 =
      apply direct(f_0 &toplevel.alloc_region) inlined(always)
-       ($Value_slot_use_a.camlValue_slot_use_a__f_2 : _ -> val)
+       ($Value_slot_use_a.camlValue_slot_use_a__f_3 : _ -> val)
          (1)
          -> k * error)
   where k (g : val) =

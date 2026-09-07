@@ -45,6 +45,7 @@ type ustructured_constant =
         word6 : int64;
         word7 : int64
       }
+  | Const_mask of int64
   | Const_block of int * uconstant list
   | Const_float_array of float list
   | Const_string of string

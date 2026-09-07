@@ -20,7 +20,8 @@ type unit_u : void mod everything
 type unit_u : void mod everything
 |}]
 
-(* Variants whose constructor arguments are all void are immediates *)
+(* Variants whose all-void constructors carry
+   [@immediate_all_void_constructor] are immediates *)
 
 type v : immediate = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -71,20 +72,16 @@ type bad : immediate = A of key [@immediate_all_void_constructor]
 Line 1, characters 0-65:
 1 | type bad : immediate = A of key [@immediate_all_void_constructor]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is immediate with key
-         because it's an enumeration variant type (all constructors are constant).
-       But the kind of type "bad" must be a subkind of immediate
-         because of the annotation on the declaration of the type bad.
+Error: This type definition does not satisfy its kind annotation immediate,
+       because key is not mod global many stateless immutable.
 |}]
 type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
 [%%expect{|
 Line 1, characters 0-79:
 1 | type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "bad" is immediate with key with unit_u
-         because it's an enumeration variant type (all constructors are constant).
-       But the kind of type "bad" must be a subkind of immediate
-         because of the annotation on the declaration of the type bad.
+Error: This type definition does not satisfy its kind annotation immediate,
+       because key is not mod global many stateless immutable.
 |}]
 
 
@@ -119,10 +116,9 @@ Lines 1-3, characters 0-59:
 1 | type bad : immediate with v1 =
 2 |   | A of v1 [@immediate_all_void_constructor]
 3 |   | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
-Error: The kind of type "bad" is immediate with unit_u with v1 with v2
-         because it's an enumeration variant type (all constructors are constant).
-       But the kind of type "bad" must be a subkind of immediate with v1
-         because of the annotation on the declaration of the type bad.
+Error: This type definition does not satisfy its kind annotation
+         immediate with v1,
+       because v2 is not mod global many stateless immutable.
 |}]
 
 type vme : void
@@ -315,8 +311,8 @@ Line 1, characters 29-30:
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
-(* [@immediate_all_void_constructor] is required on constructors whose arguments
-   are all void, and optional elsewhere. *)
+(* [@immediate_all_void_constructor] makes a constructor whose arguments are
+   all void an immediate; without it, such a constructor is a block. *)
 
 type t = A of unit_u [@immediate_all_void_constructor]
 [%%expect{|
@@ -346,35 +342,23 @@ module type S =
   sig type t = A of unit_u [@immediate_all_void_constructor] end
 |}]
 
-(* Missing attribute *)
+(* Without the attribute *)
 
 type t = A of unit_u
 [%%expect{|
-Line 1, characters 9-20:
-1 | type t = A of unit_u
-             ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of unit_u
 |}]
 
 type t = A of #(unit_u * unit_u) | B of int
 [%%expect{|
-Line 1, characters 9-32:
-1 | type t = A of #(unit_u * unit_u) | B of int
-             ^^^^^^^^^^^^^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+type t = A of #(unit_u * unit_u) | B of int
 |}]
 
 module type S = sig
   type t = A of unit_u
 end
 [%%expect{|
-Line 2, characters 11-22:
-2 |   type t = A of unit_u
-               ^^^^^^^^^^^
-Error: All arguments of the constructor "A" are void, so it must be
-       annotated with "[@immediate_all_void_constructor]".
+module type S = sig type t = A of unit_u end
 |}]
 
 (* A misplaced attribute is a warning, not an error, so the type is still

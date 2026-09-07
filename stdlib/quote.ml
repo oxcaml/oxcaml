@@ -40,8 +40,8 @@ module Expr = struct
 
   let bool b =
     let q = match b with
-    | true -> inject_constr Identifier.Constructor.true_
-    | false -> inject_constr Identifier.Constructor.false_
+    | true -> inject_constr (Identifier.Constructor.builtin "true")
+    | false -> inject_constr (Identifier.Constructor.builtin "false")
     in (Obj.magic q : <[bool]> expr)
 
   let inject x = Code.of_exp Loc.unknown (Exp.mk (Exp_desc.constant x) [])

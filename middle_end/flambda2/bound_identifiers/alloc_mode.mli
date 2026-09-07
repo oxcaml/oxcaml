@@ -45,9 +45,9 @@ end
 module For_applications : sig
   (** Decisions on allocation locations for application expressions. *)
   type t = private
-    | Heap of { alloc_region : Variable.t }
+    | Not_alloc_stack of { alloc_region : Variable.t }
         (** Normal allocation on the OCaml heap. *)
-    | Local of
+    | Maybe_alloc_stack of
         { alloc_region : Variable.t;
           region : Variable.t;
           ghost_region : Variable.t
@@ -55,16 +55,16 @@ module For_applications : sig
 
   val compare : t -> t -> int
 
-  val heap : alloc_region:Variable.t -> t
+  val not_alloc_stack : alloc_region:Variable.t -> t
 
-  (** Returns [Heap] if stack allocation is disabled! *)
-  val local :
+  (** Returns [Not_alloc_stack] if stack allocation is disabled! *)
+  val maybe_alloc_stack :
     alloc_region:Variable.t -> region:Variable.t -> ghost_region:Variable.t -> t
 
   val as_type : t -> For_types.t
 
   val from_lambda :
-    Lambda.locality_mode ->
+    Lambda.return_mode ->
     current_alloc_region:Variable.t ->
     current_region:Variable.t option ->
     current_ghost_region:Variable.t option ->

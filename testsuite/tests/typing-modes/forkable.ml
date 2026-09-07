@@ -3,6 +3,11 @@
  expect;
 *)
 
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
 let my_unforkable : (unit -> unit) @ unforkable = print_endline "Hello, world!"
 [%%expect{|
 Line 1, characters 4-79:
@@ -222,10 +227,7 @@ val f1 : 'a -> unit = <fun>
 let f2 (x @ local) = exclave_ requires_forkable x
 
 [%%expect{|
-Line 1, characters 48-49:
-1 | let f2 (x @ local) = exclave_ requires_forkable x
-                                                    ^
-Error: This value is "unforkable" but is expected to be "forkable".
+val f2 : 'a @ local forkable -> unit @ local = <fun>
 |}]
 
 let f3 (x @ unforkable) = requires_forkable x

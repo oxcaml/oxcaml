@@ -796,7 +796,7 @@ and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
   | Some lbl, Some simple_name when String.equal simple_name lbl ->
     pp f "~%s" lbl
   (* Labeled component general case *)
-  | Some lbl, _ -> pp f "~%s:%a" lbl (pattern1 ctxt) x
+  | Some lbl, _ -> pp f "~%s:%a" lbl (simple_pattern ctxt) x
   (* Unlabeled component *)
   | None, _ -> pattern1 ctxt f x
 
@@ -2329,8 +2329,9 @@ and block_access ctxt f = function
   | Baccess_block (mut, index) ->
     let s =
       match mut with
-      | Mutable -> "idx_mut"
-      | Immutable -> "idx_imm"
+      | Immutable_access -> "idx_imm"
+      | Mutable_access -> "idx_mut"
+      | Atomic_access -> "idx_atomic"
     in
     pp f ".%s(%a)" s (expression ctxt) index
 

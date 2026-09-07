@@ -3,21 +3,21 @@
  expect.opt;
 *)
 
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 [%%expect{|
-external to_int64 : int64# -> int64 = "%box_int64"
+external to_int64 : int64_u -> int64 = "%box_int64"
 external to_float : float# -> float = "%box_float"
 external to_int8 : int8# -> int8 = "%tag_int8"
-external to_nativeint : nativeint# -> nativeint = "%box_nativeint"
+external to_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 |}]
 
 (* Simple let poly_ with a polymorphic function *)
 let poly_ id x = x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let (a, b, c, d) =
@@ -40,16 +40,15 @@ Lines 2-3, characters 2-3:
 2 | ..let f x = x in
 3 |   f
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* Let poly_ with multiple bindings - all must be poly_ *)
 let poly_ const x y = x
 and poly_ apply f x = f x
 [%%expect{|
-val const : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a = <lpoly>
-val apply : layout_ l l0. ('a : l) ('b : l0). ('a -> 'b) -> 'a -> 'b =
-  <lpoly>
+val poly_ const : 'a -> 'b -> 'a = <lpoly>
+val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
 |}]
 
 (* CR-soon zqian: Tuple patterns are not yet supported by transl.
@@ -66,23 +65,11 @@ end = struct
   let poly_ (f, g) = ((fun a b -> a), (fun c d -> d))
 end
 [%%expect{|
-Lines 4-6, characters 6-3:
-4 | ......struct
+Line 5, characters 21-53:
 5 |   let poly_ (f, g) = ((fun a b -> a), (fun c d -> d))
-6 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-           val g : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'b
-         end
-       is not included in
-         sig val f : int val g : int end
-       Values do not match:
-         val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
-       is not included in
-         val f : int
-       The type "'a -> 'b -> 'a" is not compatible with the type "int"
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* Regular let cannot be given a layout_ type *)
@@ -100,11 +87,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig val regular_id : 'a -> 'a end
        is not included in
-         sig val regular_id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ regular_id : 'a -> 'a end
        Values do not match:
          val regular_id : 'a -> 'a
        is not included in
-         val regular_id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ regular_id : 'a -> 'a
        the second has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
@@ -133,11 +120,11 @@ Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 (* Error when poly_ binding generalizes no layout variables *)
 let poly_ f = 42
 [%%expect{|
-Line 1, characters 10-11:
+Line 1, characters 14-16:
 1 | let poly_ f = 42
-              ^
-Error: This binding has no layout variables, so "poly_" has no effect.
-       Consider using a regular "let" instead.
+                  ^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* layout-polymorphic id is not included in regular id,
@@ -154,11 +141,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val id : layout_ l. ('a : l). 'a -> 'a end
+         sig val poly_ id : 'a -> 'a end
        is not included in
          sig val id : 'a -> 'a end
        Values do not match:
-         val id : layout_ l. ('a : l). 'a -> 'a
+         val poly_ id : 'a -> 'a
        is not included in
          val id : 'a -> 'a
        the first has 1 more layout parameter that is not used,
@@ -172,45 +159,53 @@ Line 1, characters 17-47:
 1 | let poly_ pair = let y = 42 in fun x -> #(x, y)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* constructor: passing when all args are syntactic values *)
 let poly_ f = Some (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). ('a -> 'a) option = <lpoly>
+Line 1, characters 14-31:
+1 | let poly_ f = Some (fun x -> x)
+                  ^^^^^^^^^^^^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* constructor: failing when an arg is not a syntactic value *)
 let poly_ f = Some (let x = ref 0 in x)
 [%%expect{|
-Line 1, characters 19-39:
+Line 1, characters 14-39:
 1 | let poly_ f = Some (let x = ref 0 in x)
-                       ^^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* variant: passing - no payload *)
 let poly_ f _ = `A
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> [> `A ] = <lpoly>
+val poly_ f : 'a -> [> `A ] = <lpoly>
 |}]
 
 (* variant: passing - payload is a syntactic value *)
 let poly_ f = `A (fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). [> `A of 'a -> 'a ] = <lpoly>
+Line 1, characters 14-29:
+1 | let poly_ f = `A (fun x -> x)
+                  ^^^^^^^^^^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* variant: failing - payload is not a syntactic value *)
 let poly_ f = `A (let x = ref 0 in x)
 [%%expect{|
-Line 1, characters 17-37:
+Line 1, characters 14-37:
 1 | let poly_ f = `A (let x = ref 0 in x)
-                     ^^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* tuple: passing when all components are syntactic values *)
@@ -221,12 +216,11 @@ let (x, f, a, y, g, b) =
   let #(a, b) = #(f #1.0, g #3L) in
   (x, f, to_float a, y, g, to_int64 b)
 [%%expect{|
-val x : int = 42
-val f : '_weak1 -> '_weak1 = <fun>
-val a : float = 1.
-val y : int = 42
-val g : '_weak2 -> '_weak2 = <fun>
-val b : int64 = 3L
+Line 2, characters 16-32:
+2 |   let poly_ p = (42, fun x -> x) in
+                    ^^^^^^^^^^^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* tuple: failing when a component is not a syntactic value *)
@@ -236,23 +230,27 @@ Line 1, characters 14-46:
 1 | let poly_ f = (let x = ref 0 in x, fun x -> x)
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* unboxed tuple: passing when all components are syntactic values *)
 let poly_ f = #(42, fun x -> x)
 [%%expect{|
-val f : layout_ l. ('a : l). #(int * ('a -> 'a)) = <lpoly>
+Line 1, characters 14-31:
+1 | let poly_ f = #(42, fun x -> x)
+                  ^^^^^^^^^^^^^^^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 (* unboxed tuple: failing when a component is not a syntactic value *)
 let poly_ f = #((let x = ref 0 in x), fun x -> x)
 [%%expect{|
-Line 1, characters 16-36:
+Line 1, characters 14-49:
 1 | let poly_ f = #((let x = ref 0 in x), fun x -> x)
-                    ^^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* record: passing when all fields are syntactic values *)
@@ -260,17 +258,17 @@ type r = { a : int; b : int -> int }
 let poly_ f _ = { a = 42; b = fun x -> x }
 [%%expect{|
 type r = { a : int; b : int -> int; }
-val f : layout_ l. ('a : l). 'a -> r = <lpoly>
+val poly_ f : 'a -> r = <lpoly>
 |}]
 
 (* record: failing when a field is not a syntactic value *)
 let poly_ f = { a = (let x = ref 0 in !x); b = fun x -> x }
 [%%expect{|
-Line 1, characters 20-41:
+Line 1, characters 14-59:
 1 | let poly_ f = { a = (let x = ref 0 in !x); b = fun x -> x }
-                        ^^^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* unboxed product record: passing when all fields are syntactic values *)
@@ -278,29 +276,29 @@ type ur = #{ a : int; b : int }
 let poly_ f _ = #{ a = 42; b = 0 }
 [%%expect{|
 type ur = #{ a : int; b : int; }
-val f : layout_ l. ('a : l). 'a -> ur = <lpoly>
+val poly_ f : 'a -> ur = <lpoly>
 |}]
 
 (* unboxed product record: failing when a field is not a syntactic value *)
 let poly_ f = #{ a = (let x = ref 0 in !x); b = 0 }
 [%%expect{|
-Line 1, characters 21-42:
+Line 1, characters 14-51:
 1 | let poly_ f = #{ a = (let x = ref 0 in !x); b = 0 }
-                         ^^^^^^^^^^^^^^^^^^^^^
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
 let poly_ f x y = #(x, (y, y))
 [%%expect{|
-val f : layout_ l. ('a : l) 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+val poly_ f : 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
 let poly_ f x = (x : (_ : any))
 [%%expect{|
-val f : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ f : 'a -> 'a = <lpoly>
 |}]
 
 (* [value] does constrain the layout *)
@@ -316,7 +314,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 (* [assert false] is layout poly *)
 let poly_ f () = assert false
 [%%expect{|
-val f : layout_ l. ('a : l). unit -> 'a = <lpoly>
+val poly_ f : unit -> 'a = <lpoly>
 |}]
 
 (* We observe that foo is polymorphic on two types sharing the same polymorphic
@@ -338,7 +336,7 @@ let poly_ foo x y =
   let _ = id y in
   ()
 [%%expect{|
-val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> unit = <lpoly>
+val poly_ foo : 'a -> 'b -> unit = <lpoly>
 |}]
 
 (* [rec] prevents layout polymorphism, even for fake recursion (no
@@ -514,4 +512,23 @@ let x =
   M.id #1s |> to_int8
 [%%expect {|
 val x : int8 = 1s
+|}]
+
+(* Tupled functions *)
+let poly_ f = fun (g, x) -> g x
+let x = f ((fun y -> y + 1), 41)
+
+[%%expect{|
+>> Fatal error: Slambda does not currently support poly tupled functions
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Environment arg shouldn't push things over the maximum arity *)
+let poly_ f x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30 x31 x32 x33 x34 x35 x36 x37 x38 x39 x40 x41 x42 x43 x44 x45 x46 x47 x48 x49 x50 x51 x52 x53 x54 x55 x56 x57 x58 x59 x60 x61 x62 x63 x64 x65 x66 x67 x68 x69 x70 x71 x72 x73 x74 x75 x76 x77 x78 x79 x80 x81 x82 x83 x84 x85 x86 x87 x88 x89 x90 x91 x92 x93 x94 x95 x96 x97 x98 x99 x100 x101 x102 x103 x104 x105 x106 x107 x108 x109 x110 x111 x112 x113 x114 x115 x116 x117 x118 x119 x120 x121 x122 x123 x124 y = y
+let () = Printf.printf "%.1f\n" (to_float (f 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 #7.0))
+
+[%%expect{|
+Uncaught exception: File "lambda/lambda.ml", line 1542, characters 2-8: Assertion failed
+
 |}]

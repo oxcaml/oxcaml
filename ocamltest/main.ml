@@ -163,6 +163,7 @@ let run_test_tree log add_msg behavior env summ ast =
           string_of_test_location ~branches
             name.loc.Location.loc_start.Lexing.pos_lnum
       in
+      let name = { name with node = Environments.expand env name.node } in
       let test = lookup_test name in
       let (msg, behavior, env, result) =
         match behavior with

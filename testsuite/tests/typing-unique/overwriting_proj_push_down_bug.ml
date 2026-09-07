@@ -1,6 +1,7 @@
 (* TEST
    flags += "-extension-universe alpha ";
-   flags += "-dlambda -dcanonical-ids";
+   flags += "-dlambda -dcanonical-ids ";
+   flags += "-no-extension mode_polymorphism_alpha";
    expect;
 *)
 
@@ -15,14 +16,14 @@ type record = { x : string; y : string @@ many aliased }
 type record = { x : string; y : string @@ many aliased; }
 |}]
 
-let aliased_use x = x
+let aliased_use (x @ aliased global) = x
 [%%expect{|
 (let (aliased_use/0 = (function {nlocal = 0} x/0? x/0))
   (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/0))
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
-let unique_use (x @ unique) = x
+let unique_use (x @ unique global) = x
 [%%expect{|
 (let (unique_use/0 = (function {nlocal = 0} x/1? x/1))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/0))

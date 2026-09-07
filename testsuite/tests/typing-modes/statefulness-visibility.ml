@@ -18,6 +18,102 @@ type 'a myref = { mutable a : 'a; b : 'a }
 type 'a myref = { mutable a : 'a; b : 'a; }
 |}]
 
+type middle_payload
+type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
+type t : value mod write = { v : middle_payload @@ write } [@@unboxed]
+type u : value mod reading = { v : middle_payload @@ reading } [@@unboxed]
+type v : value mod writing = { v : middle_payload @@ writing } [@@unboxed]
+type s_arrow : value mod read = { f : (int -> int) @@ read } [@@unboxed]
+type t_arrow : value mod write = { f : (int -> int) @@ write } [@@unboxed]
+
+[%%expect{|
+type middle_payload
+type s = { v : middle_payload @@ read; } [@@unboxed]
+type t = { v : middle_payload @@ write; } [@@unboxed]
+type u = { v : middle_payload @@ reading; } [@@unboxed]
+type v = { v : middle_payload @@ writing; } [@@unboxed]
+type s_arrow = { f : int -> int @@ read; } [@@unboxed]
+type t_arrow = { f : int -> int @@ write; } [@@unboxed]
+|}]
+
+let read_from_read (x : s @ read) : s @ read_write = x
+
+let read_from_immutable (x : s @ immutable) : s @ write = x
+
+[%%expect{|
+val read_from_read : s @ read -> s = <fun>
+val read_from_immutable : s @ immutable -> s @ write = <fun>
+|}]
+
+let read_no_cross (x : s @ immutable) : s @ read = x
+
+[%%expect{|
+Line 1, characters 51-52:
+1 | let read_no_cross (x : s @ immutable) : s @ read = x
+                                                       ^
+Error: This value is "write" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "read" or "read_write".
+|}]
+
+let write_from_write (x : t @ write) : t @ read_write = x
+
+let write_from_immutable (x : t @ immutable) : t @ read = x
+
+[%%expect{|
+val write_from_write : t @ write -> t = <fun>
+val write_from_immutable : t @ immutable -> t @ read = <fun>
+|}]
+
+let write_no_cross (x : t @ immutable) : t @ write = x
+
+[%%expect{|
+Line 1, characters 53-54:
+1 | let write_no_cross (x : t @ immutable) : t @ write = x
+                                                         ^
+Error: This value is "read" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "write" or "read_write".
+|}]
+
+let reading_from_writing (x : u @ writing) : u @ stateless = x
+
+let reading_from_stateful (x : u @ stateful) : u @ reading = x
+
+[%%expect{|
+val reading_from_writing : u @ writing -> u @ stateless = <fun>
+val reading_from_stateful : u -> u @ reading = <fun>
+|}]
+
+let reading_no_cross (x : u @ reading) : u @ stateless = x
+
+[%%expect{|
+Line 1, characters 57-58:
+1 | let reading_no_cross (x : u @ reading) : u @ stateless = x
+                                                             ^
+Error: This value is "reading"
+       but is expected to be "writing" because it crosses with something
+         which is expected to be "stateless".
+|}]
+
+let writing_from_reading (x : v @ reading) : v @ stateless = x
+
+let writing_from_stateful (x : v @ stateful) : v @ writing = x
+
+[%%expect{|
+val writing_from_reading : v @ reading -> v @ stateless = <fun>
+val writing_from_stateful : v -> v @ writing = <fun>
+|}]
+
+let writing_no_cross (x : v @ writing) : v @ reading = x
+
+[%%expect{|
+Line 1, characters 55-56:
+1 | let writing_no_cross (x : v @ writing) : v @ reading = x
+                                                           ^
+Error: This value is "writing" but is expected to be "reading".
+|}]
+
 let foo x a = x.a <- a
 [%%expect{|
 val foo : 'a myref -> 'a -> unit = <fun>
@@ -35,7 +131,7 @@ Error: This value is "read"
 
 let foo (x @ write uncontended) a = x.a <- a
 [%%expect{|
-val foo : 'a myref @ uncontended write -> 'a -> unit = <fun>
+val foo : 'a myref @ write uncontended -> 'a -> unit = <fun>
 |}]
 
 let foo (x @ immutable uncontended) a = x.a <- a
@@ -50,7 +146,7 @@ Error: This value is "immutable"
 
 let foo (x @ read uncontended) = x.a
 [%%expect{|
-val foo : 'a myref @ uncontended read -> 'a @ uncontended read = <fun>
+val foo : 'a myref @ read uncontended -> 'a @ read uncontended = <fun>
 |}]
 
 let foo (x @ write uncontended) = x.a
@@ -75,19 +171,19 @@ Error: This value is "immutable"
 
 let foo (x @ read uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended read -> 'a -> 'a myref @ uncontended read =
+val foo : 'a myref @ read uncontended -> 'a -> 'a myref @ read uncontended =
   <fun>
 |}]
 
 let foo (x @ write uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended write -> 'a -> 'a myref @ uncontended write =
+val foo : 'a myref @ write uncontended -> 'a -> 'a myref @ write uncontended =
   <fun>
 |}]
 
 let foo (x @ immutable uncontended) upd = { x with a = upd }
 [%%expect{|
-val foo : 'a myref @ uncontended immutable -> 'a -> 'a myref @ immutable =
+val foo : 'a myref @ immutable uncontended -> 'a -> 'a myref @ immutable =
   <fun>
 |}]
 
@@ -304,7 +400,7 @@ Error: This value is "corrupted"
 
 let foo (x @ read uncontended) = x.contents
 [%%expect{|
-val foo : 'a ref @ uncontended read -> 'a @ uncontended read = <fun>
+val foo : 'a ref @ read uncontended -> 'a @ read uncontended = <fun>
 |}]
 
 let foo (x @ read_write) = x.contents
@@ -745,31 +841,37 @@ Error: This value is "reading"
 let foo : int Atomic.t @ read_write -> (unit -> int) @ stateless =
     fun a () -> Atomic.exchange a 2
 [%%expect{|
-Line 2, characters 4-35:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.exchange a 2
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "stateful",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-35
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "read_write".
 |}]
 
 let foo : int Atomic.t @ write -> (unit -> unit) @ stateless =
     fun a () -> Atomic.set a 2
 [%%expect{|
-Line 2, characters 4-30:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.set a 2
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "writing",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-30
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "write" or "read_write".
 |}]
 
 let foo : int Atomic.t @ read -> (unit -> int) @ stateless =
     fun a () -> Atomic.get a
 [%%expect{|
-Line 2, characters 4-28:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.get a
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "reading",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-28
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "read" or "read_write".
 |}]
 
 let foo @ stateless =
@@ -958,7 +1060,7 @@ Error: This value is "corruptible" but is expected to be "shareable".
 
 let succeeds : 'a @ writing shareable -> 'a @ shareable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ shareable writing -> 'a @ shareable = <fun>
+val succeeds : 'a @ writing shareable -> 'a @ shareable = <fun>
 |}]
 
 (* [stateful] => [nonportable] *)
@@ -973,7 +1075,7 @@ Error: This value is "shareable" but is expected to be "portable".
 
 let succeeds : 'a @ reading portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable reading -> 'a @ portable = <fun>
+val succeeds : 'a @ reading portable -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ writing -> 'a @ portable = fun x -> x
@@ -986,7 +1088,7 @@ Error: This value is "corruptible" but is expected to be "portable".
 
 let succeeds : 'a @ writing portable -> 'a @ portable = fun x -> x
 [%%expect{|
-val succeeds : 'a @ portable writing -> 'a @ portable = <fun>
+val succeeds : 'a @ writing portable -> 'a @ portable = <fun>
 |}]
 
 let fails : 'a @ stateful -> 'a @ portable = fun x -> x
@@ -1070,7 +1172,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ contended read -> 'b) -> 'b = <fun>
+val override : 'a @ contended -> ('a @ read contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [write] => [corrupted] *)
@@ -1099,7 +1201,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = fun x f -> f x
 [%%expect{|
-val override : 'a @ contended -> ('a @ contended write -> 'b) -> 'b = <fun>
+val override : 'a @ contended -> ('a @ write contended -> 'b) -> 'b = <fun>
 |}]
 
 (* [read_write] doesn't change the default. *)
@@ -1269,7 +1371,7 @@ Error: This value is "contended"
 let baz (x : int ref) @ reading immutable uncontended = lazy (x.contents)
 
 [%%expect{|
-val baz : int ref -> int lazy_t @ uncontended reading immutable = <fun>
+val baz : int ref -> int lazy_t @ reading immutable uncontended = <fun>
 |}]
 
 let () =
@@ -1283,7 +1385,7 @@ let () =
 let zab () @ immutable uncontended = lazy (ref 5)
 
 [%%expect{|
-val zab : unit -> int ref lazy_t @ uncontended immutable = <fun>
+val zab : unit -> int ref lazy_t @ immutable uncontended = <fun>
 |}]
 
 (* Forcing an [immutable] lazy returns an [immutable] value. *)
@@ -1306,7 +1408,7 @@ Error: This value is "immutable"
 let zag () @ read uncontended = lazy (ref 42)
 
 [%%expect{|
-val zag : unit -> int ref lazy_t @ uncontended read = <fun>
+val zag : unit -> int ref lazy_t @ read uncontended = <fun>
 |}]
 
 let () =
@@ -1328,7 +1430,7 @@ Error: This value is "read"
 let zig () @ write uncontended = lazy (ref 42)
 
 [%%expect{|
-val zig : unit -> int ref lazy_t @ uncontended write = <fun>
+val zig : unit -> int ref lazy_t @ write uncontended = <fun>
 |}]
 
 let () =

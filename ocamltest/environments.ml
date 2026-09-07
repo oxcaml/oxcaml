@@ -87,6 +87,8 @@ let to_system_env env =
 let lookup variable env =
   try Some (expand env (VariableMap.find variable env)) with Not_found -> None
 
+let expand env value = expand env (Some value)
+
 let lookup_nonempty variable env = match lookup variable env with
   | None -> None
   | Some x as t -> if String.words x = [] then None else t

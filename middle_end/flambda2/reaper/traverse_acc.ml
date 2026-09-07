@@ -26,6 +26,7 @@ module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
@@ -55,7 +56,6 @@ type t =
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
-    mutable kinds : K.t Name.Map.t;
     mutable fixed_arity_conts : Continuation.Set.t;
     mutable continuation_info : continuation_info Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
@@ -71,21 +71,11 @@ let create () =
     apply_deps = [];
     set_of_closures_deps = [];
     deps = Graph.create ();
-    kinds = Name.Map.empty;
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
     set_of_closures_graph = Code_id.Map.empty;
     all_sets_of_closures = []
   }
-
-let kinds t = t.kinds
-
-let kind t name k = t.kinds <- Name.Map.add name k t.kinds
-
-let bound_parameter_kind t (bp : Bound_parameter.t) =
-  let kind = K.With_subkind.kind (Bound_parameter.kind bp) in
-  let name = Name.var (Bound_parameter.var bp) in
-  t.kinds <- Name.Map.add name kind t.kinds
 
 (* CR-someday ncourant: it would be great if we kept constants and symbols from
    external compilation units in the graph as well, making effectively all
@@ -99,21 +89,6 @@ let simple_to_node t ~all_constants simple =
       if not (Current_unit.is_current (Symbol.compilation_unit s))
       then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
       Code_id_or_name.symbol s)
-
-let alias_kind t name simple =
-  let kind =
-    Simple.pattern_match simple
-      ~name:(fun name ~coercion:_ ->
-        (* Symbols are always values and might not be in t.kinds *)
-        if Name.is_symbol name
-        then K.value
-        else
-          match Name.Map.find_opt name t.kinds with
-          | Some k -> k
-          | None -> Misc.fatal_errorf "Unbound name %a" Name.print name)
-      ~const:Reg_width_const.kind
-  in
-  t.kinds <- Name.Map.add name kind t.kinds
 
 let add_code_dep t code_id dep =
   t.code_deps <- Code_id.Map.add code_id dep t.code_deps
@@ -334,6 +309,31 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
       add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
         ~base:untuple_var)
     params;
+  (* We can't ever remove the accessors from the tuple, because they are inside
+     the [caml_tuplify*] functions and not in our control. As such, even if no
+     component of the tuple is used, the tuple itself must never be replaced by
+     a poison value, because otherwise [caml_tuplify*] will try to load the
+     fields from the poison value and cause a segfault.
+
+     To force the tuple to remain alive, we read its [Is_int] field, and force
+     the result to be used if the function could be called. Ideally, we would
+     want to force the tuple to stay the same length, reading from a
+     [Block_length] field, but this does not exist yet. However, we also never
+     change the length or representation of blocks, so reading the [Is_int]
+     field is enough to ensure the block remains alive and of the same size,
+     even if all its fields turn to poison.
+
+     If we ever start changing the representation of blocks, or if we change
+     their length in another way, it will become necessary to do something else
+     here to ensure the size of the tuple cannot change. *)
+  let keep_tuple_alive_var =
+    Code_id_or_name.var (Variable.create "keep_tuple_alive_var" K.value)
+  in
+  add_accessor_dep t ~to_:keep_tuple_alive_var Field.is_int ~base:untuple_var;
+  (* Make sure [keep_tuple_alive_var] is used if [code_id] is used. *)
+  add_use_dep t
+    ~to_:(Code_id_or_name.code_id code_id)
+    ~from:keep_tuple_alive_var;
   [witness]
 
 let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params

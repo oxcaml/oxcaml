@@ -108,7 +108,7 @@ val tree_of_type_scheme: type_expr -> out_type
 val tree_of_modalities:
   Types.mutability -> Mode.Modality.Const.t -> Outcometree.out_mode list
 
-val tree_of_modes:
+val tree_of_modes_const:
   Mode.Alloc.Const.t -> Outcometree.out_mode list
 
 (** [out_jkind_of_jkind env jkind] converts a jkind to an [out_jkind]

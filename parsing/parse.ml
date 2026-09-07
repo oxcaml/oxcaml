@@ -207,8 +207,9 @@ let prepare_error err =
          Style.inline_code "let mutable f = fun x -> .."
   | Block_access_bad_paren loc ->
       Location.errorf ~loc
-        "Syntax error: A parenthesis here can only follow %a or %a."
+        "Syntax error: A parenthesis here can only follow %a, %a, or %a."
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
+        Style.inline_code ".idx_atomic"
 
 let () =
   Location.register_error_of_exn

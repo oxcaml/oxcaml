@@ -47,3 +47,13 @@ external recv : 'a receiver -> 'a = "%field0"
     sent (using [send]) to the [sender], or the initial value provided to
     [channel]. *)
 val create : 'a -> 'a sender * 'a receiver
+
+type 'a or_null_sender
+
+external send_or_null : 'a or_null_sender -> 'a Or_null.t -> unit = "%setfield0"
+
+type 'a or_null_receiver
+
+external recv_or_null : 'a or_null_receiver -> 'a Or_null.t = "%field0"
+
+val create_or_null : 'a Or_null.t -> 'a or_null_sender * 'a or_null_receiver

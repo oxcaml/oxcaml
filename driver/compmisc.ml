@@ -88,6 +88,7 @@ let init_parameters () =
 let initial_env () =
   Ident.reinit();
   Types.Uid.reinit();
+  Shape.Rec_var_ident.reinit();
   let initially_opened_module =
     if !Clflags.nopervasives then
       None

@@ -30,11 +30,6 @@ let _ = f_five_args 100 "test" 2.71 false 'x'
 let _ = f_five_args (-42) "debug" (-1.5) true '\n'
 
 (* Pattern matching on pairs and tuples *)
-(* CR sspies: Functions with pattern matching parameters display as generic
-   'param=[...] : ocaml_value' in the debugger rather than showing the
-   destructured variable names and their individual types. For example,
-   f_pair_match shows 'param=[42, "hello"] : ocaml_value' instead of showing the
-   extracted 'x : int' and 'y : string' variables separately. *)
 let[@inline never] [@local never] f_pair_match ((x, y) : int * string) =
   let result = x + String.length y in
   result

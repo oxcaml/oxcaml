@@ -19,7 +19,7 @@ type raw
 
 include Contains_ids.S with type t := t
 
-val apply_renaming : Code_id.t Code_id.Map.t -> Renaming.t -> t -> t
+val apply_renaming : Code_id.importer -> Renaming.t -> t -> t
 
 val print : Format.formatter -> t -> unit
 
@@ -39,6 +39,8 @@ val mem : Code_id.t -> t -> bool
 
 (** This function raises an exception if the code ID is unbound. *)
 val find_exn : t -> Code_id.t -> Code_or_metadata.t
+
+val get_code_metadata : t -> Code_id.t -> Code_metadata.t
 
 (** This function is only really for use in unusual cases where there needs to
     be special handling if a code ID is unbound (see comment in the .ml file) *)

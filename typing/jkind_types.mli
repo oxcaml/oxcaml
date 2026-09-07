@@ -59,10 +59,13 @@ module Sort : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
 
   val to_string_base : base -> string
 
   val equal_base : base -> base -> bool
+
+  val base_is_addressable : base -> bool
 
   type univar = { name : string option }
 
@@ -71,6 +74,7 @@ module Sort : sig
     | Base of base
     | Product of t list
     | Univar of univar
+    | Addressable of t
 
   and var
 
@@ -92,11 +96,22 @@ module Sort : sig
 
   val equate_tracking_mutation : t -> t -> equate_result
 
+  type constrain_addressable_result =
+    | Addressable_mutated
+    | Addressable_no_mutation
+    | Not_known_addressable
+
+  val constrain_addressable :
+    allow_mutation:bool -> t -> constrain_addressable_result
+
+  val strip_head_addressable : t -> t
+
   (** Post-condition (which holds deeply within the sort): If the result is a
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
-  (** Determines if the sort is [Scannable] or an unfilled sort variable *)
+  (** Determines if the sort is [Scannable] or an unfilled sort variable,
+      possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
   (** Decompose a sort into a list (of the given length) of fresh sort
@@ -111,6 +126,16 @@ module Sort : sig
       | Univar of univar
       | Base of base
   end
+end
+
+module Kind_operator : sig
+  type t =
+    | Id
+    | Addressable
+
+  val equal : t -> t -> bool
+
+  val compose : t -> t -> t
 end
 
 module Scannable_axes : sig
@@ -140,14 +165,19 @@ module Layout : sig
       2. Scannable axes are meaningful only when the layout might be scannable
       ([any], [scannable], a sort variable, or an abstract kind). On other
       layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
-      [float64]. See [Layout.Const.get_root_scannable_axes]. *)
+      [float64]. See [Layout.Const.get_root_scannable_axes].
+
+      3. Like products, [Addressable] has two possible encodings: at the layout
+      level or within a sort. [Addressable (Any _)] can only be encoded at the
+      layout level. *)
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
 
   module Const : sig
-    type t =
+    type t = private
       | Any of Scannable_axes.t
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
@@ -158,6 +188,19 @@ module Layout : sig
               by slambda. The [var] is used only for physical identity; its
               contents are not consumed and its level must be
               [Ident.highest_scope]. *)
+      | Addressable of t
+          (** See Note [Addressable kinds].
+
+              Invariant: this constructor is never redundantly applied. I.e.,
+              given [Addressable t], [not (is_surely_addressable t)]. *)
+
+    val any : Scannable_axes.t -> t
+
+    val product : t list -> t
+
+    val univar : Sort.univar -> t
+
+    val genvar : Sort.var -> t
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
@@ -170,6 +213,12 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
+
+    val is_surely_addressable : t -> bool
+
+    val addressable : t -> t
+
+    val apply_operator : t -> Kind_operator.t -> t
 
     (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
         [Base Float64], [Product], [Univar], [Genvar]). *)
@@ -193,4 +242,6 @@ module Layout : sig
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
   val product : 'a t list -> 'a t
+
+  val apply_operator : 'a t -> Kind_operator.t -> 'a t
 end

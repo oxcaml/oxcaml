@@ -28,6 +28,7 @@ module V = Dwarf_value
 type implicit_value =
   | Int of Targetint.t
   | Symbol of Asm_symbol.t
+  | Label of Asm_label.t
 
 type t =
   | DW_op_lit0
@@ -207,6 +208,8 @@ type t =
       { label : Asm_label.t;
         offset_in_bytes : Targetint.t
       }
+  | DW_op_entry_value of { block : t list }
+  | DW_op_GNU_entry_value of { block : t list }
 
 let opcode_name t =
   match t with
@@ -366,6 +369,8 @@ let opcode_name t =
   | DW_op_bit_piece _ -> "DW_op_bit_piece"
   | DW_op_implicit_pointer _ -> "DW_op_implicit_pointer"
   | DW_op_GNU_implicit_pointer _ -> "DW_op_GNU_implicit_pointer"
+  | DW_op_entry_value _ -> "DW_op_entry_value"
+  | DW_op_GNU_entry_value _ -> "DW_op_GNU_entry_value"
 
 (* DWARF-4 spec section 7.7.1. *)
 let opcode = function
@@ -525,6 +530,8 @@ let opcode = function
   | DW_op_bit_piece _ -> 0x9d
   | DW_op_implicit_pointer _ -> 0xa0
   | DW_op_GNU_implicit_pointer _ -> 0xf2
+  | DW_op_entry_value _ -> 0xa3
+  | DW_op_GNU_entry_value _ -> 0xf3
 
 external caml_string_set32 : bytes -> index:int -> Int32.t -> unit
   = "%caml_string_set32"
@@ -546,7 +553,13 @@ module Make (M : sig
   val ( >>> ) : param -> result -> (unit -> result) -> result
 end) =
 struct
-  let run param t =
+  (* [size_of_expression] is used for operators that carry expression-block
+     operands (see the forthcoming entry-value operators), whose ULEB128 length
+     prefixes require the byte size of the enclosed expression to be known up
+     front. It is passed as an argument because [size], from which it is built,
+     is itself defined in terms of this traversal (see the bottom of this
+     file). *)
+  let rec run ~size_of_expression param t =
     let unit_result = M.unit_result () in
     let opcode = M.opcode param in
     let value = M.value param in
@@ -563,6 +576,7 @@ struct
       unit_result
     | DW_op_addr (Int addr) -> value (V.absolute_address addr)
     | DW_op_addr (Symbol sym) -> value (V.code_address_from_symbol sym)
+    | DW_op_addr (Label lbl) -> value (V.code_address_from_label lbl)
     | DW_op_const1u n -> value (V.uint8 ~comment:"  arg of DW_OP_const1u" n)
     | DW_op_const2u n -> value (V.uint16 ~comment:"  arg of DW_OP_const2u" n)
     | DW_op_const4u n -> value (V.uint32 ~comment:"  arg of DW_OP_const4u" n)
@@ -693,6 +707,11 @@ struct
         (V.uleb128 ~comment:"Dwarf_arch_sizes.size_addr"
            (Uint64.of_nonnegative_int_exn Dwarf_arch_sizes.size_addr))
       >>> fun () -> value (V.code_address_from_symbol symbol)
+    | DW_op_implicit_value (Label lbl) ->
+      value
+        (V.uleb128 ~comment:"Dwarf_arch_sizes.size_addr"
+           (Uint64.of_nonnegative_int_exn Dwarf_arch_sizes.size_addr))
+      >>> fun () -> value (V.code_address_from_label lbl)
     | DW_op_stack_value -> unit_result
     | DW_op_piece { size_in_bytes } ->
       let size_in_bytes = Targetint.nonnegative_to_uint64_exn size_in_bytes in
@@ -707,6 +726,15 @@ struct
       let offset_in_bytes = Targetint.to_int64 offset_in_bytes in
       value (V.offset_into_debug_info label) >>> fun () ->
       value (V.sleb128 ~comment:"offset in bytes" offset_in_bytes)
+    | DW_op_entry_value { block } | DW_op_GNU_entry_value { block } ->
+      (* The operand is a ULEB128-length-prefixed block holding a DWARF
+         expression. The operators in the block are printed, sized and emitted
+         using the normal machinery, via the recursive calls to [run]. *)
+      let block_size = size_of_expression block in
+      List.fold_left
+        (fun acc op -> acc >>> fun () -> run ~size_of_expression param op)
+        (value (V.uleb128 ~comment:"block length" (I.to_uint64_exn block_size)))
+        block
 end
 
 module Print = Make (struct
@@ -756,8 +784,12 @@ module Emit = Make (struct
   let ( >>> ) _asm_directives () f = f ()
 end)
 
-let print ppf t = Print.run ppf t
+let rec size t = Size.run ~size_of_expression () t
 
-let size t = Size.run () t
+(* The size of a DWARF expression: the sum of the sizes of its operators. *)
+and size_of_expression ops =
+  List.fold_left (fun acc op -> I.add acc (size op)) (I.zero ()) ops
 
-let emit ~asm_directives t = Emit.run asm_directives t
+let print ppf t = Print.run ~size_of_expression ppf t
+
+let emit ~asm_directives t = Emit.run ~size_of_expression asm_directives t

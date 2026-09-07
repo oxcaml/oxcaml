@@ -170,7 +170,7 @@ type t17b : value & value
 |}]
 
 type ('a : value mod external_ stateless many unyielding non_float) t18 =
-  ('a : value mod immutable global aliased)
+  ('a : value mod immutable global)
 [%%expect{|
 type ('a : value mod everything non_float) t18 = 'a
 |}]
@@ -512,7 +512,7 @@ type ('a, 'b) labeled_fn =
     a:'a @ local unique portable contended ->
     ?b:'b @ local once portable contended ->
     'a @ local portable contended ->
-    (int -> 'b @ local unique once) @ portable
+    (int -> 'b @ local once unique) @ portable
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
@@ -944,23 +944,28 @@ val f : ('a : value_maybe_null). 'a iarray -> 'a iarray = <fun>
 let z, punned = 4, 5
 let x_must_be_even _ = assert false
 exception Odd
+type 'a t = T of 'a
 
 let x = (~x:1, ~y:2)
 let x = ((~x:1, ~y:2) [@test.attr])
 let _ = ( ~x: 5, 2, ~z, ~(punned:int))
 let (x : (x:int * y:int)) = (~x:1, ~y:2)
 let (x : ((x:int * y:int) [@test.attr])) = (~x:1, ~y:2)
+let ~x:(T x), T y = ~x:(T 5), T 10
 
 [%%expect{|
 val z : int = 4
 val punned : int = 5
 val x_must_be_even : 'a -> 'b = <fun>
 exception Odd
+type 'a t = T of 'a
 val x : x:int * y:int = (~x:1, ~y:2)
 val x : x:int * y:int = (~x:1, ~y:2)
 - : x:int * int * z:int * punned:int = (~x:5, 2, ~z:4, ~punned:5)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
 val x : x:int * y:int @@ stateless = (~x:1, ~y:2)
+val x : int = 5
+val y : int = 10
 |}]
 
 let (~x:x0, ~s, ~(y:int), ..) : (x:int * s:string * y:int * string) =
@@ -1236,7 +1241,7 @@ result: 7.000000
 val f : float# -> float# = <fun>
 larger match result: 3.000000
 - : unit = ()
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 |}]
 
 let x =
@@ -1255,7 +1260,7 @@ test_int64 "result" (f #7L);;
 
 [%%expect{|
 val x : unit = ()
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}]
@@ -1298,6 +1303,28 @@ let idx_r_r () = (.foo.#foo)
 type 'a r = { foo : 'a; }
 val idx_r : unit -> ('a r, 'a) idx_imm = <fun>
 val idx_r_r : unit -> ('a r# r, 'a) idx_imm = <fun>
+|}]
+
+(* Block index as block access (index deepening) *)
+type 'a s = { a : 'a; mutable b: 'a; mutable c: 'a [@atomic] }
+
+let idx_a = (.a)
+let idx_b = (.b)
+let idx_c = (.c)
+[%%expect{|
+type 'a s = { a : 'a; mutable b : 'a; mutable c : 'a [@atomic]; }
+val idx_a : ('a s, 'a) idx_imm = <abstr>
+val idx_b : ('a s, 'a) idx_mut = <abstr>
+val idx_c : ('a s, 'a) idx_atomic = <abstr>
+|}]
+
+let idx_a' = (.idx_imm(idx_a).#foo)
+let idx_b' = (.idx_mut(idx_b).#foo)
+let idx_c' = (.idx_atomic(idx_c).#foo)
+[%%expect{|
+val idx_a' : ('a r# s, 'a) idx_imm = <abstr>
+val idx_b' : ('a r# s, 'a) idx_mut = <abstr>
+val idx_c' : ('a r# s, 'a) idx_atomic = <abstr>
 |}]
 
 module Borrow = struct
@@ -1348,15 +1375,15 @@ type existential_abstract =
 |}]
 
 module M : sig
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end = struct
-  kind_ immediate = value mod global many uncontended
-  kind_ immutable_data = value mod uncontended many
-  kind_ immutable = value mod uncontended
+  kind_ immediate = value mod global many
+  kind_ immutable_data = value mod many
+  kind_ immutable = value
   kind_ data = value mod many
   kind_ abstract
 end
@@ -1437,7 +1464,7 @@ module type S2 = sig type t1 = M.t1 type t2 = M.t2 type t3 = M.t3 end
 (* small numbers *)
 
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
@@ -1452,13 +1479,13 @@ let z () = #42S
 
 [%%expect{|
 type t1 = float32
-type t2 = float32#
+type t2 = float32_u
 type t3 = int8
 type t4 = int8#
 type t5 = int16
 type t6 = int16#
 val x : float32 = 3.1400001s
-val x : unit -> float32# = <fun>
+val x : unit -> float32_u = <fun>
 val y : int8 = 42s
 val y : unit -> int8# = <fun>
 val z : int16 = 42S
@@ -1731,7 +1758,7 @@ Error: This binding has no layout variables, so "poly_" has no effect.
 
 let poly_ id = fun x -> x
 [%%expect{|
-val id : layout_ l. ('a : l). 'a -> 'a = <lpoly>
+val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
@@ -1758,8 +1785,8 @@ Warning 219: This value description has no layout-polymorphic type variables,
 module type S_poly =
   sig
     val f : 'a -> 'a
-    val g : layout_ l. 'a 'b ('c : l). 'a -> 'b -> 'c -> 'a
-    val h : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b -> 'a
+    val poly_ g : 'a 'b. 'a -> 'b -> 'c -> 'a
+    val poly_ h : 'a -> 'b -> 'a
   end
 |}]
 
@@ -1806,5 +1833,5 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+module type S = sig val poly_ f : 'a -> 'b end
 |}]

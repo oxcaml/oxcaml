@@ -18,7 +18,7 @@ negative_one: -1
 two_fifty_five_in_hex: 255
 twenty_five_in_octal: 25
 forty_two_in_binary: 42
-max_int + 1: -4611686018427387904
+max_int: 4611686018427387903
 untagged char: 'c'
 untagged octal char: '\000'
 untagged hex char: '\255'

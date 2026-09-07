@@ -44,4 +44,10 @@ end) : sig
   val add : t -> E.t -> Id.t
 
   val find : t -> Id.t -> E.t
+
+  type serializable
+
+  val export : t -> iter:((Id.t -> unit) -> unit) -> serializable
+
+  val import : serializable -> Id.t -> E.t
 end

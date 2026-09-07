@@ -46,6 +46,7 @@ module Singleton_mixed_block_element : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -65,8 +66,6 @@ val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t array
 val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t array
 
 val value_prefix_len : 'a t -> int
-
-val flat_suffix_len : 'a t -> int
 
 (** Access to the shape, as flattened and following the runtime restriction. *)
 val flattened_reordered_shape : 'a t -> 'a Singleton_mixed_block_element.t array

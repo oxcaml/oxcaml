@@ -91,3 +91,78 @@ if [ "$EXT" = "cmx" ]; then
     exit 1
   fi
 fi
+
+if [ "$EXT" = "cmx" ] && [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+  # The dissector reads every link input, so it must classify them by content
+  # rather than by file name. The second empty archive gets a '.a' companion
+  # sharing one blob with the first (as in a content-addressed store); the
+  # dissector must tolerate the repeated path.
+  compile -a -o empty2.$LIBEXT
+  mv empty2.$LIBEXT cas/blob_empty2
+  printf '!<arch>\n' > cas/blob_shared_empty_a
+  cat >> manifest.txt <<MANIFEST
+file empty2.$LIBEXT cas/blob_empty2
+file empty.a cas/blob_shared_empty_a
+file empty2.a cas/blob_shared_empty_a
+MANIFEST
+
+  compile "$@" -dissector -ddissector-inputs dissector.inputs \
+    -I-manifest manifest.txt \
+    helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+    -o dissected.exe
+  ./link_manifest.exe > expected.out
+  ./dissected.exe > dissected.out
+  diff expected.out dissected.out
+
+  # Every manifest-resolved object blob must be measured, and nothing may be
+  # skipped (except re-analyzing the shared blob).
+  # Resolved paths are absolute: $MANIFEST_FILES_ROOT/cas/<blob>.
+  for blob in blob_helper_o blob_main_o blob_mylib_a blob_shared_empty_a; do
+    if ! grep -Eq "^Input: [^ ]*/cas/$blob \([A-Za-z_]+\)\$" dissector.inputs
+    then
+      echo "ERROR: the dissector did not measure $blob:" >&2
+      cat dissector.inputs >&2
+      exit 1
+    fi
+  done
+  if grep "skipped" dissector.inputs | grep -qv "already analyzed"; then
+    echo "ERROR: the dissector skipped a link input:" >&2
+    cat dissector.inputs >&2
+    exit 1
+  fi
+
+  # A link input that is neither an ELF object nor an ar archive is an error.
+  echo "this is not an object file" > cas/blob_text
+  sed 's|^file mylib\.a .*|file mylib.a cas/blob_text|' manifest.txt \
+    > manifest_bad_kind.txt
+  if compile "$@" -dissector -I-manifest manifest_bad_kind.txt \
+       helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+       -o should_fail_kind.exe 2> negative_kind.err; then
+    echo "ERROR: dissected link unexpectedly succeeded with a bogus mylib.a" >&2
+    exit 1
+  fi
+  if ! grep -q "neither an ELF object file nor an ar archive" negative_kind.err
+  then
+    echo "ERROR: expected an unrecognized-input error, got:" >&2
+    cat negative_kind.err >&2
+    exit 1
+  fi
+
+  # Same for a zero-length input, which additionally exercises mapping an
+  # empty file.
+  : > cas/blob_empty_file
+  sed 's|^file mylib\.a .*|file mylib.a cas/blob_empty_file|' manifest.txt \
+    > manifest_empty_kind.txt
+  if compile "$@" -dissector -I-manifest manifest_empty_kind.txt \
+       helper.$EXT mylib.$LIBEXT empty.$LIBEXT empty2.$LIBEXT link_manifest.$EXT \
+       -o should_fail_empty.exe 2> negative_empty.err; then
+    echo "ERROR: dissected link unexpectedly succeeded with an empty mylib.a" >&2
+    exit 1
+  fi
+  if ! grep -q "neither an ELF object file nor an ar archive" negative_empty.err
+  then
+    echo "ERROR: expected an unrecognized-input error for an empty file, got:" >&2
+    cat negative_empty.err >&2
+    exit 1
+  fi
+fi

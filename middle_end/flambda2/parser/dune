@@ -130,7 +130,7 @@
   (:standard \ flambda_parser_in))
  ; ignore inputs to sed
  (libraries
-  ocamlcommon
+  ocamlfrontend
   flambda2_algorithms
   flambda2_terms
   flambda2_bound_identifiers

@@ -431,14 +431,14 @@ type b = #(a * a * a * a * a * a * a * a) (* 2^6 bytes *)
 type c = #(b * b * b * b * b * b * b * b) (* 2^9 *)
 type d = #(c * c * c * c * c * c * c * c) (* 2^12 *)
 
-type si = { s : string; i : int64# }
+type si = { s : string; i : int64_u }
 type r = { d : d; si : si# }
 [%%expect{|
 type a = float#
 type b = #(a * a * a * a * a * a * a * a)
 type c = #(b * b * b * b * b * b * b * b)
 type d = #(c * c * c * c * c * c * c * c)
-type si = { s : string; i : int64#; }
+type si = { s : string; i : int64_u; }
 type r = { d : d; si : si#; }
 |}]
 
@@ -477,11 +477,11 @@ Error: This block index cannot be created because it refers to values
 
 (* CR layouts v8: these should be allowed once we reorder array elements *)
 
-type r = #{ a : int64#; b : int }
+type r = #{ a : int64_u; b : int }
 let bad_idx () : (_, r) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
-type r = #{ a : int64#; b : int; }
+type r = #{ a : int64_u; b : int; }
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -489,11 +489,11 @@ Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
-type r = { ii : #( int * int64#) ; i : int }
+type r = { ii : #( int * int64_u) ; i : int }
 let bad_idx () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
 [%%expect{|
-type r = { ii : #(int * int64#); i : int; }
+type r = { ii : #(int * int64_u); i : int; }
 Line 3, characters 12-46:
 3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -502,11 +502,11 @@ Error: Block indices into arrays of unboxed products containing a
 |}]
 
 (* Note that this does work, though, as no reordering is needed *)
-type r = #{ a : int; b : int64# }
+type r = #{ a : int; b : int64_u }
 let idx_into_r_array () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#a)
 [%%expect{|
-type r = #{ a : int; b : int64#; }
+type r = #{ a : int; b : int64_u; }
 val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 |}]
 
@@ -515,21 +515,228 @@ val idx_into_r_array : unit -> (r array, int) idx_mut = <fun>
 
 let idx_imm x = (.idx_imm(x))
 let idx_mut x = (.idx_mut(x))
+let idx_atomic x = (.idx_atomic(x))
 [%%expect{|
 val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
+val idx_atomic : ('a, 'b) idx_atomic -> ('a, 'b) idx_atomic = <fun>
+|}]
+
+(* Invalid index deepening *)
+
+type t = { imm: int; mutable mut: int; mutable atomic: int [@atomic] }
+[%%expect{|
+type t = { imm : int; mutable mut : int; mutable atomic : int [@atomic]; }
+|}]
+
+let validImm = (.idx_imm((.imm)))
+[%%expect{|
+val validImm : (t, int) idx_imm = <abstr>
+|}]
+
+let invalidImm1 = (.idx_mut((.imm)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidImm1 = (.idx_mut((.imm)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let invalidImm2 = (.idx_atomic((.imm)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidImm2 = (.idx_atomic((.imm)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_imm"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidMut1 = (.idx_imm((.mut)))
+[%%expect{|
+Line 1, characters 28-34:
+1 | let invalidMut1 = (.idx_imm((.mut)))
+                                ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let validMut = (.idx_mut((.mut)))
+[%%expect{|
+val validMut : (t, int) idx_mut = <abstr>
+|}]
+
+let invalidMut2 = (.idx_atomic((.mut)))
+[%%expect{|
+Line 1, characters 31-37:
+1 | let invalidMut2 = (.idx_atomic((.mut)))
+                                   ^^^^^^
+Error: This expression has type "(t, int) idx_mut"
+       but an expression was expected of type "('a, 'b) idx_atomic"
+|}]
+
+let invalidAtomic1 = (.idx_imm((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic1 = (.idx_imm((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_imm"
+|}]
+
+let invalidAtomic2 = (.idx_mut((.atomic)))
+[%%expect{|
+Line 1, characters 31-40:
+1 | let invalidAtomic2 = (.idx_mut((.atomic)))
+                                   ^^^^^^^^^
+Error: This expression has type "(t, int) idx_atomic"
+       but an expression was expected of type "(t, 'a) idx_mut"
+|}]
+
+let validAtomic = (.idx_atomic((.atomic)))
+[%%expect{|
+val validAtomic : (t, int) idx_atomic = <abstr>
 |}]
 
 (*****************************************)
 (* Block indices to atomic record fields *)
-type atomic = { mutable i : int [@atomic] }
-let bad () = (.i)
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic] }
+
+let idx_atomic_i = (.i)
 [%%expect{|
-type atomic = { mutable i : int [@atomic]; }
-Line 2, characters 13-17:
-2 | let bad () = (.i)
-                 ^^^^
-Error: Block indices do not yet support [@atomic] record fields.
+type atomic = { mutable i : int [@atomic]; mutable j : int [@atomic]; }
+val idx_atomic_i : (atomic, int) idx_atomic = <abstr>
+|}]
+
+let idx_atomic_j = (.j)
+[%%expect{|
+val idx_atomic_j : (atomic, int) idx_atomic = <abstr>
+|}]
+
+(* Can get/set atomic indices *)
+let f t = Idx_atomic.get t idx_atomic_i
+[%%expect{|
+val f : atomic -> int = <fun>
+|}]
+
+let g t = Idx_atomic.set t idx_atomic_i 42
+[%%expect{|
+val g : atomic -> unit = <fun>
+|}]
+
+(* Can declare idx_atomic with a non-value element type *)
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+[%%expect{|
+type 'a nonvalue_elt_type = ('a, float#) idx_atomic
+|}]
+
+(* Cannot access an element whose layout is not value *)
+let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
+[%%expect{|
+Line 1, characters 66-69:
+1 | let f (t : 'a) (idx : ('a, float#) idx_atomic) = Idx_atomic.get t idx
+                                                                      ^^^
+Error: The value "idx" has type "('a, float#) idx_atomic"
+       but an expression was expected of type
+         "('a, 'b) Stdlib_stable.Idx_atomic.t" = "('a, 'b) idx_atomic"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout.
+|}]
+
+(* Cannot access an atomic field non-atomically *)
+let f t = Idx_mut.get t idx_atomic_i
+[%%expect{|
+Line 1, characters 24-36:
+1 | let f t = Idx_mut.get t idx_atomic_i
+                            ^^^^^^^^^^^^
+Error: The value "idx_atomic_i" has type "(atomic, int) idx_atomic"
+       but an expression was expected of type "('a, 'b) idx_mut"
+|}]
+
+let g t = Idx_mut.set t idx_atomic_i 42
+[%%expect{|
+Line 1, characters 24-36:
+1 | let g t = Idx_mut.set t idx_atomic_i 42
+                            ^^^^^^^^^^^^
+Error: The value "idx_atomic_i" has type "(atomic, int) idx_atomic"
+       but an expression was expected of type "('a, 'b) idx_mut"
+|}]
+
+(* Block indices to unboxed singleton record *)
+type inner = { y: int }
+type outer = { mutable x: inner# [@atomic] }
+
+let unbox_idx_atomic = (.x.#y)
+[%%expect{|
+type inner = { y : int; }
+type outer = { mutable x : inner# [@atomic]; }
+val unbox_idx_atomic : (outer, int) idx_atomic = <abstr>
+|}]
+
+let fst = (.x)
+let snd = (.idx_atomic(fst).#y)
+[%%expect{|
+val fst : (outer, inner#) idx_atomic = <abstr>
+val snd : (outer, int) idx_atomic = <abstr>
+|}]
+
+(* Block indices to mixed record *)
+type t = { x: int64_u; mutable y: string [@atomic]; z: int64_u }
+
+let mixed_idx_atomic = (.y)
+[%%expect{|
+type t = { x : int64_u; mutable y : string [@atomic]; z : int64_u; }
+val mixed_idx_atomic : (t, string) idx_atomic = <abstr>
+|}]
+
+(* Block indices to all-float record *)
+type floats = { x: float; mutable y: float [@atomic] } [@@warning "-214"]
+let float_idx_atomic = (.y)
+[%%expect{|
+type floats = { x : float; mutable y : float [@atomic]; }
+val float_idx_atomic : (floats, float) idx_atomic = <abstr>
+|}]
+
+(**********************************************)
+(* Block indices to polymorphic record fields *)
+
+type poly_imm = { p_imm : 'a. 'a option }
+type poly_mut = { mutable p_mut : 'a. 'a option }
+[%%expect{|
+type poly_imm = { p_imm : 'a. 'a option; }
+type poly_mut = { mutable p_mut : 'a. 'a option; }
+|}]
+
+(* Immutable indices only read, so instantiating the field is fine. *)
+let ok = (.p_imm)
+[%%expect{|
+val ok : (poly_imm, 'a option) idx_imm = <abstr>
+|}]
+
+let bad = (.p_mut)
+[%%expect{|
+Line 1, characters 12-17:
+1 | let bad = (.p_mut)
+                ^^^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_mut") are forbidden.
+|}]
+
+type poly_unboxed = #{ p_u : 'a. 'a option }
+type holds_poly = { mutable h : poly_unboxed }
+[%%expect{|
+type poly_unboxed = #{ p_u : 'a. 'a option; }
+type holds_poly = { mutable h : poly_unboxed; }
+|}]
+
+let bad_unboxed = (.h.#p_u)
+[%%expect{|
+Line 1, characters 23-26:
+1 | let bad_unboxed = (.h.#p_u)
+                           ^^^
+Error: Mutable block indices to polymorphic record fields
+       (here "p_u") are forbidden.
 |}]
 
 (**************)

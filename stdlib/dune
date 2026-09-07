@@ -27,7 +27,13 @@
    -extension runtime_metaprogramming
    -nostdlib
    -safe-string
-   -strict-formats))
+   -strict-formats
+   ; The stdlib contains a few alert-disabling attributes that do not
+   ; suppress anything under the flags used here (see e.g. the
+   ; [-unstable] disables on the Domain and Effect aliases in
+   ; stdlib.mli).  Disable warning 221 [unused-alert-disable] until
+   ; they are cleaned up.
+   -w -221))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (preprocess

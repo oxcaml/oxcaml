@@ -73,12 +73,17 @@ let update_lazy_prim =
 
 (** {1. Sizing} *)
 
+type mixed_block_size = { size : int; value_prefix_len : int }
+
 (* Simple blocks *)
 type block_size =
   | Regular_block of int
+  | Empty_block of { tag : int }
+  (** Distinct from [Regular_block], which always creates tag-0 blocks then
+      back-patches the header *)
   | Float_record of int
   | Lazy_block
-  | Mixed_record of Lambda.mixed_block_shape
+  | Mixed_block of mixed_block_size
 
 type size =
   | Unreachable
@@ -171,7 +176,23 @@ let find_size_of_alloc_prim prim args =
     Option.map (fun n -> Float_record n) int_arg
   else if same_as alloc_lazy_prim then
     Some Lazy_block
+  else if same_as alloc_mixed_record_prim then
+    match args with
+    | [Lconst (Const_base (Const_int size));
+       Lconst (Const_base (Const_int value_prefix_len))] ->
+      Some (Mixed_block { size; value_prefix_len })
+    | _ -> None
   else None
+
+let compute_mixed_block_size shape =
+  if !Clflags.native_code then
+    let bytes = Mixed_product_bytes.count (Product shape) in
+    let value_prefix_len = Mixed_product_bytes.value_prefix_len bytes in
+    let size = Mixed_product_bytes.size_in_words bytes in
+    { size; value_prefix_len }
+  else
+    let size = Array.length shape in
+    { size; value_prefix_len = size }
 
 let compute_static_size lam =
   let rec compute_expression_size env lam =
@@ -295,11 +316,23 @@ let compute_static_size lam =
     | Pbigstring_set_f32 _
     | Pbigstring_set_64 _
     | Ppoll
+    | Patomic_set_field _
+    | Patomic_set_mixed_field _
     | Patomic_add_field
     | Patomic_sub_field
     | Patomic_land_field
     | Patomic_lor_field
     | Patomic_lxor_field
+    | Patomic_add_idx
+    | Patomic_sub_idx
+    | Patomic_land_idx
+    | Patomic_lor_idx
+    | Patomic_lxor_idx
+    | Patomic_add_ptr
+    | Patomic_sub_ptr
+    | Patomic_land_ptr
+    | Patomic_lor_ptr
+    | Patomic_lxor_ptr
     | Pcpu_relax ->
         (* Unit-returning primitives. Most of these are only generated from
            external declarations and not special-cased by [Value_rec_check],
@@ -309,9 +342,12 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Block (Regular_block size)
+        | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
+            (* Extensible variants require an extra machine word
+               to identify a constructor. *)
+            Block (Regular_block (size + 1))
         | Record_float ->
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
@@ -322,24 +358,33 @@ let compute_static_size lam =
               Block (Regular_block
                 (all_value_mixed_block_size_types shape))
             else
-              Block (Mixed_record (Lambda.transl_mixed_product_shape shape))
+              let size =
+                compute_mixed_block_size
+                  (Lambda.transl_mixed_product_shape shape)
+              in
+              Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         | Record_dummy _ ->
             Misc.fatal_error
               "size_of_primitive: unexpected dummy representation"
-        | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+            Misc.fatal_error
+              "size_of_primitive: unexpected immediate representation"
+        | Record_undetermined | Record_variable _
+        | Record_inlined (_, (Constructor_undetermined
+                             | Constructor_variable _), _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected variable representation"
         end
-    | Pmakeblock (_, _, shape, _) ->
+    | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
         (* CR layout poly: This is no longer known before slambda eval, we
-           should merge Regular_block and Mixed_record (and fix the error
+           should merge Regular_block and Mixed_block (and fix the error
            produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
          | None ->
@@ -347,8 +392,9 @@ let compute_static_size lam =
              | All_value -> List.length args
              | Shape shape -> all_value_mixed_block_size shape
            in
-           Block (Regular_block size)
-         | Some arr -> Block (Mixed_record arr))
+           if size = 0 then Block (Empty_block { tag })
+           else Block (Regular_block size)
+         | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
     | Pmakearray (kind, _, _) ->
@@ -359,7 +405,8 @@ let compute_static_size lam =
         | Pfloatarray ->
             Block (Float_record size)
         | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
-        | Punboxedvectorarray _ | Pgcscannableproductarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray
+        | Pgcscannableproductarray _
         | Pgcignorableproductarray _ ->
             Misc.fatal_error "size_of_primitive"
         | Punspecializedarray ->
@@ -435,11 +482,23 @@ let compute_static_size lam =
     | Pbigstring_load_64 _
     | Pint_as_pointer _
     | Patomic_load_field _
-    | Patomic_set_field _
+    | Patomic_load_mixed_field _
     | Patomic_exchange_field _
     | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _
     | Patomic_fetch_add_field
+    | Patomic_load_idx _
+    | Patomic_set_idx _
+    | Patomic_exchange_idx _
+    | Patomic_compare_exchange_idx _
+    | Patomic_compare_set_idx _
+    | Patomic_fetch_add_idx
+    | Patomic_load_ptr _
+    | Patomic_set_ptr _
+    | Patomic_exchange_ptr _
+    | Patomic_compare_exchange_ptr _
+    | Patomic_compare_set_ptr _
+    | Patomic_fetch_add_ptr
     | Popaque _
     | Pdls_get
     | Ptls_get
@@ -463,7 +522,9 @@ let compute_static_size lam =
 
     | Psetufloatfield (_, _)
     | Pbytes_set_vec _
+    | Pbytes_set_mask _
     | Pbigstring_set_vec _
+    | Pbigstring_set_mask _
     | Pfloatarray_set_vec _
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
@@ -490,8 +551,11 @@ let compute_static_size lam =
     | Pufloatfield (_, _)
     | Punboxed_product_field (_, _)
     | Pstring_load_vec _
+    | Pstring_load_mask _
     | Pbytes_load_vec _
+    | Pbytes_load_mask _
     | Pbigstring_load_vec _
+    | Pbigstring_load_mask _
     | Pfloatarray_load_vec _
     | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _
@@ -505,6 +569,8 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Punbox_mask
+    | Pbox_mask _
     | Pjoin_vec256
     | Psplit_vec256
     | Pget_header _
@@ -623,19 +689,21 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;
         ap_mode = lfun.ret_mode;
+        ap_yielding = lfun.yielding;
         ap_probe = None;
       }
     in
     let wrapper =
-      lfunction'
-        ~kind:lfun.kind
-        ~params
-        ~return:lfun.return
-        ~body
-        ~attr:default_stub_attribute
-        ~loc:no_loc
-        ~mode:lfun.mode
-        ~ret_mode:lfun.ret_mode
+      lfunction_with_yielding lfun.yielding
+        (lfunction'
+           ~kind:lfun.kind
+           ~params
+           ~return:lfun.return
+           ~body
+           ~attr:default_stub_attribute
+           ~loc:no_loc
+           ~mode:lfun.mode
+           ~ret_mode:lfun.ret_mode)
     in
     let lifted = { lfun = wrapper; free_vars_block_size = 1 } in
     Reachable (lifted,
@@ -946,7 +1014,10 @@ let compile_indirect newval =
     ap_specialised = Default_specialise;
     ap_result_layout = Lambda.layout_lazy;
     ap_region_close = Rc_normal;
-    ap_mode = Lambda.alloc_heap;
+    ap_mode = Lambda.not_alloc_stack;
+    (* [indirect] just allocates a forwarding block; it never runs user code,
+       so it can't yield *)
+    ap_yielding = Unyielding;
     ap_probe = None;
   }
 
@@ -961,31 +1032,22 @@ let compile_alloc size =
   match size with
   | Regular_block size ->
       alloc alloc_prim [size]
+  | Empty_block { tag } ->
+      Lprim (Pmakeblock (tag, Immutable, All_value, Lambda.alloc_heap),
+             [], no_loc)
   | Float_record size ->
       alloc alloc_float_record_prim [size]
   | Lazy_block ->
       Lprim(Pccall alloc_lazy_prim,
             [Lambda.lambda_unit],
             no_loc)
-  | Mixed_record shape ->
-      if !Clflags.native_code then
-        let shape =
-          Mixed_block_shape.of_mixed_block_elements
-            ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-            shape
-        in
-        let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
-        let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
-        let size = value_prefix_len + flat_suffix_len in
-        alloc alloc_mixed_record_prim [size; value_prefix_len]
-      else
-        let size = Array.length shape in
-        alloc alloc_mixed_record_prim [size; size]
+  | Mixed_block { size; value_prefix_len } ->
+    alloc alloc_mixed_record_prim [size; value_prefix_len]
 
 let compile_update size dummy newval =
   let prim, newval =
     match size with
-    | Regular_block _ | Float_record _ | Mixed_record _ ->
+    | Regular_block _ | Empty_block _ | Float_record _ | Mixed_block _ ->
       update_prim, newval
     | Lazy_block ->
       (* Consider the following example from Vincent Laviron:

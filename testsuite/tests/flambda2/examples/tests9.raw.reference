@@ -57,11 +57,11 @@
            (Pfield_1, Pmakeblock)
            -> k1 * k2
  in
- let $camlTests9__immstring53 = "tests9.ml" in
- let $camlTests9__const_block55 = Block 0 ($camlTests9__immstring53, 39, 52)
+ let $camlTests9__immstring_0 = "tests9.ml" in
+ let $camlTests9__const_block_1 = Block 0 ($camlTests9__immstring_0, 39, 52)
  in
- let $camlTests9__Pmakeblock58 =
-   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block55)
+ let $camlTests9__Pmakeblock_2 =
+   Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlTests9__const_block_1)
  in
  let code rec loopify(default tailrec) size(42)
        chop_3 (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
@@ -97,7 +97,7 @@
                 (int_sub, Pfield)
                 -> k1 * k2
           where k3 =
-            cont k2 pop(regular k2) ($camlTests9__Pmakeblock58))
+            cont k2 pop(regular k2) ($camlTests9__Pmakeblock_2))
  in
  let code rec loopify(default tailrec) size(119)
        rev_merge_5
@@ -1502,7 +1502,7 @@
                           (s1, s2, 0)
                           -> k1 * k2)))
  in
- let code size(1692)
+ let code size(1693)
        sort_uniq_4 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure &my_alloc_region my_depth
          -> k1 * k2
@@ -1635,7 +1635,7 @@
            (n, l)
            -> k1 * k2
  in
- let code size(119)
+ let code size(120)
        foo_9 (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
          my_closure &my_alloc_region my_depth
          -> k1 * k2

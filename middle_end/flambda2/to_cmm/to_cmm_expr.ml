@@ -134,7 +134,8 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
       | Naked_number
           ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_mask
+          | Naked_float32 )
       | Value | Rec_info | Region ->
         cmm
   in
@@ -176,7 +177,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
               Misc.fatal_error "Only x86-64 and arm64 are supported")
           | Naked_number
               ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
-              | Naked_vec512 )
+              | Naked_vec512 | Naked_mask )
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Cannot compile unboxed product return from external C call with \
@@ -335,7 +336,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           Apply.print apply
     in
     ( C.indirect_call ~dbg return_ty pos
-        (C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply))
+        (C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply))
         callee args_ty (split_args ()),
       free_vars,
       env,
@@ -397,7 +398,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     let free_vars = Backend_var.Set.union free_vars obj_free_vars in
     let kind = Call_kind.Method_kind.to_lambda kind in
     let alloc_mode =
-      C.alloc_mode_for_applications_to_cmx (Apply_expr.alloc_mode apply)
+      C.alloc_mode_for_applications_to_cmx (Apply_expr.return_mode apply)
     in
     ( C.send kind callee obj (split_args ()) args_ty return_ty (pos, alloc_mode)
         dbg,

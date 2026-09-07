@@ -856,6 +856,8 @@ module Attribute_specification = struct
       let output _ = failwith "Sealed.output unsupported"
     end)
 
+    let attribute (T1 (T (attr, _form))) = Attribute.seal attr
+
     let emit ~asm_directives t =
       match t with
       | T1 (T (attribute, form)) ->

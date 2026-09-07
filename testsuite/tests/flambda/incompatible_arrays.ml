@@ -6,15 +6,15 @@
 
 type nonrec ('a : any mod separable) array = 'a array
 
-type t1 = int64# array
-type t2 = float32# array
+type t1 = int64_u array
+type t2 = float32_u array
 
-external geti : int64# array -> int -> int64# = "%array_unsafe_get"
-external getf : float32# array -> int -> float32# = "%array_unsafe_get"
-external ignorei : int64# -> unit = "%ignore"
-external ignoref : float32# -> unit = "%ignore"
-external opaquei : int64# -> int64# = "%opaque"
-external opaquef : float32# -> float32# = "%opaque"
+external geti : int64_u array -> int -> int64_u = "%array_unsafe_get"
+external getf : float32_u array -> int -> float32_u = "%array_unsafe_get"
+external ignorei : int64_u -> unit = "%ignore"
+external ignoref : float32_u -> unit = "%ignore"
+external opaquei : int64_u -> int64_u = "%opaque"
+external opaquef : float32_u -> float32_u = "%opaque"
 
 type _ wit =
 | A : t1 wit

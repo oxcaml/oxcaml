@@ -27,8 +27,8 @@ module Parameter = struct
   module T0 = struct
     type 'a t =
       { name : string;
-        sender : 'a option Channel.sender;
-        receiver : 'a option Channel.receiver
+        sender : 'a Or_null_sender.t;
+        receiver : 'a Or_null_receiver.t
       }
   end
 
@@ -36,7 +36,7 @@ module Parameter = struct
   include Heterogenous_list.Make (T0)
 
   let create name =
-    let sender, receiver = Channel.create None in
+    let sender, receiver = Channel.create_or_null Null in
     { name; sender; receiver }
 
   let rec list : type a. a String.hlist -> a hlist = function
@@ -47,7 +47,7 @@ module Parameter = struct
 
   let get_receiver { receiver; _ } = receiver
 
-  let rec to_senders : type a. a hlist -> a Option_sender.hlist = function
+  let rec to_senders : type a. a hlist -> a Or_null_sender.hlist = function
     | [] -> []
     | p :: ps -> get_sender p :: to_senders ps
 end
@@ -142,12 +142,12 @@ type filter =
   | User : ('k Constant.hlist -> bool) * 'k Term.hlist -> filter
 
 type bindings_ref =
-  | Bindings_ref : 'a Variable.hlist * 'a Option_receiver.hlist -> bindings_ref
+  | Bindings_ref : 'a Variable.hlist * 'a Or_null_receiver.hlist -> bindings_ref
 
 type bindings = Bindings : 'a Variable.hlist * 'a Constant.hlist -> bindings
 
 let get_bindings (Bindings_ref (vars, receivers)) =
-  Bindings (vars, Option_receiver.recv receivers)
+  Bindings (vars, Or_null_receiver.recv_hlist receivers)
 
 let print_bindings ppf (Bindings (vars, values)) =
   let rec loop : type a.
@@ -263,7 +263,7 @@ let rec bind_atom : type a.
     let this_iterator = { value = this_iterator; name = this_iterator_name } in
     match this_arg with
     | Constant cte ->
-      let _send, recv = Channel.create (Some cte) in
+      let _send, recv = Channel.create_or_null (Or_null.this cte) in
       bind_iterator post_level
         { value = recv; name = "<constant>" }
         this_iterator;
@@ -311,10 +311,10 @@ let find_last_binding post_level args =
   find_last_binding0 ~order:Cursor.Order.parameters post_level args
 
 let compile_term :
-    ?cardinality:_ -> 'a Term.t -> 'a option Channel.receiver with_name =
+    ?cardinality:_ -> 'a Term.t -> 'a Or_null_receiver.t with_name =
  fun ?cardinality -> function
   | Constant cte ->
-    let _send, recv = Channel.create (Some cte) in
+    let _send, recv = Channel.create_or_null (Or_null.this cte) in
     { value = recv; name = "<constant>" }
   | Parameter param ->
     { value = Parameter.get_receiver param; name = param.name }
@@ -323,7 +323,7 @@ let compile_term :
     Cursor.Level.use_output ?cardinality var
 
 let rec compile_terms : type a.
-    ?cardinality:_ -> a Term.hlist -> a Option_receiver.hlist with_names =
+    ?cardinality:_ -> a Term.hlist -> a Or_null_receiver.hlist with_names =
  fun ?cardinality vars ->
   match vars with
   | [] -> { values = []; names = [] }
@@ -339,21 +339,28 @@ let compile_condition context condition =
     bind_atom (Cursor.initial_actions context) args iterators
 
 let compile_filter context filter =
+  (* Variables bound in filters are bound with cardinality [Any_value]: if a
+     variable is only bound in filters, we only need one matching value.
+
+     This means that iteration will stop for an innermost variable that is only
+     used in filters (not yielded in the output) once we find any entry for such
+     a variable, without iterating over other possible bindings (see
+     [pop_rev_vars] in [cursor.ml]). *)
   match filter with
   | Unless_atom (id, args) ->
-    let refs = compile_terms args in
+    let refs = compile_terms ~cardinality:Any_value args in
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     let r = Cursor.add_naive_binder context id in
     Cursor.add_action post_level (Cursor.unless id r refs)
   | Unless_eq (repr, arg1, arg2) ->
-    let ref1 = compile_term arg1 in
-    let ref2 = compile_term arg2 in
+    let ref1 = compile_term ~cardinality:Any_value arg1 in
+    let ref2 = compile_term ~cardinality:Any_value arg2 in
     let post_level =
       find_last_binding (Cursor.initial_actions context) [arg1; arg2]
     in
     Cursor.add_action post_level (Cursor.unless_eq repr ref1 ref2)
   | User (fn, args) ->
-    let refs = compile_terms args in
+    let refs = compile_terms ~cardinality:Any_value args in
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     Cursor.add_action post_level (Cursor.filter fn refs)
 

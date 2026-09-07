@@ -37,8 +37,8 @@ let let_bound_vars bindings =
       | Typedtree.Tpat_unboxed_unit
       | Typedtree.Tpat_construct (_, _, _, _, _)
       | Typedtree.Tpat_variant (_, _, _)
-      | Typedtree.Tpat_record (_, _, _, _)
-      | Typedtree.Tpat_record_unboxed_product (_, _, _, _)
+      | Typedtree.Tpat_record (_, _, _)
+      | Typedtree.Tpat_record_unboxed_product (_, _, _)
       | Typedtree.Tpat_array _ | Typedtree.Tpat_lazy _
       | Typedtree.Tpat_or (_, _, _) -> None)
     bindings

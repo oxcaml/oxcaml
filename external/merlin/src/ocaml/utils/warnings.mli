@@ -54,6 +54,10 @@ type type_declaration_usage_warning =
   | Declaration
   | Alias
 
+type redundant_modifier_reason =
+  | Default_bound
+  | Implied_by of string
+
 type t =
   | Comment_start                           (*  1 *)
   | Comment_not_end                         (*  2 *)
@@ -157,7 +161,9 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier of
+      { modifier : string;
+        reason : redundant_modifier_reason }  (* 211 *)
   (* 213 was [Modal_axis_specified_twice], now subsumed by
      [Redundant_modality] (220) *)
   | Atomic_float_record_boxed               (* 214 *)
@@ -166,15 +172,24 @@ type t =
   | Lpoly_in_letrec                         (* 218 *)
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
+  | Unused_alert_disable of string          (* 221 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 
 val parse_options : bool -> string -> alert option
 
-val parse_alert_option: string -> unit
+val parse_alert_option: ?disable_loc:loc -> string -> unit
   (** Disable/enable alerts based on the parameter to the -alert
       command-line option.  Raises [Arg.Bad] if the string is not a
       valid specification.
+
+      If [disable_loc] is provided (as done when the specification comes
+      from an [[@alert ...]] attribute rather than the command line), each
+      plain disable is additionally recorded so that disables that never
+      suppress an occurrence of their alert can be reported at the end of
+      compilation with warning 221 [Unused_alert_disable]; see
+      [flush_unused_alert_disables].  A disable of ["all"] is fulfilled by
+      a suppressed occurrence of any alert.
   *)
 
 val without_warnings : (unit -> 'a) -> 'a
@@ -210,6 +225,13 @@ val with_state : state -> (unit -> 'a) -> 'a
 val mk_lazy: (unit -> 'a) -> 'a Lazy.t
     (** Like [Lazy.of_fun], but the function is applied with
         the warning/alert settings at the time [mk_lazy] is called. *)
+
+val flush_unused_alert_disables : unit -> (loc * string * state) list
+    (** Returns (and forgets) the alert-disabling attributes registered via
+        [parse_alert_option ~disable_loc] that never suppressed an occurrence
+        of their alert, together with the warning state at the point where
+        the attribute was processed.  Used to report warning 221
+        [Unused_alert_disable] at the end of compilation. *)
 
 type description =
   { number : int;

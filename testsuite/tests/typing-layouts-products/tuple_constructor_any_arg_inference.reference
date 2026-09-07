@@ -1,0 +1,4 @@
+get_float (mk_t #2.5): 2.50
+mk_up: 21 twenty-one 1
+mk_float #6.25: 6.25 2
+mk_string: hi 3

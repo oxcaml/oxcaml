@@ -1,0 +1,29 @@
+Indexed shapes:
+Resolved: Index_predef_aliases.4:
+  opt (File "index_predef_aliases.ml", line 30, characters 12-15)
+Resolved: Index_predef_aliases.4:
+  opt (File "index_predef_aliases.ml", line 30, characters 12-15)
+Resolved: Index_predef_aliases.3:
+  x (File "index_predef_aliases.ml", line 27, characters 27-28)
+Unresolved: CU Stdlib . "ignore"[value] :
+  ignore (File "index_predef_aliases.ml", line 27, characters 20-26)
+Resolved: Index_predef_aliases.0:
+  t (File "index_predef_aliases.ml", line 27, characters 16-17)
+Resolved: Index_predef_aliases.1:
+  u (File "index_predef_aliases.ml", line 27, characters 11-12)
+Resolved: Index_predef_aliases.0:
+  t (File "index_predef_aliases.ml", line 24, characters 8-9)
+Resolved: Index_predef_aliases.0:
+  t (File "index_predef_aliases.ml", line 24, characters 8-9)
+
+Uid of decls:
+Index_predef_aliases.0:
+  t (File "index_predef_aliases.ml", line 23, characters 5-6)
+Index_predef_aliases.1:
+  u (File "index_predef_aliases.ml", line 26, characters 5-6)
+Index_predef_aliases.2:
+  f (File "index_predef_aliases.ml", line 27, characters 4-5)
+Index_predef_aliases.4:
+  opt (File "index_predef_aliases.ml", line 29, characters 8-11)
+Index_predef_aliases.5:
+  g (File "index_predef_aliases.ml", line 30, characters 4-5)

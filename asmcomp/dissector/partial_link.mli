@@ -50,9 +50,15 @@ val report_error : Format_doc.formatter -> error -> unit
 (** [link_one_partition unix ~temp_dir ~partition_index partition] partially
     links [partition] into a single relocatable object file.
 
-    Creates a response file listing the input files, then invokes the linker
-    with:
-    {v   ld --whole-archive @<response_file> --relocatable -o <output.o> v}
+    Creates a response file listing -u flags for the entry symbols of the
+    partition's required compilation units, followed by the input files, then
+    invokes the linker with:
+    {v   ld @<response_file> --relocatable -o <output.o> v}
+
+    The -u flags pull exactly the required members out of archives (instead of
+    --whole-archive pulling all of them). Unlike --require-defined, which only
+    BFD ld supports, -u does not make the link fail if a required unit is
+    missing from the partition.
 
     Returns the linked partition with the path to the output .o file. Raises
     [Error] if the link fails.

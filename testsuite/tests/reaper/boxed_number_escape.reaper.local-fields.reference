@@ -1,6 +1,6 @@
 let code escape_0 deleted in
-let $camlBoxed_number_escape__int645 = 0L in
-let r = %block.mut.[`0`].`toplevel` ($camlBoxed_number_escape__int645) in
+let $camlBoxed_number_escape__int64_0 = 0L in
+let r = %block.mut.[`0`].`toplevel` ($camlBoxed_number_escape__int64_0) in
 let $camlBoxed_number_escape__escape_1 =
   closure escape_0_1 @escape &toplevel.alloc_region
 and code loopify(never) size(14) newer_version_of(escape_0)

@@ -23,7 +23,7 @@
    -open
    Int_replace_polymorphic_compare))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   flambda2_algorithms
   flambda2_identifiers
   flambda2_kinds

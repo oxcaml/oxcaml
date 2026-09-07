@@ -22,7 +22,31 @@ open Amd64_simd_instrs
 module Amd64_simd_instrs = struct
   include Amd64_simd_instrs
 
-  let equal = Stdlib.( == )
+  let equal
+      { id = id1;
+        ext = ext1;
+        args = args1;
+        res = res1;
+        imm = imm1;
+        mnemonic = mnemonic1;
+        enc = enc1
+      }
+      { id = id2;
+        ext = ext2;
+        args = args2;
+        res = res2;
+        imm = imm2;
+        mnemonic = mnemonic2;
+        enc = enc2
+      } =
+    Stdlib.( == ) id1 id2
+    && Array.length ext1 = Array.length ext2
+    && Array.for_all2 equal_ext ext1 ext2
+    && Array.length args1 = Array.length args2
+    && Array.for_all2 equal_arg args1 args2
+    && equal_res res1 res2 && equal_imm imm1 imm2
+    && String.equal mnemonic1 mnemonic2
+    && equal_enc enc1 enc2
 end
 
 type instr = Amd64_simd_instrs.instr

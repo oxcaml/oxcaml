@@ -159,9 +159,9 @@ let deduce (atoms : deduction) =
         let table_ref = find_or_create_ref binders tid in
         let callback_fn bindings keys =
           let incremental_table = !table_ref in
-          match Trie.find_opt is_trie keys incremental_table.current with
-          | Some _ -> ()
-          | None ->
+          match Trie.find_or_null is_trie keys incremental_table.current with
+          | This _ -> ()
+          | Null ->
             if !enable_provenance
             then
               provenance_table_ref

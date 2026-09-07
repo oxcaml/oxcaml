@@ -44,13 +44,21 @@ make -s test                                # Run all tests
 
 ## Configuration Commands
 ```bash
-autoconf                  # Generate configure script
-./configure               # Configure the compiler
+autoconf                                # Generate configure script
+./configure --prefix="$PWD/_install"    # Configure the compiler
 ```
+
+Always pass `--prefix="$PWD/_install"`: the dev makefiles assemble the install
+tree in `./_install` and then copy it to the configured prefix (a no-op when
+they coincide). Without it, autoconf's default prefix is `/usr/local`.
 
 If the execution of `autoconf` fails because the version is too old, try with `autoconf27` instead.
 
 Configuration is needed after changing `.in` files or the autoconf script.
+
+## Updating Merlin After Compiler Frontend Changes
+
+Merlin (`external/merlin/`) vendors the compiler's frontend. Any frontend change — approximately `parsing/`, `typing/`, and the files in `file_formats/` and `utils/` they use — must be imported into Merlin; a CI check verifies this. Import by running `external/merlin/scripts/import-ocaml-source.sh` (never hand-merge compiler changes into `external/merlin`, and never manually modify `external/merlin/upstream/ocaml_flambda` except for `external/merlin/upstream/ocaml_flambda/.gitattributes`), then get `make merlin-test` passing. This is what the user is asking you to do if they say something like "Update Merlin", "Fix Merlin", or "Merge compiler/frontend/typing/type-checker changes into Merlin". New compiler flags (even backend-only ones) also require a Merlin update. Don't do anything before reading the full documentation: `external/merlin/HACKING.jst.md`.
 
 ## Development Guidelines
 - Always verify changes build with `make -s boot-compiler`

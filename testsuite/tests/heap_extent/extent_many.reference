@@ -1,0 +1,5 @@
+no extents freed while live: ok
+all blocks intact: ok
+half the extents freed: ok
+surviving extents intact: ok
+all extents freed: ok

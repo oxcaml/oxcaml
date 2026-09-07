@@ -379,7 +379,7 @@ let () =
     ~exp_err:
       (if String.equal Config.architecture "amd64"
        then
-         ">> Fatal error: instruction 20 has a register (anon:V/37) with an \
+         ">> Fatal error: instruction 20 has a register (anon:V/44) with an \
           unknown location"
        else
          ">> Fatal error: instruction 20 has a register (anon:V/68) with an \

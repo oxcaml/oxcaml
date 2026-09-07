@@ -1460,6 +1460,9 @@ module Named = struct
       | Naked_number Naked_vec512 ->
         Simple.const
           (Reg_width_const.naked_vec512 Vector_types.Vec512.Bit_pattern.zero)
+      | Naked_number Naked_mask ->
+        Simple.const
+          (Reg_width_const.naked_mask Vector_types.Mask.Bit_pattern.zero)
       | Region -> Misc.fatal_error "[Region] kind not expected here"
       | Rec_info -> Misc.fatal_error "[Rec_info] kind not expected here"
     in
@@ -1500,14 +1503,15 @@ module Named = struct
              | Static_const
                  ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
                  | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _
-                 | Boxed_vec512 _ | Boxed_nativeint _ | Immutable_float_block _
-                 | Immutable_float_array _ | Immutable_float32_array _
-                 | Mutable_string _ | Immutable_string _ | Empty_array _
-                 | Immutable_value_array _ | Immutable_int_array _
-                 | Immutable_int8_array _ | Immutable_int16_array _
-                 | Immutable_int32_array _ | Immutable_int64_array _
-                 | Immutable_nativeint_array _ | Immutable_vec128_array _
-                 | Immutable_vec256_array _ | Immutable_vec512_array _ ) ->
+                 | Boxed_vec512 _ | Boxed_mask _ | Boxed_nativeint _
+                 | Immutable_float_block _ | Immutable_float_array _
+                 | Immutable_float32_array _ | Immutable_string _
+                 | Empty_array _ | Immutable_value_array _
+                 | Immutable_int_array _ | Immutable_int8_array _
+                 | Immutable_int16_array _ | Immutable_int32_array _
+                 | Immutable_int64_array _ | Immutable_nativeint_array _
+                 | Immutable_vec128_array _ | Immutable_vec256_array _
+                 | Immutable_vec512_array _ | Immutable_mask_array _ ) ->
                acc)
            init
 end
@@ -1527,6 +1531,7 @@ module Invalid = struct
         [`Unarized] Flambda_arity.t * Apply_expr.t
     | Application_result_kind_mismatch of
         [`Unarized] Flambda_arity.t * Apply_expr.t
+    | Application_result_kind_mismatch_in_lambda of Debuginfo.t
     | Partial_application_mode_mismatch of Apply_expr.t * Code_metadata.t
     | Partial_application_mode_mismatch_in_lambda of Debuginfo.t
     | Calling_local_returning_closure_with_normal_apply of Apply_expr.t
@@ -1571,6 +1576,11 @@ module Invalid = struct
         "@[<hov 1>(Application_result_kind_mismatch@ @[<hov 1>(result_arity@ \
          %a)@ (apply_expr@ %a)@])@]"
         Flambda_arity.print result_arity Apply_expr.print apply_expr
+    | Application_result_kind_mismatch_in_lambda dbg ->
+      Format.asprintf
+        "@[<hov 1>(Application_result_kind_mismatch_in_lambda@ @[<hov 1>(dbg@ \
+         %a)@])@]"
+        Debuginfo.print_compact dbg
     | Partial_application_mode_mismatch (apply_expr, code_metadata) ->
       Format.asprintf
         "@[<hov 1>(Partial_application_mode_mismatch@ @[<hov 1>(apply_expr@ \

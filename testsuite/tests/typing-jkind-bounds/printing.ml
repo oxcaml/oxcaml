@@ -60,6 +60,38 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
          visibility: mod immutable with 'a ≰ mod immutable
 |}]
 
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+[%%expect{|
+type 'a shared_direct : value mod shared with 'a
+type 'a shareable_direct : value mod shareable with 'a
+type 'a reading_direct : value mod reading with 'a
+type 'a read_direct : value mod read with 'a
+|}]
+
+type middle_payload
+type shared_with : immutable_data with middle_payload @@ shared
+type corrupted_with : immutable_data with middle_payload @@ corrupted
+type shareable_with : immutable_data with middle_payload @@ shareable
+type corruptible_with : immutable_data with middle_payload @@ corruptible
+type read_with : immutable_data with middle_payload @@ read
+type write_with : immutable_data with middle_payload @@ write
+type reading_with : immutable_data with middle_payload @@ reading
+type writing_with : immutable_data with middle_payload @@ writing
+[%%expect {|
+type middle_payload
+type shared_with : immutable_data with middle_payload @@ shared
+type corrupted_with : immutable_data with middle_payload @@ corrupted
+type shareable_with : immutable_data with middle_payload @@ shareable
+type corruptible_with : immutable_data with middle_payload @@ corruptible
+type read_with : immutable_data with middle_payload @@ read
+type write_with : immutable_data with middle_payload @@ write
+type reading_with : immutable_data with middle_payload @@ reading
+type writing_with : immutable_data with middle_payload @@ writing
+|}]
+
 module M : sig
   type t : immutable_data
 end = struct
@@ -208,7 +240,7 @@ Line 3, characters 11-25:
                ^^^^^^^^^^^^^^
 Error: This type "(int -> int) u" should be an instance of type
          "('a : immutable_data)"
-       The kind of (int -> int) u is value non_float mod portable immutable
+       The kind of (int -> int) u is value non_float mod immutable portable
          because of the definition of u at line 1, characters 0-33.
        But the kind of (int -> int) u must be a subkind of immutable_data
          because of the definition of t at line 2, characters 0-28.

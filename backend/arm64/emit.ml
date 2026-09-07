@@ -50,7 +50,14 @@ open! Int_replace_polymorphic_compare
 type gc_call =
   { gc_lbl : L.t; (* Entry label *)
     gc_return_lbl : L.t; (* Where to branch after GC *)
-    gc_frame_lbl : L.t (* Label of frame descriptor *)
+    (* The frame descriptor is recorded (and its return-address label defined)
+       when the out-of-line GC stub is emitted, rather than at the allocation
+       site, so that frame descriptors are emitted in increasing return-address
+       order. *)
+    gc_frame_lbl : label; (* Linear label of the frame descriptor *)
+    gc_frame_size : int;
+    gc_live_offset : int list;
+    gc_frame_dbg : frame_debuginfo
   }
 
 type local_realloc_call =
@@ -717,9 +724,8 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 
 (* Record live pointers at call points *)
 
-let record_frame_label env live dbg =
+let compute_live_offset env live =
   let encode_reg_offset n = (n lsl 1) + 1 in
-  let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   Reg.Set.iter
     (function
@@ -737,13 +743,18 @@ let record_frame_label env live dbg =
       | { typ = Val; loc = Unknown; _ } as r ->
         Misc.fatal_errorf "Unknown location %a" Printreg.reg r
       | { typ = Int | Float | Float32 | Vec128; _ } -> ()
-      | { typ = Vec256 | Vec512; _ } ->
-        Misc.fatal_error "arm64: got 256/512 bit vector")
+      | { typ = Vec256 | Vec512 | Mask; _ } ->
+        Misc.fatal_error "arm64: got 256/512 bit vector or mask")
     live;
+  !live_offset
+
+let record_frame_label env live dbg =
+  let lbl = Cmm.new_label () in
   (* CR sspies: Consider changing [record_frame_descr] to [Asm_label.t] instead
      of linear labels. *)
   record_frame_descr ~label:lbl ~frame_size:(Env.frame_size env)
-    ~live_offset:!live_offset dbg;
+    ~live_offset:(compute_live_offset env live)
+    dbg;
   label_to_asm_label ~section:Text lbl
 
 let record_frame env live dbg =
@@ -762,7 +773,17 @@ let emit_debug_info ?discriminator dbg =
 
 let emit_call_gc gc =
   labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
-  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
+  (* Record the frame descriptor here, where its return-address label is
+     defined, so descriptors are recorded (and emitted) in increasing
+     return-address order. Safe across the relaxation/sizing pass: that pass
+     runs under [Emitaux.with_snapshot], which rolls back
+     [frame_descriptors]. *)
+  record_frame_descr ~label:gc.gc_frame_lbl ~frame_size:gc.gc_frame_size
+    ~live_offset:gc.gc_live_offset gc.gc_frame_dbg;
+  labelled_ins1
+    (label_to_asm_label ~section:Text gc.gc_frame_lbl)
+    B
+    (local_label gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
 
@@ -974,7 +995,7 @@ let emit_literals_list literals align emit_literal =
       D.switch_to_section_raw
         ~names:[".rodata.cst" ^ Int.to_string align]
         ~flags:(Some "aM")
-        ~args:["@progbits"; Int.to_string align]
+        ~args:["%progbits"; Int.to_string align]
         ~is_delayed:false;
     (* CR sspies: We set the internal section ref to Text here, because section
        ref does not support named text sections yet. Fix this when cleaning up
@@ -1117,11 +1138,20 @@ let assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg =
   gc_lbl, gc_return_lbl
 
 let assembly_code_for_fast_heap_allocation env i ~n ~far ~dbginfo =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc dbginfo) in
+  let gc_frame_lbl = Cmm.new_label () in
+  let gc_frame_size = Env.frame_size env in
+  let gc_live_offset = compute_live_offset env i.live in
   let gc_lbl, gc_return_lbl =
     assembly_code_for_fast_heap_allocation0 ~n ~far ~res_reg:(H.reg_x i.res.(0))
   in
-  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+  Env.add_call_gc_site env
+    { gc_lbl;
+      gc_return_lbl;
+      gc_frame_lbl;
+      gc_frame_size;
+      gc_live_offset;
+      gc_frame_dbg = Dbg_alloc dbginfo
+    }
 
 let assembly_code_for_slow_heap_allocation env i ~n ~dbginfo =
   let lbl_frame = record_frame_label env i.live (Dbg_alloc dbginfo) in
@@ -1176,9 +1206,18 @@ let assembly_code_for_poll0 ~far ~return_label =
   gc_lbl, gc_return_lbl
 
 let assembly_code_for_poll env i ~far ~return_label =
-  let gc_frame_lbl = record_frame_label env i.live (Dbg_alloc []) in
+  let gc_frame_lbl = Cmm.new_label () in
+  let gc_frame_size = Env.frame_size env in
+  let gc_live_offset = compute_live_offset env i.live in
   let gc_lbl, gc_return_lbl = assembly_code_for_poll0 ~far ~return_label in
-  Env.add_call_gc_site env { gc_lbl; gc_return_lbl; gc_frame_lbl }
+  Env.add_call_gc_site env
+    { gc_lbl;
+      gc_return_lbl;
+      gc_frame_lbl;
+      gc_frame_size;
+      gc_live_offset;
+      gc_frame_dbg = Dbg_alloc []
+    }
 
 (* Output the assembly code for a stack check. *)
 
@@ -1249,8 +1288,8 @@ let emit_load_literal dst lbl =
   | Float32 -> A.ins2 LDR_simd_and_fp (H.reg_s dst) addr
   | Val | Int | Addr -> A.ins2 LDR (H.reg_x dst) addr
   | Vec128 | Valx2 -> A.ins2 LDR_simd_and_fp (H.reg_q dst) addr
-  | Vec256 | Vec512 ->
-    Misc.fatal_errorf "emit_load_literal: unexpected vector register %a"
+  | Vec256 | Vec512 | Mask ->
+    Misc.fatal_errorf "emit_load_literal: unexpected vector or mask register %a"
       Printreg.reg dst
 
 let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
@@ -1259,8 +1298,8 @@ let move_between_distinct_locs env (src : Reg.t) (dst : Reg.t) =
   | Float32, Reg _, Float32, Reg _ -> A.ins2 FMOV_fp (H.reg_s dst) (H.reg_s src)
   | (Vec128 | Valx2), Reg _, (Vec128 | Valx2), Reg _ ->
     A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | (Vec256 | Vec512), _, _, _ | _, _, (Vec256 | Vec512), _ ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
+  | (Vec256 | Vec512 | Mask), _, _, _ | _, _, (Vec256 | Vec512 | Mask), _ ->
+    Misc.fatal_error "arm64: got 256/512 bit vector or mask"
   | (Int | Val | Addr), Reg _, (Int | Val | Addr), Reg _ ->
     A.ins_mov_reg (H.reg_x dst) (H.reg_x src)
   | Float, Reg _, Float, Stack _ ->
@@ -1328,7 +1367,8 @@ let emit_reinterpret_cast env (cast : Cmm.reinterpret_cast) i =
   | V128_of_vec Vec128 ->
     if distinct
     then A.ins_mov_vector (H.reg_v16b_operand dst) (H.reg_v16b_operand src)
-  | V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _ ->
+  | V128_of_vec (Vec256 | Vec512)
+  | V256_of_vec _ | V512_of_vec _ | Mask_of_int64 | Int64_of_mask ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | Int_of_value | Value_of_int -> move env src dst
 
@@ -1465,7 +1505,7 @@ let emit_instr env i =
     else
       let lbl = float_literal env f in
       emit_load_literal i.res.(0) lbl
-  | Lop (Const_vec256 _ | Const_vec512 _) ->
+  | Lop (Const_vec256 _ | Const_vec512 _ | Const_mask _) ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
   | Lop (Const_vec128 ({ word0; word1 } as l)) -> (
     match word0, word1 with
@@ -1579,9 +1619,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none);
       A.ins2 LDR_simd_and_fp (H.reg_q dst) (H.mem reg_tmp1_base)
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Store (size, addr, assignment)) -> (
     (* NB: assignments other than Word_int and Word_val do not follow the
        Multicore OCaml memory model and so do not emit a barrier *)
@@ -1627,9 +1667,9 @@ let emit_instr env i =
           (symbol_or_label_for_data ~offset (Needs_reloc LOWER_TWELVE) s)
           O.optional_none;
         A.ins2 STR_simd_and_fp (H.reg_q src) (H.mem reg_tmp1_base))
-    | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-    | Fivetwelve_unaligned ->
-      Misc.fatal_error "arm64: got 256/512 bit vector")
+    | Word_mask | Twofiftysix_aligned | Twofiftysix_unaligned
+    | Fivetwelve_aligned | Fivetwelve_unaligned ->
+      Misc.fatal_error "arm64: got 256/512 bit vector or mask")
   | Lop (Alloc { bytes = n; dbginfo; mode = Heap }) ->
     assembly_code_for_allocation env i ~n ~local:false ~far:false ~dbginfo
   | Lop (Specific (Ifar_alloc { bytes = n; dbginfo; mode })) ->
@@ -2261,21 +2301,23 @@ let end_assembly () =
   global_maybe_protected data_end_sym;
   D.define_symbol_label ~section:Data data_end_sym;
   D.int64 0L;
-  let frametable_section : Asm_targets.Asm_section.t =
-    (* This is inconsistent with x86, where the non-rodata section is [Text]
-       instead of [Data]. Now that [frametables_in_rodata] is the default, it's
-       unclear how much this matters. *)
-    if !Oxcaml_flags.frametables_in_rodata then Read_only_data else Data
-  in
-  D.switch_to_section frametable_section;
+  D.switch_to_section Read_only_data;
   D.align ~fill:Zero ~bytes:8;
   (* #7887 *)
   let frametable = Cmm_helpers.make_symbol "frametable" in
   let frametable_sym = S.create_global frametable in
   global_maybe_protected frametable_sym;
-  D.define_symbol_label ~section:frametable_section frametable_sym;
+  D.define_symbol_label ~section:Read_only_data frametable_sym;
+  Emitaux.disable_short_descriptors := false;
+  (* The binary emitter keeps the strings inline in the frametable section:
+     same-section label differences need no relocations. *)
+  let debug_strings_section : Asm_targets.Asm_section.t =
+    if Binary_emitter_helpers.should_use_binary_emitter ()
+    then Read_only_data
+    else Debuginfo_strings
+  in
   (* CR sspies: Share the [emit_frames] code with the x86 backend. *)
-  emit_frames
+  emit_frames ~debug_strings_section
     { efa_code_label =
         (fun lbl ->
           let lbl = label_to_asm_label ~section:Text lbl in
@@ -2296,14 +2338,19 @@ let end_assembly () =
       efa_align = (fun n -> D.align ~fill:Zero ~bytes:n);
       efa_label_rel =
         (fun lbl ofs ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
           D.between_this_and_label_offset_32bit_expr ~upper:lbl
             ~offset_upper:(Targetint.of_int32 ofs));
+      efa_label_delta =
+        (fun upper lower ->
+          (* The return-address labels live in the text section. *)
+          let upper = label_to_asm_label ~section:Text upper in
+          let lower = label_to_asm_label ~section:Text lower in
+          D.delta_uleb128 ~upper ~lower);
       efa_def_label =
         (fun lbl ->
-          let lbl = label_to_asm_label ~section:frametable_section lbl in
-          D.define_label lbl);
-      efa_string = (fun s -> D.string (s ^ "\000"))
+          let lbl = label_to_asm_label ~section:Read_only_data lbl in
+          D.define_label lbl)
     };
   D.type_symbol ~ty:Object frametable_sym;
   D.size frametable_sym;

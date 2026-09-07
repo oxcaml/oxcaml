@@ -72,13 +72,16 @@ let name = function
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
 
-let rename = function
+let rename_with_stamp stamp = function
   | Local { name; stamp = _ }
   | Scoped { name; stamp = _; scope = _ } ->
-      incr currentstamp;
-      Local { name; stamp = !currentstamp }
+      Local { name; stamp }
   | id ->
       Misc.fatal_errorf "Ident.rename %s" (name id)
+
+let rename id =
+  incr currentstamp;
+  rename_with_stamp !currentstamp id
 
 let unique_name = function
   | Local { name; stamp }

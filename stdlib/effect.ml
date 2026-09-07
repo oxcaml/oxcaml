@@ -128,23 +128,30 @@ let[@inline] discontinue_with_backtrace (_h : Handler.t @ yielding) cont e bt =
 
 (* Retrieve the stack from a [cont]inuation, update its handlers, and resume it.
 
+   FIXME: the following functions are [@inline never] to assure there are no
+   poll points between updating the handlers and resuming the continuation.
+   If the continuation is old and the handlers are young, entering the GC
+   would cause the handlers to be forgotten. This should really be fixed by
+   making the continue primitive update the handlers.
+
    FIXME: There's a race condition here - if multiple threads call one of these
    on the same continuation at once with handlers that return different types,
    they could be interleaved, causing a segfault rather than an exception. *)
 
-let continue_with_handler (h : Handler.t @ yielding) cont valuec exnc
-    (effc : 'a. ('a, _, _) effc) tickc v =
-  continue h (Prim.update_cont_handler_noexc cont valuec exnc effc tickc) v
+let[@inline never] continue_with_handler (_h : Handler.t @ yielding) cont valuec
+    exnc (effc : 'a. ('a, _, _) effc) tickc v =
+  Prim.continue (Prim.update_cont_handler_noexc cont valuec exnc effc tickc) v
 
-let discontinue_with_handler (h : Handler.t @ yielding) cont valuec exnc
-    (effc : 'a. ('a, _, _) effc) tickc e =
-  discontinue h
+let[@inline never] discontinue_with_handler (_h : Handler.t @ yielding) cont
+    valuec exnc (effc : 'a. ('a, _, _) effc) tickc e =
+  Prim.discontinue
     (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
     e
 
-let discontinue_with_handler_with_backtrace (h : Handler.t @ yielding) cont
-    valuec exnc (effc : 'a. ('a, _, _) effc) tickc e bt =
-  discontinue_with_backtrace h
+let[@inline never] discontinue_with_handler_with_backtrace
+    (_h : Handler.t @ yielding) cont valuec exnc (effc : 'a. ('a, _, _) effc)
+    tickc e bt =
+  Prim.discontinue_with_backtrace
     (Prim.update_cont_handler_noexc cont valuec exnc effc tickc)
     e bt
 
@@ -339,7 +346,7 @@ module Shallow = struct
   let fiber : type a b. (a -> b) -> (a, b) continuation = fun f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
     let exception E of (a,b) continuation in
-    let f' () = f (perform M.Initial_setup__) in
+    let f' () = f (Safe.perform (Handler.unsafe_make ()) M.Initial_setup__) in
     let error _ = failwith "impossible" in
     let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) _last_fiber =
       match eff with

@@ -85,8 +85,10 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  (** The with-bound contributes the meet of the type's modal and externality
+      bounds and [bounds_mask]. On each axis, [top] preserves the type's bound,
+      [bot] ignores it, and a middle element caps its contribution there. *)
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end
@@ -111,6 +113,20 @@ module Rigid_name : sig
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
             [Types.get_id] of the type variable representing the parameter. *)
+    | Provenance of
+        { id : int;
+          (** Identifies this provenance occurrence. *)
+
+          ty : Format_doc.doc;
+          (** The type expression or descriptive noun phrase, retained as a
+              formatting document so its line-breaking instructions survive
+              until the diagnostic is printed. *)
+
+          plural : bool
+          (** Whether [ty] is a plural noun phrase rather than a type. *)
+        }
+        (** A diagnostic-only provenance variable. These variables must not
+            appear in stored [type_ikind]s. *)
     | Unknown of unknown_id
         (** An unknown quantity with a given id. Used to model not-best in
             ikinds. This is used when we couldn't compute a precise ikind,
@@ -127,6 +143,8 @@ module Rigid_name : sig
   val katom : Path.t -> t
 
   val param : int -> t
+
+  val provenance : id:int -> ty:Format_doc.doc -> plural:bool -> t
 
   val unknown : Shape.Uid.t -> t
 
@@ -188,6 +206,15 @@ and type_desc =
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
       The last parameter keep tracks of known expansions, see [abbrev_memo]. *)
+
+  | Tmod of type_expr * mod_bounds
+  (** [Tmod (t, bounds)] ==> [t @@ bounds]
+      The type [t] with its mode crossing bounded by [bounds]. This is a
+      transparent wrapper: it constrains mode crossing only, and erases at
+      runtime. The unboxing and kind-computation paths look through it to [t],
+      as they do for [Tpoly]; generic structural traversals rebuild it; the
+      leaf consumers that classify a type's runtime representation raise,
+      since a [Tmod] is not expected to reach them. *)
 
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   (** [Tobject (`f1:t1;...;fn: tn', `None')] ==> [< f1: t1; ...; fn: tn >]
@@ -389,7 +416,8 @@ and 'd with_bounds =
 
 and 'layout jkind_base =
   | Layout of 'layout
-  | Kconstr of Path.t * Jkind_types.Scannable_axes.t
+  | Kconstr of
+      Path.t * Jkind_types.Scannable_axes.t * Jkind_types.Kind_operator.t
 
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
@@ -867,7 +895,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -917,10 +945,12 @@ and mixed_block_element =
   | Vec128
   | Vec256
   | Vec512
+  | Mask
   | Word
   | Product of mixed_product_shape
   (* Invariant: the array has at least two things in it. *)
   | Void
+  | Addressable of mixed_block_element
 
 and mixed_product_shape = mixed_block_element array
 
@@ -960,16 +990,21 @@ and record_representation =
      until we know the kinds of the fields.
 
      After [update_decls_jkind], no record should have this representation. *)
-  | Record_variable
+  | Record_undetermined
   (* Used after [update_decls_jkind] for non-inlined records whose
      representation cannot be determined because at least one field has layout
-     [any]. The actual representation is decided at construction sites. *)
+     [any]. When typing uses, this is replaced by [Record_variable]. *)
+  | Record_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Record_undetermined] becomes after typechecking a use of the record.
+     In translation, this refines to [Record_{boxed,mixed}]. *)
 
 and record_unboxed_product_representation =
   | Record_unboxed_product
-  | Record_unboxed_product_variable
-  (* Counterpart of [Record_variable] for unboxed product records that have at
-     least one field of layout [any]. *)
+  | Record_unboxed_product_undetermined
+  (* Counterpart of [Record_undetermined] for unboxed records. When typing uses,
+     this is replaced by [Record_unboxed_product_variable].*)
+  | Record_unboxed_product_variable of Jkind_types.Sort.t array
+  (* Counterpart of [Record_variable] for unboxed records. *)
 
 and variant_representation =
   | Variant_unboxed
@@ -993,10 +1028,10 @@ and cstr_layout =
            [Constructor_mixed] if the inlined record has any unboxed fields.
         *)
       }
-  | Cstr_layout_variable
+  | Cstr_layout_undetermined
   (* The constructor's payload contains a field of layout [any], so neither
      its [shape] nor the [sorts] of its arguments can be determined at
-     typedecl time. Counterpart of [Record_variable] for variants. *)
+     typedecl time. Counterpart of [Record_undetermined] for variants. *)
   (* CR layouts v3.5: A custom variant representation for ['a or_null].
      Eventually, it should likely be merged into [Variant_unboxed], with
      [Variant_unboxed] allowing either one ordinary constructor, or one
@@ -1010,9 +1045,17 @@ and constructor_representation =
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
-  | Constructor_variable
+  | Constructor_immediate_all_void
+  (* A constructor with all-void args, represented as a constant rather than a
+     block: one annotated with [@immediate_all_void_constructor], or the null
+     constructor of a [Variant_with_null]. *)
+  | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
+  | Constructor_variable of (Jkind_types.Sort.t * type_expr) array
+  (* What [Constructor_undetermined] becomes after typechecking a use of the
+     constructor. Like [Record_variable], only ever appears in the typedtree,
+     never in a type declaration. *)
 
 and label_declaration =
   {
@@ -1310,6 +1353,13 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
+val equal_constructor_representation_up_to_scannable_axes :
+  constructor_representation -> constructor_representation -> bool
+
+(** Whether the constructor is represented as a constant rather than a block:
+    it is nullary, or its shape is [Constructor_immediate_all_void]. *)
+val cstr_layout_is_constant : cstr_layout -> bool
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
@@ -1335,10 +1385,6 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
-
-val equal_unsafe_mode_crossing :
-  type_equal:(type_expr -> type_expr -> bool) ->
-  unsafe_mode_crossing -> unsafe_mode_crossing -> bool
 
 (**** Utilities for backtracking ****)
 

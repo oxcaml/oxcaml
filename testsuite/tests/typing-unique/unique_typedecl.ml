@@ -37,9 +37,9 @@ Lines 3-4, characters 0-69:
 4 | = 'a -> 'b @ unique -> ('c -> ('d -> 'e) @ unique once) @ unique once
 Error: The type constraints are not consistent.
        Type "'a -> 'b @ unique -> 'c -> 'd -> 'e" is not compatible with type
-         "'a -> 'b @ unique -> ('c -> ('d -> 'e) @ unique once) @ unique once"
+         "'a -> 'b @ unique -> ('c -> ('d -> 'e) @ once unique) @ once unique"
        Type "'b @ unique -> 'c -> 'd -> 'e" is not compatible with type
-         "'b @ unique -> ('c -> ('d -> 'e) @ unique once) @ unique once"
+         "'b @ unique -> ('c -> ('d -> 'e) @ once unique) @ once unique"
 |}]
 
 type distinct_sarg = unit constraint int @ unique -> int = int -> int

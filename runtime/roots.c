@@ -40,7 +40,8 @@ void caml_do_roots (
   scan_roots_hook hook;
   caml_do_local_roots(f, fflags, fdata,
                       d->local_roots, d->current_stack, d->gc_regs,
-                      d->dynamic_bindings);
+                      d->dynamic_bindings,
+                      d->c_stack);
   hook = atomic_load(&caml_scan_roots_hook);
   if (hook != NULL) (*hook)(f, fflags, fdata, d);
   caml_final_do_roots(f, fflags, fdata, d, do_final_val);

@@ -183,11 +183,12 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
   | Boxed_vec128 -> rewrite_boxed_number_kind context usages kind Naked_vec128
   | Boxed_vec256 -> rewrite_boxed_number_kind context usages kind Naked_vec256
   | Boxed_vec512 -> rewrite_boxed_number_kind context usages kind Naked_vec512
+  | Boxed_mask -> rewrite_boxed_number_kind context usages kind Naked_mask
   | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
   | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
   | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
   | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_product_array ->
+  | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array ->
     (* For all these subkinds, we don't track fields (for now). Thus, being in
        this case without being top or bottom means that we never use this
        particular value, but that it syntactically looks like it could be used.

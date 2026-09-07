@@ -64,7 +64,7 @@ module type Backend = sig
 
   val link :
     Linkenv.t ->
-    string list ->
+    Linkenv.objfile_to_link list ->
     string ->
     cached_genfns_imports:Generic_fns.Partition.Set.t ->
     genfns:Generic_fns.Tbl.t ->

@@ -38,7 +38,7 @@ let simplify_array_set (array_kind : P.Array_kind.t)
            Values. *)
         | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s
         | Naked_int16s | Naked_int32s | Naked_int64s | Naked_nativeints
-        | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+        | Naked_vec128s | Naked_vec256s | Naked_vec512s | Naked_masks ->
           Misc.fatal_errorf
             "Didn't expect array specialisation to yield array kind %a from \
              array set kind %a (original array kind %a):@ %a"
@@ -46,7 +46,7 @@ let simplify_array_set (array_kind : P.Array_kind.t)
             P.Array_kind.print orig_array_kind Named.print original_term)
       | Naked_floats | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
       | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_vec128s
-      | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+      | Naked_vec256s | Naked_vec512s | Naked_masks | Unboxed_product _ ->
         ()
     in
     let named =
@@ -72,21 +72,21 @@ let simplify_bigarray_set ~num_dimensions:_ _bigarray_kind _bigarray_layout dacc
     ~result_var =
   SPR.create_unit dacc ~result_var ~original_term
 
-let simplify_atomic_field_int_arith (_op : P.int_atomic_op) ~original_prim dacc
+let simplify_atomic_int_arith (_op : P.int_atomic_op) ~original_prim dacc
     ~original_term _dbg ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_
     ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_set_field ~original_prim dacc ~original_term _dbg ~arg1:_
+let simplify_atomic_set ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_exchange_field ~original_prim dacc ~original_term _dbg
-    ~arg1:_ ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
+let simplify_atomic_exchange ~original_prim dacc ~original_term _dbg ~arg1:_
+    ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~arg3:_ ~arg3_ty:_ ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
     ~original_term
@@ -107,10 +107,9 @@ let simplify_ternary_primitive dacc original_prim (prim : P.ternary_primitive)
       simplify_bytes_or_bigstring_set bytes_like_value string_accessor_width
     | Bigarray_set (num_dimensions, bigarray_kind, bigarray_layout) ->
       simplify_bigarray_set ~num_dimensions bigarray_kind bigarray_layout
-    | Atomic_field_int_arith op ->
-      simplify_atomic_field_int_arith op ~original_prim
-    | Atomic_set_field _ -> simplify_atomic_set_field ~original_prim
-    | Atomic_exchange_field _ -> simplify_atomic_exchange_field ~original_prim
+    | Atomic_int_arith (_, op) -> simplify_atomic_int_arith op ~original_prim
+    | Atomic_set _ -> simplify_atomic_set ~original_prim
+    | Atomic_exchange _ -> simplify_atomic_exchange ~original_prim
     | Write_offset _ -> simplify_write_offset ~original_prim
   in
   simplifier dacc ~original_term dbg ~arg1 ~arg1_ty ~arg2 ~arg2_ty ~arg3

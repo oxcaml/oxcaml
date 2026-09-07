@@ -70,7 +70,7 @@
     odoc_types
     odoc_value
   )
-  (libraries dynlink_internal ocamlcommon str unix))
+  (libraries dynlink_internal ocamlfrontend str unix))
 
 (executable
   (name odoc_byte)

@@ -38,7 +38,10 @@ module One_level : sig
 
   val is_empty : t -> bool
 
-  val clean_for_export : t -> reachable_names:Name_occurrences.t -> t
+  val clean_for_export :
+    t ->
+    reachable_names:Name_occurrences.t ->
+    (TG.t * Binding_time.With_name_mode.t) Name.Map.t
 
   val remove_unused_value_slots_and_shortcut_aliases :
     t -> used_value_slots:Value_slot.Set.t -> t
@@ -86,10 +89,7 @@ end = struct
   let is_empty t = TEL.is_empty t.level
 
   let clean_for_export t ~reachable_names =
-    { t with
-      just_after_level =
-        Cached_level.clean_for_export t.just_after_level ~reachable_names
-    }
+    Cached_level.clean_for_export t.just_after_level ~reachable_names
 
   let remove_unused_value_slots_and_shortcut_aliases t ~used_value_slots =
     let just_after_level =
@@ -122,7 +122,7 @@ type t =
 and serializable =
   { defined_symbols_without_equations : Symbol.t list;
     code_age_relation : Code_age_relation.t;
-    just_after_level : Cached_level.t
+    names_to_types : (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t
   }
 
 type typing_env = t
@@ -173,19 +173,17 @@ let [@ocamlformat "disable"] print ppf
       Aliases.print (aliases t)
 
 let [@ocamlformat "disable"] print_serializable ppf
-    { defined_symbols_without_equations; code_age_relation; just_after_level } =
+    { defined_symbols_without_equations; code_age_relation; names_to_types } =
   Format.fprintf ppf
     "@[<hov 1>(\
         @[<hov 1>(defined_symbols_without_equations@ (%a))@]@ \
         @[<hov 1>(code_age_relation@ %a)@]@ \
         @[<hov 1>(type_equations@ %a)@]@ \
-        @[<hov 1>(aliases@ %a)@]\
         )@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Symbol.print) defined_symbols_without_equations
     Code_age_relation.print code_age_relation
     (Name.Map.print (fun ppf (ty, _bt_and_mode) -> TG.print ppf ty))
-    (Cached_level.names_to_types just_after_level)
-    Aliases.print (Cached_level.aliases just_after_level)
+    names_to_types
 
 module Meet_or_join_env_base : sig
   type t
@@ -330,10 +328,7 @@ let binding_time_resolver resolver name =
       (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
   | None -> raise Binding_time_resolver_failure
   | Some t -> (
-    match
-      Name.Map.find_or_null name
-        (Cached_level.names_to_types t.just_after_level)
-    with
+    match Name.Map.find_or_null name t.names_to_types with
     | Null ->
       Misc.fatal_errorf "Binding time resolver cannot find name %a in:@ %a"
         Name.print name print_serializable t
@@ -449,9 +444,7 @@ let find_with_binding_time_and_mode' t name kind =
             check_optional_kind_matches name ty kind;
             ty, Binding_time.With_name_mode.imported_variables)
       | Some t -> (
-        match
-          Name.Map.find name (Cached_level.names_to_types t.just_after_level)
-        with
+        match Name.Map.find name t.names_to_types with
         | exception Not_found ->
           Name.pattern_match name
             ~symbol:(fun symbol ->
@@ -827,6 +820,47 @@ let replace_equation (t : t) name ty =
   in
   with_current_level t ~current_level
 
+let rec type_from_closure_conversion_approx ~machine_width
+    (approx : _ Value_approximation.t) =
+  match approx with
+  | Unknown kind -> MTC.unknown kind
+  | Value_const cst -> MTC.type_for_const cst
+  | Value_symbol symbol ->
+    TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
+  | Block_approximation (tag, shape, fields, alloc_mode) ->
+    let fields =
+      List.map
+        (type_from_closure_conversion_approx ~machine_width)
+        (Array.to_list fields)
+    in
+    MTC.immutable_block ~machine_width ~is_unique:false
+      (Tag.Scannable.to_tag tag) ~shape:(Scannable shape) ~fields alloc_mode
+  | Closure_approximation { code_id; function_slot; code = _; symbol } ->
+    MTC.static_closure_with_this_code ~this_function_slot:function_slot
+      ~closure_symbol:symbol ~code_id
+
+let create_from_closure_conversion_approx ~machine_width ~resolver
+    (symbols : _ Value_approximation.t Symbol.Map.t) : t =
+  let t = create ~machine_width ~resolver in
+  let t =
+    Symbol.Map.fold (fun sym _approx t -> add_symbol_definition t sym) symbols t
+  in
+  Symbol.Map.fold
+    (fun sym approx t ->
+      let ty = type_from_closure_conversion_approx ~machine_width approx in
+      (* Symbols without approximations must still be defined. *)
+      let t =
+        Name_occurrences.fold_names (TG.free_names ty) ~init:t ~f:(fun t name ->
+            Name.pattern_match name
+              ~var:(fun _ -> t)
+              ~symbol:(fun free_sym ->
+                if Current_unit.is_current (Symbol.compilation_unit free_sym)
+                then add_symbol_definition t free_sym
+                else t))
+      in
+      replace_equation t (Name.symbol sym) ty)
+    symbols t
+
 let aliases_add t ~canonical_element1 ~canonical_element2 =
   (* This may raise [Binding_time_resolver_failure]. *)
   Aliases.add ~binding_time_resolver:t.binding_time_resolver (aliases t)
@@ -1093,8 +1127,6 @@ module Serializable : sig
 
   val print : Format.formatter -> t -> unit
 
-  val name_domain : t -> Name.Set.t
-
   val ids_for_export : t -> Ids_for_export.t
 
   val apply_renaming : t -> Renaming.t -> t
@@ -1107,14 +1139,12 @@ end = struct
   type t = serializable
 
   let create (env : Pre_serializable.t) ~reachable_names : t =
-    let current_level =
+    let names_to_types =
       One_level.clean_for_export env.current_level ~reachable_names
     in
     let code_age_relation =
       Code_age_relation.clean_for_export env.code_age_relation ~reachable_names
     in
-    let just_after_level = One_level.just_after_level current_level in
-    let names_to_types = Cached_level.names_to_types just_after_level in
     let defined_symbols_without_equations =
       Symbol.Set.fold
         (fun symbol defined_symbols_without_equations ->
@@ -1125,13 +1155,13 @@ end = struct
           else defined_symbols_without_equations)
         env.defined_symbols []
     in
-    { defined_symbols_without_equations; code_age_relation; just_after_level }
+    { defined_symbols_without_equations; code_age_relation; names_to_types }
 
   let predefined_exceptions symbols : t =
     let defined_symbols_without_equations = Symbol.Set.elements symbols in
     { defined_symbols_without_equations;
       code_age_relation = Code_age_relation.empty;
-      just_after_level = Cached_level.empty
+      names_to_types = Name.Map.empty
     }
 
   let create_from_closure_conversion_approx ~machine_width
@@ -1140,56 +1170,47 @@ end = struct
        symbols have an equation (that may be Unknown). *)
     let defined_symbols_without_equations = [] in
     let code_age_relation = Code_age_relation.empty in
-    let rec type_from_approx approx =
-      match (approx : _ Value_approximation.t) with
-      | Unknown kind -> MTC.unknown kind
-      | Value_const cst -> MTC.type_for_const cst
-      | Value_symbol symbol ->
-        TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
-      | Block_approximation (tag, shape, fields, alloc_mode) ->
-        let fields = List.map type_from_approx (Array.to_list fields) in
-        MTC.immutable_block ~machine_width ~is_unique:false
-          (Tag.Scannable.to_tag tag) ~shape:(Scannable shape) ~fields alloc_mode
-      | Closure_approximation { code_id; function_slot; code = _; symbol } ->
-        MTC.static_closure_with_this_code ~this_function_slot:function_slot
-          ~closure_symbol:symbol ~code_id
-    in
-    let just_after_level =
+    let names_to_types =
       Symbol.Map.fold
         (fun sym approx cached ->
-          Cached_level.add_or_replace_binding cached (Name.symbol sym)
-            (type_from_approx approx) Binding_time.symbols Name_mode.normal)
-        symbols Cached_level.empty
+          Name.Map.add (Name.symbol sym)
+            ( type_from_closure_conversion_approx ~machine_width approx,
+              Binding_time.With_name_mode.symbols )
+            cached)
+        symbols Name.Map.empty
     in
-    { defined_symbols_without_equations; code_age_relation; just_after_level }
+    { defined_symbols_without_equations; code_age_relation; names_to_types }
 
-  let free_function_slots_and_value_slots t =
-    Cached_level.free_function_slots_and_value_slots t.just_after_level
+  let free_function_slots_and_value_slots
+      { names_to_types;
+        defined_symbols_without_equations = _;
+        code_age_relation = _
+      } =
+    Name.Map.fold
+      (fun _name (ty, _binding_time) free_names ->
+        let free_names_of_ty = Type_grammar.free_names ty in
+        Name_occurrences.union free_names
+          (Name_occurrences.restrict_to_value_slots_and_function_slots
+             free_names_of_ty))
+      names_to_types Name_occurrences.empty
 
   let print = print_serializable
 
-  let name_domain t =
-    List.fold_left
-      (fun name_domain symbol -> Name.Set.add (Name.symbol symbol) name_domain)
-      (Name.Map.keys (Cached_level.names_to_types t.just_after_level))
-      t.defined_symbols_without_equations
-
   let ids_for_export
-      { defined_symbols_without_equations; code_age_relation; just_after_level }
-      =
+      { defined_symbols_without_equations; code_age_relation; names_to_types } =
     Ids_for_export.create
       ~symbols:(Symbol.Set.of_list defined_symbols_without_equations)
       ~code_ids:(Code_age_relation.all_code_ids_for_export code_age_relation)
       ()
-    |> Ids_for_export.union (Cached_level.ids_for_export just_after_level)
-    |> Variable.Map.fold
-         (fun var proj ids ->
-           Ids_for_export.add_variable ids var
-           |> Ids_for_export.union (Symbol_projection.ids_for_export proj))
-         (Cached_level.symbol_projections just_after_level)
+    |> Name.Map.fold
+         (fun name (typ, _binding_time_and_mode) ids ->
+           Ids_for_export.add_name
+             (Ids_for_export.union ids (Type_grammar.ids_for_export typ))
+             name)
+         names_to_types
 
   let apply_renaming
-      { defined_symbols_without_equations; code_age_relation; just_after_level }
+      { defined_symbols_without_equations; code_age_relation; names_to_types }
       renaming =
     let defined_symbols_without_equations =
       List.map
@@ -1199,10 +1220,16 @@ end = struct
     let code_age_relation =
       Code_age_relation.apply_renaming code_age_relation renaming
     in
-    let just_after_level =
-      Cached_level.apply_renaming just_after_level renaming
+    let names_to_types =
+      Name.Map.fold
+        (fun name (ty, binding_time_and_mode) acc ->
+          Name.Map.add
+            (Renaming.apply_name renaming name)
+            (Type_grammar.apply_renaming ty renaming, binding_time_and_mode)
+            acc)
+        names_to_types Name.Map.empty
     in
-    { defined_symbols_without_equations; code_age_relation; just_after_level }
+    { defined_symbols_without_equations; code_age_relation; names_to_types }
 
   let merge (t1 : t) (t2 : t) : t =
     let defined_symbols_without_equations =
@@ -1212,10 +1239,10 @@ end = struct
     let code_age_relation =
       Code_age_relation.union t1.code_age_relation t2.code_age_relation
     in
-    let just_after_level =
-      Cached_level.merge t1.just_after_level t2.just_after_level
+    let names_to_types =
+      Name.Map.disjoint_union t1.names_to_types t2.names_to_types
     in
-    { defined_symbols_without_equations; code_age_relation; just_after_level }
+    { defined_symbols_without_equations; code_age_relation; names_to_types }
 
   let extract_symbol_approx env symbol find_code =
     let rec type_to_approx (ty : Type_grammar.t) : _ Value_approximation.t =
@@ -1237,7 +1264,7 @@ end = struct
           match head with
           | Mutable_block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
           | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-          | Boxed_nativeint _ | String _ | Array _ ->
+          | Boxed_mask _ | Boxed_nativeint _ | String _ | Array _ ->
             value_unknown
           | Closures { by_function_slot; alloc_mode = _ } -> (
             let approx_of_closures_entry ~exact function_slot closures_entry :
@@ -1324,13 +1351,12 @@ end = struct
             else value_unknown))
       | Naked_immediate _ | Naked_float _ | Naked_float32 _ | Naked_int8 _
       | Naked_int16 _ | Naked_int32 _ | Naked_int64 _ | Naked_vec128 _
-      | Naked_vec256 _ | Naked_vec512 _ | Naked_nativeint _ ->
+      | Naked_vec256 _ | Naked_vec512 _ | Naked_mask _ | Naked_nativeint _ ->
         Unknown (TG.kind ty)
       | Rec_info _ | Region _ -> assert false
     in
     let symbol_ty, _binding_time_and_mode =
-      Name.Map.find (Name.symbol symbol)
-        (Cached_level.names_to_types env.just_after_level)
+      Name.Map.find (Name.symbol symbol) env.names_to_types
     in
     type_to_approx symbol_ty
 end

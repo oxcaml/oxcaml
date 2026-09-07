@@ -62,7 +62,8 @@
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 
-static _Atomic int64_t fiber_id = 0;
+static _Atomic int64_t fiber_id_global = 0;
+static CAMLthread_local int64_t fiber_id_local = 0;
 
 #define NUM_STACK_SIZE_CLASSES 5
 #define MAX_STACK_CACHE_LIMIT  Max_domains_max
@@ -289,7 +290,6 @@ Caml_inline int stack_cache_bucket (mlsize_t wosize) {
     ++bucket;
     size_bucket_wsz += size_bucket_wsz;
   }
-  CAMLassert(wosize>=size_bucket_wsz/2);
   return -1;
 }
 
@@ -353,7 +353,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->local_sp = 0;
   stack->local_top = NULL;
   stack->local_limit = 0;
-  caml_dynamic_table_init(&stack->dyn);
+  stack->dynamic = Val_null;
+  stack->is_task = false;
 #ifdef DEBUG
   stack->magic = 42;
 #endif
@@ -373,10 +374,18 @@ caml_alloc_stack_noexc(mlsize_t wosize, value hval, value hexn, value heff, int6
                                       /*htick=*/Val_null, id);
 }
 
+static int64_t new_fiber_id(void)
+{
+  enum { Fiber_id_chunk = 1024 };
+  if (fiber_id_local % Fiber_id_chunk == 0)
+    fiber_id_local = atomic_fetch_add(&fiber_id_global, Fiber_id_chunk);
+  return fiber_id_local++;
+}
+
 #ifdef NATIVE_CODE
 
 value caml_alloc_stack (value hval, value hexn, value heff) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -396,7 +405,7 @@ value caml_alloc_stack (value hval, value hexn, value heff) {
 
 value caml_alloc_stack_preemptible(value hval, value hexn, value heff,
                                         value htick) {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -611,12 +620,35 @@ next_chunk:
     CAMLassert(d);
     if (!frame_return_to_C(d)) {
       /* Scan the roots in this frame */
-      if (frame_is_long(d)) {
-        frame_descr_long *dl = frame_as_long(d);
-        uint32_t *p;
-        uint32_t n;
-        for (p = dl->live_ofs, n = dl->num_live; n > 0; n--, p++) {
-          uint32_t ofs = *p;
+      if (frame_is_short(d)) {
+        /* Short descriptor: live registers come from the hot-register
+         * bitmap, live stack slots from the frame's slot bitmap. */
+        struct frame_descr_decoded dec;
+        caml_decode_frame_descr(d, &dec);
+        if (dec.has_allocs) {
+          unsigned char bitmap = dec.short_reg_bitmap;
+          for (int i = 0; bitmap; i++, bitmap >>= 1) {
+            if (bitmap & 1) {
+              root = regs + caml_frame_hot_regs[i];
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+        /* Live stack slots: a bitmap of the frame. */
+        for (uint32_t byte = 0; byte < dec.short_live_bytes; byte++) {
+          unsigned char bits = dec.short_live[byte];
+          for (int i = 0; bits != 0; i++, bits >>= 1) {
+            if (bits & 1) {
+              root = (value *)(sp + ((uintnat)byte * 8 + i) * sizeof(value));
+              visit (f, fdata, locals, colors, root);
+            }
+          }
+        }
+      } else if (frame_is_long(d)) {
+        const unsigned char *p = d + Frame_long_live_ofs;
+        uint32_t n = caml_read_unaligned_uint32(d + Frame_long_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint32_t)) {
+          uint32_t ofs = caml_read_unaligned_uint32(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {
@@ -625,10 +657,10 @@ next_chunk:
           visit (f, fdata, locals, colors, root);
         }
       } else {
-        uint16_t *p;
-        uint16_t n;
-        for (p = d->live_ofs, n = d->num_live; n > 0; n--, p++) {
-          uint16_t ofs = *p;
+        const unsigned char *p = d + Frame_live_ofs;
+        uint16_t n = caml_read_unaligned_uint16(d + Frame_num_live_ofs);
+        for (; n > 0; n--, p += sizeof(uint16_t)) {
+          uint16_t ofs = caml_read_unaligned_uint16(p);
           if (ofs & 1) {
             root = regs + (ofs >> 1);
           } else {
@@ -661,7 +693,7 @@ void caml_scan_stack(
     scan_stack_frames(f, fflags, fdata, stack, gc_regs, locals);
 
     /* Scan dynamic bindings */
-    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
+    f(fdata, stack->dynamic, &stack->dynamic);
 
     f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
@@ -712,7 +744,7 @@ value caml_global_data = Val_unit;
 CAMLprim value caml_alloc_stack(value hval, value hexn, value heff)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info *stack =
       alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */, hval,
                                    hexn, heff, /*htick=*/Val_null, id);
@@ -737,7 +769,7 @@ CAMLprim value caml_alloc_stack_preemptible(value hval, value hexn,
                                             value heff, value htick)
 {
   value* sp;
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stack =
     alloc_size_class_stack_noexc(caml_fiber_wsz, 0 /* first bucket */,
                                  hval, hexn, heff, htick, id);
@@ -803,7 +835,8 @@ void caml_scan_stack(
     }
 
     /* Scan dynamic bindings */
-    caml_dynamic_table_scan_roots(&stack->dyn, f, fflags, fdata);
+    if (is_scannable(fflags, stack->dynamic))
+      f(fdata, stack->dynamic, &stack->dynamic);
 
     if (is_scannable(fflags, Stack_handle_value(stack)))
       f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
@@ -825,7 +858,8 @@ CAMLexport void caml_do_local_roots (
   struct caml__roots_block *local_roots,
   struct stack_info *current_stack,
   value * v_gc_regs,
-  dynamic_cache_t dynamic_bindings)
+  dynamic_cache_t dynamic_bindings,
+  struct c_stack_link* c_stack)
 {
 #ifdef NATIVE_CODE
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
@@ -833,6 +867,15 @@ CAMLexport void caml_do_local_roots (
 
   caml_dynamic_cache_scan_roots(dynamic_bindings, f, fflags, fdata);
   for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
+#ifdef NATIVE_CODE
+    /* c_stack marks the boundary between C stack segments. Distinct C stack
+       segments may have distinct ML fiber stacks, so when we change stack
+       segment we need to find the appropriate local arenas. */
+    while (c_stack != NULL && (uintnat)c_stack < (uintnat)lr) {
+      c_stack = c_stack->prev;
+      if (c_stack != NULL) locals = caml_refresh_locals(c_stack->stack);
+    }
+#endif
     for (int i = 0; i < lr->ntables; i++){
       for (int j = 0; j < lr->nitems; j++){
         value *sp = &(lr->tables[i][j]);
@@ -951,14 +994,16 @@ int caml_try_realloc_stack(asize_t required_space)
   new_stack->local_sp = old_stack->local_sp;
   new_stack->local_top = old_stack->local_top;
   new_stack->local_limit = old_stack->local_limit;
-  new_stack->dyn = old_stack->dyn;
+  new_stack->dynamic = old_stack->dynamic;
+  new_stack->is_task = old_stack->is_task;
 
-  // Detach locals stack and dynamic bindings from old_stack so they will not be freed
+  // Detach locals stack and dynamic bindings from old_stack
   old_stack->local_arenas = NULL;
   old_stack->local_sp = 0;
   old_stack->local_top = NULL;
   old_stack->local_limit = 0;
-  caml_dynamic_table_init(&old_stack->dyn);
+  old_stack->dynamic = Val_null;
+  old_stack->is_task = false;
 
 #ifdef NATIVE_CODE
   /* There's no need to do another pass rewriting from
@@ -1027,7 +1072,7 @@ int caml_try_realloc_stack(asize_t required_space)
 
 struct stack_info* caml_alloc_main_stack (uintnat init_wsize)
 {
-  const int64_t id = atomic_fetch_add(&fiber_id, 1);
+  const int64_t id = new_fiber_id();
   struct stack_info* stk =
     caml_alloc_stack_noexc(init_wsize, Val_unit, Val_unit, Val_unit, id);
   return stk;
@@ -1151,8 +1196,6 @@ void caml_free_stack (struct stack_info* stack)
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
-
-  caml_dynamic_table_free(&stack->dyn);
 
   if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
@@ -1382,11 +1425,19 @@ CAMLexport value caml_get_preemption_effect(void) {
 */
 caml_result caml_tick_fiber_res(struct stack_info *stack) {
   caml_result res;
+  /* The tick handlers below run as callbacks on the current stack: if one
+     grows it, [caml_try_realloc_stack] frees its [stack_info]. Only the
+     current stack can move, so reload it after running the parents'
+     handlers. */
+  int is_current = stack == Caml_state->current_stack;
 
   if (Stack_parent(stack)) {
     res = caml_tick_fiber_res(Stack_parent(stack));
     if (caml_result_is_exception(res) || res.data == Val_true) {
       return res;
+    }
+    if (is_current) {
+      stack = Caml_state->current_stack;
     }
   }
 
