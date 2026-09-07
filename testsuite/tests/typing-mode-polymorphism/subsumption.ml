@@ -13,16 +13,17 @@ end
 module M :
   sig
     val id : 'a @ [< 'm] -> 'a @ [> 'm]
-    val const : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm]
+    val const :
+      'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)]
     val compose :
-      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-      ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-      'c @ [< 'o] -> 'b @ [> 'm | dynamic]
+      ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('mm0) & past('o) & global] ->
+      (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< past('q) & global] ->
+       ('c @ [< 'p] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0)]) @ [> past('o)]
     val curried :
-      'a @ [< 'p & global] ->
-      'b @ [< 'o & global] ->
-      'c @ [< 'n & global] ->
-      'd @ [< 'm & global] -> 'a * 'b * 'c * 'd @ [> 'm | 'n | 'o | 'p]
+      'a @ [< 'm & global] ->
+      ('b @ [< 'n & global] ->
+       ('c @ [< 'o & global] ->
+        ('d @ [< 'p & global] -> 'a * 'b * 'c * 'd @ [> 'p | 'o | 'n | 'm]) @ [> close('o) | close('n) | close('m)]) @ [> close('n) | close('m)]) @ [> close('m)]
   end
 |}]
 
@@ -119,7 +120,9 @@ module Bounded :
     val constrained_by_use :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm
-    val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm]
+    val two_axes :
+      'a @ [< 'm & global] ->
+      ('b @ [< unique] -> 'a @ [> 'm]) @ [> close('m)]
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
     val tick : unit -> int @ [> dynamic]
   end
@@ -130,7 +133,9 @@ module Bounded :
     val constrained_by_use :
       'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic]
     val local_arg : 'a @ [> local] -> unit @ 'm
-    val two_axes : 'a @ [< 'm & global] -> 'b @ [< unique] -> 'a @ [> 'm]
+    val two_axes :
+      'a @ [< 'm & global] ->
+      ('b @ [< unique] -> 'a @ [> 'm]) @ [> close('m)]
     val dup : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased]
     val tick : unit -> int @ [> aliased stateful dynamic]
   end
@@ -357,7 +362,11 @@ module Producer = struct
 end
 [%%expect{|
 module Producer :
-  sig val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] end
+  sig
+    val f :
+      'a @ [< past('m) & global] ->
+      ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)]
+  end
 |}]
 
 module Good_client : module type of Producer = struct
@@ -384,19 +393,27 @@ Lines 1-3, characters 46-3:
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm] end
+         sig
+           val f :
+             'a @ [< past('m) > local] ->
+             ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m) | local]
+         end
        is not included in
          sig
            val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
          end
        Values do not match:
-         val f : 'a @ [> local] -> 'b @ [< 'm] -> 'b @ [> 'm]
+         val f :
+           'a @ [< past('m) > local] ->
+           ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m) | local]
        is not included in
          val f : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] @@ stateless
        The type
-         "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
+         "'a @ [< past('m) > past('p) | local] ->
+         ('b @ [< 'n > past('o)] -> 'b @ [> 'n]) @ [> past('m) | local]"
        is not compatible with the type
-         "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
+         "'a @ [< past('q) & past('p) & global] ->
+         ('b @ [< 'mm0 & past('o)] -> 'b @ [> 'mm0]) @ [> past('q)]"
 |}]
 
 module Fail_local_escapes : sig

@@ -24,7 +24,18 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | writing] =
+  <fun>
+|}, Principal{|
+(let
+  (foo/0 =
+     (function {nlocal = 0} r/0[L] x/0 : int
+       (setfield_ptr(maybe-stack) 0 r/0 x/0)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
+val foo :
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
@@ -36,8 +47,19 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< write > local] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a myref @ [< past('m) & write > local] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | local writing] =
+  <fun>
+|}, Principal{|
+(let
+  (foo/1 =
+     (function {nlocal = 2} r/1[L] x/1 : int
+       (setfield_ptr(maybe-stack) 0 r/1 x/1)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
+val foo :
+  'a myref @ [< past('m) & write > local] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | local writing] =
+  <fun>
 |}]
 
 (* Can be [setfield_ptr] *)
@@ -46,7 +68,15 @@ let foo (r @ global) x = r.i <- x
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | writing] =
+  <fun>
+|}, Principal{|
+(let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
+  (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
+val foo :
+  'a myref @ [< past('m) & global write] ->
+  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
   <fun>
 |}]
 
@@ -65,7 +95,8 @@ let foo () =
          (function {nlocal = 1} param/1[L][value<int>] : int
            (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
-val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
+val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
+  <fun>
 |}]
 
 let foo () =
@@ -86,7 +117,7 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit @ 'n -> string myref @ [< write] -> unit @ 'm = <fun>
+val foo : unit @ 'o -> (string myref @ [< write] -> unit @ 'n) @ 'm = <fun>
 |}]
 
 let foo () =
@@ -104,7 +135,8 @@ let foo () =
          (function {nlocal = 1} param/4[L][value<int>] : int
            (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
-val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
+val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
+  <fun>
 |}]
 
 
@@ -121,14 +153,16 @@ let fst x = fun y -> x
 (let
   (fst/0 = (function {nlocal = 0} x/3? (function {nlocal = 1} y/0[L]? x/3)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/0))
-val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
+val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let fst' x y = x
 [%%expect{|
 (let (fst'/0 = (function {nlocal = 1} x/4[L]? y/1[L]? x/4))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/0))
-val fst' : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
+val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 (* if explicitly annotated, the returned function is local [function[L]],
@@ -140,7 +174,9 @@ let fst_local (x @ local) = exclave_ fun y -> x
      (function {nlocal = 1} x/5[L]? : stack
        (function[L] {nlocal = 1} y/2[L]? x/5)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/0))
-val fst_local : 'a @ [< 'm > local] -> 'b @ 'n -> 'a @ [> 'm | local] = <fun>
+val fst_local :
+  'a @ [< 'm > local] ->
+  ('b @ 'n -> 'a @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo = fst 42
@@ -161,7 +197,8 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit @ 'n -> 'a @ 'm -> int @ [> local] = <fun>
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local dynamic] =
+  <fun>
 |}]
 
 
@@ -218,8 +255,8 @@ let app f x = f x
   (app/0 = (function {nlocal = 1} f/0[L] x/8[L]? (apply[yielding] f/0 x/8)))
   (apply (field_imm 1 (global Toploop!)) "app" app/0))
 val app :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 (* Both arguments are yielding: must be [apply[yielding]]. *)

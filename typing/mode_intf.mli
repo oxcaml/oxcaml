@@ -1062,6 +1062,10 @@ module type S = sig
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
 
+      (** Returns the precise floor of a mode. see notes on [get_floor] in
+          [solver_intf.mli] for cautions. *)
+      val get_floor : (allowed * 'r) t -> Const.t
+
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
