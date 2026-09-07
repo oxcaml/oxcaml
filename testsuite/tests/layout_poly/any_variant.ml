@@ -57,6 +57,11 @@ type ('a : any) r = { x : 'a }
 type ('a : any) r = { x : 'a; }
 |}]
 
+let poly_ pass (_ : 'a) (r : 'a r) = r
+[%%expect{|
+val poly_ pass : 'a -> 'a r -> 'a r = <lpoly>
+|}]
+
 (* A layout-polymorphic field is maybe-void, so this record is not known to
    contain a runtime value. *)
 let poly_ mk v = { x = v }
