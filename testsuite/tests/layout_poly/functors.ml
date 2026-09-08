@@ -19,11 +19,14 @@ module type Id = sig
   val id : layout_ l. ('a : l). 'a -> 'a
 end
 
+module type IdF = functor (M : Id @ static) -> Id @ static
+
 [%%expect{|
 external to_float : float# -> float = "%box_float"
 external to_int64 : int64_u -> int64 = "%box_int64"
 module type S = sig val y : int end
 module type Id = sig val poly_ id : 'a -> 'a end
+module type IdF = functor (M : Id @ static) -> Id @ static
 |}]
 
 (* Static functors using dynamic data. *)
@@ -439,7 +442,6 @@ Uncaught exception: Misc.Fatal_error
 |}]
 
 (* A static functor taking another static functor as its argument *)
-module type IdF = functor (M : Id @ static) -> Id @ static
 let (h2i, h2f) =
   let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
   let module Apply (G : IdF @ static) = struct
@@ -450,8 +452,6 @@ let (h2i, h2f) =
   let module R = Apply (Wrap) in
   (R.i, R.f)
 [%%expect{|
-module type IdF = functor (M : Id @ static) -> Id @ static
->> Fatal error: Slambda_types.symbol_arg_of_value: unexpected closure
-Uncaught exception: Misc.Fatal_error
-
+val h2i : int = 43
+val h2f : float = 43.
 |}]

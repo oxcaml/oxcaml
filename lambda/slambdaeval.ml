@@ -280,8 +280,7 @@ end = struct
     | SLVrecord { id; values = _ } -> id
     | SLVhalves _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected halves"
-    | SLVclosure _ ->
-      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected closure"
+    | SLVclosure id -> Fmt.asprintf "%a" Template_id.print id
 end
 
 module CU_data = struct
@@ -387,7 +386,7 @@ module Ctx = struct
     let counter = Misc.Stdlib.String.Tbl.find_opt t.uniqueify id in
     let counter = Option.value counter ~default:0 in
     Misc.Stdlib.String.Tbl.replace t.uniqueify id (counter + 1);
-    id ^ string_of_int counter
+    Fmt.asprintf "%s/%i" id counter
 end
 
 include Types
