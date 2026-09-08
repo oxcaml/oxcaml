@@ -292,6 +292,45 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
     | _ -> None)
   | _ -> None
 
+(** Logical condition for simplifying the following case:
+    {v
+    <specific1> ...args...
+    <specific2> ...args...
+    v}
+
+    where <specific1> and <specific2> are arch-specific operations without
+    results that read exactly the same registers, and that can be merged into a
+    single operation <specific> with the same effect (e.g. two amd64
+    [Ioffset_loc] adding constants to the same memory location, merged into one
+    adding their sum). The arch-specific merging is delegated to
+    [Arch.merge_adjacent_specific_operations]. Liveness is unaffected: the
+    merged instruction reads the same registers and, like the originals, defines
+    none. *)
+let merge_adjacent_specific_operations
+    (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    match fst_val.desc, snd_val.desc with
+    | Op (Specific specific1), Op (Specific specific2)
+      when Array.length fst_val.res = 0
+           && Array.length snd_val.res = 0
+           && Misc.Stdlib.Array.equal U.are_equal_regs fst_val.arg snd_val.arg
+      -> (
+      match Arch.merge_adjacent_specific_operations specific1 specific2 with
+      | None -> None
+      | Some specific ->
+        let new_cell =
+          DLL.insert_and_return_before fst
+            { fst_val with desc = Cfg.Op (Specific specific) }
+        in
+        DLL.delete_curr fst;
+        DLL.delete_curr snd;
+        Some (U.prev_at_most U.go_back_const new_cell))
+    | _, _ -> None)
+  | _ -> None
+
 let apply cell =
   let[@inline always] if_none_do f o =
     match o with Some _ -> o | None -> f cell
@@ -302,3 +341,4 @@ let apply cell =
   |> if_none_do fold_intop_imm
   |> if_none_do fold_intop_imm_into_specific
   |> if_none_do remove_intop_neutral_element
+  |> if_none_do merge_adjacent_specific_operations
