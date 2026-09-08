@@ -1214,6 +1214,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 (* CR zeisbach: we don't store enough information in TTuple, meaning we have to
    recompute some layout-related information here, which is sad (because it can
    be expensive). For now, I am trying it out and going to benchmark it. *)
+(* CR zeisbach: also confirm that falling back to Pgenval for the whole thing
+   is ok when we have even one any component... *)
 and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
   let compute_mbe_if_repr (_, ty) =
     Option.bind (Ctype.type_jkind env ty |> Jkind.get_layout env)
