@@ -1,0 +1,60 @@
+let code helper_0 deleted in
+let code f_2 deleted in
+let code loopify(never) size(15) stub
+      f_2_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  (let f_unboxed = %project_function_slot.[f].[f_unboxed] (my_closure) in
+   apply &my_alloc_region
+     (f_unboxed : imm tagged * imm tagged -> imm tagged * imm tagged)
+       (x, y)
+       -> k2 * k1)
+    where k2 (unboxed_return : imm tagged, unboxed_return_1 : imm tagged) =
+      let boxed_return =
+        %block.[`0`].my_alloc_region (unboxed_return, unboxed_return_1)
+      in
+      cont k (boxed_return)
+in
+let code loopify(never) size(3) newer_version_of(helper_0)
+      helper_0_1 (x : imm tagged, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (x, y) in
+  cont k (int_add)
+in
+let $camlInlined_attribute_on_unboxable_function__helper_3 =
+  closure helper_0_1 @helper &toplevel.alloc_region
+in
+let code loopify(never) size(5) newer_version_of(f_2)
+      f_2_2 (x : imm tagged, y : imm tagged)
+        my_unboxed_closure &my_alloc_region my_depth
+        -> unboxed_return * k
+        : imm tagged * imm tagged =
+  apply direct(helper_0_1 &my_alloc_region)
+    ($camlInlined_attribute_on_unboxable_function__helper_3 : _ -> imm tagged
+     )
+      (x, y)
+      -> k1 * k
+    where k1 (apply_result : imm tagged) =
+      cont unboxed_return (x, apply_result)
+in
+let $camlInlined_attribute_on_unboxable_function__f_4 =
+  closure f_2_1 @f &toplevel.alloc_region
+and $camlInlined_attribute_on_unboxable_function__f_unboxed_5 =
+  closure f_2_2 @f_unboxed &toplevel.alloc_region
+in
+apply direct(f_2_2 &toplevel.alloc_region)
+  ($camlInlined_attribute_on_unboxable_function__f_unboxed_5
+   : _ -> imm tagged * imm tagged)
+    (0, 0)
+    -> k * error
+  where k (unboxed_return : imm tagged, unboxed_return_1 : imm tagged) =
+    let int_add = %int_barith.add (unboxed_return, unboxed_return_1) in
+    let $camlInlined_attribute_on_unboxable_function =
+      Block 0 ($camlInlined_attribute_on_unboxable_function__helper_3,
+               $camlInlined_attribute_on_unboxable_function__f_4,
+               int_add)
+    in
+    cont done ($camlInlined_attribute_on_unboxable_function)

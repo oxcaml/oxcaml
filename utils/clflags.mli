@@ -434,6 +434,8 @@ val ddissector_verbose : bool ref
 val ddissector_partitions : bool ref
 val ddissector_inputs : string option ref
 
+val stubs_forward_inlining : bool ref
+
 val prepend_directory : string -> string
 
 val set_restrict_to_upstream_dwarf : unit -> unit
