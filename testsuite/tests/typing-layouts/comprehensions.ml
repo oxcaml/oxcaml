@@ -16,6 +16,15 @@ let unbox_array x = [| Float_u.of_float a for a in x |]
 Line 6, characters 23-41:
 6 | let unbox_array x = [| Float_u.of_float a for a in x |]
                            ^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
+         a value layout
+         because it's the element type of array comprehension.
+|}, Principal{|
+Line 6, characters 23-41:
+6 | let unbox_array x = [| Float_u.of_float a for a in x |]
+                           ^^^^^^^^^^^^^^^^^^
 Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
@@ -43,6 +52,15 @@ Error: The value "a" has type "('a : value_or_null)"
    comprehensions when that changes. *)
 let unbox_list x = [ Float_u.of_float a for a in x ]
 [%%expect{|
+Line 1, characters 21-39:
+1 | let unbox_list x = [ Float_u.of_float a for a in x ]
+                         ^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
+       But the layout of Stdlib_upstream_compatible.Float_u.t must be
+         a value layout
+         because the type argument of list has layout value_or_null.
+|}, Principal{|
 Line 1, characters 21-39:
 1 | let unbox_list x = [ Float_u.of_float a for a in x ]
                          ^^^^^^^^^^^^^^^^^^

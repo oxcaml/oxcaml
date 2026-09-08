@@ -484,13 +484,12 @@ let poly_var_term = `Foo #(1,2)
 Line 1, characters 25-31:
 1 | let poly_var_term = `Foo #(1,2)
                              ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_1 & '_representable_layout_2
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because it's the type of the field of a polymorphic variant.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type tuple_type = (int * #(bool * float#))
@@ -511,13 +510,12 @@ let tuple_term = ("hi", #(1, 2))
 Line 1, characters 24-31:
 1 | let tuple_term = ("hi", #(1, 2))
                             ^^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_3 & '_representable_layout_4
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because it's the type of a tuple element.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type record = { x : #(int * bool) }
@@ -583,13 +581,12 @@ class class_ =
 Line 3, characters 15-21:
 3 |     method x = #(1,2)
                    ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is
-           '_representable_layout_5 & '_representable_layout_6
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because it's the type of an object field.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let capture_in_object utup = object
@@ -604,7 +601,7 @@ Line 3, characters 17-21:
 Error: The value "utup" has type "('a : value_or_null)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
-           '_representable_layout_7 & '_representable_layout_8
+           '_representable_layout_1 & '_representable_layout_2
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of a variable captured in an object.
@@ -1563,13 +1560,12 @@ val e1 : unit = ()
 Line 2, characters 37-44:
 2 | let[@warning "-26"] e2 = let rec x = #(1, y) and y = 42 in ()
                                          ^^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_9 & '_representable_layout_10
+Error:
+       The layout of #(int * 'a) is value non_pointer & value_or_null
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * 'a) must be a value layout
          because it's the type of the recursive variable x.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 let[@warning "-26"] e1 = let rec x = (1, y) and y = 42 in ()
@@ -1610,13 +1606,12 @@ let _ = let rec _x = #(3, 10) and _y = 42 in 42
 Line 1, characters 21-29:
 1 | let _ = let rec _x = #(3, 10) and _y = 42 in 42
                          ^^^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_11 & '_representable_layout_12
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because it's the type of the recursive variable _x.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type letrec_simple = #{ i1 : int; i2 : int }
@@ -1717,12 +1712,11 @@ let _ = Array.init 3 (fun _ -> #(1,2))
 Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_maybe_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_13 & '_representable_layout_14
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout.
+       But the layout of #(int * int) must be a value layout.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
@@ -1840,7 +1834,7 @@ Line 2, characters 25-26:
 Error: The value "x" has type "('a : value)"
        but an expression was expected of type "#('b * 'c)"
        The layout of #('a * 'b) is
-           '_representable_layout_15 & '_representable_layout_16
+           '_representable_layout_3 & '_representable_layout_4
          because it is an unboxed tuple.
        But the layout of #('a * 'b) must be a value layout
          because it's the type of a term-level argument to a class constructor.
@@ -1889,13 +1883,12 @@ let x = lazy #(1,2)
 Line 1, characters 13-19:
 1 | let x = lazy #(1,2)
                  ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value)"
-       The layout of #('a * 'b) is
-           '_representable_layout_17 & '_representable_layout_18
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because it's the type of a lazy expression.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type t = #(int * int) lazy_t
@@ -2005,13 +1998,12 @@ let f_optional_utuple ?(x = #(1,2)) () = x
 Line 1, characters 28-34:
 1 | let f_optional_utuple ?(x = #(1,2)) () = x
                                 ^^^^^^
-Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value_or_null)"
-       The layout of #('a * 'b) is
-           '_representable_layout_19 & '_representable_layout_20
+Error:
+       The layout of #(int * int) is value non_pointer & value non_pointer
          because it is an unboxed tuple.
-       But the layout of #('a * 'b) must be a value layout
+       But the layout of #(int * int) must be a value layout
          because the type argument of option has layout value_or_null.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type optional_record = #{ i1 : int; i2 : int }
@@ -2180,11 +2172,21 @@ let g (type a) (x : a) = f () x
 
 [%%expect{|
 val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
+Line 3, characters 25-31:
+3 | let g (type a) (x : a) = f () x
+                             ^^^^^^
+Error:
+       The layout of a is value
+         because it is or unifies with an unannotated universal variable.
+       But the layout of a must be representable
+         because we must know concretely how to pass a function argument.
+|}, Principal{|
+val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^
 Error: The value "x" has type "a" but an expression was expected of type
-         "('a : '_representable_layout_21 separable & value)"
+         "('a : '_representable_layout_5 separable & value)"
        The layout of a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of a must be representable

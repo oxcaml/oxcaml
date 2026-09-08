@@ -199,9 +199,7 @@ Error: This expression has type "(< to_string : string; .. > -> unit) signal"
        The second object type has no method "to_string"
 |}]
 
-(* No propagation into a bare expected variable: here the variable's kind
-   requires portability, which [id]'s result only satisfies once [x]
-   has instantiated the kind's with-bounds. *)
+(* Check the constructor result's portability after [x] fixes its payload. *)
 
 type 'a box = Box of 'a
 let require_portable : ('a : value mod portable). 'a -> unit = fun _ -> ()
@@ -253,8 +251,7 @@ Error: This expression has type "int box"
          because of the definition of require_portable_alias at line 2, characters 4-26.
 |}]
 
-(* Unlike the alias, the injective [list] constructor does not expand to a
-   variable, so the guard allows propagation of the portable element kind. *)
+(* The same obligation can occur inside an injective type constructor. *)
 
 let require_portable_list : ('a : value mod portable).
     'a list -> unit = fun _ -> ()
@@ -263,15 +260,7 @@ let f (x : int) = require_portable_list (id [Box x])
 [%%expect{|
 val require_portable_list : ('a : value mod portable). 'a list -> unit =
   <fun>
-Line 4, characters 45-50:
-4 | let f (x : int) = require_portable_list (id [Box x])
-                                                 ^^^^^
-Error: This constructor has type "'a box"
-       but an expression was expected of type "('b : value mod portable)"
-       The kind of 'a box is immutable_data with 'a
-         because of the definition of box at line 1, characters 0-23.
-       But the kind of 'a box must be a subkind of value mod portable
-         because of the definition of require_portable_list at line 1, characters 4-25.
+val f : int -> unit = <fun>
 |}, Principal{|
 val require_portable_list : ('a : value mod portable). 'a list -> unit =
   <fun>
@@ -292,15 +281,7 @@ let f (x : int) = require_portable_fst (id (Box x, ()))
 [%%expect{|
 val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
   <fun>
-Line 3, characters 44-49:
-3 | let f (x : int) = require_portable_fst (id (Box x, ()))
-                                                ^^^^^
-Error: This constructor has type "'a box"
-       but an expression was expected of type "('b : value mod portable)"
-       The kind of 'a box is immutable_data with 'a
-         because of the definition of box at line 1, characters 0-23.
-       But the kind of 'a box must be a subkind of value mod portable
-         because of the definition of require_portable_fst at line 1, characters 4-24.
+val f : int -> unit = <fun>
 |}, Principal{|
 val require_portable_fst : ('a : value mod portable) 'b. 'a * 'b -> unit =
   <fun>
@@ -315,15 +296,23 @@ Error: This expression has type "int box * unit"
          because of the definition of require_portable_fst at line 1, characters 4-24.
 |}]
 
-(* GADT equation scoping (trefis's example): the expected type here is a
-   bare variable, into which we do not propagate, so the error is
-   unchanged. *)
+(* Propagation must not let a local GADT equation escape. *)
 
 type _ g = Int : int g
 let ky x y = ignore (x = y); x
 
 let test : type a. a g -> _ = function Int -> ky (1 : a) 1
 [%%expect{|
+type _ g = Int : int g
+val ky : 'a -> 'a -> 'a = <fun>
+Line 4, characters 57-58:
+4 | let test : type a. a g -> _ = function Int -> ky (1 : a) 1
+                                                             ^
+Error: The constant "1" has type "int" but an expression was expected of type
+         "a" = "int"
+       This instance of "int" is ambiguous:
+       it would escape the scope of its equation
+|}, Principal{|
 type _ g = Int : int g
 val ky : 'a -> 'a -> 'a = <fun>
 Line 4, characters 46-58:
@@ -344,4 +333,300 @@ Error: The constant "1" has type "int" but an expression was expected of type
          "a" = "int"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
+|}]
+
+
+(* A payload can resolve variables inside an abstract injective with-bound. *)
+
+module Hidden : sig
+  type !'a t : immutable_data with 'a
+  val ints : int t
+end = struct
+  type 'a t = 'a list
+  let ints = [1]
+end
+
+type 'a wrapped = Wrap of 'a Hidden.t
+[%%expect{|
+module Hidden : sig type !'a t : immutable_data with 'a val ints : int t end
+type 'a wrapped = Wrap of 'a Hidden.t
+|}]
+
+let direct = require_portable (Wrap Hidden.ints)
+[%%expect{|
+val direct : unit = ()
+|}, Principal{|
+Line 1, characters 30-48:
+1 | let direct = require_portable (Wrap Hidden.ints)
+                                  ^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of int wrapped is immutable_data with int Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of int wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let through_id = require_portable (id (Wrap Hidden.ints))
+[%%expect{|
+val through_id : unit = ()
+|}, Principal{|
+Line 1, characters 34-57:
+1 | let through_id = require_portable (id (Wrap Hidden.ints))
+                                      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int wrapped"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int wrapped is immutable_data with int Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of int wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+(* Delaying a check must not discard it or use equations local to a payload. *)
+
+let nonportable (x : (int -> int) Hidden.t) = require_portable (id (Wrap x))
+[%%expect{|
+Line 1, characters 67-75:
+1 | let nonportable (x : (int -> int) Hidden.t) = require_portable (id (Wrap x))
+                                                                       ^^^^^^^^
+Error:
+       The kind of (int -> int) wrapped is
+           immutable_data with (int -> int) Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of (int -> int) wrapped must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}, Principal{|
+Line 1, characters 63-76:
+1 | let nonportable (x : (int -> int) Hidden.t) = require_portable (id (Wrap x))
+                                                                   ^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) wrapped"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of (int -> int) wrapped is
+           immutable_data with (int -> int) Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of (int -> int) wrapped must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let unresolved x = require_portable (id (Wrap x))
+[%%expect{|
+Line 1, characters 40-48:
+1 | let unresolved x = require_portable (id (Wrap x))
+                                            ^^^^^^^^
+Error:
+       The kind of 'a wrapped is immutable_data with 'a Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of 'a wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}, Principal{|
+Line 1, characters 36-49:
+1 | let unresolved x = require_portable (id (Wrap x))
+                                        ^^^^^^^^^^^^^
+Error: This expression has type "'a wrapped"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a wrapped is immutable_data with 'a Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of 'a wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+type _ witness = Int : int witness | Function : (int -> int) witness
+
+let local_equations : type a. a witness -> a Hidden.t -> unit =
+  fun witness x ->
+    require_portable
+      (Wrap (match witness with Int -> x | Function -> x))
+[%%expect{|
+type _ witness = Int : int witness | Function : (int -> int) witness
+Line 6, characters 6-58:
+6 |       (Wrap (match witness with Int -> x | Function -> x))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The kind of a wrapped is immutable_data with a Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of a wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+(* A failed check must not affect later expressions. *)
+
+let after_failure = require_portable (id (Wrap Hidden.ints))
+[%%expect{|
+val after_failure : unit = ()
+|}, Principal{|
+Line 1, characters 37-60:
+1 | let after_failure = require_portable (id (Wrap Hidden.ints))
+                                         ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "int wrapped"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int wrapped is immutable_data with int Hidden.t
+         because of the definition of wrapped at line 9, characters 0-37.
+       But the kind of int wrapped must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+(* Tuples and arrays also check their result kinds after their operands. *)
+
+let tuple (x : int) = require_portable (id (x, x))
+[%%expect{|
+val tuple : int -> unit = <fun>
+|}, Principal{|
+Line 1, characters 39-50:
+1 | let tuple (x : int) = require_portable (id (x, x))
+                                           ^^^^^^^^^^^
+Error: This expression has type "int * int"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int * int is immutable_data with int
+         because it's a tuple type.
+       But the kind of int * int must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let mutable_array (x : int) = require_portable (id [|x|])
+[%%expect{|
+val mutable_array : int -> unit = <fun>
+|}, Principal{|
+Line 1, characters 47-57:
+1 | let mutable_array (x : int) = require_portable (id [|x|])
+                                                   ^^^^^^^^^^
+Error: This expression has type "int array"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int array is mutable_data with int
+         because it is the primitive value type array.
+       But the kind of int array must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let immutable_array (x : int) = require_portable (id [:x:])
+[%%expect{|
+val immutable_array : int -> unit = <fun>
+|}, Principal{|
+Line 1, characters 49-59:
+1 | let immutable_array (x : int) = require_portable (id [:x:])
+                                                     ^^^^^^^^^^
+Error: This expression has type "int iarray"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int iarray is immutable_data with int
+         because it is the primitive value type iarray.
+       But the kind of int iarray must be a subkind of value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let id_product : ('a : value & value). 'a -> 'a = fun x -> x
+let require_portable_product : ('a : value & value mod portable).
+  'a -> unit = fun _ -> ()
+let unboxed_tuple (x : int) = require_portable_product (id_product #(x, x))
+[%%expect{|
+val id_product : ('a : value & value). 'a -> 'a = <fun>
+val require_portable_product :
+  ('a : value mod portable & value mod portable). 'a -> unit = <fun>
+val unboxed_tuple : int -> unit = <fun>
+|}]
+
+let nonportable_tuple (f : int -> int) = require_portable (id (1, f))
+[%%expect{|
+Line 1, characters 62-68:
+1 | let nonportable_tuple (f : int -> int) = require_portable (id (1, f))
+                                                                  ^^^^^^
+Error:
+       The kind of int * (int -> int) is value non_float mod immutable
+         because it's a tuple type.
+       But the kind of int * (int -> int) must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}, Principal{|
+Line 1, characters 58-69:
+1 | let nonportable_tuple (f : int -> int) = require_portable (id (1, f))
+                                                              ^^^^^^^^^^^
+Error: This expression has type "int * (int -> int)"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of int * (int -> int) is
+           value non_float mod immutable with int
+         because it's a tuple type.
+       But the kind of int * (int -> int) must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let nonportable_array (f : int -> int) = require_portable (id [|f|])
+[%%expect{|
+Line 1, characters 62-67:
+1 | let nonportable_array (f : int -> int) = require_portable (id [|f|])
+                                                                  ^^^^^
+Error:
+       The kind of (int -> int) array is value non_float
+         because it is the primitive value type array.
+       But the kind of (int -> int) array must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}, Principal{|
+Line 1, characters 58-68:
+1 | let nonportable_array (f : int -> int) = require_portable (id [|f|])
+                                                              ^^^^^^^^^^
+Error: This expression has type "(int -> int) array"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of (int -> int) array is mutable_data with int -> int
+         because it is the primitive value type array.
+       But the kind of (int -> int) array must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let nonportable_iarray (f : int -> int) = require_portable (id [:f:])
+[%%expect{|
+Line 1, characters 63-68:
+1 | let nonportable_iarray (f : int -> int) = require_portable (id [:f:])
+                                                                   ^^^^^
+Error:
+       The kind of (int -> int) iarray is value non_float mod immutable
+         because it is the primitive value type iarray.
+       But the kind of (int -> int) iarray must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}, Principal{|
+Line 1, characters 59-69:
+1 | let nonportable_iarray (f : int -> int) = require_portable (id [:f:])
+                                                               ^^^^^^^^^^
+Error: This expression has type "(int -> int) iarray"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of (int -> int) iarray is immutable_data with int -> int
+         because it is the primitive value type iarray.
+       But the kind of (int -> int) iarray must be a subkind of
+           value mod portable
+         because of the definition of require_portable at line 2, characters 4-20.
+|}]
+
+let nonportable_product (f : int -> int) =
+  require_portable_product (id_product #(1, f))
+[%%expect{|
+Line 2, characters 39-46:
+2 |   require_portable_product (id_product #(1, f))
+                                           ^^^^^^^
+Error:
+       The kind of #(int * (int -> int)) is
+           value non_pointer mod aliased immutable
+           & value non_float mod aliased immutable
+         because it is an unboxed tuple.
+       But the kind of #(int * (int -> int)) must be a subkind of
+           value mod portable & value mod portable
+         because of the definition of require_portable_product at line 2, characters 4-28.
+|}, Principal{|
+Line 2, characters 27-47:
+2 |   require_portable_product (id_product #(1, f))
+                               ^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "#(int * (int -> int))"
+       but an expression was expected of type
+         "('a : value mod portable & value mod portable)"
+       The kind of #(int * (int -> int)) is
+           immediate mod dynamic with int with int -> int
+           & value mod everything
+               non_float
+               mod dynamic
+               with int
+               with int -> int
+         because it is an unboxed tuple.
+       But the kind of #(int * (int -> int)) must be a subkind of
+           value mod portable & value mod portable
+         because of the definition of require_portable_product at line 2, characters 4-28.
 |}]

@@ -193,11 +193,10 @@ let f : unit -> ('a : void) = fun () -> (1,2)
 Line 1, characters 40-45:
 1 | let f : unit -> ('a : void) = fun () -> (1,2)
                                             ^^^^^
-Error: This expression has type "'b * 'c"
-       but an expression was expected of type "('a : void)"
-       The layout of 'a * 'b is value non_float
+Error:
+       The layout of int * int is value non_float
          because it's a tuple type.
-       But the layout of 'a * 'b must be a sublayout of void
+       But the layout of int * int must be a sublayout of void
          because of the annotation on the type variable 'a.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
