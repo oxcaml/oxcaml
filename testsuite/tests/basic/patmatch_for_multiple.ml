@@ -385,7 +385,8 @@ let _ =fun a b -> match a, b with
 (function {nlocal = 0} a/9[value<int>]
   b/9[value<
        (consts (0))
-        (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+        (non_consts ([0:
+                      value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch
@@ -402,7 +403,8 @@ let _ =fun a b -> match a, b with
 (function {nlocal = 0} a/9[value<int>]
   b/9[value<
        (consts (0))
-        (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+        (non_consts ([0:
+                      value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch (if a/9 (if b/9 (field_imm 0 b/9) (exit 42)) (exit 42)) with (42)
@@ -418,7 +420,8 @@ let _ = fun a b -> match a, b with
 (function {nlocal = 0} a/10[value<int>]
   b/10[value<
         (consts (0))
-         (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+         (non_consts ([0:
+                       value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch
@@ -443,7 +446,8 @@ let _ = fun a b -> match a, b with
 (function {nlocal = 0} a/10[value<int>]
   b/10[value<
         (consts (0))
-         (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>]))>]
+         (non_consts ([0:
+                       value<(consts ()) (non_consts ([0: value<int>, *]))>]))>]
   : (consts ())
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch

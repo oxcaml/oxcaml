@@ -73,8 +73,9 @@ let get (o : int option) = match o with Some x -> x | None -> 0
 [%%expect{|
 (let
   (get =
-     (function {nlocal = 0} o[value<(consts (0)) (non_consts ([0: ?]))>]
-       : int (if o (field_imm 0 o) 0)))
+     (function {nlocal = 0}
+       o[value<(consts (0)) (non_consts ([0: value<int>]))>] : int
+       (if o (field_imm 0 o) 0)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : int option -> int = <fun>
 |}]
