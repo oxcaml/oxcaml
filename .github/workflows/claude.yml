@@ -200,9 +200,14 @@ jobs:
           # --allowedTools, and it is what carries suggestion blocks. The
           # CI-reading tools are omitted because the tag-mode baseline already
           # includes them.
+          # The model and effort come from the CLAUDE_MODEL and CLAUDE_EFFORT
+          # repository variables so maintainers can change them from
+          # Settings -> Actions -> Variables without a PR. When unset they
+          # default to the latest Fable model at xhigh effort ('fable' is a
+          # Claude Code alias that tracks new Fable releases).
           claude_args: |
-            --model claude-fable-5
-            --effort xhigh
+            --model ${{ vars.CLAUDE_MODEL || 'fable' }}
+            --effort ${{ vars.CLAUDE_EFFORT || 'xhigh' }}
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash"
             --append-system-prompt "
             Repository-specific overrides. These take precedence over the generic
