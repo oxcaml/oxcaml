@@ -247,7 +247,7 @@ module Code_id : sig
 
   (** [name] is the source-level name of the function. [slot_stamp] is the stamp
       of the [Function_slot] the code was created for, if any; it is recorded
-      separately from [name] so that it can be recognised (and omitted) when
+      separately from [name] so that it can be recognized (and omitted) when
       demangling. *)
   val create :
     name:string ->
