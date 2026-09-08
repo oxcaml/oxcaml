@@ -68,7 +68,7 @@ type modality = | Modality of string [@@unboxed]
 type modalities = modality loc list
 
 type mode =
-  | Mode of mode_const
+  | Mode of string
   | Mode_var of string loc
   | Mode_bounds of mode_bounds
 

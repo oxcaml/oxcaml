@@ -279,10 +279,10 @@ let apply_mode_implications (annots : With_locality.Const.Option.t) =
   { annots with forkable; yielding; contention; portability }
 
 let mode_consts annots =
-  List.concat_map
+  List.map
     (fun { txt; loc } ->
       match (txt : Parsetree.mode) with
-      | Mode consts -> consts
+      | Mode txt -> { txt; loc }
       | Mode_var _ | Mode_bounds _ -> mode_variable_error ~loc)
     annots
 
@@ -312,14 +312,13 @@ let const_mode_strings (atoms : Parsetree.mode_const) =
   List.map (fun { Location.txt = s; _ } -> s) atoms
 
 let untransl_mode modes =
-  let untransl_annot { txt = (Atom (ax, mode) : Mode.With_locality.atom); loc }
-      =
-    let atom =
-      untransl_const_mode
-        (Format_doc.asprintf "%a" (Mode.With_locality.Const.print_axis ax) mode)
-        ~loc
-    in
-    { Location.txt = Parsetree.Mode [atom]; loc }
+  let untransl_annot =
+    Location.map
+      (fun (Atom (ax, mode) : Mode.With_locality.atom) : Parsetree.mode ->
+        Mode
+          (Format_doc.asprintf "%a"
+             (Mode.With_locality.Const.print_axis ax)
+             mode))
   in
   List.map untransl_annot modes.mode_desc
 
