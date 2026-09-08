@@ -6,19 +6,28 @@
  { flags += " -O3"; expect.opt; }
 *)
 
+let obj_tag (a : 'a) = Obj.tag (Obj.repr (Sys.opaque_identity a))
+[%%expect{|
+val obj_tag : 'a -> int = <fun>
+|}]
+
 (* All-void inline records have the right tag and play well with other variants. *)
 type t = A of { x : unit# } | B of int
 let[@inline never] id (x : t) = x
-let selected =
-  match id (B 42) with
+let select t =
+  match id t with
   | A _ -> "A"
   | B n -> "B " ^ string_of_int n
-let tag_a = Obj.tag (Obj.repr (A { x = #() }))
-let tag_b = Obj.tag (Obj.repr (B 42))
+let select_a = select (A { x = #() })
+let select_b = select (B 42)
+let tag_a = obj_tag (A { x = #() })
+let tag_b = obj_tag (B 42)
 [%%expect{|
 type t = A of { x : unit#; } | B of int
 val id : t -> t = <fun>
-val selected : string = "B 42"
+val select : t -> string = <fun>
+val select_a : string = "A"
+val select_b : string = "B 42"
 val tag_a : int = 0
 val tag_b : int = 1
 |}]
@@ -27,16 +36,20 @@ val tag_b : int = 1
 (* Same as above, but the all-void inline record has a nonzero tag. *)
 type t = A of int | B of { x : unit# }
 let[@inline never] id (x : t) = x
-let selected =
-  match id (B { x = #() }) with
+let select t =
+  match id t with
   | A n -> "A " ^ string_of_int n
   | B _ -> "B"
-let tag_a = Obj.tag (Obj.repr (A 42))
-let tag_b = Obj.tag (Obj.repr (B { x = #() }))
+let select_a = select (A 42)
+let select_b = select (B { x = #() })
+let tag_a = obj_tag (A 42)
+let tag_b = obj_tag (B { x = #() })
 [%%expect{|
 type t = A of int | B of { x : unit#; }
 val id : t -> t = <fun>
-val selected : string = "B"
+val select : t -> string = <fun>
+val select_a : string = "A 42"
+val select_b : string = "B"
 val tag_a : int = 0
 val tag_b : int = 1
 |}]
