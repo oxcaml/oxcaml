@@ -1,3 +1,0 @@
-(executable
- (name gen_stubs)
- (libraries compiler-libs.common))

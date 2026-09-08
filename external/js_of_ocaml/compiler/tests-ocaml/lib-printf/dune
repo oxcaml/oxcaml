@@ -1,7 +1,0 @@
-(tests
- (names pr6534 pr6938 tprintf)
- (libraries ocaml_testing)
- (modes
-  js
-  wasm
-  (best exe)))

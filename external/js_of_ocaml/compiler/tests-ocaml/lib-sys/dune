@@ -1,9 +1,0 @@
-(tests
- (names rename)
- (libraries ocaml_testing)
- (modes js wasm))
-
-(tests
- (names immediate64)
- (libraries ocaml_testing)
- (modes js wasm))
