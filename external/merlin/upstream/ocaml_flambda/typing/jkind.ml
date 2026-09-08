@@ -4600,7 +4600,7 @@ let report_error ~loc : Error.t -> _ = function
     | Constructor_type_parameter _ | Existential_unpack _ | Univar _
     | Type_variable _ | Type_wildcard _ | Type_of_kind _ | With_error_message _
       ->
-      Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
+      Location.errorf ~loc "'with' syntax is not allowed on a right kind.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
 
