@@ -492,7 +492,6 @@ module History = struct
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
-    | Empty_record
     | Enumeration
     | Primitive of Ident.t
     | Immediate_polymorphic_variant
