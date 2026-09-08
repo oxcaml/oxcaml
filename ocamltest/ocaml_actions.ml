@@ -80,15 +80,10 @@ let backend_flags env =
     Ocaml_variables.ocamlc_flags
     Ocaml_variables.ocamlopt_flags
 
-let env_setting env_reader default_setting =
-  Printf.sprintf "%s=%s"
-    env_reader.Clflags.env_var
-    (env_reader.Clflags.print default_setting)
-
 let default_ocaml_env = [|
   "TERM=dumb";
-  env_setting Clflags.color_reader Misc.Color.default_setting;
-  env_setting Clflags.error_style_reader Misc.Error_style.default_setting;
+  "OCAML_COLOR=auto";
+  "OCAML_ERROR_STYLE=contextual"
 |]
 
 type module_generator = {
@@ -187,12 +182,30 @@ let get_program_file backend env =
 
 let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
 
+let find_in_path path name =
+  if not (Filename.is_implicit name) then
+    if Sys.file_exists name then name else raise Not_found
+  else begin
+    let rec try_dir = function
+      [] -> raise Not_found
+    | dir::rem ->
+        let fullname = Filename.concat dir name in
+        if Sys.file_exists fullname then fullname else try_dir rem
+    in try_dir path
+  end
+
 let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
-    match Misc.find_in_path directories library with
+    match find_in_path directories library with
     | exception Not_found ->
       Some (Error ("file not found in include path: " ^ library))
-    | library ->
+    | _library ->
+       None
+      (* Upstream OCaml uses the following logic to handle the case of
+         tests requiring `-custom` bytecode builds on platforms with
+         no shared library support. This is unused in OxCaml, and
+         disabled here to remove the dependency on the Cma format.
+
       let ic = open_in_bin library in
       try
         let len_magic_number = String.length Config.cma_magic_number in
@@ -209,6 +222,7 @@ let cmas_need_dynamic_loading directories libraries =
          | Sys_error _ ->
            begin try close_in ic with Sys_error _ -> () end;
            Some (Error ("Corrupt or non-CMA file: " ^ library))
+       *)
   in
   List.find_map loads_c_code (String.words libraries)
 
