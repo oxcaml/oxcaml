@@ -184,7 +184,8 @@ module Ty = struct
     | Array (nty, dimensions) ->
       List.fold_left
         (fun ty _ -> Typ.constr (lid "array") [ty])
-        (Typ.constr (lid (NumberTy.to_string nty)) []) dimensions
+        (Typ.constr (lid (NumberTy.to_string nty)) [])
+        dimensions
     | Record record -> Typ.constr (lid (record_name record)) []
     | Bool -> Typ.constr (lid "bool") []
 end
@@ -316,7 +317,8 @@ module Expr = struct
 
   let field_code (record : Ty.record) field receiver =
     let project = if record.unboxed then Exp.unboxed_field else Exp.field in
-    project (constrain (Ty.Record record) receiver)
+    project
+      (constrain (Ty.Record record) receiver)
       (lid (Ty.field_name record field))
 
   let record_code (record : Ty.record) fields source =
@@ -325,13 +327,10 @@ module Expr = struct
     in
     constrain (Ty.Record record) (make fields source)
 
-  (* CR hwasilewski: Add a comment explaining our reliance on
-     de facto evaluation order rather than explicitly sequencing effects. *)
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
     | Read place -> place_to_code place
-    | Array_literal elements ->
-      Exp.array Mutable (List.map to_code elements)
+    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
     | Array_make { dimensions; init_name; init } ->
       bind init_name (to_code init) (fun initial_value ->
           let rec make = function
@@ -348,8 +347,7 @@ module Expr = struct
       then Misc.fatal_errorf "Record: incorrect number of fields";
       let fields =
         List.map2
-          (fun field value ->
-            lid (Ty.field_name record field), to_code value)
+          (fun field value -> lid (Ty.field_name record field), to_code value)
           record.fields values
       in
       record_code record fields None
@@ -359,13 +357,13 @@ module Expr = struct
         (Some (constrain (Ty.Record record) (to_code source)))
     | Record_convert { from; to_unboxed; source_name; expr } ->
       let target = { from with Ty.unboxed = to_unboxed } in
-      bind source_name (constrain (Ty.Record from) (to_code expr))
+      bind source_name
+        (constrain (Ty.Record from) (to_code expr))
         (fun source ->
           let fields =
             List.map
               (fun field ->
-                ( lid (Ty.field_name target field),
-                  field_code from field source ))
+                lid (Ty.field_name target field), field_code from field source)
               from.fields
           in
           record_code target fields None)
@@ -375,9 +373,7 @@ module Expr = struct
       Bin_op.to_code ty op (to_code lhs) (to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
-      let args =
-        match args with [] -> [unit_] | _ -> List.map to_code args
-      in
+      let args = match args with [] -> [unit_] | _ -> List.map to_code args in
       apply (ident (Name.to_string fun_name)) args
 
   and place_to_code = function
@@ -386,8 +382,7 @@ module Expr = struct
       field_code record field (place_to_code parent)
     | Element (parent, indices) ->
       List.fold_left
-        (fun array index ->
-          apply (ident "array_get") [array; to_code index])
+        (fun array index -> apply (ident "array_get") [array; to_code index])
         (place_to_code parent) indices
 
   let assignment_to_code place value =
@@ -397,19 +392,19 @@ module Expr = struct
     | Field (parent, record, field) ->
       if record.unboxed || not field.is_mutable
       then Misc.fatal_errorf "Assign: field is not mutable";
-      Exp.setfield (constrain (Ty.Record record) (place_to_code parent))
-        (lid (Ty.field_name record field)) (to_code value)
+      Exp.setfield
+        (constrain (Ty.Record record) (place_to_code parent))
+        (lid (Ty.field_name record field))
+        (to_code value)
     | Element (parent, indices) ->
       let rec set array = function
         | [] -> Misc.fatal_errorf "Assign: no array indices"
         | [index] ->
-          apply (ident "array_set")
-            [array; to_code index; to_code value]
+          apply (ident "array_set") [array; to_code index; to_code value]
         | index :: rest ->
           set (apply (ident "array_get") [array; to_code index]) rest
       in
       set (place_to_code parent) indices
-
 end
 
 module Place = struct
@@ -439,8 +434,10 @@ module Statement = struct
     let mutability = if is_mutable then Mutable else Immutable in
     Exp.let_ mutability Nonrecursive
       [ Vb.mk
-          (Pat.constraint_ (Pat.var (loc (Name.to_string name)))
-             (Some (Ty.to_code ty)) [])
+          (Pat.constraint_
+             (Pat.var (loc (Name.to_string name)))
+             (Some (Ty.to_code ty))
+             [])
           expr ]
       body
 
@@ -466,8 +463,7 @@ module Statement = struct
            (Exp.while_
               (op comparison [ident name; ident bound_name])
               (Exp.sequence (to_code body)
-                 (Exp.setinstvar (loc name)
-                    (op "+" [ident name; int stride])))))
+                 (Exp.setinstvar (loc name) (op "+" [ident name; int stride])))))
     | Let (binding, expr, body) ->
       let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
@@ -506,8 +502,10 @@ module Function = struct
   let to_code { name; params; inline; body; return_ty; result } =
     let to_param ({ name; ty; _ } : Binding.t) =
       value_param
-        (Pat.constraint_ (Pat.var (loc (Name.to_string name)))
-           (Some (Ty.to_code ty)) [])
+        (Pat.constraint_
+           (Pat.var (loc (Name.to_string name)))
+           (Some (Ty.to_code ty))
+           [])
     in
     let function_params =
       match params with
@@ -521,7 +519,8 @@ module Function = struct
     let body =
       List.fold_right
         (fun (binding : Binding.t) body ->
-          Statement.let_binding binding (ident (Name.to_string binding.name))
+          Statement.let_binding binding
+            (ident (Name.to_string binding.name))
             body)
         params body
     in

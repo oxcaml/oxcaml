@@ -11,14 +11,15 @@ module Statement = Ir.Statement
 module Ty = Ir.Ty
 
 type t =
-  { record_types : Ty.record list;
+  { swarm : Config.Swarm.t;
+    record_types : Ty.record list;
     functions : Function.t list;
     toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~record_types ~functions ~toplevel_decls ~toplevel_statement =
-  { record_types; functions; toplevel_decls; toplevel_statement }
+let create ~swarm ~record_types ~functions ~toplevel_decls ~toplevel_statement =
+  { swarm; record_types; functions; toplevel_decls; toplevel_statement }
 
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
@@ -30,7 +31,7 @@ let is_floating_point_to_integral ~from ~to_ =
 let unsafe_converter_name ~from ~to_ =
   "unsafe_" ^ NumberTy.converter_name ~from ~to_
 
-let conversions =
+let conversions number_types =
   let conversion from to_ =
     let from_name = NumberTy.to_string from in
     let to_name = NumberTy.to_string to_ in
@@ -54,8 +55,8 @@ let conversions =
       List.filter_map
         (fun to_ ->
           if NumberTy.equal from to_ then None else Some (conversion from to_))
-        NumberTy.all)
-    NumberTy.all
+        number_types)
+    number_types
 
 let integral_bound_name base =
   String.lowercase_ascii (NumberTy.Base.to_module base)
@@ -110,7 +111,7 @@ let float_for_comparison from expr =
   then expr
   else apply (ident (NumberTy.converter_name ~from ~to_:boxed_float)) [expr]
 
-let float_to_integral_conversions =
+let float_to_integral_conversions number_types =
   let wrapper (from : NumberTy.t) (to_ : NumberTy.t) =
     let x = ident "x" in
     let x_for_comparison = ident "x_for_comparison" in
@@ -153,8 +154,8 @@ let float_to_integral_conversions =
           if is_floating_point_to_integral ~from ~to_
           then Some (wrapper from to_)
           else None)
-        NumberTy.all)
-    NumberTy.all
+        number_types)
+    number_types
 
 (* We check floats for equality by testing if their bits are equal. This is
    correct unless they are NaN, which is why before comparing, we run
@@ -247,11 +248,7 @@ let record_declarations records =
     in
     Str.type_ Recursive [Type.mk ~kind (loc (Ty.record_name record))]
   in
-  List.concat_map
-    (fun (record : Ty.record) ->
-      [ declaration { record with unboxed = false };
-        declaration { record with unboxed = true } ])
-    records
+  List.map declaration records
 
 let rec print_value path ty expr =
   match ty with
@@ -283,7 +280,8 @@ let rec print_value path ty expr =
       [Exp.constant (Const.string "%b "); expr]
 
 let to_code
-    { record_types;
+    { swarm;
+      record_types;
       functions;
       toplevel_decls = decls;
       toplevel_statement = statement
@@ -318,10 +316,22 @@ let to_code
           (function_ [value_param (Pat.construct (lid "()") None)] body) ]
   in
   let run = Str.eval (Exp.apply (ident "main") [Nolabel, unit_]) in
+  let number_types = Config.Swarm.number_types swarm in
+  let array_primitives = if swarm.arrays then array_primitives else [] in
+  let float_helpers =
+    if swarm.floats
+    then
+      integral_bounds @ [canonicalize_nan]
+      @ float_to_integral_conversions number_types
+    else []
+  in
   let structure =
-    opens @ record_declarations record_types @ array_primitives @ conversions
-    @ integral_bounds @ [canonicalize_nan] @ float_to_integral_conversions
+    opens
+    @ record_declarations record_types
+    @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
     @ [main; run]
   in
-  Pprintast.string_of_structure structure ^ "\n"
+  Format.sprintf "(* Swarm configuration:\n%s\n*)\n%s\n"
+    (Config.Swarm.to_string swarm)
+    (Pprintast.string_of_structure structure)

@@ -14,6 +14,8 @@ module Ty = Ir.Ty
 module State = struct
   type t =
     { random_state : Random.State.t;
+      swarm : Config.Swarm.t;
+      number_types : NumberTy.t list;
       names : Fresh.t;
       function_names : Fresh.t;
       mutable top_level_functions : Function.t list;
@@ -21,7 +23,10 @@ module State = struct
     }
 
   let create random_state =
+    let swarm = Config.Swarm.create random_state in
     { random_state;
+      swarm;
+      number_types = Config.Swarm.number_types swarm;
       names = Fresh.create ~prefix:"x";
       function_names = Fresh.create ~prefix:"f";
       top_level_functions = [];
@@ -78,6 +83,8 @@ module Gen = struct
 
   let when_ condition f = if condition then create f else unavailable
 
+  let only_if condition gen = if condition then gen else unavailable
+
   let map t ~f =
     match t with
     | None -> unavailable
@@ -121,7 +128,7 @@ end
 let random_element (st : State.t) list =
   List.nth list (Random.State.int st.random_state (List.length list))
 
-let random_number_ty st = random_element st NumberTy.all
+let random_number_ty (st : State.t) = random_element st st.number_types
 
 let random_int_in_range (st : State.t) ~min ~max =
   Random.State.int_in_range st.random_state ~min ~max
@@ -129,8 +136,8 @@ let random_int_in_range (st : State.t) ~min ~max =
 let with_probability (st : State.t) ~probability =
   Random.State.int st.random_state 100 < probability
 
-let maybe_opaque st ~probability expr =
-  if with_probability st ~probability then Expr.Opaque expr else expr
+let maybe_opaque st ~enabled ~probability expr =
+  if enabled && with_probability st ~probability then Expr.Opaque expr else expr
 
 (* CR-soon hwasilewski: Add general expressions for shift counts. *)
 let gen_shift_count (st : State.t) (nty : NumberTy.t) =
@@ -152,9 +159,11 @@ let gen_shift_count (st : State.t) (nty : NumberTy.t) =
   in
   Expr.Const (Number.Int count)
 
-let gen_array_dimensions st =
+let gen_array_dimensions (st : State.t) =
   let dimensions =
-    random_int_in_range st ~min:1 ~max:Config.max_array_dimensions
+    if st.swarm.multidimensional_arrays
+    then random_int_in_range st ~min:1 ~max:Config.max_array_dimensions
+    else 1
   in
   let rec sizes remaining budget =
     if remaining = 0
@@ -168,14 +177,25 @@ let gen_array_dimensions st =
   in
   sizes dimensions Config.max_array_elements
 
-let gen_scalar_or_array_type st =
+let gen_scalar_or_array_type (st : State.t) =
   let nty = random_number_ty st in
-  if with_probability st ~probability:Config.array_probability
+  if
+    st.swarm.arrays && with_probability st ~probability:Config.array_probability
   then Ty.Array (nty, gen_array_dimensions st)
   else Ty.Number nty
 
 let gen_record_types (st : State.t) =
-  let count = random_int_in_range st ~min:1 ~max:Config.max_record_types in
+  let representations =
+    List.filter
+      (fun unboxed ->
+        if unboxed then st.swarm.unboxed_records else st.swarm.boxed_records)
+      [false; true]
+  in
+  let count =
+    if List.is_empty representations
+    then 0
+    else random_int_in_range st ~min:1 ~max:Config.max_record_types
+  in
   let rec gen id records =
     if id = count
     then List.rev records
@@ -189,33 +209,37 @@ let gen_record_types (st : State.t) =
                    (not (List.is_empty records))
                    && with_probability st
                         ~probability:Config.nested_record_probability
-                 then
-                   let record = random_element st records in
-                   Ty.Record
-                     { record with unboxed = Random.State.bool st.random_state }
+                 then Ty.Record (random_element st records)
                  else gen_scalar_or_array_type st);
               is_mutable =
-                with_probability st
-                  ~probability:Config.mutable_field_probability
+                st.swarm.mutable_record_fields
+                && with_probability st
+                     ~probability:Config.mutable_field_probability
             })
       in
-      gen (id + 1) ({ Ty.id; fields; unboxed = false } :: records)
+      let variants =
+        List.map (fun unboxed -> { Ty.id; fields; unboxed }) representations
+      in
+      gen (id + 1) (List.rev_append variants records)
   in
   gen 0 []
 
 (* CR-soon hwasilewski: add bool arguments *)
 (* CR-soon hwasilewski: Add boolean variable generation. *)
 let gen_type (st : State.t) =
-  if with_probability st ~probability:Config.record_probability
-  then
-    let record = random_element st st.record_types in
-    Ty.Record { record with unboxed = Random.State.bool st.random_state }
+  if
+    (not (List.is_empty st.record_types))
+    && with_probability st ~probability:Config.record_probability
+  then Ty.Record (random_element st st.record_types)
   else gen_scalar_or_array_type st
 
-let can_convert from to_ =
+let can_convert (st : State.t) from to_ =
   match from, to_ with
   | Ty.Number _, Ty.Number _ -> true
-  | Ty.Record left, Ty.Record right -> Int.equal left.id right.id
+  | Ty.Record left, Ty.Record right ->
+    Int.equal left.id right.id
+    && (Bool.equal left.unboxed right.unboxed
+       || st.swarm.record_representation_conversions)
   | _ -> Ty.equal from to_
 
 let convert_value (st : State.t) from to_ expr =
@@ -260,7 +284,7 @@ let gen_array_index st (env : Env.t) size =
 let gen_array_indices st env dimensions =
   List.map (gen_array_index st env) dimensions
 
-let places st (env : Env.t) ~for_write =
+let places (st : State.t) (env : Env.t) ~for_write =
   let rec collect ty is_mutable make =
     let here = if for_write && not is_mutable then [] else [ty, make] in
     let children =
@@ -272,9 +296,13 @@ let places st (env : Env.t) ~for_write =
               (fun () -> Place.Field (make (), record, field)))
           record.fields
       | Ty.Array (nty, dimensions) ->
-        [ ( Ty.Number nty,
-            fun () ->
-              Place.Element (make (), gen_array_indices st env dimensions) ) ]
+        if for_write && not st.swarm.array_writes
+        then []
+        else
+          [ ( Ty.Number nty,
+              fun () ->
+                Place.Element (make (), gen_array_indices st env dimensions) )
+          ]
       | Ty.Number _ | Ty.Bool -> []
     in
     here @ children
@@ -288,7 +316,7 @@ let places st (env : Env.t) ~for_write =
 let gen_existing st env ty =
   let choices =
     List.filter
-      (fun (from, _) -> can_convert from ty)
+      (fun (from, _) -> can_convert st from ty)
       (places st env ~for_write:false)
   in
   Gen.when_
@@ -297,10 +325,12 @@ let gen_existing st env ty =
       let from, make = random_element st choices in
       convert_value st from ty (Expr.Read (make ())))
 
-let gen_numeric_var st env nty =
+let gen_numeric_var (st : State.t) env nty =
   Gen.map
     (gen_existing st env (Ty.Number nty))
-    ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
+    ~f:
+      (maybe_opaque st ~enabled:st.swarm.opaque_leaves
+         ~probability:Config.opaque_leaf_probability)
 
 let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     ~random_bits =
@@ -403,7 +433,9 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
       else boxed
     in
     Gen.map const
-      ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
+      ~f:
+        (maybe_opaque st ~enabled:st.swarm.opaque_leaves
+           ~probability:Config.opaque_leaf_probability)
   in
   gen_const nty
 
@@ -442,7 +474,14 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
     Gen.create (fun () ->
         let inner_ty = gen_ty nty in
         let binop =
-          random_element st (Bin_op.ops_for_ty (Ty.Number inner_ty))
+          Bin_op.ops_for_ty (Ty.Number inner_ty)
+          |> List.filter (fun (op : Bin_op.t) ->
+              match op with
+              | Bit_and | Bit_or | Bit_xor | Shift_left | Shift_right
+              | Shift_right_logical ->
+                st.swarm.bitwise_operations
+              | _ -> true)
+          |> random_element st
         in
         let lhs = gen_number st env inner_ty in
         let rhs =
@@ -470,9 +509,12 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
    of mutable records. Currently we rely on a de facto right-to-left evaluation
    order, which holds in many cases but is not specified. We should either do
    some sort of effect analysis in the style of Efftester, make sure we pull
-   function calls out of expressions into let-bindings for example. *)
+   function calls out of expressions into let-bindings for example. Or, we can
+   just decide that we treat an evaluation order violation as a bug. *)
 and gen_fun_call (st : State.t) caller_env return_ty =
-  if not (State.can_create_function st ~max:Config.max_function_count)
+  if
+    (not st.swarm.function_calls)
+    || not (State.can_create_function st ~max:Config.max_function_count)
   then Gen.unavailable
   else
     let gen_arguments params =
@@ -483,7 +525,7 @@ and gen_fun_call (st : State.t) caller_env return_ty =
     let functions =
       List.filter
         (fun (function_ : Function.t) ->
-          can_convert function_.return_ty return_ty)
+          can_convert st function_.return_ty return_ty)
         st.top_level_functions
     in
     let existing_function =
@@ -505,16 +547,19 @@ and gen_fun_call (st : State.t) caller_env return_ty =
                 { Binding.name = State.fresh st;
                   ty = gen_type st;
                   is_mutable =
-                    with_probability st
-                      ~probability:Config.mutable_binding_probability
+                    st.swarm.mutable_bindings
+                    && with_probability st
+                         ~probability:Config.mutable_binding_probability
                 })
           in
           let callee_env = List.fold_left Env.extend Env.empty params in
           let inline : Inline.t =
-            match Random.State.int st.random_state 3 with
-            | 0 -> Never
-            | 1 -> Always
-            | _ -> Default
+            let open Inline in
+            Gen.run_exn
+              (Gen.weighted st.random_state
+                 [ 1, Gen.when_ st.swarm.never_inline (fun () -> Never);
+                   1, Gen.when_ st.swarm.always_inline (fun () -> Always);
+                   1, Gen.return Default ])
           in
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
@@ -578,21 +623,24 @@ and gen_value (st : State.t) env ty =
       Gen.map existing ~f:(fun base ->
           let field = random_element st record.fields in
           Expr.Record_update (record, base, field, gen_value st env field.ty))
+      |> Gen.only_if st.swarm.record_updates
     in
     Gen.run_exn
       (Gen.weighted st.random_state
          [3, existing; 2, construct; 1, update; 1, gen_fun_call st env ty])
 
-and gen_decl st env =
+and gen_decl (st : State.t) env =
   let binding =
     { Binding.name = State.fresh st;
       ty = gen_type st;
       is_mutable =
-        with_probability st ~probability:Config.mutable_binding_probability
+        st.swarm.mutable_bindings
+        && with_probability st ~probability:Config.mutable_binding_probability
     }
   in
   let expr =
-    maybe_opaque st ~probability:Config.opaque_initializer_probability
+    maybe_opaque st ~enabled:st.swarm.opaque_initializers
+      ~probability:Config.opaque_initializer_probability
       (gen_value st env binding.ty)
   in
   Env.extend env binding, (binding, expr)
@@ -618,7 +666,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             continue env (Statement.Assign (target, expr)))
       in
       let gen_if =
-        Gen.create (fun () ->
+        Gen.when_ st.swarm.conditionals (fun () ->
             let condition = gen_bool st env in
             let _env_l, left = gen_fun_body st env (depth + 1) in
             let _env_r, right = gen_fun_body st env (depth + 1) in
@@ -635,7 +683,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
          dimension, so that there is a higher probability that the loop iterates
          over an array. *)
       let gen_bounded_loop =
-        Gen.create (fun () ->
+        Gen.when_ st.swarm.bounded_loops (fun () ->
             let name = State.fresh st in
             let times = 1 + Random.State.int st.random_state 3 in
             let scale =
@@ -651,7 +699,8 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let initial_value = (scale * times) + offset in
             let bound_value = scale + offset in
             let init =
-              maybe_opaque st ~probability:Config.opaque_loop_bound_probability
+              maybe_opaque st ~enabled:st.swarm.opaque_loop_bounds
+                ~probability:Config.opaque_loop_bound_probability
                 (Expr.Const (Number.Int initial_value))
             in
             let loop_env =
@@ -679,7 +728,9 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
         then [1, gen_assign; 1, gen_empty]
         else [4, gen_assign; 1, gen_if; 1, gen_bounded_loop; 1, gen_local_decl]
       in
-      Gen.run_exn (Gen.weighted st.random_state allowed)
+      match Gen.weighted st.random_state allowed with
+      | Some generate -> generate ()
+      | None -> env, Statement.Seq []
   in
   gen env stmt_count
 
@@ -696,7 +747,7 @@ let gen_program (st : State.t) env =
   in
   let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
   let _env, toplevel_statement = gen_fun_body st env 0 in
-  Program.create ~record_types:st.record_types
+  Program.create ~swarm:st.swarm ~record_types:st.record_types
     ~functions:(List.rev st.top_level_functions)
     ~toplevel_decls ~toplevel_statement
 

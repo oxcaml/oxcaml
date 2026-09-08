@@ -42,3 +42,34 @@ val opaque_initializer_probability : int
 val opaque_leaf_probability : int
 
 val opaque_loop_bound_probability : int
+
+module Swarm : sig
+  type t =
+    { floats : bool;
+      unboxed_numbers : bool;
+      arrays : bool;
+      multidimensional_arrays : bool;
+      boxed_records : bool;
+      unboxed_records : bool;
+      record_updates : bool;
+      record_representation_conversions : bool;
+      mutable_bindings : bool;
+      mutable_record_fields : bool;
+      array_writes : bool;
+      function_calls : bool;
+      always_inline : bool;
+      never_inline : bool;
+      conditionals : bool;
+      bounded_loops : bool;
+      bitwise_operations : bool;
+      opaque_initializers : bool;
+      opaque_leaves : bool;
+      opaque_loop_bounds : bool
+    }
+
+  val create : Random.State.t -> t
+
+  val to_string : t -> string
+
+  val number_types : t -> Ir.NumberTy.t list
+end

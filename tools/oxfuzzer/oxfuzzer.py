@@ -545,6 +545,10 @@ def check_case(
         return
     # If any of the executions time out, we discard the case.
     if any(r.execution.timed_out for r in results):
+        save_failure(
+            output_dir, run_info, seed, program, results,
+            f"discarded",
+        )
         stats.discarded += 1
         stats.report()
         return
