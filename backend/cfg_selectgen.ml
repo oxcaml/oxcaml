@@ -141,10 +141,11 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         | Cprefetch _ -> EC.arbitrary
         | Catomic _ -> EC.arbitrary
         | Craise _ -> EC.effect_only Raise
-        | Cload { mutability = Immutable } -> EC.none
-        | Cload { mutability = Mutable } | Cdls_get | Ctls_get | Cdomain_index
-          ->
-          EC.coeffect_only Read_mutable
+        | Cload { mutability = Immutable; is_atomic } ->
+          if is_atomic then EC.arbitrary else EC.none
+        | Cload { mutability = Mutable; is_atomic } ->
+          if is_atomic then EC.arbitrary else EC.coeffect_only Read_mutable
+        | Cdls_get | Ctls_get | Cdomain_index -> EC.coeffect_only Read_mutable
         | Cprobe_is_enabled _ -> EC.coeffect_only Arbitrary
         | Ctuple_field _ | Caddi | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _
         | Caddi128 | Csubi128 | Cmuli64 _ | Cand | Cor | Cxor | Cbswap _
