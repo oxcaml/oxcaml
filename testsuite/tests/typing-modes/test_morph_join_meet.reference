@@ -1,18 +1,2 @@
-Lattices_mono join check failed:
-source: Locality
-target: Locality
-f: meet(global)
-g: id
-result: meet(global)
-input: local
-expected: local
-actual: global
-Lattices_mono meet check failed:
-source: Regionality
-target: Locality
-f: regional_to_local
-g: regional_to_global
-result: regional_to_local
-input: regional
-expected: global
-actual: local
+All partial-coverage morphism join checks succeeded: the join of two morphisms agrees with the pointwise join of their outputs.
+All partial-coverage morphism meet checks succeeded: the meet of two morphisms agrees with the pointwise meet of their outputs.

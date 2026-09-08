@@ -1980,6 +1980,148 @@ module Lattices_mono = struct
       | Comonadic_with_regionality, Comonadic_with_regionality -> Id
       | Comonadic_with_locality, Comonadic_with_locality -> Id
 
+    (** Pointwise join of two left-allowed morphisms with the same source and
+        target. Locality morphisms have an order, so the join will always be one
+        of them. *)
+    let join_morph : type a b.
+        (a, b, left_only) t -> (a, b, left_only) t -> (a, b, left_only) t =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Local_to_regional, Local_to_regional -> Local_to_regional
+      | Local_to_regional, Locality_as_regionality -> Locality_as_regionality
+      | Locality_as_regionality, Local_to_regional -> Locality_as_regionality
+      | Locality_as_regionality, Locality_as_regionality ->
+        Locality_as_regionality
+      | Regional_to_local, Regional_to_local -> Regional_to_local
+      | Local_to_regional_regionality, Local_to_regional_regionality ->
+        Local_to_regional_regionality
+      | Local_to_regional_regionality, Regional_to_local_regionality ->
+        Regional_to_local_regionality
+      | Regional_to_local_regionality, Local_to_regional_regionality ->
+        Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_local_regionality ->
+        Regional_to_local_regionality
+
+    (** Pointwise meet of two right-allowed morphisms with the same source and
+        target. Locality morphisms have an order, so the meet will always be one
+        of them. *)
+    let meet_morph : type a b.
+        (a, b, right_only) t -> (a, b, right_only) t -> (a, b, right_only) t =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Locality_as_regionality, Locality_as_regionality ->
+        Locality_as_regionality
+      | Regional_to_local, Regional_to_local -> Regional_to_local
+      | Regional_to_local, Regional_to_global -> Regional_to_global
+      | Regional_to_global, Regional_to_local -> Regional_to_global
+      | Regional_to_global, Regional_to_global -> Regional_to_global
+      | Regional_to_local_regionality, Regional_to_local_regionality ->
+        Regional_to_local_regionality
+      | Regional_to_local_regionality, Regional_to_global_regionality ->
+        Regional_to_global_regionality
+      | Regional_to_global_regionality, Regional_to_local_regionality ->
+        Regional_to_global_regionality
+      | Regional_to_global_regionality, Regional_to_global_regionality ->
+        Regional_to_global_regionality
+
+    (** Normal form of [meet c (m x)] on an areality object. *)
+    type ('a, 'b, 'd) meet_const_result =
+      | Meet_const_min : ('a, 'b, 'd) meet_const_result
+      | Meet_const_id : ('a, 'a, 'd) meet_const_result
+      | Meet_const_morph : ('a, 'b, 'd) t -> ('a, 'b, 'd) meet_const_result
+
+    (** Absorbs the constant [c] into [m]: [Global] gives the constant [min],
+        [Local] is neutral and [Regional] is [Local_to_regional_regionality]. *)
+    let meet_const : type a b.
+        b areality ->
+        b ->
+        (a, b, left_only) meet_const_result ->
+        (a, b, left_only) meet_const_result =
+     fun dst c m ->
+      match dst, c, m with
+      | Locality, Locality.Global, _ -> Meet_const_min
+      | Locality, Locality.Local, _ -> m
+      | Regionality, Regionality.Global, _ -> Meet_const_min
+      | Regionality, Regionality.Local, _ -> m
+      | Regionality, Regionality.Regional, Meet_const_min -> Meet_const_min
+      | Regionality, Regionality.Regional, Meet_const_id ->
+        Meet_const_morph Local_to_regional_regionality
+      | Regionality, Regionality.Regional, Meet_const_morph m ->
+        begin match compose Local_to_regional_regionality m with
+        | Id -> Meet_const_id
+        | Morph m -> Meet_const_morph m
+        end
+
+    (** Pointwise join of two normal forms. *)
+    let join_meet_const : type a b.
+        (a, b, left_only) meet_const_result ->
+        (a, b, left_only) meet_const_result ->
+        (a, b, left_only) meet_const_result =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Meet_const_min, m -> m
+      | m, Meet_const_min -> m
+      | Meet_const_id, Meet_const_id -> Meet_const_id
+      | Meet_const_id, Meet_const_morph Local_to_regional_regionality ->
+        Meet_const_id
+      | Meet_const_id, Meet_const_morph Regional_to_local_regionality ->
+        Meet_const_morph Regional_to_local_regionality
+      | Meet_const_morph Local_to_regional_regionality, Meet_const_id ->
+        Meet_const_id
+      | Meet_const_morph Regional_to_local_regionality, Meet_const_id ->
+        Meet_const_morph Regional_to_local_regionality
+      | Meet_const_morph m1, Meet_const_morph m2 ->
+        Meet_const_morph (join_morph m1 m2)
+
+    (** Normal form of [m (imply c x)] on an areality object. *)
+    type ('a, 'b, 'd) imply_const_result =
+      | Imply_const_max : ('a, 'b, 'd) imply_const_result
+      | Imply_const_id : ('a, 'a, 'd) imply_const_result
+      | Imply_const_morph : ('a, 'b, 'd) t -> ('a, 'b, 'd) imply_const_result
+
+    (** Absorbs the constant [c] into [m]: [Global] gives the constant [max],
+        [Local] is neutral and [Regional] is [Regional_to_local_regionality]. *)
+    let imply_const : type a b.
+        a areality ->
+        a ->
+        (a, b, right_only) imply_const_result ->
+        (a, b, right_only) imply_const_result =
+     fun src c m ->
+      match src, c, m with
+      | Locality, Locality.Global, _ -> Imply_const_max
+      | Locality, Locality.Local, _ -> m
+      | Regionality, Regionality.Global, _ -> Imply_const_max
+      | Regionality, Regionality.Local, _ -> m
+      | Regionality, Regionality.Regional, Imply_const_max -> Imply_const_max
+      | Regionality, Regionality.Regional, Imply_const_id ->
+        Imply_const_morph Regional_to_local_regionality
+      | Regionality, Regionality.Regional, Imply_const_morph m ->
+        begin match compose m Regional_to_local_regionality with
+        | Id -> Imply_const_id
+        | Morph m -> Imply_const_morph m
+        end
+
+    (** Pointwise meet of two normal forms. *)
+    let meet_imply_const : type a b.
+        (a, b, right_only) imply_const_result ->
+        (a, b, right_only) imply_const_result ->
+        (a, b, right_only) imply_const_result =
+     fun m1 m2 ->
+      match m1, m2 with
+      | Imply_const_max, m -> m
+      | m, Imply_const_max -> m
+      | Imply_const_id, Imply_const_id -> Imply_const_id
+      | Imply_const_id, Imply_const_morph Regional_to_local_regionality ->
+        Imply_const_id
+      | Imply_const_id, Imply_const_morph Regional_to_global_regionality ->
+        Imply_const_morph Regional_to_global_regionality
+      | Imply_const_morph Regional_to_local_regionality, Imply_const_id ->
+        Imply_const_id
+      | Imply_const_morph Regional_to_global_regionality, Imply_const_id ->
+        Imply_const_morph Regional_to_global_regionality
+      | Imply_const_morph m1, Imply_const_morph m2 ->
+        Imply_const_morph (meet_morph m1 m2)
+
     type ('b, 'd) to_ = To : ('a, 'b, 'd) t -> ('b, 'd) to_ [@@unboxed]
 
     let left_to : type b. b areality -> (b, left_only) to_ list = function
@@ -3456,6 +3598,306 @@ module Lattices_mono = struct
         compose dst (Meet_const c) m
     [@@warning "-4"]
 
+    let meet_const_of : type a b. (a, b, left_only) t -> b option = function
+      | Id -> None
+      | Core _ -> None
+      | Meet_const c -> Some c
+      | Meet_const_core (c, _) -> Some c
+
+    (** [meet c1 (m x)] joined with [meet c2 (m x)] is [meet (join c1 c2) (m x)]
+        by distributivity. *)
+    let join_same_core : type a b.
+        b obj ->
+        (a, b, left_only) Core_morph.t ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t =
+     fun dst m m1 m2 ->
+      match meet_const_of m1, meet_const_of m2 with
+      | None, _ | _, None -> Core m
+      | Some c1, Some c2 -> Meet_const_core (join dst c1 c2, m)
+
+    (** Join of two morphisms between areality objects. The constants are
+        absorbed into [Locality_morph] normal forms, which determine the result.
+    *)
+    let join_areality : type a b.
+        b obj ->
+        (a, b, left_only) Locality_morph.t ->
+        (a, b, left_only) Locality_morph.meet_const_result ->
+        (a, b, left_only) t ->
+        (a, b, left_only) Locality_morph.meet_const_result ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t =
+     fun dst lm r1 m1 r2 m2 ->
+      let areality = to_areality dst in
+      let meet_const r m =
+        match meet_const_of m with
+        | None -> r
+        | Some c -> Locality_morph.meet_const areality c r
+      in
+      match
+        Locality_morph.join_meet_const (meet_const r1 m1) (meet_const r2 m2)
+      with
+      | Meet_const_min -> Meet_const_core (min dst, Locality_restricted lm)
+      | Meet_const_id -> Id
+      | Meet_const_morph lm -> Core (Locality_restricted lm)
+
+    (** Join of two morphisms between comonadic objects with [Locality_full]
+        cores: normal forms on the areality axis, joined constants elsewhere. *)
+    let join_areality_full : type a b.
+        b comonadic_with obj ->
+        (a, b, left_only) Locality_morph.t ->
+        (a, b, left_only) Locality_morph.meet_const_result ->
+        (a comonadic_with, b comonadic_with, left_only) t ->
+        (a, b, left_only) Locality_morph.meet_const_result ->
+        (a comonadic_with, b comonadic_with, left_only) t ->
+        (a comonadic_with, b comonadic_with, left_only) t =
+     fun dst lm r1 m1 r2 m2 ->
+      let areality = comonadic_obj_areality dst in
+      let c1 = meet_const_of m1 in
+      let c2 = meet_const_of m2 in
+      let meet_const r = function
+        | None -> r
+        | Some c -> Locality_morph.meet_const areality (Axis.proj Areality c) r
+      in
+      let c =
+        match c1, c2 with
+        | None, _ | _, None -> None
+        | Some c1, Some c2 -> Some (join dst c1 c2)
+      in
+      let r =
+        Locality_morph.join_meet_const (meet_const r1 c1) (meet_const r2 c2)
+      in
+      match r, c with
+      | Meet_const_min, Some c -> Meet_const_core (c, Locality_full lm)
+      | Meet_const_min, None ->
+        let c = max_with dst Areality (min (proj_obj Areality dst)) in
+        Meet_const_core (c, Locality_full lm)
+      | Meet_const_id, Some c -> Meet_const c
+      | Meet_const_id, None -> Id
+      | Meet_const_morph lm, Some c -> Meet_const_core (c, Locality_full lm)
+      | Meet_const_morph lm, None -> Core (Locality_full lm)
+
+    (** Join of two morphisms with cores [c1] and [c2]. Outside of areality, a
+        left-allowed core is determined by its source and target. *)
+    let join_core : type a b.
+        b obj ->
+        (a, b, left_only) Core_morph.t ->
+        (a, b, left_only) Core_morph.t ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t =
+     fun dst c1 c2 m1 m2 ->
+      match c1, c2 with
+      | Locality_restricted lm1, Locality_restricted lm2 ->
+        join_areality dst lm1 (Meet_const_morph lm1) m1 (Meet_const_morph lm2)
+          m2
+      | Locality_full lm1, Locality_full lm2 ->
+        join_areality_full dst lm1 (Meet_const_morph lm1) m1
+          (Meet_const_morph lm2) m2
+      | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op, Linearity_to_uniqueness_op
+      | Contention_op_to_portability, Contention_op_to_portability
+      | Portability_to_contention_op, Portability_to_contention_op
+      | Visibility_op_to_statefulness, Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op, Statefulness_to_visibility_op
+      | Monadic_op_to_comonadic_min, Monadic_op_to_comonadic_min
+      | Comonadic_to_monadic_op_min _, Comonadic_to_monadic_op_min _ ->
+        join_same_core dst c1 m1 m2
+      | _, _ -> .
+    [@@warning "-4"]
+
+    (** Join of a core-free morphism with one whose core is [c]. Only areality
+        has left-allowed endomorphisms. *)
+    let join_id_core : type a.
+        a obj ->
+        (a, a, left_only) Core_morph.t ->
+        (a, a, left_only) t ->
+        (a, a, left_only) t ->
+        (a, a, left_only) t =
+     fun dst c m_id m_core ->
+      match c with
+      | Locality_restricted lm ->
+        join_areality dst lm Meet_const_id m_id (Meet_const_morph lm) m_core
+      | Locality_full lm ->
+        join_areality_full dst lm Meet_const_id m_id (Meet_const_morph lm)
+          m_core
+
+    (** Pointwise join of two left-only simple morphisms. *)
+    let join_morph : type a b.
+        b obj ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t ->
+        (a, b, left_only) t =
+     fun dst m1 m2 ->
+      match m1, m2 with
+      | Id, Id -> Id
+      | Id, Meet_const _ -> Id
+      | Meet_const _, Id -> Id
+      | Meet_const c1, Meet_const c2 -> Meet_const (join dst c1 c2)
+      | Core c1, Core c2 -> join_core dst c1 c2 m1 m2
+      | Core c1, Meet_const_core (_, c2) -> join_core dst c1 c2 m1 m2
+      | Meet_const_core (_, c1), Core c2 -> join_core dst c1 c2 m1 m2
+      | Meet_const_core (_, c1), Meet_const_core (_, c2) ->
+        join_core dst c1 c2 m1 m2
+      | Id, Core c -> join_id_core dst c m1 m2
+      | Id, Meet_const_core (_, c) -> join_id_core dst c m1 m2
+      | Meet_const _, Core c -> join_id_core dst c m1 m2
+      | Meet_const _, Meet_const_core (_, c) -> join_id_core dst c m1 m2
+      | Core c, Id -> join_id_core dst c m2 m1
+      | Meet_const_core (_, c), Id -> join_id_core dst c m2 m1
+      | Core c, Meet_const _ -> join_id_core dst c m2 m1
+      | Meet_const_core (_, c), Meet_const _ -> join_id_core dst c m2 m1
+
+    let imply_const_of : type a b. (a, b, right_only) t -> a option = function
+      | Id -> None
+      | Core _ -> None
+      | Imply_const c -> Some c
+      | Core_imply_const (_, c) -> Some c
+
+    (** [m (imply c1 x)] met with [m (imply c2 x)] is
+        [m (imply (join c1 c2) x)], since right-allowed cores preserve meets. *)
+    let meet_same_core : type a b.
+        (a, b, right_only) Core_morph.t ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t =
+     fun m m1 m2 ->
+      match imply_const_of m1, imply_const_of m2 with
+      | None, _ | _, None -> Core m
+      | Some c1, Some c2 -> Core_imply_const (m, join (Core_morph.src m) c1 c2)
+
+    (** Meet of two morphisms between areality objects; see [join_areality]. The
+        constants live in the source. *)
+    let meet_areality : type a b.
+        (a, b, right_only) Locality_morph.t ->
+        (a, b, right_only) Locality_morph.imply_const_result ->
+        (a, b, right_only) t ->
+        (a, b, right_only) Locality_morph.imply_const_result ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t =
+     fun lm r1 m1 r2 m2 ->
+      let areality = comonadic_obj_areality (Locality_morph.src_full lm) in
+      let imply_const r m =
+        match imply_const_of m with
+        | None -> r
+        | Some c -> Locality_morph.imply_const areality c r
+      in
+      match
+        Locality_morph.meet_imply_const (imply_const r1 m1) (imply_const r2 m2)
+      with
+      | Imply_const_max ->
+        let src = Locality_morph.src_restricted lm in
+        Core_imply_const (Locality_restricted lm, min src)
+      | Imply_const_id -> Id
+      | Imply_const_morph lm -> Core (Locality_restricted lm)
+
+    (** Meet of two morphisms between comonadic objects with [Locality_full]
+        cores; see [join_areality_full]. *)
+    let meet_areality_full : type a b.
+        b comonadic_with obj ->
+        (a, b, right_only) Locality_morph.t ->
+        (a, b, right_only) Locality_morph.imply_const_result ->
+        (a comonadic_with, b comonadic_with, right_only) t ->
+        (a, b, right_only) Locality_morph.imply_const_result ->
+        (a comonadic_with, b comonadic_with, right_only) t ->
+        (a comonadic_with, b comonadic_with, right_only) t =
+     fun dst lm r1 m1 r2 m2 ->
+      let src = src dst m1 in
+      let areality = comonadic_obj_areality src in
+      let c1 = imply_const_of m1 in
+      let c2 = imply_const_of m2 in
+      let imply_const r = function
+        | None -> r
+        | Some c -> Locality_morph.imply_const areality (Axis.proj Areality c) r
+      in
+      let c =
+        match c1, c2 with
+        | None, _ | _, None -> None
+        | Some c1, Some c2 -> Some (join src c1 c2)
+      in
+      let r =
+        Locality_morph.meet_imply_const (imply_const r1 c1) (imply_const r2 c2)
+      in
+      match r, c with
+      | Imply_const_max, Some c -> Core_imply_const (Locality_full lm, c)
+      | Imply_const_max, None ->
+        let c = max_with src Areality (min (proj_obj Areality src)) in
+        Core_imply_const (Locality_full lm, c)
+      | Imply_const_id, Some c -> Imply_const c
+      | Imply_const_id, None -> Id
+      | Imply_const_morph lm, Some c -> Core_imply_const (Locality_full lm, c)
+      | Imply_const_morph lm, None -> Core (Locality_full lm)
+
+    (** Meet of two morphisms with cores [c1] and [c2]; see [join_core]. *)
+    let meet_core : type a b.
+        b obj ->
+        (a, b, right_only) Core_morph.t ->
+        (a, b, right_only) Core_morph.t ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t =
+     fun dst c1 c2 m1 m2 ->
+      match c1, c2 with
+      | Locality_restricted lm1, Locality_restricted lm2 ->
+        meet_areality lm1 (Imply_const_morph lm1) m1 (Imply_const_morph lm2) m2
+      | Locality_full lm1, Locality_full lm2 ->
+        meet_areality_full dst lm1 (Imply_const_morph lm1) m1
+          (Imply_const_morph lm2) m2
+      | Uniqueness_op_to_linearity, Uniqueness_op_to_linearity
+      | Linearity_to_uniqueness_op, Linearity_to_uniqueness_op
+      | Contention_op_to_portability, Contention_op_to_portability
+      | Portability_to_contention_op, Portability_to_contention_op
+      | Visibility_op_to_statefulness, Visibility_op_to_statefulness
+      | Statefulness_to_visibility_op, Statefulness_to_visibility_op
+      | Monadic_op_to_comonadic_max, Monadic_op_to_comonadic_max
+      | Comonadic_to_monadic_op_max _, Comonadic_to_monadic_op_max _ ->
+        meet_same_core c1 m1 m2
+      | _, _ -> .
+    [@@warning "-4"]
+
+    (** Meet of a core-free morphism with one whose core is [c]; see
+        [join_id_core]. *)
+    let meet_id_core : type a.
+        a obj ->
+        (a, a, right_only) Core_morph.t ->
+        (a, a, right_only) t ->
+        (a, a, right_only) t ->
+        (a, a, right_only) t =
+     fun dst c m_id m_core ->
+      match c with
+      | Locality_restricted lm ->
+        meet_areality lm Imply_const_id m_id (Imply_const_morph lm) m_core
+      | Locality_full lm ->
+        meet_areality_full dst lm Imply_const_id m_id (Imply_const_morph lm)
+          m_core
+
+    (** Pointwise meet of two right-only simple morphisms. *)
+    let meet_morph : type a b.
+        b obj ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t ->
+        (a, b, right_only) t =
+     fun dst m1 m2 ->
+      match m1, m2 with
+      | Id, Id -> Id
+      | Id, Imply_const _ -> Id
+      | Imply_const _, Id -> Id
+      | Imply_const c1, Imply_const c2 -> Imply_const (join dst c1 c2)
+      | Core c1, Core c2 -> meet_core dst c1 c2 m1 m2
+      | Core c1, Core_imply_const (c2, _) -> meet_core dst c1 c2 m1 m2
+      | Core_imply_const (c1, _), Core c2 -> meet_core dst c1 c2 m1 m2
+      | Core_imply_const (c1, _), Core_imply_const (c2, _) ->
+        meet_core dst c1 c2 m1 m2
+      | Id, Core c -> meet_id_core dst c m1 m2
+      | Id, Core_imply_const (c, _) -> meet_id_core dst c m1 m2
+      | Imply_const _, Core c -> meet_id_core dst c m1 m2
+      | Imply_const _, Core_imply_const (c, _) -> meet_id_core dst c m1 m2
+      | Core c, Id -> meet_id_core dst c m2 m1
+      | Core_imply_const (c, _), Id -> meet_id_core dst c m2 m1
+      | Core c, Imply_const _ -> meet_id_core dst c m2 m1
+      | Core_imply_const (c, _), Imply_const _ -> meet_id_core dst c m2 m1
+
     let ( let* ) xs f = List.concat_map f xs
 
     let ( let+ ) xs f = List.map f xs
@@ -4081,7 +4523,28 @@ module Lattices_mono = struct
       (a, b, left_only) morph ->
       (a, b, left_only) morph ->
       (a, b, left_only) morph =
-   fun _dst m0 _m1 -> m0
+   fun dst m0 m1 ->
+    match m0, m1 with
+    | Const_min _, m1 -> m1
+    | m0, Const_min _ -> m0
+    | Simple m0, Simple m1 -> Simple (Simple_morph.join_morph dst m0 m1)
+    | Simple_proj (m0, ax0, obj0), Simple_proj (m1, ax1, _) ->
+      begin match Axis.equal ax0 ax1 with
+      | Misc.Is_eq -> Simple_proj (Simple_morph.join_morph dst m0 m1, ax0, obj0)
+      | Misc.Is_not_eq ->
+        Misc.fatal_error "Lattices_mono.join_morph: projections of two axes"
+      end
+    | Min_with_simple (ax0, m0), Min_with_simple (ax1, m1) ->
+      begin match Axis.equal ax0 ax1 with
+      | Misc.Is_eq ->
+        Min_with_simple (ax0, Simple_morph.join_morph (proj_obj ax0 dst) m0 m1)
+      | Misc.Is_not_eq ->
+        Misc.fatal_error "Lattices_mono.join_morph: injections into two axes"
+      end
+    | Simple _, (Simple_proj _ | Min_with_simple _)
+    | Simple_proj _, (Simple _ | Min_with_simple _)
+    | Min_with_simple _, (Simple _ | Simple_proj _) ->
+      Misc.fatal_error "Lattices_mono.join_morph: morphisms of different shapes"
 
   (** Pointwise meet of two right-only morphisms; see [join_morph]. *)
   let meet_morph : type a b.
@@ -4089,7 +4552,28 @@ module Lattices_mono = struct
       (a, b, right_only) morph ->
       (a, b, right_only) morph ->
       (a, b, right_only) morph =
-   fun _dst m0 _m1 -> m0
+   fun dst m0 m1 ->
+    match m0, m1 with
+    | Const_max _, m1 -> m1
+    | m0, Const_max _ -> m0
+    | Simple m0, Simple m1 -> Simple (Simple_morph.meet_morph dst m0 m1)
+    | Simple_proj (m0, ax0, obj0), Simple_proj (m1, ax1, _) ->
+      begin match Axis.equal ax0 ax1 with
+      | Misc.Is_eq -> Simple_proj (Simple_morph.meet_morph dst m0 m1, ax0, obj0)
+      | Misc.Is_not_eq ->
+        Misc.fatal_error "Lattices_mono.meet_morph: projections of two axes"
+      end
+    | Max_with_simple (ax0, m0), Max_with_simple (ax1, m1) ->
+      begin match Axis.equal ax0 ax1 with
+      | Misc.Is_eq ->
+        Max_with_simple (ax0, Simple_morph.meet_morph (proj_obj ax0 dst) m0 m1)
+      | Misc.Is_not_eq ->
+        Misc.fatal_error "Lattices_mono.meet_morph: injections into two axes"
+      end
+    | Simple _, (Simple_proj _ | Max_with_simple _)
+    | Simple_proj _, (Simple _ | Max_with_simple _)
+    | Max_with_simple _, (Simple _ | Simple_proj _) ->
+      Misc.fatal_error "Lattices_mono.meet_morph: morphisms of different shapes"
 
   let ( let* ) xs f = List.concat_map f xs
 
