@@ -21,30 +21,43 @@ type t =
     uid : Flambda_debug_uid.t;
     kind : Flambda_kind.With_subkind.t;
     needed_by_phantom_let : bool
-        (* Deliberately not part of [compare], [equal] or [hash]: this is
-           debugging metadata about the binder, not part of its identity. *)
   }
 
 include Container_types.Make (struct
   type nonrec t = t
 
   let compare
-      { param = param1; kind = kind1; uid = uid1; needed_by_phantom_let = _ }
-      { param = param2; kind = kind2; uid = uid2; needed_by_phantom_let = _ } =
+      { param = param1;
+        kind = kind1;
+        uid = uid1;
+        needed_by_phantom_let = needed_by_phantom_let1
+      }
+      { param = param2;
+        kind = kind2;
+        uid = uid2;
+        needed_by_phantom_let = needed_by_phantom_let2
+      } =
     let c = Variable.compare param1 param2 in
     if c <> 0
     then c
     else
       let c = Flambda_kind.With_subkind.compare kind1 kind2 in
-      if c <> 0 then c else Flambda_debug_uid.compare uid1 uid2
+      if c <> 0
+      then c
+      else
+        let c = Flambda_debug_uid.compare uid1 uid2 in
+        if c <> 0
+        then c
+        else Bool.compare needed_by_phantom_let1 needed_by_phantom_let2
 
   let equal t1 t2 = compare t1 t2 = 0
 
-  let hash { param; kind; uid; needed_by_phantom_let = _ } =
+  let hash { param; kind; uid; needed_by_phantom_let } =
     Hashtbl.hash
       ( Variable.hash param,
         Flambda_kind.With_subkind.hash kind,
-        Flambda_debug_uid.hash uid )
+        Flambda_debug_uid.hash uid,
+        needed_by_phantom_let )
 
   let print_debug_uid ppf duid =
     if !Clflags.dump_debug_uids

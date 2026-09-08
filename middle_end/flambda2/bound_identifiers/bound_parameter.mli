@@ -30,8 +30,7 @@ val var : t -> Variable.t
     analysis) and must therefore remain locatable by the debugger (which matters
     when it is not user visible, since such variables otherwise receive no
     provenance). Such binders print with the visibility suffix "NP", or "UVP" if
-    also user visible. Always [false] on creation; set by [Simplify]. Not part
-    of [compare], [equal] or [hash]. *)
+    also user visible. Always [false] on creation; set by [Simplify]. *)
 val needed_by_phantom_let : t -> bool
 
 val with_needed_by_phantom_let : t -> t

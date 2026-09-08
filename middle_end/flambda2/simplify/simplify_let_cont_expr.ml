@@ -295,7 +295,11 @@ let decide_param_usage_recursive ~required_names ~invariant_set ~removed_aliased
     Name.Set.mem (BP.name param) required_names
     && not (Variable.Set.mem (BP.var param) removed_aliased)
   then
-    if Bound_parameter.Set.mem param invariant_set
+    (* [invariant_set] contains underlying variables rather than bound
+       parameters so that membership is insensitive to binder metadata such as
+       [Bound_parameter.needed_by_phantom_let] (which participates in
+       [Bound_parameter.compare]). *)
+    if Variable.Set.mem (BP.var param) invariant_set
     then Used_as_invariant
     else Used
   else Unused
@@ -380,9 +384,9 @@ let make_rewrite_for_recursive_continuation uacc ~cont
   let required_names = UA.required_names uacc in
   let removed_aliased = get_removed_aliased_params uacc cont in
   let invariant_set =
-    BP.Set.union
-      (Bound_parameters.to_set original_invariant_params)
-      (Bound_parameters.to_set
+    Variable.Set.union
+      (Bound_parameters.var_set original_invariant_params)
+      (Bound_parameters.var_set
          (EPA.extra_params invariant_extra_params_and_args))
   in
   let decide_param_usage =
