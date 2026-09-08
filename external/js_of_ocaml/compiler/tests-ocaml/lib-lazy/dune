@@ -1,0 +1,30 @@
+(rule
+ (target test.ml.corrected)
+ (action
+  (run node %{dep:../expect.bc.js} %{dep:test.ml})))
+
+(rule
+ (alias runtest-js)
+ (action
+  (diff test.ml test.ml.corrected)))
+
+(rule
+ (copy test.ml test_wasm.ml))
+
+(rule
+ (target test_wasm.ml.corrected)
+ (enabled_if
+  (and
+   %{env:WASM_OF_OCAML=false}
+   (<> %{env:JSOO_TEST_ENGINE=node} wasi)))
+ (action
+  (run node %{dep:../expect_wasm.bc.wasm.js} %{dep:test_wasm.ml})))
+
+(rule
+ (alias runtest-wasm)
+ (enabled_if
+  (and
+   %{env:WASM_OF_OCAML=false}
+   (<> %{env:JSOO_TEST_ENGINE=node} wasi)))
+ (action
+  (diff test.ml test_wasm.ml.corrected)))

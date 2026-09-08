@@ -1,0 +1,69 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2013--2016 OCamlPro SAS                                    *)
+(*   Copyright 2014--2016 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** Kosaraju's algorithm for strongly connected components. *)
+
+module type SET = sig
+  type elt
+
+  type t
+
+  val fold : (elt -> 'a -> 'a) -> t -> 'a -> 'a
+end
+
+module type MAP = sig
+  type key
+
+  type 'a t
+
+  val cardinal : 'a t -> int
+
+  val bindings : 'a t -> (key * 'a) list
+
+  val empty : 'a t
+
+  val find : key -> 'a t -> 'a
+
+  val add : key -> 'a -> 'a t -> 'a t
+end
+
+module type S = sig
+  module Id : sig
+    type t
+
+    module Map : MAP with type key = t
+
+    module Set : SET with type elt = t
+  end
+
+  type directed_graph = Id.Set.t Id.Map.t
+
+  type component =
+    | Has_loop of Id.t list
+    | No_loop of Id.t
+
+  val connected_components_sorted_from_roots_to_leaf : directed_graph -> component array
+
+  val component_graph : directed_graph -> (component * int list) array
+end
+
+module Make (Id : sig
+  type t
+
+  module Map : MAP with type key = t
+
+  module Set : SET with type elt = t
+end) : S with module Id = Id

@@ -1,0 +1,550 @@
+(* Js_of_ocaml library
+ * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2010 Jérôme Vouillon
+ * Laboratoire PPS - CNRS Université Paris Diderot
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, with linking exception;
+ * either version 2.1 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *)
+
+open Js
+open! Import
+
+class type ['node] nodeList = object
+  method item : int -> 'node t opt meth
+
+  method length : int readonly_prop
+end
+
+class type ['node] collection = object
+  inherit ['node] nodeList
+
+  method namedItem : js_string t -> 'node t opt meth
+end
+
+let list_of_nodeList (nodeList : 'a nodeList t) =
+  let length = nodeList##.length in
+  let rec add_item acc i =
+    if i < length
+    then
+      match Opt.to_option (nodeList##item i) with
+      | None -> add_item acc (i + 1)
+      | Some e -> add_item (e :: acc) (i + 1)
+    else List.rev acc
+  in
+  add_item [] 0
+
+type nodeType =
+  | OTHER
+  (* Will not happen *)
+  | ELEMENT
+  | ATTRIBUTE
+  | TEXT
+  | CDATA_SECTION
+  | ENTITY_REFERENCE
+  | ENTITY
+  | PROCESSING_INSTRUCTION
+  | COMMENT
+  | DOCUMENT
+  | DOCUMENT_TYPE
+  | DOCUMENT_FRAGMENT
+  | NOTATION
+
+module DocumentPosition = struct
+  type t = int
+
+  type mask = int
+
+  let disconnected = 0x01
+
+  let preceding = 0x02
+
+  let following = 0x04
+
+  let contains = 0x08
+
+  let contained_by = 0x10
+
+  let implementation_specific = 0x20
+
+  let has t mask = t land mask = mask
+
+  let add x y = x lor y
+
+  let ( + ) = add
+end
+
+class type node = object
+  method nodeName : js_string t readonly_prop
+
+  method nodeValue : js_string t opt readonly_prop
+
+  method nodeType : nodeType readonly_prop
+
+  method parentNode : node t opt prop
+
+  method parentElement : element t opt readonly_prop
+
+  method childNodes : node nodeList t prop
+
+  method firstChild : node t opt prop
+
+  method lastChild : node t opt prop
+
+  method previousSibling : node t opt prop
+
+  method nextSibling : node t opt prop
+
+  method namespaceURI : js_string t opt prop
+
+  method isConnected : bool t readonly_prop
+
+  method insertBefore : node t -> node t opt -> node t meth
+
+  method replaceChild : node t -> node t -> node t meth
+
+  method removeChild : node t -> node t meth
+
+  method appendChild : node t -> node t meth
+
+  method hasChildNodes : bool t meth
+
+  method cloneNode : bool t -> node t meth
+
+  method compareDocumentPosition : node t -> DocumentPosition.t meth
+
+  method contains : node t -> bool t meth
+
+  method getRootNode : node t meth
+
+  method getRootNode_options : getRootNodeOptions t -> node t meth
+
+  method isEqualNode : node t -> bool t meth
+
+  method isSameNode : node t -> bool t meth
+
+  method normalize : unit meth
+
+  method lookupNamespaceURI : js_string t -> js_string t opt meth
+
+  method lookupPrefix : js_string t -> js_string t opt meth
+end
+
+(** Specification of [Attr] objects. *)
+and attr = object
+  inherit node
+
+  method name : js_string t readonly_prop
+
+  method specified : bool t readonly_prop
+
+  method value : js_string t prop
+
+  method ownerElement : element t opt readonly_prop
+end
+
+(** Specification of [NamedNodeMap] objects. *)
+and ['node] namedNodeMap = object
+  method getNamedItem : js_string t -> 'node t opt meth
+
+  method setNamedItem : 'node t -> 'node t opt meth
+
+  method removeNamedItem : js_string t -> 'node t opt meth
+
+  method item : int -> 'node t opt meth
+
+  method length : int readonly_prop
+end
+
+(** Specification of [Element] objects. *)
+and element = object
+  inherit node
+
+  method tagName : js_string t readonly_prop
+
+  method localName : js_string t readonly_prop
+
+  method prefix : js_string t opt readonly_prop
+
+  method getAttribute : js_string t -> js_string t opt meth
+
+  method setAttribute : js_string t -> js_string t -> unit meth
+
+  method removeAttribute : js_string t -> unit meth
+
+  method hasAttribute : js_string t -> bool t meth
+
+  method hasAttributes : bool t meth
+
+  method toggleAttribute : js_string t -> bool t meth
+
+  method toggleAttribute_force : js_string t -> bool t -> bool t meth
+
+  method getAttributeNames : js_string t js_array t meth
+
+  method getAttributeNS : js_string t -> js_string t -> js_string t opt meth
+
+  method setAttributeNS : js_string t -> js_string t -> js_string t -> unit meth
+
+  method removeAttributeNS : js_string t -> js_string t -> unit meth
+
+  method hasAttributeNS : js_string t -> js_string t -> bool t meth
+
+  method getAttributeNode : js_string t -> attr t opt meth
+
+  method setAttributeNode : attr t -> attr t opt meth
+
+  method removeAttributeNode : attr t -> attr t meth
+
+  method getAttributeNodeNS : js_string t -> js_string t -> attr t opt meth
+
+  method setAttributeNodeNS : attr t -> attr t opt meth
+
+  method getElementsByTagName : js_string t -> element collection t meth
+
+  method getElementsByClassName : js_string t -> element collection t meth
+
+  method matches : js_string t -> bool t meth
+
+  method attributes : attr namedNodeMap t readonly_prop
+
+  method children : element collection t readonly_prop
+
+  method firstElementChild : element t opt readonly_prop
+
+  method lastElementChild : element t opt readonly_prop
+
+  method childElementCount : int readonly_prop
+
+  method previousElementSibling : element t opt readonly_prop
+
+  method nextElementSibling : element t opt readonly_prop
+
+  method insertAdjacentHTML : js_string t -> js_string t -> unit meth
+
+  method insertAdjacentText : js_string t -> js_string t -> unit meth
+
+  method insertAdjacentElement : js_string t -> element t -> element t opt meth
+end
+
+and getRootNodeOptions = object
+  method composed : bool t writeonly_prop
+end
+
+let appendChild (p : #node t) (n : #node t) = ignore (p##appendChild (n :> node t))
+
+let removeChild (p : #node t) (n : #node t) = ignore (p##removeChild (n :> node t))
+
+let replaceChild (p : #node t) (n : #node t) (o : #node t) =
+  ignore (p##replaceChild (n :> node t) (o :> node t))
+
+let insertBefore (p : #node t) (n : #node t) (o : #node t opt) =
+  ignore (p##insertBefore (n :> node t) (o :> node t opt))
+
+type child_node = Unsafe.any
+
+let node (n : #node t) : child_node = Js.Unsafe.inject (n :> node t)
+
+let text (s : js_string t) : child_node = Js.Unsafe.inject s
+
+let apply_child_nodes elt meth children : unit =
+  Js.Unsafe.meth_call elt meth (Array.of_list children)
+
+let before (elt : #node t) children = apply_child_nodes elt "before" children
+
+let after (elt : #node t) children = apply_child_nodes elt "after" children
+
+let replaceWith (elt : #node t) children = apply_child_nodes elt "replaceWith" children
+
+let prepend (elt : #element t) children = apply_child_nodes elt "prepend" children
+
+let append (elt : #element t) children = apply_child_nodes elt "append" children
+
+let replaceChildren (elt : #element t) children =
+  apply_child_nodes elt "replaceChildren" children
+
+let remove (n : #node t) : unit = (Js.Unsafe.coerce n)##remove
+
+let getRootNode ?composed (n : #node t) =
+  match composed with
+  | None -> n##getRootNode
+  | Some v ->
+      let opts : getRootNodeOptions t = Js.Unsafe.obj [||] in
+      opts##.composed := v;
+      n##getRootNode_options opts
+
+class type characterData = object
+  inherit node
+
+  method data : js_string t prop
+
+  method length : int readonly_prop
+
+  method substringData : int -> int -> js_string t meth
+
+  method appendData : js_string t -> unit meth
+
+  method insertData : int -> js_string t -> unit meth
+
+  method deleteData : int -> int -> unit meth
+
+  method replaceData : int -> int -> js_string t -> unit meth
+end
+
+class type comment = characterData
+
+class type text = characterData
+
+class type documentFragment = node
+
+class type documentType = object
+  inherit node
+
+  method name : js_string t readonly_prop
+
+  method publicId : js_string t readonly_prop
+
+  method systemId : js_string t readonly_prop
+end
+
+class type ['element] document = object
+  inherit node
+
+  method documentElement : 'element t readonly_prop
+
+  method doctype : documentType t opt readonly_prop
+
+  method _URL : js_string t readonly_prop
+
+  method documentURI : js_string t readonly_prop
+
+  method characterSet : js_string t readonly_prop
+
+  method contentType : js_string t readonly_prop
+
+  method compatMode : js_string t readonly_prop
+
+  method createDocumentFragment : documentFragment t meth
+
+  method createElement : js_string t -> 'element t meth
+
+  method createElementNS : js_string t -> js_string t -> 'element t meth
+
+  method createTextNode : js_string t -> text t meth
+
+  method createAttribute : js_string t -> attr t meth
+
+  method createComment : js_string t -> comment t meth
+
+  method getElementById : js_string t -> 'element t opt meth
+
+  method getElementsByTagName : js_string t -> 'element collection t meth
+
+  method getElementsByTagNameNS : js_string t -> js_string t -> 'element collection t meth
+
+  method getElementsByClassName : js_string t -> 'element collection t meth
+
+  method importNode : element t -> bool t -> 'element t meth
+
+  method adoptNode : element t -> 'element t meth
+end
+
+type node_type =
+  | Element of element t
+  | Attr of attr t
+  | Text of text t
+  | Other of node t
+
+let nodeType e =
+  match e##.nodeType with
+  | ELEMENT -> Element (Js.Unsafe.coerce e)
+  | ATTRIBUTE -> Attr (Js.Unsafe.coerce e)
+  | CDATA_SECTION | TEXT -> Text (Js.Unsafe.coerce e)
+  | _ -> Other (e :> node t)
+
+module CoerceTo = struct
+  let cast (e : #node Js.t) t =
+    if e##.nodeType == t then Js.some (Js.Unsafe.coerce e) else Js.null
+
+  let element e : element Js.t Js.opt = cast e ELEMENT
+
+  let text e : text Js.t Js.opt =
+    if e##.nodeType == TEXT || e##.nodeType == CDATA_SECTION
+    then Js.some (Js.Unsafe.coerce e)
+    else Js.null
+
+  let attr e : attr Js.t Js.opt = cast e ATTRIBUTE
+
+  let documentType e : documentType Js.t Js.opt = cast e DOCUMENT_TYPE
+end
+
+type ('a, 'b) event_listener = ('a, 'b -> bool t optdef) meth_callback opt
+(** The type of event listener functions.  The first type parameter
+      ['a] is the type of the target object; the second parameter
+      ['b] is the type of the event object.
+
+      Handlers return [bool t optdef]: a defined boolean signals an opinion
+      ([false] cancels the default action via [preventDefault]), while
+      [undefined] means "no opinion".  This matters for events like
+      [beforeunload], where the browser interprets any returned non-undefined
+      value as a request to show the confirmation dialog. *)
+
+type event_phase =
+  | Phase_none
+  | Phase_capturing
+  | Phase_at_target
+  | Phase_bubbling
+
+class type ['a] event = object
+  method _type : js_string t readonly_prop
+
+  method target : 'a t opt readonly_prop
+
+  method currentTarget : 'a t opt readonly_prop
+
+  method eventPhase : event_phase readonly_prop
+
+  method bubbles : bool t readonly_prop
+
+  method cancelable : bool t readonly_prop
+
+  method defaultPrevented : bool t readonly_prop
+
+  method composed : bool t readonly_prop
+
+  method isTrusted : bool t readonly_prop
+
+  method timeStamp : number_t readonly_prop
+
+  method composedPath : Unsafe.any js_array t meth
+
+  method preventDefault : unit meth
+
+  method stopPropagation : unit meth
+
+  method stopImmediatePropagation : unit meth
+
+  (* Legacy methods *)
+  method srcElement : 'a t opt readonly_prop
+end
+
+class type ['a, 'b] customEvent = object
+  inherit ['a] event
+
+  method detail : 'b Js.opt Js.readonly_prop
+end
+
+let no_handler : ('a, 'b) event_listener = Js.null
+
+(* The function preventDefault must be called explicitly when
+   using addEventListener... *)
+let handler f =
+  Js.some
+    (Js.Unsafe.callback (fun e ->
+         let res = f e in
+         if Js.to_bool res
+         then Js.undefined
+         else (
+           e##preventDefault;
+           Js.def Js._false)))
+
+let full_handler f =
+  Js.some
+    (Js.Unsafe.meth_callback (fun this e ->
+         let res = f this e in
+         if Js.to_bool res
+         then Js.undefined
+         else (
+           e##preventDefault;
+           Js.def Js._false)))
+
+let listener f : ('a, 'b) event_listener =
+  Js.some
+    (Js.Unsafe.callback (fun e ->
+         f e;
+         if Js.to_bool e##.defaultPrevented then Js.def Js._false else Js.undefined))
+
+let full_listener f : ('a, 'b) event_listener =
+  Js.some
+    (Js.Unsafe.meth_callback (fun this e ->
+         f this e;
+         if Js.to_bool e##.defaultPrevented then Js.def Js._false else Js.undefined))
+
+let invoke_handler (f : ('a, 'b) event_listener) (this : 'a) (event : 'b) : bool t =
+  Js.Optdef.get (Js.Unsafe.call f this [| Js.Unsafe.inject event |]) (fun () -> Js._true)
+
+let eventTarget (e : (< .. > as 'a) #event t) : 'a t =
+  Opt.get e##.target (fun () -> Opt.get e##.srcElement (fun () -> raise Not_found))
+
+module Event = struct
+  type 'a typ = Js.js_string Js.t
+
+  let make s = Js.string s
+end
+
+type event_listener_id = unit -> unit
+
+class type event_listener_options = object
+  method capture : bool t writeonly_prop
+
+  method once : bool t writeonly_prop
+
+  method passive : bool t writeonly_prop
+end
+
+let addEventListenerWithOptions (e : < .. > t) typ ?capture ?once ?passive h =
+  let opts : event_listener_options t = Js.Unsafe.obj [||] in
+  let iter t f =
+    match t with
+    | None -> ()
+    | Some b -> f b
+  in
+  iter capture (fun b -> opts##.capture := b);
+  iter once (fun b -> opts##.once := b);
+  iter passive (fun b -> opts##.passive := b);
+  let () = (Js.Unsafe.coerce e)##addEventListener typ h opts in
+  fun () -> (Js.Unsafe.coerce e)##removeEventListener typ h opts
+
+let addEventListener (e : < .. > t) typ h capt =
+  addEventListenerWithOptions e typ ~capture:capt h
+
+let removeEventListener id = id ()
+
+let preventDefault ev = ev##preventDefault
+
+let createCustomEvent ?bubbles ?cancelable ?detail typ =
+  let opt_iter f = function
+    | None -> ()
+    | Some x -> f x
+  in
+  let opts = Unsafe.obj [||] in
+  opt_iter (fun x -> opts##.bubbles := bool x) bubbles;
+  opt_iter (fun x -> opts##.cancelable := bool x) cancelable;
+  opt_iter (fun x -> opts##.detail := some x) detail;
+  let constr :
+      (   ('a, 'b) #customEvent Js.t Event.typ
+       -> < detail : 'b opt prop > t
+       -> ('a, 'b) customEvent t)
+      constr =
+    Unsafe.global##._CustomEvent
+  in
+  new%js constr typ opts
+
+class type stringList = object
+  method item : int -> js_string t opt meth
+
+  method length : int readonly_prop
+
+  method contains : js_string t -> bool t meth
+end

@@ -1,0 +1,241 @@
+(* Js_of_ocaml tests
+ * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2024 Hugo Heuzard
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, with linking exception;
+ * either version 2.1 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *)
+
+(* https://github.com/ocsigen/js_of_ocaml/issues/1559 *)
+
+(* The generated JS encodes stdlib field indices that shifted in OCaml 5.5; the
+   snapshots are promoted for 5.5+, so gate the tests there. *)
+[@@@if ocaml_version >= (5, 5, 0)]
+
+let%expect_test _ =
+  let prog =
+    {|
+let my_ref = ref 1
+
+module _ : sig end = struct
+  type 'a thing =
+    | Thing of 'a
+    | No
+
+  let f2 t =
+    match t with
+    | Thing 1 -> true
+    | Thing _ | No -> false
+  ;;
+
+  let length = function
+    | Thing i -> i
+    | No -> -1
+  ;;
+
+  let () =
+    let init = Thing 1 in
+    let nesting = 1 in
+    let rec handle_state t =
+      let this_will_be_undefined () = if f2 t then 1 else 2 in
+      match length t with
+      | 0 -> this_will_be_undefined ()
+      | 1 -> if Stdlib.Int.equal nesting 0 then nesting else this_will_be_undefined ()
+      | _ -> handle_state (Thing 0)
+    in
+    print_endline (Int.to_string (handle_state init))
+  ;;
+
+  let _ : _ thing = No
+end
+
+let () = my_ref := 2
+|}
+  in
+  Util.compile_and_run prog;
+  [%expect {|
+    1 |}];
+  let program = Util.compile_and_parse prog in
+  Util.print_program program;
+  [%expect
+    {|
+    (function(globalThis){
+       "use strict";
+       var
+        runtime = globalThis.jsoo_runtime,
+        caml_get_global = runtime.caml_get_global;
+       function caml_call1(f, a0){
+        return (f.l >= 0 ? f.l : f.l = f.length) === 1
+                ? f(a0)
+                : runtime.caml_call_gen(f, [a0]);
+       }
+       function caml_call2(f, a0, a1){
+        return (f.l >= 0 ? f.l : f.l = f.length) === 2
+                ? f(a0, a1)
+                : runtime.caml_call_gen(f, [a0, a1]);
+       }
+       var
+        Stdlib_Int = caml_get_global("Stdlib__Int"),
+        Stdlib = caml_get_global("Stdlib"),
+        t = [0, 0];
+       function handle_state(t$1){
+        var t$0 = t$1;
+        for(;;){
+         let t$1 = t$0;
+         var
+          this_will_be_undefined =
+            function(_a_){
+             a:
+             {if(t$1 && 1 === t$1[1]){_a_ = 1; break a;} _a_ = 0;}
+             return _a_ ? 1 : 2;
+            };
+         if(t$0) var i = t$0[1], match = i; else match = - 1;
+         if(0 === match) return this_will_be_undefined(0);
+         if(1 === match){
+          var nesting = 1;
+          return caml_call2(Stdlib_Int[12], nesting, 0)
+                  ? nesting
+                  : this_will_be_undefined(0);
+         }
+         t$0 = t;
+        }
+       }
+       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib_Int[22], _a_);
+       caml_call1(Stdlib[46], _a_);
+       var my_ref = [0, 1];
+       my_ref[1] = 2;
+       runtime.caml_register_global([0, my_ref], "Test");
+       return;
+      }
+      (globalThis));
+    //end
+    |}]
+
+let%expect_test _ =
+  let prog =
+    {|
+let my_ref = ref 1
+
+module _ : sig end = struct
+  type 'a thing =
+    | Thing of 'a
+    | No
+
+  let f2 t =
+    match t with
+    | Thing 1 -> true
+    | Thing _ | No -> false
+  ;;
+
+  let length = function
+    | Thing i -> i
+    | No -> -1
+  ;;
+
+  let () =
+    let init = Thing 1 in
+    let nesting = 1 in
+    let rec handle_state t =
+      let this_will_be_undefined () = if f2 t then 1 else 2 in
+      match length t with
+      | 0 ->
+        let g () = 2 + this_will_be_undefined () in
+        g () + g ()
+      | 1 ->
+        if Stdlib.Int.equal nesting 0
+        then nesting
+        else
+          let g () = if Random.int 3 > 1 then 2 + this_will_be_undefined () else 1 in
+          g () + g ()
+      | _ -> handle_state (Thing 0)
+    in
+    print_endline (Int.to_string (handle_state init))
+  ;;
+
+  let _ : _ thing = No
+end
+
+let () = my_ref := 2
+|}
+  in
+  Util.compile_and_run prog;
+  [%expect {|
+    2 |}];
+  let program = Util.compile_and_parse prog in
+  Util.print_program program;
+  [%expect
+    {|
+    (function(globalThis){
+       "use strict";
+       var
+        runtime = globalThis.jsoo_runtime,
+        caml_get_global = runtime.caml_get_global;
+       function caml_call1(f, a0){
+        return (f.l >= 0 ? f.l : f.l = f.length) === 1
+                ? f(a0)
+                : runtime.caml_call_gen(f, [a0]);
+       }
+       function caml_call2(f, a0, a1){
+        return (f.l >= 0 ? f.l : f.l = f.length) === 2
+                ? f(a0, a1)
+                : runtime.caml_call_gen(f, [a0, a1]);
+       }
+       var
+        Stdlib_Random = caml_get_global("Stdlib__Random"),
+        Stdlib_Int = caml_get_global("Stdlib__Int"),
+        Stdlib = caml_get_global("Stdlib"),
+        t = [0, 0];
+       function handle_state(t$1){
+        a:
+        {
+         var t$0 = t$1;
+         for(;;){
+          let t$1 = t$0;
+          var
+           this_will_be_undefined =
+             function(_a_){
+              a:
+              {if(t$1 && 1 === t$1[1]){_a_ = 1; break a;} _a_ = 0;}
+              return _a_ ? 1 : 2;
+             };
+          if(t$0) var i = t$0[1], _a_ = i; else _a_ = - 1;
+          if(0 === _a_) break;
+          if(1 === _a_) break a;
+          t$0 = t;
+         }
+         var
+          g = function(param){return 2 + this_will_be_undefined(0) | 0;},
+          _a_ = g(0);
+         return g(0) + _a_ | 0;
+        }
+        var nesting = 1;
+        if(caml_call2(Stdlib_Int[12], nesting, 0)) return nesting;
+        function g$0(param){
+         return 1 < caml_call1(Stdlib_Random[5], 3)
+                 ? 2 + this_will_be_undefined(0) | 0
+                 : 1;
+        }
+        var _a_ = g$0(0);
+        return g$0(0) + _a_ | 0;
+       }
+       var _a_ = handle_state([0, 1]), _a_ = caml_call1(Stdlib_Int[22], _a_);
+       caml_call1(Stdlib[46], _a_);
+       var my_ref = [0, 1];
+       my_ref[1] = 2;
+       runtime.caml_register_global([0, my_ref], "Test");
+       return;
+      }
+      (globalThis));
+    //end
+    |}]

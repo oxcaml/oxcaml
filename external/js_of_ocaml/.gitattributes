@@ -1,0 +1,8 @@
+# Default behaviour, for if core.autocrlf isn't set
+* text=auto
+
+*.ml linguist-language=OCaml
+*.mli linguist-language=OCaml
+
+# needed for the testsuite
+compiler/tests-ocaml/basic-io/wc.ml -text

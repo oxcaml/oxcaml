@@ -1,0 +1,13 @@
+(tests
+ (names test_string)
+ (build_if
+  (>= %{ocaml_version} 5.5))
+ (libraries)
+ (modes js wasm))
+
+(tests
+ (names binary)
+ (build_if
+  (>= %{ocaml_version} 5))
+ (libraries)
+ (modes js wasm))

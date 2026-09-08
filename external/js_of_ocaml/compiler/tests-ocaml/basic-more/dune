@@ -1,0 +1,36 @@
+(tests
+ (names
+  bounds
+  div_by_zero
+  function_in_ref
+  if_in_if
+  morematch
+  opaque_prim
+  pr10294
+  pr10338
+  pr1271
+  pr2719
+  pr6216
+  pr7683
+  record_evaluation_order
+  robustmatch
+  sequential_and_or
+  structural_constants
+  tbuffer
+  top_level_patterns
+  tprintf)
+ (libraries ocaml_testing)
+ (build_if
+  (>= %{ocaml_version} 5.2))
+ (modes js wasm))
+
+(tests
+ (names labels_evaluation_order)
+ (libraries ocaml_testing)
+ (build_if
+  (and
+   (>= %{ocaml_version} 5.2)
+   ; OxCaml has a different evaluation order
+   ; See ocaml/ocaml#10653
+   (not %{oxcaml_supported})))
+ (modes js wasm))
