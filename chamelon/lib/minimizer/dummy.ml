@@ -63,7 +63,8 @@ let unit_typ =
     ctyp_attributes = []
   }
 
-let default_mode = Typemode.transl_alloc_mode []
+let default_mode : Mode.Alloc.lr Typemode.modes =
+  { mode_modes = Mode.Alloc.legacy; mode_desc = [] }
 
 let a_to_unit =
   { ctyp_desc = Ttyp_arrow (Nolabel, a_typ, default_mode, unit_typ, default_mode);

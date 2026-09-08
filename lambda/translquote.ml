@@ -2519,6 +2519,9 @@ let with_new_param fp =
     (fun (id, _, _, _) -> with_new_idents_types_constr [id])
     fp.fp_newtypes
 
+let legacy_arrow_modes : Mode.Alloc.lr Typemode.modes =
+  { mode_modes = Mode.Alloc.legacy; mode_desc = [] }
+
 let without_param fp =
   let pat_of_param =
     match fp.fp_kind with
@@ -2532,7 +2535,7 @@ let without_param fp =
 
 let quote_modes loc modes =
   Typemode.untransl_mode modes
-  |> List.map (function { loc = _; txt = Parsetree.Mode m } -> m)
+  |> List.map (fun { Location.txt; _ } -> Printast.string_of_mode txt)
   |> Modes.of_string_list loc |> Modes.wrap
 
 let type_constraint_of_ambiguity loc env ambiguity =
@@ -2625,11 +2628,7 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_var (Some name, jkind_annotation)
         | Tarrow ((arg_label, _, _), ty, ty', _) ->
           Ttyp_arrow
-            ( arg_label,
-              go ty,
-              Typemode.transl_alloc_mode [],
-              go ty',
-              Typemode.transl_alloc_mode [] )
+            (arg_label, go ty, legacy_arrow_modes, go ty', legacy_arrow_modes)
         | Tpoly (ty, tyl) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
@@ -3412,9 +3411,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
                     | None -> newcorevar env loc),
-                    Typemode.transl_alloc_mode [],
+                    legacy_arrow_modes,
                     spine,
-                    Typemode.transl_alloc_mode [] );
+                    legacy_arrow_modes );
               ctyp_type = newvar ();
               ctyp_env = env;
               ctyp_loc = to_location loc;

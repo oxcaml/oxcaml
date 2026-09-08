@@ -1907,7 +1907,7 @@ module Const = struct
       Option.map
         (fun bounds_to_print ->
           Typemode.untransl_mod_bounds ~verbose:show_all_bounds bounds_to_print
-          |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s))
+          |> Typemode.const_mode_strings)
         bounds_to_print
 
     (* Returns [None] if [actual] has any scannable axis strictly greater
