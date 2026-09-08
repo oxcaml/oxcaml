@@ -133,7 +133,7 @@ class Toolchain:
 COMPILE_TIMEOUT_SEC = 100.0
 RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
-MAX_PROGRAM_BYTES = 2 * 1024 * 1024
+MAX_PROGRAM_BYTES = 1024 * 1024
 
 RATE_SMOOTHING = 0.01
 PROGRESS_INTERVAL_SEC = 30.0
@@ -724,8 +724,8 @@ executables and compares their stdout and stderr.
 A case fails if compilation fails in any configuration, a program exits with a
 non-zero status, or the configurations disagree. A case is discarded if
 execution times out or generated source exceeds {MAX_PROGRAM_BYTES} bytes.
-Failures and execution timeouts are saved under <output>/seed-<generator_seed>/.
-Oversized sources are not saved.
+Failures are saved under <output>/seed-<generator_seed>/.
+Execution timeouts and oversized sources are not saved.
 
 Exit status is 1 if any case failed, 0 otherwise.""",
         epilog="Before first use, run `make compiler` from the repository root.",
