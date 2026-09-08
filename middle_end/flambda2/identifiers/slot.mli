@@ -32,9 +32,13 @@ module type S = sig
 
   val is_imported : t -> bool
 
+  (** [to_string t] is [name t ^ "_" ^ string_of_int (stamp t)]. *)
   val to_string : t -> string
 
   val name : t -> string
+
+  (** The stamp making this slot unique within its compilation unit. *)
+  val stamp : t -> int
 
   val canonical_name : t -> string
 
