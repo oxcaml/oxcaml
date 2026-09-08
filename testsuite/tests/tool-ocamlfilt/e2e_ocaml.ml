@@ -272,6 +272,41 @@ module Alternating = struct
       named1 x
 end
 
+(* {1 Ordinals of anonymous functions, modules and lazy expressions}
+
+   Anonymous items are numbered among their siblings directly under the
+   nearest enclosing scope, in the order the compiler translates them,
+   which is not always source order: the arguments of an application
+   are visited in the order of the callee's parameters (in
+   [labelled_out_of_order], the closure passed to [~first] is [fn_{0}]
+   even though it is written second), and the body of a [let], the
+   second half of a sequence or the [else] branch of a conditional is
+   translated before what precedes it. The [@cold] local functions
+   inside the closures survive as their own symbols and make the
+   numbering visible: [labelled_out_of_order.fn_{0}.in_first]. *)
+module Ordinals = struct
+  let[@inline never] siblings_and_nesting xs =
+    List.map
+      (fun[@inline never] x ->
+        List.iter (fun[@inline never] y -> ignore (x + y)) xs;
+        x)
+      (List.filter (fun[@inline never] z -> z > 0) xs)
+
+  let[@inline never] apply_labelled ~first ~second x = first (second x)
+
+  let[@inline never] labelled_out_of_order x =
+    apply_labelled
+      ~second:(fun[@inline never] a ->
+        let[@cold] in_second () = a * 2 in
+        in_second ())
+      ~first:(fun[@inline never] b ->
+        let[@cold] in_first () = b + 1 in
+        in_first ())
+      x
+
+  let thunk = lazy (Sys.opaque_identity 41 + 1)
+end
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -300,4 +335,7 @@ let _ =
   ignore (Deep_nest.Layer1.do_thing 7);
   ignore (Deep_nest.Layer1.Layer2.down_we_go 11);
   ignore (Alternating.outer_named 2 3);
-  ignore (Alternating.anon_first 4 5)
+  ignore (Alternating.anon_first 4 5);
+  ignore (Ordinals.siblings_and_nesting [ 1; -2; 3 ]);
+  ignore (Ordinals.labelled_out_of_order 6);
+  ignore (Lazy.force Ordinals.thunk)

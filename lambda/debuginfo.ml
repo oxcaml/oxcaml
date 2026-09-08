@@ -47,7 +47,14 @@ module Scoped_location = struct
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
                mangling_item:
-                 Compilation_unit.t Structured_mangling.path_item option}
+                 Compilation_unit.t Structured_mangling.path_item option;
+               next_anonymous: int ref;
+               (* The number of anonymous functions, modules and lazy
+                  expressions entered so far directly under this scope, which
+                  is the ordinal the next one receives in its [mangling_item].
+                  Shared by the copies of the scope that
+                  [update_assume_zero_alloc] makes. *)
+              }
 
   let str = function
     | Empty -> ""
@@ -59,7 +66,20 @@ module Scoped_location = struct
 
   let cons scopes item str name mangling_item ~assume_zero_alloc =
     Cons {item; str; str_fun = str ^ ".(fun)"; name; prev = scopes;
-          assume_zero_alloc; mangling_item}
+          assume_zero_alloc; mangling_item; next_anonymous = ref 0}
+
+  (* Allocates the ordinal of the next anonymous item directly under
+     [scopes]. *)
+  let next_anonymous scopes =
+    match scopes with
+    | Empty ->
+      (* There is no enclosing scope to count in. The stamps appended to the
+         mangling path keep such symbols unique nonetheless. *)
+      0
+    | Cons { next_anonymous; _ } ->
+      let n = !next_anonymous in
+      incr next_anonymous;
+      n
 
   let empty_scopes = Empty
 
@@ -80,26 +100,22 @@ module Scoped_location = struct
     | Empty -> s
     | Cons {str; _} -> str ^ sep ^ s
 
-  let enter_anonymous_function ~scopes ~assume_zero_alloc ~loc =
+  let enter_anonymous_function ~scopes ~assume_zero_alloc =
     let str = str_fun scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_function (line, col, Some file))
+      Some (Anonymous_function (next_anonymous scopes))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
-          assume_zero_alloc; mangling_item }
+          assume_zero_alloc; mangling_item; next_anonymous = ref 0 }
 
-  let enter_anonymous_module ~scopes ~loc =
+  let enter_anonymous_module ~scopes =
     let str = str scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_module (line, col, Some file))
+      Some (Anonymous_module (next_anonymous scopes))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
           prev = scopes; assume_zero_alloc = ZA.Assume_info.none;
-          mangling_item }
+          mangling_item; next_anonymous = ref 0 }
 
   let enter_value_definition ~scopes ~assume_zero_alloc id =
     cons scopes Sc_value_definition (dot scopes (Ident.name id)) (Ident.name id)
@@ -131,8 +147,9 @@ module Scoped_location = struct
     cons scopes Sc_method_definition str s
       ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
 
-  let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
-                             ~assume_zero_alloc:ZA.Assume_info.none None
+  let enter_lazy ~scopes =
+    cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
+      (Some (Lazy (next_anonymous scopes)))
 
   let enter_partial_or_eta_wrapper ~scopes ~loc =
     let (file, line, col) = Location.get_pos_info loc.loc_start in
@@ -555,7 +572,7 @@ let to_structured_mangling_path ~name dbg :
     | Partial_function _ :: path ->
       drop_partials_and_add_function_name ~name path
     | Function name' :: _ when String.equal name name' -> path
-    | Anonymous_function _ :: _ -> path
+    | (Anonymous_function _ | Lazy _) :: _ -> path
     | Compilation_unit _ :: _ | Inline_marker :: _ | Module _ :: _
     | Anonymous_module _ :: _ | Class _ :: _ | Function _ :: _ | Stamp _ :: _
     | [] ->
