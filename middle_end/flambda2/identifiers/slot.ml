@@ -33,6 +33,8 @@ module type S = sig
 
   val name : t -> string
 
+  val stamp : t -> int
+
   val canonical_name : t -> string
 
   val payload : t -> payload
@@ -122,6 +124,8 @@ end) : S with type payload := P.payload = struct
   let to_string t = t.name ^ "_" ^ string_of_int t.name_stamp
 
   let name t = t.name
+
+  let stamp t = t.name_stamp
 
   let canonical_name t = if !Clflags.canonical_ids then name t else to_string t
 
