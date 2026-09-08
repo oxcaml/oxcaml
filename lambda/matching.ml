@@ -490,7 +490,10 @@ let matcher discr (p : Simple.pattern) rem =
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
   | Tuple l1, Tuple l2
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
-    yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
+      (* CR zeisbach: sometimes the length of these two lists can be different?
+        see robustmatch issue... come back and diagnose this. *)
+      yesif (List.length l1 = List.length l2 &&
+            List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Record (l, _), Record (l', _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')

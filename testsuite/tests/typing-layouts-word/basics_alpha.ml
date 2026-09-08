@@ -87,95 +87,43 @@ end
 module M3_5 : sig val f : nativeint_u -> nativeint_u val y : nativeint_u end
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_word) = x, false;;
 [%%expect{|
-Line 1, characters 24-25:
-1 | let f4_1 (x : t_word) = x, false;;
-                            ^
-Error: The value "x" has type "t_word" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_word is word
-         because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_word -> t_word * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_word_id) = x, false;;
 [%%expect{|
-Line 1, characters 30-31:
-1 | let f4_2 (x : 'a t_word_id) = x, false;;
-                                  ^
-Error: The value "x" has type "'a t_word_id" = "('a : word)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_word_id is word
-         because of the definition of t_word_id at line 2, characters 0-31.
-       But the layout of 'a t_word_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 : ('a : word). 'a t_word_id -> 'a t_word_id * bool = <fun>
 |}];;
 
 let f4_3 (x : nativeint_u) = x, false;;
 [%%expect{|
-Line 1, characters 29-30:
-1 | let f4_3 (x : nativeint_u) = x, false;;
-                                 ^
-Error: The value "x" has type "nativeint_u"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of nativeint_u is word
-         because it is the primitive type nativeint_u.
-       But the layout of nativeint_u must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : nativeint_u -> nativeint_u * bool = <fun>
 |}];;
 
 type t4_4 = t_word * string;;
 [%%expect{|
-Line 1, characters 12-18:
-1 | type t4_4 = t_word * string;;
-                ^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_word" is word
-         because of the definition of t_word at line 1, characters 0-18.
-       But the layout of "t_word" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_word * string
 |}];;
 
 type t4_5 = int * nativeint_u;;
 [%%expect{|
-Line 1, characters 18-29:
-1 | type t4_5 = int * nativeint_u;;
-                      ^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "nativeint_u" is word
-         because it is the primitive type nativeint_u.
-       But the layout of "nativeint_u" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * nativeint_u
 |}];;
 
 type ('a : word) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 24-26:
-1 | type ('a : word) t4_6 = 'a * 'a
-                            ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is word
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : word) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : word, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 43-45:
-1 | type ('a : word, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                               ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is word
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : word, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (****************************************************)

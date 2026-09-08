@@ -89,96 +89,46 @@ end
 Exception: Assert_failure ("", 4, 12).
 |}];;
 
-(*************************************)
-(* Test 4: No putting them in tuples *)
+(**********************************)
+(* Test 4: Putting them in tuples *)
 
 let f4_1 (x : t_untagged_immediate) = x, false;;
 [%%expect{|
-Line 1, characters 38-39:
-1 | let f4_1 (x : t_untagged_immediate) = x, false;;
-                                          ^
-Error: The value "x" has type "t_untagged_immediate"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a value layout
-         because it's the type of a tuple element.
+val f4_1 : t_untagged_immediate -> t_untagged_immediate * bool = <fun>
 |}];;
 
 let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
 [%%expect{|
-Line 1, characters 44-45:
-1 | let f4_2 (x : 'a t_untagged_immediate_id) = x, false;;
-                                                ^
-Error: The value "x" has type
-         "'a t_untagged_immediate_id" = "('a : untagged_immediate)"
-       but an expression was expected of type "('b : value_or_null)"
-       The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a value layout
-         because it's the type of a tuple element.
+val f4_2 :
+  ('a : untagged_immediate).
+    'a t_untagged_immediate_id -> 'a t_untagged_immediate_id * bool =
+  <fun>
 |}];;
 
 let f4_3 (x : int#) = x, false;;
 [%%expect{|
-Line 1, characters 22-23:
-1 | let f4_3 (x : int#) = x, false;;
-                          ^
-Error: The value "x" has type "int#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because it's the type of a tuple element.
+val f4_3 : int# -> int# * bool = <fun>
 |}];;
 
 type t4_4 = t_untagged_immediate * string;;
 [%%expect{|
-Line 1, characters 12-32:
-1 | type t4_4 = t_untagged_immediate * string;;
-                ^^^^^^^^^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_untagged_immediate" is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of "t_untagged_immediate" must be a value layout
-         because it's the type of a tuple element.
+type t4_4 = t_untagged_immediate * string
 |}];;
 
 type t4_5 = int * int#;;
 [%%expect{|
-Line 1, characters 18-22:
-1 | type t4_5 = int * int#;;
-                      ^^^^
-Error: Tuple element types must have layout value.
-       The layout of "int#" is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of "int#" must be a value layout
-         because it's the type of a tuple element.
+type t4_5 = int * int#
 |}];;
 
 type ('a : untagged_immediate) t4_6 = 'a * 'a
 [%%expect{|
-Line 1, characters 38-40:
-1 | type ('a : untagged_immediate) t4_6 = 'a * 'a
-                                          ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is untagged_immediate
-         because of the annotation on 'a in the declaration of the type t4_6.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : untagged_immediate) t4_6 = 'a * 'a
 |}];;
 
 (* check for layout propagation *)
 type ('a : untagged_immediate, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
 [%%expect{|
-Line 1, characters 57-59:
-1 | type ('a : untagged_immediate, 'b) t4_7 = ('a as 'b) -> ('b * 'b);;
-                                                             ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is untagged_immediate
-         because of the annotation on 'a in the declaration of the type t4_7.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : untagged_immediate, 'b) t4_7 = 'a -> 'a * 'a constraint 'b = 'a
 |}]
 
 (****************************************************)

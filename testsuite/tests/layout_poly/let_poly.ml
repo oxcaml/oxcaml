@@ -288,9 +288,10 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
+(* CR zeisbach: add another test that actually hits this behavior, now *)
 let poly_ f x y = #(x, (y, y))
 [%%expect{|
-val poly_ f : 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+val poly_ f : 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)

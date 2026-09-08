@@ -41,14 +41,7 @@ Error: The types of variables bound by a 'let' in a class function
 (* Tuple_element *)
 type t = t_any * t_any
 [%%expect{|
-Line 1, characters 9-14:
-1 | type t = t_any * t_any
-             ^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_any" is any
-         because of the definition of t_any at line 1, characters 0-18.
-       But the layout of "t_any" must be a value layout
-         because it's the type of a tuple element.
+type t = t_any * t_any
 |}];;
 
 (* Probe *)
