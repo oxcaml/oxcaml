@@ -121,16 +121,39 @@ type cursor = { mutable pos : int; mutable last : int }
 (* Instruction selection fuses load-add-store to the same location into a
    read-modify-write instruction; it is not a [Store], so it records no
    forwarding equation, and since it reads memory, dead store elimination
-   must leave both of them alone. *)
-(* CR xclerc: see whether we could add a peephole rule to merge the addq
-   instructions. *)
+   must leave both of them alone. The peephole optimizer then merges the two
+   adjacent read-modify-write instructions on the same location into one. *)
 let bump_twice c =
   c.pos <- c.pos + 1;
   c.pos <- c.pos + 1
 [%%expect_asm X86_64{|
 bump_twice:
+  addq  $4, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* Read-modify-write instructions on different locations are not merged. *)
+let bump_each c d =
+  c.pos <- c.pos + 1;
+  d.pos <- d.pos + 1
+[%%expect_asm X86_64{|
+bump_each:
   addq  $2, (%rax)
-  addq  $2, (%rax)
+  addq  $2, (%rbx)
+  movl  $1, %eax
+  ret
+|}]
+
+(* Nor are they when the sum of the constants does not fit in a 32-bit
+   immediate ([0x3FFF_FFFF] is tagged as [0x7FFF_FFFE]). *)
+let bump_twice_large c =
+  c.pos <- c.pos + 0x3FFF_FFFF;
+  c.pos <- c.pos + 0x3FFF_FFFF
+[%%expect_asm X86_64{|
+bump_twice_large:
+  addq  $2147483646, (%rax)
+  addq  $2147483646, (%rax)
   movl  $1, %eax
   ret
 |}]
