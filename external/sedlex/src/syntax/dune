@@ -1,0 +1,19 @@
+(library
+ (name sedlex_ppx)
+ (public_name sedlex.ppx)
+ (kind ppx_rewriter)
+ (libraries ppxlib sedlex sedlex.utils)
+ (ppx_runtime_libraries sedlex)
+ (preprocess
+  (pps ppxlib.metaquot))
+ (flags
+  (:standard -w -9)))
+
+(rule
+ (targets unicode.ml)
+ (mode promote)
+ (deps
+  (:gen ../generator/gen_unicode.exe)
+  (glob_files ../generator/data/*.txt))
+ (action
+  (run %{gen} %{targets})))
