@@ -1023,7 +1023,7 @@ let pats_of_type env ty =
   | Has_no_typedecl ->
       begin match get_desc (Ctype.expand_head env ty) with
         Ttuple tl ->
-          let sort =
+          let make_sort_var () =
             (* CR zeisbach: trying to use a bogus sort will hit some sanity
                check asserts. which contradicts that it "should never be used".
                Though I still have to investigate why... *)
@@ -1031,8 +1031,9 @@ let pats_of_type env ty =
             |> Jkind.Sort.of_var
           in
           [make_pat
-             (Tpat_tuple (List.map (fun (lbl, _) -> lbl, omega, sort) tl))
-             ty env]
+            (Tpat_tuple
+              (List.map (fun (lbl, _) -> lbl, omega, make_sort_var ()) tl))
+            ty env]
       | _ -> [omega]
       end
   | Typedecl (_, _, {type_kind = Type_abstract _ | Type_open})
