@@ -13,8 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Datalog_imports
-
 module Int = struct
   include Numbers.Int
   module Tree = Patricia_tree.Make (Numbers.Int)
@@ -103,6 +101,8 @@ module Id = struct
 
   let has_provenance { provenance; _ } = provenance
 
+  let[@inline] default_value { default_value; _ } = default_value
+
   let[@inline] columns { columns; _ } = columns
 
   let[@inline] uid { id; _ } = Type.Id.uid id
@@ -112,19 +112,6 @@ module Id = struct
     match Type.Id.provably_equal r1.id r2.id with
     | Some Equal -> t
     | None -> Misc.fatal_error "Inconsistent type for uid."
-
-  let create_iterator { is_trie; default_value; name; _ } =
-    let send_trie, recv_trie = Channel.create (Trie.empty is_trie) in
-    let send_value, recv_value = Channel.create default_value in
-    let iterator = Trie.Iterator.create is_trie recv_trie send_value in
-    let rec get_names : type a. a Trie.Iterator.hlist -> int -> string list =
-     fun (type a) (iterators : a Trie.Iterator.hlist) i : string list ->
-      match iterators with
-      | [] -> []
-      | _ :: iterators ->
-        (name ^ "." ^ string_of_int i) :: get_names iterators (i + 1)
-    in
-    send_trie, { values = iterator; names = get_names iterator 0 }, recv_value
 end
 
 let iter id f table =

@@ -215,8 +215,8 @@ module Datalog = struct
         match predicate with
         | `Atom (Atom (id, args)) -> where_atom id args f
         | `Not_atom (Atom (id, args)) -> unless_atom id args f
-        | `Distinct (Equality (repr, t1, t2)) ->
-          unless_eq (Column.value_repr repr) t1 t2 f
+        | `Distinct (Equality (column, t1, t2)) ->
+          unless_eq (Column.value_repr column) t1 t2 f
         | `Filter (Filter (p, args)) -> Datalog.filter p args f)
       f predicates
 

@@ -473,10 +473,6 @@ module Datalog : sig
     val run : ?stats:stats -> t -> database -> database
   end
 
-  type bindings
-
-  val print_bindings : Format.formatter -> bindings -> unit
-
   (** The type [('p, 'v) program] is the type of programs returning values of
       type ['v] with parameters ['p].
 
