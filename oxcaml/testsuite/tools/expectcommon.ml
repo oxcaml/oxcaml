@@ -525,7 +525,10 @@ let format_structured_diagnostic ppf
       | Annotated { annotation = _; content } -> inlines_are_empty content)
   in
   let kind_marker (kind : Diagnostic.Kind.t) =
-    match kind with Explanation -> "-" | Background -> "=" | Suggestion -> "+"
+    match kind with
+    | Explanation -> "-"
+    | Background -> "- [educate]"
+    | Suggestion -> "- [hint]"
   in
   let relation_marker (relation : Diagnostic.Relation.t) =
     match relation with Claim -> "" | Elaboration -> "~"
