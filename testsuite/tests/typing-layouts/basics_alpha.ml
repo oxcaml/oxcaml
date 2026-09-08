@@ -1083,15 +1083,7 @@ let x13 v =
   | Some v -> VV v
   | None -> assert false
 [%%expect{|
-Line 3, characters 17-18:
-3 |   | Some v -> VV v
-                     ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_void"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because it's the type of a constructor argument being projected.
+val x13 : t_void option -> void_variant = <fun>
 |}];;
 
 (* list *)
@@ -1110,15 +1102,7 @@ let x13 v =
   | [v] -> VV v
   | _ -> assert false
 [%%expect{|
-Line 3, characters 14-15:
-3 |   | [v] -> VV v
-                  ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_void"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because it's the type of a constructor argument being projected.
+val x13 : t_void list -> void_variant = <fun>
 |}];;
 
 (* array *)

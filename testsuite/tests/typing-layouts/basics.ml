@@ -1283,15 +1283,7 @@ let x13f v =
   | Some v -> f_id v
   | None -> assert false
 [%%expect{|
-Line 3, characters 19-20:
-3 |   | Some v -> f_id v
-                       ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a constructor argument being projected.
+val x13f : t_float64 option -> t_float64 = <fun>
 |}];;
 
 (* list *)
@@ -1310,15 +1302,7 @@ let x13 v =
   | [v] -> f_id v
   | _ -> assert false
 [%%expect{|
-Line 3, characters 16-17:
-3 |   | [v] -> f_id v
-                    ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a constructor argument being projected.
+val x13 : t_float64 list -> t_float64 = <fun>
 |}];;
 
 (* array *)
