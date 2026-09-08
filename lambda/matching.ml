@@ -488,7 +488,7 @@ let matcher discr (p : Simple.pattern) rem =
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
   | Unboxed_unit, Unboxed_unit -> yes ()
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
-  | Tuple n1, Tuple n2 -> yesif (n1 = n2)
+  | Tuple l1, Tuple l2
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Record (l, _), Record (l', _) ->
@@ -2516,6 +2516,7 @@ let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
        potentially get out-of-sync. this should probably be at least factored
        into a helper, and we can potentially store more info somewhere... *)
     (* check if we are in a mixed tuple. *)
+    (* CR zeisbach: this might also be the wrong call... *)
     if Mixed_product_bytes.shape_is_all_value block_shape
     then fun pos -> Pfield (pos, Pointer, sem)
     else fun pos -> Pmixedfield ([pos], block_shape, sem)
