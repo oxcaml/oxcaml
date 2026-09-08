@@ -27,27 +27,36 @@ module Scoped_location : sig
 
   val equal_scope_item : scope_item -> scope_item -> bool
 
+  (* The ordinals for the next anonymous function, module and lazy expression
+     directly under a scope. *)
+  type anonymous_counters = private
+    { next_function : int ref;
+      next_module : int ref;
+      next_lazy : int ref;
+    }
+
   type scopes = private
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
                mangling_item:
-                 Compilation_unit.t Structured_mangling.path_item option}
+                 Compilation_unit.t Structured_mangling.path_item option;
+               anonymous_counters: anonymous_counters;
+              }
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
   val compilation_unit : scopes -> Compilation_unit.t option
 
   val empty_scopes : scopes
+  (* Anonymous functions, modules and lazy expressions are each numbered among
+     the items of the same kind directly under the same enclosing scope, in the
+     order in which they are entered. *)
   val enter_anonymous_function :
     scopes:scopes ->
     assume_zero_alloc:ZA.Assume_info.t ->
-    loc:Location.t ->
     scopes
-  val enter_anonymous_module :
-    scopes:scopes ->
-    loc:Location.t ->
-    scopes
+  val enter_anonymous_module : scopes:scopes -> scopes
   val enter_value_definition :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
   val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes

@@ -48,9 +48,9 @@ module Structured = struct
       (string, int) Either.t =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> Left s
-    | Anonymous_function (l, c, f) ->
-      Left (format_anonymous_location "fn" l c f)
-    | Anonymous_module (l, c, f) -> Left (format_anonymous_location "mod" l c f)
+    | Anonymous_function n -> Left (Printf.sprintf "fn_{%d}" n)
+    | Anonymous_module n -> Left (Printf.sprintf "mod_{%d}" n)
+    | Lazy n -> Left (Printf.sprintf "lazy_{%d}" n)
     | Partial_function (l, c, f) ->
       Left (format_anonymous_location "partial" l c f)
     (* Inline_marker: the function body was specialized (copied) into the
