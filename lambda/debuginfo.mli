@@ -32,22 +32,25 @@ module Scoped_location : sig
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
                mangling_item:
-                 Compilation_unit.t Structured_mangling.path_item option}
+                 Compilation_unit.t Structured_mangling.path_item option;
+               next_anonymous: int ref;
+               (* The ordinal for the next anonymous item directly under this
+                  scope. *)
+              }
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
   val compilation_unit : scopes -> Compilation_unit.t option
 
   val empty_scopes : scopes
+  (* Anonymous functions, modules and lazy expressions are numbered among such
+     items directly under the same enclosing scope, in the order in which they
+     are entered. *)
   val enter_anonymous_function :
     scopes:scopes ->
     assume_zero_alloc:ZA.Assume_info.t ->
-    loc:Location.t ->
     scopes
-  val enter_anonymous_module :
-    scopes:scopes ->
-    loc:Location.t ->
-    scopes
+  val enter_anonymous_module : scopes:scopes -> scopes
   val enter_value_definition :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
   val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes

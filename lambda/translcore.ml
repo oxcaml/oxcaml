@@ -1311,7 +1311,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
              modifs
              (Lvar cpy))
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
-      let mod_scopes = enter_anonymous_module ~scopes ~loc:loc.loc in
+      let mod_scopes = enter_anonymous_module ~scopes in
       let lam = !transl_module ~scopes:mod_scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
                 transl_exp ~scopes layout body)
@@ -1331,7 +1331,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
            transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes layout body)
   | Texp_pack modl ->
-      let mod_scopes = enter_anonymous_module ~scopes ~loc:modl.mod_loc in
+      let mod_scopes = enter_anonymous_module ~scopes in
       !transl_module ~scopes:mod_scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _, _)},
                  loc) ->
@@ -2298,7 +2298,7 @@ and transl_function ~in_new_scope ~scopes e params body
   let scopes =
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
-    else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
+    else enter_anonymous_function ~scopes ~assume_zero_alloc
   in
   let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
@@ -3215,6 +3215,11 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
   let func =
     (* XXX fixme: use result of is_function_type *)
     let return_mode = not_alloc_stack in
+    (* The continuation is an anonymous function in its own right. *)
+    let scopes =
+      enter_anonymous_function ~scopes
+        ~assume_zero_alloc:Zero_alloc_utils.Assume_info.none
+    in
     let (kind, params, return, _region, ret_mode), body =
       event_function ~scopes case.c_rhs
         (function repr ->
