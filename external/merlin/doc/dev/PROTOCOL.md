@@ -607,6 +607,11 @@ arguments, first-class module packing and unpacking, alias chains, `include`,
 and functor-application instances.  A unit whose interface *includes* the
 target implements it too, and is reported as the `(interface)` row.
 
+Checking a module against `S with ...` retains its relationship to `S`, including
+when destructive substitution removes every declaration. Supplying a replacement
+for a module-type member relates that member to the replacement; it does not make
+the enclosing module an implementation of the replacement.
+
 Modules related to the target only definitionally are not implementers and are
 not returned: the unit or module that declares the target, an `.ml` definition
 paired with the target's own `.mli` declaration, a module ascribed to a
@@ -620,7 +625,7 @@ members, and a functor ascribed to a functor type whose result is the target.
       'target'  : string,
       'decl'    : { 'file', 'start', 'end' },
       'status'  : 'complete' | 'partial' | 'unavailable',
-      'reasons' : [ { 'kind' : string, ... } ]
+      'errors'  : [ { 'kind' : string, ... } ]
     }
   ],
   'implementations' : [
@@ -628,13 +633,11 @@ members, and a functor ascribed to a functor type whose result is the target.
       'target'     : string,
       // 'decl' is omitted for the '(interface)' target
       'decl'       : { 'file', 'start', 'end' },
-      // 'instance' is omitted for the '(interface)' target
       'instance'   : string,
       'file'       : string,
       'start'      : position,
       'end'        : position,
       'kind'       : 'unit' | 'annotations',
-      // 'check' is omitted for the '(interface)' target
       'check'      : 'annotation' | 'argument' | 'package' | 'interface',
       // 'check-site' is omitted when the check has no recorded site
       'check-site' : { 'file', 'start', 'end' }
@@ -643,20 +646,28 @@ members, and a functor ascribed to a functor type whose result is the target.
 }
 ```
 
-Reason kinds: `no-index-files`, `facts-channel-absent`, `omission` (with
+Error kinds: `no-index-files`, `facts-channel-absent` (with `index`),
+`index-read-error` (with `index` and `message`), `omission` (with
 `reason` and optional `family`),
 `unresolved-implementation` (with `target`, `instance`, `implementation` and
 optional `site`) when a matching implementation could not be resolved to a source
 location, and `unresolved-check-site` (with `target`, `instance` and `site`)
 when a recorded check site could not be resolved; neither matches nor recorded
 sites are ever silently dropped, and a match whose implementation and recorded
-site both fail to resolve reports both reasons.
+site both fail to resolve reports both errors.
 
-Each target has its own status. `complete` requires the facts channel to be
-present with no omission scoped to that declaration, and every matching
-implementation and recorded check site resolved; `partial` carries the reasons;
-`unavailable` means no usable facts channel was configured or loaded, which is
-distinct from a complete empty result.
+Each target has its own status. `complete` requires a readable facts channel in
+every configured index, no omission scoped to that declaration, and every
+matching implementation and recorded check site resolved. Usable facts from
+every index are retained even when another index fails to load or lacks the
+facts channel; the result is `partial` and carries the errors. `unavailable`
+means no usable facts channel was configured or loaded, which is distinct from
+a complete empty result.
+
+Aggregation unions all present facts channels and leaves the channel absent only
+when every input lacks one. An aggregate does not record which inputs lacked a
+channel, so `complete` describes the configured indexes, not their original
+inputs.
 
 ### `signature-help -position <position>`
 

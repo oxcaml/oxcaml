@@ -836,16 +836,12 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     in
     List.concat_map ~f:loc_and_types_of_holes nodes
   | Module_type_impls position ->
-    let typer = Mpipeline.typer_result pipeline in
-    let typedtree = Mtyper.get_typedtree typer in
     let position =
       match position with
       | None -> None
       | Some position -> Some (Mpipeline.get_lexing_pos pipeline position)
     in
-    (* [open Query_protocol] above shadows the analysis module with the
-       response types it declares under the same name. *)
-    Merlin_analysis.Module_type_impls.query ~pipeline ?position typedtree
+    Merlin_analysis.Module_type_impls.query ?position pipeline
   | Construct (pos, with_values, depth) ->
     let values_scope =
       match with_values with
