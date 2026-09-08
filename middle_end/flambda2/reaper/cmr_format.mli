@@ -22,6 +22,11 @@ type t =
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
+    cross_unit_mentions : Code_id_or_name.Set.t;
+        (** Symbols and code IDs of other compilation units that occur in this
+            unit's simplified code, and hence may be referenced by its rebuilt
+            object code. The solve uses these to decide which symbols must stay
+            global at rebuild time. *)
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -40,9 +45,11 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  (** Like [deserialise], but only deserialises the dependency graph (including
-      the hashcons restore and rename process). *)
-  val deserialise_deps_only : t -> Global_flow_graph.graph
+  (** Like [deserialise], but only deserialises the dependency graph and the
+      cross-unit mentions (including the hashcons restore and rename process).
+  *)
+  val deserialise_deps_only :
+    t -> Global_flow_graph.graph * Code_id_or_name.Set.t
 
   (** Get the unit that was being compiled when the file was saved. This is a
       pure projection. *)

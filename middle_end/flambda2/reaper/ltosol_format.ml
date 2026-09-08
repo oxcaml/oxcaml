@@ -503,6 +503,7 @@ module Shard : sig
     changed_representation:
       (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t ->
+    exported_to_other_units:Code_id_or_name.Set.t ->
     t * Field.Set.t * Compilation_unit.Set.t
 
   val deserialise :
@@ -512,6 +513,7 @@ module Shard : sig
     * Unboxing_analysis.unboxed Code_id_or_name.Map.t
     * (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t
+    * Code_id_or_name.Set.t
 end = struct
   type t =
     { table_data : Flambda_cmx_format.table_data;
@@ -519,10 +521,15 @@ end = struct
       unboxed_fields : Unboxing_analysis.unboxed Code_id_or_name.Map.t;
       changed_representation :
         (Unboxing_analysis.changed_representation * Code_id_or_name.t)
-        Code_id_or_name.Map.t
+        Code_id_or_name.Map.t;
+      (* This unit's symbols and code IDs that other participants' code
+         references; the unit's rebuild keeps exactly these global. Linkage
+         metadata, not a solver relation. *)
+      exported_to_other_units : Code_id_or_name.Set.t
     }
 
-  let create ~solution_tables ~unboxed_fields ~changed_representation =
+  let create ~solution_tables ~unboxed_fields ~changed_representation
+      ~exported_to_other_units =
     let ids = Solution_tables.ids_for_export solution_tables in
     let ids =
       Unboxing_analysis.unboxed_fields_ids_for_export unboxed_fields ids
@@ -530,6 +537,11 @@ end = struct
     let ids =
       Unboxing_analysis.changed_representation_ids_for_export
         changed_representation ids
+    in
+    let ids =
+      Code_id_or_name.Set.fold
+        (fun id ids -> Ids_for_export.add_code_id_or_name ids id)
+        exported_to_other_units ids
     in
     let fields = Solution_tables.fields_for_export solution_tables in
     let fields =
@@ -542,14 +554,19 @@ end = struct
     ( { table_data = Flambda_cmx_format.create_table_data ids;
         solution_tables;
         unboxed_fields;
-        changed_representation
+        changed_representation;
+        exported_to_other_units
       },
       fields,
       compilation_units_of_ids ids )
 
   let deserialise
-      { table_data; solution_tables; unboxed_fields; changed_representation }
-      ~rename_field =
+      { table_data;
+        solution_tables;
+        unboxed_fields;
+        changed_representation;
+        exported_to_other_units
+      } ~rename_field =
     (* [used_value_slots] and [original_compilation_unit] only drive value-slot
        pruning, which is only consulted when rewriting Flambda types, and the
        solution contains no types. [code_ids] is only needed by
@@ -570,7 +587,15 @@ end = struct
       Unboxing_analysis.changed_representation_apply_renaming
         changed_representation renaming ~rename_field
     in
-    solution_tables, unboxed_fields, changed_representation
+    let exported_to_other_units =
+      Code_id_or_name.Set.map
+        (Renaming.apply_code_id_or_name renaming)
+        exported_to_other_units
+    in
+    ( solution_tables,
+      unboxed_fields,
+      changed_representation,
+      exported_to_other_units )
 end
 
 module Header = struct
@@ -621,7 +646,19 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let save ~filename ~participants ~solution =
+(* Split a set by the compilation unit of its elements. *)
+let partition_set_by_cu set =
+  Code_id_or_name.Set.fold
+    (fun id acc ->
+      let cu = Code_id_or_name.compilation_unit id in
+      Compilation_unit.Map.update cu
+        (fun part ->
+          let part = Option.value part ~default:Code_id_or_name.Set.empty in
+          Some (Code_id_or_name.Set.add id part))
+        acc)
+    set Compilation_unit.Map.empty
+
+let save ~filename ~participants ~exported_to_other_units ~solution =
   let ({ db; unboxed_fields; changed_representation }
         : Unboxing_analysis.result) =
     solution
@@ -632,12 +669,15 @@ let save ~filename ~participants ~solution =
   in
   let unboxed_by_cu = partition_by_cu unboxed_fields in
   let changed_by_cu = partition_by_cu changed_representation in
-  (* Combine the three partitions into one map over the union of their key sets,
+  let exported_by_cu = partition_set_by_cu exported_to_other_units in
+  (* Combine the four partitions into one map over the union of their key sets,
      with empty defaults. *)
   let shard_inputs =
     let all_units =
       Compilation_unit.Set.union
-        (Compilation_unit.Map.keys tables_by_cu)
+        (Compilation_unit.Set.union
+           (Compilation_unit.Map.keys tables_by_cu)
+           (Compilation_unit.Map.keys exported_by_cu))
         (Compilation_unit.Set.union
            (Compilation_unit.Map.keys unboxed_by_cu)
            (Compilation_unit.Map.keys changed_by_cu))
@@ -649,7 +689,8 @@ let save ~filename ~participants ~solution =
       (fun cu ->
         ( find cu tables_by_cu ~default:Solution_tables.empty,
           find cu unboxed_by_cu ~default:Code_id_or_name.Map.empty,
-          find cu changed_by_cu ~default:Code_id_or_name.Map.empty ))
+          find cu changed_by_cu ~default:Code_id_or_name.Map.empty,
+          find cu exported_by_cu ~default:Code_id_or_name.Set.empty ))
       all_units
   in
   let builder =
@@ -657,10 +698,15 @@ let save ~filename ~participants ~solution =
   in
   let rev_index, fields, referenced_by_section =
     Compilation_unit.Map.fold
-      (fun cu (solution_tables, unboxed_fields, changed_representation)
+      (fun cu
+           ( solution_tables,
+             unboxed_fields,
+             changed_representation,
+             exported_to_other_units )
            (rev_index, fields, referenced_by_section) ->
         let shard, shard_fields, referenced =
           Shard.create ~solution_tables ~unboxed_fields ~changed_representation
+            ~exported_to_other_units
         in
         let idx = File_sections.Builder.add builder (Obj.repr shard) in
         ( (cu, idx) :: rev_index,
@@ -798,25 +844,38 @@ let solution_for_members { header; sections } ~members =
     Compilation_unit.Set.fold visit seeds Compilation_unit.Set.empty
   in
   let rename_field = Fields_for_export.import header.Header.field_views in
-  let tables, unboxed_fields, changed_representation, rev_loaded =
+  let tables, unboxed_fields, changed_representation, exported, rev_loaded =
     List.fold_left
-      (fun (tables, unboxed_fields, changed_representation, rev_loaded)
+      (fun (tables, unboxed_fields, changed_representation, exported, rev_loaded)
            (cu, idx) ->
         if not (Compilation_unit.Set.mem cu needed)
-        then tables, unboxed_fields, changed_representation, rev_loaded
+        then
+          tables, unboxed_fields, changed_representation, exported, rev_loaded
         else
           let shard : Shard.t = Obj.obj (File_sections.get sections idx) in
-          let shard_tables, shard_unboxed, shard_changed =
+          let shard_tables, shard_unboxed, shard_changed, shard_exported =
             Shard.deserialise shard ~rename_field
+          in
+          (* As opposed to taking the [shard_exported] sets for all compilation
+             units in the [needed] set, we only take the ones for members. The
+             [needed] compilation units also include reverse dependencies and
+             non-member dependencies, neither of which we need in the set of
+             exported identifiers for the current [members]. *)
+          let exported =
+            if List.exists (Compilation_unit.equal cu) members
+            then Code_id_or_name.Set.union exported shard_exported
+            else exported
           in
           ( Solution_tables.disjoint_union tables shard_tables,
             Code_id_or_name.Map.disjoint_union unboxed_fields shard_unboxed,
             Code_id_or_name.Map.disjoint_union changed_representation
               shard_changed,
+            exported,
             cu :: rev_loaded ))
       ( Solution_tables.empty,
         Code_id_or_name.Map.empty,
         Code_id_or_name.Map.empty,
+        Code_id_or_name.Set.empty,
         [] )
       header.Header.index
   in
@@ -825,10 +884,11 @@ let solution_for_members { header; sections } ~members =
     print_loaded_sections ~members
       ~total:(List.length header.Header.index)
       ~loaded:(List.rev rev_loaded);
-  { Unboxing_analysis.db = Solution_tables.to_database tables;
-    unboxed_fields;
-    changed_representation
-  }
+  ( { Unboxing_analysis.db = Solution_tables.to_database tables;
+      unboxed_fields;
+      changed_representation
+    },
+    exported )
 
 open Format_doc
 

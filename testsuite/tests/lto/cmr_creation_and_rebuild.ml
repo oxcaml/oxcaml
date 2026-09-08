@@ -27,7 +27,7 @@
  file = "cmr_creation_and_rebuild.reaped.cmx";
  file-exists;
 
- flags = "-flambda2-reaper";
+ flags = "-flambda2-reaper -opaque";
  compile_only = "true";
  all_modules = "cmr_creation_and_rebuild.ml";
  ocamlopt.opt;
@@ -35,6 +35,11 @@
  script = "cmp cmr_creation_and_rebuild.reaped.o cmr_creation_and_rebuild.o";
  script;
 *)
+
+(* The comparison compile uses [-opaque] so that its exported symbols are the
+   module symbol only, matching the rebuild: with a single participant, the LTO
+   solution exports no symbols to other units, so the rebuild makes everything
+   except the module symbol local. *)
 
 (* CR mvellacott: the following line would cause this test to fail, because we
    don't restore [Translmod.primitive_declarations] on resume. *)

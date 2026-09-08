@@ -21,6 +21,7 @@ type t =
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
+    cross_unit_mentions : Code_id_or_name.Set.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -116,7 +117,8 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  val deserialise_deps_only : t -> Global_flow_graph.graph
+  val deserialise_deps_only :
+    t -> Global_flow_graph.graph * Code_id_or_name.Set.t
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -131,6 +133,7 @@ end = struct
       all_code : All_code_with_sections.t;
       imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
+      cross_unit_mentions : Code_id_or_name.Set.t;
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
@@ -140,6 +143,7 @@ end = struct
          all_code;
          imported_offsets;
          deps;
+         cross_unit_mentions;
          rebuild_data
        } :
         cmr_format) : t =
@@ -183,6 +187,11 @@ end = struct
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
     in
+    let exported_ids =
+      Code_id_or_name.Set.fold
+        (fun id ids -> Ids_for_export.add_code_id_or_name ids id)
+        cross_unit_mentions exported_ids
+    in
     { original_compilation_unit = Current_unit.get_cu_exn ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
       used_value_slots;
@@ -192,6 +201,7 @@ end = struct
       (* Slots not hashconsed so we can store them as is. *)
       imported_offsets;
       deps = Deps_with_fields.create deps;
+      cross_unit_mentions;
       rebuild_data
     }
 
@@ -204,6 +214,7 @@ end = struct
         all_code;
         imported_offsets;
         deps;
+        cross_unit_mentions;
         rebuild_data
       } : cmr_format =
     (* Insert hashconsed objects from the paused process into this process'
@@ -231,6 +242,11 @@ end = struct
       |> Exported_code.apply_renaming code_ids renaming
     in
     let deps = Deps_with_fields.deserialise deps renaming in
+    let cross_unit_mentions =
+      Code_id_or_name.Set.map
+        (Renaming.apply_code_id_or_name renaming)
+        cross_unit_mentions
+    in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
@@ -239,6 +255,7 @@ end = struct
       all_code;
       imported_offsets;
       deps;
+      cross_unit_mentions;
       rebuild_data
     }
 
@@ -251,6 +268,7 @@ end = struct
         all_code = _;
         imported_offsets = _;
         deps;
+        cross_unit_mentions;
         rebuild_data = _
       } =
     (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
@@ -260,7 +278,10 @@ end = struct
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit
     in
-    Deps_with_fields.deserialise deps renaming
+    ( Deps_with_fields.deserialise deps renaming,
+      Code_id_or_name.Set.map
+        (Renaming.apply_code_id_or_name renaming)
+        cross_unit_mentions )
 
   let compilation_unit t = t.original_compilation_unit
 end

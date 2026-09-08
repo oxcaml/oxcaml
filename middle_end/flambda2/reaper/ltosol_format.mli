@@ -32,10 +32,13 @@ exception Error of error
     section per compilation unit. [participants] should list the compilation
     units included in the solution, each paired with the compilation units its
     dependency graph references; these determine which sections the unit's
-    rebuild will need to read. *)
+    rebuild will need to read. [exported_to_other_units] should contain the
+    symbols and code IDs referenced by another participant's code; each unit's
+    rebuild demotes all of its other symbols to local. *)
 val save :
   filename:string ->
   participants:(Compilation_unit.t * Compilation_unit.Set.t) list ->
+  exported_to_other_units:Code_id_or_name.Set.t ->
   solution:Unboxing_analysis.result ->
   unit
 
@@ -45,6 +48,10 @@ val load : string -> t
 val id_stamp_counters : t -> Id_stamp_counters.t
 
 (** Deserialise the solution needed to rebuild [members], inserting the
-    necessary objects into the global hashcons tables. *)
+    necessary objects into the global hashcons tables. Also returns the members'
+    symbols and code IDs that other participants' code references (see [save]).
+*)
 val solution_for_members :
-  t -> members:Compilation_unit.t list -> Unboxing_analysis.result
+  t ->
+  members:Compilation_unit.t list ->
+  Unboxing_analysis.result * Code_id_or_name.Set.t

@@ -271,6 +271,33 @@ let flambda_to_flambda0 : type m.
           let deps, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse flambda
           in
+          (* The free names of the simplified unit (which include the free names
+             of its code) cover everything the rebuilt object code can
+             reference, so they are a sound over-approximation of the unit's
+             cross-unit symbol references. The dependency graph is not: for
+             example, it does not mention the code IDs of direct calls to other
+             units. *)
+          let cross_unit_mentions =
+            let module CION = Flambda2_identifiers.Code_id_or_name in
+            let current_unit =
+              Flambda2_identifiers.Symbol.compilation_unit
+                (Flambda_unit.module_symbol flambda)
+            in
+            let add_if_cross_unit acc id =
+              if Compilation_unit.equal (CION.compilation_unit id) current_unit
+              then acc
+              else CION.Set.add id acc
+            in
+            let mentions =
+              NO.fold_names free_names ~init:CION.Set.empty ~f:(fun acc name ->
+                  Flambda2_identifiers.Name.pattern_match name
+                    ~var:(fun _ -> acc)
+                    ~symbol:(fun symbol ->
+                      add_if_cross_unit acc (CION.symbol symbol)))
+            in
+            NO.fold_code_ids free_names ~init:mentions ~f:(fun acc code_id ->
+                add_if_cross_unit acc (CION.code_id code_id))
+          in
           let cmr_payload =
             Some
               { Flambda2_reaper.Cmr_format.unit_metadata =
@@ -279,6 +306,7 @@ let flambda_to_flambda0 : type m.
                 all_code;
                 imported_offsets = Exported_offsets.imported_offsets ();
                 deps;
+                cross_unit_mentions;
                 rebuild_data
               }
           in
@@ -440,12 +468,17 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
   in
   Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
-  let graphs =
-    List.map
-      (fun cmr ->
-        ( Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr,
-          Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps_only cmr ))
-      cmrs
+  let graphs, cross_unit_mentions =
+    List.split
+      (List.map
+         (fun cmr ->
+           let graph, mentions =
+             Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps_only cmr
+           in
+           ( ( Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr,
+               graph ),
+             mentions ))
+         cmrs)
   in
   (* The compilation units referenced by each unit's own graph determine which
      pieces of the solution are loaded when rebuilding. *)
@@ -454,6 +487,35 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
       (fun (participant, graph) ->
         participant, Flambda2_reaper.Global_flow_graph.compilation_units graph)
       graphs
+  in
+  (* A participant's symbols and code IDs mentioned by another participant must
+     stay global symbols when that participant is rebuilt; the rebuild demotes
+     all others to local. Mentions of non-participant units are dropped: those
+     units are not rebuilt, so their symbol visibility never changes.
+
+     The mentions are not filtered by the solve's liveness, so a symbol stays
+     global even if the rebuilds delete every reference to it. If its own
+     definition is dead, the entry is inert: visibility is only decided for
+     symbols the rebuilt unit actually emits.
+
+     Only dependents of participants constrain this scheme. Linking
+     non-participants that participants depend on (the stdlib, say) is fine:
+     their objects cannot reference participant symbols, and participants'
+     references to them resolve against their unchanged, normally-compiled
+     objects. What must not be linked is an object compiled against a
+     participant's .cmx but not rebuilt as a participant: it could reference
+     symbols this solve never saw and therefore demotes. The one such dependent
+     is the startup file, which is safe because everything it references stays
+     global: each unit's module symbol (see [reaped_flambda2_to_cmm]) and the
+     per-unit symbols like frametables that asmgen emits as global
+     unconditionally. *)
+  let exported_to_other_units =
+    let module CION = Flambda2_identifiers.Code_id_or_name in
+    let participant_set = Compilation_unit.Set.of_list (List.map fst graphs) in
+    CION.Set.filter
+      (fun id ->
+        Compilation_unit.Set.mem (CION.compilation_unit id) participant_set)
+      (List.fold_left CION.Set.union CION.Set.empty cross_unit_mentions)
   in
   let combined_graph =
     List.fold_left
@@ -464,7 +526,30 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   in
   let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
-    ~solution
+    ~exported_to_other_units ~solution
+
+let print_exported_names ~current_unit exported_names =
+  let names =
+    NO.fold_names exported_names ~init:[] ~f:(fun acc name ->
+        Flambda2_identifiers.Name.pattern_match name
+          ~var:(fun _ -> acc)
+          ~symbol:(fun symbol ->
+            Linkage_name.to_string
+              (Flambda2_identifiers.Symbol.linkage_name symbol)
+            :: acc))
+  in
+  let names =
+    NO.fold_code_ids exported_names ~init:names ~f:(fun acc code_id ->
+        Linkage_name.to_string
+          (Flambda2_identifiers.Code_id.linkage_name code_id)
+        :: acc)
+  in
+  Format.eprintf "@[<hov 2>exported symbols for %s:@ [@[<hov>%a@]]@]@."
+    (Compilation_unit.full_path_as_string current_unit)
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+       Format.pp_print_string)
+    (List.sort String.compare names)
 
 let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     ~keep_symbol_tables ~ltosol_filename ~cmr_filename =
@@ -493,6 +578,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         all_code;
         imported_offsets;
         deps = _;
+        cross_unit_mentions = _;
         rebuild_data
       } =
     Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
@@ -503,12 +589,13 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
   (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep =
-    let member =
-      Flambda2_identifiers.Symbol.compilation_unit
-        (Flambda_unit.Metadata.module_symbol unit_metadata)
-    in
-    Flambda2_reaper.Ltosol_format.solution_for_members ltosol ~members:[member]
+  let module_symbol = Flambda_unit.Metadata.module_symbol unit_metadata in
+  let current_unit =
+    Flambda2_identifiers.Symbol.compilation_unit module_symbol
+  in
+  let solved_dep, exported_to_other_units =
+    Flambda2_reaper.Ltosol_format.solution_for_members ltosol
+      ~members:[current_unit]
   in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
@@ -520,7 +607,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         cmx;
         all_code;
         used_value_slots = _;
-        reachable_names
+        reachable_names = _
       } =
     let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets all_code
         =
@@ -536,5 +623,32 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   in
   Option.iter Compilenv.set_export_info cmx;
   Compiler_hooks.execute Reaped_flambda2 flambda;
+  (* The solve knows exactly which of this unit's symbols other participants
+     reference, so pass that set to [To_cmm] as the symbols that must stay
+     global, ignoring [reachable_names]. Neither set contains the other in
+     general: [reachable_names] is a fixpoint from the module symbol over the
+     rebuilt typing env and exported code, so a symbol another unit calls
+     directly need not be in it (for example under [-opaque], or once the module
+     block no longer carries the chain to it), and conversely it contains
+     symbols no other unit references. The module symbol always stays global
+     because the startup file references it. *)
+  let exported_names =
+    let module CION = Flambda2_identifiers.Code_id_or_name in
+    let module Name_mode = Flambda2_nominal.Name_mode in
+    CION.Set.fold
+      (fun id exported_names ->
+        CION.pattern_match' id
+          ~code_id:(fun code_id ->
+            NO.add_code_id exported_names code_id Name_mode.normal)
+          ~name:(fun name ->
+            Flambda2_identifiers.Name.pattern_match name
+              ~var:(fun _ -> exported_names)
+              ~symbol:(fun symbol ->
+                NO.add_symbol exported_names symbol Name_mode.normal)))
+      exported_to_other_units
+      (NO.singleton_symbol module_symbol Name_mode.normal)
+  in
+  if Flambda_features.debug_reaper "export"
+  then print_exported_names ~current_unit exported_names;
   flambda_result_to_cmm ~keep_symbol_tables
-    { flambda; all_code; offsets; reachable_names }
+    { flambda; all_code; offsets; reachable_names = exported_names }
