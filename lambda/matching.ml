@@ -5025,6 +5025,10 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
+    (* CR zeisbach: this technically tracks more information than the previous
+       code (which used [All_value]). I think this information is just
+       duplicating that which already exists. But it should not lead to any perf
+       regressions, and has cleaner code right here.  *)
     let shape =
       Array.of_list
         (List.map
