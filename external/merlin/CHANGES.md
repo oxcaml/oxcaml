@@ -2,10 +2,10 @@ unreleased
 ==========
 
   + index format
+    - Implemente a pointer to another index file: a new optimization of how ocaml-index builds index files. The resulting index files should take up less disk space (#2051)
     - Use a LRU to reduce memory usage when indexing. Change the way small
       values are stored. Make sub-indexes paths relative to the working
       directory of the indexer. (#2079)
-
 
 merlin 5.6
 ==========
