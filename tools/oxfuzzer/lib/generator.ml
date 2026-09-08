@@ -1,48 +1,38 @@
 (* Random generation of the IR, configurable through [Config]. *)
 module Bin_op = Ir.Bin_op
+module Binding = Ir.Binding
 module Expr = Ir.Expr
 module Function = Ir.Function
 module Inline = Ir.Inline
 module Name = Ir.Name
 module Number = Ir.Number
 module NumberTy = Ir.NumberTy
+module Place = Ir.Place
 module Statement = Ir.Statement
 module Ty = Ir.Ty
 
 module State = struct
   type t =
     { random_state : Random.State.t;
-      mutable fresh_counter : int;
-      mutable function_counter : int;
-      mutable top_level_functions : Function.t list
+      names : Fresh.t;
+      function_names : Fresh.t;
+      mutable top_level_functions : Function.t list;
+      mutable record_types : Ty.record list
     }
 
   let create random_state =
     { random_state;
-      fresh_counter = 0;
-      function_counter = 0;
-      top_level_functions = []
+      names = Fresh.create ~prefix:"x";
+      function_names = Fresh.create ~prefix:"f";
+      top_level_functions = [];
+      record_types = []
     }
 
-  let fresh t =
-    let name = Name.of_string (Format.sprintf "x_%d" t.fresh_counter) in
-    t.fresh_counter <- t.fresh_counter + 1;
-    name
+  let fresh t = Fresh.next t.names
 
-  let can_create_function t ~max = t.function_counter < max
+  let can_create_function t ~max = Fresh.count t.function_names < max
 
-  let reserve_function t =
-    let name = Name.of_string (Format.sprintf "f_%d" t.function_counter) in
-    t.function_counter <- t.function_counter + 1;
-    name
-end
-
-module Binding = struct
-  type t =
-    { name : Name.t;
-      ty : Ty.t;
-      is_mutable : bool
-    }
+  let reserve_function t = Fresh.next t.function_names
 end
 
 module Loop_variable = struct
@@ -72,44 +62,6 @@ module Env = struct
         }
     in
     { t with loop_variables = loop_variable :: t.loop_variables }
-end
-
-(* CR-someday hwasilewski: Move all constants, including probabilities, into
-   Config. *)
-(* CR-soon hwasilewski: Make [Config] controlled by swarm testing. *)
-module Config = struct
-  let max_function_count = 10
-
-  let fun_min_param_count = 0
-
-  let fun_max_param_count = 5
-
-  let max_block_depth = 4
-
-  let max_loop_stride = 8
-
-  let max_loop_offset = 16
-
-  let toplevel_var_count = 5
-
-  let max_array_dimensions = 3
-
-  let max_array_axis_size = 10
-
-  let max_array_elements = 256
-
-  (* Percentages. *)
-  let array_probability = 25
-
-  let array_literal_probability = 50
-
-  let bounded_index_probability = 75
-
-  let opaque_initializer_probability = 50
-
-  let opaque_leaf_probability = 5
-
-  let opaque_loop_bound_probability = 50
 end
 
 (* CR-someday hwasilewski: We should consider changing this to be a monad, which
@@ -216,6 +168,67 @@ let gen_array_dimensions st =
   in
   sizes dimensions Config.max_array_elements
 
+let gen_scalar_or_array_type st =
+  let nty = random_number_ty st in
+  if with_probability st ~probability:Config.array_probability
+  then Ty.Array (nty, gen_array_dimensions st)
+  else Ty.Number nty
+
+let gen_record_types (st : State.t) =
+  let count = random_int_in_range st ~min:1 ~max:Config.max_record_types in
+  let rec gen id records =
+    if id = count
+    then List.rev records
+    else
+      let fields =
+        List.init (random_int_in_range st ~min:1 ~max:Config.max_record_fields)
+          (fun index ->
+            { Ty.index;
+              ty =
+                (if
+                   (not (List.is_empty records))
+                   && with_probability st
+                        ~probability:Config.nested_record_probability
+                 then
+                   let record = random_element st records in
+                   Ty.Record
+                     { record with unboxed = Random.State.bool st.random_state }
+                 else gen_scalar_or_array_type st);
+              is_mutable =
+                with_probability st
+                  ~probability:Config.mutable_field_probability
+            })
+      in
+      gen (id + 1) ({ Ty.id; fields; unboxed = false } :: records)
+  in
+  gen 0 []
+
+(* CR-soon hwasilewski: add bool arguments *)
+(* CR-soon hwasilewski: Add boolean variable generation. *)
+let gen_type (st : State.t) =
+  if with_probability st ~probability:Config.record_probability
+  then
+    let record = random_element st st.record_types in
+    Ty.Record { record with unboxed = Random.State.bool st.random_state }
+  else gen_scalar_or_array_type st
+
+let can_convert from to_ =
+  match from, to_ with
+  | Ty.Number _, Ty.Number _ -> true
+  | Ty.Record left, Ty.Record right -> Int.equal left.id right.id
+  | _ -> Ty.equal from to_
+
+let convert_value (st : State.t) from to_ expr =
+  if Ty.equal from to_
+  then expr
+  else
+    match from, to_ with
+    | Ty.Number from, Ty.Number to_ -> Expr.Convert { expr; from; to_ }
+    | Ty.Record from, Ty.Record to_ when Int.equal from.id to_.id ->
+      Expr.Record_convert
+        { from; to_unboxed = to_.unboxed; source_name = State.fresh st; expr }
+    | _ -> Misc.fatal_errorf "convert_value: incompatible types"
+
 let gen_array_index st (env : Env.t) size =
   let variables =
     List.filter
@@ -234,12 +247,12 @@ let gen_array_index st (env : Env.t) size =
       random_int_in_range st ~min:(-lower_bound) ~max:(size - 1 - upper_bound)
     in
     if offset = 0
-    then Expr.Var name
+    then Expr.Read (Place.Variable name)
     else
       Expr.Bin_op
         { ty = Ty.Number (NumberTy.boxed Int);
           op = Bin_op.Add;
-          lhs = Expr.Var name;
+          lhs = Expr.Read (Place.Variable name);
           rhs = Expr.Const (Number.Int offset)
         }
   else Expr.Const (Number.Int (random_int_in_range st ~min:0 ~max:(size - 1)))
@@ -247,26 +260,47 @@ let gen_array_index st (env : Env.t) size =
 let gen_array_indices st env dimensions =
   List.map (gen_array_index st env) dimensions
 
-let gen_numeric_var (st : State.t) (env : Env.t) nty =
-  let vars =
-    List.filter_map
-      (fun { Binding.name; ty; _ } ->
-        match ty with
-        | Ty.Number nty -> Some (nty, fun () -> Expr.Var name)
-        | Ty.Array (nty, dimensions) ->
-          Some
-            ( nty,
-              fun () ->
-                Expr.Array_get (name, gen_array_indices st env dimensions) )
-        | Ty.Bool -> None)
-      env.bindings
+let places st (env : Env.t) ~for_write =
+  let rec collect ty is_mutable make =
+    let here = if for_write && not is_mutable then [] else [ty, make] in
+    let children =
+      match ty with
+      | Ty.Record record ->
+        List.concat_map
+          (fun (field : Ty.field) ->
+            collect field.ty ((not record.unboxed) && field.is_mutable)
+              (fun () -> Place.Field (make (), record, field)))
+          record.fields
+      | Ty.Array (nty, dimensions) ->
+        [ ( Ty.Number nty,
+            fun () ->
+              Place.Element (make (), gen_array_indices st env dimensions) ) ]
+      | Ty.Number _ | Ty.Bool -> []
+    in
+    here @ children
+  in
+  List.concat_map
+    (fun (binding : Binding.t) ->
+      collect binding.ty binding.is_mutable (fun () ->
+          Place.Variable binding.name))
+    env.bindings
+
+let gen_existing st env ty =
+  let choices =
+    List.filter
+      (fun (from, _) -> can_convert from ty)
+      (places st env ~for_write:false)
   in
   Gen.when_
-    (not (List.is_empty vars))
+    (not (List.is_empty choices))
     (fun () ->
-      let inner_ty, generate = random_element st vars in
-      maybe_opaque st ~probability:Config.opaque_leaf_probability
-        (Expr.Convert { from = inner_ty; to_ = nty; expr = generate () }))
+      let from, make = random_element st choices in
+      convert_value st from ty (Expr.Read (make ())))
+
+let gen_numeric_var st env nty =
+  Gen.map
+    (gen_existing st env (Ty.Number nty))
+    ~f:(maybe_opaque st ~probability:Config.opaque_leaf_probability)
 
 let gen_float_bits (st : State.t) ~fraction_bits ~exponent_bits ~bits_of_float
     ~random_bits =
@@ -373,6 +407,8 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
   in
   gen_const nty
 
+(* CR-someday hwasilewski: Let arrays have arbitrary types, including
+   records. *)
 let gen_array st env nty dimensions =
   if with_probability st ~probability:Config.array_literal_probability
   then
@@ -394,7 +430,7 @@ let gen_array st env nty dimensions =
       | Some generate -> generate ()
       | None -> Gen.run_exn (gen_numeric_const st nty)
     in
-    Expr.Array_make { dimensions; init }
+    Expr.Array_make { dimensions; init_name = State.fresh st; init }
 
 let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   let gen_ty nty =
@@ -428,54 +464,52 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
   in
   Gen.run_exn
     (Gen.weighted st.random_state
-       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env nty])
+       [5, leaf; 3, gen_binop nty; 1, gen_fun_call st env (Ty.Number nty)])
 
+(* CR-someday hwasilewski: These function calls can have side effects, because
+   of mutable records. Currently we rely on a de facto right-to-left evaluation
+   order, which holds in many cases but is not specified. We should either do
+   some sort of effect analysis in the style of Efftester, make sure we pull
+   function calls out of expressions into let-bindings for example. *)
 and gen_fun_call (st : State.t) caller_env return_ty =
   if not (State.can_create_function st ~max:Config.max_function_count)
   then Gen.unavailable
   else
     let gen_arguments params =
       List.map
-        (fun (_, ty) ->
-          match ty with
-          | Ty.Number nty -> gen_number st caller_env nty
-          (* CR-soon hwasilewski: add bool arguments *)
-          | Ty.Bool -> assert false
-          | Ty.Array _ ->
-            Misc.fatal_errorf "gen_arguments: unexpected array parameter")
+        (fun (binding : Binding.t) -> gen_value st caller_env binding.ty)
         params
     in
-    let call_existing_function () =
-      let function_ = random_element st st.top_level_functions in
-      let args = gen_arguments function_.params in
-      Expr.Convert
-        { expr = Expr.Call_toplevel { fun_name = function_.name; args };
-          from = function_.return_ty;
-          to_ = return_ty
-        }
+    let functions =
+      List.filter
+        (fun (function_ : Function.t) ->
+          can_convert function_.return_ty return_ty)
+        st.top_level_functions
     in
     let existing_function =
       Gen.when_
-        (not (List.is_empty st.top_level_functions))
-        call_existing_function
+        (not (List.is_empty functions))
+        (fun () ->
+          let function_ = random_element st functions in
+          let args = gen_arguments function_.params in
+          convert_value st function_.return_ty return_ty
+            (Expr.Call_toplevel { fun_name = function_.name; args }))
     in
     let new_function =
       Gen.create (fun () ->
           let name = State.reserve_function st in
-          let parameter_types =
+          let params =
             List.init
               (random_int_in_range st ~min:Config.fun_min_param_count
-                 ~max:Config.fun_max_param_count) (fun _ -> random_number_ty st)
+                 ~max:Config.fun_max_param_count) (fun _ ->
+                { Binding.name = State.fresh st;
+                  ty = gen_type st;
+                  is_mutable =
+                    with_probability st
+                      ~probability:Config.mutable_binding_probability
+                })
           in
-          let callee_env, params =
-            List.fold_left_map
-              (fun env nty ->
-                let name = State.fresh st in
-                ( Env.extend env
-                    { Binding.name; ty = Ty.Number nty; is_mutable = true },
-                  (name, Ty.Number nty) ))
-              Env.empty parameter_types
-          in
+          let callee_env = List.fold_left Env.extend Env.empty params in
           let inline : Inline.t =
             match Random.State.int st.random_state 3 with
             | 0 -> Never
@@ -485,9 +519,9 @@ and gen_fun_call (st : State.t) caller_env return_ty =
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
           let result =
-            match gen_numeric_var st callee_env return_ty with
+            match gen_existing st callee_env return_ty with
             | Some generate -> generate ()
-            | None -> gen_number st callee_env return_ty
+            | None -> gen_value st callee_env return_ty
           in
           let function_ =
             { Function.name; params; inline; body; return_ty; result }
@@ -520,21 +554,48 @@ and gen_bool (st : State.t) env =
          1, gen_bool_binop Bin_op.And;
          1, gen_bool_binop Bin_op.Or ])
 
+and gen_value (st : State.t) env ty =
+  match ty with
+  | Ty.Number nty -> gen_number st env nty
+  | Ty.Bool -> gen_bool st env
+  | Ty.Array (nty, dimensions) ->
+    Gen.run_exn
+      (Gen.weighted st.random_state
+         [ 3, gen_existing st env ty;
+           2, Gen.create (fun () -> gen_array st env nty dimensions);
+           1, gen_fun_call st env ty ])
+  | Ty.Record record ->
+    let existing = gen_existing st env ty in
+    let construct =
+      Gen.create (fun () ->
+          Expr.Record
+            ( record,
+              List.map
+                (fun (field : Ty.field) -> gen_value st env field.ty)
+                record.fields ))
+    in
+    let update =
+      Gen.map existing ~f:(fun base ->
+          let field = random_element st record.fields in
+          Expr.Record_update (record, base, field, gen_value st env field.ty))
+    in
+    Gen.run_exn
+      (Gen.weighted st.random_state
+         [3, existing; 2, construct; 1, update; 1, gen_fun_call st env ty])
+
 and gen_decl st env =
-  let name = State.fresh st in
-  let nty = random_number_ty st in
-  let ty, expr =
-    if with_probability st ~probability:Config.array_probability
-    then
-      let dimensions = gen_array_dimensions st in
-      Ty.Array (nty, dimensions), gen_array st env nty dimensions
-    else Ty.Number nty, gen_number st env nty
+  let binding =
+    { Binding.name = State.fresh st;
+      ty = gen_type st;
+      is_mutable =
+        with_probability st ~probability:Config.mutable_binding_probability
+    }
   in
   let expr =
-    maybe_opaque st ~probability:Config.opaque_initializer_probability expr
+    maybe_opaque st ~probability:Config.opaque_initializer_probability
+      (gen_value st env binding.ty)
   in
-  let env = Env.extend env { Binding.name; ty; is_mutable = true } in
-  env, (name, ty, expr)
+  Env.extend env binding, (binding, expr)
 
 and gen_fun_body (st : State.t) (env : Env.t) depth =
   let stmt_count = 1 + Random.State.int st.random_state 4 in
@@ -546,32 +607,15 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
         let env, rest = gen env (remaining - 1) in
         env, Statement.sequence statement rest
       in
-      let mutable_bindings =
-        List.filter
-          (fun (binding : Binding.t) ->
-            match binding.Binding.ty with
-            | Ty.Array _ -> true
-            | Ty.Number _ | Ty.Bool -> binding.is_mutable)
-          env.Env.bindings
-      in
+      let targets = places st env ~for_write:true in
       let gen_assign =
         Gen.when_
-          (not (List.is_empty mutable_bindings))
+          (not (List.is_empty targets))
           (fun () ->
-            let { Binding.name; ty; _ } = random_element st mutable_bindings in
-            let nty, assign =
-              (* CR-soon hwasilewski: Add boolean variable generation. *)
-              match ty with
-              | Ty.Number nty -> nty, fun expr -> Statement.Assign (name, expr)
-              | Ty.Array (nty, dimensions) ->
-                let indices = gen_array_indices st env dimensions in
-                nty, fun expr -> Statement.Array_set (name, indices, expr)
-              | Bool ->
-                Misc.fatal_errorf
-                  "gen_fun_body.gen_assign: unexpected variable of type bool"
-            in
-            let expr = gen_number st env nty in
-            continue env (assign expr))
+            let ty, make = random_element st targets in
+            let target = make () in
+            let expr = gen_value st env ty in
+            continue env (Statement.Assign (target, expr)))
       in
       let gen_if =
         Gen.create (fun () ->
@@ -582,10 +626,14 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
       in
       let gen_local_decl =
         Gen.when_ (remaining > 1) (fun () ->
-            let env, (name, _ty, expr) = gen_decl st env in
+            let env, (binding, expr) = gen_decl st env in
             let env, body = gen env (remaining - 1) in
-            env, Statement.Let_mutable (name, expr, body))
+            env, Statement.Let (binding, expr, body))
       in
+      (* CR-someday hwasilewski: We should, with some probability, generate the
+         loop bounds so that they iterate within the bounds of an array
+         dimension, so that there is a higher probability that the loop iterates
+         over an array. *)
       let gen_bounded_loop =
         Gen.create (fun () ->
             let name = State.fresh st in
@@ -624,8 +672,7 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
                  }))
       in
       let gen_empty =
-        Gen.when_ (List.is_empty mutable_bindings) (fun () ->
-            env, Statement.Seq [])
+        Gen.when_ (List.is_empty targets) (fun () -> env, Statement.Seq [])
       in
       let allowed =
         if depth >= Config.max_block_depth
@@ -649,10 +696,11 @@ let gen_program (st : State.t) env =
   in
   let env, toplevel_decls = gen_vars env Config.toplevel_var_count in
   let _env, toplevel_statement = gen_fun_body st env 0 in
-  Program.create
+  Program.create ~record_types:st.record_types
     ~functions:(List.rev st.top_level_functions)
     ~toplevel_decls ~toplevel_statement
 
 let generate random =
   let state = State.create random in
+  state.record_types <- gen_record_types state;
   gen_program state Env.empty
