@@ -6,12 +6,9 @@
  { flags += " -O3"; expect.opt; }
 *)
 
-(* [transl_record] selects [Pduprecord] at 256 source labels
-   ([Config.max_young_wosize]), even when the native payload is smaller.
-   These are partial updates of opaque arguments, not record reconstructions.
-   Native-only shape checks: bytecode does not erase the void fields.
-   Check effects without requiring an operand evaluation order, physical
-   identity, or particular allocation counts. *)
+(* Records behave differently when they have at least 256 labels:
+   for example, functional updates copy the record and then overwrite fields
+   rather than reconstructing the record from scratch. *)
 
 module Large : sig
   val all_void : unit -> unit
