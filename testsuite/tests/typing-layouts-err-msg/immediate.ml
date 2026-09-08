@@ -6,7 +6,7 @@
 (***************************)
 (* Immediate layout errors *)
 
-(* All-void boxed records are blocks, not immediates. *)
+(* All-void boxed records are empty blocks, not immediates. *)
 type bad : immediate = { x : unit# }
 [%%expect{|
 Line 1, characters 0-36:
@@ -21,7 +21,7 @@ Error: The layout of type "bad" is value non_float
        the layout value non_float.
 |}]
 
-(* All-void inline records are blocks, not immediates. *)
+(* All-void inline records are empty blocks, not immediates. *)
 
 type t : immediate = A of { x : unit# }
 [%%expect{|
