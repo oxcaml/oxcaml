@@ -184,6 +184,8 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
+let tag_stamp = "D"
+
 type 'cu path_item =
   | Compilation_unit of 'cu
   | Inline_marker
@@ -193,6 +195,7 @@ type 'cu path_item =
   | Function of string
   | Anonymous_function of int * int * string option
   | Partial_function of int * int * string option
+  | Stamp of int
 
 type 'cu path = 'cu path_item list
 
@@ -221,6 +224,11 @@ let mangle_path_item buf path_item =
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_function
   | Partial_function (line, col, file_opt) ->
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
+  | Stamp n ->
+    (* A decimal number cannot be length-prefixed like an identifier (the two
+       would run together), so it is terminated by [_] instead, which cannot
+       start an item. *)
+    Printf.bprintf buf "%s%d_" tag_stamp n
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
@@ -387,44 +395,58 @@ module Parse = struct
   let starts_with_prefix sym = Option.is_some (matched_prefix_len sym)
 
   let parse sym =
-    let parse_loc pos tag_constructor =
-      Option.bind (decode sym pos) @@ fun (decoded, l) ->
-      Option.bind (parse_location decoded) @@ fun (line, col, file_opt) ->
-      Some (tag_constructor line col file_opt, l)
-    in
-    let parse_named pos tag_constructor =
-      Option.bind (decode sym pos) @@ fun (decoded, l) ->
-      Some (tag_constructor decoded, l)
-    in
     let len = String.length sym in
-    Option.bind (matched_prefix_len sym) @@ fun start_pos ->
-    let rec loop path pos =
-      let aux parse_fun tag_constructor =
-        Option.bind (parse_fun (pos + 1) tag_constructor) @@ fun (it, l) ->
-        loop (it :: path) (pos + 1 + l)
-      and build_result () =
-        if pos = start_pos
-        then None
-        else
-          let suffix =
-            if pos < len then String.sub sym pos (len - pos) else ""
-          in
-          Some (List.rev path, suffix)
-      in
-      if pos < len
-      then
-        match sym.[pos] with
-        | 'U' -> aux parse_named (fun s -> Compilation_unit s)
-        | 'M' -> aux parse_named (fun s -> Module s)
-        | 'O' -> aux parse_named (fun s -> Class s)
-        | 'F' -> aux parse_named (fun s -> Function s)
-        | 'L' -> aux parse_loc (fun l c f -> Anonymous_function (l, c, f))
-        | 'S' -> aux parse_loc (fun l c f -> Anonymous_module (l, c, f))
-        | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
-        | 'I' -> loop (Inline_marker :: path) (pos + 1)
-        | '_' -> build_result ()
-        | _ -> None
-      else build_result ()
+    (* Inverse of [tag_prefixed_loc] in [mangle_path_item]. *)
+    let parse_location_payload pos =
+      Option.bind (decode sym pos) @@ fun (decoded, l) ->
+      Option.map (fun location -> location, l) (parse_location decoded)
     in
-    loop [] start_pos
+    (* Inverse of the [Stamp] case of [mangle_path_item]: a decimal number
+       followed by its [_] terminator. *)
+    let parse_number pos =
+      Option.bind (undecimal sym pos) @@ fun (n, l) ->
+      if pos + l < len && Char.equal sym.[pos + l] '_'
+      then Some (n, l + 1)
+      else None
+    in
+    (* Each of the parsers below returns what it parsed together with the
+       position following it. *)
+    let parse_item pos =
+      let with_payload parse_payload make_item =
+        Option.map
+          (fun (payload, l) -> make_item payload, pos + 1 + l)
+          (parse_payload (pos + 1))
+      in
+      if pos >= len
+      then None
+      else
+        match sym.[pos] with
+        | 'U' -> with_payload (decode sym) (fun s -> Compilation_unit s)
+        | 'M' -> with_payload (decode sym) (fun s -> Module s)
+        | 'O' -> with_payload (decode sym) (fun s -> Class s)
+        | 'F' -> with_payload (decode sym) (fun s -> Function s)
+        | 'L' ->
+          with_payload parse_location_payload (fun (l, c, f) ->
+              Anonymous_function (l, c, f))
+        | 'S' ->
+          with_payload parse_location_payload (fun (l, c, f) ->
+              Anonymous_module (l, c, f))
+        | 'P' ->
+          with_payload parse_location_payload (fun (l, c, f) ->
+              Partial_function (l, c, f))
+        | 'D' -> with_payload parse_number (fun n -> Stamp n)
+        | 'I' -> Some (Inline_marker, pos + 1)
+        | _ -> None
+    in
+    (* All the items up to the end of [sym]. *)
+    let rec parse_all acc pos =
+      if pos >= len
+      then Some (List.rev acc)
+      else
+        Option.bind (parse_item pos) @@ fun (item, pos) ->
+        parse_all (item :: acc) pos
+    in
+    Option.bind (matched_prefix_len sym) @@ fun start_pos ->
+    Option.bind (parse_all [] start_pos) @@ fun path ->
+    match path with [] -> None | _ :: _ -> Some path
 end

@@ -907,12 +907,12 @@ module Code_id = struct
       incr previous_name_stamp;
       !previous_name_stamp
     in
-    let name_with_slot_stamp =
-      Code_id_data.name_with_slot_stamp ~name ~slot_stamp
-    in
     let linkage_name =
       match Compilation_unit.name_mangling_scheme_for_current_unit () with
       | Flat ->
+        let name_with_slot_stamp =
+          Code_id_data.name_with_slot_stamp ~name ~slot_stamp
+        in
         let name =
           if Flambda_features.Expert.shorten_symbol_names ()
           then Printf.sprintf "%s_%d" name_with_slot_stamp name_stamp
@@ -920,15 +920,16 @@ module Code_id = struct
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
       | Structured ->
-        let suffix =
-          if Flambda_features.Expert.shorten_symbol_names ()
-          then Printf.sprintf "_%d" name_stamp
-          else Printf.sprintf "_%d_code" name_stamp
+        (* The stamps are emitted as their own path items so that the demangler
+           can omit them. There is no [_code] suffix in this scheme, and hence
+           nothing for [shorten_symbol_names] to shorten. *)
+        let stamps : _ Structured_mangling.path =
+          match slot_stamp with
+          | None -> [Stamp name_stamp]
+          | Some slot_stamp -> [Stamp slot_stamp; Stamp name_stamp]
         in
-        let path =
-          Debuginfo.to_structured_mangling_path ~name:name_with_slot_stamp debug
-        in
-        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
+        let path = Debuginfo.to_structured_mangling_path ~name debug @ stamps in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
