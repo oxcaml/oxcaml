@@ -223,16 +223,16 @@ let all_commands =
          }\n\
          ```\n\n\
          Each edit replaces its [start, end] range with [new_text] (an empty \
-         range is an insertion). The edits must be applied atomically — all \
-         or none: a hoisted signature-level clause is only sound together \
-         with its per-item exemptions.\n\n\
+         range is an insertion). The edits must be applied atomically — all or \
+         none: a hoisted signature-level clause is only sound together with \
+         its per-item exemptions.\n\n\
          Nothing is suggested for a declaration unless the set of checks \
          against it is known to be complete and every one of them could be \
          analyzed: a partial discovery suggests nothing.\n\n\
          Implementations other than the queried buffer are read from disk, so \
          unsaved edits to them are not seen; with no index configured, only \
-         the queried unit's own interface is answered for."
-      ~default:() begin fun buffer () ->
+         the queried unit's own interface is answered for." ~default:()
+      begin fun buffer () ->
         run buffer Query_protocol.Intf_weaknesses
       end;
     command "construct"
