@@ -1771,8 +1771,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.types_rewrite_context
-          bound_name ks
+        Types_rewriter.rewrite_kind_with_subkind env.uses bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -2545,7 +2544,7 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
                   raw_is_var_used solved_dep v (K.With_subkind.kind kind)
                 in
                 let kind =
-                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
+                  Types_rewriter.rewrite_kind_with_subkind solved_dep
                     (Name.var v) kind
                 in
                 (* TODO: fix this, needs the mapping between code ids of
@@ -2576,8 +2575,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       then
         Keep
           ( param,
-            Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-              (Name.var param) kind )
+            Types_rewriter.rewrite_kind_with_subkind solved_dep (Name.var param)
+              kind )
       else Delete
     | Some fields -> Unbox fields
   in
