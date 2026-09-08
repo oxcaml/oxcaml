@@ -23,6 +23,7 @@
    perf_demangled_symbols
    stack_allocation
    poll_insertion
+   runtime5
    address_sanitizer
    stack_checks
    multidomain
