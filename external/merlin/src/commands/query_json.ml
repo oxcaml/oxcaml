@@ -722,8 +722,9 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     in
     `List
       (List.map actions
-         ~f:(fun ({ intf_file; edits }
-                   : Query_protocol.Intf_weakness.code_action) ->
+         ~f:(fun
+             ({ intf_file; edits } : Query_protocol.Intf_weakness.code_action)
+           ->
            `Assoc
              [ ("intf_file", `String intf_file);
                ("edits", `List (List.map edits ~f:json_of_edit))
