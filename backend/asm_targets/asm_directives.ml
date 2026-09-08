@@ -1141,7 +1141,7 @@ let force_assembly_time_constant expr =
     direct_assignment temp expr;
     const_variable temp
 
-let between_symbols_in_current_unit ~upper ~lower =
+let between_symbols_in_current_unit0 ~upper ~lower ~const_for_width =
   (* CR-someday bkhajwal: Add checks below from gdb-names-gpr
      check_symbol_in_current_unit upper; check_symbol_in_current_unit lower;
      check_symbols_in_same_section upper lower; *)
@@ -1150,8 +1150,19 @@ let between_symbols_in_current_unit ~upper ~lower =
   let expr = const_sub upper lower in
   (* CR sspies: is this check even needed? *)
   if TS.is_macos ()
-  then const_machine_width (force_assembly_time_constant expr)
-  else const_machine_width expr
+  then const_for_width (force_assembly_time_constant expr)
+  else const_for_width expr
+
+let between_symbols_in_current_unit ~upper ~lower =
+  between_symbols_in_current_unit0 ~upper ~lower ~const_for_width:(fun expr ->
+      const_machine_width expr)
+
+let between_symbols_in_current_unit_32_bit ?comment:_comment ~upper ~lower () =
+  Option.iter comment _comment;
+  (* We rely on the assembler for overflow checking, as in
+     [between_labels_32_bit_with_offsets] below. *)
+  between_symbols_in_current_unit0 ~upper ~lower ~const_for_width:(fun expr ->
+      const expr Thirty_two)
 
 let between_labels_16_bit ?comment:_ ~upper:_ ~lower:_ () =
   (* CR poechsel: use the arguments *)
@@ -1177,17 +1188,22 @@ let delta_uleb128 ~upper ~lower =
   in
   emit (Delta_uleb128 { delta })
 
-let between_labels_64_bit_with_offsets ?comment:_comment ~upper ~upper_offset
+let between_labels_32_bit_with_offsets ?comment:_comment ~upper ~upper_offset
     ~lower ~lower_offset () =
   Option.iter comment _comment;
-  let upper_offset = Targetint.to_int64 upper_offset in
-  let lower_offset = Targetint.to_int64 lower_offset in
+  (* We rely on the assembler for overflow checking here and in
+     [between_symbol_in_current_unit_and_label_offset_32_bit] below. *)
+  let label_plus_offset label offset =
+    if Targetint.compare offset Targetint.zero = 0
+    then const_label label
+    else const_add (const_label label) (const_int64 (Targetint.to_int64 offset))
+  in
   let expr =
     const_sub
-      (const_add (const_label upper) (const_int64 upper_offset))
-      (const_add (const_label lower) (const_int64 lower_offset))
+      (label_plus_offset upper upper_offset)
+      (label_plus_offset lower lower_offset)
   in
-  const_machine_width (force_assembly_time_constant expr)
+  const (force_assembly_time_constant expr) Thirty_two
 
 let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   let upper_section = Asm_label.section upper in
@@ -1211,23 +1227,31 @@ let between_this_and_label_offset_32bit_expr ~upper ~offset_upper =
   let expr = Add (Sub (Label upper, This), offset_const) in
   const expr Thirty_two
 
-let between_symbol_in_current_unit_and_label_offset ?comment:_comment ~upper
-    ~lower ~offset_upper () =
+let between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
+    ~const_for_width =
   (* CR mshinwell: add checks, as above: check_symbol_in_current_unit lower;
      check_symbol_and_label_in_same_section lower upper; *)
+  let upper =
+    if Targetint.compare offset_upper Targetint.zero = 0
+    then const_label upper
+    else
+      const_add (const_label upper)
+        (const_int64 (Targetint.to_int64 offset_upper))
+  in
+  let expr = const_sub upper (const_symbol lower) in
+  const_for_width (force_assembly_time_constant expr)
+
+let between_symbol_in_current_unit_and_label_offset ?comment:_comment ~upper
+    ~lower ~offset_upper () =
   Option.iter comment _comment;
-  if Targetint.compare offset_upper Targetint.zero = 0
-  then
-    let expr = const_sub (const_label upper) (const_symbol lower) in
-    const_machine_width (force_assembly_time_constant expr)
-  else
-    let offset_upper = Targetint.to_int64 offset_upper in
-    let expr =
-      const_sub
-        (const_add (const_label upper) (const_int64 offset_upper))
-        (const_symbol lower)
-    in
-    const_machine_width (force_assembly_time_constant expr)
+  between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
+    ~const_for_width:(fun expr -> const_machine_width expr)
+
+let between_symbol_in_current_unit_and_label_offset_32_bit ?comment:_comment
+    ~upper ~lower ~offset_upper () =
+  Option.iter comment _comment;
+  between_symbol_in_current_unit_and_label_offset0 ~upper ~lower ~offset_upper
+    ~const_for_width:(fun expr -> const expr Thirty_two)
 
 let const_with_width ~width constant =
   match width with

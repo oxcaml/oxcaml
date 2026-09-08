@@ -12,24 +12,24 @@ let _ = f_unboxed_float #0.0
 let _ = f_unboxed_float (-#3.14)
 let _ = f_unboxed_float #1e10
 
-let[@inline never] [@local never] f_unboxed_float32 (x: float32#) = x
+let[@inline never] [@local never] f_unboxed_float32 (x: float32_u) = x
 let _ = f_unboxed_float32 #4.1s
 let _ = f_unboxed_float32 #0.0s
 let _ = f_unboxed_float32 (-#2.5s)
 
-let[@inline never] [@local never] f_unboxed_nativeint (x: nativeint#) = x
+let[@inline never] [@local never] f_unboxed_nativeint (x: nativeint_u) = x
 let _ = f_unboxed_nativeint #0n
 let _ = f_unboxed_nativeint #0x123456789abcdefn
 let _ = f_unboxed_nativeint (-#999n)
 
-let[@inline never] [@local never] f_unboxed_int32 (x: int32#) = x
+let[@inline never] [@local never] f_unboxed_int32 (x: int32_u) = x
 let _ = f_unboxed_int32 #0l
 (* CR sspies: unboxed integers are currently not printed correctly
    (missing the hash and the suffix) *)
 let _ = f_unboxed_int32 #0x12345678l
 let _ = f_unboxed_int32 (-#456l)
 
-let[@inline never] [@local never] f_unboxed_int64 (x: int64#) = x
+let[@inline never] [@local never] f_unboxed_int64 (x: int64_u) = x
 let _ = f_unboxed_int64 #0L
 let _ = f_unboxed_int64 #0x123456789abcdefL
 let _ = f_unboxed_int64 (-#789L)
@@ -77,9 +77,9 @@ let[@inline never] [@local never] f_poly_bits16 (type a : bits16) (x: a) = x
 let _ = f_poly_bits16 (Int16_u.of_int 1000)
 let _ = f_poly_bits16 (Int16_u.of_int (-2000))
 
-type simple_product = #(float# * int32#)
-type mixed_product = #(int64# * bool * float#)
-type nested_product = #(simple_product * int64#)
+type simple_product = #(float# * int32_u)
+type mixed_product = #(int64_u * bool * float#)
+type nested_product = #(simple_product * int64_u)
 type small_int_product = #(int8# * int16#)
 type mixed_small_product = #(int8# * bool * int16#)
 
@@ -108,9 +108,9 @@ let _ = f_mixed_small_product #((Int8_u.of_int 0), false, (Int16_u.of_int 0))
 let _ = f_mixed_small_product
     #((Int8_u.of_int (-25)), true, (Int16_u.of_int (-2000)))
 
-type simple_record = #{ x: float#; y: int32# }
-type mixed_record = #{ a: int64#; b: bool; c: float# }
-type nested_record = #{ inner: simple_record; outer: int64# }
+type simple_record = #{ x: float#; y: int32_u }
+type mixed_record = #{ a: int64_u; b: bool; c: float# }
+type nested_record = #{ inner: simple_record; outer: int64_u }
 type small_int_record = #{ a: int8#; b: int16# }
 type mixed_small_record = #{ i8: int8#; flag: bool; i16: int16# }
 
@@ -152,20 +152,20 @@ let _ = f_mixed_small_record
 let _ = f_poly_product #(#4L, 4L)
 let _ = f_poly_product #(#100L, true)
 
-(* Arrays of int64# *)
-let[@inline never] [@local never] f_int64_array (arr: int64# array) = arr
+(* Arrays of int64_u *)
+let[@inline never] [@local never] f_int64_array (arr: int64_u array) = arr
 let _ = f_int64_array [|#0L; #100L; #200L; #300L; #400L|]
 let _ = f_int64_array [|#0L; #1L; #42L; #9999L|]
 let _ = f_int64_array [|#0x123456789abcdefL; #1L; #0L|]
 
-(* Arrays of int32# *)
-let[@inline never] [@local never] f_int32_array (arr: int32# array) = arr
+(* Arrays of int32_u *)
+let[@inline never] [@local never] f_int32_array (arr: int32_u array) = arr
 let _ = f_int32_array [|#0l; #10l; #20l; #30l|]
 let _ = f_int32_array [|#0l; #42l; #123l; #1000l|]
 let _ = f_int32_array [|#0x12345678l; #456l; #0l|]
 
 (* Arrays of unboxed records *)
-type array_record = #{ a: int64#; b: int32#; c: float# } [@@warning "-69"]
+type array_record = #{ a: int64_u; b: int32_u; c: float# } [@@warning "-69"]
 
 let[@inline never] [@local never] f_array_record_array
     (arr: array_record array) = arr
@@ -188,7 +188,7 @@ let _ = f_float_array [|#1.0; #2.5; #3.14; #0.0; #1e10|]
 let _ = f_float_array [|#1.0; #2.0; #3.0|]
 
 (* Arrays of unboxed tuples with mixed types *)
-type mixed_tuple_for_array = #(int32# * float# * bool)
+type mixed_tuple_for_array = #(int32_u * float# * bool)
 
 let[@inline never] [@local never] f_mixed_tuple_array
     (arr: mixed_tuple_for_array array) = arr
@@ -198,14 +198,14 @@ let _ = f_mixed_tuple_array
     #(#0l, #0.0, false);
     #(#100l, #2.5, true)|]
 
-(* Arrays of nativeint# *)
+(* Arrays of nativeint_u *)
 let[@inline never] [@local never] f_nativeint_array
-    (arr: nativeint# array) = arr
+    (arr: nativeint_u array) = arr
 let _ = f_nativeint_array [|#123n; #0n; #456n; #0x7fffffffn|]
 let _ = f_nativeint_array [|#0n; #1n; #4n|]
 
-(* Nested - array of unboxed products containing int64# pairs *)
-type int64_pair_for_array = #(int64# * int64#)
+(* Nested - array of unboxed products containing int64_u pairs *)
+type int64_pair_for_array = #(int64_u * int64_u)
 
 let[@inline never] [@local never] f_int64_pair_array
     (arr: int64_pair_for_array array) = arr
@@ -215,18 +215,18 @@ let _ = f_int64_pair_array
     #(#0L, #0L);
     #(#42L, #9999L)|]
 
-(* Arrays of float32# *)
-let[@inline never] [@local never] f_float32_array (arr: float32# array) = arr
+(* Arrays of float32_u *)
+let[@inline never] [@local never] f_float32_array (arr: float32_u array) = arr
 let _ = f_float32_array [|#1.5s; #0.0s; #2.5s; #100.0s|]
 let _ = f_float32_array [|#0.0s; #1.0s; #2.0s; #3.0s|]
 
 (* Edge cases: empty and large arrays *)
 let[@inline never] [@local never] f_empty_int64_array
-    (arr: int64# array) = arr
+    (arr: int64_u array) = arr
 let _ = f_empty_int64_array [||]
 
 let[@inline never] [@local never] f_large_int64_array
-    (arr: int64# array) = arr
+    (arr: int64_u array) = arr
 let _ = f_large_int64_array
   [|#0L; #3L; #6L; #9L; #12L; #15L; #18L; #21L; #24L; #27L;
     #30L; #33L; #36L; #39L; #42L; #45L; #48L; #51L; #54L; #57L|]
@@ -256,12 +256,12 @@ let _ = f_int16_array
     (Int16_u.of_int 1000); (Int16_u.of_int (-2000))|]
 
 let[@inline never] [@local never] f_int32_array_packed_corner
-    (arr: int32# array) = arr
+    (arr: int32_u array) = arr
 let _ = f_int32_array_packed_corner [|#10l; #20l; #30l|]
 let _ = f_int32_array_packed_corner [|#7l; #8l; #9l; #10l; #11l|]
 
 let[@inline never] [@local never] f_float32_array_packed_corner
-    (arr: float32# array) = arr
+    (arr: float32_u array) = arr
 let _ = f_float32_array_packed_corner [|#1.0s; #2.0s; #3.0s|]
 let _ = f_float32_array_packed_corner [|#0.5s; #1.5s; #2.5s; #3.5s; #4.5s|]
 
@@ -277,8 +277,8 @@ let _ = f_record_2xint8_array
     #{ a = (Int8_u.of_int 3); b = (Int8_u.of_int 4) };
     #{ a = (Int8_u.of_int 5); b = (Int8_u.of_int 6) }|]
 
-(* Unboxed record with a single int64# field (8 bytes when densely packed). *)
-type record_one_int64 = #{ x: int64# } [@@warning "-69"]
+(* Unboxed record with a single int64_u field (8 bytes when densely packed). *)
+type record_one_int64 = #{ x: int64_u } [@@warning "-69"]
 
 let[@inline never] [@local never] f_record_one_int64_array
     (arr: record_one_int64 array) = arr
@@ -301,7 +301,7 @@ let _ = f_record_4xint16_array
 (* Unboxed record summing to 72 bits (9 bytes when densely packed) mixing
    32-bit, 16-bit, and 8-bit integers: 32 + 16 + 8 + 8 + 8 = 72. *)
 type record_72bit =
-  #{ a: int32#; b: int16#; c: int8#; d: int8#; e: int8# } [@@warning "-69"]
+  #{ a: int32_u; b: int16#; c: int8#; d: int8#; e: int8# } [@@warning "-69"]
 
 let[@inline never] [@local never] f_record_72bit_array
     (arr: record_72bit array) = arr
@@ -311,13 +311,13 @@ let _ = f_record_72bit_array
     #{ a = #100l; b = (Int16_u.of_int 200); c = (Int8_u.of_int 30);
        d = (Int8_u.of_int 40); e = (Int8_u.of_int 50) }|]
 
-(* Element stride beyond a byte: 16 int64# fields word-extend to 128 bytes
+(* Element stride beyond a byte: 16 int64_u fields word-extend to 128 bytes
    per element, which exceeds the range of a [Data1] byte_stride attribute. *)
 type record_16xint64 =
-  #{ f01: int64#; f02: int64#; f03: int64#; f04: int64#;
-     f05: int64#; f06: int64#; f07: int64#; f08: int64#;
-     f09: int64#; f10: int64#; f11: int64#; f12: int64#;
-     f13: int64#; f14: int64#; f15: int64#; f16: int64# }
+  #{ f01: int64_u; f02: int64_u; f03: int64_u; f04: int64_u;
+     f05: int64_u; f06: int64_u; f07: int64_u; f08: int64_u;
+     f09: int64_u; f10: int64_u; f11: int64_u; f12: int64_u;
+     f13: int64_u; f14: int64_u; f15: int64_u; f16: int64_u }
   [@@warning "-69"]
 
 let[@inline never] [@local never] f_record_16xint64_array

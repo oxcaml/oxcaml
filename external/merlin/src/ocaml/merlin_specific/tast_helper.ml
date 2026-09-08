@@ -24,7 +24,7 @@ module Pat = struct
     (* The level we use here isn't important - the constructed type is just used for
        printing and is never unified. *)
     let sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ()) in
-    let mode = Mode.Value.newvar () in
+    let mode = Mode.Value.newvar (Ctype.get_current_level ()) in
     let pat_desc =
       Tpat_var
         { id = Ident.create_local str.Asttypes.txt;

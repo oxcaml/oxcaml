@@ -1237,21 +1237,19 @@ Error: This local-returning application is in a tail position that is not
 
 let foo : 'a -> unit = fun (local_ x) -> ()
 [%%expect{|
-Line 1, characters 23-43:
+Line 1, characters 27-37:
 1 | let foo : 'a -> unit = fun (local_ x) -> ()
-                           ^^^^^^^^^^^^^^^^^^^^
-Error: This function takes a parameter which is "local",
-       but was expected to take a parameter which is "global".
+                               ^^^^^^^^^^
+Error: The parameter is "local" but is expected to be "global".
 |}]
 
 let rec f1 () = f2 ()
 and f2 () : string @ local = exclave_ "hi"
 [%%expect{|
-Line 2, characters 7-42:
+Line 2, characters 29-42:
 2 | and f2 () : string @ local = exclave_ "hi"
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function has a return value which is "local",
-       but was expected to have a return value which is "global".
+                                 ^^^^^^^^^^^^^
+Error: The function return is "local" but is expected to be "global".
 |}]
 
 (* Return mode must be greater than the type *)

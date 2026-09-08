@@ -675,6 +675,7 @@
   cfg_simplify
   cfg_prologue
   cfg_merge_blocks
+  cfg_block_layout
   extra_debug
   label
   printcfg
@@ -709,6 +710,7 @@
   regalloc_utils
   regalloc_validate
   ;; file_formats/
+  ir_config_fingerprint
   linear_format
   cfg_format
   ;; backend/debug/

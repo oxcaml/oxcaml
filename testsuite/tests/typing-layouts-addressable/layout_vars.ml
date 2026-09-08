@@ -27,13 +27,13 @@ module type Check = module type of struct
   module F (M : S @ static) = struct
     (* Check that [x addressable = x] when [x] is addressable, for different
        instantiations of the layout variable [x] *)
-    let g1 (a : int64#) (b : int64#) = M.f a b
+    let g1 (a : int64_u) (b : int64_u) = M.f a b
 
     let g2 (a : string) (b : string) = M.f a b
 
     let g3 (a : b8a) (b : b8a) = M.f a b
 
-    let g4 (a : int64#) = M.f a a
+    let g4 (a : int64_u) = M.f a a
   end
 end
 [%%expect{|
@@ -42,10 +42,10 @@ module type Check =
     module F :
       functor (M : S @ static) ->
         sig
-          val g1 : int64# -> int64# -> unit
+          val g1 : int64_u -> int64_u -> unit
           val g2 : string -> string -> unit
           val g3 : b8a -> b8a -> unit
-          val g4 : int64# -> unit
+          val g4 : int64_u -> unit
         end
       @@ stateless
   end

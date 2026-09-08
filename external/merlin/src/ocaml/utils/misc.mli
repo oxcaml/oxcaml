@@ -114,10 +114,6 @@ val create_hashtable: int -> ('a * 'b) list -> ('a, 'b) Hashtbl.t
        (** Create a hashtable with the given initial size and fills it
            with the given bindings. *)
 
-(* TODO Move this to Obj when the system compiler includes ocaml/ocaml/#14939 *)
-val hash_variant: string -> int
-        (** Hash function for variant tags *)
-
 (** {1 Extensions to the standard library} *)
 
 module Stdlib : sig
@@ -543,6 +539,12 @@ val log2_nativeint: nativeint -> int
 (** [log2_nativeint n] computes [floor (log2 n)] when [ n > 0 ].
     If [n] is also a power of 2, the result [s] satisfies
     [n = Nativeint.shift_left 1n s]
+*)
+
+val count_leading_zeroes_nativeint: nativeint -> int
+(** [count_leading_zeroes_nativeint n] computes the number of leading zeroes
+    when [n] is written in binary using [Nativeint.size] bits.
+    [count_leading_zeroes_nativeint 0n = Nativeint.size].
 *)
 
 val power : base:int -> int -> int

@@ -83,10 +83,10 @@ let assert_asan_detected_out_of_bounds_write ?(access_size = 8) test_output =
   ignore (Str.search_forward write_regex test_output 0)
 ;;
 
-type i64 = int64#
-type i32 = int32#
+type i64 = int64_u
+type i32 = int32_u
 type f64 = float#
-type f32 = float32#
+type f32 = float32_u
 
 module Bigstring = struct
   type t = (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
@@ -961,45 +961,45 @@ module Test_out_of_bounds_accesses = struct
 
   type void : void
 
-  external malloc : nativeint# -> nativeint# = "" "malloc"
+  external malloc : nativeint_u -> nativeint_u = "" "malloc"
 
-  external vec128_load_aligned : nativeint# -> int64x2# = "" "caml_sse_vec128_load_aligned"
+  external vec128_load_aligned : nativeint_u -> int64x2# = "" "caml_sse_vec128_load_aligned"
   [@@noalloc] [@@builtin]
-  external vec128_load_unaligned : nativeint# -> int64x2# = "" "caml_sse_vec128_load_unaligned"
+  external vec128_load_unaligned : nativeint_u -> int64x2# = "" "caml_sse_vec128_load_unaligned"
   [@@noalloc] [@@builtin]
-  external vec128_load_known_unaligned : nativeint# -> int64x2# = "" "caml_sse3_vec128_load_known_unaligned"
+  external vec128_load_known_unaligned : nativeint_u -> int64x2# = "" "caml_sse3_vec128_load_known_unaligned"
   [@@noalloc] [@@builtin]
-  external vec128_store_aligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_aligned"
+  external vec128_store_aligned : nativeint_u -> int64x2# -> void = "" "caml_sse_vec128_store_aligned"
   [@@noalloc] [@@builtin]
-  external vec128_store_unaligned : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_unaligned"
+  external vec128_store_unaligned : nativeint_u -> int64x2# -> void = "" "caml_sse_vec128_store_unaligned"
   [@@noalloc] [@@builtin]
-  external vec128_load_aligned_uncached : nativeint# -> int64x2# = "" "caml_sse41_vec128_load_aligned_uncached"
+  external vec128_load_aligned_uncached : nativeint_u -> int64x2# = "" "caml_sse41_vec128_load_aligned_uncached"
   [@@noalloc] [@@builtin]
-  external vec128_store_aligned_uncached : nativeint# -> int64x2# -> void = "" "caml_sse_vec128_store_aligned_uncached"
+  external vec128_store_aligned_uncached : nativeint_u -> int64x2# -> void = "" "caml_sse_vec128_store_aligned_uncached"
   [@@noalloc] [@@builtin]
-  external vec128_load_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64"
+  external vec128_load_low64 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_low64"
   [@@noalloc] [@@builtin]
-  external vec128_load_low64_copy_high64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low64_copy_high64"
+  external vec128_load_low64_copy_high64 : int64x2# -> nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_low64_copy_high64"
   [@@noalloc] [@@builtin]
-  external vec128_load_high64_copy_low64 : int64x2# -> nativeint# -> int64x2# = "" "caml_sse2_vec128_load_high64_copy_low64"
+  external vec128_load_high64_copy_low64 : int64x2# -> nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_high64_copy_low64"
   [@@noalloc] [@@builtin]
-  external vec128_load_zero_low64 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_zero_low64"
+  external vec128_load_zero_low64 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_zero_low64"
   [@@noalloc] [@@builtin]
-  external vec128_load_broadcast64 : nativeint# -> int64x2# = "" "caml_sse3_vec128_load_broadcast64"
+  external vec128_load_broadcast64 : nativeint_u -> int64x2# = "" "caml_sse3_vec128_load_broadcast64"
   [@@noalloc] [@@builtin]
-  external vec128_store_low64 : nativeint# -> int64x2# -> void = "" "caml_sse2_vec128_store_low64"
+  external vec128_store_low64 : nativeint_u -> int64x2# -> void = "" "caml_sse2_vec128_store_low64"
   [@@noalloc] [@@builtin]
-  external vec128_load_low32 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_low32"
+  external vec128_load_low32 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_low32"
   [@@noalloc] [@@builtin]
-  external vec128_load_zero_low32 : nativeint# -> int64x2# = "" "caml_sse2_vec128_load_zero_low32"
+  external vec128_load_zero_low32 : nativeint_u -> int64x2# = "" "caml_sse2_vec128_load_zero_low32"
   [@@noalloc] [@@builtin]
-  external vec128_store_low32 : nativeint# -> int64x2# -> void = "" "caml_sse2_vec128_store_low32"
+  external vec128_store_low32 : nativeint_u -> int64x2# -> void = "" "caml_sse2_vec128_store_low32"
   [@@noalloc] [@@builtin]
-  external vec128_store_mask8 : int64x2# -> int64x2# -> nativeint# -> void = "" "caml_sse2_vec128_store_mask8"
+  external vec128_store_mask8 : int64x2# -> int64x2# -> nativeint_u -> void = "" "caml_sse2_vec128_store_mask8"
   [@@noalloc] [@@builtin]
-  external vec128_store_int32_uncached : nativeint# -> int32# -> void = "" "caml_sse2_int32_store_uncached"
+  external vec128_store_int32_uncached : nativeint_u -> int32_u -> void = "" "caml_sse2_int32_store_uncached"
   [@@noalloc] [@@builtin]
-  external vec128_store_int64_uncached : nativeint# -> int64# -> void = "" "caml_sse2_int64_store_uncached"
+  external vec128_store_int64_uncached : nativeint_u -> int64_u -> void = "" "caml_sse2_int64_store_uncached"
   [@@noalloc] [@@builtin]
 
   let vec128_load_aligned () =
@@ -1184,44 +1184,44 @@ module Test_out_of_bounds_accesses = struct
       ~validate:(assert_asan_detected_out_of_bounds_write ~access_size:8)
   ;;
 
-  external vec256_load_aligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_aligned"
+  external vec256_load_aligned : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_aligned"
   [@@noalloc] [@@builtin]
-  external vec256_load_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_unaligned"
+  external vec256_load_unaligned : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_unaligned"
   [@@noalloc] [@@builtin]
-  external vec256_load_known_unaligned : nativeint# -> int64x4# = "" "caml_avx_vec256_load_known_unaligned"
+  external vec256_load_known_unaligned : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_known_unaligned"
   [@@noalloc] [@@builtin]
-  external vec256_store_aligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_aligned"
+  external vec256_store_aligned : nativeint_u -> int64x4# -> void = "" "caml_avx_vec256_store_aligned"
   [@@noalloc] [@@builtin]
-  external vec256_store_unaligned : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_unaligned"
+  external vec256_store_unaligned : nativeint_u -> int64x4# -> void = "" "caml_avx_vec256_store_unaligned"
   [@@noalloc] [@@builtin]
-  external vec256_load_aligned_uncached : nativeint# -> int64x4# = "" "caml_avx_vec256_load_aligned_uncached"
+  external vec256_load_aligned_uncached : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_aligned_uncached"
   [@@noalloc] [@@builtin]
-  external vec256_store_aligned_uncached : nativeint# -> int64x4# -> void = "" "caml_avx_vec256_store_aligned_uncached"
+  external vec256_store_aligned_uncached : nativeint_u -> int64x4# -> void = "" "caml_avx_vec256_store_aligned_uncached"
   [@@noalloc] [@@builtin]
-  external vec256_broadcast128 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast128"
+  external vec256_broadcast128 : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_broadcast128"
   [@@noalloc] [@@builtin]
-  external vec256_broadcast64 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast64"
+  external vec256_broadcast64 : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_broadcast64"
   [@@noalloc] [@@builtin]
-  external vec256_broadcast32x8 : nativeint# -> int64x4# = "" "caml_avx_vec256_load_broadcast32"
+  external vec256_broadcast32x8 : nativeint_u -> int64x4# = "" "caml_avx_vec256_load_broadcast32"
   [@@noalloc] [@@builtin]
-  external vec256_broadcast32x4 : nativeint# -> int32x4# = "" "caml_avx_vec128_load_broadcast32"
+  external vec256_broadcast32x4 : nativeint_u -> int32x4# = "" "caml_avx_vec128_load_broadcast32"
   [@@noalloc] [@@builtin]
-  external vec256_load_mask64x4 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask64"
+  external vec256_load_mask64x4 : int64x4# -> nativeint_u -> int64x4# = "" "caml_avx_vec256_load_mask64"
   [@@noalloc] [@@builtin]
-  external vec256_load_mask32x8 : int64x4# -> nativeint# -> int64x4# = "" "caml_avx_vec256_load_mask32"
+  external vec256_load_mask32x8 : int64x4# -> nativeint_u -> int64x4# = "" "caml_avx_vec256_load_mask32"
   [@@noalloc] [@@builtin]
-  external vec256_store_mask64x4 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask64"
+  external vec256_store_mask64x4 : nativeint_u -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask64"
   [@@noalloc] [@@builtin]
-  external vec256_store_mask32x8 : nativeint# -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask32"
+  external vec256_store_mask32x8 : nativeint_u -> int64x4# -> int64x4# -> void = "" "caml_avx_vec256_store_mask32"
   [@@noalloc] [@@builtin]
 
-  external vec128_load_mask64x2 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask64"
+  external vec128_load_mask64x2 : int64x2# -> nativeint_u -> int64x2# = "" "caml_avx_vec128_load_mask64"
   [@@noalloc] [@@builtin]
-  external vec128_store_mask64x2 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask64"
+  external vec128_store_mask64x2 : nativeint_u -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask64"
   [@@noalloc] [@@builtin]
-  external vec128_load_mask32x4 : int64x2# -> nativeint# -> int64x2# = "" "caml_avx_vec128_load_mask32"
+  external vec128_load_mask32x4 : int64x2# -> nativeint_u -> int64x2# = "" "caml_avx_vec128_load_mask32"
   [@@noalloc] [@@builtin]
-  external vec128_store_mask32x4 : nativeint# -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask32"
+  external vec128_store_mask32x4 : nativeint_u -> int64x2# -> int64x2# -> void = "" "caml_avx_vec128_store_mask32"
   [@@noalloc] [@@builtin]
 
   let vec256_load_aligned () =

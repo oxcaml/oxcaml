@@ -1,7 +1,7 @@
 [@@@ocaml.warnerror "+a-40-41-42"]
 
 module Int64_u = struct
-  type t = int64#
+  type t = int64_u
 
   external to_int64 : t -> (int64[@local_opt]) = "%box_int64" [@@warning "-187"]
 
@@ -10,7 +10,7 @@ module Int64_u = struct
   let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
 end
 
-type t1 = { mutable d0 : int64# ; mutable d1: int64# }
+type t1 = { mutable d0 : int64_u ; mutable d1: int64_u }
 
 let[@opaque][@specialize never] add_mutable_record (a : t1) (b: t1) (c : t1) :
      t1 =
@@ -24,10 +24,10 @@ let[@opaque][@specialize never] copy_mutable_record (a : t1) (b: t1) : unit =
   ()
 
 type t2 = {
-  mutable d0 : int64# ;
-  mutable d1: int64# ;
-  mutable d2: int64# ;
-  mutable d3: int64# }
+  mutable d0 : int64_u ;
+  mutable d1: int64_u ;
+  mutable d2: int64_u ;
+  mutable d3: int64_u }
 
 let[@opaque][@specialize never] add_fours_mutable_record (a : t1) (b: t1)
     (c : t2) : unit =

@@ -64,6 +64,8 @@ module type Oxcaml_options = sig
   val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_block_layout : unit -> unit
+  val no_cfg_block_layout : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit

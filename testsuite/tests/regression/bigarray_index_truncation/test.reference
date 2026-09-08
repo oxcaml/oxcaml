@@ -1,0 +1,8 @@
+Nativeint.to_int x = 5
+Int64.to_int x64 = 5
+unsafe_get (nativeint index) = f
+unsafe_get (int64 index) = f
+get (nativeint index) = f
+unsafe_get (constant index) = f
+after unsafe_set (nativeint index) = F
+unsafe_get int16 (nativeint index) = 105

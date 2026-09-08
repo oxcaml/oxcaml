@@ -26,7 +26,7 @@ end
 
 let alloc = ref 0.0
 
-let measure_alloc f : float32# =
+let measure_alloc f : float32_u =
   (* NB: right-to-left evaluation order gets this right *)
   let baseline_allocation = Gc.allocated_bytes() -. Gc.allocated_bytes() in
   let before = Gc.allocated_bytes () in
@@ -110,14 +110,14 @@ let _ = Pi_unboxed.estimate ()
 let _ = Pi_boxed.estimate ()
 
 
-(**********************************)
-(* float32# record allocation tests *)
+(*************************************)
+(* float32_u record allocation tests *)
 let[@inline never] consumer x y = Float32_u.(x + y)
 
-type t8 = { a : float32#;
-            mutable b : float32#;
-            c : float32#;
-            mutable d : float32# }
+type t8 = { a : float32_u;
+            mutable b : float32_u;
+            c : float32_u;
+            mutable d : float32_u }
 
 let print_record_and_allocs s r =
   let allocs = get_exact_allocations () in
@@ -165,7 +165,7 @@ let _ =
    Projections are no longer implemented that way, so there's no common
    subexpression to be eliminated, but I've kept the test.  *)
 let[@inline never] cse_test b r =
-  let (x : float32#) = r.a in
+  let (x : float32_u) = r.a in
   if b then
     (Float32_u.to_float32 x, Float32_u.to_float32 x)
   else

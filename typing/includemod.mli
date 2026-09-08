@@ -196,6 +196,7 @@ val modtypes_consistency:
     implementation file.
 *)
 val modtypes_constraint:
+  self_check:bool ->
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion * Shape.t
 

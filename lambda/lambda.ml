@@ -45,14 +45,6 @@ type has_initializer =
   | With_initializer
   | Uninitialized
 
-type atomic_flag = Asttypes.atomic_flag
-
-type access_flag = Asttypes.access_flag
-
-let access_atomicity : access_flag -> atomic_flag = function
-  | Immutable_access | Mutable_access -> Nonatomic
-  | Atomic_access -> Atomic
-
 include (struct
 
   type locality_mode =
@@ -457,6 +449,38 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of
+    { layout : layout }
+  | Patomic_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
+  | Patomic_load_ptr of
+    { layout : layout }
+  | Patomic_set_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_ptr
+  | Patomic_add_ptr
+  | Patomic_sub_ptr
+  | Patomic_land_ptr
+  | Patomic_lor_ptr
+  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -488,8 +512,8 @@ type primitive =
   (* Poll for runtime actions *)
   | Ppoll
   | Pcpu_relax
-  | Pget_idx of layout * access_flag
-  | Pset_idx of layout * modify_mode * atomic_flag
+  | Pget_idx of layout * Asttypes.mutable_flag
+  | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
@@ -1244,9 +1268,7 @@ and lfunction =
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: return_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1660,7 +1682,7 @@ let layout_initializer = nullable_value Pgenval
 let layout_array_comprehension_element = nullable_value Pgenval
 let layout_list_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
-let layout_block_idx = layout_unboxed_nativeint
+let layout_block_idx = layout_unboxed_int64
 
 let layout_unboxed_product layouts = Punboxed_product layouts
 
@@ -1894,8 +1916,8 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
-  | Lkindtemplate {ktmpl_body} ->
-      f ktmpl_body
+  | Lkindtemplate {ktmpl_body={body}} ->
+      f body
   | Lkindinstantiate {kinst_func} ->
       f kinst_func
 
@@ -2150,7 +2172,7 @@ let rec transl_address loc = function
   | Env.Aunit (cu, mode) ->
     let staticity = Mode.Value.proj_monadic Staticity mode in
     let staticity =
-      match Mode.Staticity.zap_to_floor staticity with
+      match Mode.Staticity.zap_to_floor_exn staticity with
       | Static -> Static
       | Dynamic -> Dynamic
     in
@@ -2391,13 +2413,16 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
 let subst update_env ?freshen_bound_variables s =
   (build_substs update_env ?freshen_bound_variables s).subst_lambda
 
-let rename idmap lam =
+let build_renaming_subst idmap =
   let update_env oldid (vd, mode) env =
     let newid = Ident.Map.find oldid idmap in
     Env.add_value_lazy ~mode newid vd env
   in
   let s = Ident.Map.map (fun new_id -> Lvar new_id) idmap in
-  subst update_env s lam
+  build_substs update_env s
+
+let rename idmap lam = (build_renaming_subst idmap).subst_lambda lam
+let rename_lfun idmap lfun = (build_renaming_subst idmap).subst_lfunction lfun
 
 let duplicate_function =
   (build_substs
@@ -2456,10 +2481,10 @@ let shallow_map ~tail ~non_tail:f lam =
   | Lfunction old_lfun ->
       let new_lfun = map_lfunction f old_lfun in
       if old_lfun == new_lfun then lam else Lfunction new_lfun
-  | Lkindtemplate { ktmpl_params; ktmpl_return; ktmpl_body = old_body;
-                    ktmpl_ret_mode; ktmpl_env = old_env; ktmpl_env_mode;
+  | Lkindtemplate { ktmpl_params; ktmpl_body = old_body;
+                    ktmpl_env = old_env; ktmpl_env_mode;
                     ktmpl_loc } ->
-      let new_body = f old_body in
+      let new_body = map_lfunction f old_body in
       let env_changed = ref false in
       let new_env =
         Ident.Map.map
@@ -2474,9 +2499,7 @@ let shallow_map ~tail ~non_tail:f lam =
       else
         Lkindtemplate {
           ktmpl_params;
-          ktmpl_return;
           ktmpl_body = new_body;
-          ktmpl_ret_mode;
           ktmpl_env = new_env;
           ktmpl_env_mode;
           ktmpl_loc;
@@ -2939,6 +2962,28 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx _
+  | Patomic_set_idx _
+  | Patomic_exchange_idx _
+  | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
+  | Patomic_load_ptr _
+  | Patomic_set_ptr _
+  | Patomic_exchange_ptr _
+  | Patomic_compare_exchange_ptr _
+  | Patomic_compare_set_ptr _
+  | Patomic_fetch_add_ptr
+  | Patomic_add_ptr
+  | Patomic_sub_ptr
+  | Patomic_land_ptr
+  | Patomic_lor_ptr
+  | Patomic_lxor_ptr
   | Pdls_get
   | Ptls_get
   | Pdomain_index
@@ -3134,7 +3179,15 @@ let primitive_can_raise prim =
   | Patomic_compare_set_field _ | Patomic_fetch_add_field  | Patomic_add_field
   | Patomic_sub_field  | Patomic_land_field | Patomic_lor_field
   | Patomic_lxor_field  | Patomic_load_field _ | Patomic_load_mixed_field _
-  | Patomic_set_field _ | Patomic_set_mixed_field _ -> false
+  | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_load_idx _ | Patomic_set_idx _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+  | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
+  | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+  | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr | Patomic_land_ptr
+  | Patomic_lor_ptr | Patomic_lxor_ptr -> false
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace
@@ -3639,6 +3692,18 @@ let primitive_result_layout (p : primitive) =
     layout_any_value
   | Patomic_compare_set_field _
   | Patomic_fetch_add_field -> layout_int
+  | Patomic_load_idx { layout } -> layout
+  | Patomic_set_idx _ -> layout_unit
+  | Patomic_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_exchange_idx { layout; _ } -> layout
+  | Patomic_compare_set_idx _
+  | Patomic_fetch_add_idx -> layout_int
+  | Patomic_load_ptr { layout } -> layout
+  | Patomic_set_ptr _ -> layout_unit
+  | Patomic_exchange_ptr { layout; _ } -> layout
+  | Patomic_compare_exchange_ptr { layout; _ } -> layout
+  | Patomic_compare_set_ptr _
+  | Patomic_fetch_add_ptr -> layout_int
   | Pdls_get | Ptls_get -> layout_any_value
   | Pdomain_index -> layout_unboxed_int Untagged_int
   | Patomic_add_field
@@ -3646,6 +3711,16 @@ let primitive_result_layout (p : primitive) =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
+  | Patomic_add_ptr
+  | Patomic_sub_ptr
+  | Patomic_land_ptr
+  | Patomic_lor_ptr
+  | Patomic_lxor_ptr
   | Ppoll -> layout_unit
   | Pcpu_relax -> layout_unit
   | Preinterpret_tagged_int63_as_unboxed_int64 -> layout_unboxed_int64
@@ -3841,7 +3916,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
     8
   | Punboxedfloatarray Unboxed_float32 ->
-    (* float32# arrays are packed *)
+    (* float32_u arrays are packed *)
     4
   | Punboxedfloatarray Unboxed_float64 -> 8
   | Punboxedoruntaggedintarray Untagged_int8 ->
@@ -3851,7 +3926,7 @@ let array_element_size_in_bytes (array_kind : array_kind) =
     (* int16# arrays are packed *)
     2
   | Punboxedoruntaggedintarray Unboxed_int32 ->
-    (* int32# arrays are packed *)
+    (* int32_u arrays are packed *)
     4
   | Punboxedoruntaggedintarray
       (Untagged_int | Unboxed_int64 | Unboxed_nativeint) ->

@@ -364,7 +364,7 @@ let _ =
 (* Test 8: Labeled, reordered, and partial patterns *)
 
 type t_labeled_unboxed_tuple =
-  #(x1:int * float# * x2:float# * float * y:int64#)
+  #(x1:int * float# * x2:float# * float * y:int64_u)
 
 let reverse_with_reordered_match (t : t_labeled_unboxed_tuple) =
   match t with

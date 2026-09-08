@@ -34,7 +34,7 @@ end
 module Map (T : Container_types.S_plus_iterator) = struct
   type _ t =
     | Iterator :
-        { mutable iterator : 'v T.Map.iterator;
+        { iterator : 'v T.Map.Mutable_iterator.iterator;
           map : 'v T.Map.t Channel.receiver;
           handler : 'v Channel.sender
         }
@@ -45,26 +45,27 @@ module Map (T : Container_types.S_plus_iterator) = struct
   let compare_key (type a) (Iterator _ : a t) : a -> a -> int = T.compare
 
   let current (type a) (Iterator i : a t) : a Or_null.t =
-    match T.Map.current i.iterator with
+    match T.Map.Mutable_iterator.current i.iterator with
     | Some (key, _) -> This key
     | None -> Null
 
   let advance (type a) (Iterator i : a t) : unit =
-    i.iterator <- T.Map.advance i.iterator
+    T.Map.Mutable_iterator.advance i.iterator
 
   let seek (type a) (Iterator i : a t) (k : a) : unit =
-    i.iterator <- T.Map.seek i.iterator k
+    T.Map.Mutable_iterator.seek i.iterator k
 
   let init (type a) (Iterator i : a t) : unit =
-    i.iterator <- T.Map.iterator (Channel.recv i.map)
+    T.Map.Mutable_iterator.init i.iterator (Channel.recv i.map)
 
   let accept (type a) (Iterator i : a t) : unit =
-    match T.Map.current i.iterator with
+    match T.Map.Mutable_iterator.current i.iterator with
     | None -> invalid_arg "accept: iterator is exhausted"
     | Some (_, value) -> Channel.send i.handler value
 
   let create cell handler =
-    Iterator { iterator = T.Map.iterator T.Map.empty; map = cell; handler }
+    Iterator
+      { iterator = T.Map.Mutable_iterator.create (); map = cell; handler }
 end
 
 module Join (Iterator : Iterator) : sig

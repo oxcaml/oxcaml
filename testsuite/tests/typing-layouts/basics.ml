@@ -2497,38 +2497,38 @@ Error: The primitive [%box_int32] is used in an invalid declaration.
 |}]
 
 (* can't use primitives for jkind conversions *)
-external f : float# -> int32# = "%identity";;
+external f : float# -> int32_u = "%identity";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%identity";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%identity";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%identity] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external f : float# -> int32# = "%opaque";;
+external f : float# -> int32_u = "%opaque";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%opaque";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%opaque";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%opaque] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external f : float# -> int32# = "%obj_magic";;
+external f : float# -> int32_u = "%obj_magic";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%obj_magic";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%obj_magic";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_magic] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
 (* not smart enough to stop this
    but the middle end should error in this case *)
-external f : (float# -> int32#) -> int32# -> int32# = "%apply";;
+external f : (float# -> int32_u) -> int32_u -> int32_u = "%apply";;
 [%%expect{|
-external f : (float# -> int32#) -> int32# -> int32# = "%apply"
+external f : (float# -> int32_u) -> int32_u -> int32_u = "%apply"
 |}]
 
 external f : float# -> int -> int = "%send";;

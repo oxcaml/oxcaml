@@ -24,7 +24,7 @@
    ocamltest predicate is reliable for testing whether this is an
    oxcaml build. *)
 
-(* This file contains various tests for float32#.  It's not an expect test to make
+(* This file contains various tests for float32_u.  It's not an expect test to make
    sure it gets tested for native code. *)
 
 (* CR layouts v2.5: When unboxed literals work, change this file to use them
@@ -135,9 +135,9 @@ let _ =
      minus_four #3.14s)
 
 (******************************)
-(* Test 3: float32# in closures *)
+(* Test 3: float32_u in closures *)
 
-(* [go]'s closure should haave an [int] (immediate), a [float32#] (float32) and a
+(* [go]'s closure should haave an [int] (immediate), a [float32_u] (float32) and a
    [float array] (value). *)
 let[@inline never] f3 n m steps () =
   let[@inline never] rec go k =
@@ -217,14 +217,14 @@ let[@inline never] test4 () =
   print_floatu "Test 4, 1 + 2" (Float32_u.of_float32 x1);
   print_floatu "Test 4, 1 - 2" (Float32_u.of_float32 x2);
 
-  (* partial application to float32# *)
+  (* partial application to float32_u *)
   let steps = Array.init 10 (fun _ -> 0.0s) in
   let f = Sys.opaque_identity (f3 5 #3.14s) in
   let five_pi = f steps in
   print_floatu "Test 4, 5 * pi: " (five_pi ());
   Array.iteri (fun i f -> Printf.printf "  Test 4, step %d: %.2f\n" i (Float32.to_float f)) steps;
 
-  (* partial application with float32# remaining *)
+  (* partial application with float32_u remaining *)
   let steps = Array.init 10 (fun _ -> 0.0s) in
   let f = Sys.opaque_identity (f3 6) in
   let five_pi = f #3.14s steps in
@@ -254,7 +254,7 @@ let _ = test4 ()
 
 let[@inline never] f5 n m =
   let open Float32_u in
-  (* Also testing a closure with only float32# values *)
+  (* Also testing a closure with only float32_u values *)
   let[@inline never] go f =
     f (n + m)
   in
@@ -277,7 +277,7 @@ let _ = test5 ()
 (* CR layouts: add tests that capture floats in objects, once that is
    allowed. *)
 
-(* float32# args and returns *)
+(* float32_u args and returns *)
 let f6_1 () = object
   method f6_m1 f1 f2 f3 =
     let open Float32_u in
@@ -292,7 +292,7 @@ let f6_2 n = object(self)
     else f (self#f6_m2 (n3+1) m1 f)
 end
 
-(* overapplication to float32# and non-float32# args *)
+(* overapplication to float32_u and non-float32_u args *)
 let f6_3 n k = object
   method f6_m3 n3 m1 f =
     let n = ((Sys.opaque_identity fst) n) + ((Sys.opaque_identity snd) n) in
@@ -334,7 +334,7 @@ let _ =
   let* x = #42.0s in
   print_floatu "Test 7, 36.50" Float32_u.(x - #7.0s)
 
-let ( let* ) x (f : _ -> float32#) = f x
+let ( let* ) x (f : _ -> float32_u) = f x
 let ( and* ) x y = Float32_u.(x, to_float32 (y - #1.2s))
 let _ =
   let result =
@@ -346,12 +346,12 @@ let _ =
   print_floatu "Test 7, 32.20" result
 
 (********************************)
-(* Test 8: basic float32# records *)
+(* Test 8: basic float32_u records *)
 
 (* Copy of test 3, but the float args are in a record *)
-type manyargs = { x1 : float32#; x3 : float32#; x5 : float32#; x7: float32#; x9: float32# }
+type manyargs = { x1 : float32_u; x3 : float32_u; x5 : float32_u; x7: float32_u; x9: float32_u }
 
-(* Get some float32# args by pattern matching and others by projection *)
+(* Get some float32_u args by pattern matching and others by projection *)
 let[@inline_never] f8 x0 x2 x4 x6 x8 steps ({ x1; x5; _ } as fargs) () =
   let (start_k, end_k) = x0 in
   let[@inline never] rec go k =
@@ -395,12 +395,12 @@ let test8 () =
 let _ = test8 ()
 
 (**************************************)
-(* Test 9: float32# record manipulation *)
+(* Test 9: float32_u record manipulation *)
 
-type t9 = { a : float32#;
-            mutable b : float32#;
-            c : float32#;
-            mutable d : float32# }
+type t9 = { a : float32_u;
+            mutable b : float32_u;
+            c : float32_u;
+            mutable d : float32_u }
 
 (* Construction *)
 let t9_1 = { a = #3.14s;
@@ -453,7 +453,7 @@ let _ =
   print_t9 t9_3
 
 (***********************************************)
-(* Test 10: float32# records in recursive groups *)
+(* Test 10: float32_u records in recursive groups *)
 
 let rec f r =
   r.d <- t10_1.b;
@@ -472,7 +472,7 @@ and t10_2 = { a = -#5.1s;
               d = -#8.4s }
 
 let _ =
-  Printf.printf "Test 10, float32# records in recursive groups.\n";
+  Printf.printf "Test 10, float32_u records in recursive groups.\n";
   print_t9 t10_1;
   print_t9 t10_2;
   let result = f t10_1 in
@@ -494,7 +494,7 @@ let _ =
   print_floatu "  result (1.00)" a
 
 (*************************************************)
-(* Test 13: basic float32 + float32# records *)
+(* Test 13: basic float32 + float32_u records *)
 
 (* Same as test 13 for floats, but boxed float32s have to be in the prefix. *)
 
@@ -503,11 +503,11 @@ type mixed_float32_record =
     x4_1 : float32;
     x6_1 : float32;
     x8_1 : float32;
-    x1 : float32#;
-    x3 : float32#;
-    x5 : float32#;
-    x7 : float32#;
-    x9 : float32# }
+    x1 : float32_u;
+    x3 : float32_u;
+    x5 : float32_u;
+    x7 : float32_u;
+    x9 : float32_u }
 
 type int_args =
   { x0_1 : int;
@@ -518,7 +518,7 @@ type int_args =
     x8_2 : int;
   }
 
-(* Get some float32# args by pattern matching and others by projection *)
+(* Get some float32_u args by pattern matching and others by projection *)
 let[@inline_never] f13 steps ({ x1; x8_1; x5; x6_1 } as fargs)
   ({ x0_1=start_k; x0_2=end_k; x4_2; x8_2 } as iargs) () =
   let[@inline never] rec go k =
@@ -571,16 +571,16 @@ let test13 () =
 let _ = test13 ()
 
 (*****************************************************)
-(* Test 14: (float32# + float32) record manipulation *)
+(* Test 14: (float32_u + float32) record manipulation *)
 
 (* Same as test 14 for floats, but boxed float32s have to be in the prefix. *)
 
 type t14 = { mutable b : float32;
              e : float32;
-             a : float32#;
-             c : float32#;
-             mutable d : float32#;
-             mutable f : float32# }
+             a : float32_u;
+             c : float32_u;
+             mutable d : float32_u;
+             mutable f : float32_u }
 
 (* Construction *)
 let t14_1 = { a = Float32_u.of_float32 3.14s;
@@ -646,7 +646,7 @@ let _ =
   print_t14 t14_3
 
 (*****************************************************)
-(* Test 14.1: (float32# + float32) variant manipulation *)
+(* Test 14.1: (float32_u + float32) variant manipulation *)
 
 (* Same as test 14 for floats, but boxed float32s have to be in the prefix. *)
 
@@ -654,10 +654,10 @@ type t14_variant =
   | Const
   | T of   { mutable b : float32;
              e : float32;
-             a : float32#;
-             c : float32#;
-             mutable d : float32#;
-             mutable f : float32# }
+             a : float32_u;
+             c : float32_u;
+             mutable d : float32_u;
+             mutable f : float32_u }
 
 (* Construction *)
 let t14_1 = T
@@ -726,7 +726,7 @@ let _ =
   print_t14_variant t14_3
 
 (*************************************************************)
-(* Test 15: (float32# + float32) records in recursive groups *)
+(* Test 15: (float32_u + float32) records in recursive groups *)
 
 let rec f r =
   r.d <- Float32_u.of_float32 t15_1.b;
@@ -750,7 +750,7 @@ and t15_2 = { a = Float32_u.of_float32 (- 5.1s);
               f = Float32_u.of_float32 (-10.6s) }
 
 let _ =
-  Printf.printf "Test 15, (float32#+float32) records in recursive groups:\n";
+  Printf.printf "Test 15, (float32_u+float32) records in recursive groups:\n";
   print_t14 t15_1;
   print_t14 t15_2;
   let result = f t15_1 in
@@ -761,7 +761,7 @@ let _ =
 let dummy = "dummy"
 
 (*************************************************)
-(* Test 16: basic mixed records involving float32# *)
+(* Test 16: basic mixed records involving float32_u *)
 
 type mixedargs = { x2_1 : float32;
                    x4_1 : float32;
@@ -775,17 +775,17 @@ type mixedargs = { x2_1 : float32;
                    dummy : string;
                    x0_1 : int;
                    x0_2 : int;
-                   x1 : float32#;
+                   x1 : float32_u;
                    x2_2 : int;
-                   x3 : float32#;
+                   x3 : float32_u;
                    x4_2 : int;
-                   x5 : float32#;
+                   x5 : float32_u;
                    x6_2 : int;
-                   x7 : float32#;
+                   x7 : float32_u;
                    x8_2 : int;
-                   x9 : float32# }
+                   x9 : float32_u }
 
-(* Get some float32# args by pattern matching and others by projection *)
+(* Get some float32_u args by pattern matching and others by projection *)
 let[@inline_never] f16 steps ({ x1; x0_1=start_k; x0_2=end_k; x8_1; x8_2; x5;
                                x6_1; x6_2 } as fargs) () =
   let[@inline never] rec go k =
@@ -843,10 +843,10 @@ let _ = test16 ()
 type t17 = { a : float32;
             dummy : string;
              mutable b : int;
-             c : float32#;
-             mutable d : float32#;
+             c : float32_u;
+             mutable d : float32_u;
              e : int;
-             mutable f : float32# }
+             mutable f : float32_u }
 
 (* Construction *)
 let t17_1 = { a = 3.17s;
@@ -915,7 +915,7 @@ let _ =
   print_t17 t17_3
 
 (************************************************************)
-(* Test 18: (float32# + immediate) records in recursive groups *)
+(* Test 18: (float32_u + immediate) records in recursive groups *)
 
 let rec f r =
   r.d <- Float32_u.of_int t18_1.b;
@@ -943,7 +943,7 @@ and t18_2 = { a = (- 5.1s);
             }
 
 let _ =
-  Printf.printf "Test 18, (float32#+imm) records in recursive groups:\n";
+  Printf.printf "Test 18, (float32_u+imm) records in recursive groups:\n";
   print_t17 t18_1;
   print_t17 t18_2;
   let result = f t18_1 in

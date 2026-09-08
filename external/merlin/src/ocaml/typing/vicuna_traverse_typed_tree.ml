@@ -309,7 +309,7 @@ and value_kind_variant env subst ~visited ~depth
            (Other
               "Unboxed variant should have exactly one constructor with one \
                field")))
-  | Variant_boxed _layouts ->
+  | Variant_boxed layouts ->
     let depth = depth + 1 in
     let for_one_constructor (constructor : Types.constructor_declaration) ~depth
         =
@@ -328,27 +328,22 @@ and value_kind_variant env subst ~visited ~depth
             value_kind env subst ~visited ~depth label.ld_type)
           labels
     in
-    let is_constant (cstr : Types.constructor_declaration) =
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple (_ :: _) | Cstr_record _ -> false
-    in
-    if List.for_all is_constant cstrs
+    if Array.for_all Types.cstr_layout_is_constant layouts
     then Imm
     else
-      let _, consts, _, non_consts =
+      let _, _, consts, _, non_consts =
         List.fold_left
           (fun result constructor ->
-            let next_const, consts, next_tag, non_consts = result in
-            let fields = for_one_constructor constructor ~depth in
-            if List.compare_length_with fields 0 = 0
+            let idx, next_const, consts, next_tag, non_consts = result in
+            if Types.cstr_layout_is_constant layouts.(idx)
             then
               let consts = next_const :: consts in
-              next_const + 1, consts, next_tag, non_consts
+              idx + 1, next_const + 1, consts, next_tag, non_consts
             else
+              let fields = for_one_constructor constructor ~depth in
               let non_consts = Block (Some (next_tag, fields)) :: non_consts in
-              next_const, consts, next_tag + 1, non_consts)
-          (0, [], 0, []) cstrs
+              idx + 1, next_const, consts, next_tag + 1, non_consts)
+          (0, 0, [], 0, []) cstrs
       in
       let sh =
         match non_consts with
@@ -356,7 +351,7 @@ and value_kind_variant env subst ~visited ~depth
           raise
             (Vicuna_unsupported
                (Other "Expected at least one non-constant constructor"))
-          (* See [List.for_all is_constant], above *)
+          (* See [Array.for_all Types.cstr_layout_is_constant], above *)
         | sh :: shs ->
           let shapes = List.fold_left (fun a b -> Or (a, b)) sh shs in
           shapes

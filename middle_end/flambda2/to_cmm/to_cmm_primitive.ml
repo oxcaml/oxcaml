@@ -289,7 +289,7 @@ let array_length ~dbg arr (kind : P.Array_kind.t) =
        For unboxed products, note that [Array_length] in [Flambda_primitive] is
        a unarized-array-length operation, that arrays of unboxed products are
        represented by mixed blocks with tag zero (not custom blocks), and that
-       arrays of unboxed products are not packed in any way (e.g. int32#
+       arrays of unboxed products are not packed in any way (e.g. int32_u
        elements occupy 64 bits). *)
     assert (C.wordsize_shift = C.numfloat_shift);
     C.addr_array_length arr dbg
@@ -755,10 +755,8 @@ let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
   match (width : P.string_accessor_width) with
   | Eight | Eight_signed ->
     let addr = C.add_int_ptr ~ptr_out_of_heap bytes index dbg in
-    let new_value = C.low_bits ~bits:8 new_value ~dbg in
     C.store ~dbg Byte_unsigned Assignment ~addr ~new_value
   | Sixteen | Sixteen_signed ->
-    let new_value = C.low_bits ~bits:16 new_value ~dbg in
     C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 ~ptr_out_of_heap bytes index new_value dbg
   | Single -> C.unaligned_set_f32 ~ptr_out_of_heap bytes index new_value dbg
@@ -1169,6 +1167,12 @@ let imm_or_ptr : P.Block_access_field_kind.t -> Lambda.immediate_or_pointer =
  fun block_access_kind ->
   match block_access_kind with Any_value -> Pointer | Immediate -> Immediate
 
+let atomic_offset (offset_units : P.atomic_offset_units) offset =
+  match offset_units with
+  | Field_index ->
+    C.Field_index { index = offset; index_type = tagged_immediate }
+  | Byte_offset -> C.Byte_offset { offset; offset_type = naked_int64 }
+
 let unary_primitive env res dbg f (_arg_simple : Simple.t option)
     (arg : Cmm.expression) =
   match (f : P.unary_primitive) with
@@ -1334,8 +1338,11 @@ let binary_primitive env dbg f (_x_simple : Simple.t option)
   | Float_comp (width, Yielding_int_like_compare_functions ()) ->
     binary_float_comp_primitive_yielding_int env dbg width x y
   | Bigarray_get_alignment align -> C.bigstring_get_alignment x y align dbg
-  | Atomic_load_field block_access_kind ->
-    C.atomic_load_field ~dbg (imm_or_ptr block_access_kind) x ~field:y
+  | Atomic_load (offset_units, block_access_kind) ->
+    C.atomic_load ~dbg
+      (imm_or_ptr block_access_kind)
+      x
+      (atomic_offset offset_units y)
   | Poke kind ->
     let memory_chunk =
       K.Standard_int_or_float.to_kind_with_subkind kind
@@ -1358,25 +1365,30 @@ let ternary_primitive _env dbg f (_x_simple : Simple.t option)
     bytes_or_bigstring_set ~dbg kind width ~bytes:x ~index:y ~new_value:z
   | Bigarray_set (_dimensions, kind, _layout) ->
     bigarray_store ~dbg kind ~bigarray:x ~index:y ~new_value:z
-  | Atomic_field_int_arith op -> (
+  | Atomic_int_arith (offset_units, op) -> (
+    let offset = atomic_offset offset_units y in
     match op with
-    | Fetch_add -> C.atomic_fetch_and_add_field ~dbg x ~field:y z
-    | Add -> C.atomic_add_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Sub -> C.atomic_sub_field ~dbg x ~field:y z |> C.return_unit dbg
-    | And -> C.atomic_land_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Or -> C.atomic_lor_field ~dbg x ~field:y z |> C.return_unit dbg
-    | Xor -> C.atomic_lxor_field ~dbg x ~field:y z |> C.return_unit dbg)
-  | Atomic_set_field (block_access_kind, mode) ->
-    C.atomic_exchange_field ~dbg
+    | Fetch_add -> C.atomic_fetch_and_add ~dbg x offset z
+    | Add -> C.atomic_add ~dbg x offset z |> C.return_unit dbg
+    | Sub -> C.atomic_sub ~dbg x offset z |> C.return_unit dbg
+    | And -> C.atomic_land ~dbg x offset z |> C.return_unit dbg
+    | Or -> C.atomic_lor ~dbg x offset z |> C.return_unit dbg
+    | Xor -> C.atomic_lxor ~dbg x offset z |> C.return_unit dbg)
+  | Atomic_set (offset_units, block_access_kind, mode) ->
+    C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~new_value:z
+      x
+      (atomic_offset offset_units y)
+      ~new_value:z
     |> C.return_unit dbg
-  | Atomic_exchange_field (block_access_kind, mode) ->
-    C.atomic_exchange_field ~dbg
+  | Atomic_exchange (offset_units, block_access_kind, mode) ->
+    C.atomic_exchange ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~new_value:z
+      x
+      (atomic_offset offset_units y)
+      ~new_value:z
   | Write_offset (write_offset_kind, kind, mode) ->
     let memory_chunk = C.memory_chunk_of_kind kind in
     let store =
@@ -1415,15 +1427,20 @@ let quaternary_primitive _env dbg f (_x_simple : Simple.t option)
     (_w_simple : Simple.t option) (x : Cmm.expression) (y : Cmm.expression)
     (z : Cmm.expression) (w : Cmm.expression) =
   match (f : P.quaternary_primitive) with
-  | Atomic_compare_and_set_field (block_access_kind, mode) ->
-    C.atomic_compare_and_set_field ~dbg
+  | Atomic_compare_and_set (offset_units, block_access_kind, mode) ->
+    C.atomic_compare_and_set ~dbg
       (imm_or_ptr block_access_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~old_value:z ~new_value:w
-  | Atomic_compare_exchange_field { atomic_kind = _; args_kind; mode } ->
-    C.atomic_compare_exchange_field ~dbg (imm_or_ptr args_kind)
+      x
+      (atomic_offset offset_units y)
+      ~old_value:z ~new_value:w
+  | Atomic_compare_exchange { offset_units; atomic_kind = _; args_kind; mode }
+    ->
+    C.atomic_compare_exchange ~dbg (imm_or_ptr args_kind)
       ~mode:(Alloc_mode.For_assignments.to_lambda mode)
-      x ~field:y ~old_value:z ~new_value:w
+      x
+      (atomic_offset offset_units y)
+      ~old_value:z ~new_value:w
 
 let variadic_primitive _env dbg f args =
   match (f : P.variadic_primitive) with

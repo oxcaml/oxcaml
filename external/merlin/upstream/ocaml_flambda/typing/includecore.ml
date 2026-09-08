@@ -86,12 +86,18 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
     let c = child_close_over_coercion_opt id c in
     begin match Mode.Modality.to_const_opt moda1 with
     | None ->
-      (* [wrap_constraint_with_shape] invokes inclusion check with
-          identical modes and inferred modalities, which we workaround *)
+      (* Inferred modalities on the expected side arise only with both sides
+          physically equal: [wrap_constraint_with_shape] invokes the inclusion
+          check with identical modes, and expanding the same module alias on
+          both sides (see [try_modtypes]) can reach here with different modes.
+          Since the modalities coincide, children's modes are related whenever
+          the parents' are; if the parents' are not, defer to the per-item
+          checks, which take modalities and mode crossing into account. *)
       assert (moda0 == moda1);
-      Mode.Value.submode_exn m0 m1;
-      (* For children, we only check modality inclusion *)
-      Ok All
+      begin match Mode.Value.submode m0 m1 with
+      | Ok () -> Ok All
+      | Error _ -> Ok (Specific ((m0, c), m1))
+      end
     | Some moda1 ->
       let m0 = Mode.Modality.apply_left moda0 m0 in
       let m1 = Mode.Modality.Const.apply_right moda1 m1 in
@@ -175,9 +181,9 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
   let pat_refs =
-    Ctype.moregeneral env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
   in
   (* Map from RHS sort poly var to its 1-indexed position *)
   let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
@@ -243,7 +249,7 @@ let uid_is_from_current_unit uid =
   | None, _ | _, None -> false
 
 let value_descriptions ~loc env name
-    ~mmodes
+    ~mmodes ~self_check
     (vd1 : Types.value_description)
     (vd2 : Types.value_description) =
   Builtin_attributes.check_alerts_inclusion
@@ -287,7 +293,8 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
-               moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 ty2
+               moregeneral_lpoly ~self_check env
+                 val_lpoly1 val_lpoly2 ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
@@ -301,7 +308,8 @@ let value_descriptions ~loc env name
         let ty1, mode_l1, _, sort1 =
           Ctype.instance_prim env p1 vd1.val_type
         in
-        (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
+        (try moregeneral_lpoly ~self_check env
+               val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc_loc =
           (* Prefer a declaration from the current unit.  A foreign primitive
@@ -327,7 +335,7 @@ let value_descriptions ~loc env name
         Tcoerce_primitive pc
      end
   | _ ->
-     match moregeneral_lpoly env
+     match moregeneral_lpoly ~self_check env
              val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
@@ -415,6 +423,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -718,6 +728,14 @@ let report_constructor_mismatch first second decl env ppf err =
           but has layout any in %s?@]"
         (choose ord first second)
         (choose_other ord first second)
+  | Immediate_representation ord ->
+      pr "%s is annotated with %a and %s isn't."
+        (String.capitalize_ascii (choose ord first second))
+        Style.inline_code "[@immediate_all_void_constructor]"
+        (choose_other ord first second)
+  | Constructor_representation_shape_mismatch ->
+      pr "@[<hv>Their internal representations differ:@;\
+          This is likely caused by a layout mismatch in a later definition.@]"
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
@@ -810,8 +828,15 @@ let report_kind_mismatch first second ppf (kind1, kind2) =
     (kind_to_string kind2)
 
 let print_unsafe_mode_crossing ppf umc =
-  Fmt.fprintf ppf "mod %a@ %a"
-    Mode.Crossing.print umc.unsafe_mod_bounds
+  Fmt.fprintf ppf "mod %a%a@ %a"
+    Mode.Crossing.print umc.unsafe_mod_bounds.crossing
+    (fun ppf externality ->
+      if
+        not
+          (Jkind_axis.Externality.equal externality
+             Jkind_axis.Externality.max)
+      then Fmt.fprintf ppf "@ %a" Jkind_axis.Externality.print externality)
+    umc.unsafe_mod_bounds.externality
     Jkind.With_bounds.format umc.unsafe_with_bounds
 
 let report_unsafe_mode_crossing_mismatch first second ppf e =
@@ -912,8 +937,10 @@ let compare_unsafe_mode_crossing ~env umc1 umc2 =
   | Some _, None -> Some (Unsafe_mode_crossing (Mode_crossing_only_on First))
   | None, Some _ -> Some (Unsafe_mode_crossing (Mode_crossing_only_on Second))
   | Some umc1, Some umc2 ->
-    if equal_unsafe_mode_crossing
+    if Jkind.equal_unsafe_mode_crossing
          ~type_equal:(Ctype.type_equal env)
+         ~context:(Ctype.mk_jkind_context_always_principal env)
+         env
          umc1 umc2
     then None
     else
@@ -1227,13 +1254,19 @@ module Variant_diffing = struct
     | None, None -> None
     | Some _, None -> Some (Fixed_representation First)
     | None, Some _ -> Some (Fixed_representation Second)
-    | Some _, Some _ ->
-        (* Currently the only way for the representations to be different but
-           the types the same is for the layout information to be different
-           between the two sides, which is only possible if the layout is
-           [any] on one side or the other. So if neither representation is
-           [None] then we must be okay. *)
-        None
+    | Some Constructor_immediate_all_void,
+      Some Constructor_immediate_all_void -> None
+    | Some Constructor_immediate_all_void, Some _ ->
+        Some (Immediate_representation First)
+    | Some _, Some Constructor_immediate_all_void ->
+        Some (Immediate_representation Second)
+    | Some shape1, Some shape2 ->
+        if equal_constructor_representation_up_to_scannable_axes shape1 shape2
+        then None
+        else
+          (* Analogous to where [find_mismatch_in_mixed_record_representations]
+             returns [Representation_shape_mismatch] *)
+          Some Constructor_representation_shape_mismatch
 
   let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
         shape1 shape2 =

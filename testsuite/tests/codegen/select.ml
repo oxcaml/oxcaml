@@ -67,7 +67,7 @@ select_constant:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int32 b (x : int32#) (y : int32#) =
+let select_int32 b (x : int32_u) (y : int32_u) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
@@ -80,7 +80,7 @@ select_int32:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_int64 b (x : int64#) (y : int64#) =
+let select_int64 b (x : int64_u) (y : int64_u) =
   Builtins.select_int64 b x y
 [%%expect_asm X86_64{|
 select_int64:
@@ -93,7 +93,7 @@ select_int64:
 
 
 (* CR ttebbi: Unnecessary moves. *)
-let select_nativeint b (x : nativeint#) (y : nativeint#) =
+let select_nativeint b (x : nativeint_u) (y : nativeint_u) =
   Builtins.select_nativeint b x y
 [%%expect_asm X86_64{|
 select_nativeint:
@@ -203,4 +203,50 @@ let select_equal (x : int) (y : int) = Builtins.select (x = y) x y
 select_equal:
   movq  %rbx, %rax
   ret
+|}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_match x g h =
+  match Builtins.select (Int64_u.equal x #0L) true false with
+  | true -> g #()
+  | false -> h #()
+[%%expect_asm X86_64{|
+select_and_match:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
+|}]
+
+(* CR ttebbi: Having both the test/cmov and cmp/jump is unnecessary. Ideally,
+   the jump is eliminated and the cmov selects between [g] and [h] *)
+let select_and_if x g h =
+  if Builtins.select (Int64_u.equal x #0L) true false then g #() else h #()
+[%%expect_asm X86_64{|
+select_and_if:
+  movq  %rax, %rsi
+  movq  %rbx, %rax
+  movl  $1, %ebx
+  movl  $3, %edx
+  testq %rsi, %rsi
+  cmove %rdx, %rbx
+  cmpq  $1, %rbx
+  jne   .L0
+  movq  (%rdi), %rbx
+  movq  %rdi, %rax
+  jmp   *%rbx
+.L0:
+  movq  (%rax), %rbx
+  jmp   *%rbx
 |}]

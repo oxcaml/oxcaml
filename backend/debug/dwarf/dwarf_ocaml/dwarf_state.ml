@@ -141,6 +141,16 @@ module Die_gen_ctx = struct
       String.Tbl.add t name (runtime_shape, reference)
   end
 
+  (* The per-compilation-unit DIEs for the enumerations distinguishing
+     immediates from pointers, whose contents do not depend on the type being
+     described: one variant with named enumerators, one with unnamed ones. Like
+     the "ocaml_value" fallback DIE, they are created eagerly in [Dwarf.create],
+     and only when generating full DWARF. *)
+  type imm_or_ptr_enums =
+    { named : Proto_die.t;
+      unnamed : Proto_die.t
+    }
+
   type t =
     { cache : Cache.t;
       name_cache : Name_cache.t;
@@ -148,18 +158,32 @@ module Die_gen_ctx = struct
       (* The empty environment, interned once in [rec_env_table] so that
          restricting a cache key for a closed shape (the overwhelmingly common
          case) does not involve an intern-table lookup. *)
-      empty_rec_env : Rec_var_env.t
+      empty_rec_env : Rec_var_env.t;
+      imm_or_ptr_enums : imm_or_ptr_enums option
     }
 
-  let create ~initial_size =
+  let create ~initial_size ~imm_or_ptr_enums =
     let rec_env_table = Rec_var_env.create_table ~initial_size in
     { cache = Cache.create ~initial_size;
       name_cache = Name_cache.create ~initial_size;
       rec_env_table;
-      empty_rec_env = Rec_var_env.empty rec_env_table
+      empty_rec_env = Rec_var_env.empty rec_env_table;
+      imm_or_ptr_enums
     }
 
   let name_cache t = t.name_cache
+
+  let imm_or_ptr_enums t =
+    match t.imm_or_ptr_enums with
+    | Some enums -> enums
+    | None ->
+      Misc.fatal_error
+        "Immediate-or-pointer enumeration DIEs are only created when \
+         generating full DWARF"
+
+  let imm_or_ptr_enum_named t = (imm_or_ptr_enums t).named
+
+  let imm_or_ptr_enum_unnamed t = (imm_or_ptr_enums t).unnamed
 
   let empty_rec_env t = t.empty_rec_env
 
@@ -210,8 +234,8 @@ type t =
   }
 
 let create ~compilation_unit_header_label ~compilation_unit_proto_die
-    ~code_layout debug_loc_table debug_ranges_table address_table
-    location_list_table ~get_file_num ~sourcefile =
+    ~code_layout ~imm_or_ptr_enums debug_loc_table debug_ranges_table
+    address_table location_list_table ~get_file_num ~sourcefile =
   { compilation_unit_header_label;
     compilation_unit_proto_die;
     code_layout;
@@ -227,7 +251,7 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
     complex_shape_cache = Complex_shape.Shape_cache.create ~initial_size:100;
     eval_context =
       Type_shape.Evaluated_shape.Eval_context.create ~initial_size:256;
-    die_gen_ctx = Die_gen_ctx.create ~initial_size:256
+    die_gen_ctx = Die_gen_ctx.create ~initial_size:256 ~imm_or_ptr_enums
   }
 
 let compilation_unit_header_label t = t.compilation_unit_header_label

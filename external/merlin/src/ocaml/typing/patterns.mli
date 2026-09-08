@@ -77,7 +77,7 @@ module General : sig
     | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode
+                   * alloc_mode_r
     | `Alias of pattern * Ident.t * string loc * Uid.t
                 * Jkind.Sort.t * Mode.Value.l * Types.type_expr
   ]

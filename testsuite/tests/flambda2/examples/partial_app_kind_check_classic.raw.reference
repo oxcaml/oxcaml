@@ -5,33 +5,23 @@
          : imm tagged =
    cont k1 (0)
  in
- let code size(4) stub
-       partial_f_2 (param1)
-         my_closure &my_alloc_region my_depth
-         -> k1 * k2
-         : imm tagged =
-   apply direct(f_1 &my_alloc_region)  (0, param1) -> k1 * k2
- in
- let $camlPartial_app_kind_check_classic__s2 =
-   closure partial_f_2 @partial_f &toplevel.alloc_region
- in
- let code inline(never) size(1)
+ let code inline(never) size(0)
        test_0 (u : imm tagged, a, b)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : int64 =
-   cont k1 ($camlPartial_app_kind_check_classic__s2)
+   invalid "(Application_result_kind_mismatch_in_lambda\n (dbg partial_app_kind_check_classic.ml:16,2--14))"
  in
  let $camlPartial_app_kind_check_classic__s0 =
    closure test_0 @test &toplevel.alloc_region
  in
- let $camlPartial_app_kind_check_classic__s3 =
+ let $camlPartial_app_kind_check_classic__s2 =
    Block 0 ($camlPartial_app_kind_check_classic__s0)
  in
  let $camlPartial_app_kind_check_classic__s1 =
    closure f_1 @f &toplevel.alloc_region
  in
- cont k ($camlPartial_app_kind_check_classic__s3))
+ cont k ($camlPartial_app_kind_check_classic__s2))
   where k define_root_symbol (module_block) =
     let field_0 = $camlPartial_app_kind_check_classic__s0 in
     let $camlPartial_app_kind_check_classic = Block 0 (field_0) in

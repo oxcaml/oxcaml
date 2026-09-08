@@ -82,11 +82,27 @@ module Die_gen_ctx : sig
     val add : t -> string -> Runtime_shape.t -> Proto_die.reference -> unit
   end
 
+  (** The per-compilation-unit DIEs for the enumerations distinguishing
+      immediates from pointers: one variant with named enumerators, one with
+      unnamed ones. Created eagerly in [Dwarf.create], and only when generating
+      full DWARF. *)
+  type imm_or_ptr_enums =
+    { named : Proto_die.t;
+      unnamed : Proto_die.t
+    }
+
   type t
 
-  val create : initial_size:int -> t
+  val create : initial_size:int -> imm_or_ptr_enums:imm_or_ptr_enums option -> t
 
   val name_cache : t -> Name_cache.t
+
+  (** Fatal error if the context was created without the enumeration DIEs. *)
+  val imm_or_ptr_enum_named : t -> Proto_die.t
+
+  (** As [imm_or_ptr_enum_named], but for the variant with unnamed enumerators.
+  *)
+  val imm_or_ptr_enum_unnamed : t -> Proto_die.t
 
   (** The empty recursive-variable environment, interned in this context's table
       so that it can be used as part of a cache key. *)
@@ -121,6 +137,7 @@ val create :
   compilation_unit_header_label:Asm_label.t ->
   compilation_unit_proto_die:Proto_die.t ->
   code_layout:code_layout ->
+  imm_or_ptr_enums:Die_gen_ctx.imm_or_ptr_enums option ->
   Debug_loc_table.t ->
   Debug_ranges_table.t ->
   Address_table.t ->

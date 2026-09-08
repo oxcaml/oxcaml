@@ -308,6 +308,31 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
       add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
         ~base:untuple_var)
     params;
+  (* We can't ever remove the accessors from the tuple, because they are inside
+     the [caml_tuplify*] functions and not in our control. As such, even if no
+     component of the tuple is used, the tuple itself must never be replaced by
+     a poison value, because otherwise [caml_tuplify*] will try to load the
+     fields from the poison value and cause a segfault.
+
+     To force the tuple to remain alive, we read its [Is_int] field, and force
+     the result to be used if the function could be called. Ideally, we would
+     want to force the tuple to stay the same length, reading from a
+     [Block_length] field, but this does not exist yet. However, we also never
+     change the length or representation of blocks, so reading the [Is_int]
+     field is enough to ensure the block remains alive and of the same size,
+     even if all its fields turn to poison.
+
+     If we ever start changing the representation of blocks, or if we change
+     their length in another way, it will become necessary to do something else
+     here to ensure the size of the tuple cannot change. *)
+  let keep_tuple_alive_var =
+    Code_id_or_name.var (Variable.create "keep_tuple_alive_var" K.value)
+  in
+  add_accessor_dep t ~to_:keep_tuple_alive_var Field.is_int ~base:untuple_var;
+  (* Make sure [keep_tuple_alive_var] is used if [code_id] is used. *)
+  add_use_dep t
+    ~to_:(Code_id_or_name.code_id code_id)
+    ~from:keep_tuple_alive_var;
   [witness]
 
 let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params

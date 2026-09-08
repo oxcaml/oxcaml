@@ -103,3 +103,7 @@
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_int(x=<bigarray2|data=<ADDRESS>> : (int, Bigarray.int_elt, Bigarray.c_layout) Bigarray.Array2.t @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray2_float(x=<bigarray2|data=<ADDRESS>> : (float, Bigarray.float64_elt, Bigarray.fortran_layout) Bigarray.Array2.t @ value)
     frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_bigarray3_int32(x=<bigarray3|data=<ADDRESS>> : (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array3.t @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_all_void_variant(x=Imm_void : all_void_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_all_void_variant(x=Blk_void : all_void_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_all_void_variant(x=Const : all_void_variant @ value)
+    frame #N: <ADDRESS> test_datatypes_dwarf.exe`Test_datatypes_dwarf.f_all_void_variant(x=Boxed 42 : all_void_variant @ value)

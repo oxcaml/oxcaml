@@ -1,0 +1,20 @@
+File "weak_mode_subsumption.ml", lines 26-28, characters 46-3:
+26 | ..............................................struct
+27 |   let f = h
+28 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : string -> int -> int end
+       is not included in
+         sig val f : string -> int -> int @@ stateless end
+       Values do not match:
+         val f : string -> int -> int
+       is not included in
+         val f : string -> int -> int @@ stateless
+       The type string -> int -> int is not compatible with the type
+         string -> int -> int
+       Type int -> int is not compatible with type int -> int
+       File "weak_mode_subsumption.ml", line 19, characters 6-7:
+         Expected declaration
+       File "weak_mode_subsumption.ml", line 27, characters 6-7:
+         Actual declaration
