@@ -198,6 +198,7 @@ module Binding = struct
     }
 end
 
+(* CR-someday hwasilewski: Add unary operations as well. *)
 module Bin_op = struct
   (* CR-soon hwasilewski: Add more operators. *)
   type t =

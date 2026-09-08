@@ -187,9 +187,10 @@ let gen_scalar_or_array_type (st : State.t) =
 let gen_record_types (st : State.t) =
   let representations =
     List.filter
-      (fun unboxed ->
-        if unboxed then st.swarm.unboxed_records else st.swarm.boxed_records)
-      [false; true]
+      (function
+        | `Boxed -> st.swarm.boxed_records
+        | `Unboxed -> st.swarm.unboxed_records)
+      [`Boxed; `Unboxed]
   in
   let count =
     if List.is_empty representations
@@ -218,13 +219,16 @@ let gen_record_types (st : State.t) =
             })
       in
       let variants =
-        List.map (fun unboxed -> { Ty.id; fields; unboxed }) representations
+        List.map
+          (function
+            | `Boxed -> { Ty.id; fields; unboxed = false }
+            | `Unboxed -> { Ty.id; fields; unboxed = true })
+          representations
       in
       gen (id + 1) (List.rev_append variants records)
   in
   gen 0 []
 
-(* CR-soon hwasilewski: add bool arguments *)
 (* CR-soon hwasilewski: Add boolean variable generation. *)
 let gen_type (st : State.t) =
   if
@@ -390,9 +394,9 @@ let gen_numeric_const (st : State.t) (nty : NumberTy.t) =
         let bits =
           Gen.run_exn
             (Gen.weighted st.random_state
-               [ 1, small ~min:(-1) ~max:1;
-                 1, small ~min:(-10) ~max:10;
-                 2, Gen.create (fun () -> Random.State.bits64 st.random_state)
+               [ 5, small ~min:(-1) ~max:1;
+                 5, small ~min:(-10) ~max:10;
+                 10, Gen.create (fun () -> Random.State.bits64 st.random_state)
                  (* CR-soon hwasilewski: Add max_int and min_int. *) ])
         in
         Expr.Const (Number.of_integral_bits base bits))
@@ -509,8 +513,14 @@ let rec gen_number (st : State.t) (env : Env.t) (nty : NumberTy.t) =
    of mutable records. Currently we rely on a de facto right-to-left evaluation
    order, which holds in many cases but is not specified. We should either do
    some sort of effect analysis in the style of Efftester, make sure we pull
-   function calls out of expressions into let-bindings for example. Or, we can
+   function calls out of expressions into let-bindings for example. Or we can
    just decide that we treat an evaluation order violation as a bug. *)
+
+(* Generates a function call, possibly by creating a new function. This amounts
+   to lazy function generation. Note that once [Config.max_function_count] have
+   been generated, we do not allow calls to existing functions as well. This
+   serves to limit the exponential blowup of nesting loops and functions and
+   follows the design of CSmith. *)
 and gen_fun_call (st : State.t) caller_env return_ty =
   if
     (not st.swarm.function_calls)
@@ -563,6 +573,10 @@ and gen_fun_call (st : State.t) caller_env return_ty =
           in
           let args = gen_arguments params in
           let _callee_env, body = gen_fun_body st callee_env 0 in
+          (* CR-someday hwasilewski: Make sure we use a result that uses as many
+             generated variables as possible. Otherwise, most of the function
+             might become dead code, which is a waste of CPU time for
+             fuzzing. *)
           let result =
             match gen_existing st callee_env return_ty with
             | Some generate -> generate ()
@@ -678,14 +692,17 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
             let env, body = gen env (remaining - 1) in
             env, Statement.Let (binding, expr, body))
       in
-      (* CR-someday hwasilewski: We should, with some probability, generate the
-         loop bounds so that they iterate within the bounds of an array
-         dimension, so that there is a higher probability that the loop iterates
-         over an array. *)
+      (* CR-someday hwasilewski: Skew the generation of loop bounds, so that
+         they fit inside the bounds of an array dimensions with higher
+         probability. (Similar to CSmith) *)
       let gen_bounded_loop =
         Gen.when_ st.swarm.bounded_loops (fun () ->
             let name = State.fresh st in
+            (* We iterate 1-3 times, more iterations have diminishing returns of
+               bugs found vs CPU time. *)
             let times = 1 + Random.State.int st.random_state 3 in
+            (* Apply [i -> scale * i + offset] to [times; ...; 1], giving a
+               stride of [-scale]. *)
             let scale =
               random_int_in_range st ~min:1 ~max:Config.max_loop_stride
             in
@@ -734,8 +751,6 @@ and gen_fun_body (st : State.t) (env : Env.t) depth =
   in
   gen env stmt_count
 
-(* CR-soon hwasilewski: Make the generated outputs less pessimistic for the
-   register allocator, which we do not want to spend as much time on. *)
 let gen_program (st : State.t) env =
   let rec gen_vars env count =
     if count = 0
