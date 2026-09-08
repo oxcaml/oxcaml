@@ -424,7 +424,8 @@ type moregen_ret_modes =
   | Skip_intermediate_ret_modes
         (* Skip intermediate arrows when constraining alloc modes *)
 
-val moregeneral: ?ret_modes:moregen_ret_modes -> self_check:bool -> Env.t -> bool ->
+val moregeneral: ?ret_modes:moregen_ret_modes -> self_check:bool ->
+  Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
   type_expr -> type_expr -> Jkind_types.Sort.t option list
         (* Check if the first type scheme is more general than the second.
