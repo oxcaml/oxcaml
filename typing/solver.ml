@@ -48,10 +48,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Id : ('a, 'a, 'l * 'r) t
             (** Short-hand for [Base (H.id, C.id)] to save memory *)
         | Adjoint_l :
-            'b C.obj * ('a, 'b, 'l2 * allowed) t
+            'b C.obj * ('a, 'b, 'l2 * allowed) t * H.Pinpoint.t option
             -> ('b, 'a, 'l * disallowed) t
         | Adjoint_r :
-            'b C.obj * ('a, 'b, allowed * 'r2) t
+            'b C.obj * ('a, 'b, allowed * 'r2) t * H.Pinpoint.t option
             -> ('b, 'a, disallowed * 'r) t
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
@@ -75,7 +75,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.allow_left morph_hint, C.allow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_left a_morph_hint, allow_left b_morph_hint)
-          | Adjoint_l (dst, h) -> Adjoint_l (dst, h)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
 
         let rec allow_right : type a b l r.
             (a, b, l * allowed) t -> (a, b, l * r) t =
@@ -86,7 +86,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.allow_right morph_hint, C.allow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_right a_morph_hint, allow_right b_morph_hint)
-          | Adjoint_r (dst, h) -> Adjoint_r (dst, h)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
 
         let rec disallow_left : type a b l r.
             (a, b, l * r) t -> (a, b, disallowed * r) t =
@@ -97,8 +97,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.disallow_left morph_hint, C.disallow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
-          | Adjoint_l (dst, h) -> Adjoint_l (dst, h)
-          | Adjoint_r (dst, h) -> Adjoint_r (dst, h)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
 
         let rec disallow_right : type a b l r.
             (a, b, l * r) t -> (a, b, l * disallowed) t =
@@ -109,8 +109,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.disallow_right morph_hint, C.disallow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
-          | Adjoint_l (dst, h) -> Adjoint_l (dst, h)
-          | Adjoint_r (dst, h) -> Adjoint_r (dst, h)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
       end)
 
       let left_adjoint : type a b l.
@@ -118,24 +118,27 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        fun b_obj h ->
         match h with
         | Id -> Id
-        | Adjoint_r (_, h) -> disallow_right h
-        | Base _ | Compose _ -> Adjoint_l (b_obj, h)
+        | Adjoint_r (_, h, _) -> disallow_right h
+        | Base _ | Compose _ -> Adjoint_l (b_obj, h, None)
 
       let right_adjoint : type a b r.
           b C.obj -> (a, b, allowed * r) t -> (b, a, disallowed * allowed) t =
        fun b_obj h ->
         match h with
         | Id -> Id
-        | Adjoint_l (_, h) -> disallow_left h
-        | Base _ | Compose _ -> Adjoint_r (b_obj, h)
+        | Adjoint_l (_, h, _) -> disallow_left h
+        | Base _ | Compose _ -> Adjoint_r (b_obj, h, None)
 
       let rec src : type a b l r. b C.obj -> (a, b, l * r) t -> a C.obj =
        fun dst -> function
         | Id -> dst
         | Base (_, morph) -> C.src dst morph
         | Compose (f, g) -> src (src dst f) g
-        | Adjoint_l (dst, _) -> dst
-        | Adjoint_r (dst, _) -> dst
+        | Adjoint_l (dst, _, _) -> dst
+        | Adjoint_r (dst, _, _) -> dst
+
+      let apply_pinpoint pinpoint (ahint, pp) =
+        ahint, Option.value pinpoint ~default:pp
 
       let rec populate : type b a l r.
           a C.obj ->
@@ -152,8 +155,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           (a, Apply (morph_hint, morph, ahint)), pp
         | Compose (h1, h2) ->
           populate obj_a h1 (fun obj_mid -> populate obj_mid h2 cont)
-        | Adjoint_l (dst, h) -> populate_adjoint_l obj_a dst h cont
-        | Adjoint_r (dst, h) -> populate_adjoint_r obj_a dst h cont
+        | Adjoint_l (dst, h, pinpoint) ->
+          populate_adjoint_l obj_a dst h (fun obj ->
+              apply_pinpoint pinpoint (cont obj))
+        | Adjoint_r (dst, h, pinpoint) ->
+          populate_adjoint_r obj_a dst h (fun obj ->
+              apply_pinpoint pinpoint (cont obj))
 
       and populate_adjoint_l : type b a l l2.
           a C.obj ->
@@ -164,7 +171,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        fun obj_a dst h cont ->
         match h with
         | Id -> cont obj_a
-        | Adjoint_r (_, h) ->
+        | Adjoint_r (_, h, _) ->
           populate obj_a (allow_left (disallow_right h)) cont
         | Base (morph_hint, morph) ->
           let ahint, pp = cont dst in
@@ -186,7 +193,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        fun obj_a dst h cont ->
         match h with
         | Id -> cont obj_a
-        | Adjoint_l (_, h) ->
+        | Adjoint_l (_, h, _) ->
           populate obj_a (allow_right (disallow_left h)) cont
         | Base (morph_hint, morph) ->
           let ahint, pp = cont dst in
@@ -1649,7 +1656,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.left_adjoint dst f in
     let src = C.src dst f in
-    let f'_hint = Comp_hint.Morph_hint.Adjoint_l (dst, f_hint) in
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_l (dst, f_hint, Some pp) in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vlower
@@ -1691,7 +1698,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.right_adjoint dst f in
     let src = C.src dst f in
-    let f'_hint = Comp_hint.Morph_hint.Adjoint_r (dst, f_hint) in
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_r (dst, f_hint, Some pp) in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vupper
