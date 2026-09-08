@@ -129,8 +129,8 @@ type vme : void
 type t = A of vme [@immediate_all_void_constructor]
 |}]
 
-(* Boxed records and inline payloads may be all void, including through
-   nested products. The implicit unboxed version of a boxed record is void. *)
+(* All-`void` boxed and inline records *)
+
 type u1 = #{ a : unit_u }
 type u2 = #{ a : unit_u; b : unit_u }
 type u3 = { a : unit_u } [@@unboxed]
