@@ -64,6 +64,22 @@ val r3i : int = 42
 val r3f : float = 1.
 |}]
 
+(* [@inline never] static functors using static data. *)
+
+let (r3i, r3f) =
+  let module IdA = struct let[@inline never] poly_ id x = x end in
+  let module[@inline never] F (M : Id @ static) = struct
+    let i = M.id 42
+    let f = M.id #1.0
+  end in
+  let module R = F (IdA) in
+  (R.i, to_float R.f)
+[%%expect{|
+val r3i : int = 42
+val r3f : float = 1.
+|}]
+
+
 (* Applied to an inline structure rather than a named module. *)
 let (r4i, r4f) =
   let module F (M : Id @ static) = struct
