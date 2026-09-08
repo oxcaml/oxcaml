@@ -28,8 +28,10 @@
 module PTA = Points_to_analysis
 module Unboxed_fields = Unboxing_analysis.Unboxed_fields
 
-let function_slots_to_be_built ~db ~closure_function_decls
-    ~function_slot_rewrites ~function_slots =
+let function_slots_to_be_built ~(uses : Unboxing_analysis.result)
+    ~get_code_metadata ~closure_function_decls ~function_slot_rewrites
+    ~function_slots =
+  let db = uses.db in
   List.fold_left
     (fun new_slots (slot, closure_name) ->
       let slot' =
@@ -48,14 +50,28 @@ let function_slots_to_be_built ~db ~closure_function_decls
         with
         | Some (Function_declarations.Deleted _ as decl) -> decl
         | Some
-            (Function_declarations.Code_id
-               { code_id; only_full_applications = _ }) ->
-          (* Escaping closures use this field too. *)
-          let only_full_applications =
-            not
-              (PTA.field_used db closure_name Field.unknown_arity_call_witness)
-          in
-          Code_id { code_id; only_full_applications }
+            (Function_declarations.Code_id { code_id; only_full_applications })
+          ->
+          if
+            PTA.field_used db closure_name Field.known_arity_call_witness
+            || PTA.field_used db closure_name Field.unknown_arity_call_witness
+          then
+            let changed_calling_convention =
+              not
+                (Unboxing_analysis.cannot_change_calling_convention uses code_id)
+            in
+            Code_id
+              { code_id;
+                only_full_applications =
+                  only_full_applications || changed_calling_convention
+              }
+          else
+            let code_metadata = get_code_metadata code_id in
+            Deleted
+              { function_slot_size =
+                  Code_metadata.function_slot_size code_metadata;
+                dbg = Code_metadata.dbg code_metadata
+              }
         | None ->
           Misc.fatal_errorf "No function declaration found for closure %a"
             Code_id_or_name.print closure_name
@@ -87,12 +103,13 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
    closures after rewriting. Returns [None] if the set of closures will not get
    built at all, e.g. if it has no usages. [closure_name] should be the name of
    any one of the closures in the set. *)
-let slots_to_be_built_for_set_of_closures ~db ~closure_function_decls
-    ~unboxed_fields
+let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
+    ~get_code_metadata ~closure_function_decls ~unboxed_fields
     ~(changed_representation :
        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
     =
+  let db = uses.db in
   let any_member_has_usage =
     List.exists (fun (_, member) -> PTA.has_use db member) set.function_slots
   in
@@ -119,12 +136,13 @@ let slots_to_be_built_for_set_of_closures ~db ~closure_function_decls
         Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
-      ( function_slots_to_be_built ~db ~closure_function_decls
-          ~function_slot_rewrites ~function_slots:set.function_slots,
+      ( function_slots_to_be_built ~uses ~get_code_metadata
+          ~closure_function_decls ~function_slot_rewrites
+          ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
 let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
-    ({ db; unboxed_fields; changed_representation; _ } :
+    ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
      of closures. [seen_closure_names] tracks the closures of the sets already
@@ -148,7 +166,7 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
             in
             let set_slots' =
               match
-                slots_to_be_built_for_set_of_closures ~db
+                slots_to_be_built_for_set_of_closures ~uses ~get_code_metadata
                   ~closure_function_decls ~unboxed_fields
                   ~changed_representation ~closure_name set
               with
