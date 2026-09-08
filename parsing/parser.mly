@@ -4119,7 +4119,7 @@ jkind_desc_gen(self):
       (* LIDENTs here are for modes *)
       let modes =
         List.map
-          (fun {txt; loc} -> {txt = Mode [{txt; loc}]; loc})
+          (fun {txt; loc} -> {txt = Mode txt; loc})
           $3
       in
       Pjk_mod ($1, modes)
@@ -4744,7 +4744,7 @@ strict_function_or_labeled_tuple_type:
 /* Legacy mode annotations */
 %inline mode_legacy:
    | LOCAL
-       { mkloc (Mode [mkloc "local" (make_loc $sloc)]) (make_loc $sloc) }
+       { mkloc (Mode "local") (make_loc $sloc) }
 ;
 
 %inline mode_expr_legacy:
@@ -4804,20 +4804,15 @@ mode_bound(SEP):
       { mkloc (Mode_bounds { upper; lower }) (make_loc $sloc) }
 ;
 
-mode_expr:
-  | consts = mode_const+
-      { [mkloc (Mode consts) (make_loc $sloc)] }
-  | consts = mode_const+ rest = nonconst_mode_expr
-      { mkloc (Mode consts) (make_loc $loc(consts)) :: rest }
-  | rest = nonconst_mode_expr
-      { rest }
+%inline mode:
+  | c = mode_const
+      { mkloc (Mode c.txt) c.loc }
+  | m = nonconst_mode
+      { m }
 ;
 
-nonconst_mode_expr:
-  | m = nonconst_mode
-      { [m] }
-  | m = nonconst_mode rest = mode_expr
-      { m :: rest }
+%inline mode_expr:
+  | mode+ { $1 }
 ;
 
 at_mode_expr:

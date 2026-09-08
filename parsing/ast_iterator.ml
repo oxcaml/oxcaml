@@ -877,7 +877,7 @@ let default_iterator =
         List.iter (iter_loc this) bound_const
       in
       let iter_mode : mode -> unit = function
-        | Mode consts -> List.iter (iter_loc this) consts
+        | Mode _ -> ()
         | Mode_var v -> iter_loc this v
         | Mode_bounds { upper; lower } -> iter_bound upper; iter_bound lower
       in

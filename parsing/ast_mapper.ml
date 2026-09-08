@@ -1051,7 +1051,7 @@ let default_mapper =
         }
       in
       let map_mode : mode -> mode = function
-        | Mode consts -> Mode (List.map (map_loc this) consts)
+        | Mode _ as mode -> mode
         | Mode_var v -> Mode_var (map_loc this v)
         | Mode_bounds { upper; lower } ->
           Mode_bounds { upper = map_bound upper; lower = map_bound lower }

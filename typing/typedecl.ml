@@ -4822,7 +4822,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
     | Str_primitive ->
         assert (not valdecl.pval_poly);
         let modality_to_mode {txt = Modality m; loc} =
-          {txt = Mode [{txt = m; loc}]; loc}
+          {txt = Mode m; loc}
         in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
         let modes = Typemode.transl_mode_annots modes in

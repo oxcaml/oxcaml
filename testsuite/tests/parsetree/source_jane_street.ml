@@ -516,6 +516,45 @@ type ('a, 'b) labeled_fn =
 type typvar_fn = a:('a. 'a) @ local unique portable contended -> unit
 |}]
 
+module type S_for_mode_polymorphism = sig
+  val variable : 'a @ 'm -> 'a @ 'm
+  val bounds : 'a @ [< 'm & 'n] -> 'a @ [> 'm | 'n]
+  val constants : 'a @ [< portable many] -> 'a @ [> local once]
+  val combined : 'a @ [< 'm & portable > 'n | dynamic] -> 'a @ [> 'm]
+  val past : 'a @ [< past('m)] -> 'a @ [> past('m)]
+  val modified :
+    'a @ [< 'm mod portable contended & past('n) mod global] ->
+    'a @ [> 'm mod many aliased | past('n) mod local]
+  val close :
+    'a @ [< 'm] ->
+    ('b @ 'n -> 'a @ [> 'm]) @
+      [> close('m) mod portable | close('n) | local once]
+end
+
+[%%expect{|
+module type S_for_mode_polymorphism =
+  sig
+    val variable : 'a -> 'a
+    val bounds : 'a -> 'a
+    val constants : 'a @ portable -> 'a @ local once
+    val combined : 'a @ portable -> 'a
+    val past : 'a -> 'a
+    val modified : 'a -> 'a
+    val close : 'a -> ('b -> 'a) @ local once
+  end
+|}]
+
+module type Mixed_mode_annotations = sig
+  val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
+end
+
+[%%expect{|
+Line 2, characters 15-23:
+2 |   val f : 'a @ portable many 'm contended 'n [< 'o] -> unit
+                   ^^^^^^^^
+Error: Constant modes and mode variables cannot be mixed in a mode annotation.
+|}]
+
 (* kitchen sink, with new @ syntax *)
 let f ~(x1 @ many)
       ~(x2 : string @ local)
