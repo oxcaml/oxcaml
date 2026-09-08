@@ -542,37 +542,24 @@ let rec path_of_debug_info_scopes acc (scopes : Scoped_location.scopes) =
 
 let to_structured_mangling_path ~name dbg :
     Compilation_unit.t Structured_mangling.path =
-  (* An anonymous function or module is precisely located by its own position
-     information, so the scopes enclosing it (its ancestors, up to the
-     compilation unit) are redundant. [located_by_child] becomes true once we
-     have passed such an item; while it is set we drop every enclosing item
-     except compilation units, which keep it and reset the flag. (There is no
-     need to worry about the inlining marker, since it is inserted later by
-     [mangle_ident].) *)
-  let rec collapse_anonymous ~located_by_child
-      (path : Compilation_unit.t Structured_mangling.path) =
-    match path with
-    | [] -> []
-    | (Compilation_unit _ as cu) :: path ->
-      cu :: collapse_anonymous ~located_by_child:false path
-    | _ :: path when located_by_child ->
-      collapse_anonymous ~located_by_child path
-    | ((Anonymous_function _ | Anonymous_module _) as item) :: path ->
-      item :: collapse_anonymous ~located_by_child:true path
-    | item :: path -> item :: collapse_anonymous ~located_by_child:false path
-  in
-  (* Drop the suffix of partial applications and the innermost named function
-     (if any), then end the path with [name], the name the middle end gave the
-     function. We append it even after an innermost anonymous function (which
-     is kept for its position). *)
-  let rec drop_partials_and_adjust_function_name ~name
+  (* Drop the suffix of partial applications, then make sure the path ends with
+     an item identifying the function itself. The scopes already do so when the
+     innermost item is the function's own binding or an anonymous function; in
+     the remaining cases (e.g. a functor body, whose innermost scope is the
+     module it defines, or a body with no location information at all) we
+     append [name], the name the middle end gave the function. *)
+  let rec drop_partials_and_add_function_name ~name
       (path : Compilation_unit.t Structured_mangling.path)
       =
     match path with
     | Partial_function _ :: path ->
-      drop_partials_and_adjust_function_name ~name path
-    | Function _ :: path -> Structured_mangling.Function name :: path
-    | path -> Structured_mangling.Function name :: path
+      drop_partials_and_add_function_name ~name path
+    | Function name' :: _ when String.equal name name' -> path
+    | Anonymous_function _ :: _ -> path
+    | Compilation_unit _ :: _ | Inline_marker :: _ | Module _ :: _
+    | Anonymous_module _ :: _ | Class _ :: _ | Function _ :: _ | Stamp _ :: _
+    | [] ->
+      Structured_mangling.Function name :: path
   in
   let path_from_debug =
     match to_items dbg with
@@ -585,6 +572,5 @@ let to_structured_mangling_path ~name dbg :
       path_of_debug_info_scopes [] item.dinfo_scopes
   in
   List.rev path_from_debug
-  |> collapse_anonymous ~located_by_child:false
-  |> drop_partials_and_adjust_function_name ~name
+  |> drop_partials_and_add_function_name ~name
   |> List.rev
