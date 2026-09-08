@@ -140,7 +140,6 @@ let invoke_compilation_unit_callbacks res =
   List.iter (( |> ) res) !compilation_unit_callbacks;
   compilation_unit_callbacks := []
 
-<<<<<<< HEAD
 module Reaper_mode = struct
   (* CR mvellacott: in the future it would be nice to allow running the Reaper
      on the present unit and supporting LTO at the same time, but at the moment
@@ -157,9 +156,8 @@ module Reaper_mode = struct
     then Single_unit_run
     else Disabled
 end
-=======
+
 let reaper_oclassic = Oxcaml_args.Extra_options.bool __LOC__ "reaper-oclassic"
->>>>>>> bf88f1f836
 
 let flambda_to_flambda0 : type m.
     ppf_dump:Format.formatter ->

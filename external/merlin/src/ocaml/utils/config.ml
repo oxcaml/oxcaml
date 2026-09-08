@@ -34,24 +34,16 @@ let version = Sys.ocaml_version
 let cmi_magic_number = "Caml1999I586"
 
 (* CR mvellacott: replace this with a ltosol magic number. *)
-let cmr_magic_number = "Caml1999R585"
+let cmr_magic_number = "Caml1999R586"
 
 let as_debug_prefix_map_flag = ""
 
-<<<<<<< HEAD
-let ast_impl_magic_number = "Caml1999M585"
-let ast_intf_magic_number = "Caml1999N585"
-let cmt_magic_number = "Caml1999T585"
-let cms_magic_number = "Caml1999S585"
-let index_magic_number = "Merl2023I585"
-let ltosol_magic_number = "Caml1999U585"
-=======
 let ast_impl_magic_number = "Caml1999M586"
 let ast_intf_magic_number = "Caml1999N586"
 let cmt_magic_number = "Caml1999T586"
 let cms_magic_number = "Caml1999S586"
 let index_magic_number = "Merl2023I586"
->>>>>>> bf88f1f836
+let ltosol_magic_number = "Caml1999U586"
 
 let interface_suffix = ref ".mli"
 
