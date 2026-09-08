@@ -134,7 +134,6 @@ val f :
 |}]
 
 (* Tuples *)
-(* CR zeisbach: this seems reasonable but I want to double-check this... *)
 let f (x : <[$('a) * $('b) * $('c)]> expr)
     : 'a eval * 'b eval * 'c eval = eval x
 [%%expect {|
