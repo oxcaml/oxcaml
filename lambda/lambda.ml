@@ -908,6 +908,17 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
 
+let shape_has_only_value_elements (shape : _ mixed_block_element array) =
+  Array.for_all
+    (fun (elt : _ mixed_block_element) ->
+      match elt with
+      | Value _ -> true
+      | Splice_variable var -> fatal_error_unevaluated_splice_var var
+      | Product _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+      | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+        false)
+    shape
+
 let equal_layout x y =
   match x, y with
   | Pvalue x, Pvalue y -> equal_value_kind x y

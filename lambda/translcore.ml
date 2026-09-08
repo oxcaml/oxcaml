@@ -630,10 +630,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match List.map extract_constant ll with
         | exception Not_constant -> None
         | constants ->
-            (* CR zeisbach: this might actually be the wrong function to call,
-               based on how deep vs shallow checks work? but it just mirrors the
-               version below. *)
-            if Mixed_product_bytes.shape_is_all_value shape then
+            if Lambda.shape_has_only_value_elements shape then
               (* CR zeisbach: probably worth writing a comment here explaining
                  when this case can get hit (for normal tuples, I believe, to
                  avoid regressions) and when it won't (like mixed records). *)

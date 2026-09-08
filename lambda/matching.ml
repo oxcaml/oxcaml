@@ -2523,9 +2523,7 @@ let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
        since the computation here and in translcore (and elsewhere) could
        potentially get out-of-sync. this should probably be at least factored
        into a helper, and we can potentially store more info somewhere... *)
-    (* check if we are in a mixed tuple. *)
-    (* CR zeisbach: this might also be the wrong call... *)
-    if Mixed_product_bytes.shape_is_all_value block_shape
+    if Lambda.shape_has_only_value_elements block_shape
     then fun pos -> Pfield (pos, Pointer, sem)
     else fun pos -> Pmixedfield ([pos], block_shape, sem)
   in
