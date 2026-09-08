@@ -1656,6 +1656,35 @@ let unify_exp ~sexp env exp expected_ty =
   with Error(loc, env, Expr_type_clash(err, tfc, None)) ->
     raise (error (loc, env, Expr_type_clash(err, tfc, Some sexp)))
 
+(* Propagate the result's structure before typing operands, then discharge
+   these checks once the operands have refined the shared type variables. *)
+let unify_exp_types_delaying_jkind_checks ~checks ?sexp loc env ty expected_ty =
+  try
+    let delayed =
+      if Language_extension.erasable_extensions_only () then begin
+        unify env ty expected_ty;
+        []
+      end else
+        Ctype.unify_delaying_jkind_checks env ty expected_ty
+    in
+    checks := delayed @ !checks
+  with
+  | Unify err ->
+      raise (Error (loc, env, Expr_type_clash (err, None, sexp)))
+  | Tags (l1, l2) ->
+      raise (Typetexp.Error (loc, env, Typetexp.Variant_tags (l1, l2)))
+
+let check_delayed_exp_jkind_checks ?sexp loc checks =
+  List.iter (fun (env, ty, jkind) ->
+    match Ctype.constrain_type_jkind env ty jkind with
+    | Ok () -> ()
+    | Error violation ->
+        let err =
+          Errortrace.unification_error ~trace:[Bad_jkind (ty, violation)]
+        in
+        raise (Error (loc, env, Expr_type_clash (err, None, sexp))))
+    (List.rev !checks)
+
 (* helper notation for Pattern_env.t *)
 let (!!) (penv : Pattern_env.t) = penv.env
 
@@ -7798,6 +7827,7 @@ and type_expect_
       in
       let (args, ty_ret, mode_ret, pm, ap_yielding) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
+          ty_expected
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
@@ -8209,6 +8239,7 @@ and type_expect_
       | Mutable -> ()
       | Immutable ->
         Language_extension.assert_enabled ~loc Immutable_arrays ());
+      let delayed_jkind_checks = ref [] in
       let ty_elt, elt_sort, mutability =
         let ty_expected = generic_instance ty_expected in
         match mutability with
@@ -8218,7 +8249,9 @@ and type_expect_
           in
           let ty_elt = newgenvar jkind in
           with_explanation (fun () ->
-            unify_exp_types loc env (Predef.type_iarray ty_elt) ty_expected);
+            unify_exp_types_delaying_jkind_checks
+              ~checks:delayed_jkind_checks ~sexp loc env
+              (Predef.type_iarray ty_elt) ty_expected);
           ty_elt, elt_sort, Asttypes.Immutable
         | Mutable ->
           match disambiguate_array_literal ~loc env ty_expected with
@@ -8234,7 +8267,9 @@ and type_expect_
               | Immutable -> Predef.type_iarray ty_elt
             in
             with_explanation (fun () ->
-                unify_exp_types loc env to_unify ty_expected);
+                unify_exp_types_delaying_jkind_checks
+                  ~checks:delayed_jkind_checks ~sexp loc env
+                  to_unify ty_expected);
             ty_elt, elt_sort, mut
       in
       let mutability =
@@ -8262,6 +8297,8 @@ and type_expect_
           (fun sarg -> type_expect env argument_mode sarg (mk_expected ty_elt))
           sargl
       in
+      with_explanation (fun () ->
+        check_delayed_exp_jkind_checks ~sexp loc delayed_jkind_checks);
       re {
         exp_desc = Texp_array (mutability, elt_sort, argl, alloc_mode);
         exp_loc = loc; exp_extra = [];
@@ -11236,7 +11273,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (lbl, arg, None, ~mode_fun:(Mode.alloc_as_value mode_fun))
 
 and type_application env app_loc expected_mode position_and_mode
-      funct funct_mode sargs ret_tvar =
+      funct funct_mode sargs ret_tvar ty_expected =
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -11307,6 +11344,38 @@ and type_application env app_loc expected_mode position_and_mode
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
+          (* Upstream does not yet use result types to inform application
+             typechecking. It's also unprincipal. *)
+          let delayed_layout_checks = ref [] in
+          if not (Language_extension.erasable_extensions_only ())
+             && not !Clflags.principal
+          then begin
+            let ty_res =
+              List.fold_left
+                (fun ty_ret (lbl, arg) ->
+                   match arg with
+                   | Omitted { ty_arg; mode_arg; level; _ } ->
+                       let arrow_desc =
+                         (lbl, mode_arg, Alloc.newvar (get_current_level ()))
+                       in
+                       newty2 ~level
+                         (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
+                   | Arg _ -> ty_ret)
+                ty_ret (List.rev untyped_args)
+            in
+            let ty_expected = instance ty_expected in
+            (* This extra unification might trigger incompleteness in the
+               type checker (like due to lack of [Tquote_eval]-constraints).
+               Backtracking might be expensive, but will only happen in cases
+               we'll fail anyway or when type inference is incomplete. *)
+            let snap = snapshot () in
+            try
+              let checks =
+                Ctype.unify_delaying_layout_checks env ty_res ty_expected
+              in
+              delayed_layout_checks := checks
+            with Unify _ | Tags _ -> backtrack snap
+          end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
@@ -11317,6 +11386,7 @@ and type_application env app_loc expected_mode position_and_mode
                   ~position_and_mode ~partial_app arg)
               untyped_args
           in
+          check_delayed_exp_jkind_checks app_loc delayed_layout_checks;
           (* The application can never perform a free effect if the function and
              all of its arguments are unyielding. *)
           let ap_yielding =
@@ -11375,6 +11445,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
       {containing = Tuple; container = (loc, Expression)}
   in
   (* CR layouts v5: non-values in tuples *)
+  let delayed_jkind_checks = ref [] in
   let unify_as_tuple ty_expected =
     let labeled_subtypes =
       List.map (fun (label, _) -> label,
@@ -11383,7 +11454,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     in
     let to_unify = newgenty (Ttuple labeled_subtypes) in
     with_explanation explanation (fun () ->
-      unify_exp_types loc env to_unify (generic_instance ty_expected));
+      unify_exp_types_delaying_jkind_checks ~checks:delayed_jkind_checks
+        loc env to_unify (generic_instance ty_expected));
     labeled_subtypes
   in
   let labeled_subtypes = unify_as_tuple ty_expected in
@@ -11422,6 +11494,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           (label, type_expect ~overwrite env argument_mode body (mk_expected ty)))
       sexpl types_and_modes overwrites
   in
+  with_explanation explanation (fun () ->
+    check_delayed_exp_jkind_checks loc delayed_jkind_checks);
   re {
     exp_desc =
       Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode);
@@ -11458,8 +11532,10 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts
   in
   let to_unify = newgenty (Tunboxed_tuple labeled_subtypes) in
+  let delayed_jkind_checks = ref [] in
   with_explanation explanation (fun () ->
-    unify_exp_types loc env to_unify (generic_instance ty_expected));
+    unify_exp_types_delaying_jkind_checks ~checks:delayed_jkind_checks
+      loc env to_unify (generic_instance ty_expected));
 
   let argument_modes =
     match expected_mode.tuple_modes with
@@ -11488,6 +11564,8 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
           (label, type_expect env argument_mode body (mk_expected ty), sort))
       sexpl types_sorts_and_modes
   in
+  with_explanation explanation (fun () ->
+    check_delayed_exp_jkind_checks loc delayed_jkind_checks);
   re {
     exp_desc = Texp_unboxed_tuple expl;
     exp_loc = loc; exp_extra = [];
@@ -11539,6 +11617,12 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
                 Constructor_arity_mismatch
                   (lid.txt, constr.cstr_arity, List.length sargs)));
   let separate = !Clflags.principal || Env.has_local_constraints env in
+  let delayed_jkind_checks = ref [] in
+  let unify_exp_as_construct exp expected_ty =
+    with_explanation explanation (fun () ->
+      unify_exp_types_delaying_jkind_checks ~checks:delayed_jkind_checks ~sexp
+        (proper_exp_loc exp) env exp.exp_type expected_ty)
+  in
   let unify_as_construct ty_expected =
     with_local_level_generalize_structure_if separate
       ~before_generalize:(fun (ty_args, ty_res, _) ->
@@ -11575,9 +11659,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
           (ty_args, ty_res, texp)
         end
       in
-      with_explanation explanation (fun () ->
-        unify_exp ~sexp env {texp with exp_type = instance ty_res}
-          (instance ty_expected));
+      unify_exp_as_construct {texp with exp_type = instance ty_res}
+        (instance ty_expected);
       (ty_args, ty_res, texp)
     end
   in
@@ -11588,7 +11671,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
     | _ -> assert false
   in
   let texp = {texp with exp_type = ty_res} in
-  if not separate then unify_exp ~sexp env texp (instance ty_expected);
+  if not separate then
+    unify_exp_as_construct texp (instance ty_expected);
   let recarg =
     match constr.cstr_inlined with
     | None -> Rejected
@@ -11662,6 +11746,8 @@ and type_construct ~overwrite ~sexp env (expected_mode : expected_mode) lid sarg
          type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
   in
+  with_explanation explanation (fun () ->
+    check_delayed_exp_jkind_checks ~sexp sexp.pexp_loc delayed_jkind_checks);
   if constr.cstr_private = Private then
     begin match constr.cstr_repr with
     | Variant_extensible ->

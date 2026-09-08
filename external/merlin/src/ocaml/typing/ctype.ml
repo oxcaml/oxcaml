@@ -606,7 +606,7 @@ let unify_with_decr_stage uenv f =
 *)
 type jkind_unification_mode =
   | Perform_checks
-  | Delay_checks of (type_expr * jkind_r) list ref
+  | Delay_checks of (Env.t * type_expr * jkind_r) list ref
 
 let lmode = ref Perform_checks
 
@@ -3831,7 +3831,7 @@ let unification_jkind_check uenv ty jkind =
   if not (in_subst_mode uenv) then
     match !lmode with
     | Perform_checks -> constrain_type_jkind_exn (get_env uenv) Unify ty jkind
-    | Delay_checks r -> r := (ty,jkind) :: !r
+    | Delay_checks r -> r := (get_env uenv, ty, jkind) :: !r
 
 let check_and_update_generalized_ty_jkind ?name ~loc ty =
   let generalization_check level jkind =
@@ -5867,6 +5867,22 @@ let unify env ty1 ty2 =
 let unify_delaying_jkind_checks env ty1 ty2 =
   delay_jkind_checks_in (fun () ->
     unify_pairs env ty1 ty2 [])
+
+let unify_delaying_layout_checks env ty1 ty2 =
+  (* Preserve modality propagation while allowing shared layouts to be refined
+     by the operands before checking the full obligations. *)
+  let checks = unify_delaying_jkind_checks env ty1 ty2 in
+  List.iter
+    (fun (env, ty, jkind) ->
+       match constrain_type_jkind env ty (Jkind.erase_layout env jkind) with
+       | Ok () -> ()
+       | Error violation ->
+           let err =
+             Errortrace.unification_error ~trace:[Bad_jkind (ty, violation)]
+           in
+           raise (Unify err))
+    (List.rev checks);
+  checks
 
 (* Lower the level of a type to the current level *)
 let enforce_current_level env ty =

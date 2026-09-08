@@ -3944,7 +3944,7 @@ let transl_type_decl env rec_flag sdecl_list =
   (* Now that we've ruled out ill-formed types, we can perform the delayed
      jkind checks *)
   List.iter (fun (checks,loc) ->
-    List.iter (fun (ty,jkind) ->
+    List.iter (fun (_saved_env, ty, jkind) ->
       (* The use [check_type_jkind] rather than [constrain_type_jkind] here is
          conservative. It ensures that the delayed checks don't succeed by
          mutating type variables from the [temp_env] in a way that won't be
