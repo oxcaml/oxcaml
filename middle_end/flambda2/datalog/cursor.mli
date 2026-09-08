@@ -53,13 +53,22 @@ val naive_iter : 'v t -> Table.Map.t -> ('v Constant.hlist -> unit) -> unit
     {v join(P₁ + ΔP₁, …, Pᵢ-₁ + ΔPᵢ-₁, ΔPᵢ, Pᵢ+₁, …, Pₙ v}
 
     The terms on the left use the [current] databse, the middle term uses the
-    [diff] database, and the terms on the right use the [previous] database. *)
+    [diff] database, and the terms on the right use the [previous] database.
+
+    The last two arguments [output] and [added] represent an output database
+    that will record new facts from the seminaive run. It is expected that
+    [output = disjoint_union current added]. Facts added by the cursor are
+    deduplicated with the existing facts in [output], then added to both the
+    [output] and [added] table, maintaining the invariant above in the result of
+    [seminaive_run]. *)
 val seminaive_run :
   'v t ->
   previous:Table.Map.t ->
   diff:Table.Map.t ->
   current:Table.Map.t ->
-  unit
+  output:Table.Map.t ->
+  added:Table.Map.t ->
+  (output:Table.Map.t * added:Table.Map.t)
 
 type binder =
   | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.or_null_sender -> binder
@@ -91,13 +100,5 @@ module With_parameters : sig
     'p Constant.hlist ->
     Table.Map.t ->
     ('v Constant.hlist -> unit) ->
-    unit
-
-  val seminaive_run :
-    ('p, 'v) t ->
-    'p Constant.hlist ->
-    previous:Table.Map.t ->
-    diff:Table.Map.t ->
-    current:Table.Map.t ->
     unit
 end

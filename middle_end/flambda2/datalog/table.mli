@@ -17,6 +17,19 @@ module Type : sig
   type (_, _) eq = Equal : ('a, 'a) eq
 end
 
+type _ result_repr
+
+val unit_repr : unit result_repr
+
+val result_repr_print : 'v result_repr -> Format.formatter -> 'v -> unit
+
+val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
+
+val union : ('t, 'k, 'v) Column.hlist -> 'v result_repr -> 't -> 't -> 't
+
+val diff_or_null :
+  ('t, 'k, 'v) Column.hlist -> 'v result_repr -> 't -> 't -> 't Or_null.t
+
 module Id : sig
   type (!'t, !'k, !'v) t
 
@@ -46,6 +59,8 @@ module Id : sig
 
   val columns : ('t, 'k, 'v) t -> ('t, 'k, 'v) Column.hlist
 
+  val result_repr : ('t, 'k, 'v) t -> 'v result_repr
+
   val default_value : ('t, 'k, 'v) t -> 'v
 
   val is_trie : ('t, 'k, 'v) t -> ('t, 'k, 'v) Trie.is_trie
@@ -58,7 +73,7 @@ module Id : sig
     provenance:bool ->
     name:string ->
     columns:('t, 'k, 'v) Column.hlist ->
-    default_value:'v ->
+    result_repr:'v result_repr ->
     ('t, 'k, 'v) t
 end
 
