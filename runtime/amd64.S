@@ -124,44 +124,14 @@ G(name):
 #define IF_DEBUG(...)
 #endif
 
-/* struct stack_info */
-#define Stack_sp                 0
-#define Stack_exception          8
-#define Stack_handler            16
-#define Stack_id                 48
-#define Stack_local_sp           64
-#define Stack_local_top          72
-#define Stack_local_limit        80
+/* Offsets into C structs are computed at build time by
+/* gen_asm_offsets.c.  If you change
+   Dynamic_cache_entries (DYNAMIC_CACHE_BITS in caml/dynamic.h), you
+   must also update FLUSH_DYNAMIC_CACHE. */
+#include "asm_offsets.inc"
 
-/* struct stack_handler */
-#define Handler_value(REG)       0(REG)
-#define Handler_exception(REG)   8(REG)
-#define Handler_effect(REG)     16(REG)
-#define Handler_parent          32
-
-/* struct dynamic_cache_s */
-
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
-#define Dynamic_binding_size     (2*8) /* dyn, val */
-#define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
-
-/* struct c_stack_link */
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
-#define Cstack_stack             32
-#define Cstack_sp                40
-#define Cstack_prev              48
-#define Cstack_async_exn_handler 56
-#define SIZEOF_C_STACK_LINK      64
 #error "Asynchronous exceptions support for Windows isn't finished"
-#else
-#define Cstack_stack              0
-#define Cstack_sp                 8
-#define Cstack_prev              16
-#define Cstack_async_exn_handler 24
-/* 8 bytes are left empty to ensure the stack is 16-aligned */
-#define SIZEOF_C_STACK_LINK      40
 #endif
 
 /* Continuation values
@@ -1473,7 +1443,7 @@ CFI_STARTPROC
         %rbx: continuation
         %rdi: last_fiber */
         movq    Caml_state(current_stack), %rsi  /* %rsi := old stack */
-        movq    (Stack_handler-1)(%rdi), %r10
+        movq    Stack_handler_from_cont(%rdi), %r10
         movq    %rsi, Handler_parent(%r10)       /* Append to last_fiber */
         leaq    1(%rsi), %rdi  /* %rdi (last_fiber) := Val_ptr(old stack) */
      /* Need to update the oldest saved frame pointer here as the execution of
@@ -1587,7 +1557,7 @@ END_FUNCTION(caml_preempt)
         ptwriteq Stack_id(%r10) ; \
     /* Add current stack to the last fiber */ \
 1:      popq    %rdx; CFI_ADJUST(-8) ; \
-        movq    (Stack_handler-1)(%r13), %rdi ; \
+        movq    Stack_handler_from_cont(%r13), %rdi ; \
         movq    Caml_state(current_stack), %rsi ; \
         movq    %rsi, Handler_parent(%rdi) ; \
     /* Need to update the oldest saved frame pointer here as the current \
