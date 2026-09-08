@@ -18,79 +18,55 @@ let span_start (loc : Location.t) = loc.loc_start.Lexing.pos_cnum
 let span_end (loc : Location.t) = loc.loc_end.Lexing.pos_cnum
 let same_file a b = String.equal (Filename.basename a) (Filename.basename b)
 
-type site =
-  | Unit_signature
-  | Annotation of Location.t
+let own_file (config : Mconfig.t) =
+  Misc.canonicalize_filename
+    (Filename.concat config.query.directory config.query.filename)
 
-type subject = {
-  file : string;
-  site : site
-}
+type site = Unit_signature | Annotation of Location.t
+
+type subject = { file : string; site : site }
 
 type target =
   | Unit_interface
-  | Module_type of {
-      name : string;
-      decl_span_start : int
-    }
+  | Module_type of { name : string; decl_span_start : int }
 
-type work = {
-  target : target;
-  subjects : subject list
-}
+type work = { target : target; subjects : subject list }
 
-type discovery =
-  | Unusable of string
-  | Works of work list
+type discovery = Unusable of string | Works of work list
 
 module Target_key = struct
   type t =
     | Own_interface
-    | Modtype of {
-        name : string;
-        span_start : int;
-        span_end : int
-      }
+    | Modtype of { name : string; span_start : int; span_end : int }
 
   let of_row (row : Impls.implementation) =
     match row.target with
     | Own_interface -> Some Own_interface
     | Modtype name ->
       Option.map row.target_loc ~f:(fun loc ->
-          Modtype
-            { name; span_start = span_start loc; span_end = span_end loc })
+          Modtype { name; span_start = span_start loc; span_end = span_end loc })
 end
 
-let subject_of_row config (row : Impls.implementation) =
+let subject_of_row (row : Impls.implementation) =
   let loc = row.site.impl_loc in
-  let recorded = loc.loc_start.Lexing.pos_fname in
-  let file =
-    if String.equal recorded "" then None
-    else if Filename.check_suffix recorded ".mli" then
-      Module_type_impls.impl_source_of_interface config recorded
-    else if Filename.check_suffix recorded ".ml" then
-      Some (Misc.canonicalize_filename recorded)
-    else None
-  in
-  Option.bind file ~f:(fun file ->
-      match row.site.impl_kind with
-      | Whole_unit -> Some { file; site = Unit_signature }
-      | Annotation_sites ->
-        if same_file recorded file && span_start loc < span_end loc then
-          Some { file; site = Annotation loc }
-        else None)
+  let file = loc.loc_start.Lexing.pos_fname in
+  if not (Filename.check_suffix file ".ml") then None
+  else
+    match row.site.impl_kind with
+    | Whole_unit -> Some { file; site = Unit_signature }
+    | Annotation_sites ->
+      if span_start loc < span_end loc then Some { file; site = Annotation loc }
+      else None
 
-let works_of_response config (response : Impls.response) =
+let works_of_response (response : Impls.response) =
   let partial =
-    List.find_opt response.targets
-      ~f:(fun (target : Impls.target_result) ->
+    List.find_opt response.targets ~f:(fun (target : Impls.target_result) ->
         match target.status with
         | Partial -> true
         | Complete | Unavailable -> false)
   in
   let unavailable =
-    List.exists response.targets
-      ~f:(fun (target : Impls.target_result) ->
+    List.exists response.targets ~f:(fun (target : Impls.target_result) ->
         match target.status with
         | Unavailable -> true
         | Complete | Partial -> false)
@@ -98,18 +74,17 @@ let works_of_response config (response : Impls.response) =
   match partial with
   | Some target ->
     Unusable
-      (Printf.sprintf "discovery of %s is partial (%d reasons)" target.target
-         (List.length target.reasons))
-  | None when unavailable ->
-    Works []
-  | None ->
+      (Printf.sprintf "discovery of %s is partial (%d errors)" target.target
+         (List.length target.errors))
+  | None when unavailable -> Works []
+  | None -> (
     let rows =
       List.map response.implementations ~f:(fun row ->
-          match Target_key.of_row row, subject_of_row config row with
+          match (Target_key.of_row row, subject_of_row row) with
           | Some key, Some subject -> Some (key, subject)
           | (None | Some _), (None | Some _) -> None)
     in
-    (match all_or_none rows with
+    match all_or_none rows with
     | None ->
       Unusable "an implementation could not be resolved to a source subject"
     | Some rows ->
@@ -133,9 +108,7 @@ let with_own_unit config (typedtree : Mtyper.typedtree) works =
   match typedtree with
   | `Interface _ -> works
   | `Implementation _ ->
-    let own =
-      { file = Module_type_impls.own_file config; site = Unit_signature }
-    in
+    let own = { file = own_file config; site = Unit_signature } in
     let updated =
       List.map works ~f:(fun work ->
           match work.target with
@@ -163,8 +136,7 @@ let module_type_body (parsetree : Mreader.parsetree) ~decl_span_start =
         (fun iterator (mtd : Parsetree.module_type_declaration) ->
           (match mtd.pmtd_type with
           | Some { pmty_desc = Pmty_signature signature; _ }
-            when declared_here mtd.pmtd_loc ->
-            found := Some signature
+            when declared_here mtd.pmtd_loc -> found := Some signature
           | Some _ | None -> ());
           Ast_iterator.default_iterator.module_type_declaration iterator mtd)
     }
@@ -176,8 +148,7 @@ let module_type_body (parsetree : Mreader.parsetree) ~decl_span_start =
 
 let longident_of_unit_path ~unit_name name =
   let parts = String.split_on_char name ~sep:'.' in
-  List.fold_left parts ~init:(Longident.Lident unit_name)
-    ~f:(fun prefix part ->
+  List.fold_left parts ~init:(Longident.Lident unit_name) ~f:(fun prefix part ->
       Longident.Ldot (Location.mknoloc prefix, Location.mknoloc part))
 
 let module_type_signature ~env ~unit_name name =
@@ -247,7 +218,7 @@ let unit_interface config impl_file =
     | cmi ->
       Option.map (interface_source config impl_file)
         ~f:(fun (intf_file, intf) ->
-          intf_file, intf, Subst.Lazy.force_signature (fst cmi.cmi_sign)))
+          (intf_file, intf, Subst.Lazy.force_signature (fst cmi.cmi_sign))))
 
 let config_for_file (config : Mconfig.t) file =
   Mconfig.get_external_config file
@@ -289,7 +260,8 @@ let subject_signature ~env ~site (structure : Typedtree.structure) =
   match site with
   | Unit_signature -> Some structure.str_type
   | Annotation loc -> (
-    match Option.map (annotated_module_type ~loc structure) ~f:(Mtype.scrape env)
+    match
+      Option.map (annotated_module_type ~loc structure) ~f:(Mtype.scrape env)
     with
     | Some (Types.Mty_signature signature) -> Some signature
     | Some _ | None ->
@@ -308,8 +280,7 @@ let with_typed_subject ~pipeline ~config subject ~f =
         ~f:(fun impl_sig ->
           f ~config:(Mpipeline.final_config pipeline) ~env ~impl_sig)
   in
-  if String.equal subject.file (Module_type_impls.own_file config) then
-    analyze pipeline
+  if String.equal subject.file (own_file config) then analyze pipeline
   else
     Option.bind (read_file subject.file) ~f:(fun text ->
         let source = Msource.make text in
@@ -324,11 +295,7 @@ let with_typed_subject ~pipeline ~config subject ~f =
 
 module Merge = struct
   module Decl_key = struct
-    type t = {
-      file : string;
-      span_start : int;
-      span_end : int
-    }
+    type t = { file : string; span_start : int; span_end : int }
 
     let of_loc (loc : Location.t) =
       { file = Filename.basename loc.Location.loc_start.Lexing.pos_fname;
@@ -398,7 +365,7 @@ module Merge = struct
               let impls =
                 diff.impl
                 :: List.map matching ~f:(fun (d : Intf_strengthen.arrow_diff) ->
-                       d.impl)
+                    d.impl)
               in
               { diff with impl = alloc_claims ~intf:diff.intf impls }))
 
@@ -409,8 +376,7 @@ module Merge = struct
       let shared =
         List.for_all others ~f:(fun (diff : Abstract.diff) ->
             match diff with
-            | Kind_annotation annotation' ->
-              String.equal annotation annotation'
+            | Kind_annotation annotation' -> String.equal annotation annotation'
             | Mode_diffs _ -> false)
       in
       if shared then Some (Abstract.Kind_annotation annotation) else None
@@ -426,8 +392,7 @@ module Merge = struct
       Option.map others ~f:(fun others ->
           Abstract.Mode_diffs
             { modality_diff =
-                merge_modality_diff
-                  (modality_diff :: List.map others ~f:fst);
+                merge_modality_diff (modality_diff :: List.map others ~f:fst);
               arrow_diffs =
                 merge_arrow_diffs (arrow_diffs :: List.map others ~f:snd)
             })
@@ -448,7 +413,8 @@ module Merge = struct
                 | [] | _ :: _ :: _ -> None)
           in
           Option.bind (all_or_none matching) ~f:(fun matching ->
-              Option.map (merge_diffs (strengthening.diff :: matching))
+              Option.map
+                (merge_diffs (strengthening.diff :: matching))
                 ~f:(fun diff -> { strengthening with diff })))
 end
 
@@ -482,10 +448,7 @@ module Actions = struct
         { Intf_weakness.intf_file; edits = dedup edits })
 end
 
-type interface = {
-  intf_file : string;
-  intf : Parsetree.signature
-}
+type interface = { intf_file : string; intf : Parsetree.signature }
 
 let analyze_subject ~pipeline ~config ~parsetree ~unit_name work subject =
   with_typed_subject ~pipeline ~config subject
@@ -501,7 +464,7 @@ let analyze_subject ~pipeline ~config ~parsetree ~unit_name work subject =
           ~f:(fun intf ->
             Option.map (module_type_signature ~env ~unit_name name)
               ~f:(fun intf_sig ->
-                ( { intf_file = Module_type_impls.own_file config; intf },
+                ( { intf_file = own_file config; intf },
                   Intf_strengthen.analyze ~env ~impl_sig ~intf_sig () ))))
 
 let actions_for_work ~pipeline ~config ~parsetree ~unit_name work =
@@ -522,8 +485,8 @@ let actions_for_work ~pipeline ~config ~parsetree ~unit_name work =
 
 let code_actions ~pipeline typedtree =
   let config = Mpipeline.final_config pipeline in
-  let response = Module_type_impls.query ~pipeline typedtree in
-  match works_of_response config response with
+  let response = Module_type_impls.query pipeline in
+  match works_of_response response with
   | Unusable reason ->
     log ~title:"code_actions" "nothing can be strengthened: %s" reason;
     []
