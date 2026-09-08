@@ -1639,6 +1639,15 @@ end
 Line 4, characters 16-28:
 4 |   let x () = eq (mk_void ()) (mk_void ())
                     ^^^^^^^^^^^^
+Error:
+       The layout of t_void is void
+         because of the definition of t_void at line 1, characters 0-18.
+       But the layout of t_void must be a value layout
+         because of the definition of eq at line 2, characters 2-43.
+|}, Principal{|
+Line 4, characters 16-28:
+4 |   let x () = eq (mk_void ()) (mk_void ())
+                    ^^^^^^^^^^^^
 Error: This expression has type "t_void" but an expression was expected of type
          "('a : value)"
        The layout of t_void is void
@@ -1665,6 +1674,15 @@ module _ = struct
 end
 
 [%%expect{|
+Line 8, characters 23-28:
+8 |   let g (x : t_void) = M.f x
+                           ^^^^^
+Error:
+       The layout of t_void is void
+         because of the definition of t_void at line 1, characters 0-18.
+       But the layout of t_void must be a value layout
+         because of the definition of f at line 3, characters 4-20.
+|}, Principal{|
 Line 8, characters 27-28:
 8 |   let g (x : t_void) = M.f x
                                ^

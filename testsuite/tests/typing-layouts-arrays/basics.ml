@@ -83,6 +83,14 @@ val v5 : float32_u array = [|<abstr>|]
 
 let f (x : float# array) = x.(0)
 [%%expect{|
+Line 1, characters 27-32:
+1 | let f (x : float# array) = x.(0)
+                               ^^^^^
+Error:
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout.
+|}, Principal{|
 Line 1, characters 27-28:
 1 | let f (x : float# array) = x.(0)
                                ^
@@ -241,6 +249,15 @@ module M6_1 = struct
 end
 
 [%%expect{|
+Line 11, characters 65-97:
+11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of Stdlib_upstream_compatible.Int64_u.t is bits64.
+       But the layout of Stdlib_upstream_compatible.Int64_u.t must be a sublayout of
+         bits32
+         because of the definition of get_third at lines 4-7, characters 16-23.
+|}, Principal{|
 Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^

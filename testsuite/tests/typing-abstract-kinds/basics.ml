@@ -355,6 +355,15 @@ let _ = M.f ()
 Line 1, characters 8-14:
 1 | let _ = M.f ()
             ^^^^^^
+Error:
+       The kind of M.t is M.k
+         because of the definition of t at line 4, characters 2-12.
+       But the kind of M.t must be representable
+         because it's the type of a variable bound by a `let`.
+|}, Principal{|
+Line 1, characters 8-14:
+1 | let _ = M.f ()
+            ^^^^^^
 Error: This expression has type "M.t" but an expression was expected of type
          "('a : '_representable_layout_3)"
        The kind of M.t is M.k
