@@ -144,16 +144,16 @@ let all_commands =
          application instances); a unit whose interface includes the target \
          implements it and is reported as the '(interface)' row. Checking a \
          module against 'S with ...' retains its relationship to S, including \
-         when destructive substitution removes every declaration. Supplying \
-         a replacement for a module-type member does not make the enclosing \
-         module an implementation of the replacement. Modules \
-         related to the target only definitionally are not implementers: \
-         declaring the target, being paired with its own interface \
-         declaration, providing it as an equal member, or producing it as a \
-         functor result do not qualify. With '-position <position>', the \
-         response is restricted to the single module-type declaration \
-         enclosing that position, and it is an error when no module-type \
-         declaration of the buffer encloses it. The response is:\n\n\
+         when destructive substitution removes every declaration. Supplying a \
+         replacement for a module-type member does not make the enclosing \
+         module an implementation of the replacement. Modules related to the \
+         target only definitionally are not implementers: declaring the \
+         target, being paired with its own interface declaration, providing it \
+         as an equal member, or producing it as a functor result do not \
+         qualify. With '-position <position>', the response is restricted to \
+         the single module-type declaration enclosing that position, and it is \
+         an error when no module-type declaration of the buffer encloses it. \
+         The response is:\n\n\
          ```javascript\n\
          {\n\
          'targets' : [\n\
