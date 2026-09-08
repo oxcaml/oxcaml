@@ -46,17 +46,17 @@ aggregate their artifacts into an index, then query one module type by the
 position of its declaration, computed from the source so the tests never
 hard-code coordinates.
 
-  $ setup_index () {
-  >   local artifacts=()
+  $ setup_index () (
   >   for file in "$@"; do
-  >     $OCAMLC -bin-annot -c "$file" || return
+  >     $OCAMLC -bin-annot -c "$file" || exit
+  >     shift
   >     case "$file" in
-  >       *.mli) artifacts+=("${file%.mli}.cmti") ;;
-  >       *) artifacts+=("${file%.ml}.cmt") ;;
+  >       *.mli) set -- "$@" "${file%.mli}.cmti" ;;
+  >       *) set -- "$@" "${file%.ml}.cmt" ;;
   >     esac
   >   done
-  >   ocaml-index aggregate "${artifacts[@]}" -o project.ocaml-index
-  > }
+  >   ocaml-index aggregate "$@" -o project.ocaml-index
+  > )
 
   $ position_of_module_type () {
   >   awk -v name="$1" '
@@ -81,11 +81,11 @@ shown as [<anon>].
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module M : S = struct
   >   type t = int
   > end
-  > 
+  >
   > module N : S = struct
   >   type t = string
   > end
@@ -102,15 +102,15 @@ provides the alias as a member does not.
   > module type S = sig
   >   type u
   > end
-  > 
+  >
   > module type Outer = sig
   >   module type Inner = S
   > end
-  > 
+  >
   > module O : Outer = struct
   >   module type Inner = S
   > end
-  > 
+  >
   > module P : O.Inner = struct
   >   type u = bool
   > end
@@ -124,10 +124,10 @@ Module-type aliases can form a chain before reaching an implementation.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Alias = S
   > module type Alias_of_alias = Alias
-  > 
+  >
   > module M : Alias_of_alias = struct
   >   type t = int
   > end
@@ -142,12 +142,12 @@ module type.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Extended = sig
   >   include S
   >   val make : unit -> t
   > end
-  > 
+  >
   > module M : Extended = struct
   >   type t = int
   >   let make () = 0
@@ -163,7 +163,7 @@ does.  The member [N] implements [S], not the containing structure.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > include (struct
   >   module N = struct
   >     type t = bool
@@ -180,21 +180,21 @@ projection, and alias contexts.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module Make (X : sig type t end) = struct
   >   module Result : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  > 
+  >
   > module Argument = struct
   >   type t = int
   > end
-  > 
+  >
   > module Reexported = struct
   >   include Make (Argument)
   > end
-  > 
+  >
   > module Alias = Reexported.Result
   > EOF
   complete
@@ -208,16 +208,16 @@ of the module whose type was inspected.
   >   type t
   >   val value : t
   > end
-  > 
+  >
   > module Prototype : S = struct
   >   type t = int
   >   let value = 0
   > end
-  > 
+  >
   > module type Derived = module type of struct
   >   include Prototype
   > end
-  > 
+  >
   > module Copy : Derived = struct
   >   type t = Prototype.t
   >   let value = Prototype.value
@@ -227,6 +227,90 @@ of the module whose type was inspected.
   Prototype 6:7 6:16 annotation
   Copy 15:7 15:11 annotation
 
+  $ impls_of S <<EOF
+  > module type S = sig
+  >   type t = int
+  > end
+  >
+  > module M1 : S = struct
+  >   type t = int
+  > end
+  >
+  > module M2 = struct
+  >   include M1
+  >   type u = t
+  > end
+  >
+  > module M3 : (module type of M2) = struct
+  >   type t = int
+  >   type u = int
+  > end
+  > EOF
+  complete
+  M1 5:7 5:9 annotation
+  M3 14:7 14:9 annotation
+
+Requirements survive successive structure includes, including anonymous
+structures.  Forwarding modules do not themselves introduce checks.
+
+  $ impls_of S <<'EOF'
+  > module type S = sig val value : int end
+  > module Original : S = struct let value = 0 end
+  > module Forwarded = struct include Original end
+  > module Extended = struct
+  >   include struct include Forwarded end
+  >   let extra = true
+  > end
+  > module Copy : module type of Extended = Extended
+  > EOF
+  complete
+  Original 2:7 2:15 annotation
+  Copy 8:7 8:11 annotation
+
+Shadowing an included requirement must not connect an incompatible annotation
+to the original module type.  A later include can also shadow declarations.
+
+  $ impls_of S <<'EOF'
+  > module type S = sig type t = int val value : int end
+  > module Original : S = struct type t = int let value = 0 end
+  > module Changed_value = struct
+  >   include Original
+  >   let value = true
+  > end
+  > module Value_copy : module type of Changed_value = Changed_value
+  > module Changed_type = struct
+  >   include Original
+  >   type t = string
+  > end
+  > module Type_copy : module type of Changed_type = Changed_type
+  > module Changed_by_include = struct
+  >   include Original
+  >   include struct let value = true end
+  > end
+  > module Include_copy : module type of Changed_by_include = Changed_by_include
+  > EOF
+  complete
+  Original 2:7 2:15 annotation
+
+Names in different namespaces do not shadow included declarations.  Local
+module bindings preserve the same requirements as structure-level bindings.
+
+  $ impls_of S <<'EOF'
+  > module type S = sig type t = int val value : int end
+  > module Original : S = struct type t = int let value = 0 end
+  > let result =
+  >   let module Extended = struct
+  >     include Original
+  >     let t = true
+  >     type value = bool
+  >   end in
+  >   let module Copy : module type of Extended = Extended in
+  >   Copy.value
+  > EOF
+  complete
+  Original 2:7 2:15 annotation
+  Copy 9:13 9:17 annotation
+
 Destructive module-type substitution should connect the substituted signature
 member to the replacement module type.
 
@@ -234,15 +318,15 @@ member to the replacement module type.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Carrier = sig
   >   module type Element
   >   module Value : Element
   > end
-  > 
+  >
   > module type Specialized =
   >   Carrier with module type Element := S
-  > 
+  >
   > module M : Specialized = struct
   >   module Value : S = struct
   >     type t = int
@@ -255,16 +339,43 @@ member to the replacement module type.
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
+  >   val foo : t
+  >
+  >   val bar : t -> unit
   > end
-  > 
+  >
+  > module U : S = struct
+  >   type t = string
+  >
+  >   let foo = ""
+  >
+  >   let bar _s = ()
+  > end
+  >
+  > module type Subbed = S with type t := int
+  >
+  > module Impl : Subbed = struct
+  >   let foo = 0
+  >   let bar _i = ()
+  > end
+  > EOF
+  complete
+  U 8:7 8:8 annotation
+  Impl 18:7 18:11 annotation
+
+  $ impls_of S <<EOF
+  > module type S = sig
+  >   type t
+  > end
+  >
   > module type Carrier = sig
   >   module type Element
   >   module Value : Element
   > end
-  > 
+  >
   > module type Specialized =
   >   Carrier with module type Element := S
-  > 
+  >
   > module M : Specialized = struct
   >   module Value = struct
   >     type t = int
@@ -281,9 +392,9 @@ A module checked against the resulting empty signature does not implement [S].
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Removed = S with type t := int
-  > 
+  >
   > module Gone : Removed = struct end
   > EOF
   complete
@@ -292,14 +403,14 @@ A module checked against the resulting empty signature does not implement [S].
   > module type S = sig
   >   val value : int
   > end
-  > 
+  >
   > module type Base = sig
   >   include S
   >   type t
   > end
-  > 
+  >
   > module type Removed = Base with type t := int
-  > 
+  >
   > module M : Removed = struct
   >   let value = 0
   > end
@@ -309,7 +420,7 @@ A module checked against the resulting empty signature does not implement [S].
 
   $ impls_of S <<'EOF'
   > module type S = sig val value : int end
-  > 
+  >
   > module Outer = struct
   >   module type Alias = S
   >   module type Base = sig
@@ -330,19 +441,19 @@ deduplication of application contexts.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Argument = sig
   >   type t
   > end
-  > 
+  >
   > module Make (X : Argument) : S with type t = X.t = struct
   >   type t = X.t
   > end
-  > 
+  >
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module First = Make (A)
   > module Second = Make (A)
   > EOF
@@ -356,21 +467,21 @@ contexts.
   > module type S = sig
   >   val value : int
   > end
-  > 
+  >
   > module type Argument = sig
   >   val value : int
   > end
-  > 
+  >
   > module Make (X : Argument) = struct
   >   module Result : S = struct
   >     let value = X.value
   >   end
   > end
-  > 
+  >
   > module A = struct
   >   let value = 1
   > end
-  > 
+  >
   > module Built = Make (A)
   > module Projected = Built.Result
   > EOF
@@ -384,11 +495,11 @@ query results.
   > module type S = sig
   >   val value : int
   > end
-  > 
+  >
   > module Make (X : sig val value : int end) : S = struct
   >   let value = X.value
   > end
-  > 
+  >
   > module M = Make (struct
   >   let value = 1
   > end)
@@ -404,19 +515,19 @@ signature.  [A.M] implements [S] even without a direct annotation on [M];
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Outer = sig
   >   module M : S
   > end
-  > 
+  >
   > module A = struct
   >   module M = struct
   >     type t = int
   >   end
   > end
-  > 
+  >
   > module F (X : Outer) = struct end
-  > 
+  >
   > module R = F (A)
   > EOF
   complete
@@ -426,13 +537,13 @@ signature.  [A.M] implements [S] even without a direct annotation on [M];
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Outer = sig
   >   module M : S
   > end
-  > 
+  >
   > module F (X : Outer) = struct end
-  > 
+  >
   > module R = F (struct
   >   module M = struct
   >     type t = int
@@ -491,12 +602,12 @@ Packing and unpacking a module crosses the first-class module boundary.
   >   type t
   >   val value : t
   > end
-  > 
+  >
   > module Original : S = struct
   >   type t = int
   >   let value = 0
   > end
-  > 
+  >
   > let packed = (module Original : S)
   > module Unpacked = (val packed : S)
   > EOF
@@ -511,7 +622,7 @@ group.
   > module type S = sig
   >   val value : unit -> int
   > end
-  > 
+  >
   > module rec Left : S = struct
   >   let value () = Right.value ()
   > end
@@ -530,25 +641,25 @@ body, and exposes the result through a second application context.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Argument = sig
   >   type t
   > end
-  > 
+  >
   > module type Producer =
   >   functor (X : Argument) -> S with type t = X.t
-  > 
+  >
   > module Base (X : Argument) : S with type t = X.t = struct
   >   type t = X.t
   > end
-  > 
+  >
   > module Apply (F : Producer) (X : Argument) : S with type t = X.t =
   >   F (X)
-  > 
+  >
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module Result = Apply (Base) (A)
   > EOF
   complete
@@ -562,25 +673,25 @@ should converge on the same nested result family.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Argument = sig
   >   type t
   > end
-  > 
+  >
   > module Outer (X : Argument) = struct
   >   module Inner (Y : Argument) : S with type t = X.t * Y.t = struct
   >     type t = X.t * Y.t
   >   end
   > end
-  > 
+  >
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module B = struct
   >   type t = string
   > end
-  > 
+  >
   > module Partial = Outer (A)
   > module Via_partial = Partial.Inner (B)
   > module Partial_again = Outer (A)
@@ -596,24 +707,24 @@ against that member; the result reexports the member under a new projection.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Input = sig
   >   module type T = S
   >   module Value : T
   > end
-  > 
+  >
   > module Consume (X : Input) = struct
   >   module type T = X.T
   >   module Copy : T = X.Value
   > end
-  > 
+  >
   > module A = struct
   >   module type T = S
   >   module Value : T = struct
   >     type t = int
   >   end
   > end
-  > 
+  >
   > module Built = Consume (A)
   > module Alias = Built.Copy
   > EOF
@@ -627,21 +738,21 @@ the captured type constrains another alias of that projection.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Argument = sig
   >   type t
   > end
-  > 
+  >
   > module Make (X : Argument) = struct
   >   module Witness : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  > 
+  >
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module Built = Make (A)
   > module type Snapshot = module type of Built.Witness
   > module Copy : Snapshot = Built.Witness
@@ -657,23 +768,23 @@ the same implementation before the constrained signature is implemented.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module Concrete = struct
   >   type t = int
   > end
-  > 
+  >
   > module type Container = sig
   >   module Selected : S
   >   module Nested : sig
   >     module Item : S
   >   end
   > end
-  > 
+  >
   > module type Fixed =
   >   Container
   >   with module Selected = Concrete
   >    and module Nested.Item = Concrete
-  > 
+  >
   > module M : Fixed = struct
   >   module Selected = Concrete
   >   module Nested = struct
@@ -692,17 +803,17 @@ does not provide the required type [t].
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module Concrete : S = struct
   >   type t = int
   > end
-  > 
+  >
   > module type Outer = sig
   >   module N : S
   > end
-  > 
+  >
   > module type Fixed = Outer with module N = Concrete
-  > 
+  >
   > module M : Fixed = struct
   >   module N = Concrete
   > end
@@ -749,20 +860,20 @@ direct annotations.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Left = sig
   >   module L : S
   > end
-  > 
+  >
   > module type Right = sig
   >   module R : S
   > end
-  > 
+  >
   > module type Diamond = sig
   >   include Left
   >   include Right
   > end
-  > 
+  >
   > module M : Diamond = struct
   >   module L = struct
   >     type t = int
@@ -784,21 +895,21 @@ the alias as a member does not.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Result = sig
   >   module type T = S
   > end
-  > 
+  >
   > module Build
   >     (X : sig type t end)
   >     (Y : sig type u end) : Result = struct
   >   module type T = S
   > end
-  > 
+  >
   > include Build
   >     (struct type t = int end)
   >     (struct type u = string end)
-  > 
+  >
   > module M : T = struct
   >   type t = int * string
   > end
@@ -813,21 +924,21 @@ distinct while their projected result modules retain the same family.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Argument = sig
   >   type t
   > end
-  > 
+  >
   > module Make (X : Argument) () = struct
   >   module Result : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  > 
+  >
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module First = Make (A) ()
   > module Second = Make (A) ()
   > module First_result = First.Result
@@ -843,21 +954,21 @@ from the same module and are both used in later annotations.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module Base = struct
   >   module Inner : S = struct
   >     type t = int
   >   end
   > end
-  > 
+  >
   > module type Preserved = module type of struct
   >   include Base
   > end
-  > 
+  >
   > module type Removed = module type of struct
   >   include Base
   > end [@remove_aliases]
-  > 
+  >
   > module P : Preserved = Base
   > module R : Removed = struct
   >   module Inner = Base.Inner
@@ -874,30 +985,30 @@ result members, aliases, and the eventual application instance.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module type Input = sig
   >   module type T = S
   >   module Value : T
   > end
-  > 
+  >
   > module type Transformer =
   >   functor (X : Input) -> sig
   >     module type T = X.T
   >     module Value : T
   >   end
-  > 
+  >
   > module Transform : Transformer = functor (X : Input) -> struct
   >   module type T = X.T
   >   module Value : T = X.Value
   > end
-  > 
+  >
   > module A = struct
   >   module type T = S
   >   module Value : T = struct
   >     type t = int
   >   end
   > end
-  > 
+  >
   > module Result = Transform (A)
   > module Alias = Result.Value
   > EOF
@@ -984,7 +1095,7 @@ is reported under the binding's name and position.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > let f () =
   >   let module Local : S = struct
   >     type t = int
@@ -1002,7 +1113,7 @@ earlier sibling, so an annotation against it still joins its declaration.
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > let f () =
   >   let module M = struct
   >     type t = int
@@ -1025,13 +1136,13 @@ a module packed by an expression, so both sites implement [S].
   > module type S = sig
   >   type t
   > end
-  > 
+  >
   > module M = struct
   >   type t = int
   > end
-  > 
+  >
   > let packed = (module M : S)
-  > 
+  >
   > let unpack (module X : S) = ()
   > EOF
   complete
@@ -1063,7 +1174,7 @@ applications instantiate: a client checked against [F(A).T] implements the
   > module A = struct
   >   type t = int
   > end
-  > 
+  >
   > module Z : Ifun.F(A).T = struct
   >   type t = int
   > end
@@ -1112,13 +1223,105 @@ buffer's [Container.Local] declaration.
   complete
   Impl 14:7 14:11 annotation
 
-A partial artifact has no facts channel.  Combining it with an artifact that
-has facts must not turn an unavailable answer into a complete empty answer.
-The availability is the same whether the artifacts are indexed separately
-or aggregated together.
+Duplicate filenames must resolve to the correct directory. Each [shared.ml]
+contains a named implementation ([Uid]) and an anonymous package ([Location]).
+
+  $ mkdir -p path-resolution/query path-resolution/left path-resolution/right
+  $ path_test_root="$(cd path-resolution && pwd -P)"
+  $ cat > path-resolution/query/contracts.ml <<'EOF'
+  > module type S = sig
+  >   val value : string
+  > end
+  > EOF
+  $ for directory in left right; do
+  >   cat > "path-resolution/$directory/shared.ml" <<EOF
+  > module Named : Contracts.S = struct let value = "$directory" end
+  > let packed = (module struct let value = "$directory" end : Contracts.S)
+  > EOF
+  > done
+
+Compile each source under a distinct unit name and root its index at the
+source directory. Display project-relative paths, checking that every
+check-site path matches its implementation's path.
+
+  $ index_source () (
+  >   local directory="$1" unit="$2" source="$3"
+  >   cd "$path_test_root/$directory" || exit
+  >   $OCAMLC -bin-annot -I ../query -c -o "$unit.cmo" "$source" || exit
+  >   ocaml-index aggregate "$unit.cmt" --root "./$directory" --rewrite-root \
+  >     -o stanza.ocaml-index
+  > )
+  $ path_impls () {
+  >   local file="$1"
+  >   $MERLIN single module-type-impls \
+  >     -position "$(position_of_module_type S "$file")" \
+  >     -filename "$file" < "$file" \
+  >     | jq -r --arg root "$path_test_root/" '
+  >       def node_kind: if has("uid") then "Uid" else "Location" end;
+  >       .value
+  >       | .targets[].status,
+  >         (.implementations
+  >          | sort_by([.file, .start.line])
+  >          | .[]
+  >          | if .file != ."check-site".file then
+  >              error("check-site path mismatch: \(."check-site".file)")
+  >            else "\(node_kind) \(.file | ltrimstr($root))"
+  >            end)'
+  > }
+  $ index_source query contracts contracts.ml
+  $ index_source left left shared.ml
+  $ index_source right right shared.ml
+
+Separate directory indexes, queried with [SOURCE_ROOT] from [query/].
+
+  $ cat > path-resolution/query/.merlin <<'EOF'
+  > INDEX stanza.ocaml-index
+  > INDEX ../left/stanza.ocaml-index
+  > INDEX ../right/stanza.ocaml-index
+  > SOURCE_ROOT ..
+  > B .
+  > B ../left
+  > B ../right
+  > S .
+  > S ../left
+  > S ../right
+  > EOF
+  $ (cd path-resolution/query && path_impls contracts.ml)
+  complete
+  Uid left/shared.ml
+  Location left/shared.ml
+  Uid right/shared.ml
+  Location right/shared.ml
+
+The merged index gives the same paths from the project root, even when the
+source-path order is reversed.
+
+  $ (cd path-resolution && \
+  >  ocaml-index aggregate query/stanza.ocaml-index right/stanza.ocaml-index \
+  >    left/stanza.ocaml-index --root . --rewrite-root -o global.ocaml-index)
+  $ cat > path-resolution/query/.merlin <<'EOF'
+  > INDEX ../global.ocaml-index
+  > SOURCE_ROOT ..
+  > B .
+  > B ../right
+  > B ../left
+  > S .
+  > S ../right
+  > S ../left
+  > EOF
+  $ (cd path-resolution && path_impls query/contracts.ml)
+  complete
+  Uid left/shared.ml
+  Location left/shared.ml
+  Uid right/shared.ml
+  Location right/shared.ml
+
+A partial artifact has no facts channel.  When queried alongside an index
+with facts, it makes the answer partial without losing known implementations.
 
   $ cat > channel.ml <<'EOF'
   > module type S = sig val x : int end
+  > module Kept : S = struct let x = 1 end
   > EOF
   $ cat > incomplete.ml <<'EOF'
   > module M : Channel.S = struct let x = 1 end
@@ -1134,25 +1337,59 @@ or aggregated together.
   >   -index-file ./incomplete.ocaml-index \
   >   -filename ./channel.ml < ./channel.ml \
   >   | print_results S
+  partial
+  Kept 2:7 2:11 annotation
+
+Aggregation retains the available facts in either order, both for artifacts
+and existing indexes.  It does not record which inputs lacked a channel, so
+the resulting index has a usable channel and the answer is complete.
+
+  $ for suffix in cmt ocaml-index; do
+  >   ocaml-index aggregate channel.$suffix incomplete.$suffix \
+  >     -o project.ocaml-index
+  >   impls_of_module_type S channel.ml
+  >   ocaml-index aggregate incomplete.$suffix channel.$suffix \
+  >     -o project.ocaml-index
+  >   impls_of_module_type S channel.ml
+  > done
+  complete
+  Kept 2:7 2:11 annotation
+  complete
+  Kept 2:7 2:11 annotation
+  complete
+  Kept 2:7 2:11 annotation
+  complete
+  Kept 2:7 2:11 annotation
+
+When every input lacks a facts channel, aggregation leaves it absent.
+
+  $ for suffix in cmt ocaml-index; do
+  >   ocaml-index aggregate incomplete.$suffix incomplete.$suffix \
+  >     -o project.ocaml-index
+  >   impls_of_module_type S channel.ml
+  > done
+  unavailable
   unavailable
 
-  $ ocaml-index aggregate channel.cmt incomplete.cmt -o combined.ocaml-index
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./combined.ocaml-index \
-  >   -filename ./channel.ml < ./channel.ml \
-  >   | print_results S
-  unavailable
+Facts from multiple inputs are unioned even with a missing channel between
+them.  Both implementations survive aggregation and merging indexes.
 
-A missing channel also survives merging existing indexes, with the missing
-channel first rather than last.
-
-  $ ocaml-index aggregate incomplete.ocaml-index channel.ocaml-index \
-  >   -o merged.ocaml-index
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./merged.ocaml-index \
-  >   -filename ./channel.ml < ./channel.ml \
-  >   | print_results S
-  unavailable
+  $ cat > additional.ml <<'EOF'
+  > module Also : Channel.S = struct let x = 2 end
+  > EOF
+  $ $OCAMLC -bin-annot -c additional.ml
+  $ ocaml-index aggregate additional.cmt -o additional.ocaml-index
+  $ for suffix in cmt ocaml-index; do
+  >   ocaml-index aggregate channel.$suffix incomplete.$suffix \
+  >     additional.$suffix -o project.ocaml-index
+  >   impls_of_module_type S channel.ml
+  > done
+  complete
+  Also 1:7 1:11 annotation
+  Kept 2:7 2:11 annotation
+  complete
+  Also 1:7 1:11 annotation
+  Kept 2:7 2:11 annotation
 
 A name that is not a module-type declaration of the buffer selects nothing:
 the query only ever answers for the buffer's own declarations, identified by
