@@ -184,16 +184,19 @@ let tag_anonymous_function = "L" (* lambda *)
 
 let tag_partial_function = "P"
 
+let tag_lazy = "Z"
+
 let tag_stamp = "D"
 
 type 'cu path_item =
   | Compilation_unit of 'cu
   | Inline_marker
   | Module of string
-  | Anonymous_module of int * int * string option
+  | Anonymous_module of int
   | Class of string
   | Function of string
-  | Anonymous_function of int * int * string option
+  | Anonymous_function of int
+  | Lazy of int
   | Partial_function of int * int * string option
   | Stamp of int
 
@@ -206,6 +209,10 @@ let mangle_path_item buf path_item =
     let ts = Printf.sprintf "%s_%d_%d" file_name line col in
     tag_prefixed ~tag ts
   in
+  (* A decimal number cannot be length-prefixed like an identifier (the two
+     would run together), so it is terminated by [_] instead, which cannot start
+     an item. *)
+  let tag_prefixed_number ~tag n = Printf.bprintf buf "%s%d_" tag n in
   match path_item with
   | Compilation_unit cu ->
     (* CR sspies: Use the Flat mangling scheme for parameterized libraries (and
@@ -216,19 +223,14 @@ let mangle_path_item buf path_item =
     tag_prefixed ~tag:tag_compilation_unit sym
   | Inline_marker -> Buffer.add_string buf tag_inline_marker
   | Module sym -> tag_prefixed ~tag:tag_module sym
-  | Anonymous_module (line, col, file_opt) ->
-    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_module
+  | Anonymous_module n -> tag_prefixed_number ~tag:tag_anonymous_module n
   | Class sym -> tag_prefixed ~tag:tag_class sym
   | Function sym -> tag_prefixed ~tag:tag_function sym
-  | Anonymous_function (line, col, file_opt) ->
-    tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_anonymous_function
+  | Anonymous_function n -> tag_prefixed_number ~tag:tag_anonymous_function n
+  | Lazy n -> tag_prefixed_number ~tag:tag_lazy n
   | Partial_function (line, col, file_opt) ->
     tag_prefixed_loc ~line ~col ~file_opt ~tag:tag_partial_function
-  | Stamp n ->
-    (* A decimal number cannot be length-prefixed like an identifier (the two
-       would run together), so it is terminated by [_] instead, which cannot
-       start an item. *)
-    Printf.bprintf buf "%s%d_" tag_stamp n
+  | Stamp n -> tag_prefixed_number ~tag:tag_stamp n
 
 let mangle_path buf path = List.iter (mangle_path_item buf) path
 
@@ -405,9 +407,9 @@ module Parse = struct
       Some (tag_constructor decoded, l)
     in
     let len = String.length sym in
-    (* Inverse of the [Stamp] case of [mangle_path_item]: a decimal number
+    (* Inverse of [tag_prefixed_number] in [mangle_path_item]: a decimal number
        followed by its [_] terminator. *)
-    let parse_stamp pos tag_constructor =
+    let parse_number pos tag_constructor =
       Option.bind (undecimal sym pos) @@ fun (n, l) ->
       if pos + l < len && Char.equal sym.[pos + l] '_'
       then Some (tag_constructor n, l + 1)
@@ -426,10 +428,11 @@ module Parse = struct
         | 'M' -> aux parse_named (fun s -> Module s)
         | 'O' -> aux parse_named (fun s -> Class s)
         | 'F' -> aux parse_named (fun s -> Function s)
-        | 'L' -> aux parse_loc (fun l c f -> Anonymous_function (l, c, f))
-        | 'S' -> aux parse_loc (fun l c f -> Anonymous_module (l, c, f))
+        | 'L' -> aux parse_number (fun n -> Anonymous_function n)
+        | 'S' -> aux parse_number (fun n -> Anonymous_module n)
+        | 'Z' -> aux parse_number (fun n -> Lazy n)
         | 'P' -> aux parse_loc (fun l c f -> Partial_function (l, c, f))
-        | 'D' -> aux parse_stamp (fun n -> Stamp n)
+        | 'D' -> aux parse_number (fun n -> Stamp n)
         | 'I' -> loop (Inline_marker :: path) (pos + 1)
         | _ -> None
       else if pos = start_pos

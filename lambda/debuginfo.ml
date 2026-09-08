@@ -42,12 +42,27 @@ module Scoped_location = struct
       | Sc_class_definition | Sc_method_definition | Sc_partial_or_eta_wrapper
       | Sc_lazy), _ -> false
 
+  type anonymous_counters =
+    { next_function : int ref;
+      next_module : int ref;
+      next_lazy : int ref;
+    }
+
   type scopes =
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
                mangling_item:
-                 Compilation_unit.t Structured_mangling.path_item option}
+                 Compilation_unit.t Structured_mangling.path_item option;
+               anonymous_counters: anonymous_counters;
+               (* The numbers of anonymous functions, modules and lazy
+                  expressions entered so far directly under this scope, which
+                  are the ordinals the next ones receive in their
+                  [mangling_item]. Counting each kind separately keeps the
+                  ordinals of one kind stable when an item of another kind is
+                  added. Shared by the copies of the scope that
+                  [update_assume_zero_alloc] makes. *)
+              }
 
   let str = function
     | Empty -> ""
@@ -57,9 +72,27 @@ module Scoped_location = struct
     | Empty -> "(fun)"
     | Cons r -> r.str_fun
 
+  let no_anonymous_items () =
+    { next_function = ref 0; next_module = ref 0; next_lazy = ref 0 }
+
   let cons scopes item str name mangling_item ~assume_zero_alloc =
     Cons {item; str; str_fun = str ^ ".(fun)"; name; prev = scopes;
-          assume_zero_alloc; mangling_item}
+          assume_zero_alloc; mangling_item;
+          anonymous_counters = no_anonymous_items ()}
+
+  (* Allocates the ordinal of the next anonymous item of the kind selected by
+     [counter] directly under [scopes]. *)
+  let next_anonymous scopes counter =
+    match scopes with
+    | Empty ->
+      (* There is no enclosing scope to count in. The stamps appended to the
+         mangling path keep such symbols unique nonetheless. *)
+      0
+    | Cons { anonymous_counters; _ } ->
+      let counter = counter anonymous_counters in
+      let n = !counter in
+      incr counter;
+      n
 
   let empty_scopes = Empty
 
@@ -80,26 +113,24 @@ module Scoped_location = struct
     | Empty -> s
     | Cons {str; _} -> str ^ sep ^ s
 
-  let enter_anonymous_function ~scopes ~assume_zero_alloc ~loc =
+  let enter_anonymous_function ~scopes ~assume_zero_alloc =
     let str = str_fun scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_function (line, col, Some file))
+      Some
+        (Anonymous_function (next_anonymous scopes (fun c -> c.next_function)))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
-          assume_zero_alloc; mangling_item }
+          assume_zero_alloc; mangling_item;
+          anonymous_counters = no_anonymous_items () }
 
-  let enter_anonymous_module ~scopes ~loc =
+  let enter_anonymous_module ~scopes =
     let str = str scopes in
-    let (file, line, col) = Location.get_pos_info loc.loc_start in
-    let file = Filename.basename file in
     let mangling_item : _ Structured_mangling.path_item option =
-      Some (Anonymous_module (line, col, Some file))
+      Some (Anonymous_module (next_anonymous scopes (fun c -> c.next_module)))
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
           prev = scopes; assume_zero_alloc = ZA.Assume_info.none;
-          mangling_item }
+          mangling_item; anonymous_counters = no_anonymous_items () }
 
   let enter_value_definition ~scopes ~assume_zero_alloc id =
     cons scopes Sc_value_definition (dot scopes (Ident.name id)) (Ident.name id)
@@ -131,8 +162,9 @@ module Scoped_location = struct
     cons scopes Sc_method_definition str s
       ~assume_zero_alloc:ZA.Assume_info.none (Some (Function s))
 
-  let enter_lazy ~scopes = cons scopes Sc_lazy (str scopes) ""
-                             ~assume_zero_alloc:ZA.Assume_info.none None
+  let enter_lazy ~scopes =
+    cons scopes Sc_lazy (str scopes) "" ~assume_zero_alloc:ZA.Assume_info.none
+      (Some (Lazy (next_anonymous scopes (fun c -> c.next_lazy))))
 
   let enter_partial_or_eta_wrapper ~scopes ~loc =
     let (file, line, col) = Location.get_pos_info loc.loc_start in
@@ -555,7 +587,7 @@ let to_structured_mangling_path ~name dbg :
     | Partial_function _ :: path ->
       drop_partials_and_add_function_name ~name path
     | Function name' :: _ when String.equal name name' -> path
-    | Anonymous_function _ :: _ -> path
+    | (Anonymous_function _ | Lazy _) :: _ -> path
     | Compilation_unit _ :: _ | Inline_marker :: _ | Module _ :: _
     | Anonymous_module _ :: _ | Class _ :: _ | Function _ :: _ | Stamp _ :: _
     | [] ->
