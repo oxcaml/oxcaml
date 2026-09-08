@@ -389,9 +389,8 @@ end = struct
         | Interface ->
           add_requirement_edge ();
           observe_family t source_id
-        | Functor_type
-        | Argument_member
-        | Interface_member -> observe_family t source_id
+        | Functor_type | Argument_member | Interface_member ->
+          observe_family t source_id
         | Interface_pair -> (
           add_requirement_edge ();
           observe_family t source_id;
@@ -701,8 +700,7 @@ let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
   let open Query_protocol.Module_type_impls in
   match node with
   | Location (compilation_unit, loc) ->
-    Option.map (source_of_site mconfig compilation_unit loc)
-      ~f:(fun impl_loc ->
+    Option.map (source_of_site mconfig compilation_unit loc) ~f:(fun impl_loc ->
         { implementation_uid = None;
           implementation_name = None;
           site = { impl_loc; impl_kind = Annotation_sites }
@@ -861,8 +859,7 @@ let compare_implementation_identity
 let unique_implementations implementations =
   let compare left right =
     let c = compare_implementation_identity left right in
-    if c <> 0 then c
-    else compare_check_kind left.check right.check
+    if c <> 0 then c else compare_check_kind left.check right.check
   in
   List.sort implementations ~cmp:compare
   |> List.fold_left ~init:[] ~f:(fun unique implementation ->
