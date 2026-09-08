@@ -273,19 +273,18 @@ let string_of_completion_kind = function
   | `ClassType -> "ClassType"
   | `Keyword -> "Keyword"
 
-let with_location_fields ?(with_file = false) loc =
+let with_location ?(with_file = false) ?(skip_none = false) loc assoc =
   let with_file l =
     if not with_file then l
     else ("file", `String loc.Location.loc_start.pos_fname) :: l
   in
-  with_file
-    [ ("start", Lexing.json_of_position loc.Location.loc_start);
-      ("end", Lexing.json_of_position loc.Location.loc_end)
-    ]
-
-let with_location ?(with_file = false) ?(skip_none = false) loc assoc =
   if skip_none && loc = Location.none then `Assoc assoc
-  else `Assoc (with_location_fields ~with_file loc @ assoc)
+  else
+    `Assoc
+      (with_file
+         (("start", Lexing.json_of_position loc.Location.loc_start)
+         :: ("end", Lexing.json_of_position loc.Location.loc_end)
+         :: assoc))
 
 let json_of_stack_or_heap (loc, desc) =
   with_location loc
@@ -616,7 +615,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
       (List.map locations ~f:(fun (loc, typ) ->
            with_location loc [ ("type", `String typ) ]))
   | Module_type_impls _, response ->
-    let json_of_loc loc = `Assoc (with_location_fields ~with_file:true loc) in
+    let json_of_loc loc = with_location ~with_file:true loc [] in
     let json_of_implementation
         (i : Query_protocol.Module_type_impls.implementation) =
       with_location ~with_file:true i.site.impl_loc
@@ -626,11 +625,13 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         @ (match i.target_loc with
           | Some loc -> [ ("decl", json_of_loc loc) ]
           | None -> [])
-        @ (match i.target_instance with
-          | Some target_instance -> [ ("instance", `String target_instance) ]
-          | None -> [])
+        @ [ ("instance", `String i.target_instance) ]
         @ (match i.implementation_uid with
-          | Some uid -> [ ("uid", `String uid) ]
+          | Some uid ->
+            [ ( "uid",
+                `String (Format.asprintf "%a" Ocaml_typing.Shape.Uid.print uid)
+              )
+            ]
           | None -> [])
         @ (match i.implementation_name with
           | Some name -> [ ("name", `String name) ]
@@ -639,28 +640,34 @@ let json_of_response (type a) (query : a t) (response : a) : json =
               `String
                 (match i.site.impl_kind with
                 | Whole_unit -> "unit"
-                | Annotation_sites -> "annotations") )
+                | Annotation_sites -> "annotations") );
+            ( "check",
+              `String
+                (match i.check with
+                | Annotation -> "annotation"
+                | Argument -> "argument"
+                | Package -> "package"
+                | Interface -> "interface") )
           ]
-        @ (match i.check with
-          | Some check ->
-            [ ( "check",
-                `String
-                  (match check with
-                  | Annotation -> "annotation"
-                  | Argument -> "argument"
-                  | Package -> "package"
-                  | Interface -> "interface") )
-            ]
-          | None -> [])
         @
         match i.check_site with
         | Some loc -> [ ("check-site", json_of_loc loc) ]
         | None -> [])
     in
-    let json_of_reason (r : Query_protocol.Module_type_impls.reason) =
-      match r with
+    let json_of_error (error : Query_protocol.Module_type_impls.error) =
+      match error with
       | No_index_files -> `Assoc [ ("kind", `String "no-index-files") ]
-      | Channel_absent -> `Assoc [ ("kind", `String "facts-channel-absent") ]
+      | Channel_absent index_file ->
+        `Assoc
+          [ ("kind", `String "facts-channel-absent");
+            ("index", `String index_file)
+          ]
+      | Index_read_error { index_file; message } ->
+        `Assoc
+          [ ("kind", `String "index-read-error");
+            ("index", `String index_file);
+            ("message", `String message)
+          ]
       | Omission { family; reason } ->
         `Assoc
           ([ ("kind", `String "omission"); ("reason", `String reason) ]
@@ -699,7 +706,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
         [ ("target", `String target.target);
           ("decl", json_of_loc target.target_loc);
           ("status", `String (json_of_status target.status));
-          ("reasons", `List (List.map target.reasons ~f:json_of_reason))
+          ("errors", `List (List.map target.errors ~f:json_of_error))
         ]
     in
     `Assoc

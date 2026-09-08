@@ -1,6 +1,3 @@
-val impl_source_of_interface : Mconfig.t -> string -> string option
-val own_file : Mconfig.t -> string
-
 (** The modules that must {e implement} each module-type declaration of the
     buffer (or the single declaration enclosing [position]), computed from the
     compiler facts in the configured indexes.
@@ -17,7 +14,6 @@ val own_file : Mconfig.t -> string
     functor result do not qualify.  The intended answers are encoded in
     [tests/test-dirs/module-type-impls.t]. *)
 val query :
-  pipeline:Mpipeline.t ->
   ?position:Lexing.position ->
-  Mtyper.typedtree ->
+  Mpipeline.t ->
   Query_protocol.Module_type_impls.response

@@ -230,19 +230,23 @@ module Module_type_impls = struct
   type implementation =
     { target : target;
       target_loc : Location.t option;
-      target_instance : string option;
-      implementation_uid : string option;
+      target_instance : string;
+          (** Printed facts key for the target module type in its module context.
+          Distinguishes instances of the same declaration in different functor
+          applications or projections. *)
+      implementation_uid : Ocaml_typing.Shape.Uid.t option;
       implementation_name : string option;
       site : impl_site;
-      check : check_kind option;
+      check : check_kind;
       check_site : Location.t option
     }
 
   type status = Complete | Partial | Unavailable
 
-  type reason =
+  type error =
     | No_index_files
-    | Channel_absent
+    | Channel_absent of string
+    | Index_read_error of { index_file : string; message : string }
     | Omission of { family : string option; reason : string }
     | Unresolved_implementation of
         { target : string;
@@ -257,7 +261,7 @@ module Module_type_impls = struct
     { target : string;
       target_loc : Location.t;
       status : status;
-      reasons : reason list
+      errors : error list
     }
 
   type response =
