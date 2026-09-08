@@ -1514,7 +1514,7 @@ let facts_of_tree compilation_unit artifact iterate =
             | _ -> ())
           structure.str_items)
     | Tmod_ident _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
-    | Tmod_constraint _ | Tmod_unpack _ ->
+    | Tmod_constraint _ | Tmod_unpack _ | Tmod_typed_hole ->
       ()
   in
   let register_functor_parameter ~body_env ident
