@@ -2,6 +2,7 @@
 open Ast_helper
 open Asttypes
 open Parsetree_helpers
+module Binding = Ir.Binding
 module Expr = Ir.Expr
 module Function = Ir.Function
 module Name = Ir.Name
@@ -10,13 +11,14 @@ module Statement = Ir.Statement
 module Ty = Ir.Ty
 
 type t =
-  { functions : Function.t list;
-    toplevel_decls : (Name.t * Ty.t * Expr.t) list;
+  { record_types : Ty.record list;
+    functions : Function.t list;
+    toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~functions ~toplevel_decls ~toplevel_statement =
-  { functions; toplevel_decls; toplevel_statement }
+let create ~record_types ~functions ~toplevel_decls ~toplevel_statement =
+  { record_types; functions; toplevel_decls; toplevel_statement }
 
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
@@ -224,32 +226,77 @@ let array_primitives =
     external_ "array_length" "%array_length" [array] int
   ]
 
+let record_declarations records =
+  let declaration (record : Ty.record) =
+    let fields =
+      List.map
+        (fun (field : Ty.field) ->
+          let mut =
+            if field.is_mutable && not record.unboxed
+            then Mutable
+            else Immutable
+          in
+          Type.field ~mut (loc (Ty.field_name record field))
+            (Ty.to_code field.ty))
+        record.fields
+    in
+    let kind =
+      if record.unboxed
+      then Parsetree.Ptype_record_unboxed_product fields
+      else Parsetree.Ptype_record fields
+    in
+    Str.type_ Recursive [Type.mk ~kind (loc (Ty.record_name record))]
+  in
+  List.concat_map
+    (fun (record : Ty.record) ->
+      [ declaration { record with unboxed = false };
+        declaration { record with unboxed = true } ])
+    records
+
+let rec print_value path ty expr =
+  match ty with
+  | Ty.Number nty -> print_number nty expr
+  | Ty.Array (nty, dimensions) ->
+    let rec print_elements depth dimensions array =
+      match dimensions with
+      | [] -> print_number nty array
+      | _ :: rest ->
+        let index = path ^ "_index_" ^ string_of_int depth in
+        Exp.for_ (Pat.var (loc index)) (int 0)
+          (op "-" [apply (ident "array_length") [array]; int 1])
+          Upto
+          (print_elements (depth + 1) rest
+             (apply (ident "array_get") [array; ident index]))
+    in
+    print_elements 0 dimensions expr
+  | Ty.Record record ->
+    List.fold_right
+      (fun (field : Ty.field) acc ->
+        let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+        let value = project expr (lid (Ty.field_name record field)) in
+        let path = path ^ "_field_" ^ string_of_int field.index in
+        Exp.sequence (print_value path field.ty value) acc)
+      record.fields unit_
+  | Ty.Bool ->
+    apply
+      (qualified_ident "Printf" "printf")
+      [Exp.constant (Const.string "%b "); expr]
+
 let to_code
-    { functions; toplevel_decls = decls; toplevel_statement = statement } =
+    { record_types;
+      functions;
+      toplevel_decls = decls;
+      toplevel_statement = statement
+    } =
   let opens =
     List.map
       (fun lib ->
         Str.open_ (Opn.mk (Mod.ident (lid (String.capitalize_ascii lib)))))
       libraries
   in
-  let print_decl (name, ty, _expr) =
-    match ty with
-    | Ty.Number nty -> print_number nty (ident (Name.to_string name))
-    | Ty.Array (nty, dimensions) ->
-      let rec print_elements depth dimensions array =
-        match dimensions with
-        | [] -> print_number nty array
-        | _ :: rest ->
-          let index = Name.to_string name ^ "_print_" ^ string_of_int depth in
-          Exp.for_ (Pat.var (loc index)) (int 0)
-            (op "-" [apply (ident "array_length") [array]; int 1])
-            Upto
-            (print_elements (depth + 1) rest
-               (apply (ident "array_get") [array; ident index]))
-      in
-      print_elements 0 dimensions (ident (Name.to_string name))
-    | Ty.Bool ->
-      Misc.fatal_errorf "Program.to_code: boolean declarations unsupported"
+  let print_decl ((binding : Binding.t), _expr) =
+    let name = Name.to_string binding.name in
+    print_value (name ^ "_print") binding.ty (ident name)
   in
   let body =
     Exp.sequence
@@ -260,8 +307,8 @@ let to_code
   in
   let body =
     List.fold_right
-      (fun (name, _ty, expr) acc ->
-        Statement.let_mutable name (Expr.to_code expr) acc)
+      (fun (binding, expr) acc ->
+        Statement.let_binding binding (Expr.to_code expr) acc)
       decls body
   in
   let main =
@@ -272,8 +319,8 @@ let to_code
   in
   let run = Str.eval (Exp.apply (ident "main") [Nolabel, unit_]) in
   let structure =
-    opens @ array_primitives @ conversions @ integral_bounds
-    @ [canonicalize_nan] @ float_to_integral_conversions
+    opens @ record_declarations record_types @ array_primitives @ conversions
+    @ integral_bounds @ [canonicalize_nan] @ float_to_integral_conversions
     @ List.map Function.to_code functions
     @ [main; run]
   in

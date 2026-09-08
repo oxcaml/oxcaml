@@ -149,15 +149,52 @@ module Ty = struct
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Record of record
     | Bool
+
+  and record =
+    { id : int;
+      fields : field list;
+      unboxed : bool
+    }
+
+  and field =
+    { index : int;
+      ty : t;
+      is_mutable : bool
+    }
 
   let equal left right =
     match left, right with
     | Number l, Number r -> NumberTy.equal l r
     | Array (l, ls), Array (r, rs) ->
       NumberTy.equal l r && List.equal Int.equal ls rs
+    | Record l, Record r -> l.id = r.id && Bool.equal l.unboxed r.unboxed
     | Bool, Bool -> true
-    | (Number _ | Array _ | Bool), _ -> false
+    | (Number _ | Array _ | Record _ | Bool), _ -> false
+
+  let record_name { id; unboxed; _ } =
+    Format.sprintf "record_%d_%s" id (if unboxed then "u" else "b")
+
+  let field_name record { index; _ } =
+    Format.sprintf "%s_field_%d" (record_name record) index
+
+  let to_code = function
+    | Number nty -> Typ.constr (lid (NumberTy.to_string nty)) []
+    | Array (nty, dimensions) ->
+      List.fold_left
+        (fun ty _ -> Typ.constr (lid "array") [ty])
+        (Typ.constr (lid (NumberTy.to_string nty)) []) dimensions
+    | Record record -> Typ.constr (lid (record_name record)) []
+    | Bool -> Typ.constr (lid "bool") []
+end
+
+module Binding = struct
+  type t =
+    { name : Name.t;
+      ty : Ty.t;
+      is_mutable : bool
+    }
 end
 
 module Bin_op = struct
@@ -190,7 +227,7 @@ module Bin_op = struct
     match ty with
     | Number nty ->
       if NumberTy.is_floating_point nty then num_binops else integral_binops
-    | Bool | Array _ ->
+    | Bool | Array _ | Record _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
   let to_code ty binop lhs rhs =
@@ -198,7 +235,8 @@ module Bin_op = struct
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
       | Ty.Bool -> "Bool"
-      | Ty.Array _ -> Misc.fatal_errorf "Bin_op.to_code: unexpected array"
+      | Ty.Array _ | Ty.Record _ ->
+        Misc.fatal_errorf "Bin_op.to_code: unexpected aggregate"
     in
     let call name = apply (qualified_ident module_name name) [lhs; rhs] in
     match binop with
@@ -226,13 +264,21 @@ module Expr = struct
      To mitigate, we should make [t] private and add smart constructors. *)
   type t =
     | Const of Number.t
-    | Var of Name.t
+    | Read of place
     | Array_literal of t list
     | Array_make of
         { dimensions : int list;
+          init_name : Name.t;
           init : t
         }
-    | Array_get of Name.t * t list
+    | Record of Ty.record * t list
+    | Record_update of Ty.record * t * Ty.field * t
+    | Record_convert of
+        { from : Ty.record;
+          to_unboxed : bool;
+          source_name : Name.t;
+          expr : t
+        }
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -250,50 +296,137 @@ module Expr = struct
           args : t list
         }
 
+  and place =
+    | Variable of Name.t
+    | Field of place * Ty.record * Ty.field
+    | Element of place * t list
+
   let convert_num expr ~(from : NumberTy.t) ~(to_ : NumberTy.t) =
     if NumberTy.equal from to_
     then expr
     else apply (ident (NumberTy.converter_name ~from ~to_)) [expr]
 
+  let bind name expr body =
+    let name = Name.to_string name in
+    Exp.let_ Immutable Nonrecursive
+      [Vb.mk (Pat.var (loc name)) expr]
+      (body (ident name))
+
+  let constrain ty expr = Exp.constraint_ expr (Some (Ty.to_code ty)) []
+
+  let field_code (record : Ty.record) field receiver =
+    let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+    project (constrain (Ty.Record record) receiver)
+      (lid (Ty.field_name record field))
+
+  let record_code (record : Ty.record) fields source =
+    let make =
+      if record.unboxed then Exp.record_unboxed_product else Exp.record
+    in
+    constrain (Ty.Record record) (make fields source)
+
+  (* CR hwasilewski: Add a comment explaining our reliance on
+     de facto evaluation order rather than explicitly sequencing effects. *)
   let rec to_code : t -> Parsetree.expression = function
     | Const n -> Number.to_code n
-    | Var name ->
-      Exp.ident { Location.txt = Longident.Lident name; loc = Location.none }
-    | Array_literal elements -> Exp.array Mutable (List.map to_code elements)
-    | Array_make { dimensions; init } ->
-      let init_name = "array_initial_value" in
-      let rec make = function
-        | [] -> Misc.fatal_errorf "Array_make: no dimensions"
-        | [size] -> apply (ident "array_make") [int size; ident init_name]
-        | size :: rest ->
-          apply
-            (qualified_ident "Array" "init")
-            [int size; function_ [value_param (Pat.any ())] (make rest)]
+    | Read place -> place_to_code place
+    | Array_literal elements ->
+      Exp.array Mutable (List.map to_code elements)
+    | Array_make { dimensions; init_name; init } ->
+      bind init_name (to_code init) (fun initial_value ->
+          let rec make = function
+            | [] -> Misc.fatal_errorf "Array_make: no dimensions"
+            | [size] -> apply (ident "array_make") [int size; initial_value]
+            | size :: rest ->
+              apply
+                (qualified_ident "Array" "init")
+                [int size; function_ [value_param (Pat.any ())] (make rest)]
+          in
+          make dimensions)
+    | Record (record, values) ->
+      if List.length record.fields <> List.length values
+      then Misc.fatal_errorf "Record: incorrect number of fields";
+      let fields =
+        List.map2
+          (fun field value ->
+            lid (Ty.field_name record field), to_code value)
+          record.fields values
       in
-      Exp.let_ Immutable Nonrecursive
-        [Vb.mk (Pat.var (loc init_name)) (to_code init)]
-        (make dimensions)
-    | Array_get (name, indices) ->
-      List.fold_left
-        (fun array index -> apply (ident "array_get") [array; to_code index])
-        (ident (Name.to_string name)) indices
+      record_code record fields None
+    | Record_update (record, source, field, value) ->
+      record_code record
+        [lid (Ty.field_name record field), to_code value]
+        (Some (constrain (Ty.Record record) (to_code source)))
+    | Record_convert { from; to_unboxed; source_name; expr } ->
+      let target = { from with Ty.unboxed = to_unboxed } in
+      bind source_name (constrain (Ty.Record from) (to_code expr))
+        (fun source ->
+          let fields =
+            List.map
+              (fun field ->
+                ( lid (Ty.field_name target field),
+                  field_code from field source ))
+              from.fields
+          in
+          record_code target fields None)
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
       Bin_op.to_code ty op (to_code lhs) (to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
-      let args = match args with [] -> [unit_] | _ -> List.map to_code args in
+      let args =
+        match args with [] -> [unit_] | _ -> List.map to_code args
+      in
       apply (ident (Name.to_string fun_name)) args
+
+  and place_to_code = function
+    | Variable name -> ident (Name.to_string name)
+    | Field (parent, record, field) ->
+      field_code record field (place_to_code parent)
+    | Element (parent, indices) ->
+      List.fold_left
+        (fun array index ->
+          apply (ident "array_get") [array; to_code index])
+        (place_to_code parent) indices
+
+  let assignment_to_code place value =
+    match place with
+    | Variable name ->
+      Exp.setinstvar (loc (Name.to_string name)) (to_code value)
+    | Field (parent, record, field) ->
+      if record.unboxed || not field.is_mutable
+      then Misc.fatal_errorf "Assign: field is not mutable";
+      Exp.setfield (constrain (Ty.Record record) (place_to_code parent))
+        (lid (Ty.field_name record field)) (to_code value)
+    | Element (parent, indices) ->
+      let rec set array = function
+        | [] -> Misc.fatal_errorf "Assign: no array indices"
+        | [index] ->
+          apply (ident "array_set")
+            [array; to_code index; to_code value]
+        | index :: rest ->
+          set (apply (ident "array_get") [array; to_code index]) rest
+      in
+      set (place_to_code parent) indices
+
+end
+
+module Place = struct
+  type t = Expr.place =
+    | Variable of Name.t
+    | Field of t * Ty.record * Ty.field
+    | Element of t * Expr.t list
+
+  let to_code = Expr.place_to_code
 end
 
 module Statement = struct
   type t =
-    | Assign of Name.t * Expr.t
-    | Array_set of Name.t * Expr.t list * Expr.t
+    | Assign of Place.t * Expr.t
     | Seq of t list
     | If of Expr.t * t * t
-    | Let_mutable of Name.t * Expr.t * t
+    | Let of Binding.t * Expr.t * t
     | Bounded_loop of
         { var : Name.t;
           init : Expr.t;
@@ -302,9 +435,13 @@ module Statement = struct
           body : t
         }
 
-  let let_mutable name expr body =
-    Exp.let_ Mutable Nonrecursive
-      [Vb.mk (Pat.var (Name.to_string name |> loc)) expr]
+  let let_binding ({ name; ty; is_mutable } : Binding.t) expr body =
+    let mutability = if is_mutable then Mutable else Immutable in
+    Exp.let_ mutability Nonrecursive
+      [ Vb.mk
+          (Pat.constraint_ (Pat.var (loc (Name.to_string name)))
+             (Some (Ty.to_code ty)) [])
+          expr ]
       body
 
   let sequence statement = function
@@ -312,24 +449,18 @@ module Statement = struct
     | rest -> Seq [statement; rest]
 
   let rec to_code : t -> Parsetree.expression = function
-    | Assign (name, expr) ->
-      Exp.setinstvar (Name.to_string name |> loc) (Expr.to_code expr)
-    | Array_set (name, indices, value) ->
-      let rec set array = function
-        | [] -> Misc.fatal_errorf "Array_set: no indices"
-        | [index] ->
-          apply (ident "array_set")
-            [array; Expr.to_code index; Expr.to_code value]
-        | index :: rest ->
-          set (apply (ident "array_get") [array; Expr.to_code index]) rest
-      in
-      set (ident (Name.to_string name)) indices
+    | Assign (place, expr) -> Expr.assignment_to_code place expr
     | Bounded_loop { var; init; bound; stride; body } ->
       if stride = 0 then Misc.fatal_errorf "Bounded_loop: zero stride";
       let name = Name.to_string var in
       let bound_name = name ^ "_bound" in
       let comparison = if stride > 0 then "<=" else ">=" in
-      let_mutable var (Expr.to_code init)
+      let_binding
+        { Binding.name = var;
+          ty = Ty.Number (NumberTy.boxed Int);
+          is_mutable = true
+        }
+        (Expr.to_code init)
         (Exp.let_ Immutable Nonrecursive
            [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
            (Exp.while_
@@ -337,8 +468,8 @@ module Statement = struct
               (Exp.sequence (to_code body)
                  (Exp.setinstvar (loc name)
                     (op "+" [ident name; int stride])))))
-    | Let_mutable (name, expr, body) ->
-      let_mutable name (Expr.to_code expr) (to_code body)
+    | Let (binding, expr, body) ->
+      let_binding binding (Expr.to_code expr) (to_code body)
     | Seq statements ->
       List.fold_right Exp.sequence (List.map to_code statements) unit_
     | If (condition, if_true, if_false) ->
@@ -365,29 +496,38 @@ end
 module Function = struct
   type t =
     { name : Name.t;
-      params : (Name.t * Ty.t) list;
+      params : Binding.t list;
       inline : Inline.t;
       body : Statement.t;
-      return_ty : NumberTy.t;
+      return_ty : Ty.t;
       result : Expr.t
     }
 
-  let to_code { name; params; inline; body; return_ty = _; result } =
-    let to_param (name, _ty) = value_param (Pat.var (loc name)) in
+  let to_code { name; params; inline; body; return_ty; result } =
+    let to_param ({ name; ty; _ } : Binding.t) =
+      value_param
+        (Pat.constraint_ (Pat.var (loc (Name.to_string name)))
+           (Some (Ty.to_code ty)) [])
+    in
     let function_params =
       match params with
       | [] -> [value_param (Pat.construct (lid "()") None)]
       | _ -> List.map to_param params
     in
-    let body = Exp.sequence (Statement.to_code body) (Expr.to_code result) in
+    let body =
+      Exp.sequence (Statement.to_code body)
+        (Exp.constraint_ (Expr.to_code result) (Some (Ty.to_code return_ty)) [])
+    in
     let body =
       List.fold_right
-        (fun (name, _ty) body -> Statement.let_mutable name (ident name) body)
+        (fun (binding : Binding.t) body ->
+          Statement.let_binding binding (ident (Name.to_string binding.name))
+            body)
         params body
     in
     Str.value Nonrecursive
       [ Vb.mk
           ~attrs:(Inline.to_attributes inline)
-          (Pat.var (loc name))
+          (Pat.var (loc (Name.to_string name)))
           (function_ function_params body) ]
 end

@@ -69,9 +69,33 @@ module Ty : sig
   type t =
     | Number of NumberTy.t
     | Array of NumberTy.t * int list
+    | Record of record
     | Bool
 
+  and record =
+    { id : int;
+      fields : field list;
+      unboxed : bool
+    }
+
+  and field =
+    { index : int;
+      ty : t;
+      is_mutable : bool
+    }
+
   val equal : t -> t -> bool
+  val record_name : record -> string
+  val field_name : record -> field -> string
+  val to_code : t -> Parsetree.core_type
+end
+
+module Binding : sig
+  type t =
+    { name : Name.t;
+      ty : Ty.t;
+      is_mutable : bool
+    }
 end
 
 module Bin_op : sig
@@ -106,13 +130,21 @@ end
 module Expr : sig
   type t =
     | Const of Number.t
-    | Var of Name.t
+    | Read of place
     | Array_literal of t list
     | Array_make of
         { dimensions : int list;
+          init_name : Name.t;
           init : t
         }
-    | Array_get of Name.t * t list
+    | Record of Ty.record * t list
+    | Record_update of Ty.record * t * Ty.field * t
+    | Record_convert of
+        { from : Ty.record;
+          to_unboxed : bool;
+          source_name : Name.t;
+          expr : t
+        }
     | Opaque of t
     | Bin_op of
         { ty : Ty.t;
@@ -130,6 +162,11 @@ module Expr : sig
           args : t list
         }
 
+  and place =
+    | Variable of Name.t
+    | Field of place * Ty.record * Ty.field
+    | Element of place * t list
+
   val convert_num :
     Parsetree.expression ->
     from:NumberTy.t ->
@@ -137,15 +174,25 @@ module Expr : sig
     Parsetree.expression
 
   val to_code : t -> Parsetree.expression
+  val place_to_code : place -> Parsetree.expression
+  val assignment_to_code : place -> t -> Parsetree.expression
+end
+
+module Place : sig
+  type t = Expr.place =
+    | Variable of Name.t
+    | Field of t * Ty.record * Ty.field
+    | Element of t * Expr.t list
+
+  val to_code : t -> Parsetree.expression
 end
 
 module Statement : sig
   type t =
-    | Assign of Name.t * Expr.t
-    | Array_set of Name.t * Expr.t list * Expr.t
+    | Assign of Place.t * Expr.t
     | Seq of t list
     | If of Expr.t * t * t
-    | Let_mutable of Name.t * Expr.t * t
+    | Let of Binding.t * Expr.t * t
     | Bounded_loop of
         { var : Name.t;
           init : Expr.t;
@@ -154,14 +201,11 @@ module Statement : sig
           body : t
         }
 
-  val let_mutable :
-    Name.t ->
-    Parsetree.expression ->
-    Parsetree.expression ->
+  val let_binding :
+    Binding.t -> Parsetree.expression -> Parsetree.expression ->
     Parsetree.expression
 
   val sequence : t -> t -> t
-
   val to_code : t -> Parsetree.expression
 end
 
@@ -175,10 +219,10 @@ end
 module Function : sig
   type t =
     { name : Name.t;
-      params : (Name.t * Ty.t) list;
+      params : Binding.t list;
       inline : Inline.t;
       body : Statement.t;
-      return_ty : NumberTy.t;
+      return_ty : Ty.t;
       result : Expr.t
     }
 

@@ -78,13 +78,13 @@ class Toolchain:
     @property
     def configurations(self) -> tuple[Configuration, ...]:
         return (
-            # Configuration(
-            #     name="ocamlc",
-            #     compiler=self.ocamlc,
-            #     # Use the runtime from `ocamlrun` created by `make install`.
-            #     flags=(*self.library_flags("cma"), "-use-runtime", str(self.ocamlrun)),
-            #     ocamllib=self.ocamllib,
-            # ),
+            Configuration(
+                name="ocamlc",
+                compiler=self.ocamlc,
+                # Use the runtime from `ocamlrun` created by `make install`.
+                flags=(*self.library_flags("cma"), "-use-runtime", str(self.ocamlrun)),
+                ocamllib=self.ocamllib,
+            ),
             Configuration(
                 name="ocamlopt-O4",
                 compiler=self.ocamlopt,
@@ -100,20 +100,20 @@ class Toolchain:
                 ),
                 ocamllib=self.ocamllib,
             ),
-            Configuration(
-                name="ocamlopt-Oclassic",
-                compiler=self.ocamlopt,
-                flags=(
-                    *self.library_flags("cmxa"),
-                    "-Oclassic",
-                    "-inline", "0",
-                    "-no-cfg-peephole-optimize",
-                    "-no-cfg-value-propagation",
-                    "-no-cfg-prologue-shrink-wrap",
-                    "-regalloc", "ls",
-                ),
-                ocamllib=self.ocamllib,
-            ),
+            # Configuration(
+            #     name="ocamlopt-Oclassic",
+            #     compiler=self.ocamlopt,
+            #     flags=(
+            #         *self.library_flags("cmxa"),
+            #         "-Oclassic",
+            #         "-inline", "0",
+            #         "-no-cfg-peephole-optimize",
+            #         "-no-cfg-value-propagation",
+            #         "-no-cfg-prologue-shrink-wrap",
+            #         "-regalloc", "ls",
+            #     ),
+            #     ocamllib=self.ocamllib,
+            # ),
         )
 
     def snapshot(self, destination: Path) -> "Toolchain":
