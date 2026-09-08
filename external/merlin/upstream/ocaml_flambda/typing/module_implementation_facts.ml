@@ -1452,6 +1452,57 @@ let facts_of_tree compilation_unit artifact iterate =
         | Tmod_unpack _ ->
           ()))
   in
+  let rec add_structure_requirements ~derived (implementation : module_expr) =
+    let unwrapped = unwrap_implicit_constraint implementation in
+    match unwrapped.mod_desc with
+    | Tmod_structure structure -> (
+      (* [str_type] still contains shadowed declarations. The outer module
+         type includes the implicit constraint that removes them. *)
+      match
+        scraped_signature implementation.mod_env implementation.mod_type
+      with
+      | None -> ()
+      | Some signature ->
+        let exported =
+          List.fold_left
+            (fun exported item ->
+              Ident.Set.add (Types.signature_item_id item) exported)
+            Ident.Set.empty signature
+        in
+        List.iter
+          (fun item ->
+            match item.str_desc with
+            | Tstr_include ({ incl_kind = Tincl_structure; _ } as include_)
+              when List.for_all
+                     (fun item ->
+                       Ident.Set.mem (Types.signature_item_id item) exported)
+                     include_.incl_type -> (
+              let included = unwrap_implicit_constraint include_.incl_mod in
+              match included.mod_desc with
+              | Tmod_constraint (_, _, Tmodtype_explicit (module_type, _), _) ->
+                add_dependency ~derived
+                  ~source:(key_of_module_type module_type)
+                  Dependency.Reason.Include
+              | _ -> (
+                match path_of_module_expr included with
+                | Some path ->
+                  (* Declaration UIDs do not distinguish functor instances. *)
+                  if
+                    not
+                      (path_contains_apply
+                         (normalize_module_path included.mod_env path))
+                  then
+                    add_subject_expectation_edges derived
+                      ~site:include_.incl_loc included.mod_env
+                      Dependency.Reason.Include path
+                | None -> add_structure_requirements ~derived include_.incl_mod)
+              )
+            | _ -> ())
+          structure.str_items)
+    | Tmod_ident _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
+    | Tmod_constraint _ | Tmod_unpack _ ->
+      ()
+  in
   let register_functor_parameter ~body_env ident
       (parameter : Typedtree.module_type) =
     (match ident with
@@ -1769,7 +1820,8 @@ let facts_of_tree compilation_unit artifact iterate =
             record_module_context uid (Context.Proj (enclosing_context (), uid));
             (match id with None -> () | Some _ -> add_binding uid module_expr);
             with_enclosing (functor_body_context uid module_expr) (fun () ->
-                iterator.module_expr iterator module_expr);
+                iterator.module_expr iterator module_expr;
+                add_structure_requirements ~derived:(Key.Anon uid) module_expr);
             iterator.expr iterator body
           | _ -> Tast_iterator.default_iterator.expr iterator expression);
       module_expr =
@@ -1881,7 +1933,9 @@ let facts_of_tree compilation_unit artifact iterate =
           | Some _ -> add_binding binding.mb_uid binding.mb_expr);
           with_enclosing (functor_body_context binding.mb_uid binding.mb_expr)
             (fun () ->
-              Tast_iterator.default_iterator.module_binding iterator binding));
+              Tast_iterator.default_iterator.module_binding iterator binding;
+              add_structure_requirements ~derived:(Key.Anon binding.mb_uid)
+                binding.mb_expr));
       module_declaration =
         (fun iterator declaration ->
           record_module_context declaration.md_uid
