@@ -782,36 +782,23 @@ Error: Polymorphic variant constructor argument types must have layout value.
          because it's the type of the field of a polymorphic variant.
 |}]
 
-(************************************************)
-(* Test 9: Tuples only work on values (for now) *)
+(***************************************)
+(* Test 9: Tuples work with non-values *)
 
 (* CR layouts v5: bring over void tests. *)
 module M9_1f = struct
   type foo1 = int * t_float64 * [ `Foo1 of int | `Bar1 of string ];;
 end
 [%%expect{|
-Line 2, characters 20-29:
-2 |   type foo1 = int * t_float64 * [ `Foo1 of int | `Bar1 of string ];;
-                        ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module M9_1f :
+  sig type foo1 = int * t_float64 * [ `Bar1 of string | `Foo1 of int ] end
 |}];;
 
 module M9_2f = struct
   type result = V of (string * t_float64) | I of int
 end;;
 [%%expect {|
-Line 2, characters 31-40:
-2 |   type result = V of (string * t_float64) | I of int
-                                   ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module M9_2f : sig type result = V of (string * t_float64) | I of int end
 |}];;
 
 module M9_4f = struct
@@ -822,15 +809,8 @@ module M9_4f = struct
     | (a, _) -> f_id a
 end;;
 [%%expect {|
-Line 6, characters 21-22:
-6 |     | (a, _) -> f_id a
-                         ^
-Error: The value "a" has type "('a : value_or_null)"
-       but an expression was expected of type "float#"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because it's the type of a tuple element.
+module M9_4f :
+  sig val f_id : float# -> float# val foo : float# * 'a -> float# end
 |}];;
 
 module M9_5f = struct
@@ -853,30 +833,14 @@ module M9_6f = struct
   type 'a t = int * 'a constraint 'a = t_float64
 end;;
 [%%expect {|
-Line 2, characters 34-48:
-2 |   type 'a t = int * 'a constraint 'a = t_float64
-                                      ^^^^^^^^^^^^^^
-Error: The type constraints are not consistent.
-       Type "('a : value)" is not compatible with type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+module M9_6f : sig type 'a t = int * 'a constraint 'a = t_float64 end
 |}];;
 
 module type S9_7f = sig
   val x : int * t_float64
 end;;
 [%%expect{|
-Line 2, characters 16-25:
-2 |   val x : int * t_float64
-                    ^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_float64" is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of "t_float64" must be a value layout
-         because it's the type of a tuple element.
+module type S9_7f = sig val x : int * t_float64 end
 |}];;
 
 (*************************************************)
@@ -1698,6 +1662,8 @@ val ( and* ) : 'a -> 'b -> t_float64 = <fun>
 val q : unit -> unit = <fun>
 |}]
 
+(* CR zeisbach: this test seems wrong, since [let*] and [and*] get inferred to
+   work on values only, and this tries to call them with the wrong thing. *)
 (* 28.8: non-value letop binder arg with and *)
 let ( let* ) x f = ()
 let ( and* ) x1 x2 = assert false
@@ -1781,15 +1747,8 @@ type ('a : float64) poly_var = [`A of int * 'a | `B]
 let f #poly_var = "hello"
 
 [%%expect{|
-Line 1, characters 44-46:
-1 | type ('a : float64) poly_var = [`A of int * 'a | `B]
-                                                ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is float64
-         because of the annotation on 'a in the declaration of the type
-                                      poly_var.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : float64) poly_var = [ `A of int * 'a | `B ]
+val f : [< 'a poly_var ] -> string = <fun>
 |}]
 
 (*********************************************************)
