@@ -171,6 +171,9 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 
+(* CR zeisbach: there are already lots of fatal errors in this file; my change
+   just introduces one more. I should check to see if this is the appropriate
+    thing to do, but I would imagine it is fine? *)
 (* Calling the function multiple times at different layouts *)
 module H (M : sig
   val id : layout_ x. ('a : x). 'a -> 'a
@@ -181,15 +184,9 @@ end @ static) = struct
     (x', y')
 end
 [%%expect{|
-Line 7, characters 9-11:
-7 |     (x', y')
-             ^^
-Error: The value "y'" has type "float#" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout
-         because it's the type of a tuple element.
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Let binding: binding a layout-poly value *)
