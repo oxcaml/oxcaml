@@ -221,9 +221,9 @@ end = struct
   }
 
   let describe r =
-    let obj = Obj.repr (Sys.opaque_identity r) in
-    if Obj.is_int obj then "immediate"
-    else Printf.sprintf "block tag %d size %d" (Obj.tag obj) (Obj.size obj)
+    let repr = Obj.repr (Sys.opaque_identity r) in
+    if Obj.is_int repr then "immediate"
+    else Printf.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
 
   let mark log name = log := name :: !log; #()
 

@@ -13,21 +13,36 @@ type t = { x : unit#; kept : unit# }
 type p = { y : #(unit# * unit#) }
 type m = { mutable z : unit# }
 let describe x =
-  let o = Obj.repr x in
-  if Obj.is_int o then "immediate"
-  else Printf.sprintf "block tag %d size %d" (Obj.tag o) (Obj.size o)
-let shapes =
-  let r = { x = #(); kept = #() } in
-  [describe r; describe { r with x = #() };
-   describe { y = #(#(), #()) }; describe { z = #() }]
+  let repr = Obj.repr (Sys.opaque_identity x) in
+  if Obj.is_int repr then "immediate"
+  else Printf.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
+let r = { x = #(); kept = #() }
 [%%expect{|
 type t = { x : unit#; kept : unit#; }
 type p = { y : #(unit# * unit#); }
 type m = { mutable z : unit#; }
 val describe : 'a -> string = <fun>
-val shapes : string list =
-  ["block tag 0 size 0"; "block tag 0 size 0"; "block tag 0 size 0";
-   "block tag 0 size 0"]
+val r : t = {x = <void>; kept = <void>}
+|}]
+
+let description = describe r
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { r with x = #() }
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { y = #(#(), #()) }
+[%%expect{|
+val description : string = "block tag 0 size 0"
+|}]
+
+let description = describe { z = #() }
+[%%expect{|
+val description : string = "block tag 0 size 0"
 |}]
 
 (* Branches, loop parameters, and inlined constructors preserve the shape. *)
