@@ -1,0 +1,405 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"ast-traversal"}< Traversing the AST}{%html: </div><div>%}{{!"examples"}Examples >}{%html: </div></div>%}
+
+{0 Good Practices}
+
+{1:resp_loc Respecting Locations}
+
+Correctly dealing with location is essential to correctly generate OCaml code.
+They are necessary for error reporting by the compiler, but more generally for
+Merlin's features to work, such as displaying occurrences and jumping to
+definition. When called, the driver is called with the [-check] and
+[-check-locations] flags, [ppxlib] makes it is a requirement that locations follow
+some rules in order to accept the rewriting, as it will check that some
+invariants are respected.
+
+{2 The Invariants}
+
+The invariants are as follows:
+
+- AST nodes are requested to be well-nested WRT locations
+- the locations of "sibling" AST nodes should not overlap
+
+This is required for Merlin to behave properly.
+
+Indeed, for almost any query directed at Merlin, it will need to inspect the
+context around the user's cursor to give an answer that makes sense. And the
+only input it has to do that is the cursor’s position in the buffer.
+The handling of most queries starts by traversing the AST, using the
+locations of nodes to select the right branch. (1) is necessary to avoid
+discarding subtrees too early, (2) is used to avoid Merlin making arbitrary
+choices (if you ask for the type under the cursor, and there seems to be two
+things under the cursor, Merlin will need to pick one).
+
+{2 Guidelines for Writing Well-Behaved PPXs}
+
+It's obviously not always (indeed rarely) possible to mint new locations
+when manipulating the AST.
+
+The intended way to deal with locations is this:
+
+- AST nodes that exist in the source should keep their original location
+- new nodes should be given a "ghost" location (i.e.,
+  [{ some_loc with loc_ghost = true }]) to indicate that the node doesn't
+  exist in the sources.
+
+In particular, {{!Ppxlib.Location.none}[Location.none]} is never meant to be
+used by PPX authors, where some location is always available (for instance,
+derivers and extenders at least know the locations of their relevant node).
+
+Both the new check and Merlin will happily traverse the ghost nodes as if they
+didn't exist. Note: this comes into play when deciding which nodes are
+"siblings," for instance, if your AST is:
+
+{v
+  A (B1(C, D),
+     B2(X, Y))
+v}
+
+but [B2] has a ghost location, then [B1], [X] and [Y] are considered
+siblings.
+
+Additionally, there is an attribute [\[@merlin.hide\]] that you can add on
+nodes to tell Merlin (and the check) to ignore this node and all of its
+children. Some helpers for this are provided in {{!Ppxlib.Merlin_helpers}[Merlin_helpers]}.
+
+{1:handling_errors Handling Errors}
+
+In order to give a nice user experience when reporting errors or failures in a
+PPX, it is necessary to include as much generated content as possible.
+Most IDE tools, such as Merlin, rely on the AST for their features, such as
+displaying type, jumping to definition, or showing the list of errors.
+
+{2 Embedding the Errors in the AST}
+
+A common way to report an error is to throw an exception. However, this method
+interrupts the execution flow of the [ppxlib] driver and leaves later PPXs
+unexpanded when handing the AST over to Merlin.
+
+Instead, it is better to always return a valid AST, as complete as possible, but
+with "error extension nodes" at every place where successful code generation was
+impossible. Error extension nodes are special extension nodes [[%ocaml.error
+error_message]] that can be embedded into a valid AST and are interpreted
+later as errors, e.g., by the compiler or Merlin. As all extension nodes,
+they can be put {{:https://ocaml.org/manual/extensionnodes.html}at many places
+in the AST} to replace structure items, expressions, or patterns, for example.
+
+So whenever you're in doubt whether to throw an exception or if to embed the error as
+an error extension node when writing a PPX rewriter,
+embed the error is the way to go! And whenever you're in doubt about where
+exactly to embed the error inside the AST, a good ground rule is: as deep in
+the AST as possible.
+
+For instance, suppose a rewriter is supposed to define a new record type, but
+there is an error in one field’s type generation. In order to have
+the most complete AST as output, the rewriter can still define the type and all
+of its fields, putting an extension node in place of the type of the faulty
+field:
+
+{[
+   type long_record = {
+     field_1: int;
+     field_2: [%ocaml.error "field_2 could not be implemented due to foo"];
+   }
+]}
+
+[ppxlib] provides a function in its API to create error extension nodes:
+{{!Ppxlib.Location.error_extensionf}[error_extensionf]}. This function creates
+an extension node, which then must be transformed in the right kind of node
+using functions such as
+{{!Ppxlib.Ast_builder.Default.pexp_extension}[pexp_extension]}.
+
+{2 A Documented Example}
+
+Let us give an example. We will define a deriver on types records, which
+constructs a default value from a given type. For instance, the derivation on
+the type [type t = { x:int; y: float; z: string}] would yield [let default_t =
+{x= 0; y= 0.; z= ""}]. This deriver has two limitations:
+
+{ol
+{- It does not work on other types than records,}
+{- It only works for records containing fields of type [string], [int], or [float].}
+}
+
+The rewriter should warn the user about these limitations with a good error
+reporting. Let’s first look at the second point. Here is the function mapping
+the fields from the type definition to a default expression.
+
+{[
+          let create_record ~loc fields =
+            let declaration_to_instantiation (ld : label_declaration) =
+              let loc = ld.pld_loc in
+              let { pld_type; pld_name; _ } = ld in
+              let e =
+                match pld_type with
+                | { ptyp_desc = Ptyp_constr ({ txt = Lident "string"; _ }, []); _ } ->
+                    pexp_constant ~loc (Pconst_string ("", loc, None))
+                | { ptyp_desc = Ptyp_constr ({ txt = Lident "int"; _ }, []); _ } ->
+                    pexp_constant ~loc (Pconst_integer ("0", None))
+                | { ptyp_desc = Ptyp_constr ({ txt = Lident "float"; _ }, []); _ } ->
+                    pexp_constant ~loc (Pconst_float ("0.", None))
+                | _ ->
+                    pexp_extension ~loc
+                    @@ Location.error_extensionf ~loc
+                         "Default value can only be derived for int, float, and string."
+              in
+              ({ txt = Lident pld_name.txt; loc }, e)
+            in
+            let l = List.map fields ~f:declaration_to_instantiation in
+            pexp_record ~loc l None
+]}
+
+
+When the record definition contains several fields with types other than [int],
+[float], or [string], several error nodes are added in the AST. Moreover, the
+location of the error nodes corresponds to the field record's definition.
+This allows tools such as Merlin to report all errors at once, at the right
+location, resulting in a better workflow than having to recompile every time an
+error is corrected to see the next one.
+
+The first limitation is that the deriver cannot work on non-record types.
+However, we decided here to derive a default value, even in the case of
+non-record types, so that it does not appear as undefined in the remaining of
+the file. This impossible value consists of an error extension node.
+
+{[
+          let generate_impl ~ctxt (_rec_flag, type_declarations) =
+            let loc = Expansion_context.Deriver.derived_item_loc ctxt in
+            List.map type_declarations ~f:(fun (td : type_declaration) ->
+                let e, name =
+                  match td with
+                  | { ptype_kind = Ptype_record fields; ptype_name; ptype_loc; _ } ->
+                      (create_record ~loc:ptype_loc fields, ptype_name)
+                  | { ptype_name; ptype_loc; _ } ->
+                      ( pexp_extension ~loc
+                        @@ Location.error_extensionf ~loc:ptype_loc
+                             "Cannot derive accessors for non record type %s"
+                             ptype_name.txt,
+                        ptype_name )
+                in
+                [
+                  pstr_value ~loc Nonrecursive
+                    [
+                      {
+                        pvb_pat = ppat_var ~loc { txt = "default_" ^ name.txt; loc };
+                        pvb_expr = e;
+                        pvb_attributes = [];
+                        pvb_loc = loc;
+                      };
+                    ];
+                ])
+            |> List.concat
+]}
+
+{2 In Case of Panic}
+
+In some rare cases, it might happen that a whole file rewriter is not able to
+output a meaningful AST. In this case, they might be tempted to raise a located
+error: an exception that includes the error's location. Moreover, this has
+historically been what was suggested to do by [ppxlib] examples, but it is now
+discouraged in most of the cases, as it prevents Merlin features to work well.
+
+If such an exception isn't caught, the PPX driver will return an error code,
+and the exception will be pretty-printed, including the location (that's the
+case when Dune calls the driver). When the driver is spawned with the
+[-embed-errors] or [-as-ppx] flags (that's the case when Merlin calls the driver), 
+the driver will look for located error. If it catches one, it will stop
+its rewriting chain at this point and output an AST consisting of the
+located error followed by the last valid AST: the one passed to the raising
+rewriter.
+
+Even more in context-free rewriters, raising should be avoided in favour of
+outputting a single error node when finer grained reporting is not needed or
+possible. As the whole context-free rewriting is done in one traverse of the
+AST, a single raise will cancel both the context-free pass and upcoming
+rewriters, and the AST prior to the context-free pass will be outputted together
+with the error.
+
+The function provided by the API to raise located errors is
+{{!Ppxlib.Location.raise_errorf}[raise_errorf]}.
+
+{2 Migrating From Raising to Embedding Errors}
+
+Lots of PPXs exclusively use {{!Ppxlib.Location.raise_errorf}[raise_errorf]}
+to report errors, instead of the more Merlin-friendly way of
+embedding errors in the AST, as described in this section.
+
+If you want to migrate such a codebase to the embedding approach, the rest of this section will present few
+recipes to do that. It might not be completely trivial, as raising can
+be done anywhere in the code, including in places where "embedding" would not
+make sense. The first thing you can do is to turn your internal raising functions to
+function returning a [result] type.
+
+The workflow for this change would look like this:
+
+{ol
+{- Search your code for all uses of {{!Ppxlib.Location.raise_errorf}[raise_errorf]}, using [grep], for instance.}
+{- For each of them, turn them into functions returning a [(_, extension) result] type, using {{!Ppxlib.Location.error_extensionf}[error_extensionf]} to generate the [Error].}
+{- Let the compiler or Merlin tell you where to propagate the [result] type (most certainly using [map]s and [bind]s).}
+{- When you have propagated until a point where you can embed an extension node, turn the [Error] case into an extension node and embed it.}
+}
+
+This is quite convenient, as it allows you to do a "type-driven" modification,
+using the full static analysis of OCaml to never omit a special case and to
+confidently find the place the most deeply in the AST to embed the error.
+However, it might induce quite a lot of code modification, and exceptions are
+sometimes convenient to use depending on your preference. In case you want to do only
+a very simple change and keep using exception, just catch them at the right place and turn them into extension
+points embedded in the AST, as in the following example:
+
+{[
+let rewrite_extension_point loc payload =
+  try generate_ast payload
+  with exn ->
+    let get_error exn =
+      match Location.Error.of_exn exn with
+      | None -> raise exn
+      | Some error -> error
+    in
+    let extension = exn |> get_error |> Location.Error.to_extension in
+    Ast_builder.Default.pstr_extension ~loc ext []
+]}
+
+{1:quoting Quoting}
+
+Quoting is part of producing
+{{:https://en.wikipedia.org/wiki/Hygienic_macro}hygienic} code. But before
+talking about the solution, let's introduce the problem.
+
+Say you are writing an extension rewriter, which takes an expression as payload, and would replace all identifiers [id] in the expression with a similar expression, but with a printing debug:
+
+{[
+  let x = 0 in
+  let y = 2 in
+  [%debug x + 1, y + 2 ]
+]}
+
+would generate the following code:
+
+{[
+  let x = 0 in
+  let y = 2 in
+  let debug = Printf.printf "%s = %d; " in
+  (debug "x" x ; x) + 1,
+  (debug "y" y ; y) + 2
+]}
+
+
+When executed, the code would print [x = 0; y = 2; ]. So far, so good. However, suppose now that instead of [x], the variable is named [debug]. The following seemingly equivalent code:
+
+{[
+  let debug = 0 in
+  let y = 2 in
+  [%debug debug + 1, y + 2 ]
+]}
+
+would generate:
+
+{[
+  let debug = 0 in
+  let y = 2 in
+  let debug = Printf.printf "%s = %d; " in
+  (debug "debug" debug ; debug) + 1,
+  (debug "y" y ; y) + 2
+]}
+
+which does not even type-check! The problem is that the payload is expected to
+be evaluated in some environment where [debug] has some value and type, but the
+rewriting modifies this environment and shadows the [debug] name.
+
+
+
+"Quoting" is a mechanism to prevent this problem from happenning. In [ppxlib], it
+is done through the {{!Ppxlib.Expansion_helpers.Quoter}[Expansion_helpers.Quoter]} module in several steps:
+
+- First, create a quoter using the {{!Ppxlib.Expansion_helpers.Quoter.create}[create]} function:
+
+{[
+  # open Expansion_helper ;;
+  #s let quoter = Quoter.create () ;;
+  val quoter : Quoter.t = <abstr>
+]}
+
+- Then, use {{!Ppxlib.Expansion_helpers.Quoter.quote}[Expansion_helpers.Quoter.quote]} to quote all the expressions that are given from the user, might rely on a context, and that you want "intact."
+
+{[
+  # let quoted_part = Quoter.quote quoter part_to_quote ;;
+  val quoted_payload : expression =
+]}
+
+- Finally, call {{!Ppxlib.Expansion_helpers.Quoter.sanitize}[Expansion_helpers.Quoter.sanitize]} on the whole expression (with quoted parts).
+
+{[
+  # let result = Expansion_helpers.Quoter.sanitize ~quoter rewritten_expression ;;
+  val result : expression =
+  ...
+]}
+
+If the [debug] rewriter had been written using this method, the quoting would
+have ensured that the payload is evaluated in the same context as the
+extension node!
+
+Here is an example on how to write a [debug] rewriter (with the limitation that the payload should not contain variable binding, but the code was left simple to illustrate quoting):
+
+{[
+# let rewrite expr =
+    (* Create a quoter *)
+    let quoter = Quoter.create () in
+    (* An AST mapper to log and replace variables with quoted ones *)
+    let replace_var =
+      object
+        (* See the chapter on AST traverse *)
+        inherit Ast_traverse.map as super
+  
+        (* in case of expression *)
+        method! expression expr =
+          match expr.pexp_desc with
+          (* in case of identifier (not "+") *)
+          | Pexp_ident { txt = Lident var_name; loc }
+            when not (String.equal "+" var_name) ->
+              (* quote the var *)
+              let quoted_var = Quoter.quote quoter expr in
+              let name = Ast_builder.Default.estring ~loc var_name in
+              (* and rewrite the expression *)
+              [%expr
+                debug [%e name] [%e quoted_var];
+                [%e quoted_var]]
+          (* otherwise, continue inside recursively *)
+          | _ -> super#expression expr
+      end
+    in
+    let quoted_rewrite = replace_var#expression expr in
+    let loc = expr.pexp_loc in
+    (* Sanitize the whole thing *)
+    Quoter.sanitize quoter
+      [%expr
+        let debug = Printf.printf "%s = %d; " in
+        [%e quoted_rewrite]] ;;
+  val rewrite : expression -> expression = <fun>
+]}
+
+With {!Ppxlib}'s current quoting mechanism, the code given in that example would look like:
+
+{[
+  # Format.printf "%a\n" Pprintast.expression @@ rewrite [%expr debug + 1, y + 2] ;;
+  let rec __1 = y
+  and __0 = debug in
+  let debug = Printf.printf "%s = %d; " in
+  (((debug "debug" __0; __0) + 1), ((debug "y" __1; __1) + 2))
+  - : unit = ()
+]}
+
+{1 Testing Your PPX}
+
+This section is not yet written. You can refer to {{:https://tarides.com/blog/2019-05-09-an-introduction-to-ocaml-ppx-ecosystem#testing-your-ppx}this blog post} (notice that that blog post was written before `dune` introduced its cram test feature), or contribute to the [ppxlib] documentation by opening a pull request in the {{:https://github.com/ocaml-ppx/ppxlib/}repository}.
+
+{1 Migrate From Other Preprocessing Systems}
+
+This section is not yet written. You can contribute to the [ppxlib] documentation by opening a pull request in the {{:https://github.com/ocaml-ppx/ppxlib/}repository}.
+
+{1 Other good practices}
+
+There are many good practices or other way to use [ppxlib] that are not mentioned in this manual. For instance, (in very short), you should always try to fully qualify variable names that are generated into the code via a PPX.
+
+if you want to add a section to this "good practices" manual, you can contribute to the [ppxlib] documentation by opening a pull request in the {{:https://github.com/ocaml-ppx/ppxlib/}repository}.
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"ast-traversal"}< Traversing the AST}{%html: </div><div>%}{{!"examples"}Examples >}{%html: </div></div>%}

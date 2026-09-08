@@ -1,0 +1,5 @@
+(executable
+ (name bench)
+ (enabled_if
+  (>= %{ocaml_version} "4.10.0"))
+ (libraries unix yojson))
