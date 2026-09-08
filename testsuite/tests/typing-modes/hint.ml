@@ -29,9 +29,9 @@ Error: The value "bar" is "nonportable"
          which is expected to be "portable".
 |}, Structured{|
 - {:The value `bar`} is expected to be `portable`#.
-  ~- Because {*:it}'s used inside {:the function}.
-    ~- And {:the function} is expected to be `portable`#.
-- But {:the value `bar`} is `nonportable`#.
+  ~- Because {*:it}'s used inside {:the anonymous function}.
+    ~- And {:the anonymous function} is expected to be `portable`#.
+- But {*:it}'s `nonportable`#.
   ~- Because {*:it} closes over {:the value `foo`}.
     ~- And {:the function `foo`} is `nonportable`#.
       ~- Because {*:it} closes over {:the value `x`}.
@@ -61,9 +61,9 @@ Error: The value "bar" is "nonportable"
          which is expected to be "portable".
 |}, Structured{|
 - {:The value `bar`} is expected to be `portable`#.
-  ~- Because {*:it}'s used inside {:the function}.
-    ~- And {:the function} is expected to be `portable`#.
-- But {:the value `bar`} is `nonportable`#.
+  ~- Because {*:it}'s used inside {:the anonymous function}.
+    ~- And {:the anonymous function} is expected to be `portable`#.
+- But {*:it}'s `nonportable`#.
   ~- Because {*:it} closes over {:the value `foo`}.
     ~- And {:the function `foo`} is `nonportable`#.
       ~- Because {*:it} closes over {:the value `x`}.
