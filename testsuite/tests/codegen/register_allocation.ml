@@ -241,23 +241,20 @@ let spill_xmm_on_caml_modify (a : float) (t : t) r =
 ;;
 [%%expect_asm X86_64{|
 spill_xmm_on_caml_modify:
-  subq  $24, %rsp
+  subq  $8, %rsp
   movq  %rax, %r12
   vmovsd (%r12), %xmm0
   vmovsd %xmm0, (%rsp)
   vmovsd <hidden PC-relative offset>(%rip), %xmm0
   vmovsd (%rsp), %xmm1
   vaddsd %xmm0, %xmm1, %xmm0
-  vmovsd %xmm0, 8(%rsp)
   vmovsd %xmm0, (%rbx)
   movq  %r12, %rsi
   call  caml_modify@PLT
-  vmovsd 8(%rsp), %xmm0
-  vmovsd %xmm0, (%rbx)
   vmovsd (%rsp), %xmm0
   vmovsd %xmm0, (%rbx)
   movq  %r12, %rax
-  addq  $24, %rsp
+  addq  $8, %rsp
   ret
 |}]
 

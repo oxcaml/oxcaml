@@ -237,6 +237,15 @@ let mk_no_cfg_cse_join_points f =
     Arg.Unit f,
     " Do not propagate CSE information across join points in the CFG" )
 
+let mk_cfg_dse f =
+  ( "-cfg-dse",
+    Arg.Unit f,
+    " Eliminate dead stores in the CFG (stores overwritten before being read)"
+  )
+
+let mk_no_cfg_dse f =
+  ("-no-cfg-dse", Arg.Unit f, " Do not eliminate dead stores in the CFG")
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -1365,6 +1374,8 @@ module type Oxcaml_options = sig
   val no_cfg_block_layout : unit -> unit
   val cfg_cse_join_points : unit -> unit
   val no_cfg_cse_join_points : unit -> unit
+  val cfg_dse : unit -> unit
+  val no_cfg_dse : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
@@ -1564,6 +1575,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_block_layout F.no_cfg_block_layout;
       mk_cfg_cse_join_points F.cfg_cse_join_points;
       mk_no_cfg_cse_join_points F.no_cfg_cse_join_points;
+      mk_cfg_dse F.cfg_dse;
+      mk_no_cfg_dse F.no_cfg_dse;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
@@ -1925,6 +1938,8 @@ module Oxcaml_options_impl = struct
   let no_cfg_block_layout = clear' Oxcaml_flags.cfg_block_layout
   let cfg_cse_join_points = set' Oxcaml_flags.cfg_cse_join_points
   let no_cfg_cse_join_points = clear' Oxcaml_flags.cfg_cse_join_points
+  let cfg_dse = set' Oxcaml_flags.cfg_dse
+  let no_cfg_dse = clear' Oxcaml_flags.cfg_dse
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -1951,6 +1966,7 @@ module Oxcaml_options_impl = struct
     regalloc_param "IRC_INTERF_THRESHOLD:4096";
     cfg_merge_blocks ();
     cfg_cse_join_points ();
+    cfg_dse ();
     cfg_eliminate_dead_trap_handlers ();
     cfg_value_propagation_flow ()
 
@@ -2510,6 +2526,7 @@ module Extra_params = struct
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
     | "cfg-block-layout" -> set' Oxcaml_flags.cfg_block_layout
     | "cfg-cse-join-points" -> set' Oxcaml_flags.cfg_cse_join_points
+    | "cfg-dse" -> set' Oxcaml_flags.cfg_dse
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float

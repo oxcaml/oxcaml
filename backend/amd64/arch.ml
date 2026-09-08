@@ -266,6 +266,13 @@ let equal_sym_global left right =
   | Local, Local -> true
   | (Global | Local), _ -> false
 
+let compare_sym_global left right =
+  match left, right with
+  | Global, Global
+  | Local, Local -> 0
+  | Global, Local -> -1
+  | Local, Global -> 1
+
 type addressing_mode =
     Ibased of string * sym_global * int (* symbol + displ *)
   | Iindexed of int                     (* reg + displ *)
@@ -580,6 +587,20 @@ let operation_is_pure = function
                          not using LLVM backend"
       intr
 
+(* Specific operations that are pure except possibly for writing to memory:
+   guaranteed not to read from memory, not to raise (including via a hardware
+   trap), and not to trigger the execution of arbitrary code (GC, finalizers,
+   signal handlers). Used by dead store elimination ([Cfg_dse]) to step over
+   such instructions; [false] is always a safe answer. Note that this is not
+   implied by [operation_is_pure]: e.g. [Ifloatarithmem] is pure but reads
+   memory. *)
+let operation_is_pure_except_memory_writes = function
+  | Ilea _ | Isextend32 | Izextend32 | Ineg | Ibswap _ | Ipackf32
+  | Istore_int (_, _, _) -> true
+  | Ioffset_loc _ | Ifloatarithmem _ | Irdtsc | Irdpmc | Ilfence | Imfence
+  | Isfence | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
+  | Illvm_intrinsic _ -> false
+
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
   | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
@@ -627,6 +648,32 @@ let equal_addressing_mode left right =
     Int.equal left_scale right_scale && Int.equal left_displ right_displ
   | (Ibased _ | Iindexed _ | Iindexed2 _ | Iscaled _ | Iindexed2scaled _), _ ->
     false
+
+let addressing_mode_rank = function
+  | Ibased _ -> 0
+  | Iindexed _ -> 1
+  | Iindexed2 _ -> 2
+  | Iscaled _ -> 3
+  | Iindexed2scaled _ -> 4
+
+let compare_addressing_mode left right =
+  match left, right with
+  | Ibased (left_sym, left_glob, left_displ),
+    Ibased (right_sym, right_glob, right_displ) ->
+    let c = String.compare left_sym right_sym in
+    if c <> 0 then c else
+    let c = compare_sym_global left_glob right_glob in
+    if c <> 0 then c else Int.compare left_displ right_displ
+  | Iindexed left_displ, Iindexed right_displ
+  | Iindexed2 left_displ, Iindexed2 right_displ ->
+    Int.compare left_displ right_displ
+  | Iscaled (left_scale, left_displ), Iscaled (right_scale, right_displ)
+  | Iindexed2scaled (left_scale, left_displ),
+    Iindexed2scaled (right_scale, right_displ) ->
+    let c = Int.compare left_scale right_scale in
+    if c <> 0 then c else Int.compare left_displ right_displ
+  | (Ibased _ | Iindexed _ | Iindexed2 _ | Iscaled _ | Iindexed2scaled _), _ ->
+    Int.compare (addressing_mode_rank left) (addressing_mode_rank right)
 
 let equal_prefetch_temporal_locality_hint left right =
   match left, right with
