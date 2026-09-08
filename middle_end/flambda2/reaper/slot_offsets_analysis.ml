@@ -52,6 +52,9 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result)
         | Some
             (Function_declarations.Code_id { code_id; only_full_applications })
           ->
+          (* CR mvellacott: The following logic is duplicated from
+             [Rebuild.rewrite_set_of_closures] and must be kept in sync. In the
+             future it would be nice to avoid this duplication. *)
           if
             PTA.field_used db closure_name Field.known_arity_call_witness
             || PTA.field_used db closure_name Field.unknown_arity_call_witness
