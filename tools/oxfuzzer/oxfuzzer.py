@@ -133,6 +133,7 @@ class Toolchain:
 COMPILE_TIMEOUT_SEC = 100.0
 RUN_TIMEOUT_SEC = 10.0
 GENERATE_TIMEOUT_SEC = 1.0
+MAX_PROGRAM_BYTES = 2 * 1024 * 1024
 
 RATE_SMOOTHING = 0.01
 PROGRESS_INTERVAL_SEC = 30.0
@@ -463,7 +464,20 @@ def write_command_result(directory: Path, prefix: str, result: CommandResult) ->
     (directory / f"{prefix}.stderr").write_bytes(result.stderr)
 
 
-def reproduction_script(configuration: Configuration, seed: int) -> str:
+def reproduction_script(
+    configuration: Configuration,
+    seed: int,
+    *,
+    toolchain: Toolchain,
+    directory: Path,
+) -> str:
+    relative_toolchain = Toolchain(Path(os.path.relpath(
+        toolchain.build_root.resolve(), directory.resolve()
+    )))
+    configuration = next(
+        candidate for candidate in relative_toolchain.configurations
+        if candidate.name == configuration.name
+    )
     command = compile_command(
         configuration, source=Path("../program.ml"), executable=Path("program.exe")
     )
@@ -496,6 +510,8 @@ def save_failure(
     program: bytes,
     results: Sequence[ConfigurationResult],
     reason: str,
+    *,
+    toolchain: Toolchain,
 ) -> None:
     failure_dir = output_dir / f"seed-{seed}"
     failure_dir.mkdir(parents=True, exist_ok=True)
@@ -506,7 +522,9 @@ def save_failure(
         directory = failure_dir / result.configuration.name
         directory.mkdir(exist_ok=True)
         script = directory / "run.sh"
-        script.write_text(reproduction_script(result.configuration, seed))
+        script.write_text(reproduction_script(
+            result.configuration, seed, toolchain=toolchain, directory=directory
+        ))
         script.chmod(0o755)
         write_command_result(directory, "compile", result.compilation)
         if result.execution is not None:
@@ -526,6 +544,8 @@ def check_case(
     stats: Stats,
     output_dir: Path,
     run_info: str,
+    *,
+    toolchain: Toolchain,
 ) -> None:
     failed = [
         r for r in results
@@ -539,16 +559,13 @@ def check_case(
         save_failure(
             output_dir, run_info, seed, program, results,
             f"compilation failed or timed out: {names}",
+            toolchain=toolchain,
         )
         stats.failed += 1
         stats.report()
         return
     # If any of the executions time out, we discard the case.
     if any(r.execution.timed_out for r in results):
-        save_failure(
-            output_dir, run_info, seed, program, results,
-            f"discarded",
-        )
         stats.discarded += 1
         stats.report()
         return
@@ -564,6 +581,7 @@ def check_case(
         save_failure(
             output_dir, run_info, seed, program, results,
             f"error exit: {names}",
+            toolchain=toolchain,
         )
         stats.failed += 1
         stats.report()
@@ -582,6 +600,7 @@ def check_case(
                 results,
                 f"{reference.configuration.name} and "
                 f"{other.configuration.name} disagree",
+                toolchain=toolchain,
             )
             stats.failed += 1
             stats.report()
@@ -602,6 +621,11 @@ async def run_case(
     case_dir = run_dir / f"case-{seed}"
     try:
         program = await generate(seed, toolchain=toolchain, work_dir=case_dir)
+        program_size = len(program)
+        if program_size > MAX_PROGRAM_BYTES:
+            stats.discarded += 1
+            stats.report()
+            return
         results = await asyncio.gather(
             *(
                 run_configuration(
@@ -613,7 +637,9 @@ async def run_case(
                 for configuration in toolchain.configurations
             )
         )
-        check_case(seed, program, results, stats, output_dir, run_info)
+        check_case(
+            seed, program, results, stats, output_dir, run_info, toolchain=toolchain
+        )
     finally:
         shutil.rmtree(case_dir, ignore_errors=True)
 
@@ -688,7 +714,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser(
         prog="oxfuzzer",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="""\
+        description=f"""\
 Differential fuzzer for the OxCaml compiler.
 
 Each case generates a random program with oxfuzzer.exe, compiles it with every
@@ -697,8 +723,9 @@ executables and compares their stdout and stderr.
 
 A case fails if compilation fails in any configuration, a program exits with a
 non-zero status, or the configurations disagree. A case is discarded if
-execution times out. Each failure is saved under
-<output>/seed-<generator_seed>/.
+execution times out or generated source exceeds {MAX_PROGRAM_BYTES} bytes.
+Failures and execution timeouts are saved under <output>/seed-<generator_seed>/.
+Oversized sources are not saved.
 
 Exit status is 1 if any case failed, 0 otherwise.""",
         epilog="Before first use, run `make compiler` from the repository root.",
