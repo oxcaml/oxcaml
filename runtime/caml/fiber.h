@@ -138,19 +138,11 @@ struct stack_info {
  * +------------------------+ <--- Caml_state->current_stack
  */
 
-/* Some ABI reserve space at the bottom of every C stack frame. */
-
-#if defined(TARGET_amd64) && (defined(_WIN32) || defined(__CYGWIN__))
-/* Win64 ABI shadow store for argument registers */
-  #define Reserved_space_c_stack_link 4 * 8
-#elif defined(TARGET_s390x)
-  #define Reserved_space_c_stack_link 160
-#elif defined(TARGET_power)
-/* ELF ABI: 4 reserved words at bottom of C stack */
-  #define Reserved_space_c_stack_link 4 * 8
-#else
-  #define Reserved_space_c_stack_link 0
-#endif
+/* The offsets of the fields of [struct c_stack_link] and of the other
+   structures in this file are shared with the assembly stubs via
+   caml/asm_offsets.h, which also defines
+   [Reserved_space_c_stack_link], used below. */
+#include "asm_offsets.h"
 
 /* This structure is used for storing the OCaml return pointer when
  * transitioning from an OCaml stack to a C stack at a C call. When an OCaml
