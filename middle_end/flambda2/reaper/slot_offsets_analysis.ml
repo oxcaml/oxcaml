@@ -63,9 +63,9 @@ let function_slots_to_be_built ~db ~closure_function_decls
       Function_slot.Map.add slot' code_id' new_slots)
     Function_slot.Map.empty function_slots
 
-let value_slots_to_be_built ~db ~value_slot_rewrites
+let value_slots_to_be_built ~db ~unboxed_value_slots
     ({ function_slots; value_slots } : PTA.function_and_value_slots) =
-  match value_slot_rewrites with
+  match unboxed_value_slots with
   | None ->
     (* A value slot is kept iff it is used through some member of the set. *)
     List.fold_left
@@ -78,10 +78,10 @@ let value_slots_to_be_built ~db ~value_slot_rewrites
         then Value_slot.Set.add value_slot surviving_value_slots
         else surviving_value_slots)
       Value_slot.Set.empty value_slots
-  | Some value_slot_rewrites ->
+  | Some unboxed_value_slots ->
     Unboxed_fields.fold_with_kind
       (fun _kind value_slot acc -> Value_slot.Set.add value_slot acc)
-      value_slot_rewrites Value_slot.Set.empty
+      unboxed_value_slots Value_slot.Set.empty
 
 (* Get the list of value and function slots that will be built for a set of
    closures after rewriting. Returns [None] if the set of closures will not get
@@ -104,7 +104,7 @@ let slots_to_be_built_for_set_of_closures ~db ~closure_function_decls
   if (not any_member_has_usage) || any_member_is_unboxed
   then None
   else
-    let value_slot_rewrites, function_slot_rewrites =
+    let unboxed_value_slots, function_slot_rewrites =
       match
         Code_id_or_name.Map.find_opt closure_name changed_representation
       with
@@ -114,14 +114,14 @@ let slots_to_be_built_for_set_of_closures ~db ~closure_function_decls
           "Set of closures is represented as a block rather than a closure"
       | Some
           ( Closure_representation
-              (value_slot_rewrites, function_slot_rewrites, _),
+              (unboxed_value_slots, function_slot_rewrites, _),
             _ ) ->
-        Some value_slot_rewrites, Some function_slot_rewrites
+        Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
       ( function_slots_to_be_built ~db ~closure_function_decls
           ~function_slot_rewrites ~function_slots:set.function_slots,
-        value_slots_to_be_built ~db ~value_slot_rewrites set )
+        value_slots_to_be_built ~db ~unboxed_value_slots set )
 
 let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
     ({ db; unboxed_fields; changed_representation; _ } :
@@ -184,10 +184,10 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
       (fun _ (repr, _) fresh_value_slots ->
         match (repr : Unboxing_analysis.changed_representation) with
         | Block_representation _ -> fresh_value_slots
-        | Closure_representation (value_slot_rewrites, _, _) ->
+        | Closure_representation (unboxed_value_slots, _, _) ->
           Unboxed_fields.fold_with_kind
             (fun _kind value_slot acc -> Value_slot.Set.add value_slot acc)
-            value_slot_rewrites fresh_value_slots)
+            unboxed_value_slots fresh_value_slots)
       changed_representation Value_slot.Set.empty
   in
   (* Projections have an accessed slot and a slot used as a base for accessing.
