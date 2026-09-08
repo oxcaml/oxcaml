@@ -24,10 +24,12 @@ module DepSet : Set.S with type elt = Dep.t
 val link : filepath list -> filepath -> unit
 val reset : unit -> unit
 
-val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
+val check_consistency :
+  filepath -> 'a Cmo_format.compilation_unit_descr_gen -> unit
 
 val linkdeps_unit :
-  Linkdeps.t -> filename:string -> Cmo_format.compilation_unit_descr -> unit
+  Linkdeps.t -> filename:string ->
+    'a Cmo_format.compilation_unit_descr_gen -> unit
 
 val extract_crc_interfaces: unit -> Import_info.t list
 

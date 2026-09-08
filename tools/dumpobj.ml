@@ -539,12 +539,7 @@ let dump_obj ic =
                 (* Skip the list of absolute directory names *)
     record_events 0 evl
   end;
-  let pos =
-    match cu.cu_pos with
-    | Pos_internal ofs -> ofs
-    | Pos_external _ -> invalid_arg "thin cmo unsupported"
-  in
-  seek_in ic pos;
+  seek_in ic cu.cu_pos;
   print_code ic cu.cu_codesize
 
 (* Print an executable file *)

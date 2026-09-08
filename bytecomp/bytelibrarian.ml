@@ -79,6 +79,7 @@ let copy_object_file oc name =
       let compunit_pos = input_binary_int ic in
       seek_in ic compunit_pos;
       let compunit = (input_value ic : compilation_unit_descr) in
+      let compunit = {compunit with cu_pos = Pos_internal compunit.cu_pos} in
       Bytelink.check_consistency file_name compunit;
       maybe_copy_compunit ic basename oc compunit;
       close_in ic;

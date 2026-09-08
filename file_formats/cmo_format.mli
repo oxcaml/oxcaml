@@ -34,13 +34,9 @@ type reloc_info =
 
 (* Descriptor for compilation units *)
 
-type file_position =
-  | Pos_internal of int
-  | Pos_external of { filename: string; offset: int }
-
-type compilation_unit_descr =
+type 'a compilation_unit_descr_gen =
   { cu_name: Compilation_unit.t;        (* Name of compilation unit *)
-    mutable cu_pos: file_position;      (* Position of contents *)
+    mutable cu_pos: 'a;                 (* Position of contents *)
     cu_codesize: int;                   (* Size of code block *)
     cu_reloc: (reloc_info * int) list;  (* Relocation information *)
     cu_arg_descr: Lambda.arg_descr option;
@@ -57,6 +53,7 @@ type compilation_unit_descr =
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
     cu_debugsize: int }                 (* Length of debugging info *)
 
+type compilation_unit_descr = int compilation_unit_descr_gen
 
 (* Format of a .cmo file:
      magic number (Config.cmo_magic_number)
@@ -67,8 +64,13 @@ type compilation_unit_descr =
 
 (* Descriptor for libraries *)
 
+type file_position =
+  | Pos_internal of int
+  | Pos_external of { filename: string; offset: int }
+
 type library =
-  { lib_units: compilation_unit_descr list; (* List of compilation units *)
+  { lib_units: file_position compilation_unit_descr_gen list;
+                                        (* List of compilation units *)
     lib_custom: bool;                   (* Requires custom mode linking? *)
     (* In the following fields the lists are reversed with respect to
        how they end up being used on the command line. *)

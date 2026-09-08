@@ -304,7 +304,7 @@ and really_load_file recursive ppf name filename ic =
             | Reloc_primitive _ -> ()
           )
           cu.cu_reloc;
-      load_compunit ic filename ppf cu;
+      load_compunit ic filename ppf {cu with cu_pos = Pos_internal cu.cu_pos};
       true
     end else
       if buffer = Config.cma_magic_number then begin

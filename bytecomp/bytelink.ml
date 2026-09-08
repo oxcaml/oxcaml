@@ -48,7 +48,7 @@ exception Error of error
 type link_action =
     Link_object of string * compilation_unit_descr
       (* Name of .cmo file and descriptor of the unit *)
-  | Link_archive of string * compilation_unit_descr list
+  | Link_archive of string * (file_position compilation_unit_descr_gen) list
       (* Name of .cma file and descriptors of the units to be linked. *)
 
 (* Add C objects and options from a library descriptor *)
@@ -292,6 +292,7 @@ let link_archive output_fun currpos_fun file_name units_required =
 
 let link_file output_fun currpos_fun = function
     Link_object(file_name, unit) ->
+      let unit = {unit with cu_pos = Pos_internal unit.cu_pos} in
       link_object output_fun currpos_fun file_name unit
   | Link_archive(file_name, units) ->
       link_archive output_fun currpos_fun file_name units
