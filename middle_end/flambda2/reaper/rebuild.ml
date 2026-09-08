@@ -793,7 +793,13 @@ let make_apply_wrapper env
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
-    let return_cont_wrapper = Continuation.rename return_cont in
+    (* The wrapper is bound by a [Let_cont], so it must not inherit the [Return]
+       sort of the function's return continuation. *)
+    let return_cont_wrapper =
+      Continuation.create ~sort:Continuation.Sort.Normal_or_exn
+        ~name:(Continuation.name return_cont)
+        ()
+    in
     let apply = make_apply ~continuation:(Return return_cont_wrapper) in
     let rev_args_or_invalid =
       List.fold_left2
@@ -2118,7 +2124,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let updating_calling_convention =
     Unboxing_analysis.get_calling_convention_change env.code_changes code_id
   in
-  let rebuild_body () =
+  let rebuild_body env =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
       | Not_alloc_stack { alloc_region } -> [alloc_region]
@@ -2156,7 +2162,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   in
   match updating_calling_convention with
   | Not_changing_calling_convention ->
-    let body, res = rebuild_body () in
+    let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
@@ -2166,7 +2172,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       code_metadata,
       res )
   | Changing_calling_convention
-      { my_closure_decision; params_decisions; return_decisions = _ } ->
+      { my_closure_decision; params_decisions; return_decisions } ->
     let params_decisions =
       List.map2
         (fun decision param : Unboxing_analysis.param_decision ->
@@ -2215,7 +2221,23 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     in
     let params_decisions = my_closure_decision :: params_decisions in
     let params = get_parameters params_decisions in
-    let body, res = rebuild_body () in
+    (* Update the decisions for the return continuation: this was not done at
+       toplevel because we didn't have the mapping between return continuations
+       and the corresponding code_id.
+
+       CR-someday ncourant: it's a bit hackish to do that here while all other
+       decisions for continuations are made at toplevel... Maybe we could take
+       the decisions for each continuation only when we rebuild the code they
+       are contained in? That would avoid having to store a global continuation
+       map, as well. *)
+    let env =
+      { env with
+        cont_params_to_keep =
+          Continuation.Map.add return_continuation return_decisions
+            env.cont_params_to_keep
+      }
+    in
+    let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
         (Bound_parameters.create params)
