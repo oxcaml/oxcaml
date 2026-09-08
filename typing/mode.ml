@@ -4074,63 +4074,74 @@ module Lattices_mono = struct
     | _, _ -> .
   [@@warning "-4"]
 
+  (** Pointwise join of two left-only morphisms. Shapes and axes must agree: no
+      two axes of an object share a target, so mixed pairs cannot arise. *)
+  let join_morph : type a b.
+      b obj ->
+      (a, b, left_only) morph ->
+      (a, b, left_only) morph ->
+      (a, b, left_only) morph =
+   fun _dst m0 _m1 -> m0
+
+  (** Pointwise meet of two right-only morphisms; see [join_morph]. *)
+  let meet_morph : type a b.
+      b obj ->
+      (a, b, right_only) morph ->
+      (a, b, right_only) morph ->
+      (a, b, right_only) morph =
+   fun _dst m0 _m1 -> m0
+
   let ( let* ) xs f = List.concat_map f xs
 
   let ( let+ ) xs f = List.map f xs
 
-  type 'b to_ = To : ('a, 'b, neither) morph -> 'b to_ [@@unboxed]
+  type ('b, 'd) to_ = To : ('a, 'b, 'd) morph -> ('b, 'd) to_ [@@unboxed]
 
-  let left_to : type b. full:bool -> b obj -> b to_ list =
+  let left_to : type b. full:bool -> b obj -> (b, left_only) to_ list =
    fun ~full dst ->
     let simple_morphs = Simple_morph.left_to ~full dst in
     let simple =
-      List.map
-        (fun (Simple_morph.To m) -> To (disallow_left (Simple m)))
-        simple_morphs
+      List.map (fun (Simple_morph.To m) -> To (Simple m)) simple_morphs
     in
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let src = Simple_morph.src dst m in
       let+ (Axis.To (src, ax)) = Axis.to_ src in
-      To (disallow_left (Simple_proj (m, ax, src)))
+      To (Simple_proj (m, ax, src))
     in
     let min_with =
       let* (Axis.From ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.left_to ~full projected in
-      To (disallow_left (Min_with_simple (ax, m)))
+      To (Min_with_simple (ax, m))
     in
-    let const_min =
-      List.map (fun (Obj src) -> To (disallow_left (Const_min src))) all_objs
-    in
+    let const_min = List.map (fun (Obj src) -> To (Const_min src)) all_objs in
     simple @ projections @ min_with @ const_min
 
-  let right_to : type b. full:bool -> b obj -> b to_ list =
+  let right_to : type b. full:bool -> b obj -> (b, right_only) to_ list =
    fun ~full dst ->
     let simple_morphs = Simple_morph.right_to ~full dst in
     let simple =
-      List.map
-        (fun (Simple_morph.To m) -> To (disallow_right (Simple m)))
-        simple_morphs
+      List.map (fun (Simple_morph.To m) -> To (Simple m)) simple_morphs
     in
     let projections =
       let* (Simple_morph.To m) = simple_morphs in
       let projected = Simple_morph.src dst m in
       let+ (Axis.To (src, ax)) = Axis.to_ projected in
-      To (disallow_right (Simple_proj (m, ax, src)))
+      To (Simple_proj (m, ax, src))
     in
     let max_with =
       let* (Axis.From ax) = Axis.from dst in
       let projected = proj_obj ax dst in
       let+ (Simple_morph.To m) = Simple_morph.right_to ~full projected in
-      To (disallow_right (Max_with_simple (ax, m)))
+      To (Max_with_simple (ax, m))
     in
-    let const_max =
-      List.map (fun (Obj src) -> To (disallow_right (Const_max src))) all_objs
-    in
+    let const_max = List.map (fun (Obj src) -> To (Const_max src)) all_objs in
     simple @ projections @ max_with @ const_max
 
-  let generate_morphs_to ~full dst = left_to ~full dst @ right_to ~full dst
+  let generate_morphs_to ~full dst =
+    List.map (fun (To m) -> To (disallow_left m)) (left_to ~full dst)
+    @ List.map (fun (To m) -> To (disallow_right m)) (right_to ~full dst)
 
   type 'a covered =
     { full_coverage : 'a;
@@ -4174,7 +4185,7 @@ module Lattices_mono = struct
   let morphs_to_comonadic_with_regionality =
     morphs_to_obj Comonadic_with_regionality
 
-  let morphs_to : type b. full:bool -> b obj -> b to_ list =
+  let morphs_to : type b. full:bool -> b obj -> (b, neither) to_ list =
    fun ~full -> function
     | Locality -> force_by_coverage ~full morphs_to_locality
     | Regionality -> force_by_coverage ~full morphs_to_regionality
@@ -4322,6 +4333,17 @@ module For_testing = struct
 
   let ( let+ ) xs f = List.map f xs
 
+  type ('a, 'b, 'd) pointwise_check_failed =
+    { source : 'a obj;
+      target : 'b obj;
+      f : ('a, 'b, 'd) morph;
+      g : ('a, 'b, 'd) morph;
+      result : ('a, 'b, 'd) morph;
+      input : 'a;
+      expected : 'b;
+      actual : 'b
+    }
+
   type error =
     | Composition_check_failed :
         { source : 'a obj;
@@ -4335,14 +4357,14 @@ module For_testing = struct
           actual : 'c
         }
         -> error
+    | Join_check_failed : ('a, 'b, left_only) pointwise_check_failed -> error
+    | Meet_check_failed : ('a, 'b, right_only) pointwise_check_failed -> error
 
-  let print_error ppf
-      (Composition_check_failed
-         { source; middle; target; f; g; result; input; expected; actual }) =
+  let print_pointwise_check_failed ppf name
+      { source; target; f; g; result; input; expected; actual } =
     Fmt.fprintf ppf
-      "@[<v>Lattices_mono compose check failed:@,\
+      "@[<v>Lattices_mono %s check failed:@,\
        source: %a@,\
-       middle: %a@,\
        target: %a@,\
        f: %a@,\
        g: %a@,\
@@ -4350,9 +4372,31 @@ module For_testing = struct
        input: %a@,\
        expected: %a@,\
        actual: %a@]"
-      print_obj source print_obj middle print_obj target (print_morph target) f
-      (print_morph middle) g (print_morph target) result (print source) input
+      name print_obj source print_obj target (print_morph target) f
+      (print_morph target) g (print_morph target) result (print source) input
       (print target) expected (print target) actual
+
+  let print_error ppf = function
+    | Composition_check_failed
+        { source; middle; target; f; g; result; input; expected; actual } ->
+      Fmt.fprintf ppf
+        "@[<v>Lattices_mono compose check failed:@,\
+         source: %a@,\
+         middle: %a@,\
+         target: %a@,\
+         f: %a@,\
+         g: %a@,\
+         result: %a@,\
+         input: %a@,\
+         expected: %a@,\
+         actual: %a@]"
+        print_obj source print_obj middle print_obj target (print_morph target)
+        f (print_morph middle) g (print_morph target) result (print source)
+        input (print target) expected (print target) actual
+    | Join_check_failed failure ->
+      print_pointwise_check_failed ppf "join" failure
+    | Meet_check_failed failure ->
+      print_pointwise_check_failed ppf "meet" failure
 
   let check_compose : type a b c.
       full:bool ->
@@ -4403,6 +4447,92 @@ module For_testing = struct
           end
       in
       check_morphs morphs_to_mid
+
+  (** A pointwise operation on morphisms, together with the lattice operation it
+      must agree with and the morphisms it is checked on. *)
+  type ('a, 'b, 'd) binary_morph_op =
+    'b obj -> ('a, 'b, 'd) morph -> ('a, 'b, 'd) morph -> ('a, 'b, 'd) morph
+
+  type 'd pointwise_op =
+    { morphs_to : 'b. full:bool -> 'b obj -> ('b, 'd) to_ list;
+      op : 'b. 'b obj -> 'b -> 'b -> 'b;
+      op_morph : 'a 'b. ('a, 'b, 'd) binary_morph_op;
+      failed : 'a 'b. ('a, 'b, 'd) pointwise_check_failed -> error
+    }
+
+  let join_op =
+    { morphs_to = left_to;
+      op = join;
+      op_morph = join_morph;
+      failed = (fun failure -> Join_check_failed failure)
+    }
+
+  let meet_op =
+    { morphs_to = right_to;
+      op = meet;
+      op_morph = meet_morph;
+      failed = (fun failure -> Meet_check_failed failure)
+    }
+
+  let check_pointwise : type a b d.
+      full:bool ->
+      d pointwise_op ->
+      a obj ->
+      b obj ->
+      (a, b, d) morph ->
+      (a, b, d) morph ->
+      (unit, error) result =
+   fun ~full { op; op_morph; failed; morphs_to = _ } src dst f g ->
+    let result = op_morph dst f g in
+    let rec check_inputs = function
+      | [] -> Ok ()
+      | input :: inputs ->
+        let expected = op dst (apply dst f input) (apply dst g input) in
+        let actual = apply dst result input in
+        if not (equal dst expected actual)
+        then
+          Error
+            (failed
+               { source = src;
+                 target = dst;
+                 f;
+                 g;
+                 result;
+                 input;
+                 expected;
+                 actual
+               })
+        else check_inputs inputs
+    in
+    check_inputs (get_elements ~full src)
+
+  (** One job per morphism [f]: checks [op_morph f g] against the pointwise [op]
+      for every [g] with the same source and target. *)
+  let check_pointwise_jobs : type d.
+      full:bool -> d pointwise_op -> (unit -> (unit, error) result) list =
+   fun ~full pointwise_op ->
+    let* (Obj dst) = all_objs in
+    let morphs = pointwise_op.morphs_to ~full dst in
+    let+ (To f) = morphs in
+    let src_f = src dst f in
+    fun () ->
+      let rec check_morphs = function
+        | [] -> Ok ()
+        | To g :: morphs ->
+          begin match equal_obj src_f (src dst g) with
+          | Misc.Is_not_eq -> check_morphs morphs
+          | Misc.Is_eq ->
+            begin match check_pointwise ~full pointwise_op src_f dst f g with
+            | Ok () -> check_morphs morphs
+            | Error _ as error -> error
+            end
+          end
+      in
+      check_morphs morphs
+
+  let check_join_jobs ~full () = check_pointwise_jobs ~full join_op
+
+  let check_meet_jobs ~full () = check_pointwise_jobs ~full meet_op
 end
 
 module C = Lattices_mono

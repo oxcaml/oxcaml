@@ -1,0 +1,18 @@
+Lattices_mono join check failed:
+source: Locality
+target: Locality
+f: meet(global)
+g: id
+result: meet(global)
+input: local
+expected: local
+actual: global
+Lattices_mono meet check failed:
+source: Regionality
+target: Locality
+f: regional_to_local
+g: regional_to_global
+result: regional_to_local
+input: regional
+expected: global
+actual: local
