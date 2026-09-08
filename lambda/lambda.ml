@@ -3387,7 +3387,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32

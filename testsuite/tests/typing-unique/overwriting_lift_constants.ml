@@ -71,7 +71,6 @@ let () =
   Printf.printf "(%B, %B)\n" (test4 ());
   Printf.printf "(%B, %B)\n" (test5 ());
 
-(* CR zeisbach: when do things get inferred to be any vs not? *)
 [%%expect{|
 type point = { mutable dim : int; x : float; y : float; z : float; }
 val unsafe_dup : ('a : any). 'a @ unique -> 'a * 'a @ unique = <fun>

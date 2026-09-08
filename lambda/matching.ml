@@ -488,14 +488,12 @@ let matcher discr (p : Simple.pattern) rem =
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
   | Unboxed_unit, Unboxed_unit -> yes ()
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
-  (* CR zeisbach: not checking the sorts is a little suspicious here, and could
-     (according to a robot) be bad but isn't currently... since this function
-     could lead to sharing of checks between branches with different sorts.
-     Check the invariant on line 1627 *)
   | Tuple l1, Tuple l2 ->
       (* List lengths can differ with GADT refinements.
          see [basic-more/robustmatch.ml] module [M7] for an example *)
       yesif (List.length l1 = List.length l2 &&
+              (* CR zeisbach: I'm not sure whether we can rely on the same
+                 invariant as unboxed tuples to ignore the sort variables. *)
              List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
       yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -2524,6 +2522,7 @@ let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
        potentially get out-of-sync. this should probably be at least factored
        into a helper, and we can potentially store more info somewhere... *)
     if Lambda.shape_has_only_value_elements block_shape
+    (* CR zeisbach: maybe this is ok to always be a Pmixedfield? *)
     then fun pos -> Pfield (pos, Pointer, sem)
     else fun pos -> Pmixedfield ([pos], block_shape, sem)
   in
@@ -5030,7 +5029,7 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
     (* CR zeisbach: this technically tracks more information than the previous
        code (which used [All_value]). I think this information is just
        duplicating that which already exists. But it should not lead to any perf
-       regressions, and has cleaner code right here.  *)
+       regressions, and has cleaner code right here. *)
     let shape =
       Array.of_list
         (List.map

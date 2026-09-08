@@ -1224,7 +1224,7 @@ and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
   match Misc.Stdlib.List.map_option compute_mbe_if_repr elements with
   | None ->
     (* Some element's layout is unknown or not representable, so computing
-       a more precise value kind is useless. This arises from `any` in tuples *)
+       a more precise value kind is useless. This arises from [any] in tuples *)
     num_nodes_visited, non_nullable Pgenval
   | Some mixed_block_elements ->
     let is_scannable : Types.mixed_block_element -> bool = function
