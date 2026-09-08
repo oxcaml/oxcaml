@@ -1866,8 +1866,7 @@ module_expr [@recovery default_module_expr ()]:
         { Pmod_extension ex }
     | (* A hole. *)
       UNDERSCORE
-        { let id = mkrhs Ast_helper.hole_txt $loc in
-          Pmod_extension (id, PStr []) }
+        { Pmod_hole }
     )
     { $1 }
 ;
