@@ -115,3 +115,44 @@ reload_after_nonaliasing_store:
   leaq  -1(%rax,%rdi), %rax
   ret
 |}]
+
+type cursor = { mutable pos : int; mutable last : int }
+
+(* Instruction selection fuses load-add-store to the same location into a
+   read-modify-write instruction; it is not a [Store], so it records no
+   forwarding equation, and it acts as a store barrier. *)
+(* CR xclerc: see whether we could add a peephole rule to merge the addq
+   instructions. *)
+let bump_twice c =
+  c.pos <- c.pos + 1;
+  c.pos <- c.pos + 1
+[%%expect_asm X86_64{|
+bump_twice:
+  addq  $2, (%rax)
+  addq  $2, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+(* Store-to-load forwarding: the reload of [pos] right after the store to
+   [pos] is satisfied by the stored value, so only one load of [pos] should
+   remain; the stores are all kept. *)
+let push_two c =
+  let p = c.pos in
+  c.last <- p;
+  c.pos <- p + 1;
+  let q = c.pos in
+  c.last <- q;
+  c.pos <- q + 1
+[%%expect_asm X86_64{|
+push_two:
+  movq  (%rax), %rbx
+  movq  %rbx, 8(%rax)
+  addq  $2, %rbx
+  movq  %rbx, (%rax)
+  movq  %rbx, 8(%rax)
+  addq  $2, %rbx
+  movq  %rbx, (%rax)
+  movl  $1, %eax
+  ret
+|}]
