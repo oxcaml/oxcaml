@@ -189,7 +189,7 @@ val r9a : int = 7
 
 (* The argument is itself a static functor application. *)
 let (r10i, r10f) =
-  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
+  let module Wrap (M : Id @ static) = struct let poly_ id x = M.id x end in
   let module F (M : Id @ static) = struct
     let i = M.id 8
     let f = to_float (M.id #8.0)
@@ -204,7 +204,7 @@ val r10f : float = 8.
 (* The same static functor composed with itself: the argument of the outer
    application is the result of an inner application of the same functor. *)
 let r10s =
-  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
+  let module Wrap (M : Id @ static) = struct let poly_ id x = M.id x end in
   let module F (M : Id @ static) = struct let i = M.id 9 end in
   let module R = F (Wrap (Wrap (struct let poly_ id x = x end))) in
   R.i
@@ -443,7 +443,7 @@ Uncaught exception: Misc.Fatal_error
 
 (* A static functor taking another static functor as its argument *)
 let (h2i, h2f) =
-  let module Wrap (M : Id @ static) = struct let poly_ id = M.id end in
+  let module Wrap (M : Id @ static) = struct let poly_ id x = M.id x end in
   let module Apply (G : IdF @ static) = struct
     module W = G (struct let poly_ id x = x end)
     let i = W.id 43

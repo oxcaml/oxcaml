@@ -70,6 +70,14 @@ val finalize_offsets :
   t ->
   result
 
+(** Same as [finalize_offsets], except that the used slots are computed from the
+    given free names of the whole compilation unit. *)
+val finalize_offsets_from_free_names :
+  t ->
+  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  free_names:Name_occurrences.t ->
+  result
+
 type words = int
 
 (** {2 Offsets & Layouts} *)

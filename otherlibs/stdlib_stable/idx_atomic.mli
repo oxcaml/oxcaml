@@ -14,8 +14,11 @@
 
 (** Atomic indices into blocks. *)
 
-(** An alias for the type of atomic indices into blocks. *)
-type ('a : value_or_null, 'b : value_or_null) t : bits64 mod everything =
+(** An alias for the type of atomic indices into blocks.
+
+    While its element type parameter has kind [any], atomic fields currently
+    only support types with kind [value_or_null]. *)
+type ('a : value_or_null, 'b : any) t : bits64 mod everything =
   ('a, 'b) idx_atomic
 
 (** [get a i] gets [a] at index [i] atomically.

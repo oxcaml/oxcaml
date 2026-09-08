@@ -881,6 +881,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
     "-gdwarf-fidelity";
+    "-gdwarf-version";
     "-llvm-path";
     "-afl-inst-ratio";
     "-config-var";

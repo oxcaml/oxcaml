@@ -611,11 +611,11 @@ let mk_stdin f =
 
 let mk_no_strict_sequence f =
   "-no-strict-sequence", Arg.Unit f,
-  " Left-hand part of a sequence need not have type unit (default)"
+  " Left-hand part of a sequence need not have type unit or unit# (default)"
 
 let mk_strict_sequence f =
   "-strict-sequence", Arg.Unit f,
-  " Left-hand part of a sequence must have type unit"
+  " Left-hand part of a sequence must have type unit or unit#"
 
 let mk_thread f =
   "-thread", Arg.Unit f,

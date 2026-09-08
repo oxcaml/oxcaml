@@ -37,13 +37,14 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
+  let result_arity = Code.result_arity code in
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarized_components result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -73,6 +74,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   in
   let code_dep =
     { Traverse_acc.arity;
+      result_arity;
       return;
       my_closure;
       exn;
@@ -223,22 +225,18 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
       ( ( Block_set _ | Array_load _ | String_or_bigstring_load _
         | Bigarray_load _ | Phys_equal _ | Int_arith _ | Int_shift _
         | Int_comp _ | Float_arith _ | Float_comp _ | Bigarray_get_alignment _
-        | Atomic_load_field _ | Poke _ | Read_offset _ ),
+        | Atomic_load _ | Poke _ | Read_offset _ ),
         _,
         _ )
   | Ternary
       ( ( Array_set _ | Bytes_or_bigstring_set _ | Bigarray_set _
-        | Atomic_field_int_arith _ | Atomic_set_field _
-        | Atomic_exchange_field _ | Write_offset _ ),
+        | Atomic_int_arith _ | Atomic_set _ | Atomic_exchange _ | Write_offset _
+          ),
         _,
         _,
         _ )
   | Quaternary
-      ( (Atomic_compare_and_set_field _ | Atomic_compare_exchange_field _),
-        _,
-        _,
-        _,
-        _ )
+      ((Atomic_compare_and_set _ | Atomic_compare_exchange _), _, _, _, _)
   | Variadic ((Begin_region _ | Begin_try_region _ | Make_array _), _) ->
     let () =
       match Flambda_primitive.effects_and_coeffects prim with

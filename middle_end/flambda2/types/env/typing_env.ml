@@ -820,6 +820,47 @@ let replace_equation (t : t) name ty =
   in
   with_current_level t ~current_level
 
+let rec type_from_closure_conversion_approx ~machine_width
+    (approx : _ Value_approximation.t) =
+  match approx with
+  | Unknown kind -> MTC.unknown kind
+  | Value_const cst -> MTC.type_for_const cst
+  | Value_symbol symbol ->
+    TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
+  | Block_approximation (tag, shape, fields, alloc_mode) ->
+    let fields =
+      List.map
+        (type_from_closure_conversion_approx ~machine_width)
+        (Array.to_list fields)
+    in
+    MTC.immutable_block ~machine_width ~is_unique:false
+      (Tag.Scannable.to_tag tag) ~shape:(Scannable shape) ~fields alloc_mode
+  | Closure_approximation { code_id; function_slot; code = _; symbol } ->
+    MTC.static_closure_with_this_code ~this_function_slot:function_slot
+      ~closure_symbol:symbol ~code_id
+
+let create_from_closure_conversion_approx ~machine_width ~resolver
+    (symbols : _ Value_approximation.t Symbol.Map.t) : t =
+  let t = create ~machine_width ~resolver in
+  let t =
+    Symbol.Map.fold (fun sym _approx t -> add_symbol_definition t sym) symbols t
+  in
+  Symbol.Map.fold
+    (fun sym approx t ->
+      let ty = type_from_closure_conversion_approx ~machine_width approx in
+      (* Symbols without approximations must still be defined. *)
+      let t =
+        Name_occurrences.fold_names (TG.free_names ty) ~init:t ~f:(fun t name ->
+            Name.pattern_match name
+              ~var:(fun _ -> t)
+              ~symbol:(fun free_sym ->
+                if Current_unit.is_current (Symbol.compilation_unit free_sym)
+                then add_symbol_definition t free_sym
+                else t))
+      in
+      replace_equation t (Name.symbol sym) ty)
+    symbols t
+
 let aliases_add t ~canonical_element1 ~canonical_element2 =
   (* This may raise [Binding_time_resolver_failure]. *)
   Aliases.add ~binding_time_resolver:t.binding_time_resolver (aliases t)
@@ -1129,25 +1170,12 @@ end = struct
        symbols have an equation (that may be Unknown). *)
     let defined_symbols_without_equations = [] in
     let code_age_relation = Code_age_relation.empty in
-    let rec type_from_approx approx =
-      match (approx : _ Value_approximation.t) with
-      | Unknown kind -> MTC.unknown kind
-      | Value_const cst -> MTC.type_for_const cst
-      | Value_symbol symbol ->
-        TG.alias_type_of Flambda_kind.value (Simple.symbol symbol)
-      | Block_approximation (tag, shape, fields, alloc_mode) ->
-        let fields = List.map type_from_approx (Array.to_list fields) in
-        MTC.immutable_block ~machine_width ~is_unique:false
-          (Tag.Scannable.to_tag tag) ~shape:(Scannable shape) ~fields alloc_mode
-      | Closure_approximation { code_id; function_slot; code = _; symbol } ->
-        MTC.static_closure_with_this_code ~this_function_slot:function_slot
-          ~closure_symbol:symbol ~code_id
-    in
     let names_to_types =
       Symbol.Map.fold
         (fun sym approx cached ->
           Name.Map.add (Name.symbol sym)
-            (type_from_approx approx, Binding_time.With_name_mode.symbols)
+            ( type_from_closure_conversion_approx ~machine_width approx,
+              Binding_time.With_name_mode.symbols )
             cached)
         symbols Name.Map.empty
     in
