@@ -142,7 +142,11 @@ let all_commands =
          (ascription, functor arguments, packing, aliases, includes, with \
          constraints, substitutions, strengthening, module type of, and \
          application instances); a unit whose interface includes the target \
-         implements it and is reported as the '(interface)' row. Modules \
+         implements it and is reported as the '(interface)' row. Checking a \
+         module against 'S with ...' retains its relationship to S, including \
+         when destructive substitution removes every declaration. Supplying \
+         a replacement for a module-type member does not make the enclosing \
+         module an implementation of the replacement. Modules \
          related to the target only definitionally are not implementers: \
          declaring the target, being paired with its own interface \
          declaration, providing it as an equal member, or producing it as a \
@@ -157,7 +161,7 @@ let all_commands =
          'target'  : string,\n\
          'decl'    : { 'file', 'start', 'end' },\n\
          'status'  : 'complete' | 'partial' | 'unavailable',\n\
-         'reasons' : [ { 'kind' : string, ... } ]\n\
+         'errors'  : [ { 'kind' : string, ... } ]\n\
          }\n\
          ],\n\
          'implementations' : [\n\
@@ -165,13 +169,11 @@ let all_commands =
          'target'     : string,\n\
          // 'decl' is omitted for the '(interface)' target\n\
          'decl'       : { 'file', 'start', 'end' },\n\
-         // 'instance' is omitted for the '(interface)' target\n\
          'instance'   : string,\n\
          'file'       : string,\n\
          'start'      : position,\n\
          'end'        : position,\n\
          'kind'       : 'unit' | 'annotations',\n\
-         // 'check' is omitted for the '(interface)' target\n\
          'check'      : 'annotation' | 'argument' | 'package' | 'interface',\n\
          // 'check-site' is omitted when the check has no recorded site\n\
          'check-site' : { 'file', 'start', 'end' }\n\
@@ -179,21 +181,24 @@ let all_commands =
          ]\n\
          }\n\
          ```\n\n\
-         Reason kinds: 'no-index-files', 'facts-channel-absent', 'omission' \
-         (with 'reason' and optional 'family'), 'unresolved-implementation' \
-         (with 'target', 'instance', 'implementation' and optional 'site') \
-         when a matching implementation could not be resolved to a source \
-         location, and 'unresolved-check-site' (with 'target', 'instance' and \
-         'site') when a recorded check site could not be resolved; neither \
-         matches nor recorded sites are ever silently dropped, and a match \
-         whose implementation and recorded site both fail to resolve reports \
-         both reasons.\n\n\
-         Each target has its own status. 'complete' requires the facts channel \
-         to be present with no omission scoped to that declaration, and every \
-         matching implementation and recorded check site resolved; 'partial' \
-         carries the reasons; 'unavailable' means no usable facts channel was \
-         configured or loaded, which is distinct from a complete empty result."
-      ~default:None begin fun buffer position ->
+         Error kinds: 'no-index-files', 'facts-channel-absent' (with 'index'), \
+         'index-read-error' (with 'index' and 'message'), 'omission' (with \
+         'reason' and optional 'family'), 'unresolved-implementation' (with \
+         'target', 'instance', 'implementation' and optional 'site') when a \
+         matching implementation could not be resolved to a source location, \
+         and 'unresolved-check-site' (with 'target', 'instance' and 'site') \
+         when a recorded check site could not be resolved; neither matches nor \
+         recorded sites are ever silently dropped, and a match whose \
+         implementation and recorded site both fail to resolve reports both \
+         errors.\n\n\
+         Each target has its own status. 'complete' requires a readable facts \
+         channel in every configured index, no omission scoped to that \
+         declaration, and every matching implementation and recorded check \
+         site resolved. Usable facts from every index are retained even when \
+         another index fails to load or lacks the facts channel; the result is \
+         'partial' and carries the errors. 'unavailable' means no usable facts \
+         channel was configured or loaded, which is distinct from a complete \
+         empty result." ~default:None begin fun buffer position ->
       run buffer (Query_protocol.Module_type_impls position)
       end;
     command "construct"

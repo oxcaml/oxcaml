@@ -2,6 +2,11 @@ open Std
 
 module Facts = Module_implementation_facts
 
+(* Contexts are equated by congruence closure:
+   https://en.wikipedia.org/wiki/Congruence_closure
+   Requirement cycles are collapsed using Tarjan's SCC algorithm:
+   https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm
+   Queries propagate targets through the resulting acyclic graph. *)
 module Implementation_search : sig
   type t
 
@@ -378,12 +383,12 @@ end = struct
         | Alias
         | Include
         | With_constraint
+        | Destructive_substitution
         | Module_type_of
         | Strengthening
         | Interface ->
           add_requirement_edge ();
           observe_family t source_id
-        | Destructive_substitution
         | Functor_type
         | Argument_member
         | Interface_member -> observe_family t source_id
@@ -495,7 +500,7 @@ end = struct
                       :: !matches)
                   matching_targets))
     done;
-    { matches = List.sort_uniq ~cmp:compare_matching_check !matches;
+    { matches = List.sort ~cmp:compare_matching_check !matches;
       omissions = scoped_omissions t !reached_families
     }
 
@@ -566,29 +571,39 @@ module Helpers = struct
     |> Option.map ~f:Misc.canonicalize_filename
 
   let module_facts (mconfig : Mconfig.t) =
-    let index_files = mconfig.merlin.index_files in
-    List.fold_left index_files ~init:(Some None) ~f:(fun accumulator path ->
-        match (accumulator, (Index_cache.read path).module_facts) with
-        | None, _ | _, None -> None
-        | Some facts, Some source ->
-          let source = Index_format.fetch_module_facts source in
-          Some
-            (Some
-               (match facts with
-               | None -> source
-               | Some facts -> Facts.union facts source)))
+    let open Query_protocol.Module_type_impls in
+    let read index_file =
+      try
+        match (Index_cache.read index_file).module_facts with
+        | None -> Error (Channel_absent index_file)
+        | Some source -> Ok (Index_format.fetch_module_facts source)
+      with
+      | ( Index_format.Not_an_index _
+        | Sys_error _
+        | Unix.Unix_error _
+        | End_of_file
+        | Failure _
+        | Invalid_argument _ ) as exn
+      ->
+        let message = Printexc.to_string exn in
+        log ~title:"module_facts" "cannot read index %s: %s" index_file message;
+        Error (Index_read_error { index_file; message })
+    in
+    List.fold_left mconfig.merlin.index_files ~init:(None, [])
+      ~f:(fun (facts, errors) index_file ->
+        match read index_file with
+        | Error error -> (facts, error :: errors)
+        | Ok source ->
+          let facts =
+            match facts with
+            | None -> source
+            | Some facts -> Facts.union facts source
+          in
+          (Some facts, errors))
 
   let own_file (mconfig : Mconfig.t) =
     Misc.canonicalize_filename
       (Filename.concat mconfig.query.directory mconfig.query.filename)
-
-  let find_source_of_loc mconfig ~description loc =
-    match Locate.find_source ~config:mconfig loc description with
-    | `Found (file, loc) -> Some (Misc.canonicalize_filename file, loc)
-    | `File_not_found reason ->
-      log ~title:"find_source_of_loc" "cannot find source for %s: %s"
-        description reason;
-      None
 
   let location_in_file file (loc : Location.t) =
     let with_file pos = { pos with Lexing.pos_fname = file } in
@@ -596,150 +611,88 @@ module Helpers = struct
       loc_start = with_file loc.loc_start;
       loc_end = with_file loc.loc_end
     }
-end
 
-let impl_source_of_interface = Helpers.impl_source_of_interface
-let own_file = Helpers.own_file
+  let find_source_of_loc mconfig ~description loc =
+    match Locate.find_source ~config:mconfig loc description with
+    | `Found (file, loc) ->
+      Some (location_in_file (Misc.canonicalize_filename file) loc)
+    | `File_not_found reason ->
+      log ~title:"find_source_of_loc" "cannot find source for %s: %s"
+        description reason;
+      None
+end
 
 type target =
   { target_uid : Shape.Uid.t; target_name : string; target_loc : Location.t }
 
 let module_type_decls (typedtree : Mtyper.typedtree) : target list =
   let targets = ref [] in
-  let path = ref [] in
-  let within_path_component name ~f =
-    let previous_path = !path in
-    path := name :: previous_path;
-    Fun.protect ~finally:(fun () -> path := previous_path) f
-  in
-  let iterator =
+  let rec iterator path =
     { Tast_iterator.default_iterator with
       module_binding =
-        (fun iterator (mb : Typedtree.module_binding) ->
+        (fun self (mb : Typedtree.module_binding) ->
           match mb.mb_name.txt with
-          | None -> Tast_iterator.default_iterator.module_binding iterator mb
+          | None -> Tast_iterator.default_iterator.module_binding self mb
           | Some module_name ->
-            within_path_component module_name ~f:(fun () ->
-                Tast_iterator.default_iterator.module_binding iterator mb));
+            Tast_iterator.default_iterator.module_binding
+              (iterator (module_name :: path))
+              mb);
       module_declaration =
-        (fun iterator (md : Typedtree.module_declaration) ->
+        (fun self (md : Typedtree.module_declaration) ->
           match md.md_name.txt with
-          | None ->
-            Tast_iterator.default_iterator.module_declaration iterator md
+          | None -> Tast_iterator.default_iterator.module_declaration self md
           | Some module_name ->
-            within_path_component module_name ~f:(fun () ->
-                Tast_iterator.default_iterator.module_declaration iterator md));
+            Tast_iterator.default_iterator.module_declaration
+              (iterator (module_name :: path))
+              md);
       module_type_declaration =
-        (fun iterator (mtd : Typedtree.module_type_declaration) ->
+        (fun _ (mtd : Typedtree.module_type_declaration) ->
           let name = mtd.mtd_name.txt in
           targets :=
             { target_uid = mtd.mtd_uid;
-              target_name = String.concat ~sep:"." (List.rev (name :: !path));
+              target_name = String.concat ~sep:"." (List.rev (name :: path));
               target_loc = mtd.mtd_loc
             }
             :: !targets;
-          within_path_component name ~f:(fun () ->
-              Tast_iterator.default_iterator.module_type_declaration iterator
-                mtd))
+          Tast_iterator.default_iterator.module_type_declaration
+            (iterator (name :: path))
+            mtd)
     }
   in
+  let iterator = iterator [] in
   (match typedtree with
   | `Implementation str -> iterator.structure iterator str
   | `Interface sg -> iterator.signature iterator sg);
   List.rev !targets
 
-type uid_site =
-  { uid : Shape.Uid.t;
-    name : string;
-    spans_file : string;
-    row_file : string;
-    loc : Location.t
-  }
-
-let source_of_recorded_location mconfig ~unit_name ~description
+let source_of_recorded_location (mconfig : Mconfig.t) ~unit_name ~description
     (loc : Location.t) =
   let recorded = loc.loc_start.Lexing.pos_fname in
   if String.equal recorded "" then None
   else
     let candidate =
       if Filename.is_relative recorded then
-        match unit_name with
-        | Some unit_name when String.equal unit_name (Mconfig.unitname mconfig)
-          -> Some (Filename.concat mconfig.query.directory recorded)
-        | None | Some _ -> None
+        match (mconfig.merlin.source_root, unit_name) with
+        | Some root, _ -> Some (Filename.concat root recorded)
+        | None, Some unit_name
+          when String.equal unit_name (Mconfig.unitname mconfig) ->
+          Some (Filename.concat mconfig.query.directory recorded)
+        | None, _ -> None
       else Some recorded
     in
     match candidate with
     | Some candidate when Sys.file_exists candidate ->
       let file = Misc.canonicalize_filename candidate in
-      Some (file, Helpers.location_in_file file loc)
-    | Some _ | None ->
-      Option.map (Helpers.find_source_of_loc mconfig ~description loc)
-        ~f:(fun (file, loc) -> (file, Helpers.location_in_file file loc))
+      Some (Helpers.location_in_file file loc)
+    | Some _ | None -> Helpers.find_source_of_loc mconfig ~description loc
 
 let source_of_site mconfig compilation_unit loc =
   let unit_name = Compilation_unit.full_path_as_string compilation_unit in
   source_of_recorded_location mconfig ~unit_name:(Some unit_name)
     ~description:unit_name loc
 
-let uid_site (mconfig : Mconfig.t) ~local_defs (evidence_uid : Shape.Uid.t) =
-  match evidence_uid with
-  | Item { from; _ } ->
-    let declaration =
-      match
-        Locate.lookup_loc_of_uid ~config:mconfig ~local_defs evidence_uid
-      with
-      | Some (`Declaration declaration) -> Some declaration
-      | Some (`Compilation_unit _) | None -> None
-      | exception Not_found -> None
-    in
-    Option.bind declaration ~f:(fun { Location.txt = name; loc } ->
-        let description = Format.asprintf "%a" Shape.Uid.print evidence_uid in
-        Option.bind (Helpers.find_source_of_loc mconfig ~description loc)
-          ~f:(fun (spans_file, loc) ->
-            let loc = Helpers.location_in_file spans_file loc in
-            match from with
-            | Unit_info.Impl ->
-              Some
-                { uid = evidence_uid;
-                  name;
-                  spans_file;
-                  row_file = spans_file;
-                  loc
-                }
-            | Unit_info.Intf ->
-              Option.map (Helpers.impl_source_of_interface mconfig spans_file)
-                ~f:(fun row_file ->
-                  { uid = evidence_uid; name; spans_file; row_file; loc })))
-  | Compilation_unit _ | Internal | Predef _ | Unboxed_version _ -> None
-
-let own_interface_implementation mconfig ~own_file
-    (typedtree : Mtyper.typedtree) =
-  let open Query_protocol.Module_type_impls in
-  match typedtree with
-  | `Implementation _ -> None
-  | `Interface _ ->
-    Option.map (Helpers.impl_source_of_interface mconfig own_file)
-      ~f:(fun impl_file ->
-        { target = Own_interface;
-          target_loc = None;
-          target_instance = None;
-          implementation_uid = None;
-          implementation_name = None;
-          site =
-            { impl_loc = Location.in_file impl_file; impl_kind = Whole_unit };
-          check = None;
-          check_site = None
-        })
-
-let has_precise_location (loc : Location.t) =
-  (not loc.loc_ghost)
-  && (not (Location.is_none loc))
-  && loc.loc_start.Lexing.pos_cnum <> -1
-  && loc.loc_end.Lexing.pos_cnum <> -1
-
 type resolved_implementation =
-  { implementation_uid : string option;
+  { implementation_uid : Shape.Uid.t option;
     implementation_name : string option;
     site : Query_protocol.Module_type_impls.impl_site
   }
@@ -748,74 +701,78 @@ let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
   let open Query_protocol.Module_type_impls in
   match node with
   | Location (compilation_unit, loc) ->
-    let impl_kind =
-      if has_precise_location loc then Annotation_sites else Whole_unit
-    in
     Option.map (source_of_site mconfig compilation_unit loc)
-      ~f:(fun (file, loc) ->
-        let impl_loc =
-          match impl_kind with
-          | Whole_unit -> Location.in_file file
-          | Annotation_sites -> loc
-        in
+      ~f:(fun impl_loc ->
         { implementation_uid = None;
           implementation_name = None;
-          site = { impl_loc; impl_kind }
+          site = { impl_loc; impl_kind = Annotation_sites }
         })
-  | Uid (Compilation_unit unit_name as unit_uid) ->
-    let unit_loc =
-      match Locate.lookup_loc_of_uid ~config:mconfig ~local_defs unit_uid with
-      | Some (`Compilation_unit loc) -> Some loc
-      | Some (`Declaration _) | None -> None
-      | exception Not_found -> None
-    in
-    Option.bind unit_loc ~f:(fun loc ->
-        Option.map
-          (Helpers.find_source_of_loc mconfig ~description:unit_name loc)
-          ~f:(fun (file, _) ->
-            { implementation_uid =
-                Some (Format.asprintf "%a" Shape.Uid.print unit_uid);
-              implementation_name = Some unit_name;
-              site =
-                { impl_loc = Location.in_file file; impl_kind = Whole_unit }
-            }))
   | Uid uid ->
-    Option.bind (uid_site mconfig ~local_defs uid)
-      ~f:(fun { uid; name; spans_file; row_file; loc } ->
-        if loc.Location.loc_ghost then None
-        else
-          let site =
-            if String.equal spans_file row_file then
-              { impl_loc = loc; impl_kind = Annotation_sites }
+    let description = Format.asprintf "%a" Shape.Uid.print uid in
+    let location =
+      try Locate.lookup_loc_of_uid ~config:mconfig ~local_defs uid
+      with Not_found -> None
+    in
+    let name_and_site =
+      match location with
+      | None -> None
+      | Some (`Compilation_unit loc) ->
+        Option.map (Helpers.find_source_of_loc mconfig ~description loc)
+          ~f:(fun (loc : Location.t) ->
+            ( description,
+              { impl_loc = Location.in_file loc.loc_start.pos_fname;
+                impl_kind = Whole_unit
+              } ))
+      | Some (`Declaration { Location.txt = name; loc }) ->
+        Option.bind (Helpers.find_source_of_loc mconfig ~description loc)
+          ~f:(fun loc ->
+            if loc.Location.loc_ghost then None
             else
-              { impl_loc = Location.in_file row_file; impl_kind = Whole_unit }
-          in
-          Some
-            { implementation_uid =
-                Some (Format.asprintf "%a" Shape.Uid.print uid);
-              implementation_name =
-                (if String.equal name "_" then None else Some name);
-              site
-            })
+              let site =
+                match uid with
+                | Item { from = Unit_info.Intf; _ } ->
+                  Option.map
+                    (Helpers.impl_source_of_interface mconfig
+                       loc.loc_start.pos_fname) ~f:(fun impl_file ->
+                      { impl_loc = Location.in_file impl_file;
+                        impl_kind = Whole_unit
+                      })
+                | _ -> Some { impl_loc = loc; impl_kind = Annotation_sites }
+              in
+              Option.map site ~f:(fun site -> (name, site)))
+    in
+    Option.map name_and_site ~f:(fun (name, site) ->
+        { implementation_uid = Some uid;
+          implementation_name =
+            (if String.equal name "_" then None else Some name);
+          site
+        })
+
+type site_resolution =
+  | No_recorded_site
+  | Resolved_site of Location.t
+  | Unresolved_site
 
 let resolve_check_site mconfig (check : Facts.Check.t) =
-  if Location.is_none check.site then None
+  if Location.is_none check.site then No_recorded_site
   else
-    match check.implementation with
-    | Location (compilation_unit, _) ->
-      Option.map (source_of_site mconfig compilation_unit check.site)
-        ~f:(fun (_, loc) -> loc)
-    | Uid uid ->
-      let unit_name =
-        match uid with
-        | Item { comp_unit; _ } -> Some comp_unit
-        | Compilation_unit unit_name -> Some unit_name
-        | Internal | Predef _ | Unboxed_version _ -> None
-      in
-      let description = Format.asprintf "%a" Shape.Uid.print uid in
-      Option.map
-        (source_of_recorded_location mconfig ~unit_name ~description check.site)
-        ~f:(fun (_, loc) -> loc)
+    let loc =
+      match check.implementation with
+      | Location (compilation_unit, _) ->
+        source_of_site mconfig compilation_unit check.site
+      | Uid uid ->
+        let unit_name =
+          match uid with
+          | Item { comp_unit; _ } -> Some comp_unit
+          | Compilation_unit unit_name -> Some unit_name
+          | Internal | Predef _ | Unboxed_version _ -> None
+        in
+        let description = Format.asprintf "%a" Shape.Uid.print uid in
+        source_of_recorded_location mconfig ~unit_name ~description check.site
+    in
+    match loc with
+    | Some loc -> Resolved_site loc
+    | None -> Unresolved_site
 
 let protocol_check_kind :
     Facts.Check.Kind.t -> Query_protocol.Module_type_impls.check_kind = function
@@ -830,8 +787,8 @@ let string_of_omission_reason : Facts.Omission.Reason.t -> string = function
   | Unsupported_path -> "unsupported-path"
   | Missing_parameter_expectation -> "missing-parameter-expectation"
 
-let reason_of_omission (omission : Facts.Omission.t) :
-    Query_protocol.Module_type_impls.reason =
+let error_of_omission (omission : Facts.Omission.t) :
+    Query_protocol.Module_type_impls.error =
   Omission
     { family =
         Option.map omission.source ~f:(fun uid ->
@@ -849,17 +806,6 @@ let render_site (site : Location.t) =
     (start.pos_cnum - start.pos_bol)
     finish.Lexing.pos_lnum
     (finish.pos_cnum - finish.pos_bol)
-
-type site_resolution =
-  | No_recorded_site
-  | Resolved_site of Location.t
-  | Unresolved_site
-
-type matching_check_resolution =
-  | Resolved_match of
-      Query_protocol.Module_type_impls.implementation
-      * Query_protocol.Module_type_impls.reason list
-  | Unresolved_match of Query_protocol.Module_type_impls.reason list
 
 let compare_target left right =
   let open Query_protocol.Module_type_impls in
@@ -897,7 +843,7 @@ let compare_implementation_identity
     if c <> 0 then c
     else
       let c =
-        Stdlib.Option.compare String.compare left.implementation_uid
+        Stdlib.Option.compare Shape.Uid.compare left.implementation_uid
           right.implementation_uid
       in
       if c <> 0 then c
@@ -916,7 +862,7 @@ let unique_implementations implementations =
   let compare left right =
     let c = compare_implementation_identity left right in
     if c <> 0 then c
-    else Stdlib.Option.compare compare_check_kind left.check right.check
+    else compare_check_kind left.check right.check
   in
   List.sort implementations ~cmp:compare
   |> List.fold_left ~init:[] ~f:(fun unique implementation ->
@@ -927,17 +873,22 @@ let unique_implementations implementations =
       | _ -> implementation :: unique)
   |> List.rev
 
-let reason_rank : Query_protocol.Module_type_impls.reason -> int = function
+let error_rank : Query_protocol.Module_type_impls.error -> int = function
   | No_index_files -> 0
-  | Channel_absent -> 1
-  | Omission _ -> 2
-  | Unresolved_implementation _ -> 3
-  | Unresolved_check_site _ -> 4
+  | Channel_absent _ -> 1
+  | Index_read_error _ -> 2
+  | Omission _ -> 3
+  | Unresolved_implementation _ -> 4
+  | Unresolved_check_site _ -> 5
 
-let compare_reason left right =
+let compare_error left right =
   let open Query_protocol.Module_type_impls in
   match (left, right) with
-  | No_index_files, No_index_files | Channel_absent, Channel_absent -> 0
+  | No_index_files, No_index_files -> 0
+  | Channel_absent left, Channel_absent right -> String.compare left right
+  | Index_read_error left, Index_read_error right ->
+    let c = String.compare left.index_file right.index_file in
+    if c <> 0 then c else String.compare left.message right.message
   | ( Omission { family = left_family; reason = left_reason },
       Omission { family = right_family; reason = right_reason } ) ->
     let c = Stdlib.Option.compare String.compare left_family right_family in
@@ -958,7 +909,7 @@ let compare_reason left right =
     else
       let c = String.compare left.target_instance right.target_instance in
       if c <> 0 then c else String.compare left.site right.site
-  | _, _ -> Int.compare (reason_rank left) (reason_rank right)
+  | _, _ -> Int.compare (error_rank left) (error_rank right)
 
 let pp_node fmt (node : Facts.Node.t) =
   match node with
@@ -967,113 +918,93 @@ let pp_node fmt (node : Facts.Node.t) =
     Format.fprintf fmt "%s"
       (Compilation_unit.full_path_as_string compilation_unit)
 
-let check_site_resolution mconfig (check : Facts.Check.t) =
-  if Location.is_none check.site then No_recorded_site
-  else
-    match resolve_check_site mconfig check with
-    | Some loc -> Resolved_site loc
-    | None -> Unresolved_site
-
-let resolve_matching_check ~mconfig ~local_defs ~own_file target
+let resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
     ({ target_instance; check } : Implementation_search.matching_check) =
   let open Query_protocol.Module_type_impls in
+  let target_name =
+    match target with
+    | Own_interface -> "(interface)"
+    | Modtype name -> name
+  in
   let target_instance = render_target_instance target_instance in
-  let site_resolution = check_site_resolution mconfig check in
-  let site_reasons =
-    match site_resolution with
-    | No_recorded_site | Resolved_site _ -> []
+  let check_site, site_errors =
+    match resolve_check_site mconfig check with
+    | No_recorded_site -> (None, [])
+    | Resolved_site loc -> (Some loc, [])
     | Unresolved_site ->
-      [ Unresolved_check_site
-          { target = target.target_name;
-            target_instance;
-            site = render_site check.site
-          }
-      ]
+      ( None,
+        [ Unresolved_check_site
+            { target = target_name;
+              target_instance;
+              site = render_site check.site
+            }
+        ] )
   in
   match resolve_implementation mconfig ~local_defs check.implementation with
   | Some { implementation_uid; implementation_name; site } ->
-    Resolved_match
-      ( { target = Modtype target.target_name;
-          target_loc =
-            Some (Helpers.location_in_file own_file target.target_loc);
-          target_instance = Some target_instance;
+    ( Some
+        { target;
+          target_loc;
+          target_instance;
           implementation_uid;
           implementation_name;
           site;
-          check = Some (protocol_check_kind check.kind);
-          check_site =
-            (match site_resolution with
-            | Resolved_site loc -> Some loc
-            | No_recorded_site | Unresolved_site -> None)
+          check = protocol_check_kind check.kind;
+          check_site
         },
-        site_reasons )
+      site_errors )
   | None ->
     let site =
-      match site_resolution with
-      | Resolved_site loc -> Some loc.loc_start.Lexing.pos_fname
-      | No_recorded_site | Unresolved_site -> None
+      Option.map check_site ~f:(fun (loc : Location.t) ->
+          loc.loc_start.pos_fname)
     in
-    Unresolved_match
-      (Unresolved_implementation
-         { target = target.target_name;
-           target_instance;
-           implementation = Format.asprintf "%a" pp_node check.implementation;
-           site
-         }
-      :: site_reasons)
+    ( None,
+      Unresolved_implementation
+        { target = target_name;
+          target_instance;
+          implementation = Format.asprintf "%a" pp_node check.implementation;
+          site
+        }
+      :: site_errors )
 
-let resolve_matching_checks ~mconfig ~local_defs ~own_file results =
-  let resolutions =
-    List.concat_map results
-      ~f:(fun ((target, result) : target * Implementation_search.result) ->
-        List.map result.matches
-          ~f:(resolve_matching_check ~mconfig ~local_defs ~own_file target))
+let resolve_matching_checks ~mconfig ~local_defs ~target ~target_loc matches =
+  let implementations, errors =
+    List.fold_left matches ~init:([], [])
+      ~f:(fun (implementations, errors) matching_check ->
+        let implementation, check_errors =
+          resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
+            matching_check
+        in
+        let implementations =
+          match implementation with
+          | Some implementation -> implementation :: implementations
+          | None -> implementations
+        in
+        (implementations, List.rev_append check_errors errors))
   in
-  let implementations =
-    List.filter_map resolutions ~f:(function
-      | Resolved_match (implementation, _) -> Some implementation
-      | Unresolved_match _ -> None)
-    |> unique_implementations
-  in
-  let reasons =
-    List.concat_map resolutions ~f:(function
-        | Resolved_match (_, reasons) | Unresolved_match reasons -> reasons)
-    |> List.sort_uniq ~cmp:compare_reason
-  in
-  (implementations, reasons)
+  (List.rev implementations, List.rev errors)
 
-let status_and_reasons ~index_files ~facts_present ~omissions
-    ~resolution_reasons =
+let status_and_errors ~index_files ~facts_present ~index_errors ~omissions
+    ~resolution_errors =
   let open Query_protocol.Module_type_impls in
-  match (index_files, facts_present) with
-  | [], _ -> (Unavailable, [ No_index_files ])
-  | _ :: _, false -> (Unavailable, [ Channel_absent ])
-  | _ :: _, true -> (
-    let reasons =
-      List.map omissions ~f:reason_of_omission @ resolution_reasons
-    in
-    match reasons with
-    | [] -> (Complete, [])
-    | _ :: _ -> (Partial, reasons))
+  let errors =
+    index_errors @ List.map omissions ~f:error_of_omission @ resolution_errors
+    |> List.sort_uniq ~cmp:compare_error
+  in
+  match (index_files, facts_present, errors) with
+  | [], _, _ -> (Unavailable, [ No_index_files ])
+  | _ :: _, false, _ -> (Unavailable, errors)
+  | _ :: _, true, [] -> (Complete, [])
+  | _ :: _, true, _ :: _ -> (Partial, errors)
 
-let find_target_checks search targets =
-  List.map targets ~f:(fun target ->
-      let result =
-        match search with
-        | None ->
-          ({ matches = []; omissions = [] } : Implementation_search.result)
-        | Some search ->
-          Implementation_search.find_for_family search target.target_uid
-      in
-      (target, result))
-
-let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
+let query ?position pipeline =
+  let typedtree = Mtyper.get_typedtree (Mpipeline.typer_result pipeline) in
   let mconfig = Mpipeline.final_config pipeline in
   let own_file = Helpers.own_file mconfig in
   let targets = module_type_decls typedtree in
-  let targets, buffer_wide =
+  let targets =
     match position with
-    | None -> (targets, true)
+    | None -> targets
     | Some position -> (
       let enclosing =
         List.filter targets ~f:(fun (target : target) ->
@@ -1081,78 +1012,56 @@ let query ~pipeline ?position (typedtree : Mtyper.typedtree) =
       in
       match List.rev enclosing with
       | [] -> failwith "No module-type declaration at this position"
-      | target :: _ -> ([ target ], false))
+      | target :: _ -> [ target ])
   in
   let open Query_protocol.Module_type_impls in
   let index_files = mconfig.merlin.index_files in
-  let facts = Helpers.module_facts mconfig in
-  let search =
-    match facts with
-    | None | Some None -> None
-    | Some (Some facts) -> Some (Implementation_search.create facts)
-  in
-  let results = find_target_checks search targets in
+  let facts, index_errors = Helpers.module_facts mconfig in
+  let search = Option.map facts ~f:Implementation_search.create in
   let targets, implementations =
     List.split
-      (List.map results ~f:(fun ((target, result) as target_result) ->
-           let implementations, resolution_reasons =
-             resolve_matching_checks ~mconfig ~local_defs:typedtree ~own_file
-               [ target_result ]
+      (List.map targets ~f:(fun target ->
+           let result =
+             match search with
+             | None ->
+               ({ matches = []; omissions = [] } : Implementation_search.result)
+             | Some search ->
+               Implementation_search.find_for_family search target.target_uid
            in
-           let status, reasons =
-             status_and_reasons ~index_files
+           let target_loc =
+             Helpers.location_in_file own_file target.target_loc
+           in
+           let implementations, resolution_errors =
+             resolve_matching_checks ~mconfig ~local_defs:typedtree
+               ~target:(Modtype target.target_name)
+               ~target_loc:(Some target_loc) result.matches
+           in
+           let status, errors =
+             status_and_errors ~index_files ~index_errors
                ~facts_present:(Option.is_some facts) ~omissions:result.omissions
-               ~resolution_reasons
+               ~resolution_errors
            in
-           ( { target = target.target_name;
-               target_loc = Helpers.location_in_file own_file target.target_loc;
-               status;
-               reasons
-             },
+           ( { target = target.target_name; target_loc; status; errors },
              implementations )))
   in
-  let implementations = List.concat implementations |> unique_implementations in
+  let implementations = List.concat implementations in
   let own_interface_rows =
-    match own_interface_implementation mconfig ~own_file typedtree with
-    | Some own_interface -> [ own_interface ]
-    | None -> (
-      match (typedtree, search) with
-      | `Implementation _, _ | _, None -> []
-      | `Interface _, Some search ->
-        let unit_uid =
-          Shape.Uid.of_compilation_unit_id
-            (Compilation_unit.of_string (Mconfig.unitname mconfig))
-        in
-        let result =
-          Implementation_search.find_for_anonymous_type search unit_uid
-        in
-        List.filter_map result.matches
-          ~f:(fun
-              ({ target_instance; check } :
-                Implementation_search.matching_check)
-            ->
-            Option.map
-              (resolve_implementation mconfig ~local_defs:typedtree
-                 check.implementation)
-              ~f:(fun
-                  ({ implementation_uid; implementation_name; site } :
-                    resolved_implementation)
-                ->
-                { target = Own_interface;
-                  target_loc = None;
-                  target_instance =
-                    Some (render_target_instance target_instance);
-                  implementation_uid;
-                  implementation_name;
-                  site;
-                  check = Some (protocol_check_kind check.kind);
-                  check_site =
-                    (match check_site_resolution mconfig check with
-                    | Resolved_site loc -> Some loc
-                    | No_recorded_site | Unresolved_site -> None)
-                })))
+    match (position, typedtree, search) with
+    | None, `Interface _, Some search ->
+      let unit_uid =
+        Shape.Uid.of_compilation_unit_id
+          (Compilation_unit.of_string (Mconfig.unitname mconfig))
+      in
+      let result =
+        Implementation_search.find_for_anonymous_type search unit_uid
+      in
+      let implementations, _ =
+        resolve_matching_checks ~mconfig ~local_defs:typedtree
+          ~target:Own_interface ~target_loc:None result.matches
+      in
+      implementations
+    | _ -> []
   in
-  let own_interface_rows = if buffer_wide then own_interface_rows else [] in
   let implementations =
     unique_implementations (own_interface_rows @ implementations)
   in
