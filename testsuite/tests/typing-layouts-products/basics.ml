@@ -45,7 +45,7 @@ type t5 = string * #(string * bool)
 |}]
 
 type t6_inner = #{ s : string; b : bool }
-type t6 = string * t_nope_inner
+type t6 = string * t6_inner
 [%%expect{|
 type t6_inner = #{ s : string; b : bool; }
 type t6 = string * t6_inner

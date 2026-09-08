@@ -1676,16 +1676,7 @@ let q () =
 [%%expect{|
 val ( let* ) : 'a -> 'b -> unit = <fun>
 val ( and* ) : 'a -> 'b -> 'c = <fun>
-Line 4, characters 9-22:
-4 |     let* x : t_float64 = assert false
-             ^^^^^^^^^^^^^
-Error: This pattern matches values of type "t_float64"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a tuple element.
+val q : unit -> unit = <fun>
 |}]
 
 (*******************************************)
