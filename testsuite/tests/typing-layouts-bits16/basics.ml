@@ -336,6 +336,15 @@ val id_value : 'a -> 'a = <fun>
 
 let x8_1 = id_value (make_t_bits16 ());;
 [%%expect{|
+Line 1, characters 11-38:
+1 | let x8_1 = id_value (make_t_bits16 ());;
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of t_bits16 is bits16
+         because of the definition of t_bits16 at line 1, characters 0-22.
+       But the layout of t_bits16 must be a value layout
+         because of the definition of id_value at line 5, characters 13-18.
+|}, Principal{|
 Line 1, characters 20-38:
 1 | let x8_1 = id_value (make_t_bits16 ());;
                         ^^^^^^^^^^^^^^^^^^
@@ -349,6 +358,15 @@ Error: This expression has type "t_bits16"
 
 let x8_2 = id_value (make_t_bits16_id ());;
 [%%expect{|
+Line 1, characters 11-41:
+1 | let x8_2 = id_value (make_t_bits16_id ());;
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of 'a t_bits16_id is bits16
+         because of the definition of t_bits16_id at line 2, characters 0-35.
+       But the layout of 'a t_bits16_id must be a value layout
+         because of the definition of id_value at line 5, characters 13-18.
+|}, Principal{|
 Line 1, characters 20-41:
 1 | let x8_2 = id_value (make_t_bits16_id ());;
                         ^^^^^^^^^^^^^^^^^^^^^
@@ -362,6 +380,15 @@ Error: This expression has type "'a t_bits16_id" = "('a : bits16)"
 
 let x8_3 = id_value (make_int16u ());;
 [%%expect{|
+Line 1, characters 11-36:
+1 | let x8_3 = id_value (make_int16u ());;
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of int16# is bits16
+         because it is the unboxed version of the primitive type int16.
+       But the layout of int16# must be a value layout
+         because of the definition of id_value at line 5, characters 13-18.
+|}, Principal{|
 Line 1, characters 20-36:
 1 | let x8_3 = id_value (make_int16u ());;
                         ^^^^^^^^^^^^^^^^

@@ -924,6 +924,17 @@ let bad () : (float array, _) idx_mut =
 Line 2, characters 2-36:
 2 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of float is value
+         because it is the primitive type float.
+       But the layout of float must be a sublayout of value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+Line 2, characters 2-36:
+2 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(float array, 'b) idx_mut"
        The layout of float is value
@@ -938,6 +949,19 @@ type non_sep = float or_null
 let bad () : (_ array, non_sep) idx_mut =
   Idx_mut.unsafe_create_into_array 0
 [%%expect{|
+type non_sep = float or_null
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of non_sep is value_or_null
+         because it is the primitive type or_null.
+       But the layout of non_sep must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 type non_sep = float or_null
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
@@ -962,6 +986,19 @@ type abstract
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of abstract is value
+         because of the definition of abstract at line 1, characters 0-13.
+       But the layout of abstract must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+type abstract
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a array, 'a) idx_mut"
        but an expression was expected of type "(abstract array, 'b) idx_mut"
        The layout of abstract is value
@@ -975,6 +1012,17 @@ Error: This expression has type "('a array, 'a) idx_mut"
 
 let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
+Line 1, characters 41-76:
+1 | let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of float is value
+         because it is the primitive type float.
+       But the layout of float must be a sublayout of value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 Line 1, characters 41-76:
 1 | let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1014,6 +1062,19 @@ type non_sep = float or_null
 Line 3, characters 2-37:
 3 |   Idx_imm.unsafe_create_into_iarray 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of non_sep is value_or_null
+         because it is the primitive type or_null.
+       But the layout of non_sep must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+type non_sep = float or_null
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "('a iarray, 'a) idx_imm"
        but an expression was expected of type "('a iarray, non_sep) idx_imm"
        Type "'a" is not compatible with type "non_sep" = "float or_null"
@@ -1030,6 +1091,19 @@ type abstract
 let bad () : (abstract iarray, _) idx_imm =
   Idx_imm.unsafe_create_into_iarray 0
 [%%expect{|
+type abstract
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of abstract is value
+         because of the definition of abstract at line 1, characters 0-13.
+       But the layout of abstract must be a sublayout of
+           value_or_null non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 type abstract
 Line 3, characters 2-37:
 3 |   Idx_imm.unsafe_create_into_iarray 0

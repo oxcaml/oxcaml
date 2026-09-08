@@ -220,6 +220,15 @@ module M6_1 = struct
 end
 
 [%%expect{|
+Line 13, characters 25-57:
+13 |                     #42L (get_third [: #0L; #1L; #42L :]))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of Stdlib_upstream_compatible.Int64_u.t is bits64.
+       But the layout of Stdlib_upstream_compatible.Int64_u.t must be a sublayout of
+         bits32
+         because of the definition of get_third at lines 4-7, characters 16-23.
+|}, Principal{|
 Line 13, characters 39-42:
 13 |                     #42L (get_third [: #0L; #1L; #42L :]))
                                             ^^^

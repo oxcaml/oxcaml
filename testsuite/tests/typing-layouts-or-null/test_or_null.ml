@@ -125,11 +125,10 @@ let should_fail = This (This 5)
 Line 1, characters 23-31:
 1 | let should_fail = This (This 5)
                            ^^^^^^^^
-Error: This constructor has type "'a t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
-       The layout of 'a t is value_or_null
+Error:
+       The layout of int t is value_or_null
          because it is the primitive type or_null.
-       But the layout of 'a t must be a sublayout of value
+       But the layout of int t must be a sublayout of value
          because of the definition of t at line 1, characters 0-69.
 |}]
 
@@ -139,8 +138,7 @@ let should_also_fail = This Null
 Line 1, characters 28-32:
 1 | let should_also_fail = This Null
                                 ^^^^
-Error: The constructor "Null" has type "'a t" = "'a or_null"
-       but an expression was expected of type "('b : value)"
+Error:
        The layout of 'a t is value_or_null
          because it is the primitive type or_null.
        But the layout of 'a t must be a sublayout of value
@@ -207,17 +205,14 @@ val should_work : int t array = [|Null; This 5|]
 let should_fail = [| This 5.; Null |]
 
 [%%expect{|
-Line 1, characters 26-28:
+Line 1, characters 21-28:
 1 | let should_fail = [| This 5.; Null |]
-                              ^^
-Error: The constant "5." has type "float" but an expression was expected of type
-         "('a : value non_float)"
-       The layout of float is value
-         because it is the primitive type float.
-       But the layout of float must be a sublayout of value non_float
+                         ^^^^^^^
+Error:
+       The layout of float t is value_or_null
+         because it is the primitive type or_null.
+       But the layout of float t must be a sublayout of value_maybe_null
          because it's the type of an array element.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 type should_work = string or_null array
@@ -437,8 +432,7 @@ let should_fail_unboxed_var = This (Wrap Null)
 Line 1, characters 35-46:
 1 | let should_fail_unboxed_var = This (Wrap Null)
                                        ^^^^^^^^^^^
-Error: This constructor has type "unboxed_var"
-       but an expression was expected of type "('a : value)"
+Error:
        The layout of unboxed_var is value_or_null
          because it is the primitive type or_null.
        But the layout of unboxed_var must be a sublayout of value
@@ -451,8 +445,7 @@ let should_fail_unboxed_gadt = This (Gadt Null)
 Line 1, characters 36-47:
 1 | let should_fail_unboxed_gadt = This (Gadt Null)
                                         ^^^^^^^^^^^
-Error: This constructor has type "('a, 'a or_null) gadt"
-       but an expression was expected of type "('b : value)"
+Error:
        The layout of ('a, 'a or_null) gadt is value_or_null
          because it is the primitive type or_null.
        But the layout of ('a, 'a or_null) gadt must be a sublayout of value

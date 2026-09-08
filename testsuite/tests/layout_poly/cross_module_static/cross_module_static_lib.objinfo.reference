@@ -37,10 +37,10 @@ Static data:
         ⟪(function {nlocal = 1} closure/349[L]
            (function {nlocal = 0} x/334[$layout_2] : $layout_2 x/334))⟫ }))
   (Cross_module_static_lib/pair/1
-    (closure ⟨env⟩ layout_11 layout_12 ->
+    (closure ⟨env⟩ layout_5 layout_7 ->
       { c = (missing)
       ; r =
         ⟪(function {nlocal = 1} closure/350[L]
-           (function {nlocal = 0} x/337[$layout_11] y/338[$layout_12]
-             : #($layout_11, $layout_12)
-             (make_unboxed_product #($layout_11, $layout_12) x/337 y/338)))⟫ }))
+           (function {nlocal = 0} x/337[$layout_5] y/338[$layout_7]
+             : #($layout_5, $layout_7)
+             (make_unboxed_product #($layout_5, $layout_7) x/337 y/338)))⟫ }))

@@ -50,6 +50,17 @@ val ( = ) : Float_u.t -> Float_u.t -> bool = <fun>
 Line 25, characters 13-29:
 25 | let f () = [|Float_u.of_int e for e = 0 to 9|]
                   ^^^^^^^^^^^^^^^^
+Error:
+       The layout of Float_u.t is float64.
+       But the layout of Float_u.t must be a value layout
+         because it's the element type of array comprehension.
+|}, Principal{|
+module Float_u = Stdlib_upstream_compatible.Float_u
+val of_int : int -> Float_u.t = <fun>
+val ( = ) : Float_u.t -> Float_u.t -> bool = <fun>
+Line 25, characters 13-29:
+25 | let f () = [|Float_u.of_int e for e = 0 to 9|]
+                  ^^^^^^^^^^^^^^^^
 Error: This expression has type "Float_u.t" = "float#"
        but an expression was expected of type "('a : value_or_null)"
        The layout of Float_u.t is float64.
