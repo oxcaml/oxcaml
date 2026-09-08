@@ -331,23 +331,42 @@ module Code_id_data = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
+          (** The source-level name of the function, without any stamp. *)
+      slot_stamp : int option;
+          (** The stamp of the [Function_slot] whose code this is, if the code
+              was created for one. Kept separate from [name] so that it can be
+              recognised (and omitted) when demangling. *)
       debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
     }
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
+  (* The historical printed form, e.g. [my_fun_42], used for dumps and for
+     naming derived entities. *)
+  let name_with_slot_stamp ~name ~slot_stamp =
+    match slot_stamp with
+    | None -> name
+    | Some stamp -> Printf.sprintf "%s_%d" name stamp
+
+  let [@ocamlformat "disable"] print ppf
+        { compilation_unit; name; slot_stamp; debug_info = _; linkage_name; } =
     Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(name@ %s)@]@ \
         @[<hov 1>(linkage_name@ %a)@]@ \
         )@]"
       (Format_doc.compat Compilation_unit.print_debug) compilation_unit
-      name
+      (name_with_slot_stamp ~name ~slot_stamp)
       Linkage_name.print linkage_name
 
-  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
+  let hash
+      { compilation_unit = _;
+        name = _;
+        slot_stamp = _;
+        debug_info = _;
+        linkage_name
+      } =
     (* Linkage names are unique across a whole project, so there's no need to
        hash the other fields. *)
     Linkage_name.hash linkage_name
@@ -355,11 +374,13 @@ module Code_id_data = struct
   let equal
       { compilation_unit = _;
         name = _;
+        slot_stamp = _;
         debug_info = _;
         linkage_name = linkage_name1
       }
       { compilation_unit = _;
         name = _;
+        slot_stamp = _;
         debug_info = _;
         linkage_name = linkage_name2
       } =
@@ -873,26 +894,29 @@ module Code_id = struct
 
   let linkage_name t = (find_data t).linkage_name
 
-  let name t = (find_data t).name
-
-  let debug t = (find_data t).debug_info
+  let name t =
+    let { Code_id_data.name; slot_stamp; _ } = find_data t in
+    Code_id_data.name_with_slot_stamp ~name ~slot_stamp
 
   let previous_name_stamp = ref (-1)
 
-  let create ~name ~(debug : Debuginfo.t) compilation_unit =
+  let create ~name ~slot_stamp ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
       then Misc.fatal_error "Have run out of name stamps";
       incr previous_name_stamp;
       !previous_name_stamp
     in
+    let name_with_slot_stamp =
+      Code_id_data.name_with_slot_stamp ~name ~slot_stamp
+    in
     let linkage_name =
       match Compilation_unit.name_mangling_scheme_for_current_unit () with
       | Flat ->
         let name =
           if Flambda_features.Expert.shorten_symbol_names ()
-          then Printf.sprintf "%s_%d" name name_stamp
-          else Printf.sprintf "%s_%d_code" name name_stamp
+          then Printf.sprintf "%s_%d" name_with_slot_stamp name_stamp
+          else Printf.sprintf "%s_%d_code" name_with_slot_stamp name_stamp
         in
         Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
       | Structured ->
@@ -901,17 +925,20 @@ module Code_id = struct
           then Printf.sprintf "_%d" name_stamp
           else Printf.sprintf "_%d_code" name_stamp
         in
-        let path = Debuginfo.to_structured_mangling_path ~name debug in
+        let path =
+          Debuginfo.to_structured_mangling_path ~name:name_with_slot_stamp debug
+        in
         Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
         |> Symbol0.linkage_name
     in
     let data : Code_id_data.t =
-      { compilation_unit; name; debug_info = debug; linkage_name }
+      { compilation_unit; name; slot_stamp; debug_info = debug; linkage_name }
     in
     Table.add !grand_table_of_code_ids data
 
   let rename t =
-    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
+    let { Code_id_data.name; slot_stamp; debug_info; _ } = find_data t in
+    create ~name ~slot_stamp ~debug:debug_info (Current_unit.get_cu_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit
