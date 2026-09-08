@@ -451,7 +451,7 @@ let mode_bound sep f { bound_vars; bound_const } =
 
 let mode_desc f m =
   match m with
-  | Mode consts -> pp_mode_consts f consts
+  | Mode s -> pp_print_string f s
   | Mode_var v -> pp f "'%s" v.txt
   | Mode_bounds { upper; lower } -> (
       let is_empty { bound_vars; bound_const } =
