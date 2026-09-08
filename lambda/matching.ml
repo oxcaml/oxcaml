@@ -488,6 +488,10 @@ let matcher discr (p : Simple.pattern) rem =
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
   | Unboxed_unit, Unboxed_unit -> yes ()
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
+  (* CR zeisbach: not checking the sorts is a little suspicious here, and could
+     (according to a robot) be bad but isn't currently... since this function
+     could lead to sharing of checks between branches with different sorts.
+     Check the invariant on line 1627 *)
   | Tuple l1, Tuple l2 ->
       (* List lengths can differ with GADT refinements.
          see [basic-more/robustmatch.ml] module [M7] for an example *)
