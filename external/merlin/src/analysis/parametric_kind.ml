@@ -21,8 +21,7 @@ let parameter_bound ~base param coeff =
   let coeff = Ldd.sub_subsets coeff base in
   let mask = Ldd.round_up coeff in
   if Axis_lattice.equal mask Axis_lattice.bot then None
-  else
-    Some (param, { Types.With_bounds_type_info.bounds_mask = mask })
+  else Some (param, { Types.With_bounds_type_info.bounds_mask = mask })
 
 (* Rebuild a jkind from a settled ikind: one whose base and coefficients
    are constants, as produced by [remove_named_types]. Note, that we cannot

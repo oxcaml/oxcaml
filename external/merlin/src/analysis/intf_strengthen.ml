@@ -295,7 +295,9 @@ end = struct
         } ~f:(fun acc (item : Types.signature_item) ->
         match item with
         | Sig_value (id, vd, _) ->
-          { acc with vds = String.Map.add ~key:(Ident.name id) ~data:vd acc.vds }
+          { acc with
+            vds = String.Map.add ~key:(Ident.name id) ~data:vd acc.vds
+          }
         | Sig_type (id, td, _, _) ->
           let name = Ident.name id in
           let path : Path.t =
@@ -308,7 +310,8 @@ end = struct
           }
         | Sig_module (id, _, _, _, _) ->
           { acc with
-            module_ids = String.Map.add ~key:(Ident.name id) ~data:id acc.module_ids
+            module_ids =
+              String.Map.add ~key:(Ident.name id) ~data:id acc.module_ids
           }
         | Sig_modtype (id, _, _) ->
           { acc with
@@ -317,7 +320,8 @@ end = struct
           }
         | Sig_jkind (id, _, _) ->
           { acc with
-            jkind_ids = String.Map.add ~key:(Ident.name id) ~data:id acc.jkind_ids
+            jkind_ids =
+              String.Map.add ~key:(Ident.name id) ~data:id acc.jkind_ids
           }
         | _ -> acc)
 
@@ -358,7 +362,9 @@ end = struct
     let index = index_impl_sig ~impl_prefix impl_sig in
     { impl_vds = index.vds;
       impl_tds =
-        String.Map.map ~f:(fun (~id:_, ~path, ~decl) -> (~path, ~decl)) index.tds;
+        String.Map.map
+          ~f:(fun (~id:_, ~path, ~decl) -> (~path, ~decl))
+          index.tds;
       impl_prefix;
       impl_sig;
       subst = extend_subst subst index ~intf_sig
