@@ -41,7 +41,7 @@ module Monomorphic_immutable = struct
 end
 
 module Monomorphic_mutable = struct
-  type field = #(float32# * int32#)
+  type field = #(float32_u * int32_u)
   type t = { mutable a : field } [@@boxed]
 
   external make : field -> t = "%makemutable"
@@ -83,7 +83,7 @@ module Polymorphic_immutable = struct
   external field0 : ('a : any). 'a t -> 'a = "%field0_of_1_immut"
   [@@layout_poly]
 
-  type field = int64#
+  type field = int64_u
 
   let print a =
     pr (Int64_u.to_string a)
@@ -146,7 +146,7 @@ module Polymorphic_mutable = struct
 end
 
 module Ref = struct
-  type field = #(int16# * nativeint#)
+  type field = #(int16# * nativeint_u)
 
   let print #(a1, a2) =
     pr ("#(" ^ Int16_u.to_string a1 ^ ", " ^ Nativeint_u.to_string a2 ^ ")")
