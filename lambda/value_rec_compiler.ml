@@ -292,6 +292,8 @@ let compute_static_size lam =
     else Array.length shape
   and all_value_mixed_block_size_types shape =
     all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
+  and uniform_block_size ~tag size =
+    if size = 0 then Empty_block { tag } else Regular_block size
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -356,9 +358,7 @@ let compute_static_size lam =
                Variant_boxed _)
               when Mixed_product_bytes.types_shape_is_all_value shape ->
             let size = all_value_mixed_block_size_types shape in
-            if size = 0
-            then Block (Empty_block { tag = runtime_tag })
-            else Block (Regular_block size)
+            Block (uniform_block_size ~tag:runtime_tag size)
         | Record_inlined (_, Constructor_mixed shape,
                           (Variant_boxed _ | Variant_extensible))
         | Record_mixed shape ->
@@ -401,8 +401,7 @@ let compute_static_size lam =
              | All_value -> List.length args
              | Shape shape -> all_value_mixed_block_size shape
            in
-           if size = 0 then Block (Empty_block { tag })
-           else Block (Regular_block size)
+           Block (uniform_block_size ~tag size)
          | Some arr -> Block (Mixed_block (compute_mixed_block_size arr)))
     | Pmakelazyblock _ ->
         Block Lazy_block
