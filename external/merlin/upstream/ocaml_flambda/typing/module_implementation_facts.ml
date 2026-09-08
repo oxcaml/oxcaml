@@ -498,42 +498,6 @@ let signature_index_of_module_type env (module_type : Types.module_type) =
   | Some signature -> index_of_signature signature
   | None -> empty_signature_index
 
-let constraint_removes_requirement env module_type (path, _, constraint_) =
-  let removes_item = function
-    | Types.Sig_type _, Twith_typesubst _
-    | Types.Sig_module _, Twith_modsubst _
-    | Types.Sig_modtype _, Twith_modtypesubst _
-    | Types.Sig_jkind _, Twith_jkindsubst _ ->
-      true
-    | _ -> false
-  in
-  let rec contains env module_type names =
-    match scraped_signature env module_type with
-    | None -> true
-    | Some signature ->
-      let env = Env.add_signature signature env in
-      List.exists
-        (fun item ->
-          match names, item with
-          | ( [name],
-              ( Types.Sig_type (id, _, _, _)
-              | Types.Sig_module (id, _, _, _, _)
-              | Types.Sig_modtype (id, _, _)
-              | Types.Sig_jkind (id, _, _) ) ) ->
-            String.equal name (Ident.name id) && removes_item (item, constraint_)
-          | name :: (_ :: _ as rest), Types.Sig_module (id, _, md, _, _) ->
-            String.equal name (Ident.name id) && contains env md.md_type rest
-          | _ -> false)
-        signature
-  in
-  match constraint_ with
-  | Twith_type _ | Twith_module _ | Twith_modtype _ | Twith_jkind _ -> false
-  | Twith_typesubst _ | Twith_modsubst _ | Twith_modtypesubst _
-  | Twith_jkindsubst _ -> (
-    match Path.flatten path with
-    | `Ok (root, names) -> contains env module_type (Ident.name root :: names)
-    | `Contains_apply -> true)
-
 let has_argument_members env (parameter_type : Types.module_type) =
   match scraped_signature env parameter_type with
   | Some signature ->
@@ -593,24 +557,11 @@ let named_modtype_uids env (module_type : Types.module_type) =
   Uid.Set.elements !uids
 
 let facts_of_tree compilation_unit artifact iterate =
-  let module Module_type_table = Hashtbl.Make (struct
-    type t = Typedtree.module_type
-
-    let equal left right = left == right
-
-    let hash module_type =
-      Hashtbl.hash (module_type.mty_uid, module_type.mty_loc)
-  end) in
   let unit_uid = Uid.of_compilation_unit_id compilation_unit in
   let facts = Builder.create () in
   let module_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let modtype_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let modtype_declaration_contexts : Context.t Uid.Tbl.t = Uid.Tbl.create 16 in
-  let modtype_definitions : Typedtree.module_type Uid.Tbl.t =
-    Uid.Tbl.create 16
-  in
-  let resolved_module_type_keys = Module_type_table.create 16 in
-  let substituted_module_types = ref [] in
   let parameter_expectations : Uid.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let binding_expectations : Key.t Uid.Tbl.t = Uid.Tbl.create 16 in
   let site_counter = ref 0 in
@@ -1969,7 +1920,6 @@ let facts_of_tree compilation_unit artifact iterate =
           (match declaration.mtd_type with
           | None -> ()
           | Some body -> (
-            Uid.Tbl.replace modtype_definitions declaration.mtd_uid body;
             match body.mty_desc with
             | Tmty_ident (path, _) -> (
               match
@@ -1990,8 +1940,6 @@ let facts_of_tree compilation_unit artifact iterate =
       module_type =
         (fun iterator module_type ->
           let traverse () =
-            Module_type_table.replace resolved_module_type_keys module_type
-              (key_of_module_type module_type);
             let env = module_type.mty_env in
             let key = Key.Anon module_type.mty_uid in
             (match module_type.mty_desc with
@@ -2033,26 +1981,22 @@ let facts_of_tree compilation_unit artifact iterate =
                     ())
                 signature.sig_items
             | Tmty_with (base, constraints) ->
-              let preserves_base =
-                List.for_all
+              let has_destructive_substitution =
+                List.exists
                   (fun (_, _, constraint_) ->
                     match constraint_ with
                     | Twith_type _ | Twith_module _ | Twith_modtype _
                     | Twith_jkind _ ->
-                      true
+                      false
                     | Twith_typesubst _ | Twith_modsubst _
                     | Twith_modtypesubst _ | Twith_jkindsubst _ ->
-                      false)
+                      true)
                   constraints
               in
               add_dependency ~derived:key ~source:(key_of_module_type base)
-                (if preserves_base
-                 then Dependency.Reason.With_constraint
-                 else Dependency.Reason.Destructive_substitution);
-              if not preserves_base
-              then
-                substituted_module_types
-                  := (key, base, constraints) :: !substituted_module_types;
+                (if has_destructive_substitution
+                 then Dependency.Reason.Destructive_substitution
+                 else Dependency.Reason.With_constraint);
               let base_index =
                 lazy (signature_index_of_module_type env base.mty_type)
               in
@@ -2061,14 +2005,11 @@ let facts_of_tree compilation_unit artifact iterate =
                 (fun (component, (lid : Longident.t Location.loc), constraint_)
                    ->
                   match constraint_ with
-                  | Twith_modtype constraint_type ->
-                    add_dependency ~derived:key
-                      ~source:(key_of_module_type constraint_type)
-                      Dependency.Reason.Interface_member
+                  | Twith_modtype constraint_type
                   | Twith_modtypesubst constraint_type ->
                     add_dependency ~derived:key
                       ~source:(key_of_module_type constraint_type)
-                      Dependency.Reason.Destructive_substitution
+                      Dependency.Reason.Interface_member
                   | Twith_module (rhs, _) | Twith_modsubst (rhs, _) -> (
                     add_subject_expectation_edges key ~site:lid.loc env
                       Dependency.Reason.Interface_member rhs;
@@ -2163,55 +2104,6 @@ let facts_of_tree compilation_unit artifact iterate =
     }
   in
   iterate iterator;
-  let add_preserved_requirements (derived, base, constraints) =
-    let rec visit visited constraints (module_type : Typedtree.module_type) =
-      let env = module_type.mty_env in
-      match
-        Module_type_table.find_opt resolved_module_type_keys module_type
-      with
-      | None ->
-        add_omission ~affected:(Some derived) ~source:None
-          Omission.Reason.Unresolved_module_type
-      | Some source -> (
-        if
-          not
-            (List.exists
-               (constraint_removes_requirement env module_type.mty_type)
-               constraints)
-        then add_dependency ~derived ~source Dependency.Reason.With_constraint
-        else
-          let unresolved () =
-            add_omission ~affected:(Some derived) ~source:(Key.family source)
-              Omission.Reason.Unresolved_module_type
-          in
-          match module_type.mty_desc with
-          | Tmty_ident (path, _) -> (
-            match find_modtype env path with
-            | Some declaration
-              when not (Uid.Set.mem declaration.mtd_uid visited) -> (
-              match
-                Uid.Tbl.find_opt modtype_definitions declaration.mtd_uid
-              with
-              | Some body ->
-                visit (Uid.Set.add declaration.mtd_uid visited) constraints body
-              | None -> unresolved ())
-            | Some _ | None -> unresolved ())
-          | Tmty_signature signature ->
-            List.iter
-              (fun item ->
-                match item.sig_desc with
-                | Tsig_include (include_, _) ->
-                  visit visited constraints include_.incl_mod
-                | _ -> ())
-              signature.sig_items
-          | Tmty_with (base, inner_constraints) ->
-            visit visited (inner_constraints @ constraints) base
-          | Tmty_strengthen (base, _, _) -> visit visited constraints base
-          | Tmty_typeof _ | Tmty_alias _ | Tmty_functor _ -> unresolved ())
-    in
-    visit Uid.Set.empty constraints base
-  in
-  List.iter add_preserved_requirements !substituted_module_types;
   facts, fun uid -> Uid.Tbl.find_opt modtype_declaration_contexts uid
 
 let interface_check ~impl ~expectation =
