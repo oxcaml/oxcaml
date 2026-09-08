@@ -1193,8 +1193,7 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
         | Record_unboxed | Record_dummy _ | Record_undetermined
         | Record_variable _
         | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _
-                             | Constructor_immediate_all_void), _) ->
+                             | Constructor_variable _), _) ->
             (* The outer match guards against this *)
             assert false
         | Record_inlined (_, Constructor_uniform_value, _)
