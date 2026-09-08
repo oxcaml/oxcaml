@@ -148,7 +148,7 @@ type b1_unboxed = b1#
 type inline = A of { a : nested; }
 |}]
 
-(* Erasing fields does not erase source-level mutability. *)
+(* Mutability of `void` fields in all-`void` records. *)
 
 type t = A of { x : unit# }
 let set (A r) = r.x <- #()
