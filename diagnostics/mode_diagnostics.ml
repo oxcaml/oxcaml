@@ -201,9 +201,6 @@ module Step = struct
           Some { pinpoint = s.pinpoint; mode = s.mode; says })
       chain
 
-  let origin (chain : t list) =
-    match List.rev chain with [] -> None | s :: _ -> Some s
-
   let rec for_explanation (chain : t list) =
     match chain with
     | [] -> []
@@ -233,8 +230,6 @@ module Step = struct
     | Signature_argument _ | Reroute _ ->
       false
 
-  let any_escapes_region chain = List.exists is_region_escape chain
-
   let mutable_read (s : t) : Mode.Hint.mutable_part option =
     match s.says with
     | Fact (Mutable_read part) -> Some part
@@ -259,16 +254,6 @@ module Step = struct
     | Signature_argument _ | Reroute _ ->
       false
 
-  let no_reroutes (chain : t list) =
-    List.for_all
-      (fun (s : t) ->
-        match s.says with
-        | Nothing_to_say | Unexplained | User_annotation _
-        | User_modality_annotation _ | Capture _ | Fact _
-        | Signature_argument _ ->
-          true
-        | Reroute _ -> false)
-      chain
 end
 
 let word_segment = function
@@ -280,7 +265,7 @@ let subject_words subject = List.map word_segment subject.Nlg.name
 let human_desc : Mode.Hint.pinpoint_desc -> string = function
   | Unknown -> "this value"
   | Ident _ -> "this identifier"
-  | Function -> "the function"
+  | Function -> "the anonymous function"
   | Parameter -> "the parameter"
   | Return -> "the function's return value"
   | Module -> "the module"
@@ -574,12 +559,15 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
           txt " applied at ";
           Nlg.mention ~case:Subject application ] ]
 
-let rec explain_chain ~side ~subject (chain : Step.t list) :
+let rec explain_chain ~side ~subject ~extras (chain : Step.t list) :
     term Nlg.aside list =
+  let following rest =
+    match rest with [] -> None | (next : Step.t) :: _ -> Some next
+  in
   match chain with
   | [] -> []
   | { says = Nothing_to_say | Unexplained; _ } :: rest ->
-    explain_chain ~side ~subject rest
+    explain_chain ~side ~subject ~extras rest
   | ({ says = Capture { relation; details; source_side }; _ } as step)
     :: rest ->
     let pinpoint =
@@ -606,11 +594,12 @@ let rec explain_chain ~side ~subject (chain : Step.t list) :
         in
         (* Introduce the next subject by name; its reasons may use pronouns. *)
         [ Nlg.note
-            ~asides:(explain_chain ~side:source_side ~subject:source rest)
+            ~asides:
+              (explain_chain ~side:source_side ~subject:source ~extras rest)
             (Nlg.txt "and " :: Nlg.mention ~case:Subject source :: Nlg.copula
             :: Nlg.txt predicate :: mode) ]
     in
-    say_step ~side ~asides ~subject step
+    say_step ~side ~asides ~subject step @ extras step (following rest)
   | step :: rest ->
     let next_subject =
       match rest with
@@ -623,8 +612,8 @@ let rec explain_chain ~side ~subject (chain : Step.t list) :
         in
         if same_location then subject else subject_of_pinpoint next.pinpoint
     in
-    let asides = explain_chain ~side ~subject:next_subject rest in
-    say_step ~side ~asides ~subject step
+    let asides = explain_chain ~side ~subject:next_subject ~extras rest in
+    say_step ~side ~asides ~subject step @ extras step (following rest)
 
 module Rule = struct
   type accessed =
@@ -641,11 +630,6 @@ module Rule = struct
     | Mutable_write_requirement of accessed * mutable_axis
     | Mutable_read_requirement of accessed * mutable_axis
     | Local_escape
-
-  let explains : t -> Side.t = function
-    | Nonportable_closure | Portable_function_contends_captures -> Actual
-    | Mutable_write_requirement _ | Mutable_read_requirement _ | Local_escape ->
-      Expected
 
   let accessed (part : Mode.Hint.mutable_part) : accessed =
     match part with Record_field _ -> Field | Array_elements -> Array_elements
@@ -706,11 +690,21 @@ module Rule = struct
   let same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right) =
     Int.equal (Mode.Alloc.Axis.compare left right) 0
 
-  let detect ~axis ~actual ~expected : t list =
+  let at_step ~axis (step : Step.t) (next : Step.t option) : t list =
     let on axis' = same_alloc_axis axis (Mode.Alloc.Axis.P axis') in
-    let actual_is_closure =
-      Step.no_reroutes actual && List.exists Step.is_capture actual
+    let step_on wanted (s : Step.t) =
+      match Mode.reported_mode_as_alloc_atom s.mode with
+      | None -> false
+      | Some (Mode.Alloc.Atom (ax, _)) ->
+        same_alloc_axis (Mode.Alloc.Axis.P ax) wanted
     in
+    let crosses ~source ~target =
+      Step.is_capture step && step_on source step
+      &&
+      match next with None -> false | Some next -> step_on target next
+    in
+    let portability = Mode.Alloc.Axis.P (Comonadic Portability) in
+    let contention = Mode.Alloc.Axis.P (Monadic Contention) in
     let mutable_axis =
       if on (Monadic Contention)
       then Some On_contention
@@ -719,19 +713,21 @@ module Rule = struct
       else None
     in
     let mutable_requirement part_of =
-      Option.bind mutable_axis (fun mutable_axis ->
-          match
-            ( Option.bind (Step.origin actual) part_of,
-              Option.bind (Step.origin expected) part_of )
-          with
-          | Some part, _ | None, Some part -> Some (accessed part, mutable_axis)
-          | None, None -> None)
+      match next with
+      | Some _ -> None
+      | None ->
+        Option.bind mutable_axis (fun mutable_axis ->
+            Option.map
+              (fun part -> accessed part, mutable_axis)
+              (part_of step))
     in
     List.filter_map Fun.id
-      [ (if on (Comonadic Portability) && actual_is_closure
+      [ (if on (Comonadic Portability)
+            && crosses ~source:portability ~target:contention
          then Some Nonportable_closure
          else None);
-        (if on (Monadic Contention) && actual_is_closure
+        (if on (Monadic Contention)
+            && crosses ~source:contention ~target:portability
          then Some Portable_function_contends_captures
          else None);
         Option.map
@@ -742,24 +738,20 @@ module Rule = struct
           (fun (accessed, mutable_axis) ->
             Mutable_read_requirement (accessed, mutable_axis))
           (mutable_requirement Step.mutable_read);
-        (if Step.any_escapes_region actual || Step.any_escapes_region expected
+        (if on (Comonadic Areality) && Step.is_region_escape step
          then Some Local_escape
          else None) ]
 end
 
-let plan_rules ~axis ~actual ~expected ~explains : term Nlg.aside list =
-  Rule.detect ~axis ~actual ~expected
-  |> List.filter (fun rule -> Side.equal (Rule.explains rule) explains)
+let step_rules ~axis (step : Step.t) (next : Step.t option) :
+    term Nlg.aside list =
+  Rule.at_step ~axis step next
   |> List.map (fun rule -> Nlg.background (Rule.sentence rule))
 
-let plan_suggestions ~(expected : Step.t list) : term Nlg.aside list =
+let step_suggestions (step : Step.t) (next : Step.t option) :
+    term Nlg.aside list =
   let open Nlg in
-  let function_return_origin =
-    match Step.origin expected with
-    | None -> false
-    | Some origin -> Step.is_function_return origin
-  in
-  if function_return_origin
+  if Option.is_none next && Step.is_function_return step
   then
     [ Nlg.suggest
         [ txt "use ";
@@ -871,8 +863,8 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
      } :
       axis_input) : term Nlg.story list =
   let open Nlg in
-  let actual = Step.of_chain actual in
-  let expected = Step.of_chain expected in
+  let actual = Step.for_explanation (Step.of_chain actual) in
+  let expected = Step.for_explanation (Step.of_chain expected) in
   let subject =
     match (subject_override : subject option) with
     | Some subject -> subject
@@ -881,8 +873,12 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
       | (s : Step.t) :: _ -> subject_of_pinpoint s.pinpoint
       | [] -> subject_of_loc ~fallback:"this value" error_loc)
   in
-  let step_asides side chain =
-    explain_chain ~side ~subject (Step.for_explanation chain)
+  let expected_extras step next =
+    step_rules ~axis step next @ step_suggestions step next
+  in
+  let actual_extras step next = step_rules ~axis step next in
+  let step_asides side ~extras chain =
+    explain_chain ~side ~subject ~extras chain
   in
   let actuality_explanation =
     match actuality_note with
@@ -909,10 +905,8 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
   let expected_beat =
     Nlg.claim ~subject
       ~asides:
-        (step_asides Expected expected
-        @ signature_reason
-        @ plan_rules ~axis ~actual ~expected ~explains:Expected
-        @ extra_rules.for_expected @ plan_suggestions ~expected)
+        (step_asides Expected ~extras:expected_extras expected
+        @ signature_reason @ extra_rules.for_expected)
       (Nlg.mention ~case:Subject subject
       :: copula
       :: txt
@@ -923,9 +917,8 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
   let actual_beat =
     Nlg.but ~subject
       ~asides:
-        (step_asides Actual actual @ actuality_explanation
-        @ plan_rules ~axis ~actual ~expected ~explains:Actual
-        @ extra_rules.for_actual)
+        (step_asides Actual ~extras:actual_extras actual
+        @ actuality_explanation @ extra_rules.for_actual)
       (Nlg.mention ~case:Subject subject
       :: copula
       :: txt (" " ^ loosened_comparative actual_loosened ~side:Actual)
