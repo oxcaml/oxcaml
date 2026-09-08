@@ -577,36 +577,23 @@ Error: Polymorphic variant constructor argument types must have layout value.
          because it's the type of the field of a polymorphic variant.
 |}]
 
-(************************************************)
-(* Test 9: Tuples only work on values (for now) *)
+(***************************************)
+(* Test 9: Tuples work with non-values *)
 
-(* CR layouts v5: these should work *)
 module M9_1 = struct
   type foo1 = int * t_void * [ `Foo1 of int | `Bar1 of string ];;
 end
 [%%expect{|
-Line 2, characters 20-26:
-2 |   type foo1 = int * t_void * [ `Foo1 of int | `Bar1 of string ];;
-                        ^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_void" is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a value layout
-         because it's the type of a tuple element.
+module M9_1 :
+  sig type foo1 = int * t_void * [ `Bar1 of string | `Foo1 of int ] end
 |}];;
 
 module M9_2 = struct
   type result = V of (string * void_unboxed_record) | I of int
 end;;
 [%%expect {|
-Line 2, characters 31-50:
-2 |   type result = V of (string * void_unboxed_record) | I of int
-                                   ^^^^^^^^^^^^^^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "void_unboxed_record" is void
-         because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of "void_unboxed_record" must be a value layout
-         because it's the type of a tuple element.
+module M9_2 :
+  sig type result = V of (string * void_unboxed_record) | I of int end
 |}];;
 
 module M9_3 = struct
@@ -618,15 +605,13 @@ module M9_3 = struct
     | V t -> t, 27
 end;;
 [%%expect {|
-Line 7, characters 13-14:
-7 |     | V t -> t, 27
-                 ^
-Error: The value "t" has type "void_unboxed_record"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of void_unboxed_record is void
-         because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a value layout
-         because it's the type of a tuple element.
+module M9_3 :
+  sig
+    type s =
+        V of void_unboxed_record [@immediate_all_void_constructor]
+      | I of int
+    val foo : s -> void_unboxed_record * int
+  end
 |}];;
 
 module M9_4 = struct
@@ -635,16 +620,7 @@ module M9_4 = struct
     | ({vur_void = _},i) -> i
 end;;
 [%%expect {|
-Line 4, characters 7-21:
-4 |     | ({vur_void = _},i) -> i
-           ^^^^^^^^^^^^^^
-Error: This pattern matches values of type "void_unboxed_record"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The layout of void_unboxed_record is void
-         because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a value layout
-         because it's the type of a tuple element.
+module M9_4 : sig val foo : void_unboxed_record * 'a -> 'a end
 |}];;
 
 module M9_5 = struct
@@ -663,34 +639,21 @@ Error: This type "t_void" should be an instance of type "('a : value)"
          because of the definition of t at line 2, characters 2-24.
 |}];;
 
+(* CR zeisbach: this matches the unboxed tuple behavior but I am still a little
+   confused as to why 'a seems to be inferred with kind value? *)
 module M9_6 = struct
   type 'a t = int * 'a constraint 'a = void_unboxed_record
 end;;
 [%%expect {|
-Line 2, characters 34-58:
-2 |   type 'a t = int * 'a constraint 'a = void_unboxed_record
-                                      ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The type constraints are not consistent.
-       Type "('a : value)" is not compatible with type "void_unboxed_record"
-       The layout of void_unboxed_record is void
-         because of the definition of void_unboxed_record at line 12, characters 0-60.
-       But the layout of void_unboxed_record must be a value layout
-         because it instantiates an unannotated type parameter of t,
-         chosen to have layout value.
+module M9_6 :
+  sig type 'a t = int * 'a constraint 'a = void_unboxed_record end
 |}];;
 
 module type S9_7 = sig
   val x : int * t_void
 end;;
 [%%expect{|
-Line 2, characters 16-22:
-2 |   val x : int * t_void
-                    ^^^^^^
-Error: Tuple element types must have layout value.
-       The layout of "t_void" is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of "t_void" must be a value layout
-         because it's the type of a tuple element.
+module type S9_7 = sig val x : int * t_void end
 |}];;
 
 module M9_9 (X : sig
@@ -701,15 +664,7 @@ struct
   | _ -> 42
 end;;
 [%%expect {|
-Line 5, characters 11-23:
-5 |   match 3, X.vr.vr_void with
-               ^^^^^^^^^^^^
-Error: The field access "X.vr.vr_void" has type "t_void"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because it's the type of a tuple element.
+module M9_9 : functor (X : sig val vr : void_record end) -> sig end
 |}];;
 
 (*************************************************)
@@ -1575,8 +1530,9 @@ val q : unit -> unit = <fun>
 |}]
 
 (* 28.7: non-value letop binder arg with and *)
-(* CR layouts v5: when we allow non-values in tuples, this next one should
-   type-check *)
+(* CR zeisbach: this does in fact type-check, as the previous comment said, but
+   in a way that is slightly confusing to me (though not as confusing as the
+   other one of these). This is worth discussing, I believe. *)
 let rec ( let* ) x f = ()
 and ( and* ) x1 x2 = assert false
 and q () =
@@ -1586,18 +1542,12 @@ and q () =
     ()
 
 [%%expect{|
-Line 4, characters 9-19:
-4 |     let* x : t_void = assert false
-             ^^^^^^^^^^
-Error: This pattern matches values of type "t_void"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 1, characters 0-18.
-       But the layout of t_void must be a value layout
-         because it's the type of a tuple element.
+val ( let* ) : 'a -> (t_void * 'b -> unit) -> unit = <fun>
+val ( and* ) : 'a -> int -> 'b = <fun>
+val q : unit -> unit = <fun>
 |}]
 
+(* CR zeisbach: see, this is the one that confuses me! *)
 let ( let* ) x f = ()
 let ( and* ) x1 x2 = assert false
 let q () =
@@ -1609,16 +1559,7 @@ let q () =
 [%%expect{|
 val ( let* ) : 'a -> 'b -> unit = <fun>
 val ( and* ) : 'a -> 'b -> 'c = <fun>
-Line 4, characters 9-22:
-4 |     let* x : t_float64 = assert false
-             ^^^^^^^^^^^^^
-Error: This pattern matches values of type "t_float64"
-       but a pattern was expected which matches values of type
-         "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 5, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a tuple element.
+val q : unit -> unit = <fun>
 |}]
 
 
@@ -1684,15 +1625,8 @@ type ('a : void) poly_var = [`A of int * 'a | `B]
 let f #poly_var = "hello"
 
 [%%expect{|
-Line 1, characters 41-43:
-1 | type ('a : void) poly_var = [`A of int * 'a | `B]
-                                             ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is void
-         because of the annotation on 'a in the declaration of the type
-                                      poly_var.
-       But the layout of "'a" must be a value layout
-         because it's the type of a tuple element.
+type ('a : void) poly_var = [ `A of int * 'a | `B ]
+val f : [< 'a poly_var ] -> string = <fun>
 |}]
 
 (* CR layouts bug: this should be accepted (or maybe we should reject
