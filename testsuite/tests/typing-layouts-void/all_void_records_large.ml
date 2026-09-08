@@ -14,8 +14,8 @@
    identity, or particular allocation counts. *)
 
 module Large : sig
-  val all_void : unit -> string list * string list
-  val mixed : unit -> string list * string list * string list
+  val all_void : unit -> unit
+  val mixed : unit -> string list
 end = struct
   (* One type supplies both the zero-word and one-word native records. *)
   type ('a : any) t = {
@@ -223,56 +223,58 @@ end = struct
   let describe r =
     let repr = Obj.repr (Sys.opaque_identity r) in
     if Obj.is_int repr then "immediate"
-    else Printf.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
+    else Format.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
 
-  let mark log name = log := name :: !log; #()
+  let mark name = Format.printf "%s\n" name; #()
 
-  let[@inline never] update_void log (r : unit# t) =
-    { (log := "record" :: !log; Sys.opaque_identity r) with
-      f000 = mark log "first";
-      f254 = mark log "last" }
+  let[@inline never] update_void (r : unit# t) =
+    { (Format.printf "record\n"; Sys.opaque_identity r) with
+      f000 = mark "first";
+      f254 = mark "last" }
 
-  let[@inline never] update_mixed log (r : string t) =
-    { (log := "record" :: !log; Sys.opaque_identity r) with
-      f000 = mark log "first";
-      f254 = mark log "last" }
+  let[@inline never] update_mixed (r : string t) =
+    { (Format.printf "record\n"; Sys.opaque_identity r) with
+      f000 = mark "first";
+      f254 = mark "last" }
 
   let all_void () =
-    let log = ref [] in
     let before = Sys.opaque_identity (make_void ()) in
-    let after = update_void log before in
+    let after = update_void before in
     let #() = after.f000 in
     let #() = after.f254 in
     let #() = after.kept in
-    [describe before; describe after], List.sort String.compare !log
+    Format.printf "before: %s\n after: %s\n" (describe before) (describe after)
 
   let mixed () =
-    let log = ref [] in
     let kept = String.concat "-" ["preserved"; "payload"] in
     let before = Sys.opaque_identity (make_mixed kept) in
-    let after = update_mixed log before in
+    let after = update_mixed before in
     let #() = after.f000 in
     let #() = after.f254 in
-    [describe before; describe after],
-    [before.kept; after.kept], List.sort String.compare !log
+    Format.printf "before: %s\n after: %s\n" (describe before) (describe after);
+    [before.kept; after.kept]
 end
 [%%expect{|
 module Large :
-  sig
-    val all_void : unit -> string list * string list
-    val mixed : unit -> string list * string list * string list
-  end
+  sig val all_void : unit -> unit val mixed : unit -> string list end
 |}]
 
-let all_void = Large.all_void ()
+let all_void = Large.all_void (); Format.print_flush ()
 [%%expect{|
-val all_void : string list * string list =
-  (["block tag 0 size 0"; "block tag 0 size 0"], ["first"; "last"; "record"])
+record
+last
+first
+before: block tag 0 size 0
+ after: block tag 0 size 0
+val all_void : unit = ()
 |}]
 
-let mixed = Large.mixed ()
+let mixed = let rtn = Large.mixed () in Format.print_flush (); rtn
 [%%expect{|
-val mixed : string list * string list * string list =
-  (["block tag 0 size 1"; "block tag 0 size 1"],
-   ["preserved-payload"; "preserved-payload"], ["first"; "last"; "record"])
+record
+last
+first
+before: block tag 0 size 1
+ after: block tag 0 size 1
+val mixed : string list = ["preserved-payload"; "preserved-payload"]
 |}]
