@@ -302,6 +302,16 @@ let equal_addressing_mode left right =
     && Int.equal left_int right_int
   | (Iindexed _ | Ibased _), _ -> false
 
+let compare_addressing_mode left right =
+  match left, right with
+  | Iindexed left_v, Iindexed right_v ->
+    Validated_mem_offset.compare left_v right_v
+  | Ibased (left_sym, left_int), Ibased (right_sym, right_int) ->
+    let c = Asm_targets.Asm_symbol.compare left_sym right_sym in
+    if c <> 0 then c else Int.compare left_int right_int
+  | Iindexed _, Ibased _ -> -1
+  | Ibased _, Iindexed _ -> 1
+
 let equal_arith_operation left right =
   match left, right with
   | Ishiftadd, Ishiftadd -> true
@@ -365,6 +375,17 @@ let operation_is_pure : specific_operation -> bool = function
       Misc.fatal_errorf "Arch.operation_is_pure: Unexpected llvm_intrinsic %s: \
                                                   not using LLVM backend"
       intr
+
+(* Specific operations that are pure except possibly for writing to memory:
+   guaranteed not to read from memory, not to raise, and not to trigger the
+   execution of arbitrary code. Used by dead store elimination ([Cfg_dse]);
+   [false] is always a safe answer. *)
+let operation_is_pure_except_memory_writes : specific_operation -> bool =
+  function
+  | Ishiftarith _ | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
+  | Imulsubf | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ -> true
+  | Isimd _ | Illvm_intrinsic _ | Ifar_poll | Ifar_alloc _
+  | Ifar_stackcheck _ -> false
 
 (* Specific operations that can raise *)
 
