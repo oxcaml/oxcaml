@@ -1,3 +1,4 @@
+(* CR-someday hwasilewski: Turn on strong warnings (unused value etc.). *)
 module Name : sig
   type t
 
@@ -109,7 +110,7 @@ module Bin_op : sig
     | Shift_left
     | Shift_right
     | Shift_right_logical
-    | Eq
+    | Eq (* CR-someday hwasilewski: Also add non-equality. *)
     | Lt
     | Le
     | Gt
@@ -122,8 +123,8 @@ module Bin_op : sig
   val to_code :
     Ty.t ->
     t ->
-    Parsetree.expression ->
-    Parsetree.expression ->
+    lhs:Parsetree.expression ->
+    rhs:Parsetree.expression ->
     Parsetree.expression
 end
 

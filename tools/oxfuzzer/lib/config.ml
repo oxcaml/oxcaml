@@ -1,6 +1,5 @@
-(* CR-someday hwasilewski: Move all constants, including probabilities, into
-   Config. *)
-(* CR-soon hwasilewski: Make [Config] controlled by swarm testing. *)
+(* CR-someday hwasilewski: Make sure all constants, including probabilities, are
+   inside Config. *)
 let max_function_count = 10
 
 let fun_min_param_count = 0
