@@ -42,6 +42,13 @@ val mode_const_word :
 
 val words : t -> t Diagnostic_nlg.Phrase.t
 
+type documentation =
+  { description : string;
+    url : string option
+  }
+
+val set_documentation : (t -> documentation option) -> unit
+
 val entry : t -> Structured_diagnostic.Glossary_entry.t
 
 val realize :
