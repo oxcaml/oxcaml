@@ -109,7 +109,7 @@ function caml_ephe_get_key_copy(x, i) {
   return y;
 }
 
-//Provides: caml_ephe_check_key mutable
+//Provides: caml_ephe_check_key
 //Requires: caml_ephe_key_offset, caml_ephe_data_offset
 //Requires: caml_ephe_none
 //Alias: caml_weak_check
