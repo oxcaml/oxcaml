@@ -359,6 +359,23 @@ type t =
   | Saturate of rule list
   | Fixpoint of t list
 
+let rec print ppf = function
+  | Saturate rules ->
+    let char_trie = { count = 0; trie = CharMap.empty } in
+    let char_trie =
+      List.fold_left
+        (fun char_trie (Rule { rule_id; _ }) ->
+          add_to_trie char_trie (rule_id_to_string rule_id) ~pos:0)
+        char_trie rules
+    in
+    Format.fprintf ppf "(@[<1>saturate@ %a)@]"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space (print_rule char_trie))
+      rules
+  | Fixpoint schedules ->
+    Format.fprintf ppf "(@[<1>fix@ %a)@]"
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print)
+      schedules
+
 let recompile_rule_with_provenance ~stats rule =
   let (Rule { rule_id; variables; rule; _ }) = rule in
   let executor = compile_rule ~with_provenance:stats ~rule_id variables rule in

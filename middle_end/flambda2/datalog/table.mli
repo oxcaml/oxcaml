@@ -21,6 +21,8 @@ type _ result_repr
 
 val unit_repr : unit result_repr
 
+val provably_unit_repr : 'a result_repr -> ('a, unit) Type.eq option
+
 val result_repr_print : 'v result_repr -> Format.formatter -> 'v -> unit
 
 val result_repr_union : 'v result_repr -> 'v -> 'v -> 'v
