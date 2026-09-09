@@ -14,6 +14,10 @@ let[@inline always] mk_adder x = fun[@inline never] y -> x + y
 
 let[@inline always] apply_thrice f x = f (f (f x))
 
+(* Partially applied from e2e_inline.ml with its first argument omitted, so
+   that the frontend builds the wrapper and names this callee. *)
+let[@inline never] labelled ~a ~b = a - b
+
 let[@inline always] iterate_n f init n =
   let rec loop i acc =
     if i >= n then acc else loop (i + 1) (f acc)

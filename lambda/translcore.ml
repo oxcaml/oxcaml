@@ -526,8 +526,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let lam =
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -545,7 +544,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode ~yielding
+             ~position ~mode ~yielding ~callee:(path, e.exp_env)
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
@@ -560,11 +559,16 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
+      let callee =
+        match funct.exp_desc with
+        | Texp_ident { path; _ } -> Some (path, funct.exp_env)
+        | _ -> None
+      in
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout:layout
-           ~position ~mode ~yielding
+           ~position ~mode ~yielding ?callee
            (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
@@ -1693,6 +1697,31 @@ and transl_tupled_cases ~scopes rhs_layout patl_expr_list =
        (patl, transl_guard ~scopes guard rhs_layout expr))
     patl_expr_list
 
+(* The mangling path of the callee of a partial application, carried by the
+   [P] item of the wrapper's symbol: the callee's compilation unit and enclosing
+   modules, then the function itself, as in the path of the callee's own
+   symbol. Module aliases and [open]s are expanded so that every way of
+   referring to the callee gives the same name, and the compilation unit is
+   taken from the callee's address so that [-for-pack] prefixes and instance
+   arguments agree with the middle end's naming of the same callee. A callee
+   reached through a functor application cannot be named, and the path of a
+   callee bound in the current unit is relative to the application site. *)
+and partial_application_callee env (path : Path.t) :
+    Compilation_unit.t Structured_mangling.path =
+  match Path.flatten (Env.normalize_value_path None env path) with
+  | `Contains_apply -> []
+  | `Ok (name, []) -> [Structured_mangling.Function (Ident.name name)]
+  | `Ok (head, names) ->
+    let modules, name = Misc.split_last names in
+    let head : _ Structured_mangling.path_item =
+      match Env.find_module_address (Pident head) env with
+      | Env.Aunit (cu, _) -> Compilation_unit cu
+      | Env.Alocal _ | Env.Adot _ | exception Not_found ->
+        Module (Ident.name head)
+    in
+    (head :: List.map (fun m -> Structured_mangling.Module m) modules)
+    @ [Structured_mangling.Function name]
+
 and transl_apply ~scopes
       ?(tailcall=Default_tailcall)
       ?(inlined = Default_inlined)
@@ -1701,6 +1730,7 @@ and transl_apply ~scopes
       ?(position=Rc_normal)
       ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
+      ?callee
       ~result_layout
       lam sargs loc
   =
@@ -1749,8 +1779,7 @@ and transl_apply ~scopes
          always false currently for them. *)
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             loc
         in
         Lapply {
@@ -1866,7 +1895,16 @@ and transl_apply ~scopes
         let id_arg_duid = Lambda.debug_uid_none in
         (* Process remaining arguments and build closure *)
         let body =
-          let loc = map_scopes enter_partial_or_eta_wrapper loc in
+          let loc =
+            let callee =
+              match callee with
+              | None -> []
+              | Some (path, env) -> partial_application_callee env path
+            in
+            map_scopes
+              (fun scopes -> enter_partial_application ~scopes ~callee)
+              loc
+          in
           let mode = transl_typed_locality_mode_r mode_closure in
           let arg_mode = transl_typed_locality_mode_l mode_arg in
           let ret_mode = transl_ret_mode mode_ret in
