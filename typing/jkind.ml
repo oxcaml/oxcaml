@@ -1532,6 +1532,8 @@ module Base_and_axes = struct
                     fully_expand_aliases env b_jkind.jkind
                   in
                   let skippable_bounds =
+                    (* Prevent [b]'s with-bounds from raising its layout-implied
+                       externality. *)
                     match b_jkind_jkind.base with
                     | Layout l when Layout.crosses_externality l ->
                       Bounds_mask.join skippable_bounds
