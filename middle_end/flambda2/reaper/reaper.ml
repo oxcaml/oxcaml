@@ -143,6 +143,8 @@ module Staged = struct
         all_sets_of_closures = all_sets_of_closures'
       }
 
+    let code_deps t = t.code_deps
+
     let map_result_types t ~f =
       (* [code] is the only part of the rebuild data holding Flambda types. *)
       let map_rev_code (rev_code : Rev_expr.rev_code) =
@@ -168,19 +170,18 @@ module Staged = struct
       Traverse.run unit
     in
     let rebuild_data =
-      Traverse_rebuild.
-        { toplevel_expr;
-          code;
-          ordered_code_ids;
-          fixed_arity_continuations;
-          continuation_info;
-          code_deps;
-          all_sets_of_closures
-        }
+      { Traverse_rebuild.toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        code_deps;
+        all_sets_of_closures
+      }
     in
     deps, rebuild_data
 
-  let solve deps =
+  let solve deps ~code_deps:_ =
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps)
@@ -245,7 +246,10 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
   let deps, traverse_rebuild = Staged.traverse unit in
-  let solved_dep = Staged.solve deps in
+  let solved_dep =
+    Staged.solve deps
+      ~code_deps:(Staged.Traverse_rebuild.code_deps traverse_rebuild)
+  in
   let unit_metadata = Flambda_unit.metadata unit in
   Staged.rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
     ~cmx_loader ~all_code ~final_typing_env

@@ -24,13 +24,18 @@ module Staged : sig
     (** Map over the result types of the stored code metadata. Used for
         canonicalisation. *)
     val map_result_types : t -> f:(Flambda2_types.t -> Flambda2_types.t) -> t
+
+    val code_deps : t -> Traverse_acc.code_dep Code_id.Map.t
   end
 
   (** Traverse the compilation unit in preparation for Reaper analysis. *)
   val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t
 
   (** Run Reaper analysis for a compilation unit producing a Reaper solution. *)
-  val solve : Global_flow_graph.graph -> Unboxing_analysis.result
+  val solve :
+    Global_flow_graph.graph ->
+    code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+    Unboxing_analysis.result
 
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
       with dead code removed. *)
