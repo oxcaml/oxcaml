@@ -7,7 +7,7 @@
 type ('a : any) t = { mutable field : 'a }
 
 (* Record creation should return a statically allocated block
-   by moving it into `%rax`. *)
+   by moving it into [%rax]. *)
 let make () : unit# t = { field = #() }
 [%%expect_asm X86_64{|
 make:
@@ -17,7 +17,7 @@ make:
 
 (* Products shouldn't matter:
    they should also simply return a statically allocated block
-   by moving it into `%rax`. *)
+   by moving it into [%rax]. *)
 let product () : #(unit# * unit#) t = { field = #(#(), #()) }
 [%%expect_asm X86_64{|
 product:
@@ -25,16 +25,14 @@ product:
   ret
 |}]
 
-(* Getting a `void` field should be a no-op. *)
+(* Getting a [void] field should be a no-op. *)
 let get (t : unit# t) = t.field
 [%%expect_asm X86_64{|
 get:
   ret
 |}]
 
-(* Setting a `void` field should be a no-op.
-   Note that `set` itself returns a *boxed* `()`,
-   so the assembly will return an immediate. *)
+(* Setting a [void] field should be a no-op. *)
 let set (t : unit# t) = t.field <- #()
 [%%expect_asm X86_64{|
 set:
