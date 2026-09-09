@@ -39,39 +39,40 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
-  let format_anonymous_location prefix line col file_opt =
-    let file = Option.value ~default:"" file_opt in
-    Printf.sprintf "%s(%s:%d:%d)" prefix file line col
-
   (* Stamps are rendered separately from the other items: see [pp_path]. *)
-  let render_path_item (item : string Structured_mangling.path_item) :
+  let rec render_path_item (item : string Structured_mangling.path_item) :
       (string, int) Either.t =
     match item with
     | Compilation_unit s | Module s | Class s | Function s -> Left s
     | Anonymous_function n -> Left (Printf.sprintf "fn_{%d}" n)
     | Anonymous_module n -> Left (Printf.sprintf "mod_{%d}" n)
     | Lazy n -> Left (Printf.sprintf "lazy_{%d}" n)
-    | Partial_function (l, c, f) ->
-      Left (format_anonymous_location "partial" l c f)
+    | Partial [] -> Left "partial{?}"
+    | Partial callee -> Left ("partial{" ^ fst (render_items callee) ^ "}")
     (* Inline_marker: the function body was specialized (copied) into the
        current compilation unit, not inlined at a particular call site, so we
        print [<specialization_of>] rather than [<inlining>]. *)
     | Inline_marker -> Left "<specialization_of>"
     | Stamp n -> Right n
 
+  (* Renders the items of a path, setting its stamps aside. *)
+  and render_items items =
+    let items, stamps = List.partition_map render_path_item items in
+    String.concat "." items, stamps
+
   (* Compiler-generated stamps only serve to make symbols unique and change
      whenever unrelated code is modified, so by default they are omitted so that
      the demangled name is stable. With [show_stamps], they are appended in
      braces, e.g. [Foo.bar{0,3}]. *)
   let pp_path ~show_stamps path =
-    let items, stamps = List.partition_map render_path_item path in
+    let items, stamps = render_items path in
     let stamps =
       match show_stamps, stamps with
       | false, _ | true, [] -> ""
       | true, _ :: _ ->
         "{" ^ String.concat "," (List.map string_of_int stamps) ^ "}"
     in
-    String.concat "." items ^ stamps
+    items ^ stamps
 
   let unmangle ~show_stamps sym =
     Option.map (pp_path ~show_stamps) (Structured_mangling.Parse.parse sym)
