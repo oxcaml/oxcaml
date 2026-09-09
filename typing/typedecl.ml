@@ -2128,7 +2128,9 @@ let compute_block_shape env types =
         (Element_repr.classify env ty jkind ~default_to_scannable:false))
       types
   in
-  Option.map Element_repr.mixed_product_shape_known ts
+  match ts with
+  | None -> `Undetermined
+  | Some ts -> Element_repr.mixed_product_shape_known ts
 
 type unrepresentable_constructor =
   | Unrepresentable_argument of int
@@ -2580,10 +2582,10 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
     else
       let types = Array.to_list sorts_and_types |> List.map snd in
       match compute_block_shape env types with
-      | Some shape ->
+      | (`Not_mixed | `Mixed _) as shape ->
           Element_repr.check_mixed_product_shape loc shape kind;
           shape
-      | None ->
+      | `Undetermined ->
           Misc.fatal_error
             "Typedecl.finalize_instantiated_shape: unrepresentable element, \
              but typechecking succeeded"
