@@ -116,6 +116,10 @@ class Toolchain:
             # ),
         )
 
+    # Snapshotting is mainly useful for development and running the fuzzer locally.
+    # Without copying the toolchain from the compiler repo to another directory, any
+    # recompile of oxcaml will cause some compilation failures, while the compiler
+    # executable is temporarily nonexistent, for example, which happens fairly often.
     def snapshot(self, destination: Path) -> "Toolchain":
         for source in (
             self.oxfuzzer, self.ocamlc, self.ocamlopt, self.ocamlrun, self.ocamllib,
@@ -129,6 +133,30 @@ class Toolchain:
                 shutil.copy2(source, target)
         return Toolchain(destination)
 
+    # Make sure `make compiler` was run before the fuzzer is executed and that
+    # all necessary dependencies are available.
+    def check_dependencies(self) -> None:
+        missing = [
+            path
+            for path in [self.oxfuzzer, self.ocamlc, self.ocamlopt]
+            if not path.is_file() or not os.access(path, os.X_OK)
+        ]
+        if not self.ocamllib.is_dir():
+            missing.append(self.ocamllib)
+        if not os.access(self.ocamlrun, os.X_OK):
+            missing.append(self.ocamlrun)
+
+        if missing:
+            formatted = "\n".join(f"  {path}" for path in missing)
+            raise SystemExit(f"""oxfuzzer: some dependencies are missing.
+
+Missing files:
+{formatted}
+
+From the repository root, run:
+  make compiler
+""")
+
 
 COMPILE_TIMEOUT_SEC = 100.0
 RUN_TIMEOUT_SEC = 10.0
@@ -137,30 +165,6 @@ MAX_PROGRAM_BYTES = 1024 * 1024
 
 RATE_SMOOTHING = 0.01
 PROGRESS_INTERVAL_SEC = 30.0
-
-# Make sure `make compiler` was run before the fuzzer is executed and that
-# all dependencies are available.
-def check_dependencies(toolchain: Toolchain) -> None:
-    missing = [
-        path
-        for path in [toolchain.oxfuzzer, toolchain.ocamlc, toolchain.ocamlopt]
-        if not path.is_file() or not os.access(path, os.X_OK)
-    ]
-    if not toolchain.ocamllib.is_dir():
-        missing.append(toolchain.ocamllib)
-    if not os.access(toolchain.ocamlrun, os.X_OK):
-        missing.append(toolchain.ocamlrun)
-
-    if missing:
-        formatted = "\n".join(f"  {path}" for path in missing)
-        raise SystemExit(f"""oxfuzzer: some dependencies are missing.
-
-Missing files:
-{formatted}
-
-From the repository root, run:
-  make compiler
-""")
 
 @dataclass(frozen=True)
 class CommandResult:
@@ -316,6 +320,10 @@ async def generate(seed: int, *, toolchain: Toolchain, work_dir: Path) -> bytes:
         output_prefix=work_dir / "generate",
     )
     stderr = result.stderr.decode(errors="replace")
+    # CR-soon hwasilewski: This should not interrupt the fuzzing campaign,
+    # it should probably be reported as a standard failure and saved to
+    # investigate the generator bug.
+
     # Generation failing is a fatal error.
     if result.timed_out:
         raise SystemExit(f"generation timed out. seed: {seed}.\n{stderr}")
@@ -481,6 +489,9 @@ def reproduction_script(
     command = compile_command(
         configuration, source=Path("../program.ml"), executable=Path("program.exe")
     )
+    # CR-soon hwasilewski: We should also capture OCAMLPARAM and OCAMLRUNPARAM,
+    # which are inherited by compilation and execution by default, but may differ
+    # in the shell, which executes ./run.sh.
     return "\n".join(
         [
             "#!/usr/bin/env bash",
@@ -759,8 +770,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         help="seed for the sequence of case seeds (default: random, printed)",
     )
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be at least 1")
     toolchain = Toolchain(REPOSITORY_ROOT / "_build")
-    check_dependencies(toolchain)
+    toolchain.check_dependencies()
     base_seed = (
         args.seed if args.seed is not None else random.SystemRandom().getrandbits(62)
     )
@@ -771,6 +784,8 @@ Exit status is 1 if any case failed, 0 otherwise.""",
     toolchain_dir = Path(tempfile.mkdtemp(
         prefix="toolchain-", dir=args.output.resolve()
     ))
+    # CR-someday hwasilewski: Clean up the snapshot after finishing fuzzing if
+    # no failures were saved.
     toolchain = toolchain.snapshot(toolchain_dir)
     print(f"toolchain: {toolchain_dir}", file=sys.stderr)
     run_info = run_metadata(base_seed, toolchain)
@@ -789,6 +804,10 @@ Exit status is 1 if any case failed, 0 otherwise.""",
                 run_dir=Path(run_dir),
                 iterations=args.iterations,
                 jobs=args.jobs,
+                # CR-soon hwasilewski: We should instead create a temporary
+                # directory inside of args.output, so that there are no
+                # collisions on rerunning a command with the same output
+                # directory.
                 output_dir=args.output,
                 base_seed=base_seed,
                 run_info=run_info,

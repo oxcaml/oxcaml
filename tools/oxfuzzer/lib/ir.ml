@@ -153,7 +153,7 @@ module Ty = struct
     | Bool
 
   and record =
-    { id : int;
+    { id : int; (* Unique record ID. *)
       fields : field list;
       unboxed : bool
     }
@@ -232,7 +232,7 @@ module Bin_op = struct
     | Bool | Array _ | Record _ ->
       Misc.fatal_errorf "Bin_op.ops_for_ty: expected a numeric type"
 
-  let to_code ty binop lhs rhs =
+  let to_code ty binop ~lhs ~rhs =
     let module_name =
       match ty with
       | Ty.Number nty -> NumberTy.to_module nty
@@ -252,6 +252,7 @@ module Bin_op = struct
     | Shift_right -> call "shift_right"
     | Shift_right_logical -> call "shift_right_logical"
     | Eq -> call "equal"
+    (* CR-someday hwasilewski: Sometimes emit compare x y = 0 instead. *)
     | Lt -> op "<" [call "compare"; int 0]
     | Le -> op "<=" [call "compare"; int 0]
     | Gt -> op ">" [call "compare"; int 0]
@@ -371,7 +372,7 @@ module Expr = struct
     | Opaque expr ->
       apply (qualified_ident "Sys" "opaque_identity") [to_code expr]
     | Bin_op { ty; op; lhs; rhs } ->
-      Bin_op.to_code ty op (to_code lhs) (to_code rhs)
+      Bin_op.to_code ty op ~lhs:(to_code lhs) ~rhs:(to_code rhs)
     | Convert { expr; from; to_ } -> convert_num (to_code expr) ~from ~to_
     | Call_toplevel { fun_name; args } ->
       let args = match args with [] -> [unit_] | _ -> List.map to_code args in
@@ -461,6 +462,7 @@ module Statement = struct
         (Expr.to_code init)
         (Exp.let_ Immutable Nonrecursive
            [Vb.mk (Pat.var (loc bound_name)) (Expr.to_code bound)]
+           (* CR-someday hwasilewski: Sometimes emit as a for loop instead. *)
            (Exp.while_
               (op comparison [ident name; ident bound_name])
               (Exp.sequence (to_code body)
