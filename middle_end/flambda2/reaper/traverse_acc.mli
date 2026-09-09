@@ -90,6 +90,13 @@ val find_code_dep : t -> Code_id.t -> code_dep option
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
 
+val connect_closure :
+  Graph.graph ->
+  closure:Code_id_or_name.t ->
+  code_id:Code_id.t ->
+  code_dep ->
+  unit
+
 val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
 
 val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
