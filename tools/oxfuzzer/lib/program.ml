@@ -41,11 +41,8 @@ let conversions number_types =
       then unsafe_converter_name ~from ~to_
       else NumberTy.converter_name ~from ~to_
     in
-    let type_expression name = Typ.constr (lid name) [] in
     let conversion_type =
-      Typ.arrow Nolabel
-        (type_expression from_name)
-        (type_expression to_name) [] []
+      Typ.arrow Nolabel (NumberTy.to_code from) (NumberTy.to_code to_) [] []
     in
     Str.primitive
       (Val.mk (loc function_name) conversion_type ~prim:[primitive_name])
