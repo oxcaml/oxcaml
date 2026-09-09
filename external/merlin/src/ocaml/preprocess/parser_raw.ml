@@ -35322,7 +35322,7 @@ module Tables = struct
           let _1 =
             let _1 = 
 # 2883 "external/merlin/src/ocaml/preprocess/parser_raw.mly"
-    ( Pexp_sequence(_1, _3) )
+    ( Pexp_sequence(_1, (merloc _endpos__2_ _3)) )
 # 35327 "external/merlin/src/ocaml/preprocess/parser_raw.ml"
              in
             let _endpos__1_ = _endpos__3_ in
@@ -35395,7 +35395,7 @@ module Tables = struct
           let _sloc = (_symbolstartpos, _endpos) in
           (
 # 2886 "external/merlin/src/ocaml/preprocess/parser_raw.mly"
-    ( mkexp_attrs ~loc:_sloc (Pexp_sequence (_1, _5)) (Some _4, []) )
+    ( mkexp_attrs ~loc:_sloc (Pexp_sequence (_1, (merloc _endpos__4_ _5))) (Some _4, []) )
 # 35400 "external/merlin/src/ocaml/preprocess/parser_raw.ml"
            : (Parsetree.expression))
         in
