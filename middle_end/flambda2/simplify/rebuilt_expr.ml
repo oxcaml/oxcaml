@@ -295,118 +295,112 @@ module Matching_for_unique_handler = struct
 
   let fail_if_not_equal f x y = fail_if_not (f x y)
 
-  module HV = Hashtbl.Make (Variable)
+  module Match_permutable_parameters : sig
+    (** Bipartite matcher between two lists of parameters.
 
-  (** A [parameter_in_second_env] represents one continuation parameter
-      introduced in the second environment, recording the corresponding
-      [Bound_parameter.t] in the [parameter_in_second_env] field.
+        This is an imperative data structure that gets updated by calling
+        [match_variable]. *)
+    type t
 
-      Its [name_in_first_env] is the (unique at the end of matching) matching
-      parameter in the first environment, or [None] if it has not been
-      determined yet. *)
-  type parameter_in_second_env =
-    { parameter_in_second_env : Bound_parameter.t;
-      mutable name_in_first_env : Variable.t option
-    }
+    (** Create a new matcher.
 
-  (** A [name_in_second_env] represents the (unique at the end of matching)
-      matching parameter in the second environment for a given parameter in the
-      first environment.
+        Fails if the two parameter lists have distinct number of parameters. *)
+    val create : Bound_parameters.t -> Bound_parameters.t -> t
 
-      It can be either:
+    (** [match_variable t var1 var2] records that [var1] and [var2] must match
+        in the respective parameter lists.
 
-      - A [Name_in_second_env var] if the matching parameter has already been
-        determined, or
+        Fails if either [var1] or [var2] are not part of this matching, if
+        either [var1] or [var2] has already been matched to another variable, or
+        if [var1] and [var2] are bound with incompatible kinds in their
+        respective parameter lists. *)
+    val match_variable : t -> Variable.t -> Variable.t -> unit
 
-      - A [Not_yet_renamed params] marker recording the
-        [parameter_in_second_env] entries it can be bound to (it is a matching
-        failure to try to match a parameter in the first environment with a
-        variable in the second environment that is not one of these parameters).
-  *)
-  type name_in_second_env =
-    | Not_yet_renamed of parameter_in_second_env HV.t
-    | Name_in_second_env of Variable.t
+    (** Returns an argument that can be used to bind the provided parameter from
+        the second list from a parameter in the first list.
 
-  (** Similar to [parameter_in_second_env], but for the first environment, and
-      uses [name_in_second_env] instead of an [option] to ensure the parameter
-      is only matched with valid another parameter of the right continuation. *)
-  type parameter_in_first_env =
-    { parameter_in_first_env : Bound_parameter.t;
-      mutable name_in_second_env : name_in_second_env
-    }
+        Fails if the parameter has not been matched. *)
+    val matching_variable_for_parameter_on_second_side :
+      t -> Bound_parameter.t -> Variable.t
+  end = struct
+    module HV = Hashtbl.Make (Variable)
 
-  let empty = Variable.Map.empty
+    (** Represents a parameter in one of the two parameter lists, and maps it to
+        the corresponding parameter (as a variable) in the other list. *)
+    type parameter_on_one_side =
+      { kind : Flambda_kind.With_subkind.t;
+        mutable matching_variable_on_other_side : Variable.t option
+      }
 
-  (* Allows any bijection between [params1] in the left environment and
-     [params2] in the right environment. *)
-  let bind_permutable_parameters env params1 params2 =
-    (* Must have the same number of parameters for both handlers, but we allow
-       permutations -- kinds are checked in [match_variable]. *)
-    if not (Bound_parameters.same_number params1 params2) then fail ();
-    (* The same hash table is shared across all the parameters for the same
-       bijection, but not across other bijections. This ensures that we can only
-       bind the parameters in [params1] to a parameter in [params2], not to
-       arbitrary variables. *)
-    let name_in_second_env = HV.create 16 in
-    let args2 =
-      List.map
-        (fun param2 ->
-          let binding2 =
-            { parameter_in_second_env = param2; name_in_first_env = None }
-          in
-          HV.replace name_in_second_env (Bound_parameter.var param2) binding2;
-          binding2)
-        (Bound_parameters.to_list params2)
-    in
-    let name_in_second_env = Not_yet_renamed name_in_second_env in
-    let env =
-      List.fold_left
-        (fun params1 param1 ->
-          let binding1 =
-            { parameter_in_first_env = param1; name_in_second_env }
-          in
-          Variable.Map.add (Bound_parameter.var param1) binding1 params1)
-        env
-        (Bound_parameters.to_list params1)
-    in
-    env, args2
+    type t =
+      { parameters_on_first_side : parameter_on_one_side HV.t;
+            (** Keys are parameters from the first side (identified by their
+                variable). *)
+        parameters_on_second_side : parameter_on_one_side HV.t
+            (** Keys are parameters from the second side (identified by their
+                variable). *)
+      }
+
+    let matching_variable_for_parameter_on_second_side t param =
+      match HV.find t.parameters_on_second_side (Bound_parameter.var param) with
+      | exception Not_found ->
+        Misc.fatal_errorf "Parameter %a is not bound on the second side"
+          Bound_parameter.print param
+      | { matching_variable_on_other_side = None; _ } -> fail ()
+      | { matching_variable_on_other_side = Some var; _ } -> var
+
+    let create params1 params2 =
+      (* Must have the same number of parameters in both cases, but we allow
+         permutations -- kinds are checked in [match_variable]. *)
+      if not (Bound_parameters.same_number params1 params2) then fail ();
+      let create_mapping params =
+        let table = HV.create 16 in
+        List.iter
+          (fun param ->
+            HV.replace table
+              (Bound_parameter.var param)
+              { kind = Bound_parameter.kind param;
+                matching_variable_on_other_side = None
+              })
+          (Bound_parameters.to_list params);
+        table
+      in
+      let parameters_on_first_side = create_mapping params1 in
+      let parameters_on_second_side = create_mapping params2 in
+      { parameters_on_first_side; parameters_on_second_side }
+
+    let match_variable t var1 var2 =
+      match HV.find t.parameters_on_first_side var1 with
+      | exception Not_found ->
+        (* [var1] is not a parameter for this permutation *) fail ()
+      | { matching_variable_on_other_side = Some var2'; _ } ->
+        (* [var1] is a parameter and is already matched *)
+        fail_if_not_equal Variable.equal var2' var2
+      | { matching_variable_on_other_side = None; kind = kind1 } as binding1
+        -> (
+        (* [var1] is a parameter, but not yet matched: try to match it. *)
+        match HV.find t.parameters_on_second_side var2 with
+        | (exception Not_found)
+        | { matching_variable_on_other_side = Some _; _ } ->
+          (* [var2] is either not a parameter of the same continuation, or
+             already matched to another parameter in the first environment. *)
+          fail ()
+        | { matching_variable_on_other_side = None; kind = kind2 } as
+          (* [var2] is a parameter of the same continuation and is not yet
+             matched: we can match [var1] and [var2] if the kinds agree. *)
+          binding2 ->
+          fail_if_not_equal Flambda_kind.With_subkind.equal kind1 kind2;
+          binding1.matching_variable_on_other_side <- Some var2;
+          binding2.matching_variable_on_other_side <- Some var1)
+  end
 
   let match_variable env var1 var2 =
     match Variable.Map.find_or_null var1 env with
     | Null ->
       (* [var1] is not a parameter: both variables must be equal *)
       fail_if_not_equal Variable.equal var1 var2
-    | This { name_in_second_env = Name_in_second_env var2'; _ } ->
-      (* [var1] is a parameter and is already matched *)
-      fail_if_not_equal Variable.equal var2' var2
-    | This
-        ({ name_in_second_env = Not_yet_renamed renamed2;
-           parameter_in_first_env = param1
-         } as binding1) -> (
-      (* [var1] is a parameter, but not yet matched: try to match it. *)
-      match HV.find renamed2 var2 with
-      | (exception Not_found) | { name_in_first_env = Some _; _ } ->
-        (* [var2] is either not a parameter of the same continuation, or already
-           matched to another parameter in the first environment. *)
-        fail ()
-      | { name_in_first_env = None; parameter_in_second_env = param2 } as
-        (* [var2] is a parameter of the same continuation and is not yet
-           matched: we can match [var1] and [var2] if the kinds agree. *)
-        binding2 ->
-        fail_if_not_equal Flambda_kind.With_subkind.equal
-          (Bound_parameter.kind param1)
-          (Bound_parameter.kind param2);
-        HV.remove renamed2 var2;
-        binding1.name_in_second_env <- Name_in_second_env var2;
-        binding2.name_in_first_env <- Some var1)
-
-  let to_args_exn args =
-    List.map
-      (fun binding ->
-        match binding.name_in_first_env with
-        | None -> fail ()
-        | Some var -> Simple.var var)
-      args
+    | This permutation ->
+      Match_permutable_parameters.match_variable permutation var1 var2
 
   module type Equal_and_free_names = sig
     type t
@@ -517,17 +511,29 @@ module Matching_for_unique_handler = struct
       (* CR-someday bclement: consider trap actions *)
       fail ()
 
-  let match_permutable_continuation_handler env params1 handler1 params2
-      handler2 =
-    let env, args = bind_permutable_parameters env params1 params2 in
+  let match_permutable_continuation_handler params1 handler1 params2 handler2 =
+    let permutation = Match_permutable_parameters.create params1 params2 in
+    let env =
+      List.fold_left
+        (fun env param1 ->
+          Variable.Map.add (Bound_parameter.var param1) permutation env)
+        Variable.Map.empty
+        (Bound_parameters.to_list params1)
+    in
     match_expr env handler1 handler2;
     (* We are matching continuation handlers after rebuilding/dataflow, so we
        expect that all parameters are used and we can reconstruct a suitable
-       bijection, so if we get there, [to_args_exn] should never raise. *)
-    to_args_exn args
+       bijection, so if we get there, this should never raise (but it is also
+       harmless if it does). *)
+    List.map
+      (fun param2 ->
+        Simple.var
+          (Match_permutable_parameters
+           .matching_variable_for_parameter_on_second_side permutation param2))
+      (Bound_parameters.to_list params2)
 
-  let match_non_recursive_continuation_handler env ~is_exn_handler params1
-      handler1 params2 handler2 =
+  let match_non_recursive_continuation_handler ~is_exn_handler params1 handler1
+      params2 handler2 =
     if is_exn_handler
     then (
       (* If we are trying to share exception handlers, their first (exception)
@@ -546,22 +552,20 @@ module Matching_for_unique_handler = struct
                (Bound_parameter.var exn1))
         in
         Bound_parameter.simple exn1
-        :: match_permutable_continuation_handler env
+        :: match_permutable_continuation_handler
              (Bound_parameters.create params1)
              handler1
              (Bound_parameters.create params2)
              handler2)
-    else
-      match_permutable_continuation_handler env params1 handler1 params2
-        handler2
+    else match_permutable_continuation_handler params1 handler1 params2 handler2
 end
 
 let match_continuation_handler ~is_exn_handler params1 handler1 params2 handler2
     =
   let open Matching_for_unique_handler in
   match
-    match_non_recursive_continuation_handler ~is_exn_handler empty params1
-      handler1 params2 handler2
+    match_non_recursive_continuation_handler ~is_exn_handler params1 handler1
+      params2 handler2
   with
   | exception Match_failure -> None
   | args -> Some args
