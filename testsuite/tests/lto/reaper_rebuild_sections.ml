@@ -23,14 +23,17 @@
  file = "reaper_rebuild_sections_other.reaped.cmx";
  file-exists;
 
- flags = "-reaper-rebuild reaper_rebuild_sections.cmr reaper_rebuild_sections.ltosol -dcmm -dump-into-file";
+ flags = "-reaper-rebuild reaper_rebuild_sections.cmr reaper_rebuild_sections.ltosol -dcmm";
+ compiler_output2 = "reaper_rebuild_sections.cmm";
  ocamlopt.opt;
 
  file = "reaper_rebuild_sections.reaped.cmx";
  file-exists;
 
- script = "awk 'BEGIN { while ((getline line) > 0) text = text line; exit !(text ~ /G:.camlReaper_rebuild_sections_dep__fn[^ ]*_code.[[:space:]]+83[[:space:]]+int[)]/) }' reaper_rebuild_sections.reaped.cmx.dump";
+ script = "awk 'BEGIN { while ((getline line) > 0) text = text line; exit !(text ~ /G:.camlReaper_rebuild_sections_dep__fn[^ ]*_code.[[:space:]]+83[[:space:]]+int[)]/) }' reaper_rebuild_sections.cmm";
  script;
+
+ compiler_output2 = "ocamlopt.opt.output";
 
  flags = "-reaper-rebuild reaper_rebuild_sections_dep.cmr reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
  ocamlopt.opt;
