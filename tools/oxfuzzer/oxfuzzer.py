@@ -575,6 +575,11 @@ def check_case(
         stats.failed += 1
         stats.report()
         return
+
+    # CR-soon hwasilewski: This is a bug, execution failures should take
+    # precedence over timeouts and if any execution fails the test is considered
+    # a failure.
+
     # If any of the executions time out, we discard the case.
     if any(r.execution.timed_out for r in results):
         stats.discarded += 1
@@ -657,6 +662,8 @@ async def run_case(
 
 SELF_CHECK_SEED = 0
 
+# CR-soon hwasilewski: Self check more than 1 case, possibly ~100, maybe turn
+# off swarm testing for this also.
 
 # Compile and run one generated program before running the fuzzer. This
 # is supposed to give more informative messages when the compilation
@@ -769,6 +776,8 @@ Exit status is 1 if any case failed, 0 otherwise.""",
         default=None,
         help="seed for the sequence of case seeds (default: random, printed)",
     )
+    # CR-soon hwasilewski: Add flag to limit amount of failures before the
+    # campaign is aborted, so that there are no space leaks.
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")

@@ -86,6 +86,14 @@ module NumberTy = struct
     String.lowercase_ascii (Base.to_module t.base)
     ^ if t.unboxed then if no_hash then "_u" else "#" else ""
 
+  let to_code t =
+    let no_hash =
+      match t.base with
+      | Float32 | Nativeint | Int64 | Int32 -> true
+      | Float | Int | Int16 | Int8 -> false
+    in
+    Typ.constr (lid (to_string ~no_hash t)) []
+
   let converter_name ~from ~to_ =
     Format.sprintf "%s_of_%s"
       (to_string ~no_hash:true to_)
@@ -180,12 +188,11 @@ module Ty = struct
     Format.sprintf "%s_field_%d" (record_name record) index
 
   let to_code = function
-    | Number nty -> Typ.constr (lid (NumberTy.to_string nty)) []
+    | Number nty -> NumberTy.to_code nty
     | Array (nty, dimensions) ->
       List.fold_left
         (fun ty _ -> Typ.constr (lid "array") [ty])
-        (Typ.constr (lid (NumberTy.to_string nty)) [])
-        dimensions
+        (NumberTy.to_code nty) dimensions
     | Record record -> Typ.constr (lid (record_name record)) []
     | Bool -> Typ.constr (lid "bool") []
 end
@@ -200,7 +207,8 @@ end
 
 (* CR-someday hwasilewski: Add unary operations as well. *)
 module Bin_op = struct
-  (* CR-soon hwasilewski: Add more operators. *)
+  (* CR-soon hwasilewski: Add more operators. Especially division and modulo
+     (with safe wrappers). *)
   type t =
     | Add
     | Sub

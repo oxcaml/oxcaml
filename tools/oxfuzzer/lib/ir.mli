@@ -43,6 +43,8 @@ module NumberTy : sig
 
   val to_string : ?no_hash:bool -> t -> string
 
+  val to_code : t -> Parsetree.core_type
+
   val converter_name : from:t -> to_:t -> string
 
   val is_floating_point : t -> bool
