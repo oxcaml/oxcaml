@@ -222,15 +222,15 @@ end = struct
     if Obj.is_int repr then "immediate"
     else Format.sprintf "block tag %d size %d" (Obj.tag repr) (Obj.size repr)
 
-  let mark name = Format.printf "%s\n" name; #()
+  let mark name = Format.printf "%s@." name; #()
 
   let[@inline never] update_void (r : unit# t) =
-    { (Format.printf "record\n"; Sys.opaque_identity r) with
+    { (Format.printf "record@."; Sys.opaque_identity r) with
       f000 = mark "first";
       f254 = mark "last" }
 
   let[@inline never] update_mixed (r : string t) =
-    { (Format.printf "record\n"; Sys.opaque_identity r) with
+    { (Format.printf "record@."; Sys.opaque_identity r) with
       f000 = mark "first";
       f254 = mark "last" }
 
@@ -240,7 +240,7 @@ end = struct
     let #() = after.f000 in
     let #() = after.f254 in
     let #() = after.kept in
-    Format.printf "before: %s\n after: %s\n" (describe before) (describe after)
+    Format.printf "before: %s\n after: %s@." (describe before) (describe after)
 
   let mixed () =
     let kept = String.concat "-" ["preserved"; "payload"] in
@@ -248,7 +248,7 @@ end = struct
     let after = update_mixed before in
     let #() = after.f000 in
     let #() = after.f254 in
-    Format.printf "before: %s\n after: %s\n" (describe before) (describe after);
+    Format.printf "before: %s\n after: %s@." (describe before) (describe after);
     [before.kept; after.kept]
 end
 [%%expect{|
