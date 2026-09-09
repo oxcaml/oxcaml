@@ -493,7 +493,8 @@ let matcher discr (p : Simple.pattern) rem =
          see [basic-more/robustmatch.ml] module [M7] for an example *)
       yesif (List.length l1 = List.length l2 &&
               (* CR zeisbach: I'm not sure whether we can rely on the same
-                 invariant as unboxed tuples to ignore the sort variables. *)
+                 invariant as unboxed tuples to ignore the sort variables,
+                 or whether we should be using a sort equality function. *)
              List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
       yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -5036,6 +5037,7 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
            (fun (_, _, layout) -> Lambda.mixed_block_element_of_layout layout)
            idl)
     in
+    Typedecl.assert_mixed_block_shape_support loc Tuple shape;
     Lprim (Pmakeblock (0, Immutable, Shape shape, mode), param_lambda, sloc)
   in
   let input_args =

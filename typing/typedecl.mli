@@ -167,10 +167,14 @@ module Mixed_product_kind : sig
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Tuple
 end
 
 val assert_mixed_product_support :
   Warnings.loc -> Mixed_product_kind.t -> value_prefix_len:int -> unit
+
+val assert_mixed_block_shape_support :
+  Warnings.loc -> Mixed_product_kind.t -> Lambda.mixed_block_shape -> unit
 
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t

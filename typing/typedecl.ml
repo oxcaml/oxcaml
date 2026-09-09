@@ -54,12 +54,14 @@ module Mixed_product_kind = struct
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Tuple
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
     | Module -> "modules"
+    | Tuple -> "tuples"
 end
 
 type mixed_product_violation =
@@ -1969,6 +1971,16 @@ let assert_mixed_product_support =
                   (Value_prefix_too_long
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
+
+let assert_mixed_block_shape_support loc mixed_product_kind shape =
+  let mpb = Mixed_product_bytes.count (Product shape) in
+  (* All-value/void shapes compile to uniform blocks (products of values are
+     flattened), so the scannable prefix length limit doesn't apply.
+     We only want to do the check if we are in a mixed block. *)
+  if not (Mixed_product_bytes.all_value mpb)
+  then
+    assert_mixed_product_support loc mixed_product_kind
+      ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
 
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
