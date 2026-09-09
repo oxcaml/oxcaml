@@ -55,6 +55,7 @@ module Staged : sig
     free_names:Name_occurrences.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
+    closed_world:bool ->
     Flambda_unit.t ->
     Global_flow_graph.graph
     * Slot_offsets_analysis.Inputs.t

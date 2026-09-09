@@ -28,4 +28,4 @@ type result =
       Code_id_or_name.Map.t
   }
 
-val run : Flambda_unit.t -> result
+val run : closed_world:bool -> Flambda_unit.t -> result

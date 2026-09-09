@@ -842,13 +842,14 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants () =
+let run0 unit acc ~all_constants ~closed_world () =
   let le_monde_exterieur =
     create_symbol_and_add_any_source acc "le_monde_extérieur"
   in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  if not closed_world
+  then Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
@@ -876,11 +877,12 @@ let run0 unit acc ~all_constants () =
        ~all_constants:(Name.symbol all_constants))
     acc (Flambda_unit.body unit)
 
-let run (unit : Flambda_unit.t) =
+let run ~closed_world (unit : Flambda_unit.t) =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+    Profile.record_call ~accumulate:false "down"
+      (run0 unit acc ~all_constants ~closed_world)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in

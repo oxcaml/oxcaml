@@ -170,7 +170,7 @@ module Staged = struct
       code_changes : Unboxing_analysis.code_changes
     }
 
-  let traverse ~free_names ~cmx_loader ~all_code unit =
+  let traverse ~free_names ~cmx_loader ~all_code ~closed_world unit =
     let Traverse.
           { toplevel_expr;
             code;
@@ -182,7 +182,7 @@ module Staged = struct
             all_sets_of_closures;
             closure_function_decls
           } =
-      Traverse.run unit
+      Traverse.run ~closed_world unit
     in
     let slot_offsets_inputs =
       Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
@@ -291,7 +291,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let deps, slot_offsets_inputs, code_changes_inputs, traverse_rebuild =
-    Staged.traverse ~free_names ~cmx_loader ~all_code unit
+    Staged.traverse ~free_names ~cmx_loader ~all_code ~closed_world:false unit
   in
   let solution, slot_offsets =
     Staged.solve ~slot_offsets_inputs ~analysis_scope:Current_unit
