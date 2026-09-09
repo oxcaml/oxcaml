@@ -394,6 +394,7 @@ Error: Signature mismatch:
        is not compatible with the type "'a @ local -> 'b @ local -> unit"
        Type "'b @ local unyielding -> unit" is not compatible with type
          "'b @ local -> unit"
+       The argument mode was expected to be "unyielding" but is "yielding"
 |}]
 
 module Zap_before = struct
