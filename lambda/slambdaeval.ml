@@ -680,20 +680,20 @@ and eval_raw_value_kind env value_kind =
 
 and eval_constructor_shape env constructor_shape =
   match constructor_shape with
-  | Constructor_uniform old_value_kinds ->
+  | Constructor_shape_uniform old_value_kinds ->
     let new_value_kinds =
       Misc.Stdlib.List.map_sharing (eval_value_kind env) old_value_kinds
     in
     if new_value_kinds == old_value_kinds
     then constructor_shape
-    else Constructor_uniform new_value_kinds
-  | Constructor_mixed old_mixed_block_shape ->
+    else Constructor_shape_uniform new_value_kinds
+  | Constructor_shape_mixed old_mixed_block_shape ->
     let new_mixed_block_shape =
       eval_mixed_block_shape env old_mixed_block_shape
     in
     if new_mixed_block_shape == old_mixed_block_shape
     then constructor_shape
-    else Constructor_mixed new_mixed_block_shape
+    else Constructor_shape_mixed new_mixed_block_shape
 
 and eval_lfunction_shallow env
     ({ kind;
@@ -923,9 +923,9 @@ and assert_raw_value_kind_contains_no_splices = function
     ()
 
 and assert_constructor_shape_contains_no_splices = function
-  | Constructor_uniform value_kinds ->
+  | Constructor_shape_uniform value_kinds ->
     List.iter assert_value_kind_contains_no_splices value_kinds
-  | Constructor_mixed mixed_block_shape ->
+  | Constructor_shape_mixed mixed_block_shape ->
     assert_mixed_block_shape_contains_no_splices mixed_block_shape
 
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =

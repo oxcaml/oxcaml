@@ -673,8 +673,8 @@ and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
 and constructor_shape =
-  | Constructor_uniform of value_kind list
-  | Constructor_mixed of mixed_block_shape
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64

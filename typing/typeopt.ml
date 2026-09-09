@@ -814,7 +814,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         num_nodes_visited,
         non_nullable
           (Pvariant { consts = [];
-                      non_consts = [0, Constructor_uniform fields] }))
+                      non_consts = [0, Constructor_shape_uniform fields] }))
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -935,7 +935,7 @@ and value_kind_mixed_block
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
   in
-  num_nodes_visited, Constructor_mixed (Array.of_list shape)
+  num_nodes_visited, Constructor_shape_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (cstrs : Types.constructor_declaration list) rep =
@@ -985,7 +985,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           num_nodes_visited
           fields
       in
-      num_nodes_visited, Lambda.Constructor_uniform shape
+      num_nodes_visited, Lambda.Constructor_shape_uniform shape
     in
     let for_one_constructor (constructor : Types.constructor_declaration)
           ~depth ~num_nodes_visited
@@ -1155,7 +1155,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                     num_nodes_visited, field)
                   num_nodes_visited labels
               in
-              num_nodes_visited, Constructor_uniform fields
+              num_nodes_visited, Constructor_shape_uniform fields
           | Record_inlined (_, Constructor_mixed shape, _)
           | Record_mixed shape ->
             let types = List.map (fun label -> label.Types.ld_type) labels in

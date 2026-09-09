@@ -1934,8 +1934,10 @@ and transl_tupled_function
           match arg_layout with
           | Pvalue {
               nullable = Non_nullable;
-              raw_kind = Pvariant { consts = [];
-                               non_consts = [0, Constructor_uniform kinds] }} ->
+              raw_kind =
+                Pvariant { consts = [];
+                           non_consts = [0, Constructor_shape_uniform kinds] }
+            } ->
               (* CR layouts v5: to change when we have non-value tuple
                  elements. *)
               Some kinds

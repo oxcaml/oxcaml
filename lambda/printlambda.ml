@@ -194,10 +194,10 @@ let rec mixed_block_element print_value_kind ppf el =
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
-  | Constructor_uniform fields ->
+  | Constructor_shape_uniform fields ->
      Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
        print_value_kind ppf fields
-  | Constructor_mixed shape->
+  | Constructor_shape_mixed shape->
     fprintf ppf "%a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
