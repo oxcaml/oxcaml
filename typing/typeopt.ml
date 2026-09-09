@@ -1110,8 +1110,8 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
     | labels ->
         let types = List.map (fun label -> label.Types.ld_type) labels in
         match Typedecl.compute_block_shape env types with
-        | None -> num_nodes_visited, non_nullable Pgenval
-        | Some shape ->
+        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | (`Not_mixed | `Mixed _) as shape ->
             value_kind_immutable_record env ~loc ~visited ~depth
               ~num_nodes_visited ~params ~args labels (make_rep shape)
   in
