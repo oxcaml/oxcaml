@@ -639,8 +639,6 @@ Error: This type "t_void" should be an instance of type "('a : value)"
          because of the definition of t at line 2, characters 2-24.
 |}];;
 
-(* CR zeisbach: this matches the unboxed tuple behavior but I am still a little
-   confused as to why 'a seems to be inferred with kind value? *)
 module M9_6 = struct
   type 'a t = int * 'a constraint 'a = void_unboxed_record
 end;;
@@ -1530,9 +1528,6 @@ val q : unit -> unit = <fun>
 |}]
 
 (* 28.7: non-value letop binder arg with and *)
-(* CR zeisbach: this does in fact type-check, as the previous comment said, but
-   in a way that is slightly confusing to me (though not as confusing as the
-   other one of these). This is worth discussing, I believe. *)
 let rec ( let* ) x f = ()
 and ( and* ) x1 x2 = assert false
 and q () =
@@ -1547,7 +1542,6 @@ val ( and* ) : 'a -> int -> 'b = <fun>
 val q : unit -> unit = <fun>
 |}]
 
-(* CR zeisbach: see, this is the one that confuses me! *)
 let ( let* ) x f = ()
 let ( and* ) x1 x2 = assert false
 let q () =
