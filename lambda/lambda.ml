@@ -919,6 +919,20 @@ let shape_has_only_value_elements (shape : _ mixed_block_element array) =
         false)
     shape
 
+(* CR zeisbach: this helper is going to be written by someone else too *)
+let rec mixed_block_element_has_splice_variable
+    (elt : _ mixed_block_element) =
+  match elt with
+  | Splice_variable _ -> true
+  | Product shape ->
+    Array.exists mixed_block_element_has_splice_variable shape
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+    false
+
+let shape_has_splice_variable (shape : _ mixed_block_element array) =
+  Array.exists mixed_block_element_has_splice_variable shape
+
 let equal_layout x y =
   match x, y with
   | Pvalue x, Pvalue y -> equal_value_kind x y

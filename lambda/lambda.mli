@@ -1440,6 +1440,10 @@ val is_uniform_block_shape : block_shape -> bool
    actual intended layout is *)
 val shape_has_only_value_elements : _ mixed_block_element array -> bool
 
+(* Returns whether the shape contains a splice variable anywhere, including
+   nested inside products. *)
+val shape_has_splice_variable : _ mixed_block_element array -> bool
+
 (* Returns [None] if contains all values (including products of values
    and void), returns the [mixed_block_shape] if it has at least one
    non-value. Errors if there's a splice variable *)
