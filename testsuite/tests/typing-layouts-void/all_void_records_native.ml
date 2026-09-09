@@ -6,9 +6,8 @@
  { flags += " -O3"; expect.opt; }
 *)
 
-(* Native boxed records are empty tag-0 blocks, regardless of mutability
-   or product fields. Partial small-record updates reconstruct that shape.
-   No physical sharing is required. *)
+(* Native boxed all-[void] records are empty blocks with tag 0. *)
+
 type t = { x : unit#; kept : unit# }
 type p = { y : #(unit# * unit#) }
 type m = { mutable z : unit# }
@@ -45,7 +44,6 @@ let description = describe { z = #() }
 val description : string = "block tag 0 size 0"
 |}]
 
-(* Branches, loop parameters, and inlined constructors preserve the shape. *)
 let[@inline always] make () = { x = #(); kept = #() }
 let[@inline never] flow choose =
   let r = if choose then make () else Sys.opaque_identity (make ()) in
