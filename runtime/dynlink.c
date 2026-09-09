@@ -43,6 +43,8 @@
 
 #include "build_config.h"
 
+#ifndef CAML_BARE_METAL
+
 #ifndef NATIVE_CODE
 
 #ifndef O_BINARY
@@ -384,3 +386,5 @@ value caml_dynlink_get_bytecode_sections(value unit)
 }
 
 #endif /* NATIVE_CODE */
+
+#endif /* !CAML_BARE_METAL */

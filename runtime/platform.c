@@ -94,13 +94,6 @@ void caml_plat_cond_init(caml_plat_cond* cond)
   (void)cond;
 }
 
-void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
-{
-  (void)cond;
-  (void)mut;
-  caml_fatal_error("caml_plat_wait cannot be used on bare metal");
-}
-
 void caml_plat_broadcast(caml_plat_cond* cond)
 {
   (void)cond;
@@ -121,12 +114,6 @@ void caml_plat_latch_release(caml_plat_binary_latch* latch)
   atomic_store_release(&latch->value, Latch_released);
 }
 
-void caml_plat_latch_wait(caml_plat_binary_latch* latch)
-{
-  if (caml_plat_latch_is_set(latch))
-    caml_fatal_error("caml_plat_latch_wait would deadlock on bare metal");
-}
-
 void caml_plat_barrier_flip(caml_plat_barrier* barrier,
                             barrier_status current_sense)
 {
@@ -135,14 +122,6 @@ void caml_plat_barrier_flip(caml_plat_barrier* barrier,
   atomic_store_release(&barrier->futex.value,
                        (caml_plat_futex_value)
                          (current_sense ^ BARRIER_SENSE_BIT));
-}
-
-void caml_plat_barrier_wait_sense(caml_plat_barrier* barrier,
-                                  barrier_status current_sense)
-{
-  if (!caml_plat_barrier_sense_has_flipped(barrier, current_sense))
-    caml_fatal_error("caml_plat_barrier_wait_sense would deadlock"
-                     " on bare metal");
 }
 
 #else /* !CAML_BARE_METAL */

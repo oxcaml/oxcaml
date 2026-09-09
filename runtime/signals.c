@@ -407,6 +407,7 @@ caml_result caml_do_pending_actions_flags_res(int flags)
   caml_check_async(res, "finaliser");
   if (caml_result_is_exception(res)) goto exception;
 
+#ifndef CAML_BARE_METAL
   /* Process external interrupts (e.g. preemptive systhread switching). By doing
      this after all other possibly exception-returning actions, we do not need
      to set the action pending flag in case a context switch happens: all
@@ -414,6 +415,7 @@ caml_result caml_do_pending_actions_flags_res(int flags)
   res = caml_process_tick_res();
   caml_check_async(res, "tick handler");
   if (caml_result_is_exception(res)) goto exception;
+#endif
 
   /* Check for a pending preemption
 

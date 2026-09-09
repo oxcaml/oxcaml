@@ -75,7 +75,9 @@ void caml_handle_incoming_interrupts(void);
 void caml_domain_setup_preemption(void);
 #endif
 void caml_domain_reset_preemption(void);
+#ifndef CAML_BARE_METAL
 caml_result caml_process_tick_res(void);
+#endif
 
 CAMLextern void caml_interrupt_self(void);
 void caml_interrupt_all_signal_safe(void);
@@ -92,6 +94,7 @@ CAMLextern void caml_bt_exit_ocaml(void);
 CAMLextern void caml_acquire_domain_lock(void);
 CAMLextern void caml_release_domain_lock(void);
 
+#ifndef CAML_BARE_METAL
 /* Start the tick thread unless it is disabled. Returns nonzero in the case of
    an error. */
 CAMLextern int caml_start_tick_thread(void);
@@ -99,6 +102,7 @@ CAMLextern int caml_start_tick_thread(void);
 /* Stop the tick thread */
 CAMLextern void caml_stop_tick_thread(void);
 CAMLextern uintnat caml_effective_tick_interval_usec(void);
+#endif
 
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);

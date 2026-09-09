@@ -760,7 +760,7 @@ char * caml_dlerror(void)
 }
 
 #endif /* __CYGWIN__ */
-#else
+#elif !defined(CAML_BARE_METAL)
 
 void * caml_dlopen(char * libname, int global)
 {
