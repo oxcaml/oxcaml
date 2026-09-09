@@ -426,6 +426,12 @@ let
           pname = "ppxlib_ast";
           src = "${src}/external/ppxlib";
           propagatedBuildInputs = ppxlibBase;
+          doCheck = true;
+          checkPhase = ''
+            runHook preCheck
+            dune build -p ppxlib_ast @test/501_migrations/runtest
+            runHook postCheck
+          '';
         };
 
         ppxlib_jane = mkLibrary {

@@ -1,3 +1,8 @@
+let has_module_holes =
+  match Ocaml_common.Parse.implementation (Lexing.from_string "module M = _") with
+  | _ -> true
+  | exception Ocaml_common.Syntaxerr.Error _ -> false
+
 let () =
   match Sys.argv with
   | [| _; ocaml_version; fname |] ->
@@ -6,7 +11,8 @@ let () =
       in
       let ic = open_in_bin fname in
       Printf.printf "# 1 %S\n" fname;
-      Pp_rewrite.rewrite is_current ocaml_version (Lexing.from_channel ic)
+      Pp_rewrite.rewrite is_current ocaml_version has_module_holes
+        (Lexing.from_channel ic)
   | _ ->
       Printf.eprintf "%s: <ocaml-version> <file-name>\n" Sys.executable_name;
       exit 2

@@ -326,6 +326,15 @@ ppxlib-ast-build: \
 	    --only-packages=ppxlib_ast \
 	    @install
 
+.PHONY: ppxlib-ast-test
+ppxlib-ast-test: ppxlib-ast-build
+	env OCAMLPATH="$(PPXLIB_BASE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/ppxlib \
+	    --build-dir="$(PPXLIB_AST_DIR)" \
+	    --only-packages=ppxlib_ast \
+	    @test/501_migrations/runtest
+
 .PHONY: ppxlib-jane-build
 ppxlib-jane-build: ppxlib-ast-build
 	env OCAMLPATH="$(PPXLIB_JANE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \

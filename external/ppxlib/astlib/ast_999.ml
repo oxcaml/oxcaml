@@ -1307,6 +1307,7 @@ module Parsetree = struct
         (** [(ME : MT @@ modes)] *)
     | Pmod_unpack of expression  (** [(val E)] *)
     | Pmod_extension of extension  (** [[%id]] *)
+    (*IF_MODULE_HOLES | Pmod_hole *)
     | Pmod_instance of module_instance
         (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]] *)
 
