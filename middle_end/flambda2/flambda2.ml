@@ -443,8 +443,8 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
           Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_solve cmr ))
       cmrs
   in
-  (* The compilation units referenced by each unit's own graph determine which
-     pieces of the solution are loaded when rebuilding. *)
+  (* Reference facts are part of the graph, so they also select the solution
+     sections needed by rebuild. *)
   let participants =
     List.map
       (fun (participant, (graph, _, _, _)) ->
@@ -473,7 +473,9 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   let participant_units =
     Compilation_unit.Set.of_list (List.map fst participants)
   in
-  let is_participant cu = Compilation_unit.Set.mem cu participant_units in
+  let analysis_scope =
+    Flambda2_reaper.Analysis.Scope.Lto_participants participant_units
+  in
   (* Make the offsets of slots defined by units outside the solve available to
      [Slot_offsets.finalize_offsets]. The offsets of the participants' own slots
      are recomputed from the solution, so the stale ones stored in the .cmr
@@ -482,12 +484,13 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     (fun (_participant, (_, _, imported_offsets, _)) ->
       Exported_offsets.import_offsets
         (Exported_offsets.filter_by_compilation_unit imported_offsets
-           ~keep:(fun cu -> not (is_participant cu))))
+           ~keep:(fun cu ->
+             not
+               (Flambda2_reaper.Analysis.Scope.contains_unit analysis_scope cu))))
     solve_data;
   let solution, slot_offsets =
-    Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs
-      ~is_local_compilation_unit:is_participant ~code_changes_inputs
-      combined_graph
+    Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs ~analysis_scope
+      ~code_changes_inputs combined_graph
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution ~slot_offsets

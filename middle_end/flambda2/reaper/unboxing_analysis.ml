@@ -996,9 +996,11 @@ let perform_analysis db ~stats =
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let cannot_change_calling_convention ~is_local_compilation_unit uses v =
+let cannot_change_calling_convention ~analysis_scope uses v =
   (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (is_local_compilation_unit (Code_id.get_compilation_unit v)))
+  || (not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit v)))
   || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 type code_change =
@@ -1063,10 +1065,10 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~is_local_compilation_unit
-    ~rewrite_kind_with_subkind ~code_deps =
+let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
+    ~code_deps =
   let cannot_change_calling_convention =
-    cannot_change_calling_convention ~is_local_compilation_unit
+    cannot_change_calling_convention ~analysis_scope
   in
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields

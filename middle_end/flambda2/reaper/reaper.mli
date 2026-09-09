@@ -61,18 +61,11 @@ module Staged : sig
     * Code_changes_inputs.t
     * Traverse_rebuild.t
 
-  (** Run Reaper analysis producing a Reaper solution, together with the slot
-      offsets of the sets of closures that will be built after rewriting. The
-      solution includes calling convention changes and rewritten code metadata
-      for all code covered by [code_changes_inputs]. For LTO, the graph and slot
-      offsets inputs are the unions of those of all participating units,
-      [code_changes_inputs] has one entry per participant, and
-      [is_local_compilation_unit] is membership of the set of participants, so
-      that one consistent assignment of offsets and calling conventions is
-      computed for the whole program. Result types are left unknown. *)
+  (** Analyse the combined dependency graph and compute rewriting decisions and
+      slot offsets. *)
   val solve :
     slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
-    is_local_compilation_unit:(Compilation_unit.t -> bool) ->
+    analysis_scope:Analysis.Scope.t ->
     code_changes_inputs:Code_changes_inputs.t list ->
     Global_flow_graph.graph ->
     solution * Slot_offsets.result

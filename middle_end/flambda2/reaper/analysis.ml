@@ -17,10 +17,11 @@ open! Datalog_helpers.Syntax
 module PTA = Points_to_analysis
 open! Points_to_analysis.Relations
 open Unboxing_analysis
+module Scope = Analysis_scope
 
 type result = Unboxing_analysis.result
 
-let fixpoint (graph : Global_flow_graph.graph) =
+let fixpoint (graph : Global_flow_graph.graph) ~analysis_scope:_ =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
