@@ -101,7 +101,8 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Other]
 
 (* Translate (inlined) record representations to Lambda, defaulting unfilled
-   sorts. This should not be called until the end of typechecking. *)
+   sorts and turning generalized sorts into splices. This should not be called
+   until the end of typechecking. *)
 val finalize_record_representation:
     Env.t -> Location.t -> Types.record_representation ->
     Lambda.record_representation
