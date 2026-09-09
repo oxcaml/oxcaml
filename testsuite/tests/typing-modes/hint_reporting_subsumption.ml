@@ -37,6 +37,7 @@ Error: Signature mismatch:
          val with_ : f:('a -> 'a) @ local -> unit
        The type "f:('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "f:('a -> 'a) @ local -> unit"
+       The argument mode was expected to be "unyielding" but is "yielding"
 |}]
 
 (* Putting an unyielding annotation in the signature fixes the inclusion error *)
@@ -87,6 +88,7 @@ Error: Signature mismatch:
          val with_ : ('a -> 'a) @ local -> unit
        The type "('a -> 'a) @ local unyielding -> unit"
        is not compatible with the type "('a -> 'a) @ local -> unit"
+       The argument mode was expected to be "unyielding" but is "yielding"
 |}]
 
 module M : sig
@@ -111,4 +113,5 @@ Error: Signature mismatch:
          val local_ret : 'a @ local -> 'a @ local unyielding
        The type "'a @ local -> 'a @ local" is not compatible with the type
          "'a @ local -> 'a @ local unyielding"
+       The return mode was expected to be "unyielding" but is "yielding"
 |}]

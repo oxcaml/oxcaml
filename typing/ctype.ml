@@ -6536,15 +6536,17 @@ let moregen_alloc_mode env ~is_ret ty v a1 a2 =
     | Invariant ->
         Result.bind (submode_with_cross env ~is_ret ty a1 a2)
           (fun _ -> submode_with_cross env ~is_ret ty a2 a1)
-        |> Result.map_error ignore
-    | Covariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a1 a2)
-    | Contravariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a2 a1)
+    | Covariant -> submode_with_cross env ~is_ret ty a1 a2
+    | Contravariant -> submode_with_cross env ~is_ret ty a2 a1
     | Bivariant -> Ok ()
   with
   | Ok () -> ()
-  | Error _ ->
+  | Error e ->
     tighten ();
-    raise_unexplained_for Moregen
+    let pos : Errortrace.arrow_position =
+      if is_ret then Return else Argument
+    in
+    raise_for Moregen (Mode_mismatch (pos, e))
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
