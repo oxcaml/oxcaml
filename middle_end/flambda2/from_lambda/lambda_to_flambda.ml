@@ -1413,7 +1413,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(0, Constructor_uniform field_kinds)]
+                non_consts = [(0, Constructor_shape_uniform field_kinds)]
               }
         } ->
       Some
@@ -1427,7 +1427,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(tag, Constructor_uniform field_kinds)]
+                non_consts = [(tag, Constructor_shape_uniform field_kinds)]
               }
         }
       when tag = Obj.double_array_tag ->
