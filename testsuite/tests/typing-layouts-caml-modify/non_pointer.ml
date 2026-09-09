@@ -331,3 +331,16 @@ let () =
       t.t <- M.y;
       ignore (Sys.opaque_identity t))
 *)
+
+(* Projecting an abstract non_pointer component out of a mixed tuple and
+   storing it *)
+let () =
+  let open struct
+    type holder = { mutable x : Mnp.t }
+  end in
+  let[@inline never] set h (t : Mnp.t * float#) =
+    let (x, _) = t in h.x <- x
+  in
+  let h = { x = Mnp.mk 0 } in
+  test ~expect_caml_modifies:0
+    (fun () -> set h (Mnp.mk 1, #2.0); ignore (Sys.opaque_identity h))
