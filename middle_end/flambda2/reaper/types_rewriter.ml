@@ -149,7 +149,7 @@ let[@inline] erase kind =
     Flambda_kind.With_subkind.Non_null_value_subkind.Anything
     (Flambda_kind.With_subkind.nullable kind)
 
-let rewrite_boxed_number_kind context usages kind bn =
+let rewrite_boxed_number_kind db usages kind bn =
   (* The contents of boxed numbers are tracked via [Boxed_number] fields. If the
      contents are read, the value must really be a boxed number (in particular,
      it cannot have been replaced by a poison value), so the subkind can be
@@ -163,27 +163,26 @@ let rewrite_boxed_number_kind context usages kind bn =
      this kind, but not immediately invalid (it may be behind a branch), so the
      value here can still have been replaced by a poison value and the subkind
      must be erased. *)
-  match PTA.get_one_field_usage context.db (Field.boxed_number bn) usages with
+  match PTA.get_one_field_usage db (Field.boxed_number bn) usages with
   | Bottom -> erase kind
   | Unknown | Ok _ -> kind
 
-let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
+let rec rewrite_kind_with_subkind_not_top_not_bottom db usages kind =
   (* CR ncourant: rewrite changed representation, or at least replace with Top.
      Not needed while we don't change representation of blocks. *)
   match Flambda_kind.With_subkind.non_null_value_subkind kind with
   | Anything -> kind
   | Tagged_immediate ->
     kind (* Always correct, since poison is a tagged immediate *)
-  | Boxed_float32 -> rewrite_boxed_number_kind context usages kind Naked_float32
-  | Boxed_float -> rewrite_boxed_number_kind context usages kind Naked_float
-  | Boxed_int32 -> rewrite_boxed_number_kind context usages kind Naked_int32
-  | Boxed_int64 -> rewrite_boxed_number_kind context usages kind Naked_int64
-  | Boxed_nativeint ->
-    rewrite_boxed_number_kind context usages kind Naked_nativeint
-  | Boxed_vec128 -> rewrite_boxed_number_kind context usages kind Naked_vec128
-  | Boxed_vec256 -> rewrite_boxed_number_kind context usages kind Naked_vec256
-  | Boxed_vec512 -> rewrite_boxed_number_kind context usages kind Naked_vec512
-  | Boxed_mask -> rewrite_boxed_number_kind context usages kind Naked_mask
+  | Boxed_float32 -> rewrite_boxed_number_kind db usages kind Naked_float32
+  | Boxed_float -> rewrite_boxed_number_kind db usages kind Naked_float
+  | Boxed_int32 -> rewrite_boxed_number_kind db usages kind Naked_int32
+  | Boxed_int64 -> rewrite_boxed_number_kind db usages kind Naked_int64
+  | Boxed_nativeint -> rewrite_boxed_number_kind db usages kind Naked_nativeint
+  | Boxed_vec128 -> rewrite_boxed_number_kind db usages kind Naked_vec128
+  | Boxed_vec256 -> rewrite_boxed_number_kind db usages kind Naked_vec256
+  | Boxed_vec512 -> rewrite_boxed_number_kind db usages kind Naked_vec512
+  | Boxed_mask -> rewrite_boxed_number_kind db usages kind Naked_mask
   | Float_block _ | Float_array | Immediate_array | Value_array | Generic_array
   | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
   | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
@@ -196,7 +195,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
        is best to delete it. *)
     erase kind
   | Variant { consts; non_consts } ->
-    let fields = PTA.get_fields context.db usages in
+    let fields = PTA.get_fields db usages in
     let non_consts =
       Tag.Scannable.Map.map
         (fun (shape, kinds) ->
@@ -210,9 +209,8 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
                 | None -> (* maybe poison *) erase kind
                 | Some Unknown -> (* top *) kind
                 | Some (Known flow_to) ->
-                  let usages = PTA.get_direct_usages context.db flow_to in
-                  rewrite_kind_with_subkind_not_top_not_bottom context usages
-                    kind)
+                  let usages = PTA.get_direct_usages db flow_to in
+                  rewrite_kind_with_subkind_not_top_not_bottom db usages kind)
               kinds
           in
           shape, kinds)
@@ -223,15 +221,15 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
          { consts; non_consts })
       (Flambda_kind.With_subkind.nullable kind)
 
-let rewrite_kind_with_subkind context var kind =
+let rewrite_kind_with_subkind (uses : UA.result) var kind =
   let var = Code_id_or_name.name var in
-  match PTA.get_usages context.db var with
+  match PTA.get_usages uses.db var with
   | Bottom -> erase kind
   | Unknown -> kind
   | Ok usages ->
     (* We don't need to add usages through function slots, since functions never
        appear in value_kinds. *)
-    rewrite_kind_with_subkind_not_top_not_bottom context usages kind
+    rewrite_kind_with_subkind_not_top_not_bottom uses.db usages kind
 
 let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
@@ -369,7 +367,8 @@ module Rewriter = struct
               Field.print field
           | Some field_use, Some unboxed_fields ->
             Some (field_use, unboxed_fields))
-        fields unboxed_fields
+        fields
+        (Unboxed_fields.to_map unboxed_fields)
     in
     let forget unboxed_fields =
       Unboxed_fields.map_u (fun x -> None, x) unboxed_fields
@@ -411,6 +410,12 @@ module Rewriter = struct
             in
             Unboxed_fields.Unboxed vars, patterns))
     in
+    let[@local] finish vars pattern =
+      ( Unboxed_fields.mapi_fields
+          (fun field _ -> Field.Map.find field vars)
+          unboxed_fields,
+        pattern )
+    in
     let[@local] closure value_slots =
       let value_slots = Value_slot.Map.bindings value_slots in
       let vars, pats =
@@ -426,14 +431,17 @@ module Rewriter = struct
         | None -> pats
         | Some p -> p @ pats
       in
-      vars, Pattern.closure pats
+      finish vars (Pattern.closure pats)
     in
     match classify_field_map combined with
     | Empty when Option.is_some patterns_for_function_slots ->
       closure Value_slot.Map.empty
     | Empty | Fields_from_distinct_subkinds ->
-      ( Field.Map.map (fun (_, unboxed_fields) -> forget unboxed_fields) combined,
-        Pattern.any )
+      finish
+        (Field.Map.map
+           (fun (_, unboxed_fields) -> forget unboxed_fields)
+           combined)
+        Pattern.any
     | Boxed_number_field (bn, use) ->
       if Option.is_some patterns_for_function_slots
       then
@@ -442,7 +450,7 @@ module Rewriter = struct
            function slots";
       let field = Field.boxed_number bn in
       let vars, pat = for_one_use field use in
-      Field.Map.singleton field vars, Pattern.boxed_number bn pat
+      finish (Field.Map.singleton field vars) (Pattern.boxed_number bn pat)
     | Block_fields { is_int; get_tag; fields } ->
       if Option.is_some patterns_for_function_slots
       then
@@ -481,7 +489,7 @@ module Rewriter = struct
                    kind pat
                  :: !pats)
         fields;
-      !acc, Pattern.block !pats
+      finish !acc (Pattern.block !pats)
     | Closure_fields (value_slots, function_slots) ->
       assert (Function_slot.Map.is_empty function_slots);
       closure value_slots

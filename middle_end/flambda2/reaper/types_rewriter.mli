@@ -15,11 +15,11 @@
 
 type rewrite_context
 
-(** [rewrite_kind_with_subkind context var kind_with_subkind] For
+(** [rewrite_kind_with_subkind uses var kind_with_subkind] For
     [kind_with_subkind] the kind associated to variable [var], removes the
     subkinds on the parts that are not used. *)
 val rewrite_kind_with_subkind :
-  rewrite_context ->
+  Unboxing_analysis.result ->
   Name.t ->
   Flambda_kind.With_subkind.t ->
   Flambda_kind.With_subkind.t
