@@ -363,6 +363,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
     let[@local] add_apply acc ~only_if_closure_any_source =
+      let participant_call = call_widget, callee in
       let callee, call_widget =
         if only_if_closure_any_source
         then (
@@ -382,11 +383,9 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         else callee, call_widget
       in
       if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
+      then
+        Acc.add_external_apply acc ~participant_call ~denv ~code_id
+          ~witness:call_widget ~closure:callee
       else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr =
@@ -410,10 +409,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | No ->
         if is_external
         then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
+          (* Rebuild can retain this foreign direct target even when the
+             closure's target is unknown, so record the explicit reference. *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -829,6 +826,7 @@ type result =
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    code_references : Traverse_acc.code_reference list;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
     closure_function_decls :
@@ -896,6 +894,7 @@ let run ~closed_world (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
+    code_references = Acc.code_references acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc;
     closure_function_decls = Acc.get_closure_function_decls acc
   }

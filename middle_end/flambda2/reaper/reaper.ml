@@ -22,14 +22,15 @@ let get_code_metadata ~cmx_loader ~all_code =
       | None -> Exported_code.find_exn (load_code ()) code_id)
 
 module Staged = struct
-  module Code_changes_inputs = struct
+  module Solve_inputs = struct
     type t =
       { code_deps : Traverse_acc.code_dep Code_id.Map.t;
+        code_references : Traverse_acc.code_reference list;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
 
-    let ids_for_export { code_deps; all_sets_of_closures } =
+    let ids_for_export { code_deps; code_references; all_sets_of_closures } =
       let ids =
         Code_id.Map.fold
           (fun code_id code_dep ids ->
@@ -38,18 +39,26 @@ module Staged = struct
               (Traverse_acc.ids_for_export_code_dep code_dep))
           code_deps Ids_for_export.empty
       in
-      List.fold_left
-        (fun ids set_of_closures ->
-          Function_slot.Lmap.fold
-            (fun _function_slot (name, code_id) ids ->
-              let ids = Ids_for_export.add_name ids name in
-              match (code_id : _ Or_unknown.t) with
-              | Unknown -> ids
-              | Known code_id -> Ids_for_export.add_code_id ids code_id)
-            set_of_closures ids)
-        ids all_sets_of_closures
+      let ids =
+        List.fold_left
+          (fun ids set_of_closures ->
+            Function_slot.Lmap.fold
+              (fun _function_slot (name, code_id) ids ->
+                let ids = Ids_for_export.add_name ids name in
+                match (code_id : _ Or_unknown.t) with
+                | Unknown -> ids
+                | Known code_id -> Ids_for_export.add_code_id ids code_id)
+              set_of_closures ids)
+          ids all_sets_of_closures
+      in
+      Ids_for_export.union ids
+        (Traverse_acc.ids_for_export_code_references code_references)
 
-    let apply_renaming { code_deps; all_sets_of_closures } renaming =
+    let referenced_compilation_units t =
+      Traverse_acc.code_references_compilation_units t.code_references
+
+    let apply_renaming { code_deps; code_references; all_sets_of_closures }
+        renaming =
       let code_deps =
         Code_id.Map.fold
           (fun code_id code_dep map ->
@@ -66,11 +75,14 @@ module Staged = struct
                  Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
           all_sets_of_closures
       in
-      { code_deps; all_sets_of_closures }
+      let code_references =
+        Traverse_acc.apply_renaming_code_references code_references renaming
+      in
+      { code_deps; code_references; all_sets_of_closures }
 
     let map_result_types t ~f =
-      (* The code metadata stored in [code_deps] is the only part of the
-         code-changes inputs holding Flambda types. *)
+      (* The code metadata stored in [code_deps] is the only part of the solve
+         inputs holding Flambda types. *)
       let map_code_dep (code_dep : Traverse_acc.code_dep) =
         { code_dep with
           code_metadata =
@@ -179,6 +191,7 @@ module Staged = struct
             fixed_arity_continuations;
             continuation_info;
             code_deps;
+            code_references;
             all_sets_of_closures;
             closure_function_decls
           } =
@@ -189,8 +202,8 @@ module Staged = struct
         ~code_deps
         ~get_code_metadata:(get_code_metadata ~cmx_loader ~all_code)
     in
-    let code_changes_inputs =
-      Code_changes_inputs.{ code_deps; all_sets_of_closures }
+    let solve_inputs =
+      Solve_inputs.{ code_deps; code_references; all_sets_of_closures }
     in
     let rebuild_data =
       { Traverse_rebuild.toplevel_expr;
@@ -200,9 +213,9 @@ module Staged = struct
         continuation_info
       }
     in
-    deps, slot_offsets_inputs, code_changes_inputs, rebuild_data
+    deps, slot_offsets_inputs, solve_inputs, rebuild_data
 
-  let solve ~slot_offsets_inputs ~analysis_scope ~code_changes_inputs deps =
+  let solve ~slot_offsets_inputs ~analysis_scope ~solve_inputs deps =
     let uses =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps ~analysis_scope)
@@ -215,9 +228,9 @@ module Staged = struct
     in
     let code_deps =
       List.fold_left
-        (fun code_deps (inputs : Code_changes_inputs.t) ->
+        (fun code_deps (inputs : Solve_inputs.t) ->
           Code_id.Map.disjoint_union code_deps inputs.code_deps)
-        Code_id.Map.empty code_changes_inputs
+        Code_id.Map.empty solve_inputs
     in
     let code_changes =
       Unboxing_analysis.compute_code_changes uses ~analysis_scope
@@ -290,20 +303,20 @@ end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
-  let deps, slot_offsets_inputs, code_changes_inputs, traverse_rebuild =
+  let deps, slot_offsets_inputs, solve_inputs, traverse_rebuild =
     Staged.traverse ~free_names ~cmx_loader ~all_code ~closed_world:false unit
   in
   let solution, slot_offsets =
     Staged.solve ~slot_offsets_inputs ~analysis_scope:Current_unit
-      ~code_changes_inputs:[code_changes_inputs] deps
+      ~solve_inputs:[solve_inputs] deps
   in
   let unit_metadata = Flambda_unit.metadata unit in
   let flambda, all_code, final_typing_env =
     Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution
       ~code_deps_for_result_types:
-        (Some code_changes_inputs.Staged.Code_changes_inputs.code_deps)
+        (Some solve_inputs.Staged.Solve_inputs.code_deps)
       ~all_sets_of_closures:
-        code_changes_inputs.Staged.Code_changes_inputs.all_sets_of_closures
-      ~machine_width ~cmx_loader ~all_code ~final_typing_env
+        solve_inputs.Staged.Solve_inputs.all_sets_of_closures ~machine_width
+      ~cmx_loader ~all_code ~final_typing_env
   in
   flambda, all_code, slot_offsets, final_typing_env

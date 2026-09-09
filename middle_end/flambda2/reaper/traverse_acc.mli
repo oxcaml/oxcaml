@@ -44,6 +44,30 @@ type code_dep =
     unknown_arity_call_witnesses : Code_id_or_name.t list
   }
 
+type code_reference =
+  | Closure of
+      { closure : Code_id_or_name.t;
+        code_id : Code_id.t;
+        external_witness : Code_id_or_name.t
+      }
+  | Direct_call of
+      { call : Code_id_or_name.t;
+        code_id : Code_id.t;
+        closure : Code_id_or_name.t option;
+        caller : Code_id.t option;
+        external_call : Code_id_or_name.t;
+        external_closure : Code_id_or_name.t option;
+        external_world : Code_id_or_name.t
+      }
+
+val ids_for_export_code_references : code_reference list -> Ids_for_export.t
+
+val code_references_compilation_units :
+  code_reference list -> Compilation_unit.Set.t
+
+val apply_renaming_code_references :
+  code_reference list -> Renaming.t -> code_reference list
+
 (** A record of a direct function application, to be resolved into graph edges
     once all code has been traversed. *)
 type apply_dep =
@@ -55,6 +79,17 @@ type apply_dep =
 
 (** The type of traversal accumulators. *)
 type t
+
+(** [participant_call] is the unguarded call site, before any Auto-mode fallback
+    condition. Nonparticipants retain the guarded fallback. *)
+val add_external_apply :
+  t ->
+  participant_call:Code_id_or_name.t * Simple.t option ->
+  denv:Traverse_env.t ->
+  code_id:Code_id.t ->
+  witness:Code_id_or_name.t ->
+  closure:Simple.t option ->
+  unit
 
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
@@ -89,6 +124,8 @@ val find_code_dep : t -> Code_id.t -> code_dep option
 
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
+
+val code_references : t -> code_reference list
 
 val connect_closure :
   Graph.graph ->

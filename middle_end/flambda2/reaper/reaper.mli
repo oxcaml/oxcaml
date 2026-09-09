@@ -14,17 +14,19 @@
 (**************************************************************************)
 
 module Staged : sig
-  (** The per-unit inputs of the solve-time code changes computation: the code
-      dependencies (which carry the code metadata captured at traverse time) and
-      the unit's sets of closures. *)
-  module Code_changes_inputs : sig
+  (** Per-unit code information and references collected for the solve. *)
+  module Solve_inputs : sig
     type t =
       { code_deps : Traverse_acc.code_dep Code_id.Map.t;
+        code_references : Traverse_acc.code_reference list;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
 
     val ids_for_export : t -> Ids_for_export.t
+
+    (** Units mentioned by pending code references. *)
+    val referenced_compilation_units : t -> Compilation_unit.Set.t
 
     val apply_renaming : t -> Renaming.t -> t
 
@@ -59,7 +61,7 @@ module Staged : sig
     Flambda_unit.t ->
     Global_flow_graph.graph
     * Slot_offsets_analysis.Inputs.t
-    * Code_changes_inputs.t
+    * Solve_inputs.t
     * Traverse_rebuild.t
 
   (** Analyse the combined dependency graph and compute rewriting decisions and
@@ -67,7 +69,7 @@ module Staged : sig
   val solve :
     slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
     analysis_scope:Analysis.Scope.t ->
-    code_changes_inputs:Code_changes_inputs.t list ->
+    solve_inputs:Solve_inputs.t list ->
     Global_flow_graph.graph ->
     solution * Slot_offsets.result
 

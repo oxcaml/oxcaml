@@ -264,7 +264,7 @@ let flambda_to_flambda0 : type m.
           in
           result, "reaper", None
         | Lto_support ->
-          let deps, slot_offsets_inputs, code_changes_inputs, rebuild_data =
+          let deps, slot_offsets_inputs, solve_inputs, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
               ~all_code ~closed_world:true flambda
           in
@@ -277,7 +277,7 @@ let flambda_to_flambda0 : type m.
                 imported_offsets = Exported_offsets.imported_offsets ();
                 deps;
                 slot_offsets_inputs;
-                code_changes_inputs;
+                solve_inputs;
                 rebuild_data
               }
           in
@@ -464,10 +464,9 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
         Flambda2_reaper.Slot_offsets_analysis.Inputs.union combined inputs)
       Flambda2_reaper.Slot_offsets_analysis.Inputs.empty solve_data
   in
-  let code_changes_inputs =
+  let solve_inputs =
     List.map
-      (fun (_participant, (_, _, _, code_changes_inputs)) ->
-        code_changes_inputs)
+      (fun (_participant, (_, _, _, solve_inputs)) -> solve_inputs)
       solve_data
   in
   let participant_units =
@@ -490,7 +489,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     solve_data;
   let solution, slot_offsets =
     Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs ~analysis_scope
-      ~code_changes_inputs combined_graph
+      ~solve_inputs combined_graph
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution ~slot_offsets
@@ -523,7 +522,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         imported_offsets;
         deps = _;
         slot_offsets_inputs = _;
-        code_changes_inputs;
+        solve_inputs;
         rebuild_data
       } =
     Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
@@ -556,9 +555,8 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
       ~traverse_rebuild:rebuild_data ~solution ~code_deps_for_result_types:None
       ~all_sets_of_closures:
-        code_changes_inputs
-          .Flambda2_reaper.Reaper.Staged.Code_changes_inputs
-           .all_sets_of_closures
+        solve_inputs
+          .Flambda2_reaper.Reaper.Staged.Solve_inputs.all_sets_of_closures
       ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let { unit = flambda;
