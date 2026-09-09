@@ -153,24 +153,24 @@ let get_mod_bound_doc mod_bound =
   in
   let* description =
     match parsed with
-    | Axis_pair (Modal (Comonadic _), _) ->
+    | Axis_pair (Comonadic Externality, Modality (Meet_const Internal)) ->
+      Some "Values of types of this kind might be pointers to the OCaml heap"
+    | Axis_pair (Comonadic Externality, Modality (Meet_const External64)) ->
+      Some
+        "On 64-bit systems, values of types of this kind are never pointers to \
+         the OCaml heap"
+    | Axis_pair (Comonadic Externality, Modality (Meet_const External)) ->
+      Some "Values of types of this kind are never pointers to the OCaml heap"
+    | Axis_pair (Comonadic _, _) ->
       Some
         (Format.asprintf
            "Values of types of this kind can cross to `%s` from weaker modes."
            mod_bound)
-    | Axis_pair (Modal (Monadic _), _) ->
+    | Axis_pair (Monadic _, _) ->
       Some
         (Format.asprintf
            "Values of types of this kind can cross from `%s` to stronger modes"
            mod_bound)
-    | Axis_pair (Nonmodal Externality, Internal) ->
-      Some "Values of types of this kind might be pointers to the OCaml heap"
-    | Axis_pair (Nonmodal Externality, External64) ->
-      Some
-        "On 64-bit systems, values of types of this kind are never pointers to \
-         the OCaml heap"
-    | Axis_pair (Nonmodal Externality, External) ->
-      Some "Values of types of this kind are never pointers to the OCaml heap"
     | Everything ->
       Some
         "Synonym for \"global aliased many contended portable unyielding \
@@ -189,6 +189,7 @@ let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
   let open Option.Infix in
   let* description =
     match (axis, mode) with
+    | Comonadic Externality, _ -> None
     | Comonadic Areality, Local ->
       Some "Values with this mode cannot escape the current region"
     | Comonadic Areality, Global ->
@@ -269,6 +270,7 @@ let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
     let subpage =
       match axis with
       | Comonadic Areality -> "stack-allocation/intro/"
+      | Comonadic Externality -> "kinds/intro/"
       | Monadic Contention -> "parallelism/01-intro/"
       | Comonadic Portability -> "parallelism/01-intro/"
       | Monadic Uniqueness -> "uniqueness/intro/"

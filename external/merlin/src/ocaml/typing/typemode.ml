@@ -742,10 +742,7 @@ module Modifier_axis_pair = struct
   let of_string s =
     match Modality_axis_pair.of_string s with
     | Atom (Monadic axis, modality) ->
-      P (Modal (Monadic axis), Modality modality)
+      P (Monadic axis, Modality modality)
     | Atom (Comonadic axis, modality) ->
-      P (Modal (Comonadic axis), Modality modality)
-    | exception Not_found ->
-      let P (axis, value) = Nonmodal_axis_pair.of_string s in
-      P (Nonmodal axis, value)
+      P (Comonadic axis, Modality modality)
 end
