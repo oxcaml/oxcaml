@@ -2251,15 +2251,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined
           (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
         when Mixed_product_bytes.types_shape_is_all_value shape ->
+        let length = MPB.count_types_shape shape |> MPB.value_prefix_len in
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
-            length = Target_ocaml_int.of_int machine_width num_fields
+            length = Target_ocaml_int.of_int machine_width length
           }
       | Record_mixed shape
         when Mixed_product_bytes.types_shape_is_all_value shape ->
+        let length = MPB.count_types_shape shape |> MPB.value_prefix_len in
         Values
           { tag = Tag.Scannable.zero;
-            length = Target_ocaml_int.of_int machine_width num_fields
+            length = Target_ocaml_int.of_int machine_width length
           }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
