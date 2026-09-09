@@ -25,6 +25,8 @@ val create_rule : Lang.Variable.t_ list -> Lang.rule -> rule
 
 type t
 
+val print : Format.formatter -> t -> unit
+
 val saturate : rule list -> t
 
 val fixpoint : t list -> t

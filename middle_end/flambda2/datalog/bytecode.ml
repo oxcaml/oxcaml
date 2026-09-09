@@ -120,13 +120,14 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * string list
         -> code
     | Union :
-        'v Table.result_repr
-        * ('t, 'k, 'v) Column.hlist
+        ('t, 'k, 's) Column.hlist
+        * ('s, _, 'v) Column.hlist
+        * 'v Table.result_repr
         * 't output_ref
         * string
         * 'k Or_null_receiver.hlist
         * string list
-        * 'v Or_null_receiver.t
+        * 's Or_null_receiver.t
         * string
         -> code
 
@@ -171,7 +172,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         (print_label digits) if_false
     | Call_with_bindings (_, name, _, _, names) ->
       Format.fprintf ppf "call@ %s,@ [@[%a]@]" name print_list names
-    | Union (_, _, _, name, _, names, _, value_name) ->
+    | Union (_, _, _, _, name, _, names, _, value_name) ->
       Format.fprintf ppf "union@ %s,@ @[{[@[%a]@] ->@;<1 2>%s}@]" name
         print_list names value_name
 
@@ -362,9 +363,19 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let call_with_bindings { value = fn; name } { values = args; names } st =
     emit (Call_with_bindings (fn, name, st.bindings, args, names)) st
 
-  let union repr is_trie { value = table; name } { values = args; names }
-      { value; name = value_name } =
-    emit (Union (repr, is_trie, table, name, args, names, value, value_name))
+  let union outer_cols inner_cols repr { value = table; name }
+      { values = args; names } { value; name = value_name } =
+    emit
+      (Union
+         ( outer_cols,
+           inner_cols,
+           repr,
+           table,
+           name,
+           args,
+           names,
+           value,
+           value_name ))
 
   (* Use a [private] type from an anonymous module to ensure that we only ever
      construct bytecode that satisfies the requirements of [exec] below (namely,
@@ -442,6 +453,21 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | arg :: args, column :: columns ->
       Column.singleton column (read arg) (read_singleton columns args value)
 
+  let rec union_impl : type t s k i v.
+      (t, k, s) Column.hlist ->
+      (s, i, v) Column.hlist ->
+      v Table.result_repr ->
+      t ->
+      t ->
+      t =
+   fun outer_cols inner_cols repr t1 t2 ->
+    match outer_cols with
+    | [] -> Table.union inner_cols repr t1 t2
+    | outer_col :: outer_cols ->
+      Column.union_total outer_col
+        (fun s1 s2 -> union_impl outer_cols inner_cols repr s1 s2)
+        t1 t2
+
   (* Isomorphic to [unit], but with a different type so that accidentally
      returning instead of calling [next] is a type error. *)
   type explicit_exit = Explicit_exit
@@ -497,12 +523,13 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     | Call_with_bindings (func, _name, bindings, args, _names) ->
       func bindings (read_hlist args);
       next ()
-    | Union (repr, columns, table, _, args, _, value, _) ->
-      let entry = read_singleton columns args value in
+    | Union (outer_cols, inner_cols, repr, table, _, args, _, value, _) ->
+      let entry = read_singleton outer_cols args value in
       (match table.contents with
       | Null -> table.contents <- Or_null.this entry
       | This contents ->
-        table.contents <- Or_null.this (Table.union columns repr contents entry));
+        table.contents
+          <- Or_null.this (union_impl outer_cols inner_cols repr contents entry));
       next ()
 
   let run t =

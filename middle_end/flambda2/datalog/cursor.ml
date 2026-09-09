@@ -69,7 +69,14 @@ let unbind_cursor cursor =
 
 let with_bound_cursor ?callback cursor db f =
   bind_cursor ?callback cursor db;
-  Fun.protect ~finally:(fun () -> unbind_cursor cursor) f
+  Fun.protect
+    ~finally:(fun () -> unbind_cursor cursor)
+    (fun () ->
+      try f ()
+      with Misc.Fatal_error ->
+        let bt = Printexc.get_raw_backtrace () in
+        Format.eprintf "%a@." print cursor;
+        Printexc.raise_with_backtrace Misc.Fatal_error bt)
 
 let naive_iter cursor db f =
   with_bound_cursor ~callback:f cursor db @@ fun () ->
@@ -133,6 +140,7 @@ module From_plan = struct
   module Env = struct
     type bound_var =
       | Bound_var : 'a variable * 'a Channel.or_null_receiver -> bound_var
+      | Bound_output : 'a variable * 'a Bytecode.output_ref -> bound_var
 
     type naive_table =
       | Naive_table :
@@ -143,24 +151,17 @@ module From_plan = struct
 
     type t =
       { bound_vars : bound_var Variable.Id.Map.t;
-        naive_tables : naive_table Int.Tbl.t;
-        output_tables : output Int.Tbl.t
+        naive_tables : naive_table Int.Tbl.t
       }
 
     let create () =
-      { bound_vars = Variable.Id.Map.empty;
-        naive_tables = Int.Tbl.create 0;
-        output_tables = Int.Tbl.create 0
-      }
+      { bound_vars = Variable.Id.Map.empty; naive_tables = Int.Tbl.create 0 }
 
     let get_naive_tables t =
       Int.Tbl.fold
         (fun _ (Naive_table (table, sender, _)) acc ->
           Bind_table (table, sender) :: acc)
         t.naive_tables []
-
-    let get_output_tables t =
-      Int.Tbl.fold (fun _ output acc -> output :: acc) t.output_tables []
 
     let bind_var env var receiver =
       if Variable.Id.Map.mem (Variable.uid var) env.bound_vars
@@ -176,15 +177,42 @@ module From_plan = struct
       in
       { env with bound_vars }
 
+    let bind_output env var receiver =
+      if Variable.Id.Map.mem (Variable.uid var) env.bound_vars
+      then
+        Misc.fatal_errorf
+          "*BUG*: Datalog planner tried to bind variable %a, but it is already \
+           bound"
+          Variable.print var;
+      let bound_vars =
+        Variable.Id.Map.add (Variable.uid var)
+          (Bound_output (var, receiver))
+          env.bound_vars
+      in
+      { env with bound_vars }
+
     let must_be_bound (type a) env (var : a variable) :
         a Channel.or_null_receiver with_name =
       match Variable.Id.Map.find (Variable.uid var) env.bound_vars with
       | exception Not_found ->
         Misc.fatal_errorf "Datalog variable not bound in this context: %a"
           Variable.print var
+      | Bound_output _ ->
+        Misc.fatal_error "Datalog variable is bound to an output"
       | Bound_var (var', receiver) ->
         let Equal = Variable.must_be_equal var var' in
         { value = receiver; name = Variable.name var' }
+
+    let get_output (type a) env (var : a variable) :
+        a Bytecode.output_ref with_name =
+      match Variable.Id.Map.find (Variable.uid var) env.bound_vars with
+      | exception Not_found ->
+        Misc.fatal_errorf "Datalog variable not bound in this context: %a"
+          Variable.print var
+      | Bound_output (var', output_ref) ->
+        let Equal = Variable.must_be_equal var var' in
+        { value = output_ref; name = Variable.name var' }
+      | Bound_var _ -> Misc.fatal_error "Datalog variable is bound to an output"
 
     let lit_to_string ?column lit =
       match column with
@@ -219,18 +247,6 @@ module From_plan = struct
       | Naive_table (tid', _, receiver) ->
         let Equal = Table.Id.provably_equal_exn tid tid' in
         { value = receiver; name = Table.Id.name tid }
-
-    let get_output (type t k v) env (tid : (t, k, v) Table.Id.t) :
-        t Bytecode.output_ref with_name =
-      match Int.Tbl.find env.output_tables (Table.Id.uid tid) with
-      | exception Not_found ->
-        let output_ref = Bytecode.create_output () in
-        Int.Tbl.replace env.output_tables (Table.Id.uid tid)
-          (Output_table (tid, output_ref));
-        { value = output_ref; name = Table.Id.name tid }
-      | Output_table (tid', output_ref) ->
-        let Equal = Table.Id.provably_equal_exn tid tid' in
-        { value = output_ref; name = Table.Id.name tid }
   end
 
   type _ column = Column : (_, 'k, _) Column.id -> 'k column
@@ -259,24 +275,26 @@ module From_plan = struct
     if index >= Iarray.length plan.input_stages
     then
       Iarray.fold_right
-        (fun (Atom (relation, terms)) body ->
+        (fun (Output_atom (relation, terms)) body ->
           match relation with
-          | Unless _ | Distinct _ | Filter _ ->
-            Misc.fatal_error "not supported in the head"
-          | Table tid ->
-            let repr = Table.Id.result_repr tid in
-            let columns = Table.Id.columns tid in
-            let value = Table.Id.default_value tid in
-            let _, value_receiver =
-              Channel.create_or_null (Or_null.this value)
+          | Union (table, outer_cols, inner_cols, repr, var) ->
+            let get_value : type t k v.
+                (t, k, v) Column.hlist ->
+                v Table.result_repr ->
+                t variable ->
+                t Or_null_receiver.t with_name =
+             fun inner_cols repr var ->
+              match inner_cols, Table.provably_unit_repr repr with
+              | [], Some Equal ->
+                let _, receiver = Channel.create_or_null (Or_null.this ()) in
+                { value = receiver; name = "()" }
+              | ([] | _ :: _), (None | Some Equal) -> Env.must_be_bound env var
             in
-            let value_name =
-              Format.asprintf "%a" (Table.result_repr_print repr) value
-            in
-            let value = { value = value_receiver; name = value_name } in
-            let table = Env.get_output env tid in
+            let value = get_value inner_cols repr var in
+            let table = Env.get_output env table in
             let args = Env.must_be_bound_term_hlist env terms in
-            Executor.list [Executor.union repr columns table args value; body]
+            Executor.list
+              [Executor.union outer_cols inner_cols repr table args value; body]
           | Callback_with_bindings (fn, name) ->
             let args = Env.must_be_bound_term_hlist env terms in
             Executor.list
@@ -320,6 +338,7 @@ module From_plan = struct
          parameters;
          input_stages = _;
          output_atoms = _;
+         output_tables;
          num_existentials = _;
          callback
        } as plan) : (_, _) with_parameters =
@@ -345,9 +364,16 @@ module From_plan = struct
           Env.bind_var env var receiver, binders)
         (env, []) tables
     in
+    let env, cursor_outputs =
+      Iarray.fold_left
+        (fun (env, outputs) (Bound_table (table, var)) ->
+          let output_ref = Bytecode.create_output () in
+          let outputs = Output_table (table, output_ref) :: outputs in
+          Env.bind_output env var output_ref, outputs)
+        (env, []) output_tables
+    in
     let executor = Executor.assemble (build_stages env plan 0) in
     let cursor_naive_binders = Env.get_naive_tables env in
-    let cursor_outputs = Env.get_output_tables env in
     { parameters;
       cursor =
         { cursor_binders;
