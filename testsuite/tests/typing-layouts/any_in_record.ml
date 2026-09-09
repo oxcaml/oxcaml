@@ -586,3 +586,26 @@ let w = { id = 1; value = "visible" }
 [%%expect{|
 val w : string r = {id = 1; value = "visible"}
 |}]
+
+(* Functional updates that change the representation *)
+
+type ('a : any) fu = { a : 'a; i : int }
+[%%expect{|
+type ('a : any) fu = { a : 'a; i : int; }
+|}]
+
+let f (r : int fu) = { r with a = #2.5 }
+[%%expect{|
+val f : int fu -> float# fu = <fun>
+|}]
+
+let f (r : 'a fu) = { r with a = "hi" }
+[%%expect{|
+val f : ('a : any). 'a fu -> string fu = <fun>
+|}]
+
+(* The original record isn't representable *)
+let bad (type a : any) (r : a fu) = { r with a = "hi" }
+[%%expect{|
+val bad : ('a : any). 'a fu -> string fu = <fun>
+|}]
