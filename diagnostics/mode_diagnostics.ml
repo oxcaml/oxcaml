@@ -195,9 +195,8 @@ module Step = struct
       (fun (s : mismatch_step) ->
         match Meaning.interpret s with
         | Nothing_to_say -> None
-        | ( Unexplained | User_annotation _
-        | User_modality_annotation _ | Capture _ | Signature_argument _
-          | Fact _ | Reroute _ ) as says ->
+        | ( Unexplained | User_annotation _ | User_modality_annotation _
+          | Capture _ | Signature_argument _ | Fact _ | Reroute _ ) as says ->
           Some { pinpoint = s.pinpoint; mode = s.mode; says })
       chain
 
@@ -211,49 +210,46 @@ module Step = struct
           Step_mode.equal s.mode next.mode
         | _ -> false
       in
-      if transparent then for_explanation rest
-      else s :: for_explanation rest
+      if transparent then for_explanation rest else s :: for_explanation rest
 
   let is_capture (s : t) =
     match s.says with
     | Capture _ -> true
     | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Signature_argument _
-    | Fact _ | Reroute _ ->
+    | User_modality_annotation _ | Signature_argument _ | Fact _ | Reroute _ ->
       false
 
   let is_region_escape (s : t) =
     match s.says with
     | Fact fact -> Meaning.is_region_escape fact
     | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
+    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
+      ->
       false
 
   let mutable_read (s : t) : Mode.Hint.mutable_part option =
     match s.says with
     | Fact (Mutable_read part) -> Some part
     | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
+    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
+      ->
       None
 
   let mutable_write (s : t) : Mode.Hint.mutable_part option =
     match s.says with
     | Fact (Mutable_write part) -> Some part
     | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
+    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
+      ->
       None
 
   let is_function_return (s : t) =
     match s.says with
     | Fact Function_return_default -> true
     | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
+    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
+      ->
       false
-
 end
 
 let word_segment = function
@@ -303,12 +299,11 @@ let subject_of_pinpoint ((loc, desc) : Mode.Hint.pinpoint) =
     let name = Format_doc.asprintf "%a" Printtyp.Doc.longident lid in
     let span = if Location.is_none loc then None else Some loc in
     Nlg.subject ?span [Phrase.Text noun; Phrase.Code name]
-  | Structure_item (_, id) ->
-    Nlg.subject ~span:loc [Phrase.Code (Ident.name id)]
+  | Structure_item (_, id) -> Nlg.subject ~span:loc [Phrase.Code (Ident.name id)]
   | Unknown | Function | Module | Functor | Functor_parameter | Parameter
-  | Return | Structure | Lazy | Quote | Allocation | Expression
-  | Effect_match | Effect_try | Class | Object | Loop | Letop | Cases_result
-  | Pattern -> subject_of_loc ~fallback:(human_desc desc) loc
+  | Return | Structure | Lazy | Quote | Allocation | Expression | Effect_match
+  | Effect_try | Class | Object | Loop | Letop | Cases_result | Pattern ->
+    subject_of_loc ~fallback:(human_desc desc) loc
 
 let short_subject (subject : subject) =
   match subject.name with
@@ -319,16 +314,16 @@ let short_subject (subject : subject) =
 let subject_of_chain (pinpoint : Mode.Hint.pinpoint) (chain : Step.t list) =
   let subject = subject_of_pinpoint pinpoint in
   match snd pinpoint, chain with
-  | (Ident { category = Value; _ } | Structure_item (Value, _)),
-    { says =
-        Capture
-          { relation = Closes_over;
-            details = { closure = _, Function; _ };
-            _
-          };
-      _
-    }
-    :: _ ->
+  | ( (Ident { category = Value; _ } | Structure_item (Value, _)),
+      { says =
+          Capture
+            { relation = Closes_over;
+              details = { closure = _, Function; _ };
+              _
+            };
+        _
+      }
+      :: _ ) ->
     { subject with
       name = Phrase.Text "the function " :: (short_subject subject).name
     }
@@ -367,7 +362,8 @@ let modality_annotation_reason ~mode_name ~subject:owner ?(asides = [])
     (written : string Location.loc) =
   let open Nlg in
   let implication =
-    if String.equal mode_name written.txt then []
+    if String.equal mode_name written.txt
+    then []
     else
       [ background
           [ code mode_name;
@@ -413,9 +409,8 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
         ~subject:owner ~asides annotation ]
   | User_annotation annotation ->
     [ about
-        [ subj;
-          ref_source annotation
-            (copula :: txt " annotated as " :: mode) ] ]
+        [subj; ref_source annotation (copula :: txt " annotated as " :: mode)]
+    ]
   | Capture { relation = Closes_over; details = { closed; _ }; _ } ->
     [ about
         [ subj;
@@ -554,10 +549,8 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
   | Reroute (Functor_applied_at loc) ->
     let application = subject_of_loc ~fallback:"this application" loc in
     [ say
-        [ subj;
-          copula;
-          txt " applied at ";
-          Nlg.mention ~case:Subject application ] ]
+        [subj; copula; txt " applied at "; Nlg.mention ~case:Subject application]
+    ]
 
 let rec explain_chain ~side ~subject ~extras (chain : Step.t list) :
     term Nlg.aside list =
@@ -568,8 +561,8 @@ let rec explain_chain ~side ~subject ~extras (chain : Step.t list) :
   | [] -> []
   | { says = Nothing_to_say | Unexplained; _ } :: rest ->
     explain_chain ~side ~subject ~extras rest
-  | ({ says = Capture { relation; details; source_side }; _ } as step)
-    :: rest ->
+  | ({ says = Capture { relation; details; source_side }; _ } as step) :: rest
+    ->
     let pinpoint =
       match relation with
       | Closes_over -> details.closed
@@ -596,8 +589,9 @@ let rec explain_chain ~side ~subject ~extras (chain : Step.t list) :
         [ Nlg.note
             ~asides:
               (explain_chain ~side:source_side ~subject:source ~extras rest)
-            (Nlg.txt "and " :: Nlg.mention ~case:Subject source :: Nlg.copula
-            :: Nlg.txt predicate :: mode) ]
+            (Nlg.txt "and "
+            :: Nlg.mention ~case:Subject source
+            :: Nlg.copula :: Nlg.txt predicate :: mode) ]
     in
     say_step ~side ~asides ~subject step @ extras step (following rest)
   | step :: rest ->
@@ -700,8 +694,7 @@ module Rule = struct
     in
     let crosses ~source ~target =
       Step.is_capture step && step_on source step
-      &&
-      match next with None -> false | Some next -> step_on target next
+      && match next with None -> false | Some next -> step_on target next
     in
     let portability = Mode.Alloc.Axis.P (Comonadic Portability) in
     let contention = Mode.Alloc.Axis.P (Monadic Contention) in
@@ -717,17 +710,17 @@ module Rule = struct
       | Some _ -> None
       | None ->
         Option.bind mutable_axis (fun mutable_axis ->
-            Option.map
-              (fun part -> accessed part, mutable_axis)
-              (part_of step))
+            Option.map (fun part -> accessed part, mutable_axis) (part_of step))
     in
     List.filter_map Fun.id
-      [ (if on (Comonadic Portability)
-            && crosses ~source:portability ~target:contention
+      [ (if
+           on (Comonadic Portability)
+           && crosses ~source:portability ~target:contention
          then Some Nonportable_closure
          else None);
-        (if on (Monadic Contention)
-            && crosses ~source:contention ~target:portability
+        (if
+           on (Monadic Contention)
+           && crosses ~source:contention ~target:portability
          then Some Portable_function_contends_captures
          else None);
         Option.map
@@ -823,32 +816,35 @@ let signature_reason ~axis ~subject:owner
   | Some declaration ->
     let modalities = declaration.val_modalities in
     let constant =
-      if Mode.Modality.is_undefined modalities then None
+      if Mode.Modality.is_undefined modalities
+      then None
       else Mode.Modality.to_const_opt modalities
     in
     begin match constant with
     | None -> []
-    | Some modalities ->
+    | Some modalities -> (
       let (Mode.Modality.Axis.P axis) =
         Mode.Modality.Axis.of_value (Mode.Const.Axis.alloc_as_value axis)
       in
       let modality = Mode.Modality.Const.proj axis modalities in
-      if Mode.Modality.Per_axis.is_id axis modality then []
+      if Mode.Modality.Per_axis.is_id axis modality
+      then []
       else
         match Mode.Modality.Const.annotation axis modalities with
         | Some written ->
           let mode_name =
-            Format_doc.asprintf "%a" (Mode.Modality.Per_axis.print axis)
+            Format_doc.asprintf "%a"
+              (Mode.Modality.Per_axis.print axis)
               modality
           in
           [modality_annotation_reason ~mode_name ~subject:owner written]
         | None ->
-        [ Nlg.note
-            [ txt "because ";
-              Nlg.pronoun ~case:Possessive owner;
-              txt " signature requires ";
-              ref_source declaration.val_loc
-                [modality_word (Mode.Modality.Atom (axis, modality))] ] ]
+          [ Nlg.note
+              [ txt "because ";
+                Nlg.pronoun ~case:Possessive owner;
+                txt " signature requires ";
+                ref_source declaration.val_loc
+                  [modality_word (Mode.Modality.Atom (axis, modality))] ] ])
     end
 
 let plan_axis ~extra_rules ~actuality_note ~subject_override
@@ -895,10 +891,11 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
             txt (" do not all cross " ^ axis_name) ] ]
   in
   let signature_reason =
-    if List.exists
-         (fun (step : Step.t) ->
-           match step.says with User_modality_annotation _ -> true | _ -> false)
-         expected
+    if
+      List.exists
+        (fun (step : Step.t) ->
+          match step.says with User_modality_annotation _ -> true | _ -> false)
+        expected
     then []
     else signature_reason ~axis ~subject expected_declaration
   in
@@ -1087,8 +1084,8 @@ let modality_story ~(sides : Diagnostic_term.sides) (input : modality_input) :
        header)
 
 let mode_stories ~error_loc ?extra_rules ?actuality_note ?subject_override
-    ?expected_declaration
-    (axes : mismatch_step list Mode.folded_axis list) : story list =
+    ?expected_declaration (axes : mismatch_step list Mode.folded_axis list) :
+    story list =
   List.filter_map prepare_axis axes
   |> List.map (fun (input : axis_input) ->
       let extra_rules =
@@ -1199,7 +1196,8 @@ let diagnose ~error_loc = function
           [ [Nlg.txt "try splitting the application in two"];
             Nlg.txt "the arguments after "
             :: List.map word_segment argument_words
-            @ [Nlg.txt " in the function's type should be applied separately"] ]
+            @ [Nlg.txt " in the function's type should be applied separately"]
+          ]
       in
       let extra_rules axis =
         match restricted_word axis with
@@ -1283,8 +1281,7 @@ let diagnose ~error_loc = function
       let actual_words =
         if Mode.Modality.Per_axis.is_id ax left
         then [txt ("no modality on the " ^ axis_name ^ " axis")]
-        else
-          [txt "the modality "; modality_word (Mode.Modality.Atom (ax, left))]
+        else [txt "the modality "; modality_word (Mode.Modality.Atom (ax, left))]
       in
       plain_story
         ~claim:
@@ -1299,8 +1296,8 @@ let diagnose ~error_loc = function
         ~background:
           [ [ txt
                 "this is a current limitation: the block-index primitives are \
-                 typed with one fixed modality and cannot express others \
-                 yet" ] ]
+                 typed with one fixed modality and cannot express others yet" ]
+          ]
         ~suggestions:
           [ [ txt
                 "remove the modality from the field, or read the field \
@@ -1353,8 +1350,7 @@ let diagnose ~error_loc = function
           [ ref_source loc
               (subject_words subject
               @ [ txt " returns a ";
-                  mode_const_word (Comonadic Areality)
-                    Mode.Locality.Const.Local;
+                  mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
                   txt " value" ]) ]
         ~contrast:
           [ txt "but it is in the tail position of a function that is not ";
@@ -1438,14 +1434,12 @@ let diagnose ~error_loc = function
         for_actual =
           [ Nlg.background
               [ Nlg.txt
-                  "all argument types must mode-cross for rebinding to \
-                   succeed" ]
-          ]
+                  "all argument types must mode-cross for rebinding to succeed"
+              ] ]
       }
     in
     mode_stories ~error_loc ~extra_rules ~actuality_note:Arguments_do_not_cross
-      (Mode.Value.fold_error ~init:[] ~step:fold_step
-         (loc, Mode.Hint.Unknown) e)
+      (Mode.Value.fold_error ~init:[] ~step:fold_step (loc, Mode.Hint.Unknown) e)
   | Local_value_used_in_exclave { loc; description = desc } ->
     let open Nlg in
     let local_word =
@@ -1547,9 +1541,8 @@ let diagnose ~error_loc = function
           ref_source region_loc [txt "this borrow"] ]
       ~background:
         [ [ txt
-              "a borrow lends the value for the length of its context: \
-               until the context ends, the value is not the borrower's to use"
-          ] ]
+              "a borrow lends the value for the length of its context: until \
+               the context ends, the value is not the borrower's to use" ] ]
       ()
     end
   | Uniqueness_error err -> begin
@@ -1600,8 +1593,7 @@ let diagnose ~error_loc = function
     | Uniqueness_analysis.Borrowed_out_of_context loc ->
       plain_story
         ~claim:
-          [ ref_source loc [code "borrow_"];
-            txt " is not in a borrowing context" ]
+          [ref_source loc [code "borrow_"]; txt " is not in a borrowing context"]
         ~background:
           [ [txt "a borrow may be an argument of a function application"];
             [txt "a borrow may appear on the right-hand side of a let binding"];
@@ -1625,16 +1617,16 @@ let diagnose ~error_loc = function
               | Uniqueness_analysis.Par ->
                 "but the tag is being changed by a mutation, so it is not \
                  known here"
-              | Uniqueness_analysis.Seq_before
-              | Uniqueness_analysis.Seq_after ->
-                "but the tag was changed by a mutation, so it is not \
-                 known here")
+              | Uniqueness_analysis.Seq_before | Uniqueness_analysis.Seq_after
+                ->
+                "but the tag was changed by a mutation, so it is not known here")
           ]
       in
       plain_story
         ~claim:
           [ ref_source new_tag.name_for_error.loc
-              [txt "this overwrite sets the tag to "; code (tag_name new_tag)] ]
+              [txt "this overwrite sets the tag to "; code (tag_name new_tag)]
+          ]
         ~contrast
         ~background:
           [ [ txt
