@@ -147,7 +147,11 @@ let preallocate_set_of_closures (res, updates, env) ~closure_symbols
     To_cmm_set_of_closures.let_static_set_of_closures env res closure_symbols
       set_of_closures ~prev_updates:updates
   in
-  let res = R.set_data res data in
+  let res =
+    if Set_of_closures.is_specialisation_site set_of_closures
+    then R.add_specialisation_site_data res data
+    else R.set_data res data
+  in
   res, updates, env
 
 let pack_small_ints_into_word ~bits int64_list =

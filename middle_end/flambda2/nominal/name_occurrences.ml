@@ -852,6 +852,11 @@ let continuations_including_in_trap_actions t =
 
 let code_ids t = For_code_ids.keys t.code_ids
 
+let code_ids_in_normal_mode t =
+  For_code_ids.fold_with_mode t.code_ids ~init:Code_id.Set.empty
+    ~f:(fun acc code_id name_mode ->
+      if Name_mode.is_normal name_mode then Code_id.Set.add code_id acc else acc)
+
 let newer_version_of_code_ids t = For_code_ids.keys t.newer_version_of_code_ids
 
 let code_ids_and_newer_version_of_code_ids t =
@@ -926,8 +931,9 @@ let remove_continuation t ~continuation =
       continuations_in_trap_actions
     }
 
-let greatest_name_mode_var t var =
-  For_names.greatest_name_mode t.names (Name.var var)
+let greatest_name_mode_name t name = For_names.greatest_name_mode t.names name
+
+let greatest_name_mode_var t var = greatest_name_mode_name t (Name.var var)
 
 let downgrade_occurrences_at_strictly_greater_name_mode
     { names;

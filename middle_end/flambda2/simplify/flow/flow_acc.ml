@@ -35,7 +35,8 @@ let empty () =
       map = Continuation.Map.empty;
       extra = Continuation.Map.empty;
       lifted_constants = Lifted_constant_state.empty;
-      dummy_toplevel_cont = wrong_dummy_toplevel_cont
+      dummy_toplevel_cont = wrong_dummy_toplevel_cont;
+      has_specialisation_sites = false
     }
   in
   res
@@ -339,7 +340,7 @@ let get_block_and_constant_field ~block ~field =
       Some (var, field))
 
 let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
-    ~simplified_defining_expr t =
+    ~simplified_defining_expr (t : t) =
   match (simplified_defining_expr : Simplified_named.t) with
   | { free_names; named; cost_metrics = _ } -> (
     let record_var_bindings t free_names =
@@ -352,7 +353,42 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
       let bound_var = Bound_pattern.must_be_singleton let_bound in
       let var = Bound_var.var bound_var in
       record_var_alias var simple t
-    | Set_of_closures _ | Rec_info _ -> record_var_bindings t free_names
+    | Set_of_closures (set, alloc_mode) ->
+      if Set_of_closures.is_specialisation_site set
+      then (
+        (* Synthetic value slots are weak hints, excluded from liveness and
+           escape. A site kept for its code must not refer to a region that
+           could be deleted, hence the checks below (see [Set_of_closures]). *)
+        let alloc_mode_free_names =
+          Alloc_mode.For_allocations.free_names alloc_mode
+        in
+        (match (alloc_mode : Alloc_mode.For_allocations.t) with
+        | Heap _ -> ()
+        | Local _ ->
+          Misc.fatal_errorf "Specialisation site in a local region:@ %a"
+            Set_of_closures.print set);
+        Name_occurrences.fold_variables alloc_mode_free_names ~init:()
+          ~f:(fun () region ->
+            if
+              List.exists
+                (fun (elt : T.Continuation_info.t) ->
+                  Variable.Set.mem region elt.defined)
+                t.stack
+            then
+              Misc.fatal_errorf
+                "Specialisation site in a region %a bound in the same body:@ %a"
+                Variable.print region Set_of_closures.print set);
+        let free_names =
+          Name_occurrences.union
+            (Function_declarations.free_names
+               (Set_of_closures.function_decls set))
+            alloc_mode_free_names
+        in
+        record_var_bindings
+          { t with has_specialisation_sites = true }
+          free_names)
+      else record_var_bindings t free_names
+    | Rec_info _ -> record_var_bindings t free_names
     | Prim (original_prim, _) -> (
       let bound_var = Bound_pattern.must_be_singleton let_bound in
       let var = Bound_var.var bound_var in
@@ -438,7 +474,12 @@ let record_lifted_constant_definition_aux ~being_defined elt definition =
           (Function_declarations.free_names
              (Set_of_closures.function_decls set_of_closures))
       in
-      let value_slots = Set_of_closures.value_slots set_of_closures in
+      let value_slots =
+        (* Lifted sets treat synthetic contents like ordinary slot contents. *)
+        Value_slot.Map.disjoint_union
+          (Set_of_closures.value_slots set_of_closures)
+          (Set_of_closures.synthetic_value_slots set_of_closures)
+      in
       Function_slot.Lmap.fold
         (record_lifted_function_slot_aux ~free_names ~value_slots)
         closure_symbols_with_types elt
@@ -486,10 +527,13 @@ let normalize_lifted_constants_aux lifted_constants elt =
       normalize_lifted_constant_aux lifted_constant elt)
 
 let record_lifted_constants lifted_constants (t : t) =
-  { t with
-    lifted_constants =
-      Lifted_constant_state.union lifted_constants t.lifted_constants
-  }
+  if Lifted_constant_state.is_empty lifted_constants
+  then t
+  else
+    { t with
+      lifted_constants =
+        Lifted_constant_state.union lifted_constants t.lifted_constants
+    }
 
 (* Normalisation *)
 (* ************* *)
@@ -524,7 +568,7 @@ let add_extra_args_to_call ~extra_args rewrite_id original_args =
     in
     Some args
 
-let normalize_acc ~specialization_map (t : T.Acc.t) =
+let normalize_acc ~is_toplevel ~specialization_map (t : T.Acc.t) =
   let map =
     Continuation.Map.map
       (fun (elt : T.Continuation_info.t) ->
@@ -632,7 +676,12 @@ let normalize_acc ~specialization_map (t : T.Acc.t) =
           Misc.fatal_errorf
             "Data_flow: missing continuation info for top-level expression"
         | Some elt ->
-          Some (normalize_lifted_constants_aux t.lifted_constants elt))
+          let elt =
+            if is_toplevel || t.has_specialisation_sites
+            then normalize_lifted_constants_aux t.lifted_constants elt
+            else elt
+          in
+          Some elt)
       map
   in
   { t with map; extra = Continuation.Map.empty }

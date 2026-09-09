@@ -1,0 +1,68 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ {
+   fexpr with dump-simplify;
+ }{
+   ocamlopt_flags += " -g -flambda2-expert-phantom-lets";
+   fexpr_reference_suffix = "debug.reference";
+   fexpr with dump-simplify;
+ }
+*)
+
+(* Inlining removes the last runtime uses of the helper and of [captured].
+   The site, its code and the allocation must all disappear; with phantom lets
+   only debug bindings may remain. *)
+
+let code inline(always) size(1) inline_helper (p : val, x : val)
+      specialised { p = p_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(20) metadata_only (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let site =
+    closure specialisation_site inline_helper &my_alloc_region
+      synthetic { p_slot = captured }
+  in
+  apply direct(inline_helper &my_alloc_region) site (captured, x) -> k * e
+in
+
+(* The second site's code stays live through a redirected callee-less call, but
+   its [removed_slot] must not make [r] escape. Mutable unboxing removes [r] and
+   its loop alias, so that slot must not remain in the rebuilt site. *)
+
+let code inline(never) size(1) live_helper (v : val, w : val)
+      specialised { w = x_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (v)
+in
+let code size(30) mutable_alias (x : val, n : imm tagged)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let r = %block.mut.[`0`].my_alloc_region (x) in
+  (cont loop (r, n)
+    where rec loop (r_alias : val, i : imm tagged) =
+      (let site =
+        closure specialisation_site live_helper &my_alloc_region
+          synthetic { removed_slot = r_alias; x_slot = x }
+      in
+      let stop = %int_comp.`le` (i, 0) in
+      switch stop
+        | 0 -> next
+        | 1 -> finish
+        where next =
+          let set = %block_set.[`0`] (r_alias, i) in
+          let pred = %int_barith.`sub` (i, 1) in
+          cont loop (r_alias, pred)
+        where finish =
+          let value = %block_load.mut.[`0`] (r_alias) in
+          apply direct(live_helper &my_alloc_region) (value, x) -> k * e))
+in
+let $metadata_only = closure metadata_only &toplevel in
+let $mutable_alias = closure mutable_alias &toplevel in
+let $camlSpecialised_params_weak_hints = Block 0 ($metadata_only, $mutable_alias)
+in
+cont done ($camlSpecialised_params_weak_hints)

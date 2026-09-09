@@ -309,15 +309,21 @@ let remove_unused_value_slots uacc static_const =
   Rebuilt_static_const.map_set_of_closures static_const ~find_code_metadata
     ~f:(fun set_of_closures ->
       let name_occurrences = UA.used_value_slots uacc in
-      let value_slots =
+      let filter_slots slots =
         Value_slot.Map.filter
           (fun value_slot _ ->
             Name_occurrences.value_slot_is_used_or_imported name_occurrences
               value_slot)
-          (Set_of_closures.value_slots set_of_closures)
+          slots
       in
-      Set_of_closures.create ~value_slots
-        (Set_of_closures.function_decls set_of_closures))
+      let value_slots =
+        filter_slots (Set_of_closures.value_slots set_of_closures)
+      in
+      let synthetic_value_slots =
+        filter_slots (Set_of_closures.synthetic_value_slots set_of_closures)
+      in
+      Set_of_closures.with_value_slots set_of_closures ~value_slots
+        ~synthetic_value_slots)
 
 let create_let_symbols uacc lifted_constant ~body =
   let bound_static = LC.bound_static lifted_constant in

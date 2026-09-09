@@ -1,0 +1,49 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify, dump-reaper;
+*)
+
+(* Sites with different assumptions reach a join, so the call cannot be
+   redirected. The reaper must keep their shared calling convention and each
+   site consistent with its rebuilt set. *)
+
+let code size(5) square (x : val) my_closure &my_alloc_region my_depth
+      -> k * e : val =
+  let r = %int_barith.`mul` (x, x) in
+  cont k (r)
+in
+let $square = closure square &toplevel in
+let code size(5) double (x : val) my_closure &my_alloc_region my_depth
+      -> k * e : val =
+  let r = %int_barith.`add` (x, x) in
+  cont k (r)
+in
+let $double = closure double &toplevel in
+let code inline(never) size(10) helper (f : val, x : val)
+      specialised { f = f_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+let code size(50) map (b : val, x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let c1 =
+    closure specialisation_site helper &my_alloc_region
+      synthetic { f_slot = $square }
+  in
+  let c2 =
+    closure specialisation_site helper &my_alloc_region
+      synthetic { f_slot = $double }
+  in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> k1 (c1, $square)
+    | 1 -> k1 (c2, $double)
+  where k1 (p : val, g : val) =
+    apply direct(helper &my_alloc_region) p (g, x) -> k * e
+in
+let $map = closure map &toplevel in
+let $camlSpecialised_params_joined_sites = Block 0 ($map) in
+cont done ($camlSpecialised_params_joined_sites)

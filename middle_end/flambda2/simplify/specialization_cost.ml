@@ -73,6 +73,9 @@ let update_cost ~f = function
   | Can_specialize cost -> Can_specialize (f cost)
   | Cannot_specialize _ as res -> res
 
+(* CR mshinwell: Specialisation sites (see [Set_of_closures]) block continuation
+   specialisation like any set of closures. Exempting them means dealing with
+   the lifted constants their re-simplification produces. *)
 let add_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
 

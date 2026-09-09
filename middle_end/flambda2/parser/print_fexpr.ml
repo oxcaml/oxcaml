@@ -546,10 +546,11 @@ let apply_cont ppf ({ cont; trap_action = action; args } : Fexpr.apply_cont) =
     (simple_args ~space:Before ~omit_if_empty:true)
     args
 
-let value_slots expr_or_static ppf = function
+let value_slots_with_keyword keyword expr_or_static ppf = function
   | None -> ()
   | Some ces ->
-    Format.fprintf ppf "@ @[<hv2>%twith%t {" expr_or_static Flambda_colours.pop;
+    Format.fprintf ppf "@ @[<hv2>%t%s%t {" expr_or_static keyword
+      Flambda_colours.pop;
     pp_list ~sep:";"
       (fun ppf ({ var; value; kind } : one_value_slot) ->
         match kind with
@@ -561,19 +562,38 @@ let value_slots expr_or_static ppf = function
       ppf ces;
     Format.fprintf ppf "@;<1 -2>}@]"
 
+let value_slots expr_or_static ppf ces =
+  value_slots_with_keyword "with" expr_or_static ppf ces
+
 let alloc_mode_for_allocations ppf (alloc_mode : alloc_mode_for_allocations) =
   match alloc_mode with
   | Heap { alloc_region } -> Format.fprintf ppf "@ &%a" region alloc_region
   | Local { alloc_region; region = r } ->
     Format.fprintf ppf "@ &%a@ &%a" region alloc_region region r
 
+let code_specialised_params ppf = function
+  | [] -> ()
+  | params ->
+    Format.fprintf ppf "@ @[<hv2>%tspecialised%t {" Flambda_colours.expr_keyword
+      Flambda_colours.pop;
+    pp_list ~sep:";"
+      (fun ppf (param, slot) ->
+        Format.fprintf ppf "@ @[<hv2>%a =@ %a@]" variable param value_slot slot)
+      ppf params;
+    Format.fprintf ppf "@;<1 -2>}@]"
+
 let fun_decl expr_or_static ppf (decl : fun_decl) =
   let pp_at_function_slot ppf cid =
     pp_option ~space:Before (pp_like "@@%a" function_slot) ppf cid
   in
-  Format.fprintf ppf "@[<2>%tclosure%t@ %a%a%a@]" expr_or_static
-    Flambda_colours.pop code_id decl.code_id pp_at_function_slot
+  Format.fprintf ppf "@[<2>%tclosure%t%a@ %a%a%a%a@]" expr_or_static
+    Flambda_colours.pop
+    (fun ppf is_site ->
+      if is_site then Format.fprintf ppf "@ specialisation_site")
+    decl.is_specialisation_site code_id decl.code_id pp_at_function_slot
     decl.function_slot alloc_mode_for_allocations decl.alloc
+    (value_slots_with_keyword "synthetic" expr_or_static)
+    decl.synthetic_value_slots
 
 let named ppf = function
   | (Simple s : named) -> simple ppf s
@@ -865,14 +885,21 @@ and code_binding ppf
     is_tupled
     (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
     stub Flambda_colours.pop code_id id;
-  let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
-      =
+  let { params;
+        specialised_params;
+        closure_var;
+        region_vars;
+        depth_var;
+        ret_cont;
+        exn_cont;
+        body
+      } =
     params_and_body
   in
   Format.fprintf ppf
-    "%a@]@ @[<hov 2>%a%a@ %a@]@ @[<hv 2>-> %a@ * %a@]%a%s@]@] =@ %a"
+    "%a%a@]@ @[<hov 2>%a%a@ %a@]@ @[<hv 2>-> %a@ * %a@]%a%s@]@] =@ %a"
     (kinded_parameters ~space:Before)
-    params variable closure_var
+    params code_specialised_params specialised_params variable closure_var
     (alloc_mode_for_applications variable ~space:Before)
     region_vars variable depth_var continuation_id ret_cont continuation_id
     exn_cont

@@ -248,6 +248,7 @@ let prepare_code ~env ~res ~code_id code =
         ~my_alloc_mode:_
         ~my_depth:_
         ~free_names_of_body:_
+        ~specialised_params:_
       ->
       let params =
         List.init (Bound_parameters.cardinal bound_params) (fun _ ->
@@ -293,6 +294,7 @@ let code ~env ~res ~translate_body ~code_id code =
         ~my_alloc_mode:_
         ~my_depth:_
         ~free_names_of_body:_
+        ~specialised_params:_
       ->
       (* This has already been populated by the first phase of the [Static] arm
          of [To_jsir.let_expr_normal] *)

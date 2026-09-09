@@ -227,7 +227,12 @@ let $camlUnbox_boxed_numbers__test_float32_10 =
   closure test_float32_9_1 @test_float32 &toplevel
 in
 let code inline(never) loopify(never) size(3) newer_version_of(read_11)
-      read_11_1 (read_into_my_closure_field_b_field_unboxed_int64 : int64)
+      read_11_1
+        (read_into_my_closure_field_b_field_unboxed_int64 : int64)
+        specialised {
+          read_into_my_closure_field_b_field_unboxed_int64 =
+            b_field_unboxed_int64
+        }
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -239,7 +244,7 @@ let code inline(never) loopify(never) size(3) newer_version_of(read_11)
   let int_of_int64 = %tag_imm (prim_1) in
   cont k (int_of_int64)
 in
-let code loopify(never) size(10) newer_version_of(test_value_slot_10)
+let code loopify(never) size(13) newer_version_of(test_value_slot_10)
       test_value_slot_10_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
@@ -251,8 +256,16 @@ let code loopify(never) size(10) newer_version_of(test_value_slot_10)
   let read_into_read_field_b_field_unboxed_int64 =
     b_into_b_field_unboxed_int64
   in
+  let read =
+    closure specialisation_site read_11_1 @read &my_alloc_region
+      synthetic {
+        b_field_unboxed_int64 : int64 = b_into_b_field_unboxed_int64
+      }
+  in
   apply direct(read_11_1 &my_alloc_region)
-     (read_into_read_field_b_field_unboxed_int64) -> k2 * k1
+    (read : _ -> imm tagged)
+      (read_into_read_field_b_field_unboxed_int64)
+      -> k2 * k1
     where k2 (apply_result : imm tagged) =
       let int_add = %int_barith.add (apply_result, 1) in
       let `unit` = %end_region (`region`) in
@@ -276,7 +289,7 @@ let code inline(never) loopify(never) size(4) newer_version_of(read_13)
         -> k * k1
         : imm tagged =
   let b_into_b_field_unboxed_int64 =
-    %project_value_slot.[read].[unboxed_field_b_field_unboxed_int64]
+    %project_value_slot.[read_1].[unboxed_field_b_field_unboxed_int64]
       (my_closure)
   in
   let prim = b_into_b_field_unboxed_int64 in
@@ -293,7 +306,7 @@ let code loopify(never) size(22) newer_version_of(test_value_slot_not_unboxed_12
   let prim = %untag_imm (n) in
   let prim_1 = %num_conv.[`imm`].[`int64`] (prim) in
   let b_into_b_field_unboxed_int64 = prim_1 in
-  let read = closure read_13_1 @read &my_alloc_region &`region`
+  let read = closure read_13_1 @read_1 &my_alloc_region &`region`
   with {
     unboxed_field_b_field_unboxed_int64 :
       int64 =

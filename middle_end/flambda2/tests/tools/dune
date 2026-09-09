@@ -1,6 +1,23 @@
 (executables
-  (names fldiff fexprc roundtrip)
+  (names fldiff fexprc roundtrip specialised_params_test)
+  (modules (:standard \ to_cmm_result_test))
   (modes native)
   (libraries
    ocamlfrontend ocamloptcomp
    flambda2 flambda2_compare flambda2_parser flambda2_terms flambda2_cmx))
+
+(executable
+ (name to_cmm_result_test)
+ (modules to_cmm_result_test)
+ (modes native)
+ (libraries ocamloptcomp flambda2_identifiers flambda2_to_cmm))
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:specialised_params_test.exe})))
+
+(rule
+ (alias runtest)
+ (action
+  (run %{exe:to_cmm_result_test.exe})))

@@ -1,0 +1,38 @@
+let code square deleted in
+let code loopify(never) size(5) newer_version_of(square)
+      square_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  let r = %int_barith.mul (x, x) in
+  cont k (r)
+in
+let $square = closure square_1 @square &toplevel in
+let code loop deleted in
+let code map deleted in
+let code rec loopify(never) size(29) newer_version_of(loop)
+      loop_1 (f : val, l : val) specialised { f = f_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let prim = %is_int (l) in
+  switch prim
+    | 0 -> k_cons
+    | 1 -> k (0)
+    where k_cons =
+      let x = %block_load.[`0`] (l) in
+      let r = %int_barith.mul (x, x) in
+      ((let xs = %block_load.[`1`] (l) in
+        apply direct(loop_1 &my_alloc_region)  ($square, xs) -> k_ys * e)
+         where k_ys (ys) =
+           let block = %block.[`0`].my_alloc_region (r, ys) in
+           cont k (block))
+in
+let $camlSpecialised_params__loop_0 =
+  closure loop_1 @loop &toplevel synthetic { f_slot = $square }
+in
+let code loopify(never) size(4) newer_version_of(map)
+      map_1 (l : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  apply direct(loop_1 &my_alloc_region)
+    $camlSpecialised_params__loop_0 ($square, l) -> k * e
+in
+let $map = closure map_1 @map &toplevel in
+let $camlSpecialised_params = Block 0 ($map) in
+cont done ($camlSpecialised_params)

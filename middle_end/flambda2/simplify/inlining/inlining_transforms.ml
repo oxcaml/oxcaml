@@ -158,6 +158,7 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
           ~my_alloc_mode
           ~my_depth
           ~free_names_of_body:_
+          ~specialised_params:_
         ->
         let make_inlined_body () =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)

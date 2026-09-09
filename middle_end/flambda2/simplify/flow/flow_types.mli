@@ -114,7 +114,10 @@ module Acc : sig
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
       lifted_constants : Lifted_constant_state.t;
-      dummy_toplevel_cont : Continuation.t
+      dummy_toplevel_cont : Continuation.t;
+      has_specialisation_sites : bool
+          (** Enables the site-liveness and synthetic-slot analyses (see
+              [Specialisation_site_info]). *)
     }
 
   val print : Format.formatter -> t -> unit
@@ -186,6 +189,9 @@ end
 module Mutable_unboxing_result : sig
   type t =
     { did_unbox_a_mutable_block : bool;
+      unboxed_vars : Variable.Set.t;
+          (** Unboxed block variables and their aliases. Empty unless requested
+              (see [Mutable_unboxing.make_result]). *)
       additional_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
       let_rewrites : Named_rewrite.t Named_rewrite_id.Map.t
     }
@@ -196,9 +202,31 @@ end
 (* Result of the flow analysis *)
 (* *************************** *)
 
+(** Liveness used to keep specialisation sites (see [Set_of_closures]) and their
+    synthetic value slots. Empty unless [Acc.has_specialisation_sites]. *)
+module Specialisation_site_info : sig
+  type t =
+    { names_available_for_hints : Name.Set.t;
+          (** Names required without non-normal (phantom or in-types) roots or
+              code dependencies. Synthetic value slots may mention these, except
+              variables removed by unboxing. *)
+      live_code_ids : Code_id.Set.t
+          (** Code IDs reachable through the recorded normal code and symbol
+              dependencies, also inside closures; a site declaring one is kept.
+              Inside a closure only the lifted constants recorded there are
+              known, so code reached only through code defined outside it is
+              missed and its site dropped. *)
+    }
+
+  val empty : t
+
+  val print : Format.formatter -> t -> unit
+end
+
 module Flow_result : sig
   type t =
     { data_flow_result : Data_flow_result.t;
+      specialisation_site_info : Specialisation_site_info.t;
       aliases_result : Alias_result.t;
       mutable_unboxing_result : Mutable_unboxing_result.t
     }

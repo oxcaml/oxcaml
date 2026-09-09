@@ -15,9 +15,16 @@
 module C = Cmm_helpers
 module String = Misc.Stdlib.String
 
+type data_group =
+  | Required of Cmm.data_item list
+  | Specialisation_site of
+      { data : Cmm.data_item list;
+        symbols : Cmm.symbol list
+      }
+
 type t =
   { gc_roots : Symbol.t list;
-    data_list : Cmm.phrase list;
+    data_list : data_group list;
     functions : Cmm.fundecl list;
     current_data : Cmm.data_item list;
     reachable_names : Name_occurrences.t;
@@ -104,25 +111,32 @@ let check_for_module_symbol t symbol =
     { t with module_symbol_defined = true })
   else t
 
-let defines_a_symbol data =
+let defined_symbol data =
   match (data : Cmm.data_item) with
-  | Cdefine_symbol _ -> true
+  | Cdefine_symbol sym -> Some sym
   | Cint8 _ | Cint16 _ | Cint32 _ | Cint _ | Csingle _ | Cdouble _ | Cvec128 _
   | Cvec256 _ | Cvec512 _ | Csymbol_address _ | Csymbol_offset _ | Cstring _
   | Cskip _ | Calign _ ->
-    false
+    None
 
-let add_to_data_list x l =
+let add_to_data_list ?(is_specialisation_site = false) x l =
   match x with
   | [] -> l
   | _ :: _ ->
-    if not (List.exists defines_a_symbol x)
+    if not (List.exists (fun data -> Option.is_some (defined_symbol data)) x)
     then
       Misc.fatal_errorf
         "data list does not define any symbol, its elements will be unusable: \
          %a"
         Printcmm.data x;
-    C.cdata x :: l
+    let group =
+      if is_specialisation_site
+      then
+        Specialisation_site
+          { data = x; symbols = List.filter_map defined_symbol x }
+      else Required x
+    in
+    group :: l
 
 let archive_data r =
   { r with
@@ -141,6 +155,11 @@ let set_data r l =
 
 let add_archive_data_items r l =
   { r with data_list = add_to_data_list l r.data_list }
+
+let add_specialisation_site_data r data =
+  { r with
+    data_list = add_to_data_list ~is_specialisation_site:true data r.data_list
+  }
 
 let add_gc_roots r l = { r with gc_roots = l @ r.gc_roots }
 
@@ -172,7 +191,113 @@ let add_invalid_message_symbol t symbol ~message =
 let invalid_message_symbol t ~message =
   String.Map.find_opt message t.invalid_message_symbols
 
-let to_cmm r =
+let add_data_references used data =
+  List.fold_left
+    (fun used (item : Cmm.data_item) ->
+      match item with
+      | Csymbol_address sym | Csymbol_offset (sym, _) ->
+        String.Set.add sym.sym_name used
+      | Cdefine_symbol _ | Cint8 _ | Cint16 _ | Cint32 _ | Cint _ | Csingle _
+      | Cdouble _ | Cvec128 _ | Cvec256 _ | Cvec512 _ | Cstring _ | Cskip _
+      | Calign _ ->
+        used)
+    used data
+
+let add_expr_references used expr =
+  let used = ref used in
+  let add (sym : Cmm.symbol) = used := String.Set.add sym.sym_name !used in
+  let rec visit (expr : Cmm.expression) =
+    (match expr with
+    | Cconst_symbol (sym, _) | Cinvalid { symbol = sym; _ } -> add sym
+    | Cphantom_let (_, defining_expr, _) -> (
+      match defining_expr with
+      | Some (Cphantom_const_symbol sym | Cphantom_read_symbol_field { sym; _ })
+        ->
+        add sym
+      | None
+      | Some
+          ( Cphantom_const_int _ | Cphantom_var _ | Cphantom_offset_var _
+          | Cphantom_read_field _ | Cphantom_block _ ) ->
+        ())
+    | Cop (_, _, _) ->
+      (* Operations only name C functions and probe handlers, never closure
+         data; call targets are operands. *)
+      ()
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cvar _ | Clet _ | Cname_for_debugger _ | Ctuple _ | Csequence _
+    | Cifthenelse _ | Cswitch _ | Ccatch _ | Cexit _ ->
+      ());
+    Cmm.iter_shallow visit expr
+  in
+  visit expr;
+  !used
+
+let add_phrase_references used (phrase : Cmm.phrase) =
+  match phrase with
+  | Cfunction func -> add_expr_references used func.fun_body
+  | Cdata data -> add_data_references used data
+
+let site_is_required used symbols =
+  List.exists
+    (fun (sym : Cmm.symbol) ->
+      match sym.sym_global with
+      | Global -> true
+      | Local -> String.Set.mem sym.sym_name used)
+    symbols
+
+let filter_specialisation_sites data_list roots ~extra_phrases =
+  let site_symbols =
+    List.fold_left
+      (fun all_symbols -> function
+        | Required _ -> all_symbols
+        | Specialisation_site { symbols; _ } ->
+          List.fold_left
+            (fun all_symbols (sym : Cmm.symbol) ->
+              String.Set.add sym.sym_name all_symbols)
+            all_symbols symbols)
+      String.Set.empty data_list
+  in
+  let used, roots =
+    if String.Set.is_empty site_symbols
+    then String.Set.empty, roots
+    else
+      (* Sites have no fields for the GC to scan, so they need no roots, which
+         would otherwise keep their data. *)
+      let roots =
+        List.filter
+          (fun (sym : Cmm.symbol) ->
+            not (String.Set.mem sym.sym_name site_symbols))
+          roots
+      in
+      let used =
+        List.fold_left
+          (fun used (sym : Cmm.symbol) -> String.Set.add sym.sym_name used)
+          String.Set.empty roots
+      in
+      let used = List.fold_left add_phrase_references used extra_phrases in
+      let used =
+        List.fold_left
+          (fun used -> function
+            | Required data -> add_data_references used data
+            | Specialisation_site _ -> used)
+          used data_list
+      in
+      (* Sites only point to code, never to other sites, so one pass
+         suffices. *)
+      used, roots
+  in
+  let data_items =
+    List.filter_map
+      (function
+        | Required data -> Some (C.cdata data)
+        | Specialisation_site { data; symbols } ->
+          if site_is_required used symbols then Some (C.cdata data) else None)
+      data_list
+  in
+  data_items, roots
+
+let to_cmm r ~extra_phrases =
   (* Make sure the module symbol is defined *)
   let r = define_module_symbol_if_missing r in
   (* Make sure we do not forget any current data *)
@@ -192,5 +317,8 @@ let to_cmm r =
   let function_phrases = List.map (fun f -> C.cfunction f) sorted_functions in
   (* Translate roots to Cmm symbols *)
   let roots = List.map (symbol r) r.gc_roots in
-  (* Return the data list, gc roots and function declarations *)
-  { data_items = r.data_list; gc_roots = roots; functions = function_phrases }
+  let data_items, gc_roots =
+    filter_specialisation_sites r.data_list roots
+      ~extra_phrases:(function_phrases @ extra_phrases)
+  in
+  { data_items; gc_roots; functions = function_phrases }

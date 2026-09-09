@@ -1,0 +1,54 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+*)
+
+(* With unknown [x], the square call must fall back to the older candidate.
+   With [x = 1], both candidates match and the newest must win. A different
+   known function, and an unknown function, must still use the generic
+   helper. *)
+
+let code size(5) square (x : val) my_closure &my_alloc_region my_depth
+      -> k * e : val =
+  let r = %int_barith.`mul` (x, x) in
+  cont k (r)
+in
+let $square = closure square &toplevel in
+let code size(5) double (x : val) my_closure &my_alloc_region my_depth
+      -> k * e : val =
+  let r = %int_barith.`add` (x, x) in
+  cont k (r)
+in
+let $double = closure double &toplevel in
+let code inline(never) size(10) helper (f : val, x : val)
+      specialised { f = f_slot; x = x_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+let code size(30) map (g : val, x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let site =
+    closure helper &my_alloc_region synthetic { f_slot = $square }
+  in
+  let site2 =
+    closure helper &my_alloc_region synthetic { f_slot = $square; x_slot = 1 }
+  in
+  (apply direct(helper &my_alloc_region) ($square, x) -> k_square * e)
+    where k_square (y : val) =
+      ((apply direct(helper &my_alloc_region) ($square, 1) -> k_one * e)
+        where k_one (one : val) =
+          ((apply direct(helper &my_alloc_region) ($double, x) -> k_double * e)
+            where k_double (z : val) =
+              ((apply direct(helper &my_alloc_region) (g, x) -> k_unknown * e)
+                where k_unknown (w : val) =
+                  let squares = %int_barith.`add` (y, one) in
+                  let sum = %int_barith.`add` (squares, z) in
+                  let total = %int_barith.`add` (sum, w) in
+                  cont k (total))))
+in
+let $map = closure map &toplevel in
+let $camlSpecialised_params_guard = Block 0 ($map) in
+cont done ($camlSpecialised_params_guard)

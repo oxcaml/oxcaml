@@ -68,6 +68,7 @@ module Function_params_and_body : sig
     my_closure:Variable.t ->
     my_alloc_mode:Alloc_mode.For_applications.t ->
     my_depth:Variable.t ->
+    specialised_params:Value_slot.t Variable.Map.t ->
     t
 
   (** This function may only be used when rebuilding terms. *)

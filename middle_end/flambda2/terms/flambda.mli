@@ -515,11 +515,15 @@ module Function_params_and_body : sig
     my_closure:Variable.t ->
     my_alloc_mode:Alloc_mode.For_applications.t ->
     my_depth:Variable.t ->
+    specialised_params:Value_slot.t Variable.Map.t ->
     t
 
   (** Choose a member of the alpha-equivalence class to enable examination of
       the parameters, relations thereon and the body over which they are scoped.
-  *)
+
+      [specialised_params] maps parameters to the synthetic value slots of the
+      closure they are known to equal (see
+      [Set_of_closures.synthetic_value_slots]). *)
   val pattern_match :
     t ->
     f:
@@ -538,8 +542,14 @@ module Function_params_and_body : sig
       my_alloc_mode:Alloc_mode.For_applications.t ->
       my_depth:Variable.t ->
       free_names_of_body:Name_occurrences.t Or_unknown.t ->
+      specialised_params:Value_slot.t Variable.Map.t ->
       'a) ->
     'a
+
+  (** Projection occurrences of the slots of the given specialised parameters.
+      Code free names must include them, so that the slots survive import. *)
+  val free_names_of_specialised_params :
+    Value_slot.t Variable.Map.t -> Name_occurrences.t
 
   (** Choose members of the alpha-equivalence classes of two definitions using
       the same names for the return continuation, the exception continuation,
@@ -559,6 +569,8 @@ module Function_params_and_body : sig
       Bound_parameters.t ->
       body1:expr ->
       body2:expr ->
+      specialised_params1:Value_slot.t Variable.Map.t ->
+      specialised_params2:Value_slot.t Variable.Map.t ->
       my_closure:Variable.t ->
       my_alloc_mode:Alloc_mode.For_applications.t ->
       my_depth:Variable.t ->

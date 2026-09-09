@@ -20,7 +20,9 @@
        apply &my_alloc_region func (0) -> k1 * k2
  in
  let code inline(never) size(23)
-       f_0 (f_into_my_closure_field_bind)
+       f_0
+         (f_into_my_closure_field_bind)
+         specialised { f_into_my_closure_field_bind = bind }
          my_closure &my_alloc_region my_depth
          -> k1 * k2
          : val =

@@ -1,0 +1,37 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+*)
+
+(* Several sites for [helper] are in scope. A call must use the version with
+   the most assumptions that hold, not the most recent one; the site with no
+   synthetic value slots must disappear. *)
+
+let code inline(never) size(10) helper (p : val, q : val)
+      specialised { p = p_slot; q = q_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let r = %int_barith.`mul` (p, q) in
+  cont k (r)
+in
+let code size(30) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let both = closure specialisation_site helper &my_alloc_region
+    synthetic { p_slot = 2; q_slot = 3 }
+  in
+  let p_only = closure specialisation_site helper &my_alloc_region
+    synthetic { p_slot = 2 }
+  in
+  let empty = closure specialisation_site helper &my_alloc_region in
+  (apply direct(helper &my_alloc_region) (2, 3) -> k_both * e)
+  where k_both (a : val) =
+    ((apply direct(helper &my_alloc_region) (2, x) -> k_p * e)
+      where k_p (b : val) =
+        let sum = %int_barith.`add` (a, b) in
+        cont k (sum))
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_candidates = Block 0 ($outer) in
+cont done ($camlSpecialised_params_candidates)

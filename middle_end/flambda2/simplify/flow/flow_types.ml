@@ -194,7 +194,8 @@ module Acc = struct
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
       lifted_constants : Lifted_constant_state.t;
-      dummy_toplevel_cont : Continuation.t
+      dummy_toplevel_cont : Continuation.t;
+      has_specialisation_sites : bool
     }
 
   let print_stack ppf stack =
@@ -209,7 +210,8 @@ module Acc = struct
     Continuation.Map.print Continuation_extra_params_and_args.print ppf extra
 
   let [@ocamlformat "disable"] print ppf
-      { stack; map; extra; lifted_constants; dummy_toplevel_cont = _ } =
+      { stack; map; extra; lifted_constants; dummy_toplevel_cont = _;
+        has_specialisation_sites = _ } =
     Format.fprintf ppf
       "@[<hov 1>(\
        @[<hov 1>(stack %a)@]@ \
@@ -323,18 +325,23 @@ end
 module Mutable_unboxing_result = struct
   type t =
     { did_unbox_a_mutable_block : bool;
+      unboxed_vars : Variable.Set.t;
       additional_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
       let_rewrites : Named_rewrite.t Named_rewrite_id.Map.t
     }
 
-  let [@ocamlformat "disable"] print ppf { did_unbox_a_mutable_block; additional_epa; let_rewrites } =
+  let [@ocamlformat "disable"] print ppf
+      { did_unbox_a_mutable_block; unboxed_vars; additional_epa;
+        let_rewrites } =
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(did_unbox_a_mutable_block@ %b)@]@ \
+         @[<hov 1>(unboxed_vars@ %a)@]@ \
          @[<hov 1>(additional_epa@ %a)@]@ \
          @[<hov 1>(let_rewrites@ %a)@]\
        )@]"
       did_unbox_a_mutable_block
+      Variable.Set.print unboxed_vars
       (Continuation.Map.print Continuation_extra_params_and_args.print) additional_epa
       (Named_rewrite_id.Map.print Named_rewrite.print) let_rewrites
 end
@@ -342,22 +349,48 @@ end
 (* Result of the flow analysis *)
 (* *************************** *)
 
+module Specialisation_site_info = struct
+  type t =
+    { names_available_for_hints : Name.Set.t;
+      live_code_ids : Code_id.Set.t
+    }
+
+  let empty =
+    { names_available_for_hints = Name.Set.empty;
+      live_code_ids = Code_id.Set.empty
+    }
+
+  let [@ocamlformat "disable"] print ppf
+      { names_available_for_hints; live_code_ids } =
+    Format.fprintf ppf
+      "@[<hov 1>(\
+         @[<hov 1>(names_available_for_hints@ %a)@]@ \
+         @[<hov 1>(live_code_ids@ %a)@]\
+       )@]"
+      Name.Set.print names_available_for_hints
+      Code_id.Set.print live_code_ids
+end
+
 module Flow_result = struct
   type t =
     { data_flow_result : Data_flow_result.t;
+      specialisation_site_info : Specialisation_site_info.t;
       aliases_result : Alias_result.t;
       mutable_unboxing_result : Mutable_unboxing_result.t
     }
 
   let [@ocamlformat "disable"] print ppf
-      { data_flow_result; aliases_result; mutable_unboxing_result; } =
+      { data_flow_result; specialisation_site_info;
+        aliases_result; mutable_unboxing_result; } =
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(data_flow_result@ %a)@]@ \
+         @[<hov 1>(specialisation_site_info@ %a)@]@ \
          @[<hov 1>(aliases_result@ %a)@]@ \
          @[<hov 1>(mutable_unboxing_result@ %a)@]\
        )@]"
     Data_flow_result.print data_flow_result
+    Specialisation_site_info.print specialisation_site_info
     Alias_result.print aliases_result
     Mutable_unboxing_result.print mutable_unboxing_result
 end

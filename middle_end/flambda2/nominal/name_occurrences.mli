@@ -138,6 +138,8 @@ val symbols : t -> Symbol.Set.t
 
 val code_ids : t -> Code_id.Set.t
 
+val code_ids_in_normal_mode : t -> Code_id.Set.t
+
 val newer_version_of_code_ids : t -> Code_id.Set.t
 
 val restrict_to_value_slots_and_function_slots : t -> t
@@ -182,6 +184,8 @@ val remove_var_opt : t -> var:Variable.t option -> t
 val remove_code_id_or_symbol : t -> code_id_or_symbol:Code_id_or_symbol.t -> t
 
 val remove_continuation : t -> continuation:Continuation.t -> t
+
+val greatest_name_mode_name : t -> Name.t -> Name_mode.Or_absent.t
 
 val greatest_name_mode_var : t -> Variable.t -> Name_mode.Or_absent.t
 

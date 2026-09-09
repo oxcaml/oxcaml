@@ -1,0 +1,51 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ flambda2;
+ native-compiler;
+ setup-simple-build-env;
+ program = "${ocamlsrcdir}/testsuite/tools/fexprc";
+ arguments = "-dcanonical-ids -dflambda -color never ${ocamlopt_flags} ${test_file}";
+ output = "phantom-sibling-check.output";
+ stdout = "phantom-sibling.output";
+ stderr = "phantom-sibling.output";
+ {
+   run;
+   stdout = "${output}";
+   stderr = "${output}";
+   script = "sh ${test_source_directory}/check-specialisation-deleted-sibling.sh phantom-sibling.output sibling";
+   script;
+ }{
+   ocamlopt_flags += " -g -flambda2-expert-phantom-lets";
+   run;
+   stdout = "${output}";
+   stderr = "${output}";
+   script = "sh ${test_source_directory}/check-specialisation-deleted-sibling.sh phantom-sibling.output phantom-sibling";
+   script;
+ }
+*)
+
+(* Only [live]'s code is needed, but [unused = b] survives as a phantom alias.
+   Keep [b]'s binder and a [Deleted] declaration. Check raw Flambda because the
+   fexpr printer does not support deleted function declarations. *)
+
+let code inline(never) size(1) live (x : val)
+      specialised { x = x_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code inline(never) size(1) dead (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(30) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let a = closure specialisation_site live &my_alloc_region
+    synthetic { x_slot = 0 }
+  and b = closure specialisation_site dead &my_alloc_region in
+  let unused = b in
+  apply direct(live &my_alloc_region) (0) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlSpecialised_params_phantom_sibling = Block 0 ($outer) in
+cont done ($camlSpecialised_params_phantom_sibling)

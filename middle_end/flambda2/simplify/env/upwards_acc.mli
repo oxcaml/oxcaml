@@ -104,6 +104,8 @@ val with_slot_offsets : t -> Slot_offsets.t Or_unknown.t -> t
 
 val required_names : t -> Name.Set.t
 
+val specialisation_site_info : t -> Flow_types.Specialisation_site_info.t
+
 val reachable_code_ids : t -> Flow_types.Reachable_code_ids.t Or_unknown.t
 
 val continuation_param_aliases : t -> Flow_types.Alias_result.t

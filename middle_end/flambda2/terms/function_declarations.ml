@@ -43,6 +43,15 @@ let funs t = t.funs
 
 let funs_in_order t = t.in_order
 
+let code_ids t =
+  Function_slot.Lmap.fold
+    (fun _ (decl : code_id_in_function_declaration) code_ids ->
+      match decl with
+      | Deleted _ -> code_ids
+      | Code_id { code_id; only_full_applications = _ } -> code_id :: code_ids)
+    t.in_order []
+  |> List.rev
+
 let find ({ funs; _ } : t) function_slot =
   Function_slot.Map.find function_slot funs
 

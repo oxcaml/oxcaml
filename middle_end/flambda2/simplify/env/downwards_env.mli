@@ -266,3 +266,24 @@ val denv_for_lifted_continuation : denv_for_join:t -> denv:t -> t
 val has_seen_a_non_liftable_continuation : t -> bool
 
 val set_has_seen_a_non_liftable_continuation : t -> t
+
+(** A new version of some code, and the argument equalities under which a
+    callee-less direct call to the old code may be redirected to it (see
+    [Set_of_closures.is_specialisation_site]). *)
+module Code_specialisation : sig
+  type t =
+    { new_code_id : Code_id.t;
+      assumptions : (Value_slot.t * Simple.t) option list
+          (** One entry per parameter, in order. [None] imposes no condition;
+              [Some (slot, value)] requires the argument to equal [value].
+              Checked even inside the set's own functions, since inlining can
+              bring in calls made under other assumptions. All entries may be
+              [None]: the new code can still specialise its callees. *)
+    }
+end
+
+val add_code_specialisation :
+  t -> old_code_id:Code_id.t -> Code_specialisation.t -> t
+
+(** Most recent first. *)
+val find_code_specialisations : t -> Code_id.t -> Code_specialisation.t list

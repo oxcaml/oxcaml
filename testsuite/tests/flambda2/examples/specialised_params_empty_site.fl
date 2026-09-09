@@ -1,0 +1,31 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -flambda2-reaper -dflambda-invariants";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify, dump-reaper;
+*)
+
+(* A live empty site still versions its code: later simplification may use
+   specialisations of its callees. A separate unused site must disappear. *)
+
+let code inline(never) size(10) helper (f : val, x : val)
+      specialised { f = f_slot }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  apply &my_alloc_region f (x) -> k * e
+in
+let code inline(never) size(1) unused_helper (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(10) map (g : val, x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let site = closure specialisation_site helper &my_alloc_region in
+  let unused_site =
+    closure specialisation_site unused_helper &my_alloc_region
+  in
+  apply direct(helper &my_alloc_region) (g, x) -> k * e
+in
+let $map = closure map &toplevel in
+let $camlSpecialised_params_empty_site = Block 0 ($map) in
+cont done ($camlSpecialised_params_empty_site)

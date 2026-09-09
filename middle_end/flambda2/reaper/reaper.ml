@@ -30,7 +30,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
           fixed_arity_continuations;
           continuation_info;
           code_deps;
-          all_sets_of_closures
+          all_sets_of_closures;
+          dynamic_sets_of_closures
         } =
     Traverse.run unit
   in
@@ -56,9 +57,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
       =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
-      ~fixed_arity_continuations ~continuation_info ~final_typing_env
-      ~types_rewrite_context ~code_changes solved_dep get_code_metadata
-      toplevel_expr code
+      ~dynamic_sets_of_closures ~fixed_arity_continuations ~continuation_info
+      ~final_typing_env ~types_rewrite_context ~code_changes solved_dep
+      get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code

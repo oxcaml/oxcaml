@@ -20,9 +20,14 @@ type t =
     name_to_code_id : Code_id.Set.t Name.Map.t;
     code_id_to_name : Name.Set.t Code_id.Map.t;
     code_id_to_code_id : Code_id.Set.t Code_id.Map.t;
+    normal_code_id_to_name : Name.Set.t Code_id.Map.t;
+    normal_code_id_to_code_id : Code_id.Set.t Code_id.Map.t;
+    normal_code_id_unconditionally_used : Code_id.Set.t;
     unconditionally_used : Name.Set.t;
+    non_normal_only_roots : Name.Set.t;
+    has_specialisation_sites : bool;
     code_id_unconditionally_used : Code_id.Set.t;
-    is_toplevel : bool
+    traverse_code_dependencies : bool
   }
 
 module Reachable = struct
@@ -56,7 +61,7 @@ module Reachable = struct
       name_queue name_enqueued =
     match Queue.take name_queue with
     | exception Queue.Empty ->
-      if t.is_toplevel
+      if t.traverse_code_dependencies
       then
         if Queue.is_empty code_id_queue
         then
@@ -145,43 +150,67 @@ module Reachable = struct
             older_enqueued name_queue name_enqueued)
 end
 
-let empty code_age_relation is_toplevel ~code_ids_to_never_delete =
+let empty code_age_relation traverse_code_dependencies ~code_ids_to_never_delete
+    ~has_specialisation_sites =
   { code_age_relation;
-    is_toplevel;
+    traverse_code_dependencies;
     name_to_name = Name.Map.empty;
     name_to_code_id = Name.Map.empty;
     code_id_to_name = Code_id.Map.empty;
     code_id_to_code_id = Code_id.Map.empty;
+    normal_code_id_to_name = Code_id.Map.empty;
+    normal_code_id_to_code_id = Code_id.Map.empty;
+    normal_code_id_unconditionally_used = code_ids_to_never_delete;
     unconditionally_used = Name.Set.empty;
+    non_normal_only_roots = Name.Set.empty;
+    has_specialisation_sites;
     code_id_unconditionally_used = code_ids_to_never_delete
   }
 
-let print ppf
-    { is_toplevel;
+let [@ocamlformat "disable"] print ppf
+    { traverse_code_dependencies;
       name_to_name;
       name_to_code_id;
       code_id_to_name;
       code_id_to_code_id;
+      normal_code_id_to_name;
+      normal_code_id_to_code_id;
+      normal_code_id_unconditionally_used;
       code_age_relation;
       unconditionally_used;
+      non_normal_only_roots;
+      has_specialisation_sites;
       code_id_unconditionally_used
     } =
   Format.fprintf ppf
-    "@[<hov 1>(@[<hov 1>(is_toplevel %b)@]@ @[<hov 1>(code_age_relation@ \
-     %a)@]@ @[<hov 1>(name_to_name@ %a)@]@ @[<hov 1>(name_to_code_id@ %a)@]@ \
-     @[<hov 1>(code_id_to_name@ %a)@]@ @[<hov 1>(code_id_to_code_id@ %a)@]@ \
-     @[<hov 1>(unconditionally_used@ %a)@]@ @[<hov \
-     1>(code_id_unconditionally_used@ %a)@])@]"
-    is_toplevel Code_age_relation.print code_age_relation
-    (Name.Map.print Name.Set.print)
-    name_to_name
-    (Name.Map.print Code_id.Set.print)
-    name_to_code_id
-    (Code_id.Map.print Name.Set.print)
-    code_id_to_name
-    (Code_id.Map.print Code_id.Set.print)
-    code_id_to_code_id Name.Set.print unconditionally_used Code_id.Set.print
-    code_id_unconditionally_used
+    "@[<hov 1>(\
+       @[<hov 1>(traverse_code_dependencies %b)@]@ \
+       @[<hov 1>(code_age_relation@ %a)@]@ \
+       @[<hov 1>(name_to_name@ %a)@]@ \
+       @[<hov 1>(name_to_code_id@ %a)@]@ \
+       @[<hov 1>(code_id_to_name@ %a)@]@ \
+       @[<hov 1>(code_id_to_code_id@ %a)@]@ \
+       @[<hov 1>(unconditionally_used@ %a)@]@ \
+       @[<hov 1>(code_id_unconditionally_used@ %a)@]@ \
+       @[<hov 1>(has_specialisation_sites %b)@]@ \
+       @[<hov 1>(normal_code_id_to_name@ %a)@]@ \
+       @[<hov 1>(normal_code_id_to_code_id@ %a)@]@ \
+       @[<hov 1>(normal_code_id_unconditionally_used@ %a)@]@ \
+       @[<hov 1>(non_normal_only_roots@ %a)@]\
+     )@]"
+    traverse_code_dependencies
+    Code_age_relation.print code_age_relation
+    (Name.Map.print Name.Set.print) name_to_name
+    (Name.Map.print Code_id.Set.print) name_to_code_id
+    (Code_id.Map.print Name.Set.print) code_id_to_name
+    (Code_id.Map.print Code_id.Set.print) code_id_to_code_id
+    Name.Set.print unconditionally_used
+    Code_id.Set.print code_id_unconditionally_used
+    has_specialisation_sites
+    (Code_id.Map.print Name.Set.print) normal_code_id_to_name
+    (Code_id.Map.print Code_id.Set.print) normal_code_id_to_code_id
+    Code_id.Set.print normal_code_id_unconditionally_used
+    Name.Set.print non_normal_only_roots
 
 (* *)
 let fold_name_occurrences name_occurrences ~init ~names ~code_ids =
@@ -233,19 +262,57 @@ let add_code_id_to_code_id ~src ~dst ({ code_id_to_code_id; _ } as t) =
   in
   { t with code_id_to_code_id }
 
+let name_occurs_normally name_occurrences name =
+  match Name_occurrences.greatest_name_mode_name name_occurrences name with
+  | Absent -> false
+  | Present mode -> Name_mode.is_normal mode
+
 let add_name_occurrences name_occurrences
-    ({ unconditionally_used; code_id_unconditionally_used; _ } as t) =
-  let unconditionally_used =
-    Name_occurrences.fold_names name_occurrences
-      ~f:(fun set name -> Name.Set.add name set)
-      ~init:unconditionally_used
+    ({ unconditionally_used;
+       non_normal_only_roots;
+       has_specialisation_sites;
+       code_id_unconditionally_used;
+       _
+     } as t) =
+  let unconditionally_used, non_normal_only_roots =
+    if not has_specialisation_sites
+    then
+      ( Name_occurrences.fold_names name_occurrences
+          ~f:(fun used name -> Name.Set.add name used)
+          ~init:unconditionally_used,
+        non_normal_only_roots )
+    else
+      Name_occurrences.fold_names name_occurrences
+        ~f:(fun (used, phantom_only) name ->
+          let is_normal = name_occurs_normally name_occurrences name in
+          let phantom_only =
+            if is_normal
+            then Name.Set.remove name phantom_only
+            else if Name.Set.mem name used
+            then phantom_only
+            else Name.Set.add name phantom_only
+          in
+          Name.Set.add name used, phantom_only)
+        ~init:(unconditionally_used, non_normal_only_roots)
   in
   let code_id_unconditionally_used =
     Code_id.Set.union
       (Name_occurrences.code_ids name_occurrences)
       code_id_unconditionally_used
   in
-  { t with unconditionally_used; code_id_unconditionally_used }
+  let normal_code_id_unconditionally_used =
+    if not has_specialisation_sites
+    then t.normal_code_id_unconditionally_used
+    else
+      Code_id.Set.union t.normal_code_id_unconditionally_used
+        (Name_occurrences.code_ids_in_normal_mode name_occurrences)
+  in
+  { t with
+    unconditionally_used;
+    non_normal_only_roots;
+    code_id_unconditionally_used;
+    normal_code_id_unconditionally_used
+  }
 
 let add_continuation_info map ~return_continuation ~exn_continuation
     ~used_value_slots _
@@ -334,9 +401,32 @@ let add_continuation_info map ~return_continuation ~exn_continuation
   let t =
     Code_id.Map.fold
       (fun src name_occurrences graph ->
-        fold_name_occurrences name_occurrences ~init:graph
-          ~names:(fun t dst -> add_code_id_dependency ~src ~dst t)
-          ~code_ids:(fun t dst -> add_code_id_to_code_id ~src ~dst t))
+        let graph =
+          fold_name_occurrences name_occurrences ~init:graph
+            ~names:(fun t dst -> add_code_id_dependency ~src ~dst t)
+            ~code_ids:(fun t dst -> add_code_id_to_code_id ~src ~dst t)
+        in
+        if not graph.has_specialisation_sites
+        then graph
+        else
+          (* Non-normal code dependencies must not keep sites or their synthetic
+             value slots alive. *)
+          let names =
+            Name_occurrences.fold_names name_occurrences ~init:Name.Set.empty
+              ~f:(fun names name ->
+                if name_occurs_normally name_occurrences name
+                then Name.Set.add name names
+                else names)
+          in
+          let code_ids =
+            Name_occurrences.code_ids_in_normal_mode name_occurrences
+          in
+          { graph with
+            normal_code_id_to_name =
+              Code_id.Map.add src names graph.normal_code_id_to_name;
+            normal_code_id_to_code_id =
+              Code_id.Map.add src code_ids graph.normal_code_id_to_code_id
+          })
       code_ids t
   in
   (* Build the graph of dependencies between continuation parameters and
@@ -412,10 +502,10 @@ let add_continuation_info map ~return_continuation ~exn_continuation
     apply_cont_args t
 
 let create ~return_continuation ~exn_continuation ~code_age_relation
-    ~used_value_slots ~code_ids_to_never_delete map =
+    ~used_value_slots ~code_ids_to_never_delete ~has_specialisation_sites map =
   (* Build the dependencies using the regular params and args of continuations,
      and the let-bindings in continuations handlers. *)
-  let is_toplevel =
+  let traverse_code_dependencies =
     match (used_value_slots : _ Or_unknown.t) with
     | Known _ -> true
     | Unknown -> false
@@ -425,27 +515,71 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
       (add_continuation_info map ~return_continuation ~exn_continuation
          ~used_value_slots)
       map
-      (empty code_age_relation is_toplevel ~code_ids_to_never_delete)
+      (empty code_age_relation traverse_code_dependencies
+         ~code_ids_to_never_delete ~has_specialisation_sites)
   in
   t
 
-let required_names
+let compute_reachability
     ({ code_age_relation = _;
        name_to_name = _;
        name_to_code_id = _;
        code_id_to_name = _;
        code_id_to_code_id = _;
+       normal_code_id_to_name = _;
+       normal_code_id_to_code_id = _;
+       normal_code_id_unconditionally_used = _;
        unconditionally_used;
+       non_normal_only_roots = _;
+       has_specialisation_sites = _;
        code_id_unconditionally_used;
-       is_toplevel
+       traverse_code_dependencies
      } as t) =
   let name_queue = Queue.create () in
   Name.Set.iter (fun v -> Queue.push v name_queue) unconditionally_used;
   let code_id_queue = Queue.create () in
-  if is_toplevel
+  if traverse_code_dependencies
   then
     Code_id.Set.iter
       (fun v -> Queue.push v code_id_queue)
       code_id_unconditionally_used;
   Reachable.reachable_names t code_id_queue code_id_unconditionally_used
     Code_id.Set.empty name_queue unconditionally_used
+
+let required_names t =
+  let all_uses = compute_reachability t in
+  let specialisation_site_info : T.Specialisation_site_info.t =
+    if not t.has_specialisation_sites
+    then T.Specialisation_site_info.empty
+    else
+      let t =
+        { t with
+          unconditionally_used =
+            Name.Set.diff t.unconditionally_used t.non_normal_only_roots;
+          code_id_to_name = t.normal_code_id_to_name;
+          code_id_to_code_id = t.normal_code_id_to_code_id;
+          code_id_unconditionally_used = t.normal_code_id_unconditionally_used
+        }
+      in
+      let without_non_normal_roots = compute_reachability t in
+      let names_available_for_hints = without_non_normal_roots.required_names in
+      let live_code_ids =
+        match without_non_normal_roots.reachable_code_ids with
+        | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
+          live_code_ids
+        | Unknown -> (
+          (* Follow the recorded code and symbol dependencies for site liveness,
+             without widening the names available for hints. *)
+          let result =
+            compute_reachability { t with traverse_code_dependencies = true }
+          in
+          match result.reachable_code_ids with
+          | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
+            live_code_ids
+          | Unknown ->
+            Misc.fatal_error
+              "Expected code reachability for specialisation sites")
+      in
+      { names_available_for_hints; live_code_ids }
+  in
+  all_uses, specialisation_site_info

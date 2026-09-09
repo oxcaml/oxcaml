@@ -523,6 +523,7 @@ module Inlining = struct
           ~my_alloc_mode
           ~my_depth
           ~free_names_of_body
+          ~specialised_params:_
         ->
         let free_names_of_body =
           match free_names_of_body with
@@ -2614,7 +2615,7 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
   let wrapper_params_and_body =
     Function_params_and_body.create ~return_continuation ~exn_continuation
       params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
-      ~my_alloc_mode ~my_depth
+      ~my_alloc_mode ~my_depth ~specialised_params:Variable.Map.empty
   in
   let free_names_of_params_and_body =
     Name_occurrences.remove_continuation ~continuation:return_continuation
@@ -2999,6 +3000,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
       main_code_unarized_params ~body ~my_closure ~my_alloc_mode ~my_depth
       ~free_names_of_body:(Known free_names_of_body)
+      ~specialised_params:Variable.Map.empty
   in
   let result_mode = Function_decl.result_mode decl in
   (match my_region with
@@ -3343,7 +3345,10 @@ let close_functions acc external_env ~current_alloc_region ~current_region
       (Function_decls.alloc_mode function_declarations)
       ~current_alloc_region ~current_region
   in
-  let set_of_closures = Set_of_closures.create ~value_slots function_decls in
+  let set_of_closures =
+    Set_of_closures.create ~is_specialisation_site:false
+      ~synthetic_value_slots:Value_slot.Map.empty ~value_slots function_decls
+  in
   let acc =
     Acc.add_set_of_closures_offsets ~is_phantom:false acc set_of_closures
   in

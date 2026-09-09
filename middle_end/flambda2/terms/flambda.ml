@@ -126,7 +126,9 @@ and continuation_handlers = continuation_handler Continuation.Lmap.t
 
 and function_params_and_body_base =
   { expr : expr;
-    free_names : Name_occurrences.t Or_unknown.t
+    free_names : Name_occurrences.t Or_unknown.t;
+    specialised_params : Value_slot.t Variable.Map.t
+        (* See [Set_of_closures.synthetic_value_slots]. *)
   }
 
 and function_params_and_body =
@@ -303,13 +305,25 @@ and apply_renaming_continuations_handlers_t0 t renaming =
          k, handler)
        (Continuation.Lmap.bindings t)
 
-and apply_renaming_function_params_and_body_base { expr; free_names } renaming =
+and apply_renaming_function_params_and_body_base
+    { expr; free_names; specialised_params } renaming =
   let expr = apply_renaming expr renaming in
   let free_names =
     Or_unknown.map free_names ~f:(fun free_names ->
         Name_occurrences.apply_renaming free_names renaming)
   in
-  { expr; free_names }
+  let specialised_params =
+    Variable.Map.fold
+      (fun param value_slot specialised_params ->
+        if Renaming.value_slot_is_used renaming value_slot
+        then
+          Variable.Map.add
+            (Renaming.apply_variable renaming param)
+            value_slot specialised_params
+        else specialised_params)
+      specialised_params Variable.Map.empty
+  in
+  { expr; free_names; specialised_params }
 
 and apply_renaming_function_params_and_body ({ abst; is_my_closure_used } as t)
     renaming =
@@ -434,7 +448,8 @@ and ids_for_export_recursive_let_cont_handlers t =
     (module Bound_continuations)
     t ~ids_for_export_of_term:ids_for_export_recursive_let_cont_handlers_t0
 
-and ids_for_export_function_params_and_body_base { expr; free_names = _ } =
+and ids_for_export_function_params_and_body_base
+    { expr; free_names = _; specialised_params = _ } =
   ids_for_export expr
 
 and ids_for_export_function_params_and_body { abst; is_my_closure_used = _ } =
@@ -598,16 +613,23 @@ and print_continuation_handler (recursive : Recursive.t) invariant_params ppf k
 and print_function_params_and_body ppf t =
   let print ~return_continuation ~exn_continuation params ~body ~my_closure
       ~is_my_closure_used:_ ~my_alloc_region ~my_region ~my_ghost_region
-      ~my_depth ~free_names_of_body:_ =
+      ~my_depth ~free_names_of_body:_ ~specialised_params =
     let my_closure =
       Bound_parameter.create my_closure
         (K.With_subkind.create K.value Anything Non_nullable)
         Flambda_debug_uid.none
     in
+    let print_specialised_params ppf specialised_params =
+      if not (Variable.Map.is_empty specialised_params)
+      then
+        fprintf ppf "@ @[<hov 1>(specialised_params@ %a)@]"
+          (Variable.Map.print Value_slot.print)
+          specialised_params
+    in
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \
        1>@<1>\u{3008}%a@<1>\u{3009}@<1>\u{300a}%a@<1>\u{300b}\u{27c5}%t%a%t\u{27c6}@ \
-       \u{27c5}%t%a%t\u{27c6}@ \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t %t.%t@]@ \
+       \u{27c5}%t%a%t\u{27c6}@ \u{27c5}%t%a%t\u{27c6}@ %a %a %t%a%t%a %t.%t@]@ \
        %a))@]"
       Flambda_colours.lambda Flambda_colours.pop Continuation.print
       return_continuation Continuation.print exn_continuation
@@ -618,14 +640,14 @@ and print_function_params_and_body ppf t =
       (Format.pp_print_option Variable.print)
       my_ghost_region Flambda_colours.pop Bound_parameters.print params
       Bound_parameter.print my_closure Flambda_colours.depth_variable
-      Variable.print my_depth Flambda_colours.pop Flambda_colours.elide
-      Flambda_colours.pop print body
+      Variable.print my_depth Flambda_colours.pop print_specialised_params
+      specialised_params Flambda_colours.elide Flambda_colours.pop print body
   in
   let module BFF = Bound_for_function in
   Name_abstraction.pattern_match_for_printing
     (module BFF)
     t.abst ~apply_renaming_to_term:apply_renaming_function_params_and_body_base
-    ~f:(fun bff { expr; free_names } ->
+    ~f:(fun bff { expr; free_names; specialised_params } ->
       print
         ~return_continuation:(BFF.return_continuation bff)
         ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
@@ -634,7 +656,7 @@ and print_function_params_and_body ppf t =
         ~my_alloc_region:(BFF.my_alloc_region bff)
         ~my_region:(BFF.my_region bff)
         ~my_ghost_region:(BFF.my_ghost_region bff) ~my_depth:(BFF.my_depth bff)
-        ~free_names_of_body:free_names)
+        ~free_names_of_body:free_names ~specialised_params)
 
 and print_let_cont_expr ppf t =
   let rec gather_let_conts let_conts let_cont =
@@ -1030,13 +1052,28 @@ module Function_params_and_body = struct
   type t = function_params_and_body
 
   let create ~return_continuation ~exn_continuation params ~body
-      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
+      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth
+      ~specialised_params =
     Bound_parameters.check_no_duplicates params;
+    (if Flambda_features.check_invariants ()
+     then
+       let param_set = Bound_parameters.var_set params in
+       Variable.Map.iter
+         (fun param _ ->
+           if not (Variable.Set.mem param param_set)
+           then
+             Misc.fatal_errorf
+               "Specialised parameter %a is not a parameter of the function:@ \
+                %a"
+               Variable.print param Bound_parameters.print params)
+         specialised_params);
     let is_my_closure_used =
       Or_unknown.map free_names_of_body ~f:(fun free_names_of_body ->
           Name_occurrences.mem_var free_names_of_body my_closure)
     in
-    let base : Base.t = { expr = body; free_names = free_names_of_body } in
+    let base : Base.t =
+      { expr = body; free_names = free_names_of_body; specialised_params }
+    in
     let bound_for_function =
       Bound_for_function.create ~return_continuation ~exn_continuation ~params
         ~my_closure ~my_alloc_mode ~my_depth
@@ -1049,20 +1086,33 @@ module Function_params_and_body = struct
   let pattern_match t ~f =
     let module BFF = Bound_for_function in
     let open A in
-    let<> bff, { expr; free_names } = t.abst in
+    let<> bff, { expr; free_names; specialised_params } = t.abst in
     f
       ~return_continuation:(BFF.return_continuation bff)
       ~exn_continuation:(BFF.exn_continuation bff) (BFF.params bff) ~body:expr
       ~my_closure:(BFF.my_closure bff) ~is_my_closure_used:t.is_my_closure_used
       ~my_alloc_mode:(BFF.my_alloc_mode bff) ~my_depth:(BFF.my_depth bff)
-      ~free_names_of_body:free_names
+      ~free_names_of_body:free_names ~specialised_params
+
+  let free_names_of_specialised_params specialised_params =
+    Variable.Map.fold
+      (fun _param value_slot free_names ->
+        Name_occurrences.add_value_slot_in_projection free_names value_slot
+          Name_mode.normal)
+      specialised_params Name_occurrences.empty
 
   let pattern_match_pair t1 t2 ~f =
     A.pattern_match_pair t1.abst t2.abst
       ~f:(fun
           bound_for_function
-          { expr = body1; free_names = _ }
-          { expr = body2; free_names = _ }
+          { expr = body1;
+            free_names = _;
+            specialised_params = specialised_params1
+          }
+          { expr = body2;
+            free_names = _;
+            specialised_params = specialised_params2
+          }
         ->
         f
           ~return_continuation:
@@ -1070,7 +1120,7 @@ module Function_params_and_body = struct
           ~exn_continuation:
             (Bound_for_function.exn_continuation bound_for_function)
           (Bound_for_function.params bound_for_function)
-          ~body1 ~body2
+          ~body1 ~body2 ~specialised_params1 ~specialised_params2
           ~my_closure:(Bound_for_function.my_closure bound_for_function)
           ~my_alloc_mode:(Bound_for_function.my_alloc_mode bound_for_function)
           ~my_depth:(Bound_for_function.my_depth bound_for_function))
@@ -1396,6 +1446,15 @@ module Named = struct
   let create_prim prim dbg = Prim (prim, dbg)
 
   let create_set_of_closures ~alloc_mode set_of_closures =
+    (if
+       Flambda_features.check_invariants ()
+       && Set_of_closures.is_specialisation_site set_of_closures
+     then
+       match (alloc_mode : Alloc_mode.For_allocations.t) with
+       | Heap _ -> ()
+       | Local _ ->
+         Misc.fatal_errorf "Specialisation site in a local region:@ %a"
+           Set_of_closures.print set_of_closures);
     Set_of_closures (set_of_closures, alloc_mode)
 
   let create_static_consts consts = Static_consts consts

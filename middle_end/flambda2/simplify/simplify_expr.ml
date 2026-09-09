@@ -43,21 +43,26 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
            which are only used when simplifying at the toplevel. So if we are in
            a closure, we use empty/dummy values for the code_age_relation and
            used_value_slots, and in return we do not use the reachable_code_id
-           part of the data_flow analysis. *)
-        let code_age_relation, used_value_slots, print_name =
+           part of the data_flow analysis. Specialisation sites use
+           [Flow_types.Specialisation_site_info] instead. *)
+        let is_toplevel, code_age_relation, used_value_slots, print_name =
           match closure_info with
           | Closure { code_id; _ } ->
-            Code_age_relation.empty, Or_unknown.Unknown, Code_id.name code_id
+            ( false,
+              Code_age_relation.empty,
+              Or_unknown.Unknown,
+              Code_id.name code_id )
           | In_a_set_of_closures_but_not_yet_in_a_specific_closure ->
             assert false
           | Not_in_a_closure ->
-            ( DA.code_age_relation dacc,
+            ( true,
+              DA.code_age_relation dacc,
               Or_unknown.Known (DA.used_value_slots dacc),
               "toplevel" )
         in
         let flow_result =
           Flow.Analysis.analyze data_flow ~print_name ~code_age_relation
-            ~used_value_slots
+            ~is_toplevel ~used_value_slots
             ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
             ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation ~exn_continuation

@@ -1,0 +1,23 @@
+let code helper deleted in
+let code outer deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(helper)
+      helper_1 (x : val) specialised { x = plain_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (x)
+in
+let code loopify(never) size(5) newer_version_of(outer)
+      outer_1 (f : val, b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let site =
+    closure specialisation_site helper_1 @helper &my_alloc_region
+      synthetic { plain_slot = f }
+  in
+  apply direct(helper_1 &my_alloc_region)  (f) -> k * e
+in
+let $outer = closure outer_1 @outer &toplevel in
+let $camlSpecialised_params_coercion_hint = Block 0 ($outer) in
+cont done ($camlSpecialised_params_coercion_hint)

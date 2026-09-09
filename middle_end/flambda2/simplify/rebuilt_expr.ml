@@ -69,10 +69,11 @@ module Function_params_and_body = struct
   type t = Function_params_and_body.t
 
   let create ~return_continuation ~exn_continuation params ~body
-      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth =
+      ~free_names_of_body ~my_closure ~my_alloc_mode ~my_depth
+      ~specialised_params =
     Function_params_and_body.create ~return_continuation ~exn_continuation
       params ~body ~free_names_of_body:(Known free_names_of_body) ~my_closure
-      ~my_alloc_mode ~my_depth
+      ~my_alloc_mode ~my_depth ~specialised_params
 
   let to_function_params_and_body t are_rebuilding =
     if ART.do_not_rebuild_terms are_rebuilding

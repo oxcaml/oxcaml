@@ -50,7 +50,7 @@ let print_graph ~print ~print_name ~lazy_ppf ~graph =
 
 (* analysis *)
 
-let analyze ?(speculative = false) ?print_name ~machine_width
+let analyze ?(speculative = false) ?print_name ~machine_width ~is_toplevel
     ~return_continuation ~exn_continuation ~code_age_relation ~used_value_slots
     ~code_ids_to_never_delete ~specialization_map t : T.Flow_result.t =
   Profile.record_call ~accumulate:true "data_flow" (fun () ->
@@ -64,9 +64,10 @@ let analyze ?(speculative = false) ?print_name ~machine_width
              map;
              extra = _;
              lifted_constants = _;
-             dummy_toplevel_cont
+             dummy_toplevel_cont;
+             has_specialisation_sites
            } as t) =
-        Flow_acc.normalize_acc ~specialization_map t
+        Flow_acc.normalize_acc ~is_toplevel ~specialization_map t
       in
       assert (match stack with [] -> true | _ :: _ -> false);
       assert (
@@ -80,11 +81,14 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       let deps =
         Data_flow_graph.create map ~return_continuation ~exn_continuation
           ~code_age_relation ~used_value_slots ~code_ids_to_never_delete
+          ~has_specialisation_sites
       in
       if Flambda_features.dump_flow ()
       then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
       (* Dead variable analysis *)
-      let dead_variable_result = Data_flow_graph.required_names deps in
+      let dead_variable_result, specialisation_site_info =
+        Data_flow_graph.required_names deps
+      in
       (* Aliases analysis *)
       let dom_graph =
         Dominator_graph.create map ~return_continuation ~exn_continuation
@@ -106,7 +110,8 @@ let analyze ?(speculative = false) ?print_name ~machine_width
       in
       let pp_node = Mutable_unboxing.pp_node reference_analysis in
       let reference_result, unboxed_blocks =
-        Mutable_unboxing.make_result reference_analysis
+        Mutable_unboxing.make_result reference_analysis ~dom:aliases
+          ~compute_unboxed_vars:has_specialisation_sites
       in
       let continuation_parameters =
         Control_flow_graph.compute_continuation_extra_args_for_aliases
@@ -139,6 +144,7 @@ let analyze ?(speculative = false) ?print_name ~machine_width
               { dead_variable_result with
                 required_names = required_names_after_ref_reference_analysis
               };
+            specialisation_site_info;
             aliases_result = { aliases_kind; continuation_parameters };
             mutable_unboxing_result = reference_result
           }
