@@ -10,6 +10,9 @@
  file = "cmr_creation_and_rebuild.cmr";
  file-exists;
 
+ script = "grep -a -q LTO_UNUSED_MODULE_EXPORT cmr_creation_and_rebuild.o";
+ script;
+
  compile_only = "false";
  flags = "-reaper-solve cmr_creation_and_rebuild.cmr";
  last_flags = "-o cmr_creation_and_rebuild.ltosol";
@@ -27,19 +30,18 @@
  file = "cmr_creation_and_rebuild.reaped.cmx";
  file-exists;
 
- flags = "-flambda2-reaper -no-reaper-unbox -no-reaper-change-calling-conventions";
- compile_only = "true";
- all_modules = "cmr_creation_and_rebuild.ml";
- ocamlopt.opt;
-
- script = "cmp cmr_creation_and_rebuild.reaped.o cmr_creation_and_rebuild.o";
+ script = "sh -c 'grep -a -q LTO_UNUSED_MODULE_EXPORT cmr_creation_and_rebuild.reaped.o; test $? -eq 1'";
  script;
+
+ flags = "";
+ compile_only = "false";
+ all_modules = "cmr_creation_and_rebuild.reaped.cmx";
+ program = "${test_build_directory}/cmr_creation_and_rebuild.exe";
+ ocamlopt.opt;
+ run;
 *)
 
-(* The rebuilt object is compared with a per-unit Reaper compilation. The
-   whole-program solve only does dead code elimination, so the per-unit
-   compilation must have unboxing and calling convention changes disabled for
-   the outputs to agree. *)
+(* Check that LTO removes an unused export, then link and run the rebuilt unit. *)
 
 (* CR mvellacott: the following line would cause this test to fail, because we
    don't restore [Translmod.primitive_declarations] on resume. *)
@@ -61,4 +63,6 @@ end = struct
   let go x = read (make x)
 end
 
-let () = ignore (Sys.opaque_identity (M.go 3) : int)
+let[@inline never] unused_export () = print_endline "LTO_UNUSED_MODULE_EXPORT"
+
+let () = assert (Sys.opaque_identity (M.go 3) = 3)
