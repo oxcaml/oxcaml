@@ -36,7 +36,7 @@ exception Error of error
 val save :
   filename:string ->
   participants:(Compilation_unit.t * Compilation_unit.Set.t) list ->
-  solution:Unboxing_analysis.result ->
+  solution:Reaper.Staged.solution ->
   unit
 
 (** Read the header of an ltosol file from disk. *)
@@ -47,4 +47,4 @@ val id_stamp_counters : t -> Id_stamp_counters.t
 (** Deserialise the solution needed to rebuild [members], inserting the
     necessary objects into the global hashcons tables. *)
 val solution_for_members :
-  t -> members:Compilation_unit.t list -> Unboxing_analysis.result
+  t -> members:Compilation_unit.t list -> Reaper.Staged.solution

@@ -28,6 +28,8 @@ module Staged : sig
     val code_deps : t -> Traverse_acc.code_dep Code_id.Map.t
   end
 
+  type solution = { uses : Unboxing_analysis.result }
+
   (** Traverse the compilation unit in preparation for Reaper analysis. *)
   val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t
 
@@ -35,14 +37,14 @@ module Staged : sig
   val solve :
     Global_flow_graph.graph ->
     code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    Unboxing_analysis.result
+    solution
 
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
       with dead code removed. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     traverse_rebuild:Traverse_rebuild.t ->
-    solved_dep:Unboxing_analysis.result ->
+    solution:solution ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->

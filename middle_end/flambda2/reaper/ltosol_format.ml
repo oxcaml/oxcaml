@@ -621,10 +621,10 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let save ~filename ~participants ~solution =
+let save ~filename ~participants ~solution:({ uses } : Reaper.Staged.solution) =
   let ({ db; unboxed_fields; changed_representation }
         : Unboxing_analysis.result) =
-    solution
+    uses
   in
   let tables_by_cu =
     Solution_tables.partition_by_compilation_unit
@@ -825,9 +825,11 @@ let solution_for_members { header; sections } ~members =
     print_loaded_sections ~members
       ~total:(List.length header.Header.index)
       ~loaded:(List.rev rev_loaded);
-  { Unboxing_analysis.db = Solution_tables.to_database tables;
-    unboxed_fields;
-    changed_representation
+  { Reaper.Staged.uses =
+      { Unboxing_analysis.db = Solution_tables.to_database tables;
+        unboxed_fields;
+        changed_representation
+      }
   }
 
 open Format_doc

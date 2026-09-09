@@ -508,7 +508,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
   (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep =
+  let solution =
     let member =
       Flambda2_identifiers.Symbol.compilation_unit
         (Flambda_unit.Metadata.module_symbol unit_metadata)
@@ -517,7 +517,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-      ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
+      ~traverse_rebuild:rebuild_data ~solution ~machine_width ~cmx_loader
       ~all_code ~final_typing_env
   in
   let { unit = flambda;
