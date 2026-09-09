@@ -1227,9 +1227,12 @@ and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
        a more precise value kind is useless. This arises from [any] in tuples *)
     num_nodes_visited, non_nullable Pgenval
   | Some mixed_block_elements ->
-    let is_scannable : Types.mixed_block_element -> bool = function
+    let rec is_scannable : Types.mixed_block_element -> bool = function
       | Scannable _ -> true
-      | _ -> false
+      | Addressable mbe -> is_scannable mbe
+      | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Product _
+      | Void -> false
     in
     let num_nodes_visited, constructor_shape =
       (* if we are not in a mixed tuple, match existing value kind exactly *)
