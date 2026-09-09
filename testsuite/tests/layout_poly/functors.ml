@@ -30,7 +30,6 @@ module type IdF = functor (M : Id @ static) -> Id @ static
 |}]
 
 (* Static functors using dynamic data. *)
-
 let r1 =
   let module F (X : S @ static) = struct let z = X.y + 1 end in
   let module R = F (struct let y = 1 end) in
@@ -50,7 +49,6 @@ val r2 : int = 12
 |}]
 
 (* Static functors using static data. *)
-
 let (r3i, r3f) =
   let module IdA = struct let poly_ id x = x end in
   let module F (M : Id @ static) = struct
@@ -65,18 +63,19 @@ val r3f : float = 1.
 |}]
 
 (* [@inline never] static functors using static data. *)
-
-let (r3i, r3f) =
+let (r3ai, r3af) =
   let module IdA = struct let[@inline never] poly_ id x = x end in
-  let module[@inline never] F (M : Id @ static) = struct
+  let module F = functor[@inline never] (M : Id @ static) -> struct
     let i = M.id 42
     let f = M.id #1.0
   end in
+  (* F must be invoked twice otherwise it gets inlined anyway. *)
   let module R = F (IdA) in
-  (R.i, to_float R.f)
+  let module S = F (IdA) in
+  (R.i, to_float S.f)
 [%%expect{|
-val r3i : int = 42
-val r3f : float = 1.
+val r3ai : int = 42
+val r3af : float = 1.
 |}]
 
 
@@ -258,24 +257,48 @@ val r12 : int = 11
 |}]
 
 (* Captured values of several layouts at once. *)
-let (k1i, k1f, k1s, k1i64) =
+let (k1i, k1f, k1s, k1l) =
   let ci = 17 in
   let cf = #2.5 in
   let cs = "cap" in
-  let ci64 = #3L in
+  let cl = #3L in
   let module K (M : Id @ static) = struct
     let i = M.id ci
     let f = M.id cf
     let s = M.id cs
-    let i64 = M.id ci64
+    let l = M.id cl
   end in
   let module R = K (struct let poly_ id x = x end) in
-  (R.i, to_float R.f, R.s, to_int64 R.i64)
+  (R.i, to_float R.f, R.s, to_int64 R.l)
 [%%expect{|
 val k1i : int = 17
 val k1f : float = 2.5
 val k1s : string = "cap"
-val k1i64 : int64 = 3L
+val k1l : int64 = 3L
+|}]
+
+(* Captured values of several layouts at once, no inlining. *)
+let (k1ai, k1af, k1as, k1al) =
+  let ci = Sys.opaque_identity 17 in
+  let cf = Sys.opaque_identity #2.5 in
+  let cs = Sys.opaque_identity "cap" in
+  let cl = Sys.opaque_identity #3L in
+  let module K (M : Id @ static) = struct
+    let i = M.id ci
+    let f = M.id cf
+    let s = M.id cs
+    let l = M.id cl
+  end in
+  let module M = struct let[@inline never] poly_ id x = x end in
+  (* Called twice to prevent continuation optimisation. *)
+  let module R = K (M) in
+  let module S = K (M) in
+  (R.i, to_float R.f, S.s, to_int64 S.l)
+[%%expect{|
+val k1ai : int = 17
+val k1af : float = 2.5
+val k1as : string = "cap"
+val k1al : int64 = 3L
 |}]
 
 (* Capture a module and use a field of it. *)
@@ -470,4 +493,21 @@ let (h2i, h2f) =
 [%%expect{|
 val h2i : int = 43
 val h2f : float = 43.
+|}]
+
+(* A static functor taking another static functor as its argument. No inline. *)
+let (h3i, h3f) =
+  let module Wrap = functor[@inline never] (M : Id @ static) -> struct
+    let[@inline never] poly_ id x = M.id x end
+  in
+  let module Apply = functor[@inline never] (G : IdF @ static) -> struct
+    module W = G (struct let[@inline never] poly_ id x = x end)
+    let i = W.id 43
+    let f = to_float (W.id #43.0)
+  end in
+  let module R = Apply (Wrap) in
+  (R.i, R.f)
+[%%expect{|
+val h3i : int = 43
+val h3f : float = 43.
 |}]
