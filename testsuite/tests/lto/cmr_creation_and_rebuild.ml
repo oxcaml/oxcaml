@@ -27,7 +27,7 @@
  file = "cmr_creation_and_rebuild.reaped.cmx";
  file-exists;
 
- flags = "-flambda2-reaper";
+ flags = "-flambda2-reaper -no-reaper-unbox -no-reaper-change-calling-conventions";
  compile_only = "true";
  all_modules = "cmr_creation_and_rebuild.ml";
  ocamlopt.opt;
@@ -35,6 +35,11 @@
  script = "cmp cmr_creation_and_rebuild.reaped.o cmr_creation_and_rebuild.o";
  script;
 *)
+
+(* The rebuilt object is compared with a per-unit Reaper compilation. The
+   whole-program solve only does dead code elimination, so the per-unit
+   compilation must have unboxing and calling convention changes disabled for
+   the outputs to agree. *)
 
 (* CR mvellacott: the following line would cause this test to fail, because we
    don't restore [Translmod.primitive_declarations] on resume. *)
