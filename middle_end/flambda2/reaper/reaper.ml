@@ -35,6 +35,7 @@ module Staged = struct
           code_deps;
           all_sets_of_closures
         } =
+<<<<<<< HEAD
       let ids = Rev_expr.ids_for_export toplevel_expr in
       let ids =
         Code_id.Map.fold
@@ -255,3 +256,91 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
   let unit_metadata = Flambda_unit.metadata unit in
   Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution ~machine_width
     ~cmx_loader ~all_code ~final_typing_env
+||||||| parent of a43fe05e0e (move calling convention changes to solve time)
+    Traverse.run unit
+  in
+  let solved_dep =
+    Profile.record_call ~accumulate:true "solver" (fun () ->
+        Analysis.fixpoint deps)
+  in
+  let () =
+    if Flambda_features.debug_reaper "print-solved"
+    then (
+      Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
+      Dot_printer.print_solved_dep solved_dep deps)
+  in
+  let types_rewrite_context =
+    Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
+  in
+  let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
+      =
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
+      ~fixed_arity_continuations ~continuation_info ~final_typing_env
+      ~types_rewrite_context solved_dep get_code_metadata toplevel_expr code
+  in
+  let all_code =
+    Exported_code.add_code
+      ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
+      all_code
+      (Exported_code.mark_as_imported
+         (Flambda_cmx.get_imported_code cmx_loader ()))
+  in
+  let final_typing_env =
+    Option.map
+      (Types_rewriter.rewrite_typing_env types_rewrite_context
+         ~unit_symbol:(Flambda_unit.module_symbol unit))
+      final_typing_env
+  in
+  ( Flambda_unit.with_body unit body,
+    free_names,
+    all_code,
+    slot_offsets,
+    final_typing_env )
+=======
+    Traverse.run unit
+  in
+  let solved_dep =
+    Profile.record_call ~accumulate:true "solver" (fun () ->
+        Analysis.fixpoint deps)
+  in
+  let () =
+    if Flambda_features.debug_reaper "print-solved"
+    then (
+      Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
+      Dot_printer.print_solved_dep solved_dep deps)
+  in
+  let types_rewrite_context =
+    Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
+  in
+  let code_changes =
+    Unboxing_analysis.compute_code_changes solved_dep
+      ~rewrite_kind_with_subkind:
+        (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~code_deps
+  in
+  let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }
+      =
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
+      ~fixed_arity_continuations ~continuation_info ~final_typing_env
+      ~types_rewrite_context ~code_changes solved_dep get_code_metadata
+      toplevel_expr code
+  in
+  let all_code =
+    Exported_code.add_code
+      ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
+      all_code
+      (Exported_code.mark_as_imported
+         (Flambda_cmx.get_imported_code cmx_loader ()))
+  in
+  let final_typing_env =
+    Option.map
+      (Types_rewriter.rewrite_typing_env types_rewrite_context
+         ~unit_symbol:(Flambda_unit.module_symbol unit))
+      final_typing_env
+  in
+  ( Flambda_unit.with_body unit body,
+    free_names,
+    all_code,
+    slot_offsets,
+    final_typing_env )
+>>>>>>> a43fe05e0e (move calling convention changes to solve time)

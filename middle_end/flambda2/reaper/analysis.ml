@@ -59,6 +59,3 @@ let arguments_used_by_unknown_arity_call uses callee args =
 let has_source uses v = PTA.has_source_query uses.db v
 
 let any_source uses v = PTA.any_source uses.db v
-
-let cannot_change_calling_convention =
-  Unboxing_analysis.cannot_change_calling_convention
