@@ -32,10 +32,28 @@ type t =
            [Unique_continuation_map]). *)
   }
 
-(* Matches [max_raw] in [lambda.ml]. *)
+(* Rebuilt terms with no [contents_hash] cannot be deduplicated (e.g. because
+   they contain not-shareable subterms such as sets of closures). We also want
+   to clear it for terms that are "too big": sharing those is unlikely to
+   succeed, and might cause hash collisions.
+
+   This limit is added out of abundance of caution; it is likely fine to
+   increase it or even remove it completely if needed (e.g. we end up having
+   programs where we do want to share very large terms). Note that unlike the
+   sharing of match branches in [lambda.ml] (which computes a sharing key with
+   the same size as the term), there is no prohibitive memory cost to increasing
+   this limit.
+
+   The value of [32] matches [max_raw] in [lambda.ml], which is at the time of
+   writing the limit for the size of sub-expressions that can be shared across
+   switch branches. *)
 let max_hash_depth = 32
 
 let create ?contents_hash expr =
+  (* Since we are building terms from the bottom-up, we don't know initially at
+     which depth they will end up. Instead, we eagerly compute hashes as we
+     rebuild expressions (so that computing the hash does not need another
+     traversal), and zero it out when we reach the maximum depth. *)
   let contents_hash =
     match contents_hash with
     | Some { depth; _ } when depth >= max_hash_depth -> Or_null.null
@@ -257,36 +275,64 @@ let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
       in
       expr, cost_metrics, free_names)
 
-module Unify_for_unique_handler = struct
+module Matching_for_unique_handler = struct
   (* Computes an approximate equality between terms. Terms that are equal in
      this way can be substituted for each other, and in particular two
      continuation handlers with equal content can be merged.
 
      As an extension, we support detecting continuations that have identical
-     handlers up to permutation of their parameters. *)
+     handlers up to permutation of their parameters.
 
-  exception Cannot_unify
+     This is done by a matching algorithm that enforce a bipartite matching
+     between the parameters of the two continuations when they occur at the same
+     position in the term. *)
 
-  let cannot_unify () = raise Cannot_unify
+  exception Match_failure
 
-  let must_hold b = if not b then raise Cannot_unify
+  let fail () = raise Match_failure
 
-  let must_equal f x y = must_hold (f x y)
+  let fail_if_not b = if not b then raise Match_failure
+
+  let fail_if_not_equal f x y = fail_if_not (f x y)
 
   module HV = Hashtbl.Make (Variable)
 
-  type parameter_in_right_env =
-    { parameter_in_right_env : Bound_parameter.t;
-      mutable name_in_left_env : Variable.t option
+  (** A [parameter_in_second_env] represents one continuation parameter
+      introduced in the second environment, recording the corresponding
+      [Bound_parameter.t] in the [parameter_in_second_env] field.
+
+      Its [name_in_first_env] is the (unique at the end of matching) matching
+      parameter in the first environment, or [None] if it has not been
+      determined yet. *)
+  type parameter_in_second_env =
+    { parameter_in_second_env : Bound_parameter.t;
+      mutable name_in_first_env : Variable.t option
     }
 
-  type name_in_right_env =
-    | Not_yet_renamed of parameter_in_right_env HV.t
-    | Name_in_right_env of Variable.t
+  (** A [name_in_second_env] represents the (unique at the end of matching)
+      matching parameter in the second environment for a given parameter in the
+      first environment.
 
-  type parameter_in_left_env =
-    { parameter_in_left_env : Bound_parameter.t;
-      mutable name_in_right_env : name_in_right_env
+      It can be either:
+
+      - A [Name_in_second_env var] if the matching parameter has already been
+        determined, or
+
+      - A [Not_yet_renamed params] marker recording the
+        [parameter_in_second_env] entries it can be bound to (it is a matching
+        failure to try to match a parameter in the first environment with a
+        variable in the second environment that is not one of these parameters).
+  *)
+  type name_in_second_env =
+    | Not_yet_renamed of parameter_in_second_env HV.t
+    | Name_in_second_env of Variable.t
+
+  (** Similar to [parameter_in_second_env], but for the first environment, and
+      uses [name_in_second_env] instead of an [option] to ensure the parameter
+      is only matched with valid another parameter of the right continuation. *)
+  type parameter_in_first_env =
+    { parameter_in_first_env : Bound_parameter.t;
+      mutable name_in_second_env : name_in_second_env
     }
 
   let empty = Variable.Map.empty
@@ -295,29 +341,29 @@ module Unify_for_unique_handler = struct
      [params2] in the right environment. *)
   let bind_permutable_parameters env params1 params2 =
     (* Must have the same number of parameters for both handlers, but we allow
-       permutations -- kinds are checked in [unify_variable]. *)
-    if not (Bound_parameters.same_number params1 params2) then cannot_unify ();
+       permutations -- kinds are checked in [match_variable]. *)
+    if not (Bound_parameters.same_number params1 params2) then fail ();
     (* The same hash table is shared across all the parameters for the same
        bijection, but not across other bijections. This ensures that we can only
        bind the parameters in [params1] to a parameter in [params2], not to
        arbitrary variables. *)
-    let name_in_right_env = HV.create 16 in
+    let name_in_second_env = HV.create 16 in
     let args2 =
       List.map
         (fun param2 ->
           let binding2 =
-            { parameter_in_right_env = param2; name_in_left_env = None }
+            { parameter_in_second_env = param2; name_in_first_env = None }
           in
-          HV.replace name_in_right_env (Bound_parameter.var param2) binding2;
+          HV.replace name_in_second_env (Bound_parameter.var param2) binding2;
           binding2)
         (Bound_parameters.to_list params2)
     in
-    let name_in_right_env = Not_yet_renamed name_in_right_env in
+    let name_in_second_env = Not_yet_renamed name_in_second_env in
     let env =
       List.fold_left
         (fun params1 param1 ->
           let binding1 =
-            { parameter_in_left_env = param1; name_in_right_env }
+            { parameter_in_first_env = param1; name_in_second_env }
           in
           Variable.Map.add (Bound_parameter.var param1) binding1 params1)
         env
@@ -325,32 +371,40 @@ module Unify_for_unique_handler = struct
     in
     env, args2
 
-  let unify_variable env var1 var2 =
+  let match_variable env var1 var2 =
     match Variable.Map.find_or_null var1 env with
-    | Null -> must_equal Variable.equal var1 var2
-    | This { name_in_right_env = Name_in_right_env var2'; _ } ->
-      must_equal Variable.equal var2' var2
+    | Null ->
+      (* [var1] is not a parameter: both variables must be equal *)
+      fail_if_not_equal Variable.equal var1 var2
+    | This { name_in_second_env = Name_in_second_env var2'; _ } ->
+      (* [var1] is a parameter and is already matched *)
+      fail_if_not_equal Variable.equal var2' var2
     | This
-        ({ name_in_right_env = Not_yet_renamed renamed2;
-           parameter_in_left_env = param1
+        ({ name_in_second_env = Not_yet_renamed renamed2;
+           parameter_in_first_env = param1
          } as binding1) -> (
+      (* [var1] is a parameter, but not yet matched: try to match it. *)
       match HV.find renamed2 var2 with
-      | (exception Not_found) | { name_in_left_env = Some _; _ } ->
-        raise Cannot_unify
-      | { name_in_left_env = None; parameter_in_right_env = param2 } as binding2
-        ->
-        must_equal Flambda_kind.With_subkind.equal
+      | (exception Not_found) | { name_in_first_env = Some _; _ } ->
+        (* [var2] is either not a parameter of the same continuation, or already
+           matched to another parameter in the first environment. *)
+        fail ()
+      | { name_in_first_env = None; parameter_in_second_env = param2 } as
+        (* [var2] is a parameter of the same continuation and is not yet
+           matched: we can match [var1] and [var2] if the kinds agree. *)
+        binding2 ->
+        fail_if_not_equal Flambda_kind.With_subkind.equal
           (Bound_parameter.kind param1)
           (Bound_parameter.kind param2);
         HV.remove renamed2 var2;
-        binding1.name_in_right_env <- Name_in_right_env var2;
-        binding2.name_in_left_env <- Some var1)
+        binding1.name_in_second_env <- Name_in_second_env var2;
+        binding2.name_in_first_env <- Some var1)
 
   let to_args_exn args =
     List.map
       (fun binding ->
-        match binding.name_in_left_env with
-        | None -> raise Cannot_unify
+        match binding.name_in_first_env with
+        | None -> fail ()
         | Some var -> Simple.var var)
       args
 
@@ -362,77 +416,80 @@ module Unify_for_unique_handler = struct
     val free_names : t -> Name_occurrences.t
   end
 
-  let unify_equal_and_free_names (type t)
+  let match_equal_and_free_names (type t)
       (module T : Equal_and_free_names with type t = t) env t1 t2 =
     (* Make sure that the variables contained within are equal on both sides. *)
-    must_equal T.equal t1 t2;
+    fail_if_not_equal T.equal t1 t2;
     Name_occurrences.fold_variables (T.free_names t1) ~init:() ~f:(fun () var ->
-        unify_variable env var var)
+        match_variable env var var)
 
-  let unify_name env name1 name2 =
+  let match_name env name1 name2 =
     Name.pattern_match name1
       ~var:(fun var1 ->
         Name.pattern_match name2
-          ~var:(fun var2 -> unify_variable env var1 var2)
-          ~symbol:(fun _ -> cannot_unify ()))
-      ~symbol:(fun symbol1 -> must_equal Name.equal name2 (Name.symbol symbol1))
+          ~var:(fun var2 -> match_variable env var1 var2)
+          ~symbol:(fun _ -> fail ()))
+      ~symbol:(fun symbol1 ->
+        fail_if_not_equal Name.equal name2 (Name.symbol symbol1))
 
-  let unify_simple env simple1 simple2 =
+  let match_simple env simple1 simple2 =
     Simple.pattern_match simple1
       ~const:(fun const1 ->
         Simple.pattern_match simple2
-          ~const:(fun const2 -> must_equal Reg_width_const.equal const1 const2)
-          ~name:(fun _ ~coercion:_ -> cannot_unify ()))
+          ~const:(fun const2 ->
+            fail_if_not_equal Reg_width_const.equal const1 const2)
+          ~name:(fun _ ~coercion:_ -> fail ()))
       ~name:(fun name1 ~coercion:coercion1 ->
         Simple.pattern_match simple2
-          ~const:(fun _ -> cannot_unify ())
+          ~const:(fun _ -> fail ())
           ~name:(fun name2 ~coercion:coercion2 ->
-            unify_equal_and_free_names (module Coercion) env coercion1 coercion2;
-            unify_name env name1 name2))
+            match_equal_and_free_names (module Coercion) env coercion1 coercion2;
+            match_name env name1 name2))
 
-  let rec unify_list unify env xs ys =
+  (* Like [iter2], but raises [Match_failure] if the lengths are not equal *)
+  let rec match_list match_elt env xs ys =
     match xs, ys with
     | [], [] -> ()
-    | [], _ | _, [] -> cannot_unify ()
+    | [], _ | _, [] -> fail ()
     | x :: xs, y :: ys ->
-      unify env x y;
-      unify_list unify env xs ys
+      match_elt env x y;
+      match_list match_elt env xs ys
 
-  let unify_simples env simples1 simples2 =
-    unify_list unify_simple env simples1 simples2
+  let match_simples env simples1 simples2 =
+    match_list match_simple env simples1 simples2
 
-  let unify_primitive env prim1 prim2 =
+  let match_primitive env prim1 prim2 =
     let module P = Flambda_primitive in
-    unify_equal_and_free_names
+    match_equal_and_free_names
       (module P.Without_args)
       env (P.without_args prim1) (P.without_args prim2);
-    unify_simples env (P.args prim1) (P.args prim2)
+    match_simples env (P.args prim1) (P.args prim2)
 
-  let unify_named env (named1 : Named.t) (named2 : Named.t) =
+  let match_named env (named1 : Named.t) (named2 : Named.t) =
     match named1, named2 with
-    | Simple simple1, Simple simple2 -> unify_simple env simple1 simple2
+    | Simple simple1, Simple simple2 -> match_simple env simple1 simple2
     | Prim (prim1, _dbg1), Prim (prim2, _dbg2) ->
-      unify_primitive env prim1 prim2
+      match_primitive env prim1 prim2
     | (Simple _ | Prim _ | Set_of_closures _ | Static_consts _ | Rec_info _), _
       ->
-      cannot_unify ()
+      fail ()
 
-  let rec unify_expr env t1 t2 =
+  let rec match_expr env t1 t2 =
     (* CR-someday bclement: consider sharing more expressions, e.g. apply
        switches, and maybe let conts -- [bind_permutable_parameters] should
        allow to do this up to permutation of their parameters, but make sure
        it's not too expensive. *)
     match Expr.descr t1, Expr.descr t2 with
-    | Let let_expr1, Let let_expr2 -> unify_let_expr env let_expr1 let_expr2
+    | Let let_expr1, Let let_expr2 -> match_let_expr env let_expr1 let_expr2
     | Apply_cont apply_cont1, Apply_cont apply_cont2 ->
-      unify_apply_cont env apply_cont1 apply_cont2
+      match_apply_cont env apply_cont1 apply_cont2
     | (Let _ | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _), _ ->
-      cannot_unify ()
+      fail ()
 
-  and unify_let_expr env let_expr1 let_expr2 =
-    (* This call to [unify_named] ensures that the kinds for the bound patterns
+  and match_let_expr env let_expr1 let_expr2 =
+    (* This call to [match_named] ensures that the kinds for the bound patterns
        below match. *)
-    unify_named env (Let.defining_expr let_expr1) (Let.defining_expr let_expr2);
+    match_named env (Let.defining_expr let_expr1) (Let.defining_expr let_expr2);
     Let.pattern_match let_expr1 ~f:(fun bound_pattern1 ~body:body1 ->
         Let.pattern_match let_expr2 ~f:(fun bound_pattern2 ~body:body2 ->
             match bound_pattern1, bound_pattern2 with
@@ -442,34 +499,34 @@ module Unify_for_unique_handler = struct
                   (Renaming.add_variable Renaming.empty
                      (Bound_var.var bound_var2) (Bound_var.var bound_var1))
               in
-              unify_expr env body1 body2
-            | (Singleton _ | Set_of_closures _ | Static _), _ -> cannot_unify ()))
+              match_expr env body1 body2
+            | (Singleton _ | Set_of_closures _ | Static _), _ -> fail ()))
 
-  and unify_apply_cont env apply_cont1 apply_cont2 =
+  and match_apply_cont env apply_cont1 apply_cont2 =
     match
       Apply_cont.trap_action apply_cont1, Apply_cont.trap_action apply_cont2
     with
     | None, None ->
-      must_equal Continuation.equal
+      fail_if_not_equal Continuation.equal
         (Apply_cont.continuation apply_cont1)
         (Apply_cont.continuation apply_cont2);
-      unify_simples env
+      match_simples env
         (Apply_cont.args apply_cont1)
         (Apply_cont.args apply_cont2)
     | _ ->
       (* CR-someday bclement: consider trap actions *)
-      cannot_unify ()
+      fail ()
 
-  let unify_permutable_continuation_handler env params1 handler1 params2
+  let match_permutable_continuation_handler env params1 handler1 params2
       handler2 =
     let env, args = bind_permutable_parameters env params1 params2 in
-    unify_expr env handler1 handler2;
-    (* We are unifying continuation handlers after rebuilding/dataflow, so we
+    match_expr env handler1 handler2;
+    (* We are matching continuation handlers after rebuilding/dataflow, so we
        expect that all parameters are used and we can reconstruct a suitable
        bijection, so if we get there, [to_args_exn] should never raise. *)
     to_args_exn args
 
-  let unify_non_recursive_continuation_handler env ~is_exn_handler params1
+  let match_non_recursive_continuation_handler env ~is_exn_handler params1
       handler1 params2 handler2 =
     if is_exn_handler
     then (
@@ -478,9 +535,9 @@ module Unify_for_unique_handler = struct
       match
         Bound_parameters.to_list params1, Bound_parameters.to_list params2
       with
-      | [], _ | _, [] -> cannot_unify ()
+      | [], _ | _, [] -> fail ()
       | exn1 :: params1, exn2 :: params2 ->
-        must_equal Flambda_kind.With_subkind.equal
+        fail_if_not_equal Flambda_kind.With_subkind.equal
           (Bound_parameter.kind exn1)
           (Bound_parameter.kind exn2);
         let handler2 =
@@ -489,24 +546,24 @@ module Unify_for_unique_handler = struct
                (Bound_parameter.var exn1))
         in
         Bound_parameter.simple exn1
-        :: unify_permutable_continuation_handler env
+        :: match_permutable_continuation_handler env
              (Bound_parameters.create params1)
              handler1
              (Bound_parameters.create params2)
              handler2)
     else
-      unify_permutable_continuation_handler env params1 handler1 params2
+      match_permutable_continuation_handler env params1 handler1 params2
         handler2
 end
 
-let unify_continuation_handler ~is_exn_handler params1 handler1 params2 handler2
+let match_continuation_handler ~is_exn_handler params1 handler1 params2 handler2
     =
-  let open Unify_for_unique_handler in
+  let open Matching_for_unique_handler in
   match
-    unify_non_recursive_continuation_handler ~is_exn_handler empty params1
+    match_non_recursive_continuation_handler ~is_exn_handler empty params1
       handler1 params2 handler2
   with
-  | exception Cannot_unify -> None
+  | exception Match_failure -> None
   | args -> Some args
 
 module Unique_continuation_handlers = struct
@@ -524,11 +581,15 @@ module Unique_continuation_handlers = struct
       match handler.contents_hash with
       | Null -> Or_null.null
       | This { depth; structural_hash } ->
-        (* The [contents_hash] does not include variable names, so we include
-           the free names of variables in the hash.
+        (* The [contents_hash] does not include variable names (it is not clear
+           how to do this up to alpha-equivalence since we are computing the
+           hashes from the bottom up), so we include the free names of variables
+           in the hash.
 
            This is an approximation, since we can't distinguish e.g. [x + y]
-           from [y + x] in this way, but should be discriminating enough. *)
+           from [y + x] in this way, but should be discriminating enough.
+
+           CR-someday bclement: consider occurrence count. *)
         Name_occurrences.fold_variables free_names_without_params
           ~init:
             (Hashtbl.hash (depth, structural_hash, Bool.hash is_exn_handler))
@@ -571,7 +632,7 @@ module Unique_continuation_handlers = struct
           then
             Option.map
               (fun args -> value, args)
-              (unify_continuation_handler ~is_exn_handler params handler.expr
+              (match_continuation_handler ~is_exn_handler params handler.expr
                  other_params other_handler)
           else None)
       |> Option.bind (Numeric_types.Int.Map.find_opt hash t)
