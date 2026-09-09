@@ -6,7 +6,7 @@ let $camlDuplicate_block_mixed_record_length__first_const_0 = Block 0 () in
          : val =
    let next_depth = rec_info (succ my_depth) in
    let r = %opaque (x) in
-   let newrecord = %duplicate_block.`0`.`257`.my_alloc_region (r) in
+   let newrecord = %duplicate_block.`0`.`385`.my_alloc_region (r) in
    let Pmixedfield = %block_load.`imm`.[`384`] (r) in
    let int_add = %int_barith.add (Pmixedfield, 1) in
    let Psetmixedfield = %block_set.`imm`.[`384`] (newrecord, int_add) in
@@ -31,7 +31,7 @@ let $camlDuplicate_block_mixed_record_length__first_const_0 = Block 0 () in
       where k5 =
         cont k4)
      where k4 =
-       let newrecord = %duplicate_block.`0`.`257`.my_alloc_region (`*match*`)
+       let newrecord = %duplicate_block.`0`.`385`.my_alloc_region (`*match*`)
        in
        let Pmixedfield = %block_load.`imm`.[`384`] (`*match*`) in
        let int_add = %int_barith.add (Pmixedfield, 1) in
