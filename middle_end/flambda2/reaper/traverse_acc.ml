@@ -448,6 +448,17 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
+let connect_closure graph ~closure ~code_id (code_dep : code_dep) =
+  Graph.add_propagate_dep graph
+    ~to_:(Code_id_or_name.var code_dep.my_closure)
+    ~from:closure
+    ~if_used:(Code_id_or_name.code_id code_id);
+  Graph.add_constructor_dep graph ~from:code_dep.known_arity_call_witness
+    Field.known_arity_call_witness ~base:closure;
+  Graph.add_constructor_dep graph
+    ~from:(List.hd code_dep.unknown_arity_call_witnesses)
+    Field.unknown_arity_call_witness ~base:closure
+
 let record_set_of_closures_deps_one_closure t
     { let_bound_name_of_the_closure = name;
       closure_code_id = code_id;
@@ -474,16 +485,7 @@ let record_set_of_closures_deps_one_closure t
     add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
       ~base:name;
     add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
-  | Some code_dep ->
-    add_propagate_dep t
-      ~to_:(Code_id_or_name.var code_dep.my_closure)
-      ~from:name
-      ~if_used:(Code_id_or_name.code_id code_id);
-    add_constructor_dep t ~from:code_dep.known_arity_call_witness
-      Field.known_arity_call_witness ~base:name;
-    add_constructor_dep t
-      ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-      Field.unknown_arity_call_witness ~base:name
+  | Some code_dep -> connect_closure t.deps ~closure:name ~code_id code_dep
 
 let record_set_of_closures_deps t =
   List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
