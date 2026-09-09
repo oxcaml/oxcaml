@@ -53,8 +53,7 @@ and rev_static_const =
 
 and rev_code =
   { params_and_body : rev_params_and_body;
-    free_names_of_params_and_body : Name_occurrences.t;
-    code_metadata : Code_metadata.t
+    free_names_of_params_and_body : Name_occurrences.t
   }
 
 and rev_params_and_body =
@@ -167,8 +166,7 @@ let ids_for_export_code
           my_alloc_mode;
           my_depth
         };
-      free_names_of_params_and_body;
-      code_metadata
+      free_names_of_params_and_body
     } =
   let ids = ids_for_export body in
   let ids = Ids_for_export.add_continuation ids return_continuation in
@@ -181,8 +179,7 @@ let ids_for_export_code
     [ ids;
       Alloc_mode.For_applications.ids_for_export my_alloc_mode;
       Bound_parameters.ids_for_export params;
-      Name_occurrences.ids_for_export free_names_of_params_and_body;
-      Code_metadata.ids_for_export code_metadata ]
+      Name_occurrences.ids_for_export free_names_of_params_and_body ]
 
 let apply_renaming_set_of_closures { value_slots; function_decls } renaming =
   { value_slots =
@@ -273,8 +270,7 @@ let apply_renaming_code
           my_alloc_mode;
           my_depth
         };
-      free_names_of_params_and_body;
-      code_metadata
+      free_names_of_params_and_body
     } renaming =
   { params_and_body =
       { return_continuation =
@@ -288,6 +284,5 @@ let apply_renaming_code
         my_depth = Renaming.apply_variable renaming my_depth
       };
     free_names_of_params_and_body =
-      Name_occurrences.apply_renaming free_names_of_params_and_body renaming;
-    code_metadata = Code_metadata.apply_renaming code_metadata renaming
+      Name_occurrences.apply_renaming free_names_of_params_and_body renaming
   }

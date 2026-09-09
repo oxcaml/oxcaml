@@ -503,6 +503,7 @@ module Shard : sig
     changed_representation:
       (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t ->
+    code_changes:Unboxing_analysis.code_changes ->
     t * Field.Set.t * Compilation_unit.Set.t
 
   val deserialise :
@@ -512,6 +513,7 @@ module Shard : sig
     * Unboxing_analysis.unboxed Code_id_or_name.Map.t
     * (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t
+    * Unboxing_analysis.code_changes
 end = struct
   type t =
     { table_data : Flambda_cmx_format.table_data;
@@ -519,10 +521,12 @@ end = struct
       unboxed_fields : Unboxing_analysis.unboxed Code_id_or_name.Map.t;
       changed_representation :
         (Unboxing_analysis.changed_representation * Code_id_or_name.t)
-        Code_id_or_name.Map.t
+        Code_id_or_name.Map.t;
+      code_changes : Unboxing_analysis.code_changes
     }
 
-  let create ~solution_tables ~unboxed_fields ~changed_representation =
+  let create ~solution_tables ~unboxed_fields ~changed_representation
+      ~code_changes =
     let ids = Solution_tables.ids_for_export solution_tables in
     let ids =
       Unboxing_analysis.unboxed_fields_ids_for_export unboxed_fields ids
@@ -531,6 +535,7 @@ end = struct
       Unboxing_analysis.changed_representation_ids_for_export
         changed_representation ids
     in
+    let ids = Unboxing_analysis.code_changes_ids_for_export code_changes ids in
     let fields = Solution_tables.fields_for_export solution_tables in
     let fields =
       Unboxing_analysis.unboxed_fields_fields_for_export unboxed_fields fields
@@ -539,21 +544,29 @@ end = struct
       Unboxing_analysis.changed_representation_fields_for_export
         changed_representation fields
     in
+    let fields =
+      Unboxing_analysis.code_changes_fields_for_export code_changes fields
+    in
     ( { table_data = Flambda_cmx_format.create_table_data ids;
         solution_tables;
         unboxed_fields;
-        changed_representation
+        changed_representation;
+        code_changes
       },
       fields,
       compilation_units_of_ids ids )
 
   let deserialise
-      { table_data; solution_tables; unboxed_fields; changed_representation }
-      ~rename_field =
+      { table_data;
+        solution_tables;
+        unboxed_fields;
+        changed_representation;
+        code_changes
+      } ~rename_field =
     (* [used_value_slots] and [original_compilation_unit] only drive value-slot
        pruning, which is only consulted when rewriting Flambda types, and the
        solution contains no types. [code_ids] is only needed by
-       [Exported_code.apply_renaming], and the solution contains no code. *)
+       [Exported_code.apply_renaming], and the shards contain no code. *)
     let renaming, (_code_ids : Code_id.importer) =
       Flambda_cmx_format.import_renaming ~table_data
         ~used_value_slots:Value_slot.Set.empty
@@ -570,7 +583,11 @@ end = struct
       Unboxing_analysis.changed_representation_apply_renaming
         changed_representation renaming ~rename_field
     in
-    solution_tables, unboxed_fields, changed_representation
+    let code_changes =
+      Unboxing_analysis.code_changes_apply_renaming code_changes renaming
+        ~rename_field
+    in
+    solution_tables, unboxed_fields, changed_representation, code_changes
 end
 
 module Header = struct
@@ -590,7 +607,11 @@ module Header = struct
       (* One section per compilation unit that keys any fact (participant or
          not), in section order. *)
       index : (Compilation_unit.t * File_sections.Idx.t) list;
-      section_toc : int array
+      section_toc : int array;
+      (* The slot offsets computed from the solution for the sets of closures of
+         all participants. Slots are not hashconsed, so the offsets can be
+         stored as is. *)
+      slot_offsets : Slot_offsets.result
     }
 end
 
@@ -600,6 +621,10 @@ type t =
   }
 
 let id_stamp_counters t = t.header.Header.id_stamp_counters
+
+let participants t = List.map fst t.header.Header.participants
+
+let slot_offsets t = t.header.Header.slot_offsets
 
 type error =
   | Wrong_format of string
@@ -621,7 +646,7 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let save ~filename ~participants ~solution =
+let save ~filename ~participants ~solution ~slot_offsets ~code_changes =
   let ({ db; unboxed_fields; changed_representation }
         : Unboxing_analysis.result) =
     solution
@@ -632,12 +657,17 @@ let save ~filename ~participants ~solution =
   in
   let unboxed_by_cu = partition_by_cu unboxed_fields in
   let changed_by_cu = partition_by_cu changed_representation in
-  (* Combine the three partitions into one map over the union of their key sets,
+  let code_changes_by_cu =
+    Unboxing_analysis.partition_code_changes_by_compilation_unit code_changes
+  in
+  (* Combine the four partitions into one map over the union of their key sets,
      with empty defaults. *)
   let shard_inputs =
     let all_units =
       Compilation_unit.Set.union
-        (Compilation_unit.Map.keys tables_by_cu)
+        (Compilation_unit.Set.union
+           (Compilation_unit.Map.keys tables_by_cu)
+           (Compilation_unit.Map.keys code_changes_by_cu))
         (Compilation_unit.Set.union
            (Compilation_unit.Map.keys unboxed_by_cu)
            (Compilation_unit.Map.keys changed_by_cu))
@@ -649,7 +679,9 @@ let save ~filename ~participants ~solution =
       (fun cu ->
         ( find cu tables_by_cu ~default:Solution_tables.empty,
           find cu unboxed_by_cu ~default:Code_id_or_name.Map.empty,
-          find cu changed_by_cu ~default:Code_id_or_name.Map.empty ))
+          find cu changed_by_cu ~default:Code_id_or_name.Map.empty,
+          find cu code_changes_by_cu
+            ~default:Unboxing_analysis.empty_code_changes ))
       all_units
   in
   let builder =
@@ -657,10 +689,14 @@ let save ~filename ~participants ~solution =
   in
   let rev_index, fields, referenced_by_section =
     Compilation_unit.Map.fold
-      (fun cu (solution_tables, unboxed_fields, changed_representation)
-           (rev_index, fields, referenced_by_section) ->
+      (fun cu
+           ( solution_tables,
+             unboxed_fields,
+             changed_representation,
+             code_changes ) (rev_index, fields, referenced_by_section) ->
         let shard, shard_fields, referenced =
           Shard.create ~solution_tables ~unboxed_fields ~changed_representation
+            ~code_changes
         in
         let idx = File_sections.Builder.add builder (Obj.repr shard) in
         ( (cu, idx) :: rev_index,
@@ -681,7 +717,8 @@ let save ~filename ~participants ~solution =
       section_references = referenced_by_section;
       field_views = Fields_for_export.export fields;
       index = List.rev rev_index;
-      section_toc
+      section_toc;
+      slot_offsets
     }
   in
   let oc = open_out_bin filename in
@@ -798,25 +835,36 @@ let solution_for_members { header; sections } ~members =
     Compilation_unit.Set.fold visit seeds Compilation_unit.Set.empty
   in
   let rename_field = Fields_for_export.import header.Header.field_views in
-  let tables, unboxed_fields, changed_representation, rev_loaded =
+  let tables, unboxed_fields, changed_representation, code_changes, rev_loaded =
     List.fold_left
-      (fun (tables, unboxed_fields, changed_representation, rev_loaded)
-           (cu, idx) ->
+      (fun ( tables,
+             unboxed_fields,
+             changed_representation,
+             code_changes,
+             rev_loaded ) (cu, idx) ->
         if not (Compilation_unit.Set.mem cu needed)
-        then tables, unboxed_fields, changed_representation, rev_loaded
+        then
+          ( tables,
+            unboxed_fields,
+            changed_representation,
+            code_changes,
+            rev_loaded )
         else
           let shard : Shard.t = Obj.obj (File_sections.get sections idx) in
-          let shard_tables, shard_unboxed, shard_changed =
+          let shard_tables, shard_unboxed, shard_changed, shard_code_changes =
             Shard.deserialise shard ~rename_field
           in
           ( Solution_tables.disjoint_union tables shard_tables,
             Code_id_or_name.Map.disjoint_union unboxed_fields shard_unboxed,
             Code_id_or_name.Map.disjoint_union changed_representation
               shard_changed,
+            Unboxing_analysis.code_changes_disjoint_union code_changes
+              shard_code_changes,
             cu :: rev_loaded ))
       ( Solution_tables.empty,
         Code_id_or_name.Map.empty,
         Code_id_or_name.Map.empty,
+        Unboxing_analysis.empty_code_changes,
         [] )
       header.Header.index
   in
@@ -825,10 +873,11 @@ let solution_for_members { header; sections } ~members =
     print_loaded_sections ~members
       ~total:(List.length header.Header.index)
       ~loaded:(List.rev rev_loaded);
-  { Unboxing_analysis.db = Solution_tables.to_database tables;
-    unboxed_fields;
-    changed_representation
-  }
+  ( { Unboxing_analysis.db = Solution_tables.to_database tables;
+      unboxed_fields;
+      changed_representation
+    },
+    code_changes )
 
 open Format_doc
 
