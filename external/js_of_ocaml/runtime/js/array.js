@@ -17,7 +17,7 @@
 
 ///////////// Array
 
-//Provides: caml_array_sub mutable
+//Provides: caml_array_sub mutator
 //Alias: caml_array_sub_local
 function caml_array_sub(a, i, len) {
   var a2 = new Array(len + 1);
@@ -28,7 +28,7 @@ function caml_array_sub(a, i, len) {
   return a2;
 }
 
-//Provides: caml_floatarray_sub mutable
+//Provides: caml_floatarray_sub mutator
 //Requires: caml_array_sub
 //Version: >= 5.3
 function caml_floatarray_sub(a, i, len) {
@@ -37,7 +37,7 @@ function caml_floatarray_sub(a, i, len) {
   return r;
 }
 
-//Provides: caml_floatarray_sub_local mutable
+//Provides: caml_floatarray_sub_local mutator
 //Requires: caml_floatarray_sub
 //Version: >= 5.4
 //If: oxcaml
