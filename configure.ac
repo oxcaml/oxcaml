@@ -417,6 +417,7 @@ AC_SUBST([ASPP])
 AC_SUBST([endianness])
 AC_SUBST([AS])
 AC_SUBST([asm_cfi_supported])
+AC_SUBST([asm_file0_supported])
 AC_SUBST([as_compress_debug_sections_flag])
 AC_SUBST([cc_compress_debug_sections_flag])
 AC_SUBST([objcopy_compress_debug_sections_flag])
@@ -3025,6 +3026,7 @@ AS_CASE([$enable_systhreads,$enable_unix_lib],
 ## Does the assembler support debug prefix map and CFI directives
 as_debug_prefix_map_flag=""
 asm_cfi_supported=false
+asm_file0_supported=false
 as_compress_debug_sections_flag=""
 cc_compress_debug_sections_flag=""
 objcopy_compress_debug_sections_flag=""
@@ -3033,6 +3035,7 @@ AS_IF([$native_compiler],
     [*-w64-mingw32*|*-pc-windows], [],
     [OCAML_AS_HAS_DEBUG_PREFIX_MAP
     OCAML_AS_HAS_CFI_DIRECTIVES
+    OCAML_AS_HAS_FILE_ZERO_DIRECTIVE
     OCAML_AS_COMPRESSION_SUPPORT
     OCAML_CC_COMPRESSION_SUPPORT
     OCAML_OBJCOPY_COMPRESSION_SUPPORT])])
