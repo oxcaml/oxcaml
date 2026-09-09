@@ -208,6 +208,26 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     ignore (Type_utils.type_in_env ~verbosity ~context env ppf source : bool);
     to_string ()
   | Structured_errors ->
+    let documentation (doc : Query_protocol.Syntax_doc_result.t option) =
+      match doc with
+      | Some doc ->
+        Some
+          { Diagnostic_term.description = doc.description;
+            url = doc.documentation
+          }
+      | None -> None
+    in
+    Diagnostic_term.set_documentation (fun term ->
+        match term with
+        | Mode_term (Alloc_mode atom) ->
+          documentation (Syntax_doc.get_mode_doc atom)
+        | Mode_term (Reported_mode mode) -> (
+          match Mode.reported_mode_as_alloc_atom mode with
+          | Some atom -> documentation (Syntax_doc.get_mode_doc atom)
+          | None -> None)
+        | Modality_term atom ->
+          documentation (Syntax_doc.get_modality_doc atom)
+        | Written_modality_term _ | Concept_term _ -> None);
     let errors = Mpipeline.typer_errors pipeline in
     List.filter_map errors ~f:(fun exn ->
         match Location.error_of_exn exn with
