@@ -6,9 +6,10 @@
  { flags += " -O3"; native; }
 *)
 
-(* A has a payload, so B has block tag 1. With 256 source fields, the
-   partial update uses record duplication even though its native payload
-   is empty. Recursive initialization must preserve B. *)
+(* Records behave differently when they have at least 256 labels:
+   for example, functional updates copy the record and then overwrite fields
+   rather than reconstructing the record from scratch. *)
+
 type t = A of int | B of {
   f000 : unit#; f001 : unit#; f002 : unit#; f003 : unit#;
   f004 : unit#; f005 : unit#; f006 : unit#; f007 : unit#;

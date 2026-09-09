@@ -222,7 +222,7 @@ Error: This type definition does not satisfy its kind annotation
        because key is not mod forkable unyielding many stateless immutable.
 |}]
 
-(* Refining a generic field to void preserves the surrounding boxed kind. *)
+(* Refining a generic field to void preserves mutability. *)
 
 type ('a : any) generic = A of { mutable x : 'a }
 type bad : immutable_data = unit# generic

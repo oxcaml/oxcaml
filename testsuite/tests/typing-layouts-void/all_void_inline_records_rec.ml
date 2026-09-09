@@ -33,15 +33,15 @@ let run ~should_raise =
   in
   !calls, result
 [%%expect{|
-val run : should_raise:bool -> int * string
+val run : should_raise:bool -> int * string = <fun>
 |}]
 
-let () = run ~should_raise:false
+let returned = run ~should_raise:false
 [%%expect{|
-val () : int * string = (1, "B")
+val returned : int * string = (1, "B")
 |}]
 
-let () = run ~should_raise:true
+let raised = run ~should_raise:true
 [%%expect{|
-val () : int * string = (1, "raised")
+val raised : int * string = (1, "raised")
 |}]

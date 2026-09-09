@@ -61,8 +61,12 @@ let[@inline never] classify (x : unit# generic) =
   | G r -> r.field <- #(); "G"
   | C -> "C"
 let specialized = List.map classify [G { field = #() }; C]
+let tag_g = obj_tag (G { field = #() })
+let tag_c = obj_tag (C : unit# generic)
 [%%expect{|
 type ('a : any) generic = G of { mutable field : 'a; } | C
 val classify : unit# generic -> string = <fun>
 val specialized : string list = ["G"; "C"]
+val tag_g : int = 0
+val tag_c : int = 1
 |}]
