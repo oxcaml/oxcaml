@@ -204,6 +204,7 @@
   ;; DRIVER
   pparse
   ;; DIAGNOSTICS
+  json
   structured_diagnostic
   ;; TYPING
   ident
