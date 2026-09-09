@@ -7,9 +7,7 @@
  { flags += " -O3"; expect.opt; }
 *)
 
-(* Void operands are still evaluated exactly once, including when they
-   raise. Only one operand has effects in each row, so no evaluation order
-   is prescribed. The partial updates also read a retained void field. *)
+(* [void] expressions are evaluated exactly once for their side effects. *)
 type t = { x : unit#; kept : unit# }
 type m = { mutable z : unit# }
 [%%expect{|
@@ -17,57 +15,65 @@ type t = { x : unit#; kept : unit#; }
 type m = { mutable z : unit#; }
 |}]
 
+(* Measure a side effect that increments a counter then optionally raises. *)
 let () =
-  let check name f =
-    let run should_raise =
+  let check name (f : (unit -> unit) -> unit) =
+    let run ~should_raise =
       let calls = ref 0 in
-      let tick () = incr calls; if should_raise then raise Exit in
-      let outcome = try let () = f tick in "returned" with Exit -> "raised" in
+      let eff () = incr calls; if should_raise then raise Exit in
+      let outcome = try let () = f eff in "returned" with Exit -> "raised" in
       !calls, outcome
     in
-    let calls, outcome = run false in
-    let raised_calls, raised_outcome = run true in
-    Format.printf "%s: %d %s; %d %s@."
-      name calls outcome raised_calls raised_outcome
+    let calls, outcome = run ~should_raise:false in
+    let raised_calls, raised_outcome = run ~should_raise:true in
+    Format.printf "%18s: %s with %d; %s with %d@."
+      name outcome calls raised_outcome raised_calls
   in
   let r = { x = #(); kept = #() } in
   let m = { z = #() } in
-  check "construct" (fun tick ->
-    let _ : t = { x = (tick (); #()); kept = #() } in ());
-  check "project" (fun tick ->
-    let #() = (tick (); r).x in ());
-  check "set receiver" (fun tick -> (tick (); m).z <- #());
-  check "set value" (fun tick -> m.z <- (tick (); #()));
-  check "update receiver" (fun tick ->
-    let _ : t = { (tick (); r) with x = #() } in ());
-  check "update value" (fun tick ->
-    let _ : t = { r with x = (tick (); #()) } in ());
-  check "index get receiver" (fun tick ->
-    let #() = Stdlib_stable.Idx_mut.get (tick (); m) (.z) in ());
-  check "index get index" (fun tick ->
-    let #() = Stdlib_stable.Idx_mut.get m (tick (); (.z)) in ());
-  check "index set receiver" (fun tick ->
-    Stdlib_stable.Idx_mut.set (tick (); m) (.z) #());
-  check "index set index" (fun tick ->
-    Stdlib_stable.Idx_mut.set m (tick (); (.z)) #());
-  check "index set value" (fun tick ->
-    Stdlib_stable.Idx_mut.set m (.z) (tick (); #()))
+  check "nothing" (fun eff -> ());
+  check "twice" (fun eff ->
+    let _ = (eff (), eff ()) in ());
+  check "five" (fun eff ->
+    let _ = (eff (), eff (), eff (), eff (), eff ()) in ());
+  check "construct" (fun eff ->
+    let _ : t = { x = (eff (); #()); kept = #() } in ());
+  check "project" (fun eff ->
+    let #() = (eff (); r).x in ());
+  check "set receiver" (fun eff -> (eff (); m).z <- #());
+  check "set value" (fun eff -> m.z <- (eff (); #()));
+  check "update receiver" (fun eff ->
+    let _ : t = { (eff (); r) with x = #() } in ());
+  check "update value" (fun eff ->
+    let _ : t = { r with x = (eff (); #()) } in ());
+  check "index get receiver" (fun eff ->
+    let #() = Stdlib_stable.Idx_mut.get (eff (); m) (.z) in ());
+  check "index get index" (fun eff ->
+    let #() = Stdlib_stable.Idx_mut.get m (eff (); (.z)) in ());
+  check "index set receiver" (fun eff ->
+    Stdlib_stable.Idx_mut.set (eff (); m) (.z) #());
+  check "index set index" (fun eff ->
+    Stdlib_stable.Idx_mut.set m (eff (); (.z)) #());
+  check "index set value" (fun eff ->
+    Stdlib_stable.Idx_mut.set m (.z) (eff (); #()))
 [%%expect{|
-construct: 1 returned; 1 raised
-project: 1 returned; 1 raised
-set receiver: 1 returned; 1 raised
-set value: 1 returned; 1 raised
-update receiver: 1 returned; 1 raised
-update value: 1 returned; 1 raised
-index get receiver: 1 returned; 1 raised
-index get index: 1 returned; 1 raised
-index set receiver: 1 returned; 1 raised
-index set index: 1 returned; 1 raised
-index set value: 1 returned; 1 raised
+           nothing: returned with 0; returned with 0
+             twice: returned with 2; raised with 1
+              five: returned with 5; raised with 1
+         construct: returned with 1; raised with 1
+           project: returned with 1; raised with 1
+      set receiver: returned with 1; raised with 1
+         set value: returned with 1; raised with 1
+   update receiver: returned with 1; raised with 1
+      update value: returned with 1; raised with 1
+index get receiver: returned with 1; raised with 1
+   index get index: returned with 1; raised with 1
+index set receiver: returned with 1; raised with 1
+   index set index: returned with 1; raised with 1
+   index set value: returned with 1; raised with 1
 |}]
 
-(* Specializing a generic record to a void product preserves construction,
-   mutation, and matching, including evaluation of every product component. *)
+(* Same behavior as above when specializing a generic type parameter. *)
 type ('a : any) generic = { mutable field : 'a }
 let generic_round_trip =
   let log = ref [] in
@@ -103,8 +109,7 @@ let abstract_void =
 val abstract_void : string = "projected"
 |}]
 
-(* Marshaling, structural comparison, and hashing depend on contents, not
-   physical identity. *)
+(* Marshaling, comparison, and hashing are structural, not pointer-wise. *)
 let round_trip =
   let original = { x = #(); kept = #() } in
   let restored : t = Marshal.from_string (Marshal.to_string original []) 0 in
