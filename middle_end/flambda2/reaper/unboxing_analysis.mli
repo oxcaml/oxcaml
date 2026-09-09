@@ -108,6 +108,9 @@ val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
     (in particular those of units that did not participate in the solve). *)
 val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
 
+val fold_code_metadata :
+  code_changes -> init:'a -> f:(Code_metadata.t -> 'a -> 'a) -> 'a
+
 val empty_code_changes : code_changes
 
 val code_changes_disjoint_union : code_changes -> code_changes -> code_changes

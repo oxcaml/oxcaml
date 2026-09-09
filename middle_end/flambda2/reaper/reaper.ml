@@ -248,24 +248,35 @@ module Staged = struct
     let types_rewrite_context =
       Types_rewriter.prepare_rewrite_context uses all_sets_of_closures
     in
-    let Rebuild.{ body; all_code; code_ids_to_remember } =
+    let Rebuild.{ body; all_code = rebuilt_code; code_ids_to_remember } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
         ~fixed_arity_continuations ~continuation_info ~final_typing_env
         ~types_rewrite_context ~code_changes ~code_deps_for_result_types uses
         get_code_metadata toplevel_expr code
     in
-    (* CR sspies: Propagate foreign participants' solved metadata from
-       [code_changes] into [all_code] for [To_cmm], overriding stale imported
-       metadata but keeping rebuilt local code. Otherwise cross-unit direct
-       calls can fail in [To_cmm_env.get_code_metadata] or use stale parameter
-       arities and closure-use flags. Slot sizing already consults the solved
-       metadata. *)
+    let is_foreign code_id =
+      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
+    (* Retain foreign metadata saved in the CMR even if rebuild never reloads
+       its CMX. Local entries are replaced by rebuilt code below. *)
+    let imported_code =
+      Exported_code.merge
+        (Exported_code.mark_as_imported all_code)
+        (Exported_code.mark_as_imported
+           (Flambda_cmx.get_imported_code cmx_loader ()))
+      |> Exported_code.filter ~f:is_foreign
+    in
+    let imported_code =
+      Unboxing_analysis.fold_code_metadata code_changes ~init:imported_code
+        ~f:(fun code_metadata imported_code ->
+          if is_foreign (Code_metadata.code_id code_metadata)
+          then Exported_code.add_code_metadata imported_code code_metadata
+          else imported_code)
+    in
     let all_code =
       Exported_code.add_code
         ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
-        all_code
-        (Exported_code.mark_as_imported
-           (Flambda_cmx.get_imported_code cmx_loader ()))
+        rebuilt_code imported_code
     in
     let final_typing_env =
       Option.map

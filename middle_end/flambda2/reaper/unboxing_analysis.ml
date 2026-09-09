@@ -1230,6 +1230,12 @@ let find_code_metadata t code_id =
     (fun code_change -> code_change.code_metadata)
     (Code_id.Map.find_opt code_id t)
 
+let fold_code_metadata t ~init ~f =
+  Code_id.Map.fold
+    (fun _code_id { code_metadata; calling_convention_change = _ } acc ->
+      f code_metadata acc)
+    t init
+
 let empty_code_changes = Code_id.Map.empty
 
 let code_changes_disjoint_union t1 t2 = Code_id.Map.disjoint_union t1 t2
