@@ -22,7 +22,7 @@ type t =
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
     slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
-    code_changes_inputs : Reaper.Staged.Code_changes_inputs.t;
+    solve_inputs : Reaper.Staged.Solve_inputs.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -123,7 +123,7 @@ module Serialisable : sig
     Global_flow_graph.graph
     * Slot_offsets_analysis.Inputs.t
     * Exported_offsets.t
-    * Reaper.Staged.Code_changes_inputs.t
+    * Reaper.Staged.Solve_inputs.t
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -139,7 +139,7 @@ end = struct
       imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
       slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
-      code_changes_inputs : Reaper.Staged.Code_changes_inputs.t;
+      solve_inputs : Reaper.Staged.Solve_inputs.t;
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
@@ -150,7 +150,7 @@ end = struct
          imported_offsets;
          deps;
          slot_offsets_inputs;
-         code_changes_inputs;
+         solve_inputs;
          rebuild_data
        } :
         cmr_format) : t =
@@ -165,18 +165,17 @@ end = struct
         fill_free_names_cache_for_typing_env env;
         Some env, canonicalise
     in
-    (* Code metadata is stored twice ([all_code] and [code_changes_inputs]);
-       both must have their types canonicalised. [unit_metadata] doesn't have
-       types, so doesn't need canonicalising. *)
+    (* Code metadata is stored twice ([all_code] and [solve_inputs]); both must
+       have their types canonicalised. [unit_metadata] doesn't have types, so
+       doesn't need canonicalising. *)
     let all_code, all_code_ids =
       All_code_with_sections.create ~used_value_slots ~canonicalise all_code
     in
     (* Apply the canonicalisation and unused value slot removal that
-       [Pre_serializable.create] applied to the typing env to the
-       [code_changes_inputs] types so that they are consistent. *)
-    let code_changes_inputs =
-      Reaper.Staged.Code_changes_inputs.map_result_types code_changes_inputs
-        ~f:(fun ty ->
+       [Pre_serializable.create] applied to the typing env to the [solve_inputs]
+       types so that they are consistent. *)
+    let solve_inputs =
+      Reaper.Staged.Solve_inputs.map_result_types solve_inputs ~f:(fun ty ->
           let ty =
             Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
               ~used_value_slots ~canonicalise
@@ -192,7 +191,7 @@ end = struct
           all_code_ids;
           Global_flow_graph.ids_for_export deps;
           Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
-          Reaper.Staged.Code_changes_inputs.ids_for_export code_changes_inputs;
+          Reaper.Staged.Solve_inputs.ids_for_export solve_inputs;
           Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
@@ -207,7 +206,7 @@ end = struct
       imported_offsets;
       deps = Deps_with_fields.create deps;
       slot_offsets_inputs;
-      code_changes_inputs;
+      solve_inputs;
       rebuild_data
     }
 
@@ -221,7 +220,7 @@ end = struct
         imported_offsets;
         deps;
         slot_offsets_inputs;
-        code_changes_inputs;
+        solve_inputs;
         rebuild_data
       } : cmr_format =
     (* Insert hashconsed objects from the paused process into this process'
@@ -252,9 +251,8 @@ end = struct
     let slot_offsets_inputs =
       Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
     in
-    let code_changes_inputs =
-      Reaper.Staged.Code_changes_inputs.apply_renaming code_changes_inputs
-        renaming
+    let solve_inputs =
+      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming
     in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
@@ -265,7 +263,7 @@ end = struct
       imported_offsets;
       deps;
       slot_offsets_inputs;
-      code_changes_inputs;
+      solve_inputs;
       rebuild_data
     }
 
@@ -279,7 +277,7 @@ end = struct
         imported_offsets;
         deps;
         slot_offsets_inputs;
-        code_changes_inputs;
+        solve_inputs;
         rebuild_data = _
       } =
     (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
@@ -293,8 +291,7 @@ end = struct
       Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming,
       (* Slots are not hashconsed, so the offsets need no renaming. *)
       imported_offsets,
-      Reaper.Staged.Code_changes_inputs.apply_renaming code_changes_inputs
-        renaming )
+      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming )
 
   let compilation_unit t = t.original_compilation_unit
 end
