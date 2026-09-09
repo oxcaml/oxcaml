@@ -396,7 +396,7 @@ let to_change_representation_tbl =
 
 let to_change_representation x = to_change_representation_tbl % [x]
 
-let datalog_rules =
+let datalog_rules ~analysis_scope =
   saturate_in_order
     [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
@@ -406,7 +406,7 @@ let datalog_rules =
          x); *)
       (let$ [x; field; y] = ["x"; "field"; "y"] in
        [ any_usage x;
-         unless1 Field.is_local field;
+         unless1 (Field.is_local ~analysis_scope) field;
          when1 Field.is_real_field field;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -416,7 +416,7 @@ let datalog_rules =
          the source at each point. *)
       (let$ [x; field; y; z] = ["x"; "field"; "y"; "z"] in
        [ any_usage x;
-         when1 Field.is_local field;
+         when1 (Field.is_local ~analysis_scope) field;
          reading_field field z;
          constructor ~base:x field ~from:y ]
        ==> cannot_change_representation0 x);
@@ -428,7 +428,7 @@ let datalog_rules =
        in
        [ rev_accessor ~base:usage field ~to_:v;
          has_usage v;
-         when1 Field.is_local field;
+         when1 (Field.is_local ~analysis_scope) field;
          sources usage source1;
          has_source source1;
          sources usage source2;
@@ -790,7 +790,7 @@ let cannot_change_calling_convention_query =
   let^? [x], [] = ["x"], [] in
   [cannot_change_calling_convention x]
 
-let perform_analysis0 db ~stats =
+let perform_analysis0 db ~stats ~analysis_scope =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -819,7 +819,8 @@ let perform_analysis0 db ~stats =
         in
         List.fold_left
           (fun db rule -> Datalog.Schedule.run ~stats rule db)
-          db datalog_rules)
+          db
+          (datalog_rules ~analysis_scope))
   in
   let name_of_node =
     if Flambda_features.debug_reaper "nostamps"
@@ -985,11 +986,11 @@ let perform_analysis0 db ~stats =
   in
   { db; unboxed_fields = unboxed; changed_representation }
 
-let perform_analysis db ~stats =
+let perform_analysis db ~stats ~analysis_scope =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats
+  then perform_analysis0 db ~stats ~analysis_scope
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;

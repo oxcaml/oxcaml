@@ -194,7 +194,10 @@ val get_allocation_point :
   Datalog.database -> Code_id_or_name.t -> Code_id_or_name.t option
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> Datalog.database
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  Datalog.database
 
 val get_usages :
   Datalog.database -> Code_id_or_name.t -> usages Or_unknown_or_bottom.t
