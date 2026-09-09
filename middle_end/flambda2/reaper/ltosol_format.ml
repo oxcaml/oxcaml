@@ -539,8 +539,8 @@ end = struct
       } ~rename_field =
     (* [used_value_slots] and [original_compilation_unit] only drive value-slot
        pruning, which is only consulted when rewriting Flambda types. The
-       solution stores kinds but no Flambda types. [code_ids] is only needed by
-       [Exported_code.apply_renaming], and the solution contains no code. *)
+       solution's metadata has unknown result types. [code_ids] is only needed
+       by [Exported_code.apply_renaming], and the shards contain no code. *)
     let renaming, (_code_ids : Code_id.importer) =
       Flambda_cmx_format.import_renaming ~table_data
         ~used_value_slots:Value_slot.Set.empty
@@ -578,8 +578,8 @@ module Header = struct
       (* Fields are hashconsed per-process, so the solution is stored with views
          of them in the style of [table_data]. One list serves all sections. *)
       field_views : Fields_for_export.t;
-      (* One section per compilation unit that keys any fact or calling-
-         convention decision (participant or not), in section order. *)
+      (* One section per compilation unit that keys any fact or code change
+         (participant or not), in section order. *)
       index : (Compilation_unit.t * File_sections.Idx.t) list;
       section_toc : int array;
       (* The slot offsets computed from the solution for the sets of closures of
@@ -620,17 +620,6 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let partition_code_changes_by_cu code_changes =
-  Code_id.Map.fold
-    (fun code_id change acc ->
-      let cu = Code_id.get_compilation_unit code_id in
-      Compilation_unit.Map.update cu
-        (fun part ->
-          let part = Option.value part ~default:Code_id.Map.empty in
-          Some (Code_id.Map.add code_id change part))
-        acc)
-    code_changes Compilation_unit.Map.empty
-
 let save ~filename ~participants
     ~solution:({ uses; code_changes } : Reaper.Staged.solution) ~slot_offsets =
   let ({ db; unboxed_fields; changed_representation }
@@ -643,7 +632,9 @@ let save ~filename ~participants
   in
   let unboxed_by_cu = partition_by_cu unboxed_fields in
   let changed_by_cu = partition_by_cu changed_representation in
-  let code_changes_by_cu = partition_code_changes_by_cu code_changes in
+  let code_changes_by_cu =
+    Unboxing_analysis.partition_code_changes_by_compilation_unit code_changes
+  in
   (* Combine the four partitions into one map over the union of their key sets,
      with empty defaults. *)
   let shard_inputs =
@@ -664,7 +655,8 @@ let save ~filename ~participants
         ( find cu tables_by_cu ~default:Solution_tables.empty,
           find cu unboxed_by_cu ~default:Code_id_or_name.Map.empty,
           find cu changed_by_cu ~default:Code_id_or_name.Map.empty,
-          find cu code_changes_by_cu ~default:Code_id.Map.empty ))
+          find cu code_changes_by_cu
+            ~default:Unboxing_analysis.empty_code_changes ))
       all_units
   in
   let builder =
@@ -762,9 +754,9 @@ let solution_for_members { header; sections } ~members =
      a participant [P], [referenced_by_graph(P)] (its [Header.participants]
      entry) is computed before the solve: the units whose identifiers appear in
      [P]'s code and graph. [section_references(P)] is computed after the solve:
-     the units whose identifiers appear in the facts and calling-convention
-     decisions keyed by [P]. Each fact or decision is stored in the section of
-     the unit that keys it, which is not always the unit whose rebuild reads it.
+     the units whose identifiers appear in the facts and code changes keyed by
+     [P]. Each fact or code change is stored in the section of the unit that
+     keys it, which is not always the unit whose rebuild reads it.
 
      The starting points must come from [referenced_by_graph] because the
      rebuild queries the solution directly about identifiers in the member's own
@@ -841,12 +833,13 @@ let solution_for_members { header; sections } ~members =
             Code_id_or_name.Map.disjoint_union unboxed_fields shard_unboxed,
             Code_id_or_name.Map.disjoint_union changed_representation
               shard_changed,
-            Code_id.Map.disjoint_union code_changes shard_code_changes,
+            Unboxing_analysis.code_changes_disjoint_union code_changes
+              shard_code_changes,
             cu :: rev_loaded ))
       ( Solution_tables.empty,
         Code_id_or_name.Map.empty,
         Code_id_or_name.Map.empty,
-        Code_id.Map.empty,
+        Unboxing_analysis.empty_code_changes,
         [] )
       header.Header.index
   in

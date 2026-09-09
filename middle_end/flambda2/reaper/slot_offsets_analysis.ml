@@ -44,8 +44,8 @@ module Inputs = struct
 
   let create ~free_names ~closure_function_decls ~code_deps ~get_code_metadata =
     (* [code_info] covers every code ID a function slot can be bound to, so the
-       solve-time computation does not need access to code metadata (which would
-       require loading .cmx files). *)
+       solve-time computation can fall back to traversal metadata without
+       loading .cmx files. *)
     let code_info =
       Code_id_or_name.Map.fold
         (fun _closure_name
@@ -174,14 +174,8 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
             PTA.field_used db closure_name Field.known_arity_call_witness
             || PTA.field_used db closure_name Field.unknown_arity_call_witness
           then
-            (* CR sspies: [Rebuild.rewrite_set_of_closures] gates this on
-               [Current_unit.is_current] rather than
-               [is_local_compilation_unit]. For a single-unit run these agree.
-               For LTO they would disagree for closures whose code lives in
-               another participant, but calling convention changes are currently
-               disabled under LTO, so [code_changes] is empty there. If they are
-               re-enabled for LTO, the rebuild-side check must be changed to
-               participant membership to keep the two in sync. *)
+            (* Only participating units can change calling convention. Use the
+               solved decision, not eligibility, to detect a change. *)
             let changed_calling_convention =
               is_local_compilation_unit (Code_id.get_compilation_unit code_id)
               &&
@@ -276,12 +270,18 @@ let compute ~(inputs : Inputs.t) ~is_local_compilation_unit ~code_changes
     ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   let { Inputs.free_names; closure_function_decls; code_info } = inputs in
-  let get_code_info code_id =
-    match Code_id.Map.find_opt code_id code_info with
-    | Some info -> info
-    | None ->
-      Misc.fatal_errorf "No code info was recorded for code ID %a" Code_id.print
-        code_id
+  let get_code_info code_id : Inputs.code_info =
+    match Unboxing_analysis.find_code_metadata code_changes code_id with
+    | Some code_metadata ->
+      { function_slot_size = Code_metadata.function_slot_size code_metadata;
+        dbg = Code_metadata.dbg code_metadata
+      }
+    | None -> (
+      match Code_id.Map.find_opt code_id code_info with
+      | Some info -> info
+      | None ->
+        Misc.fatal_errorf "No code info was recorded for code ID %a"
+          Code_id.print code_id)
   in
   (* The query gives us the name of every closure, but we want one entry per set
      of closures. [seen_closure_names] tracks the closures of the sets already
@@ -371,9 +371,6 @@ let compute ~(inputs : Inputs.t) ~is_local_compilation_unit ~code_changes
           built_value_slots
     }
   in
-  (* CR mvellacott: this uses the pre-reaper metadata, but function slots can be
-     shrunk by untupling. Once we pre-compute code metadata too, we should use
-     it here. *)
   let get_function_slot_size code_id =
     let ({ function_slot_size; dbg = _ } : Inputs.code_info) =
       get_code_info code_id

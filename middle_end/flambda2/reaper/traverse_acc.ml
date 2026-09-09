@@ -26,7 +26,7 @@ module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
-    result_arity : [`Unarized] Flambda_arity.t;
+    code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
@@ -560,7 +560,7 @@ let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
 
 let ids_for_export_code_dep
     { arity = _;
-      result_arity = _;
+      code_metadata;
       function_slot_size = _;
       params;
       my_closure;
@@ -574,6 +574,9 @@ let ids_for_export_code_dep
     Variable.Set.of_list (List.concat [params; return; [my_closure; exn]])
   in
   let ids = Ids_for_export.create ~variables () in
+  let ids =
+    Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+  in
   let ids = Ids_for_export.add_code_id_or_name ids known_arity_call_witness in
   List.fold_left Ids_for_export.add_code_id_or_name ids
     unknown_arity_call_witnesses
@@ -587,7 +590,7 @@ let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
 
 let apply_renaming_code_dep
     { arity;
-      result_arity;
+      code_metadata;
       function_slot_size;
       params;
       my_closure;
@@ -598,7 +601,7 @@ let apply_renaming_code_dep
       unknown_arity_call_witnesses
     } renaming =
   { arity;
-    result_arity;
+    code_metadata = Code_metadata.apply_renaming code_metadata renaming;
     function_slot_size;
     params = List.map (Renaming.apply_variable renaming) params;
     my_closure = Renaming.apply_variable renaming my_closure;

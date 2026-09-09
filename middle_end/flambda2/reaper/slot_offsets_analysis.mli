@@ -27,8 +27,7 @@
 
 (** The per-compilation-unit inputs to [compute]. They are recorded at traverse
     time (and, for LTO, serialised into the .cmr file) so that the solve-time
-    computation does not need access to code metadata, which would require
-    loading .cmx files. *)
+    computation does not need to load .cmx files for external code. *)
 module Inputs : sig
   (** The code metadata needed when laying out function slots. *)
   type code_info =
@@ -71,9 +70,10 @@ end
     rewriting. This runs at solve time: for LTO, [inputs] is the union of the
     participating units' inputs and [is_local_compilation_unit] is membership of
     the set of participants, so that one consistent assignment of offsets is
-    computed for the whole program. [code_changes] are the calling convention
-    changes computed from the solution, which determine whether a function slot
-    may be partially applied. *)
+    computed for the whole program. [code_changes] supplies solved calling
+    convention changes and metadata, determining whether a function slot may be
+    partially applied and its size. Solved metadata is preferred over the
+    traversal-time info in [inputs]. *)
 val compute :
   inputs:Inputs.t ->
   is_local_compilation_unit:(Compilation_unit.t -> bool) ->

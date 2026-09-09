@@ -367,7 +367,8 @@ module Rewriter = struct
               Field.print field
           | Some field_use, Some unboxed_fields ->
             Some (field_use, unboxed_fields))
-        fields unboxed_fields
+        fields
+        (Unboxed_fields.to_map unboxed_fields)
     in
     let forget unboxed_fields =
       Unboxed_fields.map_u (fun x -> None, x) unboxed_fields
@@ -409,6 +410,12 @@ module Rewriter = struct
             in
             Unboxed_fields.Unboxed vars, patterns))
     in
+    let[@local] finish vars pattern =
+      ( Unboxed_fields.mapi_fields
+          (fun field _ -> Field.Map.find field vars)
+          unboxed_fields,
+        pattern )
+    in
     let[@local] closure value_slots =
       let value_slots = Value_slot.Map.bindings value_slots in
       let vars, pats =
@@ -424,14 +431,17 @@ module Rewriter = struct
         | None -> pats
         | Some p -> p @ pats
       in
-      vars, Pattern.closure pats
+      finish vars (Pattern.closure pats)
     in
     match classify_field_map combined with
     | Empty when Option.is_some patterns_for_function_slots ->
       closure Value_slot.Map.empty
     | Empty | Fields_from_distinct_subkinds ->
-      ( Field.Map.map (fun (_, unboxed_fields) -> forget unboxed_fields) combined,
-        Pattern.any )
+      finish
+        (Field.Map.map
+           (fun (_, unboxed_fields) -> forget unboxed_fields)
+           combined)
+        Pattern.any
     | Boxed_number_field (bn, use) ->
       if Option.is_some patterns_for_function_slots
       then
@@ -440,7 +450,7 @@ module Rewriter = struct
            function slots";
       let field = Field.boxed_number bn in
       let vars, pat = for_one_use field use in
-      Field.Map.singleton field vars, Pattern.boxed_number bn pat
+      finish (Field.Map.singleton field vars) (Pattern.boxed_number bn pat)
     | Block_fields { is_int; get_tag; fields } ->
       if Option.is_some patterns_for_function_slots
       then
@@ -479,7 +489,7 @@ module Rewriter = struct
                    kind pat
                  :: !pats)
         fields;
-      !acc, Pattern.block !pats
+      finish !acc (Pattern.block !pats)
     | Closure_fields (value_slots, function_slots) ->
       assert (Function_slot.Map.is_empty function_slots);
       closure value_slots

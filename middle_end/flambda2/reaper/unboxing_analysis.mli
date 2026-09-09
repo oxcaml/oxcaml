@@ -14,11 +14,27 @@
 (**************************************************************************)
 
 module Unboxed_fields : sig
+  type 'a t
+
   type 'a u =
     | Not_unboxed of 'a
     | Unboxed of 'a t
 
-  and 'a t = 'a u Field.Map.t
+  (** Fixes the traversal order, which is preserved by mapping and renaming. *)
+  val of_map : 'a u Field.Map.t -> 'a t
+
+  val to_map : 'a t -> 'a u Field.Map.t
+
+  val find : Field.t -> 'a t -> 'a u
+
+  val is_empty : 'a t -> bool
+
+  val keys : 'a t -> Field.Set.t
+
+  val fold : (Field.t -> 'a u -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  (** Map the immediate fields without changing their order. *)
+  val mapi_fields : (Field.t -> 'a u -> 'b u) -> 'a t -> 'b t
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
@@ -56,6 +72,8 @@ type param_decision =
   | Delete
   | Unbox of Variable.t Unboxed_fields.t
 
+val arity_of_decisions : param_decision list -> [`Complex] Flambda_arity.t
+
 type my_closure_param_decision =
   | Keep_my_closure
   | Unbox_my_closure of Variable.t Unboxed_fields.t
@@ -77,10 +95,25 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
-type code_changes = calling_convention_change Code_id.Map.t
+(** Calling-convention changes and metadata with unknown result types. *)
+type code_changes
 
 val get_calling_convention_change :
   code_changes -> Code_id.t -> calling_convention_change
+
+(* Should only be called on code_ids from the current unit. *)
+val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
+
+(** Like [get_code_metadata], but returns [None] for code ids without an entry
+    (in particular those of units that did not participate in the solve). *)
+val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
+
+val empty_code_changes : code_changes
+
+val code_changes_disjoint_union : code_changes -> code_changes -> code_changes
+
+val partition_code_changes_by_compilation_unit :
+  code_changes -> code_changes Compilation_unit.Map.t
 
 val code_changes_ids_for_export :
   code_changes -> Ids_for_export.t -> Ids_for_export.t
@@ -126,11 +159,22 @@ val changed_representation_apply_renaming :
 val cannot_change_calling_convention_table :
   Datalog_helpers.Serialisation.N.table
 
+(** [is_local_compilation_unit] must be membership of the set of units whose
+    code the current Reaper run may rewrite: the current unit for a single-unit
+    run, and the set of participants for an LTO solve. Calling conventions of
+    code outside this set can never be changed. *)
+val cannot_change_calling_convention :
+  is_local_compilation_unit:(Compilation_unit.t -> bool) ->
+  result ->
+  Code_id.t ->
+  bool
+
 val perform_analysis :
   Datalog.database -> stats:Datalog.Schedule.stats -> result
 
 val compute_code_changes :
   result ->
+  is_local_compilation_unit:(Compilation_unit.t -> bool) ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->

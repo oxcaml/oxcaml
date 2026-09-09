@@ -264,7 +264,7 @@ let flambda_to_flambda0 : type m.
           in
           result, "reaper", None
         | Lto_support ->
-          let deps, slot_offsets_inputs, rebuild_data =
+          let deps, slot_offsets_inputs, code_changes_inputs, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
               ~all_code flambda
           in
@@ -277,6 +277,7 @@ let flambda_to_flambda0 : type m.
                 imported_offsets = Exported_offsets.imported_offsets ();
                 deps;
                 slot_offsets_inputs;
+                code_changes_inputs;
                 rebuild_data
               }
           in
@@ -450,22 +451,24 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
         participant, Flambda2_reaper.Global_flow_graph.compilation_units graph)
       solve_data
   in
-  let combined_graph, code_deps =
+  let combined_graph =
     List.fold_left
-      (fun (combined, code_deps) (_participant, (graph, unit_code_deps, _, _))
-         ->
-        ( Flambda2_reaper.Global_flow_graph.union combined graph,
-          Flambda2_identifiers.Code_id.Map.disjoint_union code_deps
-            unit_code_deps ))
-      ( Flambda2_reaper.Global_flow_graph.create (),
-        Flambda2_identifiers.Code_id.Map.empty )
+      (fun combined (_participant, (graph, _, _, _)) ->
+        Flambda2_reaper.Global_flow_graph.union combined graph)
+      (Flambda2_reaper.Global_flow_graph.create ())
       solve_data
   in
   let slot_offsets_inputs =
     List.fold_left
-      (fun combined (_participant, (_, _, inputs, _)) ->
+      (fun combined (_participant, (_, inputs, _, _)) ->
         Flambda2_reaper.Slot_offsets_analysis.Inputs.union combined inputs)
       Flambda2_reaper.Slot_offsets_analysis.Inputs.empty solve_data
+  in
+  let code_changes_inputs =
+    List.map
+      (fun (_participant, (_, _, _, code_changes_inputs)) ->
+        code_changes_inputs)
+      solve_data
   in
   let participant_units =
     Compilation_unit.Set.of_list (List.map fst participants)
@@ -476,14 +479,15 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
      are recomputed from the solution, so the stale ones stored in the .cmr
      files must not be imported. *)
   List.iter
-    (fun (_participant, (_, _, _, imported_offsets)) ->
+    (fun (_participant, (_, _, imported_offsets, _)) ->
       Exported_offsets.import_offsets
         (Exported_offsets.filter_by_compilation_unit imported_offsets
            ~keep:(fun cu -> not (is_participant cu))))
     solve_data;
   let solution, slot_offsets =
     Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs
-      ~is_local_compilation_unit:is_participant combined_graph ~code_deps
+      ~is_local_compilation_unit:is_participant ~code_changes_inputs
+      combined_graph
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution ~slot_offsets
@@ -516,6 +520,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
         imported_offsets;
         deps = _;
         slot_offsets_inputs = _;
+        code_changes_inputs;
         rebuild_data
       } =
     Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
@@ -546,8 +551,12 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   in
   let flambda, all_code, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-      ~traverse_rebuild:rebuild_data ~solution ~machine_width ~cmx_loader
-      ~all_code ~final_typing_env
+      ~traverse_rebuild:rebuild_data ~solution ~code_deps_for_result_types:None
+      ~all_sets_of_closures:
+        code_changes_inputs
+          .Flambda2_reaper.Reaper.Staged.Code_changes_inputs
+           .all_sets_of_closures
+      ~machine_width ~cmx_loader ~all_code ~final_typing_env
   in
   let { unit = flambda;
         exported_offsets = offsets;
