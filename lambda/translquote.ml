@@ -3660,7 +3660,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       in
       let base =
         Option.map
-          (fun (e, _, _) -> quote_expression ~scopes ~transl stage e)
+          (fun (e, _, _, _) -> quote_expression ~scopes ~transl stage e)
           extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base

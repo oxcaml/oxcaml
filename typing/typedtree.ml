@@ -348,7 +348,9 @@ and expression_desc =
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
-      extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
+      extended_expression :
+        (expression * Jkind.sort * Types.record_representation
+         * Unique_barrier.t) option;
       alloc_mode : alloc_mode_r option
     }
   | Texp_record_unboxed_product of {
