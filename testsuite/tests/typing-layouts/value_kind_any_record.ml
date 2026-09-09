@@ -110,11 +110,11 @@ type ('a : any) mutable_record = { mutable field : 'a }
 type ('a : any) mutable_record = { mutable field : 'a; }
 |}]
 
-let mutable_record (r : int mutable_record) = r
+let mutable_record (r : float# mutable_record) = r
 [%%expect{|
 (let (mutable_record = (function {nlocal = 0} r r))
   (apply (field_imm 1 (global Toploop!)) "mutable_record" mutable_record))
-val mutable_record : int mutable_record -> int mutable_record = <fun>
+val mutable_record : float# mutable_record -> float# mutable_record = <fun>
 |}]
 
 type ('a : any) inline = A | B of { x : 'a; y : int }
@@ -123,16 +123,21 @@ type ('a : any) inline = A | B of { x : 'a; y : int }
 type ('a : any) inline = A | B of { x : 'a; y : int; }
 |}]
 
-let inline (r : float# inline) =
-  match r with
-  | A -> 0
-  | B r -> r.y
+(* This match makes it so [r]'s lambda expression isn't equivalent to either
+   [v] or [w]'s, so we can see its value kind in the simplified lambda. *)
+let either (v : float# inline) (w : float# inline) =
+  match v, w with
+  | B r, _ | _, B r -> r.y
+  | A, A -> 0
 [%%expect{|
 (let
-  (inline =
+  (either =
      (function {nlocal = 0}
-       r[value<(consts (0)) (non_consts ([0: float64, value<int>]))>] : int
-       (if r (mixedfield 1  (float64,value<int>) r) 0)))
-  (apply (field_imm 1 (global Toploop!)) "inline" inline))
-val inline : float# inline -> int = <fun>
+       v[value<(consts (0)) (non_consts ([0: float64, value<int>]))>]
+       w[value<(consts (0)) (non_consts ([0: float64, value<int>]))>] : int
+       (catch (if v (exit 11 v) (if w (exit 11 w) 0))
+        with (11 r[value<(consts ()) (non_consts ([0: float64, value<int>]))>])
+         (mixedfield 1  (float64,value<int>) r))))
+  (apply (field_imm 1 (global Toploop!)) "either" either))
+val either : float# inline -> float# inline -> int = <fun>
 |}]

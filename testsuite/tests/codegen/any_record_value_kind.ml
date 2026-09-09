@@ -23,7 +23,7 @@ rebuild_float:
 
 (* Keep the array access polymorphic until inlining. *)
 let first (r : int array t) =
-  let[@inline always] first (a : _ array) = Array.unsafe_get a 0 in
+  let[@inline always] first (type a) (a : a array) = Array.unsafe_get a 0 in
   first r.field
 [%%expect_asm X86_64{|
 first:
