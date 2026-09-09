@@ -222,7 +222,7 @@ type primitive =
   | Psetufloatfield of int * initialization_or_assignment
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
@@ -573,6 +573,25 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+and constructor_representation =
+  | Constructor_uniform_value
+  | Constructor_mixed of mixed_block_shape
+
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
@@ -755,9 +774,9 @@ and equal_value_kind x y =
 
 and equal_mixed_block_element :
   type p.
-    (p -> p -> bool) -> p mixed_block_element -> p mixed_block_element
-    -> bool =
-  fun eq_param m1 m2 ->
+    (p -> p -> bool) -> equal_value_kind:(value_kind -> value_kind -> bool)
+    -> p mixed_block_element -> p mixed_block_element -> bool =
+  fun eq_param ~equal_value_kind m1 m2 ->
   match m1, m2 with
   | Value v1, Value v2 -> equal_value_kind v1 v2
   | Float_boxed param1, Float_boxed param2 -> eq_param param1 param2
@@ -774,8 +793,8 @@ and equal_mixed_block_element :
   | Word, Word
   | Untagged_immediate, Untagged_immediate -> true
   | Product es1, Product es2 ->
-    Misc.Stdlib.Array.equal (equal_mixed_block_element eq_param)
-      es1 es2
+    Misc.Stdlib.Array.equal
+      (equal_mixed_block_element eq_param ~equal_value_kind) es1 es2
   | Splice_variable id1, Splice_variable id2 -> Slambdaident.equal id1 id2
   | (Value _ | Float_boxed _ | Float64 | Float32
      | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
@@ -783,7 +802,8 @@ and equal_mixed_block_element :
      | Splice_variable _), _ -> false
 
 and equal_mixed_block_shape shape1 shape2 =
-  Misc.Stdlib.Array.equal (equal_mixed_block_element Unit.equal) shape1 shape2
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind) shape1 shape2
 
 and equal_constructor_shape x y =
   match x, y with
@@ -793,6 +813,42 @@ and equal_constructor_shape x y =
   | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
   | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
+
+let equal_mixed_block_shape_up_to_value_kinds shape1 shape2 =
+  Misc.Stdlib.Array.equal
+    (equal_mixed_block_element Unit.equal ~equal_value_kind:(fun _ _ -> true))
+    shape1 shape2
+
+let equal_constructor_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Constructor_uniform_value, Constructor_uniform_value -> true
+  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | (Constructor_uniform_value | Constructor_mixed _), _ -> false
+
+let equal_variant_representation r1 r2 =
+  match r1, r2 with
+  | Variant_unboxed, Variant_unboxed
+  | Variant_boxed, Variant_boxed
+  | Variant_extensible, Variant_extensible
+  | Variant_with_null, Variant_with_null -> true
+  | (Variant_unboxed | Variant_boxed | Variant_extensible | Variant_with_null),
+    _ -> false
+
+let equal_record_representation_up_to_value_kinds r1 r2 =
+  match r1, r2 with
+  | Record_unboxed, Record_unboxed
+  | Record_boxed, Record_boxed
+  | Record_float, Record_float
+  | Record_ufloat, Record_ufloat -> true
+  | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
+      Types.equal_tag tag1 tag2
+      && equal_constructor_representation_up_to_value_kinds cr1 cr2
+      && equal_variant_representation vr1 vr2
+  | Record_mixed shape1, Record_mixed shape2 ->
+      equal_mixed_block_shape_up_to_value_kinds shape1 shape2
+  | (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
+    | Record_ufloat | Record_mixed _), _ -> false
 
 let join_nullable x y =
   match x, y with
@@ -2044,7 +2100,7 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+let rec mixed_block_element_of_types (elt : Types.mixed_block_element) =
   match elt with
   | Scannable { separability; _ } ->
     let raw_kind =
@@ -2059,34 +2115,41 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 ->
-    if split_vectors
-    then Product [|Vec128; Vec128|]
-    else Vec256
+  | Vec256 -> Vec256
   | Vec512 -> Vec512
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
-    Product (transl_mixed_product_shape shapes)
+    Product (mixed_block_shape_of_types shapes)
   | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
-    transl_mixed_block_element elt
+    mixed_block_element_of_types elt
 
-and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
+and mixed_block_shape_of_types shape =
+  Array.map mixed_block_element_of_types shape
 
-let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
-    (elt : Types.mixed_block_element) =
+let rec split_mixed_block_element_vectors elt =
   match elt with
-  | Scannable { separability; _ } ->
-    let raw_kind =
-      value_kind_of_pointerness (pointerness_of_separability separability)
-    in
-    Value { (get_value_kind i) with raw_kind }
-  | Float_boxed -> Float_boxed (get_mode i)
+  | Vec256 when split_vectors -> Product [|Vec128; Vec128|]
+  | Product shape -> Product (split_mixed_block_shape_vectors shape)
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+  | Untagged_immediate | Splice_variable _ -> elt
+
+and split_mixed_block_shape_vectors shape =
+  Array.map split_mixed_block_element_vectors shape
+
+let transl_mixed_product_shape shape =
+  split_mixed_block_shape_vectors (mixed_block_shape_of_types shape)
+
+let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : unit mixed_block_element) =
+  match elt with
+  | Value { raw_kind; _ } -> Value { (get_value_kind i) with raw_kind }
+  | Float_boxed () -> Float_boxed (get_mode i)
   | Float64 -> Float64
   | Float32 -> Float32
   | Bits8 -> Bits8
@@ -2104,18 +2167,15 @@ let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
     let get_value_kind _ = generic_value in
-    Product
-      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-  | Void -> Product [||]
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+    Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Splice_variable id -> Splice_variable id
 
-and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi
-    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
-    shape
+and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (mixed_block_element_for_read ~get_value_kind ~get_mode) shape
+
+let transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  mixed_product_shape_for_read ~get_value_kind ~get_mode
+    (mixed_block_shape_of_types shape)
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->

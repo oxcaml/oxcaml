@@ -2265,23 +2265,21 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Naked_floats
           { length = Target_ocaml_int.of_int machine_width num_fields }
       | Record_inlined
-          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed _)
-        when Mixed_product_bytes.types_shape_is_all_value shape ->
+          (Ordinary { runtime_tag; _ }, Constructor_mixed shape, Variant_boxed)
+        when Mixed_product_bytes.shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
-      | Record_mixed shape
-        when Mixed_product_bytes.types_shape_is_all_value shape ->
+      | Record_mixed shape when Mixed_product_bytes.shape_is_all_value shape ->
         Values
           { tag = Tag.Scannable.zero;
             length = Target_ocaml_int.of_int machine_width num_fields
           }
       | Record_inlined (_, Constructor_mixed _, _) | Record_mixed _ -> Mixed
       | Record_inlined
-          ( Ordinary { runtime_tag; _ },
-            Constructor_uniform_value,
-            Variant_boxed _ ) ->
+          (Ordinary { runtime_tag; _ }, Constructor_uniform_value, Variant_boxed)
+        ->
         Values
           { tag = Tag.Scannable.create_exn runtime_tag;
             length = Target_ocaml_int.of_int machine_width num_fields
@@ -2297,9 +2295,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             }
         | Constructor_mixed _ ->
           (* CR layouts v5.9: support this *)
-          Misc.fatal_error "Mixed blocks extensible variants are not supported"
-        | Constructor_undetermined | Constructor_variable _ ->
-          Misc.fatal_error "convert_lprim: Pduprecord: variable representation")
+          Misc.fatal_error "Mixed blocks extensible variants are not supported")
       | Record_inlined (Extension _, _, _)
       | Record_inlined
           ( Ordinary _,
@@ -2309,12 +2305,6 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Record_inlined (Null, _, _) ->
         Misc.fatal_errorf "Cannot handle record kind for Pduprecord: %a"
           Printlambda.primitive prim
-      | Record_dummy _ ->
-        Misc.fatal_error "convert_lprim: Pduprecord: dummy representation"
-      | Record_undetermined | Record_variable _
-      | Record_inlined
-          (_, (Constructor_undetermined | Constructor_variable _), _) ->
-        Misc.fatal_error "convert_lprim: Pduprecord: variable representation"
     in
     [Unary (Duplicate_block { kind; alloc_region = current_alloc_region }, arg)]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]

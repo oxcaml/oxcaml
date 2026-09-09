@@ -287,8 +287,6 @@ let compute_static_size lam =
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
     else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
   and size_of_primitive env p args =
     match p with
     | Pignore
@@ -335,34 +333,26 @@ let compute_static_size lam =
         begin match repres with
         | Record_boxed
         | Record_inlined (_, Constructor_uniform_value,
-                          (Variant_boxed _ | Variant_extensible)) ->
+                          (Variant_boxed | Variant_extensible)) ->
             Block (Regular_block size)
         | Record_float ->
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed | Variant_extensible))
         | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+            if Mixed_product_bytes.shape_is_all_value shape
             then
               Block (Regular_block
-                (all_value_mixed_block_size_types shape))
+                (all_value_mixed_block_size shape))
             else
               let size =
                 compute_mixed_block_size
-                  (Lambda.transl_mixed_product_shape shape)
+                  (Lambda.split_mixed_block_shape_vectors shape)
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
-        | Record_dummy _ ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected dummy representation"
-        | Record_undetermined | Record_variable _
-        | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _), _) ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (_, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the
