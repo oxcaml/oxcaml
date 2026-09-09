@@ -21,6 +21,7 @@ type t =
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
+    slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -117,7 +118,11 @@ module Serialisable : sig
     cmr_format
 
   val deserialise_for_solve :
-    t -> Global_flow_graph.graph * Traverse_acc.code_dep Code_id.Map.t
+    t ->
+    Global_flow_graph.graph
+    * Traverse_acc.code_dep Code_id.Map.t
+    * Slot_offsets_analysis.Inputs.t
+    * Exported_offsets.t
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -132,6 +137,7 @@ end = struct
       all_code : All_code_with_sections.t;
       imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
+      slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
@@ -141,6 +147,7 @@ end = struct
          all_code;
          imported_offsets;
          deps;
+         slot_offsets_inputs;
          rebuild_data
        } :
         cmr_format) : t =
@@ -180,6 +187,7 @@ end = struct
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
           all_code_ids;
           Global_flow_graph.ids_for_export deps;
+          Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
           Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
@@ -193,6 +201,7 @@ end = struct
       (* Slots not hashconsed so we can store them as is. *)
       imported_offsets;
       deps = Deps_with_fields.create deps;
+      slot_offsets_inputs;
       rebuild_data
     }
 
@@ -205,6 +214,7 @@ end = struct
         all_code;
         imported_offsets;
         deps;
+        slot_offsets_inputs;
         rebuild_data
       } : cmr_format =
     (* Insert hashconsed objects from the paused process into this process'
@@ -232,6 +242,9 @@ end = struct
       |> Exported_code.apply_renaming code_ids renaming
     in
     let deps = Deps_with_fields.deserialise deps renaming in
+    let slot_offsets_inputs =
+      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
+    in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
@@ -240,6 +253,7 @@ end = struct
       all_code;
       imported_offsets;
       deps;
+      slot_offsets_inputs;
       rebuild_data
     }
 
@@ -250,8 +264,9 @@ end = struct
         unit_metadata = _;
         final_typing_env = _;
         all_code = _;
-        imported_offsets = _;
+        imported_offsets;
         deps;
+        slot_offsets_inputs;
         rebuild_data
       } =
     (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
@@ -272,7 +287,11 @@ end = struct
         (Reaper.Staged.Traverse_rebuild.code_deps rebuild_data)
         Code_id.Map.empty
     in
-    deps, code_deps
+    let slot_offsets_inputs =
+      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
+    in
+    (* Slots are not hashconsed, so the offsets need no renaming. *)
+    deps, code_deps, slot_offsets_inputs, imported_offsets
 
   let compilation_unit t = t.original_compilation_unit
 end

@@ -13,6 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let get_code_metadata ~cmx_loader ~all_code =
+  let load_code = Flambda_cmx.get_imported_code cmx_loader in
+  fun code_id ->
+    Code_or_metadata.code_metadata
+      (match Exported_code.find all_code code_id with
+      | Some code -> code
+      | None -> Exported_code.find_exn (load_code ()) code_id)
+
 module Staged = struct
   module Traverse_rebuild = struct
     type t =
@@ -161,7 +169,7 @@ module Staged = struct
       code_changes : Unboxing_analysis.code_changes
     }
 
-  let traverse unit =
+  let traverse ~free_names ~cmx_loader ~all_code unit =
     let Traverse.
           { toplevel_expr;
             code;
@@ -170,9 +178,15 @@ module Staged = struct
             fixed_arity_continuations;
             continuation_info;
             code_deps;
-            all_sets_of_closures
+            all_sets_of_closures;
+            closure_function_decls
           } =
       Traverse.run unit
+    in
+    let slot_offsets_inputs =
+      Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
+        ~code_deps
+        ~get_code_metadata:(get_code_metadata ~cmx_loader ~all_code)
     in
     let rebuild_data =
       { Traverse_rebuild.toplevel_expr;
@@ -184,9 +198,9 @@ module Staged = struct
         all_sets_of_closures
       }
     in
-    deps, rebuild_data
+    deps, slot_offsets_inputs, rebuild_data
 
-  let solve deps ~code_deps =
+  let solve ~slot_offsets_inputs ~is_local_compilation_unit deps ~code_deps =
     let uses =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps)
@@ -203,17 +217,15 @@ module Staged = struct
           (Types_rewriter.rewrite_kind_with_subkind uses)
         ~code_deps
     in
-    { uses; code_changes }
+    let slot_offsets =
+      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs
+        ~is_local_compilation_unit ~code_changes uses
+    in
+    { uses; code_changes }, slot_offsets
 
   let rebuild ~unit_metadata ~traverse_rebuild ~solution:{ uses; code_changes }
       ~machine_width ~cmx_loader ~all_code ~final_typing_env =
-    let load_code = Flambda_cmx.get_imported_code cmx_loader in
-    let get_code_metadata code_id =
-      Code_or_metadata.code_metadata
-        (match Exported_code.find all_code code_id with
-        | Some code -> code
-        | None -> Exported_code.find_exn (load_code ()) code_id)
-    in
+    let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Traverse_rebuild.
           { toplevel_expr;
             code;
@@ -228,8 +240,7 @@ module Staged = struct
     let types_rewrite_context =
       Types_rewriter.prepare_rewrite_context uses all_sets_of_closures
     in
-    let Rebuild.
-          { body; free_names; all_code; code_ids_to_remember; slot_offsets } =
+    let Rebuild.{ body; all_code; code_ids_to_remember } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
         ~fixed_arity_continuations ~continuation_info ~final_typing_env
         ~types_rewrite_context ~code_changes uses get_code_metadata
@@ -249,19 +260,23 @@ module Staged = struct
         final_typing_env
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
-      free_names,
       all_code,
-      slot_offsets,
       final_typing_env )
 end
 
-let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
+let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
-  let deps, traverse_rebuild = Staged.traverse unit in
-  let solution =
-    Staged.solve deps
+  let deps, slot_offsets_inputs, traverse_rebuild =
+    Staged.traverse ~free_names ~cmx_loader ~all_code unit
+  in
+  let solution, slot_offsets =
+    Staged.solve ~slot_offsets_inputs
+      ~is_local_compilation_unit:Current_unit.is_current deps
       ~code_deps:(Staged.Traverse_rebuild.code_deps traverse_rebuild)
   in
   let unit_metadata = Flambda_unit.metadata unit in
-  Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution ~machine_width
-    ~cmx_loader ~all_code ~final_typing_env
+  let flambda, all_code, final_typing_env =
+    Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution ~machine_width
+      ~cmx_loader ~all_code ~final_typing_env
+  in
+  flambda, all_code, slot_offsets, final_typing_env

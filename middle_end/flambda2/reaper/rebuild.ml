@@ -67,8 +67,7 @@ type env =
   }
 
 type rebuild_result =
-  { all_slot_offsets : Slot_offsets.t;
-    all_code : Code.t Code_id.Map.t;
+  { all_code : Code.t Code_id.Map.t;
     code_ids_to_remember : Code_id.Set.t
   }
 
@@ -386,7 +385,7 @@ let rewrite_simple_with_debuginfo env (simple : Simple.With_debuginfo.t) =
 let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
-let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
+let rewrite_set_of_closures env res ~(bound : Name.t list)
     ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
@@ -561,15 +560,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
   let set_of_closures = Set_of_closures.create ~value_slots function_decls in
-  let res =
-    { res with
-      all_slot_offsets =
-        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-          set_of_closures;
-      code_ids_to_remember
-    }
-  in
-  set_of_closures, res
+  set_of_closures, { res with code_ids_to_remember }
 
 let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   match sc with
@@ -1789,11 +1780,8 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
        of the set of closures has changed *)
     let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
     let bound_pattern = Bound_pattern.set_of_closures bvs in
-    let is_phantom =
-      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
-    in
     let set_of_closures, res =
-      rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
+      rewrite_set_of_closures env res ~bound set_of_closures
     in
     let size_of_defining_expr =
       Cost_metrics.size
@@ -2415,7 +2403,6 @@ and rebuild_static_const_or_code env res
     let bound_to = List.map Name.symbol bound_to in
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound:bound_to set_of_closures
-        ~is_phantom:false
     in
     let static_const_or_code =
       SC.set_of_closures set_of_closures
@@ -2434,10 +2421,8 @@ and rebuild_static_const_or_code env res
 
 type result =
   { body : Expr.t;
-    free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t;
-    slot_offsets : Slot_offsets.t
+    code_ids_to_remember : Code_id.Set.t
   }
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
@@ -2499,12 +2484,9 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     }
   in
   let res =
-    { all_slot_offsets = Slot_offsets.empty;
-      all_code = Code_id.Map.empty;
-      code_ids_to_remember = Code_id.Set.empty
-    }
+    { all_code = Code_id.Map.empty; code_ids_to_remember = Code_id.Set.empty }
   in
-  let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
+  let rebuilt_expr, ({ all_code; code_ids_to_remember } : rebuild_result) =
     Profile.record_call ~accumulate:true "up" (fun () ->
         let res =
           Array.fold_left
@@ -2515,9 +2497,4 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         in
         rebuild_expr env res toplevel_expr)
   in
-  { body = rebuilt_expr.expr;
-    free_names = rebuilt_expr.free_names;
-    all_code;
-    code_ids_to_remember;
-    slot_offsets = all_slot_offsets
-  }
+  { body = rebuilt_expr.expr; all_code; code_ids_to_remember }

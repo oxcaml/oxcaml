@@ -22,6 +22,7 @@ type t =
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
+    slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -40,10 +41,16 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  (** Like [deserialise], but only deserialises what the solve needs (including
-      the hashcons restore and rename process). *)
+  (** Like [deserialise], but only deserialises what the solve invocation needs:
+      the dependency graph, the code dependencies and the slot offsets inputs
+      (including the hashcons restore and rename process), together with the
+      stored imported offsets. *)
   val deserialise_for_solve :
-    t -> Global_flow_graph.graph * Traverse_acc.code_dep Code_id.Map.t
+    t ->
+    Global_flow_graph.graph
+    * Traverse_acc.code_dep Code_id.Map.t
+    * Slot_offsets_analysis.Inputs.t
+    * Exported_offsets.t
 
   (** Get the unit that was being compiled when the file was saved. This is a
       pure projection. *)

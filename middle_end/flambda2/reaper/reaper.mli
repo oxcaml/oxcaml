@@ -33,14 +33,32 @@ module Staged : sig
       code_changes : Unboxing_analysis.code_changes
     }
 
-  (** Traverse the compilation unit in preparation for Reaper analysis. *)
-  val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t
+  (** Traverse the compilation unit in preparation for Reaper analysis.
+      [free_names] are the free names of the whole compilation unit as output by
+      simplify. Returns the dependency graph, the unit's inputs to the
+      solve-time slot offsets computation, and the data needed to rebuild the
+      unit. *)
+  val traverse :
+    free_names:Name_occurrences.t ->
+    cmx_loader:Flambda_cmx.loader ->
+    all_code:Exported_code.t ->
+    Flambda_unit.t ->
+    Global_flow_graph.graph
+    * Slot_offsets_analysis.Inputs.t
+    * Traverse_rebuild.t
 
-  (** Run Reaper analysis for a compilation unit producing a Reaper solution. *)
+  (** Run Reaper analysis producing a Reaper solution, together with the slot
+      offsets of the sets of closures that will be built after rewriting. For
+      LTO, the graph, code dependencies and slot offsets inputs are the unions
+      of those of all participating units, and [is_local_compilation_unit] is
+      membership of the set of participants, so that one consistent assignment
+      of offsets is computed for the whole program. *)
   val solve :
+    slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
+    is_local_compilation_unit:(Compilation_unit.t -> bool) ->
     Global_flow_graph.graph ->
     code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    solution
+    solution * Slot_offsets.result
 
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
       with dead code removed. *)
@@ -52,11 +70,7 @@ module Staged : sig
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
     final_typing_env:Typing_env.t option ->
-    Flambda_unit.t
-    * Name_occurrences.t
-    * Exported_code.t
-    * Slot_offsets.t
-    * Typing_env.t option
+    Flambda_unit.t * Exported_code.t * Typing_env.t option
 end
 
 val run :
@@ -64,9 +78,6 @@ val run :
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
   final_typing_env:Typing_env.t option ->
+  free_names:Name_occurrences.t ->
   Flambda_unit.t ->
-  Flambda_unit.t
-  * Name_occurrences.t
-  * Exported_code.t
-  * Slot_offsets.t
-  * Typing_env.t option
+  Flambda_unit.t * Exported_code.t * Slot_offsets.result * Typing_env.t option
