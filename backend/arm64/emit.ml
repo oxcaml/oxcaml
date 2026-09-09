@@ -1466,6 +1466,9 @@ let emit_instr env i =
       | Iindexed v -> Validated_mem_offset.offset v = 0
       | Ibased _ -> false);
     let mem = H.mem (H.gp_reg_of_reg i.arg.(1)) in
+    (* Order preceding non-atomic loads before this release store. See Note [MM]
+       in runtime/memory.c. *)
+    A.ins0 (DMB ISHLD);
     match size with
     | Word | Sixtyfour -> A.ins2 STLR (H.reg_x i.arg.(0)) mem
     | Thirtytwo -> A.ins2 STLR (H.reg_w i.arg.(0)) mem)
@@ -1609,17 +1612,14 @@ let emit_instr env i =
     | Word_int | Word_val -> (
       match atomic with
       | None -> A.ins2 LDR (H.reg_x dst) addressing
-      | Some memory_order ->
+      | Some (Seq_cst | Acquire) ->
         assert (
           match addressing_mode with
           | Iindexed v -> Validated_mem_offset.offset v = 0
           | Ibased _ -> false);
-        (match memory_order with
-        | Seq_cst ->
-          (* memory model barrier: order preceding non-atomic loads before this
-             atomic load *)
-          A.ins0 (DMB ISHLD)
-        | Acquire -> ());
+        (* Order preceding non-atomic loads before this atomic load, even for
+           acquire loads. See Note [MM] in runtime/memory.c. *)
+        A.ins0 (DMB ISHLD);
         A.ins2 LDAR (H.reg_x dst) (H.mem (H.gp_reg_of_reg i.arg.(0))))
     | Double -> A.ins2 LDR_simd_and_fp (H.reg_d dst) addressing
     | Single { reg = Float32 } ->
