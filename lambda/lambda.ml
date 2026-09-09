@@ -2706,6 +2706,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts: this should support [Const_mixed_block] once there is
+         proper support for mixed tupled applications *)
       | _ -> None
       end
 
