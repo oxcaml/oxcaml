@@ -206,3 +206,27 @@ type ('a : bits8) c2 : value mod portable with 'a
 [%%expect{|
 type ('a : bits8) c2 : value mod portable with 'a
 |}]
+
+(* Values are actually treated as having a kind that's [mod external_] *)
+
+module M : sig
+  type 'a f : float64 with 'a
+  val mk : unit -> string f
+end = struct
+  type 'a f = #{ x : float# }
+  let mk () = #{ x = #1. }
+end
+let use_external (type (a : float64 mod external_)) (_ : a) = ()
+let ok_value = use_external (M.mk ())
+[%%expect{|
+module M : sig type 'a f : float64 with 'a val mk : unit -> string f end
+val use_external : ('a : float64). 'a -> unit = <fun>
+val ok_value : unit = ()
+|}]
+
+let ok_value_infer y =
+  use_external y;
+  (y : string M.f)
+[%%expect{|
+val ok_value_infer : string M.f -> string M.f = <fun>
+|}]
