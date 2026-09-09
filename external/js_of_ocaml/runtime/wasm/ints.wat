@@ -19,6 +19,7 @@
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
    (import "fail" "caml_invalid_argument"
       (func $caml_invalid_argument (param (ref eq))))
+   (import "fail" "caml_raise_zero_divide" (func $caml_raise_zero_divide))
 
    (@if $portable-int
    (@then
@@ -276,6 +277,44 @@
             (i32.shl (i32.and (local.get $x) (i32.const 0xFF)) (i32.const 8))
             (i32.and
                (i32.shr_u (local.get $x) (i32.const 8)) (i32.const 0xFF)))))
+
+   (func (export "caml_int_unsigned_div") (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (local $x i64)
+      (local $y i64)
+      (local $x32 i32)
+      (local $y32 i32)
+      (@if $portable-int
+      (@then
+        (local.set $x (call $portable_int_val (local.get 0)))
+        (local.set $x (i64.shr_u (i64.shl (local.get $x) (i64.const 1)) (i64.const 1)))
+        (local.set $y (call $portable_int_val (local.get 1)))
+        (local.set $y (i64.shr_u (i64.shl (local.get $y) (i64.const 1)) (i64.const 1)))
+        (if (i64.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+        (return_call $val_portable_int (i64.div_u (local.get $x) (local.get $y))))
+      (@else
+        (local.set $x32 (i31.get_u (ref.cast (ref i31) (local.get 0))))
+        (local.set $y32 (i31.get_u (ref.cast (ref i31) (local.get 1))))
+        (if (i32.eqz (local.get $y32)) (then (call $caml_raise_zero_divide)))
+        (ref.i31 (i32.div_u (local.get $x32) (local.get $y32))))))
+
+   (func (export "caml_int_unsigned_mod") (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (local $x i64)
+      (local $y i64)
+      (local $x32 i32)
+      (local $y32 i32)
+      (@if $portable-int
+      (@then
+        (local.set $x (call $portable_int_val (local.get 0)))
+        (local.set $x (i64.shr_u (i64.shl (local.get $x) (i64.const 1)) (i64.const 1)))
+        (local.set $y (call $portable_int_val (local.get 1)))
+        (local.set $y (i64.shr_u (i64.shl (local.get $y) (i64.const 1)) (i64.const 1)))
+        (if (i64.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+        (return_call $val_portable_int (i64.rem_u (local.get $x) (local.get $y))))
+      (@else
+        (local.set $x32 (i31.get_u (ref.cast (ref i31) (local.get 0))))
+        (local.set $y32 (i31.get_u (ref.cast (ref i31) (local.get 1))))
+        (if (i32.eqz (local.get $y32)) (then (call $caml_raise_zero_divide)))
+        (ref.i31 (i32.rem_u (local.get $x32) (local.get $y32))))))
 
    (type $chars (array i8))
 
