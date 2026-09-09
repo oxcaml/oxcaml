@@ -356,6 +356,10 @@ open! Relations
    the compilation unit), or a given constructor. *)
 
 module Datalog_schedule = struct
+  let in_scope ~analysis_scope node =
+    Analysis_scope.contains_unit analysis_scope
+      (Code_id_or_name.compilation_unit node)
+
   (* Group rules by priority. Rules with (let$) are executed first, then the
      rules with (let$$) are executed. *)
   let with_priority p x f = p, ( let$ ) x f
@@ -492,7 +496,10 @@ module Datalog_schedule = struct
     ]
 
   let any_source_rules ~analysis_scope =
-    [ (let$ [x] = ["x"] in
+    [ (let$ [symbol] = ["symbol"] in
+       [imported_symbol symbol; unless1 (in_scope ~analysis_scope) symbol]
+       ==> any_source symbol);
+      (let$ [x] = ["x"] in
        [zero_alloc_source x] ==> any_source x);
       (let$ [from; to_] = ["from"; "to_"] in
        [rev_alias ~from ~to_; any_source from] ==> any_source to_);

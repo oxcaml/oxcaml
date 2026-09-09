@@ -97,6 +97,8 @@ module Relations : sig
     from:Code_id_or_name.t term ->
     _ atom
 
+  val imported_symbol : Code_id_or_name.t term -> _ atom
+
   val any_usage : Code_id_or_name.t term -> _ atom
 
   val any_source : Code_id_or_name.t term -> _ atom
@@ -148,6 +150,8 @@ val add_alias_if_any_source_dep :
   to_:Code_id_or_name.t ->
   from:Code_id_or_name.t ->
   unit
+
+val add_imported_symbol : graph -> Symbol.t -> unit
 
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 

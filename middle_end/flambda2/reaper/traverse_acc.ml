@@ -92,7 +92,7 @@ let simple_to_node t ~all_constants simple =
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
       if not (Current_unit.is_current (Symbol.compilation_unit s))
-      then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
+      then Graph.add_imported_symbol t.deps s;
       Code_id_or_name.symbol s)
 
 let add_code_dep t code_id dep =
