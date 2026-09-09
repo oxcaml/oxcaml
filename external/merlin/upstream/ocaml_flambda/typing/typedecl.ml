@@ -1879,7 +1879,7 @@ let eagerly_check_record_not_all_void loc sorts =
 (* [update_label_sorts] returns the labels with their [ld_sort]s updated,
    each paired with its jkind. *)
 let update_label_sorts (type rep) env loc lbls ~(form : rep record_form) =
-  let sorts_and_lbls_and_jkinds =
+  let live_sorts, lbls_and_jkinds =
     List.map (fun (lbl : Types.label_declaration) ->
       let jkind = Ctype.type_jkind env lbl.ld_type in
       let sort = Jkind.sort_option_of_jkind env jkind in
@@ -1899,9 +1899,8 @@ let update_label_sorts (type rep) env loc lbls ~(form : rep record_form) =
         Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
       in
       sort, ({ lbl with ld_sort }, jkind)
-    ) lbls
+    ) lbls |> List.split
   in
-  let live_sorts, lbls_and_jkinds = List.split sorts_and_lbls_and_jkinds in
   (match form with
    | Legacy -> eagerly_check_record_not_all_void loc live_sorts
    | Unboxed_product -> ());
@@ -1933,8 +1932,9 @@ let update_constructor_arguments_sorts env loc cd_args =
     (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args)
       |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
-    let lbls_and_jkinds = update_label_sorts env loc lbls ~form:Legacy in
-    let lbls, jkinds = List.split lbls_and_jkinds in
+    let lbls, jkinds =
+      update_label_sorts env loc lbls ~form:Legacy |> List.split
+    in
     Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
 
 let assert_mixed_product_support =
