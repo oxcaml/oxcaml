@@ -9497,7 +9497,7 @@ and type_function
         with exn when !Clflags.typing_recovery
                    && Typing_recovery.is_recoverable exn ->
             Typing_recovery.erroneous_type_register ty_expected
-     end;
+      end;
       { function_ = exp_type, params, body;
         params_contain_gadt = contains_gadt; newtypes = newtype :: newtypes;
         fun_alloc_mode; ret_info;
