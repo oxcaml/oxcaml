@@ -143,7 +143,7 @@ val mixed_block_element :
 (* Does not default sorts or check whether the block can be constructed. *)
 val compute_block_shape :
     Env.t -> type_expr list ->
-    [ `Not_mixed | `Mixed of mixed_product_shape ] option
+    [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
 type native_repr_kind = Unboxed | Untagged | Unpacked
 
