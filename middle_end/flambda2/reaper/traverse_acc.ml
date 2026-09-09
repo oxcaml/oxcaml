@@ -214,9 +214,7 @@ let add_external_apply t ~participant_call ~(denv : Env.t) ~code_id ~witness
          external_call = witness;
          external_closure = Option.map to_node closure;
          external_world = Code_id_or_name.name (Env.le_monde_exterieur denv)
-       });
-  add_cond_any_source t ~denv witness;
-  Option.iter (add_cond_any_usage t ~denv) closure
+       })
 
 let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
@@ -510,9 +508,6 @@ let record_set_of_closures_deps_one_closure t
   match find_code_dep t code_id with
   | None ->
     assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit, so we don't know what
-       happens once it is applied. As such, it must cause the whole block to
-       escape. *)
     let witness =
       Code_id_or_name.var
         (Variable.create
@@ -520,13 +515,7 @@ let record_set_of_closures_deps_one_closure t
            K.value)
     in
     add_code_reference t
-      (Closure { closure = name; code_id; external_witness = witness });
-    add_any_source t witness;
-    add_constructor_dep t ~from:witness Field.known_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
+      (Closure { closure = name; code_id; external_witness = witness })
   | Some code_dep -> connect_closure t.deps ~closure:name ~code_id code_dep
 
 let record_set_of_closures_deps t =

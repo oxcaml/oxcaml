@@ -65,7 +65,7 @@ module Staged : sig
     * Traverse_rebuild.t
 
   (** Analyse the combined dependency graph and compute rewriting decisions and
-      slot offsets. *)
+      slot offsets. Mutates the graph by linking code references. *)
   val solve :
     slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
     analysis_scope:Analysis.Scope.t ->
