@@ -171,9 +171,6 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 
-(* CR zeisbach: there are already lots of fatal errors in this file; my change
-   just introduces one more. I should check to see if this is the appropriate
-    thing to do, but I would imagine it is fine? *)
 (* Calling the function multiple times at different layouts *)
 module H (M : sig
   val id : layout_ x. ('a : x). 'a -> 'a

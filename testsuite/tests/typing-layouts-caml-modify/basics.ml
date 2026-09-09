@@ -733,3 +733,13 @@ let () =
   let t = { x = #("s", U 1) } in
   test ~expect_caml_modifies:1
     (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))
+
+(* Projecting an immediate component out of a mixed tuple and storing it *)
+let () =
+  let open struct
+    type holder = { mutable i : int }
+  end in
+  let[@inline never] set h (t : int * float#) = let (i, _) = t in h.i <- i in
+  let h = { i = 0 } in
+  test ~expect_caml_modifies:0
+    (fun () -> set h (1, #2.0); ignore (Sys.opaque_identity h))

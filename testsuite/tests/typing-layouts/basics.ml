@@ -1662,8 +1662,6 @@ val ( and* ) : 'a -> 'b -> t_float64 = <fun>
 val q : unit -> unit = <fun>
 |}]
 
-(* CR zeisbach: this test seems wrong, since [let*] and [and*] get inferred to
-   work on values only, and this tries to call them with the wrong thing. *)
 (* 28.8: non-value letop binder arg with and *)
 let ( let* ) x f = ()
 let ( and* ) x1 x2 = assert false
