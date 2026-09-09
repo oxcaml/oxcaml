@@ -8474,8 +8474,8 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply_left ?is_contained_by t
-        ({ monadic; comonadic } : _ Value.t) : Value.l =
+    let apply_left ?is_contained_by t ({ monadic; comonadic } : _ Value.t) :
+        Value.l =
       let annotations = hint_annotations t.annotations in
       let monadic =
         Monadic.apply_left ~annotations ?is_contained_by t.monadic monadic
@@ -8485,8 +8485,8 @@ module Modality = struct
       in
       { monadic; comonadic }
 
-    let apply_right ?is_contained_by t
-        ({ monadic; comonadic } : _ Value.t) : Value.r =
+    let apply_right ?is_contained_by t ({ monadic; comonadic } : _ Value.t) :
+        Value.r =
       let annotations = hint_annotations t.annotations in
       let monadic = Monadic.apply_right ?is_contained_by t.monadic monadic in
       let comonadic =
@@ -8508,14 +8508,16 @@ module Modality = struct
         List.fold_left
           (fun kept ({ bound = Atom (axis, bound); _ } as annotation) ->
             let result = proj axis composed in
-            if bound <> result || Per_axis.is_id axis result
-               || List.exists
-                    (fun previous ->
-                      Axis.compare (annotation_axis previous) (Axis.P axis) = 0)
-                    kept
+            if
+              bound <> result || Per_axis.is_id axis result
+              || List.exists
+                   (fun previous ->
+                     Axis.compare (annotation_axis previous) (Axis.P axis) = 0)
+                   kept
             then kept
             else annotation :: kept)
-          [] (then_.annotations @ t.annotations)
+          []
+          (then_.annotations @ t.annotations)
       in
       { composed with annotations }
 
@@ -8572,8 +8574,8 @@ module Modality = struct
     | _ -> false
   [@@ocaml.warning "-4"]
 
-  let apply_left ?is_contained_by t
-      ({ monadic; comonadic } : _ Value.t) : Value.l =
+  let apply_left ?is_contained_by t ({ monadic; comonadic } : _ Value.t) :
+      Value.l =
     let annotations = hint_annotations t.annotations in
     let monadic =
       Monadic.apply_left ~annotations ?is_contained_by t.monadic monadic
@@ -8621,8 +8623,7 @@ module Modality = struct
     let { monadic; comonadic } = t in
     Option.bind (Comonadic.to_const_opt comonadic) (fun comonadic ->
         Option.bind (Monadic.to_const_opt monadic) (fun monadic ->
-            Some
-              ({ monadic; comonadic; annotations = t.annotations } : Const.t)))
+            Some ({ monadic; comonadic; annotations = t.annotations } : Const.t)))
 
   let to_const_exn t = t |> to_const_opt |> Option.get
 
