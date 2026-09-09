@@ -35,8 +35,6 @@ val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
 val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
 
-val cannot_change_calling_convention : result -> Code_id.t -> bool
-
 val code_id_actually_directly_called :
   result -> Name.t -> Code_id.Set.t Or_unknown.t
 

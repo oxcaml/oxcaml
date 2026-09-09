@@ -143,6 +143,8 @@ module Staged = struct
         all_sets_of_closures = all_sets_of_closures'
       }
 
+    let code_deps t = t.code_deps
+
     let map_result_types t ~f =
       (* [code] is the only part of the rebuild data holding Flambda types. *)
       let map_rev_code (rev_code : Rev_expr.rev_code) =
@@ -153,6 +155,11 @@ module Staged = struct
       in
       { t with code = Code_id.Map.map map_rev_code t.code }
   end
+
+  type solution =
+    { uses : Unboxing_analysis.result;
+      code_changes : Unboxing_analysis.code_changes
+    }
 
   let traverse unit =
     let Traverse.
@@ -168,33 +175,38 @@ module Staged = struct
       Traverse.run unit
     in
     let rebuild_data =
-      Traverse_rebuild.
-        { toplevel_expr;
-          code;
-          ordered_code_ids;
-          fixed_arity_continuations;
-          continuation_info;
-          code_deps;
-          all_sets_of_closures
-        }
+      { Traverse_rebuild.toplevel_expr;
+        code;
+        ordered_code_ids;
+        fixed_arity_continuations;
+        continuation_info;
+        code_deps;
+        all_sets_of_closures
+      }
     in
     deps, rebuild_data
 
-  let solve deps =
-    let solved_dep =
+  let solve deps ~code_deps =
+    let uses =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
       then (
-        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
-        Dot_printer.print_solved_dep solved_dep deps)
+        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
+        Dot_printer.print_solved_dep uses deps)
     in
-    solved_dep
+    let code_changes =
+      Unboxing_analysis.compute_code_changes uses
+        ~rewrite_kind_with_subkind:
+          (Types_rewriter.rewrite_kind_with_subkind uses)
+        ~code_deps
+    in
+    { uses; code_changes }
 
-  let rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
-      ~cmx_loader ~all_code ~final_typing_env =
+  let rebuild ~unit_metadata ~traverse_rebuild ~solution:{ uses; code_changes }
+      ~machine_width ~cmx_loader ~all_code ~final_typing_env =
     let load_code = Flambda_cmx.get_imported_code cmx_loader in
     let get_code_metadata code_id =
       Code_or_metadata.code_metadata
@@ -214,13 +226,14 @@ module Staged = struct
       traverse_rebuild
     in
     let types_rewrite_context =
-      Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
+      Types_rewriter.prepare_rewrite_context uses all_sets_of_closures
     in
     let Rebuild.
           { body; free_names; all_code; code_ids_to_remember; slot_offsets } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
         ~fixed_arity_continuations ~continuation_info ~final_typing_env
-        ~types_rewrite_context solved_dep get_code_metadata toplevel_expr code
+        ~types_rewrite_context ~code_changes uses get_code_metadata
+        toplevel_expr code
     in
     let all_code =
       Exported_code.add_code
@@ -245,7 +258,10 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
   let deps, traverse_rebuild = Staged.traverse unit in
-  let solved_dep = Staged.solve deps in
+  let solution =
+    Staged.solve deps
+      ~code_deps:(Staged.Traverse_rebuild.code_deps traverse_rebuild)
+  in
   let unit_metadata = Flambda_unit.metadata unit in
-  Staged.rebuild ~unit_metadata ~traverse_rebuild ~solved_dep ~machine_width
+  Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution ~machine_width
     ~cmx_loader ~all_code ~final_typing_env
