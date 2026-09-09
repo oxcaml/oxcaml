@@ -82,6 +82,15 @@ let display (t : t) : string =
   let name, suffix = display_parts t in
   name ^ Option.value ~default:"" suffix
 
+type documentation =
+  { description : string;
+    url : string option
+  }
+
+let documentation : (t -> documentation option) ref = ref (fun _ -> None)
+
+let set_documentation lookup = documentation := lookup
+
 let entry (t : t) : Structured_diagnostic.Glossary_entry.t =
   let entry ~category ?(description = "") ?url () =
     { Structured_diagnostic.Glossary_entry.term = display t;
@@ -90,9 +99,14 @@ let entry (t : t) : Structured_diagnostic.Glossary_entry.t =
       url
     }
   in
+  let documented ~category =
+    match !documentation t with
+    | Some { description; url } -> entry ~category ~description ?url ()
+    | None -> entry ~category ()
+  in
   match t with
-  | Mode_term _ -> entry ~category:"Mode" ()
-  | Modality_term _ | Written_modality_term _ -> entry ~category:"Modality" ()
+  | Mode_term _ -> documented ~category:"Mode"
+  | Modality_term _ | Written_modality_term _ -> documented ~category:"Modality"
   | Concept_term Unsafe_mode_crossing ->
     entry ~category:"Mode crossing"
       ~description:
