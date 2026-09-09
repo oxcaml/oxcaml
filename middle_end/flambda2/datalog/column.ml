@@ -34,7 +34,7 @@ type (_, _, _) repr =
 
 type ('t, 'k, 'v) id =
   { name : string;
-    value_repr : 'k Value.repr;
+    print_key : Format.formatter -> 'k -> unit;
     repr : ('t, 'k, 'v) repr
   }
 
@@ -43,11 +43,14 @@ let singleton : type t k v. (t, k, v) id -> k -> v -> t =
   let Patricia_tree_repr = repr in
   Trie.singleton Trie.patricia_tree_is_trie [key] value
 
-let equal_key { value_repr; _ } = Value.equal_repr value_repr
+let equal_key : type t k v. (t, k, v) id -> k -> k -> bool =
+ fun { repr = Patricia_tree_repr; _ } -> Int.equal
 
-let print_key { value_repr; _ } = Value.print_repr value_repr
+let compare_key : type t k v. (t, k, v) id -> k -> k -> int =
+ fun { repr = Patricia_tree_repr; _ } -> Int.compare
 
-let value_repr { value_repr; _ } = value_repr
+let print_key : type t k v. (t, k, v) id -> Format.formatter -> k -> unit =
+ fun { print_key; _ } -> print_key
 
 type (_, _, _) hlist =
   | [] : ('v, nil, 'v) hlist
@@ -74,9 +77,6 @@ let rec is_trie : type t k v. (t, k, v) hlist -> (t, k, v) Trie.is_trie =
   | { repr = Patricia_tree_repr; _ } :: (_ :: _ as columns) ->
     Trie.patricia_tree_of_trie (is_trie columns)
 
-let compare_key : type m k v. (m, k, v) id -> k -> k -> int =
- fun column x y -> Value.compare_repr (value_repr column) x y
-
 let rec compare_keys : type t k v.
     (t, k, v) hlist -> k Constant.hlist -> k Constant.hlist -> int =
  fun columns xs ys ->
@@ -100,8 +100,6 @@ struct
   module Set = Tree.Set
   module Map = Tree.Map
 
-  let value_repr = Value.int_repr ~print
-
   let datalog_column_id =
-    { name = X.name; value_repr; repr = Patricia_tree_repr }
+    { name = X.name; print_key = print; repr = Patricia_tree_repr }
 end

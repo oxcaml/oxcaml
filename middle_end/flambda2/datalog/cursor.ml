@@ -143,15 +143,15 @@ module From_plan = struct
         let Equal = Variable.must_be_equal var var' in
         { value = receiver; name = Variable.name var' }
 
-    let lit_to_string ?repr lit =
-      match repr with
-      | Some repr -> Format.asprintf "%a" (Value.print_repr repr) lit
+    let lit_to_string ?column lit =
+      match column with
+      | Some column -> Format.asprintf "%a" (Column.print_key column) lit
       | None -> "<cst>"
 
-    let must_be_bound_term ?repr env = function
+    let must_be_bound_term ?column env = function
       | Literal lit ->
         { value = Channel.create_or_null (Or_null.this lit) |> snd;
-          name = lit_to_string ?repr lit
+          name = lit_to_string ?column lit
         }
       | Variable var -> must_be_bound env var
 
@@ -178,9 +178,11 @@ module From_plan = struct
         { value = receiver; name = Table.Id.name tid }
   end
 
-  let value_repr_for_join = function
+  type _ column = Column : (_, 'k, _) Column.id -> 'k column
+
+  let column_for_join = function
     | [] -> Misc.fatal_error "Empty join"
-    | Column_iterator (column, _, _) :: _ -> Column.value_repr column
+    | Column_iterator (column, _, _) :: _ -> Column column
 
   let rec join_iterators : type k.
       _ -> k column_iterator list -> _ * k Trie.Iterator.t list with_names =
@@ -216,14 +218,14 @@ module From_plan = struct
       match Iarray.get plan.input_stages index with
       | Join_stage (var, columns) ->
         let env, iterators = join_iterators env columns in
-        let repr = value_repr_for_join columns in
-        Executor.for_in { value = repr; name = Variable.name var } iterators
+        let (Column column) = column_for_join columns in
+        Executor.for_in { value = column; name = Variable.name var } iterators
         @@ fun receiver ->
         build_stages (Env.bind_var env var receiver) plan (index + 1)
       | Seek_stage (term, columns) ->
         let env, iterators = join_iterators env columns in
-        let repr = value_repr_for_join columns in
-        let receiver = Env.must_be_bound_term ~repr env term in
+        let (Column column) = column_for_join columns in
+        let receiver = Env.must_be_bound_term ~column env term in
         Executor.if_in receiver iterators @@ build_stages env plan (index + 1)
       | Check_stage (Atom (relation, terms)) ->
         (match relation with
@@ -232,11 +234,11 @@ module From_plan = struct
           | Unless tid ->
             Executor.if_not_in (Table.Id.is_trie tid) (Env.get_table env tid)
               (Env.must_be_bound_term_hlist env terms)
-          | Distinct repr ->
+          | Distinct column ->
             let [term1; term2] = terms in
-            Executor.if_not_equal repr
-              (Env.must_be_bound_term ~repr env term1)
-              (Env.must_be_bound_term ~repr env term2)
+            Executor.if_not_equal column
+              (Env.must_be_bound_term ~column env term1)
+              (Env.must_be_bound_term ~column env term2)
           | Filter (fn, name) ->
             Executor.if_ { value = fn; name }
               (Env.must_be_bound_term_hlist env terms)

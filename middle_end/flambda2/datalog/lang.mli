@@ -57,7 +57,7 @@ end
 type ('k, 'v) relation =
   | Table : (_, 'k, 'v) Table.Id.t -> ('k, 'v) relation
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
-  | Distinct : 'k Value.repr -> ('k -> 'k -> nil, unit) relation
+  | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
   | Callback_with_bindings :
       (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
@@ -75,7 +75,7 @@ val table : (_, 'k, 'v) Table.Id.t -> 'k Term.hlist -> atom
 
 val unless : (_, 'k, 'v) Table.Id.t -> 'k Term.hlist -> atom
 
-val distinct : 'k Value.repr -> 'k term -> 'k term -> atom
+val distinct : (_, 'k, _) Column.id -> 'k term -> 'k term -> atom
 
 val filter :
   ?name:string -> ('k Constant.hlist -> bool) -> 'k Term.hlist -> atom

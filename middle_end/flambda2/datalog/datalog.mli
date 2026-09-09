@@ -65,7 +65,7 @@ val unless_atom :
   ('p, 'a) program
 
 val unless_eq :
-  'k Value.repr ->
+  (_, 'k, _) Column.id ->
   'k Term.t ->
   'k Term.t ->
   ('p, 'a) program ->
