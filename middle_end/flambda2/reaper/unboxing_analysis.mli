@@ -77,7 +77,24 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
-<<<<<<< HEAD
+type code_changes = calling_convention_change Code_id.Map.t
+
+val get_calling_convention_change :
+  code_changes -> Code_id.t -> calling_convention_change
+
+val code_changes_ids_for_export :
+  code_changes -> Ids_for_export.t -> Ids_for_export.t
+
+val code_changes_fields_for_export : code_changes -> Field.Set.t -> Field.Set.t
+
+val code_changes_apply_renaming :
+  code_changes ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  code_changes
+
+val pp_result : Format.formatter -> result -> unit
+
 val unboxed_fields_ids_for_export :
   unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
 
@@ -108,18 +125,6 @@ val changed_representation_apply_renaming :
 
 val cannot_change_calling_convention_table :
   Datalog_helpers.Serialisation.N.table
-
-val cannot_change_calling_convention : result -> Code_id.t -> bool
-||||||| parent of a43fe05e0e (move calling convention changes to solve time)
-val cannot_change_calling_convention : result -> Code_id.t -> bool
-=======
-type code_changes
-
-val get_calling_convention_change :
-  code_changes -> Code_id.t -> calling_convention_change
-
-val pp_result : Format.formatter -> result -> unit
->>>>>>> a43fe05e0e (move calling convention changes to solve time)
 
 val perform_analysis :
   Datalog.database -> stats:Datalog.Schedule.stats -> result

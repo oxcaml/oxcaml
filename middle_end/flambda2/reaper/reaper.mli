@@ -28,7 +28,10 @@ module Staged : sig
     val code_deps : t -> Traverse_acc.code_dep Code_id.Map.t
   end
 
-  type solution = { uses : Unboxing_analysis.result }
+  type solution =
+    { uses : Unboxing_analysis.result;
+      code_changes : Unboxing_analysis.code_changes
+    }
 
   (** Traverse the compilation unit in preparation for Reaper analysis. *)
   val traverse : Flambda_unit.t -> Global_flow_graph.graph * Traverse_rebuild.t

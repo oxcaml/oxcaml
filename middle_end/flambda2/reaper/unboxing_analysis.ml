@@ -1023,3 +1023,81 @@ let get_calling_convention_change t code_id =
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some x -> x
+
+let code_changes_ids_for_export code_changes ids =
+  let add_param_decision ids = function
+    | Keep (var, _kind) -> Ids_for_export.add_variable ids var
+    | Delete -> ids
+    | Unbox tree -> add_unboxed_variables_tree tree ids
+  in
+  Code_id.Map.fold
+    (fun code_id change ids ->
+      let ids = Ids_for_export.add_code_id ids code_id in
+      match change with
+      | Not_changing_calling_convention -> ids
+      | Changing_calling_convention
+          { my_closure_decision; params_decisions; return_decisions } ->
+        let ids =
+          match my_closure_decision with
+          | Keep_my_closure -> ids
+          | Unbox_my_closure tree -> add_unboxed_variables_tree tree ids
+        in
+        let ids = List.fold_left add_param_decision ids params_decisions in
+        List.fold_left add_param_decision ids return_decisions)
+    code_changes ids
+
+let code_changes_fields_for_export code_changes fields =
+  let add_param_decision fields = function
+    | Keep _ | Delete -> fields
+    | Unbox tree -> Unboxed_fields.add_fields tree fields
+  in
+  Code_id.Map.fold
+    (fun (_ : Code_id.t) change fields ->
+      match change with
+      | Not_changing_calling_convention -> fields
+      | Changing_calling_convention
+          { my_closure_decision; params_decisions; return_decisions } ->
+        let fields =
+          match my_closure_decision with
+          | Keep_my_closure -> fields
+          | Unbox_my_closure tree -> Unboxed_fields.add_fields tree fields
+        in
+        let fields =
+          List.fold_left add_param_decision fields params_decisions
+        in
+        List.fold_left add_param_decision fields return_decisions)
+    code_changes fields
+
+let code_changes_apply_renaming code_changes renaming ~rename_field =
+  let rename_tree tree =
+    rename_unboxed_fields_tree tree
+      ~rename_leaf:(Renaming.apply_variable renaming)
+      ~rename_field
+  in
+  let rename_param_decision = function
+    | Keep (var, kind) -> Keep (Renaming.apply_variable renaming var, kind)
+    | Delete -> Delete
+    | Unbox tree -> Unbox (rename_tree tree)
+  in
+  Code_id.Map.fold
+    (fun code_id change new_code_changes ->
+      let change =
+        match change with
+        | Not_changing_calling_convention -> Not_changing_calling_convention
+        | Changing_calling_convention
+            { my_closure_decision; params_decisions; return_decisions } ->
+          let my_closure_decision =
+            match my_closure_decision with
+            | Keep_my_closure -> Keep_my_closure
+            | Unbox_my_closure tree -> Unbox_my_closure (rename_tree tree)
+          in
+          Changing_calling_convention
+            { my_closure_decision;
+              params_decisions = List.map rename_param_decision params_decisions;
+              return_decisions = List.map rename_param_decision return_decisions
+            }
+      in
+      Code_id.Map.add
+        (Renaming.apply_code_id renaming code_id)
+        change new_code_changes)
+    code_changes Code_id.Map.empty
