@@ -36,6 +36,10 @@
             (param (ref eq)) (result i64)))
       (import "int64" "caml_int64_compare"
          (func $caml_int64_compare (param i64) (param i64) (result i32)))
+      (import "int64" "caml_int64_unsigned_div"
+         (func $caml_int64_unsigned_div (param i64) (param i64) (result i64)))
+      (import "int64" "caml_int64_unsigned_mod"
+         (func $caml_int64_unsigned_mod (param i64) (param i64) (result i64)))
       (import "int64" "caml_int64_format"
          (func $caml_int64_format (param (ref eq)) (param (ref eq)) (result (ref eq))))
       (import "int64" "caml_portability_int64_cmp"
@@ -67,6 +71,10 @@
       (func $Int32_val (param (ref eq)) (result i32)))
    (import "int32" "caml_int32_compare"
       (func $caml_int32_compare (param i32) (param i32) (result i32)))
+   (import "int32" "caml_int32_unsigned_div"
+      (func $caml_int32_unsigned_div (param i32) (param i32) (result i32)))
+   (import "int32" "caml_int32_unsigned_mod"
+      (func $caml_int32_unsigned_mod (param i32) (param i32) (result i32)))
    (import "int32" "caml_int32_bswap"
       (func $caml_int32_bswap (param i32) (result i32)))
    (import "int32" "caml_int32_format"
@@ -111,6 +119,12 @@
       (func (export "caml_nativeint_compare")
          (param $i1 i64) (param $i2 i64) (result i32)
          (return_call $caml_int64_compare (local.get $i1) (local.get $i2)))
+      (func (export "caml_nativeint_unsigned_div")
+         (param $i1 i64) (param $i2 i64) (result i64)
+         (return_call $caml_int64_unsigned_div (local.get $i1) (local.get $i2)))
+      (func (export "caml_nativeint_unsigned_mod")
+         (param $i1 i64) (param $i2 i64) (result i64)
+         (return_call $caml_int64_unsigned_mod (local.get $i1) (local.get $i2)))
 
       (func $nativeint_serialize
          (param $s (ref eq)) (param $v (ref eq)) (result i32) (result i32)
@@ -159,6 +173,10 @@
    (export "caml_nativeint_bswap" (func $caml_int32_bswap))
 
    (export "caml_nativeint_compare" (func $caml_int32_compare))
+
+   (export "caml_nativeint_unsigned_div" (func $caml_int32_unsigned_div))
+
+   (export "caml_nativeint_unsigned_mod" (func $caml_int32_unsigned_mod))
 
    (func $nativeint_serialize
       (param $s (ref eq)) (param $v (ref eq)) (result i32) (result i32)
