@@ -37,6 +37,7 @@ Error: The value "bar" is "nonportable"
       ~- Because {*:it} closes over {:the value `x`}.
         ~- And {:the value `x`} is used as `uncontended`#.
           ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+      ~- [educate] A function that closes over `uncontended`# data is `nonportable`#.
 |}]
 
 
@@ -69,6 +70,7 @@ Error: The value "bar" is "nonportable"
       ~- Because {*:it} closes over {:the value `x`}.
         ~- And {:the value `x`} is used as `uncontended`#.
           ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+      ~- [educate] A function that closes over `uncontended`# data is `nonportable`#.
 |}]
 
 module M : sig
@@ -123,4 +125,5 @@ Error: Signature mismatch:
             ~- Because {*:it} closes over {:the value `x`}.
               ~- And {:the value `x`} is used as `uncontended`#.
                 ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+            ~- [educate] A function that closes over `uncontended`# data is `nonportable`#.
 |}]
