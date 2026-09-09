@@ -19,9 +19,8 @@
 
 (* Common subexpression elimination by value numbering. Information is
    propagated across fork points, and across join points (by intersection of the
-   numberings of the predecessors) when [-cfg-cse-join-points] is enabled (which
-   [-experimental-optimizations] also does). Loop headers and exception handlers
-   always start from an empty numbering. *)
+   numberings of the predecessors) when [-cfg-cse-join-points] is enabled. Loop
+   headers and exception handlers always start from an empty numbering. *)
 
 module Cse_generic (_ : Cfg_cse_target_intf.S) : sig
   val cfg_with_layout : Cfg_with_layout.t -> Cfg_with_layout.t

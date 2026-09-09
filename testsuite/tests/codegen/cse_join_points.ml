@@ -4,13 +4,12 @@
  expect.opt;
 *)
 
-(* Tests for CSE across join points ([-cfg-cse-join-points], also enabled
-   by [-experimental-optimizations]): facts established before a branch
-   survive the join when they are valid on all incoming paths. Mutable
-   loads are used because they cannot be eliminated by the middle end, so
-   any elimination visible here is performed by [Cfg_cse]. Without the
-   flag, [Cfg_cse] starts from an empty state at every join point, and the
-   reloads below would remain.
+(* Tests for CSE across join points ([-cfg-cse-join-points]): facts
+   established before a branch survive the join when they are valid on all
+   incoming paths. Mutable loads are used because they cannot be eliminated
+   by the middle end, so any elimination visible here is performed by
+   [Cfg_cse]. Without the flag, [Cfg_cse] starts from an empty state at
+   every join point, and the reloads below would remain.
 
    A [match] on an option is used rather than an [if] on two pure arms so
    that the function contains an actual diamond: the [Some] arm loads from
