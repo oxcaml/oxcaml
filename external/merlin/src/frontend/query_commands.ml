@@ -225,8 +225,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           match Mode.reported_mode_as_alloc_atom mode with
           | Some atom -> documentation (Syntax_doc.get_mode_doc atom)
           | None -> None)
-        | Modality_term atom ->
-          documentation (Syntax_doc.get_modality_doc atom)
+        | Modality_term atom -> documentation (Syntax_doc.get_modality_doc atom)
         | Written_modality_term _ | Concept_term _ -> None);
     let errors = Mpipeline.typer_errors pipeline in
     List.filter_map errors ~f:(fun exn ->
