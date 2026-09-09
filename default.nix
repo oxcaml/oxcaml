@@ -353,47 +353,229 @@ let
         '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
   '';
 
+  mkLibraryPackages =
+    oxcaml:
+    let
+      ocamlPackages = (pkgs.ocaml-ng.mkOcamlPackages oxcaml).overrideScope (
+        _: osuper: {
+          dune_3 = dune;
+          findlib = osuper.findlib.overrideAttrs (old: {
+            postPatch = (old.postPatch or "") + ''
+              substituteInPlace src/findlib/topfind.ml.in \
+                --replace-fail \
+                  'if real_toploop then prerr_endline else ignore' \
+                  'if real_toploop then (fun s -> prerr_endline s) else ignore'
+            '';
+          });
+        }
+      );
+      mkLibrary =
+        args:
+        ocamlPackages.buildDunePackage (
+          {
+            version = "dev";
+            duneVersion = "3";
+            dontStrip = true;
+            DUNE_CACHE = "disabled";
+          }
+          // args
+        );
+      ppxlibBase = with packages; [
+        ocaml-compiler-libs
+        ppx_derivers
+        sexplib0
+        stdlib-shims
+      ];
+      mkJsooLibrary =
+        args:
+        mkLibrary (
+          {
+            src = "${src}/external/js_of_ocaml";
+            nativeBuildInputs = [ menhir ];
+            buildInputs = [ packages.ppxlib ];
+          }
+          // args
+        );
+      packages = rec {
+        inherit (ocamlPackages) findlib;
+
+        ocaml-compiler-libs = mkLibrary {
+          pname = "ocaml-compiler-libs";
+          src = "${src}/external/ocaml-compiler-libs";
+        };
+
+        ppx_derivers = mkLibrary {
+          pname = "ppx_derivers";
+          version = "1.2.1";
+          src = ppxDeriversSrc;
+        };
+
+        sexplib0 = mkLibrary {
+          pname = "sexplib0";
+          version = "v0.17.0";
+          src = sexplib0Src;
+        };
+
+        stdlib-shims = mkLibrary {
+          pname = "stdlib-shims";
+          version = "0.3.0";
+          src = stdlibShimsSrc;
+        };
+
+        ppxlib_ast = mkLibrary {
+          pname = "ppxlib_ast";
+          src = "${src}/external/ppxlib";
+          propagatedBuildInputs = ppxlibBase;
+        };
+
+        ppxlib_jane = mkLibrary {
+          pname = "ppxlib_jane";
+          src = "${src}/external/ppxlib_jane";
+          propagatedBuildInputs = [ ppxlib_ast ];
+        };
+
+        ppxlib = mkLibrary {
+          pname = "ppxlib";
+          src = "${src}/external/ppxlib";
+          propagatedBuildInputs = ppxlibBase ++ [
+            ppxlib_ast
+            ppxlib_jane
+          ];
+        };
+
+        gen = mkLibrary {
+          pname = "gen";
+          version = "1.1";
+          src = genSrc;
+          propagatedBuildInputs = [ ocamlPackages.seq ];
+        };
+
+        sedlex = mkLibrary {
+          pname = "sedlex";
+          version = "3.7";
+          src = "${src}/external/sedlex";
+          propagatedBuildInputs = [
+            ppxlib
+            gen
+          ];
+        };
+
+        cmdliner = stdenv.mkDerivation {
+          pname = "ocaml${oxcaml.version}-cmdliner";
+          version = "2.1.1";
+          src = cmdlinerSrc;
+          nativeBuildInputs = [
+            oxcaml
+            findlib
+          ];
+          dontConfigure = true;
+          buildPhase = ''
+            runHook preBuild
+            make build-byte build-native build-native-dynlink
+            runHook postBuild
+          '';
+          installPhase = ''
+            runHook preInstall
+            make PREFIX="$out" LIBDIR="$OCAMLFIND_DESTDIR/cmdliner" \
+              install-common install-srcs install-byte install-native \
+              install-native-dynlink
+            runHook postInstall
+          '';
+        };
+
+        menhirLib = mkLibrary {
+          pname = "menhirLib";
+          version = menhirVersion;
+          src = menhirLibrariesSrc;
+        };
+
+        menhirSdk = mkLibrary {
+          pname = "menhirSdk";
+          version = menhirVersion;
+          src = menhirLibrariesSrc;
+        };
+
+        yojson = mkLibrary {
+          pname = "yojson";
+          version = "2.2.2";
+          src = yojsonSrc;
+          propagatedBuildInputs = [ ocamlPackages.seq ];
+        };
+
+        js_of_ocaml-compiler = mkJsooLibrary {
+          pname = "js_of_ocaml-compiler";
+          propagatedBuildInputs = [
+            ocaml-compiler-libs
+            cmdliner
+            findlib
+            menhirLib
+            menhirSdk
+            sedlex
+            yojson
+          ];
+          meta.mainProgram = "js_of_ocaml";
+        };
+
+        js_of_ocaml = mkJsooLibrary {
+          pname = "js_of_ocaml";
+          propagatedBuildInputs = [ js_of_ocaml-compiler ];
+        };
+
+        js_of_ocaml-ppx = mkJsooLibrary {
+          pname = "js_of_ocaml-ppx";
+          propagatedBuildInputs = [
+            js_of_ocaml
+            ppxlib
+          ];
+        };
+
+        js_of_ocaml-ppx_deriving_json = mkJsooLibrary {
+          pname = "js_of_ocaml-ppx_deriving_json";
+          propagatedBuildInputs = [
+            js_of_ocaml
+            ppxlib
+          ];
+        };
+
+        js_of_ocaml-toplevel = mkJsooLibrary {
+          pname = "js_of_ocaml-toplevel";
+          propagatedBuildInputs = [
+            js_of_ocaml
+            js_of_ocaml-compiler
+          ];
+        };
+
+        wasm_of_ocaml-compiler = mkJsooLibrary {
+          pname = "wasm_of_ocaml-compiler";
+          nativeBuildInputs = [
+            menhir
+            pkgs.binaryen
+            pkgs.makeWrapper
+          ];
+          propagatedBuildInputs = [
+            js_of_ocaml-compiler
+            pkgs.binaryen
+          ];
+          postFixup = ''
+            wrapProgram "$out/bin/wasm_of_ocaml" \
+              --prefix PATH : ${lib.makeBinPath [ pkgs.binaryen ]}
+          '';
+          meta.mainProgram = "wasm_of_ocaml";
+        };
+      };
+    in
+    packages;
+
   mkJsoo =
     oxcaml:
-    stdenv.mkDerivation {
-      pname = "oxcaml-jsoo";
-      inherit (oxcaml) version meta;
-      inherit src;
-
-      PPXLIB_PPX_DERIVERS_SRC = ppxDeriversSrc;
-      PPXLIB_SEXPLIB0_SRC = sexplib0Src;
-      PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
-      SEDLEX_GEN_SRC = genSrc;
-      JSOO_CMDLINER_SRC = cmdlinerSrc;
-      JSOO_MENHIR_SRC = menhirLibrariesSrc;
-      JSOO_YOJSON_SRC = yojsonSrc;
-
-      nativeBuildInputs = [
-        dune
-        oxcaml
-        menhir
-        pkgs.nodejs
-        pkgs.binaryen
+    pkgs.buildEnv {
+      name = "oxcaml-jsoo-${oxcaml.version}";
+      paths = with mkLibraryPackages oxcaml; [
+        js_of_ocaml-compiler
+        wasm_of_ocaml-compiler
       ];
-
-      dontConfigure = true;
-
-      buildPhase = ''
-        runHook preBuild
-        make \
-          SHELL="$SHELL" \
-          REQUIRES_CONFIGURATION= \
-          DUNE=${dune}/bin/dune \
-          OXCAML_INSTALL=${oxcaml} \
-          jsoo-build
-        runHook postBuild
-      '';
-
-      installPhase = ''
-        runHook preInstall
-        mkdir "$out"
-        runHook postInstall
-      '';
+      pathsToLink = [ "/bin" ];
+      inherit (oxcaml) meta;
     };
 
   gfortran =
@@ -608,16 +790,25 @@ stdenv.mkDerivation {
       ${merlinCommands}EOF
     '';
 
-  meta =
-    { } // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
+  meta = {
+    platforms = [
+      "x86_64-linux"
+      "aarch64-linux"
+      "x86_64-darwin"
+      "aarch64-darwin"
+    ];
+  }
+  // (if framePointers && !pkgs.stdenv.hostPlatform.isx86_64 then { broken = true; } else { });
 
   passthru = {
+    nativeCompilers = true;
     inherit
       ocaml_4_14_2
       ocaml_5_4_0
       ocamlformat
       lldb
       mkJsoo
+      mkLibraryPackages
       mkMerlinPackages
       ;
   };

@@ -24,11 +24,26 @@
         lib = pkgs.lib;
         oxcaml = pkgs.callPackage ./default.nix { src = self; };
         merlinPackages = oxcaml.mkMerlinPackages oxcaml;
+        libraryPackages = oxcaml.mkLibraryPackages oxcaml;
       in
       {
         packages = {
           inherit oxcaml;
           inherit (merlinPackages) merlin-lib dot-merlin-reader merlin;
+          inherit (libraryPackages)
+            findlib
+            ocaml-compiler-libs
+            ppxlib_ast
+            ppxlib_jane
+            ppxlib
+            sedlex
+            js_of_ocaml-compiler
+            js_of_ocaml
+            js_of_ocaml-ppx
+            js_of_ocaml-ppx_deriving_json
+            js_of_ocaml-toplevel
+            wasm_of_ocaml-compiler
+            ;
           oxcaml-fp = oxcaml.override { framePointers = true; };
           oxcaml-asan = oxcaml.override { addressSanitizer = true; };
           jsoo = oxcaml.mkJsoo oxcaml;
@@ -42,6 +57,9 @@
             oxcaml-asan
             jsoo
             merlin
+            js_of_ocaml-ppx
+            js_of_ocaml-ppx_deriving_json
+            js_of_ocaml-toplevel
             ;
         };
 
