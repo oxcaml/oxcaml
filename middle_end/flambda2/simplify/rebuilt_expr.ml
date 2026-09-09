@@ -305,23 +305,23 @@ module Matching_for_unique_handler = struct
     (** Create a new matcher.
 
         Fails if the two parameter lists have distinct number of parameters. *)
-    val create : Bound_parameters.t -> Bound_parameters.t -> t
+    val create : params1:Bound_parameters.t -> params2:Bound_parameters.t -> t
 
     (** [match_variable t var1 var2] records that [var1] and [var2] must match
         in the respective parameter lists.
 
         Fails if either [var1] or [var2] are not part of this matching, if
-        either [var1] or [var2] has already been matched to another variable, or
-        if [var1] and [var2] are bound with incompatible kinds in their
-        respective parameter lists. *)
+        either has already been matched to another variable, or if [var1] and
+        [var2] are bound with incompatible kinds in their respective parameter
+        lists. *)
     val match_variable : t -> Variable.t -> Variable.t -> unit
 
     (** Returns an argument that can be used to bind the provided parameter from
         the second list from a parameter in the first list.
 
         Fails if the parameter has not been matched. *)
-    val matching_variable_for_parameter_on_second_side :
-      t -> Bound_parameter.t -> Variable.t
+    val matching_variable_for_param2 :
+      t -> param2:Bound_parameter.t -> Variable.t
   end = struct
     module HV = Hashtbl.Make (Variable)
 
@@ -333,23 +333,23 @@ module Matching_for_unique_handler = struct
       }
 
     type t =
-      { parameters_on_first_side : parameter_on_one_side HV.t;
+      { params1 : parameter_on_one_side HV.t;
             (** Keys are parameters from the first side (identified by their
                 variable). *)
-        parameters_on_second_side : parameter_on_one_side HV.t
+        params2 : parameter_on_one_side HV.t
             (** Keys are parameters from the second side (identified by their
                 variable). *)
       }
 
-    let matching_variable_for_parameter_on_second_side t param =
-      match HV.find t.parameters_on_second_side (Bound_parameter.var param) with
+    let matching_variable_for_param2 t ~param2 =
+      match HV.find t.params2 (Bound_parameter.var param2) with
       | exception Not_found ->
         Misc.fatal_errorf "Parameter %a is not bound on the second side"
-          Bound_parameter.print param
+          Bound_parameter.print param2
       | { matching_variable_on_other_side = None; _ } -> fail ()
       | { matching_variable_on_other_side = Some var; _ } -> var
 
-    let create params1 params2 =
+    let create ~params1 ~params2 =
       (* Must have the same number of parameters in both cases, but we allow
          permutations -- kinds are checked in [match_variable]. *)
       if not (Bound_parameters.same_number params1 params2) then fail ();
@@ -365,12 +365,10 @@ module Matching_for_unique_handler = struct
           (Bound_parameters.to_list params);
         table
       in
-      let parameters_on_first_side = create_mapping params1 in
-      let parameters_on_second_side = create_mapping params2 in
-      { parameters_on_first_side; parameters_on_second_side }
+      { params1 = create_mapping params1; params2 = create_mapping params2 }
 
     let match_variable t var1 var2 =
-      match HV.find t.parameters_on_first_side var1 with
+      match HV.find t.params1 var1 with
       | exception Not_found ->
         (* [var1] is not a parameter for this permutation *) fail ()
       | { matching_variable_on_other_side = Some var2'; _ } ->
@@ -379,11 +377,11 @@ module Matching_for_unique_handler = struct
       | { matching_variable_on_other_side = None; kind = kind1 } as binding1
         -> (
         (* [var1] is a parameter, but not yet matched: try to match it. *)
-        match HV.find t.parameters_on_second_side var2 with
+        match HV.find t.params2 var2 with
         | (exception Not_found)
         | { matching_variable_on_other_side = Some _; _ } ->
           (* [var2] is either not a parameter of the same continuation, or
-             already matched to another parameter in the first environment. *)
+             already matched to another parameter in the first list. *)
           fail ()
         | { matching_variable_on_other_side = None; kind = kind2 } as
           (* [var2] is a parameter of the same continuation and is not yet
@@ -394,10 +392,23 @@ module Matching_for_unique_handler = struct
           binding2.matching_variable_on_other_side <- Some var1)
   end
 
+  (** Maps each variable that is a parameter to the corresponding matching
+      between two [Bound_parameters.t].
+
+      {b Note}: Matching information is recorded by mutably modifying the
+      [Match_permutable_parameters.t] instance(s), so environments should only
+      be passed down the call stack, not returned. *)
+  type matching_env =
+    { permutable_params1 : Match_permutable_parameters.t Variable.Map.t;
+      permutable_params2 : Match_permutable_parameters.t Variable.Map.t
+    }
+
   let match_variable env var1 var2 =
-    match Variable.Map.find_or_null var1 env with
+    match Variable.Map.find_or_null var1 env.permutable_params1 with
     | Null ->
-      (* [var1] is not a parameter: both variables must be equal *)
+      (* [var1] is not a parameter: both variables must be equal, and [var2]
+         must not be a parameter either. *)
+      if Variable.Map.mem var2 env.permutable_params2 then fail ();
       fail_if_not_equal Variable.equal var1 var2
     | This permutation ->
       Match_permutable_parameters.match_variable permutation var1 var2
@@ -512,15 +523,17 @@ module Matching_for_unique_handler = struct
       fail ()
 
   let match_permutable_continuation_handler params1 handler1 params2 handler2 =
-    let permutation = Match_permutable_parameters.create params1 params2 in
-    let env =
+    let permutation = Match_permutable_parameters.create ~params1 ~params2 in
+    let create_permutable_params params =
       List.fold_left
-        (fun env param1 ->
-          Variable.Map.add (Bound_parameter.var param1) permutation env)
+        (fun env param ->
+          Variable.Map.add (Bound_parameter.var param) permutation env)
         Variable.Map.empty
-        (Bound_parameters.to_list params1)
+        (Bound_parameters.to_list params)
     in
-    match_expr env handler1 handler2;
+    let permutable_params1 = create_permutable_params params1 in
+    let permutable_params2 = create_permutable_params params2 in
+    match_expr { permutable_params1; permutable_params2 } handler1 handler2;
     (* We are matching continuation handlers after rebuilding/dataflow, so we
        expect that all parameters are used and we can reconstruct a suitable
        bijection, so if we get there, this should never raise (but it is also
@@ -528,8 +541,8 @@ module Matching_for_unique_handler = struct
     List.map
       (fun param2 ->
         Simple.var
-          (Match_permutable_parameters
-           .matching_variable_for_parameter_on_second_side permutation param2))
+          (Match_permutable_parameters.matching_variable_for_param2 permutation
+             ~param2))
       (Bound_parameters.to_list params2)
 
   let match_non_recursive_continuation_handler ~is_exn_handler params1 handler1
