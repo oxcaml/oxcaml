@@ -69,5 +69,24 @@ type t =
     body : Block.t list
   }
 
+module Json : sig
+  val to_value :
+    string:(string -> 'json) ->
+    int:(int -> 'json) ->
+    array:('json list -> 'json) ->
+    object_:((string * 'json) list -> 'json) ->
+    t ->
+    'json
+
+  val from_value :
+    string:('json -> string) ->
+    int:('json -> int) ->
+    array:('json -> 'json list) ->
+    field:(string -> 'json -> 'json) ->
+    optional_field:(string -> 'json -> 'json option) ->
+    'json ->
+    t
+end
+
 val to_json : t -> string
 val of_json : string -> (t, string) result
