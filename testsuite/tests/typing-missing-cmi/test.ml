@@ -4,14 +4,14 @@
  setup-ocamlc.byte-build-env;
  module = "subdir/m.ml";
  ocamlc.byte;
- flags = "-I subdir";
+ flags = "-extension layouts_beta -I subdir";
  module = "a.ml";
  ocamlc.byte;
  module = "b.ml";
  ocamlc.byte;
  module = "c.ml";
  ocamlc.byte;
- flags = "";
+ flags = "-extension layouts_beta";
  module = "main_ok.ml";
  ocamlc.byte;
  module = "main.ml";
