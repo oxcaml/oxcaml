@@ -114,25 +114,21 @@ end = struct
         label
     | Some component -> component
 
+  (* [visited] is the set of blocks traversed so far, shared by the successive
+     traversals; [components] is filled in postorder and coincides with
+     [visited] between traversals. *)
   let iter_blocks_from :
       Cfg.t ->
       from:Label.t ->
       f:(Cfg.basic_block -> unit) ->
       component:component ->
       components:components ->
+      visited:unit Label.Tbl.t ->
       unit =
-   fun cfg ~from ~f ~component ~components ->
-    let rec iter (label : Label.t) : unit =
-      if not (Label.Tbl.mem components label)
-      then (
-        Label.Tbl.replace components label component;
-        let block = Cfg.get_block_exn cfg label in
-        Label.Set.iter
-          (fun succ_label -> iter succ_label)
-          (Cfg.successor_labels ~normal:true ~exn:true block);
+   fun cfg ~from ~f ~component ~components ~visited ->
+    Cfg.iter_blocks_postorder_from cfg ~from ~visited ~f:(fun block ->
+        Label.Tbl.replace components block.start component;
         f block)
-    in
-    iter from
 
   exception Found of Label.t
 
@@ -160,19 +156,23 @@ end = struct
       f:(Cfg.basic_block -> unit) ->
       component:component ->
       components:components ->
+      visited:unit Label.Tbl.t ->
       unit =
-   fun cfg ~f ~component ~components ->
+   fun cfg ~f ~component ~components ~visited ->
     if Label.Tbl.length components < Label.Tbl.length cfg.blocks
     then (
       let from = find_pseudo_entry cfg ~components in
-      iter_blocks_from cfg ~from ~f ~component ~components;
-      iter_blocks_pseudo_entries cfg ~f ~component:(succ component) ~components)
+      iter_blocks_from cfg ~from ~f ~component ~components ~visited;
+      iter_blocks_pseudo_entries cfg ~f ~component:(succ component) ~components
+        ~visited)
 
   let iter_blocks : Cfg.t -> f:(Cfg.basic_block -> unit) -> components =
    fun cfg ~f ->
     let components = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
-    iter_blocks_from cfg ~from:cfg.entry_label ~f ~component:0 ~components;
-    iter_blocks_pseudo_entries cfg ~f ~component:1 ~components;
+    let visited = Label.Tbl.create (Label.Tbl.length cfg.blocks) in
+    iter_blocks_from cfg ~from:cfg.entry_label ~f ~component:0 ~components
+      ~visited;
+    iter_blocks_pseudo_entries cfg ~f ~component:1 ~components ~visited;
     components
 end
 

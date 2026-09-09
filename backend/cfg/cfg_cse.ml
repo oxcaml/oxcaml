@@ -24,9 +24,40 @@ module Array = ArrayLabels
 
 type valnum = int
 
+let equal_valnum : valnum -> valnum -> bool = Int.equal
+
 (* Classification of operations *)
 
 type op_class = Cfg_cse_target_intf.op_class
+
+module State : sig
+  type t
+
+  val make : InstructionId.sequence -> t
+
+  val get_and_incr_instruction_id : t -> InstructionId.t
+
+  (** Value numbers are drawn from a per-function counter, so that value numbers
+      created on different control-flow paths are distinct; this is what makes
+      [Numbering.intersect] sound. *)
+  val fresh_valnum : t -> valnum
+end = struct
+  (* CR-soon xclerc for xclerc: factor out with the state of GI, IRC, LS. *)
+  type t =
+    { instruction_id : InstructionId.sequence;
+      mutable next_valnum : valnum
+    }
+
+  let make instruction_id = { instruction_id; next_valnum = 0 }
+
+  let get_and_incr_instruction_id state =
+    InstructionId.get_and_incr state.instruction_id
+
+  let fresh_valnum state =
+    let v = state.next_valnum in
+    state.next_valnum <- v + 1;
+    v
+end
 
 module type Operation = sig
   type t
@@ -58,10 +89,7 @@ module type S = sig
   val intersect : numbering -> numbering -> numbering
 
   val valnum_regs :
-    next_valnum:valnum ref ->
-    numbering ->
-    Reg.t array ->
-    numbering * valnum array
+    State.t -> numbering -> Reg.t array -> numbering * valnum array
 
   val find_equation : op_class -> numbering -> rhs -> valnum array option
 
@@ -69,16 +97,10 @@ module type S = sig
 
   val set_known_regs : numbering -> Reg.t array -> valnum array -> numbering
 
-  val set_move :
-    next_valnum:valnum ref -> numbering -> Reg.t -> Reg.t -> numbering
+  val set_move : State.t -> numbering -> Reg.t -> Reg.t -> numbering
 
   val set_fresh_regs :
-    next_valnum:valnum ref ->
-    numbering ->
-    Reg.t array ->
-    rhs ->
-    op_class ->
-    numbering
+    State.t -> numbering -> Reg.t array -> rhs -> op_class -> numbering
 
   val add_equation : op_class -> numbering -> rhs -> valnum array -> numbering
 
@@ -157,40 +179,36 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let empty_numbering = { num_eqs = Equations.empty; num_reg = Reg.Map.empty }
 
   (* Keep only the facts present in both numberings. This is sound because value
-     numbers are allocated from a per-function counter (see [fresh_valnum_reg]):
-     a register redefined on one of the paths reaching a join point has been
-     mapped to a fresh value number on that path, so the paths disagree on the
-     value number and the entry is dropped. Note that the intersection only
-     keeps facts inherited from a common ancestor state: an expression
-     recomputed independently on both paths receives distinct value numbers and
-     is conservatively dropped. *)
+     numbers are allocated from a per-function counter (see
+     [State.fresh_valnum]): a register redefined on one of the paths reaching a
+     join point has been mapped to a fresh value number on that path, so the
+     paths disagree on the value number and the entry is dropped. Note that the
+     intersection only keeps facts inherited from a common ancestor state: an
+     expression recomputed independently on both paths receives distinct value
+     numbers and is conservatively dropped. *)
   let intersect (n1 : numbering) (n2 : numbering) : numbering =
     if n1 == n2
     then n1
     else
       { num_eqs =
           Equations.intersect
-            (Misc.Stdlib.Array.equal Int.equal)
+            (Misc.Stdlib.Array.equal equal_valnum)
             n1.num_eqs n2.num_eqs;
         num_reg =
           Reg.Map.merge
             (fun _reg v1 v2 ->
               match v1, v2 with
-              | Some v1, Some v2 when v1 = v2 -> Some v1
+              | Some v1, Some v2 when equal_valnum v1 v2 -> Some v1
               | (Some _ | None), (Some _ | None) -> None)
             n1.num_reg n2.num_reg
       }
 
-  (** Generate a fresh value number [v] and associate it to register [r].
-      Returns a pair [(n',v)] with the updated value numbering [n'].
+  (** Generate a fresh value number [v] (see [State.fresh_valnum]) and associate
+      it to register [r]. Returns a pair [(n',v)] with the updated value
+      numbering [n']. *)
 
-      Value numbers are drawn from [next_valnum], a per-function counter, so
-      that value numbers created on different control-flow paths are distinct;
-      this is what makes [intersect] sound. *)
-
-  let fresh_valnum_reg ~next_valnum n r =
-    let v = !next_valnum in
-    next_valnum := v + 1;
+  let fresh_valnum_reg state n r =
+    let v = State.fresh_valnum state in
     { n with num_reg = Reg.Map.add r v n.num_reg }, v
 
   (* Same, for a set of registers [rs]. *)
@@ -211,20 +229,19 @@ module Make (Op : Operation) : S with type op = Op.t = struct
       done;
       !n, b
 
-  let fresh_valnum_regs ~next_valnum n rs =
-    array_fold_transf (fresh_valnum_reg ~next_valnum) n rs
+  let fresh_valnum_regs state n rs =
+    array_fold_transf (fresh_valnum_reg state) n rs
 
   (** [valnum_reg n r] returns the value number for the contents of register
       [r]. If none exists, a fresh value number is returned and associated with
       register [r]. The possibly updated numbering is also returned.
       [valnum_regs] is similar, but for an array of registers. *)
 
-  let valnum_reg ~next_valnum n r =
+  let valnum_reg state n r =
     try n, Reg.Map.find r n.num_reg
-    with Not_found -> fresh_valnum_reg ~next_valnum n r
+    with Not_found -> fresh_valnum_reg state n r
 
-  let valnum_regs ~next_valnum n rs =
-    array_fold_transf (valnum_reg ~next_valnum) n rs
+  let valnum_regs state n rs = array_fold_transf (valnum_reg state) n rs
 
   (* Look up the set of equations for an equation with the given rhs. Return
      [Some res] if there is one, where [res] is the lhs. *)
@@ -235,7 +252,9 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   (* Find a register containing the given value number. *)
 
   let find_reg_containing n v =
-    Reg.Map.fold (fun r v' res -> if v' = v then Some r else res) n.num_reg None
+    Reg.Map.fold
+      (fun r v' res -> if equal_valnum v' v then Some r else res)
+      n.num_reg None
 
   (* Find a set of registers containing the given value numbers. *)
 
@@ -271,15 +290,15 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   (* Record the effect of a move: no new equations, but the result reg maps to
      the same value number as the argument reg. *)
 
-  let set_move ~next_valnum n src dst =
-    let n1, v = valnum_reg ~next_valnum n src in
+  let set_move state n src dst =
+    let n1, v = valnum_reg state n src in
     { n1 with num_reg = Reg.Map.add dst v n1.num_reg }
 
   (* Record the equation [fresh valnums = rhs] and associate the given result
      registers [rs] to [fresh valnums]. *)
 
-  let set_fresh_regs ~next_valnum n rs rhs op_class =
-    let n1, vs = fresh_valnum_regs ~next_valnum n rs in
+  let set_fresh_regs state n rs rhs op_class =
+    let n1, vs = fresh_valnum_regs state n rs in
     { n1 with num_eqs = Equations.add op_class rhs vs n.num_eqs }
 
   (* Record the equation [vres = rhs] without modifying the register-to-valnum
@@ -320,29 +339,6 @@ open Numbering
 
 let debug = false
 
-module State : sig
-  type t
-
-  val make : InstructionId.sequence -> t
-
-  val get_and_incr_instruction_id : t -> InstructionId.t
-
-  val next_valnum : t -> valnum ref
-end = struct
-  (* CR-soon xclerc for xclerc: factor out with the state of GI, IRC, LS. *)
-  type t =
-    { instruction_id : InstructionId.sequence;
-      next_valnum : valnum ref
-    }
-
-  let make instruction_id = { instruction_id; next_valnum = ref 0 }
-
-  let get_and_incr_instruction_id state =
-    InstructionId.get_and_incr state.instruction_id
-
-  let next_valnum state = state.next_valnum
-end
-
 let insert_single_move :
     State.t -> Reg.t -> Reg.t -> Cfg.basic Cfg.instruction DLL.cell -> unit =
  fun state src dst cell ->
@@ -372,27 +368,6 @@ let insert_move :
     let insert_single_move src dst = insert_single_move state src dst cell in
     Array.iter2 tmps dsts ~f:insert_single_move;
     Array.iter2 srcs tmps ~f:insert_single_move
-
-(* Reverse postorder of the blocks reachable from the entry block, over both
-   normal and exceptional successors so that trap handlers are included. *)
-(* CR-someday xclerc for xclerc: see whether some code can be factored out with
-   [Cfg_dominators], which has its own (unexported) reverse postorder
-   computation. *)
-let reverse_postorder : Cfg.t -> Cfg.basic_block list =
- fun cfg ->
-  let visited = ref Label.Set.empty in
-  let accu = ref [] in
-  let rec visit (block : Cfg.basic_block) =
-    if not (Label.Set.mem block.start !visited)
-    then (
-      visited := Label.Set.add block.start !visited;
-      Label.Set.iter
-        (fun successor_label -> visit (Cfg.get_block_exn cfg successor_label))
-        (Cfg.successor_labels ~normal:true ~exn:true block);
-      accu := block :: !accu)
-  in
-  visit (Cfg.get_block_exn cfg cfg.entry_label);
-  !accu
 
 module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let class_of_operation0 : Operation.t -> op_class = function
@@ -534,7 +509,6 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let cse_instruction :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.cell -> numbering =
    fun state n cell ->
-    let next_valnum = State.next_valnum state in
     let i = DLL.value cell in
     match i.desc with
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
@@ -543,7 +517,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Op (Move | Spill | Reload) ->
       (* For moves, we associate the same value number to the result reg as to
          the argument reg. *)
-      let n1 = set_move ~next_valnum n i.arg.(0) i.res.(0) in
+      let n1 = set_move state n i.arg.(0) i.res.(0) in
       n1
     | Op Opaque ->
       (* Assume arbitrary side effects from Opaque *)
@@ -575,7 +549,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
-        let n1, varg = valnum_regs ~next_valnum n i.arg in
+        let n1, varg = valnum_regs state n i.arg in
         let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
         match find_equation op_class n1 (op, varg) with
         | Some vres -> (
@@ -600,19 +574,19 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
             n3)
         | None ->
           (* This operation produces a result we haven't seen earlier. *)
-          let n3 = set_fresh_regs ~next_valnum n2 i.res (op, varg) op_class in
+          let n3 = set_fresh_regs state n2 i.res (op, varg) op_class in
           n3)
       | Op_store false | Op_other ->
         (* An initializing store or an "other" operation do not invalidate any
            equations, but we do not know anything about the results. *)
-        let n1, varg = valnum_regs ~next_valnum n i.arg in
+        let n1, varg = valnum_regs state n i.arg in
         let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
         let n3 = set_unknown_regs n2 i.res in
         add_store_to_load_forwarding_equations n3 i varg
       | Op_store true ->
         (* A non-initializing store can invalidate anything we know about prior
            mutable loads. *)
-        let n1, varg = valnum_regs ~next_valnum n i.arg in
+        let n1, varg = valnum_regs state n i.arg in
         let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
         let n3 = set_unknown_regs n2 i.res in
         let n4 = kill_loads n3 in
@@ -648,7 +622,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          forget everything. *)
       empty_numbering
 
-  (* Blocks are visited in reverse postorder (see [reverse_postorder]).
+  (* Blocks are visited in reverse postorder (see [Cfg.reverse_postorder]), i.e.
+     every block is visited after all of its predecessors, except for the
+     predecessors that reach it through a back edge.
 
      The numbering at the start of a block is the empty numbering for the entry
      block and for trap handlers (since handlers are entered from the middle of
@@ -667,7 +643,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
      untouched. *)
   let cse_blocks : State.t -> Cfg.t -> unit =
    fun state cfg ->
-    let reverse_postorder = reverse_postorder cfg in
+    let reverse_postorder = Cfg.reverse_postorder cfg in
     let out_numberings : numbering Label.Tbl.t =
       Label.Tbl.create (Label.Tbl.length cfg.blocks)
     in
