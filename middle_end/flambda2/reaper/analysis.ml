@@ -21,12 +21,13 @@ module Scope = Analysis_scope
 
 type result = Unboxing_analysis.result
 
-let fixpoint (graph : Global_flow_graph.graph) ~analysis_scope:_ =
+let fixpoint (graph : Global_flow_graph.graph) ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
-  let db = Points_to_analysis.perform_analysis datalog ~stats in
-  let result = Unboxing_analysis.perform_analysis db ~stats in
+  let db = Points_to_analysis.perform_analysis datalog ~stats ~analysis_scope in
+  let result = Unboxing_analysis.perform_analysis db ~stats ~analysis_scope in
+  let db = result.db in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
