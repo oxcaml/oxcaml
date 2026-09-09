@@ -157,7 +157,7 @@ val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
 (** Convert a [Simple.t] to a dependency graph node. Constants map to the
     [all_constants] node; variables map to themselves; symbols from other
-    compilation units are marked [any_source]. *)
+    compilation units are recorded as imports for the solve. *)
 val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
 
 (** Mark a [Simple.t] as used, conditional on the current function (if any)
