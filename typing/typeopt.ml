@@ -1199,36 +1199,49 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
       sorts_and_types
   in
-  (* CR layout-polymorphism: Still reject layout variables here. A follow-up
-     can translate generalized sorts to [Lambda.Splice_variable] instead. *)
-  if not (Array.for_all Jkind.Sort.Const.is_concrete consts) then
-    raise (Typedecl.Error (loc, Typedecl.Layout_poly_variable_representation));
   let all_scannable =
-    Array.for_all
-      (fun (const : Jkind.Sort.Const.t) ->
-         match const with
-         | Base Scannable -> true
-         | _ -> false)
-      consts
+    let rec is_scannable : Jkind.Sort.Const.t -> bool = function
+      | Base Scannable -> true
+      | Addressable const -> is_scannable const
+      | Base _ | Product _ | Univar _ | Genvar _ -> false
+    in
+    Array.for_all is_scannable consts
   in
   let shape =
-    if all_scannable then
-      (* Optimization: the other branch would also compute [`Not_mixed] *)
-      `Not_mixed
+    if all_scannable then `Not_mixed
     else
-      let ts =
-        Array.to_list sorts_and_types
-        |> List.map (fun (_sort, ty) ->
-             Typedecl.Element_repr.classify env ty (Ctype.type_jkind env ty)
-               ~default_to_scannable:false)
+      let rec element (layout : Jkind_types.Layout.Const.t)
+          : unit Lambda.mixed_block_element =
+        match layout with
+        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+        | Product layouts ->
+            Product (Array.of_list (List.map element layouts))
+        | Addressable layout -> element layout
+        | Base (base, axes) ->
+            Typedecl.Element_repr.classify_base base axes
+            |> Typedecl.Element_repr.to_shape_element
+            |> Lambda.mixed_block_element_of_types
+        | Any _ | Univar _ ->
+            Misc.fatal_error
+              "Typeopt.finalize_instantiated_shape: unrepresentable layout"
       in
-      match Typedecl.Element_repr.mixed_product_shape loc ts kind with
-      | Ok `Not_mixed -> `Not_mixed
-      | Ok (`Mixed shape) -> `Mixed (Lambda.mixed_block_shape_of_types shape)
-      | Error (Typedecl.Element_repr.Unrepresentable_element _) ->
-          Misc.fatal_error
-            "Typeopt.finalize_instantiated_shape: unrepresentable element, \
-             but typechecking succeeded"
+      let shape =
+        Array.map (fun (_sort, ty) ->
+          match Jkind.get_layout env (Ctype.type_jkind env ty) with
+          | Some layout -> element layout
+          | None ->
+              Misc.fatal_error
+                "Typeopt.finalize_instantiated_shape: missing layout")
+          sorts_and_types
+      in
+      (* Shapes containing splices are checked after static evaluation *)
+      if not (Lambda.mixed_block_shape_has_splices shape) then begin
+        let counts = Mixed_product_bytes.count (Product shape) in
+        if not (Mixed_product_bytes.all_value counts) then
+          Typedecl.assert_mixed_product_support loc kind
+            ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+      end;
+      `Mixed shape
   in
   shape, consts
 

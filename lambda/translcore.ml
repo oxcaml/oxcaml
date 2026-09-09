@@ -682,9 +682,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
               | Constructor_mixed shape
                 when Mixed_product_bytes.shape_is_all_value shape ->
                   (* Note [Constant all-value mixed records]:
-                     Currently unreachable: mixed constructors with all-value
-                     shapes require void or product fields, which don't have
-                     constant representations, so [extract_constant] raises
+                     Currently unreachable. For a mixed constructor to contain
+                     all values, its shape must contain void, products, or
+                     splice variables. None of these have constant
+                     representations, so [extract_constant] raises
                      [Not_constant] first. *)
                   None
               | Constructor_mixed shape ->
@@ -2794,13 +2795,15 @@ and transl_idx ~scopes loc env ba uas =
       let shape = Lambda.split_mixed_block_shape_vectors shape in
       (* Check to make sure the gap never overflows.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-      let cts =
-        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
-      in
-      if Option.is_none
-           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
-      then
-        raise (Error (loc, Block_index_gap_overflow_possible));
+      if not (mixed_block_shape_has_splices shape) then begin
+        let cts =
+          Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
+        in
+        if Option.is_none
+             (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
+        then
+          raise (Error (loc, Block_index_gap_overflow_possible))
+      end;
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     end

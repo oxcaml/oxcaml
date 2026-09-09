@@ -2123,6 +2123,16 @@ and split_mixed_block_shape_vectors shape =
 let transl_mixed_product_shape shape =
   split_mixed_block_shape_vectors (mixed_block_shape_of_types shape)
 
+let mixed_block_shape_has_splices shape =
+  let rec has_splices : 'a mixed_block_element -> bool = function
+    | Splice_variable _ -> true
+    | Product shape -> Array.exists has_splices shape
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+    | Untagged_immediate -> false
+  in
+  Array.exists has_splices shape
+
 let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
     (elt : unit mixed_block_element) =
   match elt with

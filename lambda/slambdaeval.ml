@@ -515,7 +515,12 @@ and eval_lam_shallow ctx env lam =
     if new_bindings == old_bindings then lam else Lletrec (new_bindings, body)
   | Lprim (old_prim, args, loc) ->
     let new_prim = eval_prim env old_prim in
-    if new_prim == old_prim then lam else Lprim (new_prim, args, loc)
+    if new_prim == old_prim
+    then lam
+    else begin
+      check_evaluated_primitive loc new_prim;
+      Lprim (new_prim, args, loc)
+    end
   | Lswitch (scrutinee, switch, loc, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout
@@ -614,6 +619,21 @@ and eval_block_shape env block_shape =
   | Shape old_shape ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape then block_shape else Shape new_shape
+
+and eval_record_representation env (repr : record_representation) =
+  match repr with
+  | Record_mixed old_shape ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape then repr else Record_mixed new_shape
+  | Record_inlined (tag, Constructor_mixed old_shape, variant_repr) ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then repr
+    else Record_inlined (tag, Constructor_mixed new_shape, variant_repr)
+  | Record_unboxed | Record_boxed | Record_float | Record_ufloat
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_immediate_all_void), _) ->
+    repr
 
 and eval_mixed_block_shape :
     'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
@@ -725,6 +745,9 @@ and eval_prim env prim =
   | Pmakeblock (n, mut, old_shape, mode) ->
     let new_shape = eval_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pduprecord (old_repr, size) ->
+    let new_repr = eval_record_representation env old_repr in
+    if new_repr == old_repr then prim else Pduprecord (new_repr, size)
   | Pmixedfield (is, old_shape, sem) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
@@ -733,6 +756,16 @@ and eval_prim env prim =
     if new_shape == old_shape
     then prim
     else Psetmixedfield (is, new_shape, init_or_assign)
+  | Patomic_load_mixed_field { index; shape = old_shape } ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Patomic_load_mixed_field { index; shape = new_shape }
+  | Patomic_set_mixed_field { index; shape = old_shape; mode } ->
+    let new_shape = eval_mixed_block_shape env old_shape in
+    if new_shape == old_shape
+    then prim
+    else Patomic_set_mixed_field { index; shape = new_shape; mode }
   | Pmake_unboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -837,7 +870,7 @@ and eval_prim env prim =
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
+  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
   | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
@@ -867,8 +900,7 @@ and eval_prim env prim =
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
-  | Patomic_load_field _ | Patomic_load_mixed_field _ | Patomic_set_field _
-  | Patomic_set_mixed_field _ | Patomic_exchange_field _
+  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
   | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
@@ -883,6 +915,39 @@ and eval_prim env prim =
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax ->
     prim
+
+and check_evaluated_primitive loc prim =
+  let check_shape shape =
+    (* Shapes without splice variables were already checked. This check only
+       runs for prims that changed during static evaluation. *)
+    let counts = Mixed_product_bytes.count (Product shape) in
+    if not (Mixed_product_bytes.all_value counts)
+    then
+      Typedecl.assert_mixed_product_support
+        (Debuginfo.Scoped_location.to_location loc)
+        Block
+        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+  in
+  match prim with
+  | Pmakeblock (_, _, Shape shape, _)
+  | Psetmixedfield (_, shape, _)
+  | Patomic_load_mixed_field { shape; _ }
+  | Patomic_set_mixed_field { shape; _ }
+  | Pduprecord
+      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
+    ->
+    check_shape shape
+  | Pmixedfield (_, shape, _) -> check_shape shape
+  | Pmake_idx_mixed_field (shape, pos, path) ->
+    check_shape shape;
+    let counts = Mixed_product_bytes.Wrt_path.count_shape shape pos path in
+    if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
+    then
+      raise
+        (Translcore.Error
+           ( Debuginfo.Scoped_location.to_location loc,
+             Block_index_gap_overflow_possible ))
+  | _ -> ()
 
 (* Helpers for asserting that slambda is trivial. *)
 
@@ -948,7 +1013,12 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, Shape shape, _)
+  | Patomic_load_mixed_field { shape; _ }
+  | Patomic_set_mixed_field { shape; _ }
+  | Pduprecord
+      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
+    ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape

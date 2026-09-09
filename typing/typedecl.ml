@@ -54,12 +54,14 @@ module Mixed_product_kind = struct
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Block
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
     | Module -> "modules"
+    | Block -> "blocks"
 end
 
 type mixed_product_violation =
@@ -154,7 +156,6 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
@@ -2026,6 +2027,23 @@ module Element_repr = struct
     in
     of_t t
 
+  let classify_base (base : Jkind_types.Sort.base) sa =
+    match base with
+    | Scannable -> Value_element sa
+    | Float64 -> Unboxed_element Float64
+    | Float32 -> Unboxed_element Float32
+    | Word -> Unboxed_element Word
+    | Bits8 -> Unboxed_element Bits8
+    | Bits16 -> Unboxed_element Bits16
+    | Bits32 -> Unboxed_element Bits32
+    | Bits64 -> Unboxed_element Bits64
+    | Untagged_immediate -> Unboxed_element Untagged_immediate
+    | Vec128 -> Unboxed_element Vec128
+    | Vec256 -> Unboxed_element Vec256
+    | Vec512 -> Unboxed_element Vec512
+    | Mask -> Unboxed_element Mask
+    | Void -> Void
+
   (* If [default_to_scannable] is true, unfilled sort variables are defaulted;
      otherwise the element is classified as [None]. See the CR in
      [update_label_sorts]. *)
@@ -2041,21 +2059,7 @@ module Element_repr = struct
       in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
-      | Base (Scannable, sa) -> Some (Value_element sa)
-      | Base (Float64, _) -> Some (Unboxed_element Float64)
-      | Base (Float32, _) -> Some (Unboxed_element Float32)
-      | Base (Word, _) -> Some (Unboxed_element Word)
-      | Base (Bits8, _) -> Some (Unboxed_element Bits8)
-      | Base (Bits16, _) -> Some (Unboxed_element Bits16)
-      | Base (Bits32, _) -> Some (Unboxed_element Bits32)
-      | Base (Bits64, _) -> Some (Unboxed_element Bits64)
-      | Base (Untagged_immediate, _) ->
-        Some (Unboxed_element Untagged_immediate)
-      | Base (Vec128, _) -> Some (Unboxed_element Vec128)
-      | Base (Vec256, _) -> Some (Unboxed_element Vec256)
-      | Base (Vec512, _) -> Some (Unboxed_element Vec512)
-      | Base (Mask, _) -> Some (Unboxed_element Mask)
-      | Base (Void, _) -> Some Void
+      | Base (base, sa) -> Some (classify_base base sa)
       | Product l ->
         Misc.Stdlib.List.some_if_all_elements_are_some
           (List.map layout_to_t l)
@@ -6038,10 +6042,6 @@ let report_error ~loc = function
   | Layout_poly_unsupported ->
     Location.errorf ~loc
       "Layout polymorphism is unsupported in this context."
-  | Layout_poly_variable_representation ->
-    Location.errorf ~loc
-      "The representation of this record or variant depends on a@ \
-       layout-polymorphic type, which is not yet supported."
   | Misplaced_flatten_floats ->
     Location.errorf ~loc
       "The %a attribute is only allowed on records with one or more@ \

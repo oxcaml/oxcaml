@@ -1486,6 +1486,8 @@ val is_uniform_block_shape : block_shape -> bool
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
 
+val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
+
 val mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
   -> mixed_block_shape

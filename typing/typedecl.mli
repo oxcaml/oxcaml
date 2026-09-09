@@ -117,6 +117,13 @@ val instance_record_representation:
     (Types.label_declaration * Types.type_expr) list ->
     'rep
 
+module Element_repr : sig
+  type t
+
+  val classify_base : Jkind.Sort.base -> Jkind.Scannable_axes.t -> t
+  val to_shape_element : t -> Types.mixed_block_element
+end
+
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
@@ -147,20 +154,7 @@ module Mixed_product_kind : sig
     | Cstr_tuple
     | Cstr_record
     | Module
-end
-
-module Element_repr : sig
-  type t
-
-  val classify :
-    Env.t -> type_expr -> _ jkind -> default_to_scannable:bool -> t option
-
-  type unrepresentable_element = Unrepresentable_element of int
-
-  val mixed_product_shape :
-    Location.t -> t option list -> Mixed_product_kind.t ->
-    ([ `Not_mixed | `Mixed of mixed_product_shape ],
-     unrepresentable_element) result
+    | Block
 end
 
 val assert_mixed_product_support :
@@ -258,7 +252,6 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
-  | Layout_poly_variable_representation
   | Misplaced_flatten_floats
   | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
   | Bad_represent_as_float_array_attribute
