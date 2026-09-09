@@ -900,6 +900,28 @@ module Code_id = struct
 
   let previous_name_stamp = ref (-1)
 
+  (* Make sure [path], the mangling path of the scopes enclosing a function,
+     ends with an item identifying the function itself. It already does when its
+     last item is the function's own binding, an anonymous function, a lazy
+     expression or a partial application; otherwise (e.g. for a functor body,
+     whose innermost scope is the module it defines, or a body without location
+     information), [name], the name the middle end gave the function, is
+     appended. *)
+  let add_function_name ~name
+      (path : Compilation_unit.t Structured_mangling.path) =
+    match Misc.last path with
+    | Some (Function name') when String.equal name name' -> path
+    | Some (Anonymous_function _ | Lazy _ | Partial _) -> path
+    | Some
+        ( Compilation_unit _ | Inline_marker | Module _ | Anonymous_module _
+        | Class _ | Function _ | Stamp _ )
+    | None ->
+      path @ [Structured_mangling.Function name]
+
+  (* The mangling path of a function, without stamps. *)
+  let mangling_path_of ~name ~debug =
+    Debuginfo.to_structured_mangling_path debug |> add_function_name ~name
+
   let create ~name ~slot_stamp ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
@@ -928,7 +950,7 @@ module Code_id = struct
           | None -> [Stamp name_stamp]
           | Some slot_stamp -> [Stamp slot_stamp; Stamp name_stamp]
         in
-        let path = Debuginfo.to_structured_mangling_path ~name debug @ stamps in
+        let path = mangling_path_of ~name ~debug @ stamps in
         Symbol0.for_structured_mangling_path ~compilation_unit ~path
         |> Symbol0.linkage_name
     in
@@ -936,6 +958,10 @@ module Code_id = struct
       { compilation_unit; name; slot_stamp; debug_info = debug; linkage_name }
     in
     Table.add !grand_table_of_code_ids data
+
+  let mangling_path t =
+    let { Code_id_data.name; debug_info; _ } = find_data t in
+    mangling_path_of ~name ~debug:debug_info
 
   let rename t =
     let { Code_id_data.name; slot_stamp; debug_info; _ } = find_data t in

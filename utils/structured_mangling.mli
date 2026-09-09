@@ -57,10 +57,17 @@
     ordinal among such items directly enclosed in the same scope, so it only
     changes when the enclosing scope itself is edited. The stamps make otherwise
     identically-named symbols unique; keeping them out of the identifiers lets a
-    demangler omit them.
+    demangler omit them. Names without stamps are therefore not unique: the
+    wrappers of several partial applications of one callee in one scope, the
+    copies of a function specialised by inlining, or functions the frontend
+    creates without any scope information (e.g. for classes and objects) share a
+    name, which suits the aggregation of profiles those names are meant for.
 
-    Finally, [I] is a payload-free inline marker and [P], a partial application,
-    carries a position encoded as an identifier.
+    Finally, [I] is a payload-free inline marker, and [P] marks the closure
+    created by a partial application: it is followed by the number of items in
+    the path of the callee, terminated by [_], then by those items (e.g.
+    [P2_M5InnerF3add] for a partial application of [Inner.add]; [P0_] when the
+    callee is unknown).
 
     For example, [Foo.Bar.baz] in compilation unit [Foo] mangles to
     [_CamlU3FooM3BarF3baz], and the code of the second lambda directly inside
@@ -81,17 +88,18 @@ type 'cu path_item =
       (** [fun ... -> ...], numbered among the anonymous items of its scope *)
   | Lazy of int
       (** [lazy ...], numbered among the anonymous items of its scope *)
-  | Partial_function of int * int * string option
-      (** A partial application at (line, col, file) *)
+  | Partial of 'cu path
+      (** The closure created by a partial application of the function with the
+          given path (empty when unknown) *)
   | Stamp of int
       (** A compiler-generated stamp (of a function slot or a code ID) *)
 
-(* CR sspies: Support for object methods (they appear as regular functions) is
-   still missing. *)
-
 (** A mangling path is a list of path items representing the full lexical
     context of an identifier. *)
-type 'cu path = 'cu path_item list
+and 'cu path = 'cu path_item list
+
+(* CR sspies: Support for object methods (they appear as regular functions) is
+   still missing. *)
 
 (** Transform a {!Compilation_unit.t} and a {!path} into a mangled name suitable
     for creating a {!LinkageName.t} *)

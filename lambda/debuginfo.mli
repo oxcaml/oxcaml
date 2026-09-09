@@ -58,7 +58,17 @@ module Scoped_location : sig
   val enter_class_definition : scopes:scopes -> Ident.t -> scopes
   val enter_method_definition : scopes:scopes -> Asttypes.label -> scopes
   val enter_lazy : scopes:scopes -> scopes
-  val enter_partial_or_eta_wrapper : scopes:scopes -> loc:Location.t -> scopes
+  (* The closure created by a partial application of [callee] (when known). *)
+  val enter_partial_application :
+    scopes:scopes -> callee:Path.t option -> scopes
+  (* The eta-expansion of a primitive used as a value; unlike a partial
+     application, it does not appear in mangled names. *)
+  val enter_eta_wrapper : scopes:scopes -> scopes
+  (* Like [enter_partial_application], for the wrappers the middle end creates
+     at an application site: the callee is given by its mangling path, and the
+     scopes' string form is left unchanged. *)
+  val add_partial_application_item :
+    scopes:scopes -> Compilation_unit.t Structured_mangling.path -> scopes
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t
@@ -73,7 +83,7 @@ module Scoped_location : sig
   val to_location : t -> Location.t
   val string_of_scoped_location : include_zero_alloc:bool -> t -> string
 
-  val map_scopes : (scopes:scopes -> loc:Location.t -> scopes) -> t -> t
+  val map_scopes : (scopes -> scopes) -> t -> t
 end
 
 type item = private {
@@ -144,13 +154,18 @@ val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
-(** [to_structured_mangling_path ~name dbg] converts the debug info of a
-    function into a mangling path, i.e. the scopes enclosing the function
-    followed by an item identifying the function itself. [name] is the name the
-    middle end gave the function; it ends the path when the scopes do not
-    already identify the function (see the implementation for details). *)
+(** [to_structured_mangling_path dbg] converts the scopes recorded in the debug
+    info of a function into a mangling path, outermost first. The middle end
+    appends the items identifying the function itself (see [Code_id.create]). *)
 val to_structured_mangling_path :
-  name:string -> t -> Compilation_unit.t Structured_mangling.path
+  t -> Compilation_unit.t Structured_mangling.path
+
+(** [add_partial_application_item ~callee dbg] marks the function whose debug
+    info [dbg] is as the wrapper created by a partial application of the
+    function with mangling path [callee]: see
+    [Scoped_location.add_partial_application_item]. *)
+val add_partial_application_item :
+  callee:Compilation_unit.t Structured_mangling.path -> t -> t
 
 module Dbg : sig
   type t

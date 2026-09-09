@@ -527,8 +527,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let lam =
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             (of_location ~scopes e.exp_loc)
         in
         Translprim.transl_primitive_application
@@ -546,7 +545,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         event_after ~scopes e
           (transl_apply ~scopes ~tailcall ~inlined ~specialised
              ~assume_zero_alloc
-             ~position ~mode ~yielding
+             ~position ~mode ~yielding ~callee:path
              ~result_layout:layout lam extra_args
              (of_location ~scopes e.exp_loc))
       end
@@ -561,11 +560,20 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let assume_zero_alloc =
         zero_alloc_of_application ~num_args:(List.length oargs) zero_alloc funct
       in
+      let callee =
+        match funct.exp_desc with
+        | Texp_ident { path; _ } ->
+          (* Expanding module aliases and [open]s gives the same name to every
+             way of referring to the callee. *)
+          Some
+            (Env.normalize_value_path (Some funct.exp_loc) funct.exp_env path)
+        | _ -> None
+      in
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
            ~assume_zero_alloc
            ~result_layout:layout
-           ~position ~mode ~yielding
+           ~position ~mode ~yielding ?callee
            (transl_exp ~scopes Lambda.layout_function funct)
            oargs (of_location ~scopes e.exp_loc))
   | Texp_match(arg, arg_sort, pat_expr_list, [], partial) ->
@@ -1695,6 +1703,7 @@ and transl_apply ~scopes
       ?(position=Rc_normal)
       ?(mode=not_alloc_stack)
       ?(yielding=May_yield)
+      ?callee
       ~result_layout
       lam sargs loc
   =
@@ -1743,8 +1752,7 @@ and transl_apply ~scopes
          always false currently for them. *)
         let loc =
           map_scopes
-            (fun ~scopes ~loc:_ ->
-              update_assume_zero_alloc ~assume_zero_alloc ~scopes)
+            (fun scopes -> update_assume_zero_alloc ~assume_zero_alloc ~scopes)
             loc
         in
         Lapply {
@@ -1805,7 +1813,11 @@ and transl_apply ~scopes
         let id_arg_duid = Lambda.debug_uid_none in
         (* Process remaining arguments and build closure *)
         let body =
-          let loc = map_scopes enter_partial_or_eta_wrapper loc in
+          let loc =
+            map_scopes
+              (fun scopes -> enter_partial_application ~scopes ~callee)
+              loc
+          in
           let mode = transl_alloc_mode_r mode_closure in
           let arg_mode = transl_alloc_mode_l mode_arg in
           let ret_mode = transl_ret_mode mode_ret in

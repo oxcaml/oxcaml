@@ -705,9 +705,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
             remaining_params ~body ~my_closure ~my_alloc_mode ~my_depth
             ~free_names_of_body:Unknown
         in
-        let name =
-          Function_slot.to_string callee's_function_slot ^ "_partial"
-        in
+        let name = Function_slot.name callee's_function_slot ^ "_partial" in
         let absolute_history, relative_history =
           DE.inlining_history_tracker (DA.denv dacc)
           |> Inlining_history.Tracker.fundecl
@@ -716,8 +714,14 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         in
         let code_id =
           (* [name] is derived from the callee's function slot rather than the
-             wrapper's own, so no slot stamp is recorded here. *)
-          Code_id.create ~name ~slot_stamp:None ~debug:dbg
+             wrapper's own, so no slot stamp is recorded here. It only names the
+             wrapper when the application has no debug info to attach the callee
+             to. *)
+          Code_id.create ~name ~slot_stamp:None
+            ~debug:
+              (Debuginfo.add_partial_application_item
+                 ~callee:(Code_id.mangling_path callee's_code_id)
+                 dbg)
             (Current_unit.get_cu_exn ())
         in
         (* We could create better result types by combining the types for the

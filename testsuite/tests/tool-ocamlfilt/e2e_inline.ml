@@ -104,7 +104,13 @@ let use_first_class x =
    two is indistinguishable from a direct one. *)
 let use_transitive x = E2e_inline_mid.relay x 100
 
+(* A partial application of a function from another unit: the wrapper
+   the middle end creates names the callee with its unit,
+   [partial{E2e_inline_lib.add}]. *)
+let add_one = E2e_inline_lib.add (Sys.opaque_identity 1)
+
 let () =
+  ignore (add_one 41);
   ignore (inline_squares 3 4);
   ignore (chain_three 1 2 3);
   ignore (composed 5);

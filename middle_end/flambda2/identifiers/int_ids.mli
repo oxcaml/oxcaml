@@ -268,6 +268,10 @@ module Code_id : sig
       was given. *)
   val name : t -> string
 
+  (** The mangling path of the function in the structured scheme, without
+      stamps; used to name the wrappers of its partial applications. *)
+  val mangling_path : t -> Compilation_unit.t Structured_mangling.path
+
   (* The [rename] function, in addition to changing the stamp of the code ID,
      changes the compilation unit to the current one. *)
   val rename : t -> t

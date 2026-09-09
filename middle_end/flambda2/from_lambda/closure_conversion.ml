@@ -3626,6 +3626,18 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         (Partial_application_mode_mismatch_in_lambda
            (Debuginfo.from_location apply.loc)) )
   else
+    (* Name the wrapper after the callee, when it is known. *)
+    let loc =
+      match (approx : Env.value_approximation) with
+      | Closure_approximation { code_id; _ } ->
+        Debuginfo.Scoped_location.map_scopes
+          (fun scopes ->
+            Debuginfo.Scoped_location.add_partial_application_item ~scopes
+              (Code_id.mangling_path code_id))
+          apply.loc
+      | Unknown _ | Value_symbol _ | Value_const _ | Block_approximation _ ->
+        apply.loc
+    in
     let function_declarations =
       [ Function_decl.create ~let_rec_ident:(Some wrapper_id)
           ~let_rec_uid:wrapper_id_duid ~function_slot
@@ -3638,7 +3650,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
           ~params ~params_arity ~removed_params:Ident.Set.empty
           ~return:result_arity ~calling_convention:Normal_calling_convention
           ~return_continuation ~exn_continuation ~my_alloc_region ~my_region
-          ~my_ghost_region ~body:fbody ~attr ~loc:apply.loc ~free_idents_of_body
+          ~my_ghost_region ~body:fbody ~attr ~loc ~free_idents_of_body
           ~closure_alloc_mode ~first_complex_local_param ~result_mode
           Recursive.Non_recursive ]
     in

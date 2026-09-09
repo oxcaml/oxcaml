@@ -2602,7 +2602,7 @@ let transl_primitive
   | _ ->
      let loc =
        Debuginfo.Scoped_location.map_scopes
-         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
+         (fun scopes -> Debuginfo.Scoped_location.enter_eta_wrapper ~scopes)
          loc
      in
      let body =

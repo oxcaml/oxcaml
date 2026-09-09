@@ -307,6 +307,28 @@ module Ordinals = struct
   let thunk = lazy (Sys.opaque_identity 41 + 1)
 end
 
+(* {1 Partial application}
+
+   A partial application that the frontend compiles to a closure (a
+   later labelled argument is supplied while an earlier one is omitted)
+   is marked [partial{<callee>}], with the callee's path as written at
+   the application site. Merely using a primitive as a first-class value
+   ([let neg = ( ~- )]) is an eta-expansion, not a partial application,
+   so it gets no marker: the wrapper simply is [neg]. The middle end
+   marks the wrappers it creates for the partial applications it
+   compiles itself ([curried]) in the same way. *)
+module Partial = struct
+  let[@inline never] labelled ~a ~b = a - b
+
+  let[@inline never] omit_first x = labelled ~b:x
+
+  let neg = ( ~- )
+end
+
+let[@inline never] omit_first_qualified x = Partial.labelled ~b:x
+
+let curried = Partial.labelled ~a:(Sys.opaque_identity 1)
+
 (* {1 Force evaluation so the symbols are not stripped} *)
 
 let _ =
@@ -338,4 +360,8 @@ let _ =
   ignore (Alternating.anon_first 4 5);
   ignore (Ordinals.siblings_and_nesting [ 1; -2; 3 ]);
   ignore (Ordinals.labelled_out_of_order 6);
-  ignore (Lazy.force Ordinals.thunk)
+  ignore (Lazy.force Ordinals.thunk);
+  ignore (Partial.omit_first 1 ~a:2);
+  ignore (omit_first_qualified 3 ~a:4);
+  ignore (Partial.neg 5);
+  ignore (curried ~b:6)
