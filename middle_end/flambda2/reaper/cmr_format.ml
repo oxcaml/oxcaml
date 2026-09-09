@@ -116,7 +116,8 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  val deserialise_deps_only : t -> Global_flow_graph.graph
+  val deserialise_for_solve :
+    t -> Global_flow_graph.graph * Traverse_acc.code_dep Code_id.Map.t
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -242,7 +243,7 @@ end = struct
       rebuild_data
     }
 
-  let deserialise_deps_only
+  let deserialise_for_solve
       { original_compilation_unit;
         table_data;
         used_value_slots;
@@ -251,7 +252,7 @@ end = struct
         all_code = _;
         imported_offsets = _;
         deps;
-        rebuild_data = _
+        rebuild_data
       } =
     (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
        requires as a separate argument. We're not deserialising any
@@ -260,7 +261,18 @@ end = struct
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit
     in
-    Deps_with_fields.deserialise deps renaming
+    let deps = Deps_with_fields.deserialise deps renaming in
+    let code_deps =
+      Code_id.Map.fold
+        (fun code_id code_dep map ->
+          Code_id.Map.add
+            (Renaming.apply_code_id renaming code_id)
+            (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+            map)
+        (Reaper.Staged.Traverse_rebuild.code_deps rebuild_data)
+        Code_id.Map.empty
+    in
+    deps, code_deps
 
   let compilation_unit t = t.original_compilation_unit
 end
