@@ -266,7 +266,7 @@ let flambda_to_flambda0 : type m.
         | Lto_support ->
           let deps, slot_offsets_inputs, code_changes_inputs, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
-              ~all_code flambda
+              ~all_code ~closed_world:true flambda
           in
           let cmr_payload =
             Some
