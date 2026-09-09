@@ -231,8 +231,8 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
-    | Lprim (p, args, _) ->
-      size_of_primitive env p args
+    | Lprim (p, args, loc) ->
+      size_of_primitive env loc p args
     | Lswitch (_, sw, _, _) ->
       let fail_case =
         match sw.sw_failaction with
@@ -301,7 +301,21 @@ let compute_static_size lam =
     else Array.length shape
   and uniform_block_size ~tag size =
     if size = 0 then Empty_block { tag } else Regular_block size
-  and size_of_primitive env p args =
+  and size_of_primitive env loc p args =
+    let check_shape shape =
+      if Lambda.mixed_block_shape_has_splices shape then
+        Location.raise_errorf ~loc:(Debuginfo.Scoped_location.to_location loc)
+          "Recursive definitions of layout-polymorphic blocks are not \
+           currently supported."
+    in
+    begin match p with
+    | Pmakeblock (_, _, Shape shape, _)
+    | Pduprecord
+        ((Record_mixed shape
+         | Record_inlined (_, Constructor_mixed shape, _)), _) ->
+      check_shape shape
+    | _ -> ()
+    end;
     match p with
     | Pignore
     | Psetfield _
