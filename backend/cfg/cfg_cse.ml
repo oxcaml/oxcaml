@@ -22,9 +22,29 @@ module DLL = Doubly_linked_list
 module List = ListLabels
 module Array = ArrayLabels
 
-type valnum = int
+(* Value numbers. They are allocated sequentially, from a per-function counter
+   (see [State.fresh_valnum]). *)
+module Valnum : sig
+  type t
 
-let equal_valnum : valnum -> valnum -> bool = Int.equal
+  val first : t
+
+  val succ : t -> t
+
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
+end = struct
+  type t = int
+
+  let first = 0
+
+  let succ v = v + 1
+
+  let equal = Int.equal
+
+  let compare = Int.compare
+end
 
 (* Classification of operations *)
 
@@ -40,22 +60,22 @@ module State : sig
   (** Value numbers are drawn from a per-function counter, so that value numbers
       created on different control-flow paths are distinct; this is what makes
       [Numbering.intersect] sound. *)
-  val fresh_valnum : t -> valnum
+  val fresh_valnum : t -> Valnum.t
 end = struct
   (* CR-soon xclerc for xclerc: factor out with the state of GI, IRC, LS. *)
   type t =
     { instruction_id : InstructionId.sequence;
-      mutable next_valnum : valnum
+      mutable next_valnum : Valnum.t
     }
 
-  let make instruction_id = { instruction_id; next_valnum = 0 }
+  let make instruction_id = { instruction_id; next_valnum = Valnum.first }
 
   let get_and_incr_instruction_id state =
     InstructionId.get_and_incr state.instruction_id
 
   let fresh_valnum state =
     let v = state.next_valnum in
-    state.next_valnum <- v + 1;
+    state.next_valnum <- Valnum.succ v;
     v
 end
 
@@ -67,7 +87,7 @@ end
 module type S = sig
   type op
 
-  type rhs = op * valnum array
+  type rhs = op * Valnum.t array
 
   module Equations : sig
     module Rhs_map : Map.S with type key = rhs
@@ -79,8 +99,8 @@ module type S = sig
   end
 
   type numbering =
-    { num_eqs : valnum array Equations.t; (* mapping rhs -> valnums *)
-      num_reg : valnum Reg.Map.t
+    { num_eqs : Valnum.t array Equations.t; (* mapping rhs -> valnums *)
+      num_reg : Valnum.t Reg.Map.t
     }
   (* mapping register -> valnum *)
 
@@ -89,20 +109,20 @@ module type S = sig
   val intersect : numbering -> numbering -> numbering
 
   val valnum_regs :
-    State.t -> numbering -> Reg.t array -> numbering * valnum array
+    State.t -> numbering -> Reg.t array -> numbering * Valnum.t array
 
-  val find_equation : op_class -> numbering -> rhs -> valnum array option
+  val find_equation : op_class -> numbering -> rhs -> Valnum.t array option
 
-  val find_regs_containing : numbering -> valnum array -> Reg.t array option
+  val find_regs_containing : numbering -> Valnum.t array -> Reg.t array option
 
-  val set_known_regs : numbering -> Reg.t array -> valnum array -> numbering
+  val set_known_regs : numbering -> Reg.t array -> Valnum.t array -> numbering
 
   val set_move : State.t -> numbering -> Reg.t -> Reg.t -> numbering
 
   val set_fresh_regs :
     State.t -> numbering -> Reg.t array -> rhs -> op_class -> numbering
 
-  val add_equation : op_class -> numbering -> rhs -> valnum array -> numbering
+  val add_equation : op_class -> numbering -> rhs -> Valnum.t array -> numbering
 
   val set_unknown_regs : numbering -> Reg.t array -> numbering
 
@@ -117,13 +137,16 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   (* We maintain sets of equations of the form valnums = operation(valnums) plus
      a mapping from registers to valnums (value numbers). *)
 
-  type rhs = op * valnum array
+  type rhs = op * Valnum.t array
 
   module Equations = struct
     module Rhs_map = Map.Make (struct
       type t = rhs
 
-      let compare = Stdlib.compare
+      let compare ((op1, vs1) : t) ((op2, vs2) : t) =
+        match Stdlib.compare op1 op2 with
+        | 0 -> Misc.Stdlib.Array.compare Valnum.compare vs1 vs2
+        | c -> c
     end)
 
     type 'a t =
@@ -171,8 +194,8 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   end
 
   type numbering =
-    { num_eqs : valnum array Equations.t; (* mapping rhs -> valnums *)
-      num_reg : valnum Reg.Map.t
+    { num_eqs : Valnum.t array Equations.t; (* mapping rhs -> valnums *)
+      num_reg : Valnum.t Reg.Map.t
     }
   (* mapping register -> valnum *)
 
@@ -192,13 +215,13 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     else
       { num_eqs =
           Equations.intersect
-            (Misc.Stdlib.Array.equal equal_valnum)
+            (Misc.Stdlib.Array.equal Valnum.equal)
             n1.num_eqs n2.num_eqs;
         num_reg =
           Reg.Map.merge
             (fun _reg v1 v2 ->
               match v1, v2 with
-              | Some v1, Some v2 when equal_valnum v1 v2 -> Some v1
+              | Some v1, Some v2 when Valnum.equal v1 v2 -> Some v1
               | (Some _ | None), (Some _ | None) -> None)
             n1.num_reg n2.num_reg
       }
@@ -213,24 +236,8 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   (* Same, for a set of registers [rs]. *)
 
-  let array_fold_transf (f : numbering -> 'a -> numbering * 'b) n (a : 'a array)
-      : numbering * 'b array =
-    match Array.length a with
-    | 0 -> n, [||]
-    | 1 ->
-      let n', b = f n a.(0) in
-      n', [| b |]
-    | l ->
-      let b = Array.make l 0 and n = ref n in
-      for i = 0 to l - 1 do
-        let n', x = f !n a.(i) in
-        b.(i) <- x;
-        n := n'
-      done;
-      !n, b
-
   let fresh_valnum_regs state n rs =
-    array_fold_transf (fresh_valnum_reg state) n rs
+    Array.fold_left_map ~f:(fresh_valnum_reg state) ~init:n rs
 
   (** [valnum_reg n r] returns the value number for the contents of register
       [r]. If none exists, a fresh value number is returned and associated with
@@ -241,7 +248,8 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     try n, Reg.Map.find r n.num_reg
     with Not_found -> fresh_valnum_reg state n r
 
-  let valnum_regs state n rs = array_fold_transf (valnum_reg state) n rs
+  let valnum_regs state n rs =
+    Array.fold_left_map ~f:(valnum_reg state) ~init:n rs
 
   (* Look up the set of equations for an equation with the given rhs. Return
      [Some res] if there is one, where [res] is the lhs. *)
@@ -253,7 +261,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   let find_reg_containing n v =
     Reg.Map.fold
-      (fun r v' res -> if equal_valnum v' v then Some r else res)
+      (fun r v' res -> if Valnum.equal v' v then Some r else res)
       n.num_reg None
 
   (* Find a set of registers containing the given value numbers. *)
@@ -471,7 +479,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
      later stores, atomics, fences, allocations, polls and calls remove them
      through the existing invalidation logic. *)
   let store_to_load_forwarding_equations (instr : Cfg.basic Cfg.instruction)
-      (varg : valnum array) : (rhs * valnum array) list =
+      (varg : Valnum.t array) : (rhs * Valnum.t array) list =
     match instr.desc with
     | Op (Store (memory_chunk, addressing_mode, _)) ->
       let vaddr = Array.sub varg ~pos:1 ~len:(Array.length varg - 1) in
@@ -502,7 +510,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
      [store_to_load_forwarding_equations] above for the requirements on [varg]
      and on the point at which this must be called). *)
   let add_store_to_load_forwarding_equations (n : numbering)
-      (instr : Cfg.basic Cfg.instruction) (varg : valnum array) : numbering =
+      (instr : Cfg.basic Cfg.instruction) (varg : Valnum.t array) : numbering =
     List.fold_left (store_to_load_forwarding_equations instr varg) ~init:n
       ~f:(fun n (rhs, vres) -> add_equation (Op_load Mutable) n rhs vres)
 
