@@ -56,8 +56,7 @@ end = struct
       field_of_constructor_is_used : Serialisation.Nf.t;
       field_of_constructor_is_used_top : Serialisation.Nf.t;
       field_of_constructor_is_used_as : Serialisation.Nfn.t;
-      allocation_point_dominator : Serialisation.Nn.t;
-      cannot_change_calling_convention : Serialisation.N.t
+      allocation_point_dominator : Serialisation.Nn.t
     }
 
   let of_database db : t =
@@ -79,9 +78,7 @@ end = struct
       field_of_constructor_is_used_as =
         get Points_to_analysis.Relations.field_of_constructor_is_used_as_table;
       allocation_point_dominator =
-        get Points_to_analysis.Relations.allocation_point_dominator_table;
-      cannot_change_calling_convention =
-        get Unboxing_analysis.cannot_change_calling_convention_table
+        get Points_to_analysis.Relations.allocation_point_dominator_table
     }
 
   let to_database
@@ -98,8 +95,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) =
     (* CR mvellacott: it would be nice to make reading a table that was not
@@ -132,9 +128,6 @@ end = struct
     |> Datalog.set_table
          Points_to_analysis.Relations.allocation_point_dominator_table
          allocation_point_dominator
-    |> Datalog.set_table
-         Unboxing_analysis.cannot_change_calling_convention_table
-         cannot_change_calling_convention
 
   let ids_for_export
       ({ constructor;
@@ -150,8 +143,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) =
     let ids = Ids_for_export.empty in
@@ -169,7 +161,6 @@ end = struct
     let ids = Serialisation.Nf.add_ids field_of_constructor_is_used_top ids in
     let ids = Serialisation.Nfn.add_ids field_of_constructor_is_used_as ids in
     let ids = Serialisation.Nn.add_ids allocation_point_dominator ids in
-    let ids = Serialisation.N.add_ids cannot_change_calling_convention ids in
     ids
 
   let fields_for_export
@@ -186,8 +177,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator = _;
-         cannot_change_calling_convention = _
+         allocation_point_dominator = _
        } :
         t) =
     let fields = Field.Set.empty in
@@ -218,8 +208,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) renaming ~rename_field : t =
     let rename_id = Renaming.apply_code_id_or_name renaming in
@@ -245,9 +234,7 @@ end = struct
         Serialisation.Nfn.rename field_of_constructor_is_used_as ~rename_id
           ~rename_field;
       allocation_point_dominator =
-        Serialisation.Nn.rename allocation_point_dominator ~rename_id;
-      cannot_change_calling_convention =
-        Serialisation.N.rename cannot_change_calling_convention ~rename_id
+        Serialisation.Nn.rename allocation_point_dominator ~rename_id
     }
 
   let empty =
@@ -264,8 +251,7 @@ end = struct
       field_of_constructor_is_used = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_top = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_as = Code_id_or_name.Map.empty;
-      allocation_point_dominator = Code_id_or_name.Map.empty;
-      cannot_change_calling_convention = Code_id_or_name.Map.empty
+      allocation_point_dominator = Code_id_or_name.Map.empty
     }
 
   let disjoint_union t1 t2 =
@@ -288,10 +274,7 @@ end = struct
       field_of_constructor_is_used_as =
         u t1.field_of_constructor_is_used_as t2.field_of_constructor_is_used_as;
       allocation_point_dominator =
-        u t1.allocation_point_dominator t2.allocation_point_dominator;
-      cannot_change_calling_convention =
-        u t1.cannot_change_calling_convention
-          t2.cannot_change_calling_convention
+        u t1.allocation_point_dominator t2.allocation_point_dominator
     }
 
   (* Mutable counterpart of [t], so that [partition_by_compilation_unit] can
@@ -311,8 +294,7 @@ end = struct
       mutable field_of_constructor_is_used : Serialisation.Nf.t;
       mutable field_of_constructor_is_used_top : Serialisation.Nf.t;
       mutable field_of_constructor_is_used_as : Serialisation.Nfn.t;
-      mutable allocation_point_dominator : Serialisation.Nn.t;
-      mutable cannot_change_calling_convention : Serialisation.N.t
+      mutable allocation_point_dominator : Serialisation.Nn.t
     }
 
   let create_accumulator () : accumulator =
@@ -329,8 +311,7 @@ end = struct
       field_of_constructor_is_used = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_top = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_as = Code_id_or_name.Map.empty;
-      allocation_point_dominator = Code_id_or_name.Map.empty;
-      cannot_change_calling_convention = Code_id_or_name.Map.empty
+      allocation_point_dominator = Code_id_or_name.Map.empty
     }
 
   let to_solution_tables
@@ -347,8 +328,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         accumulator) : t =
     { constructor;
@@ -364,8 +344,7 @@ end = struct
       field_of_constructor_is_used;
       field_of_constructor_is_used_top;
       field_of_constructor_is_used_as;
-      allocation_point_dominator;
-      cannot_change_calling_convention
+      allocation_point_dominator
     }
 
   let partition_by_compilation_unit (t : t) =
@@ -443,11 +422,6 @@ end = struct
         acc.allocation_point_dominator
           <- add acc.allocation_point_dominator id value)
       t.allocation_point_dominator;
-    distribute_across_section_tables
-      (fun acc id value ->
-        acc.cannot_change_calling_convention
-          <- add acc.cannot_change_calling_convention id value)
-      t.cannot_change_calling_convention;
     Compilation_unit.Tbl.fold
       (fun cu accumulator acc ->
         Compilation_unit.Map.add cu (to_solution_tables accumulator) acc)
@@ -503,6 +477,7 @@ module Shard : sig
     changed_representation:
       (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t ->
+    code_changes:Unboxing_analysis.code_changes ->
     t * Field.Set.t * Compilation_unit.Set.t
 
   val deserialise :
@@ -512,6 +487,7 @@ module Shard : sig
     * Unboxing_analysis.unboxed Code_id_or_name.Map.t
     * (Unboxing_analysis.changed_representation * Code_id_or_name.t)
       Code_id_or_name.Map.t
+    * Unboxing_analysis.code_changes
 end = struct
   type t =
     { table_data : Flambda_cmx_format.table_data;
@@ -519,10 +495,12 @@ end = struct
       unboxed_fields : Unboxing_analysis.unboxed Code_id_or_name.Map.t;
       changed_representation :
         (Unboxing_analysis.changed_representation * Code_id_or_name.t)
-        Code_id_or_name.Map.t
+        Code_id_or_name.Map.t;
+      code_changes : Unboxing_analysis.code_changes
     }
 
-  let create ~solution_tables ~unboxed_fields ~changed_representation =
+  let create ~solution_tables ~unboxed_fields ~changed_representation
+      ~code_changes =
     let ids = Solution_tables.ids_for_export solution_tables in
     let ids =
       Unboxing_analysis.unboxed_fields_ids_for_export unboxed_fields ids
@@ -531,6 +509,7 @@ end = struct
       Unboxing_analysis.changed_representation_ids_for_export
         changed_representation ids
     in
+    let ids = Unboxing_analysis.code_changes_ids_for_export code_changes ids in
     let fields = Solution_tables.fields_for_export solution_tables in
     let fields =
       Unboxing_analysis.unboxed_fields_fields_for_export unboxed_fields fields
@@ -539,20 +518,28 @@ end = struct
       Unboxing_analysis.changed_representation_fields_for_export
         changed_representation fields
     in
+    let fields =
+      Unboxing_analysis.code_changes_fields_for_export code_changes fields
+    in
     ( { table_data = Flambda_cmx_format.create_table_data ids;
         solution_tables;
         unboxed_fields;
-        changed_representation
+        changed_representation;
+        code_changes
       },
       fields,
       compilation_units_of_ids ids )
 
   let deserialise
-      { table_data; solution_tables; unboxed_fields; changed_representation }
-      ~rename_field =
+      { table_data;
+        solution_tables;
+        unboxed_fields;
+        changed_representation;
+        code_changes
+      } ~rename_field =
     (* [used_value_slots] and [original_compilation_unit] only drive value-slot
-       pruning, which is only consulted when rewriting Flambda types, and the
-       solution contains no types. [code_ids] is only needed by
+       pruning, which is only consulted when rewriting Flambda types. The
+       solution stores kinds but no Flambda types. [code_ids] is only needed by
        [Exported_code.apply_renaming], and the solution contains no code. *)
     let renaming, (_code_ids : Code_id.importer) =
       Flambda_cmx_format.import_renaming ~table_data
@@ -570,7 +557,11 @@ end = struct
       Unboxing_analysis.changed_representation_apply_renaming
         changed_representation renaming ~rename_field
     in
-    solution_tables, unboxed_fields, changed_representation
+    let code_changes =
+      Unboxing_analysis.code_changes_apply_renaming code_changes renaming
+        ~rename_field
+    in
+    solution_tables, unboxed_fields, changed_representation, code_changes
 end
 
 module Header = struct
@@ -587,8 +578,8 @@ module Header = struct
       (* Fields are hashconsed per-process, so the solution is stored with views
          of them in the style of [table_data]. One list serves all sections. *)
       field_views : Fields_for_export.t;
-      (* One section per compilation unit that keys any fact (participant or
-         not), in section order. *)
+      (* One section per compilation unit that keys any fact or calling-
+         convention decision (participant or not), in section order. *)
       index : (Compilation_unit.t * File_sections.Idx.t) list;
       section_toc : int array
     }
@@ -621,10 +612,22 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let save ~filename ~participants ~solution =
+let partition_code_changes_by_cu code_changes =
+  Code_id.Map.fold
+    (fun code_id change acc ->
+      let cu = Code_id.get_compilation_unit code_id in
+      Compilation_unit.Map.update cu
+        (fun part ->
+          let part = Option.value part ~default:Code_id.Map.empty in
+          Some (Code_id.Map.add code_id change part))
+        acc)
+    code_changes Compilation_unit.Map.empty
+
+let save ~filename ~participants
+    ~solution:({ uses; code_changes } : Reaper.Staged.solution) =
   let ({ db; unboxed_fields; changed_representation }
         : Unboxing_analysis.result) =
-    solution
+    uses
   in
   let tables_by_cu =
     Solution_tables.partition_by_compilation_unit
@@ -632,15 +635,18 @@ let save ~filename ~participants ~solution =
   in
   let unboxed_by_cu = partition_by_cu unboxed_fields in
   let changed_by_cu = partition_by_cu changed_representation in
-  (* Combine the three partitions into one map over the union of their key sets,
+  let code_changes_by_cu = partition_code_changes_by_cu code_changes in
+  (* Combine the four partitions into one map over the union of their key sets,
      with empty defaults. *)
   let shard_inputs =
     let all_units =
       Compilation_unit.Set.union
-        (Compilation_unit.Map.keys tables_by_cu)
         (Compilation_unit.Set.union
-           (Compilation_unit.Map.keys unboxed_by_cu)
-           (Compilation_unit.Map.keys changed_by_cu))
+           (Compilation_unit.Map.keys tables_by_cu)
+           (Compilation_unit.Map.keys unboxed_by_cu))
+        (Compilation_unit.Set.union
+           (Compilation_unit.Map.keys changed_by_cu)
+           (Compilation_unit.Map.keys code_changes_by_cu))
     in
     let find cu map ~default =
       Option.value (Compilation_unit.Map.find_opt cu map) ~default
@@ -649,7 +655,8 @@ let save ~filename ~participants ~solution =
       (fun cu ->
         ( find cu tables_by_cu ~default:Solution_tables.empty,
           find cu unboxed_by_cu ~default:Code_id_or_name.Map.empty,
-          find cu changed_by_cu ~default:Code_id_or_name.Map.empty ))
+          find cu changed_by_cu ~default:Code_id_or_name.Map.empty,
+          find cu code_changes_by_cu ~default:Code_id.Map.empty ))
       all_units
   in
   let builder =
@@ -657,10 +664,14 @@ let save ~filename ~participants ~solution =
   in
   let rev_index, fields, referenced_by_section =
     Compilation_unit.Map.fold
-      (fun cu (solution_tables, unboxed_fields, changed_representation)
-           (rev_index, fields, referenced_by_section) ->
+      (fun cu
+           ( solution_tables,
+             unboxed_fields,
+             changed_representation,
+             code_changes ) (rev_index, fields, referenced_by_section) ->
         let shard, shard_fields, referenced =
           Shard.create ~solution_tables ~unboxed_fields ~changed_representation
+            ~code_changes
         in
         let idx = File_sections.Builder.add builder (Obj.repr shard) in
         ( (cu, idx) :: rev_index,
@@ -742,9 +753,9 @@ let solution_for_members { header; sections } ~members =
      a participant [P], [referenced_by_graph(P)] (its [Header.participants]
      entry) is computed before the solve: the units whose identifiers appear in
      [P]'s code and graph. [section_references(P)] is computed after the solve:
-     the units whose identifiers appear in the facts keyed by [P]. A fact is
-     stored in the section of the unit that keys it, which is not always the
-     unit whose rebuild reads the fact.
+     the units whose identifiers appear in the facts and calling-convention
+     decisions keyed by [P]. Each fact or decision is stored in the section of
+     the unit that keys it, which is not always the unit whose rebuild reads it.
 
      The starting points must come from [referenced_by_graph] because the
      rebuild queries the solution directly about identifiers in the member's own
@@ -798,25 +809,35 @@ let solution_for_members { header; sections } ~members =
     Compilation_unit.Set.fold visit seeds Compilation_unit.Set.empty
   in
   let rename_field = Fields_for_export.import header.Header.field_views in
-  let tables, unboxed_fields, changed_representation, rev_loaded =
+  let tables, unboxed_fields, changed_representation, code_changes, rev_loaded =
     List.fold_left
-      (fun (tables, unboxed_fields, changed_representation, rev_loaded)
-           (cu, idx) ->
+      (fun ( tables,
+             unboxed_fields,
+             changed_representation,
+             code_changes,
+             rev_loaded ) (cu, idx) ->
         if not (Compilation_unit.Set.mem cu needed)
-        then tables, unboxed_fields, changed_representation, rev_loaded
+        then
+          ( tables,
+            unboxed_fields,
+            changed_representation,
+            code_changes,
+            rev_loaded )
         else
           let shard : Shard.t = Obj.obj (File_sections.get sections idx) in
-          let shard_tables, shard_unboxed, shard_changed =
+          let shard_tables, shard_unboxed, shard_changed, shard_code_changes =
             Shard.deserialise shard ~rename_field
           in
           ( Solution_tables.disjoint_union tables shard_tables,
             Code_id_or_name.Map.disjoint_union unboxed_fields shard_unboxed,
             Code_id_or_name.Map.disjoint_union changed_representation
               shard_changed,
+            Code_id.Map.disjoint_union code_changes shard_code_changes,
             cu :: rev_loaded ))
       ( Solution_tables.empty,
         Code_id_or_name.Map.empty,
         Code_id_or_name.Map.empty,
+        Code_id.Map.empty,
         [] )
       header.Header.index
   in
@@ -825,9 +846,12 @@ let solution_for_members { header; sections } ~members =
     print_loaded_sections ~members
       ~total:(List.length header.Header.index)
       ~loaded:(List.rev rev_loaded);
-  { Unboxing_analysis.db = Solution_tables.to_database tables;
-    unboxed_fields;
-    changed_representation
+  { Reaper.Staged.uses =
+      { Unboxing_analysis.db = Solution_tables.to_database tables;
+        unboxed_fields;
+        changed_representation
+      };
+    code_changes
   }
 
 open Format_doc

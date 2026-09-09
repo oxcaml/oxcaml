@@ -444,25 +444,30 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
     List.map
       (fun cmr ->
         ( Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr,
-          Flambda2_reaper.Cmr_format.Serialisable.deserialise_deps_only cmr ))
+          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_solve cmr ))
       cmrs
   in
   (* The compilation units referenced by each unit's own graph determine which
      pieces of the solution are loaded when rebuilding. *)
   let participants =
     List.map
-      (fun (participant, graph) ->
+      (fun (participant, (graph, _code_deps)) ->
         participant, Flambda2_reaper.Global_flow_graph.compilation_units graph)
       graphs
   in
-  let combined_graph =
+  let combined_graph, code_deps =
     List.fold_left
-      (fun combined (_participant, graph) ->
-        Flambda2_reaper.Global_flow_graph.union combined graph)
-      (Flambda2_reaper.Global_flow_graph.create ())
+      (fun (combined, code_deps) (_participant, (graph, unit_code_deps)) ->
+        ( Flambda2_reaper.Global_flow_graph.union combined graph,
+          Flambda2_identifiers.Code_id.Map.disjoint_union code_deps
+            unit_code_deps ))
+      ( Flambda2_reaper.Global_flow_graph.create (),
+        Flambda2_identifiers.Code_id.Map.empty )
       graphs
   in
-  let solution = Flambda2_reaper.Reaper.Staged.solve combined_graph in
+  let solution =
+    Flambda2_reaper.Reaper.Staged.solve combined_graph ~code_deps
+  in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution
 
@@ -503,7 +508,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
      [Slot_offsets.finalize_offsets]. *)
   Exported_offsets.import_offsets imported_offsets;
   (* CR mvellacott: add profiling and debug printing code. *)
-  let solved_dep =
+  let solution =
     let member =
       Flambda2_identifiers.Symbol.compilation_unit
         (Flambda_unit.Metadata.module_symbol unit_metadata)
@@ -512,7 +517,7 @@ let reaped_flambda2_to_cmm ~ppf_dump:_ ~prefixname:_ ~machine_width
   in
   let flambda, free_names, all_code, slot_offsets, final_typing_env =
     Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-      ~traverse_rebuild:rebuild_data ~solved_dep ~machine_width ~cmx_loader
+      ~traverse_rebuild:rebuild_data ~solution ~machine_width ~cmx_loader
       ~all_code ~final_typing_env
   in
   let { unit = flambda;

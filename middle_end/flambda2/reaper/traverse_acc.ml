@@ -26,6 +26,7 @@ module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
@@ -546,6 +547,7 @@ let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
 
 let ids_for_export_code_dep
     { arity = _;
+      result_arity = _;
       params;
       my_closure;
       return;
@@ -571,6 +573,7 @@ let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
 
 let apply_renaming_code_dep
     { arity;
+      result_arity;
       params;
       my_closure;
       return;
@@ -580,6 +583,7 @@ let apply_renaming_code_dep
       unknown_arity_call_witnesses
     } renaming =
   { arity;
+    result_arity;
     params = List.map (Renaming.apply_variable renaming) params;
     my_closure = Renaming.apply_variable renaming my_closure;
     return = List.map (Renaming.apply_variable renaming) return;

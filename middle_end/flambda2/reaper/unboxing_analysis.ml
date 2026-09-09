@@ -169,6 +169,23 @@ module Unboxed_fields = struct
           | Unboxed fields1, Unboxed fields2 ->
             fold2_subset_with_kind f fields1 fields2 acc))
       fields1 acc
+
+  let rec equal_shape_u fields1 fields2 =
+    match fields1, fields2 with
+    | Not_unboxed _, Not_unboxed _ -> true
+    | Unboxed _, Not_unboxed _ | Not_unboxed _, Unboxed _ -> false
+    | Unboxed fields1, Unboxed fields2 -> equal_shape fields1 fields2
+
+  and equal_shape fields1 fields2 =
+    (* CR ncourant: we can't use [Field.Map.equal] here because it doesn't have
+       a type that is general enough :( *)
+    let bindings1 = Field.Map.bindings fields1 in
+    let bindings2 = Field.Map.bindings fields2 in
+    List.compare_lengths bindings1 bindings2 = 0
+    && List.for_all2
+         (fun (f1, fields1) (f2, fields2) ->
+           Field.equal f1 f2 && equal_shape_u fields1 fields2)
+         bindings1 bindings2
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
@@ -191,6 +208,24 @@ type changed_representation =
       Value_slot.t Unboxed_fields.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
+
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
+let print_param_decision ppf param_decision =
+  match param_decision with
+  | Keep (v, kind) ->
+    Format.fprintf ppf "Keep (%a, %a)" Variable.print v
+      Flambda_kind.With_subkind.print kind
+  | Delete -> Format.fprintf ppf "Delete"
+  | Unbox fields ->
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
@@ -217,19 +252,21 @@ let rename_unboxed_fields_tree tree ~rename_leaf ~rename_field =
   in
   rename_tree tree
 
+let rec add_unboxed_variables_tree tree ids =
+  Field.Map.fold
+    (fun (_ : Field.t) u ids -> add_unboxed_variables u ids)
+    tree ids
+
+and add_unboxed_variables (u : _ Unboxed_fields.u) ids =
+  match u with
+  | Not_unboxed var -> Ids_for_export.add_variable ids var
+  | Unboxed tree -> add_unboxed_variables_tree tree ids
+
 let unboxed_fields_ids_for_export unboxed_fields ids =
-  let rec add_tree tree ids =
-    Field.Map.fold
-      (fun (_ : Field.t) u ids -> add_unboxed_fields u ids)
-      tree ids
-  and add_unboxed_fields (u : _ Unboxed_fields.u) ids =
-    match u with
-    | Not_unboxed var -> Ids_for_export.add_variable ids var
-    | Unboxed tree -> add_tree tree ids
-  in
   Code_id_or_name.Map.fold
     (fun id tree ids ->
-      add_tree tree (Ids_for_export.add_code_id_or_name ids id))
+      add_unboxed_variables_tree tree
+        (Ids_for_export.add_code_id_or_name ids id))
     unboxed_fields ids
 
 let unboxed_fields_fields_for_export unboxed_fields fields =
@@ -619,6 +656,14 @@ type result =
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
+type calling_convention_change =
+  | Not_changing_calling_convention
+  | Changing_calling_convention of
+      { my_closure_decision : my_closure_param_decision;
+        params_decisions : param_decision list;
+        return_decisions : param_decision list
+      }
+
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
@@ -702,6 +747,15 @@ let query_dominated_by =
   query
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
+
+let cannot_change_calling_convention_query =
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
+
+let cannot_change_calling_convention uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
 
 let perform_analysis0 db ~stats =
   let db =
@@ -909,11 +963,141 @@ let perform_analysis db ~stats =
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let cannot_change_calling_convention_query =
-  let^? [x], [] = ["x"], [] in
-  [cannot_change_calling_convention x]
+let compute_code_changes uses ~rewrite_kind_with_subkind ~code_deps =
+  let get_unboxed_fields cn =
+    Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  in
+  let is_var_used var =
+    match Variable.kind var with
+    | Region | Rec_info -> true
+    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
+  in
+  Code_id.Map.mapi
+    (fun code_id (code_dep : Traverse_acc.code_dep) ->
+      if cannot_change_calling_convention uses code_id
+      then Not_changing_calling_convention
+      else
+        let params_decisions =
+          List.map2
+            (fun param kind ->
+              match get_unboxed_fields (Code_id_or_name.var param) with
+              | None -> if is_var_used param then Keep (param, kind) else Delete
+              | Some fields -> Unbox fields)
+            code_dep.params
+            (Flambda_arity.unarize code_dep.arity)
+        in
+        let my_closure_decision =
+          match
+            get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
+          with
+          | None -> Keep_my_closure
+          | Some unboxed_fields -> Unbox_my_closure unboxed_fields
+        in
+        let return_decisions =
+          List.map2
+            (fun v kind ->
+              match get_unboxed_fields (Code_id_or_name.var v) with
+              | None ->
+                let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                (* TODO: fix this, needs the mapping between code ids of
+                   functions and their return continuations *)
+                if true || is_var_used v then Keep (v, kind) else Delete
+              | Some fields -> Unbox fields)
+            code_dep.return
+            (Flambda_arity.unarized_components code_dep.result_arity)
+        in
+        Changing_calling_convention
+          { params_decisions; return_decisions; my_closure_decision })
+    code_deps
 
-let cannot_change_calling_convention uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+type code_changes = calling_convention_change Code_id.Map.t
+
+let get_calling_convention_change t code_id =
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    then
+      Misc.fatal_errorf
+        "[get_calling_convention_change]: code_id %a is in current unit but \
+         not in the result"
+        Code_id.print code_id
+    else Not_changing_calling_convention
+  | Some x -> x
+
+let code_changes_ids_for_export code_changes ids =
+  let add_param_decision ids = function
+    | Keep (var, _kind) -> Ids_for_export.add_variable ids var
+    | Delete -> ids
+    | Unbox tree -> add_unboxed_variables_tree tree ids
+  in
+  Code_id.Map.fold
+    (fun code_id change ids ->
+      let ids = Ids_for_export.add_code_id ids code_id in
+      match change with
+      | Not_changing_calling_convention -> ids
+      | Changing_calling_convention
+          { my_closure_decision; params_decisions; return_decisions } ->
+        let ids =
+          match my_closure_decision with
+          | Keep_my_closure -> ids
+          | Unbox_my_closure tree -> add_unboxed_variables_tree tree ids
+        in
+        let ids = List.fold_left add_param_decision ids params_decisions in
+        List.fold_left add_param_decision ids return_decisions)
+    code_changes ids
+
+let code_changes_fields_for_export code_changes fields =
+  let add_param_decision fields = function
+    | Keep _ | Delete -> fields
+    | Unbox tree -> Unboxed_fields.add_fields tree fields
+  in
+  Code_id.Map.fold
+    (fun (_ : Code_id.t) change fields ->
+      match change with
+      | Not_changing_calling_convention -> fields
+      | Changing_calling_convention
+          { my_closure_decision; params_decisions; return_decisions } ->
+        let fields =
+          match my_closure_decision with
+          | Keep_my_closure -> fields
+          | Unbox_my_closure tree -> Unboxed_fields.add_fields tree fields
+        in
+        let fields =
+          List.fold_left add_param_decision fields params_decisions
+        in
+        List.fold_left add_param_decision fields return_decisions)
+    code_changes fields
+
+let code_changes_apply_renaming code_changes renaming ~rename_field =
+  let rename_tree tree =
+    rename_unboxed_fields_tree tree
+      ~rename_leaf:(Renaming.apply_variable renaming)
+      ~rename_field
+  in
+  let rename_param_decision = function
+    | Keep (var, kind) -> Keep (Renaming.apply_variable renaming var, kind)
+    | Delete -> Delete
+    | Unbox tree -> Unbox (rename_tree tree)
+  in
+  Code_id.Map.fold
+    (fun code_id change new_code_changes ->
+      let change =
+        match change with
+        | Not_changing_calling_convention -> Not_changing_calling_convention
+        | Changing_calling_convention
+            { my_closure_decision; params_decisions; return_decisions } ->
+          let my_closure_decision =
+            match my_closure_decision with
+            | Keep_my_closure -> Keep_my_closure
+            | Unbox_my_closure tree -> Unbox_my_closure (rename_tree tree)
+          in
+          Changing_calling_convention
+            { my_closure_decision;
+              params_decisions = List.map rename_param_decision params_decisions;
+              return_decisions = List.map rename_param_decision return_decisions
+            }
+      in
+      Code_id.Map.add
+        (Renaming.apply_code_id renaming code_id)
+        change new_code_changes)
+    code_changes Code_id.Map.empty

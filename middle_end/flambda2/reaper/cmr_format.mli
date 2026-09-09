@@ -40,9 +40,10 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  (** Like [deserialise], but only deserialises the dependency graph (including
+  (** Like [deserialise], but only deserialises what the solve needs (including
       the hashcons restore and rename process). *)
-  val deserialise_deps_only : t -> Global_flow_graph.graph
+  val deserialise_for_solve :
+    t -> Global_flow_graph.graph * Traverse_acc.code_dep Code_id.Map.t
 
   (** Get the unit that was being compiled when the file was saved. This is a
       pure projection. *)
