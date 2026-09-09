@@ -21,11 +21,11 @@ let code loopify(never) size(2) newer_version_of(all_boolean_simplifications_0)
   let not_scrutinee = %boolean_not (param) in
   cont k (param, not_scrutinee, x)
 in
-let $camlTOP3__all_boolean_simplifications_1 =
+let $camlTOP3__all_boolean_simplifications_3 =
   closure all_boolean_simplifications_0_1 @all_boolean_simplifications
-    &toplevel.alloc_region
+    &toplevel
 in
-let $camlTOP3 = Block 0 ($camlTOP3__all_boolean_simplifications_1) in
+let $camlTOP3 = Block 0 ($camlTOP3__all_boolean_simplifications_3) in
 cont done ($camlTOP3)
 |}]
 
@@ -36,28 +36,27 @@ let all_large_simplifications x = function
   | C -> #(2, x, 3, Some 0)
   | D -> #(3, x, 4, Some 0)
 [%%expect_fexpr Simplify{|
-let $camlTOP4__const_block85 = Block 0 (0) in
-let code all_large_simplifications_2 deleted in
-let $camlTOP4__switch_block118 =
+let $camlTOP4__const_block_5 = Block 0 (0) in
+let code all_large_simplifications_1 deleted in
+let $camlTOP4__switch_block_7 =
   Value_array [|0;
   0;
-  $camlTOP4__const_block85;
-  $camlTOP4__const_block85|]
+  $camlTOP4__const_block_5;
+  $camlTOP4__const_block_5|]
 in
-let code loopify(never) size(4) newer_version_of(all_large_simplifications_2)
-      all_large_simplifications_2_1 (x, param : imm tagged)
+let code loopify(never) size(4) newer_version_of(all_large_simplifications_1)
+      all_large_simplifications_1_1 (x, param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val * val * val * val =
   let final_arg = %int_barith.add (1, param) in
-  let arg = %array_load ($camlTOP4__switch_block118, param) in
+  let arg = %array_load ($camlTOP4__switch_block_7, param) in
   cont k (param, x, final_arg, arg)
 in
-let $camlTOP4__all_large_simplifications_3 =
-  closure all_large_simplifications_2_1 @all_large_simplifications
-    &toplevel.alloc_region
+let $camlTOP4__all_large_simplifications_6 =
+  closure all_large_simplifications_1_1 @all_large_simplifications &toplevel
 in
-let $camlTOP4 = Block 0 ($camlTOP4__all_large_simplifications_3) in
+let $camlTOP4 = Block 0 ($camlTOP4__all_large_simplifications_6) in
 cont done ($camlTOP4)
 |}]
 
@@ -68,9 +67,9 @@ let shared_affine_functions = function
   | C -> #(4, 5)
   | D -> #(6, 7)
 [%%expect_fexpr Simplify{|
-let code shared_affine_functions_4 deleted in
-let code loopify(never) size(7) newer_version_of(shared_affine_functions_4)
-      shared_affine_functions_4_1 (param : imm tagged)
+let code shared_affine_functions_2 deleted in
+let code loopify(never) size(7) newer_version_of(shared_affine_functions_2)
+      shared_affine_functions_2_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val * val =
@@ -78,11 +77,10 @@ let code loopify(never) size(7) newer_version_of(shared_affine_functions_4)
   let final_arg = %int_barith.add (1, scaled_arg) in
   cont k (scaled_arg, final_arg)
 in
-let $camlTOP5__shared_affine_functions_5 =
-  closure shared_affine_functions_4_1 @shared_affine_functions
-    &toplevel.alloc_region
+let $camlTOP5__shared_affine_functions_10 =
+  closure shared_affine_functions_2_1 @shared_affine_functions &toplevel
 in
-let $camlTOP5 = Block 0 ($camlTOP5__shared_affine_functions_5) in
+let $camlTOP5 = Block 0 ($camlTOP5__shared_affine_functions_10) in
 cont done ($camlTOP5)
 |}]
 
@@ -93,26 +91,26 @@ let shared_lookup_table = function
   | C -> #(2, Some 0, Some 0)
   | D -> #(3, Some 0, Some 0)
 [%%expect_fexpr Simplify{|
-let $camlTOP6__const_block210 = Block 0 (0) in
-let code shared_lookup_table_6 deleted in
-let $camlTOP6__switch_block236 =
+let $camlTOP6__const_block_12 = Block 0 (0) in
+let code shared_lookup_table_3 deleted in
+let $camlTOP6__switch_block_14 =
   Value_array [|0;
   0;
-  $camlTOP6__const_block210;
-  $camlTOP6__const_block210|]
+  $camlTOP6__const_block_12;
+  $camlTOP6__const_block_12|]
 in
-let code loopify(never) size(2) newer_version_of(shared_lookup_table_6)
-      shared_lookup_table_6_1 (param : imm tagged)
+let code loopify(never) size(2) newer_version_of(shared_lookup_table_3)
+      shared_lookup_table_3_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val * val * val =
-  let arg = %array_load ($camlTOP6__switch_block236, param) in
+  let arg = %array_load ($camlTOP6__switch_block_14, param) in
   cont k (param, arg, arg)
 in
-let $camlTOP6__shared_lookup_table_7 =
-  closure shared_lookup_table_6_1 @shared_lookup_table &toplevel.alloc_region
+let $camlTOP6__shared_lookup_table_13 =
+  closure shared_lookup_table_3_1 @shared_lookup_table &toplevel
 in
-let $camlTOP6 = Block 0 ($camlTOP6__shared_lookup_table_7) in
+let $camlTOP6 = Block 0 ($camlTOP6__shared_lookup_table_13) in
 cont done ($camlTOP6)
 |}]
 
@@ -123,23 +121,22 @@ let multiple_lookup_tables = function
   | C -> #(0, 0)
   | D -> #(1, 0)
 [%%expect_fexpr Simplify{|
-let code multiple_lookup_tables_8 deleted in
-let $camlTOP7__switch_block289 = Value_array [|1; 1; 0; 0|] in
-let $camlTOP7__switch_block287 = Value_array [|0; 1; 0; 1|] in
-let code loopify(never) size(3) newer_version_of(multiple_lookup_tables_8)
-      multiple_lookup_tables_8_1 (param : imm tagged)
+let code multiple_lookup_tables_4 deleted in
+let $camlTOP7__switch_block_19 = Value_array [|1; 1; 0; 0|] in
+let $camlTOP7__switch_block_18 = Value_array [|0; 1; 0; 1|] in
+let code loopify(never) size(3) newer_version_of(multiple_lookup_tables_4)
+      multiple_lookup_tables_4_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : val * val =
-  let arg = %array_load.`imm` ($camlTOP7__switch_block287, param) in
-  let arg_1 = %array_load.`imm` ($camlTOP7__switch_block289, param) in
+  let arg = %array_load.`imm` ($camlTOP7__switch_block_18, param) in
+  let arg_1 = %array_load.`imm` ($camlTOP7__switch_block_19, param) in
   cont k (arg, arg_1)
 in
-let $camlTOP7__multiple_lookup_tables_9 =
-  closure multiple_lookup_tables_8_1 @multiple_lookup_tables
-    &toplevel.alloc_region
+let $camlTOP7__multiple_lookup_tables_17 =
+  closure multiple_lookup_tables_4_1 @multiple_lookup_tables &toplevel
 in
-let $camlTOP7 = Block 0 ($camlTOP7__multiple_lookup_tables_9) in
+let $camlTOP7 = Block 0 ($camlTOP7__multiple_lookup_tables_17) in
 cont done ($camlTOP7)
 |}]
 
@@ -157,10 +154,10 @@ let offset_lookup_table i =
   | C -> 2
   | D -> 1
 [%%expect_fexpr Simplify{|
-let code offset_lookup_table_10 deleted in
-let $camlTOP8__switch_block359 = Value_array [|0; 2; 1|] in
-let code loopify(never) size(30) newer_version_of(offset_lookup_table_10)
-      offset_lookup_table_10_1 (i : imm tagged)
+let code offset_lookup_table_5 deleted in
+let $camlTOP8__switch_block_25 = Value_array [|0; 2; 1|] in
+let code loopify(never) size(30) newer_version_of(offset_lookup_table_5)
+      offset_lookup_table_5_1 (i : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
@@ -177,15 +174,14 @@ let code loopify(never) size(30) newer_version_of(offset_lookup_table_10)
       let tagged_scrutinee = %tag_imm (naked_immediate) in
       let offset_scrutinee = %int_barith.add (tagged_scrutinee, -1) in
       let arg =
-        %array_load.`imm` ($camlTOP8__switch_block359, offset_scrutinee)
+        %array_load.`imm` ($camlTOP8__switch_block_25, offset_scrutinee)
       in
       cont k (arg)
 in
-let $camlTOP8__offset_lookup_table_11 =
-  closure offset_lookup_table_10_1 @offset_lookup_table
-    &toplevel.alloc_region
+let $camlTOP8__offset_lookup_table_24 =
+  closure offset_lookup_table_5_1 @offset_lookup_table &toplevel
 in
-let $camlTOP8 = Block 0 ($camlTOP8__offset_lookup_table_11) in
+let $camlTOP8 = Block 0 ($camlTOP8__offset_lookup_table_24) in
 cont done ($camlTOP8)
 |}]
 
@@ -224,14 +220,14 @@ let poison_prevents_boolean_not b =
   | Absent -> A
   | Box_A t -> t
 [%%expect_fexpr Simplify{|
-let code poison_prevents_boolean_not_12 deleted in
-let $camlTOP11__switch_block455 = Int_array [|0; 0; 1|] in
-let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_12)
-      poison_prevents_boolean_not_12_1 (b : imm tagged)
+let code poison_prevents_boolean_not_6 deleted in
+let $camlTOP11__switch_block_32 = Int_array [|0; 0; 1|] in
+let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_6)
+      poison_prevents_boolean_not_6_1 (b : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  (let arg = %array_load.`int` ($camlTOP11__switch_block455, b) in
+  (let arg = %array_load.`int` ($camlTOP11__switch_block_32, b) in
    let final_arg = %int_barith.sub (1, b) in
    cont k2 (arg, final_arg))
     where k2 (is_int : imm, unboxed_field_0_0) =
@@ -239,10 +235,10 @@ let code loopify(never) size(14) newer_version_of(poison_prevents_boolean_not_12
         | 0 -> k (unboxed_field_0_0)
         | 1 -> k (0)
 in
-let $camlTOP11__poison_prevents_boolean_not_13 =
-  closure poison_prevents_boolean_not_12_1 @poison_prevents_boolean_not
-    &toplevel.alloc_region
+let $camlTOP11__poison_prevents_boolean_not_31 =
+  closure poison_prevents_boolean_not_6_1 @poison_prevents_boolean_not
+    &toplevel
 in
-let $camlTOP11 = Block 0 ($camlTOP11__poison_prevents_boolean_not_13) in
+let $camlTOP11 = Block 0 ($camlTOP11__poison_prevents_boolean_not_31) in
 cont done ($camlTOP11)
 |}]
