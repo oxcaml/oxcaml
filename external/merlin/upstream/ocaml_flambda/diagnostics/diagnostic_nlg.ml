@@ -371,25 +371,41 @@ let pronominalize (plans : 'term plan list) : 'term plan list =
       in
       { rewritten with body }
   in
-  let rec go_plan state plan =
-    let state, statement =
-      match plan.statement with
-      | None -> state, None
-      | Some s ->
-        let prev_last, prev_pronouns = state in
-        let s' = rewrite ~prev_last ~prev_pronouns s in
-        (last_mention s, pronouns_of s'), Some s'
-    in
-    let state, children =
-      List.fold_left_map
-        (fun state (relation, child) ->
-          let state, child = go_plan state child in
-          state, (relation, child))
-        state plan.children
-    in
-    state, { statement; children }
+  let antecedent frames =
+    List.find_map
+      (fun (_, (last, pronouns)) ->
+        Option.map (fun last -> last, pronouns) last)
+      frames
   in
-  snd (List.fold_left_map go_plan (None, []) plans)
+  let rec go_plan ~depth frames plan =
+    let frames, statement =
+      match plan.statement with
+      | None -> frames, None
+      | Some s ->
+        let frames =
+          List.filter (fun (frame_depth, _) -> frame_depth <= depth) frames
+        in
+        let prev_last, prev_pronouns =
+          match antecedent frames with
+          | None -> None, []
+          | Some (last, pronouns) -> Some last, pronouns
+        in
+        let s' = rewrite ~prev_last ~prev_pronouns s in
+        (depth, (last_mention s, pronouns_of s')) :: frames, Some s'
+    in
+    let child_depth =
+      match statement with None -> depth | Some _ -> depth + 1
+    in
+    let frames, children =
+      List.fold_left_map
+        (fun frames (relation, child) ->
+          let frames, child = go_plan ~depth:child_depth frames child in
+          frames, (relation, child))
+        frames plan.children
+    in
+    frames, { statement; children }
+  in
+  snd (List.fold_left_map (go_plan ~depth:0) [] plans)
 
 let pronominalize_one (plan : 'term plan) : 'term plan =
   match pronominalize [plan] with
