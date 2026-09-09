@@ -218,6 +218,15 @@ let mk_cfg_merge_blocks f =
 let mk_no_cfg_merge_blocks f =
   ("-no-cfg-merge-blocks", Arg.Unit f, " Do not merge equivalent CFG blocks")
 
+let mk_cfg_block_layout f =
+  ( "-cfg-block-layout",
+    Arg.Unit f,
+    " Reorder CFG blocks to improve layout (affects coldness and prologue \
+     placement)" )
+
+let mk_no_cfg_block_layout f =
+  ("-no-cfg-block-layout", Arg.Unit f, " Do not reorder CFG blocks")
+
 let mk_cfg_value_propagation f =
   ("-cfg-value-propagation", Arg.Unit f, " Propagate value to simplify CFG")
 
@@ -1176,17 +1185,6 @@ module Debugging = Dwarf_flags
 
 (* CR mshinwell: These help texts should show the default values. *)
 
-let mk_restrict_to_upstream_dwarf f =
-  ( "-gupstream-dwarf",
-    Arg.Unit f,
-    " Only emit the same DWARF information as the upstream compiler" )
-
-let mk_no_restrict_to_upstream_dwarf f =
-  ( "-gno-upstream-dwarf",
-    Arg.Unit f,
-    " Emit potentially more DWARF information than the upstream compiler. \
-     Implies -shape-format debugging-shapes." )
-
 let mk_dwarf_inlined_frames f =
   ("-gdwarf-inlined-frames", Arg.Unit f, " Emit DWARF inlined frame information")
 
@@ -1194,6 +1192,12 @@ let mk_no_dwarf_inlined_frames f =
   ( "-gno-dwarf-inlined-frames",
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
+
+let mk_gdwarf_version f =
+  ( "-gdwarf-version",
+    Arg.String f,
+    "<version>  Set the DWARF version for OxCaml debugging information\n\
+    \         (4 (default) or 5)" )
 
 let mk_ddebug_avail_sets f =
   ( "-ddebug-avail-sets",
@@ -1347,6 +1351,8 @@ module type Oxcaml_options = sig
   val no_omit_leaf_frame_pointers : unit -> unit
   val cfg_merge_blocks : unit -> unit
   val no_cfg_merge_blocks : unit -> unit
+  val cfg_block_layout : unit -> unit
+  val no_cfg_block_layout : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
@@ -1542,6 +1548,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_omit_leaf_frame_pointers F.no_omit_leaf_frame_pointers;
       mk_cfg_merge_blocks F.cfg_merge_blocks;
       mk_no_cfg_merge_blocks F.no_cfg_merge_blocks;
+      mk_cfg_block_layout F.cfg_block_layout;
+      mk_no_cfg_block_layout F.no_cfg_block_layout;
       mk_cfg_value_propagation F.cfg_value_propagation;
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
@@ -1899,6 +1907,8 @@ module Oxcaml_options_impl = struct
   let no_omit_leaf_frame_pointers = clear' Oxcaml_flags.omit_leaf_frame_pointers
   let cfg_merge_blocks = set' Oxcaml_flags.cfg_merge_blocks
   let no_cfg_merge_blocks = clear' Oxcaml_flags.cfg_merge_blocks
+  let cfg_block_layout = set' Oxcaml_flags.cfg_block_layout
+  let no_cfg_block_layout = clear' Oxcaml_flags.cfg_block_layout
   let cfg_value_propagation = set' Oxcaml_flags.cfg_value_propagation
   let no_cfg_value_propagation = clear' Oxcaml_flags.cfg_value_propagation
 
@@ -2300,10 +2310,9 @@ module Oxcaml_options_impl = struct
 end
 
 module type Debugging_options = sig
-  val restrict_to_upstream_dwarf : unit -> unit
-  val no_restrict_to_upstream_dwarf : unit -> unit
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
@@ -2320,10 +2329,9 @@ end
 module Make_debugging_options (F : Debugging_options) = struct
   let list3 =
     [
-      mk_restrict_to_upstream_dwarf F.restrict_to_upstream_dwarf;
-      mk_no_restrict_to_upstream_dwarf F.no_restrict_to_upstream_dwarf;
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_gdwarf_version F.gdwarf_version;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
@@ -2341,20 +2349,19 @@ module Make_debugging_options (F : Debugging_options) = struct
 end
 
 module Debugging_options_impl = struct
-  let restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := true;
-    Clflags.shape_format := Clflags.Old_merlin
-
-  let no_restrict_to_upstream_dwarf () =
-    Debugging.restrict_to_upstream_dwarf := false;
-    Clflags.shape_format := Clflags.Debugging_shapes
-  (* CR sspies: We should only enable OxCaml DWARF on the compiler once we are
-     ready to switch, since it leads to a new format of shapes in the .cms and
-     .cmt files. Merlin should continue to work, but we should be careful and
-     probably should switch over to debugging shapes in general first. *)
-
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+
+  let gdwarf_version version =
+    match version with
+    | "4" -> Debugging.gdwarf_version := Dwarf_flags.Four
+    | "5" -> Debugging.gdwarf_version := Dwarf_flags.Five
+    | _ ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf "invalid DWARF version '%s' (must be 4 or 5)"
+                version))
+
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
@@ -2484,6 +2491,7 @@ module Extra_params = struct
     | "cfg-prologue-shrink-wrap" -> set' Oxcaml_flags.cfg_prologue_shrink_wrap
     | "omit-leaf-frame-pointers" -> set' Oxcaml_flags.omit_leaf_frame_pointers
     | "cfg-merge-blocks" -> set' Oxcaml_flags.cfg_merge_blocks
+    | "cfg-block-layout" -> set' Oxcaml_flags.cfg_block_layout
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float
@@ -2584,7 +2592,6 @@ module Extra_params = struct
     | "caml-apply-inline-fast-path" ->
         set' Oxcaml_flags.caml_apply_inline_fast_path
     | "dasm-comments" -> set' Oxcaml_flags.dasm_comments
-    | "gupstream-dwarf" -> set' Debugging.restrict_to_upstream_dwarf
     | "gdwarf-inlined-frames" -> set' Debugging.dwarf_inlined_frames
     | "gdwarf-may-alter-codegen" -> set' Debugging.gdwarf_may_alter_codegen
     | "gdwarf-may-alter-codegen-experimental" ->

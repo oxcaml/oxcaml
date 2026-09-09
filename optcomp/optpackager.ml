@@ -126,7 +126,7 @@ end) : S = struct
         in
         let code =
           Simplif.simplify_lambda code
-            ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
+            ~restrict_to_upstream_dwarf:!Clflags.restrict_to_upstream_dwarf
             ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
         in
         let main_module_block_format : Lambda.main_module_block_format =
@@ -186,7 +186,7 @@ end) : S = struct
       (* [arg_descr] is None because we don't allow packs to be arguments.
          [static_data] is empty as we don't support packs with layout poly. *)
       Compilenv.build_unit_info ~main_module_block_format ~arg_descr:None
-        ~static_data:Slambdaeval.CU_data.empty
+        ~static_data:(Slambdaeval.CU_data.empty ())
     in
     let file_sections =
       let length =

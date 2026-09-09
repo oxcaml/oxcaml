@@ -332,27 +332,31 @@ end
 module type Map_plus_iterator = sig
   include Map
 
-  (** An ['a iterator] iterates over the values in a ['a t] map in increasing
-      order. *)
-  type 'a iterator
+  module Mutable_iterator : sig
+    (** An ['a iterator] iterates over the values in a ['a t] map in increasing
+        order. *)
+    type 'a iterator
 
-  (** [iterator t] returns an iterator for all the bindings in [t], initially
-      positioned on [min_binding t]. *)
-  val iterator : 'a t -> 'a iterator
+    (** [create ()] returns a fresh and initially exhausted iterator. *)
+    val create : unit -> 'a iterator
 
-  (** [current iterator] returns the key-value pair at the current position, or
-      [None] if the iterator is exhausted. *)
-  val current : 'a iterator -> (key * 'a) option
+    (** [init it m] prepares [it] for iteration over the values in [m]. *)
+    val init : 'a iterator -> 'a t -> unit
 
-  (** [advance iterator] position the [iterator] on the next key. *)
-  val advance : 'a iterator -> 'a iterator
+    (** [current it] returns the key-value pair at the current position, or
+        [None] if the iterator is exhausted. *)
+    val current : 'a iterator -> (key * 'a) option
 
-  (** [seek iterator key] positions the [iterator] on the next key higher or
-      equal to the provided [key].
+    (** [advance it] positions the iterator [it] on the next key. *)
+    val advance : 'a iterator -> unit
 
-      {b Note}: does nothing if [key] is less than or equal to the current key.
-  *)
-  val seek : 'a iterator -> key -> 'a iterator
+    (** [seek iterator key] positions the [iterator] on the next key higher or
+        equal to the provided [key].
+
+        {b Note}: does nothing if [key] is less than or equal to the current
+        key. *)
+    val seek : 'a iterator -> key -> unit
+  end
 end
 
 module type S_plus_iterator = sig

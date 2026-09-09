@@ -177,7 +177,7 @@ let rec fracture_lam lambda : slambda =
             sval_runtime =
               (if bindings_r == bindings && body_r == body
                then lambda
-               else Lletrec (bindings, body_r))
+               else Lletrec (bindings_r, body_r))
           })
   | Lprim (prim, args, loc) -> fracture_prim lambda prim args loc
   | Lswitch
@@ -332,14 +332,7 @@ let rec fracture_lam lambda : slambda =
        slambda) and Lsplice only exists in slambda. *)
     fatal_error_invalid_constructor lambda
   | Lkindtemplate
-      { ktmpl_params;
-        ktmpl_return;
-        ktmpl_body;
-        ktmpl_ret_mode;
-        ktmpl_env;
-        ktmpl_env_mode;
-        ktmpl_loc
-      } ->
+      { ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode; ktmpl_loc } ->
     let env = Ident.Map.to_list ktmpl_env in
     let free_vars_shape_locality_mode =
       Misc.Stdlib.Array.of_list_map
@@ -351,51 +344,71 @@ let rec fracture_lam lambda : slambda =
         (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
         env
     in
+    let { kind; params; return; body; attr; loc; mode = _; ret_mode; yielding }
+        =
+      ktmpl_body
+    in
     let templated_function_body =
-      slet_local "body" ktmpl_body (fun body_c body_r ->
-          let closure_id = Ident.create_local "closure" in
-          let closure_param =
-            { name = closure_id;
-              debug_uid = debug_uid_none;
-              layout = layout_block;
-              attributes = default_param_attribute;
-              (* The env parameter can be local because we immediately
-                 destructure it. *)
-              mode = alloc_local
+      let closure_id = Ident.create_local "closure" in
+      let closure_param =
+        { name = closure_id;
+          debug_uid = debug_uid_none;
+          layout = layout_block;
+          attributes = default_param_attribute;
+          (* The env parameter can be local because we immediately
+              destructure it. *)
+          mode = alloc_local
+        }
+      in
+      let _, body =
+        List.fold_left
+          (fun (i, lam) (ident, (_, layout)) ->
+            ( i + 1,
+              Llet
+                ( Alias,
+                  layout,
+                  ident,
+                  debug_uid_none,
+                  Lprim
+                    ( Pmixedfield
+                        ([i], free_vars_shape_locality_mode, Reads_agree),
+                      [Lvar closure_id],
+                      ktmpl_loc ),
+                  lam ) ))
+          (0, fracture_dynamic body)
+          env
+      in
+      let kind =
+        match kind with
+        | Tupled ->
+          Misc.fatal_errorf
+            "Slambda does not currently support poly tupled functions"
+        | Curried { nlocal } ->
+          Curried
+            { nlocal =
+                begin match ktmpl_env_mode with
+                | Alloc_heap -> nlocal
+                | Alloc_local -> List.length params + 1
+                end
             }
-          in
-          let _, body =
-            List.fold_left
-              (fun (i, lam) (ident, (_, layout)) ->
-                ( i + 1,
-                  Llet
-                    ( Alias,
-                      layout,
-                      ident,
-                      debug_uid_none,
-                      Lprim
-                        ( Pmixedfield
-                            ([i], free_vars_shape_locality_mode, Reads_agree),
-                          [Lvar closure_id],
-                          ktmpl_loc ),
-                      lam ) ))
-              (0, body_r) env
-          in
-          (* This relies on all templates currently being generated from
-             [let poly_] which means all arguments are erased, this will need to
-             be improved for functors where the arguments aren't erased. *)
-          SLhalves
-            { sval_comptime = body_c;
-              sval_runtime =
-                lfunction
-                  ~kind:(Curried { nlocal = 1 })
-                  ~params:[closure_param] ~return:ktmpl_return ~body
-                  ~attr:default_function_attribute
-                  ~loc:ktmpl_loc
-                    (* This closure has no free variables and will always be
-                     statically allocated. alloc_heap is an safe choice. *)
-                  ~mode:alloc_heap ~ret_mode:ktmpl_ret_mode
-            })
+      in
+      if List.length params > Lambda.max_arity () - 1
+      then
+        Misc.fatal_errorf
+          "Slambda does not currently support functions with over %i arguments"
+          (Lambda.max_arity () - 1);
+      let lf =
+        lfunction' ~kind ~params:(closure_param :: params) ~return ~body ~attr
+          ~loc
+          ~mode:alloc_heap
+            (* This closure has no free variables and will always be
+                statically allocated. alloc_heap is an safe choice. *)
+          ~ret_mode
+      in
+      let sval_runtime = Lfunction (lfunction_with_yielding yielding lf) in
+      (* The compile-time half of the instantiated function is missing like any
+         normal function. *)
+      SLhalves { sval_comptime = SLmissing; sval_runtime }
     in
     let free_var_capture =
       List.map
@@ -562,8 +575,15 @@ and fracture_prim lambda prim args loc =
   | Patomic_set_mixed_field _ | Patomic_exchange_field _
   | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Popaque _
-  | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Punbox_unit
+  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx | Patomic_add_idx
+  | Patomic_sub_idx | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+  | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_load_ptr _
+  | Patomic_set_ptr _ | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
+  | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr | Patomic_add_ptr
+  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _ | Punbox_unit
   | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256
   | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
   | Preinterpret_tuple_as_boxed_vector _

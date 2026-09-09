@@ -40,7 +40,9 @@ val non_bot_axes : t -> int list
 (** Build a mask from a set of relevant axes. *)
 val of_axis_set : Jkind_axis.Axis_set.t -> t
 
-(** Relevant axes of a constant modality and the corresponding mask. *)
+(** Relevance mask for a constant modality: identity axes are [top], constant
+    axes are [bot], middle modalities retain their level, and externality is
+    [top]. *)
 val mask_of_modality : Mode.Modality.Const.t -> t
 
 val create :
@@ -56,6 +58,9 @@ val create :
   staticity:Mode.Staticity.const ->
   externality:Jkind_axis.Externality.t ->
   t
+
+val of_mode_crossing :
+  Mode.Crossing.t -> externality:Jkind_axis.Externality.t -> t
 
 val areality : t -> Mode.Regionality.Const.t
 

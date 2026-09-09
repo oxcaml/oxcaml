@@ -303,24 +303,67 @@ specify a mode along the contention axis, the expression behaves as if it contai
 `contended`. This rule still allows you to write e.g. `t @ immutable uncontended`
 if that's what you want; most users will never want this, though.
 
+## How mode implications apply
+
+*Fixed sites* require every axis to be pinned to a specific mode.
+These include:
+
+- modes appearing in types (like in the `f` example above)
+- modes on functor arguments and returns
+- external declarations
+- mode annotations on recursive modules
+
+At fixed sites, an axis you leave unwritten is filled in by an implication from a mode you did write, or, failing that, by the legacy mode.
+
+Everywhere else, a mode annotation constrains only the axes you actually wrote, and the remaining axes are inferred from the code. Those *flexible sites* include:
+
+- function parameters: `fun (x @ local) -> ...`
+- let bindings: `let f @ local = ...`
+- expression constraints: `(e : ty @ local)`
+- return-mode annotations: `let f x : ty @ local = ...`
+- mode constraints on modules
+
+At flexible sites, the implied axes are not pinned. For example, in
+`fun (x @ local) -> ...` the parameter must accept `local` values, but its
+yielding axis is left open: if the parameter is captured by a closure that
+must be `unyielding`, inference can pick `unyielding`. When nothing in the
+program constrains an unwritten axis, it defaults just as it would at a
+fixed site (in particular, `local` still defaults to `yielding` and
+`unforkable`).
+
+Beware of this asymmetry when moving an annotation between positions:
+
+```ocaml
+val f : t @ local -> u     (* argument pinned to yielding *)
+let f (x @ local) = ...    (* yielding mode of x is inferred *)
+```
+
+If you want the pinned behavior at a flexible site, write the implied
+axes explicitly, e.g. `(x @ local yielding)`.
+
+## Implications on modalities
+
 Once we've done this for modes, it would be odd if we didn't also do this
-for modalities. For example, `local` implies `yielding`. Now consider
+for modalities. Consider
 ```ocaml
 type 'a glob = { g : 'a @@ global }
 let unglob (r : 'a glob @ local) : 'a = r.g
 ```
-Because of the mode implication, `r` has mode `local unforkable yielding`.
-The written `global` modality means that `r.g` will have mode `global`
-(corresponding to the unwritten legacy `global` on the return type of `'a`).
-But without a `unyielding` modality, then `r.g` will have mode `yielding`,
+A `local` record such as `r` may also be `yielding`. The written `global`
+modality means that `r.g` will have mode `global` (corresponding to the
+unwritten legacy `global` on the return type of `'a`). But without an
+`unyielding` modality, `r.g` of a `yielding` record would be `yielding`,
 which is not compatible with a return expecting the legacy `unyielding`.
 We thus extend implications to include modalities, such that `global`
 implies `unyielding`, thus getting `unglob` to type-check (because now
 `r.g` will be `unyielding`).
 
-Other implications
-exist, all to lower users' annotation burden, all applying both to modes
-and modalities, according to this table:
+Unlike mode implications, modality implications are not positional: a
+modality expression always describes a complete modality, so its unwritten
+axes are filled in by implications wherever the modality is written.
+
+## The implication table
+
 
 
 | this         | implies this  |
@@ -338,8 +381,9 @@ and modalities, according to this table:
 | `write`      | `corrupted`   |
 | `read_write` | `uncontended` |
 
-These implications exist only in the surface syntax for mode and modality
-expressions. Mode inference does not necessarily follow these implications.
+
+These implications only affect defaults. All combinations on these axes
+are permissible.
 
 ## Global and aliased
 

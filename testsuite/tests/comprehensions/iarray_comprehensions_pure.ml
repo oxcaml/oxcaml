@@ -267,13 +267,6 @@ Line 1, characters 13-15:
 Error: The constructor "[]" has type "'a list"
        but an expression was expected of type "'b iarray"
        because it is in a for-in iterator in an immutable array comprehension
-|}, Principal{|
-Line 1, characters 13-15:
-1 | [:x for x in []:];;
-                 ^^
-Error: The constructor "[]" has type "'a list"
-       but an expression was expected of type "'b iarray"
-       because it is in a for-in iterator in an immutable array comprehension
 |}];;
 
 (* As above, but don't trigger type-based disambiguation; this affects the error

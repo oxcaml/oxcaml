@@ -38,6 +38,7 @@ type error =
   | Wrong_version of string
   | Corrupted of string
   | Marshal_failed of string
+  | Configuration_mismatch of Ir_config_fingerprint.configuration_mismatch
 
 exception Error of error
 
@@ -45,6 +46,9 @@ let save filename cfg_unit_info =
   let ch = open_out_bin filename in
   Misc.try_finally (fun () ->
     output_string ch Config.cfg_magic_number;
+    (* Saved because code generation decisions already applied to the IR
+       depend on it; checked when the file is reloaded. *)
+    output_value ch (Ir_config_fingerprint.current ());
     output_value ch cfg_unit_info;
     (* Saved because Emit depends on Cmm.label. *)
     output_value ch (Cmm.cur_label ());
@@ -64,6 +68,9 @@ let restore filename =
        let buffer = really_input_string ic (String.length magic) in
        if String.equal buffer magic then begin
          try
+           Ir_config_fingerprint.read_and_check ic ~filename
+             ~raise_configuration_mismatch:(fun configuration_mismatch ->
+               raise (Error (Configuration_mismatch configuration_mismatch)));
            let cfg_unit_info = (input_value ic : cfg_unit_info) in
            let last_label = (input_value ic : Cmm.label) in
            Cmm.reset ();
@@ -98,6 +105,9 @@ let report_error ppf = function
   | Marshal_failed filename ->
       fprintf ppf "Failed to marshal Cfg to file@ %a"
         Location.Doc.filename filename
+  | Configuration_mismatch configuration_mismatch ->
+      Ir_config_fingerprint.print_configuration_mismatch ppf
+        configuration_mismatch
 
 let () =
   Location.register_error_of_exn

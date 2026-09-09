@@ -68,20 +68,18 @@ let create_discontiguous_range_list_entry state ~start_of_code_symbol
   let start_inclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (start_pos |> Label.to_int))
-      ~adjustment:start_pos_offset ~start_of_code_symbol
+      ~adjustment:start_pos_offset
   in
   let end_exclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (end_pos |> Label.to_int))
-      ~adjustment:end_pos_offset ~start_of_code_symbol
+      ~adjustment:end_pos_offset
   in
   let range_list_entry : Range_list_entry.entry =
     (* DWARF-5 spec page 54 line 1. *)
     Startx_endx { start_inclusive; end_exclusive; payload = () }
   in
-  let range_list_entry =
-    Range_list_entry.create range_list_entry ~start_of_code_symbol
-  in
+  let range_list_entry = Range_list_entry.create range_list_entry in
   (* We still use the [Range_list] when emitting DWARF-4 (even though it is a
      DWARF-5 structure) for the purposes of de-duplicating ranges. *)
   let range_list = Range_list.add range_list range_list_entry in
@@ -144,7 +142,7 @@ module All_summaries = Identifiable.Make (struct
 end)
 
 let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
-    range_list_attributes block =
+    ~(caller_item : Debuginfo.item) range_list_attributes block =
   let abstract_instance_symbol =
     Dwarf_abstract_instances.find state ~compilation_unit_proto_die block
   in
@@ -170,17 +168,24 @@ let die_for_inlined_frame state ~compilation_unit_proto_die ~parent
           ~linkage_name:(Asm_symbol.encode_without_prefix fun_symbol);
         DAH.create_external ~is_visible_externally:true ]
   in
-  let block : Debuginfo.item = List.hd (Debuginfo.to_items block) in
+  (* The call site of the current inlined frame lies in the frame one level
+     further out, which is described by [caller_item] (for a frame inlined
+     directly into [fundecl], that is [fundecl]'s own debuginfo item). The
+     current frame's own item must not be used here: it describes a position
+     _inside_ the inlined function's body, not where that function was called
+     from. *)
   Proto_die.create ~parent:(Some parent) ~tag:Inlined_subroutine
     ~attribute_values:
       (abstract_instance @ range_list_attributes
-      @ [DAH.create_call_file (Dwarf_state.get_file_num state block.dinfo_file)]
-      @ (if block.dinfo_line >= 0
-         then [DAH.create_call_line block.dinfo_line]
+      @ [ DAH.create_call_file
+            (Dwarf_state.get_file_num state
+               (Debuginfo.item_file_path caller_item)) ]
+      @ (if caller_item.dinfo_line >= 0
+         then [DAH.create_call_line caller_item.dinfo_line]
          else [])
       @
-      if block.dinfo_char_start >= 0
-      then [DAH.create_call_column block.dinfo_char_start]
+      if caller_item.dinfo_char_start >= 0
+      then [DAH.create_call_column caller_item.dinfo_char_start]
       else [])
     ()
 
@@ -205,7 +210,7 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
         ~high_pc_offset_in_bytes:end_pos_offset
     in
     [low_pc; high_pc], all_summaries
-  | Some (Discontiguous (dwarf_4_range_list_entries, _range_list, summary)) -> (
+  | Some (Discontiguous (dwarf_4_range_list_entries, range_list, summary)) -> (
     match All_summaries.Map.find summary all_summaries with
     | exception Not_found ->
       let range_list_attributes =
@@ -220,10 +225,10 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
           in
           [range_list_attribute]
         | Five ->
-          (* CR mshinwell: implement DWARF-5 support *)
-          (* let range_list_index = Range_list_table.add (DS.range_list_table
-             state) range_list in DAH.create_ranges range_list_index *)
-          Misc.fatal_error "not yet implemented"
+          let range_list_index =
+            Range_list_table.add (DS.range_list_table state) range_list
+          in
+          [DAH.create_ranges range_list_index]
       in
       let all_summaries =
         All_summaries.Map.add summary range_list_attributes all_summaries
@@ -288,9 +293,21 @@ let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
         create_range_list_attributes_and_summarise state ~start_of_code_symbol
           ~dwarf_4_base_address_entry range all_summaries
       in
+      (* [prefix] is ordered outermost first and always starts with [fundecl]'s
+         own item, so its last element describes the frame into which the
+         current block was inlined, i.e. the current block's call site. *)
+      let caller_item =
+        match Misc.last prefix with
+        | Some caller_item -> caller_item
+        | None ->
+          Misc.fatal_errorf
+            "Dwarf_inlined_frames.create_down_to_innermost_frame:@ empty \
+             prefix when creating DIE for %a in function %s"
+            Debuginfo.print_compact_extended block fundecl.L.fun_name
+      in
       let inlined_subroutine_die =
         die_for_inlined_frame state ~compilation_unit_proto_die
-          ~parent:parent_die range_list_attributes block
+          ~parent:parent_die ~caller_item range_list_attributes block
       in
       DS.Debug.log "Our DIE ref (DW_TAG_inlined_subroutine) for %a is %a\n%!"
         Debuginfo.print_compact_extended block Asm_label.print

@@ -174,6 +174,7 @@ val type_option_some:
 val type_option_none:
         Env.t -> type_expr -> Location.t -> Typedtree.expression
 val generalizable: int -> type_expr -> bool
+val generalize_structure_exp: Typedtree.expression -> unit
 type delayed_check
 val delayed_checks: delayed_check list ref
 val reset_delayed_checks: unit -> unit
@@ -185,9 +186,36 @@ val optimise_allocations: unit -> unit
 val has_poly_constraint : Parsetree.pattern -> bool
 
 
-val name_pattern : string -> Typedtree.pattern list -> Ident.t * Uid.t
+(** The syntactic construct a binder for a pattern comes from. *)
+type binder_pattern_kind =
+  | Synthetic_eta_expansion
+      (** The parameter of an eta-expansion the compiler inserts, e.g. when
+          [g] is rewritten to [fun x -> g x] to reorder labelled arguments. *)
+  | Value_pattern_in_argument
+      (** A non-variable value pattern in argument position, e.g.
+          [fun (x, y) -> ...], [function Some x -> ...], or the parameter of a
+          binding operator such as [let* (x, y) = ...]. *)
+  | Value_pattern_in_match
+      (** The scrutinee of a [match]/[try] with exception or effect cases, e.g.
+          [match e with (x, y) -> ... | exception Not_found -> ...]. Without
+          such an arm the scrutinee is handled directly by the pattern-matching
+          compiler and needs no synthetic binder. *)
+  | Exception_pattern
+      (** The exception caught by an exception handler, e.g.
+          [try e with Failure _ -> ...] or
+          [match e with ... | exception Not_found -> ...]. *)
+  | Effect_pattern
+      (** The effect handled by an effect handler, e.g.
+          [match e with ... | effect E, k -> ...]. *)
+
+val create_uid_for_pattern_kind : binder_pattern_kind -> Uid.t
+
+val name_pattern :
+  pattern_kind:binder_pattern_kind -> string -> Typedtree.pattern list
+  -> Ident.t * Uid.t
 val name_cases :
-          string -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
+          pattern_kind:binder_pattern_kind -> string
+          -> Typedtree.value Typedtree.case list -> Ident.t * Uid.t
 
 (* Why are we calling [submode]? This tells us why. *)
 type submode_reason =
@@ -353,8 +381,8 @@ type error =
   | Submode_failed of Mode.Value.error * submode_reason
   | Curried_application_complete of
       arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Mode_mismatch of mode_mismatch_kind * Mode.Alloc.equate_error
-  | Uncurried_function_escapes of Mode.Alloc.error
+  | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+  | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
   | Bad_tail_annotation of [`Conflict|`Not_a_tailcall]
@@ -375,8 +403,6 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
-  | Indeterminate_record_layout of type_expr * string
-  | Indeterminate_constructor_layout of type_expr * string * int
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -387,7 +413,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Let_poly_not_yet_implemented
-  | Let_poly_not_syntactic_value
+  | Let_poly_not_function
   | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Useless_lpoly
 

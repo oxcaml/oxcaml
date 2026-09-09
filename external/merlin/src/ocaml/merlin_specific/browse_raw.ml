@@ -404,12 +404,12 @@ let of_pattern_desc (type k) (desc : k pattern_desc) =
            ** list_fold (fun (_, jkind) -> of_jkind_annotation_opt jkind) jkinds)
          t
   | Tpat_array (_, _, ps) -> list_fold of_pattern ps
-  | Tpat_record (ls, _, _, _) ->
+  | Tpat_record (ls, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Legacy ** of_pattern p)
       ls
-  | Tpat_record_unboxed_product (ls, _, _, _) ->
+  | Tpat_record_unboxed_product (ls, _, _) ->
     list_fold
       (fun (lid_loc, desc, p) ->
         of_pat_record_field p lid_loc desc Unboxed_product ** of_pattern p)
@@ -505,7 +505,6 @@ let rec of_expression_desc loc = function
         label = lbl;
         newval = e2;
         record_repres = _;
-        record_sorts = _;
         modality = _
       } ->
     of_expression e1 ** of_expression e2

@@ -7,14 +7,14 @@ module B = A
 [%%expect{|
 {
  "A"[module] -> {<.1>
-                 "t"[type] -> <.0>;
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module A : sig type t end
 {
  "B"[module] -> Alias(<.2>
                       {<.1>
-                       "t"[type] -> <.0>;
+                       "t"[type] -> ((? ) : value)<.0>;
                        });
  }
 module B = A
@@ -24,7 +24,7 @@ type u = B.t
 
 [%%expect{|
 {
- "u"[type] -> <.3>;
+ "u"[type] -> ((? ) : value)<.3>;
  }
 type u = B.t
 |}]
@@ -47,7 +47,7 @@ module C = F'(A)
 [%%expect{|
 {
  "C"[module] -> {<.8>
-                 "t"[type] -> <.0>;
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module C : sig type t = A.t end
@@ -60,7 +60,7 @@ module C = F(B)
 {
  "C"[module] -> Alias(<.9>
                       {<.1>
-                       "t"[type] -> <.0>;
+                       "t"[type] -> ((? ) : value)<.0>;
                        });
  }
 module C : sig type t = B.t end
@@ -70,11 +70,12 @@ module D = C
 
 [%%expect{|
 {
- "D"[module] -> Alias(<.10>
-                      Alias(<.9>
-                            {<.1>
-                             "t"[type] -> <.0>;
-                             }));
+ "D"[module] ->
+   Alias(<.10>
+         Alias(<.9>
+               {<.1>
+                "t"[type] -> ((? ) : value)<.0>;
+                }));
  }
 module D = C
 |}]
@@ -93,7 +94,7 @@ module E = G(B)
 [%%expect{|
 {
  "E"[module] -> {<.14>
-                 "t"[type] -> <.0>;
+                 "t"[type] -> ((? ) : value)<.0>;
                  };
  }
 module E : sig type t = B.t end
@@ -105,21 +106,21 @@ module O = N
 [%%expect{|
 {
  "M"[module] -> {<.17>
-                 "t"[type] -> <.15>;
+                 "t"[type] -> ((? ) : value)<.15>;
                  "x"[value] -> <.16>;
                  };
  }
 module M : sig type t val x : int end
 {
  "N"[module] -> {<.19>
-                 "t"[type] -> <.15>;
+                 "t"[type] -> ((? ) : value)<.15>;
                  };
  }
 module N : sig type t end
 {
  "O"[module] -> Alias(<.20>
                       {<.19>
-                       "t"[type] -> <.15>;
+                       "t"[type] -> ((? ) : value)<.15>;
                        });
  }
 module O = N

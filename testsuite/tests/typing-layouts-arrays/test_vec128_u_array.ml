@@ -102,7 +102,7 @@ let check_inval f arg =
   | exception (Invalid_argument _) -> ()
   | exception _ -> assert false
 
-external const : int64# -> int64x2# = "" "caml_int64x2_const1"
+external const : int64_u -> int64x2# = "" "caml_int64x2_const1"
   [@@noalloc] [@@unboxed] [@@builtin]
 
 let () =

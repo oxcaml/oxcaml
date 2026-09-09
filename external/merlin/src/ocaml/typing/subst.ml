@@ -40,7 +40,7 @@ type kind_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_mode : For_copy.copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr;
         prepare_modality : Mode.Modality.t -> Mode.Modality.t;
         prepare_ident : Ident.t -> Ident.t
       }
@@ -304,8 +304,11 @@ let with_additional_action =
         in
         (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
-        let prepare_mode mode =
-          Mode.Alloc.(mode |> to_const_exn |> of_const)
+        (* if a mode is generic we copy it persistently for saving *)
+        let prepare_mode copy_scope mode =
+          if Mode.Alloc.check_generic mode
+          then For_copy.mode_copy_for_saving copy_scope mode
+          else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)
@@ -446,6 +449,7 @@ let to_subst_by_type_function s p =
 let new_type_id = s_ref (-1)
 let reset_additional_action_id () =
   new_type_id := -1;
+  Mode.reset_persistent_id ();
   Jkind_types.Sort.reset_cmi_sort_id ()
 
 let newpersty desc =
@@ -521,7 +525,8 @@ let apply_type_function params args body =
           let t = newgenstub ~scope:(get_scope ty)
             (Jkind.Builtin.any ~why:Dummy_jkind) in
           For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
-          let desc' = copy_type_desc copy desc in
+          let copy_mode m = For_copy.mode_copy_generic copy_scope m in
+          let desc' = copy_type_desc copy copy_mode desc in
           Transient_expr.set_stub_desc t desc';
           t
     in
@@ -570,6 +575,10 @@ let rec sort s srt =
     let var' = sort_var s var in
     if var == var' then srt
     else Var var'
+  | Addressable srt' ->
+    let srt'' = sort s srt' in
+    if srt' == srt'' then srt
+    else Addressable srt''
 
 let rec layout s l =
   let open Jkind_types.Layout in
@@ -583,17 +592,22 @@ let rec layout s l =
     let sort_l' = sort s sort_l in
     if sort_l == sort_l' then l
     else Sort (sort_l', ax)
+  | Addressable l' ->
+    let l'' = layout s l' in
+    if l' == l'' then l
+    else Addressable l''
 
 let jkind_desc s jkind =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       let const =
         { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
           mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
@@ -609,14 +623,15 @@ let jkind_desc s jkind =
 let jkind_const_desc s
       ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
   match jkind.base with
-  | Kconstr (p, sa) ->
+  | Kconstr (p, sa, op) ->
     begin match Path.Map.find p s.jkinds with
     | exception Not_found ->
       let p' = jkind_path s p in
       if Path.compare p' p = 0 then jkind else
-        { jkind with base = Kconstr (p', sa) }
-    | Jkind_path p' -> { jkind with base = Kconstr (p', sa) }
+        { jkind with base = Kconstr (p', sa, op) }
+    | Jkind_path p' -> { jkind with base = Kconstr (p', sa, op) }
     | Jkind_const { base; mod_bounds; with_bounds = No_with_bounds } ->
+      let base = Jkind.Base_and_axes.apply_operator base op in
       { base = Jkind.Base_and_axes.meet_scannable_axes base sa;
         mod_bounds = Jkind.Mod_bounds.meet mod_bounds jkind.mod_bounds;
         with_bounds = jkind.with_bounds }
@@ -756,9 +771,17 @@ let rec typexp copy_scope s ty =
           Tlink (typexp copy_scope s t2)
       | Tarrow ((label, marg, mret), arg, ret, comm) ->
           let marg, mret =
+            if get_id ty < 0 then
+              For_copy.mode_copy_for_restoring copy_scope marg,
+              For_copy.mode_copy_for_restoring copy_scope mret
+            else
             match s.additional_action with
             | Prepare_for_saving { prepare_mode; _ } ->
-              prepare_mode marg, prepare_mode mret
+              prepare_mode copy_scope marg,
+              prepare_mode copy_scope mret
+            | Duplicate_variables ->
+              For_copy.mode_copy_generic copy_scope marg,
+              For_copy.mode_copy_generic copy_scope mret
             | _ -> marg, mret
           in
           let arg = typexp copy_scope s arg in
@@ -768,7 +791,8 @@ let rec typexp copy_scope s ty =
       | Tof_kind jk -> Tof_kind (jkind copy_scope s jk)
       | Tmod (ty, mod_bounds) ->
           Tmod (typexp copy_scope s ty, mod_bounds)
-      | _ -> copy_type_desc (typexp copy_scope s) desc
+      | _ ->
+        copy_type_desc (typexp copy_scope s) (fun _ -> assert false) desc
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
@@ -807,7 +831,8 @@ let jkind copy_scope s loc jk =
 *)
 let type_expr s ty =
   let loc = Option.value s.loc ~default:Location.none in
-  For_copy.with_scope (fun copy_scope -> typexp copy_scope s loc ty)
+  For_copy.with_scope (fun copy_scope ->
+    typexp copy_scope s loc ty)
 
 (* For idents that are guaranteed to be local/scoped, such as bound
    signature items and functor parameters. *)

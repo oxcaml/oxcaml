@@ -21,16 +21,16 @@
 open! Stdlib
 
 (** Unboxed 32-bit integers.  This file primarily duplicates
-    functionality from the [Int32] module, but for [int32#].
+    functionality from the [Int32] module, but for [int32_u].
 
-   This module provides operations on the type [int32#]
+   This module provides operations on the type [int32_u]
    of unboxed signed 32-bit integers.  Unlike the built-in [int] type,
-   the type [int32#] is guaranteed to be exactly 32-bits wide on all
-   platforms.  All arithmetic operations over [int32#] are wrapping, not
+   the type [int32_u] is guaranteed to be exactly 32-bits wide on all
+   platforms.  All arithmetic operations over [int32_u] are wrapping, not
    truncating.
 *)
 
-type t = int32#
+type t = int32_u
 (** An alias for the type of unboxed 32-bit integers. *)
 
 (* CR layouts v2.1: add back this comment to the above when we support
@@ -38,15 +38,15 @@ type t = int32#
 
     Literals for unboxed 32-bit integers are prefixed by # and suffixed by l:
     {[
-     let zero: int32# = #0l
-     let one: int32# = #1l
-     let m_one: int32# = #-1l
+     let zero: int32_u = #0l
+     let one: int32_u = #1l
+     let m_one: int32_u = #-1l
     ]}
 *)
 
 (* Unboxed-specific stuff at the top. *)
 external to_int32 : t -> (int32[@local_opt]) = "%box_int32" [@@warning "-187"]
-(** Box a [int32#] *)
+(** Box a [int32_u] *)
 
 external of_int32 : (int32[@local_opt]) -> t = "%unbox_int32" [@@warning "-187"]
 (** Unbox a boxed [int32] *)
@@ -56,16 +56,16 @@ external of_int32 : (int32[@local_opt]) -> t = "%unbox_int32" [@@warning "-187"]
 
 (* CR layouts v5: add back all the commented-out values in this module when we
    support [bits32]s in structures.  This includes constants (e.g., [zero] and
-   [one]) and functions that return things like [int32#] (e.g.,
+   [one]) and functions that return things like [int32_u] (e.g.,
    [of_string_opt]). *)
 
-(* val zero : int32#
+(* val zero : int32_u
  * (** The unboxed 32-bit integer 0.*)
  *
- * val one : int32#
+ * val one : int32_u
  * (** The unboxed 32-bit integer 1.*)
  *
- * val minus_one : int32#
+ * val minus_one : int32_u
  * (** The unboxed 32-bit integer -1.*) *)
 
 val neg : t -> t
@@ -112,10 +112,10 @@ val pred : t -> t
 val abs : t -> t
 (** Return the absolute value of its argument. *)
 
-(* val max_int : int32#
+(* val max_int : int32_u
  * (** The greatest representable unboxed 32-bit integer, 2{^31} - 1. *)
  *
- * val min_int : int32#
+ * val min_int : int32_u
  * (** The smallest representable unboxed 32-bit integer, -2{^31}. *)
  *)
 
@@ -150,11 +150,11 @@ val shift_right_logical : t -> int -> t
 
 val of_int : int -> t
 (** Convert the given integer (type [int]) to an unboxed 32-bit integer
-   (type [int32#]). On 64-bit platforms, the argument is taken
+   (type [int32_u]). On 64-bit platforms, the argument is taken
     modulo 2{^32}. *)
 
 val to_int : t -> int
-(** Convert the given unboxed 32-bit integer (type [int32#]) to an
+(** Convert the given unboxed 32-bit integer (type [int32_u]) to an
    integer (type [int]).  On 32-bit platforms, the 32-bit integer
    is taken modulo 2{^31}, i.e. the high-order bit is lost
    during the conversion.  On 64-bit platforms, the conversion
@@ -208,7 +208,7 @@ val bits_of_float : float -> t
 val float_of_bits : t -> float
 (** Return the floating-point number whose internal representation,
    according to the IEEE 754 floating-point 'single format' bit layout,
-   is the given [int32#]. *)
+   is the given [int32_u]. *)
 
 val compare: t -> t -> int
 (** The comparison function for unboxed 32-bit integers, with the same

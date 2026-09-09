@@ -69,6 +69,7 @@ module Sort = struct
     | Base of base
     | Product of t list
     | Univar of univar
+    | Addressable of t
 
   and var =
     { mutable contents : t option;
@@ -122,6 +123,11 @@ module Sort = struct
     | Vec512 -> "vec512"
     | Mask -> "mask"
 
+  let base_is_addressable = function
+    | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 | Mask -> true
+    | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
+      false
+
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
 
@@ -164,6 +170,15 @@ module Sort = struct
       | Product of t list
       | Univar of univar
       | Genvar of var
+      | Addressable of t
+
+    let base b = Base b
+
+    let product cs = Product cs
+
+    let univar uv = Univar uv
+
+    let genvar v = Genvar v
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -171,7 +186,10 @@ module Sort = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | (Base _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Addressable c1, Addressable c2 ->
+        (* Relies on constants not having redundant addressability wrappers. *)
+        equal c1 c2
+      | (Base _ | Product _ | Univar _ | Genvar _ | Addressable _), _ -> false
 
     let format ppf c =
       let module Fmt = Format_doc in
@@ -183,6 +201,8 @@ module Sort = struct
         | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
         | Univar { name = None } -> Fmt.fprintf ppf "_"
         | Genvar v -> Fmt.fprintf ppf "%s" (to_string_genvar v)
+        | Addressable c ->
+          Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) c
       in
       pp_element ~nested:false ppf c
 
@@ -195,6 +215,36 @@ module Sort = struct
       | Univar _ -> Misc.fatal_error "Sort.Const.all_void: Univar"
       | Genvar _ -> Misc.fatal_error "Sort.Const.all_void: Genvar"
       | Product ts -> List.for_all all_void ts
+      | Addressable t ->
+        (* CR box: This may have to be updated once addressability affects boxed
+           representations *)
+        all_void t
+
+    let rec is_surely_addressable = function
+      | Base b -> base_is_addressable b
+      | Product cs -> List.for_all is_surely_addressable cs
+      | Univar _ | Genvar _ -> false
+      | Addressable _ -> true
+
+    (* Maintains invariant of no redundant [Addressable] constructors in
+       constants *)
+    let addressable c = if is_surely_addressable c then c else Addressable c
+
+    let rec maybe_all_void = function
+      | Base Void -> true
+      | Base
+          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
+        false
+      | Univar _ | Genvar _ -> true
+      | Product ts -> List.for_all maybe_all_void ts
+      | Addressable t -> maybe_all_void t
+
+    let rec is_concrete = function
+      | Base _ -> true
+      | Product ts -> List.for_all is_concrete ts
+      | Univar _ | Genvar _ -> false
+      | Addressable t -> is_concrete t
 
     let scannable = Base Scannable
 
@@ -252,6 +302,8 @@ module Sort = struct
           | Univar { name = Some n } -> Format.fprintf ppf "Univar '%s" n
           | Univar { name = None } -> Format.fprintf ppf "Univar '_"
           | Genvar v -> Format.fprintf ppf "Genvar %d" v.id
+          | Addressable c ->
+            Format.fprintf ppf "Addressable (%a)" (pp_element ~nested:false) c
         in
         pp_element ~nested:false ppf c
     end
@@ -350,7 +402,7 @@ module Sort = struct
 
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
-      | (Product _ | Univar _ | Genvar _) as t -> Some t
+      | (Product _ | Univar _ | Genvar _ | Addressable _) as t -> Some t
   end
 
   module Var = struct
@@ -411,6 +463,7 @@ module Sort = struct
           ts
       | Univar { name = Some n } -> fprintf ppf "Univar '%s" n
       | Univar { name = None } -> fprintf ppf "Univar '_"
+      | Addressable s -> fprintf ppf "Addressable (%a)" t s
 
     and opt_t ppf = function
       | Some s -> fprintf ppf "Some %a" t s
@@ -442,6 +495,7 @@ module Sort = struct
     | Var v -> update_level_var level v
     | Base _ | Univar _ -> ()
     | Product ts -> List.iter (update_level level) ts
+    | Addressable t -> update_level level t
 
   and update_level_var level u =
     match u.contents with
@@ -530,6 +584,7 @@ module Sort = struct
         | Product cs -> Product (List.map of_const cs)
         | Univar uv -> Univar uv
         | Genvar v -> Var v
+        | Addressable c -> Addressable (of_const c)
     end
 
     module T_option = struct
@@ -585,6 +640,7 @@ module Sort = struct
             (Misc.Stdlib.List.map_option of_const cs)
         | Univar uv -> Some (Univar uv)
         | Genvar v -> Some (Var v)
+        | Addressable c -> Option.map (fun s -> Addressable s) (of_const c)
     end
 
     module Const = struct
@@ -708,12 +764,16 @@ module Sort = struct
     | Var v -> instance_var v
     | (Base _ | Univar _) as s -> s
     | Product ts -> Product (List.map instance ts)
+    | Addressable s -> Addressable (instance s)
 
   let rec get : t -> t = function
     | (Base _ | Univar _) as t -> t
     | Product ts as t ->
       let ts' = List.map get ts in
       if List.for_all2 ( == ) ts ts' then t else Product ts'
+    | Addressable s as t ->
+      let s' = get s in
+      if s' == s then t else Addressable s'
     | Var r as t -> (
       match r.contents with
       | None -> t
@@ -729,6 +789,11 @@ module Sort = struct
       begin match get_representable_product ts with
       | None -> None
       | Some ts' -> Some (Product ts')
+      end
+    | Addressable s ->
+      begin match get_representable s with
+      | None -> None
+      | Some s' -> Some (Addressable s')
       end
     | Var v -> get_representable_var v
 
@@ -749,6 +814,13 @@ module Sort = struct
       end
     | Some t -> get_representable t
 
+  let rec strip_head_addressable : t -> t = function
+    | Addressable s -> strip_head_addressable s
+    | Var { contents = Some s; _ } as t ->
+      let s' = strip_head_addressable s in
+      if s' == s then t else s'
+    | (Var _ | Base _ | Product _ | Univar _) as t -> t
+
   let rec subst s t =
     match t with
     | Var v ->
@@ -760,6 +832,7 @@ module Sort = struct
       end
     | Base _ | Univar _ -> t
     | Product ts -> Product (List.map (subst s) ts)
+    | Addressable t -> Addressable (subst s t)
 
   (* Sort generalization context for let poly_ *)
   let in_sort_generalization_context : var list ref option ref = ref None
@@ -778,6 +851,7 @@ module Sort = struct
         vars_ref := v :: !vars_ref
       end
     | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
+    | Addressable sort -> generalize_rec ~current_level ~vars_ref sort
     | Base _ | Univar _ -> ()
 
   let generalize ~current_level sort =
@@ -802,6 +876,7 @@ module Sort = struct
     | Product ts -> Product (List.map default_to_scannable_and_get ts)
     | Univar uv -> Univar uv
     | Var r -> var_default_to_scannable_and_get r
+    | Addressable s -> Const.addressable (default_to_scannable_and_get s)
 
   and var_default_to_scannable_and_get r : Const.t =
     match r.contents with
@@ -819,157 +894,89 @@ module Sort = struct
       (* path compression *)
       result
 
-  (* Like [default_to_scannable_and_get], but returns a [Some] wrapping. Reuses
-     pre-allocated [Some] boxes when the result is one of the known base
-     constants, to avoid an allocation per call site. *)
-  let default_to_scannable_and_get_some s =
-    Const.some (default_to_scannable_and_get s)
+  let get_concrete_defaulting_to_scannable s =
+    let const = default_to_scannable_and_get s in
+    if Const.is_concrete const then Const.some const else None
 
   (* CR layouts v12: Default to void instead. *)
   let default_for_transl_and_get s = default_to_scannable_and_get s
 
+  let rec to_const_opt : t -> Const.t option = function
+    | Base b -> Some (Static.Const.of_base b)
+    | Product ts ->
+      Misc.Stdlib.List.map_option to_const_opt ts
+      |> Option.map (fun cs : Const.t -> Const.Product cs)
+    | Univar uv -> Some (Univar uv)
+    | Var r -> (
+      match r.contents with None -> None | Some s -> to_const_opt s)
+    | Addressable s -> Option.map Const.addressable (to_const_opt s)
+
   let is_scannable_or_var s =
-    match get s with Base Scannable | Var _ -> true | _ -> false
+    let rec go = function
+      | Base Scannable | Var _ -> true
+      | Addressable s -> go s
+      | Base _ | Product _ | Univar _ -> false
+    in
+    go (get s)
 
   (***********************)
   (* equality *)
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
+  let rec constrain_addressable ~allow_mutation : t -> bool = function
+    | Addressable _ -> true
+    | Base b -> base_is_addressable b
+    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
+    | Univar _ -> false
+    | Var v -> (
+      match v.contents with
+      | Some s -> constrain_addressable ~allow_mutation s
+      | None when is_rigidvar v -> false
+      | None when not allow_mutation -> false
+      | None ->
+        set v (Some (Addressable (of_var (new_var ~level:level_fresh))));
+        true)
 
-  let swap_equate_result = function
-    | Equal_mutated_first -> Equal_mutated_second
-    | Equal_mutated_second -> Equal_mutated_first
-    | (Unequal | Equal_no_mutation | Equal_mutated_both) as r -> r
+  let is_surely_addressable = constrain_addressable ~allow_mutation:false
 
-  let[@inline] sorts_of_product s =
-    (* In the equate functions, it's useful to pass around lists of sorts inside
-       the product constructor they came from to avoid re-allocating it if we
-       end up wanting to store it in a variable. We could probably eliminate the
-       use of this by collapsing a bunch of the functions below into each other,
-       but that would be much less readable. *)
-    match s with
-    | Product sorts -> sorts
-    | Var _ | Base _ | Univar _ ->
-      Misc.fatal_error "Jkind_types.sorts_of_product"
-
-  let rec equate_sort_sort s1 s2 =
-    match s1 with
-    | Base b1 -> swap_equate_result (equate_sort_base s2 b1)
-    | Var v1 -> equate_var_sort v1 s2
-    | Product _ -> swap_equate_result (equate_sort_product s2 s1)
-    | Univar uv1 -> swap_equate_result (equate_sort_univar s2 uv1)
-
-  and equate_sort_base s1 b2 =
-    match s1 with
-    | Base b1 -> if equal_base b1 b2 then Equal_no_mutation else Unequal
-    | Var v1 -> equate_var_base v1 b2
-    | Product _ | Univar _ -> Unequal
-
-  and equate_sort_univar s1 uv2 =
-    match s1 with
-    | Univar uv1 ->
-      if equal_univar_univar uv1 uv2 then Equal_no_mutation else Unequal
-    | Base _ | Product _ -> Unequal
-    | Var v1 -> equate_var_univar v1 uv2
-
-  and equate_var_univar v1 uv2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_univar s1 uv2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Some (Univar uv2));
-      Equal_mutated_first
-
-  and equate_var_base v1 b2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_base s1 b2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Static.T_option.of_base b2);
-      Equal_mutated_first
-
-  and equate_var_sort v1 s2 =
-    match s2 with
-    | Base b2 -> equate_var_base v1 b2
-    | Var v2 -> equate_var_var v1 v2
-    | Product _ -> equate_var_product v1 s2
-    | Univar uv2 -> equate_var_univar v1 uv2
-
-  and equate_var_var v1 v2 =
-    if v1.id = v2.id (* equal id means physical equality *)
-    then Equal_no_mutation
-    else
-      match v1.contents, v2.contents with
-      | Some s1, _ -> swap_equate_result (equate_var_sort v2 s1)
-      | _, Some s2 -> equate_var_sort v1 s2
-      | None, None when not @@ is_rigidvar v1 ->
-        set v1 (Some (of_var v2));
-        Equal_mutated_first
-      | None, None when not @@ is_rigidvar v2 ->
-        set v2 (Some (of_var v1));
-        Equal_mutated_second
-      | None, None -> Unequal
-
-  and equate_var_product v1 s2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_product s1 s2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
+  let rec equate ~allow_mutation s1 s2 =
+    match s1, s2 with
+    | Var v1, Var v2 when v1.id = v2.id -> true
+    | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
+    | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
+    | Var ({ contents = None } as v1), _
+      when (not (is_rigidvar v1)) && allow_mutation ->
       set v1 (Some s2);
-      Equal_mutated_first
-
-  and equate_sort_product s1 s2 =
-    match s1 with
-    | Base _ | Univar _ -> Unequal
-    | Product sorts1 ->
-      let sorts2 = sorts_of_product s2 in
-      equate_sorts sorts1 sorts2
-    | Var v1 -> equate_var_product v1 s2
-
-  and equate_sorts sorts1 sorts2 =
-    let rec go sorts1 sorts2 acc =
-      match sorts1, sorts2 with
-      | [], [] -> acc
-      | sort1 :: sorts1, sort2 :: sorts2 -> (
-        match equate_sort_sort sort1 sort2, acc with
-        | Unequal, _ -> Unequal
-        | _, Unequal -> assert false
-        | Equal_no_mutation, acc | acc, Equal_no_mutation ->
-          go sorts1 sorts2 acc
-        | Equal_mutated_both, _ | _, Equal_mutated_both ->
-          go sorts1 sorts2 Equal_mutated_both
-        | Equal_mutated_first, Equal_mutated_first ->
-          go sorts1 sorts2 Equal_mutated_first
-        | Equal_mutated_second, Equal_mutated_second ->
-          go sorts1 sorts2 Equal_mutated_second
-        | Equal_mutated_first, Equal_mutated_second
-        | Equal_mutated_second, Equal_mutated_first ->
-          go sorts1 sorts2 Equal_mutated_both)
-      | _, _ -> assert false
-    in
-    if List.compare_lengths sorts1 sorts2 = 0
-    then go sorts1 sorts2 Equal_no_mutation
-    else Unequal
-
-  let equate_tracking_mutation = equate_sort_sort
-
-  (* Don't expose whether or not mutation happened; we just need that for
-     [Jkind] *)
-  let equate s1 s2 =
-    match equate_tracking_mutation s1 s2 with
-    | Unequal -> false
-    | Equal_mutated_first | Equal_mutated_second | Equal_no_mutation
-    | Equal_mutated_both ->
       true
+    | _, Var ({ contents = None } as v2)
+      when (not (is_rigidvar v2)) && allow_mutation ->
+      set v2 (Some s1);
+      true
+    | Var _, _ | _, Var _ ->
+      (* rigid *)
+      false
+    | Addressable _, _ | _, Addressable _ ->
+      (* We reduce the problem to [s1 addressable = s2 addressable], since if
+         one side is addressable, then the other is too. At this point we
+         proceed by proving [s1 = s2], which is incomplete:
+
+         Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
+         We could unify ['var = bits8] or ['var = bits8 addressable], but
+         neither is more general. *)
+      constrain_addressable ~allow_mutation s1
+      && constrain_addressable ~allow_mutation s2
+      && equate ~allow_mutation
+           (strip_head_addressable s1)
+           (strip_head_addressable s2)
+    | Base b1, Base b2 -> equal_base b1 b2
+    | Product sorts1, Product sorts2 -> (
+      try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
+      with Invalid_argument _ -> false)
+    | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
+    | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
     let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
-    if equate t (Product ts) then Some ts else None
+    if equate ~allow_mutation:true t (Product ts) then Some ts else None
 
   (*** pretty printing ***)
 
@@ -984,6 +991,9 @@ module Sort = struct
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
       | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
       | Univar { name = None } -> Fmt.fprintf ppf "_"
+      | Addressable s when is_surely_addressable s -> pp_element ~nested ppf s
+      | Addressable s ->
+        Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) s
     in
     pp_element ~nested:false ppf t
 
@@ -996,6 +1006,22 @@ module Sort = struct
       | Univar of univar
       | Base of base
   end
+end
+
+module Kind_operator = struct
+  type t =
+    | Id
+    | Addressable
+
+  let equal t1 t2 =
+    match t1, t2 with
+    | Id, Id | Addressable, Addressable -> true
+    | (Id | Addressable), _ -> false
+
+  let compose t1 t2 =
+    match t1, t2 with
+    | Id, t | t, Id -> t
+    | Addressable, Addressable -> Addressable
 end
 
 module Scannable_axes = struct
@@ -1034,6 +1060,7 @@ module Layout = struct
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t
 
   module Const = struct
     type t =
@@ -1042,6 +1069,15 @@ module Layout = struct
       | Product of t list
       | Univar of Sort.univar
       | Genvar of Sort.var
+      | Addressable of t
+
+    let any sa = Any sa
+
+    let product cs = Product cs
+
+    let univar uv = Univar uv
+
+    let genvar v = Genvar v
 
     let max = Any Scannable_axes.max
 
@@ -1054,7 +1090,11 @@ module Layout = struct
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
       | Genvar v1, Genvar v2 -> v1.id = v2.id
-      | (Base _ | Any _ | Product _ | Univar _ | Genvar _), _ -> false
+      | Addressable c1, Addressable c2 ->
+        (* Relies on invariant that constants don't have redundant [Addressable] *)
+        equal c1 c2
+      | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
+        false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
@@ -1065,8 +1105,9 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
       | Genvar v -> Some (Sort.Const.Genvar v)
+      | Addressable t -> Option.map Sort.Const.addressable (get_sort t)
 
-    let is_scannable_or_any = function
+    let rec is_scannable_or_any = function
       | Any _ | Base (Scannable, _) -> true
       | Base
           ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
@@ -1076,22 +1117,37 @@ module Layout = struct
       | Product _ -> false
       | Univar _ -> false
       | Genvar _ -> false
+      | Addressable t -> is_scannable_or_any t
 
-    let get_root_scannable_axes t =
+    let rec is_surely_addressable = function
+      | Base (b, _) -> Sort.base_is_addressable b
+      | Product cs -> List.for_all is_surely_addressable cs
+      | Any _ | Univar _ | Genvar _ -> false
+      | Addressable _ -> true
+
+    let addressable c = if is_surely_addressable c then c else Addressable c
+
+    let apply_operator c : Kind_operator.t -> t = function
+      | Id -> c
+      | Addressable -> addressable c
+
+    let rec get_root_scannable_axes t =
       match t with
       | Any sa -> Some sa
       | Base (_, sa) -> if is_scannable_or_any t then Some sa else None
       | Product _ -> None
       | Univar _ -> None
       | Genvar _ -> None
+      | Addressable t -> get_root_scannable_axes t
 
-    let set_root_scannable_axes t sa =
+    let rec set_root_scannable_axes t sa =
       match t with
       | Any _ -> Any sa
       | Base (b, _) -> if is_scannable_or_any t then Base (b, sa) else t
       | Product _ -> t
       | Univar _ -> t
       | Genvar _ -> t
+      | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
 
     let meet_root_scannable_axes t sa =
       match get_root_scannable_axes t with
@@ -1252,6 +1308,7 @@ module Layout = struct
                (fun s -> of_sort s Scannable_axes.max)
                sorts)
         | Univar uv -> Some (Univar uv)
+        | Addressable s -> Option.map addressable (of_sort s sa)
       in
       of_sort (Sort.get s) sa
 
@@ -1272,11 +1329,16 @@ module Layout = struct
     | Product cs -> Product (List.map of_const cs)
     | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
     | Genvar v -> Sort (Sort.Var v, Scannable_axes.max)
+    | Addressable c -> Addressable (of_const c)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
     | [lay] -> lay
     | lays -> Product lays
+
+  let apply_operator t : Kind_operator.t -> _ t = function
+    | Id -> t
+    | Addressable -> Addressable t
 
   let rec get_const of_sort : _ t -> Const.t option = function
     | Any sa -> Some (Any sa)
@@ -1285,6 +1347,7 @@ module Layout = struct
       Option.map
         (fun x -> Const.Product x)
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
+    | Addressable t -> Option.map Const.addressable (get_const of_sort t)
 
   let get_flat_const t = get_const Const.of_flat_sort t
 

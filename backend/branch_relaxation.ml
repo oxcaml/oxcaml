@@ -117,6 +117,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           (T.relaxed_instruction_desc ri)
           arg [||] next ~available_before:Reg_availability_set.Unreachable
           ~available_across:Reg_availability_set.Unreachable
+          ~phantom_available_before:None
     in
     let rec fixup did_fix pc instr sizes =
       match instr.desc with
@@ -167,9 +168,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 [||] [||]
                 (instr_cons llabel [||] [||] instr.next
                    ~available_before:Reg_availability_set.Unreachable
-                   ~available_across:Reg_availability_set.Unreachable)
+                   ~available_across:Reg_availability_set.Unreachable
+                   ~phantom_available_before:None)
                 ~available_before:Reg_availability_set.Unreachable
                 ~available_across:Reg_availability_set.Unreachable
+                ~phantom_available_before:None
             in
             let ri_inverted =
               T.relax_condbranch

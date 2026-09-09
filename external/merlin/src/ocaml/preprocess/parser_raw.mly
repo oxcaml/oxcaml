@@ -1866,8 +1866,7 @@ module_expr [@recovery default_module_expr ()]:
         { Pmod_extension ex }
     | (* A hole. *)
       UNDERSCORE
-        { let id = mkrhs Ast_helper.hole_txt $loc in
-          Pmod_extension (id, PStr []) }
+        { Pmod_hole }
     )
     { $1 }
 ;
@@ -3434,7 +3433,7 @@ labeled_simple_expr:
       { let loc = $loc(label) in
         (Labelled label, mkexpvar ~loc label) }
   | TILDE UNDERSCORE
-      { (Labelled "_", mkexp ~loc:$sloc Pexp_hole) }
+      { (Labelled "_", mkexp ~loc:$loc($2) Pexp_hole) }
   | TILDE LPAREN label = LIDENT c = type_constraint RPAREN
       { (Labelled label, mkexp_type_constraint_with_modes ~loc:($startpos($2), $endpos) ~modes:[]
                            (mkexpvar ~loc:$loc(label) label) c) }
@@ -3442,7 +3441,7 @@ labeled_simple_expr:
       { let loc = $loc(label) in
         (Optional label, mkexpvar ~loc label) }
   | QUESTION UNDERSCORE
-      { (Optional "_", mkexp ~loc:$sloc Pexp_hole) }
+      { (Optional "_", mkexp ~loc:$loc($2) Pexp_hole) }
   | OPTLABEL simple_expr %prec below_HASH
       { (Optional $1, $2) }
 ;

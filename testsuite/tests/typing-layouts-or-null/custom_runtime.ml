@@ -363,3 +363,128 @@ let () =
   assert (Multi_null <> Multi_payload ([ 1 ], "a"));
   assert (compare Multi_null (Multi_payload ([ 1 ], "a")) < 0)
 ;;
+
+(* GADT constructors keep the same null/payload representation. *)
+type 'a gadt = N : 'a gadt | P : 'a -> 'a gadt [@@or_null]
+
+let[@inline never] map_gadt : type a b. (a -> b) -> a gadt -> b gadt =
+  fun f -> function N -> N | P x -> P (f x)
+
+let () =
+  assert (map_gadt succ (P 3) = P 4);
+  assert (map_gadt succ N = N);
+  assert (map_gadt String.length (P "abc") = P 3);
+  assert (map_gadt (fun x -> x +. 1.) (P 2.5) = P 3.5);
+  assert (map_gadt (fun x -> x +. 1.) N = N);
+  let xs = [|P 1; N; P 3|] in
+  xs.(1) <- P 2;
+  xs.(0) <- N;
+  assert (Array.fold_left
+    (fun sum -> function N -> sum | P x -> sum + x) 0 xs = 5);
+  let round_trip (x : int gadt) : int gadt =
+    Marshal.from_bytes (Marshal.to_bytes x []) 0
+  in
+  assert (round_trip N = N);
+  assert (round_trip (P 7) = P 7);
+  assert (compare (N : int gadt) (P 0) < 0);
+  assert (compare (P 0) (N : int gadt) > 0)
+;;
+
+type mixed =
+  | Mixed_null
+  | Mixed_this : 'a -> mixed
+[@@or_null]
+
+let[@inline never] mixed_is_null = function
+  | Mixed_null -> true
+  | Mixed_this _ -> false
+
+type 'a mixed_null_gadt =
+  | Mixed_gadt_null : int mixed_null_gadt
+  | Mixed_plain_this of 'a
+[@@or_null]
+
+let[@inline never] mixed_to_option : type a. a mixed_null_gadt -> a option =
+  function
+  | Mixed_gadt_null -> None
+  | Mixed_plain_this x -> Some x
+
+let[@inline never] mixed_string_payload (x : string mixed_null_gadt) =
+  match x with Mixed_plain_this s -> s
+
+let () =
+  assert (mixed_is_null Mixed_null);
+  assert (not (mixed_is_null (Mixed_this 42)));
+  assert (not (mixed_is_null (Mixed_this "hello")));
+  assert (mixed_to_option Mixed_gadt_null = None);
+  assert (mixed_to_option (Mixed_plain_this 42) = Some 42);
+  assert (mixed_to_option (Mixed_plain_this "hello") = Some "hello");
+  assert (mixed_string_payload (Mixed_plain_this "hello") = "hello")
+;;
+
+type _ indexed_gadt =
+  | IN : int indexed_gadt
+  | IP : float -> float indexed_gadt
+[@@or_null]
+
+let[@inline never] indexed_float (x : float indexed_gadt) =
+  match x with IP f -> f
+let[@inline never] indexed_null (x : int indexed_gadt) =
+  match x with IN -> ()
+
+let () =
+  assert (indexed_float (IP 3.5) = 3.5);
+  indexed_null IN
+;;
+
+type 'a existential_gadt =
+  | EN : 'a existential_gadt
+  | EP : ('b * ('b -> 'a)) -> 'a existential_gadt
+[@@or_null]
+
+let[@inline never] run_existential : type a. a existential_gadt -> a option =
+  function EN -> None | EP (x, f) -> Some (f x)
+
+let () =
+  assert (run_existential EN = None);
+  assert (run_existential (EP ("abcd", String.length)) = Some 4);
+  assert (run_existential (EP (2., fun x -> x +. 1.)) = Some 3.)
+;;
+
+type _ compound_gadt =
+  | CN : 'a compound_gadt
+  | CP : 'a -> 'a list compound_gadt
+[@@or_null]
+
+let () =
+  let x : int list compound_gadt = CP 3 in
+  match x with CP n -> assert (n = 3) | CN -> assert false
+;;
+
+type _ void_gadt =
+  | VN : void -> int void_gadt
+  | VP : int -> int void_gadt
+[@@or_null]
+
+type _ void_gadt_flipped =
+  | FP : int -> int void_gadt_flipped
+  | FN : #(void * void) -> int void_gadt_flipped
+[@@or_null]
+
+let[@inline never] void_gadt_value = function
+  | VN v -> use_void v - 1
+  | VP n -> n
+
+let () =
+  let effects = ref 0 in
+  let v = VN (incr effects; void ()) in
+  assert (!effects = 1);
+  assert (void_gadt_value v = 0);
+  assert (void_gadt_value (VP 5) = 5);
+  assert (Array.fold_left
+    (fun sum x -> sum + void_gadt_value x) 0 [|v; VP 7|] = 7);
+  (match FN #(void (), void ()) with
+   | FN #(x, y) -> assert (use_void x + use_void y = 2)
+   | FP _ -> assert false);
+  (match FP 9 with FP n -> assert (n = 9) | FN _ -> assert false)
+;;

@@ -445,6 +445,114 @@ Error: This variant or record definition does not match that of type
          portable contended with 'a
 |}]
 
+type 'a unsafe_saturated : value mod shared with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_saturated_reexport
+  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared = 'a unsafe_parameter_saturated =
+  { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated
+  : value mod shared with 'a @@ external64 = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated_reexport
+  : value mod shared with 'a = 'a unsafe_externality_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared =
+  'a unsafe_parameter_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_externality_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+
+type unsafe_middle_original
+  : immutable_data
+    with unsafe_middle_payload @@ shared
+    with unsafe_middle_alias @@ corrupted = { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload = unsafe_middle_original =
+  { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+type unsafe_middle_original
+  : immutable_data
+      with unsafe_middle_alias @@ corrupted
+      with unsafe_middle_payload @@ shared = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload =
+  unsafe_middle_original = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_corrupted
+  : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+Lines 4-6, characters 0-34:
+4 | type 'a unsafe_corrupted
+5 |   : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+6 | [@@unsafe_allow_any_mode_crossing]
+Error: This variant or record definition does not match that of type
+         "'a unsafe_shared"
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ shared
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ corrupted
+|}]
+
 (* mcomp *)
 
 type (_, _) eq = Refl : ('a, 'a) eq

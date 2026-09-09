@@ -108,14 +108,12 @@ void caml_gc_log (const char *msg, ...)
   }
 }
 
-void caml_gc_message (int level, const char *msg, ...)
+void caml_gc_message (const char *msg, ...)
 {
-  if ((atomic_load_relaxed(&caml_verb_gc) & level) != 0){
-    va_list ap;
-    va_start(ap, msg);
-    print_log(msg, 0, ap);
-    va_end(ap);
-  }
+  va_list ap;
+  va_start (ap, msg);
+  print_log(msg, 0, ap);
+  va_end (ap);
 }
 
 _Atomic fatal_error_hook caml_fatal_error_hook = (fatal_error_hook)NULL;

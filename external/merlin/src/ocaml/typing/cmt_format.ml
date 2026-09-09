@@ -50,6 +50,7 @@ type binary_annots =
   | Interface of signature
   | Partial_implementation of binary_part array
   | Partial_interface of binary_part array
+  | Functorize
 
 and binary_part =
   | Partial_structure of structure
@@ -98,7 +99,7 @@ let iter_on_parts (it : Tast_iterator.iterator) = function
 let iter_on_annots (it : Tast_iterator.iterator) = function
   | Implementation s -> it.structure it s
   | Interface s -> it.signature it s
-  | Packed _ -> ()
+  | Packed _ | Functorize -> ()
   | Partial_implementation array -> Array.iter (iter_on_parts it) array
   | Partial_interface array -> Array.iter (iter_on_parts it) array
 
@@ -153,7 +154,7 @@ let clear_env binary_annots =
     match binary_annots with
     | Implementation s -> Implementation (cenv.structure cenv s)
     | Interface s -> Interface (cenv.signature cenv s)
-    | Packed _ -> binary_annots
+    | Packed _ | Functorize -> binary_annots
     | Partial_implementation array ->
         Partial_implementation (Array.map clear_part array)
     | Partial_interface array ->
@@ -316,9 +317,9 @@ let iter_on_occurrences
       (match pat_desc with
       | Tpat_construct (lid, constr_desc, _, _, _) ->
           add_constructor_description pat_env lid constr_desc
-      | Tpat_record (fields, _, _, _) ->
+      | Tpat_record (fields, _, _) ->
         iter_field_pats ~namespace:Label pat_env fields
-      | Tpat_record_unboxed_product (fields, _, _, _) ->
+      | Tpat_record_unboxed_product (fields, _, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
       | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
       | Tpat_fun_layout _

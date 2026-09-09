@@ -126,6 +126,13 @@ val all_type_shapes : shape_with_layout Uid.Tbl.t
 val add_to_type_shapes :
   Uid.t -> Types.type_expr -> Layout.t -> name:string -> path_lookup -> unit
 
+val has_type_shape : Uid.t -> bool
+
+(** Whether the compiler should compute and record type shapes for debug
+    information. All call sites that record type shapes for debug information
+    must be guarded by this predicate. *)
+val enabled : unit -> bool
+
 (*
 val print_table_all_type_shapes : Format.formatter -> unit
 

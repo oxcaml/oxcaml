@@ -6,7 +6,7 @@
 (* Classic mode doesn't perform any lifting after inlining *)
 [@@@ocaml.flambda_o3]
 
-type t = { x : int64#; y : int option; }
+type t = { x : int64_u; y : int option; }
 
 let[@inline] f x y = { x; y }
 

@@ -55,6 +55,10 @@ module DeBruijn_env = struct
 
   let push t x = x :: t
 
+  let length t = List.length t
+
+  let truncate t ~depth = List.take depth t
+
   let equal equal_elem = List.equal equal_elem
 
   let hash hash_elem l =
@@ -201,7 +205,12 @@ end
 type t =
   { desc : desc;
     runtime_layout : Runtime_layout.t;
-    hash : int
+    hash : int;
+    free_depth : int
+        (* Number of enclosing [Mu] binders that the shape can reference: one
+           more than the largest free de Bruijn index, or zero if the shape is
+           closed. A shape's meaning (and generated DWARF) depends only on the
+           first [free_depth] entries of any enclosing environment. *)
   }
 
 and desc =
@@ -246,10 +255,12 @@ and 'label mixed_block_field =
 and constructor =
   | Constructor_with_tuple_arg of
       { name : string;
+        is_constant : bool;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        is_constant : bool;
         args : string mixed_block_field list
       }
 
@@ -320,6 +331,34 @@ and simd_vec_split =
 let runtime_layout { runtime_layout; _ } = runtime_layout
 
 let hash { hash; _ } = hash
+
+let free_depth { free_depth; _ } = free_depth
+
+let free_depth_fields fields =
+  List.fold_left
+    (fun acc { field_type; _ } -> Int.max acc field_type.free_depth)
+    0 fields
+
+let free_depth_constructor = function
+  | Constructor_with_tuple_arg { args; _ } -> free_depth_fields args
+  | Constructor_with_record_arg { args; _ } -> free_depth_fields args
+
+let free_depth_constructors constructors =
+  List.fold_left
+    (fun acc constr -> Int.max acc (free_depth_constructor constr))
+    0 constructors
+
+let free_depth_list ts =
+  List.fold_left (fun acc t -> Int.max acc t.free_depth) 0 ts
+
+let free_depth_predef = function
+  | Array (Regular s) -> s.free_depth
+  | Array (Packed l) -> free_depth_list l
+  | Lazy_t s -> s.free_depth
+  | Bytes | Char | Extension_constructor | Float | Float32 | Floatarray | Int
+  | Int8 | Int16 | Int32 | Int64 | Mask | Nativeint | String | Simd _
+  | Exception | Unboxed _ ->
+    0
 
 (* Hash constants for desc constructors *)
 let hash_unknown = 0
@@ -449,10 +488,15 @@ let hash_mixed_block_field (type label) (hash_label : label -> int)
   Hashtbl.hash (hash field_type, hash_label label)
 
 let hash_constructor = function
-  | Constructor_with_tuple_arg { name; args } ->
-    Hashtbl.hash (0, name, List.map (hash_mixed_block_field (fun () -> 0)) args)
-  | Constructor_with_record_arg { name; args } ->
-    Hashtbl.hash (1, name, List.map (hash_mixed_block_field Hashtbl.hash) args)
+  | Constructor_with_tuple_arg { name; is_constant; args } ->
+    Hashtbl.hash
+      ( 0,
+        name,
+        is_constant,
+        List.map (hash_mixed_block_field (fun () -> 0)) args )
+  | Constructor_with_record_arg { name; is_constant; args } ->
+    Hashtbl.hash
+      (1, name, is_constant, List.map (hash_mixed_block_field Hashtbl.hash) args)
 
 let hash_array_kind = function
   | Regular s -> Hashtbl.hash (0, hash s)
@@ -495,13 +539,18 @@ let hash_tuple_kind = function Tuple_boxed -> 0
 
 let unknown layout =
   let desc = Unknown layout in
-  { desc; runtime_layout = layout; hash = Hashtbl.hash (hash_unknown, layout) }
+  { desc;
+    runtime_layout = layout;
+    hash = Hashtbl.hash (hash_unknown, layout);
+    free_depth = 0
+  }
 
 let predef p =
   let desc = Predef p in
   { desc;
     runtime_layout = runtime_layout_of_predef p;
-    hash = Hashtbl.hash (hash_predef, hash_predef p)
+    hash = Hashtbl.hash (hash_predef, hash_predef p);
+    free_depth = free_depth_predef p
   }
 
 let mixed_block_field ~field_type ~label = { field_type; label }
@@ -511,17 +560,16 @@ let map_mixed_block_field_label f { field_type; label } =
 
 let tuple args =
   let desc = Tuple { args; kind = Tuple_boxed } in
-  { desc;
-    runtime_layout = Value;
-    hash =
-      Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
-  }
+  let hash =
+    Hashtbl.hash (hash_tuple, hash_tuple_kind Tuple_boxed, List.map hash args)
+  in
+  { desc; runtime_layout = Value; hash; free_depth = free_depth_list args }
 
-let constructor_with_tuple_arg ~name ~args =
-  Constructor_with_tuple_arg { name; args }
+let constructor_with_tuple_arg ~name ~is_constant ~args =
+  Constructor_with_tuple_arg { name; is_constant; args }
 
-let constructor_with_record_arg ~name ~args =
-  Constructor_with_record_arg { name; args }
+let constructor_with_record_arg ~name ~is_constant ~args =
+  Constructor_with_record_arg { name; is_constant; args }
 
 let variant constructors =
   let desc = Variant { constructors; kind = Variant_boxed } in
@@ -531,7 +579,8 @@ let variant constructors =
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind Variant_boxed,
-          List.map hash_constructor constructors )
+          List.map hash_constructor constructors );
+    free_depth = free_depth_constructors constructors
   }
 
 let polymorphic_variant constructors =
@@ -542,7 +591,8 @@ let polymorphic_variant constructors =
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind Variant_polymorphic,
-          List.map hash_constructor constructors )
+          List.map hash_constructor constructors );
+    free_depth = free_depth_constructors constructors
   }
 
 let variant_attribute_unboxed ~constructor_name
@@ -553,11 +603,13 @@ let variant_attribute_unboxed ~constructor_name
     | None ->
       Constructor_with_tuple_arg
         { name = constructor_name;
+          is_constant = false;
           args = [{ field_type = constructor_arg.field_type; label = () }]
         }
     | Some label ->
       Constructor_with_record_arg
         { name = constructor_name;
+          is_constant = false;
           args = [{ field_type = constructor_arg.field_type; label }]
         }
   in
@@ -571,7 +623,8 @@ let variant_attribute_unboxed ~constructor_name
       Hashtbl.hash
         ( hash_variant,
           hash_variant_kind (Variant_attribute_unboxed layout),
-          List.map hash_constructor [constructor] )
+          List.map hash_constructor [constructor] );
+    free_depth = free_depth_constructor constructor
   }
 
 let record_attribute_unboxed ~contents =
@@ -585,7 +638,8 @@ let record_attribute_unboxed ~contents =
       Hashtbl.hash
         ( hash_record,
           hash_record_kind (Record_attribute_unboxed layout),
-          List.map (hash_mixed_block_field Hashtbl.hash) [contents] )
+          List.map (hash_mixed_block_field Hashtbl.hash) [contents] );
+    free_depth = contents.field_type.free_depth
   }
 
 let record_mixed fields =
@@ -596,23 +650,33 @@ let record_mixed fields =
       Hashtbl.hash
         ( hash_record,
           hash_record_kind Record_mixed,
-          List.map (hash_mixed_block_field Hashtbl.hash) fields )
+          List.map (hash_mixed_block_field Hashtbl.hash) fields );
+    free_depth = free_depth_fields fields
   }
 
 let func =
   let desc = Func in
-  { desc; runtime_layout = Value; hash = Hashtbl.hash hash_func }
+  { desc;
+    runtime_layout = Value;
+    hash = Hashtbl.hash hash_func;
+    free_depth = 0
+  }
 
 let mu shape =
   let desc = Mu shape in
   { desc;
     runtime_layout = runtime_layout shape;
-    hash = Hashtbl.hash (hash_mu, hash shape)
+    hash = Hashtbl.hash (hash_mu, hash shape);
+    free_depth = Int.max 0 (shape.free_depth - 1)
   }
 
 let rec_var var ly =
   let desc = Rec_var (var, ly) in
-  { desc; runtime_layout = ly; hash = Hashtbl.hash (hash_rec_var, (var, ly)) }
+  { desc;
+    runtime_layout = ly;
+    hash = Hashtbl.hash (hash_rec_var, (var, ly));
+    free_depth = var + 1
+  }
 
 let print_runtime_layout fmt (t : Runtime_layout.t) =
   Format.pp_print_string fmt (Runtime_layout.to_string t)
@@ -648,10 +712,10 @@ let print_unboxed fmt unb =
   let s =
     match unb with
     | Unboxed_float -> "float#"
-    | Unboxed_float32 -> "float32#"
-    | Unboxed_nativeint -> "nativeint#"
-    | Unboxed_int64 -> "int64#"
-    | Unboxed_int32 -> "int32#"
+    | Unboxed_float32 -> "float32_u"
+    | Unboxed_nativeint -> "nativeint_u"
+    | Unboxed_int64 -> "int64_u"
+    | Unboxed_int32 -> "int32_u"
     | Unboxed_int16 -> "int16#"
     | Unboxed_int8 -> "int8#"
     | Unboxed_mask -> "mask#"
@@ -678,7 +742,7 @@ let rec print fmt { desc } =
       | Variant_polymorphic -> "poly"
     in
     let print_constructor fmt = function
-      | Constructor_with_tuple_arg { name; args } ->
+      | Constructor_with_tuple_arg { name; is_constant = _; args } ->
         Format.fprintf fmt "%s (%a)" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
@@ -687,7 +751,7 @@ let rec print fmt { desc } =
                  print_runtime_layout
                  (runtime_layout field_type)))
           args
-      | Constructor_with_record_arg { name; args } ->
+      | Constructor_with_record_arg { name; is_constant = _; args } ->
         Format.fprintf fmt "%s { %a }" name
           (Format.pp_print_list
              ~pp_sep:(fun fmt () -> Format.fprintf fmt "; ")
@@ -857,12 +921,20 @@ and equal_record_field { field_type = type1; label = label1 }
 
 and equal_constructor c1 c2 =
   match c1, c2 with
-  | ( Constructor_with_tuple_arg { name = name1; args = args1 },
-      Constructor_with_tuple_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_tuple_field args1 args2
-  | ( Constructor_with_record_arg { name = name1; args = args1 },
-      Constructor_with_record_arg { name = name2; args = args2 } ) ->
-    String.equal name1 name2 && List.equal equal_record_field args1 args2
+  | ( Constructor_with_tuple_arg
+        { name = name1; is_constant = is_constant1; args = args1 },
+      Constructor_with_tuple_arg
+        { name = name2; is_constant = is_constant2; args = args2 } ) ->
+    String.equal name1 name2
+    && Bool.equal is_constant1 is_constant2
+    && List.equal equal_tuple_field args1 args2
+  | ( Constructor_with_record_arg
+        { name = name1; is_constant = is_constant1; args = args1 },
+      Constructor_with_record_arg
+        { name = name2; is_constant = is_constant2; args = args2 } ) ->
+    String.equal name1 name2
+    && Bool.equal is_constant1 is_constant2
+    && List.equal equal_record_field args1 args2
   | Constructor_with_tuple_arg _, Constructor_with_record_arg _ -> false
   | Constructor_with_record_arg _, Constructor_with_tuple_arg _ -> false
 
@@ -913,3 +985,8 @@ let constructor_args = function
     List.map
       (fun { field_type; label } -> { field_type; label = Some label })
       args
+
+let constructor_is_constant = function
+  | Constructor_with_tuple_arg { is_constant; _ }
+  | Constructor_with_record_arg { is_constant; _ } ->
+    is_constant

@@ -147,6 +147,23 @@ module Unboxed_fields = struct
           | Unboxed fields1, Unboxed fields2 ->
             fold2_subset_with_kind f fields1 fields2 acc))
       fields1 acc
+
+  let rec equal_shape_u fields1 fields2 =
+    match fields1, fields2 with
+    | Not_unboxed _, Not_unboxed _ -> true
+    | Unboxed _, Not_unboxed _ | Not_unboxed _, Unboxed _ -> false
+    | Unboxed fields1, Unboxed fields2 -> equal_shape fields1 fields2
+
+  and equal_shape fields1 fields2 =
+    (* CR ncourant: we can't use [Field.Map.equal] here because it doesn't have
+       a type that is general enough :( *)
+    let bindings1 = Field.Map.bindings fields1 in
+    let bindings2 = Field.Map.bindings fields2 in
+    List.compare_lengths bindings1 bindings2 = 0
+    && List.for_all2
+         (fun (f1, fields1) (f2, fields2) ->
+           Field.equal f1 f2 && equal_shape_u fields1 fields2)
+         bindings1 bindings2
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
@@ -169,6 +186,24 @@ type changed_representation =
       Value_slot.t Unboxed_fields.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
+
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
+let print_param_decision ppf param_decision =
+  match param_decision with
+  | Keep (v, kind) ->
+    Format.fprintf ppf "Keep (%a, %a)" Variable.print v
+      Flambda_kind.With_subkind.print kind
+  | Delete -> Format.fprintf ppf "Delete"
+  | Unbox fields ->
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
@@ -506,6 +541,14 @@ type result =
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
+type calling_convention_change =
+  | Not_changing_calling_convention
+  | Changing_calling_convention of
+      { my_closure_decision : my_closure_param_decision;
+        params_decisions : param_decision list;
+        return_decisions : param_decision list
+      }
+
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
@@ -590,7 +633,16 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let perform_analysis db ~stats =
+let cannot_change_calling_convention_query =
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
+
+let cannot_change_calling_convention uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+
+let perform_analysis0 db ~stats =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -772,21 +824,76 @@ let perform_analysis db ~stats =
             !changed_representation;
         unboxed, !changed_representation)
   in
+  { db; unboxed_fields = unboxed; changed_representation }
+
+let perform_analysis db ~stats =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then { db; unboxed_fields = unboxed; changed_representation }
+  then perform_analysis0 db ~stats
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let cannot_change_calling_convention_query =
-  let^? [x], [] = ["x"], [] in
-  [cannot_change_calling_convention x]
+let compute_code_changes uses ~rewrite_kind_with_subkind ~code_deps =
+  let get_unboxed_fields cn =
+    Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  in
+  let is_var_used var =
+    match Variable.kind var with
+    | Region | Rec_info -> true
+    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
+  in
+  Code_id.Map.mapi
+    (fun code_id (code_dep : Traverse_acc.code_dep) ->
+      if cannot_change_calling_convention uses code_id
+      then Not_changing_calling_convention
+      else
+        let params_decisions =
+          List.map2
+            (fun param kind ->
+              match get_unboxed_fields (Code_id_or_name.var param) with
+              | None -> if is_var_used param then Keep (param, kind) else Delete
+              | Some fields -> Unbox fields)
+            code_dep.params
+            (Flambda_arity.unarize code_dep.arity)
+        in
+        let my_closure_decision =
+          match
+            get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
+          with
+          | None -> Keep_my_closure
+          | Some unboxed_fields -> Unbox_my_closure unboxed_fields
+        in
+        let return_decisions =
+          List.map2
+            (fun v kind ->
+              match get_unboxed_fields (Code_id_or_name.var v) with
+              | None ->
+                let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                (* TODO: fix this, needs the mapping between code ids of
+                   functions and their return continuations *)
+                if true || is_var_used v then Keep (v, kind) else Delete
+              | Some fields -> Unbox fields)
+            code_dep.return
+            (Flambda_arity.unarized_components code_dep.result_arity)
+        in
+        Changing_calling_convention
+          { params_decisions; return_decisions; my_closure_decision })
+    code_deps
 
-let cannot_change_calling_convention uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+type code_changes = calling_convention_change Code_id.Map.t
+
+let get_calling_convention_change t code_id =
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    then
+      Misc.fatal_errorf
+        "[get_calling_convention_change]: code_id %a is in current unit but \
+         not in the result"
+        Code_id.print code_id
+    else Not_changing_calling_convention
+  | Some x -> x

@@ -31,7 +31,7 @@ let reset_instr_id () = InstructionId.reset instr_id
 
 let next_instr_id () = InstructionId.get_and_incr instr_id
 
-let make_instr desc arg res dbg =
+let make_instr desc arg res dbg ~phantom_available_before =
   { Cfg.desc;
     arg;
     res;
@@ -41,7 +41,8 @@ let make_instr desc arg res dbg =
     stack_offset = Cfg.invalid_stack_offset;
     id = next_instr_id ();
     available_before = Unreachable;
-    available_across = Unreachable
+    available_across = Unreachable;
+    phantom_available_before
   }
 
 type t =
@@ -54,13 +55,16 @@ let exit_has_never_terminator sub_cfg =
   Cfg.is_never_terminator sub_cfg.exit.terminator.desc
 
 let make_never_block ?label () : Cfg.basic_block =
-  Cfg.make_empty_block ?label (make_instr Cfg.Never [||] [||] Debuginfo.none)
+  Cfg.make_empty_block ?label
+    (make_instr Cfg.Never [||] [||] Debuginfo.none
+       ~phantom_available_before:None)
 
 let make_empty () =
   let exit = make_never_block () in
   let entry =
     Cfg.make_empty_block
-      (make_instr (Cfg.Always exit.start) [||] [||] Debuginfo.none)
+      (make_instr (Cfg.Always exit.start) [||] [||] Debuginfo.none
+         ~phantom_available_before:None)
   in
   let layout = DLL.make_empty () in
   DLL.add_end layout entry;
@@ -75,7 +79,9 @@ let add_block_at_start sub_cfg block =
 
 let add_empty_block_at_start sub_cfg ~label =
   Cfg.make_empty_block ~label
-    (make_instr (Cfg.Always (start_label sub_cfg)) [||] [||] Debuginfo.none)
+    (make_instr
+       (Cfg.Always (start_label sub_cfg))
+       [||] [||] Debuginfo.none ~phantom_available_before:None)
   |> add_block_at_start sub_cfg
 
 let add_block sub_cfg block =
@@ -85,28 +91,37 @@ let add_block sub_cfg block =
 let add_never_block sub_cfg ~label =
   add_block sub_cfg (make_never_block ~label ())
 
-let add_instruction_at_start sub_cfg desc arg res dbg =
+let add_instruction_at_start sub_cfg desc arg res dbg ~phantom_available_before
+    =
   (* We don't check [exit_has_never_terminator] since we're adding at the start,
      and this function is only used in very specific situations (note comment in
      the interface). *)
-  DLL.add_begin sub_cfg.entry.body (make_instr desc arg res dbg)
+  DLL.add_begin sub_cfg.entry.body
+    (make_instr desc arg res dbg ~phantom_available_before)
 
 let add_instruction' sub_cfg instr =
   assert (exit_has_never_terminator sub_cfg);
   DLL.add_end sub_cfg.exit.body instr
 
-let add_instruction sub_cfg desc arg res dbg =
-  add_instruction' sub_cfg (make_instr desc arg res dbg)
+let add_instruction sub_cfg desc arg res dbg ~phantom_available_before =
+  add_instruction' sub_cfg
+    (make_instr desc arg res dbg ~phantom_available_before)
 
-let set_terminator sub_cfg desc arg res dbg =
+let set_terminator sub_cfg desc arg res dbg ~phantom_available_before =
   assert (Cfg.is_never_terminator sub_cfg.exit.terminator.desc);
-  sub_cfg.exit.terminator <- make_instr desc arg res dbg
+  sub_cfg.exit.terminator
+    <- make_instr desc arg res dbg ~phantom_available_before
 
-let link_if_needed ~(from : Cfg.basic_block) ~(to_ : Cfg.basic_block) () =
+let link_if_needed ~(from : Cfg.basic_block) ~(to_ : Cfg.basic_block)
+    ~phantom_available_before () =
   if Cfg.is_never_terminator from.terminator.desc
   then
     from.terminator
-      <- { from.terminator with desc = Always to_.start; id = next_instr_id () }
+      <- { from.terminator with
+           desc = Always to_.start;
+           id = next_instr_id ();
+           phantom_available_before
+         }
 
 let iter_basic_blocks sub_cfg ~f = DLL.iter sub_cfg.layout ~f
 
@@ -114,22 +129,42 @@ let exists_basic_blocks sub_cfg ~f = DLL.exists sub_cfg.layout ~f
 
 let transfer ~from ~to_ = DLL.transfer ~from:from.layout ~to_:to_.layout ()
 
-let join ~from ~to_ =
-  List.iter (fun from -> transfer ~from ~to_) from;
+type join_branch =
+  { sub_cfg : t;
+    may_fall_through : bool
+  }
+
+let join ~from ~to_ ~phantom_available_before =
+  List.iter
+    (fun { sub_cfg = from; may_fall_through = _ } -> transfer ~from ~to_)
+    from;
   let join_block = make_never_block () in
-  List.iter (fun from -> link_if_needed ~from:from.exit ~to_:join_block ()) from;
+  List.iter
+    (fun { sub_cfg = from; may_fall_through } ->
+      (* A branch whose emission stopped because the code never returns must not
+         be linked to the join block, even if its exit block still has a [Never]
+         terminator: that can happen when the divergence arose inside a nested
+         construct (e.g. a [Ccatch] all of whose arms diverge), whose own join
+         block was left unfilled. Linking such an exit would create a reference
+         to a block that may never be materialised. *)
+      if may_fall_through
+      then
+        link_if_needed ~from:from.exit ~to_:join_block ~phantom_available_before
+          ())
+    from;
   add_block to_ join_block
 
 let join_tail ~from ~to_ =
   List.iter (fun from -> transfer ~from ~to_) from;
   add_never_block to_ ~label:(Cmm.new_label ())
 
-let update_exit_terminator ?arg sub_cfg desc =
+let update_exit_terminator ?arg sub_cfg desc ~phantom_available_before =
   sub_cfg.exit.terminator
     <- { sub_cfg.exit.terminator with
          desc;
          id = next_instr_id ();
-         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg
+         arg = Option.value arg ~default:sub_cfg.exit.terminator.arg;
+         phantom_available_before
        }
 
 let mark_as_trap_handler sub_cfg = sub_cfg.entry.is_trap_handler <- true

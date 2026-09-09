@@ -4,7 +4,7 @@
  native;
 *)
 
-(* A test comparing allocations when using unboxed [int32#]es to allocations
+(* A test comparing allocations when using unboxed [int32_u]es to allocations
    when using boxed [int32s]. *)
 
 (* Hide polymorphic equality *)

@@ -44,9 +44,13 @@ make -s test                                # Run all tests
 
 ## Configuration Commands
 ```bash
-autoconf                  # Generate configure script
-./configure               # Configure the compiler
+autoconf                                # Generate configure script
+./configure --prefix="$PWD/_install"    # Configure the compiler
 ```
+
+Always pass `--prefix="$PWD/_install"`: the dev makefiles assemble the install
+tree in `./_install` and then copy it to the configured prefix (a no-op when
+they coincide). Without it, autoconf's default prefix is `/usr/local`.
 
 If the execution of `autoconf` fails because the version is too old, try with `autoconf27` instead.
 

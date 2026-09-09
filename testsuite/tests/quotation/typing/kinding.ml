@@ -20,9 +20,9 @@ type t : value = <[int]> expr
 type t = <[int]> expr
 |}]
 
-type t : value = <[int64#]> expr
+type t : value = <[int64_u]> expr
 [%%expect {|
-type t = <[int64#]> expr
+type t = <[int64_u]> expr
 |}]
 
 type t : value = <[#(bytes * float#)]> expr
@@ -54,9 +54,9 @@ type t : immediate = <[int]>
 type t = <[int]>
 |}]
 
-type t : bits64 = <[int64#]>
+type t : bits64 = <[int64_u]>
 [%%expect {|
-type t = <[int64#]>
+type t = <[int64_u]>
 |}]
 
 type t : value & float64 = <[#(bytes * float#)]>
@@ -64,22 +64,22 @@ type t : value & float64 = <[#(bytes * float#)]>
 type t = <[#(bytes * float#)]>
 |}]
 
-type t : value = <[int64#]> (* should error! *)
+type t : value = <[int64_u]> (* should error! *)
 [%%expect {|
-Line 1, characters 0-27:
-1 | type t : value = <[int64#]> (* should error! *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "<[int64#]>" is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of type "<[int64#]>" must be a value layout
-         because of the definition of t at line 1, characters 0-27.
+Line 1, characters 0-28:
+1 | type t : value = <[int64_u]> (* should error! *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "<[int64_u]>" is bits64
+         because it is the primitive type int64_u.
+       But the layout of type "<[int64_u]>" must be a value layout
+         because of the definition of t at line 1, characters 0-28.
 |}]
 
 (** Splice kinding **)
 
-type t : bits64 = <[$(int64#)]>
+type t : bits64 = <[$(int64_u)]>
 [%%expect {|
-type t = int64#
+type t = int64_u
 |}]
 
 type ('a : float64) t : value & float64 = <[#(bytes * $('a))]>
@@ -87,15 +87,15 @@ type ('a : float64) t : value & float64 = <[#(bytes * $('a))]>
 type ('a : float64) t = <[#(bytes * $('a))]>
 |}]
 
-type t : value = <[$(int64#)]> (* should error! *)
+type t : value = <[$(int64_u)]> (* should error! *)
 [%%expect {|
-Line 1, characters 0-30:
-1 | type t : value = <[$(int64#)]> (* should error! *)
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int64#" is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of type "int64#" must be a value layout
-         because of the definition of t at line 1, characters 0-30.
+Line 1, characters 0-31:
+1 | type t : value = <[$(int64_u)]> (* should error! *)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "int64_u" is bits64
+         because it is the primitive type int64_u.
+       But the layout of type "int64_u" must be a value layout
+         because of the definition of t at line 1, characters 0-31.
 |}]
 
 (** Eval kinding **)

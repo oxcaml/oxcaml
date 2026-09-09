@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_unit(x=() : unit @ value)
     frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bool(x=true : bool @ value)
     frame #N: <ADDRESS> test_basic_dwarf.exe`Test_basic_dwarf.f_bool(x=false : bool @ value)

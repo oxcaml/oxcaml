@@ -671,6 +671,15 @@ shr:
   ret
 |}]
 
+let sar_int64_u x y = Int8_u.sar x (Int8_u.of_int64_u y)
+[%%expect_asm X86_64{|
+sar_int64_u:
+  movq  %rbx, %rcx
+  andl  $7, %ecx
+  sarq  %cl, %rax
+  ret
+|}]
+
 let select x y z = Int8_u.select x y z
 [%%expect_asm X86_64{|
 select:

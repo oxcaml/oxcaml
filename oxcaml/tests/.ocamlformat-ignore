@@ -41,6 +41,7 @@ backend/llvmize/multi_ret_main.ml
 backend/llvmize/alloc.ml
 backend/llvmize/extcalls.ml
 backend/oxcaml_dwarf/test_unboxed_dwarf.ml
+backend/oxcaml_dwarf/test_addressable_dwarf.ml
 backend/oxcaml_dwarf/test_datatypes_dwarf.ml
 backend/oxcaml_dwarf/test_simd_dwarf.ml
 dissector/large_module*.ml

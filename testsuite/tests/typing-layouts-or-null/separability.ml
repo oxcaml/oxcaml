@@ -410,13 +410,13 @@ type t1 = { f1 : string; f2: int }
 type t2 = { f1 : float; f2 : float }
 type t3 = { f1 : float }
 type t4 = { f1 : string; f2 : string; f3 : int }
-type t5 = { f1 : string; f2 : float; f3: int64#; f4: int32# }
+type t5 = { f1 : string; f2 : float; f3: int64_u; f4: int32_u }
 [%%expect{|
 type t1 = { f1 : string; f2 : int; }
 type t2 = { f1 : float; f2 : float; }
 type t3 = { f1 : float; }
 type t4 = { f1 : string; f2 : string; f3 : int; }
-type t5 = { f1 : string; f2 : float; f3 : int64#; f4 : int32#; }
+type t5 = { f1 : string; f2 : float; f3 : int64_u; f4 : int32_u; }
 |}]
 
 type succeeds = t1 accepts_nonfloat
@@ -435,12 +435,12 @@ type succeeds = t5 accepts_nonfloat
 
 type t1 = | A | B | C
 type t2 = | A | B of string | C of { f1 : float; f2 : int }
-type t3 = | A of { f1: int64#; f2: float# } | B of int32#
+type t3 = | A of { f1: int64_u; f2: float# } | B of int32_u
 
 [%%expect{|
 type t1 = A | B | C
 type t2 = A | B of string | C of { f1 : float; f2 : int; }
-type t3 = A of { f1 : int64#; f2 : float#; } | B of int32#
+type t3 = A of { f1 : int64_u; f2 : float#; } | B of int32_u
 |}]
 
 type succeeds = t1 accepts_nonfloat

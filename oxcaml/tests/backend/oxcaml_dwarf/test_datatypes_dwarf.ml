@@ -55,7 +55,7 @@ let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 
 (* Unboxed variants *)
 type unboxed_variant_float = Simple of float# [@@unboxed]
-type unboxed_variant_int = Complex of int32# [@@unboxed]
+type unboxed_variant_int = Complex of int32_u [@@unboxed]
 
 let[@inline never] [@local never] f_unboxed_variant_float
     (x: unboxed_variant_float) = x
@@ -172,7 +172,7 @@ let _ = f_poly_bits32 #42l
 let _ = f_poly_bits32 (-#123l)
 
 (* Unboxed tuple field *)
-type t = { f : #(int64# * int); s : string; b : bool }
+type t = { f : #(int64_u * int); s : string; b : bool }
 
 let[@inline never] [@local never] f_unboxed_tuple_field (x: t) =
   let { f; s; b } = x in { f; s; b }
@@ -357,5 +357,21 @@ let _ = for i = 0 to 1 do for j = 0 to 1 do for k = 0 to 1 do
 done done done
 let _ = f_bigarray3_int32 bigarray3_int32
 
+type void_ty : void
+external unbox_unit : unit -> void_ty = "%unbox_unit"
+
+(* All-void constructors are tagged immediates with
+   [@immediate_all_void_constructor] and blocks without. *)
+type all_void_variant =
+  | Imm_void of void_ty [@immediate_all_void_constructor]
+  | Blk_void of void_ty
+  | Const
+  | Boxed of int
+
+let[@inline never] [@local never] f_all_void_variant (x : all_void_variant) = x
+let _ = f_all_void_variant (Imm_void (unbox_unit ()))
+let _ = f_all_void_variant (Blk_void (unbox_unit ()))
+let _ = f_all_void_variant Const
+let _ = f_all_void_variant (Boxed 42)
 
 (* CR sspies: Add testing for Maps and Hashtables once oxcaml dwarf is enabled on the compiler. *)

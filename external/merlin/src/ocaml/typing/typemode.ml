@@ -202,7 +202,7 @@ let enforce_forbidden_modalities ~loc annot_type m =
     raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
-let default_mode_annots (annots : Alloc.Const.Option.t) =
+let apply_mode_implications (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
      is [global] or [local]. *)
   let forkable =
@@ -256,9 +256,7 @@ let transl_mode_annots annots =
     then raise (Error (loc, Duplicated_axis (Mode, ax)))
     else Alloc.Const.Option.set ax (Some mode) modes_so_far
   in
-  let modes =
-    List.fold_left step Alloc.Const.Option.none annots |> default_mode_annots
-  in
+  let modes = List.fold_left step Alloc.Const.Option.none annots in
   { mode_modes = modes; mode_desc = annots }
 
 let untransl_mode modes =
@@ -547,6 +545,7 @@ let transl_alloc_mode annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
     transl_mode_annots annots
   in
+  let opt_modes = apply_mode_implications opt_modes in
   let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
   { mode_modes = modes; mode_desc = annots }
 

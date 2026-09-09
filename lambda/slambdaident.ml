@@ -48,6 +48,11 @@ let of_sort_var var =
   then Misc.fatal_error "Slambdaident.of_sort_var: not a root";
   Sort_var (Jkind_types.Sort.Var.get_id var)
 
+let name = function
+  | Local { name; _ } -> name
+  | Ident i -> Ident.name i
+  | Sort_var _ -> "sort_var"
+
 let equal i1 i2 =
   match i1, i2 with
   | Local { stamp = s1; _ }, Local { stamp = s2; _ } -> s1 = s2

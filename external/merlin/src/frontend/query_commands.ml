@@ -250,9 +250,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             ret (`String ("not an allocation (" ^ reason ^ ")"))
           | Stack_or_heap_enclosing.Alloc_mode alloc_mode, true ->
             let locality =
-              alloc_mode
-              |> Mode.Alloc.proj_comonadic Areality
-              |> Mode.Locality.Guts.check_const_conservative
+              Typedtree.alloc_mode_r_map
+                Mode.Locality.Guts.check_const_conservative alloc_mode
             in
             let str =
               match locality with

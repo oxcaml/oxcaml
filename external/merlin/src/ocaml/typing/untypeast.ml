@@ -424,10 +424,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
-    | Tpat_record (list, _, _, closed) ->
+    | Tpat_record (list, _, closed) ->
         Ppat_record (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
-    | Tpat_record_unboxed_product (list, _, _, closed) ->
+    | Tpat_record_unboxed_product (list, _, closed) ->
         Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
@@ -1033,8 +1033,7 @@ let module_expr (sub : mapper) mexpr =
               Pmod_unpack (sub.expr sub exp)
               (* TODO , sub.package_type sub pack) *)
           | Tmod_typed_hole ->
-              let id = Location.mkloc hole_txt loc in
-              Pmod_extension (id, PStr [])
+              Pmod_hole
         in
         Mod.mk ~loc ~attrs desc
 

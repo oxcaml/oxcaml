@@ -50,7 +50,7 @@ mutual_recursion:
   movq  %rbx, 40(%rdi)
   leaq  24(%rdi), %rbx
   addq  $8, %rsp
-  jmp   camlTOP3__f_5_8_code@PLT
+  jmp   camlTOP3__f_3_8_code@PLT
 
 mutual_recursion.f:
   movq  %rbx, %rdi
@@ -62,7 +62,7 @@ mutual_recursion.f:
   movq  16(%rdi), %rdi
   subq  %rdi, %rax
   incq  %rax
-  jmp   camlTOP3__g_6_9_code@PLT
+  jmp   camlTOP3__g_4_9_code@PLT
 
 mutual_recursion.g:
   cmpq  $1, %rax
@@ -71,7 +71,7 @@ mutual_recursion.g:
 .L0:
   addq  $24, %rbx
   addq  $-60, %rax
-  jmp   camlTOP3__f_5_8_code@PLT
+  jmp   camlTOP3__f_3_8_code@PLT
 |}]
 
 
@@ -81,7 +81,7 @@ let rec f x = (if x < 0 then (fun () -> f (x-100)) else (fun () -> x)) ()
 f.(fun):
   movq  16(%rbx), %rax
   addq  $-200, %rax
-  jmp   camlTOP4__f_8_13_code@PLT
+  jmp   camlTOP4__f_5_13_code@PLT
 
 f.(fun):
   movq  16(%rbx), %rax

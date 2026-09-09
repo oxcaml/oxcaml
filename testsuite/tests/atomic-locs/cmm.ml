@@ -1,5 +1,7 @@
 (* TEST_BELOW *)
 
+open Stdlib_stable
+
 (* CR-someday mslater: this should also work on arm once atomics are builtins *)
 
 (* standard atomics *)
@@ -31,7 +33,31 @@ let set_imm (r : int atomic) v =
 let cas (r : 'a atomic) oldv newv =
   Atomic.Loc.compare_and_set [%atomic.loc r.x] oldv newv
 
+(* atomic block-index operations *)
+
+let idx_get (r : int atomic) (idx : (int atomic, int) idx_atomic) : int =
+  Idx_atomic.get r idx
+
+let idx_set (r : int atomic) (idx : (int atomic, int) idx_atomic) value =
+  Idx_atomic.set r idx value
+
+let idx_exchange (r : int atomic) (idx : (int atomic, int) idx_atomic) value =
+  Idx_atomic.exchange r idx value
+
+let idx_compare_and_set (r : int atomic)
+    (idx : (int atomic, int) idx_atomic) old_value new_value =
+  Idx_atomic.compare_and_set r idx old_value new_value
+
+let idx_compare_exchange (r : int atomic)
+    (idx : (int atomic, int) idx_atomic) old_value new_value =
+  Idx_atomic.compare_exchange r idx old_value new_value
+
+let idx_fetch_and_add (r : int atomic)
+    (idx : (int atomic, int) idx_atomic) value =
+  Idx_atomic.fetch_and_add r idx value
+
 (* TEST
+   include stdlib_stable;
    arch_amd64;
    flambda;
    no-tsan;

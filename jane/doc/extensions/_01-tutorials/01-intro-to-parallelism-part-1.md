@@ -1071,7 +1071,7 @@ ignoring those modes. In summary (this table isn't nearly exhaustive—see the
 | `mutable_data` | no functions, deeply | portability |
 | `value` | none | none |
 
-(Note that unboxed types like `int64#` can't have any of these kinds, since
+(Note that unboxed types like `int64_u` can't have any of these kinds, since
 they have different kinds that express how they're represented in memory and
 in registers. Nonetheless, they are all immutable data and thus cross both
 portability and contention.)

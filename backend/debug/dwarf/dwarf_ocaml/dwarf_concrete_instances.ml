@@ -56,6 +56,14 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
     then [DAH.create_artificial ()]
     else
       let file, line, startchar = Location.get_pos_info loc.loc_start in
+      (* Prefer the [dinfo_dir]-qualified filename, which remains valid when
+         [fundecl] is a copy of code imported from another compilation unit
+         (whose source directory may differ from this unit's). *)
+      let file =
+        match Debuginfo.to_file_path fundecl.fun_dbg with
+        | Some file -> file
+        | None -> file
+      in
       let attributes = [DAH.create_decl_file (get_file_id file)] in
       if line < 0
       then attributes
@@ -76,9 +84,8 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let attribute_values =
     [ DAH.create_low_pc_from_symbol start_sym;
       DAH.create_high_pc ~low_pc:start_sym fun_end_label;
-      (* CR mshinwell: Probably no need to set this at the moment since the low
-         PC value should be assumed, which is correct. *)
-      DAH.create_entry_pc_from_symbol start_sym;
+      (* No [DW_AT_entry_pc]: in its absence the low PC value is assumed, which
+         is correct. *)
       DAH.create_stmt_list
         ~debug_line_label:(Asm_label.for_dwarf_section Asm_section.Debug_line);
       DAH.create_abstract_origin ~die_symbol:_abstract_instance_root_symbol ]
@@ -96,7 +103,7 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   (match value_type_proto_die with
   | None -> ()
   | Some value_type_proto_die ->
-    assert (not !Dwarf_flags.restrict_to_upstream_dwarf);
+    assert (not !Clflags.restrict_to_upstream_dwarf);
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
         Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die

@@ -254,19 +254,6 @@ Error: This alias is bound to type "int list"
        Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
-|}, Principal{|
-Line 1, characters 21-23:
-1 | let x : int list as ('a : immediate) = [3;4;5]
-                         ^^
-Error: This alias is bound to type "int list"
-       but is used as an instance of type "('a : immediate)"
-       The layout of int list is value non_float
-         because it's a boxed variant type.
-       But the layout of int list must be a sublayout of value non_pointer
-         because of the annotation on the type variable 'a.
-       Note: The layout of immediate is value non_pointer.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 (* CR layouts: error message could be phrased better *)
 
@@ -1062,11 +1049,11 @@ val f : ('a. 'a -> 'a) -> string * int = <fun>
 |}]
 
 let f (x : ('a : word mod external_ many aliased). 'a -> 'a) =
-  let native_int : nativeint# = assert false in
+  let native_int : nativeint_u = assert false in
   x native_int
 
 [%%expect {|
-val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint# = <fun>
+val f : (('a : word mod many aliased). 'a -> 'a) -> nativeint_u = <fun>
 |}]
 
 let f (x : ('a : immediate). 'a -> 'a) = x "string"
@@ -1783,14 +1770,14 @@ type t = int as (_ : value)
 type t = int as (_ : immediate)
 type t = int as (_ : value mod global)
 type t = int as (_ : immediate mod global)
-type t = nativeint# as (_ : word mod external_ many aliased)
+type t = nativeint_u as (_ : word mod external_ many aliased)
 
 [%%expect {|
 type t = int
 type t = int
 type t = int
 type t = int
-type t = nativeint#
+type t = nativeint_u
 |}]
 
 (*********************************************************)

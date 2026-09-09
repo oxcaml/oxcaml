@@ -18,7 +18,8 @@ open Dwarf_low
 (** Helper functions for constructing attribute values that do not require a
     knowledge of DWARF forms. *)
 
-val create_entry_pc : Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
+(* Note that there are deliberately no [DW_AT_entry_pc] helpers; see the .ml
+   file. *)
 
 val create_low_pc : Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
 
@@ -40,9 +41,6 @@ val create_high_pc :
   low_pc:Asm_symbol.t -> Asm_label.t -> Dwarf_attribute_values.Attribute_value.t
 
 (* CR mshinwell: Make labels consistent / remove unnecessary ones. *)
-
-val create_entry_pc_from_symbol :
-  Asm_symbol.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_low_pc_from_symbol :
   Asm_symbol.t -> Dwarf_attribute_values.Attribute_value.t
@@ -122,11 +120,15 @@ val create_import :
 val create_encoding :
   encoding:Encoding_attribute.t -> Dwarf_attribute_values.Attribute_value.t
 
+(** Fatal error if [byte_size] is negative. *)
 val create_byte_size_exn :
   byte_size:int -> Dwarf_attribute_values.Attribute_value.t
 
 val create_bit_size : Numbers.Int8.t -> Dwarf_attribute_values.Attribute_value.t
 
+(** Fatal error if [byte_offset] is negative. (Negative offsets relative to a
+    pointer are instead expressed via [create_ocaml_offset_record_from_pointer]
+    below.) *)
 val create_data_member_location_offset :
   byte_offset:Int64.t -> Dwarf_attribute_values.Attribute_value.t
 
@@ -193,12 +195,14 @@ val create_language :
 
 val create_declaration : unit -> Dwarf_attribute_values.Attribute_value.t
 
+(** Fatal error if [bytes] is negative. *)
 val create_byte_stride :
   bytes:Int64.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_count :
   Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
 
+(** Fatal error if the count is negative. *)
 val create_count_const : Int64.t -> Dwarf_attribute_values.Attribute_value.t
 
 (** OCaml-specific DWARF attributes. *)
