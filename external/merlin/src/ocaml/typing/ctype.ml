@@ -6678,13 +6678,14 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
           | (Tbox t1, Tbox t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen (compose_variance variance Variance.full)
+                type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
-              moregen inst_nongen variance type_pairs
-                env t (unbox_ty_exn env t2')
+              moregen inst_nongen (compose_variance variance Variance.full)
+                type_pairs env t (unbox_ty_exn env t2')
           | (_, Tbox t) when is_unboxable_ty env t1' ->
-              moregen inst_nongen variance type_pairs
-                env (unbox_ty_exn env t1') t
+              moregen inst_nongen (compose_variance variance Variance.full)
+                type_pairs env (unbox_ty_exn env t1') t
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -7936,10 +7937,8 @@ let rec build_subtype env (visited : transient_expr list)
       in
       if c > Unchanged then (newty (Tquote_eval t1'), c)
       else (t, Unchanged)
-  | Tbox t1 ->
-      let (t1', c) = build_subtype env visited loops posi level t1 in
-      if c > Unchanged then (newty (Tbox t1'), c)
-      else (t, Unchanged)
+  | Tbox _ ->
+      (t, Unchanged)
   | Tnil ->
       if posi then
         let v = newvar (Jkind.Builtin.value ~why:Tnil) in
@@ -8127,12 +8126,6 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec (decr_stage env) trace t1 t2 cstrs
     | (Tquote_eval t1, Tquote_eval t2) ->
          subtype_rec (incr_stage env) trace t1 t2 cstrs
-    | (Tbox t1, Tbox t2) ->
-         subtype_rec
-           env
-           (Subtype.Diff {got = t1; expected = t2} :: trace)
-           t1 t2
-           cstrs
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end

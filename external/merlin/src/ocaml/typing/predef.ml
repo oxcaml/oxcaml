@@ -1053,8 +1053,11 @@ let decl_of_type_constr type_constr =
          }))
        ()
   | `Box ->
+    (* Box is invariant: ['a t# box = 'a t], and it's possible that [t#] is a
+       covariant unboxed record while [t] is an invariant mutable boxed record,
+       so [t# box] must not unsoundly be more permissive than [t]. *)
     decl1
-       ~variance:Variance.covariant
+       ~variance:Variance.full
        ~separability:Separability.Ind
        ~manifest:(fun param -> newgenty (Tbox param))
        ~jkind:(fun _ -> Jkind.Builtin.value ~why:Boxed)
