@@ -62,6 +62,15 @@ let wrong_to_seq (xt : 'a t) : 'a Seq.t =
    with the Ctype.Escape exception, as it did from 4.13 to 5.1. *)
 [%%expect{|
 type 'a t = T of 'a
+Line 4, characters 21-22:
+4 |   Seq.cons Seq.empty x
+                         ^
+Error: The value "x" has type "'a Seq.t" = "unit -> 'a Seq.node"
+       but an expression was expected of type "unit -> 'a Seq.t Seq.node"
+       Type "'a" is not compatible with type "'a Seq.t" = "unit -> 'a Seq.node"
+       The type variable "'a" occurs inside "'a Seq.t"
+|}, Principal{|
+type 'a t = T of 'a
 Line 4, characters 2-22:
 4 |   Seq.cons Seq.empty x
       ^^^^^^^^^^^^^^^^^^^^

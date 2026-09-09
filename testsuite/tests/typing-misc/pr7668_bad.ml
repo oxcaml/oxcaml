@@ -20,6 +20,17 @@ else `Right ()) xs
 val partition_map :
   ('a -> [< `Left of 'b | `Right of 'c ]) -> 'a list -> 'b list * 'c list =
   <fun>
+Line 12, characters 69-77:
+12 | let f xs : (int list * int list) = partition_map (fun x -> if x then `Left ()
+                                                                          ^^^^^^^^
+Error: This constructor has type "[> `Left of unit ]"
+       but an expression was expected of type
+         "[< `Left of int | `Right of int ]"
+       Types for tag "`Left" are incompatible
+|}, Principal{|
+val partition_map :
+  ('a -> [< `Left of 'b | `Right of 'c ]) -> 'a list -> 'b list * 'c list =
+  <fun>
 Lines 12-13, characters 35-18:
 12 | ...................................partition_map (fun x -> if x then `Left ()
 13 | else `Right ()) xs
