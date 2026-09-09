@@ -2,6 +2,7 @@
 open Ast_helper
 open Asttypes
 open Parsetree_helpers
+module Binding = Ir.Binding
 module Expr = Ir.Expr
 module Function = Ir.Function
 module Name = Ir.Name
@@ -10,13 +11,15 @@ module Statement = Ir.Statement
 module Ty = Ir.Ty
 
 type t =
-  { functions : Function.t list;
-    toplevel_decls : (Name.t * Ty.t * Expr.t) list;
+  { swarm : Config.Swarm.t;
+    record_types : Ty.record list;
+    functions : Function.t list;
+    toplevel_decls : (Binding.t * Expr.t) list;
     toplevel_statement : Statement.t
   }
 
-let create ~functions ~toplevel_decls ~toplevel_statement =
-  { functions; toplevel_decls; toplevel_statement }
+let create ~swarm ~record_types ~functions ~toplevel_decls ~toplevel_statement =
+  { swarm; record_types; functions; toplevel_decls; toplevel_statement }
 
 let is_floating_point_to_integral ~from ~to_ =
   NumberTy.is_floating_point from && not (NumberTy.is_floating_point to_)
@@ -28,7 +31,7 @@ let is_floating_point_to_integral ~from ~to_ =
 let unsafe_converter_name ~from ~to_ =
   "unsafe_" ^ NumberTy.converter_name ~from ~to_
 
-let conversions =
+let conversions number_types =
   let conversion from to_ =
     let from_name = NumberTy.to_string from in
     let to_name = NumberTy.to_string to_ in
@@ -38,11 +41,8 @@ let conversions =
       then unsafe_converter_name ~from ~to_
       else NumberTy.converter_name ~from ~to_
     in
-    let type_expression name = Typ.constr (lid name) [] in
     let conversion_type =
-      Typ.arrow Nolabel
-        (type_expression from_name)
-        (type_expression to_name) [] []
+      Typ.arrow Nolabel (NumberTy.to_code from) (NumberTy.to_code to_) [] []
     in
     Str.primitive
       (Val.mk (loc function_name) conversion_type ~prim:[primitive_name])
@@ -52,8 +52,8 @@ let conversions =
       List.filter_map
         (fun to_ ->
           if NumberTy.equal from to_ then None else Some (conversion from to_))
-        NumberTy.all)
-    NumberTy.all
+        number_types)
+    number_types
 
 let integral_bound_name base =
   String.lowercase_ascii (NumberTy.Base.to_module base)
@@ -108,7 +108,7 @@ let float_for_comparison from expr =
   then expr
   else apply (ident (NumberTy.converter_name ~from ~to_:boxed_float)) [expr]
 
-let float_to_integral_conversions =
+let float_to_integral_conversions number_types =
   let wrapper (from : NumberTy.t) (to_ : NumberTy.t) =
     let x = ident "x" in
     let x_for_comparison = ident "x_for_comparison" in
@@ -151,8 +151,8 @@ let float_to_integral_conversions =
           if is_floating_point_to_integral ~from ~to_
           then Some (wrapper from to_)
           else None)
-        NumberTy.all)
-    NumberTy.all
+        number_types)
+    number_types
 
 (* We check floats for equality by testing if their bits are equal. This is
    correct unless they are NaN, which is why before comparing, we run
@@ -187,14 +187,111 @@ let print_number nty e =
     (qualified_ident "Printf" "printf")
     [Exp.constant (Const.string fmt); arg]
 
+(* Keep in sync with [LIBRARIES] in oxfuzzer.py. *)
+let libraries = ["stdlib_upstream_compatible"; "stdlib_stable"]
+
+let array_primitives =
+  let open Parsetree in
+  let any =
+    { pjka_loc = Location.none;
+      pjka_desc = Pjk_abbreviation (lid "any")
+    }
+  in
+  let separable =
+    { pjka_loc = Location.none;
+      pjka_desc = Pjk_mod (any, [loc (Mode "separable")])
+    }
+  in
+  let a = Typ.var "a" None in
+  let array = Typ.constr (lid "array") [a] in
+  let int = Typ.constr (lid "int") [] in
+  let unit = Typ.constr (lid "unit") [] in
+  let external_ name primitive args result =
+    let typ =
+      List.fold_right
+        (fun arg result -> Typ.arrow Nolabel arg result [] [])
+        args result
+    in
+    Str.primitive
+      (Val.mk
+         ~attrs:[Attr.mk (loc "layout_poly") (PStr [])]
+         ~prim:[primitive] (loc name)
+         (Typ.poly [loc "a", Some separable] typ))
+  in
+  [ external_ "array_make" "%makearray_dynamic" [int; a] array;
+    external_ "array_get" "%array_safe_get" [array; int] a;
+    external_ "array_set" "%array_safe_set" [array; int; a] unit;
+    external_ "array_length" "%array_length" [array] int
+  ]
+
+let record_declarations records =
+  let declaration (record : Ty.record) =
+    let fields =
+      List.map
+        (fun (field : Ty.field) ->
+          let mut =
+            if field.is_mutable && not record.unboxed
+            then Mutable
+            else Immutable
+          in
+          Type.field ~mut (loc (Ty.field_name record field))
+            (Ty.to_code field.ty))
+        record.fields
+    in
+    let kind =
+      if record.unboxed
+      then Parsetree.Ptype_record_unboxed_product fields
+      else Parsetree.Ptype_record fields
+    in
+    Str.type_ Recursive [Type.mk ~kind (loc (Ty.record_name record))]
+  in
+  List.map declaration records
+
+let rec print_value path ty expr =
+  match ty with
+  | Ty.Number nty -> print_number nty expr
+  | Ty.Array (nty, dimensions) ->
+    let rec print_elements depth dimensions array =
+      match dimensions with
+      | [] -> print_number nty array
+      | _ :: rest ->
+        let index = path ^ "_index_" ^ string_of_int depth in
+        Exp.for_ (Pat.var (loc index)) (int 0)
+          (op "-" [apply (ident "array_length") [array]; int 1])
+          Upto
+          (print_elements (depth + 1) rest
+             (apply (ident "array_get") [array; ident index]))
+    in
+    print_elements 0 dimensions expr
+  | Ty.Record record ->
+    List.fold_right
+      (fun (field : Ty.field) acc ->
+        let project = if record.unboxed then Exp.unboxed_field else Exp.field in
+        let value = project expr (lid (Ty.field_name record field)) in
+        let path = path ^ "_field_" ^ string_of_int field.index in
+        Exp.sequence (print_value path field.ty value) acc)
+      record.fields unit_
+  | Ty.Bool ->
+    apply
+      (qualified_ident "Printf" "printf")
+      [Exp.constant (Const.string "%b "); expr]
+
 let to_code
-    { functions; toplevel_decls = decls; toplevel_statement = statement } =
-  let print_decl (name, ty, _expr) =
-    match ty with
-    | Ty.Number nty -> print_number nty (ident (Name.to_string name))
-    | _ ->
-      Misc.fatal_errorf
-        "Program.to_code: only numeric types allowed in toplevel declarations"
+    { swarm;
+      record_types;
+      functions;
+      toplevel_decls = decls;
+      toplevel_statement = statement
+    } =
+  let opens =
+    List.map
+      (fun lib ->
+        Str.open_ (Opn.mk (Mod.ident (lid (String.capitalize_ascii lib)))))
+      libraries
+  in
+  let print_decl ((binding : Binding.t), _expr) =
+    let name = Name.to_string binding.name in
+    print_value (name ^ "_print") binding.ty (ident name)
   in
   let body =
     Exp.sequence
@@ -205,8 +302,8 @@ let to_code
   in
   let body =
     List.fold_right
-      (fun (name, _ty, expr) acc ->
-        Statement.let_mutable name (opaque_identity (Expr.to_code expr)) acc)
+      (fun (binding, expr) acc ->
+        Statement.let_binding binding (Expr.to_code expr) acc)
       decls body
   in
   let main =
@@ -216,10 +313,22 @@ let to_code
           (function_ [value_param (Pat.construct (lid "()") None)] body) ]
   in
   let run = Str.eval (Exp.apply (ident "main") [Nolabel, unit_]) in
+  let number_types = Config.Swarm.number_types swarm in
+  let array_primitives = if swarm.arrays then array_primitives else [] in
+  let float_helpers =
+    if swarm.floats
+    then
+      integral_bounds @ [canonicalize_nan]
+      @ float_to_integral_conversions number_types
+    else []
+  in
   let structure =
-    conversions @ integral_bounds @ [canonicalize_nan]
-    @ float_to_integral_conversions
+    opens
+    @ record_declarations record_types
+    @ array_primitives @ conversions number_types @ float_helpers
     @ List.map Function.to_code functions
     @ [main; run]
   in
-  Pprintast.string_of_structure structure ^ "\n"
+  Format.sprintf "(* Swarm configuration:\n%s\n*)\n%s\n"
+    (Config.Swarm.to_string swarm)
+    (Pprintast.string_of_structure structure)
