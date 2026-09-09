@@ -202,11 +202,10 @@ module Staged = struct
     in
     deps, slot_offsets_inputs, code_changes_inputs, rebuild_data
 
-  let solve ~slot_offsets_inputs ~is_local_compilation_unit ~code_changes_inputs
-      deps =
+  let solve ~slot_offsets_inputs ~analysis_scope ~code_changes_inputs deps =
     let uses =
       Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps)
+          Analysis.fixpoint deps ~analysis_scope)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
@@ -221,14 +220,14 @@ module Staged = struct
         Code_id.Map.empty code_changes_inputs
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes uses ~is_local_compilation_unit
+      Unboxing_analysis.compute_code_changes uses ~analysis_scope
         ~rewrite_kind_with_subkind:
           (Types_rewriter.rewrite_kind_with_subkind uses)
         ~code_deps
     in
     let slot_offsets =
-      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs
-        ~is_local_compilation_unit ~code_changes uses
+      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
+        ~code_changes uses
     in
     { uses; code_changes }, slot_offsets
 
@@ -295,8 +294,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     Staged.traverse ~free_names ~cmx_loader ~all_code unit
   in
   let solution, slot_offsets =
-    Staged.solve ~slot_offsets_inputs
-      ~is_local_compilation_unit:Current_unit.is_current
+    Staged.solve ~slot_offsets_inputs ~analysis_scope:Current_unit
       ~code_changes_inputs:[code_changes_inputs] deps
   in
   let unit_metadata = Flambda_unit.metadata unit in
