@@ -302,7 +302,39 @@ module CU_data = struct
       Template_store.print templates
 end
 
-module Ctx = struct
+module Ctx : sig
+  type t
+
+  (** [cu_static_data] is used to look up the [CU_data.t] for a give compilation
+      unit, calls to it are memoized. *)
+  val create : cu_static_data:(Compilation_unit.t -> CU_data.t option) -> t
+
+  (** Memoized fetch of the compile-time data for the given unit. *)
+  val cu_static_data : t -> Compilation_unit.t -> Types.value Or_missing.t
+
+  (** A template store, used to store the templates for the current unit. *)
+  val store : t -> Template_store.t
+
+  (** Instantiate a template. This is memoized so if this template has already
+      been instantiated with these arguments it just returns the previously
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated function. *)
+  val instantiate :
+    t ->
+    eval_apply:(Types.closure -> Types.value array -> Types.halves) ->
+    Template_id.t ->
+    Types.value array ->
+    Types.value Or_missing.t
+
+  (** All of the template instantiations cached by [instantiate]. These are in
+      dependency order; entries earlier in the list may depend on later ones. *)
+  val instantiations : t -> (Ident.t * lambda) list
+
+  (** Makes the given string unique in the context of this [Ctx.t] by adding a
+      stamp to the end. It should already be unique across [Ctx.t]s, which is
+      usually achievable by including the [Compilation_unit.t]. *)
+  val uniqueify : t -> string -> string
+end = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
@@ -326,10 +358,8 @@ module Ctx = struct
     | Some { cu; _ } -> cu
     | None -> Or_missing.Missing
 
-  (** Instantiate a template. This is memoized so if this template has already
-      been instantiated with these arguments it just returns the previously
-      computed results, otherwise it uses [eval_apply] to evaluate the closure.
-      The returned runtime half is a reference to the instantiated function. *)
+  let store t = t.store
+
   let instantiate t ~eval_apply (id : Template_id.t) args :
       Types.value Or_missing.t =
     let closure =
@@ -456,7 +486,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
     let id =
-      Fmt.asprintf "%a_%a"
+      Fmt.asprintf "%a/%a"
         (Fmt.pp_print_option Compilation_unit.print)
         (Current_unit.get_cu ())
         (Fmt.pp_print_option Fmt.pp_print_string)
@@ -475,7 +505,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
       { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
     let cu = Current_unit.get_cu () in
-    let closure_id = Template_store.add ctx.store ~cu ~name closure in
+    let closure_id = Template_store.add (Ctx.store ctx) ~cu ~name closure in
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
@@ -1061,4 +1091,4 @@ let eval ~cu_static_data slam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
+      { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, slv_runtime)

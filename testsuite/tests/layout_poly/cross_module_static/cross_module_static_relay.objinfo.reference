@@ -18,12 +18,12 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  Cross_module_static_relay_/0[ Cross_module_static_relay/relay_id/0; ]
+  Cross_module_static_relay//0[ Cross_module_static_relay/relay_id/0; ]
   (Cross_module_static_relay/relay_id/0
     (closure ⟨env⟩ layout_2 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/341[L] x/334[$layout_2] : $layout_2
+        ⟪(function {nlocal = 0} closure/341 x/334[$layout_2] : $layout_2
            $(let (#body/2 =
                { c = (missing)
                ; r =

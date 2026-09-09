@@ -336,20 +336,30 @@ let rec fracture_lam lambda : slambda =
     (* A kind template fractures into a compile-time template over its kind
        parameters, paired with a runtime block capturing its free variables.
 
-       The template evaluates to a pair representing the body: the compile-time
-       half is the body's compile-time half; the runtime half is a function of
-       that environment to the original body.
+       Kind templates always wrap functions (we only have kind polymorphic
+       functions), so this also merges the runtime part of the template with the
+       user function. That is:
+       [template k1 k2 ... -> fun arg1 arg2 ... -> body]
+       turns into a function like:
+       [fun env [k1] [k2] ... -> fun arg1 arg2 ... -> body]
+       But k1, k2 etc don't actually exist as they have no runtime
+       representation, so with that and the merging we get:
+       [fun env arg1 arg2 ... -> body]
+
+       Specifically, the compile-time template is from the kind arguments to a
+       pair. The compile-time half of that pair is missing (because runtime
+       functions have no compile-time part), the runtime half is the above
+       function of the env and function args.
 
        {[
          let <free_var_0> = <fracture free_var_0> in
          ...
          { c = template <...ktmpl_params> ->
-                let body = <fracture ktmpl_body> in
-                { c = body.c
-                ; r = << fun closure ->
+                { c = Missing
+                ; r = << fun closure $(ktmpl_body.args...)->
                           let <free_var_0> = closure.<0> in
                           ...
-                          $(body.r) >> }
+                          $(fracture_dynamic ktmpl_body.body) >> }
          ; r = << makeblock ($(<free_var_0>.r), ...) >> }
        ]} *)
     let env = Ident.Map.to_list ktmpl_env in
@@ -374,9 +384,7 @@ let rec fracture_lam lambda : slambda =
           debug_uid = debug_uid_none;
           layout = layout_template_env;
           attributes = default_param_attribute;
-          (* The env parameter can be local because we immediately
-              destructure it. *)
-          mode = alloc_local
+          mode = ktmpl_env_mode
         }
       in
       let _, body =
@@ -529,9 +537,7 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_template_env;
               attributes = default_param_attribute;
-              (* The env parameter can be local because we immediately
-                 destructure it. *)
-              mode = alloc_local
+              mode = mode
             }
           in
           let _, body =

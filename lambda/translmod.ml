@@ -656,7 +656,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
   match staticity with
   | Static ->
     let tmpl_func, tmpl_env =
-      Lambda.freshen_free_vars_lfunction lfun
+      Lambda.extract_free_var_env lfun
         ~layout_of_ident:(Typeopt.layout_of_ident mexp.mod_env)
     in
     Ltemplate { tmpl_func; tmpl_env }

@@ -4840,7 +4840,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       | _ -> Misc.fatal_error "let poly_ definitions must be functions"
     in
     let ktmpl_body, ktmpl_env =
-      Lambda.freshen_free_vars_lfunction param
+      Lambda.extract_free_var_env param
         ~layout_of_ident:(Typeopt.layout_of_ident pat.pat_env)
     in
     let f =

@@ -475,9 +475,11 @@ let rec p13 =
   end : F)
 [%%expect{|
 module type F = functor (X : sig end @ static) -> sig val f : unit -> int end
->> Fatal error: letrec: poly_ not supported
-Uncaught exception: Misc.Fatal_error
-
+Lines 7-9, characters 18-5:
+7 | ..................(X : sig end @ static) -> struct
+8 |     let f () = ignore p13; 1
+9 |   end.....
+Error: Recursive static functors are not supported
 |}]
 
 (* A static functor taking another static functor as its argument *)

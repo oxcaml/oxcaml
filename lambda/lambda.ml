@@ -2475,8 +2475,9 @@ let map_lfunction f ({ kind; params; return; body = old_body; attr; loc;
   else { kind; params; return; body = new_body; attr; loc; mode; ret_mode;
          yielding }
 
-let freshen_free_vars_map ~layout_of_ident lam =
-  Ident.Set.fold
+let extract_free_var_env ~layout_of_ident lfun =
+  let fresh_vars, env =
+      Ident.Set.fold
     (fun ident (fresh_vars, env) ->
        match layout_of_ident ident with
        | None -> fresh_vars, env
@@ -2484,19 +2485,8 @@ let freshen_free_vars_map ~layout_of_ident lam =
          let fresh_ident = Ident.rename ident in
          Ident.Map.add ident fresh_ident fresh_vars,
          Ident.Map.add fresh_ident (Lvar ident, layout) env)
-    (free_variables lam)
+    (free_variables (Lfunction lfun))
     (Ident.Map.empty, Ident.Map.empty)
-
-let freshen_free_vars ~layout_of_ident lam =
-  let fresh_vars, env = freshen_free_vars_map ~layout_of_ident lam in
-  let lam =
-    if Ident.Map.is_empty fresh_vars then lam else rename fresh_vars lam
-  in
-  lam, env
-
-let freshen_free_vars_lfunction ~layout_of_ident lfun =
-  let fresh_vars, env =
-    freshen_free_vars_map ~layout_of_ident (Lfunction lfun)
   in
   let lfun =
     if Ident.Map.is_empty fresh_vars
