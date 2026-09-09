@@ -55,8 +55,7 @@ and rev_static_const =
 
 and rev_code =
   { params_and_body : rev_params_and_body;
-    free_names_of_params_and_body : Name_occurrences.t;
-    code_metadata : Code_metadata.t
+    free_names_of_params_and_body : Name_occurrences.t
   }
 
 and rev_params_and_body =
