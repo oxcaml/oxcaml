@@ -447,8 +447,12 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
      sections needed by rebuild. *)
   let participants =
     List.map
-      (fun (participant, (graph, _, _, _)) ->
-        participant, Flambda2_reaper.Global_flow_graph.compilation_units graph)
+      (fun (participant, (graph, _, _, inputs)) ->
+        ( participant,
+          Compilation_unit.Set.union
+            (Flambda2_reaper.Global_flow_graph.compilation_units graph)
+            (Flambda2_reaper.Reaper.Staged.Solve_inputs
+             .referenced_compilation_units inputs) ))
       solve_data
   in
   let combined_graph =

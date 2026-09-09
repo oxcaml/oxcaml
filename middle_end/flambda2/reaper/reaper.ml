@@ -215,7 +215,91 @@ module Staged = struct
     in
     deps, slot_offsets_inputs, solve_inputs, rebuild_data
 
+  let link_code_references ~analysis_scope
+      ~(code_deps : Traverse_acc.code_dep Code_id.Map.t) ~solve_inputs deps =
+    let module Graph = Global_flow_graph in
+    let add_alias_for_caller graph ~caller ~from ~to_ =
+      match caller with
+      | None -> Graph.add_alias graph ~from ~to_
+      | Some code_id ->
+        Graph.add_propagate_dep graph
+          ~if_used:(Code_id_or_name.code_id code_id)
+          ~from ~to_
+    in
+    let find_in_scope code_id =
+      if
+        not
+          (Analysis_scope.contains_unit analysis_scope
+             (Code_id.get_compilation_unit code_id))
+      then None
+      else
+        match Code_id.Map.find_opt code_id code_deps with
+        | Some code_dep -> Some code_dep
+        | None ->
+          Misc.fatal_errorf "Missing participant code interface %a"
+            Code_id.print code_id
+    in
+    let link_reference = function
+      | Traverse_acc.Closure { closure; code_id; external_witness } -> (
+        match find_in_scope code_id with
+        | Some code_dep ->
+          Traverse_acc.connect_closure deps ~closure ~code_id code_dep
+        | None ->
+          Graph.add_any_source deps external_witness;
+          Graph.add_constructor_dep deps ~base:closure
+            Field.known_arity_call_witness ~from:external_witness;
+          Graph.add_constructor_dep deps ~base:closure
+            Field.unknown_arity_call_witness ~from:external_witness;
+          Graph.add_constructor_dep deps ~base:external_witness
+            Field.code_id_of_call_witness ~from:closure)
+      | Traverse_acc.Direct_call
+          { call;
+            code_id;
+            closure;
+            caller;
+            external_call;
+            external_closure;
+            external_world
+          } -> (
+        match find_in_scope code_id with
+        | Some code_dep ->
+          add_alias_for_caller deps ~caller ~to_:call
+            ~from:code_dep.known_arity_call_witness;
+          Option.iter
+            (fun closure ->
+              add_alias_for_caller deps ~caller ~from:closure
+                ~to_:(Code_id_or_name.var code_dep.my_closure))
+            closure
+        | None ->
+          (match caller with
+          | None -> Graph.add_any_source deps external_call
+          | Some caller ->
+            Graph.add_propagate_dep deps
+              ~if_used:(Code_id_or_name.code_id caller)
+              ~to_:external_call ~from:external_world);
+          Option.iter
+            (fun closure ->
+              match caller with
+              | None -> Graph.add_any_usage deps closure
+              | Some caller ->
+                Graph.add_use_dep deps
+                  ~to_:(Code_id_or_name.code_id caller)
+                  ~from:closure)
+            external_closure)
+    in
+    List.iter
+      (fun (inputs : Solve_inputs.t) ->
+        List.iter link_reference inputs.code_references)
+      solve_inputs
+
   let solve ~slot_offsets_inputs ~analysis_scope ~solve_inputs deps =
+    let code_deps =
+      List.fold_left
+        (fun code_deps (inputs : Solve_inputs.t) ->
+          Code_id.Map.disjoint_union code_deps inputs.code_deps)
+        Code_id.Map.empty solve_inputs
+    in
+    link_code_references ~analysis_scope ~code_deps ~solve_inputs deps;
     let uses =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps ~analysis_scope)
@@ -225,12 +309,6 @@ module Staged = struct
       then (
         Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
         Dot_printer.print_solved_dep uses deps)
-    in
-    let code_deps =
-      List.fold_left
-        (fun code_deps (inputs : Solve_inputs.t) ->
-          Code_id.Map.disjoint_union code_deps inputs.code_deps)
-        Code_id.Map.empty solve_inputs
     in
     let code_changes =
       Unboxing_analysis.compute_code_changes uses ~analysis_scope
