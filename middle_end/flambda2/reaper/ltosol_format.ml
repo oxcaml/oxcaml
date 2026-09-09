@@ -56,8 +56,7 @@ end = struct
       field_of_constructor_is_used : Serialisation.Nf.t;
       field_of_constructor_is_used_top : Serialisation.Nf.t;
       field_of_constructor_is_used_as : Serialisation.Nfn.t;
-      allocation_point_dominator : Serialisation.Nn.t;
-      cannot_change_calling_convention : Serialisation.N.t
+      allocation_point_dominator : Serialisation.Nn.t
     }
 
   let of_database db : t =
@@ -79,9 +78,7 @@ end = struct
       field_of_constructor_is_used_as =
         get Points_to_analysis.Relations.field_of_constructor_is_used_as_table;
       allocation_point_dominator =
-        get Points_to_analysis.Relations.allocation_point_dominator_table;
-      cannot_change_calling_convention =
-        get Unboxing_analysis.cannot_change_calling_convention_table
+        get Points_to_analysis.Relations.allocation_point_dominator_table
     }
 
   let to_database
@@ -98,8 +95,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) =
     (* CR mvellacott: it would be nice to make reading a table that was not
@@ -132,9 +128,6 @@ end = struct
     |> Datalog.set_table
          Points_to_analysis.Relations.allocation_point_dominator_table
          allocation_point_dominator
-    |> Datalog.set_table
-         Unboxing_analysis.cannot_change_calling_convention_table
-         cannot_change_calling_convention
 
   let ids_for_export
       ({ constructor;
@@ -150,8 +143,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) =
     let ids = Ids_for_export.empty in
@@ -169,7 +161,6 @@ end = struct
     let ids = Serialisation.Nf.add_ids field_of_constructor_is_used_top ids in
     let ids = Serialisation.Nfn.add_ids field_of_constructor_is_used_as ids in
     let ids = Serialisation.Nn.add_ids allocation_point_dominator ids in
-    let ids = Serialisation.N.add_ids cannot_change_calling_convention ids in
     ids
 
   let fields_for_export
@@ -186,8 +177,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator = _;
-         cannot_change_calling_convention = _
+         allocation_point_dominator = _
        } :
         t) =
     let fields = Field.Set.empty in
@@ -218,8 +208,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         t) renaming ~rename_field : t =
     let rename_id = Renaming.apply_code_id_or_name renaming in
@@ -245,9 +234,7 @@ end = struct
         Serialisation.Nfn.rename field_of_constructor_is_used_as ~rename_id
           ~rename_field;
       allocation_point_dominator =
-        Serialisation.Nn.rename allocation_point_dominator ~rename_id;
-      cannot_change_calling_convention =
-        Serialisation.N.rename cannot_change_calling_convention ~rename_id
+        Serialisation.Nn.rename allocation_point_dominator ~rename_id
     }
 
   let empty =
@@ -264,8 +251,7 @@ end = struct
       field_of_constructor_is_used = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_top = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_as = Code_id_or_name.Map.empty;
-      allocation_point_dominator = Code_id_or_name.Map.empty;
-      cannot_change_calling_convention = Code_id_or_name.Map.empty
+      allocation_point_dominator = Code_id_or_name.Map.empty
     }
 
   let disjoint_union t1 t2 =
@@ -288,10 +274,7 @@ end = struct
       field_of_constructor_is_used_as =
         u t1.field_of_constructor_is_used_as t2.field_of_constructor_is_used_as;
       allocation_point_dominator =
-        u t1.allocation_point_dominator t2.allocation_point_dominator;
-      cannot_change_calling_convention =
-        u t1.cannot_change_calling_convention
-          t2.cannot_change_calling_convention
+        u t1.allocation_point_dominator t2.allocation_point_dominator
     }
 
   (* Mutable counterpart of [t], so that [partition_by_compilation_unit] can
@@ -311,8 +294,7 @@ end = struct
       mutable field_of_constructor_is_used : Serialisation.Nf.t;
       mutable field_of_constructor_is_used_top : Serialisation.Nf.t;
       mutable field_of_constructor_is_used_as : Serialisation.Nfn.t;
-      mutable allocation_point_dominator : Serialisation.Nn.t;
-      mutable cannot_change_calling_convention : Serialisation.N.t
+      mutable allocation_point_dominator : Serialisation.Nn.t
     }
 
   let create_accumulator () : accumulator =
@@ -329,8 +311,7 @@ end = struct
       field_of_constructor_is_used = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_top = Code_id_or_name.Map.empty;
       field_of_constructor_is_used_as = Code_id_or_name.Map.empty;
-      allocation_point_dominator = Code_id_or_name.Map.empty;
-      cannot_change_calling_convention = Code_id_or_name.Map.empty
+      allocation_point_dominator = Code_id_or_name.Map.empty
     }
 
   let to_solution_tables
@@ -347,8 +328,7 @@ end = struct
          field_of_constructor_is_used;
          field_of_constructor_is_used_top;
          field_of_constructor_is_used_as;
-         allocation_point_dominator;
-         cannot_change_calling_convention
+         allocation_point_dominator
        } :
         accumulator) : t =
     { constructor;
@@ -364,8 +344,7 @@ end = struct
       field_of_constructor_is_used;
       field_of_constructor_is_used_top;
       field_of_constructor_is_used_as;
-      allocation_point_dominator;
-      cannot_change_calling_convention
+      allocation_point_dominator
     }
 
   let partition_by_compilation_unit (t : t) =
@@ -443,11 +422,6 @@ end = struct
         acc.allocation_point_dominator
           <- add acc.allocation_point_dominator id value)
       t.allocation_point_dominator;
-    distribute_across_section_tables
-      (fun acc id value ->
-        acc.cannot_change_calling_convention
-          <- add acc.cannot_change_calling_convention id value)
-      t.cannot_change_calling_convention;
     Compilation_unit.Tbl.fold
       (fun cu accumulator acc ->
         Compilation_unit.Map.add cu (to_solution_tables accumulator) acc)
