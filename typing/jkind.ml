@@ -3600,8 +3600,7 @@ module Violation = struct
                              |> With_bounds.modalities_of_bounds_mask
                            in
                            let modalities =
-                             !outcometree_of_modalities Types.Immutable
-                               modality
+                             !outcometree_of_modalities Types.Immutable modality
                            in
                            Some
                              (List.map
