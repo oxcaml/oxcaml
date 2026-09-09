@@ -78,3 +78,4 @@ val dump_dir : string option ref
 val verbose_types : bool ref
 val canonical_ids : bool ref
 val error_style : Misc.Error_style.setting option ref
+val structured_diagnostics : bool ref
