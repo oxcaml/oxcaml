@@ -307,6 +307,26 @@ module Ordinals = struct
   let thunk = lazy (Sys.opaque_identity 41 + 1)
 end
 
+(* {1 Anonymous first-class modules}
+
+   The two [(module struct ... end)] bodies are anonymous modules, numbered
+   among the anonymous items of [pick]: [pick.mod_{0}.v] and
+   [pick.mod_{1}.v]. *)
+module type V = sig
+  val v : int -> int
+end
+
+let pick flag : (module V) =
+  if flag
+  then
+    (module struct
+      let[@cold] v x = x + 1
+    end)
+  else
+    (module struct
+      let[@cold] v x = x - 1
+    end)
+
 (* {1 Partial application}
 
    A partial application that the frontend compiles to a closure (a
@@ -364,4 +384,5 @@ let _ =
   ignore (Partial.omit_first 1 ~a:2);
   ignore (omit_first_qualified 3 ~a:4);
   ignore (Partial.neg 5);
-  ignore (curried ~b:6)
+  ignore (curried ~b:6);
+  ignore (pick true)

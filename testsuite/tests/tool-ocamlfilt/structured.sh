@@ -28,7 +28,17 @@ ${OCAMLFILT} --format structured \
   "_CamlU8Functor2F8combinedL0_D1_D3_" \
   "_CamlU3FooS0_F4initL0_D5_D6_" \
   "_CamlU3FooM3BarIU3BazF3qux" \
-  "_CamlU3FooM3BarO5ShapeF4area"
+  "_CamlU3FooM3BarO5ShapeF4area" \
+  "_CamlU22Naming_demo_lib__WorldF11double_evenD0_D3_" \
+  "_CamlU10Lib____ArgF1f" \
+  "_CamlU4Foo_F3bar"
+
+# A function body copied into another unit by inlining is attributed to its
+# definition site by default; --specialization-site shows the destination too.
+${OCAMLFILT} --format structured --specialization-site \
+  "_CamlU3FooIU3BarF3qux" \
+  "_CamlU3FooM3BarIU3BazF3qux" \
+  "_CamlU3FooM3BarF3baz"
 
 # Stamps are shown on request, and everything after the last item is rejected:
 # the pre-stamp-item [_<n>_code] suffix is no longer valid, and neither is a

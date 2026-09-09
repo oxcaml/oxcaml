@@ -39,11 +39,47 @@
 module Structured = struct
   let starts_with_prefix = Structured_mangling.Parse.starts_with_prefix
 
+  type options =
+    { show_stamps : bool;
+          (** Append the compiler-generated stamps, which are omitted by default
+              so that demangled names are stable across builds. *)
+      show_specialization_site : bool
+          (** Keep the compilation unit into which a specialized (copied)
+              function body was inlined; by default only the definition site is
+              shown so that copies aggregate under one name. *)
+    }
+
+  (* Wrapped libraries name their units [Lib__Module]: render the [__] as [.],
+     as the flat demangler does. Runs of underscores of any other length (a
+     single [_] within an identifier, the [____] separating the arguments of a
+     parameterised library) are kept as they are. *)
+  let split_wrapped_unit_name unit_name =
+    let buf = Buffer.create (String.length unit_name) in
+    let flush_underscores n =
+      match n with
+      | 2 -> Buffer.add_char buf '.'
+      | n -> Buffer.add_string buf (String.make n '_')
+    in
+    let pending =
+      String.fold_left
+        (fun pending c ->
+          match c with
+          | '_' -> pending + 1
+          | c ->
+            flush_underscores pending;
+            Buffer.add_char buf c;
+            0)
+        0 unit_name
+    in
+    flush_underscores pending;
+    Buffer.contents buf
+
   (* Stamps are rendered separately from the other items: see [pp_path]. *)
   let rec render_path_item (item : string Structured_mangling.path_item) :
       (string, int) Either.t =
     match item with
-    | Compilation_unit s | Module s | Class s | Function s -> Left s
+    | Compilation_unit s -> Left (split_wrapped_unit_name s)
+    | Module s | Class s | Function s -> Left s
     | Anonymous_function n -> Left (Printf.sprintf "fn_{%d}" n)
     | Anonymous_module n -> Left (Printf.sprintf "mod_{%d}" n)
     | Lazy n -> Left (Printf.sprintf "lazy_{%d}" n)
@@ -60,11 +96,27 @@ module Structured = struct
     let items, stamps = List.partition_map render_path_item items in
     String.concat "." items, stamps
 
+  (* The path of a function body copied from another compilation unit is
+     [<destination unit> I <path at the definition site>]. *)
+  let definition_site path =
+    match
+      List.drop_while
+        (function Structured_mangling.Inline_marker -> false | _ -> true)
+        path
+    with
+    | [] -> None
+    | _ :: definition -> Some definition
+
   (* Compiler-generated stamps only serve to make symbols unique and change
      whenever unrelated code is modified, so by default they are omitted so that
      the demangled name is stable. With [show_stamps], they are appended in
      braces, e.g. [Foo.bar{0,3}]. *)
-  let pp_path ~show_stamps path =
+  let pp_path { show_stamps; show_specialization_site } path =
+    let path =
+      match show_specialization_site, definition_site path with
+      | false, Some definition -> definition
+      | false, None | true, _ -> path
+    in
     let items, stamps = render_items path in
     let stamps =
       match show_stamps, stamps with
@@ -74,8 +126,8 @@ module Structured = struct
     in
     items ^ stamps
 
-  let unmangle ~show_stamps sym =
-    Option.map (pp_path ~show_stamps) (Structured_mangling.Parse.parse sym)
+  let unmangle options sym =
+    Option.map (pp_path options) (Structured_mangling.Parse.parse sym)
 end
 
 module FlatCommon = struct
@@ -240,10 +292,10 @@ module Flat0 = struct
 end
 
 (* Auto-detect and demangle *)
-let auto_demangle ~show_stamps str =
+let auto_demangle structured_options str =
   (* Try the structured scheme first (most specific pattern) *)
   if Structured.starts_with_prefix str
-  then Structured.unmangle ~show_stamps str
+  then Structured.unmangle structured_options str
   else if FlatCommon.starts_with_prefix str
   then
     (* Try the flat scheme from 5.3-5.4 first, then the previously-used one *)
@@ -261,15 +313,15 @@ type demangle_format =
 
 type options =
   { format : demangle_format;
-    show_stamps : bool  (** Only affects the structured scheme. *)
+    structured : Structured.options
   }
 
-let demangle { format; show_stamps } str =
+let demangle { format; structured } str =
   match format with
-  | Auto -> auto_demangle ~show_stamps str
+  | Auto -> auto_demangle structured str
   | Flat0 -> Flat0.unmangle str
   | Flat1 -> Flat1.unmangle str
-  | Structured -> Structured.unmangle ~show_stamps str
+  | Structured -> Structured.unmangle structured str
 
 type codecops =
   | Encode
@@ -332,6 +384,8 @@ let format_ref = ref Auto
 
 let show_stamps_ref = ref false
 
+let show_specialization_site_ref = ref false
+
 let symbols_ref = ref []
 
 let codecops_ref = ref []
@@ -354,6 +408,11 @@ let specs =
       Arg.Set show_stamps_ref,
       " Show the compiler-generated stamps that make symbols unique, in braces \
        after the demangled name (structured scheme only)" );
+    ( "--specialization-site",
+      Arg.Set show_specialization_site_ref,
+      " For a function body copied into another compilation unit by inlining, \
+       show that unit as [Unit.<specialization_of>.] before the name of the \
+       definition site (structured scheme only)" );
     ( "--encode",
       Arg.Unit (fun () -> codecops_ref := Encode :: !codecops_ref),
       " Encode input as an identifier, instead of demangling; can be pipelined \
@@ -366,5 +425,10 @@ let specs =
 let () =
   Arg.parse specs (fun s -> symbols_ref := !symbols_ref @ [s]) usage_msg;
   main
-    { format = !format_ref; show_stamps = !show_stamps_ref }
+    { format = !format_ref;
+      structured =
+        { show_stamps = !show_stamps_ref;
+          show_specialization_site = !show_specialization_site_ref
+        }
+    }
     (List.rev !codecops_ref) !symbols_ref
