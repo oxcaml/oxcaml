@@ -2881,8 +2881,8 @@ let to_unsafe_mode_crossing jkind =
   }
 
 let all_except_externality =
-  Axis_set.singleton (Comonadic Externality) |> Axis_set.complement
-  |> Axis_lattice.of_axis_set
+  Axis_set.singleton (Comonadic Externality)
+  |> Axis_set.complement |> Axis_lattice.of_axis_set
 
 let get_externality_upper_bound ~context env jk =
   let mod_bounds =
@@ -3594,14 +3594,13 @@ module Violation = struct
                            let other_axes =
                              Bounds_mask.residual Axis_lattice.top axis_mask
                            in
-                           let modal_modality, nonmodal_axes =
+                           let modality =
                              Bounds_mask.join axis_bounds other_axes
                              |> With_bounds.modalities_of_bounds_mask
                            in
                            let modalities =
                              !outcometree_of_modalities Types.Immutable
-                               modal_modality
-                             @ nonmodal_axes
+                               modality
                            in
                            Some
                              (List.map
