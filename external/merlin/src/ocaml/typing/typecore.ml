@@ -1532,7 +1532,8 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
+let check_atomic_loc_of_finalized_repr ~loc ~env label
+    (record_repres : Lambda.record_representation) lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
@@ -1547,17 +1548,12 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _)
   (* Inline records are never immediate. *)
   | Record_inlined (_, Constructor_immediate_all_void, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat
-  (* Only exists as an intermediate step of typechecking the decl itself *)
-  | Record_dummy _ ->
+  | Record_float | Record_ufloat ->
       Misc.fatal_error
         "check_atomic_loc_of_finalized_repr: unexpected record representation"
 
@@ -9125,7 +9121,7 @@ and type_expect_
              typechecking. *)
           add_delayed_check (fun () ->
             let record_repres =
-              Typedecl.finalize_record_representation env loc record_repres
+              Typeopt.finalize_record_representation env loc record_repres
             in
             check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
               lid.txt);

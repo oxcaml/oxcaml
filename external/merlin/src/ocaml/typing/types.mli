@@ -1040,8 +1040,9 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   (* A constant constructor or a constructor all of whose fields are values.
-     This is named 'uniform_value' to distinguish from the 'Constructor_uniform'
-     of [lambda.mli], which can also represent all-flat-float records.
+     This is named 'uniform_value' to distinguish from the
+     'Constructor_shape_uniform' of [lambda.mli], which can also represent
+     all-flat-float records.
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
