@@ -224,8 +224,8 @@ let compute_static_size lam =
           env bindings
       in
       compute_expression_size env body
-    | Lprim (p, args, _) ->
-      size_of_primitive env p args
+    | Lprim (p, args, loc) ->
+      size_of_primitive env loc p args
     | Lswitch (_, sw, _, _) ->
       let fail_case =
         match sw.sw_failaction with
@@ -290,9 +290,21 @@ let compute_static_size lam =
       Mixed_product_bytes.value_prefix_len
         (Mixed_product_bytes.count (Product shape))
     else Array.length shape
-  and all_value_mixed_block_size_types shape =
-    all_value_mixed_block_size (Lambda.transl_mixed_product_shape shape)
-  and size_of_primitive env p args =
+  and size_of_primitive env loc p args =
+    let check_shape shape =
+      if Lambda.mixed_block_shape_has_splices shape then
+        Location.raise_errorf ~loc:(Debuginfo.Scoped_location.to_location loc)
+          "Recursive definitions of layout-polymorphic blocks are not \
+           currently supported."
+    in
+    begin match p with
+    | Pmakeblock (_, _, Shape shape, _)
+    | Pduprecord
+        ((Record_mixed shape
+         | Record_inlined (_, Constructor_mixed shape, _)), _) ->
+      check_shape shape
+    | _ -> ()
+    end;
     match p with
     | Pignore
     | Psetfield _
@@ -342,7 +354,7 @@ let compute_static_size lam =
     | Pduprecord (repres, size) ->
         begin match repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Block (Regular_block size)
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
             (* Extensible variants require an extra machine word
@@ -351,32 +363,24 @@ let compute_static_size lam =
         | Record_float ->
             Block (Float_record size)
         | Record_inlined (_, Constructor_mixed shape,
-                          (Variant_boxed _ | Variant_extensible))
+                          (Variant_boxed | Variant_extensible))
         | Record_mixed shape ->
-            if Mixed_product_bytes.types_shape_is_all_value shape
+            if Mixed_product_bytes.shape_is_all_value shape
             then
               Block (Regular_block
-                (all_value_mixed_block_size_types shape))
+                (all_value_mixed_block_size shape))
             else
               let size =
                 compute_mixed_block_size
-                  (Lambda.transl_mixed_product_shape shape)
+                  (Lambda.split_mixed_block_shape_vectors shape)
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
-        | Record_dummy _ ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected dummy representation"
         | Record_inlined (_, Constructor_immediate_all_void, _) ->
             Misc.fatal_error
               "size_of_primitive: unexpected immediate representation"
-        | Record_undetermined | Record_variable _
-        | Record_inlined (_, (Constructor_undetermined
-                             | Constructor_variable _), _) ->
-            Misc.fatal_error
-              "size_of_primitive: unexpected variable representation"
         end
     | Pmakeblock (tag, _, shape, _) ->
         (* The block shape is unfortunately an option, so we rely on the

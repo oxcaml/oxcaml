@@ -323,7 +323,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     type outval_record_rep =
       | Outval_record_boxed
       | Outval_record_unboxed
-      | Outval_record_mixed_block of mixed_product_shape
+      | Outval_record_mixed_block of Lambda.mixed_block_shape
 
     type printing_jkind =
       | Print_as_value (* can interpret as a value and print *)
@@ -738,7 +738,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             in
             (* Finalize the representation just to be able to print it *)
             let finalize rep =
-              Typedecl.finalize_record_representation env Location.none rep
+              Typeopt.finalize_record_representation env Location.none rep
             in
             let rep =
               match rep with
@@ -752,7 +752,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                      finalize
                        (Record_inlined (tag, Constructor_variable l, vrep)))
                   (sorts_and_types ())
-              | _ -> Some rep
+              | Record_variable _
+              | Record_inlined (_, Constructor_variable _, _) ->
+                  Misc.fatal_error "variable record representation"
+              | _ -> Some (finalize rep)
             in
             match rep with
             | None -> Oval_stuff "<abstr>"
@@ -785,12 +788,6 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                     else Outval_record_boxed
               | Record_inlined (_, Constructor_immediate_all_void, _) ->
                   Misc.fatal_error "immediate record representation"
-              | Record_dummy _ ->
-                  Misc.fatal_error "dummy record representation"
-              | Record_undetermined | Record_variable _
-              | Record_inlined (_, (Constructor_undetermined
-                                   | Constructor_variable _), _) ->
-                  Misc.fatal_error "variable record representation"
             in
             tree_of_record_fields depth
               env path type_params ty_list
@@ -827,21 +824,17 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       nest tree_of_val (depth - 1) fld ty_arg
                   | Outval_record_mixed_block shape ->
                       let fld =
-                        let rec of_element
-                            : Types.mixed_block_element -> _ = function
-                        | Scannable _ -> `Continue (O.field obj pos)
-                        | Float_boxed | Float64 ->
+                        let of_element
+                            : unit Lambda.mixed_block_element -> _ = function
+                        | Value _ -> `Continue (O.field obj pos)
+                        | Float_boxed () | Float64 ->
                             `Continue (O.repr (O.double_field obj pos))
+                        | Product [||] ->
+                            `Stop (Oval_stuff "<void>")
                         | Float32 | Bits8 | Bits16 | Untagged_immediate
                         | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask
-                        | Word | Product _ ->
+                        | Word | Product _ | Splice_variable _ ->
                             `Stop (Oval_stuff "<abstr>")
-                        | Void ->
-                            `Stop (Oval_stuff "<void>")
-                        | Addressable e ->
-                          (* CR box: Update this read once addressability
-                             affects how elements are stored in blocks *)
-                          of_element e
                         in
                         of_element shape.(pos)
                       in

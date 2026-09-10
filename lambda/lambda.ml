@@ -222,7 +222,7 @@ type primitive =
   | Psetufloatfield of int * initialization_or_assignment
   | Psetmixedfield of int list * mixed_block_shape
       * initialization_or_assignment
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * layout list
@@ -589,9 +589,29 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
 
 and array_kind =
     Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
@@ -803,12 +823,12 @@ and equal_mixed_block_shape shape1 shape2 =
 
 and equal_constructor_shape x y =
   match x, y with
-  | Constructor_uniform fields1, Constructor_uniform fields2 ->
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2 ->
       List.length fields1 = List.length fields2
       && List.for_all2 equal_value_kind fields1 fields2
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       equal_mixed_block_shape shape1 shape2
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> false
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> false
 
 let join_nullable x y =
   match x, y with
@@ -831,14 +851,15 @@ let rec join_value_kind_non_null x y =
 
 and join_constructor_shape shape1 shape2 =
   match shape1, shape2 with
-  | Constructor_uniform fields1, Constructor_uniform fields2
+  | Constructor_shape_uniform fields1, Constructor_shape_uniform fields2
     when List.length fields1 = List.length fields2 ->
-      Some (Constructor_uniform (List.map2 join_value_kind fields1 fields2))
-  | Constructor_mixed shape1, Constructor_mixed shape2 ->
+      Some
+        (Constructor_shape_uniform (List.map2 join_value_kind fields1 fields2))
+  | Constructor_shape_mixed shape1, Constructor_shape_mixed shape2 ->
       Option.map
-        (fun shape -> Constructor_mixed shape)
+        (fun shape -> Constructor_shape_mixed shape)
         (join_mixed_block_shape shape1 shape2)
-  | (Constructor_uniform _ | Constructor_mixed _), _ -> None
+  | (Constructor_shape_uniform _ | Constructor_shape_mixed _), _ -> None
 
 and join_mixed_block_shape shape1 shape2 =
   if Array.length shape1 <> Array.length shape2 then None
@@ -1601,7 +1622,7 @@ let layout_list =
        { consts = [0];
          non_consts =
            [0,
-            Constructor_uniform
+            Constructor_shape_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
 let layout_tuple_element = nullable_value Pgenval
@@ -1652,7 +1673,8 @@ let layout_tupled_vector v =
   in
   Pvalue
     { raw_kind =
-        Pvariant { consts = []; non_consts = [0, Constructor_mixed fields] };
+        Pvariant
+          { consts = []; non_consts = [0, Constructor_shape_mixed fields] };
       nullable = Non_nullable
     }
 
@@ -2056,7 +2078,7 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
+let rec mixed_block_element_of_types (elt : Types.mixed_block_element) =
   match elt with
   | Scannable { separability; _ } ->
     let raw_kind =
@@ -2071,34 +2093,51 @@ let rec transl_mixed_block_element (elt : Types.mixed_block_element) =
   | Bits32 -> Bits32
   | Bits64 -> Bits64
   | Vec128 -> Vec128
-  | Vec256 ->
-    if split_vectors
-    then Product [|Vec128; Vec128|]
-    else Vec256
+  | Vec256 -> Vec256
   | Vec512 -> Vec512
   | Mask -> Mask
   | Word -> Word
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
-    Product (transl_mixed_product_shape shapes)
+    Product (mixed_block_shape_of_types shapes)
   | Void -> Product [||]
   | Addressable elt ->
     (* CR box: Addressability should be preserved here once it affects boxed
        representations *)
-    transl_mixed_block_element elt
+    mixed_block_element_of_types elt
 
-and transl_mixed_product_shape shape =
-  Array.map transl_mixed_block_element shape
+and mixed_block_shape_of_types shape =
+  Array.map mixed_block_element_of_types shape
 
-let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
-    (elt : Types.mixed_block_element) =
+let rec split_mixed_block_element_vectors elt =
   match elt with
-  | Scannable { separability; _ } ->
-    let raw_kind =
-      value_kind_of_pointerness (pointerness_of_separability separability)
-    in
-    Value { (get_value_kind i) with raw_kind }
-  | Float_boxed -> Float_boxed (get_mode i)
+  | Vec256 when split_vectors -> Product [|Vec128; Vec128|]
+  | Product shape -> Product (split_mixed_block_shape_vectors shape)
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+  | Untagged_immediate | Splice_variable _ -> elt
+
+and split_mixed_block_shape_vectors shape =
+  Array.map split_mixed_block_element_vectors shape
+
+let transl_mixed_product_shape shape =
+  split_mixed_block_shape_vectors (mixed_block_shape_of_types shape)
+
+let mixed_block_shape_has_splices shape =
+  let rec has_splices : 'a mixed_block_element -> bool = function
+    | Splice_variable _ -> true
+    | Product shape -> Array.exists has_splices shape
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+    | Untagged_immediate -> false
+  in
+  Array.exists has_splices shape
+
+let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
+    (elt : unit mixed_block_element) =
+  match elt with
+  | Value { raw_kind; _ } -> Value { (get_value_kind i) with raw_kind }
+  | Float_boxed () -> Float_boxed (get_mode i)
   | Float64 -> Float64
   | Float32 -> Float32
   | Bits8 -> Bits8
@@ -2116,18 +2155,15 @@ let rec transl_mixed_block_element_for_read ~get_value_kind ~get_mode i
   | Untagged_immediate -> Untagged_immediate
   | Product shapes ->
     let get_value_kind _ = generic_value in
-    Product
-      (transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
-  | Void -> Product [||]
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    transl_mixed_block_element_for_read ~get_value_kind ~get_mode i elt
+    Product (mixed_product_shape_for_read ~get_value_kind ~get_mode shapes)
+  | Splice_variable id -> Splice_variable id
 
-and transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  Array.mapi
-    (transl_mixed_block_element_for_read ~get_value_kind ~get_mode)
-    shape
+and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  Array.mapi (mixed_block_element_for_read ~get_value_kind ~get_mode) shape
+
+let transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
+  mixed_product_shape_for_read ~get_value_kind ~get_mode
+    (mixed_block_shape_of_types shape)
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->

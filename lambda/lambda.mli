@@ -179,7 +179,7 @@ type primitive =
       * initialization_or_assignment
     (** The same comment about the index as for [Pmixedfield] applies to
         [Psetmixedfield]. *)
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* Unboxed products *)
   | Pmake_unboxed_product of layout list
   | Punboxed_product_field of int * (layout list)
@@ -672,9 +672,32 @@ and mixed_block_shape = unit mixed_block_element array
 and mixed_block_shape_with_locality_mode
   = locality_mode mixed_block_element array
 
-and constructor_shape =
-  | Constructor_uniform of value_kind list
+(** Compare to [Types.record_representation]. *)
+and record_representation =
+  | Record_unboxed
+  | Record_inlined of
+      Types.tag * constructor_representation * variant_representation
+  | Record_boxed
+  | Record_float
+  | Record_ufloat
+  | Record_mixed of mixed_block_shape
+
+(** Compare to [Types.constructor_representation]. *)
+and constructor_representation =
+  | Constructor_uniform_value
   | Constructor_mixed of mixed_block_shape
+  | Constructor_immediate_all_void
+
+(** Compare to [Types.variant_representation]. *)
+and variant_representation =
+  | Variant_unboxed
+  | Variant_boxed
+  | Variant_extensible
+  | Variant_with_null
+
+and constructor_shape =
+  | Constructor_shape_uniform of value_kind list
+  | Constructor_shape_mixed of mixed_block_shape
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
@@ -1441,6 +1464,15 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
+val mixed_block_element_of_types :
+  Types.mixed_block_element -> unit mixed_block_element
+
+val mixed_block_shape_of_types :
+  Types.mixed_product_shape -> mixed_block_shape
+
+val split_mixed_block_shape_vectors :
+  'a mixed_block_element array -> 'a mixed_block_element array
+
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
 val block_shape_of_value_kinds : value_kind list option -> block_shape
@@ -1453,6 +1485,13 @@ val is_uniform_block_shape : block_shape -> bool
    and void), returns the [mixed_block_shape] if it has at least one
    non-value. Errors if there's a splice variable *)
 val mixed_block_of_block_shape : block_shape -> mixed_block_shape option
+
+val mixed_block_shape_has_splices : 'a mixed_block_element array -> bool
+
+val mixed_product_shape_for_read :
+  get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
+  -> mixed_block_shape
+  -> 'a mixed_block_element array
 
 val transl_mixed_product_shape_for_read :
   get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)

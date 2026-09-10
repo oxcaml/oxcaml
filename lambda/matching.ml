@@ -2115,7 +2115,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typedecl.finalize_constructor_representation head.pat_env
+        Typeopt.finalize_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2160,8 +2160,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     | Constructor_uniform_value ->
       fatal_error "Matching.get_exr_args_constr: if constant, should have no \
                    args and then shouldn't produce accesses"
-    | Constructor_mixed _ | Constructor_undetermined
-    | Constructor_variable _ ->
+    | Constructor_mixed _ ->
       fatal_error "Matching.get_exr_args_constr: not constant"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
@@ -2173,7 +2172,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         | Constructor_uniform_value -> Pfield (pos, Pointer, sem)
         | Constructor_mixed shape ->
             let shape =
-              Lambda.transl_mixed_product_shape_for_read
+              Lambda.mixed_product_shape_for_read
                 ~get_value_kind:(fun _i -> Lambda.generic_value)
                 ~get_mode:(fun _i ->
                   Misc.fatal_error
@@ -2184,8 +2183,6 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
             Pmixedfield ([pos], shape, sem)
         | Constructor_immediate_all_void ->
             fatal_error "Matching.get_exr_args_constr: non-constant immediate"
-        | Constructor_undetermined | Constructor_variable _ ->
-            fatal_error "Matching.get_exr_args_constr: variable representation"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2585,7 +2582,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typedecl.finalize_record_representation_and_sorts head.pat_env
+    Typeopt.finalize_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2595,7 +2592,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        finalized_label_sort lbl lbl_repres ~record_sort:sort ~variable_sorts
+        Typeopt.finalized_label_sort lbl lbl_repres ~record_sort:sort
+          ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -2606,7 +2604,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let access, sort, layout =
         match lbl_repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_unboxed
@@ -2627,10 +2625,10 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed)
         | Record_mixed shape ->
             let shape =
-              Lambda.transl_mixed_product_shape_for_read
+              Lambda.mixed_product_shape_for_read
                 ~get_value_kind:(fun _i -> Lambda.generic_value)
                 ~get_mode:(fun _i ->
                   (* TODO: could optimise to Alloc_local sometimes *)
@@ -2640,16 +2638,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
-        | Record_dummy _ ->
-          fatal_error "get_expr_args_record: unexpected dummy representation"
         | Record_inlined (_, Constructor_immediate_all_void, _) ->
           fatal_error
             "get_expr_args_record: unexpected immediate representation"
-        | Record_inlined
-            (_, (Constructor_undetermined
-                | Constructor_variable _), _)
-        | Record_undetermined | Record_variable _ ->
-          fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =
         if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
@@ -3323,7 +3314,7 @@ let complete_pats_constrs = function
         cstr_pat.pat_desc in
       let pat_of_constr cstr =
         let open Patterns.Head in
-        let fake_repr : constructor_representation =
+        let fake_repr : Types.constructor_representation =
           Constructor_mixed [| Types.Bits64 |]
         in
         let sorts =
