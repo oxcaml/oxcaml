@@ -61,6 +61,7 @@ let unboxed_product_uninitialized_array_check loc array_kind =
 
 (* Insertion of debugging events *)
 
+(*
 let event_before loc exp lam = match lam with
 | Lstaticraise (_,_) -> lam
 | _ ->
@@ -78,6 +79,8 @@ let event_after loc exp lam =
                     lev_repr = None;
                     lev_env = exp.exp_env})
   else lam
+
+*)
 
 type comparison =
   | Equal
@@ -204,6 +207,7 @@ let to_modify_mode ~poly = function
     | None -> assert false
     | Some mode -> transl_modify_mode mode
 
+(*
 let to_return_mode ~poly = function
   | Prim_global, _ -> not_alloc_stack
   | Prim_local, _ -> maybe_alloc_stack
@@ -211,6 +215,7 @@ let to_return_mode ~poly = function
     match poly with
     | None -> assert false
     | Some locality -> transl_return_mode_l locality
+*)
 
 let extern_repr_of_native_repr:
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
@@ -2205,6 +2210,7 @@ let comparison_primitive comparison comparison_kind =
   | Compare, Compare_int32s -> three_way_comparei_signed int32
   | Compare, Compare_int64s -> three_way_comparei_signed int64
 
+(*
 let lambda_of_loc kind sloc =
   let loc = to_location sloc in
   let loc_start = loc.Location.loc_start in
@@ -2244,6 +2250,8 @@ let lambda_of_loc kind sloc =
     let scope_name = Debuginfo.Scoped_location.string_of_scoped_location
                        ~include_zero_alloc:false sloc in
     Lconst (Const_immstring scope_name)
+
+*)
 
 let atomic_arity op (kind : atomic_kind) =
   let arity_of_op =
@@ -2313,6 +2321,7 @@ let atomic_lambda_primitive op (kind : atomic_kind) : Lambda.primitive =
       | Lxor -> Patomic_lxor_ptr
   end
 
+(*
 let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
   if List.length args <> atomic_arity op kind then
     raise (Error (to_location loc, Wrong_arity_builtin_primitive prim_name)) ;
@@ -2494,6 +2503,8 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
+*)
+
 let get_default_poly_mode_sort p =
   let mode =
     match p.prim_native_repr_res with
@@ -2560,6 +2571,7 @@ let transl_primitive_common loc ~poly_mode ~poly_sort
   else
     prim
 
+(*
 let transl_primitive
       loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc_check path =
   let prim =
@@ -2859,6 +2871,8 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     end
   in
   lam
+
+*)
 
 (* Whether a primitive allocates when fully applied.
    Exception should be raised at later stage, so here we just be conservative
