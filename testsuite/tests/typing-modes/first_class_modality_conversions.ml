@@ -344,3 +344,410 @@ let explicit_intermediate = (result_wrapper 1) 2
 val result_wrapper : int -> (int -> int @@ global) = <fun>
 val explicit_intermediate : int = 3
 |}]
+
+(* Explicit coercions preserve the modes of values in covariant containers. *)
+let subtype_portable_list (type a)
+    (xs : (a @@ portable) list @ nonportable) : a list @ portable =
+  (xs :> a list)
+[%%expect{|
+val subtype_portable_list : ('a @@ portable) list -> 'a list @ portable =
+  <fun>
+|}]
+
+let subtype_portable_list_explicit (type a)
+    (xs : (a @@ portable) list @ portable) : a list @ portable =
+  (xs : (a @@ portable) list :> a list)
+[%%expect{|
+val subtype_portable_list_explicit :
+  ('a @@ portable) list @ portable -> 'a list @ portable = <fun>
+|}]
+
+let subtype_nested (type a)
+    (xs : (a @@ portable) option list option @ portable)
+    : a option list option @ portable =
+  (xs :> a option list option)
+[%%expect{|
+val subtype_nested :
+  ('a @@ portable) option list option @ portable ->
+  'a option list option @ portable = <fun>
+|}]
+
+type +'a covariant_box = Box of 'a
+let subtype_covariant_box (type a)
+    (xs : (a @@ portable) covariant_box list @ portable)
+    : a covariant_box list @ portable =
+  (xs :> a covariant_box list)
+[%%expect{|
+type 'a covariant_box = Box of 'a
+val subtype_covariant_box :
+  ('a @@ portable) covariant_box list @ portable ->
+  'a covariant_box list @ portable = <fun>
+|}]
+
+let subtype_tuple (type a b)
+    (xs : ((a @@ portable) * (b @@ portable)) list @ portable)
+    : (a * b) list @ portable =
+  (xs :> (a * b) list)
+[%%expect{|
+val subtype_tuple :
+  (('a @@ portable) * ('b @@ portable)) list @ portable ->
+  ('a * 'b) list @ portable = <fun>
+|}]
+
+let subtype_global_list (type a) (xs : (a @@ global) list)
+    : (a @@ aliased) list =
+  (xs :> (a @@ aliased) list)
+[%%expect{|
+val subtype_global_list : ('a @@ global) list -> ('a @@ aliased) list = <fun>
+|}]
+
+(* [global] implies [aliased], which cannot be forgotten. *)
+let bad_subtype_global_aliasing (type a) (xs : (a @@ global) list) =
+  (xs :> a list)
+[%%expect{|
+Line 2, characters 2-16:
+2 |   (xs :> a list)
+      ^^^^^^^^^^^^^^
+Error: Type "(a @@ global) list" is not a subtype of "a list"
+       Type "(a @@ global)" is not a subtype of "a"
+|}]
+
+let subtype_weaken_modalities (type a)
+    (xs : (a @@ global portable) list)
+    : (a @@ global) list =
+  (xs :> (a @@ global) list)
+[%%expect{|
+val subtype_weaken_modalities :
+  ('a @@ global portable) list -> ('a @@ global) list = <fun>
+|}]
+
+let subtype_identity_modalities (type a)
+    (xs : (a @@ nonportable) list) : a list =
+  (xs :> a list)
+let subtype_introduce_identity (type a) (xs : a list)
+    : (a @@ nonportable) list =
+  (xs :> (a @@ nonportable) list)
+[%%expect{|
+val subtype_identity_modalities : ('a @@ nonportable) list -> 'a list = <fun>
+val subtype_introduce_identity : 'a list -> ('a @@ nonportable) list = <fun>
+|}]
+
+let subtype_nested_modalities (type a)
+    (xs : ((a @@ portable) @@ global) list @ portable)
+    : (a @@ aliased) list @ portable =
+  (xs :> (a @@ aliased) list)
+let subtype_nested_weakening (type a)
+    (xs : ((a @@ portable) @@ global) list)
+    : ((a @@ nonportable) @@ global) list =
+  (xs :> ((a @@ nonportable) @@ global) list)
+[%%expect{|
+val subtype_nested_modalities :
+  (('a @@ portable) @@ global) list @ portable ->
+  ('a @@ aliased) list @ portable = <fun>
+val subtype_nested_weakening :
+  (('a @@ portable) @@ global) list -> (('a @@ nonportable) @@ global) list =
+  <fun>
+|}]
+
+let subtype_combine_modalities (type a)
+    (xs : ((a @@ portable) @@ global) list)
+    : (a @@ global portable) list =
+  (xs :> (a @@ global portable) list)
+[%%expect{|
+val subtype_combine_modalities :
+  (('a @@ portable) @@ global) list -> ('a @@ global portable) list = <fun>
+|}]
+
+let subtype_split_modalities (type a)
+    (xs : (a @@ global portable) list)
+    : ((a @@ portable) @@ global) list =
+  (xs :> ((a @@ portable) @@ global) list)
+[%%expect{|
+val subtype_split_modalities :
+  ('a @@ global portable) list -> (('a @@ portable) @@ global) list = <fun>
+|}]
+
+type +'a portable_alias = ('a @@ portable)
+let subtype_alias (type a)
+    (xs : a portable_alias option list @ portable)
+    : a option list @ portable =
+  (xs :> a option list)
+[%%expect{|
+type 'a portable_alias = ('a @@ portable)
+val subtype_alias :
+  'a portable_alias option list @ portable -> 'a option list @ portable =
+  <fun>
+|}]
+
+(* The full coercion form also supports free type variables. *)
+let subtype_free_variables_explicit (xs : ('a @@ portable) list) =
+  (xs : ('a @@ portable) list :> 'a list)
+[%%expect{|
+val subtype_free_variables_explicit : ('a @@ portable) list -> 'a list =
+  <fun>
+|}]
+
+let subtype_free_variables_alias (xs : 'a portable_alias list) =
+  (xs : 'a portable_alias list :> 'a list)
+[%%expect{|
+val subtype_free_variables_alias : 'a portable_alias list -> 'a list = <fun>
+|}]
+
+let bad_subtype_free_variables_portable (xs : 'a list @ nonportable) =
+  (xs : 'a list :> ('a @@ portable) list)
+[%%expect{|
+Line 2, characters 2-41:
+2 |   (xs : 'a list :> ('a @@ portable) list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "'a list" is not a subtype of "('a @@ portable) list"
+       Type "'a" is not a subtype of "('a @@ portable)"
+|}]
+
+let subtype_unknown_target (type a) (xs : (a @@ portable) list) =
+  (xs : (a @@ portable) list :> _ list)
+[%%expect{|
+val subtype_unknown_target : ('a @@ portable) list -> ('a @@ portable) list =
+  <fun>
+|}]
+
+(* Shared unknown targets retain exact wrappers in either tuple order. *)
+let bad_subtype_shared_target_left
+    (xs : ('a @@ global portable) * ('a @@ global)) =
+  (xs : ('a @@ global portable) * ('a @@ global) :> 'b * 'b)
+[%%expect{|
+Line 3, characters 2-60:
+3 |   (xs : ('a @@ global portable) * ('a @@ global) :> 'b * 'b)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "('a @@ global portable) * ('a @@ global)" is not a subtype of
+         "('a @@ global portable) * ('a @@ global portable)"
+       Type "('a @@ global)" is not a subtype of "('a @@ global portable)"
+|}]
+
+let bad_subtype_shared_target_right
+    (xs : ('a @@ global) * ('a @@ global portable)) =
+  (xs : ('a @@ global) * ('a @@ global portable) :> 'b * 'b)
+[%%expect{|
+Line 3, characters 2-60:
+3 |   (xs : ('a @@ global) * ('a @@ global portable) :> 'b * 'b)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "('a @@ global) * ('a @@ global portable)" is not a subtype of
+         "('a @@ global) * ('a @@ global)"
+       Type "('a @@ global portable)" is not a subtype of "('a @@ global)"
+|}]
+
+(* Equality in another component can identify the wrapper's payload. *)
+let subtype_equal_payloads_left (xs : 'a * ('a @@ portable)) =
+  (xs : 'a * ('a @@ portable) :> 'b * 'b)
+[%%expect{|
+val subtype_equal_payloads_left : 'b * ('b @@ portable) -> 'b * 'b = <fun>
+|}]
+
+let subtype_equal_payloads_right (xs : ('a @@ portable) * 'a) =
+  (xs : ('a @@ portable) * 'a :> 'b * 'b)
+[%%expect{|
+val subtype_equal_payloads_right : ('b @@ portable) * 'b -> 'b * 'b = <fun>
+|}]
+
+module Private_payload : sig
+  type +'a t = private 'a
+end = struct
+  type 'a t = 'a
+end
+[%%expect{|
+module Private_payload : sig type +'a t = private 'a end @@ stateless
+|}]
+
+let bad_subtype_private_target (type a)
+    (xs : (a @@ portable) list) : a Private_payload.t list =
+  (xs : (a @@ portable) list :> a Private_payload.t list)
+[%%expect{|
+Line 3, characters 2-57:
+3 |   (xs : (a @@ portable) list :> a Private_payload.t list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "(a @@ portable) list" is not a subtype of "a Private_payload.t list"
+       Type "a" is not a subtype of "a Private_payload.t"
+|}]
+
+module Private_portable : sig
+  type +'a t = private ('a @@ portable)
+end = struct
+  type 'a t = ('a @@ portable)
+end
+[%%expect{|
+module Private_portable : sig type +'a t = private ('a @@ portable) end @@
+  stateless
+|}]
+
+let subtype_private_source (type a)
+    (xs : a Private_portable.t list @ portable) : a list @ portable =
+  (xs :> a list)
+[%%expect{|
+val subtype_private_source :
+  'a Private_portable.t list @ portable -> 'a list @ portable = <fun>
+|}]
+
+let bad_subtype_private_portable_target (type a)
+    (xs : (a @@ portable) list) : a Private_portable.t list =
+  (xs : (a @@ portable) list :> a Private_portable.t list)
+[%%expect{|
+Line 3, characters 2-58:
+3 |   (xs : (a @@ portable) list :> a Private_portable.t list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "(a @@ portable) list" is not a subtype of
+         "a Private_portable.t list"
+       Type "a" is not a subtype of "a Private_portable.t"
+|}]
+
+let bad_subtype_distinct_payloads (type a b)
+    (xs : (a @@ portable) list) : b list =
+  (xs :> b list)
+[%%expect{|
+Line 3, characters 2-16:
+3 |   (xs :> b list)
+      ^^^^^^^^^^^^^^
+Error: Type "(a @@ portable) list" is not a subtype of "b list"
+       Type "a" is not a subtype of "b"
+|}]
+
+(* Function arguments reverse the direction of the conversion. *)
+let subtype_consumer (type a) (f : a -> unit)
+    : (a @@ portable) -> unit =
+  (f :> (a @@ portable) -> unit)
+[%%expect{|
+val subtype_consumer : ('a -> unit) -> ('a @@ portable) -> unit = <fun>
+|}]
+
+let subtype_contended_consumer (type a) (f : (a @@ contended) -> unit)
+    : a -> unit =
+  (f :> a -> unit)
+[%%expect{|
+val subtype_contended_consumer : (('a @@ contended) -> unit) -> 'a -> unit =
+  <fun>
+|}]
+
+let bad_subtype_consumer (type a) (f : (a @@ portable) -> unit)
+    : a -> unit =
+  (f :> a -> unit)
+[%%expect{|
+Line 3, characters 2-18:
+3 |   (f :> a -> unit)
+      ^^^^^^^^^^^^^^^^
+Error: Type "(a @@ portable) -> unit" is not a subtype of "a -> unit"
+       Type "a" is not a subtype of "(a @@ portable)"
+|}]
+
+(* Mutation would allow writing a value without the stored guarantee. *)
+let bad_subtype_ref (type a) (xs : (a @@ portable) ref) : a ref =
+  (xs :> a ref)
+[%%expect{|
+Line 2, characters 2-15:
+2 |   (xs :> a ref)
+      ^^^^^^^^^^^^^
+Error: Type "(a @@ portable) ref" is not a subtype of "a ref"
+|}]
+
+let bad_subtype_array (type a) (xs : (a @@ portable) array) : a array =
+  (xs :> a array)
+[%%expect{|
+Line 2, characters 2-17:
+2 |   (xs :> a array)
+      ^^^^^^^^^^^^^^^
+Error: Type "(a @@ portable) array" is not a subtype of "a array"
+|}]
+
+type (_, _) equality = Refl : ('a, 'a) equality
+let bad_subtype_equality (type a)
+    (witness : ((a @@ portable), (a @@ portable)) equality)
+    : (a, (a @@ portable)) equality =
+  (witness :> (a, (a @@ portable)) equality)
+[%%expect{|
+type (_, _) equality = Refl : ('a, 'a) equality
+Line 5, characters 2-44:
+5 |   (witness :> (a, (a @@ portable)) equality)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "((a @@ portable), (a @@ portable)) equality" is not a subtype of
+         "(a, (a @@ portable)) equality"
+|}]
+
+(* Coercions cannot manufacture portability or global allocation. *)
+let bad_subtype_portable_list (type a) (xs : a list @ nonportable)
+    : (a @@ portable) list =
+  (xs :> (a @@ portable) list)
+[%%expect{|
+Line 3, characters 2-30:
+3 |   (xs :> (a @@ portable) list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "a list" is not a subtype of "(a @@ portable) list"
+       Type "a" is not a subtype of "(a @@ portable)"
+|}]
+
+let bad_subtype_strengthen_modalities (type a)
+    (xs : (a @@ global) list @ nonportable)
+    : (a @@ global portable) list =
+  (xs :> (a @@ global portable) list)
+[%%expect{|
+Line 4, characters 2-37:
+4 |   (xs :> (a @@ global portable) list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "(a @@ global) list" is not a subtype of
+         "(a @@ global portable) list"
+       Type "(a @@ global)" is not a subtype of "(a @@ global portable)"
+|}]
+
+let bad_subtype_global_list (type a) (xs : a list @ local)
+    : (a @@ global) list @ local =
+  (xs :> (a @@ global) list)
+[%%expect{|
+Line 3, characters 2-28:
+3 |   (xs :> (a @@ global) list)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "a list" is not a subtype of "(a @@ global) list"
+       Type "a" is not a subtype of "(a @@ global)"
+|}]
+
+let bad_subtype_uncontended (type a)
+    (xs : (a @@ contended) list) : a list =
+  (xs :> a list)
+[%%expect{|
+Line 3, characters 2-16:
+3 |   (xs :> a list)
+      ^^^^^^^^^^^^^^
+Error: Type "(a @@ contended) list" is not a subtype of "a list"
+       Type "(a @@ contended)" is not a subtype of "a"
+|}]
+
+let subtype_introduce_contended (type a) (xs : a list)
+    : (a @@ contended) list =
+  (xs :> (a @@ contended) list)
+[%%expect{|
+val subtype_introduce_contended : 'a list -> ('a @@ contended) list = <fun>
+|}]
+
+let bad_subtype_nested_contention (type a)
+    (xs : ((a @@ contended) @@ portable) list) : a list =
+  (xs :> a list)
+[%%expect{|
+Line 3, characters 2-16:
+3 |   (xs :> a list)
+      ^^^^^^^^^^^^^^
+Error: Type "((a @@ contended) @@ portable) list" is not a subtype of "a list"
+       Type "((a @@ contended) @@ portable)" is not a subtype of "a"
+|}]
+
+let bad_subtype_unique (type a) (xs : (a @@ aliased) list @ unique)
+    : a list @ unique =
+  (xs :> a list)
+[%%expect{|
+Line 3, characters 2-16:
+3 |   (xs :> a list)
+      ^^^^^^^^^^^^^^
+Error: Type "(a @@ aliased) list" is not a subtype of "a list"
+       Type "(a @@ aliased)" is not a subtype of "a"
+|}]
+
+let subtype_introduce_aliasing (type a) (xs : a list)
+    : (a @@ aliased) list =
+  (xs :> (a @@ aliased) list)
+[%%expect{|
+val subtype_introduce_aliasing : 'a list -> ('a @@ aliased) list = <fun>
+|}]

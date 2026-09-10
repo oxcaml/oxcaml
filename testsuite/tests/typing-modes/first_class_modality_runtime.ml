@@ -24,6 +24,10 @@ let[@inline never] wrapped_product (x : #(float# * int))
 let[@inline never] bare_product (x : (#(float# * int) @@ portable))
     : #(float# * int) = x
 
+let[@inline never] coerce_portable_list (type a)
+    (xs : (a @@ portable) list @ portable) : a list @ portable =
+  (xs :> a list)
+
 let events = ref []
 let note event x = events := event :: !events; x
 let add x y = x + y
@@ -75,6 +79,11 @@ let allocated f =
 
 let () =
   let value = Sys.opaque_identity (String.make 20 'x') in
+  let wrapped_values =
+    Sys.opaque_identity [(value : (string @@ portable))] in
+  let values = coerce_portable_list wrapped_values in
+  assert (Obj.repr wrapped_values == Obj.repr values);
+  assert (List.hd values == value);
   assert (unwrap (Copy.Nested.id (wrap value)) == value);
   assert (unwrap (id (wrap 42)) = 42);
   assert (unwrap (id (wrap true)));
