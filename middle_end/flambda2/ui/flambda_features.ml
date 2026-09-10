@@ -109,24 +109,17 @@ let reaper_local_fields () =
   !Oxcaml_flags.Flambda2.reaper_local_fields
   |> with_default ~f:(fun d -> d.reaper_local_fields)
 
-(* LTO only supports dead code elimination, so unboxing and calling convention
-   changes are disabled when solving or rebuilding for it. CR mvellacott: In the
-   future we hope to lift the DCE restriction on LTO. *)
-let reaper_lto () = !Clflags.reaper_solve || !Clflags.reaper_rebuild
-
 let reaper_unbox () =
-  (not (reaper_lto ()))
-  && !Oxcaml_flags.Flambda2.reaper_unbox
-     |> with_default ~f:(fun d -> d.reaper_unbox)
+  !Oxcaml_flags.Flambda2.reaper_unbox
+  |> with_default ~f:(fun d -> d.reaper_unbox)
 
 let reaper_max_unbox_size () =
   !Oxcaml_flags.Flambda2.reaper_max_unbox_size
   |> with_default ~f:(fun d -> d.reaper_max_unbox_size)
 
 let reaper_change_calling_conventions () =
-  (not (reaper_lto ()))
-  && !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
-     |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
+  !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
+  |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
 
 let simplify_stubs () =
   !Oxcaml_flags.Flambda2.simplify_stubs
