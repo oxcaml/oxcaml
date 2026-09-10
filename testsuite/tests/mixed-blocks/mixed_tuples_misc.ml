@@ -317,4 +317,26 @@ let letop_mixed =
 val letop_mixed : int * string * bool = (4, "hi", true)
 |}]
 
-(* value_rec_compiler checks *)
+(* works with recursive construction of recursive data *)
+
+type rec_record = { r : (rec_record * float#) ; i : int }
+let _ =
+  let rec recursive = { r = (recursive, #2.0) ; i = 42 } in
+  (* no layout poly first, so we need to make our own *)
+  let fst (x, _) = x in
+  assert (recursive == fst recursive.r)
+[%%expect{|
+type rec_record = { r : rec_record * float#; i : int; }
+- : unit = ()
+|}]
+
+type rec_constr = C of (#(rec_constr option * float#) * int)
+let _ =
+  let rec recursive = C ( #(Some recursive, #4.0), 2 ) in
+  (* no layout poly first, so we need to make our own *)
+  let get = function C (#(opt, _), _) -> Option.get opt in
+  assert (recursive == get recursive)
+[%%expect{|
+type rec_constr = C of (#(rec_constr option * float#) * int)
+- : unit = ()
+|}]
