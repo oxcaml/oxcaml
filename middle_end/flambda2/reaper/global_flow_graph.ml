@@ -31,6 +31,7 @@ type graph =
     mutable parameter : NCN.t;
     mutable propagate : NNN.t;
     mutable alias_if_any_source : NNN.t;
+    mutable imported_symbol : N.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
     mutable zero_alloc_source : N.t;
@@ -84,6 +85,8 @@ let propagate = NNN.create ~name:"propagate"
 
 let alias_if_any_source = NNN.create ~name:"alias_if_any_source"
 
+let imported_symbol = N.create ~name:"imported_symbol"
+
 let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
@@ -101,6 +104,7 @@ let to_datalog graph =
   @@ Datalog.set_table parameter graph.parameter
   @@ Datalog.set_table propagate graph.propagate
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
+  @@ Datalog.set_table imported_symbol graph.imported_symbol
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
@@ -139,6 +143,8 @@ module Relations = struct
   let alias_if_any_source ~if_any_source ~to_ ~from =
     Datalog.atom alias_if_any_source [if_any_source; to_; from]
 
+  let imported_symbol symbol = Datalog.atom imported_symbol [symbol]
+
   let any_usage var = Datalog.atom any_usage [var]
 
   let any_source var = Datalog.atom any_source [var]
@@ -158,18 +164,13 @@ let create () =
     parameter = NCN.empty;
     propagate = NNN.empty;
     alias_if_any_source = NNN.empty;
+    imported_symbol = N.empty;
     any_usage = N.empty;
     any_source = N.empty;
     zero_alloc_source = N.empty;
     code_id_my_closure = NN.empty
   }
 
-(* CR mvellacott: This is a naive union: nodes with the same identity (such as a
-   symbol defined in one unit and used from another) are combined, but the
-   conservative facts each unit's traversal records at its boundary (e.g.
-   [any_source] on imported symbols) are all kept. This means we can't yet
-   determine anything more from analysis of the combined graph than we could
-   from analysis of per-unit graphs. *)
 let union g1 g2 =
   (* Relations can carry data on each edge, but for these types it is always
      unit. *)
@@ -183,6 +184,7 @@ let union g1 g2 =
     propagate = NNN.union keep g1.propagate g2.propagate;
     alias_if_any_source =
       NNN.union keep g1.alias_if_any_source g2.alias_if_any_source;
+    imported_symbol = N.union keep g1.imported_symbol g2.imported_symbol;
     any_usage = N.union keep g1.any_usage g2.any_usage;
     any_source = N.union keep g1.any_source g2.any_source;
     zero_alloc_source = N.union keep g1.zero_alloc_source g2.zero_alloc_source;
@@ -225,6 +227,10 @@ let add_opaque_let_dependency t ~to_ ~from =
   in
   Name_occurrences.fold_names bound_to ~f ~init:()
 
+let add_imported_symbol t symbol =
+  t.imported_symbol
+    <- N.add_or_replace [Code_id_or_name.symbol symbol] () t.imported_symbol
+
 let add_any_usage t (var : Code_id_or_name.t) =
   t.any_usage <- N.add_or_replace [var] () t.any_usage
 
@@ -251,6 +257,7 @@ let ids_for_export graph =
   let ids = Serialisation.Ncn.add_ids graph.parameter ids in
   let ids = Serialisation.Nnn.add_ids graph.propagate ids in
   let ids = Serialisation.Nnn.add_ids graph.alias_if_any_source ids in
+  let ids = Serialisation.N.add_ids graph.imported_symbol ids in
   let ids = Serialisation.N.add_ids graph.any_usage ids in
   let ids = Serialisation.N.add_ids graph.any_source ids in
   let ids = Serialisation.N.add_ids graph.zero_alloc_source ids in
@@ -271,6 +278,7 @@ let compilation_units graph =
   let cus = Serialisation.Ncn.fold_ids graph.parameter ~init:cus ~f in
   let cus = Serialisation.Nnn.fold_ids graph.propagate ~init:cus ~f in
   let cus = Serialisation.Nnn.fold_ids graph.alias_if_any_source ~init:cus ~f in
+  let cus = Serialisation.N.fold_ids graph.imported_symbol ~init:cus ~f in
   let cus = Serialisation.N.fold_ids graph.any_usage ~init:cus ~f in
   let cus = Serialisation.N.fold_ids graph.any_source ~init:cus ~f in
   let cus = Serialisation.N.fold_ids graph.zero_alloc_source ~init:cus ~f in
@@ -296,6 +304,7 @@ let apply_renaming graph renaming ~rename_field =
     propagate = Serialisation.Nnn.rename graph.propagate ~rename_id;
     alias_if_any_source =
       Serialisation.Nnn.rename graph.alias_if_any_source ~rename_id;
+    imported_symbol = Serialisation.N.rename graph.imported_symbol ~rename_id;
     any_usage = Serialisation.N.rename graph.any_usage ~rename_id;
     any_source = Serialisation.N.rename graph.any_source ~rename_id;
     zero_alloc_source =

@@ -13,9 +13,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Scope = Analysis_scope
+
 type result = Unboxing_analysis.result
 
-val fixpoint : Global_flow_graph.graph -> result
+val fixpoint : Global_flow_graph.graph -> analysis_scope:Scope.t -> result
 
 val get_unboxed_fields :
   result -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

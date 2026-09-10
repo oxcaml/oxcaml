@@ -162,22 +162,20 @@ val changed_representation_apply_renaming :
 val cannot_change_calling_convention_table :
   Datalog_helpers.Serialisation.N.table
 
-(** [is_local_compilation_unit] must be membership of the set of units whose
-    code the current Reaper run may rewrite: the current unit for a single-unit
-    run, and the set of participants for an LTO solve. Calling conventions of
-    code outside this set can never be changed. *)
+(** Calling conventions of code outside [analysis_scope] can never be changed.
+*)
 val cannot_change_calling_convention :
-  is_local_compilation_unit:(Compilation_unit.t -> bool) ->
-  result ->
-  Code_id.t ->
-  bool
+  analysis_scope:Analysis_scope.t -> result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
 
 val compute_code_changes :
   result ->
-  is_local_compilation_unit:(Compilation_unit.t -> bool) ->
+  analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->

@@ -38,6 +38,22 @@ type code_dep =
       Code_id_or_name.t list (* One element for each (complex) parameter *)
   }
 
+type code_reference =
+  | Closure of
+      { closure : Code_id_or_name.t;
+        code_id : Code_id.t;
+        external_witness : Code_id_or_name.t
+      }
+  | Direct_call of
+      { call : Code_id_or_name.t;
+        code_id : Code_id.t;
+        closure : Code_id_or_name.t option;
+        caller : Code_id.t option;
+        external_call : Code_id_or_name.t;
+        external_closure : Code_id_or_name.t option;
+        external_world : Code_id_or_name.t
+      }
+
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
@@ -53,6 +69,7 @@ type closure_dep =
 
 type t =
   { mutable code_deps : code_dep Code_id.Map.t;
+    mutable code_references : code_reference list;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
     mutable set_of_closures_deps : closure_dep list;
@@ -69,8 +86,14 @@ type t =
 
 let code_deps t = t.code_deps
 
+let code_references t = t.code_references
+
+let add_code_reference t reference =
+  t.code_references <- reference :: t.code_references
+
 let create () =
   { code_deps = Code_id.Map.empty;
+    code_references = [];
     code = Code_id.Map.empty;
     apply_deps = [];
     set_of_closures_deps = [];
@@ -92,7 +115,7 @@ let simple_to_node t ~all_constants simple =
     ~var:(fun v ~coercion:_ -> Code_id_or_name.var v)
     ~symbol:(fun s ~coercion:_ ->
       if not (Current_unit.is_current (Symbol.compilation_unit s))
-      then Graph.add_any_source t.deps (Code_id_or_name.symbol s);
+      then Graph.add_imported_symbol t.deps s;
       Code_id_or_name.symbol s)
 
 let add_code_dep t code_id dep =
@@ -177,6 +200,21 @@ let continuation_info t k ~params ~arity ~is_exn_handler =
   t.continuation_info <- Continuation.Map.add k info t.continuation_info
 
 let get_continuation_info t = t.continuation_info
+
+let add_external_apply t ~participant_call ~(denv : Env.t) ~code_id ~witness
+    ~closure =
+  let participant_witness, participant_closure = participant_call in
+  let to_node = simple_to_node t ~all_constants:(Env.all_constants denv) in
+  add_code_reference t
+    (Direct_call
+       { call = participant_witness;
+         code_id;
+         closure = Option.map to_node participant_closure;
+         caller = Env.current_code_id denv;
+         external_call = witness;
+         external_closure = Option.map to_node closure;
+         external_world = Code_id_or_name.name (Env.le_monde_exterieur denv)
+       })
 
 let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
@@ -448,6 +486,17 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
+let connect_closure graph ~closure ~code_id (code_dep : code_dep) =
+  Graph.add_propagate_dep graph
+    ~to_:(Code_id_or_name.var code_dep.my_closure)
+    ~from:closure
+    ~if_used:(Code_id_or_name.code_id code_id);
+  Graph.add_constructor_dep graph ~from:code_dep.known_arity_call_witness
+    Field.known_arity_call_witness ~base:closure;
+  Graph.add_constructor_dep graph
+    ~from:(List.hd code_dep.unknown_arity_call_witnesses)
+    Field.unknown_arity_call_witness ~base:closure
+
 let record_set_of_closures_deps_one_closure t
     { let_bound_name_of_the_closure = name;
       closure_code_id = code_id;
@@ -459,31 +508,15 @@ let record_set_of_closures_deps_one_closure t
   match find_code_dep t code_id with
   | None ->
     assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit, so we don't know what
-       happens once it is applied. As such, it must cause the whole block to
-       escape. *)
     let witness =
       Code_id_or_name.var
         (Variable.create
            (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
            K.value)
     in
-    add_any_source t witness;
-    add_constructor_dep t ~from:witness Field.known_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
-  | Some code_dep ->
-    add_propagate_dep t
-      ~to_:(Code_id_or_name.var code_dep.my_closure)
-      ~from:name
-      ~if_used:(Code_id_or_name.code_id code_id);
-    add_constructor_dep t ~from:code_dep.known_arity_call_witness
-      Field.known_arity_call_witness ~base:name;
-    add_constructor_dep t
-      ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-      Field.unknown_arity_call_witness ~base:name
+    add_code_reference t
+      (Closure { closure = name; code_id; external_witness = witness })
+  | Some code_dep -> connect_closure t.deps ~closure:name ~code_id code_dep
 
 let record_set_of_closures_deps t =
   List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
@@ -554,6 +587,78 @@ let sort_code_ids t =
 let get_all_sets_of_closures t = t.all_sets_of_closures
 
 let get_closure_function_decls t = t.closure_function_decls
+
+let fold_code_reference_ids reference ~init ~f =
+  match reference with
+  | Closure { closure; code_id; external_witness } ->
+    let acc = f init closure in
+    let acc = f acc (Code_id_or_name.code_id code_id) in
+    f acc external_witness
+  | Direct_call
+      { call;
+        code_id;
+        closure;
+        caller;
+        external_call;
+        external_closure;
+        external_world
+      } ->
+    let acc =
+      List.fold_left f init
+        [call; Code_id_or_name.code_id code_id; external_call; external_world]
+    in
+    let acc = Option.fold ~none:acc ~some:(f acc) closure in
+    let acc = Option.fold ~none:acc ~some:(f acc) external_closure in
+    Option.fold ~none:acc
+      ~some:(fun code_id -> f acc (Code_id_or_name.code_id code_id))
+      caller
+
+let rename_code_reference renaming = function
+  | Closure { closure; code_id; external_witness } ->
+    Closure
+      { closure = Renaming.apply_code_id_or_name renaming closure;
+        code_id = Renaming.apply_code_id renaming code_id;
+        external_witness =
+          Renaming.apply_code_id_or_name renaming external_witness
+      }
+  | Direct_call
+      { call;
+        code_id;
+        closure;
+        caller;
+        external_call;
+        external_closure;
+        external_world
+      } ->
+    Direct_call
+      { call = Renaming.apply_code_id_or_name renaming call;
+        code_id = Renaming.apply_code_id renaming code_id;
+        closure = Option.map (Renaming.apply_code_id_or_name renaming) closure;
+        caller = Option.map (Renaming.apply_code_id renaming) caller;
+        external_call = Renaming.apply_code_id_or_name renaming external_call;
+        external_closure =
+          Option.map (Renaming.apply_code_id_or_name renaming) external_closure;
+        external_world = Renaming.apply_code_id_or_name renaming external_world
+      }
+
+let ids_for_export_code_references references =
+  List.fold_left
+    (fun ids reference ->
+      fold_code_reference_ids reference ~init:ids ~f:(fun ids id ->
+          Code_id_or_name.pattern_match' id
+            ~code_id:(Ids_for_export.add_code_id ids)
+            ~name:(Ids_for_export.add_name ids)))
+    Ids_for_export.empty references
+
+let code_references_compilation_units references =
+  List.fold_left
+    (fun units reference ->
+      fold_code_reference_ids reference ~init:units ~f:(fun units id ->
+          Compilation_unit.Set.add (Code_id_or_name.compilation_unit id) units))
+    Compilation_unit.Set.empty references
+
+let apply_renaming_code_references references renaming =
+  List.map (rename_code_reference renaming) references
 
 let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
   Ids_for_export.create ~variables:(Variable.Set.of_list params) ()
