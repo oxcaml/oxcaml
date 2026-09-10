@@ -133,6 +133,19 @@ bump_twice:
   ret
 |}]
 
+(* Merging is repeated after each step, so three adjacent read-modify-write
+   instructions on the same location also collapse into a single one. *)
+let bump_thrice c =
+  c.pos <- c.pos + 1;
+  c.pos <- c.pos + 1;
+  c.pos <- c.pos + 1
+[%%expect_asm X86_64{|
+bump_thrice:
+  addq  $6, (%rax)
+  movl  $1, %eax
+  ret
+|}]
+
 (* Read-modify-write instructions on different locations are not merged. *)
 let bump_each c d =
   c.pos <- c.pos + 1;
