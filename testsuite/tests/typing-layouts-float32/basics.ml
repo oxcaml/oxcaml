@@ -367,15 +367,6 @@ val id_value : 'a -> 'a = <fun>
 
 let x8_1 = id_value (make_t_float32 ());;
 [%%expect{|
-Line 1, characters 11-39:
-1 | let x8_1 = id_value (make_t_float32 ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of t_float32 is float32
-         because of the definition of t_float32 at line 1, characters 0-24.
-       But the layout of t_float32 must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-39:
 1 | let x8_1 = id_value (make_t_float32 ());;
                         ^^^^^^^^^^^^^^^^^^^
@@ -389,15 +380,6 @@ Error: This expression has type "t_float32"
 
 let x8_2 = id_value (make_t_float32_id ());;
 [%%expect{|
-Line 1, characters 11-42:
-1 | let x8_2 = id_value (make_t_float32_id ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of 'a t_float32_id is float32
-         because of the definition of t_float32_id at line 2, characters 0-37.
-       But the layout of 'a t_float32_id must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-42:
 1 | let x8_2 = id_value (make_t_float32_id ());;
                         ^^^^^^^^^^^^^^^^^^^^^^
@@ -411,15 +393,6 @@ Error: This expression has type "'a t_float32_id" = "('a : float32)"
 
 let x8_3 = id_value (make_floatu ());;
 [%%expect{|
-Line 1, characters 11-36:
-1 | let x8_3 = id_value (make_floatu ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of float32_u is float32
-         because it is the primitive type float32_u.
-       But the layout of float32_u must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-36:
 1 | let x8_3 = id_value (make_floatu ());;
                         ^^^^^^^^^^^^^^^^

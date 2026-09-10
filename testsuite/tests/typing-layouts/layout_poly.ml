@@ -34,17 +34,6 @@ Error: This expression has type "t_any" but an expression was expected of type
        The layout of t_any is any
          because of the definition of t_any at line 3, characters 0-16.
        But the layout of t_any must be representable
-         because we must know concretely how to return a function result.
-|}, Principal{|
-external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
-Line 3, characters 14-36:
-3 | let f () = id (assert false : t_any)
-                  ^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_1)"
-       The layout of t_any is any
-         because of the definition of t_any at line 3, characters 0-16.
-       But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -85,17 +74,6 @@ module M = struct
 end
 
 [%%expect{|
-Line 4, characters 58-69:
-4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
-                                                              ^^^^^^^^^^^
-Error:
-       The layout of string is value non_float
-         because it is the primitive type string.
-       But the layout of string must be a sublayout of float64
-         because of the definition of id' at line 2, characters 10-18.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
