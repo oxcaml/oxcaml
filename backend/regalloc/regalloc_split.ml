@@ -254,9 +254,17 @@ let insert_spills_in_block :
       (* See comment before Insert_skipping_name_for_debugger *)
       Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
     ~copy_default:
+      (* The terminator is the destruction point that has necessitated the
+         spill, making its debug and FDO information the natural choice for a
+         spill that is not associated with any instruction in the block's body.
+         Such a spill is inserted at the beginning of the block, however, so the
+         other fields (in particular the stack offset) must come from the first
+         instruction of the block, since they may differ from those of the
+         terminator. *)
       (match DLL.hd block.body with
       | None -> dummy_instr_of_terminator block.terminator
-      | Some hd -> hd)
+      | Some hd ->
+        { hd with dbg = block.terminator.dbg; fdo = block.terminator.fdo })
     ~add_default:(fun list instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
       Insert_skipping_name_for_debugger.add_begin list instr ~reg)
@@ -309,10 +317,39 @@ let make_reload : type a. a make_operation =
     ~id:(InstructionId.get_and_incr instr_id)
     ~copy ~from:stack_reg ~to_:new_reg
 
+(* Computes the default copy instruction for reloads at the beginning of [block]
+   that are not associated with any instruction in the block's body. Such
+   reloads exist because of a destruction point at the end of a predecessor; the
+   debug and FDO information of that destruction point (e.g. a call) is the
+   natural choice. The relevant terminator is found by walking the
+   unique-predecessor chain while the terminators encountered have no debuginfo,
+   since the block may be separated from the destruction point by empty blocks
+   inserted on destruction (or critical) edges. Only the debug and FDO
+   information is taken from that terminator: the other fields (in particular
+   the stack offset) come from the block's own terminator, as they may differ
+   from those of the predecessors' terminators. *)
+let default_copy_for_reloads : Cfg.t -> Cfg.basic_block -> Instruction.t =
+ fun cfg block ->
+  let rec find_dbg_source (block : Cfg.basic_block) fuel =
+    if (not (Debuginfo.is_none block.terminator.dbg)) || fuel <= 0
+    then block.terminator
+    else
+      match Label.Set.elements block.predecessors with
+      | [predecessor_label] ->
+        find_dbg_source (Cfg.get_block_exn cfg predecessor_label) (pred fuel)
+      | [] | _ :: _ -> block.terminator
+  in
+  let dbg_source = find_dbg_source block 3 in
+  { (dummy_instr_of_terminator block.terminator) with
+    dbg = dbg_source.dbg;
+    fdo = dbg_source.fdo
+  }
+
 (* Inserts the reloads in a block, as late as possible (i.e. immediately before
    the register is first read), to reduce live ranges. *)
 let insert_reloads_in_block :
     State.t ->
+    cfg:Cfg.t ->
     instr_id:InstructionId.sequence ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
@@ -320,7 +357,7 @@ let insert_reloads_in_block :
     Instruction.t DLL.cell option ->
     Reg.Set.t ->
     unit =
- fun state ~instr_id ~block_subst ~stack_subst block cell
+ fun state ~cfg ~instr_id ~block_subst ~stack_subst block cell
      live_at_definition_point ->
   insert_spills_or_reloads_in_block state ~instr_id
     ~make_spill_or_reload:make_reload ~occur_check
@@ -332,7 +369,7 @@ let insert_reloads_in_block :
          Reg_availability_set.canonicalise), so it's probably not necessary to
          add a Name_for_debugger on the reloaded one. *)
       DLL.insert_before cell instr)
-    ~copy_default:(dummy_instr_of_terminator block.terminator)
+    ~copy_default:(default_copy_for_reloads cfg block)
     ~add_default:(fun list instr _reg ->
       (* Same reasoning as for insert above *)
       DLL.add_end list instr)
@@ -350,11 +387,12 @@ let insert_reloads :
   Label.Map.iter
     (fun label live_at_definition_point ->
       if debug then log "block %a" Label.format label;
+      let cfg = Cfg_with_infos.cfg cfg_with_infos in
       let block = Cfg_with_infos.get_block_exn cfg_with_infos label in
-      let instr_id = (Cfg_with_infos.cfg cfg_with_infos).next_instruction_id in
+      let instr_id = cfg.next_instruction_id in
       let block_subst = Substitution.for_label substs label in
-      insert_reloads_in_block state ~instr_id ~block_subst ~stack_subst block
-        (DLL.hd_cell block.body) live_at_definition_point)
+      insert_reloads_in_block state ~cfg ~instr_id ~block_subst ~stack_subst
+        block (DLL.hd_cell block.body) live_at_definition_point)
     (State.definitions_at_beginning state);
   if debug then dedent ()
 
