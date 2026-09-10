@@ -93,7 +93,8 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
     associative binary operators such that either <op1> is the same as <op2>, or
     <op1> is the inverse of <op2>, or there exists const3 such that <op1 const1>
     can be expressed as <op2 const3> or <op2 const2> can be expressed as <op1
-    const3> *)
+    const3>. The resulting instruction carries the debug info of <op1> (see
+    [Peephole_utils.debuginfo_allows_merging]). *)
 
 let are_compatible op1 op2 imm1 imm2 :
     (Operation.integer_operation * int) option =
@@ -173,6 +174,7 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
       && U.are_equal_regs
            (Array.unsafe_get snd_val.arg 0)
            (Array.unsafe_get snd_val.res 0)
+      && U.debuginfo_allows_merging fst_val.dbg snd_val.dbg
     then
       match fst_val.desc, snd_val.desc with
       | Op (Intop_imm (op1, imm1)), Op (Intop_imm (op2, imm2)) -> (
@@ -206,7 +208,8 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
     [lea] as [-1(r,r)]). The arch-specific rewriting is delegated to
     [Arch.fold_delta_into_specific_operation]. Deleting the first instruction is
     sound because the second one overwrites [r], and it does not affect liveness
-    because <specific'> still reads [r]. *)
+    because <specific'> still reads [r]. <specific'> carries the debug info of
+    <specific> (see [Peephole_utils.debuginfo_allows_merging]). *)
 let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
   match U.get_cells cell 2 with
   | [fst; snd] -> (
@@ -228,7 +231,8 @@ let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
                 (Array.unsafe_get fst_val.res 0)
            && U.are_equal_regs
                 (Array.unsafe_get fst_val.res 0)
-                (Array.unsafe_get snd_val.res 0) -> (
+                (Array.unsafe_get snd_val.res 0)
+           && U.debuginfo_allows_merging fst_val.dbg snd_val.dbg -> (
       let reg = Array.unsafe_get fst_val.res 0 in
       let arg_is_folded_reg =
         Array.map (fun arg -> U.are_equal_regs reg arg) snd_val.arg
@@ -305,7 +309,8 @@ let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
     adding their sum). The arch-specific merging is delegated to
     [Arch.merge_adjacent_specific_operations]. Liveness is unaffected: the
     merged instruction reads the same registers and, like the originals, defines
-    none. *)
+    none. <specific> carries the debug info of <specific1> (see
+    [Peephole_utils.debuginfo_allows_merging]). *)
 let merge_adjacent_specific_operations
     (cell : Cfg.basic Cfg.instruction DLL.cell) =
   match U.get_cells cell 2 with
@@ -317,7 +322,7 @@ let merge_adjacent_specific_operations
       when Array.length fst_val.res = 0
            && Array.length snd_val.res = 0
            && Misc.Stdlib.Array.equal U.are_equal_regs fst_val.arg snd_val.arg
-      -> (
+           && U.debuginfo_allows_merging fst_val.dbg snd_val.dbg -> (
       match Arch.merge_adjacent_specific_operations specific1 specific2 with
       | None -> None
       | Some specific ->
