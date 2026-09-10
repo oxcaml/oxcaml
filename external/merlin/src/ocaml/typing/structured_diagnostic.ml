@@ -1,20 +1,31 @@
 module Location_key = struct
+  type position_key =
+    { line : int;
+      column : int
+    }
+
   type t =
     { file : string;
-      start_offset : int;
-      end_offset : int
+      start_position : position_key;
+      end_position : position_key
     }
+
+  let of_position (position : Lexing.position) =
+    { line = position.pos_lnum; column = position.pos_cnum - position.pos_bol }
 
   let of_location (loc : Location.t) =
     { file = loc.loc_start.pos_fname;
-      start_offset = loc.loc_start.pos_cnum;
-      end_offset = loc.loc_end.pos_cnum
+      start_position = of_position loc.loc_start;
+      end_position = of_position loc.loc_end
     }
+
+  let equal_position p1 p2 =
+    Int.equal p1.line p2.line && Int.equal p1.column p2.column
 
   let equal t1 t2 =
     String.equal t1.file t2.file
-    && Int.equal t1.start_offset t2.start_offset
-    && Int.equal t1.end_offset t2.end_offset
+    && equal_position t1.start_position t2.start_position
+    && equal_position t1.end_position t2.end_position
 end
 
 module Symbol_table (Item : sig
@@ -296,7 +307,8 @@ module Json = struct
     let annotation_to_value (annotation : Wire.Annotation.t) =
       match annotation with
       | Code -> object_ [kind_field "code"]
-      | Source loc -> object_ [kind_field "source"; "loc", location_to_value loc]
+      | Source loc ->
+        object_ [kind_field "source"; "loc", location_to_value loc]
       | Mention { entity; form } ->
         object_
           [kind_field "mention";
@@ -327,7 +339,8 @@ module Json = struct
     let entity_to_value ((id, loc) : Entities.Id.t * Location.t) =
       object_ ["id", int (Entities.Id.to_int id); "loc", location_to_value loc]
     in
-    let glossary_entry_to_value ((id, entry) : Glossary.Id.t * Glossary_entry.t) =
+    let glossary_entry_to_value
+        ((id, entry) : Glossary.Id.t * Glossary_entry.t) =
       let url =
         match entry.url with
         | None -> []
