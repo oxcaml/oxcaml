@@ -222,7 +222,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       @@ List.exists errors ~f:(function
         | Msupport.Warning _ -> false
         | _ -> true)
-    then Typecore.optimise_allocations ();
+    then Typeallocation.optimise_allocations ();
 
     let pos = Mpipeline.get_lexing_pos pipeline pos in
     let structures =
