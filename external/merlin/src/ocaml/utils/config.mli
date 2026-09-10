@@ -22,22 +22,7 @@ val as_debug_prefix_map_flag : string
 (** The flag to use for assembler debug prefix map ("" if none) *)
 
 val interface_suffix: string ref
-<<<<<<< Merlin:oxcaml-backport-11997
         (* Suffix for interface file names *)
-||||||| Compiler:last-imported
-(** Suffix for interface file names *)
-
-val exec_magic_number: string
-(** Magic number for bytecode executable files *)
-=======
-(** Suffix for interface file names *)
-
-val caml_symbol_prefix: string
-(** Prefix used for mangling symbol names *)
-
-val exec_magic_number: string
-(** Magic number for bytecode executable files *)
->>>>>>> Compiler:HEAD
 
 val cmi_magic_number: string
         (* Magic number for compiled interface files *)
