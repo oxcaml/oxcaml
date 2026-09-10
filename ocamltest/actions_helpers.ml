@@ -129,6 +129,7 @@ let setup_simple_build_env add_testfile additional_files log env =
   setup_build_env add_testfile additional_files log build_env
 
 let run_cmd
+    ~full_environment
     ?(environment=[||])
     ?(stdin_variable=Builtin_variables.stdin)
     ?(stdout_variable=Builtin_variables.stdout)
@@ -175,6 +176,7 @@ let run_cmd
   log_redirection "stderr" stderr_filename;
   let systemenv =
     Environments.append_to_system_env
+      ~full:full_environment
       environment
       env
   in
@@ -210,6 +212,7 @@ let run_cmd
   n
 
 let run
+    ~full_environment
     (log_message : string)
     (redirect_output : bool)
     (can_skip : bool)
@@ -245,7 +248,7 @@ let run
     let expected_exit_status =
       exit_status_of_variable env Builtin_variables.exit_status
     in
-    let exit_status = run_cmd log env commandline in
+    let exit_status = run_cmd ~full_environment log env commandline in
     if exit_status=expected_exit_status
     then (Result.pass, env)
     else begin
@@ -254,6 +257,8 @@ let run
       then (Result.skip_with_reason reason, env)
       else (Result.fail_with_reason reason, env)
     end
+
+let run_cmd = run_cmd ~full_environment:false
 
 (* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
@@ -271,6 +276,7 @@ let run_program log env =
     end
   in
   run
+    ~full_environment:false
     "Running program"
     true
     false
@@ -285,6 +291,7 @@ let run_script log env =
   let scriptenv = Environments.add
     Builtin_variables.ocamltest_response response_file env in
   let (result, newenv) = run
+    ~full_environment:true
     "Running script"
     true
     true
@@ -327,7 +334,7 @@ let run_hook hook_name log input_env =
   let hookenv = Environments.add
     Builtin_variables.ocamltest_response response_file input_env in
   let systemenv =
-    Environments.to_system_env hookenv in
+    Environments.to_system_env ~full:true hookenv in
   let timeout =
     Option.value ~default:0
       (Environments.lookup_as_int Builtin_variables.timeout input_env) in

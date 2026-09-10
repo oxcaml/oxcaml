@@ -572,6 +572,7 @@ let objinfo log env =
   let ocamllib = [| (Printf.sprintf "OCAMLLIB=%s" tools_directory) |] in
   let systemenv =
     Environments.append_to_system_env
+      ~full:false
       (Array.concat
        [
          default_ocaml_env;
@@ -1545,7 +1546,7 @@ let compile_ocamldoc (basename,filetype as module_) log env =
   ] in
   let exit_status =
     Actions_helpers.run_cmd
-      ~environment:(Environments.to_system_env env)
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable
@@ -1638,7 +1639,8 @@ let run_ocamldoc =
      "-o"; ocamldoc_o_flag env
    ] in
   let exit_status =
-    Actions_helpers.run_cmd ~environment:(Environments.to_system_env env)
+    Actions_helpers.run_cmd
+      ~environment:(Environments.to_system_env ~full:false env)
       ~stdin_variable: Ocaml_variables.compiler_stdin
       ~stdout_variable:Ocamldoc.output_variable
       ~stderr_variable:Ocamldoc.output_variable

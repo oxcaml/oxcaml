@@ -65,9 +65,11 @@ let debug debugger_type log env =
     match debugger_type with
     | LLDB | GDB ->
        Environments.append_to_system_env
+         ~full:false
          default_debugger_env env
     | Bytecode ->
        Environments.append_to_system_env
+         ~full:false
          default_debugger_env
          (env_with_lib_unix env)
   in
