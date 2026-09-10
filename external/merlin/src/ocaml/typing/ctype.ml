@@ -8030,6 +8030,26 @@ let subtype_alloc_mode env trace a1 a2 =
   | Ok () -> ()
   | Error _ -> subtype_error ~env ~trace ~unification_trace:[]
 
+let rec subtype_expand_head env ty =
+  match get_desc ty with
+  | Tconstr (path, _, _)
+    when generic_abbrev env path && safe_abbrev env ty ->
+      subtype_expand_head env (expand_abbrev env ty)
+  | _ -> ty
+
+let rec subtype_modality_head env ty modality =
+  let ty = subtype_expand_head env ty in
+  match get_desc ty with
+  | Tmod (payload, inner) ->
+      subtype_modality_head env payload
+        (Mode.Modality.Const.concat modality ~then_:inner)
+  | _ -> ty, modality
+
+let subtype_modality env trace m1 m2 =
+  match Mode.Modality.Const.sub m1 m2 with
+  | Ok () -> ()
+  | Error _ -> subtype_error ~env ~trace ~unification_trace:[]
+
 let rec subtype_rec env trace t1 t2 cstrs =
   if eq_type t1 t2 then cstrs else
 
@@ -8038,8 +8058,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
   else begin
     TypePairs.add subtypes (t1, t2);
     match (get_desc t1, get_desc t2) with
-      (Tvar _, _) | (_, Tvar _) ->
-        (trace, t1, t2, !univar_pairs)::cstrs
+    | (Tvar _, _) | (_, Tvar _) ->
+        `Variable (trace, t1, t2, !univar_pairs)::cstrs
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
@@ -8079,9 +8099,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
               let (co, cn) = Variance.get_upper v in
               if co then
                 if cn then
-                  (trace, newty2 ~level:(get_level t1) (Ttuple[None, t1]),
-                   newty2 ~level:(get_level t2) (Ttuple[None, t2]),
-                   !univar_pairs)
+                  `Equal
+                    (trace, newty2 ~level:(get_level t1) (Ttuple[None, t1]),
+                     newty2 ~level:(get_level t2) (Ttuple[None, t2]),
+                     !univar_pairs)
                   :: cstrs
                 else
                   subtype_rec
@@ -8100,7 +8121,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
                 else cstrs)
             cstrs decl.type_variance (List.combine tl1 tl2)
         with Not_found ->
-          (trace, t1, t2, !univar_pairs)::cstrs
+          `Equal (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tconstr(p1, _, _), _)
       when generic_private_abbrev env p1 && safe_abbrev_opt env t1 ->
@@ -8110,14 +8131,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tobject (f1, _), Tobject (f2, _))
       when is_Tvar (object_row f1) && is_Tvar (object_row f2) ->
         (* Same row variable implies same object. *)
-        (trace, t1, t2, !univar_pairs)::cstrs
+        `Equal (trace, t1, t2, !univar_pairs)::cstrs
     | (Tobject (f1, _), Tobject (f2, _)) ->
         subtype_fields env trace f1 f2 cstrs
     | (Tvariant row1, Tvariant row2) ->
         begin try
           subtype_row env trace row1 row2 cstrs
         with Exit ->
-          (trace, t1, t2, !univar_pairs)::cstrs
+          `Equal (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tpoly (u1, []), Tpoly (u2, [])) ->
         subtype_rec env trace u1 u2 cstrs
@@ -8129,7 +8150,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
           enter_poly env u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)
         with Escape _ ->
-          (trace, t1, t2, !univar_pairs)::cstrs
+          `Equal (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Trepr (u1, sort_vars1), Trepr (u2, sort_vars2)) ->
         (* For layout-polymorphic types, establish correspondence between
@@ -8138,7 +8159,8 @@ let rec subtype_rec env trace t1 t2 cstrs =
           let pairs = List.combine sort_vars1 sort_vars2 in
           Jkind_types.Sort.enter_repr pairs
             (fun () -> subtype_rec env trace u1 u2 cstrs)
-        with Invalid_argument _ -> (trace, t1, t2, !univar_pairs)::cstrs)
+        with Invalid_argument _ ->
+          `Equal (trace, t1, t2, !univar_pairs)::cstrs)
     | (Tpackage pack1, Tpackage pack2) ->
         subtype_package env trace (get_level t1) pack1
           (get_level t2) pack2 cstrs
@@ -8148,8 +8170,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec (decr_stage env) trace t1 t2 cstrs
     | (Tquote_eval t1, Tquote_eval t2) ->
          subtype_rec (incr_stage env) trace t1 t2 cstrs
-    | (Tmod (t1, m1), Tmod (t2, m2))
-      when Result.is_ok (Mode.Modality.Const.equate m1 m2) ->
+    | (Tmod _, _) | (_, Tmod _) ->
+        let t1, m1 = subtype_modality_head env t1 Mode.Modality.Const.id in
+        let t2, m2 = subtype_modality_head env t2 Mode.Modality.Const.id in
+        subtype_modality env trace m1 m2;
         subtype_rec env (Subtype.Diff {got = t1; expected = t2} :: trace)
           t1 t2 cstrs
     | (Tbox t1, Tbox t2) ->
@@ -8159,7 +8183,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
            t1 t2
            cstrs
     | (_, _) ->
-        (trace, t1, t2, !univar_pairs)::cstrs
+        `Equal (trace, t1, t2, !univar_pairs)::cstrs
   end
 
 and subtype_labeled_list env trace labeled_tl1 labeled_tl2 cstrs =
@@ -8187,18 +8211,23 @@ and subtype_package env trace lvl1 pack1 lvl2 pack2 cstrs =
         (fun (n2,t2) -> (trace, List.assoc n2 ntl1, t2, !univar_pairs))
         ntl2
     in
-    if eq_package_path env pack1.pack_path pack2.pack_path then cstrs' @ cstrs
+    let add_constraints () =
+      List.map (fun cstr -> `Equal cstr) cstrs' @ cstrs
+    in
+    if eq_package_path env pack1.pack_path pack2.pack_path
+    then add_constraints ()
     else begin
       (* need to check module subtyping *)
       let snap = Btype.snapshot () in
       match List.iter (fun (_, t1, t2, _) -> unify env t1 t2) cstrs' with
       | () when Result.is_ok (!package_subtype env pack1 pack2) ->
-        Btype.backtrack snap; cstrs' @ cstrs
+        Btype.backtrack snap; add_constraints ()
       | () | exception Unify _ ->
         Btype.backtrack snap; raise Not_found
     end
   with Not_found ->
-    (trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
+    `Equal
+      (trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
       ::cstrs
 
 and subtype_fields env trace ty1 ty2 cstrs =
@@ -8215,12 +8244,12 @@ and subtype_fields env trace ty1 ty2 cstrs =
         rest1 rest2
         cstrs
     else
-      (trace, build_fields (get_level ty1) miss1 rest1, rest2,
+      `Equal (trace, build_fields (get_level ty1) miss1 rest1, rest2,
        !univar_pairs) :: cstrs
   in
   let cstrs =
     if miss2 = [] then cstrs else
-    (trace, rest1, build_fields (get_level ty2) miss2
+    `Equal (trace, rest1, build_fields (get_level ty2) miss2
                      (newvar (Jkind.Builtin.value ~why:Object_field)),
      !univar_pairs) :: cstrs
   in
@@ -8315,14 +8344,40 @@ let subtype env ty1 ty2 =
     TypePairs.clear subtypes;
     (* Enforce constraints. *)
     function () ->
-      List.iter
-        (function (trace0, t1, t2, pairs) ->
-           try unify_pairs env t1 t2 pairs with Unify {trace} ->
-           subtype_error
-             ~env
-             ~trace:trace0
-             ~unification_trace:(List.tl trace))
-        (List.rev cstrs))
+      let equalities, modalities =
+        List.partition_map
+          (function `Equal cstr -> Either.Left cstr
+                  | `Variable ((_, t1, t2, _) as cstr) ->
+                    match get_desc (subtype_expand_head env t1),
+                          get_desc (subtype_expand_head env t2) with
+                    | Tmod _, _ | _, Tmod _ -> Either.Right cstr
+                    | _ -> Either.Left cstr)
+          (List.rev cstrs)
+      in
+      let enforce_equality (trace0, t1, t2, pairs) =
+        try unify_pairs env t1 t2 pairs with Unify {trace} ->
+        subtype_error
+          ~env
+          ~trace:trace0
+          ~unification_trace:(List.tl trace)
+      in
+      List.iter enforce_equality equalities;
+      (* Delayed type annotations and equality constraints may identify the
+         payload variables. Otherwise retain whole-type inference. Classify
+         all modality constraints before unifying any unknown targets, so
+         their order cannot choose which wrapper to retain. *)
+      let remaining =
+        List.filter
+          (fun (trace, t1, t2, _) ->
+            let u1, m1 = subtype_modality_head env t1 Mode.Modality.Const.id in
+            let u2, m2 = subtype_modality_head env t2 Mode.Modality.Const.id in
+            if eq_type u1 u2 then begin
+              subtype_modality env trace m1 m2;
+              false
+            end else true)
+          modalities
+      in
+      List.iter enforce_equality remaining)
 
                               (*******************)
                               (*  Miscellaneous  *)

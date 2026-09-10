@@ -1235,6 +1235,9 @@ module type S = sig
           [t0]. *)
       val diff : t -> t -> atom list
 
+      (** [sub t0 t1] checks that [t0(a) <= t1(a)] for every mode [a]. *)
+      val sub : t -> t -> (unit, error) Result.t
+
       (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
           [t0 <= t1] and [t1 <= t0]. *)
       val equate : t -> t -> (unit, equate_error) Result.t
