@@ -5522,7 +5522,7 @@ let rec is_nonexpansive exp =
                lbl.lbl_mut = Immutable && is_nonexpansive exp
            | Kept _ -> true)
         fields
-      && is_nonexpansive_opt (Option.map Misc.fst3 extended_expression)
+      && is_nonexpansive_opt (Option.map Misc.fst4 extended_expression)
   | Texp_record_unboxed_product { fields; extended_expression } ->
       Array.for_all
         (fun (lbl, _sort, definition) ->
@@ -7335,18 +7335,19 @@ and type_expect_
             in
             Some ({exp with exp_type = ty_exp}, sort, ubr), label_definitions
       in
-      let num_fields =
+      let representative_label =
         match lbl_exp_list with [] -> assert false
-        | (_, lbl,_)::_ -> Array.length lbl.lbl_all in
+        | (_, lbl, _) :: _ -> lbl
+      in
+      let label_descriptions = representative_label.lbl_all in
+      let num_fields = Array.length label_descriptions in
       (if opt_sexp <> None && List.length lid_sexp_list = num_fields then
          Location.prerr_warning loc
            (Warnings.Useless_record_with (record_form_to_string record_form)));
-      let label_descriptions, representation =
-        let (_, { lbl_all; lbl_repres; _ }, _) = List.hd lbl_exp_list in
-        lbl_all, lbl_repres
-      in
       let representation =
-        match determined_lbl_repres record_form representation with
+        match
+          determined_lbl_repres record_form representative_label.lbl_repres
+        with
         | Some rep -> rep
         | None ->
             let labels_with_updated_types =
@@ -7365,7 +7366,8 @@ and type_expect_
                each label all over again. Possibly we're doing things in the
                wrong order. *)
             Typedecl.instance_record_representation ~why env
-              sexp.pexp_loc record_form ~old_repres:representation
+              sexp.pexp_loc record_form
+              ~old_repres:representative_label.lbl_repres
               labels_with_updated_types
       in
       let fields =
@@ -7375,9 +7377,20 @@ and type_expect_
       let exp_desc =
         match record_form with
         | Legacy ->
+          let extended_expression =
+            match opt_exp with
+            | None -> None
+            | Some (exp, sort, ubr) ->
+              let source_representation =
+                update_labels env Legacy ~representative_label
+                  ~why:Field_functional_update ~loc:exp.exp_loc
+                  ~containing_type:exp.exp_type
+              in
+              Some (exp, sort, source_representation, ubr)
+          in
           Texp_record {
             fields; representation;
-            extended_expression = opt_exp;
+            extended_expression;
             alloc_mode
           }
         | Unboxed_product ->

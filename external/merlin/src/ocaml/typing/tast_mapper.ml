@@ -597,7 +597,9 @@ let expr sub x =
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =
-            Option.map (fun (exp, sort, ubr) -> (sub.expr sub exp, sort, ubr))
+            Option.map
+              (fun (exp, sort, repres, ubr) ->
+                 (sub.expr sub exp, sort, repres, ubr))
               extended_expression;
           alloc_mode
         }
