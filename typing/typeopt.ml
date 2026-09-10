@@ -1106,6 +1106,7 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
         labels
     with
     | exception Ctype.Cannot_apply ->
+        (* Reachable if a cmi is missing *)
         num_nodes_visited, non_nullable Pgenval
     | labels ->
         let types = List.map (fun label -> label.Types.ld_type) labels in
