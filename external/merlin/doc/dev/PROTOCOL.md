@@ -313,6 +313,41 @@ Returns supported compiler flags.The purpose of this command is to implement int
 This command will return the ordered list of the positions and types of all
 holes in the current document.
 
+### `intf-weaknesses`
+
+Strengthenings of the interfaces the buffer's declarations live in: the mode,
+modality and kind annotations that make a declaration strictly wider — accepting
+more programs at use sites — without breaking the implementations checked
+against it. At most one action per interface:
+
+```javascript
+[
+  {
+    'intf_file' : string,  // the interface all edits target
+    'edits' : [
+      { 'file' : string, 'start' : position, 'end' : position, 'new_text' : string }
+    ]
+  }
+]
+```
+
+Each edit replaces its `[start, end]` range with `new_text` (an empty range is an
+insertion). The edits of an action must be applied atomically: a hoisted
+signature-level clause is only sound together with the per-item exemptions that
+come with it.
+
+The queried unit's own interface is strengthened against the unit itself. A
+module type declared in the buffer is shared, so it is strengthened against
+everything the configured indexes record a check against it, keeping only the
+annotations all of those support. A whole-unit check is evidence about the
+unit's own signature and an annotation is evidence only about the module bound
+at that site; a check whose signature cannot be read, or that the analysis says
+nothing about, leaves its interface unstrengthened. So does a `partial`
+discovery: an incomplete view of who was checked cannot certify anything.
+Implementations other than the buffer are read from disk, so unsaved edits to
+them are not seen. With no index configured only the queried unit's own
+interface is answered for.
+
 ### `jump -target <string> -position <position>`
 
         -target <string>  Entity to jump to
