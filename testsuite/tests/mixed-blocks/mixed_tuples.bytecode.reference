@@ -1,0 +1,6 @@
+t1: uniform
+t2: uniform
+all_unit_u: uniform
+t3: mixed (scannable_prefix_len = 3)
+int t4: uniform
+float# t4: mixed (scannable_prefix_len = 2)
