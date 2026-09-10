@@ -493,9 +493,9 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             let exn_cont, env =
               Env.bind_named_continuation env exn_continuation
             in
+            let bound_params = Bound_parameters.to_list params in
             let params, env =
-              map_accum_left kinded_parameter env
-                (Bound_parameters.to_list params)
+              map_accum_left kinded_parameter env bound_params
             in
             let closure_var, env = Env.bind_var env my_closure in
             let (region_vars : _ Fexpr.alloc_mode_for_applications), env =
@@ -515,11 +515,16 @@ and static_let_expr env bound_static defining_expr body : Fexpr.expr =
             in
             let depth_var, env = Env.bind_var env my_depth in
             let specialised_params =
-              List.map
-                (fun (param, value_slot) ->
-                  ( Env.find_var_exn env param,
-                    Env.translate_value_slot env value_slot ))
-                (Variable.Map.bindings specialised_params)
+              (* In parameter order, for stable output. *)
+              List.filter_map
+                (fun param ->
+                  let param = Bound_parameter.var param in
+                  Option.map
+                    (fun value_slot ->
+                      ( Env.find_var_exn env param,
+                        Env.translate_value_slot env value_slot ))
+                    (Variable.Map.find_opt param specialised_params))
+                bound_params
             in
             let body = expr env body in
             (* CR-someday lmaurer: Omit exn_cont, closure_var if not used *)

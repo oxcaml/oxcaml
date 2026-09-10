@@ -1,19 +1,17 @@
-let code helper deleted in
-let code map deleted in
-let code inline(never) loopify(never) size(6) newer_version_of(helper)
-      helper_1 (f : val, x : val) specialised { f = f_slot }
+let code inline(never) size(10)
+      helper (f : val, x : val) specialised { f = f_slot }
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =
   apply &my_alloc_region f (x) -> k * e
 in
+let code map deleted in
 let code loopify(never) size(4) newer_version_of(map)
       map_1 (g : val, x : val)
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =
-  let site = closure specialisation_site helper_1 @helper &my_alloc_region in
-  apply direct(helper_1 &my_alloc_region)  (g, x) -> k * e
+  apply direct(helper &my_alloc_region)  (g, x) -> k * e
 in
 let $map = closure map_1 @map &toplevel in
 let $camlSpecialised_params_empty_site = Block 0 ($map) in

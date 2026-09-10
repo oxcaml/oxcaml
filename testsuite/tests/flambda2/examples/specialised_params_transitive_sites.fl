@@ -16,35 +16,47 @@
    calls the new [first], so all three sites must survive. The unused chain in
    [dead] must disappear, except for phantom/debug bindings. *)
 
-let code inline(never) size(10) first (x : val)
+let code inline(never) size(10) first (x : val) specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
   cont k (x)
 in
-let code inline(never) size(10) second (x : val)
+let code inline(never) size(10) second (x : val) specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
   apply direct(first &my_alloc_region) (x) -> k * e
 in
-let code inline(never) size(10) third (x : val)
+let code inline(never) size(10) third (x : val) specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
   apply direct(second &my_alloc_region) (x) -> k * e
 in
 let code size(30) live (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first &my_alloc_region in
-  let b = closure specialisation_site second &my_alloc_region in
-  let c = closure specialisation_site third &my_alloc_region in
+  let a = closure specialisation_site first &my_alloc_region
+    synthetic { x_slot = x }
+  in
+  let b = closure specialisation_site second &my_alloc_region
+    synthetic { x_slot = x }
+  in
+  let c = closure specialisation_site third &my_alloc_region
+    synthetic { x_slot = x }
+  in
   apply direct(third &my_alloc_region) (x) -> k * e
 in
 let code size(30) dead (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first &my_alloc_region in
-  let b = closure specialisation_site second &my_alloc_region in
-  let c = closure specialisation_site third &my_alloc_region in
+  let a = closure specialisation_site first &my_alloc_region
+    synthetic { x_slot = x }
+  in
+  let b = closure specialisation_site second &my_alloc_region
+    synthetic { x_slot = x }
+  in
+  let c = closure specialisation_site third &my_alloc_region
+    synthetic { x_slot = x }
+  in
   cont k (x)
 in
-(* In normal mode, unboxing [nested_second]'s cell re-simplifies it and its
-   ordinary nested closure, kept non-lifted by [captured]. The nested code's
-   dependency on [first] must reach [nested], retaining [a]. *)
+(* The new [nested_second] re-simplifies its nested closure, whose new code
+   calls the new [first]. That dependency must reach [nested] through the
+   nested code, retaining [a]. *)
 
 let code inline(never) size(10) nested_third (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
@@ -52,16 +64,19 @@ let code inline(never) size(10) nested_third (x : val)
   apply direct(first &my_alloc_region) (v) -> k * e
 in
 let code inline(never) size(20) nested_second (x : val)
+      specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
-  let r = %block.mut.[`0`].my_alloc_region (x) in
-  let v = %block_load.mut.[`0`] (r) in
-  let c = closure nested_third &my_alloc_region with { captured = v } in
+  let c = closure nested_third &my_alloc_region with { captured = x } in
   apply direct(nested_third &my_alloc_region) c (x) -> k * e
 in
 let code size(30) nested (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first &my_alloc_region in
-  let b = closure specialisation_site nested_second &my_alloc_region in
+  let a = closure specialisation_site first &my_alloc_region
+    synthetic { x_slot = x }
+  in
+  let b = closure specialisation_site nested_second &my_alloc_region
+    synthetic { x_slot = x }
+  in
   apply direct(nested_second &my_alloc_region) (x) -> k * e
 in
 let $live = closure live &toplevel in

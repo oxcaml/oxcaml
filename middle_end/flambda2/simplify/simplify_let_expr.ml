@@ -250,12 +250,13 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                     } =
                   UA.specialisation_site_info uacc
                 in
-                (* Even an empty site can specialise its callees using other
-                   sites in scope when the enclosing code is inlined. *)
-                List.exists
-                  (fun code_id -> Code_id.Set.mem code_id live_code_ids)
-                  (Function_declarations.code_ids
-                     (Set_of_closures.function_decls set))
+                (not
+                   (Value_slot.Map.is_empty
+                      (Set_of_closures.synthetic_value_slots set)))
+                && List.exists
+                     (fun code_id -> Code_id.Set.mem code_id live_code_ids)
+                     (Function_declarations.code_ids
+                        (Set_of_closures.function_decls set))
               | ( ( Set_of_closures _ | Simple _ | Prim _ | Static_consts _
                   | Rec_info _ ),
                   (In_a_closure | Not_in_a_closure) ) ->

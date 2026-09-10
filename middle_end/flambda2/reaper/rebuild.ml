@@ -99,8 +99,8 @@ type env =
     dynamic_sets_of_closures : Traverse_acc.dynamic_sets_of_closures;
     (* Shared by the rebuilding of calls and bindings, which must agree. *)
     specialisation_sites : specialisation_site option Variable.Map.t ref;
-        (* Keyed by the representative variable of each original binding. [Some]
-           can have no hints; [None] means no site is needed. *)
+        (* Keyed by the representative variable of each original binding. [None]
+           means no site is needed. *)
     site_vars : Variable.t Variable.Map.t ref;
         (* Original closure variable to specialisation site variable. *)
     synthetic_slots_by_path : Leaf_slots.t Value_slot.Map.t ref
@@ -621,17 +621,18 @@ let used_functions env (set : Rev_expr.rev_set_of_closures) =
     (Function_slot.Lmap.bindings
        (Function_declarations.funs_in_order set.function_decls))
 
-(* Existing sites and captures that become parameters provide a site even if all
-   hints disappear: re-simplifying its code can use contextual assumptions from
-   other sites. Originally fieldless closures need no new site. *)
+(* The synthetic value slots of the site left behind when the given set is
+   unboxed: the surviving existing ones, plus the contents of the value slots
+   that become parameters. No site is left without slots (see
+   [Set_of_closures]). *)
 let compute_specialisation_site env (set : Rev_expr.rev_set_of_closures) :
     specialisation_site option =
   match used_functions env set with
   | [] -> None
   | used_functions ->
-    let needed, synthetic_value_slots =
+    let synthetic_value_slots =
       List.fold_left
-        (fun (needed, slots) (_, code_id, _) ->
+        (fun slots (_, code_id, _) ->
           match
             Unboxing_analysis.get_calling_convention_change env.code_changes
               code_id
@@ -642,22 +643,19 @@ let compute_specialisation_site env (set : Rev_expr.rev_set_of_closures) :
                 params_decisions = _;
                 return_decisions = _
               } ->
-            needed, slots
+            slots
           | Changing_calling_convention
               { my_closure_decision = Unbox_my_closure fields;
                 params_decisions = _;
                 return_decisions = _
               } ->
-            ( needed || not (Field.Map.is_empty fields),
-              Value_slot.Map.union_left_biased slots
-                (synthetic_value_slots_of_unboxed_closure env
-                   ~value_slots:set.value_slots fields) ))
-        ( set.is_specialisation_site
-          || not (Value_slot.Map.is_empty set.synthetic_value_slots),
-          rewrite_synthetic_value_slots env set.synthetic_value_slots )
+            Value_slot.Map.union_left_biased slots
+              (synthetic_value_slots_of_unboxed_closure env
+                 ~value_slots:set.value_slots fields))
+        (rewrite_synthetic_value_slots env set.synthetic_value_slots)
         used_functions
     in
-    if not needed
+    if Value_slot.Map.is_empty synthetic_value_slots
     then None
     else
       let function_decls =
@@ -2226,9 +2224,12 @@ let rebuild_let_expr_holed_set_of_closures env res bvs
     in
     let is_used =
       some_var_is_used
-      || env.inside_code_definition && set_of_closures.is_specialisation_site
-         && List.exists (is_code_id_used env)
-              (Function_declarations.code_ids set_of_closures.function_decls)
+      || set_of_closures.is_specialisation_site
+         &&
+         match bvs with
+         | [] -> false
+         | bv :: _ ->
+           Option.is_some (specialisation_site env (Bound_var.var bv))
     in
     if not is_used
     then hole, res

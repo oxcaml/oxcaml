@@ -299,12 +299,7 @@ let compute_code_specialisations denv ~all_sets_of_closures
   List.fold_left2
     (fun code_specialisations (set_of_closures, _alloc_mode)
          synthetic_value_slots ->
-      let is_specialisation_site =
-        Set_of_closures.is_specialisation_site set_of_closures
-      in
-      if
-        Value_slot.Map.is_empty synthetic_value_slots
-        && not is_specialisation_site
+      if Value_slot.Map.is_empty synthetic_value_slots
       then code_specialisations
       else
         List.fold_left
@@ -317,12 +312,9 @@ let compute_code_specialisations denv ~all_sets_of_closures
               let assumptions =
                 assumptions_for_code old_code_id ~synthetic_value_slots
               in
-              (* A marked site's code can use other specialisations in scope
-                 even without assumptions of its own. Keep that candidate;
-                 candidates with more matching assumptions take precedence. *)
-              if
-                List.for_all Option.is_none assumptions
-                && not is_specialisation_site
+              (* A candidate without assumptions would only redirect calls to a
+                 version of the code that is no more specialised. *)
+              if List.for_all Option.is_none assumptions
               then code_specialisations
               else
                 Code_id.Map.add old_code_id

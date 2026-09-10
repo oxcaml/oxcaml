@@ -6,17 +6,17 @@
  fexpr with dump-simplify;
 *)
 
-(* [outer] calls [wrap], which returns a lifted [g] closure calling [helper].
-   The empty site must survive the code -> symbol -> code path. The unused copy
-   of this chain must not keep [dead_site] alive. *)
+(* [outer] calls [wrap], which returns a lifted [g] closure whose code calls the
+   specialised [helper]. The site must survive the code -> symbol -> code path.
+   The unused copy of this chain must not keep [dead_site] alive. *)
 
-let code inline(never) size(10) helper (x : val)
+let code inline(never) size(10) helper (x : val) specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
   cont k (x)
 in
 let code inline(never) size(10) g (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  apply direct(helper &my_alloc_region) (x) -> k * e
+  apply direct(helper &my_alloc_region) (0) -> k * e
 in
 let code inline(never) size(10) wrap (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
@@ -24,12 +24,13 @@ let code inline(never) size(10) wrap (x : val)
   cont k (g)
 in
 let code inline(never) size(10) unused_helper (x : val)
+      specialised { x = unused_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
   cont k (x)
 in
 let code inline(never) size(10) unused_g (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  apply direct(unused_helper &my_alloc_region) (x) -> k * e
+  apply direct(unused_helper &my_alloc_region) (0) -> k * e
 in
 let code inline(never) size(10) unused_wrap (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
@@ -38,8 +39,12 @@ let code inline(never) size(10) unused_wrap (x : val)
 in
 let code size(30) outer (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =
-  let site = closure specialisation_site helper &my_alloc_region in
-  let dead_site = closure specialisation_site unused_helper &my_alloc_region in
+  let site = closure specialisation_site helper &my_alloc_region
+    synthetic { x_slot = 0 }
+  in
+  let dead_site = closure specialisation_site unused_helper &my_alloc_region
+    synthetic { unused_slot = 0 }
+  in
   let unused = closure unused_wrap &my_alloc_region in
   let wrap = closure wrap &my_alloc_region in
   apply direct(wrap &my_alloc_region) wrap (x) -> k * e

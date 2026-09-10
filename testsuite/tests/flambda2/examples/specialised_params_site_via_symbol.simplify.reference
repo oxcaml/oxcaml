@@ -3,12 +3,15 @@ let code g deleted in
 let code wrap deleted in
 let code outer deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(helper)
-      helper_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  cont k (x)
+      helper_1 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  cont k (0)
 in
 let code inline(never) loopify(never) size(4) newer_version_of(g)
       g_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  apply direct(helper_1 &my_alloc_region)  (x) -> k * e
+  apply direct(helper_1 &my_alloc_region)  (0) -> k * e
 in
 let $camlSpecialised_params_site_via_symbol__g_3 = closure g_1 @g &toplevel
 in
@@ -21,7 +24,10 @@ let $camlSpecialised_params_site_via_symbol__wrap_2 =
 in
 let code loopify(never) size(4) newer_version_of(outer)
       outer_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  let site = closure specialisation_site helper_1 @helper &my_alloc_region in
+  let site =
+    closure specialisation_site helper_1 @helper &my_alloc_region
+      synthetic { x_slot = 0 }
+  in
   apply direct(wrap_1 &my_alloc_region)
     $camlSpecialised_params_site_via_symbol__wrap_2 (x) -> k * e
 in

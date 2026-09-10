@@ -1,13 +1,22 @@
 let code inline(never) size(10)
-      first (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      first (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   cont k (x)
 in
 let code inline(never) size(10)
-      second (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      second (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(first &my_alloc_region)  (x) -> k * e
 in
 let code inline(never) size(10)
-      third (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      third (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(second &my_alloc_region)  (x) -> k * e
 in
 let code live deleted in
@@ -16,47 +25,86 @@ let code nested_third deleted in
 let code nested_second deleted in
 let code nested deleted in
 let code inline(never) loopify(never) size(1) newer_version_of(first)
-      first_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      first_1 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   cont k (x)
 in
 let code inline(never) loopify(never) size(4) newer_version_of(second)
-      second_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      second_1 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(first_1 &my_alloc_region)  (x) -> k * e
 in
 let code inline(never) loopify(never) size(4) newer_version_of(third)
-      third_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      third_1 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(second_1 &my_alloc_region)  (x) -> k * e
 in
 let code loopify(never) size(4) newer_version_of(live)
       live_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first_1 @first &my_alloc_region in
-  let b = closure specialisation_site second_1 @second &my_alloc_region in
-  let c = closure specialisation_site third_1 @third &my_alloc_region in
+  let a =
+    closure specialisation_site first_1 @first &my_alloc_region
+      synthetic { x_slot = x }
+  in
+  let b =
+    closure specialisation_site second_1 @second &my_alloc_region
+      synthetic { x_slot = x }
+  in
+  let c =
+    closure specialisation_site third_1 @third &my_alloc_region
+      synthetic { x_slot = x }
+  in
   apply direct(third_1 &my_alloc_region)  (x) -> k * e
 in
 let $live = closure live_1 @live &toplevel in
 let code inline(never) loopify(never) size(1) newer_version_of(first)
-      first_2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      first_2 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   cont k (x)
 in
 let code inline(never) loopify(never) size(4) newer_version_of(second)
-      second_2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      second_2 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(first_2 &my_alloc_region)  (x) -> k * e
 in
 let code inline(never) loopify(never) size(4) newer_version_of(third)
-      third_2 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      third_2 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   apply direct(second_2 &my_alloc_region)  (x) -> k * e
 in
 let code loopify(never) size(1) newer_version_of(dead)
       dead_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first_2 @first &my_alloc_region in
-  let b = closure specialisation_site second_2 @second &my_alloc_region in
-  let c = closure specialisation_site third_2 @third &my_alloc_region in
+  let a =
+    closure specialisation_site first_2 @first &my_alloc_region
+      synthetic { x_slot = x }
+  in
+  let b =
+    closure specialisation_site second_2 @second &my_alloc_region
+      synthetic { x_slot = x }
+  in
+  let c =
+    closure specialisation_site third_2 @third &my_alloc_region
+      synthetic { x_slot = x }
+  in
   cont k (x)
 in
 let $dead = closure dead_1 @dead &toplevel in
 let code inline(never) loopify(never) size(1) newer_version_of(first)
-      first_3 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+      first_3 (x : val) specialised { x = x_slot }
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
   cont k (x)
 in
 let code inline(never) loopify(never) size(5) newer_version_of(nested_third)
@@ -67,24 +115,25 @@ let code inline(never) loopify(never) size(5) newer_version_of(nested_third)
   let v = %project_value_slot.[nested_third].[captured] (my_closure) in
   apply direct(first_3 &my_alloc_region)  (v) -> k * e
 in
-let code inline(never) loopify(never) size(24) newer_version_of(nested_second)
-      nested_second_1 (x : val)
+let code inline(never) loopify(never) size(17) newer_version_of(nested_second)
+      nested_second_1 (x : val) specialised { x = x_slot }
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =
-  let r = %block.mut.[`0`].my_alloc_region (x) in
-  let v = %block_load.mut.[`0`] (r) in
   let c = closure nested_third_1 @nested_third &my_alloc_region
-  with { captured = v }
+  with { captured = x }
   in
   apply direct(nested_third_1 &my_alloc_region) c (x) -> k * e
 in
 let code loopify(never) size(4) newer_version_of(nested)
       nested_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
-  let a = closure specialisation_site first_3 @first &my_alloc_region in
+  let a =
+    closure specialisation_site first_3 @first &my_alloc_region
+      synthetic { x_slot = x }
+  in
   let b =
     closure specialisation_site nested_second_1 @nested_second
-      &my_alloc_region
+      &my_alloc_region synthetic { x_slot = x }
   in
   apply direct(nested_second_1 &my_alloc_region)  (x) -> k * e
 in

@@ -1,5 +1,5 @@
 let code inline(never) size(10)
-      helper (p : val, q : val) specialised { q = q_slot; p = p_slot }
+      helper (p : val, q : val) specialised { p = p_slot; q = q_slot }
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =
@@ -8,7 +8,7 @@ let code inline(never) size(10)
 in
 let code outer deleted in
 let code inline(never) loopify(never) size(5) newer_version_of(helper)
-      helper_1 (p : val, q : val) specialised { q = q_slot; p = p_slot }
+      helper_1 (p : val, q : val) specialised { p = p_slot; q = q_slot }
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =
@@ -16,7 +16,7 @@ let code inline(never) loopify(never) size(5) newer_version_of(helper)
   cont k (r)
 in
 let code inline(never) loopify(never) size(1) newer_version_of(helper)
-      helper_2 (p : val, q : val) specialised { q = q_slot; p = p_slot }
+      helper_2 (p : val, q : val) specialised { p = p_slot; q = q_slot }
         my_closure &my_alloc_region my_depth
         -> k * e
         : val =

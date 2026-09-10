@@ -13,8 +13,8 @@ let code inline(never) loopify(never) size(7) newer_version_of(u_4)
       u_4_1
         (u_into_my_closure_field_g_field_y, u_into_my_closure_field_g_field_x)
         specialised {
-          u_into_my_closure_field_g_field_x = g_field_x;
-          u_into_my_closure_field_g_field_y = g_field_y
+          u_into_my_closure_field_g_field_y = g_field_y;
+          u_into_my_closure_field_g_field_x = g_field_x
         }
         my_closure &my_alloc_region my_depth
         -> k * k1

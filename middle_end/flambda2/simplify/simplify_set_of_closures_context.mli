@@ -48,9 +48,7 @@ val dacc_prior_to_sets : t -> DA.t
 val old_to_new_code_ids_all_sets : t -> Code_id.t Code_id.Map.t
 
 (** Assumptions indexed by old code ID. Already recorded inside the functions;
-    use [record_code_specialisations] for the scope of the sets' bindings. A
-    marked site may have no assumptions: its code can still use other
-    specialisations in scope. *)
+    use [record_code_specialisations] for the scope of the sets' bindings. *)
 val code_specialisations : t -> DE.Code_specialisation.t Code_id.Map.t
 
 val record_code_specialisations :

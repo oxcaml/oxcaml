@@ -6,8 +6,8 @@
  fexpr with dump-simplify, dump-reaper;
 *)
 
-(* A live empty site still versions its code: later simplification may use
-   specialisations of its callees. A separate unused site must disappear. *)
+(* A site with no synthetic value slots is deleted, whether or not its code is
+   called (see [Set_of_closures]); the call keeps using the generic code. *)
 
 let code inline(never) size(10) helper (f : val, x : val)
       specialised { f = f_slot }

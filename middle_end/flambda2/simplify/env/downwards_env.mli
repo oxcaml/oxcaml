@@ -277,8 +277,7 @@ module Code_specialisation : sig
           (** One entry per parameter, in order. [None] imposes no condition;
               [Some (slot, value)] requires the argument to equal [value].
               Checked even inside the set's own functions, since inlining can
-              bring in calls made under other assumptions. All entries may be
-              [None]: the new code can still specialise its callees. *)
+              bring in calls made under other assumptions. *)
     }
 end
 
