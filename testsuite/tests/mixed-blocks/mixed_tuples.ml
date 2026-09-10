@@ -1,15 +1,23 @@
 (* TEST
  include stdlib_upstream_compatible;
  flambda2;
- { expect.opt; }
+ { expect; }
 *)
 
 (* The native toplevel prints mixed tuples as [<abstr>], so we check values
    with structural equality helpers instead. *)
 
 module Float_u = Stdlib_upstream_compatible.Float_u
+
+let block_kind x =
+  let uniform_or_mixed = Obj.Uniform_or_mixed.of_block (Obj.repr x) in
+  match Obj.Uniform_or_mixed.repr uniform_or_mixed with
+  | Uniform -> "uniform"
+  | Mixed { scannable_prefix_len } ->
+    Printf.sprintf "mixed (scannable_prefix_len = %d)" scannable_prefix_len
 [%%expect{|
 module Float_u = Stdlib_upstream_compatible.Float_u
+val block_kind : 'a -> string = <fun>
 |}]
 
 (* basics *)
@@ -24,19 +32,22 @@ let reconstruct_t1 =
     match 4, #("hi", false) with
     | x, #(y, z) -> x, #(y, z)
   in
-  assert (equal_t1 reconstructed (4, #("hi", false)))
+  assert (equal_t1 reconstructed (4, #("hi", false)));
+  block_kind reconstructed
 [%%expect{|
 type t1 = int * #(string * bool)
 val equal_t1 : t1 -> t1 -> bool = <fun>
-val reconstruct_t1 : unit = ()
+val reconstruct_t1 : string = "uniform"
 |}]
 
 type t2 = unit# * unit# * int
 
 let make_t2 = (#(), #(), 42)
+let make_t2_kind = block_kind make_t2
 [%%expect{|
 type t2 = unit# * unit# * int
 val make_t2 : unit# * unit# * int = <abstr>
+val make_t2_kind : string = "uniform"
 |}]
 
 type t3 = int * float# * #((unit * string) * unit#)
@@ -51,11 +62,12 @@ let reconstruct_t3 =
     match (42, #4.0, #(((), "hi"), #())) with
     | (a, b, #((c, d), e)) -> (a, b, #((c, d), e))
   in
-  assert (equal_t3 reconstructed (42, #4.0, #(((), "hi"), #())))
+  assert (equal_t3 reconstructed (42, #4.0, #(((), "hi"), #())));
+  block_kind reconstructed
 [%%expect{|
 type t3 = int * float# * #((unit * string) * unit#)
 val equal_t3 : t3 -> t3 -> bool = <fun>
-val reconstruct_t3 : unit = ()
+val reconstruct_t3 : string = "mixed (scannable_prefix_len = 2)"
 |}]
 
 (* CR zeisbach: should this pass? what tests are needed for this behavior?
@@ -72,9 +84,13 @@ val make_all_void : t_void -> t_void * t_void = <fun>
 
 type all_unit_u = unit# * unit# * unit#
 let all_unit_v = (#(), #(), #())
+(* CR zeisbach: should this be mixed to match mixed records? what would the
+   benefits of doing that be? Probably for consistency! *)
+let all_unit_v_kind = block_kind all_unit_v
 [%%expect{|
 type all_unit_u = unit# * unit# * unit#
 val all_unit_v : unit# * unit# * unit# = <abstr>
+val all_unit_v_kind : string = "uniform"
 |}]
 
 type ('a : any) t4 = 'a * int
@@ -90,9 +106,10 @@ let check =
   let v4_uniform : int t4 = (6, 7) in
   let v4_mixed : float# t4 = (#6.0, 7) in
   assert (v4_uniform = (6, 7));
-  assert (equal_t4_float v4_mixed (#6.0, 7))
+  assert (equal_t4_float v4_mixed (#6.0, 7));
+  block_kind v4_uniform, block_kind v4_mixed
 [%%expect{|
-val check : unit = ()
+val check : string * string = ("uniform", "mixed (scannable_prefix_len = 1)")
 |}]
 
 (* There is a cap on the number of elements in the scannable prefix. The error
@@ -253,8 +270,6 @@ module M :
   end
 |}]
 
-
-
 (* [let*] and [and*] desugar into a mixed tuple. *)
 
 let letop_mixed =
@@ -267,3 +282,5 @@ let letop_mixed =
 [%%expect{|
 val letop_mixed : int * string * bool = (4, "hi", true)
 |}]
+
+(* value_rec_compiler checks *)
