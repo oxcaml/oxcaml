@@ -61,18 +61,18 @@ for_loop_layout:
   subq  $24, %rsp
   movq  %rbx, (%rsp)
   sarq  $1, %rax
-  movq  %rax, 8(%rsp)
+  movq  %rax, 16(%rsp)
   xorl  %eax, %eax
 .L0:
-  movq  %rax, 16(%rsp)
+  movq  %rax, 8(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L1:
-  movq  16(%rsp), %rax
+  movq  8(%rsp), %rax
   incq  %rax
   movq  (%rsp), %rbx
-  movq  8(%rsp), %rdi
+  movq  16(%rsp), %rdi
   cmpq  %rdi, %rax
   jle   .L0
   movl  $1, %eax
@@ -228,14 +228,14 @@ module M = struct
 end
 [%%expect_asm X86_64{|
 M.f:
-  movq  %rax, %rdi
-  movq  -8(%rdi), %rax
+  movq  %rax, %rsi
+  movq  -8(%rsi), %rax
   salq  $8, %rax
   shrq  $18, %rax
   movq  %rax, %rbx
   shrq  $63, %rbx
-  movabsq $6148914691236517206, %rsi
-  imulq %rsi
+  movabsq $6148914691236517206, %rdi
+  imulq %rdi
   leaq  (%rdx,%rbx), %rax
   leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
@@ -244,12 +244,12 @@ M.f:
   vxorpd %xmm0, %xmm0, %xmm0
   xorl  %ebx, %ebx
 .L0:
-  movq  %rbx, %rsi
-  imulq $6, %rsi
-  incq  %rsi
-  vmovsd -4(%rdi,%rsi,4), %xmm1
-  vmulsd 4(%rdi,%rsi,4), %xmm1, %xmm1
-  vmulsd 12(%rdi,%rsi,4), %xmm1, %xmm1
+  movq  %rbx, %rdi
+  imulq $6, %rdi
+  incq  %rdi
+  vmovsd -4(%rsi,%rdi,4), %xmm1
+  vmulsd 4(%rsi,%rdi,4), %xmm1, %xmm1
+  vmulsd 12(%rsi,%rdi,4), %xmm1, %xmm1
   vaddsd %xmm1, %xmm0, %xmm0
   incq  %rbx
   cmpq  %rax, %rbx
