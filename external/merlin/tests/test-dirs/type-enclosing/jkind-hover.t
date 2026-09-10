@@ -4,15 +4,15 @@ Test that hovering over jkind annotations shows their full expansion.
 
   $ print_merlin_result () {
   >   result="$1"
-  >   line=$(echo "$result" | jq '.start.line')
-  >   start=$(echo "$result" | jq '.start.col')
-  >   end=$(echo "$result" | jq '.end.col')
+  >   line=$(printf '%s\n' "$result" | jq '.start.line')
+  >   start=$(printf '%s\n' "$result" | jq '.start.col')
+  >   end=$(printf '%s\n' "$result" | jq '.end.col')
   >   
   >   start_for_cut=$((start + 1))
   >   end_for_cut=$((end + 1))
   >   value=$(sed -n "${line}p" "$file" | cut -c "${start_for_cut}-${end_for_cut}")
-  >   type=$(echo "$result" | jq '.type' -r)
-  >   echo "\"$value\" : \"$type\""
+  >   type=$(printf '%s\n' "$result" | jq '.type' -r)
+  >   printf '"%s" : "%s"\n' "$value" "$type"
   > }
 
   $ hover () {
