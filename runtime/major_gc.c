@@ -2273,10 +2273,28 @@ static void major_collection_slice(intnat howmuch,
        at the same time. (Needed for performance, not for safety.)
      */
     uintnat wkcnt = atomic_load (&total_work_completed);
-    intnat idle;
-  retry_idle:
-    idle = diffmod (work_completed_min_before_mark, wkcnt);
-    if (idle <= 0){
+    intnat idle = diffmod (work_completed_min_before_mark, wkcnt);
+    /* Idle work is drawn from the slice budget, so that
+       Gc.major_slice makes progress towards marking even in the
+       absence of allocation. */
+    intnat idle_work = 0;
+    while (idle > 0) {
+      intnat todo = min2 (get_major_slice_sweepwork(mode), idle);
+      if (todo <= 0) break;
+      if (atomic_compare_exchange_strong(&total_work_completed,
+                                         &wkcnt, wkcnt + todo)){
+        account_work_completed(todo);
+        wkcnt += todo;
+        idle_work += todo;
+      }
+      /* On failure, the compare_exchange reloads [wkcnt]. */
+      idle = diffmod (work_completed_min_before_mark, wkcnt);
+    }
+    if (idle_work > 0) {
+      CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
+                       idle_work, idle <= 0 ? " [finished]" : "");
+    }
+    if (idle <= 0) {
       /* Idle phase is finished (or never existed), we should start marking */
       request_mark_phase();
       /* If there was neither sweeping nor idle work to do, but marking
@@ -2285,16 +2303,6 @@ static void major_collection_slice(intnat howmuch,
       if (sweep_work == 0) {
         caml_request_minor_gc();
       }
-    } else {
-      intnat todo = diffmod (atomic_load (&total_work_incurred), wkcnt);
-      todo = min2 (todo, idle);
-      CAML_GC_MESSAGE (SLICE, "Idle phase: "F_D"%s\n",
-                       todo, todo == idle ? " [finished]" : "");
-      if (!atomic_compare_exchange_strong(&total_work_completed,
-                                          &wkcnt, wkcnt + todo))
-        goto retry_idle;
-      account_work_completed(todo);
-      if (todo == idle) request_mark_phase ();
     }
   }
 
