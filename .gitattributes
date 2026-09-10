@@ -51,6 +51,8 @@
 # check verifies that they're in line, so there's no need to review them.
 /external/merlin/upstream/ocaml_flambda/**/*.ml linguist-generated
 /external/merlin/upstream/ocaml_flambda/**/*.mli linguist-generated
+/external/merlin/upstream/ocaml_flambda/**/*.mll linguist-generated
+/external/merlin/upstream/ocaml_flambda/**/*.mly linguist-generated
 
 # 'union' merge driver just unions textual content in case of conflict
 #   http://krlmlr.github.io/using-gitattributes-to-avoid-merge-conflicts/
