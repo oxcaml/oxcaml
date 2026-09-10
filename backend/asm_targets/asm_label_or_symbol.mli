@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,23 +12,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Either an assembly label or an assembly symbol. *)
+
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-(** A value of type [t] represents an "initial length" (DWARF-4 standard section
-    7.4). *)
-type t
+type t =
+  | Label of Asm_label.t
+  | Symbol of Asm_symbol.t
 
-val create : Dwarf_int.t -> t
+val compare : t -> t -> int
 
-val to_dwarf_int : t -> Dwarf_int.t
+val equal : t -> t -> bool
 
-include Dwarf_emittable.S with type t := t
+val hash : t -> int
 
-(** Emit an initial length whose value is computed by the assembler as the
-    distance between the two labels (which must be in the same section),
-    including the 64-bit indicator when the DWARF format is 64-bit. *)
-val emit_as_label_difference :
-  asm_directives:Asm_targets.Asm_directives_dwarf.t ->
-  upper:Asm_targets.Asm_label.t ->
-  lower:Asm_targets.Asm_label.t ->
-  unit
+val print : Format.formatter -> t -> unit

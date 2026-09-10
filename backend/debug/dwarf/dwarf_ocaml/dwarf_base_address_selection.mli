@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,23 +12,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-30-40-41-42"]
+(** Selection of the symbol from which the offsets in location and range list
+    entries are computed, together with any DWARF-4 base address selection entry
+    that must precede such entries. *)
 
-(** A value of type [t] represents an "initial length" (DWARF-4 standard section
-    7.4). *)
-type t
+open Asm_targets
 
-val create : Dwarf_int.t -> t
-
-val to_dwarf_int : t -> Dwarf_int.t
-
-include Dwarf_emittable.S with type t := t
-
-(** Emit an initial length whose value is computed by the assembler as the
-    distance between the two labels (which must be in the same section),
-    including the 64-bit indicator when the DWARF format is 64-bit. *)
-val emit_as_label_difference :
-  asm_directives:Asm_targets.Asm_directives_dwarf.t ->
-  upper:Asm_targets.Asm_label.t ->
-  lower:Asm_targets.Asm_label.t ->
-  unit
+val start_of_code_symbol_and_base_entries :
+  Dwarf_state.t ->
+  function_symbol:Asm_symbol.t ->
+  create_base_address_selection_entry:(base_address_symbol:Asm_symbol.t -> 'a) ->
+  Asm_symbol.t * 'a list

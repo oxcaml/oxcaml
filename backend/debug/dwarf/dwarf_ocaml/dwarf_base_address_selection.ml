@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -12,23 +12,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-30-40-41-42"]
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
-(** A value of type [t] represents an "initial length" (DWARF-4 standard section
-    7.4). *)
-type t
-
-val create : Dwarf_int.t -> t
-
-val to_dwarf_int : t -> Dwarf_int.t
-
-include Dwarf_emittable.S with type t := t
-
-(** Emit an initial length whose value is computed by the assembler as the
-    distance between the two labels (which must be in the same section),
-    including the 64-bit indicator when the DWARF format is 64-bit. *)
-val emit_as_label_difference :
-  asm_directives:Asm_targets.Asm_directives_dwarf.t ->
-  upper:Asm_targets.Asm_label.t ->
-  lower:Asm_targets.Asm_label.t ->
-  unit
+let start_of_code_symbol_and_base_entries state ~function_symbol
+    ~create_base_address_selection_entry =
+  match !Dwarf_flags.gdwarf_version with
+  | Five ->
+    (* The offsets in DWARF-5 location and range list entries are relative to
+       the function symbol, which is established as the base address of each
+       list. *)
+    function_symbol, []
+  | Four -> (
+    match Dwarf_state.code_layout state with
+    | Function_sections ->
+      ( function_symbol,
+        [ create_base_address_selection_entry
+            ~base_address_symbol:function_symbol ] )
+    | Continuous_code_section { code_begin; _ } -> code_begin, [])

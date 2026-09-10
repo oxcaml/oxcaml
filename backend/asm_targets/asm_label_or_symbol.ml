@@ -4,7 +4,7 @@
 (*                                                                        *)
 (*                  Mark Shinwell, Jane Street Europe                     *)
 (*                                                                        *)
-(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -14,21 +14,23 @@
 
 [@@@ocaml.warning "+a-4-30-40-41-42"]
 
-(** A value of type [t] represents an "initial length" (DWARF-4 standard section
-    7.4). *)
-type t
+type t =
+  | Label of Asm_label.t
+  | Symbol of Asm_symbol.t
 
-val create : Dwarf_int.t -> t
+let compare t1 t2 =
+  match t1, t2 with
+  | Label lbl1, Label lbl2 -> Asm_label.compare lbl1 lbl2
+  | Symbol sym1, Symbol sym2 -> Asm_symbol.compare sym1 sym2
+  | Label _, Symbol _ -> -1
+  | Symbol _, Label _ -> 1
 
-val to_dwarf_int : t -> Dwarf_int.t
+let equal t1 t2 = compare t1 t2 = 0
 
-include Dwarf_emittable.S with type t := t
+let hash = function
+  | Label lbl -> Hashtbl.hash (0, Asm_label.hash lbl)
+  | Symbol sym -> Hashtbl.hash (1, Asm_symbol.hash sym)
 
-(** Emit an initial length whose value is computed by the assembler as the
-    distance between the two labels (which must be in the same section),
-    including the 64-bit indicator when the DWARF format is 64-bit. *)
-val emit_as_label_difference :
-  asm_directives:Asm_targets.Asm_directives_dwarf.t ->
-  upper:Asm_targets.Asm_label.t ->
-  lower:Asm_targets.Asm_label.t ->
-  unit
+let print ppf = function
+  | Label lbl -> Asm_label.print ppf lbl
+  | Symbol sym -> Asm_symbol.print ppf sym
