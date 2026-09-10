@@ -718,7 +718,8 @@ let property : (prop, unit) Typedecl_properties.property =
   let compute env decl () = compute_decl env decl in
   let update_decl decl type_separability = { decl with type_separability } in
   let check _env _id _decl _req = () in (* FIXME run final check? *)
-  { eq; merge; default; compute; update_decl; check; }
+  { eq; merge; default; compute; update_decl;
+    unboxed_version_inherits_prop = false; check; }
 
 (* Definition using the fixpoint infrastructure. *)
 let update_decls env decls =

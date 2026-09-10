@@ -1594,3 +1594,40 @@ Lines 10-12, characters 11-4:
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
 |}]
+
+(* Test 45: [t# box] reduces to [t], so the unboxed version of a record with
+   mutable fields must be invariant like the boxed version; otherwise a
+   coercion through [box] changes the type of a mutable field in place. *)
+
+type 'a mut = { mutable a : 'a }
+type 'a imm = { i : 'a }
+[%%expect{|
+type 'a mut = { mutable a : 'a; }
+type 'a imm = { i : 'a; }
+|}]
+
+let bad (x : [ `A ] mut) = (x : [ `A ] mut# box :> [ `A | `B ] mut# box)
+[%%expect{|
+Line 1, characters 27-72:
+1 | let bad (x : [ `A ] mut) = (x : [ `A ] mut# box :> [ `A | `B ] mut# box)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `A ] mut# box" = "[ `A ] mut" is not a subtype of
+         "[ `A | `B ] mut# box" = "[ `A | `B ] mut"
+       The first variant type does not allow tag(s) "`B"
+|}]
+
+let bad_ref (x : [ `A ] ref) = (x : [ `A ] ref# box :> [ `A | `B ] ref# box)
+[%%expect{|
+Line 1, characters 31-76:
+1 | let bad_ref (x : [ `A ] ref) = (x : [ `A ] ref# box :> [ `A | `B ] ref# box)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `A ] ref# box" = "[ `A ] ref" is not a subtype of
+         "[ `A | `B ] ref# box" = "[ `A | `B ] ref"
+       The first variant type does not allow tag(s) "`B"
+|}]
+
+(* Immutable records keep their covariance through [box]. *)
+let ok (x : [ `A ] imm) = (x : [ `A ] imm# box :> [ `A | `B ] imm# box)
+[%%expect{|
+val ok : [ `A ] imm -> [ `A | `B ] imm = <fun>
+|}]
