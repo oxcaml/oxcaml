@@ -7,7 +7,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(helper)
         : val =
   apply &my_alloc_region f (x) -> k * e
 in
-let code loopify(never) size(10) newer_version_of(map)
+let code loopify(never) size(4) newer_version_of(map)
       map_1 (g : val, x : val)
         my_closure &my_alloc_region my_depth
         -> k * e

@@ -180,6 +180,9 @@ type t =
     vars : (Cmm.expression * free_vars) Variable.Map.t;
     (* Cmm expressions (of the form [Cvar ...]) for all bound variables in
        scope. *)
+    specialisation_site_vars : Variable.Set.t;
+    (* Variables bound to the closures of specialisation sites, which are not
+       translated (see [Set_of_closures.is_specialisation_site]). *)
     bindings : any_binding Variable.Map.t;
     (* All bindings currently in env. *)
     inline_once_aliases : Variable.t Variable.Map.t;
@@ -303,6 +306,7 @@ let create offsets functions_info ~trans_prim ~return_continuation
     inline_once_aliases = Variable.Map.empty;
     vars_extra = Variable.Map.empty;
     vars = Variable.Map.empty;
+    specialisation_site_vars = Variable.Set.empty;
     conts;
     exn_handlers = Continuation.Set.singleton exn_continuation;
     symbol_inits = Backend_var.Map.empty
@@ -971,6 +975,17 @@ let can_substitute ?consider_inlining_effectful_expressions env var binding =
     can_substitute_wrt_effects ?consider_inlining_effectful_expressions env var
       binding
 
+let add_specialisation_site_vars env bound_vars =
+  let specialisation_site_vars =
+    List.fold_left
+      (fun vars bound_var -> Variable.Set.add (Bound_var.var bound_var) vars)
+      env.specialisation_site_vars bound_vars
+  in
+  { env with specialisation_site_vars }
+
+let is_specialisation_site_var env var =
+  Variable.Set.mem var env.specialisation_site_vars
+
 let inline_variable ?consider_inlining_effectful_expressions env res var =
   let var = resolve_alias env var in
   match Variable.Map.find var env.bindings with
@@ -979,6 +994,11 @@ let inline_variable ?consider_inlining_effectful_expressions env res var =
        flushed *)
     match Variable.Map.find var env.vars with
     | exception Not_found ->
+      if is_specialisation_site_var env var
+      then
+        Misc.fatal_errorf
+          "The closure %a of a specialisation site is used at runtime"
+          Variable.print var;
       Misc.fatal_errorf "Variable %a not found in env" Variable.print var
     | cmm, free_vars ->
       (* the env.vars map only contain bindings to expressions of the form

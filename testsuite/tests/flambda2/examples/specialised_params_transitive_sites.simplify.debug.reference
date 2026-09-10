@@ -27,7 +27,7 @@ let code inline(never) loopify(never) size(4) newer_version_of(third)
       third_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
   apply direct(second_1 &my_alloc_region)  (x) -> k * e
 in
-let code loopify(never) size(13) newer_version_of(live)
+let code loopify(never) size(4) newer_version_of(live)
       live_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
   let a = closure specialisation_site first_1 @first &my_alloc_region in
   let b = closure specialisation_site second_1 @second &my_alloc_region in
@@ -79,7 +79,7 @@ let code inline(never) loopify(never) size(24) newer_version_of(nested_second)
   in
   apply direct(nested_third_1 &my_alloc_region) c (x) -> k * e
 in
-let code loopify(never) size(29) newer_version_of(nested)
+let code loopify(never) size(4) newer_version_of(nested)
       nested_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
   let a = closure specialisation_site first_3 @first &my_alloc_region in
   let b =

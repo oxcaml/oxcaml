@@ -17,7 +17,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(live_helper_1)
         : val =
   cont k (v)
 in
-let code loopify(never) size(21) newer_version_of(mutable_alias)
+let code loopify(never) size(20) newer_version_of(mutable_alias)
       mutable_alias_1 (x : val, n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * e

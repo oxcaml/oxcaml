@@ -9,7 +9,7 @@ let code inline(never) loopify(never) size(6) newer_version_of(helper)
         : val =
   apply &my_alloc_region f (x) -> k * e
 in
-let code loopify(never) size(30) newer_version_of(live_alias)
+let code loopify(never) size(24) newer_version_of(live_alias)
       live_alias_1 (g : val, n : imm tagged, x : val)
         my_closure &my_alloc_region my_depth
         -> k * e
@@ -42,7 +42,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(keep_arg)
         : val =
   cont k (p)
 in
-let code loopify(never) size(23) newer_version_of(live_root)
+let code loopify(never) size(22) newer_version_of(live_root)
       live_root_1 (x : val, n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * e

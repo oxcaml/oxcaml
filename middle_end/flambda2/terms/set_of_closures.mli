@@ -41,15 +41,16 @@ val create :
     specialised on those values when the enclosing code is simplified again,
     typically after inlining into another compilation unit.
 
-    A site is heap allocated and closed, hence statically allocated. Its closure
-    allocation, headers and slots contribute no cost; only its live function
-    bodies contribute to cost metrics. [To_cmm] omits its data unless something
-    refers to it; its synthetic value slots keep nothing alive. Inside code, it
-    is never lifted and is kept while its code is live, even without synthetic
-    slots: re-simplifying its functions may specialise their callees. Runtime
-    uses keep its closures like any other set. Like any set of closures, it does
-    prevent specialisation of the enclosing continuation handler (see
-    [Specialization_cost]). *)
+    Invariant: the closures of a site do not exist at runtime. Its bound
+    variables occur only as the callee of direct calls to code that does not use
+    [my_closure]. [To_cmm] therefore translates neither the site nor those
+    callees; [To_jsir] still allocates the closures, since a JSIR call needs a
+    function value. A site is closed, heap allocated, never lifted, and costs
+    nothing (see [Cost_metrics]); its synthetic value slots keep nothing alive.
+    Inside code, it is kept while its code is live, even without synthetic
+    slots: re-simplifying its functions may specialise their callees. Like any
+    set of closures, it does prevent specialisation of the enclosing
+    continuation handler (see [Specialization_cost]). *)
 val is_specialisation_site : t -> bool
 
 (** The function declarations associated with the set of closures. *)

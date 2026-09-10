@@ -19,7 +19,7 @@ in
 let $camlSpecialised_params_site_via_symbol__wrap_2 =
   closure wrap_1 @wrap &toplevel
 in
-let code loopify(never) size(5) newer_version_of(outer)
+let code loopify(never) size(4) newer_version_of(outer)
       outer_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
   let site = closure specialisation_site helper_1 @helper &my_alloc_region in
   apply direct(wrap_1 &my_alloc_region)

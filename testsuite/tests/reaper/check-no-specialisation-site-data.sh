@@ -1,6 +1,6 @@
 #!/bin/sh
-# The lifted [loop] must have code but no closure data (its specialisation site
-# is not referenced by the Cmm); the exported [map_stack] must have both.
+# The lifted [loop] must have code but no closure data (specialisation sites are
+# not translated to Cmm); the exported [map_stack] must have both.
 if test -s "$1" &&
    ! grep -Fq '*set_of_closures*' "$1" &&
    ! grep -Eq 'addr[[:space:]]+[GL]:"caml[^"]*__loop_[^"]*_code"' "$1" &&

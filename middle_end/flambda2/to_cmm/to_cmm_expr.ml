@@ -228,7 +228,30 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
   cmm, free_vars, env, res, Ece.all
 
 let translate_apply0 ~dbg_with_inlined:dbg env res apply =
-  let callee_simple = Apply.callee apply in
+  let callee_simple =
+    match Apply.callee apply with
+    | None -> None
+    | Some callee as callee_simple -> (
+      match Simple.must_be_var callee with
+      | Some (var, _coercion) when Env.is_specialisation_site_var env var -> (
+        (* The closure does not exist at runtime (see
+           [Set_of_closures.is_specialisation_site]). *)
+        match Apply.call_kind apply with
+        | Function { function_call = Direct code_id }
+          when not
+                 (Code_metadata.is_my_closure_used
+                    (Env.get_code_metadata env code_id)) ->
+          None
+        | Function
+            { function_call =
+                Direct _ | Indirect_unknown_arity | Indirect_known_arity _
+            }
+        | Method _ | C_call _ | Effect _ ->
+          Misc.fatal_errorf
+            "The closure %a of a specialisation site is used by a call:@ %a"
+            Variable.print var Apply.print apply)
+      | Some _ | None -> callee_simple)
+  in
   let args = Apply.args apply in
   (* CR mshinwell: When we fix the problem that [prim_effects] and
      [prim_coeffects] are ignored for C calls, we need to take into account the
@@ -800,6 +823,9 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     cmm, free_vars, symbol_inits, res
   | Singleton v, Prim (p, dbg) ->
     let_prim env res ~num_normal_occurrences_of_bound_vars v p dbg body
+  | Set_of_closures bound_vars, Set_of_closures (soc, _alloc_mode)
+    when Set_of_closures.is_specialisation_site soc ->
+    expr (Env.add_specialisation_site_vars env bound_vars) res body
   | Set_of_closures bound_vars, Set_of_closures (soc, alloc_mode) ->
     To_cmm_set_of_closures.let_dynamic_set_of_closures env res ~body ~bound_vars
       ~num_normal_occurrences_of_bound_vars soc alloc_mode ~translate_expr:expr

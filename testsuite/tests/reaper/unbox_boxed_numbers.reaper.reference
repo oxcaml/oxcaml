@@ -244,7 +244,7 @@ let code inline(never) loopify(never) size(3) newer_version_of(read_11)
   let int_of_int64 = %tag_imm (prim_1) in
   cont k (int_of_int64)
 in
-let code loopify(never) size(13) newer_version_of(test_value_slot_10)
+let code loopify(never) size(10) newer_version_of(test_value_slot_10)
       test_value_slot_10_1 (n : imm tagged)
         my_closure &my_alloc_region my_depth
         -> k * k1

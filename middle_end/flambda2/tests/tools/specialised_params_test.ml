@@ -674,7 +674,7 @@ let () =
   check_parse_error "synthetic slot projection" synthetic_projection
     ~message:"is used both as a synthetic and as an ordinary value slot"
 
-(* Sites have no allocation cost, but duplicating their live code has a cost. *)
+(* Sites cost nothing; ordinary sets charge their bodies and allocation. *)
 let () =
   let open Flambda2_kinds in
   let compilation_unit = Current_unit.get_cu_exn () in
@@ -726,15 +726,16 @@ let () =
       fail "%s: expected %a, got %a" name Cost_metrics.print expected
         Cost_metrics.print actual
   in
-  check "site charges both live bodies"
-    (Cost_metrics.( + ) f_cost g_cost)
+  check "site costs nothing" Cost_metrics.zero
     (cost ~is_specialisation_site:true
        [f_slot, live f; g_slot, live g; dead_slot, deleted]);
-  check "site does not charge deleted bodies" f_cost
-    (cost ~is_specialisation_site:true
-       [f_slot, live f; g_slot, deleted; dead_slot, deleted]);
-  check "all-deleted site costs nothing" Cost_metrics.zero
-    (cost ~is_specialisation_site:true [f_slot, deleted; g_slot, deleted]);
+  check "ordinary closed set charges its bodies"
+    (Cost_metrics.( + )
+       (Cost_metrics.( + ) f_cost g_cost)
+       (Cost_metrics.from_size
+          (Code_size.( + ) Code_size.alloc_size (Code_size.of_int 9))))
+    (cost ~is_specialisation_site:false
+       [f_slot, live f; g_slot, live g; dead_slot, deleted]);
   let value_slot =
     Value_slot.create compilation_unit ~name:"captured"
       ~is_always_immediate:false Flambda_kind.value

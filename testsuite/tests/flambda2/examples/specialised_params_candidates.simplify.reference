@@ -22,7 +22,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(helper)
         : val =
   cont k (6)
 in
-let code loopify(never) size(17) newer_version_of(outer)
+let code loopify(never) size(11) newer_version_of(outer)
       outer_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
   let both =
     closure specialisation_site helper_2 @helper &my_alloc_region

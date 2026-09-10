@@ -286,6 +286,13 @@ val add_alias :
 
 val add_symbol_init : t -> Backend_var.t -> Cmm.expression -> t
 
+(** Record the variables bound to the closures of a specialisation site, which
+    is not translated (see [Set_of_closures.is_specialisation_site]). Using one
+    of them is an error. *)
+val add_specialisation_site_vars : t -> Bound_var.t list -> t
+
+val is_specialisation_site_var : t -> Variable.t -> bool
+
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
   ?consider_inlining_effectful_expressions:bool ->

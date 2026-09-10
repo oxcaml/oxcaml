@@ -21,7 +21,7 @@
           (f_into_my_closure_field_y, int_sub) -> k1 * k2
  in
  let code _g_2 deleted in
- let code inline(never) size(44)
+ let code inline(never) size(22)
        outer_0 (y : imm tagged, n : imm tagged)
          my_closure &my_alloc_region my_depth
          -> k1 * k2

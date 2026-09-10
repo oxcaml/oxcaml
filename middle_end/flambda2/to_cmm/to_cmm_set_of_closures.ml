@@ -610,12 +610,6 @@ let params_and_body env res code_id p ~result_arity ~fun_dbg
 (* Translation of sets of closures. *)
 
 let layout_for_set_of_closures env set =
-  if
-    Set_of_closures.is_specialisation_site set
-    && not (Set_of_closures.is_closed set)
-  then
-    Misc.fatal_errorf "Specialisation site has runtime value slots: %a"
-      Set_of_closures.print set;
   Slot_offsets.Layout.make (Env.exported_offsets env)
     (Set_of_closures.function_decls set |> Function_declarations.funs_in_order)
     (Set_of_closures.value_slots set)
@@ -742,11 +736,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
   then
     Misc.fatal_errorf "non-empty [updates] when lifting set of closures: %a"
       Set_of_closures.print set;
-  let res =
-    if Set_of_closures.is_specialisation_site set
-    then R.add_specialisation_site_data res static_data
-    else R.archive_data (R.set_data res static_data)
-  in
+  (* Update the result with the new static data *)
+  let res = R.archive_data (R.set_data res static_data) in
   (* Bind the variables to the symbols for function slots. *)
   let env, res =
     List.fold_left2

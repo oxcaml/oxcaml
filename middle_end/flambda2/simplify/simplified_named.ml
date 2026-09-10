@@ -140,15 +140,8 @@ let mark_unused_functions_as_deleted t ~live_code_ids ~find_code_metadata =
           (Function_declarations.create function_decls)
       in
       let named = Set_of_closures (set, alloc_mode) in
-      let cost_metrics =
-        Cost_metrics.set_of_closures set
-          ~find_code_characteristics:(fun code_id ->
-            let metadata = find_code_metadata code_id in
-            { Cost_metrics.cost_metrics = Code_metadata.cost_metrics metadata;
-              function_slot_size = Code_metadata.function_slot_size metadata
-            })
-      in
-      { named; cost_metrics; free_names = Named.free_names (to_named named) }
+      (* The cost metrics of a specialisation site are zero. *)
+      { t with named; free_names = Named.free_names (to_named named) }
 
 let print ppf { named; _ } = Named.print ppf (to_named named)
 

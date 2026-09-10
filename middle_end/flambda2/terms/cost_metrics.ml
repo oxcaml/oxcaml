@@ -63,7 +63,7 @@ let ( + ) a b =
  * closure where the "+ 1" is for the size of the infix header, and "- 1" to
  * exclude the header of the set of closures. 
  *)
-let set_of_closures ~find_code_characteristics set_of_closures =
+let set_of_closures0 ~find_code_characteristics set_of_closures =
   let func_decls = Set_of_closures.function_decls set_of_closures in
   let funs = Function_declarations.funs func_decls in
   let num_clos_vars =
@@ -86,12 +86,16 @@ let set_of_closures ~find_code_characteristics set_of_closures =
       funs (zero, num_clos_vars)
   in
   let alloc_size =
-    (* Sites need no runtime allocation, but their code can still be copied. *)
-    if Set_of_closures.is_specialisation_site set_of_closures
-    then Code_size.zero
-    else Code_size.( + ) Code_size.alloc_size (Code_size.of_int (num_words - 1))
+    Code_size.( + ) Code_size.alloc_size (Code_size.of_int (num_words - 1))
   in
   cost_metrics + from_size alloc_size
+
+let set_of_closures ~find_code_characteristics set_of_closures =
+  (* Specialisation sites must not affect inlining decisions (see
+     [Set_of_closures.is_specialisation_site]). *)
+  if Set_of_closures.is_specialisation_site set_of_closures
+  then zero
+  else set_of_closures0 ~find_code_characteristics set_of_closures
 
 let increase_due_to_let_expr ~is_phantom ~cost_metrics_of_defining_expr =
   if is_phantom then zero else cost_metrics_of_defining_expr

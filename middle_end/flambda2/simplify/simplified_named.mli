@@ -49,8 +49,7 @@ val create_with_known_free_names :
 val filter_synthetic_value_slots : t -> f:(Simple.t -> bool) -> t
 
 (** Mark dead code in a specialisation site as [Deleted], preserving its slots
-    and binders for imported offsets and phantom uses. Recompute the cost of the
-    remaining code. *)
+    and binders for imported offsets and phantom uses. *)
 val mark_unused_functions_as_deleted :
   t ->
   live_code_ids:Code_id.Set.t ->
