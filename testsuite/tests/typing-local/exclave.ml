@@ -95,7 +95,7 @@ let foo () =
   done
 
 [%%expect{|
-val foo : unit -> 'a = <fun>
+val foo : ('a : any). unit -> 'a = <fun>
 |}]
 
 (* we also require tail position *)

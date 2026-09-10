@@ -82,15 +82,7 @@ module M2 (X : S2) = struct
 end
 
 [%%expect{|
-Line 2, characters 13-19:
-2 |   let g () = X.g ()
-                 ^^^^^^
-Error: This expression has type "t_any_mod_separable"
-       but an expression was expected of type "('a : '_representable_layout_2)"
-       The layout of t_any_mod_separable is any separable
-         because of the definition of t_any_mod_separable at line 2, characters 0-44.
-       But the layout of t_any_mod_separable must be representable
-         because we must know concretely how to return a function result.
+module M2 : functor (X : S2) -> sig val g : unit -> t_any_mod_separable end
 |}]
 
 (* [value_or_null] is representable *)

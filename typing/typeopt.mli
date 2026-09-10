@@ -69,6 +69,12 @@ val layout_of_non_void_sort : Jkind.Sort.Const.t -> Lambda.layout
 val layout_or_sort :
   Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
 
+(* Like [layout], but falls back to [Ptop] when the type's jkind is not
+   representable (e.g. is [any]).  A failure caused by a missing cmi falls
+   back to the sort instead, like [layout_or_sort]. *)
+val layout_or_top :
+  Env.t -> Location.t -> Jkind.Sort.Const.t -> Types.type_expr -> Lambda.layout
+
 (* Given a function type and the sort of its return type, compute the layout of
    its return type. *)
 val function_return_layout :

@@ -47,6 +47,7 @@ type native_repr =
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
   | Unpacked_product of Jkind_types.Sort.Const.t
+  | Repr_never_returns
 (* CR mshinwell/ccasinghino: should we actually use
    "any_locality_mode Scalar.Integral.Width.t" here rather than defining an
    additional unboxed_or_untagged_integer type? *)
@@ -151,6 +152,10 @@ val prim_has_valid_reprs : loc:Location.t -> description -> unit
     declaration. Returns [false] for built-in primitives that inspect
     the layout of type parameters ([%array_length] for example). *)
 val prim_can_contain_layout_any : description -> bool
+
+(** Whether the named primitive is a raise variant, which never returns
+    normally. Such primitives may declare a result of layout [any]. *)
+val prim_name_never_returns : string -> bool
 
 type wrong_repr_error =
   | Product_arg
