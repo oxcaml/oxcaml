@@ -9761,7 +9761,8 @@ and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
           referenced are considered [noalloc_strict] by mode crossing,
           so we manually register allocation for them. *)
        if Translprim.non_arrow_prim_allocates lid.loc prim then
-         Typeallocation.register_allocation_mode ~env ~loc:lid.loc Locality.legacy;
+         Typeallocation.register_allocation_mode ~env ~loc:lid.loc
+           Locality.legacy;
        let yielding =
          prim_params_yielding env ty ~arity:prim.prim_arity
        in
