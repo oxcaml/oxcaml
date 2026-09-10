@@ -4,9 +4,13 @@
 *)
 
 module Test = struct
+  (* Unboxed record: creation allocates a block on the heap. *)
   type t = { mutable value : int }
+  (* A function returning (a function returning (a block on the heap)). *)
   let make_make_t () () = { value = 42 }
+  (* Instantiate only the outer function, then abuse mode polymorphism. *)
   let make_t @ noalloc_strict = make_make_t ()
+  (* Inexplicably pause trading. *)
   let secretly_allocated : t @ global = make_t ()
 end
 [%%expect{|
