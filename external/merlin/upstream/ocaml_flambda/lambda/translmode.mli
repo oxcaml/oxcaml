@@ -1,0 +1,31 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                    Zesen Qian, Jane Street, London                     *)
+(*                                                                        *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Mode
+
+val transl_locality_mode_l : (allowed * 'r) Locality.t -> Lambda.locality_mode
+
+val transl_yielding_mode_l : (allowed * 'r) Yielding.t -> Lambda.yielding_kind
+
+val transl_return_mode_l : (allowed * 'r) Locality.t -> Lambda.return_mode
+
+val transl_alloc_mode_l : Typedtree.alloc_mode_l -> Lambda.locality_mode
+
+val transl_alloc_mode_r : Typedtree.alloc_mode_r -> Lambda.locality_mode
+
+val transl_ret_mode : Typedtree.return_mode -> Lambda.return_mode
+
+val transl_modify_mode : (allowed * 'r) Locality.t -> Lambda.modify_mode
+
+val transl_unique_barrier : Typedtree.Unique_barrier.t -> Lambda.unique_barrier
