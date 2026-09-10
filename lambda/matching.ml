@@ -2115,7 +2115,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typedecl.finalize_constructor_representation head.pat_env
+        Typeopt.finalize_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2585,7 +2585,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typedecl.finalize_record_representation_and_sorts head.pat_env
+    Typeopt.finalize_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
