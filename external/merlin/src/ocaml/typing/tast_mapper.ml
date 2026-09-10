@@ -701,14 +701,15 @@ let expr sub x =
           path,
           List.map (tuple3 id (map_loc sub) (sub.expr sub)) list
         )
-    | Texp_letmodule (id, s, pres, mexpr, exp) ->
-        Texp_letmodule (
-          id,
-          map_loc sub s,
-          pres,
-          sub.module_expr sub mexpr,
-          sub.expr sub exp
-        )
+    | Texp_letmodule { id; name; presence; uid; module_expr; body } ->
+        Texp_letmodule
+          { id;
+            name = map_loc sub name;
+            presence;
+            uid;
+            module_expr = sub.module_expr sub module_expr;
+            body = sub.expr sub body
+          }
     | Texp_letexception (cd, exp) ->
         Texp_letexception (
           sub.extension_constructor sub cd,
@@ -929,6 +930,13 @@ let module_expr sub x =
     | Tmod_constraint (mexpr, mt, Tmodtype_implicit, c) ->
         Tmod_constraint (sub.module_expr sub mexpr, mt, Tmodtype_implicit,
                          sub.module_coercion sub c)
+    | Tmod_constraint
+        (mexpr, mt, Tmodtype_package { package_module_type_path }, c) ->
+        Tmod_constraint
+          ( sub.module_expr sub mexpr,
+            mt,
+            Tmodtype_package { package_module_type_path },
+            sub.module_coercion sub c )
     | Tmod_constraint (mexpr, mt, Tmodtype_explicit (mtype, ma), c) ->
         Tmod_constraint (
           sub.module_expr sub mexpr,
