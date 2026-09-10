@@ -22,7 +22,10 @@ let code loopify(never) size(19) newer_version_of(p_2)
     where k2 =
       let Pfield = %block_load.[`1`] (param) in
       let Popaque = %opaque ($camlTest_exn_handler_inlining__id_1) in
-      apply &my_alloc_region Popaque (Pfield) -> k * k1
+      apply &my_alloc_region
+        (Popaque : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+          (Pfield)
+          -> k * k1
 in
 let $camlTest_exn_handler_inlining__p_3 = closure p_2_1 @p &toplevel in
 let code loopify(never) size(4) newer_version_of(g_1)

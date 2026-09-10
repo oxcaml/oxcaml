@@ -10,7 +10,7 @@ let $camlApp_unarized_to_single_kind__first_const_0 = Block 0 () in
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   apply &my_alloc_region f (x) -> k1 * k2
+   apply &my_alloc_region (f : _ -> imm tagged) (x) -> k1 * k2
  in
  let code size(6)
        h_2 (x) my_closure &my_alloc_region my_depth -> k1 * k2 : imm tagged =

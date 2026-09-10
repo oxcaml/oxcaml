@@ -105,6 +105,59 @@ let layout_of_fun_arg_ty fun_arg_ty loc sort =
   | Some (env, ty) -> layout_or_sort env loc sort ty
   | None -> layout_of_sort loc sort
 
+let layout_of_function_return ~env ~ty ~params
+    (return_sort : function_return_sort) body =
+  let loc =
+    match body with
+    | Tfunction_body exp -> exp.exp_loc
+    | Tfunction_cases cases -> cases.fc_loc
+  in
+  let rec result_type arity ty =
+    if arity = 0 then ty
+    else
+      match Typeopt.is_function_type env ty with
+      | Some (_, result) -> result_type (arity - 1) result
+      | None ->
+          Misc.fatal_error "Function type has fewer arguments than its body"
+  in
+  let ty = result_type (Typedtree.function_arity params body) ty in
+  match return_sort with
+  | Function_returns sort ->
+      layout_or_top env loc (Jkind.Sort.default_for_transl_and_get sort) ty
+  | Function_forwards -> begin
+      match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
+      | Ok sort ->
+          layout_or_sort env loc (Jkind.Sort.default_for_transl_and_get sort) ty
+      | Error _ -> Lambda.Ptop
+    end
+  | Function_never_returns -> Lambda.layout_bottom
+
+(* Matches with exception or effect cases and try-expressions always have
+   representable result types (checked during typing), so their layouts can
+   be refined when the ambient expected layout is unknown.  Plain matches
+   have no such guarantee and keep the ambient layout: a forwarder may
+   legitimately dispatch through one. *)
+let refine_ptop_layout_from_result layout e =
+  match layout with
+  | Pbottom | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ | Psplicevar _ ->
+      layout
+  | Ptop ->
+      match
+        Ctype.type_sort ~why:Match_or_try_result ~fixed:true e.exp_env
+          e.exp_type
+      with
+      | Ok sort ->
+          layout_or_sort e.exp_env e.exp_loc
+            (Jkind.Sort.default_for_transl_and_get sort) e.exp_type
+      | Error _ ->
+          fatal_errorf_doc
+            "Translcore: unrepresentable match or try result in an unknown \
+             return position at %a (typing should have rejected it with \
+             Match_or_try_result)"
+            (Location.Doc.loc ~capitalize_first:false)
+            e.exp_loc
+
 let field_offset_for_label lbl repres =
   match repres with
   | Record_boxed
@@ -309,7 +362,7 @@ let assert_failed loc ~scopes exp =
 type fusable_function =
   { params : function_param list
   ; body : function_body
-  ; return_sort : Jkind.Sort.Const.t
+  ; return_layout : Lambda.layout
   ; return_mode : return_mode
   ; region : bool
   }
@@ -324,26 +377,14 @@ type fusable_function =
    It detects whether the AST is a method by the presence of [Texp_poly] on the
    inner function. This is only ever added to methods.
 *)
-let transl_function_return_sort ret_sort body =
-  match ret_sort with
-  | Function_returns sort -> Jkind.Sort.default_for_transl_and_get sort
-  | Function_forwards | Function_never_returns -> (
-      let env, ty =
-        match body with
-        | Tfunction_body exp -> exp.exp_env, exp.exp_type
-        | Tfunction_cases cases -> cases.fc_env, cases.fc_ret_type
-      in
-      (* CR dkalinichenko: support any layout here. *)
-      match Ctype.type_sort ~why:Function_result ~fixed:true env ty with
-      | Ok sort -> Jkind.Sort.default_for_transl_and_get sort
-      | Error _ -> Jkind.Sort.Const.base Scannable)
-
 let fuse_method_arity (parent : fusable_function) : fusable_function =
   match parent with
   | { params = [ self_param ];
       return_mode = Not_alloc_stack;
       body =
-        Tfunction_body { exp_desc = Texp_function method_; exp_extra; }
+        Tfunction_body
+          { exp_desc = Texp_function method_; exp_extra;
+            exp_env; exp_type; }
     }
     when
       List.exists
@@ -366,8 +407,9 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
                 (Mode.Locality.disallow_right Mode.Locality.legacy) }
         }
       in
-      let return_sort =
-        transl_function_return_sort method_.ret_sort method_.body
+      let return_layout =
+        layout_of_function_return ~env:exp_env ~ty:exp_type
+          ~params:method_.params method_.ret_sort method_.body
       in
       (* We keep the outer function's yielding mode and drop [method_]'s: object
          code can never close over a yielding value, so the inner method is
@@ -377,7 +419,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
       { params = self_param :: method_.params;
         body = method_.body;
         return_mode = transl_ret_mode method_.ret_mode.mode_modes;
-        return_sort;
+        return_layout;
         region = true;
       }
   | _ -> parent
@@ -500,9 +542,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     yielding; zero_alloc } ->
-      let ret_sort = transl_function_return_sort ret_sort body in
+      let ret_layout =
+        layout_of_function_return ~env:e.exp_env ~ty:e.exp_type
+          ~params ret_sort body
+      in
       transl_function ~in_new_scope ~scopes e params body
-        ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~alloc_mode ~ret_mode ~ret_layout ~region:true ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
@@ -588,6 +633,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         partial
   | Texp_match(arg, arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
+      let layout = refine_ptop_layout_from_result layout e in
   (* need to separate the values from exceptions for transl_handler *)
       let split_case (val_cases, exn_cases as acc)
             ({ c_lhs; c_rhs } as case) =
@@ -612,6 +658,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         (Some (pat_expr_list, partial, arg_sort)) exn_pat_expr_list
         eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
+      let layout = refine_ptop_layout_from_result layout e in
       let id, id_duid =
         Typecore.name_cases ~pattern_kind:Exception_pattern "exn"
           pat_expr_list
@@ -622,6 +669,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  (transl_cases_try ~scopes layout pat_expr_list),
                layout)
   | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
+      let layout = refine_ptop_layout_from_result layout e in
       transl_handler ~scopes ~return_layout:layout ~body_layout:layout e body
         None exn_pat_expr_list eff_pat_expr_list
   | Texp_unboxed_unit ->
@@ -1884,15 +1932,8 @@ and transl_apply ~scopes
    [trans_curried_function]).
 *)
 and transl_function_without_attributes
-    ~scopes ~return_sort ~return_mode ~mode ~region ~fun_ty loc repr params
+    ~scopes ~return_layout ~return_mode ~mode ~region ~fun_ty loc repr params
     body =
-  let return_layout =
-    match body with
-    | Tfunction_body exp ->
-        layout_or_sort exp.exp_env exp.exp_loc return_sort exp.exp_type
-    | Tfunction_cases cases ->
-        layout_or_sort cases.fc_env cases.fc_loc return_sort cases.fc_ret_type
-  in
   match
     transl_tupled_function ~scopes loc params body
       ~return_mode ~return_layout ~mode ~region ~fun_ty
@@ -2296,8 +2337,8 @@ and transl_curried_function ~scopes loc repr params body
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
 and transl_function ~in_new_scope ~scopes e params body
-      ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc ~yielding =
+      ~alloc_mode ~ret_mode:sreturn_mode ~ret_layout:sreturn_layout
+      ~region:sregion ~zero_alloc ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_alloc_mode_r alloc_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
@@ -2314,10 +2355,10 @@ and transl_function ~in_new_scope ~scopes e params body
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
   in
   let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
-  let { params; body; return_sort; return_mode; region } =
+  let { params; body; return_layout; return_mode; region } =
     fuse_method_arity
       { params; body;
-        return_sort = sreturn_sort;
+        return_layout = sreturn_layout;
         return_mode = sreturn_mode;
         region = sregion;
       }
@@ -2331,7 +2372,7 @@ and transl_function ~in_new_scope ~scopes e params body
     event_function ~scopes e
       (function repr ->
          transl_function_without_attributes
-           ~mode ~return_sort ~return_mode
+           ~mode ~return_layout ~return_mode
            ~fun_ty:(Some (e.exp_env, e.exp_type))
            ~scopes e.exp_loc repr ~region params body)
   in
@@ -2904,6 +2945,13 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
   (arg, lbl)
 
 and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
+  let return_layout =
+    if List.exists
+         (fun { c_lhs; _ } -> Option.is_some (snd (split_pattern c_lhs)))
+         pat_expr_list
+    then refine_ptop_layout_from_result return_layout e
+    else return_layout
+  in
   let rewrite_case (val_cases, exn_cases, static_handlers as acc)
         ({ c_lhs; c_guard; c_rhs } as case) =
     if c_rhs.exp_desc = Texp_unreachable then acc else
@@ -3233,8 +3281,11 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
         (function repr ->
            let loc = case.c_rhs.exp_loc in
            let ghost_loc = { loc with loc_ghost = true } in
+           let return_layout =
+             layout_or_sort env ghost_loc case_sort case.c_rhs.exp_type
+           in
            transl_function_without_attributes ~scopes ~region:true
-             ~return_sort:case_sort ~mode:alloc_heap ~return_mode
+             ~return_layout ~mode:alloc_heap ~return_mode
              ~fun_ty:None loc repr []
              (Tfunction_cases
                 { fc_cases = [case]; fc_param = param;

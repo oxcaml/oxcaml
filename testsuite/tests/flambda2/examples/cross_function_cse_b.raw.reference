@@ -45,7 +45,10 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
    let Pfield =
      %block_load.[`1`] ($Cross_function_cse_a.camlCross_function_cse_a)
    in
-   apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
+   apply &my_alloc_region inlined(always)
+     (Pfield : _ -> [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ])
+       (x)
+       -> k1 * k2
  in
  let code size(7)
        g_classic_4 (x)
@@ -56,7 +59,10 @@ let $camlCross_function_cse_b__first_const_0 = Block 0 () in
    let Pfield =
      %block_load.[`2`] ($Cross_function_cse_a.camlCross_function_cse_a)
    in
-   apply &my_alloc_region inlined(always) Pfield (x) -> k1 * k2
+   apply &my_alloc_region inlined(always)
+     (Pfield : _ -> [ 0 of [ 0 | 0 of val ] * [ 0 | 0 of val ] ])
+       (x)
+       -> k1 * k2
  in
  let some = closure some_0 @some &toplevel in
  let f = closure f_1 @f &toplevel with { some = some } in

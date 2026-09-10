@@ -199,7 +199,13 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~inlining_arguments ~absolute_history code_id ~return_continuation
       ~exn_continuation ~loopify_state (Code.code_metadata code)
   in
-  let dacc = dacc_at_function_entry in
+  let dacc =
+    match Code.result_arity code with
+    | Unknown ->
+      DA.map_denv dacc_at_function_entry ~f:(fun denv ->
+          DE.add_return_continuation denv return_continuation Unknown)
+    | Ok _ | Bottom -> dacc_at_function_entry
+  in
   if not (DA.no_lifted_constants dacc)
   then
     Misc.fatal_errorf "Did not expect lifted constants in [dacc]:@ %a" DA.print
@@ -225,7 +231,9 @@ let simplify_function_body context ~outer_dacc function_slot_opt
   let my_depth_duid = Flambda_debug_uid.none in
   match
     C.simplify_function_body context dacc body ~return_continuation
-      ~exn_continuation ~return_arity:(Code.result_arity code)
+      ~exn_continuation
+      ~return_arity:
+        (Result_arity.to_arity_with_placeholder (Code.result_arity code))
       ~implicit_params:
         (Bound_parameters.create
            ([ Bound_parameter.create my_closure
@@ -397,6 +405,9 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       ~from_metadata:(Code.inlining_arguments code)
   in
   let result_arity = Code.result_arity code in
+  let result_arity_for_body =
+    Result_arity.to_arity_with_placeholder result_arity
+  in
   let return_cont_params =
     List.mapi
       (fun i kind_with_subkind ->
@@ -407,7 +418,7 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
         in
         let result_var_duid = Flambda_debug_uid.none in
         BP.create result_var kind_with_subkind result_var_duid)
-      (Flambda_arity.unarized_components result_arity)
+      (Flambda_arity.unarized_components result_arity_for_body)
     |> Bound_parameters.create
   in
   let { params;
@@ -457,9 +468,15 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   let is_a_functor = Code.is_a_functor code in
   let is_opaque = Code.is_opaque code in
   let result_types =
-    compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
-      ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
-      ~lifted_consts_this_function ~params
+    (* [return_cont_params] for an unknown result arity is the placeholder, not
+       the function's actual result, so no result types may be inferred. *)
+    match (result_arity : Result_arity.t), is_opaque, return_cont_uses with
+    | Unknown, false, None -> Or_unknown_or_bottom.Bottom
+    | Unknown, _, Some _ | Unknown, true, None -> Or_unknown_or_bottom.Unknown
+    | (Ok _ | Bottom), _, _ ->
+      compute_result_types ~is_a_functor ~is_opaque ~return_cont_uses
+        ~dacc_after_body ~dacc_at_function_entry ~return_cont_params
+        ~lifted_consts_this_function ~params
   in
   let outer_dacc =
     (* This is the complicated part about slot offsets. We just traversed the

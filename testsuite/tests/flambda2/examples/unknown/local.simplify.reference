@@ -64,7 +64,7 @@ and code rec loopify(never) size(31) newer_version_of(map_local_1)
             -> k2 * k1)
          where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
            ((let Pfield = %block_load.[`0`] (l) in
-             apply &my_alloc_region f (Pfield) -> k2 * k1)
+             apply &my_alloc_region (f : _ -> val) (Pfield) -> k2 * k1)
               where k2 (apply_result_1 : val) =
                 let Pmakeblock =
                   %block.[`0`].my_alloc_region.local[my_region]
@@ -209,7 +209,8 @@ apply direct(length_2_1 &toplevel)
                     let acc_1 =
                       %block.[`0`].my_alloc_region.local[my_region] (a, acc)
                     in
-                    (apply &my_alloc_region break_here (a) -> k3 * k1
+                    (apply &my_alloc_region
+                       (break_here : _ -> [ 0 |1 ]) (a) -> k3 * k1
                        where k3 (param : [ 0 |1 ]) =
                          let unboxed_field = %untag_imm (param) in
                          cont k2 (unboxed_field)

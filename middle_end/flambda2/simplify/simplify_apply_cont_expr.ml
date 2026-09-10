@@ -153,23 +153,34 @@ let simplify_apply_cont dacc apply_cont ~down_to_up =
   let { S.simples = args; simple_tys = arg_types } =
     S.simplify_simples dacc (AC.args apply_cont)
   in
-  let use_kind =
-    Simplify_common.apply_cont_use_kind ~context:Apply_cont_expr apply_cont
-  in
-  let dacc, rewrite_id =
-    DA.record_continuation_use dacc
-      (AC.continuation apply_cont)
-      use_kind ~env_at_use:(DA.denv dacc) ~arg_types
-  in
-  let dacc =
-    let record_args_for_data_flow data_flow =
-      Flow.Acc.add_apply_cont_args
-        (AC.continuation apply_cont)
-        ~rewrite_id args data_flow
+  if
+    not
+      (DE.return_arity_is_compatible (DA.denv dacc)
+         (AC.continuation apply_cont)
+         ~arity:(T.arity_of_list arg_types))
+  then
+    down_to_up dacc ~rebuild:(fun uacc ~after_rebuild ->
+        EB.rebuild_invalid uacc
+          (Message "Inlined function returned an incompatible result arity")
+          ~after_rebuild)
+  else
+    let use_kind =
+      Simplify_common.apply_cont_use_kind ~context:Apply_cont_expr apply_cont
     in
-    DA.map_flow_acc dacc ~f:record_args_for_data_flow
-  in
-  let dbg = AC.debuginfo apply_cont in
-  let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
-  let apply_cont = AC.with_debuginfo apply_cont ~dbg in
-  down_to_up dacc ~rebuild:(rebuild_apply_cont apply_cont ~args ~rewrite_id)
+    let dacc, rewrite_id =
+      DA.record_continuation_use dacc
+        (AC.continuation apply_cont)
+        use_kind ~env_at_use:(DA.denv dacc) ~arg_types
+    in
+    let dacc =
+      let record_args_for_data_flow data_flow =
+        Flow.Acc.add_apply_cont_args
+          (AC.continuation apply_cont)
+          ~rewrite_id args data_flow
+      in
+      DA.map_flow_acc dacc ~f:record_args_for_data_flow
+    in
+    let dbg = AC.debuginfo apply_cont in
+    let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
+    let apply_cont = AC.with_debuginfo apply_cont ~dbg in
+    down_to_up dacc ~rebuild:(rebuild_apply_cont apply_cont ~args ~rewrite_id)

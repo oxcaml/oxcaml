@@ -34,7 +34,7 @@
              -> k3 * k2)
           where k3 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
             ((let Pfield = %block_load.[`0`] (l) in
-              apply &my_alloc_region f (Pfield) -> k3 * k2)
+              apply &my_alloc_region (f : _ -> val) (Pfield) -> k3 * k2)
                where k3 (apply_result_1 : val) =
                  let Pmakeblock =
                    %block.[`0`].my_alloc_region.local[my_region]
@@ -128,7 +128,7 @@
        let l_1 = %block_load.[`1`] (l) in
        let a = %block_load.[`0`] (l) in
        let acc_1 = %block.[`0`].my_alloc_region.local[my_region] (a, acc) in
-       (apply &my_alloc_region break_here (a) -> k6 * k2
+       (apply &my_alloc_region (break_here : _ -> [ 0 |1 ]) (a) -> k6 * k2
           where k6 (apply_result : [ 0 |1 ]) =
             ((let untagged = %untag_imm (apply_result) in
               switch untagged

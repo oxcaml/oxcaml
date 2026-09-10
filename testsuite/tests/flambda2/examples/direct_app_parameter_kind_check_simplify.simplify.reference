@@ -14,7 +14,8 @@ let code loopify(never) size(21) newer_version_of(send_0)
       let `*match*_1` = %block_load.[`0`] (`*match*`) in
       let Pfield = %block_load.[`1`] (`*match*_1`) in
       let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-      apply &my_alloc_region c (Pfield_1, Pfield) -> k * k1
+      apply &my_alloc_region
+        (c : _ -> imm tagged) (Pfield_1, Pfield) -> k * k1
 in
 let $camlDirect_app_parameter_kind_check_simplify__send_1 =
   closure send_0_1 @send &toplevel

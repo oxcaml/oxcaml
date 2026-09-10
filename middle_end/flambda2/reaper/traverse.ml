@@ -28,23 +28,29 @@ type acc = Acc.t
 let apply_cont_deps denv acc apply_cont =
   let cont = Apply_cont_expr.continuation apply_cont in
   let args = Apply_cont_expr.args apply_cont in
-  let (Normal params) = Env.find_cont denv cont in
-  List.iter2
-    (fun param dep ->
-      Acc.add_alias acc
-        ~to_:(Code_id_or_name.var param)
-        ~from:(Acc.simple_to_node acc ~denv dep))
-    params args
+  match Env.find_cont denv cont with
+  | Unknown_return -> List.iter (Acc.add_cond_any_usage acc ~denv) args
+  | Normal params ->
+    List.iter2
+      (fun param dep ->
+        Acc.add_alias acc
+          ~to_:(Code_id_or_name.var param)
+          ~from:(Acc.simple_to_node acc ~denv dep))
+      params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   let result_arity = Code.result_arity code in
   let return =
-    List.mapi
-      (fun i kind ->
-        Variable.create
-          (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
-          (KS.kind kind))
-      (Flambda_arity.unarized_components result_arity)
+    match Code.result_arity code with
+    | Unknown | Bottom -> []
+    | Ok arity ->
+      List.mapi
+        (fun index kind ->
+          Variable.create
+            (Format.asprintf "function_return_%i_%s" index
+               (Code_id.name code_id))
+            (KS.kind kind))
+        (Flambda_arity.unarized_components arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -86,6 +92,16 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     }
   in
   Acc.add_any_source acc (Code_id_or_name.code_id code_id);
+  (match Code.result_arity code with
+  | Ok _ | Bottom -> ()
+  | Unknown -> (
+    Acc.add_unknown_result_call_witness acc known_arity_call_witness;
+    match List.rev unknown_arity_call_witnesses with
+    | final_witness :: _ ->
+      Acc.add_unknown_result_call_witness acc final_witness
+    | [] ->
+      Misc.fatal_errorf "Missing unknown-arity call witness for %a"
+        Code_id.print code_id));
   if never_delete
   then (
     List.iter
@@ -433,17 +449,23 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
 
 let traverse_apply denv acc apply : rev_expr =
   let return_args =
-    match Apply.continuation apply with
-    | Never_returns -> []
-    | Return cont ->
-      let (Normal params) = Env.find_cont denv cont in
-      params
+    match Apply.return apply with
+    | Never_returns _ -> []
+    | Returns_to { cont; arity = _ } | Tail_forwards_to_caller cont -> (
+      match Env.find_cont denv cont with
+      | Normal params -> params
+      | Unknown_return -> [])
   in
   let exn_arg =
     let exn = Apply.exn_continuation apply in
     let extra_args = Exn_continuation.extra_args exn in
-    let (Normal exn_params) =
-      Env.find_cont denv (Exn_continuation.exn_handler exn)
+    let exn_params =
+      match Env.find_cont denv (Exn_continuation.exn_handler exn) with
+      | Normal params -> params
+      | Unknown_return ->
+        Misc.fatal_errorf
+          "Unknown-result return continuation used as exception handler:@ %a"
+          Apply.print apply
     in
     match exn_params with
     | [] ->
@@ -741,16 +763,18 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
   let maybe_opaque var = if is_opaque then Variable.rename var else var in
   let return = List.map maybe_opaque code_dep.return in
   let exn = maybe_opaque code_dep.exn in
+  let return_kind, return_arity =
+    match Code_metadata.result_arity code_metadata with
+    | Unknown -> Env.Unknown_return, []
+    | Bottom -> Env.Normal return, []
+    | Ok arity -> Env.Normal return, Flambda_arity.unarized_components arity
+  in
   let conts =
     Continuation.Map.of_list
-      [ return_continuation, Env.Normal return;
-        exn_continuation, Env.Normal [exn] ]
+      [return_continuation, return_kind; exn_continuation, Env.Normal [exn]]
   in
   Acc.continuation_info acc return_continuation ~is_exn_handler:false
-    ~params:return
-    ~arity:
-      (Flambda_arity.unarized_components
-         (Code_metadata.result_arity code_metadata));
+    ~params:return ~arity:return_arity;
   Acc.continuation_info acc exn_continuation ~is_exn_handler:true ~params:[exn]
     ~arity:[KS.any_value];
   Acc.fixed_arity_continuation acc return_continuation;

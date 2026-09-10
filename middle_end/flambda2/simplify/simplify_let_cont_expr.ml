@@ -1809,6 +1809,24 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
      we need to add them to the handler's denv. *)
   let dacc, prior_lifted_constants = DA.get_and_clear_lifted_constants dacc in
   let denv_before_body = DA.denv dacc in
+  let denv_before_body =
+    match DE.forwarded_result_arity denv_before_body with
+    | None -> denv_before_body
+    | Some _ -> (
+      match data.handlers with
+      | Non_recursive handler ->
+        DE.add_return_continuation denv_before_body handler.cont
+          (Ok (Bound_parameters.arity handler.params))
+      | Recursive { invariant_params; continuation_handlers; _ } ->
+        Continuation.Lmap.fold
+          (fun cont (handler : One_recursive_handler.t) denv ->
+            let params =
+              Bound_parameters.append invariant_params handler.params
+            in
+            DE.add_return_continuation denv cont
+              (Ok (Bound_parameters.arity params)))
+          continuation_handlers denv_before_body)
+  in
   let can_be_lifted =
     Original_handlers.can_be_lifted data.handlers
     && not (DE.has_seen_a_non_liftable_continuation denv_before_body)

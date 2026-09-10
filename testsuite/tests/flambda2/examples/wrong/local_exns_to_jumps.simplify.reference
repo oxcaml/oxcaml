@@ -27,7 +27,8 @@ apply ccall noalloc
                   | 0 -> k pop(k2) (0)
                   | 1 -> k4
                   where k4 =
-                    (apply &my_alloc_region g (r_unboxed0) -> k6 * k2
+                    (apply &my_alloc_region
+                       (g : _ -> [ 0 |1 ]) (r_unboxed0) -> k6 * k2
                        where k6 (param : [ 0 |1 ]) =
                          let unboxed_field = %untag_imm (param) in
                          cont k5 (unboxed_field)
@@ -70,7 +71,8 @@ apply ccall noalloc
                  cont k7 push(k6)
                    where k7 =
                      let r_unboxed0_1 = r_unboxed0 in
-                     (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
+                     (apply &my_alloc_region
+                        (g : _ -> [ 0 |1 ]) (r_unboxed0) -> k8 * k6
                         where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
@@ -117,7 +119,8 @@ apply ccall noalloc
                  cont k7 push(k6)
                    where k7 =
                      let r_unboxed0_1 = r_unboxed0 in
-                     (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
+                     (apply &my_alloc_region
+                        (g : _ -> [ 0 |1 ]) (r_unboxed0) -> k8 * k6
                         where k8 (param : [ 0 |1 ]) =
                           let unboxed_field = %untag_imm (param) in
                           cont k7 (unboxed_field)
@@ -171,7 +174,8 @@ apply ccall noalloc
                       cont k7 push(k6)
                         where k7 =
                           let r_unboxed0_1 = r_unboxed0 in
-                          (apply &my_alloc_region g (r_unboxed0) -> k8 * k6
+                          (apply &my_alloc_region
+                             (g : _ -> [ 0 |1 ]) (r_unboxed0) -> k8 * k6
                              where k8 (param : [ 0 |1 ]) =
                                let unboxed_field = %untag_imm (param) in
                                cont k7 (unboxed_field)

@@ -40,3 +40,12 @@
  (instrumentation (backend bisect_ppx))
  (modules datalog)
  (libraries flambda2_datalog))
+
+(test
+ (name fexpr_result_arity)
+ (modes native)
+ (instrumentation (backend bisect_ppx))
+ (modules fexpr_result_arity)
+ (libraries
+  ocamloptcomp ocamlfrontend
+  flambda2_kinds flambda2_parser flambda2_term_basics flambda2_terms))

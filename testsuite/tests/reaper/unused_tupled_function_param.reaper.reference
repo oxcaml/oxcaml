@@ -40,7 +40,9 @@ in
      -> k1 * error
    where k1 (func) =
      (apply &toplevel
-        func ($camlUnused_tupled_function_param__const_block_0) -> k2 * error
+        (func : _ -> [ 0 |1 ])
+          ($camlUnused_tupled_function_param__const_block_0)
+          -> k2 * error
         where k2 (param : [ 0 |1 ]) =
           let unboxed_field = %untag_imm (param) in
           cont k1 (unboxed_field)

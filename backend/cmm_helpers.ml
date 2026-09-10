@@ -2549,6 +2549,29 @@ module Extended_machtype = struct
     | Punboxed_product fields -> Array.concat (List.map of_layout fields)
 end
 
+module Extended_result_type = struct
+  type t =
+    | Known of Extended_machtype.t
+    | Unknown
+
+  let of_machtype machtype = Known (Extended_machtype.of_machtype machtype)
+
+  let of_result_type = function
+    | Cmm.Known machtype -> of_machtype machtype
+    | Cmm.Unknown -> Unknown
+
+  let to_result_type = function
+    | Known result -> Cmm.Known (Extended_machtype.to_machtype result)
+    | Unknown -> Cmm.Unknown
+
+  let change_tagged_int_to_val = function
+    | Known result ->
+      Cmm.Known (Extended_machtype.change_tagged_int_to_val result)
+    | Unknown -> Cmm.Unknown
+
+  let is_unknown = function Known _ -> false | Unknown -> true
+end
+
 let machtype_of_layout layout =
   layout |> Extended_machtype.of_layout |> Extended_machtype.to_machtype
 
@@ -2578,11 +2601,15 @@ let unique_arity_identifier (arity : Cmm.machtype list) =
   then Int.to_string (List.length arity)
   else String.concat "_" (List.map machtype_identifier arity)
 
-let result_layout_suffix result =
+let concrete_result_layout_suffix result =
   match result with [| Val |] -> "" | _ -> "_R" ^ machtype_identifier result
 
+let result_layout_suffix = function
+  | Cmx_format.Known result -> concrete_result_layout_suffix result
+  | Cmx_format.Unknown -> "_Runknown"
+
 let send_function_name arity result (mode : Cmx_format.return_mode) =
-  let res = result_layout_suffix result in
+  let res = concrete_result_layout_suffix result in
   let suff =
     match mode with Not_alloc_stack -> "" | Maybe_alloc_stack -> "L"
   in
@@ -2602,7 +2629,7 @@ let call_cached_method obj tag cache pos args args_type result (apos, mode) dbg
   in
   Cop
     ( Capply
-        { result_type = Extended_machtype.to_machtype result;
+        { result_type = Cmm.Known (Extended_machtype.to_machtype result);
           region = apos;
           callees = Some [sym]
         },
@@ -2793,7 +2820,14 @@ let apply_function_name arity result (mode : Cmx_format.return_mode) =
 
 let apply_function_sym arity result mode =
   let arity = List.map Extended_machtype.change_tagged_int_to_val arity in
-  let result = Extended_machtype.change_tagged_int_to_val result in
+  let mode =
+    (* An unknown-result application function opens no region, so both modes
+       would produce the same code. *)
+    if Extended_result_type.is_unknown result
+    then Cmx_format.Not_alloc_stack
+    else mode
+  in
+  let result = Extended_result_type.change_tagged_int_to_val result in
   assert (List.length arity > 0);
   Compilenv.need_apply_fun arity result mode;
   global_symbol (apply_function_name arity result mode)
@@ -2822,6 +2856,7 @@ let curry_function_sym_name function_kind arity result =
     tuplify_function_name (List.length arity) result
 
 let curry_function_sym function_kind arity result =
+  let result = Extended_result_type.change_tagged_int_to_val result in
   { sym_name = curry_function_sym_name function_kind arity result;
     sym_global = Global
   }
@@ -3613,12 +3648,12 @@ let split_arity_for_apply arity args =
     let args1, args2 = Misc.Stdlib.List.split_at max_arity args in
     (a1, args1), Some (a2, args2)
 
-let call_caml_apply extended_ty extended_args_type mut clos args pos mode dbg =
+let call_caml_apply result extended_args_type mut clos args pos mode dbg =
   (* Treat tagged int arguments and results as [typ_val], to avoid generating
      excessive numbers of caml_apply functions. *)
-  let ty = Extended_machtype.to_machtype extended_ty in
+  let ty = Extended_result_type.to_result_type result in
   let really_call_caml_apply clos args =
-    let sym = apply_function_sym extended_args_type extended_ty mode in
+    let sym = apply_function_sym extended_args_type result mode in
     let cargs = (Cconst_symbol (sym, dbg) :: args) @ [clos] in
     Cop
       ( Capply { result_type = ty; region = pos; callees = Some [sym] },
@@ -3678,7 +3713,7 @@ let apply_or_call_caml_apply result arity mut clos args pos mode dbg =
     bind "fun" clos (fun clos ->
         Cop
           ( Capply
-              { result_type = Extended_machtype.to_machtype result;
+              { result_type = Extended_result_type.to_result_type result;
                 region = pos;
                 callees = None
               },
@@ -3701,10 +3736,15 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
              Cmx_format.Maybe_alloc_stack dbg)
         old_region)
   | (arity, args), Some (arity', args') -> (
+    let intermediate_mode =
+      if Extended_result_type.is_unknown result
+      then Cmx_format.Not_alloc_stack
+      else Cmx_format.Maybe_alloc_stack
+    in
     let body old_region =
       bind "result"
-        (call_caml_apply [| Val |] arity mut clos args Rc_normal
-           Cmx_format.Maybe_alloc_stack dbg) (fun clos ->
+        (call_caml_apply (Extended_result_type.Known Extended_machtype.typ_val)
+           arity mut clos args Rc_normal intermediate_mode dbg) (fun clos ->
           might_split_call_caml_apply ?old_region result arity' mut clos args'
             pos mode dbg)
     in
@@ -3716,9 +3756,16 @@ let rec might_split_call_caml_apply ?old_region result arity mut clos args pos
        To avoid doing that, when splitting a [caml_apply], we check before
        calling the last [caml_apply] if we allocated on the local stack; and if
        so, we close the region ourselves afterwards, as is already done inside
-       [caml_apply]. *)
+       [caml_apply].
+
+       This is only needed for concrete results: the unknown-result split cannot
+       open a region (the final call must stay a genuine tail call), so unknown
+       results force the intermediate applications to [Not_alloc_stack] above
+       and never allocate locally here. *)
     match old_region, mode with
-    | None, Cmx_format.Not_alloc_stack when Config.stack_allocation ->
+    | None, Cmx_format.Not_alloc_stack
+      when Config.stack_allocation
+           && not (Extended_result_type.is_unknown result) ->
       let dbg = placeholder_dbg in
       bind "region"
         (Cop (Cbeginregion, [], dbg ()))
@@ -3734,7 +3781,7 @@ let send kind met obj args args_type result akind dbg =
        Immutable load *)
     generic_apply Asttypes.Mutable clos (obj :: args)
       (Extended_machtype.typ_val :: args_type)
-      result akind dbg
+      (Extended_result_type.Known result) akind dbg
   in
   bind "obj" obj (fun obj ->
       match (kind : Lambda.meth_kind), args, args_type with
@@ -3880,10 +3927,11 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
   let dbg = placeholder_dbg in
   let args = List.map (fun _ -> V.create_local "arg") arity in
   let clos = V.create_local "clos" in
+  let result_type = Extended_result_type.to_result_type result in
   (* In the slowpath, a region is necessary in case the initial applications do
      local allocations *)
   let region =
-    if not Config.stack_allocation
+    if Extended_result_type.is_unknown result || not Config.stack_allocation
     then None
     else
       match mode with
@@ -3896,7 +3944,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
     | [arg] -> (
       let app =
         Cop
-          ( Capply { result_type = result; region = Rc_normal; callees = None },
+          ( Capply { result_type; region = Rc_normal; callees = None },
             (* The code pointer and closure info of a closure are write-once;
                reading them immutably is correct and lets the debugger describe
                the call target (and closure projections) for call sites. *)
@@ -3915,11 +3963,11 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
           (Cvar region))
     | arg :: args ->
       let newclos = V.create_local "clos" in
+      let result_type = Known typ_val in
       Clet
         ( VP.create newclos,
           Cop
-            ( Capply
-                { result_type = typ_val; region = Rc_normal; callees = None },
+            ( Capply { result_type; region = Rc_normal; callees = None },
               [ get_field_codepointer Asttypes.Immutable (Cvar clos) 0 (dbg ());
                 Cvar arg;
                 Cvar clos ],
@@ -3950,7 +3998,7 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
               dbg () ),
           dbg (),
           Cop
-            ( Capply { result_type = result; region = Rc_normal; callees = None },
+            ( Capply { result_type; region = Rc_normal; callees = None },
               get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
               :: List.map (fun s -> Cvar s) all_args,
               dbg () ),
@@ -3961,7 +4009,10 @@ let apply_function_body arity result (mode : Cmx_format.return_mode) =
 let send_function (arity, result, mode) =
   let dbg = placeholder_dbg in
   let cconst_int i = Cconst_int (i, dbg ()) in
-  let args, clos', body = apply_function_body (typ_val :: arity) result mode in
+  let extended_result = Extended_result_type.of_machtype result in
+  let args, clos', body =
+    apply_function_body (typ_val :: arity) extended_result mode
+  in
   let cache = V.create_local "cache"
   and pos = V.create_local "pos"
   and obj = List.hd args
@@ -4033,11 +4084,12 @@ let send_function (arity, result, mode) =
       fun_codegen_options = [];
       fun_dbg;
       fun_poll = Default_poll;
-      fun_ret_type = result
+      fun_ret_type = Cmm.Known result
     }
 
 let apply_function (arity, result, mode) =
-  let args, clos, body = apply_function_body arity result mode in
+  let extended_result = Extended_result_type.of_result_type result in
+  let args, clos, body = apply_function_body arity extended_result mode in
   let all_args = List.combine args arity @ [clos, typ_val] in
   let fun_name = global_symbol (apply_function_name arity result mode) in
   let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
@@ -4048,7 +4100,7 @@ let apply_function (arity, result, mode) =
       fun_codegen_options = [];
       fun_dbg;
       fun_poll = Default_poll;
-      fun_ret_type = result
+      fun_ret_type = Extended_result_type.to_result_type extended_result
     }
 
 (* Generate tuplifying functions:
@@ -4057,6 +4109,8 @@ let apply_function (arity, result, mode) =
  *)
 
 let tuplify_function arity return =
+  let extended_return = Extended_result_type.of_result_type return in
+  let result_type = Extended_result_type.to_result_type extended_return in
   if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
   then
     Misc.fatal_error
@@ -4079,7 +4133,7 @@ let tuplify_function arity return =
       fun_args = [VP.create arg, typ_val; VP.create clos, typ_val];
       fun_body =
         Cop
-          ( Capply { result_type = return; region = Rc_normal; callees = None },
+          ( Capply { result_type; region = Rc_normal; callees = None },
             (* The closure code pointer is write-once; see
                [apply_function_body]. *)
             get_field_codepointer Asttypes.Immutable (Cvar clos) 2 (dbg ())
@@ -4089,7 +4143,7 @@ let tuplify_function arity return =
       fun_codegen_options = [];
       fun_dbg;
       fun_poll = Default_poll;
-      fun_ret_type = return
+      fun_ret_type = result_type
     }
 
 (* Generate currying functions:
@@ -4229,10 +4283,11 @@ let curry_clos_has_nary_application ~narity n =
 
 let rec make_curry_apply result narity args_type args clos n =
   let dbg = placeholder_dbg in
+  let result_type = Extended_result_type.to_result_type result in
   match args_type with
   | [] ->
     Cop
-      ( Capply { result_type = result; region = Rc_normal; callees = None },
+      ( Capply { result_type; region = Rc_normal; callees = None },
         (* Code pointer and chain links of a partial-application closure are
            write-once; reading them immutably lets the debugger describe the
            call target and the recovered arguments as closure projections. *)
@@ -4253,6 +4308,7 @@ let rec make_curry_apply result narity args_type args clos n =
           newclos (n - 1) )
 
 let final_curry_function nlocal arity result =
+  let extended_result = Extended_result_type.of_result_type result in
   let last_arg = V.create_local "arg" in
   let last_clos = V.create_local "clos" in
   let narity = List.length arity in
@@ -4269,15 +4325,16 @@ let final_curry_function nlocal arity result =
       fun_args =
         [VP.create last_arg, List.hd args_type; VP.create last_clos, typ_val];
       fun_body =
-        make_curry_apply result narity (List.tl args_type) [Cvar last_arg]
-          last_clos (narity - 1);
+        make_curry_apply extended_result narity (List.tl args_type)
+          [Cvar last_arg] last_clos (narity - 1);
       fun_codegen_options = [];
       fun_dbg;
       fun_poll = Default_poll;
-      fun_ret_type = result
+      fun_ret_type = Extended_result_type.to_result_type extended_result
     }
 
 let intermediate_curry_functions ~nlocal ~arity result =
+  let extended_result = Extended_result_type.of_result_type result in
   let name1 =
     curry_function_sym_name (Lambda.Curried { nlocal }) arity result
   in
@@ -4335,7 +4392,7 @@ let intermediate_curry_functions ~nlocal ~arity result =
           fun_codegen_options = [];
           fun_dbg;
           fun_poll = Default_poll;
-          fun_ret_type = result
+          fun_ret_type = Extended_result_type.to_result_type extended_result
         }
       ::
       (if has_nary
@@ -4360,14 +4417,15 @@ let intermediate_curry_functions ~nlocal ~arity result =
              { fun_name;
                fun_args;
                fun_body =
-                 make_curry_apply result narity
+                 make_curry_apply extended_result narity
                    (arg_type :: accumulated_args)
                    (List.map (fun (arg, _) -> Cvar arg) direct_args)
                    clos (num + 1);
                fun_codegen_options = [];
                fun_dbg;
                fun_poll = Default_poll;
-               fun_ret_type = result
+               fun_ret_type =
+                 Extended_result_type.to_result_type extended_result
              }
          in
          [cf]
@@ -4679,9 +4737,8 @@ let fail_if_called_indirectly_function () =
       fun_codegen_options = [];
       fun_poll = Default_poll;
       fun_dbg = Debuginfo.none;
-      fun_ret_type =
-        typ_void
-        (* This function never returns, so we can assume this return type *)
+      (* This function never returns, so we can assume this return type. *)
+      fun_ret_type = Known typ_void
     }
   in
   [Cdata string_data; Cfunction fn]
@@ -4721,6 +4778,7 @@ let entry_point namelist =
   in
   let table_symbol = global_symbol "caml_globals_entry_functions" in
   let call i =
+    let result_type = Known typ_void in
     let f =
       Cop
         ( Cadda,
@@ -4730,7 +4788,7 @@ let entry_point namelist =
     in
     Csequence
       ( Cop
-          ( Capply { result_type = typ_void; region = Rc_normal; callees = None },
+          ( Capply { result_type; region = Rc_normal; callees = None },
             [Cop (mk_load_immut Word_int, [f], dbg ())],
             dbg () ),
         incr_global_inited () )
@@ -4789,7 +4847,7 @@ let entry_point namelist =
         fun_codegen_options = [Reduce_code_size; Use_linscan_regalloc];
         fun_dbg;
         fun_poll = Default_poll;
-        fun_ret_type = typ_val
+        fun_ret_type = Known typ_val
       } ]
 
 (* Generate the table of globals *)
@@ -5264,7 +5322,7 @@ let indirect_full_call ~dbg ty pos f ~callees args_type args =
     ~body:
       (Cop
          ( Capply
-             { result_type = Extended_machtype.to_machtype ty;
+             { result_type = Extended_result_type.to_result_type ty;
                region = pos;
                callees
              },
@@ -5606,15 +5664,17 @@ let perform ~dbg eff =
   (* Rc_normal means "allow tailcalls". Preventing them here by using Rc_nontail
      improves backtraces of paused fibers. *)
   let sym = Cmm.global_symbol "caml_perform" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_nontail; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_nontail; callees = Some [sym] },
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
 let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5635,8 +5695,9 @@ let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
 
 let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
         Cop
           ( Cextcall
@@ -5662,22 +5723,25 @@ let with_stack_preemptible ~dbg ~valuec ~exnc ~effc ~handle_tick ~f ~arg =
 
 let continue ~dbg ~cont ~value =
   let sym = Cmm.global_symbol "caml_continue" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [Cconst_symbol (sym, dbg); cont; value],
       dbg )
 
 let discontinue ~dbg ~cont ~exn =
   let sym = Cmm.global_symbol "caml_discontinue" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [Cconst_symbol (sym, dbg); cont; exn],
       dbg )
 
 let discontinue_with_backtrace ~dbg ~cont ~exn ~bt =
   let sym = Cmm.global_symbol "caml_discontinue_with_backtrace" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [Cconst_symbol (sym, dbg); cont; exn; bt],
       dbg )
 
@@ -5685,8 +5749,9 @@ let reperform ~dbg ~eff ~cont ~last_fiber =
   (* Rc_normal is required here, this is used in tail position and should tail
      call. *)
   let sym = Cmm.global_symbol "caml_reperform" in
+  let result_type = Known typ_val in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+    ( Capply { result_type; region = Rc_normal; callees = Some [sym] },
       [Cconst_symbol (sym, dbg); eff; cont; last_fiber],
       dbg )
 

@@ -15,17 +15,23 @@ let $camlJs__Pmakeblock_6 =
 in
 let code of__debug_2 deleted in
 let code loopify(never) size(3) newer_version_of(init_0)
-      init_0_1 (x, y) my_closure &my_alloc_region my_depth -> k * k1 =
+      init_0_1 (x, y) my_closure &my_alloc_region my_depth -> k * k1 : bottom =
   cont k1 pop(regular k1) ($camlJs__Pmakeblock_2)
 in
 let $camlJs__init_7 = closure init_0_1 @init &toplevel in
 let code loopify(never) size(3) newer_version_of(of__unsafe_1)
-      of__unsafe_1_1 (a) my_closure &my_alloc_region my_depth -> k * k1 =
+      of__unsafe_1_1 (a)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : bottom =
   cont k1 pop(regular k1) ($camlJs__Pmakeblock_4)
 in
 let $camlJs__of__unsafe_8 = closure of__unsafe_1_1 @of__unsafe &toplevel in
 let code loopify(never) size(3) newer_version_of(of__debug_2)
-      of__debug_2_1 (a) my_closure &my_alloc_region my_depth -> k * k1 =
+      of__debug_2_1 (a)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : bottom =
   cont k1 pop(regular k1) ($camlJs__Pmakeblock_6)
 in
 let $camlJs__of__debug_9 = closure of__debug_2_1 @of__debug &toplevel in

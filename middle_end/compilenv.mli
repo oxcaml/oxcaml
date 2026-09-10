@@ -54,9 +54,15 @@ val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
 val need_curry_fun:
-  Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
+  Lambda.function_kind ->
+  Cmm.machtype list ->
+  Cmx_format.generic_result_type ->
+  unit
 val need_apply_fun:
-  Cmm.machtype list -> Cmm.machtype -> Cmx_format.return_mode -> unit
+  Cmm.machtype list ->
+  Cmx_format.generic_result_type ->
+  Cmx_format.return_mode ->
+  unit
 val need_send_fun:
   Cmm.machtype list -> Cmm.machtype -> Cmx_format.return_mode -> unit
         (* Record the need of a currying (resp. application,

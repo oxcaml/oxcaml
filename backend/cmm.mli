@@ -57,6 +57,20 @@ tracked by the GC:
 
 type machtype = machtype_component array
 
+(** The type of the result of a function or of an application. [Unknown] means
+    that the number and layout of the returned values are not statically
+    determined (e.g. a function whose OCaml return type has layout [any]), so no
+    machtype describing them is ever materialized. An [Unknown]-result
+    application is only valid where it is compiled as a genuine tail call,
+    forwarding the callee's result registers directly to the caller; this is
+    enforced during instruction selection. A function declared with an [Unknown]
+    return type typically exits via such tail calls, but it may also return
+    ordinarily: each of its return points then fixes its own concrete return
+    convention. *)
+type result_type = Cmx_format.generic_result_type =
+  | Known of machtype
+  | Unknown
+
 val equal_machtype : machtype -> machtype -> bool
 
 val typ_void : machtype
@@ -426,7 +440,7 @@ val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 
 type operation =
   | Capply of
-      { result_type : machtype;
+      { result_type : result_type;
         region : Lambda.region_close;
         callees : symbol list option
             (* List of possible callees, or [None] if not known. The actual
@@ -617,7 +631,7 @@ type fundecl =
     fun_codegen_options : codegen_option list;
     fun_poll : Lambda.poll_attribute;
     fun_dbg : Debuginfo.t;
-    fun_ret_type : machtype
+    fun_ret_type : result_type
   }
 
 (** When data items that are less than 64 bits wide occur in blocks, whose

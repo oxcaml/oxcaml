@@ -30,7 +30,8 @@
             let ifso_result = %box_num.`float`.my_alloc_region (prim) in
             cont k4 (ifso_result)
           where k4 (if_then_else_result) =
-            apply &my_alloc_region f (if_then_else_result) -> k3 * k2)
+            apply &my_alloc_region
+              (f : _ -> val) (if_then_else_result) -> k3 * k2)
      where k3 (apply_result : val) =
        ((let prim = %array_length.generic (arr) in
          let prim_1 = %int_comp.unsigned.lt (i, prim) in

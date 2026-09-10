@@ -15,7 +15,7 @@ let code loopify(never) size(28) newer_version_of(test_1)
       test_1_1 (src : [ 0 | 0 of imm tagged ], f : val, g : val)
         my_closure &my_alloc_region my_depth
         -> k * k1 =
-  apply &my_alloc_region f (0) -> k4 * k1
+  apply &my_alloc_region (f : _ -> [ 0 |1 ]) (0) -> k4 * k1
     where k4 (param : [ 0 |1 ]) =
       let unboxed_field = %untag_imm (param) in
       cont k3 (unboxed_field)

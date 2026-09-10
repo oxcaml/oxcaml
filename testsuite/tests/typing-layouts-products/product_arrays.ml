@@ -2269,7 +2269,7 @@ Line 2, characters 47-63:
 Error: An unboxed product array element must be formed from all
        external types (which are ignored by the gc) or all gc-scannable types.
        But this array operation is peformed for an array whose
-       element type is #(float# * a * bool option), which is an unboxed product
+       element type is #(float# * 'a * bool option), which is an unboxed product
        that is not external and contains a type with the non-scannable
        layout float64.
        Hint: if the array contents should not be scanned, annotating

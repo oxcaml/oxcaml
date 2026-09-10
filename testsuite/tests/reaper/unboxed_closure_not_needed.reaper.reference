@@ -17,7 +17,7 @@
          : imm tagged =
    apply direct(g_1 &my_alloc_region)  -> k3 * k2
      where k3 (func) =
-       apply &my_alloc_region func (0) -> k1 * k2
+       apply &my_alloc_region (func : _ -> imm tagged) (0) -> k1 * k2
  in
  let code inline(never) size(23)
        f_0 (f_into_my_closure_field_bind)
@@ -27,7 +27,7 @@
    let next_depth = rec_info (succ my_depth) in
    let bind = f_into_my_closure_field_bind in
    let fn = closure fn_2 @fn_1 &my_alloc_region in
-   apply &my_alloc_region bind (fn) -> k1 * k2
+   apply &my_alloc_region (bind : _ -> imm tagged) (fn) -> k1 * k2
  in
  let  in
  let bind = %opaque (0) in

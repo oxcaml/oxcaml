@@ -103,7 +103,7 @@ val create :
   Exported_code.t ->
   trans_prim:t trans_prim ->
   return_continuation:Continuation.t ->
-  return_continuation_arity:Cmm.machtype list ->
+  return_continuation_arity:Cmm.machtype list Or_unknown.t ->
   exn_continuation:Continuation.t ->
   t
 
@@ -113,7 +113,7 @@ val create :
 val enter_function_body :
   t ->
   return_continuation:Continuation.t ->
-  return_continuation_arity:Cmm.machtype list ->
+  return_continuation_arity:Cmm.machtype list Or_unknown.t ->
   exn_continuation:Continuation.t ->
   t
 
@@ -347,7 +347,7 @@ type 'a param_type =
     translated as a static jump to a Cmm continuation (represented as a Cmm
     label), or inlined at any unique use site. *)
 type cont = private
-  | Return of { param_types : Cmm.machtype list }
+  | Return of { param_types : Cmm.machtype list Or_unknown.t }
   | Jump of
       { cont : Lambda.static_label;
         param_types : Cmm.machtype param_type list

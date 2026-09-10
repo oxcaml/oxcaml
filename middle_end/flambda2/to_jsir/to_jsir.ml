@@ -452,17 +452,25 @@ and apply_expr ~env ~res e =
       in
       To_jsir_primitive.extern ~env ~res symbol args
   in
-  match Apply_expr.continuation e with
-  | Never_returns ->
+  let return_to_caller () =
     env, To_jsir_result.end_block_with_last_exn res (Return return_var)
-  | Return cont ->
+  in
+  match Apply_expr.return e with
+  | Never_returns _ -> return_to_caller ()
+  | Tail_forwards_to_caller cont ->
     if Continuation.equal (To_jsir_env.return_continuation env) cont
-    then env, To_jsir_result.end_block_with_last_exn res (Return return_var)
+    then return_to_caller ()
+    else
+      Misc.fatal_errorf
+        "Unknown-result application must forward to the enclosing function's \
+         return continuation, not %a:@ %a"
+        Continuation.print cont Apply_expr.print e
+  | Returns_to { cont; arity = return_arity } ->
+    if Continuation.equal (To_jsir_env.return_continuation env) cont
+    then return_to_caller ()
     else
       let addr = To_jsir_env.get_continuation_exn env cont in
-      let arity =
-        Apply_expr.return_arity e |> Flambda_arity.cardinal_unarized
-      in
+      let arity = Flambda_arity.cardinal_unarized return_arity in
       let return_vars, res =
         match arity with
         | 0 -> [], res

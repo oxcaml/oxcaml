@@ -135,7 +135,7 @@ type t =
     mutable fun_prologue_required : bool;
     fun_poll : Lambda.poll_attribute;
     next_instruction_id : InstructionId.sequence;
-    fun_ret_type : Cmm.machtype;
+    fun_ret_type : Cmm.result_type;
     fun_phantom_lets :
       (Backend_var.Provenance.t option * phantom_defining_expr)
       Backend_var.Map.t;

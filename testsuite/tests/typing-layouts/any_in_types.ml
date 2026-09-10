@@ -79,6 +79,145 @@ let () = M2'.print_one ()
 (* edge cases and order of evaluation *)
 let g : type (a : any). unit -> a -> a = fun () -> assert false
 
+let any_raise : type (a : any). unit -> a = fun () -> assert false
+
+let[@inline never] compose_unit : type (a : any). (unit -> a) -> unit -> a =
+  fun f () -> f ()
+
+let[@inline never] composed_int () = 5
+
+let[@inline never] composed_float () = unbox 5.
+
+let forward_any_raise : type (a : any). unit -> a =
+  fun () -> any_raise ()
+
+let rec recursive_any_raise : type (a : any). int -> a =
+  fun n ->
+    if n = 0 then assert false else recursive_any_raise (n - 1)
+
+let[@inline never] branch_any_raise : type (a : any). bool -> a =
+  fun b ->
+    if Sys.opaque_identity b then any_raise () else forward_any_raise ()
+
+let[@inline never] switch_any_raise : type (a : any). int -> a =
+  fun n ->
+    match Sys.opaque_identity n with
+    | 0 -> any_raise ()
+    | 1 -> forward_any_raise ()
+    | _ -> recursive_any_raise n
+
+let () =
+  try
+    let _ : int = any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "raised int\n"
+;;
+
+let () =
+  try
+    let _ : float# = any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "raised float#\n"
+;;
+
+let () =
+  try
+    let _ : int = forward_any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "forwarded int\n"
+;;
+
+let () =
+  try
+    let _ : float# = forward_any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "forwarded float#\n"
+;;
+
+let () =
+  try
+    let _ : int = recursive_any_raise 1 in
+    ()
+  with
+  | _ -> Printf.printf "recursive int\n"
+;;
+
+let () =
+  try
+    let _ : float# = recursive_any_raise 1 in
+    ()
+  with
+  | _ -> Printf.printf "recursive float#\n"
+;;
+
+let () =
+  try
+    let _ : int = branch_any_raise true in
+    ()
+  with
+  | _ -> Printf.printf "branch int\n"
+;;
+
+let () =
+  try
+    let _ : float# = branch_any_raise false in
+    ()
+  with
+  | _ -> Printf.printf "branch float#\n"
+;;
+
+let () =
+  try
+    let _ : int = switch_any_raise 0 in
+    ()
+  with
+  | _ -> Printf.printf "switch int\n"
+;;
+
+let () =
+  try
+    let _ : float# = switch_any_raise 1 in
+    ()
+  with
+  | _ -> Printf.printf "switch float#\n"
+;;
+
+let () =
+  Printf.printf "composed concrete int: %d\n" (compose_unit composed_int ())
+;;
+
+let () =
+  Printf.printf "composed concrete float#: %f\n"
+    (Stdlib_upstream_compatible.Float_u.to_float
+       (compose_unit composed_float ()))
+;;
+
+let composed_any_raise : type (a : any). unit -> a =
+  fun () ->
+    let f = compose_unit any_raise in
+    f ()
+;;
+
+let () =
+  try
+    let _ : int = composed_any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "composed int\n"
+;;
+
+let () =
+  try
+    let _ : float# = composed_any_raise () in
+    ()
+  with
+  | _ -> Printf.printf "composed float#\n"
+;;
+
 let () =
   try
     let r =

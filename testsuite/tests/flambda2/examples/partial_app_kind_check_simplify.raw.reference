@@ -25,7 +25,7 @@ let $camlPartial_app_kind_check_simplify__first_const_0 = Block 0 () in
    let f = closure f_2 @f &my_alloc_region in
    apply direct(cast_1 &my_alloc_region) (cast : _ -> val) (u, f) -> k3 * k2
      where k3 (apply_result : val) =
-       apply &my_alloc_region apply_result (0) -> k1 * k2
+       apply &my_alloc_region (apply_result : _ -> int64) (0) -> k1 * k2
  in
  let test = closure test_0 @test &toplevel in
  let Pmakeblock = %block.[`0`].`toplevel` (test) in

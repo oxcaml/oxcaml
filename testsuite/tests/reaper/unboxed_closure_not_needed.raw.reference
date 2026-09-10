@@ -21,7 +21,7 @@
    let g = %project_value_slot.[fn_1].[g] (my_closure) in
    apply direct(g_1 &my_alloc_region) g (0) -> k3 * k2
      where k3 (func) =
-       apply &my_alloc_region func (0) -> k1 * k2
+       apply &my_alloc_region (func : _ -> imm tagged) (0) -> k1 * k2
  in
  let code inline(never) size(27)
        f_0 (param : imm tagged)
@@ -34,7 +34,7 @@
    let fn = closure fn_2 @fn_1 &my_alloc_region
    with { g = g ~ depth my_depth -> next_depth }
    in
-   apply &my_alloc_region bind (fn) -> k1 * k2
+   apply &my_alloc_region (bind : _ -> imm tagged) (fn) -> k1 * k2
  in
  let $camlUnboxed_closure_not_needed__s1 = Block 0 () in
  let bind = %opaque (0) in

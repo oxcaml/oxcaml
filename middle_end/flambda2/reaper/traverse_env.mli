@@ -18,7 +18,9 @@
 
 (** [Normal params] carries the variables representing a continuation's
     parameters. *)
-type cont_kind = Normal of Variable.t list
+type cont_kind =
+  | Normal of Variable.t list
+  | Unknown_return
 
 (** Controls whether the reaper preserves direct function calls when the code_id
     being called might otherwise be dead. The typical situation is a call to a

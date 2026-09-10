@@ -41,13 +41,18 @@ type return_mode =
   | Not_alloc_stack
   | Maybe_alloc_stack
 
-type apply_fn := machtype list * machtype * return_mode
+type generic_result_type =
+  | Known of machtype
+  | Unknown
+
+type apply_fn := machtype list * generic_result_type * return_mode
 
 (* Curry/apply/send functions *)
 type generic_fns =
-  { curry_fun: (Lambda.function_kind * machtype list * machtype) list;
+  { curry_fun:
+      (Lambda.function_kind * machtype list * generic_result_type) list;
     apply_fun: apply_fn list;
-    send_fun: apply_fn list }
+    send_fun: (machtype list * machtype * return_mode) list }
 
 type unit_infos =
   { ui_unit: Compilation_unit.t;  (* Compilation unit implemented *)

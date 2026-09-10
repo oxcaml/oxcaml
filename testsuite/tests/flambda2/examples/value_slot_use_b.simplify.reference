@@ -14,7 +14,8 @@
          (1)
          -> k * error)
   where k (g : val) =
-    (apply &toplevel inlined(never) g (2) -> k1 * error
+    (apply &toplevel inlined(never)
+       (g : _ -> [ 0 of imm tagged * imm tagged ]) (2) -> k1 * error
        where k1 (param : [ 0 of imm tagged * imm tagged ]) =
          cont k
        where k =

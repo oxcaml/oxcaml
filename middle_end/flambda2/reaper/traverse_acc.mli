@@ -33,7 +33,7 @@ type continuation_info =
 *)
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
-    result_arity : [`Unarized] Flambda_arity.t;
+    result_arity : Result_arity.t;
     code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
@@ -171,6 +171,8 @@ val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
 (** Record a direct function application to be resolved later by [deps]. Only
     used for applications to code ids in the current compilation unit. *)
 val add_apply : t -> apply_dep -> unit
+
+val add_unknown_result_call_witness : t -> Code_id_or_name.t -> unit
 
 (** Create the call witness node for a known-arity function definition. The
     witness carries parameter, return, exception, and code-id edges

@@ -16,7 +16,8 @@
        let `*match*_1` = %block_load.[`0`] (`*match*`) in
        let Pfield = %block_load.[`1`] (`*match*_1`) in
        let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-       apply &my_alloc_region c (Pfield_1, Pfield) -> k1 * k2
+       apply &my_alloc_region
+         (c : _ -> imm tagged) (Pfield_1, Pfield) -> k1 * k2
  in
  let code size(7)
        create_1 (_arity : imm tagged)
@@ -67,7 +68,8 @@
           let `*match*_1` = %block_load.[`0`] (`*match*`) in
           let Pfield = %block_load.[`1`] (`*match*_1`) in
           let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
-          apply &toplevel c (Pfield_1, Pfield) -> k1 * error)
+          apply &toplevel
+            (c : _ -> imm tagged) (Pfield_1, Pfield) -> k1 * error)
    where k1 (`*match*` : imm tagged) =
      cont k ($camlDirect_app_parameter_kind_check_classic__s3))
   where k define_root_symbol (module_block) =

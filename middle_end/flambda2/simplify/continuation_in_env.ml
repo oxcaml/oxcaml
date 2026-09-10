@@ -24,7 +24,9 @@ type t =
   | Non_inlinable_zero_arity of { handler : Rebuilt_expr.t Or_unknown.t }
   | Non_inlinable_non_zero_arity of { arity : [`Unarized] Flambda_arity.t }
   | Toplevel_or_function_return_or_exn_continuation of
-      { arity : [`Unarized] Flambda_arity.t }
+      { arity : [`Unarized] Flambda_arity.t;
+        has_unknown_arity : bool
+      }
   | Invalid of { arity : [`Unarized] Flambda_arity.t }
 
 let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
@@ -51,12 +53,14 @@ let [@ocamlformat "disable"] print are_rebuilding_terms ppf t =
         @[<hov 1>(arity@ %a)@]\
         )@]"
       Flambda_arity.print arity
-  | Toplevel_or_function_return_or_exn_continuation { arity } ->
+  | Toplevel_or_function_return_or_exn_continuation
+      { arity; has_unknown_arity } ->
     Format.fprintf ppf
       "@[<hov 1>(Toplevel_or_function_return_or_exn_continuation@ \
-        @[<hov 1>(arity@ %a)@]\
+        @[<hov 1>(arity@ %a)@]@ \
+        @[<hov 1>(has_unknown_arity@ %b)@]\
         )@]"
-      Flambda_arity.print arity
+      Flambda_arity.print arity has_unknown_arity
   | Invalid { arity } ->
     Format.fprintf ppf "@[<hov 1>(Invalid@ \
         @[<hov 1>(arity@ %a)@]\
@@ -74,6 +78,7 @@ let arity t =
     Bound_parameters.arity params
   | Non_inlinable_zero_arity _ -> Flambda_arity.nullary
   | Non_inlinable_non_zero_arity { arity }
-  | Toplevel_or_function_return_or_exn_continuation { arity }
+  | Toplevel_or_function_return_or_exn_continuation
+      { arity; has_unknown_arity = _ }
   | Invalid { arity } ->
     arity
