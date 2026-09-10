@@ -15,6 +15,34 @@
 (** Registers equipped with information used for generating debugging
     information. *)
 
+module Holds_value_of : sig
+  (** What value a register holds: either (part of) the value of a variable, or
+      a constant. The constant cases arise for example when a register holding
+      an immediate is an argument to a function call: the constant may then be
+      quoted in DWARF call site information, permitting the recovery of the
+      values of the callee's parameters by virtual unwinding (DWARF "entry
+      values"). *)
+  type t =
+    | Var of Backend_var.t
+    | Const_int of nativeint
+    | Const_naked_float of Int64.t
+    | Const_symbol of Cmm.symbol
+    | Projection of
+        { base : t;
+          field : int
+              (* Field index, in words, of an immutable load from [base] (e.g. a
+                 closure value slot): the value can be described to a debugger,
+                 in the context of a caller, as a projection from whatever
+                 caller-evaluable description applies to [base]. *)
+        }
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val print : Format.formatter -> t -> unit
+end
+
 module Debug_info : sig
   type t
 
@@ -22,8 +50,9 @@ module Debug_info : sig
 
   val equal : t -> t -> bool
 
-  (** The identifier that the register holds (part of) the value of. *)
-  val holds_value_of : t -> Backend_var.t
+  (** The identifier or constant that the register holds (part of) the value of.
+  *)
+  val holds_value_of : t -> Holds_value_of.t
 
   val part_of_value : t -> int
 
@@ -44,7 +73,7 @@ type reg_with_debug_info = t
 
 val create :
   reg:Reg.t ->
-  holds_value_of:Backend_var.t ->
+  holds_value_of:Holds_value_of.t ->
   part_of_value:int ->
   num_parts_of_value:int ->
   which_parameter:int option ->
