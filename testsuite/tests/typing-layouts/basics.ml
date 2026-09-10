@@ -246,15 +246,6 @@ module M1 = struct
 end;;
 
 [%%expect{|
-Line 4, characters 33-73:
-4 |   let f1 () = A {a = (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)}
-                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be
-         a value layout
-         because of the definition of s at line 2, characters 2-55.
-|}, Principal{|
 Line 4, characters 72-73:
 4 |   let f1 () = A {a = (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)}
                                                                             ^
@@ -290,15 +281,6 @@ module M1 = struct
 end;;
 
 [%%expect{|
-Line 4, characters 28-68:
-4 |   let f1 () = A (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)
-                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of Stdlib_upstream_compatible.Float_u.t is float64.
-       But the layout of Stdlib_upstream_compatible.Float_u.t must be
-         a value layout
-         because of the definition of s at line 2, characters 2-50.
-|}, Principal{|
 Line 4, characters 67-68:
 4 |   let f1 () = A (fun x y -> Stdlib_upstream_compatible.Float_u.abs x)
                                                                        ^
@@ -1755,17 +1737,6 @@ val mk_float64 : unit -> t_float64 = <fun>
 Line 3, characters 14-29:
 3 | let x () = eq (mk_float64 ()) (mk_float64 ())
                   ^^^^^^^^^^^^^^^
-Error:
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because of the definition of eq at line 1, characters 0-41.
-|}, Principal{|
-external eq : 'a -> 'a -> bool = "%equal"
-val mk_float64 : unit -> t_float64 = <fun>
-Line 3, characters 14-29:
-3 | let x () = eq (mk_float64 ()) (mk_float64 ())
-                  ^^^^^^^^^^^^^^^
 Error: This expression has type "t_float64"
        but an expression was expected of type "('a : value)"
        The layout of t_float64 is float64
@@ -1788,16 +1759,6 @@ end
 let g (x : t_float64) = M.f x
 
 [%%expect{|
-module M : sig val f : 'a -> 'a end
-Line 7, characters 24-29:
-7 | let g (x : t_float64) = M.f x
-                            ^^^^^
-Error:
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because of the definition of f at line 2, characters 2-18.
-|}, Principal{|
 module M : sig val f : 'a -> 'a end
 Line 7, characters 28-29:
 7 | let g (x : t_float64) = M.f x

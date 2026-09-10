@@ -340,15 +340,6 @@ val id_value : 'a -> 'a = <fun>
 
 let x8_1 = id_value (make_t_untagged_immediate ());;
 [%%expect{|
-Line 1, characters 11-50:
-1 | let x8_1 = id_value (make_t_untagged_immediate ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of t_untagged_immediate is untagged_immediate
-         because of the definition of t_untagged_immediate at line 1, characters 0-46.
-       But the layout of t_untagged_immediate must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-50:
 1 | let x8_1 = id_value (make_t_untagged_immediate ());;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -362,15 +353,6 @@ Error: This expression has type "t_untagged_immediate"
 
 let x8_2 = id_value (make_t_untagged_immediate_id ());;
 [%%expect{|
-Line 1, characters 11-53:
-1 | let x8_2 = id_value (make_t_untagged_immediate_id ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of 'a t_untagged_immediate_id is untagged_immediate
-         because of the definition of t_untagged_immediate_id at line 2, characters 0-59.
-       But the layout of 'a t_untagged_immediate_id must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-53:
 1 | let x8_2 = id_value (make_t_untagged_immediate_id ());;
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -385,15 +367,6 @@ Error: This expression has type
 
 let x8_3 = id_value (make_intu ());;
 [%%expect{|
-Line 1, characters 11-34:
-1 | let x8_3 = id_value (make_intu ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-34:
 1 | let x8_3 = id_value (make_intu ());;
                         ^^^^^^^^^^^^^^

@@ -341,15 +341,6 @@ val id_value : 'a -> 'a = <fun>
 
 let x8_1 = id_value (make_t_word ());;
 [%%expect{|
-Line 1, characters 11-36:
-1 | let x8_1 = id_value (make_t_word ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of t_word is word
-         because of the definition of t_word at line 1, characters 0-18.
-       But the layout of t_word must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-36:
 1 | let x8_1 = id_value (make_t_word ());;
                         ^^^^^^^^^^^^^^^^
@@ -363,15 +354,6 @@ Error: This expression has type "t_word" but an expression was expected of type
 
 let x8_2 = id_value (make_t_word_id ());;
 [%%expect{|
-Line 1, characters 11-39:
-1 | let x8_2 = id_value (make_t_word_id ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of 'a t_word_id is word
-         because of the definition of t_word_id at line 2, characters 0-31.
-       But the layout of 'a t_word_id must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-39:
 1 | let x8_2 = id_value (make_t_word_id ());;
                         ^^^^^^^^^^^^^^^^^^^
@@ -385,15 +367,6 @@ Error: This expression has type "'a t_word_id" = "('a : word)"
 
 let x8_3 = id_value (make_nativeintu ());;
 [%%expect{|
-Line 1, characters 11-40:
-1 | let x8_3 = id_value (make_nativeintu ());;
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error:
-       The layout of nativeint_u is word
-         because it is the primitive type nativeint_u.
-       But the layout of nativeint_u must be a value layout
-         because of the definition of id_value at line 5, characters 13-18.
-|}, Principal{|
 Line 1, characters 20-40:
 1 | let x8_3 = id_value (make_nativeintu ());;
                         ^^^^^^^^^^^^^^^^^^^^

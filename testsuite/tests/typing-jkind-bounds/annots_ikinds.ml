@@ -646,17 +646,6 @@ Line 1, characters 24-31:
 1 | let f { field } = field "hello"
                             ^^^^^^^
 Error: This constant has type "string" but an expression was expected of type
-         "('a : value_or_null mod everything)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of
-           value_or_null mod everything
-         because of the definition of r at line 1, characters 0-47.
-|}, Principal{|
-Line 1, characters 24-31:
-1 | let f { field } = field "hello"
-                            ^^^^^^^
-Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -674,16 +663,6 @@ Line 1, characters 26-33:
 1 | let f { fieldg } = fieldg "hello"
                               ^^^^^^^
 Error: This constant has type "string" but an expression was expected of type
-         "('a : value_or_null mod global)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of value_or_null mod global
-         because of the definition of rg at line 1, characters 0-56.
-|}, Principal{|
-Line 1, characters 26-33:
-1 | let f { fieldg } = fieldg "hello"
-                              ^^^^^^^
-Error: This constant has type "string" but an expression was expected of type
          "('a : value mod global)"
        The kind of string is immutable_data
          because it is the primitive type string.
@@ -694,17 +673,6 @@ Error: This constant has type "string" but an expression was expected of type
 let f { fieldc } = fieldc "hello"
 ;;
 [%%expect {|
-Line 1, characters 26-33:
-1 | let f { fieldc } = fieldc "hello"
-                              ^^^^^^^
-Error: This constant has type "string" but an expression was expected of type
-         "('a : value_or_null mod many aliased external_)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of
-           value_or_null mod many aliased external_
-         because of the definition of rc at line 1, characters 0-71.
-|}, Principal{|
 Line 1, characters 26-33:
 1 | let f { fieldc } = fieldc "hello"
                               ^^^^^^^
@@ -1095,17 +1063,6 @@ Line 1, characters 43-51:
 1 | let f (x : ('a : immediate). 'a -> 'a) = x "string"
                                                ^^^^^^^^
 Error: This constant has type "string" but an expression was expected of type
-         "('a : value_or_null mod everything)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of
-           value_or_null mod everything
-         because of the annotation on the universal variable 'a.
-|}, Principal{|
-Line 1, characters 43-51:
-1 | let f (x : ('a : immediate). 'a -> 'a) = x "string"
-                                               ^^^^^^^^
-Error: This constant has type "string" but an expression was expected of type
          "('a : immediate)"
        The layout of string is value non_float
          because it is the primitive type string.
@@ -1119,16 +1076,6 @@ Error: This constant has type "string" but an expression was expected of type
 let f (x : ('a : value mod global). 'a -> 'a) = x "string"
 
 [%%expect {|
-Line 1, characters 50-58:
-1 | let f (x : ('a : value mod global). 'a -> 'a) = x "string"
-                                                      ^^^^^^^^
-Error: This constant has type "string" but an expression was expected of type
-         "('a : value_or_null mod global)"
-       The kind of string is immutable_data
-         because it is the primitive type string.
-       But the kind of string must be a subkind of value_or_null mod global
-         because of the annotation on the universal variable 'a.
-|}, Principal{|
 Line 1, characters 50-58:
 1 | let f (x : ('a : value mod global). 'a -> 'a) = x "string"
                                                       ^^^^^^^^
