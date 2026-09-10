@@ -38,6 +38,7 @@ type cms_infos = {
     (Longident.t Location.loc * Shape_reduce.result) array;
   cms_declaration_dependencies :
     (Cmt_format.dependency_kind * Uid.t * Uid.t) list;
+  cms_module_implementation_facts : Module_implementation_facts.t option;
   cms_externals: Vicuna_value_shapes.extfun array;
 }
 
@@ -108,7 +109,7 @@ let externals_of_binary_annots binary_annots =
   | _ -> [| |]
 
 let save_cms target modname binary_annots initial_env shape
-  cms_declaration_dependencies =
+  cms_declaration_dependencies cms_module_implementation_facts =
   if (!Clflags.binary_annotations_cms && not !Clflags.print_types) then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] (Unit_info.Artifact.filename target)
@@ -147,6 +148,7 @@ let save_cms target modname binary_annots initial_env shape
             cms_impl_shape = shape;
             cms_ident_occurrences;
             cms_declaration_dependencies;
+            cms_module_implementation_facts;
             cms_externals;
           }
         in

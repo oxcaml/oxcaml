@@ -12,7 +12,7 @@ module type Stringable = sig
 end
 [%%expect{|
 {
- "Stringable"[module type] -> <.2>;
+ "Stringable"[module type] -> <.3>;
  }
 module type Stringable = sig type t val to_string : t -> string end
 |}]
@@ -25,11 +25,11 @@ end
 [%%expect{|
 {
  "Pair"[module] ->
-   Abs<.9>
+   Abs<.10>
       (X, Y,
        {
-        "t"[type] -> <.5>(X<.3> . "t"[type] ) * (Y<.4> . "t"[type] );
-        "to_string"[value] -> <.6>;
+        "t"[type] -> <.6>(X<.4> . "t"[type] ) * (Y<.5> . "t"[type] );
+        "to_string"[value] -> <.7>;
         });
  }
 module Pair :
@@ -43,9 +43,9 @@ module Int = struct
 end
 [%%expect{|
 {
- "Int"[module] -> {<.13>
-                   "t"[type] -> int<.10>;
-                   "to_string"[value] -> <.11>;
+ "Int"[module] -> {<.14>
+                   "t"[type] -> int<.11>;
+                   "to_string"[value] -> <.12>;
                    };
  }
 module Int : sig type t = int val to_string : int -> string end
@@ -58,9 +58,9 @@ end
 [%%expect{|
 {
  "String"[module] ->
-   {<.17>
-    "t"[type] -> string<.14>;
-    "to_string"[value] -> <.15>;
+   {<.18>
+    "t"[type] -> string<.15>;
+    "to_string"[value] -> <.16>;
     };
  }
 module String : sig type t = string val to_string : 'a -> 'a end
@@ -70,9 +70,9 @@ module P = Pair(Int)(Pair(String)(Int))
 [%%expect{|
 {
  "P"[module] ->
-   {<.18>
-    "t"[type] -> <.5>int<.10>  * (<.5>string<.14>  * int<.10>  );
-    "to_string"[value] -> <.6>;
+   {<.19>
+    "t"[type] -> <.6>int<.11>  * (<.6>string<.15>  * int<.11>  );
+    "to_string"[value] -> <.7>;
     };
  }
 module P :

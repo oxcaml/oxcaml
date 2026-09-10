@@ -1,0 +1,13 @@
+== facts read back from the .cmt and the .cmti of a unit
+present: cmt true cmti true
+== .cms and .cmsi hold the same facts as .cmt and .cmti
+present: cms true cmsi true
+cms = cmt: true
+cmsi = cmti: true
+== facts are only extracted for the artifacts that are written
+mtf_gate_cmt: cmt true, cms no artifact
+mtf_gate_cms: cmt no artifact, cms true
+mtf_gate_none: cmt no artifact, cms no artifact
+== a partial artifact carries no facts
+partial implementation: true
+present: false
