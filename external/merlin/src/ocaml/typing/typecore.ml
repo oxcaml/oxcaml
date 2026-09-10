@@ -6968,10 +6968,9 @@ and type_expect ?recarg ?(overwrite=No_overwrite) ?(is_applied=false) env
   Msupport.with_saved_types
     ~warning_attribute:sexp.pexp_attributes ?save_part:None
       (fun () ->
-<<<<<<< Merlin:shsong.zero-alloc-test
         let saved = save_levels () in
         try
-          type_expect_ ?recarg ~overwrite env
+          type_expect_ ?recarg ~overwrite ~is_applied env
             expected_mode sexp ty_expected_explained
         with exn ->
           Msupport.erroneous_type_register ty_expected_explained.ty;
@@ -6980,22 +6979,6 @@ and type_expect ?recarg ?(overwrite=No_overwrite) ?(is_applied=false) env
           let loc = sexp.pexp_loc in
           create_merlin_type_error_node loc env ty_expected_explained.ty
             ~attributes:(Msupport.recovery_attributes sexp.pexp_attributes))
-||||||| Compiler:last-imported
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
-      )
-  in
-  Cmt_format.set_saved_types
-    (Cmt_format.Partial_expression exp :: previous_saved_types);
-  exp
-=======
-         type_expect_ ?recarg ~overwrite ~is_applied env expected_mode sexp
-           ty_expected_explained
-      )
-  in
-  Cmt_format.set_saved_types
-    (Cmt_format.Partial_expression exp :: previous_saved_types);
-  exp
->>>>>>> Compiler:HEAD
 
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite) ?(is_applied=false)
@@ -9655,7 +9638,6 @@ and type_newtype
   end
    ~before_generalize:(fun (_,ety,_,_) -> enforce_current_level env ety)
 
-<<<<<<< Merlin:shsong.zero-alloc-test
 (** [type_newtype] where the "body" is just an expression. *)
 and type_newtype_expr
     ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
@@ -9669,12 +9651,7 @@ and type_newtype_expr
         (Texp_newtype (id, name, jkind_annot_opt, uid),
          loc, attributes) :: body.exp_extra }
 
-and type_ident env ?(recarg=Rejected) lid =
-||||||| Compiler:last-imported
-and type_ident env ?(recarg=Rejected) lid =
-=======
 and type_ident env ?(recarg=Rejected) ?(is_applied=false) lid =
->>>>>>> Compiler:HEAD
   (* CR zqian: [lookup_value] should close over the memaddr of all prefix
   modules.  *)
   let path, desc, (mode, locks) = Env.lookup_value ~loc:lid.loc lid.txt env in
