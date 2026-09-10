@@ -419,6 +419,11 @@ let rec fracture_lam lambda : slambda =
                 end
             }
       in
+      if List.length params > Lambda.max_arity () - 1
+      then
+        Misc.fatal_errorf
+          "Slambda does not currently support functions with over %i arguments"
+          (Lambda.max_arity () - 1);
       let lf =
         lfunction' ~kind ~params:(closure_param :: params) ~return ~body ~attr
           ~loc
@@ -537,7 +542,7 @@ let rec fracture_lam lambda : slambda =
               debug_uid = debug_uid_none;
               layout = layout_template_env;
               attributes = default_param_attribute;
-              mode = mode
+              mode
             }
           in
           let _, body =

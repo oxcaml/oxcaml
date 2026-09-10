@@ -139,14 +139,14 @@ end = struct
   module Name_map_iterator = Leapfrog.Map (Name)
   module Name_map_join_iterator = Leapfrog.Join (Name_map_iterator)
 
-  let create_iterator ~init ~dummy =
-    let send_map, recv_map = Channel.create init in
-    let send_val, recv_val = Channel.create dummy in
+  let create_iterator ~init =
+    let send_map, recv_map = Channel.create_or_null (Or_null.this init) in
+    let send_val, recv_val = Channel.create_or_null Or_null.null in
     let iterator = Name_map_iterator.create recv_map send_val in
     send_map, iterator, recv_val
 
-  let naive_iterator ~init ~dummy =
-    let _send, iterator, recv = create_iterator ~init ~dummy in
+  let naive_iterator ~init =
+    let _send, iterator, recv = create_iterator ~init in
     iterator, recv
 
   let join_iterators = Name_map_join_iterator.create
@@ -164,11 +164,16 @@ end = struct
     Name_map_join_iterator.init iterator;
     loop iterator init
 
-  type ('a, 'b) incremental_join_entry = ('a * 'b Channel.receiver) list
+  let get_or_null (or_null : _ Or_null.t) =
+    match or_null with Null -> assert false | This value -> value
+
+  let recv receiver = Channel.recv_or_null receiver |> get_or_null
+
+  type ('a, 'b) incremental_join_entry = ('a * 'b Channel.or_null_receiver) list
 
   let fold_incremental_join_entry ~f ~init incremental_join_entry =
     List.fold_left
-      (fun acc (index, receiver) -> f index (Channel.recv receiver) acc)
+      (fun acc (index, receiver) -> f index (recv receiver) acc)
       init incremental_join_entry
 
   type 'a incremental =
@@ -241,26 +246,20 @@ end = struct
               perform_initial_join
               || (Name.Map.is_empty previous && not (Name.Map.is_empty diff))
             in
-            (* CR bclement: we should be able to initialise the iterator with
-               this value. *)
-            match Name.Map.choose_opt current with
-            | None -> raise Join_is_empty
-            | Some (_, dummy) ->
-              if Name.Map.is_empty diff || Name.Map.is_empty previous
-              then
-                let iterator, receiver = naive_iterator ~init:current ~dummy in
-                ( senders,
-                  iterator :: iterators,
-                  (index, receiver) :: receivers,
-                  perform_initial_join )
-              else
-                let sender, iterator, receiver =
-                  create_iterator ~init:previous ~dummy
-                in
-                ( (sender, diff, current) :: senders,
-                  iterator :: iterators,
-                  (index, receiver) :: receivers,
-                  perform_initial_join ))
+            if Name.Map.is_empty current then raise Join_is_empty;
+            if Name.Map.is_empty diff || Name.Map.is_empty previous
+            then
+              let iterator, receiver = naive_iterator ~init:current in
+              ( senders,
+                iterator :: iterators,
+                (index, receiver) :: receivers,
+                perform_initial_join )
+            else
+              let sender, iterator, receiver = create_iterator ~init:previous in
+              ( (sender, diff, current) :: senders,
+                iterator :: iterators,
+                (index, receiver) :: receivers,
+                perform_initial_join ))
           ([], [], [], false)
       in
       let iterator = join_iterators iterators in
@@ -273,9 +272,9 @@ end = struct
       in
       List.fold_left
         (fun acc (sender, diff, current) ->
-          Channel.send sender diff;
+          Channel.send_or_null sender (Or_null.this diff);
           let acc = fold_iterator ~f ~init:acc iterator in
-          Channel.send sender current;
+          Channel.send_or_null sender (Or_null.this current);
           acc)
         acc senders
     with Join_is_empty -> init

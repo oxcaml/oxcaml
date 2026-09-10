@@ -133,22 +133,10 @@ let rec fold : type t k v.
 module Iterator = struct
   include Leapfrog.Map (Int)
 
-  include Heterogenous_list.Make (struct
-    type nonrec 'a t = 'a t
-  end)
-
-  let create_iterator = create
-
-  let rec create : type m k v.
-      (m, k, v) is_trie -> m Channel.receiver -> v Channel.sender -> k hlist =
-   fun is_trie this_ref value_handler ->
-    match is_trie with
-    | Map_is_trie -> [create_iterator this_ref value_handler]
-    | Nested_trie next_trie ->
-      let send_next, recv_next = Channel.create (empty next_trie) in
-      create_iterator this_ref send_next
-      :: create next_trie recv_next value_handler
-
-  let create is_trie this_ref value_handler =
-    create is_trie this_ref value_handler
+  let create : type m k v.
+      (m, k -> nil, v) is_trie ->
+      m Channel.or_null_receiver ->
+      v Channel.or_null_sender ->
+      k t =
+   fun Map_is_trie -> create
 end

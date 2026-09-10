@@ -62,11 +62,11 @@
        in
        cont k1 (boxed_return)
  in
- let f = closure f_1_1 @f &toplevel.alloc_region
- and generated = closure f_1 @f_unboxed &toplevel.alloc_region
+ let f = closure f_1_1 @f &toplevel
+ and generated = closure f_1 @f_unboxed &toplevel
  in
- let g = closure g_3_1 @g &toplevel.alloc_region
- and generated_1 = closure g_3 @g_unboxed &toplevel.alloc_region
+ let g = closure g_3_1 @g &toplevel
+ and generated_1 = closure g_3 @g_unboxed &toplevel
  in
  let Pmakeblock = %block.[`0`].`toplevel` (f, g) in
  cont k (Pmakeblock))

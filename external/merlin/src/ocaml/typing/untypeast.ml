@@ -1033,8 +1033,7 @@ let module_expr (sub : mapper) mexpr =
               Pmod_unpack (sub.expr sub exp)
               (* TODO , sub.package_type sub pack) *)
           | Tmod_typed_hole ->
-              let id = Location.mkloc hole_txt loc in
-              Pmod_extension (id, PStr [])
+              Pmod_hole
         in
         Mod.mk ~loc ~attrs desc
 

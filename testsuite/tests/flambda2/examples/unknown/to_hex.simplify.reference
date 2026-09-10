@@ -33,9 +33,7 @@ apply ccall
       in
       cont k1 pop(regular k1) (Pmakeblock)
     in
-    let $camlTo_hex__failwith_6 =
-      closure failwith_0_1 @failwith &toplevel.alloc_region
-    in
+    let $camlTo_hex__failwith_6 = closure failwith_0_1 @failwith &toplevel in
     let code loopify(never) size(10) newer_version_of(invalid_arg_1)
           invalid_arg_1_1 (s : val)
             my_closure &my_alloc_region my_depth
@@ -48,7 +46,7 @@ apply ccall
       cont k1 pop(regular k1) (Pmakeblock)
     in
     let $camlTo_hex__invalid_arg_7 =
-      closure invalid_arg_1_1 @invalid_arg &toplevel.alloc_region
+      closure invalid_arg_1_1 @invalid_arg &toplevel
     in
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
@@ -72,8 +70,7 @@ apply ccall
                  | 0 -> k (y)
                  | 1 -> k (x)
          in
-         let $camlTo_hex__min_9 = closure min_2_1 @min &toplevel.alloc_region
-         in
+         let $camlTo_hex__min_9 = closure min_2_1 @min &toplevel in
          let code loopify(never) size(21) newer_version_of(max_3)
                max_3_1 (x : val, y : val)
                  my_closure &my_alloc_region my_depth
@@ -89,9 +86,7 @@ apply ccall
                  | 0 -> k (y)
                  | 1 -> k (x)
          in
-         let $camlTo_hex__max_10 =
-           closure max_3_1 @max &toplevel.alloc_region
-         in
+         let $camlTo_hex__max_10 = closure max_3_1 @max &toplevel in
          let code loopify(never) size(15) newer_version_of(abs_4)
                abs_4_1 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -105,9 +100,7 @@ apply ccall
                let int_neg = %int_barith.sub (0, x) in
                cont k (int_neg)
          in
-         let $camlTo_hex__abs_11 =
-           closure abs_4_1 @abs &toplevel.alloc_region
-         in
+         let $camlTo_hex__abs_11 = closure abs_4_1 @abs &toplevel in
          let code loopify(never) size(3) newer_version_of(lnot_5)
                lnot_5_1 (x : imm tagged)
                  my_closure &my_alloc_region my_depth
@@ -116,9 +109,7 @@ apply ccall
            let int_xor = %int_barith.xor (x, -1) in
            cont k (int_xor)
          in
-         let $camlTo_hex__lnot_12 =
-           closure lnot_5_1 @lnot &toplevel.alloc_region
-         in
+         let $camlTo_hex__lnot_12 = closure lnot_5_1 @lnot &toplevel in
          let $camlTo_hex__Pmakeblock_13 =
            Block 0 ($camlTo_hex__failwith_6,
                     $camlTo_hex__invalid_arg_7,
@@ -156,7 +147,7 @@ apply ccall
                cont k (int_add)
          in
          let $camlTo_hex__char_hex_14 =
-           closure char_hex_6_1 @char_hex &toplevel.alloc_region
+           closure char_hex_6_1 @char_hex &toplevel
          in
          let code loopify(never) size(97) newer_version_of(to_hex_7)
                to_hex_7_1 (d : val)
@@ -265,9 +256,7 @@ apply ccall
                             where k3 =
                               cont k1 pop(regular k1) ($camlTo_hex__block_4))))
          in
-         let $camlTo_hex__to_hex_15 =
-           closure to_hex_7_1 @to_hex &toplevel.alloc_region
-         in
+         let $camlTo_hex__to_hex_15 = closure to_hex_7_1 @to_hex &toplevel in
          let $camlTo_hex =
            Block 0 ($camlTo_hex__Pmakeblock_13,
                     $camlTo_hex__char_hex_14,
