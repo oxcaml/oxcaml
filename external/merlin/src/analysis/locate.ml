@@ -851,24 +851,26 @@ let lookup_uid_loc_of_decl ~config:mconfig uid =
         log ~title "Failed to load the cmt file";
         None)
 
+let find_loc_of_local_item ~local_defs uid =
+  let title = "find_loc_of_uid" in
+  log ~title "We look for %a in the current compilation unit." Logger.fmt
+    (fun fmt -> Shape.Uid.print fmt uid);
+  log ~title "Looking for %a in the uid_to_loc table" Logger.fmt (fun fmt ->
+      Shape.Uid.print fmt uid);
+  let tbl = Ast_iterators.build_uid_to_locs_tbl ~local_defs () in
+  match Shape.Uid.Tbl.find_opt tbl uid with
+  | Some loc -> Some loc
+  | None ->
+    log ~title "Uid not found in the local table.";
+    None
+
 (** uid's location are given by tables stored int he cmt files for external
     compilation units or computed by Merlin for the current buffer.
     [find_loc_of_uid] function lookups a uid's location in the appropriate
     table. *)
 let find_loc_of_item ~config ~local_defs uid comp_unit =
-  let title = "find_loc_of_uid" in
-  if Misc_utils.is_current_unit comp_unit then begin
-    log ~title "We look for %a in the current compilation unit." Logger.fmt
-      (fun fmt -> Shape.Uid.print fmt uid);
-    log ~title "Looking for %a in the uid_to_loc table" Logger.fmt (fun fmt ->
-        Shape.Uid.print fmt uid);
-    let tbl = Ast_iterators.build_uid_to_locs_tbl ~local_defs () in
-    match Shape.Uid.Tbl.find_opt tbl uid with
-    | Some loc -> Some loc
-    | None ->
-      log ~title "Uid not found in the local table.";
-      None
-  end
+  if Misc_utils.is_current_unit comp_unit then
+    find_loc_of_local_item ~local_defs uid
   else lookup_uid_loc_of_decl ~config:config.mconfig uid
 
 let find_loc_of_comp_unit ~config uid comp_unit =
@@ -907,6 +909,31 @@ let find_loc_of_uid ~config ~local_defs ?ident ?fallback (uid : Shape.Uid.t) =
     | Compilation_unit comp_unit -> find_loc_of_comp_unit ~config uid comp_unit
   in
   extract_from_uid uid
+
+let lookup_loc_of_uid ~config:mconfig ~local_defs (uid : Shape.Uid.t) =
+  let rec dispatch (uid : Shape.Uid.t) =
+    match uid with
+    | Unboxed_version uid -> dispatch uid
+    | Internal | Predef _ -> None
+    | Item { comp_unit; _ } ->
+      let local_declaration =
+        if Misc_utils.is_current_unit comp_unit then
+          find_loc_of_local_item ~local_defs uid
+        else None
+      in
+      let declaration =
+        match local_declaration with
+        | Some _ -> local_declaration
+        | None -> lookup_uid_loc_of_decl ~config:mconfig uid
+      in
+      Option.map declaration ~f:(fun declaration -> `Declaration declaration)
+    | Compilation_unit comp_unit -> (
+      let config = { mconfig; ml_or_mli = `ML; traverse_aliases = false } in
+      match find_loc_of_comp_unit ~config uid comp_unit with
+      | `Some (_, loc) -> Some (`Compilation_unit loc)
+      | `None -> None)
+  in
+  dispatch uid
 
 let get_linked_uids ~config ~comp_unit decl_uid =
   let title = "linked_uids" in
