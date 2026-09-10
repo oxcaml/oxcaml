@@ -1582,11 +1582,9 @@ let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
 let split_vectors =
-  match Target_system.architecture () with
-  | X86_64 -> false
-  | AArch64 -> true
-  | IA32 | ARM | POWER | Z | Riscv ->
-    Misc.fatal_error "Only x86-64 and arm64 are supported"
+  (* The compiler toggles this value based on the target architecture. Since we don't have
+     a target architecture, we arbitrarily choose the x86 case. *)
+  false
 
 let layout_unit = non_null_value Pintval
 let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})

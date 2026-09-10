@@ -41,6 +41,10 @@ val max_tag: int
         (* Biggest tag that can be stored in the header of a regular block. *)
 
 val flat_float_array: bool
+val stack_allocation : bool
+val poll_insertion : bool
+val with_frame_pointers : bool
+val lazy_tag : int
 
 val reserved_header_bits : int
 val syntax_quotations : bool

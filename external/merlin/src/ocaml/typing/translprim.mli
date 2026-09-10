@@ -15,6 +15,7 @@
 
 (* Insertion of debugging events *)
 
+(*
 val event_before : Lambda.scoped_location -> Typedtree.expression
                    -> Lambda.lambda -> Lambda.lambda
 
@@ -26,12 +27,15 @@ val event_after : Lambda.scoped_location -> Typedtree.expression
 val add_exception_ident : Ident.t -> unit
 val remove_exception_ident : Ident.t -> unit
 
+*)
+
 val clear_used_primitives : unit -> unit
 val get_units_with_used_primitives: unit -> Compilation_unit.t list
 
 val check_primitive_arity :
   Location.t -> Primitive.description -> unit
 
+(*
 val transl_primitive :
   Lambda.scoped_location -> Primitive.description -> Env.t ->
   Types.type_expr ->
@@ -51,6 +55,8 @@ val transl_primitive_application :
   Typedtree.expression option ->
   Lambda.lambda list -> Typedtree.expression list ->
   Lambda.region_close -> Lambda.lambda
+
+*)
 
 (** [sort_of_native_repr] returns the sort expected after typechecking (which
     may be different than the sort used in the external interface).
