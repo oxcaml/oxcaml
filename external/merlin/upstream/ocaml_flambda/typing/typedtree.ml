@@ -190,6 +190,11 @@ and _ poly_param =
   | Arrow : (arg_label * type_expr option) list -> [`exp] poly_param
   | Method : string loc * type_expr -> [`exp] poly_param
 
+type function_return_sort =
+  | Function_returns of Jkind.sort
+  | Function_forwards
+  | Function_never_returns
+
 type pattern = value general_pattern
 and 'k general_pattern = 'k pattern_desc pattern_data
 
@@ -322,7 +327,7 @@ and expression_desc =
       { params : function_param list;
         body : function_body;
         ret_mode : return_mode modes;
-        ret_sort : Jkind.sort;
+        ret_sort : function_return_sort;
         alloc_mode : alloc_mode_r;
         yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
