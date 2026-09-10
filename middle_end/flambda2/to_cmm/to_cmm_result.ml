@@ -26,7 +26,13 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
-    invalid_message_symbols : Symbol.t String.Map.t
+    invalid_message_symbols : Symbol.t String.Map.t;
+    atom_redirected_symbols : int String.Map.t
+        (* Linkage names of zero-sized statics of the current unit: every
+           reference to them is redirected to the runtime's permanent atom of
+           the given tag, via [Cmm_helpers.atom_symbol]. Exported ones
+           additionally keep a definition, referenced only from other units, so
+           cross-unit references still link (see [static_const0]). *)
   }
 
 let create ~module_symbol ~reachable_names =
@@ -38,8 +44,21 @@ let create ~module_symbol ~reachable_names =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
-    invalid_message_symbols = String.Map.empty
+    invalid_message_symbols = String.Map.empty;
+    atom_redirected_symbols = String.Map.empty
   }
+
+let redirect_symbol_to_atom t symbol ~tag =
+  assert (Current_unit.is_current (Symbol.compilation_unit symbol));
+  { t with
+    atom_redirected_symbols =
+      String.Map.add
+        (Linkage_name.to_string (Symbol.linkage_name symbol))
+        tag t.atom_redirected_symbols
+  }
+
+let symbol_is_exported t symbol =
+  Name_occurrences.mem_symbol t.reachable_names symbol
 
 (* Symbol handling
 
@@ -60,15 +79,20 @@ let raw_symbol res ~global:sym_global sym_name : t * Cmm.symbol =
 
 let symbol res sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
-  let sym_global =
-    if
-      Current_unit.is_current (Symbol.compilation_unit sym)
-      && not (Name_occurrences.mem_symbol res.reachable_names sym)
-    then Cmm.Local
-    else Cmm.Global
-  in
-  let s : Cmm.symbol = { sym_name; sym_global } in
-  s
+  match String.Map.find_opt sym_name res.atom_redirected_symbols with
+  | Some tag ->
+    (* Zero-sized static: every reference resolves to the runtime's atom. *)
+    C.atom_symbol ~tag
+  | None ->
+    let sym_global =
+      if
+        Current_unit.is_current (Symbol.compilation_unit sym)
+        && not (Name_occurrences.mem_symbol res.reachable_names sym)
+      then Cmm.Local
+      else Cmm.Global
+    in
+    let s : Cmm.symbol = { sym_name; sym_global } in
+    s
 
 let symbol_of_code_id res code_id ~currently_in_inlined_body : Cmm.symbol =
   let sym_name = Linkage_name.to_string (Code_id.linkage_name code_id) in
