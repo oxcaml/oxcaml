@@ -130,7 +130,9 @@ CAMLextern void caml_plat_mutex_reinit(caml_plat_mutex*);
 typedef custom_condvar caml_plat_cond;
 #define CAML_PLAT_COND_INITIALIZER CUSTOM_COND_INITIALIZER
 void caml_plat_cond_init(caml_plat_cond*);
+#ifndef CAML_BARE_METAL
 void caml_plat_wait(caml_plat_cond*, caml_plat_mutex*); /* blocking */
+#endif
 void caml_plat_broadcast(caml_plat_cond*);
 void caml_plat_signal(caml_plat_cond*);
 void caml_plat_cond_free(caml_plat_cond*);
@@ -228,9 +230,11 @@ Caml_inline void caml_plat_latch_init(caml_plat_binary_latch* latch) {
 }
 /* Release the latch, waking any waiters */
 void caml_plat_latch_release(caml_plat_binary_latch*);
+#ifndef CAML_BARE_METAL
 /* Block until released. This is no-op (but more expensive than checking with
    [is_released()]) if the latch has already been released. */
 void caml_plat_latch_wait(caml_plat_binary_latch*);
+#endif
 /* Check if a latch is released */
 Caml_inline int caml_plat_latch_is_released(caml_plat_binary_latch* latch) {
   return atomic_load_acquire(&latch->value) == Latch_released;
@@ -332,10 +336,12 @@ Caml_inline int caml_plat_barrier_is_released(caml_plat_barrier* barrier) {
 Caml_inline void caml_plat_barrier_release(caml_plat_barrier* barrier) {
   caml_plat_latch_release(&barrier->futex);
 }
+#ifndef CAML_BARE_METAL
 /* Block until released */
 Caml_inline void caml_plat_barrier_wait(caml_plat_barrier* barrier) {
   caml_plat_latch_wait(&barrier->futex);
 }
+#endif
 
 /* -- Sense-reversing -- */
 /* Flip the sense of the barrier, releasing current waiters and
@@ -351,9 +357,11 @@ caml_plat_barrier_sense_has_flipped(caml_plat_barrier* barrier,
   return (atomic_load_acquire(&barrier->futex.value) & BARRIER_SENSE_BIT)
     != current_sense;
 }
+#ifndef CAML_BARE_METAL
 /* Block until flipped */
 void caml_plat_barrier_wait_sense(caml_plat_barrier*,
                                   barrier_status current_sense);
+#endif
 
 /* Spin-wait loops
 
@@ -473,6 +481,31 @@ CAMLextern CAMLthread_local int caml_lockdepth;
 #define DEBUG_UNLOCK(m)
 #endif
 
+#ifdef CAML_BARE_METAL
+
+Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+Caml_inline int caml_plat_try_lock(caml_plat_mutex* m)
+{
+  (void)m;
+  return 1;
+}
+
+Caml_inline void caml_plat_lock_non_blocking(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
+{
+  (void)m;
+}
+
+#else
+
 Caml_inline void caml_plat_lock_blocking(caml_plat_mutex* m)
 {
   check_err("lock", pthread_mutex_lock(m));
@@ -505,6 +538,8 @@ Caml_inline void caml_plat_unlock(caml_plat_mutex* m)
   DEBUG_UNLOCK(m);
   check_err("unlock", pthread_mutex_unlock(m));
 }
+
+#endif
 
 extern intnat caml_plat_pagesize;
 extern intnat caml_plat_hugepagesize; /* zero if unknown/unsupported */

@@ -31,7 +31,7 @@
 
 #include "caml/hooks.h"
 
-intnat caml_globals_inited = 0;
+#ifdef SUPPORT_DYNAMIC_LINKING
 
 CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
 
@@ -223,3 +223,5 @@ CAMLprim value caml_natdynlink_existssym(value symbol)
   void* sym = caml_globalsym(String_val(symbol));
   return sym != NULL ? Val_true : Val_false;
 }
+
+#endif /* SUPPORT_DYNAMIC_LINKING */

@@ -214,6 +214,7 @@ Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
 
 uintnat caml_tick_use_usleep = 0;
+#ifndef CAML_BARE_METAL
 static struct {
   /* This mutex protects mutation of `thread_id` and `running` */
   caml_plat_mutex mutex;
@@ -239,6 +240,7 @@ static struct {
   -1, -1, -1
 #endif
 };
+#endif /* !CAML_BARE_METAL */
 
 static struct {
   /* enter barrier for STW sections, participating domains arrive into
@@ -274,8 +276,10 @@ static struct {
 static caml_plat_mutex all_domains_lock = CAML_PLAT_MUTEX_INITIALIZER;
 static caml_plat_cond all_domains_cond = CAML_PLAT_COND_INITIALIZER;
 static atomic_uintnat /* dom_internal* */ stw_leader = 0;
+#ifdef MULTIDOMAIN
 static uintnat stw_requests_suspended = 0; /* protected by all_domains_lock */
 static caml_plat_cond requests_suspended_cond = CAML_PLAT_COND_INITIALIZER;
+#endif
 static dom_internal* all_domains;
 static atomic_intnat domains_exiting = 0;
 
@@ -528,6 +532,7 @@ static void free_minor_heap(void) {
 
   check_minor_heap();
 
+#ifndef CAML_BARE_METAL
   /* free old minor heap.
      instead of unmapping the heap, we decommit it, so there's
      no race whereby other code could attempt to reuse the memory. */
@@ -535,6 +540,7 @@ static void free_minor_heap(void) {
       (void*)domain_self->minor_heap_area_start,
       Bsize_wsize(domain_state->minor_heap_wsz),
       "minor reservation");
+#endif
 
   domain_state->young_start   = NULL;
   domain_state->young_end     = NULL;
@@ -558,12 +564,14 @@ static int allocate_minor_heap(asize_t wsize) {
                   "Allocating minor heap: %"
                   ARCH_SIZET_PRINTF_FORMAT "uk words\n", wsize / 1024);
 
+#ifndef CAML_BARE_METAL
   char name[32];
   snprintf(name, sizeof name, "minor heap %d", domain_self->id);
   if (!caml_mem_commit(
           (void*)domain_self->minor_heap_area_start, Bsize_wsize(wsize), name)) {
     return -1;
   }
+#endif
 
 #ifdef DEBUG
   {
@@ -642,6 +650,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
      set atomically */
   caml_plat_lock_blocking(&all_domains_lock);
 
+#ifdef MULTIDOMAIN
   /* How many STW sections we are willing to wait for, any more are
      prevented from happening */
 #define Max_stws_before_suspend 2
@@ -667,6 +676,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
       break;
     }
   }
+#endif /* MULTIDOMAIN */
 
   d = next_free_domain();
 
@@ -898,6 +908,7 @@ fail_domain:
   caml_plat_unlock(&all_domains_lock);
 }
 
+#ifndef CAML_BARE_METAL
 CAMLexport void caml_reset_domain_lock(void)
 {
   dom_internal* self = domain_self;
@@ -921,6 +932,7 @@ CAMLexport void caml_reset_domain_lock(void)
 
   return;
 }
+#endif /* !CAML_BARE_METAL */
 
 /* minor heap initialization and resizing */
 
@@ -1136,6 +1148,7 @@ struct domain_ml_values {
 #define Term_mutex(sync) (&Field(sync, 1))
 #define Term_condition(sync) (&Field(sync, 2))
 
+#ifdef MULTIDOMAIN
 static void init_domain_ml_values(struct domain_ml_values* ml_values,
                                   value callback, value term_sync)
 {
@@ -1254,6 +1267,7 @@ static void install_backup_thread (dom_internal* di)
     pthread_detach(di->backup_thread);
   }
 }
+#endif /* MULTIDOMAIN */
 
 static void terminate_backup_thread(dom_internal *di)
 {
@@ -1322,6 +1336,7 @@ CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
 CAMLexport _Atomic caml_timing_hook caml_domain_terminated_hook =
   (caml_timing_hook)NULL;
 
+#ifdef MULTIDOMAIN
 static value make_finished(caml_result result)
 {
   CAMLparam0();
@@ -1514,6 +1529,14 @@ CAMLprim value caml_domain_spawn(value callback, value term_sync)
 
   CAMLreturn (Val_long(p.unique_id));
 }
+#else
+CAMLprim value caml_domain_spawn(value callback, value term_sync)
+{
+  (void)callback;
+  (void)term_sync;
+  caml_failwith("Domain.spawn is not supported by a single-domain runtime");
+}
+#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_ml_domain_id(value unit)
 {
@@ -1529,9 +1552,11 @@ CAMLprim value caml_ml_domain_index(value unit)
 
 /* Global barrier implementation */
 
+#if defined(MULTIDOMAIN) || defined(DEBUG)
 Caml_inline int global_barrier_is_nth(barrier_status b, int n) {
   return (b & ~BARRIER_SENSE_BIT) == n;
 }
+#endif
 
 static barrier_status global_barrier_begin(void)
 {
@@ -1544,6 +1569,7 @@ static void global_barrier_flip(barrier_status sense)
   caml_plat_barrier_flip(&stw_request.barrier, sense);
 }
 
+#ifdef MULTIDOMAIN
 /* wait until another domain flips the sense */
 static void global_barrier_wait(barrier_status sense, int num_participating)
 {
@@ -1558,30 +1584,36 @@ static void global_barrier_wait(barrier_status sense, int num_participating)
   /* just block */
   caml_plat_barrier_wait_sense(&stw_request.barrier, sense);
 }
+#endif /* MULTIDOMAIN */
 
 void caml_enter_global_barrier(int num_participating)
 {
   CAMLassert(num_participating == stw_request.num_domains);
   barrier_status b = global_barrier_begin();
   barrier_status sense = b & BARRIER_SENSE_BIT;
-  if (global_barrier_is_nth(b, num_participating)) {
-    global_barrier_flip(sense);
-  } else {
+#ifdef MULTIDOMAIN
+  if (!global_barrier_is_nth(b, num_participating)) {
     global_barrier_wait(sense, num_participating);
+    return;
   }
+#endif
+  CAMLassert(global_barrier_is_nth(b, num_participating));
+  global_barrier_flip(sense);
 }
 
 barrier_status caml_global_barrier_and_check_final(int num_participating)
 {
   CAMLassert(num_participating == stw_request.num_domains);
   barrier_status b = global_barrier_begin();
-  if (global_barrier_is_nth(b, num_participating)) {
-    CAMLassert(b); /* always nonzero */
-    return b;
-  } else {
+#ifdef MULTIDOMAIN
+  if (!global_barrier_is_nth(b, num_participating)) {
     global_barrier_wait(b & BARRIER_SENSE_BIT, num_participating);
     return 0;
   }
+#endif
+  CAMLassert(global_barrier_is_nth(b, num_participating));
+  CAMLassert(b); /* always nonzero */
+  return b;
 }
 
 void caml_global_barrier_release_as_final(barrier_status b)
@@ -1612,6 +1644,7 @@ static void decrement_stw_domains_still_processing(void)
   }
 }
 
+#ifdef MULTIDOMAIN
 /* Wait for other running domains to stop, called by interrupted
    domains before entering the STW section */
 static void stw_wait_for_running(caml_domain_state* domain)
@@ -1657,13 +1690,16 @@ static void stw_api_barrier(caml_domain_state* domain)
   }
   CAML_EV_END(EV_STW_API_BARRIER);
 }
+#endif /* MULTIDOMAIN */
 
 static void stw_handler(caml_domain_state* domain)
 {
   CAML_EV_BEGIN(EV_STW_HANDLER);
+#ifdef MULTIDOMAIN
   if (!caml_plat_barrier_is_released(&stw_request.domains_still_running)) {
     stw_api_barrier(domain);
   }
+#endif
 
   #ifdef DEBUG
   Caml_state->inside_stw_handler = 1;
@@ -1784,6 +1820,7 @@ int caml_try_run_on_all_domains_with_spin_work(
     return 0;
   }
 
+#ifdef MULTIDOMAIN
   while (1) {
     /* see if there is a stw_leader already */
     if (atomic_load_acquire(&stw_leader)) {
@@ -1803,6 +1840,7 @@ int caml_try_run_on_all_domains_with_spin_work(
 
     break;
   }
+#endif /* MULTIDOMAIN */
 
   /* we have the lock and can claim the stw_leader */
   atomic_store_release(&stw_leader, (uintnat)domain_self);
@@ -1821,12 +1859,14 @@ int caml_try_run_on_all_domains_with_spin_work(
   caml_atomic_counter_init(&stw_request.num_domains_still_processing,
                            stw_domains.participating_domains);
 
+#ifdef MULTIDOMAIN
   int is_alone = stw_request.num_domains == 1;
   int should_sync = sync && !is_alone;
 
   if (should_sync) {
     caml_plat_barrier_reset(&stw_request.domains_still_running);
   }
+#endif
 
   if( leader_setup ) {
     leader_setup(domain_state, data);
@@ -1869,10 +1909,12 @@ int caml_try_run_on_all_domains_with_spin_work(
   */
   caml_plat_unlock(&all_domains_lock);
 
+#ifdef MULTIDOMAIN
   /* arrive at enter barrier */
   if (should_sync) {
     stw_api_barrier(domain_state);
   }
+#endif
 
   #ifdef DEBUG
   domain_state->inside_stw_handler = 1;
@@ -2158,6 +2200,24 @@ void caml_handle_gc_interrupt(void)
    [false] argument. In this case, all tick requests will be ignored.
  */
 
+#ifdef CAML_BARE_METAL
+
+/* Stdlib.Domain retains these primitives even in single-domain programs. */
+CAMLextern uintnat caml_effective_tick_interval_usec(void)
+{
+  return 0;
+}
+
+CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
+{
+  if (interval_usec != 0) {
+    caml_failwith("Domain.Tick is not supported by a bare-metal runtime");
+  }
+  return 0;
+}
+
+#else /* !CAML_BARE_METAL */
+
 #ifdef HAS_INTERRUPTIBLE_TICK
 
 /* Interruptible wait helpers for the tick thread.
@@ -2371,10 +2431,6 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
   return res;
 }
 
-CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
-  return Val_long(caml_effective_tick_interval_usec());
-}
-
 static void caml_do_tick_all_domains(void)
 {
   /* See [caml_interrupt_all_signal_safe] for why reading from this array can
@@ -2525,6 +2581,12 @@ CAMLprim intnat caml_domain_set_tick_interval_usec(intnat interval_usec)
   return 0;
 }
 
+#endif /* !CAML_BARE_METAL */
+
+CAMLprim value caml_effective_tick_interval_usec_bytecode(value v_unit) {
+  return Val_long(caml_effective_tick_interval_usec());
+}
+
 CAMLprim value caml_domain_set_tick_interval_usec_bytecode(value v_interval_usec) {
   CAMLparam1(v_interval_usec);
   caml_domain_set_tick_interval_usec(Long_val(v_interval_usec));
@@ -2541,7 +2603,11 @@ CAMLexport int caml_bt_is_in_blocking_section(void)
 
 CAMLexport int caml_bt_is_self(void)
 {
+#ifdef CAML_BARE_METAL
+  return 0;
+#else
   return pthread_equal(domain_self->backup_thread, pthread_self());
+#endif
 }
 
 CAMLexport intnat caml_domain_is_multicore (void)
@@ -2602,6 +2668,7 @@ CAMLexport void caml_bt_exit_ocaml(void)
   }
 }
 
+#ifndef CAML_BARE_METAL
 /* default handler for unix_fork, will be called by unix_fork. */
 static void caml_atfork_default(void)
 {
@@ -2614,6 +2681,7 @@ static void caml_atfork_default(void)
 }
 
 CAMLexport void (*caml_atfork_hook)(void) = caml_atfork_default;
+#endif /* !CAML_BARE_METAL */
 
 static inline int domain_terminating(dom_internal *d) {
   return d->terminating;
@@ -2649,8 +2717,10 @@ void caml_domain_terminate(bool last)
   caml_domain_stop_hook();
   call_timing_hook(&caml_domain_terminated_hook);
 
+#ifndef CAML_BARE_METAL
   /* Reset the tick interval back to 0, since we no longer want ticks */
   caml_domain_set_tick_interval_usec(0);
+#endif
 
   while (!finished) {
     caml_finish_sweeping();
@@ -2672,7 +2742,11 @@ void caml_domain_terminate(bool last)
 
     /* No need to check for interrupts if we are the last domain running. */
     if (last) {
+#ifdef CAML_BARE_METAL
+      CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, 0); /* no OS PID */
+#else
       CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, getpid());
+#endif
       break;
     }
 
@@ -2714,7 +2788,11 @@ void caml_domain_terminate(bool last)
       /* We must signal domain termination before releasing [all_domains_lock]:
          after that, this domain will no longer take part in STWs and emitting
          an event could race with runtime events teardown. */
+#ifdef CAML_BARE_METAL
+      CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, 0); /* no OS PID */
+#else
       CAML_EV_LIFECYCLE(EV_DOMAIN_TERMINATE, getpid());
+#endif
     }
     caml_plat_unlock(&all_domains_lock);
   }
@@ -2797,6 +2875,7 @@ void caml_domain_terminate(bool last)
     caml_atomic_counter_decr(&caml_num_domains_running);
 }
 
+#ifdef MULTIDOMAIN
 /* Try and terminate the currently running domain.
    This is only invoked when extra domains are left running while the
    main one is terminating. In this case, we are not in a state where
@@ -2844,6 +2923,7 @@ void caml_stop_all_domains(void)
 
   caml_plat_assert_all_locks_unlocked();
 }
+#endif /* MULTIDOMAIN */
 
 bool caml_free_domains(void)
 {
@@ -2951,6 +3031,7 @@ CAMLprim value caml_domain_tls_get(value unused)
   return domain_root_get(&Caml_state->tls_state);
 }
 
+#ifdef MULTIDOMAIN
 CAMLprim value caml_recommended_domain_count(value unused)
 {
   intnat n = -1;
@@ -2983,6 +3064,12 @@ CAMLprim value caml_recommended_domain_count(value unused)
 
   return (Val_long(n));
 }
+#else
+CAMLprim value caml_recommended_domain_count(value unused)
+{
+  return (Val_long(1));
+}
+#endif /* MULTIDOMAIN */
 
 CAMLprim value caml_max_domain_count(value unused)
 {

@@ -48,7 +48,9 @@ struct generic_table CAML_TABLE_STRUCT(char);
 CAMLexport atomic_uintnat caml_minor_collections_count;
 CAMLexport atomic_uintnat caml_major_slice_epoch;
 
+#ifdef MULTIDOMAIN
 static caml_plat_barrier minor_gc_end_barrier = CAML_PLAT_BARRIER_INITIALIZER;
+#endif
 
 static atomic_uintnat caml_minor_cycles_started = 0;
 
@@ -629,8 +631,10 @@ void caml_empty_minor_heap_domain_clear(caml_domain_state* domain)
    [caml_try_run_on_all_domains_with_spin_work]. */
 int caml_do_opportunistic_major_slice
   (caml_domain_state* domain_unused, void* unused);
+#ifdef MULTIDOMAIN
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count);
+#endif
 
 typedef struct promote_result_s {
   bool locked_ephemerons;
@@ -850,6 +854,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
      start running, so before arriving at the barrier. */
   caml_collect_gc_stats_sample_stw(domain);
 
+#ifdef MULTIDOMAIN
   /* The code above is synchronised with other domains by the barrier below,
      which is split into two steps, "arriving" and "leaving". When the final
      domain arrives at the barrier, all other domains are free to leave, after
@@ -871,6 +876,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   }
   /* other domains may be executing mutator code from this point, but
      not before */
+#endif
 
   call_timing_hook(&caml_minor_gc_end_hook);
   CAML_EV_COUNTER(EV_C_MINOR_PROMOTED,
@@ -880,12 +886,14 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
   CAML_EV_END(EV_MINOR);
 
+#ifdef MULTIDOMAIN
   /* leave the barrier */
   if( participating_count > 1 ) {
     CAML_EV_BEGIN(EV_MINOR_LEAVE_BARRIER);
     minor_gc_leave_barrier(domain, participating_count);
     CAML_EV_END(EV_MINOR_LEAVE_BARRIER);
   }
+#endif
   return result;
 }
 
@@ -965,6 +973,7 @@ static void nonatomic_increment_counter(atomic_uintnat* counter) {
   atomic_store_relaxed(counter, 1 + atomic_load_relaxed(counter));
 }
 
+#ifdef MULTIDOMAIN
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count)
 {
@@ -992,6 +1001,7 @@ static void minor_gc_leave_barrier
   /* If there's nothing to do, block */
   caml_plat_barrier_wait(&minor_gc_end_barrier);
 }
+#endif /* MULTIDOMAIN */
 
 int caml_do_opportunistic_major_slice
   (caml_domain_state* domain_state, void* unused)
@@ -1025,7 +1035,9 @@ void caml_empty_minor_heap_setup(caml_domain_state* domain_unused,
     : 0;
   /* Increment the total number of minor collections done in the program */
   nonatomic_increment_counter (&caml_minor_collections_count);
+#ifdef MULTIDOMAIN
   caml_plat_barrier_reset(&minor_gc_end_barrier);
+#endif
 }
 
 /* must be called within a STW section */
