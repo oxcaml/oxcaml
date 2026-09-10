@@ -26,6 +26,15 @@ parsing/parse.mli merlin-exclude
 
 typing/cmt2annot.ml* merlin-exclude
 
+lambda/* merlin-exclude
+lambda/debuginfo.ml* -merlin-exclude
+lambda/lambda.ml* -merlin-exclude
+lambda/printlambda.ml* -merlin-exclude
+lambda/slambdaident.ml* -merlin-exclude
+lambda/static_label.ml* -merlin-exclude
+lambda/translmode.ml* -merlin-exclude
+lambda/translprim.ml* -merlin-exclude
+
 utils/arg_helper.ml* merlin-exclude
 utils/arrayset.ml* merlin-exclude
 utils/binutils.ml* merlin-exclude
@@ -43,7 +52,6 @@ utils/priority_queue.ml* merlin-exclude
 utils/profile_counters_functions.ml* merlin-exclude
 utils/runtimetags.ml* merlin-exclude
 utils/strongly_connected_components.ml* merlin-exclude
-utils/structured_mangling.ml* merlin-exclude
 utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
 utils/targetint.ml* merlin-exclude
