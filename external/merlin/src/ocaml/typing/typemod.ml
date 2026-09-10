@@ -4414,8 +4414,7 @@ let remove_mode_and_jkind_variables_for_toplevel str =
 let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
-<<<<<<< Merlin:wsturgeon.allocation-mode-axis.merlin-import-20260915-135711
-  Typecore.reset_allocations ();
+  Typeallocation.reset_allocations ();
   let (str, sg, mode, _to_remove_from_sg, shape, env) =
     type_structure
       ~toplevel:(Some sig_acc)
@@ -4425,29 +4424,12 @@ let type_toplevel_phrase env sig_acc s =
       sig_acc
       s
   in
-||||||| Compiler:last-imported
-  Typecore.reset_allocations ();
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
-=======
-  Typeallocation.reset_allocations ();
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
->>>>>>> Compiler:HEAD
   With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
   Typeallocation.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
-<<<<<<< Merlin:wsturgeon.allocation-mode-axis.merlin-import-20260915-135711
-  Typecore.optimise_allocations ();
-  (str, sg, (* to_remove_from_sg, *) shape, env)
-||||||| Compiler:last-imported
-  Typecore.optimise_allocations ();
-  (str, sg, to_remove_from_sg, shape, env)
-=======
   Typeallocation.optimise_allocations ();
-  (str, sg, to_remove_from_sg, shape, env)
->>>>>>> Compiler:HEAD
+  (str, sg, (* to_remove_from_sg, *) shape, env)
 
 let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true ~strengthen:true
