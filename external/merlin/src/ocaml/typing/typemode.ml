@@ -797,8 +797,8 @@ let () =
 module Modifier_axis_pair = struct
   type t = P : 'a Jkind_axis.Axis.t * 'a -> t
 
-  let of_string s =
-    match Modality_axis_pair.of_string s with
+  let of_string ~loc s =
+    match Modality_axis_pair.of_string ~loc s with
     | Atom (Monadic axis, modality) ->
       P (Modal (Monadic axis), Modality modality)
     | Atom (Comonadic axis, modality) ->
