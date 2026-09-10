@@ -738,7 +738,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             in
             (* Finalize the representation just to be able to print it *)
             let finalize rep =
-              Typedecl.finalize_record_representation env Location.none rep
+              Typeopt.finalize_record_representation env Location.none rep
             in
             let rep =
               match rep with

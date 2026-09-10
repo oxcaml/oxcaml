@@ -117,26 +117,6 @@ val instance_record_representation:
     (Types.label_declaration * Types.type_expr) list ->
     'rep
 
-(* Finalize variable (inlined) record representations, defaulting any unfilled
-   sorts. This should not be called until the end of typechecking. *)
-val finalize_record_representation:
-    Env.t -> Location.t -> Types.record_representation ->
-    Types.record_representation
-
-(* As [finalize_record_representation], also returning the fields' (now
-   defaulted) sorts if the representation was variable. [None] means the
-   representation was already final, so the field sorts are on the
-   declaration ([lbl_sort]). *)
-val finalize_record_representation_and_sorts:
-    Env.t -> Location.t -> Types.record_representation ->
-    Types.record_representation
-    * variable_sorts:Jkind.Sort.Const.t array option
-
-(* As [finalize_record_representation], for [Constructor_variable]. *)
-val finalize_constructor_representation:
-    Env.t -> Location.t -> Types.constructor_representation ->
-    Types.constructor_representation
-
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
 
@@ -167,6 +147,20 @@ module Mixed_product_kind : sig
     | Cstr_tuple
     | Cstr_record
     | Module
+end
+
+module Element_repr : sig
+  type t
+
+  val classify :
+    Env.t -> type_expr -> _ jkind -> default_to_scannable:bool -> t option
+
+  type unrepresentable_element = Unrepresentable_element of int
+
+  val mixed_product_shape :
+    Location.t -> t option list -> Mixed_product_kind.t ->
+    ([ `Not_mixed | `Mixed of mixed_product_shape ],
+     unrepresentable_element) result
 end
 
 val assert_mixed_product_support :

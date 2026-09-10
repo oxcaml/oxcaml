@@ -95,3 +95,23 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Float_that_cannot_be_shortcut
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
+
+(* Finalize variable (inlined) record representations, defaulting any unfilled
+   sorts. This should not be called until the end of typechecking. *)
+val finalize_record_representation:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation
+
+(* As [finalize_record_representation], also returning the fields' (now
+   defaulted) sorts if the representation was variable. [None] means the
+   representation was already final, so the field sorts are on the
+   declaration ([lbl_sort]). *)
+val finalize_record_representation_and_sorts:
+    Env.t -> Location.t -> Types.record_representation ->
+    Types.record_representation
+    * variable_sorts:Jkind.Sort.Const.t array option
+
+(* As [finalize_record_representation], for [Constructor_variable]. *)
+val finalize_constructor_representation:
+    Env.t -> Location.t -> Types.constructor_representation ->
+    Types.constructor_representation

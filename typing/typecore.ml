@@ -8856,7 +8856,7 @@ and type_expect_
              typechecking. *)
           add_delayed_check (fun () ->
             let record_repres =
-              Typedecl.finalize_record_representation env loc record_repres
+              Typeopt.finalize_record_representation env loc record_repres
             in
             check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
               lid.txt);
