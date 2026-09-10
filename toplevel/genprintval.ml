@@ -396,7 +396,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
               (* Mixed tuples are only represented as mixed blocks in native
-                 code. *)
+                 code. Using the [Obj] module here to check would let print out
+                 flattened mixed tuples as normal tuples. *)
               if !Clflags.native_code
                  && not (List.for_all (fun (_, ty) -> is_value ty) labeled_tys)
               then Oval_stuff "<abstr>"
