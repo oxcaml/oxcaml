@@ -1,0 +1,8 @@
+File "functor_mode_cmi.ml", line 18, characters 11-59:
+18 | module N = Functor_mode_cmi_lib.F (struct type t = int end)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module is local
+       but is expected to be global
+         because it is the module N in the structure at file "functor_mode_cmi.ml", lines 12-18, characters 0-59
+         which is expected to be global
+         because modules always need to be allocated on the heap.
