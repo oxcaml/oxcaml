@@ -30,8 +30,7 @@ module type S =
   end
 |}]
 
-(* CR zeisbach: is this the expected behavior? maybe the behavior that this was
-   actually testing should be preserved somehow. But I need more context. *)
+(* CR zeisbach: write another test that does constraining *)
 (* the layout variables are rigid and cannot be constrained *)
 module type T = sig
   val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
