@@ -1159,6 +1159,8 @@ let value_kind env loc ty =
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
 
+*)
+
 let finalize_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
@@ -1179,7 +1181,7 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
       let rec element (layout : Jkind_types.Layout.Const.t)
           : unit Lambda.mixed_block_element =
         match layout with
-        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+        | Genvar var -> Splice_variable var
         | Product layouts ->
             Product (Array.of_list (List.map element layouts))
         | Addressable layout -> element layout
@@ -1313,6 +1315,7 @@ let finalized_label_sort (label : Data_types.label_description)
     Misc.fatal_error
       "finalized_label_sort: unexpected immediate representation"
 
+(*
 let refine_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
