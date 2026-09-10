@@ -1,13 +1,13 @@
 (* TEST
  include stdlib_upstream_compatible;
  flambda2;
- compiler_reference = "${test_source_directory}/mixed_tuples.compiler.reference";
- compiler_reference2 = "${test_source_directory}/mixed_tuples.compiler.reference";
+ compiler_reference = "${test_source_directory}/mixed_tuples_repr.compiler.reference";
+ compiler_reference2 = "${test_source_directory}/mixed_tuples_repr.compiler.reference";
  {
-   reference = "${test_source_directory}/mixed_tuples.native.reference";
+   reference = "${test_source_directory}/mixed_tuples_repr.native.reference";
    native;
  }{
-   reference = "${test_source_directory}/mixed_tuples.bytecode.reference";
+   reference = "${test_source_directory}/mixed_tuples_repr.bytecode.reference";
    bytecode;
  }
 *)
