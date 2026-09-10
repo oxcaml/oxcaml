@@ -6403,23 +6403,16 @@ let relevant_pairs pairs v =
   | Contravariant -> pairs.contravariant_pairs
   | Bivariant -> pairs.bivariant_pairs
 
-(* A flag for controlling submode constraints placed on intermediate
+(* Flag for controlling submode constraints placed on intermediate
    return arrows. [Constrain_all_ret_modes] is the current default behavior.
    Merlin uses [Skip_intermediate_ret_modes] to pretend like they don't exist,
-   which allows us to compute the strongest OxCaml signature for a function.
-
-   The flag holds for a whole [moregeneral] check, so it applies to arrows
-   wherever they turn up, including under tuples, constructors, packages,
-   rows and objects. [moregen]'s helpers therefore take it as a mandatory
-   argument, so that a new recursive call cannot silently fall back to
-   [Constrain_all_ret_modes]. *)
+   simulating N-ary arrows, which allows us to compute the strongest OxCaml signature
+   for a function in the interface strength analysis. *)
 type moregen_ret_modes =
   | Constrain_all_ret_modes
   | Skip_intermediate_ret_modes
 
-(* Number of arrows along a type's return spine. Abbreviations ([Tconstr])
-   are not expanded, and [Tpoly] wrappers do not count as a step, matching
-   the syntactic walk of Merlin's intf-weakness analysis. *)
+(* Number of arrows along a type's return spine. *)
 let rec count_arrow_spine ty =
   match get_desc ty with
   | Tpoly (ty, _) -> count_arrow_spine ty
@@ -6601,8 +6594,6 @@ let rec moregen ?(ret_modes = Constrain_all_ret_modes)
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) ->
               eq_labels Moregen ~in_pattern_mode:false l1 l2;
-              (* When intermediate return modes are skipped, only the mode of
-                 the last arrow of the subject's spine is constrained. *)
               let constrain_ret_mode =
                 match ret_modes with
                 | Constrain_all_ret_modes -> true
