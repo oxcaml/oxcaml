@@ -29,6 +29,8 @@ type t
 
 type rebuilt_expr = t
 
+val apply_renaming : t -> Renaming.t -> t
+
 val print : Are_rebuilding_terms.t -> Format.formatter -> t -> unit
 
 (** This function may only be used when rebuilding terms. *)
