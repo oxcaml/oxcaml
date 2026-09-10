@@ -1,57 +1,98 @@
 (* TEST
+ include stdlib_upstream_compatible;
  flambda2;
- { expect; expect.opt; }
+ { expect.opt; }
 *)
+
+(* The native toplevel prints mixed tuples as [<abstr>], so we check values
+   with structural equality helpers instead. *)
+
+module Float_u = Stdlib_upstream_compatible.Float_u
+[%%expect{|
+module Float_u = Stdlib_upstream_compatible.Float_u
+|}]
 
 (* basics *)
 
 type t1 = int * #(string * bool)
+
+let equal_t1 ((x, #(y, z)) : t1) ((x', #(y', z')) : t1) =
+  Int.equal x x' && String.equal y y' && Bool.equal z z'
+
+let reconstruct_t1 =
+  let reconstructed =
+    match 4, #("hi", false) with
+    | x, #(y, z) -> x, #(y, z)
+  in
+  assert (equal_t1 reconstructed (4, #("hi", false)))
 [%%expect{|
 type t1 = int * #(string * bool)
+val equal_t1 : t1 -> t1 -> bool = <fun>
+val reconstruct_t1 : unit = ()
 |}]
 
-let reconstruct_t1 : t1 =
-  match 4, #("hi", false) with
-  | x, #(y, z) -> x, #(y, z)
+type t2 = unit# * unit# * int
+
+let make_t2 = (#(), #(), 42)
 [%%expect{|
-val reconstruct_t1 : t1 = (4, #("hi", false))
+type t2 = unit# * unit# * int
+val make_t2 : unit# * unit# * int = <abstr>
 |}]
 
-type t_void : void
+type t3 = int * float# * #((unit * string) * unit#)
 
-type t2 = t_void * t_void * int
-let make_t2 (v : t_void) = (v, v, 42)
-[%%expect{|
-type t_void : void
-type t2 = t_void * t_void * int
-val make_t2 : t_void -> t_void * t_void * int = <fun>
-|}]
+let equal_t3 ((a, b, #((c, d), #())) : t3)
+    ((a', b', #((c', d'), #())) : t3) =
+  Int.equal a a' && Float_u.equal b b'
+  && Unit.equal c c' && String.equal d d'
 
-type t3 = int * bool# * #((unit * string) * unit#)
-let reconstruct_t3 : t3 =
-  match (42, #true, #(((), "hi"), #())) with
-  | (a, b, #((c, d), e)) -> (a, b, #((c, d), e))
+let reconstruct_t3 =
+  let reconstructed =
+    match (42, #4.0, #(((), "hi"), #())) with
+    | (a, b, #((c, d), e)) -> (a, b, #((c, d), e))
+  in
+  assert (equal_t3 reconstructed (42, #4.0, #(((), "hi"), #())))
 [%%expect{|
-type t3 = int * bool# * #((unit * string) * unit#)
-val reconstruct_t3 : t3 = (42, <abstr>, #(((), "hi"), <abstr>))
+type t3 = int * float# * #((unit * string) * unit#)
+val equal_t3 : t3 -> t3 -> bool = <fun>
+val reconstruct_t3 : unit = ()
 |}]
 
 (* CR zeisbach: should this pass? what tests are needed for this behavior?
    I guess it's cool if it just works, but I'm very low confidence. I should
    look at Will's tests once that gets merged. *)
+type t_void : void
 type all_void = t_void * t_void
 let make_all_void (v : t_void) = (v, v)
 [%%expect{|
+type t_void : void
 type all_void = t_void * t_void
 val make_all_void : t_void -> t_void * t_void = <fun>
 |}]
 
-type ('a : any) t4 = 'a * int
-let v4_uniform : int t4 = (6, 7)
-let v4_mixed : float# t4 = (#6.0, 7)
+type all_unit_u = unit# * unit# * unit#
+let all_unit_v = (#(), #(), #())
 [%%expect{|
-type all_void = t_void * t_void
-val make_all_void : t_void -> t_void * t_void = <fun>
+type all_unit_u = unit# * unit# * unit#
+val all_unit_v : unit# * unit# * unit# = <abstr>
+|}]
+
+type ('a : any) t4 = 'a * int
+
+let equal_t4_float ((f, n) : float# t4) ((f', n') : float# t4) =
+  Float_u.equal f f' && Int.equal n n'
+[%%expect{|
+type ('a : any) t4 = 'a * int
+val equal_t4_float : float# t4 -> float# t4 -> bool = <fun>
+|}]
+
+let check =
+  let v4_uniform : int t4 = (6, 7) in
+  let v4_mixed : float# t4 = (#6.0, 7) in
+  assert (v4_uniform = (6, 7));
+  assert (equal_t4_float v4_mixed (#6.0, 7))
+[%%expect{|
+val check : unit = ()
 |}]
 
 (* There is a cap on the number of elements in the scannable prefix. The error
@@ -175,13 +216,13 @@ val partial_match_t3_none : t3 option -> unit = <fun>
 |}]
 
 let partial_match_t3_some : t3 option -> unit = function
-  | Some (3, #true, _) -> ()
+  | Some (6, #7.0, _) -> ()
 [%%expect{|
-Lines 1-2, characters 48-28:
+Lines 1-2, characters 48-27:
 1 | ................................................function
-2 |   | Some (3, #true, _) -> ()
+2 |   | Some (6, #7.0, _) -> ()
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
-  Here is an example of a case that is not matched: "Some (3, #false, _)"
+  Here is an example of a case that is not matched: "Some (6, #0., _)"
 
 val partial_match_t3_some : t3 option -> unit = <fun>
 |}]
@@ -222,7 +263,7 @@ let letop_mixed =
   let* #(n, s) = #(4, "hi")
   and* b = true
   in
-  (#(n + 1, s), b)
+  (n, s, b)
 [%%expect{|
-val letop_mixed : #(int * string) * bool = (#(5, "hi"), true)
+val letop_mixed : int * string * bool = (4, "hi", true)
 |}]
