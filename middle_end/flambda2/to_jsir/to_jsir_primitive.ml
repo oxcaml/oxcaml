@@ -220,6 +220,25 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
         | Naked_int8 -> assert false
       in
       use_prim' (Extern extern_name))
+  | Int_bit_counting (kind, op) ->
+    let prim_name =
+      match op with
+      | Leading_zeros -> "clz"
+      | Trailing_zeros -> "ctz"
+      | Popcount -> "popcnt"
+    in
+    let extern_name =
+      let pf fmt = Format.asprintf fmt prim_name in
+      match kind with
+      | Naked_int32 -> pf "caml_int32_%s_unboxed_to_untagged"
+      | Naked_int64 -> pf "caml_int64_%s_unboxed_to_untagged"
+      | Naked_nativeint -> pf "caml_nativeint_%s_unboxed_to_untagged"
+      | Naked_int8 -> pf "caml_int8_%s_untagged_to_untagged"
+      | Naked_int16 -> pf "caml_int16_%s_untagged_to_untagged"
+      | Naked_immediate -> pf "caml_int_%s_untagged_to_untagged"
+      | Tagged_immediate -> pf "caml_int_%s_tagged_to_untagged"
+    in
+    use_prim' (Extern extern_name)
   | Float_arith (bitwidth, op) ->
     let op_name = match op with Abs -> "abs" | Neg -> "neg" in
     let extern_name = with_float_suffix ~bitwidth op_name in

@@ -142,6 +142,12 @@ module type Int_number_kind = sig
     val neg : t -> t
 
     val compare_unsigned : t -> t -> int
+
+    val leading_zeros : t -> int
+
+    val trailing_zeros : t -> int
+
+    val popcount : t -> int
   end
 
   include Number_kind_common with module Num := Num

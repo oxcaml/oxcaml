@@ -255,6 +255,21 @@ let shift_right_logical t n =
   | Int32 x -> Int32 (Int32.shift_right_logical x n)
   | Int64 x -> Int64 (Int64.shift_right_logical x n)
 
+let leading_zeros t =
+  match t with
+  | Int32 x -> Misc.Stdlib.Int32.leading_zeros x
+  | Int64 x -> Misc.Stdlib.Int64.leading_zeros x
+
+let trailing_zeros t =
+  match t with
+  | Int32 x -> Misc.Stdlib.Int32.trailing_zeros x
+  | Int64 x -> Misc.Stdlib.Int64.trailing_zeros x
+
+let popcount t =
+  match t with
+  | Int32 x -> Misc.Stdlib.Int32.popcount x
+  | Int64 x -> Misc.Stdlib.Int64.popcount x
+
 (* Comparison functions *)
 let compare t1 t2 =
   match t1, t2 with
