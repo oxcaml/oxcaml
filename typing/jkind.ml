@@ -2005,6 +2005,49 @@ module Const = struct
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
+  (******************)
+  (* kind operators *)
+  (******************)
+
+  module Scannable_axis = struct
+    type t =
+      | Nullability of Nullability.t
+      | Separability of Separability.t
+
+    let lower_axes (sa : Scannable_axes.t) (axis : t) =
+      match axis with
+      | Nullability axis ->
+        { sa with nullability = Nullability.meet sa.nullability axis }
+      | Separability axis ->
+        { sa with separability = Separability.meet sa.separability axis }
+  end
+
+  module Kind_operator = struct
+    type t =
+      | Scannable_axis of Scannable_axis.t
+      | Addressable
+      | Box
+  end
+
+  let apply_scannable_axis env (axis : Scannable_axis.t option) t =
+    match axis with
+    | None -> t
+    | Some axis -> (
+      let t = Base_and_axes.fully_expand_aliases_const env t in
+      match t.base with
+      | Kconstr (p, sa, op) ->
+        { t with base = Kconstr (p, Scannable_axis.lower_axes sa axis, op) }
+      | Layout layout -> (
+        match Layout.Const.get_root_scannable_axes layout with
+        | None -> t
+        | Some sa ->
+          { t with
+            base =
+              Layout
+                (Layout.Const.set_root_scannable_axes layout
+                   (Scannable_axis.lower_axes sa axis))
+          }))
+
   (* The mod bounds of [k box], given [k]'s mod bounds. *)
   let box_mod_bounds mod_bounds =
     (* [k box] crosses like [mutable_data with (type : k)].
@@ -2014,6 +2057,24 @@ module Const = struct
        which will have kind [immediate box], would incorrectly be
        [immutable_data]. *)
     Mod_bounds.join Builtin.mutable_data.jkind.mod_bounds mod_bounds
+
+  let apply_box ~loc env t =
+    let t = Base_and_axes.fully_expand_aliases_const env t in
+    match t.base with
+    | Layout layout ->
+      { base = Layout (Layout.Const.box layout Scannable_axes.max);
+        mod_bounds = box_mod_bounds t.mod_bounds;
+        with_bounds = t.with_bounds
+      }
+    | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
+
+  let apply_addressable env t =
+    let t = Base_and_axes.fully_expand_aliases_const env t in
+    match t.base with
+    | Layout layout ->
+      { t with base = Layout (Layout.Const.addressable layout) }
+    | Kconstr (p, sa, _) ->
+      { t with base = Kconstr (p, sa, Jkind_types.Kind_operator.Addressable) }
 
   module To_out_jkind_const : sig
     (** Convert a [t] into a [Outcometree.out_jkind_const]. If [verbosity] is
@@ -2355,26 +2416,6 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-  module Scannable_axis = struct
-    type t =
-      | Nullability of Nullability.t
-      | Separability of Separability.t
-
-    let lower_axes (sa : Scannable_axes.t) (axis : t) =
-      match axis with
-      | Nullability axis ->
-        { sa with nullability = Nullability.meet sa.nullability axis }
-      | Separability axis ->
-        { sa with separability = Separability.meet sa.separability axis }
-  end
-
-  module Kind_operator = struct
-    type t =
-      | Scannable_axis of Scannable_axis.t
-      | Addressable
-      | Box
-  end
-
   let warn_redundant_kind_modifier ~loc
       ((base : Parsetree.jkind_annotation), (rev_ops : string Location.loc list))
       =
@@ -2389,43 +2430,6 @@ module Const = struct
     Location.prerr_warning loc
       (Warnings.Redundant_kind_modifier
          (Format.asprintf "%a" Pprintast.jkind_annotation annotation))
-
-  let apply_scannable_axis env (axis : Scannable_axis.t option) t =
-    match axis with
-    | None -> t
-    | Some axis -> (
-      let t = Base_and_axes.fully_expand_aliases_const env t in
-      match t.base with
-      | Kconstr (p, sa, op) ->
-        { t with base = Kconstr (p, Scannable_axis.lower_axes sa axis, op) }
-      | Layout layout -> (
-        match Layout.Const.get_root_scannable_axes layout with
-        | None -> t
-        | Some sa ->
-          { t with
-            base =
-              Layout
-                (Layout.Const.set_root_scannable_axes layout
-                   (Scannable_axis.lower_axes sa axis))
-          }))
-
-  let apply_box ~loc env t =
-    let t = Base_and_axes.fully_expand_aliases_const env t in
-    match t.base with
-    | Layout layout ->
-      { base = Layout (Layout.Const.box layout Scannable_axes.max);
-        mod_bounds = box_mod_bounds t.mod_bounds;
-        with_bounds = t.with_bounds
-      }
-    | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
-
-  let apply_addressable env t =
-    let t = Base_and_axes.fully_expand_aliases_const env t in
-    match t.base with
-    | Layout layout ->
-      { t with base = Layout (Layout.Const.addressable layout) }
-    | Kconstr (p, sa, _) ->
-      { t with base = Kconstr (p, sa, Jkind_types.Kind_operator.Addressable) }
 
   let warn_ignored_kind_modifier ~loc modifier base =
     Location.prerr_warning loc
