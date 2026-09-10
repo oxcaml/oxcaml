@@ -11,8 +11,12 @@ type t =
     pp : Hint.pinpoint
   }
 
+type snapshot = t list
+
 let allocations : t list ref = Local_store.s_ref []
 
+let snapshot () = !allocations
+let restore snapshot = allocations := snapshot
 let reset_allocations () = allocations := []
 
 let register_mode_for_optimisation pp ?(closures=[]) alloc_mode =

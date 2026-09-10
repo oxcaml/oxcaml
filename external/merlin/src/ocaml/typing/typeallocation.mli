@@ -2,6 +2,11 @@
 
 open Mode
 
+type snapshot
+
+val snapshot : unit -> snapshot
+val restore : snapshot -> unit
+
 val reset_allocations : unit -> unit
 
 val register_mode_for_optimisation :

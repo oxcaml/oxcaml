@@ -26,6 +26,7 @@ type ('p, 't) item =
     part_rev_sg : Types.signature_item list;
     part_errors : exn list;
     part_checks : Typecore.delayed_check list;
+    part_allocations : Typeallocation.snapshot;
     part_warnings : Warnings.state;
     part_index : index lazy_t
   }
@@ -127,6 +128,7 @@ let[@tail_mod_cons] rec type_structure config caught env index sg = function
         part_uid = Shape.Uid.get_current_stamp ();
         part_errors = !caught;
         part_checks = !Typecore.delayed_checks;
+        part_allocations = Typeallocation.snapshot ();
         part_warnings = Warnings.backup ();
         part_index
       }
@@ -161,6 +163,7 @@ let[@tail_mod_cons] rec type_signature config caught env index sg psg_modalities
         part_uid = Shape.Uid.get_current_stamp ();
         part_errors = !caught;
         part_checks = !Typecore.delayed_checks;
+        part_allocations = Typeallocation.snapshot ();
         part_warnings = Warnings.backup ();
         part_index
       }
@@ -192,6 +195,7 @@ let type_implementation config caught parsetree =
     | x :: _ ->
       caught := x.part_errors;
       Typecore.delayed_checks := x.part_checks;
+      Typeallocation.restore x.part_allocations;
       ( x.part_env,
         x.part_rev_sg,
         x.part_snapshot,
@@ -243,6 +247,7 @@ let type_interface config caught (parsetree : Parsetree.signature) =
     | x :: _ ->
       caught := x.part_errors;
       Typecore.delayed_checks := x.part_checks;
+      Typeallocation.restore x.part_allocations;
       ( x.part_env,
         x.part_rev_sg,
         x.part_snapshot,
@@ -298,6 +303,7 @@ let run config parsetree =
   let caught = ref [] in
   Msupport.catch_errors Mconfig.(config.ocaml.warnings) caught @@ fun () ->
   Typecore.reset_delayed_checks ();
+  Typeallocation.reset_allocations ();
   let cached_result, cache_stat =
     match parsetree with
     | `Implementation parsetree -> type_implementation config caught parsetree

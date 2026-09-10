@@ -4387,6 +4387,11 @@ let merlin_type_structure env sig_acc str =
   let (str, sg, _mode, _sg_names, _shape, env) =
     type_structure ~keep_warnings:true ~funct_body:false None env sig_acc str
   in
+  begin try
+    Typeallocation.constrain_allocations ();
+    Typeallocation.constrain_closures ()
+  with exn -> Msupport.raise_error exn
+  end;
   str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
 let merlin_transl_signature ?interface_toplevel env sig_acc sg =
