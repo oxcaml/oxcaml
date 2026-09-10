@@ -76,8 +76,10 @@
     "value": "sig
     type ('a : value_or_null) t = 'a list = [] | (::) of 'a * 'a list
     val length : 'a list -> int @@ portable
-    val compare_lengths : 'a list -> 'b list -> int @@ portable
-    val compare_length_with : 'a list -> int -> int @@ portable
+    val compare_lengths : 'a list -> ('b list -> int) @ local @@ portable
+      noalloc_strict
+    val compare_length_with : 'a list -> (int -> int) @ local @@ portable
+      noalloc_strict
     val is_empty : 'a list -> bool @@ portable
     val cons : 'a -> 'a list -> 'a list @@ portable
     val singleton : 'a -> 'a list @@ portable
@@ -132,7 +134,7 @@
     val find_all : ('a -> bool) -> 'a list -> 'a list @@ portable
     val filteri : (int -> 'a -> bool) -> 'a list -> 'a list @@ portable
     val take : int -> 'a list -> 'a list @@ portable
-    val drop : int -> 'a list -> 'a list @@ portable
+    val drop : int -> 'a list -> 'a list @@ portable [@@zero_alloc strict]
     val take_while : ('a -> bool) -> 'a list -> 'a list @@ portable
     val drop_while : ('a -> bool) -> 'a list -> 'a list @@ portable
     val partition : ('a -> bool) -> 'a list -> 'a list * 'a list @@ portable
@@ -140,10 +142,11 @@
       ('a -> ('b, 'c) Either.t) -> 'a list -> 'b list * 'c list @@ portable
     val assoc : 'a -> ('a * 'b) list -> 'b @@ portable
     val assoc_opt : 'a -> ('a * 'b) list -> 'b option @@ portable
-    val assq : 'a -> ('a * 'b) list -> 'b @@ portable
+    val assq : 'a -> ('a * 'b) list -> 'b @@ portable [@@zero_alloc strict]
     val assq_opt : 'a -> ('a * 'b) list -> 'b option @@ portable
     val mem_assoc : 'a -> ('a * 'b) list -> bool @@ portable
-    val mem_assq : 'a -> ('a * 'b) list -> bool @@ portable
+    val mem_assq : 'a -> (('a * 'b) list -> bool) @ local @@ portable
+      noalloc_strict
     val remove_assoc : 'a -> ('a * 'b) list -> ('a * 'b) list @@ portable
     val remove_assq : 'a -> ('a * 'b) list -> ('a * 'b) list @@ portable
     val split : ('a * 'b) list -> 'a list * 'b list @@ portable
