@@ -3,7 +3,6 @@
  (name dot_merlin_reader)
  (public_name dot-merlin-reader)
  (libraries
-  findlib
   merlin-lib.utils
   merlin-lib.ocaml_utils
   merlin-lib.dot_protocol

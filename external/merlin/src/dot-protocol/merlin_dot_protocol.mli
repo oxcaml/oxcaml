@@ -76,12 +76,7 @@ module Directive : sig
   end
 
   module Raw : sig
-    type t =
-      [ Processed.acceptable_in_input
-      | `PKG of string list
-      | `FINDLIB of string
-      | `FINDLIB_PATH of string
-      | `FINDLIB_TOOLCHAIN of string ]
+    type t = Processed.acceptable_in_input
   end
 end
 

@@ -197,7 +197,6 @@ let
           version = "dev";
           src = merlinSrc;
           duneVersion = "3";
-          propagatedBuildInputs = [ ocamlPackages.findlib ];
           buildInputs = [ merlin-lib ];
           checkInputs = [ ocamlPackages.alcotest ];
           doCheck = true;
@@ -244,7 +243,6 @@ let
             devBuildInputs = [
               ocamlPackages.alcotest
               ocamlPackages.csexp
-              ocamlPackages.findlib
               ocamlPackages.menhirLib
               ocamlPackages.menhirSdk
               ocamlPackages.yojson
