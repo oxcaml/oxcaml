@@ -282,16 +282,22 @@ type signal = int
   to independent ones, and {!signal_to_int} does the reverse.
   @since 5.4 *)
 
+type external_signal_handler (* abstract *)
+
 type signal_behavior =
     Signal_default
   | Signal_ignore
   | Signal_handle of (signal -> unit)   (** *)
+  | Signal_external of external_signal_handler
 (** What to do when receiving a signal:
    - [Signal_default]: take the default behavior
      (usually: abort the program)
    - [Signal_ignore]: ignore the signal
    - [Signal_handle f]: call function [f], giving it the signal
-   number as an argument. *)
+     number as argument
+   - [Signal_external e]: run external signal handler defined by abstract
+    value [e].
+*)
 
 external signal :
   signal -> signal_behavior -> signal_behavior @@ nonportable
