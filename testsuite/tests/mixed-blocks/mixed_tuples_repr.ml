@@ -29,11 +29,13 @@ let print_block_kind name x =
 
 (* Type declarations, construction, destruction *)
 
-type t1 = int * #(string * bool)
-type t2 = unit# * unit# * int
-type t3 = int * float# * #((unit * string) * unit#)
+type nested_unboxed_tuple_gets_flattened = int * #(string * bool)
+type void_void_int = unit# * unit# * int
+type large_nested_mixed = int * float# * #((unit * string) * unit#)
 
-let equal_t1 ((x, #(y, z)) : t1) ((x', #(y', z')) : t1) =
+let equal_flattened
+    ((x, #(y, z)) : nested_unboxed_tuple_gets_flattened)
+    ((x', #(y', z')) : nested_unboxed_tuple_gets_flattened) =
   Int.equal x x' && String.equal y y' && Bool.equal z z'
 
 (* Uniform block after flattening *)
@@ -42,19 +44,20 @@ let () =
     match 4, #("hi", false) with
     | x, #(y, z) -> x, #(y, z)
   in
-  assert (equal_t1 reconstructed (4, #("hi", false)));
-  print_block_kind "t1" reconstructed
+  assert (equal_flattened reconstructed (4, #("hi", false)));
+  print_block_kind "nested_unboxed_tuple_gets_flattened" reconstructed
 
 (* Singleton block *)
-let () = print_block_kind "t2" ((#(), #(), 42) : t2)
+let () =
+  print_block_kind "void_void_int" ((#(), #(), 42) : void_void_int)
 
 (* all void mixed tuple *)
 
 type all_unit_u = unit# * unit# * #(unit# * unit#)
 let () = print_block_kind "all_unit_u" ((#(), #(), #(#(), #())) : all_unit_u)
 
-let equal_t3 ((a, b, #((c, d), #())) : t3)
-    ((a', b', #((c', d'), #())) : t3) =
+let equal_large ((a, b, #((c, d), #())) : large_nested_mixed)
+    ((a', b', #((c', d'), #())) : large_nested_mixed) =
   Int.equal a a' && Float_u.equal b b'
   && Unit.equal c c' && String.equal d d'
 
@@ -63,21 +66,22 @@ let () =
     match (42, #4.0, #(((), "hi"), #())) with
     | (a, b, #((c, d), e)) -> (a, b, #((c, d), e))
   in
-  assert (equal_t3 reconstructed (42, #4.0, #(((), "hi"), #())));
-  print_block_kind "t3" reconstructed
+  assert (equal_large reconstructed (42, #4.0, #(((), "hi"), #())));
+  print_block_kind "large_nested_mixed" reconstructed
 
 
 (* [any] in mixed tuples *)
 
-type ('a : any) t4 = 'a * int
+type ('a : any) any_and_int = 'a * int
 
-let equal_t4_float ((f, n) : float# t4) ((f', n') : float# t4) =
+let equal_any_float ((f, n) : float# any_and_int)
+    ((f', n') : float# any_and_int) =
   Float_u.equal f f' && Int.equal n n'
 
 let () =
-  let v4_uniform : int t4 = (6, 7) in
-  let v4_mixed : float# t4 = (#6.0, 7) in
-  assert (v4_uniform = (6, 7));
-  assert (equal_t4_float v4_mixed (#6.0, 7));
-  print_block_kind "int t4" v4_uniform;
-  print_block_kind "float# t4" v4_mixed
+  let uniform : int any_and_int = (6, 7) in
+  let mixed : float# any_and_int = (#6.0, 7) in
+  assert (uniform = (6, 7));
+  assert (equal_any_float mixed (#6.0, 7));
+  print_block_kind "mixed any tuple inst with int" uniform;
+  print_block_kind "mixed any tuple inst with float#" mixed
