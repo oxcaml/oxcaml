@@ -32,17 +32,11 @@ let check_round_trip diagnostic =
 let () =
   let first = location ~line:1 ~line_start:0 in
   let second = location ~line:2 ~line_start:10 in
-  let entities, first_id =
-    Diagnostic.Entities.intern Diagnostic.Entities.empty first
-  in
-  let entities, second_id = Diagnostic.Entities.intern entities second in
   let diagnostic : Diagnostic.t =
     { loc = first;
-      entities;
-      glossary = Diagnostic.Glossary.empty;
       body =
         [ { kind = Diagnostic.Kind.Explanation;
-            content = [mention first_id "first"; mention second_id "second"];
+            content = [mention first "first"; mention second "second"];
             children = []
           } ]
     }
@@ -51,40 +45,43 @@ let () =
 
 let () =
   let loc = location ~line:1 ~line_start:0 in
-  let glossary_entry : Diagnostic.Glossary.Entry.t =
+  let glossary_entry : Diagnostic.Glossary_entry.t =
     { term = "portable";
       category = "mode";
       description = "May be used from another domain";
       url = None
     }
   in
-  let mention text : Diagnostic_plan.Inline.t =
-    Diagnostic_plan.Inline.Annotated
-      { annotation =
-          Diagnostic_plan.Annotation.Mention
-            { entity = loc; form = Diagnostic.Form.Name };
-        content = [Diagnostic_plan.Inline.Text text]
+  let term : Diagnostic.Inline.t =
+    Diagnostic.Inline.Annotated
+      { annotation = Diagnostic.Annotation.Term glossary_entry;
+        content = [Diagnostic.Inline.Text "portable"]
       }
   in
-  let term : Diagnostic_plan.Inline.t =
-    Diagnostic_plan.Inline.Annotated
-      { annotation = Diagnostic_plan.Annotation.Term glossary_entry;
-        content = [Diagnostic_plan.Inline.Text "portable"]
+  let source : Diagnostic.Inline.t =
+    Diagnostic.Inline.Annotated
+      { annotation = Diagnostic.Annotation.Source loc;
+        content = [Diagnostic.Inline.Text "let x = ()"]
       }
   in
-  let leaf content =
-    Diagnostic_plan.create ~kind:Diagnostic.Kind.Explanation ~content
-      ~children:[]
+  let code : Diagnostic.Inline.t =
+    Diagnostic.Inline.Annotated
+      { annotation = Diagnostic.Annotation.Code;
+        content = [Diagnostic.Inline.Text "x"]
+      }
   in
-  let plan =
-    Diagnostic_plan.create ~kind:Diagnostic.Kind.Explanation ~content:[]
-      ~children:
-        [ Diagnostic.Relation.Claim, leaf [mention "first"; term];
-          Diagnostic.Relation.Claim, leaf [mention "again"; term] ]
+  let leaf content : Diagnostic.Block.t =
+    { kind = Diagnostic.Kind.Explanation; content; children = [] }
   in
-  let diagnostic = Diagnostic_plan.to_diagnostic ~loc [plan] in
-  if List.length (Diagnostic.Entities.to_list diagnostic.entities) <> 1
-  then failwith "diagnostic plan did not deduplicate entities";
-  if List.length (Diagnostic.Glossary.to_list diagnostic.glossary) <> 1
-  then failwith "diagnostic plan did not deduplicate glossary entries";
+  let diagnostic : Diagnostic.t =
+    { loc;
+      body =
+        [ { kind = Diagnostic.Kind.Background;
+            content = [mention loc "first"; term];
+            children =
+              [ Diagnostic.Relation.Claim, leaf [source];
+                Diagnostic.Relation.Elaboration, leaf [code] ]
+          } ]
+    }
+  in
   check_round_trip diagnostic
