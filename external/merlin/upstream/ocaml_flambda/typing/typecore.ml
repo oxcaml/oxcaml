@@ -1549,7 +1549,8 @@ let unify_exp_types_delaying_jkind_checks ~checks ?sexp loc env ty expected_ty =
         unify env ty expected_ty;
         []
       end else
-        Ctype.unify_delaying_jkind_checks env ty expected_ty
+        Ctype.unify_delaying_jkind_checks ~check_variables:true
+          env ty expected_ty
     in
     checks := delayed @ !checks
   with
@@ -10917,17 +10918,22 @@ and type_application env app_loc expected_mode position_and_mode
                 ty_ret (List.rev untyped_args)
             in
             let ty_expected = instance ty_expected in
-            (* This extra unification might trigger incompleteness in the
-               type checker (like due to lack of [Tquote_eval]-constraints).
-               Backtracking might be expensive, but will only happen in cases
-               we'll fail anyway or when type inference is incomplete. *)
-            let snap = snapshot () in
-            try
-              let checks =
-                Ctype.unify_delaying_layout_checks env ty_res ty_expected
-              in
-              delayed_layout_checks := checks
-            with Unify _ | Tags _ -> backtrack snap
+            (* An unknown result has no structure to propagate. Its constraints
+               can restrict shared argument types before later arguments have
+               determined them. *)
+            if not (is_Tvar (expand_head env ty_expected)) then begin
+              (* This extra unification might trigger incompleteness in the
+                 type checker (like due to lack of [Tquote_eval]-constraints).
+                 Backtracking might be expensive, but will only happen in cases
+                 we'll fail anyway or when type inference is incomplete. *)
+              let snap = snapshot () in
+              try
+                let checks =
+                  Ctype.unify_delaying_layout_checks env ty_res ty_expected
+                in
+                delayed_layout_checks := checks
+              with Unify _ | Tags _ -> backtrack snap
+            end
           end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =

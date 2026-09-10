@@ -603,17 +603,22 @@ let unify_with_decr_stage uenv f =
      ill-founded types.  Jkind checking does things that blow up on those
      types.  So we save the checks that would be done and do them after the
      circularity checking.
+     Expression typing can instead check variables immediately, preserving
+     their kind constraints when unification links them together.
 *)
 type jkind_unification_mode =
   | Perform_checks
-  | Delay_checks of (Env.t * type_expr * jkind_r) list ref
+  | Delay_checks of
+      { checks : (Env.t * type_expr * jkind_r) list ref;
+        check_variables : bool }
 
 let lmode = ref Perform_checks
 
-let delay_jkind_checks_in f =
-  let r = ref [] in
-  Misc.protect_refs [Misc.R (lmode, Delay_checks r)] f;
-  !r
+let delay_jkind_checks_in ~check_variables f =
+  let checks = ref [] in
+  Misc.protect_refs
+    [Misc.R (lmode, Delay_checks { checks; check_variables })] f;
+  !checks
 
 (*** Checks for type definitions ***)
 
@@ -3831,7 +3836,11 @@ let unification_jkind_check uenv ty jkind =
   if not (in_subst_mode uenv) then
     match !lmode with
     | Perform_checks -> constrain_type_jkind_exn (get_env uenv) Unify ty jkind
-    | Delay_checks r -> r := (get_env uenv, ty, jkind) :: !r
+    | Delay_checks { check_variables = true; _ }
+      when is_Tvar (expand_head (get_env uenv) ty) ->
+        constrain_type_jkind_exn (get_env uenv) Unify ty jkind
+    | Delay_checks { checks; _ } ->
+        checks := (get_env uenv, ty, jkind) :: !checks
 
 let check_and_update_generalized_ty_jkind ?name ~loc ty =
   let generalization_check level jkind =
@@ -5864,8 +5873,8 @@ let unify_pairs env ty1 ty2 pairs =
 let unify env ty1 ty2 =
   unify_pairs env ty1 ty2 []
 
-let unify_delaying_jkind_checks env ty1 ty2 =
-  delay_jkind_checks_in (fun () ->
+let unify_delaying_jkind_checks ?(check_variables = false) env ty1 ty2 =
+  delay_jkind_checks_in ~check_variables (fun () ->
     unify_pairs env ty1 ty2 [])
 
 let unify_delaying_layout_checks env ty1 ty2 =
