@@ -156,9 +156,6 @@ let test_module_root () =
   let unit =
     Flambda_unit.create ~return_continuation
       ~exn_continuation:(Continuation.create ())
-      ~toplevel_my_region:(Variable.create "region" Flambda_kind.region)
-      ~toplevel_my_ghost_region:
-        (Variable.create "ghost_region" Flambda_kind.region)
       ~toplevel_my_alloc_region:
         (Variable.create "alloc_region" Flambda_kind.region)
       ~body ~module_symbol:root

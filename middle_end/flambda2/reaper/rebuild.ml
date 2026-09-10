@@ -53,13 +53,7 @@ type env =
   { machine_width : Target_system.Machine_width.t;
     uses : Unboxing_analysis.result;
     code_changes : Unboxing_analysis.code_changes;
-<<<<<<< HEAD
     code_deps_for_result_types : Traverse_acc.code_dep Code_id.Map.t option;
-||||||| bf88f1f836
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
-=======
-    code_deps : Traverse_acc.code_dep Code_id.Map.t;
->>>>>>> origin/main
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -465,13 +459,6 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
             if code_is_used bound_name
             then
               let changed_calling_convention =
-<<<<<<< HEAD
-||||||| bf88f1f836
-                not (Analysis.cannot_change_calling_convention env.uses code_id)
-=======
-                Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                &&
->>>>>>> origin/main
                 match
                   Unboxing_analysis.get_calling_convention_change
                     env.code_changes code_id
@@ -486,7 +473,6 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                 }
             else
               let code_metadata =
-<<<<<<< HEAD
                 match
                   Unboxing_analysis.find_code_metadata env.code_changes code_id
                 with
@@ -496,15 +482,6 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                      did not participate in it; its .cmx metadata is not
                      stale. *)
                   env.get_code_metadata code_id
-||||||| bf88f1f836
-              let code_metadata = env.get_code_metadata code_id in
-=======
-                if
-                  Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                then
-                  Unboxing_analysis.get_code_metadata env.code_changes code_id
-                else env.get_code_metadata code_id
->>>>>>> origin/main
               in
               Deleted
                 { function_slot_size =
@@ -1075,30 +1052,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   in
   match code_id_actually_called with
   | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-<<<<<<< HEAD
   | Some code_id ->
     ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
       call_kind )
-||||||| bf88f1f836
-  | None -> Not_changing_calling_convention, call_kind
-  | Some code_id -> (
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> Not_changing_calling_convention, call_kind
-    | Some _ ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      if cannot_change_calling_convention
-      then Not_changing_calling_convention, call_kind
-      else Changing_calling_convention code_id, call_kind)
-=======
-  | Some code_id -> (
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-    | Some _ ->
-      ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
-        call_kind ))
->>>>>>> origin/main
 
 let rebuild_apply env apply =
   let callee_is_dead =
@@ -2152,7 +2108,6 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention =
     Unboxing_analysis.get_calling_convention_change env.code_changes code_id
-<<<<<<< HEAD
   in
   let code_metadata =
     match env.code_deps_for_result_types with
@@ -2201,25 +2156,6 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                    ~results:results_vars_and_keep result_types))
       in
       Code_metadata.with_result_types result_types code_metadata
-||||||| bf88f1f836
-  let updating_calling_convention, params_vars, results_vars =
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None ->
-      Misc.fatal_errorf
-        "No code dependencies found for code id %a in \
-         [rebuild_function_params_and_body]"
-        Code_id.print code_id
-    | Some code_dep ->
-      let cannot_change_calling_convention =
-        Analysis.cannot_change_calling_convention env.uses code_id
-      in
-      ( (if cannot_change_calling_convention
-         then Not_changing_calling_convention
-         else Changing_calling_convention code_id),
-        code_dep.params,
-        code_dep.return )
-=======
->>>>>>> origin/main
   in
   let rebuild_body () =
     let region_vars =
@@ -2330,21 +2266,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
 and rebuild_code env res code_id
     ({ params_and_body; free_names_of_params_and_body = _ } : Rev_expr.rev_code)
     =
-<<<<<<< HEAD
   (* Calling-convention metadata comes from the solve. Rebuild only updates cost
      metrics, inlining decisions, and result types for non-LTO export. *)
-||||||| bf88f1f836
-and rebuild_code env res
-    ({ params_and_body; code_metadata; free_names_of_params_and_body = _ } :
-      Rev_expr.rev_code) =
-  let is_my_closure_used = is_var_used env params_and_body.my_closure in
-=======
-  (* At rebuild time, [code_metadata] may only be changed for fields that will
-     never be read again if we perform LTO, namely, code_size and
-     inlining_decisions. All other changes to [code_metadata] must be done in
-     [unboxing_analysis.ml] so that they correctly propagate to other
-     compilation units when in LTO mode. *)
->>>>>>> origin/main
   let code_metadata =
     Unboxing_analysis.get_code_metadata env.code_changes code_id
   in
@@ -2418,106 +2341,8 @@ type result =
 let rebuild ~machine_width ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
-<<<<<<< HEAD
     ~code_changes ~code_deps_for_result_types (solved_dep : Analysis.result)
     get_code_metadata toplevel_expr code =
-||||||| bf88f1f836
-    (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
-  let should_keep_function_param code_id =
-    let cannot_change_calling_convention =
-      Analysis.cannot_change_calling_convention solved_dep code_id
-    in
-    if cannot_change_calling_convention
-    then (
-      fun var kind ->
-        assert (
-          Option.is_none
-            (Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var var)));
-        Keep (var, kind))
-    else
-      fun param kind ->
-        match
-          Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var param)
-        with
-        | None ->
-          let is_var_used =
-            raw_is_var_used solved_dep param (K.With_subkind.kind kind)
-          in
-          if is_var_used then Keep (param, kind) else Delete
-        | Some fields -> Unbox fields
-  in
-  let function_params_to_keep =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let kinds = Flambda_arity.unarize code_dep.arity in
-        List.map2 (should_keep_function_param code_id) code_dep.params kinds)
-      code_deps
-  in
-  let my_closure_decisions =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let unboxed_fields =
-          Analysis.get_unboxed_fields solved_dep
-            (Code_id_or_name.var code_dep.my_closure)
-        in
-        match unboxed_fields with
-        | None -> Keep_my_closure
-        | Some unboxed_fields ->
-          if Analysis.cannot_change_calling_convention solved_dep code_id
-          then
-            Misc.fatal_errorf
-              "For code_id %a, we cannot change calling convention but closure \
-               is expected to be unboxed"
-              Code_id.print code_id;
-          Unbox_my_closure unboxed_fields)
-      code_deps
-  in
-  let should_keep_function_param code_id =
-    match Code_id.Map.find_opt code_id code_deps with
-    | None -> fun var kind -> Keep (var, kind)
-    | Some _ -> should_keep_function_param code_id
-  in
-  let function_return_decision =
-    Code_id.Map.mapi
-      (fun code_id (code_dep : Traverse_acc.code_dep) ->
-        let cannot_change_calling_convention =
-          Analysis.cannot_change_calling_convention solved_dep code_id
-        in
-        let metadata = get_code_metadata code_id in
-        let result_kinds =
-          Flambda_arity.unarized_components
-            (Code_metadata.result_arity metadata)
-        in
-        if cannot_change_calling_convention
-        then
-          List.map2 (fun v kind -> Keep (v, kind)) code_dep.return result_kinds
-        else
-          (* Format.eprintf "DIRECT: %a@." Code_id.print code_id; *)
-          List.map2
-            (fun v kind ->
-              match
-                Analysis.get_unboxed_fields solved_dep (Code_id_or_name.var v)
-              with
-              | None ->
-                let is_var_used =
-                  raw_is_var_used solved_dep v (K.With_subkind.kind kind)
-                in
-                let kind =
-                  Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
-                    (Name.var v) kind
-                in
-                (* TODO: fix this, needs the mapping between code ids of
-                   functions and their return continuations *)
-                if true || is_var_used then Keep (v, kind) else Delete
-              | Some fields -> Unbox fields)
-            code_dep.return result_kinds)
-      code_deps
-  in
-  let should_keep_param cont param kind =
-=======
-    ~code_changes (solved_dep : Analysis.result) get_code_metadata toplevel_expr
-    code =
->>>>>>> origin/main
   let should_keep_param cont param kind : Unboxing_analysis.param_decision =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
@@ -2560,13 +2385,7 @@ let rebuild ~machine_width ~ordered_code_ids
     { machine_width;
       uses = solved_dep;
       code_changes;
-<<<<<<< HEAD
       code_deps_for_result_types;
-||||||| bf88f1f836
-      code_deps;
-=======
-      code_deps;
->>>>>>> origin/main
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
