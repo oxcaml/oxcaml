@@ -103,21 +103,14 @@ type t3_cmixed2 = C of { x : t_immediate; y : t_value; z : t_void; }
 type t3_cmixed3 = C of { x : t_value; y : t_immediate; }
 |}];;
 
-(* CR layouts v5: allow this *)
 type t3_void = { x : t_void };;
 [%%expect {|
-Line 1, characters 0-29:
-1 | type t3_void = { x : t_void };;
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type t3_void = { x : t_void; }
 |}]
 
 type t3_cvoid = C of { x : t_void }
 [%%expect{|
-Line 1, characters 16-35:
-1 | type t3_cvoid = C of { x : t_void }
-                    ^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+type t3_cvoid = C of { x : t_void; }
 |}]
 
 (*************************)
@@ -230,7 +223,8 @@ type t5 += T5_16 of { x : t_void }
 Line 1, characters 11-34:
 1 | type t5 += T5_16 of { x : t_void }
                ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Records must contain at least one runtime value.
+Error: Extensible types can't have fields of unboxed type.
+       Consider wrapping the unboxed fields in a record.
 |}]
 
 type t5 += T5_17 of { x : t_immediate; y : t_any }

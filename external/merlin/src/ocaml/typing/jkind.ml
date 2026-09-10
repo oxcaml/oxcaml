@@ -3245,8 +3245,6 @@ module Format_history = struct
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
-    | Empty_record ->
-      fprintf ppf "it's a record type containing all void elements"
     | Enumeration ->
       fprintf ppf
         "it's an enumeration variant type (all constructors are constant)"
@@ -4384,7 +4382,6 @@ module Debug_printers = struct
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
-    | Empty_record -> fprintf ppf "Empty_record"
     | Enumeration -> fprintf ppf "Enumeration"
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Immediate_polymorphic_variant ->

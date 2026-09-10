@@ -230,16 +230,6 @@ module Sort = struct
        constants *)
     let addressable c = if is_surely_addressable c then c else Addressable c
 
-    let rec maybe_all_void = function
-      | Base Void -> true
-      | Base
-          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
-          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
-        false
-      | Univar _ | Genvar _ -> true
-      | Product ts -> List.for_all maybe_all_void ts
-      | Addressable t -> maybe_all_void t
-
     let rec is_concrete = function
       | Base _ -> true
       | Product ts -> List.for_all is_concrete ts
