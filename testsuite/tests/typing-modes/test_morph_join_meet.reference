@@ -1,0 +1,2 @@
+All partial-coverage morphism join checks succeeded: the join of two morphisms agrees with the pointwise join of their outputs.
+All partial-coverage morphism meet checks succeeded: the meet of two morphisms agrees with the pointwise meet of their outputs.
