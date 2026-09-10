@@ -29,7 +29,8 @@ module Mode_info = struct
            linearity;
            forkable;
            yielding;
-           staticity
+           staticity;
+           allocation
          }
           : Mode.Value.Const.t) =
       const
@@ -45,7 +46,8 @@ module Mode_info = struct
           maybe_print (module Mode.Linearity.Const) linearity;
           maybe_print (module Mode.Forkable.Const) forkable;
           maybe_print (module Mode.Yielding.Const) yielding;
-          maybe_print (module Mode.Staticity.Const) staticity
+          maybe_print (module Mode.Staticity.Const) staticity;
+          maybe_print (module Mode.Allocation.Const) allocation
         ]
         ~f:Fun.id
     in
