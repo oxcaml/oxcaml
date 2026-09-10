@@ -395,7 +395,13 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Tarrow _ ->
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
-              Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
+              (* Mixed tuples are only represented as mixed blocks in native
+                 code. *)
+              if !Clflags.native_code
+                 && not (List.for_all (fun (_, ty) -> is_value ty) labeled_tys)
+              then Oval_stuff "<abstr>"
+              else
+                Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
