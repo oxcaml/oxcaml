@@ -30,10 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The diff checks compare against HEAD^1, the merge commit's first
-          # parent. A separate `--deepen` fetch is unreliable: when GitHub
-          # regenerates the PR merge commit, GITHUB_SHA can be unreachable from
-          # the server's refs and upload-pack silently declines to deepen.
+          # Fetch the base for diff checks
           fetch-depth: 2
 
       - name: Pretend we're running in a container (makes setup-ocaml go faster)
