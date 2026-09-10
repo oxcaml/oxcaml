@@ -590,7 +590,11 @@ module Header = struct
       (* One section per compilation unit that keys any fact (participant or
          not), in section order. *)
       index : (Compilation_unit.t * File_sections.Idx.t) list;
-      section_toc : int array
+      section_toc : int array;
+      (* The slot offsets computed from the solution for the sets of closures of
+         all participants. Slots are not hashconsed, so the offsets can be
+         stored as is. *)
+      slot_offsets : Slot_offsets.result
     }
 end
 
@@ -600,6 +604,10 @@ type t =
   }
 
 let id_stamp_counters t = t.header.Header.id_stamp_counters
+
+let participants t = List.map fst t.header.Header.participants
+
+let slot_offsets t = t.header.Header.slot_offsets
 
 type error =
   | Wrong_format of string
@@ -621,7 +629,7 @@ let partition_by_cu map =
         acc)
     map Compilation_unit.Map.empty
 
-let save ~filename ~participants ~solution =
+let save ~filename ~participants ~solution ~slot_offsets =
   let ({ db; unboxed_fields; changed_representation }
         : Unboxing_analysis.result) =
     solution
@@ -681,7 +689,8 @@ let save ~filename ~participants ~solution =
       section_references = referenced_by_section;
       field_views = Fields_for_export.export fields;
       index = List.rev rev_index;
-      section_toc
+      section_toc;
+      slot_offsets
     }
   in
   let oc = open_out_bin filename in

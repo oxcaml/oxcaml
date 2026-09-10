@@ -37,12 +37,20 @@ val save :
   filename:string ->
   participants:(Compilation_unit.t * Compilation_unit.Set.t) list ->
   solution:Unboxing_analysis.result ->
+  slot_offsets:Slot_offsets.result ->
   unit
 
 (** Read the header of an ltosol file from disk. *)
 val load : string -> t
 
 val id_stamp_counters : t -> Id_stamp_counters.t
+
+(** The compilation units included in the solution. *)
+val participants : t -> Compilation_unit.t list
+
+(** The slot offsets computed from the solution for the sets of closures of all
+    participants. *)
+val slot_offsets : t -> Slot_offsets.result
 
 (** Deserialise the solution needed to rebuild [members], inserting the
     necessary objects into the global hashcons tables. *)
