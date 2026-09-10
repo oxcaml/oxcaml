@@ -534,26 +534,19 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     Compilation_unit.Set.of_list
       (Flambda2_reaper.Ltosol_format.participants ltosol)
   in
-  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  (* Members of the batch whose rebuild has not started yet: demanding one's cmx
-     here means the .cmr files were not given in dependency order. The direct
-     imports of each member are checked upfront by the driver code. *)
-  let pending_members = ref (Compilation_unit.Set.of_list batch_members) in
-  let load_cmx_file_contents comp_unit =
-    if Compilation_unit.Set.mem comp_unit !pending_members
+  let get_module_info comp_unit =
+    if Compilation_unit.Set.mem comp_unit participant_units
     then
       Misc.fatal_errorf
-        "-reaper-rebuild: unit %a is needed before its own rebuild; the .cmr \
-         files were not given in dependency order"
+        "-reaper-rebuild: attempted to read the .cmx of %a, which participated \
+         in the solve"
         (Format_doc.compat Compilation_unit.print)
         comp_unit;
-    Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
+    get_module_info comp_unit
   in
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let load_cmx_file_contents = Flambda_cmx.load_cmx_file_contents cmx_loader in
   fun ~keep_symbol_tables ~cmr_filename ~ppf_dump:_ ~prefixname:_ ->
-    pending_members
-      := Compilation_unit.Set.remove
-           (Current_unit.get_cu_exn ())
-           !pending_members;
     (* We expect the stamp counters in the .cmr file to be less than the
        counters in the .ltosol file, because the -reaper-solve invocation begins
        by taking the maximum counters across the .cmr files it reads. Therefore,

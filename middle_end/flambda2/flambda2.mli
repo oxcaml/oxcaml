@@ -30,10 +30,9 @@ val lambda_to_cmm :
 
     Applying the first three arguments loads and deserialises the .ltosol file,
     creating the state shared by a batch of rebuilds. The returned function
-    rebuilds one unit; it must be called once per member of the batch, in
-    dependency order (dependencies first), with [Compilenv.reset] having been
-    called for the member first. [batch_members] must be the compilation units
-    of the batch.
+    rebuilds one unit; it must be called once per member of the batch, in any
+    order, with [Compilenv.reset] having been called for the member first.
+    [batch_members] must be the compilation units of the batch.
 
     The identifier tables are shared by the whole batch, so
     [keep_symbol_tables:false], which resets them after producing the Cmm code,

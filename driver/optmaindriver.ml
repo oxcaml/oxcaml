@@ -187,8 +187,6 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
          Compenv.fatal
            "Must specify at least one .cmr file with -reaper-rebuild"
        | _ :: _ -> ());
-      (* [cmr_files] is in command-line order, which is required to be
-         dependency order (dependencies first). *)
       let units =
         List.map
           (fun cmr_file ->

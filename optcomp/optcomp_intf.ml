@@ -52,7 +52,7 @@ type rebuild_unit_from_reaped_flambda =
 (** Create the state shared by a batch of reaped compilation unit rebuilds,
     resumed from the given .ltosol file. [batch_members] must be the compilation
     units of the batch, and the returned function must be called once per
-    member, in dependency order (dependencies first). *)
+    member, in any order. *)
 type compile_from_reaped_flambda =
   ltosol_file:string ->
   batch_members:Compilation_unit.t list ->

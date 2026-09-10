@@ -41,8 +41,7 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
-  (** [units] are (.cmr file, output prefix) pairs, in dependency order
-      (dependencies first). *)
+  (** [units] are (.cmr file, output prefix) pairs, in any order. *)
   val reaper_rebuild :
     ltosol_file:string ->
     units:(string * string) list ->
@@ -243,8 +242,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | None -> Misc.fatal_error "This backend does not support -reaper-rebuild"
     | Some compile_from_reaped_flambda ->
       (* Read the paused unit infos upfront: they provide the compilation unit
-         names and import lists used to check that the batch is in dependency
-         order, and are needed to resume compilation. *)
+         names of the batch members and are needed to resume compilation. *)
       let units =
         List.map
           (fun (cmr_file, output_prefix) ->
@@ -265,31 +263,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       then
         Misc.fatal_error
           "-reaper-rebuild: the same compilation unit was given more than once";
-      (* Check the direct imports here so that mis-ordered batches fail before
-         any work is done; violations via indirect dependencies are caught
-         during the rebuilds themselves. *)
-      let (_ : Compilation_unit.Set.t) =
-        List.fold_left
-          (fun rebuilt (_, _, (paused : Cmx_format.unit_infos)) ->
-            List.iter
-              (fun import ->
-                let import_cu = Import_info.cu import in
-                if
-                  Compilation_unit.Set.mem import_cu member_set
-                  && not (Compilation_unit.Set.mem import_cu rebuilt)
-                then
-                  Misc.fatal_errorf
-                    "-reaper-rebuild: %a depends on %a, whose .cmr file \
-                     appears later on the command line (the .cmr files must be \
-                     given in dependency order)"
-                    (Format_doc.compat Compilation_unit.print)
-                    paused.ui_unit
-                    (Format_doc.compat Compilation_unit.print)
-                    import_cu)
-              paused.ui_imports_cmx;
-            Compilation_unit.Set.add paused.ui_unit rebuilt)
-          Compilation_unit.Set.empty units
-      in
       let rebuild_unit =
         compile_from_reaped_flambda ~ltosol_file ~batch_members
       in
