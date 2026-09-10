@@ -1,0 +1,3028 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* Translation of primitives *)
+
+open Primitive
+open Typedtree
+open Typeopt
+open Lambda
+open Debuginfo.Scoped_location
+open Translmode
+
+module String = Misc.Stdlib.String
+
+type invalid_stack_primitive =
+  | Not_primitive
+  | Not_allocating
+  | Allocating_on_heap
+
+type error =
+  | Unknown_builtin_primitive of string
+  | Wrong_arity_builtin_primitive of string
+  | Wrong_layout_for_peek_or_poke of string
+  | Invalid_floatarray_glb
+  | Invalid_array_kind_for_uninitialized_makearray_dynamic
+  | Invalid_stack_primitive of invalid_stack_primitive
+  | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Element_would_be_reordered_in_record
+
+exception Error of Location.t * error
+
+let unboxed_product_uninitialized_array_check loc array_kind =
+  (* See comments in lambda_to_lambda_transforms.ml in Flambda 2 for more
+     details on this restriction. *)
+  match array_kind with
+  | Pgcignorableproductarray igns
+    when not (List.exists
+        Lambda.ignorable_product_element_kind_involves_int igns) -> ()
+  | Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+  | Punboxedvectorarray _ | Punboxedmaskarray ->
+    ()
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray
+  | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+    raise (Error (loc, Invalid_array_kind_for_uninitialized_makearray_dynamic))
+  | Punspecializedarray ->
+    Misc.fatal_error
+      "Translprim.unboxed_product_uninitialized_array_check: \
+       Punspecializedarray"
+
+(* Insertion of debugging events *)
+
+let event_before loc exp lam = match lam with
+| Lstaticraise (_,_) -> lam
+| _ ->
+  if !Clflags.debug && not !Clflags.native_code
+  then Levent(lam, {lev_loc = loc;
+                    lev_kind = Lev_before;
+                    lev_repr = None;
+                    lev_env = exp.exp_env})
+  else lam
+
+let event_after loc exp lam =
+  if !Clflags.debug && not !Clflags.native_code
+  then Levent(lam, {lev_loc = loc;
+                    lev_kind = Lev_after exp.exp_type;
+                    lev_repr = None;
+                    lev_env = exp.exp_env})
+  else lam
+
+type comparison =
+  | Equal
+  | Not_equal
+  | Less_equal
+  | Less_than
+  | Greater_equal
+  | Greater_than
+  | Compare
+
+type comparison_kind =
+  | Compare_generic
+  | Compare_ints
+  | Compare_floats
+  | Compare_float32s
+  | Compare_strings
+  | Compare_bytes
+  | Compare_nativeints
+  | Compare_int32s
+  | Compare_int64s
+
+type loc_kind =
+  | Loc_FILE
+  | Loc_LINE
+  | Loc_MODULE
+  | Loc_LOC
+  | Loc_POS
+  | Loc_FUNCTION
+
+type atomic_field_kind =
+  | Ref   (* operation on an atomic reference (takes only a pointer) *)
+  | Field (* operation on an atomic field (takes a pointer and an offset) *)
+  | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
+
+type atomic_idx_kind =
+  | Idx (* operation on an idx_atomic (takes a pointer and an idx) *)
+  | Ptr (* operation on an atomic ptr (takes an unboxed (pointer, idx) pair) *)
+
+type atomic_kind =
+  | Field_like of atomic_field_kind * immediate_or_pointer
+  | Idx_like of atomic_idx_kind * layout
+
+type atomic_op =
+  | Load
+  | Set of modify_mode
+  | Exchange of modify_mode
+  | Compare_exchange of modify_mode
+  | Compare_and_set of modify_mode
+  | Fetch_add
+  | Add
+  | Sub
+  | Land
+  | Lor
+  | Lxor
+
+
+type prim =
+  | Primitive of Lambda.primitive * int
+  | External of Lambda.external_call_description
+  | Sys_argv
+  | Comparison of comparison * comparison_kind
+  | Raise of Lambda.raise_kind
+  | Raise_with_backtrace
+  | Lazy_force of Lambda.region_close
+  | Loc of loc_kind
+  | Send of Lambda.region_close * Lambda.layout
+  | Send_self of Lambda.region_close * Lambda.layout
+  | Send_cache of Lambda.region_close * Lambda.layout
+  | Frame_pointers
+  | Identity
+  | Apply of Lambda.region_close * Lambda.layout
+  | Revapply of Lambda.region_close * Lambda.layout
+  | Atomic of atomic_op * atomic_kind
+  | Peek of Lambda.peek_or_poke option
+  | Poke of Lambda.peek_or_poke option
+    (* For [Peek] and [Poke] the [option] is [None] until the primitive
+       specialization code (below) has been run. *)
+  | Unsupported of Lambda.primitive [@warning "-unused-constructor"]
+
+let units_with_used_primitives = Hashtbl.create 7
+let add_used_primitive loc env path =
+  match path with
+    Some (Path.Pdot (path, _)) ->
+      let address = Env.find_module_address path env in
+      begin match Env.address_head address with
+      | AHunit cu ->
+          if not (Hashtbl.mem units_with_used_primitives cu)
+          then Hashtbl.add units_with_used_primitives cu loc
+      | AHlocal _ -> ()
+      end
+  | _ -> ()
+
+let clear_used_primitives () = Hashtbl.clear units_with_used_primitives
+let get_units_with_used_primitives () =
+  Hashtbl.fold (fun path _ acc -> path :: acc) units_with_used_primitives []
+
+(* For the [%obj_*] primitives, which re-use the array primitives but should
+   not be specialized, we resolve the array kind right away. *)
+let gen_array_kind =
+  if Config.flat_float_array then Pgenarray else Paddrarray
+
+let gen_array_ref_kind mode =
+  if Config.flat_float_array then Pgenarray_ref mode else Paddrarray_ref
+
+let gen_array_set_kind mode =
+  if Config.flat_float_array then Pgenarray_set mode else Paddrarray_set mode
+
+let prim_sys_argv =
+  Lambda.simple_prim_on_values ~name:"caml_sys_argv" ~arity:1 ~alloc:true
+
+let to_locality ~poly = function
+  | Prim_global, _ -> alloc_heap
+  | Prim_local, _ -> alloc_local
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some locality -> transl_locality_mode_l locality
+
+let to_modify_mode ~poly = function
+  | Prim_global, _ -> modify_heap
+  | Prim_local, _ -> modify_maybe_stack
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some mode -> transl_modify_mode mode
+
+let to_return_mode ~poly = function
+  | Prim_global, _ -> not_alloc_stack
+  | Prim_local, _ -> maybe_alloc_stack
+  | Prim_poly, _ ->
+    match poly with
+    | None -> assert false
+    | Some locality -> transl_return_mode_l locality
+
+let extern_repr_of_native_repr:
+  poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Lambda.extern_repr
+  = fun ~poly_sort r -> match r, poly_sort with
+  | Repr_poly, Some s ->
+    Same_as_ocaml_repr (Jkind.Sort.default_to_scannable_and_get s)
+  | Repr_poly, None -> Misc.fatal_error "Unexpected Repr_poly"
+  | Same_as_ocaml_repr s, _ -> Same_as_ocaml_repr s
+  | Unboxed_float f, _ -> Unboxed_float f
+  | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
+  | Unboxed_vector i, _ -> Unboxed_vector i
+  | Unboxed_mask, _ -> Unboxed_mask
+  | Unpacked_product sort, _ ->
+    (* The product sort is unarized into separate C arguments by
+       [unarize_extern_repr] in [closure_conversion.ml]. *)
+    Same_as_ocaml_repr sort
+
+let sort_of_native_repr ~poly_sort repr =
+  match extern_repr_of_native_repr ~poly_sort repr with
+  | Same_as_ocaml_repr s -> s
+  | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
+     Unboxed_vector _ | Unboxed_mask) ->
+    Jkind.Sort.Const.scannable
+
+let to_lambda_prim prim ~poly_sort =
+  let native_repr_args =
+    List.map
+    (fun (m, r) -> m, extern_repr_of_native_repr ~poly_sort r)
+      prim.prim_native_repr_args
+  in
+  let native_repr_res =
+    let (m, r) = prim.prim_native_repr_res in
+    m, extern_repr_of_native_repr ~poly_sort r
+  in
+  Primitive.make
+    ~name:prim.prim_name
+    ~alloc:prim.prim_alloc
+    ~c_builtin:prim.prim_c_builtin
+    ~effects:prim.prim_effects
+    ~coeffects:prim.prim_coeffects
+    ~native_name:prim.prim_native_name
+    ~native_repr_args
+    ~native_repr_res
+    ~is_layout_poly:prim.prim_is_layout_poly
+
+let bigstring_checks ~unsafe ~aligned size =
+  if unsafe
+  then None
+  else
+    let len =
+      match size with
+      | Boxed_vec128 -> 16
+      | Boxed_vec256 -> 32
+      | Boxed_vec512 -> 64
+    in
+    let align = if aligned then len else 0 in
+    Some (~len, ~align)
+
+let indexing_primitives =
+  let types_and_widths =
+    [
+      ( Printf.sprintf "%%caml_bigstring_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i8 { unsafe; index_kind; tagged } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_bigstring_get16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pbigstring_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bigstring_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_get32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getf32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_f32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_get64%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
+          Pbigstring_load_vec
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
+          Pbigstring_load_vec
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = true; boxed } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_32 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setf32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_f32 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_set64%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_64 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
+          Pbigstring_load_vec
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
+          Pbigstring_load_vec
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
+          Pbigstring_load_vec
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
+          Pbigstring_load_vec
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = false; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbigstring_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bigstring_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbigstring_set_mask { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i8 { unsafe; index_kind; tagged } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pbytes_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bytes_get32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getf32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_f32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_get64%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_64 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getu128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_vec { size = Boxed_vec128; unsafe;
+                            index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bytes_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bytes_set32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_32 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setf32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_f32 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_set64%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_64 { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setu128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_vec { size = Boxed_vec128; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_vec { size = Boxed_vec256; unsafe;
+                            index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_vec { size = Boxed_vec512; unsafe;
+                            index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_bytes_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pbytes_load_mask { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_bytes_setmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode:_ ->
+          Pbytes_set_mask { unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_string_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i8 { unsafe; index_kind; tagged } );
+      ( (fun unsafe _boxed index_kind ->
+          Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
+        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
+          Pstring_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_string_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_string_get32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getf32%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_f32 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_get64%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_64 { unsafe; index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getu128%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_vec { size = Boxed_vec128; unsafe;
+                             index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getu256%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_vec { size = Boxed_vec256; unsafe;
+                             index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getu512%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_vec { size = Boxed_vec512; unsafe;
+                             index_kind; mode; boxed } );
+      ( Printf.sprintf "%%caml_string_getmask%s%s%s",
+        fun ~unsafe ~boxed ~index_kind ~mode ->
+          Pstring_load_mask { unsafe; index_kind; mode; boxed } );
+      (* We encourage respecting the immutability of [string]s and so do not add
+         new [string] setters. However, we keep existing setting primitives for
+         upstream compatibility. *)
+      ( (fun unsafe _boxed _index_kind ->
+          Printf.sprintf "%%caml_string_set16%s" unsafe),
+        fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
+          Pbytes_set_16
+            { unsafe; index_kind = Ptagged_int_index; tagged = true } );
+      ( (fun unsafe _boxed _index_kind ->
+          Printf.sprintf "%%caml_string_set32%s" unsafe ),
+        fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
+          Pbytes_set_32
+            { unsafe; index_kind = Ptagged_int_index; boxed = true } ) ;
+      ( (fun unsafe _boxed _index_kind ->
+          Printf.sprintf "%%caml_string_set64%s" unsafe ),
+        fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
+          Pbytes_set_64
+            { unsafe; index_kind = Ptagged_int_index; boxed = true } )
+    ]
+  in
+  let index_kinds =
+    [
+      (Ptagged_int_index, "");
+      (Punboxed_or_untagged_integer_index Unboxed_nativeint,
+       "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
+      (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
+      (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
+    ]
+  in
+  (let ( let* ) x f = List.concat_map f x in
+   let* string_gen, primitive_gen = types_and_widths in
+   let* index_kind, index_kind_sigil = index_kinds in
+   let* unsafe, unsafe_sigil = [ (true, "u"); (false, "") ] in
+   let* boxed, boxed_sigil = [ (true, ""); (false, "#") ] in
+   let string = string_gen unsafe_sigil boxed_sigil index_kind_sigil in
+   let primitive = primitive_gen ~unsafe ~boxed ~index_kind in
+   let arity = if String.is_substring string ~substring:"get" then 2 else 3 in
+   [ (string, fun ~mode -> Primitive (primitive ~mode, arity)) ])
+  |> List.to_seq
+  |> String.Map.of_seq
+
+let array_vec_primitives =
+  let array_types_and_primitives =
+    [
+      ("floatarray",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Pfloatarray_set_vec { size; unsafe; index_kind; boxed }));
+      ("unboxed_float_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("unboxed_float32_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_float32_array_load_vec { size; unsafe; index_kind;
+                                           mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("int_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Pint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Pint_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("unboxed_int64_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int64_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("unboxed_int32_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_int32_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int16_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int16_array_load_vec { size; unsafe; index_kind;
+                                          mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int8_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int8_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("unboxed_nativeint_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
+                                             mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Punboxed_nativeint_array_set_vec { size; unsafe; index_kind; boxed }));
+    ]
+  in
+  let vec_sizes = [
+    ("128", Boxed_vec128);
+    ("256", Boxed_vec256);
+    ("512", Boxed_vec512);
+  ] in
+  let index_kinds =
+    [
+      (Ptagged_int_index, "");
+      (Punboxed_or_untagged_integer_index Unboxed_nativeint,
+       "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
+      (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
+      (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
+    ]
+  in
+  (let ( let* ) x f = List.concat_map f x in
+   let* array_type, load_prim, set_prim = array_types_and_primitives in
+   let* size_str, size = vec_sizes in
+   let* index_kind, index_kind_sigil = index_kinds in
+   let* unsafe, unsafe_sigil = [ (false, ""); (true, "u") ] in
+   let* boxed, boxed_sigil = [ (true, ""); (false, "#") ] in
+   [
+     (Printf.sprintf "%%caml_%s_get%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
+      fun ~mode ->
+        Primitive (load_prim ~size ~unsafe ~index_kind ~mode ~boxed, 2));
+     (Printf.sprintf "%%caml_%s_set%s%s%s%s" array_type size_str unsafe_sigil
+        boxed_sigil index_kind_sigil,
+      fun ~mode:_ -> Primitive (set_prim ~size ~unsafe ~index_kind ~boxed, 3))
+   ])
+  |> List.to_seq
+  |> String.Map.of_seq
+
+(* Resolve a primitive according to its name. The return value is unspecialized
+   in the sense that the array kind in the various primitives that deal with
+   arrays is set to [Punspecializedarray{,_ref,set}]. The caller is meant to
+   then specialize the array kind based on the context.
+*)
+let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
+  let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
+  let arg_modes =
+    List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
+  in
+  let get_first_arg_mode () =
+    match arg_modes with
+    | mode :: _ -> mode
+    | [] ->
+        Misc.fatal_errorf "Primitive \"%s\" unexpectedly had zero arguments"
+          p.prim_name
+  in
+  let get_third_arg_mode () =
+    match arg_modes with
+    | _ :: _ :: mode :: _ -> mode
+    | _ ->
+        Misc.fatal_errorf "Primitive \"%s\" unexpectedly had fewer than three \
+                           arguments"
+          p.prim_name
+  in
+  let lambda_prim = to_lambda_prim p ~poly_sort in
+  let layout =
+    (* Extract the result layout of the primitive.  This can be a non-value
+       layout even without the use of [@layout_poly]. For example:
+
+       {[ external id : float# -> float# = "%opaque" ]}
+
+       We don't allow non-value layouts for most primitives. This is checked by
+       [prim_has_valid_reprs] in [typing/primitive.ml]. *)
+    let (_, repr) = lambda_prim.prim_native_repr_res in
+    Lambda.layout_of_extern_repr repr
+  in
+  let int : _ Scalar.Integral.t = Value (Taggable Int) in
+  let int8 : _ Scalar.Integral.t = Value (Taggable Int8) in
+  let int16 : _ Scalar.Integral.t = Value (Taggable Int16) in
+  let int32 : _ Scalar.Integral.t = Value (Boxable (Int32 mode)) in
+  let int64 : _ Scalar.Integral.t = Value (Boxable (Int64 mode)) in
+  let nativeint : _ Scalar.Integral.t = Value (Boxable (Nativeint mode)) in
+  let float : _ Scalar.Floating.t = Value (Float64 mode) in
+  let float32 : _ Scalar.Floating.t = Value (Float32 mode) in
+  let unary op : prim = Primitive (Pscalar (Unary op), 1) in
+  let binary op : prim = Primitive (Pscalar (Binary op), 2) in
+  let icmp size cmp =
+    binary (Icmp (Scalar.Integral.ignore_locality size, cmp))
+  in
+  let fcmp size cmp =
+    binary (Fcmp (Scalar.Floating.ignore_locality size, cmp))
+  in
+  let naked scalar = Scalar.naked (Scalar.width scalar) in
+  let static_cast ~src ~dst =
+    let src = Scalar.ignore_locality src in
+    unary (Static_cast { src; dst })
+  in
+  let i = Scalar.integral in
+  let f = Scalar.floating in
+  let get_arg_layouts () =
+    List.map
+      (fun (_, repr) -> Lambda.layout_of_extern_repr repr)
+      lambda_prim.prim_native_repr_args
+  in
+  let int_layout = Pvalue { raw_kind = Pintval; nullable = Non_nullable } in
+  let prim = match p.prim_name with
+    | "%identity" -> Identity
+    | "%bytes_to_string" -> Primitive (Pbytes_to_string, 1)
+    | "%bytes_of_string" -> Primitive (Pbytes_of_string, 1)
+    | "%ignore" -> Primitive (Pignore, 1)
+    | "%revapply" -> Revapply (pos, layout)
+    | "%apply" -> Apply (pos, layout)
+    | "%loc_LOC" -> Loc Loc_LOC
+    | "%loc_FILE" -> Loc Loc_FILE
+    | "%loc_LINE" -> Loc Loc_LINE
+    | "%loc_POS" -> Loc Loc_POS
+    | "%loc_MODULE" -> Loc Loc_MODULE
+    | "%loc_FUNCTION" -> Loc Loc_FUNCTION
+    | "%field0" -> Primitive (Pfield (0, Pointer, Reads_vary), 1)
+    | "%field1" -> Primitive (Pfield (1, Pointer, Reads_vary), 1)
+    | "%field0_immut" -> Primitive ((Pfield (0, Pointer, Reads_agree)), 1)
+    | "%field1_immut" -> Primitive ((Pfield (1, Pointer, Reads_agree)), 1)
+    | "%setfield0" ->
+       let mode = get_first_arg_mode () in
+       Primitive ((Psetfield(0, Pointer, Assignment mode)), 2)
+    | "%setfield1" ->
+       let mode = get_first_arg_mode () in
+       Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
+    | "%makeblock" ->
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+    | "%makemutable" ->
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+    | "%raise" -> Raise Raise_regular
+    | "%reraise" -> Raise Raise_reraise
+    | "%raise_notrace" -> Raise Raise_notrace
+    | "%raise_with_backtrace" -> Raise_with_backtrace
+    | "%sequand" -> Primitive (Psequand, 2)
+    | "%sequor" -> Primitive (Psequor, 2)
+    | "%boolnot" -> Primitive (Pnot, 1)
+    | "%big_endian" -> Primitive ((Pctconst Big_endian), 1)
+    | "%backend_type" -> Primitive ((Pctconst Backend_type), 1)
+    | "%word_size" -> Primitive ((Pctconst Word_size), 1)
+    | "%int_size" -> Primitive ((Pctconst Int_size), 1)
+    | "%max_wosize" -> Primitive ((Pctconst Max_wosize), 1)
+    | "%ostype_unix" -> Primitive ((Pctconst Ostype_unix), 1)
+    | "%ostype_win32" -> Primitive ((Pctconst Ostype_win32), 1)
+    | "%ostype_cygwin" -> Primitive ((Pctconst Ostype_cygwin), 1)
+    | "%runtime5" -> Primitive ((Pctconst Runtime5), 1)
+    | "%arch_amd64" -> Primitive ((Pctconst Arch_amd64), 1)
+    | "%arch_arm64" -> Primitive ((Pctconst Arch_arm64), 1)
+    | "%frame_pointers" -> Frame_pointers
+    | "%negint" -> unary (Integral (int, Neg))
+    | "%succint" -> unary (Integral (int, Succ))
+    | "%predint" -> unary (Integral (int, Pred))
+    | "%addint" -> binary (Integral (int, Add))
+    | "%subint" -> binary (Integral (int, Sub))
+    | "%mulint" -> binary (Integral (int, Mul))
+    | "%divint" -> binary (Integral (int, Div (Safe, Signed)))
+    | "%modint" -> binary (Integral (int, Mod (Safe, Signed)))
+    | "%andint" -> binary (Integral (int, And))
+    | "%orint" -> binary (Integral (int, Or))
+    | "%xorint" -> binary (Integral (int, Xor))
+    | "%lslint" -> binary (Shift (int, Lsl, Int))
+    | "%lsrint" -> binary (Shift (int, Lsr, Int))
+    | "%asrint" -> binary (Shift (int, Asr, Int))
+    | "%eq" ->  Primitive (Pphys_equal Eq, 2)
+    | "%noteq" -> Primitive (Pphys_equal Noteq, 2)
+    | "%ltint" -> icmp int Clt
+    | "%leint" -> icmp int Cle
+    | "%gtint" -> icmp int Cgt
+    | "%geint" -> icmp int Cge
+    | "%incr" -> Primitive ((Poffsetref(1)), 1)
+    | "%decr" -> Primitive ((Poffsetref(-1)), 1)
+    | "%floatoffloat32" -> static_cast ~dst:(f float) ~src:(f float32)
+    | "%float32offloat" -> static_cast ~dst:(f float32) ~src:(f float)
+    | "%intoffloat32" -> static_cast ~dst:(i int) ~src:(f float32)
+    | "%float32ofint" -> static_cast ~dst:(f float32) ~src:(i int)
+    | "%negfloat32" -> unary (Floating (float32, Neg))
+    | "%absfloat32" -> unary (Floating (float32, Abs))
+    | "%addfloat32" -> binary (Floating (float32, Add))
+    | "%subfloat32" -> binary (Floating (float32, Sub))
+    | "%mulfloat32" -> binary (Floating (float32, Mul))
+    | "%divfloat32" -> binary (Floating (float32, Div))
+    | "%eqfloat32" -> fcmp float32 CFeq
+    | "%noteqfloat32" -> fcmp float32 CFneq
+    | "%ltfloat32" -> fcmp float32 CFlt
+    | "%lefloat32" -> fcmp float32 CFle
+    | "%gtfloat32" -> fcmp float32 CFgt
+    | "%gefloat32" -> fcmp float32 CFge
+    | "%intoffloat" -> static_cast ~dst:(i int) ~src:(f float)
+    | "%floatofint" -> static_cast ~dst:(f float) ~src:(i int)
+    | "%negfloat" -> unary (Floating (float, Neg))
+    | "%absfloat" -> unary (Floating (float, Abs))
+    | "%addfloat" -> binary (Floating (float, Add))
+    | "%subfloat" -> binary (Floating (float, Sub))
+    | "%mulfloat" -> binary (Floating (float, Mul))
+    | "%divfloat" -> binary (Floating (float, Div))
+    | "%eqfloat" -> fcmp float CFeq
+    | "%noteqfloat" -> fcmp float CFneq
+    | "%ltfloat" -> fcmp float CFlt
+    | "%lefloat" -> fcmp float CFle
+    | "%gtfloat" -> fcmp float CFgt
+    | "%gefloat" -> fcmp float CFge
+    | "%string_length" -> Primitive (Pstringlength, 1)
+    | "%string_safe_get" -> Primitive (Pstringrefs, 2)
+    | "%string_safe_set" -> Primitive (Pbytessets, 3)
+    | "%string_unsafe_get" -> Primitive (Pstringrefu, 2)
+    | "%string_unsafe_set" -> Primitive (Pbytessetu, 3)
+    | "%bytes_length" -> Primitive (Pbyteslength, 1)
+    | "%bytes_safe_get" -> Primitive (Pbytesrefs, 2)
+    | "%bytes_safe_set" -> Primitive (Pbytessets, 3)
+    | "%bytes_unsafe_get" -> Primitive (Pbytesrefu, 2)
+    | "%bytes_unsafe_set" -> Primitive (Pbytessetu, 3)
+    | "%array_length" -> Primitive ((Parraylength Punspecializedarray), 1)
+    | "%array_safe_get" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Ptagged_int_index, Mutable)), 2)
+    | "%array_safe_set" ->
+      Primitive
+        (Parraysets (Punspecializedarray_set (get_first_arg_mode ()),
+                     Ptagged_int_index),
+         3)
+    | "%array_unsafe_get" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Ptagged_int_index, Mutable), 2)
+    | "%array_unsafe_set" ->
+      Primitive
+        ((Parraysetu (Punspecializedarray_set (get_first_arg_mode ()),
+                      Ptagged_int_index)),
+        3)
+    | "%array_safe_get_indexed_by_int64#" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Punboxed_or_untagged_integer_index Unboxed_int64,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int64#" ->
+      Primitive
+        (Parraysets
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int64),
+         3)
+    | "%array_unsafe_get_indexed_by_int64#" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Punboxed_or_untagged_integer_index Unboxed_int64,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int64#" ->
+      Primitive
+        ((Parraysetu
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int64)),
+        3)
+    | "%array_safe_get_indexed_by_int32#" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Punboxed_or_untagged_integer_index Unboxed_int32,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int32#" ->
+      Primitive
+        (Parraysets
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int32),
+         3)
+    | "%array_unsafe_get_indexed_by_int32#" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Punboxed_or_untagged_integer_index Unboxed_int32,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int32#" ->
+      Primitive
+        ((Parraysetu
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_int32)),
+        3)
+    | "%array_safe_get_indexed_by_int16#" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Punboxed_or_untagged_integer_index Untagged_int16,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int16#" ->
+      Primitive
+        (Parraysets
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int16),
+         3)
+    | "%array_unsafe_get_indexed_by_int16#" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Punboxed_or_untagged_integer_index Untagged_int16,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int16#" ->
+      Primitive
+        ((Parraysetu
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int16)),
+        3)
+    | "%array_safe_get_indexed_by_int8#" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Punboxed_or_untagged_integer_index Untagged_int8,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_int8#" ->
+      Primitive
+        (Parraysets
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int8),
+         3)
+    | "%array_unsafe_get_indexed_by_int8#" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Punboxed_or_untagged_integer_index Untagged_int8,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_int8#" ->
+      Primitive
+        ((Parraysetu
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Untagged_int8)),
+        3)
+    | "%array_safe_get_indexed_by_nativeint#" ->
+      Primitive
+        ((Parrayrefs (Punspecializedarray_ref mode,
+                      Punboxed_or_untagged_integer_index Unboxed_nativeint,
+                      Mutable)), 2)
+    | "%array_safe_set_indexed_by_nativeint#" ->
+      Primitive
+        (Parraysets
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_nativeint),
+         3)
+    | "%array_unsafe_get_indexed_by_nativeint#" ->
+      Primitive
+        (Parrayrefu (Punspecializedarray_ref mode,
+                     Punboxed_or_untagged_integer_index Unboxed_nativeint,
+                     Mutable), 2)
+    | "%array_unsafe_set_indexed_by_nativeint#" ->
+      Primitive
+        ((Parraysetu
+          (Punspecializedarray_set (get_first_arg_mode ()),
+           Punboxed_or_untagged_integer_index Unboxed_nativeint)),
+        3)
+    | "%makearray_dynamic" ->
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, With_initializer), 2)
+    | "%makearray_dynamic_uninit" ->
+      Primitive
+        (Pmakearray_dynamic (Punspecializedarray, mode, Uninitialized), 1)
+    | "%arrayblit" ->
+      Primitive (Parrayblit {
+        src_mutability = Mutable;
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
+      }, 5);
+    | "%arrayblit_src_immut" ->
+      Primitive (Parrayblit {
+        src_mutability = Immutable;
+        dst_array_set_kind = Punspecializedarray_set (get_third_arg_mode ())
+      }, 5);
+    | "%array_element_size_in_bytes" ->
+      (* The array kind will be filled in later *)
+      Primitive (Parray_element_size_in_bytes Punspecializedarray, 1)
+    | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
+    | "%obj_field" ->
+      Primitive
+        ((Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
+    | "%obj_set_field" ->
+      Primitive
+        ((Parraysetu
+            (gen_array_set_kind (get_first_arg_mode ()),Ptagged_int_index)), 3)
+    | "%floatarray_length" -> Primitive ((Parraylength Pfloatarray), 1)
+    | "%floatarray_safe_get" ->
+      Primitive ((Parrayrefs (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
+    | "%floatarray_safe_set" ->
+      Primitive (Parraysets (Pfloatarray_set, Ptagged_int_index), 3)
+    | "%floatarray_unsafe_get" ->
+      Primitive ((Parrayrefu (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
+    | "%floatarray_unsafe_set" ->
+      Primitive ((Parraysetu (Pfloatarray_set, Ptagged_int_index)), 3)
+    | "%obj_is_int" -> Primitive (Pisint { variant_only = false }, 1)
+    | "%is_null" -> Primitive (Pisnull, 1)
+    | "%lazy_force" -> Lazy_force pos
+    | "%nativeint_of_int" -> static_cast ~dst:(i nativeint) ~src:(i int)
+    | "%nativeint_to_int" -> static_cast ~src:(i nativeint) ~dst:(i int)
+    | "%nativeint_neg" -> unary (Integral (nativeint, Neg))
+    | "%nativeint_add" -> binary (Integral (nativeint, Add))
+    | "%nativeint_sub" -> binary (Integral (nativeint, Sub))
+    | "%nativeint_mul" -> binary (Integral (nativeint, Mul))
+    | "%nativeint_div" -> binary (Integral (nativeint, Div (Safe, Signed)))
+    | "%nativeint_mod" -> binary (Integral (nativeint, Mod (Safe, Signed)))
+    | "%nativeint_and" -> binary (Integral (nativeint, And))
+    | "%nativeint_or" -> binary (Integral (nativeint, Or))
+    | "%nativeint_xor" -> binary (Integral (nativeint, Xor))
+    | "%nativeint_lsl" -> binary (Shift (nativeint, Lsl, Int))
+    | "%nativeint_lsr" -> binary (Shift (nativeint, Lsr, Int))
+    | "%nativeint_asr" -> binary (Shift (nativeint, Asr, Int))
+    | "%int32_of_int" -> static_cast ~dst:(i int32) ~src:(i int)
+    | "%int32_to_int" -> static_cast ~src:(i int32) ~dst:(i int)
+    | "%int32_neg" -> unary (Integral (int32, Neg))
+    | "%int32_add" -> binary (Integral (int32, Add))
+    | "%int32_sub" -> binary (Integral (int32, Sub))
+    | "%int32_mul" -> binary (Integral (int32, Mul))
+    | "%int32_div" -> binary (Integral (int32, Div (Safe, Signed)))
+    | "%int32_mod" -> binary (Integral (int32, Mod (Safe, Signed)))
+    | "%int32_and" -> binary (Integral (int32, And))
+    | "%int32_or" -> binary (Integral (int32, Or))
+    | "%int32_xor" -> binary (Integral (int32, Xor))
+    | "%int32_lsl" -> binary (Shift (int32, Lsl, Int))
+    | "%int32_lsr" -> binary (Shift (int32, Lsr, Int))
+    | "%int32_asr" -> binary (Shift (int32, Asr, Int))
+    | "%int64_of_int" -> static_cast ~dst:(i int64) ~src:(i int)
+    | "%int64_to_int" -> static_cast ~src:(i int64) ~dst:(i int)
+    | "%int64_neg" -> unary (Integral (int64, Neg))
+    | "%int64_add" -> binary (Integral (int64, Add))
+    | "%int64_sub" -> binary (Integral (int64, Sub))
+    | "%int64_mul" -> binary (Integral (int64, Mul))
+    | "%int64_div" -> binary (Integral (int64, Div (Safe, Signed)))
+    | "%int64_mod" -> binary (Integral (int64, Mod (Safe, Signed)))
+    | "%int64_and" -> binary (Integral (int64, And))
+    | "%int64_or" -> binary (Integral (int64, Or))
+    | "%int64_xor" -> binary (Integral (int64, Xor))
+    | "%int64_lsl" -> binary (Shift (int64, Lsl, Int))
+    | "%int64_lsr" -> binary (Shift (int64, Lsr, Int))
+    | "%int64_asr" -> binary (Shift (int64, Asr, Int))
+    | "%nativeint_of_int32" -> static_cast ~dst:(i nativeint) ~src:(i int32)
+    | "%nativeint_to_int32" -> static_cast ~src:(i nativeint) ~dst:(i int32)
+    | "%int64_of_int32" -> static_cast ~dst:(i int64) ~src:(i int32)
+    | "%int64_to_int32" -> static_cast ~src:(i int64) ~dst:(i int32)
+    | "%int64_of_nativeint" -> static_cast ~dst:(i int64) ~src:(i nativeint)
+    | "%int64_to_nativeint" -> static_cast ~src:(i int64) ~dst:(i nativeint)
+    | "%caml_ba_ref_1" ->
+      Primitive
+        ((Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         2);
+    | "%caml_ba_ref_2" ->
+      Primitive
+        ((Pbigarrayref(false, 2, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_ref_3" ->
+      Primitive
+        ((Pbigarrayref(false, 3, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_set_1" ->
+      Primitive
+        ((Pbigarrayset(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_set_2" ->
+      Primitive
+        ((Pbigarrayset(false, 2, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_set_3" ->
+      Primitive
+        ((Pbigarrayset(false, 3, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         5);
+    | "%caml_ba_unsafe_ref_1" ->
+      Primitive
+        ((Pbigarrayref(true, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         2);
+    | "%caml_ba_unsafe_ref_2" ->
+      Primitive
+        ((Pbigarrayref(true, 2, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_unsafe_ref_3" ->
+      Primitive
+        ((Pbigarrayref(true, 3, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_unsafe_set_1" ->
+      Primitive
+        ((Pbigarrayset(true, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_unsafe_set_2" ->
+      Primitive
+        ((Pbigarrayset(true, 2, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_unsafe_set_3" ->
+      Primitive
+        ((Pbigarrayset(true, 3, Pbigarray_unknown, Pbigarray_unknown_layout)),
+         5);
+    | "%caml_ba_float32_ref_1" ->
+      Primitive
+        ((Pbigarrayref(false, 1, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         2);
+    | "%caml_ba_float32_ref_2" ->
+      Primitive
+        ((Pbigarrayref(false, 2, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_float32_ref_3" ->
+      Primitive
+        ((Pbigarrayref(false, 3, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_float32_set_1" ->
+      Primitive
+        ((Pbigarrayset(false, 1, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_float32_set_2" ->
+      Primitive
+        ((Pbigarrayset(false, 2, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_float32_set_3" ->
+      Primitive
+        ((Pbigarrayset(false, 3, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         5);
+    | "%caml_ba_float32_unsafe_ref_1" ->
+      Primitive
+        ((Pbigarrayref(true, 1, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         2);
+    | "%caml_ba_float32_unsafe_ref_2" ->
+      Primitive
+        ((Pbigarrayref(true, 2, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_float32_unsafe_ref_3" ->
+      Primitive
+        ((Pbigarrayref(true, 3, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_float32_unsafe_set_1" ->
+      Primitive
+        ((Pbigarrayset(true, 1, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         3);
+    | "%caml_ba_float32_unsafe_set_2" ->
+      Primitive
+        ((Pbigarrayset(true, 2, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         4);
+    | "%caml_ba_float32_unsafe_set_3" ->
+      Primitive
+        ((Pbigarrayset(true, 3, Pbigarray_float32_t, Pbigarray_unknown_layout)),
+         5);
+    | "%caml_ba_dim_1" -> Primitive ((Pbigarraydim(1)), 1)
+    | "%caml_ba_dim_2" -> Primitive ((Pbigarraydim(2)), 1)
+    | "%caml_ba_dim_3" -> Primitive ((Pbigarraydim(3)), 1)
+    | "%bswap16" -> unary (Integral (int, Bswap))
+    | "%bswap_int32" -> unary (Integral (int32, Bswap))
+    | "%bswap_int64" -> unary (Integral (int64, Bswap))
+    | "%bswap_native" -> unary (Integral (nativeint, Bswap))
+    | "%int_as_pointer" -> Primitive (Pint_as_pointer mode, 1)
+    | "%opaque" -> Primitive (Popaque layout, 1)
+    | "%sys_argv" -> Sys_argv
+    | "%send" -> Send (pos, layout)
+    | "%sendself" -> Send_self (pos, layout)
+    | "%sendcache" -> Send_cache (pos, layout)
+    | "%equal" -> Comparison(Equal, Compare_generic)
+    | "%notequal" -> Comparison(Not_equal, Compare_generic)
+    | "%lessequal" -> Comparison(Less_equal, Compare_generic)
+    | "%lessthan" -> Comparison(Less_than, Compare_generic)
+    | "%greaterequal" -> Comparison(Greater_equal, Compare_generic)
+    | "%greaterthan" -> Comparison(Greater_than, Compare_generic)
+    | "%compare" -> Comparison(Compare, Compare_generic)
+    | "%obj_dup" -> Primitive(Pobj_dup, 1)
+    | "%obj_magic" -> Primitive(Pobj_magic layout, 1)
+    | "%array_to_iarray" -> Primitive (Parray_to_iarray, 1)
+    | "%array_of_iarray" -> Primitive (Parray_of_iarray, 1)
+    | "%unbox_float" -> static_cast ~src:(f float) ~dst:(naked (f float))
+    | "%box_float" -> static_cast ~src:(naked (f float)) ~dst:(f float)
+    | "%unbox_float32" -> static_cast ~src:(f float32) ~dst:(naked (f float32))
+    | "%box_float32" -> static_cast ~src:(naked (f float32)) ~dst:(f float32)
+    | "%unbox_vec128" -> Primitive(Punbox_vector Boxed_vec128, 1)
+    | "%box_vec128" -> Primitive(Pbox_vector (Boxed_vec128, mode), 1)
+    | "%unbox_vec256" -> Primitive(Punbox_vector Boxed_vec256, 1)
+    | "%box_vec256" -> Primitive(Pbox_vector (Boxed_vec256, mode), 1)
+    | "%join_vec256" -> Primitive(Pjoin_vec256, 2)
+    | "%split_vec256" -> Primitive(Psplit_vec256, 1)
+    | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
+    | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%unbox_mask" -> Primitive(Punbox_mask, 1)
+    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
+    | "%get_header" -> Primitive (Pget_header mode, 1)
+    | "%atomic_load" -> Atomic(Load, Field_like (Ref, Pointer))
+    | "%atomic_load_field" -> Atomic(Load, Field_like (Field, Pointer))
+    | "%atomic_load_loc" -> Atomic(Load, Field_like (Loc, Pointer))
+    | "%atomic_load_idx" -> Atomic(Load, Idx_like (Idx, layout))
+    | "%unsafe_atomic_load_ptr" -> Atomic(Load, Idx_like (Ptr, layout))
+    | "%atomic_set" ->
+      Atomic(Set (get_first_arg_mode ()), Field_like (Ref, Pointer))
+    | "%atomic_set_field" ->
+      Atomic(Set (get_first_arg_mode ()), Field_like (Field, Pointer))
+    | "%atomic_set_loc" ->
+      Atomic(Set (get_first_arg_mode ()), Field_like (Loc, Pointer))
+    | "%atomic_set_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Set (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_set_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Set (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%atomic_exchange" ->
+      Atomic(Exchange (get_first_arg_mode ()), Field_like (Ref, Pointer))
+    | "%atomic_exchange_field" ->
+      Atomic(Exchange (get_first_arg_mode ()), Field_like (Field, Pointer))
+    | "%atomic_exchange_loc" ->
+      Atomic(Exchange (get_first_arg_mode ()), Field_like (Loc, Pointer))
+    | "%atomic_exchange_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Exchange (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_exchange_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Exchange (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%atomic_compare_exchange" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()),
+             Field_like (Ref, Pointer))
+    | "%atomic_compare_exchange_field" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()),
+             Field_like (Field, Pointer))
+    | "%atomic_compare_exchange_loc" ->
+      Atomic(Compare_exchange (get_first_arg_mode ()),
+             Field_like (Loc, Pointer))
+    | "%atomic_compare_exchange_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Compare_exchange (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_compare_exchange_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_exchange (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%atomic_cas" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Field_like (Ref, Pointer))
+    | "%atomic_cas_field" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()),
+             Field_like (Field, Pointer))
+    | "%atomic_cas_loc" ->
+      Atomic(Compare_and_set (get_first_arg_mode ()), Field_like (Loc, Pointer))
+    | "%atomic_cas_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Atomic(Compare_and_set (get_first_arg_mode ()), Idx_like (Idx, layout))
+    | "%unsafe_atomic_cas_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Atomic(Compare_and_set (get_first_arg_mode ()), Idx_like (Ptr, layout))
+    | "%atomic_fetch_add" -> Atomic(Fetch_add, Field_like (Ref, Immediate))
+    | "%atomic_fetch_add_field" ->
+      Atomic(Fetch_add, Field_like (Field, Immediate))
+    | "%atomic_fetch_add_loc" -> Atomic(Fetch_add, Field_like (Loc, Immediate))
+    | "%atomic_fetch_add_idx" ->
+      Atomic(Fetch_add, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_fetch_add_ptr" ->
+      Atomic(Fetch_add, Idx_like (Ptr, int_layout))
+    | "%atomic_add" -> Atomic(Add, Field_like (Ref, Immediate))
+    | "%atomic_add_field" -> Atomic(Add, Field_like (Field, Immediate))
+    | "%atomic_add_loc" -> Atomic(Add, Field_like (Loc, Immediate))
+    | "%atomic_add_idx" ->
+      Atomic(Add, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_add_ptr" ->
+      Atomic(Add, Idx_like (Ptr, int_layout))
+    | "%atomic_sub" -> Atomic(Sub, Field_like (Ref, Immediate))
+    | "%atomic_sub_field" -> Atomic(Sub, Field_like (Field, Immediate))
+    | "%atomic_sub_loc" -> Atomic(Sub, Field_like (Loc, Immediate))
+    | "%atomic_sub_idx" ->
+      Atomic(Sub, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_sub_ptr" ->
+      Atomic(Sub, Idx_like (Ptr, int_layout))
+    | "%atomic_land" -> Atomic(Land, Field_like (Ref, Immediate))
+    | "%atomic_land_field" -> Atomic(Land, Field_like (Field, Immediate))
+    | "%atomic_land_loc" -> Atomic(Land, Field_like (Loc, Immediate))
+    | "%atomic_land_idx" ->
+      Atomic(Land, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_land_ptr" ->
+      Atomic(Land, Idx_like (Ptr, int_layout))
+    | "%atomic_lor" -> Atomic(Lor, Field_like (Ref, Immediate))
+    | "%atomic_lor_field" -> Atomic(Lor, Field_like (Field, Immediate))
+    | "%atomic_lor_loc" -> Atomic(Lor, Field_like (Loc, Immediate))
+    | "%atomic_lor_idx" ->
+      Atomic(Lor, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_lor_ptr" ->
+      Atomic(Lor, Idx_like (Ptr, int_layout))
+    | "%atomic_lxor" -> Atomic(Lxor, Field_like (Ref, Immediate))
+    | "%atomic_lxor_field" -> Atomic(Lxor, Field_like (Field, Immediate))
+    | "%atomic_lxor_loc" -> Atomic(Lxor, Field_like (Loc, Immediate))
+    | "%atomic_lxor_idx" ->
+      Atomic(Lxor, Idx_like (Idx, int_layout))
+    | "%unsafe_atomic_lxor_ptr" ->
+      Atomic(Lxor, Idx_like (Ptr, int_layout))
+    | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
+    | "%with_stack" -> Primitive (Pwith_stack, 5)
+    | "%with_stack_preemptible" -> Primitive (Pwith_stack_preemptible, 6)
+    | "%reperform" -> Primitive (Preperform, 3)
+    | "%perform" -> Primitive (Pperform, 1)
+    | "%continue" -> Primitive (Pcontinue, 2)
+    | "%discontinue" -> Primitive (Pdiscontinue, 2)
+    | "%discontinue_with_backtrace" ->
+      Primitive (Pdiscontinue_with_backtrace, 3)
+    | "%dls_get" -> Primitive (Pdls_get, 1)
+    | "%tls_get" -> Primitive (Ptls_get, 1)
+    | "%domain_index" -> Primitive (Pdomain_index, 1)
+    | "%poll" -> Primitive (Ppoll, 1)
+    | "%unbox_nativeint" ->
+      static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
+    | "%box_nativeint" ->
+      static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
+    | "%untag_int" -> static_cast ~src:(i int) ~dst:(naked (i int))
+    | "%tag_int" -> static_cast ~src:(naked (i int)) ~dst:(i int)
+    | "%untag_int8" -> static_cast ~src:(i int8) ~dst:(naked (i int8))
+    | "%tag_int8" -> static_cast ~src:(naked (i int8)) ~dst:(i int8)
+    | "%untag_int16" -> static_cast ~src:(i int16) ~dst:(naked (i int16))
+    | "%tag_int16" -> static_cast ~src:(naked (i int16)) ~dst:(i int16)
+    | "%unbox_int32" -> static_cast ~src:(i int32) ~dst:(naked (i int32))
+    | "%box_int32" -> static_cast ~src:(naked (i int32)) ~dst:(i int32)
+    | "%unbox_int64" -> static_cast ~src:(i int64) ~dst:(naked (i int64))
+    | "%box_int64" -> static_cast ~src:(naked (i int64)) ~dst:(i int64)
+    | "%unbox_unit" -> Primitive(Punbox_unit, 1)
+    | "%reinterpret_tagged_int63_as_unboxed_int64" ->
+      Primitive(Preinterpret_tagged_int63_as_unboxed_int64, 1)
+    | "%reinterpret_unboxed_int64_as_tagged_int63" ->
+      Primitive(Preinterpret_unboxed_int64_as_tagged_int63, 1)
+    | "%get_idx_imm" ->
+      (* This primitive requires the indexed data to be truly immutable,
+         which the compiler will rely upon when performing optimizations *)
+      Primitive(Pget_idx (layout, Immutable), 2)
+    | "%get_idx" ->
+      (* Whenever it's safe to use the "_imm" counterpart to this primitive
+         (just above), it's also safe to use this one. Marking the primitive as
+         [Mutable] just restricts the optimizations that can be performed. *)
+      Primitive(Pget_idx (layout, Mutable), 2)
+    | "%set_idx" ->
+      let layout = List.nth (get_arg_layouts ()) 2 in
+      Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+    | "%unsafe_array_idx" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray, Ptagged_int_index,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int8#" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Untagged_int8,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int16#" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Untagged_int16,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int32#" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_int32,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int64#" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_int64,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_nativeint#" ->
+      Primitive(Pmake_idx_array
+        (Punspecializedarray,
+         Punboxed_or_untagged_integer_index Unboxed_nativeint,
+         Value generic_value, []), 1)
+    | "%unsafe_get_ptr_imm" ->
+      (* This primitive requires the pointed-to data to be truly immutable,
+         which the compiler will rely upon when performing optimizations *)
+      Primitive(Pget_ptr (layout, Immutable), 1)
+    | "%unsafe_get_ptr" ->
+      (* Whenever it's safe to use the "_imm" counterpart to this primitive
+         (just above), it's also safe to use this one. Marking the primitive as
+         [Mutable] just restricts the optimizations that can be performed. *)
+      Primitive(Pget_ptr (layout, Mutable), 1)
+    | "%unsafe_set_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Primitive(Pset_ptr (layout, get_first_arg_mode ()), 2)
+    | "%unsafe_get_ext_ptr_imm" ->
+      Primitive(Pget_ext_ptr (layout, Immutable), 1)
+    | "%unsafe_get_ext_ptr" ->
+      Primitive(Pget_ext_ptr (layout, Mutable), 1)
+    | "%unsafe_set_ext_ptr" ->
+      let layout = List.nth (get_arg_layouts ()) 1 in
+      Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
+    | "%peek" -> Peek None
+    | "%poke" -> Poke None
+    | s when String.length s > 0 && s.[0] = '%' ->
+      (match String.Map.find_opt s indexing_primitives with
+       | Some prim -> prim ~mode
+       | None ->
+         match String.Map.find_opt s array_vec_primitives with
+         | Some prim -> prim ~mode
+         | None ->
+           match Scalar.Operation.With_percent_prefix.of_string s with
+           | exception Not_found ->
+             raise (Error (loc, Unknown_builtin_primitive s))
+           | intrinsic ->
+             let arity = Scalar.Operation.arity intrinsic in
+             let intrinsic =
+               Scalar.Operation.map intrinsic
+                 ~f:(fun Any_locality_mode -> mode)
+             in
+             (Primitive (Pscalar intrinsic, arity)))
+    | _ -> External lambda_prim
+  in
+  prim
+
+let simplify_constant_constructor = function
+  | Equal -> true
+  | Not_equal -> true
+  | Less_equal -> false
+  | Less_than -> false
+  | Greater_equal -> false
+  | Greater_than -> false
+  | Compare -> false
+
+(* See [glb_array_type] *)
+let rec glb_scannable_kinds kinds1 kinds2 =
+  if List.length kinds1 = List.length kinds2 then
+    Misc.Stdlib.List.map2_option glb_scannable_kind kinds1 kinds2
+  else
+    None
+
+and glb_scannable_kind kind1 kind2 =
+  match kind1, kind2 with
+  | Pint_scannable, (Paddr_scannable | Pint_scannable)
+  | Paddr_scannable, Pint_scannable -> Some Pint_scannable
+  | Paddr_scannable, Paddr_scannable -> Some Paddr_scannable
+  | Pproduct_scannable kinds1, Pproduct_scannable kinds2 ->
+    Option.map (fun x -> Pproduct_scannable x)
+      (glb_scannable_kinds kinds1 kinds2)
+  | (Pint_scannable | Paddr_scannable | Pproduct_scannable _), _ -> None
+
+(* The following function computes the greatest lower bound of array kinds:
+
+          unspecialized
+          /           \
+        gen      unboxed-{float,int,int8,int16,int32,int64,nativeint,vec*}
+         |
+      /------\
+      |      |
+    addr  float
+      |
+ gcignorableaddr
+      |
+    int
+
+   [unspecialized] sits above every other kind and is the placeholder used
+   for primitives that have not been specialized yet. For product kinds, we
+   take the product of this lattice.
+
+   Note that the GLB is not guaranteed to exist.
+   In case of array kinds working with layout value, we return
+   our first argument instead of raising a fatal error because, although
+   it cannot happen in a well-typed program, (ab)use of Obj.magic can
+   probably trigger it. For other layouts, we raise an error.
+*)
+let glb_array_type loc t1 t2 =
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %s, %s"
+      Location.print_loc loc
+      what
+      (Printlambda.array_kind t1) (Printlambda.array_kind t2)
+  in
+  match t1, t2 with
+  (* [Punspecializedarray] is the top of the lattice: it is the marker placed
+     on primitives before specialization, and so the GLB with any other
+     array kind is that other kind. *)
+  | Punspecializedarray, x | x, Punspecializedarray -> x
+  (* Handle unboxed array kinds which can only match with themselves. *)
+  | Pfloatarray, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                 | Punboxedvectorarray _ | Punboxedmaskarray) ->
+    (* Have a nice error message for a case reachable. *)
+    raise(Error(loc, Invalid_floatarray_glb))
+  | Punboxedfloatarray Unboxed_float64, Punboxedfloatarray Unboxed_float64 ->
+    Punboxedfloatarray Unboxed_float64
+  | Punboxedfloatarray Unboxed_float32, Punboxedfloatarray Unboxed_float32 ->
+    Punboxedfloatarray Unboxed_float32
+  | Punboxedfloatarray _, _ | _, Punboxedfloatarray _ ->
+    unexpected ()
+  | Punboxedoruntaggedintarray Untagged_int,
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray Untagged_int
+  | Punboxedoruntaggedintarray Untagged_int8,
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray Untagged_int8
+  | Punboxedoruntaggedintarray Untagged_int16,
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray Untagged_int16
+  | Punboxedoruntaggedintarray Unboxed_int32,
+    Punboxedoruntaggedintarray Unboxed_int32 ->
+    Punboxedoruntaggedintarray Unboxed_int32
+  | Punboxedoruntaggedintarray Unboxed_int64,
+    Punboxedoruntaggedintarray Unboxed_int64 ->
+    Punboxedoruntaggedintarray Unboxed_int64
+  | Punboxedoruntaggedintarray Unboxed_nativeint,
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
+    Punboxedoruntaggedintarray Unboxed_nativeint
+  | Punboxedoruntaggedintarray _, _ | _, Punboxedoruntaggedintarray _ ->
+    unexpected ()
+  | Punboxedvectorarray Unboxed_vec128, Punboxedvectorarray Unboxed_vec128 ->
+    Punboxedvectorarray Unboxed_vec128
+  | Punboxedvectorarray Unboxed_vec256, Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray Unboxed_vec256
+  | Punboxedvectorarray Unboxed_vec512, Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray Unboxed_vec512
+  | Punboxedvectorarray _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray | Punboxedmaskarray), Punboxedmaskarray ->
+    Punboxedmaskarray
+  | Punboxedmaskarray, _ | _, Punboxedmaskarray ->
+    unexpected ()
+
+  (* Unboxed product arrays. *)
+  | (Pgcignorableproductarray kinds1) as k, Pgcignorableproductarray kinds2 ->
+    if List.equal equal_ignorable_product_element_kind kinds1 kinds2
+    then k
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
+  | Pgcscannableproductarray kinds1, Pgcscannableproductarray kinds2 ->
+    begin match glb_scannable_kinds kinds1 kinds2 with
+    | Some kinds -> Pgcscannableproductarray kinds
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
+    end
+  | Pgcignorableproductarray _, _ | _, Pgcignorableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcignorableproductarray kind"
+  | Pgcscannableproductarray _, _ | _, Pgcscannableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcscannableproductarray kind"
+
+  (* No GLB; only used in the [Obj.magic] case *)
+  | Pfloatarray, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray | Pgcignorableaddrarray | Pintarray), Pfloatarray -> t1
+
+  (* Compute the correct GLB *)
+  | Pgenarray,
+    ((Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray)
+      as x)
+  | ((Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray) as x),
+    Pgenarray -> x
+  | Paddrarray, Paddrarray -> Paddrarray
+  | Paddrarray, Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Paddrarray -> Pgcignorableaddrarray
+  | Paddrarray, Pintarray | Pintarray, Paddrarray -> Pintarray
+  | Pgcignorableaddrarray, Pgcignorableaddrarray -> Pgcignorableaddrarray
+  | Pgcignorableaddrarray, Pintarray
+  | Pintarray, Pgcignorableaddrarray -> Pintarray
+  | Pintarray, Pintarray -> Pintarray
+  | Pfloatarray, Pfloatarray -> Pfloatarray
+
+let glb_array_ref_type loc t1 t2 =
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %a, %s"
+      Location.print_loc loc
+      what
+      Printlambda.array_ref_kind t1 (Printlambda.array_kind t2)
+  in
+  match t1, t2 with
+  (* [Punspecializedarray] / [Punspecializedarray_ref] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_ref m, t2 -> Lambda.array_ref_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
+  | Pfloatarray_ref _, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                       | Punboxedvectorarray _ | Punboxedmaskarray) ->
+    (* Have a nice error message for a case reachable. *)
+    raise(Error(loc, Invalid_floatarray_glb))
+  | Punboxedfloatarray_ref Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
+    Punboxedfloatarray_ref Unboxed_float64
+  | Punboxedfloatarray_ref Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
+    Punboxedfloatarray_ref Unboxed_float32
+  | Punboxedfloatarray_ref _, _
+  | _, Punboxedfloatarray _ ->
+    unexpected ()
+  | Punboxedoruntaggedintarray_ref Untagged_int,
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_ref Untagged_int
+  | Punboxedoruntaggedintarray_ref Untagged_int8,
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_ref Untagged_int8
+  | Punboxedoruntaggedintarray_ref Untagged_int16,
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_ref Untagged_int16
+  | Punboxedoruntaggedintarray_ref Unboxed_int32,
+    Punboxedoruntaggedintarray Unboxed_int32 ->
+    Punboxedoruntaggedintarray_ref Unboxed_int32
+  | Punboxedoruntaggedintarray_ref Unboxed_int64,
+    Punboxedoruntaggedintarray Unboxed_int64 ->
+    Punboxedoruntaggedintarray_ref Unboxed_int64
+  | Punboxedoruntaggedintarray_ref Unboxed_nativeint,
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
+    Punboxedoruntaggedintarray_ref Unboxed_nativeint
+  | Punboxedoruntaggedintarray_ref _, _ | _, Punboxedoruntaggedintarray _ ->
+    unexpected ()
+  | Punboxedvectorarray_ref Unboxed_vec128,
+    Punboxedvectorarray Unboxed_vec128 ->
+    Punboxedvectorarray_ref Unboxed_vec128
+  | Punboxedvectorarray_ref Unboxed_vec256,
+    Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray_ref Unboxed_vec256
+  | Punboxedvectorarray_ref Unboxed_vec512,
+    Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_ref Unboxed_vec512
+  | Punboxedvectorarray_ref _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_ref _ | Punboxedmaskarray_ref), Punboxedmaskarray ->
+    Punboxedmaskarray_ref
+  | Punboxedmaskarray_ref, _ | _, Punboxedmaskarray ->
+    unexpected ()
+
+  (* Unboxed product arrays. *)
+  | (Pgcignorableproductarray_ref kinds1) as k,
+    Pgcignorableproductarray kinds2 ->
+    if kinds1 = kinds2 then k
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
+  | Pgcscannableproductarray_ref kinds1, Pgcscannableproductarray kinds2 ->
+    begin match glb_scannable_kinds kinds1 kinds2 with
+    | Some kinds -> Pgcscannableproductarray_ref kinds
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
+    end
+  | Pgcignorableproductarray_ref _, _ | _, Pgcignorableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcignorableproductarray kind"
+  | Pgcscannableproductarray_ref _, _ | _, Pgcscannableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcscannableproductarray kind"
+
+  (* No GLB; only used in the [Obj.magic] case *)
+  | Pfloatarray_ref _, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref), Pfloatarray ->
+    t1
+
+  (* Compute the correct GLB *)
+
+  (* Pgenarray >= _ *)
+  | (Pgenarray_ref _ as x), Pgenarray -> x
+  | Pgenarray_ref _, Pintarray -> Pintarray_ref
+  | Pgenarray_ref _, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
+  | Pgenarray_ref _, Paddrarray -> Paddrarray_ref
+  | Pgenarray_ref mode, Pfloatarray -> Pfloatarray_ref mode
+  | (Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+     | Pfloatarray_ref _ as x), Pgenarray -> x
+
+  (* Paddrarray > Pintarray *)
+  | Paddrarray_ref, Paddrarray -> Paddrarray_ref
+  | Paddrarray_ref, Pgcignorableaddrarray -> Pgcignorableaddrarray_ref
+  | Paddrarray_ref, Pintarray -> Pintarray_ref
+  | Pgcignorableaddrarray_ref, Paddrarray -> Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_ref
+  | Pgcignorableaddrarray_ref, Pintarray -> Pintarray_ref
+  | Pintarray_ref, Paddrarray -> Pintarray_ref
+  | Pintarray_ref, Pgcignorableaddrarray -> Pintarray_ref
+
+  (* Pintarray is a minimum *)
+  | Pintarray_ref, Pintarray -> Pintarray_ref
+
+  (* Pfloatarray is a minimum *)
+  | (Pfloatarray_ref _ as x), Pfloatarray -> x
+
+let glb_array_set_type loc t1 t2 =
+  let unexpected ?(what="unexpected array kind") () =
+    Misc.fatal_errorf "%a: %s in glb: %a, %s"
+      Location.print_loc loc
+      what
+      Printlambda.array_set_kind t1 (Printlambda.array_kind t2)
+  in
+  match t1, t2 with
+  (* [Punspecializedarray] / [Punspecializedarray_set] sit above every other
+     kind in the lattice (see [glb_array_type]); the GLB with any other kind
+     is therefore that other kind. *)
+  | Punspecializedarray_set m, t2 -> Lambda.array_set_kind m t2
+  | t1, Punspecializedarray -> t1
+  (* Handle unboxed array kinds which can only match with themselves. *)
+  | Pfloatarray_set, (Punboxedfloatarray _ | Punboxedoruntaggedintarray _
+                     | Punboxedvectorarray _ | Punboxedmaskarray) ->
+    (* Have a nice error message for a case reachable. *)
+    raise(Error(loc, Invalid_floatarray_glb))
+  | Punboxedfloatarray_set Unboxed_float64,
+    Punboxedfloatarray Unboxed_float64 ->
+    Punboxedfloatarray_set Unboxed_float64
+  | Punboxedfloatarray_set Unboxed_float32,
+    Punboxedfloatarray Unboxed_float32 ->
+    Punboxedfloatarray_set Unboxed_float32
+  | Punboxedfloatarray_set _, _
+  | _, Punboxedfloatarray _ ->
+    unexpected ()
+  | Punboxedoruntaggedintarray_set Untagged_int,
+    Punboxedoruntaggedintarray Untagged_int ->
+    Punboxedoruntaggedintarray_set Untagged_int
+  | Punboxedoruntaggedintarray_set Untagged_int8,
+    Punboxedoruntaggedintarray Untagged_int8 ->
+    Punboxedoruntaggedintarray_set Untagged_int8
+  | Punboxedoruntaggedintarray_set Untagged_int16,
+    Punboxedoruntaggedintarray Untagged_int16 ->
+    Punboxedoruntaggedintarray_set Untagged_int16
+  | Punboxedoruntaggedintarray_set Unboxed_int32,
+    Punboxedoruntaggedintarray Unboxed_int32 ->
+    Punboxedoruntaggedintarray_set Unboxed_int32
+  | Punboxedoruntaggedintarray_set Unboxed_int64,
+    Punboxedoruntaggedintarray Unboxed_int64 ->
+    Punboxedoruntaggedintarray_set Unboxed_int64
+  | Punboxedoruntaggedintarray_set Unboxed_nativeint,
+    Punboxedoruntaggedintarray Unboxed_nativeint ->
+    Punboxedoruntaggedintarray_set Unboxed_nativeint
+  | Punboxedoruntaggedintarray_set _, _ | _, Punboxedoruntaggedintarray _ ->
+    unexpected ()
+  | Punboxedvectorarray_set Unboxed_vec128,
+    Punboxedvectorarray Unboxed_vec128 ->
+    Punboxedvectorarray_set Unboxed_vec128
+  | Punboxedvectorarray_set Unboxed_vec256,
+    Punboxedvectorarray Unboxed_vec256 ->
+    Punboxedvectorarray_set Unboxed_vec256
+  | Punboxedvectorarray_set Unboxed_vec512,
+    Punboxedvectorarray Unboxed_vec512 ->
+    Punboxedvectorarray_set Unboxed_vec512
+  | Punboxedvectorarray_set _, _ | _, Punboxedvectorarray _ ->
+    unexpected ()
+  | (Pgenarray_set _ | Punboxedmaskarray_set), Punboxedmaskarray ->
+    Punboxedmaskarray_set
+  | Punboxedmaskarray_set, _ | _, Punboxedmaskarray ->
+    unexpected ()
+
+  (* Unboxed product arrays. *)
+  | (Pgcignorableproductarray_set kinds1) as k,
+    Pgcignorableproductarray kinds2 ->
+    if kinds1 = kinds2 then k
+    else unexpected () ~what:"mismatched ignorableproductarray kinds"
+  | Pgcscannableproductarray_set (mode, kinds1),
+    Pgcscannableproductarray kinds2 ->
+    begin match glb_scannable_kinds kinds1 kinds2 with
+    | Some kinds -> Pgcscannableproductarray_set (mode, kinds)
+    | None -> unexpected () ~what:"mismatched scannableproductarray kinds"
+    end
+  | Pgcignorableproductarray_set _, _ | _, Pgcignorableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcignorableproductarray_set kind"
+  | Pgcscannableproductarray_set _, _ | _, Pgcscannableproductarray _ ->
+    unexpected () ~what:"unexpected Pgcscannableproductarray_set kind"
+
+  (* No GLB; only used in the [Obj.magic] case *)
+  | Pfloatarray_set, (Paddrarray | Pgcignorableaddrarray | Pintarray)
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set),
+      Pfloatarray -> t1
+
+  (* Compute the correct GLB *)
+
+  (* Pgenarray >= _ *)
+  | (Pgenarray_set _ as x), Pgenarray -> x
+  | Pgenarray_set _, Pintarray -> Pintarray_set
+  | Pgenarray_set _, Pgcignorableaddrarray -> Pgcignorableaddrarray_set
+  | Pgenarray_set mode, Paddrarray -> Paddrarray_set mode
+  | Pgenarray_set _, Pfloatarray -> Pfloatarray_set
+  | (Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+     | Pfloatarray_set as x), Pgenarray -> x
+
+  (* Paddrarray > Pintarray *)
+  | (Paddrarray_set _ as x), Paddrarray -> x
+  | (Paddrarray_set _ as x), Pgcignorableaddrarray -> x
+  | Paddrarray_set _, Pintarray -> Pintarray_set
+  | Pgcignorableaddrarray_set, Paddrarray -> Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pgcignorableaddrarray ->
+    Pgcignorableaddrarray_set
+  | Pgcignorableaddrarray_set, Pintarray -> Pintarray_set
+  | Pintarray_set, Paddrarray -> Pintarray_set
+  | Pintarray_set, Pgcignorableaddrarray -> Pintarray_set
+
+  (* Pintarray is a minimum *)
+  | Pintarray_set, Pintarray -> Pintarray_set
+
+  (* Pfloatarray is a minimum *)
+  | Pfloatarray_set, Pfloatarray -> Pfloatarray_set
+
+let peek_or_poke_layout_from_type ~prim_name error_loc env ty
+      : Lambda.peek_or_poke option =
+  match Ctype.type_sort ~why:Peek_or_poke ~fixed:true env ty with
+  | Error _ -> None
+  | Ok sort ->
+    let sort = Jkind.Sort.default_to_scannable_and_get sort in
+    let layout = Typeopt.layout env error_loc sort ty in
+    match layout with
+    | Punboxed_float Unboxed_float32 -> Some Ppp_unboxed_float32
+    | Punboxed_float Unboxed_float64 -> Some Ppp_unboxed_float
+    | Punboxed_or_untagged_integer Untagged_int8 -> Some Ppp_untagged_int8
+    | Punboxed_or_untagged_integer Untagged_int16 -> Some Ppp_untagged_int16
+    | Punboxed_or_untagged_integer Unboxed_int32 -> Some Ppp_unboxed_int32
+    | Punboxed_or_untagged_integer Unboxed_int64 -> Some Ppp_unboxed_int64
+    | Punboxed_or_untagged_integer Unboxed_nativeint ->
+      Some Ppp_unboxed_nativeint
+    | Punboxed_or_untagged_integer Untagged_int -> Some Ppp_untagged_immediate
+    | Pvalue { raw_kind = Pintval ; _ } -> Some Ppp_tagged_immediate
+    | Ptop
+    | Pvalue _
+    | Punboxed_vector _
+    | Punboxed_mask
+    | Punboxed_product _
+    | Pbottom
+    | Psplicevar _ ->
+      raise (Error (error_loc, Wrong_layout_for_peek_or_poke prim_name))
+
+let should_specialize_primitive p =
+  match p.prim_name with
+  | "%obj_size" | "%obj_field" | "%obj_set_field" ->
+    (* The obj primitives re-use the array primitives (see
+       [lookup_primitive_unspecialized]), but we shouldn't specialize
+       their array kinds.
+       CR layouts v4: we should just make separate object primitives. *)
+    false
+  | _ ->
+    true
+
+let layout_of_ty_for_idx_set env loc ty =
+  (* CR layouts: This is gross - particularly the call to [type_jkind] and the
+    conversion to and from [mixed_block_element]! The slightly less gross
+    thing would be to change [layout_of_const_sort_generic] in the same way
+    that we have changed [transl_mixed_block_element] to desecend into
+    products. But that's a big change that (a) will have substantial
+    performance impacts for lots of cases that don't matter, and (b) will
+    become obsolete when we do complex values. So for now, the gross
+    thing. *)
+  let jkind = Ctype.type_jkind env ty in
+  let mbe = Typedecl.mixed_block_element env ty jkind in
+  let mbe =
+    match mbe with
+    | Some mbe -> mbe
+    | None ->
+      Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
+        Printtyp.type_expr ty
+  in
+  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  let context = Ctype.mk_jkind_context_check_principal env in
+  let ext = Jkind.get_externality_upper_bound ~context env jkind in
+  layout_of_mixed_block_element_for_idx_set ext mbe
+
+(* Specialize a primitive from available type information. *)
+(* CR layouts v7: This function had a loc argument added just to support the void
+   check error message.  Take it out when we remove that. *)
+let specialize_primitive env loc ty ~has_constant_constructor prim =
+  let param_tys, rest_ty =
+    match is_function_type env ty with
+    | None -> [], ty
+    | Some (p1, rhs) ->
+      match is_function_type env rhs with
+      | None -> [p1], rhs
+      | Some (p2, rhs) ->
+        match is_function_type env rhs with
+        | None -> [p1;p2], rhs
+        | Some (p3, rhs) ->
+          match is_function_type env rhs with
+          | None -> [p1;p2;p3], rhs
+          | Some (p4, rhs) -> [p1;p2;p3;p4], rhs
+  in
+  match prim, param_tys with
+  | Primitive (Psetfield(n, Pointer, init), arity), [_; p2] -> begin
+      match fst (maybe_pointer_type env p2) with
+      | Pointer -> None
+      | Immediate -> Some (Primitive (Psetfield(n, Immediate, init), arity))
+    end
+  | Primitive (Pfield (n, Pointer, mut), arity), _ ->
+      (* try strength reduction based on the *result type* *)
+      let is_int = match is_function_type env ty with
+        | None -> Pointer
+        | Some (_p1, rhs) -> fst (maybe_pointer_type env rhs) in
+      Some (Primitive (Pfield (n, is_int, mut), arity))
+  | Primitive (Parraylength t, arity), [p] -> begin
+      let loc = to_location loc in
+      let array_type =
+        glb_array_type loc t (array_type_kind ~elt_ty:None env loc p)
+      in
+      if t = array_type then None
+      else Some (Primitive (Parraylength array_type, arity))
+    end
+  | Primitive (Parrayrefu (rt, index_kind, mut), arity), p1 :: _ -> begin
+      let loc = to_location loc in
+      let array_ref_type =
+        glb_array_ref_type loc rt
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+      in
+      let array_mut = array_type_mut env p1 in
+      if rt = array_ref_type && mut = array_mut then None
+      else Some (Primitive (Parrayrefu (array_ref_type, index_kind, array_mut), arity))
+    end
+  | Primitive (Parraysetu (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
+      let loc = to_location loc in
+      let array_set_type =
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
+      in
+      if st = array_set_type then None
+      else Some (Primitive (Parraysetu (array_set_type, index_kind), arity))
+    end
+  | Primitive (Parrayrefs (rt, index_kind, mut), arity), p1 :: _ -> begin
+      let loc = to_location loc in
+      let array_ref_type =
+        glb_array_ref_type loc rt
+          (array_type_kind ~elt_ty:(Some rest_ty) env loc p1)
+      in
+      let array_mut = array_type_mut env p1 in
+      if rt = array_ref_type && mut = array_mut then None
+      else Some (Primitive (Parrayrefs (array_ref_type, index_kind, array_mut), arity))
+    end
+  | Primitive (Parraysets (st, index_kind), arity), p1 :: _ :: p3 :: _ -> begin
+      let loc = to_location loc in
+      let array_set_type =
+        glb_array_set_type loc st (array_type_kind ~elt_ty:(Some p3) env loc p1)
+      in
+      if st = array_set_type then None
+      else Some (Primitive (Parraysets (array_set_type, index_kind), arity))
+    end
+  | Primitive (Pmakearray_dynamic (array_kind, mode, With_initializer), 2),
+    _ :: p2 :: [] -> begin
+      let loc = to_location loc in
+      let new_array_kind =
+        array_kind_of_elt env loc p2
+        |> glb_array_type loc array_kind
+      in
+      if array_kind = new_array_kind then None
+      else
+        Some (Primitive (Pmakearray_dynamic (
+          new_array_kind, mode, With_initializer), 2))
+    end
+  | Primitive (Pmakearray_dynamic (array_kind, mode, Uninitialized), 1),
+    _ :: [] -> begin
+      let loc = to_location loc in
+      let new_array_kind =
+        array_type_kind ~elt_ty:None env loc rest_ty
+        |> glb_array_type loc array_kind
+      in
+      unboxed_product_uninitialized_array_check loc new_array_kind;
+      if array_kind = new_array_kind then None
+      else
+        Some (Primitive (Pmakearray_dynamic (
+          new_array_kind, mode, Uninitialized), 1))
+    end
+  | Primitive (Pmakearray_dynamic _, arity), args ->
+    Misc.fatal_errorf
+      "Wrong arity for Pmakearray_dynamic (arity=%d, args length %d)"
+      arity (List.length args)
+  | Primitive (Parrayblit { src_mutability; dst_array_set_kind }, arity),
+    _p1 :: _ :: p2 :: _ ->
+    let loc = to_location loc in
+    (* We only use the kind of one of two input arrays here. If you've bound the
+       "%arrayblit" primitive with a sane type, both arrays have the same array
+       kind.  If you haven't, then taking the glb of both would be just as
+       likely to compound your error (e.g., by treating a Pgenarray as a
+       Pfloatarray) as to help you. *)
+    let array_kind = array_type_kind ~elt_ty:None env loc p2 in
+    let new_dst_array_set_kind =
+      glb_array_set_type loc dst_array_set_kind array_kind
+    in
+    if dst_array_set_kind = new_dst_array_set_kind then None
+    else Some (Primitive (Parrayblit {
+      src_mutability; dst_array_set_kind = new_dst_array_set_kind }, arity))
+  | Primitive (Parray_element_size_in_bytes _, arity), p1 :: _ -> (
+      let array_kind =
+        array_type_kind ~elt_ty:None env (to_location loc) p1
+      in
+      Some (Primitive (Parray_element_size_in_bytes array_kind, arity))
+    )
+  | Primitive (Pbigarrayref(unsafe, n, kind, layout), arity), p1 :: _ -> begin
+      let (k, l) = bigarray_specialize_kind_and_layout env ~kind ~layout p1 in
+      match k, l with
+      | Pbigarray_unknown, Pbigarray_unknown_layout -> None
+      | _, _ -> Some (Primitive (Pbigarrayref(unsafe, n, k, l), arity))
+    end
+  | Primitive (Pbigarrayset(unsafe, n, kind, layout), arity), p1 :: _ -> begin
+      let (k, l) = bigarray_specialize_kind_and_layout env ~kind ~layout p1 in
+      match k, l with
+      | Pbigarray_unknown, Pbigarray_unknown_layout -> None
+      | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
+    end
+  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
+    begin
+      let shape =
+        List.map (fun typ ->
+          Lambda.must_be_value (Typeopt.layout env (to_location loc)
+                                  Jkind.Sort.Const.for_block_element typ))
+          fields
+      in
+      let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
+      if useful then
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.block_shape_of_value_kinds (Some shape),
+                           mode), arity))
+      else None
+    end
+  | Comparison(comp, Compare_generic), p1 :: _ ->
+    if (has_constant_constructor
+        && simplify_constant_constructor comp) then begin
+      Some (Comparison(comp, Compare_ints))
+    end else if (is_base_type env p1 Predef.path_int
+        || is_base_type env p1 Predef.path_char
+        || ((* Non-null external types are always represented by tagged integers. *)
+            maybe_pointer_type env p1 = (Immediate, Non_nullable))) then begin
+      Some (Comparison(comp, Compare_ints))
+    end else if is_base_type env p1 Predef.path_float then begin
+      Some (Comparison(comp, Compare_floats))
+    end else if is_base_type env p1 Predef.path_float32 then begin
+      Some (Comparison(comp, Compare_float32s))
+    end else if is_base_type env p1 Predef.path_string then begin
+      Some (Comparison(comp, Compare_strings))
+    end else if is_base_type env p1 Predef.path_bytes then begin
+      Some (Comparison(comp, Compare_bytes))
+    end else if is_base_type env p1 Predef.path_nativeint then begin
+      Some (Comparison(comp, Compare_nativeints))
+    end else if is_base_type env p1 Predef.path_int32 then begin
+      Some (Comparison(comp, Compare_int32s))
+    end else if is_base_type env p1 Predef.path_int64 then begin
+      Some (Comparison(comp, Compare_int64s))
+    end else begin
+      None
+    end
+  | Peek _, _ -> (
+    match is_function_type env ty with
+    | None -> None
+    | Some (_p1, result_ty) ->
+      match
+        peek_or_poke_layout_from_type ~prim_name:"peek"
+          (to_location loc) env result_ty
+      with
+      | None -> None
+      | Some contents_layout -> Some (Peek (Some contents_layout))
+  )
+  | Poke _, _ptr_ty :: new_value_ty :: _ -> (
+    match
+      peek_or_poke_layout_from_type ~prim_name:"poke"
+        (to_location loc) env new_value_ty
+    with
+    | None -> None
+    | Some contents_layout -> Some (Poke (Some contents_layout))
+  )
+  | Atomic (Load, Field_like ((Ref | Loc) as kind, Pointer)), _ ->
+    (match is_function_type env ty with
+    | None -> None
+    | Some (_, rhs) ->
+      match fst (maybe_pointer_type env rhs) with
+      | Pointer -> None
+      | Immediate -> Some (Atomic (Load, Field_like (kind, Immediate))))
+  | Atomic (Load, Field_like (Field, Pointer)), _ ->
+    (match is_function_type env ty with
+    | None -> None
+    | Some (_, ty) ->
+      match is_function_type env ty with
+      | None -> None
+      | Some (_, rhs) ->
+        match fst (maybe_pointer_type env rhs) with
+        | Pointer -> None
+        | Immediate ->
+          Some (Atomic (Load, Field_like (Field, Immediate))))
+  | Atomic (Set _ as op, Field_like ((Ref | Loc) as kind, Pointer)), [_; v]
+  | Atomic (Set _ as op, Field_like (Field as kind, Pointer)), [_; _; v]
+  | Atomic (Exchange _ as op, Field_like ((Ref | Loc) as kind, Pointer)),
+      [_; v]
+  | Atomic (Exchange _ as op, Field_like (Field as kind, Pointer)), [_; _; v]
+  | Atomic (Compare_and_set _ as op,
+      Field_like ((Ref | Loc) as kind, Pointer)), [_; _; v]
+  | Atomic (Compare_and_set _ as op, Field_like (Field as kind, Pointer)),
+      [_; _; _; v]
+  | Atomic (Compare_exchange _ as op,
+      Field_like ((Ref | Loc) as kind, Pointer)), [_; _; v]
+  | Atomic (Compare_exchange _ as op, Field_like (Field as kind, Pointer)),
+      [_; _; _; v] ->
+    (* Checking [v] is sufficient for CAS: we only need the contents' type. *)
+    (match fst (maybe_pointer_type env v) with
+    | Pointer -> None
+    | Immediate -> Some (Atomic (op, Field_like (kind, Immediate))))
+  | Atomic (Set _ as op, Idx_like (Idx, _)), [_; _; v]
+  | Atomic (Exchange _ as op, Idx_like (Idx, _)), [_; _; v]
+  | Atomic (Compare_and_set _ as op, Idx_like (Idx, _)), [_; _; _; v]
+  | Atomic (Compare_exchange _ as op, Idx_like (Idx, _)), [_; _; _; v] ->
+    let l = layout_of_ty_for_idx_set env loc v in
+    Some (Atomic (op, Idx_like (Idx, l)))
+  | Atomic (Set _ as op, Idx_like (Ptr, _)), [_; v]
+  | Atomic (Exchange _ as op, Idx_like (Ptr, _)), [_; v]
+  | Atomic (Compare_and_set _ as op, Idx_like (Ptr, _)), [_; _; v]
+  | Atomic (Compare_exchange _ as op, Idx_like (Ptr, _)), [_; _; v] ->
+    let l = layout_of_ty_for_idx_set env loc v in
+    Some (Atomic (op, Idx_like (Ptr, l)))
+  | Primitive (Pset_idx (_, m), arity), (_ :: _ :: p3 :: _) ->
+    let l = layout_of_ty_for_idx_set env loc p3 in
+    Some (Primitive (Pset_idx (l, m), arity))
+  | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
+    let l = layout_of_ty_for_idx_set env loc p2 in
+    Some (Primitive (Pset_ptr (l, m), arity))
+  | Primitive (Pset_ext_ptr (_, m), arity), (_ :: p2 :: _) ->
+    let l = layout_of_ty_for_idx_set env loc p2 in
+    Some (Primitive (Pset_ext_ptr (l, m), arity))
+  | Primitive (Pmake_idx_array (_, ik, _mbe, path), arity), _ ->
+    let loc = to_location loc in
+    let err () =
+      raise (Error (loc,
+        Unable_to_specialize_array_idx_primitive rest_ty))
+    in
+    let array_ty, elt_ty =
+      match Types.get_desc (Ctype.expand_head env rest_ty) with
+      | Tconstr (p, [array_ty; elt_ty], _)
+        when Path.same p Predef.path_idx_mut
+          || Path.same p Predef.path_idx_imm ->
+        array_ty, elt_ty
+      | _ -> err ()
+    in
+    (match Types.get_desc (Ctype.expand_head env array_ty) with
+     | Tconstr (p, _, _)
+       when Path.same p Predef.path_array
+         || Path.same p Predef.path_iarray -> ()
+     | _ -> err ());
+    let ak =
+      Typeopt.array_type_kind ~elt_ty:None env loc array_ty
+    in
+    let jkind = Ctype.type_jkind env elt_ty in
+    let mbe = Typedecl.mixed_block_element env elt_ty jkind in
+    let mbe = Option.map (transl_mixed_block_element env loc elt_ty) mbe in
+    begin match mbe with
+    | Some mbe when not (Lambda.will_be_reordered mbe) ->
+      Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
+    | _ ->
+      (* Either something known to get reordered or an [any] that might be *)
+      raise (Error (loc, Element_would_be_reordered_in_record));
+    end
+  | _ -> None
+
+let caml_equal =
+  Lambda.simple_prim_on_values ~name:"caml_equal" ~arity:2 ~alloc:true
+let caml_string_equal =
+  Lambda.simple_prim_on_values ~name:"caml_string_equal" ~arity:2 ~alloc:false
+let caml_bytes_equal =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_equal" ~arity:2 ~alloc:false
+let caml_notequal =
+  Lambda.simple_prim_on_values ~name:"caml_notequal" ~arity:2 ~alloc:true
+let caml_string_notequal =
+  Lambda.simple_prim_on_values ~name:"caml_string_notequal" ~arity:2 ~alloc:false
+let caml_bytes_notequal =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_notequal" ~arity:2 ~alloc:false
+let caml_lessequal =
+  Lambda.simple_prim_on_values ~name:"caml_lessequal" ~arity:2 ~alloc:true
+let caml_string_lessequal =
+  Lambda.simple_prim_on_values ~name:"caml_string_lessequal" ~arity:2 ~alloc:false
+let caml_bytes_lessequal =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_lessequal" ~arity:2 ~alloc:false
+let caml_lessthan =
+  Lambda.simple_prim_on_values ~name:"caml_lessthan" ~arity:2 ~alloc:true
+let caml_string_lessthan =
+  Lambda.simple_prim_on_values ~name:"caml_string_lessthan" ~arity:2 ~alloc:false
+let caml_bytes_lessthan =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_lessthan" ~arity:2 ~alloc:false
+let caml_greaterequal =
+  Lambda.simple_prim_on_values ~name:"caml_greaterequal" ~arity:2 ~alloc:true
+let caml_string_greaterequal =
+  Lambda.simple_prim_on_values ~name:"caml_string_greaterequal" ~arity:2
+    ~alloc:false
+let caml_bytes_greaterequal =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_greaterequal" ~arity:2
+    ~alloc:false
+let caml_greaterthan =
+  Lambda.simple_prim_on_values ~name:"caml_greaterthan" ~arity:2 ~alloc:true
+let caml_string_greaterthan =
+  Lambda.simple_prim_on_values ~name:"caml_string_greaterthan" ~arity:2
+    ~alloc:false
+let caml_bytes_greaterthan =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_greaterthan" ~arity:2
+    ~alloc:false
+let caml_compare =
+  Lambda.simple_prim_on_values ~name:"caml_compare" ~arity:2 ~alloc:true
+let caml_string_compare =
+  Lambda.simple_prim_on_values ~name:"caml_string_compare" ~arity:2 ~alloc:false
+let caml_bytes_compare =
+  Lambda.simple_prim_on_values ~name:"caml_bytes_compare" ~arity:2 ~alloc:false
+
+let comparison_primitive comparison comparison_kind =
+  let int : any_locality_mode Scalar.Integral.t = Value (Taggable Int) in
+  let float64 : any_locality_mode Scalar.Floating.t =
+    Value (Float64 Any_locality_mode)
+  in
+  let float32 : any_locality_mode Scalar.Floating.t =
+    Value (Float32 Any_locality_mode)
+  in
+  let int32 : any_locality_mode Scalar.Integral.t =
+    Value (Boxable (Int32 Any_locality_mode))
+  in
+  let nativeint : any_locality_mode Scalar.Integral.t =
+    Value (Boxable (Nativeint Any_locality_mode))
+  in
+  let int64 : any_locality_mode Scalar.Integral.t =
+    Value (Boxable (Int64 Any_locality_mode))
+  in
+  let icmp size cmp = Pscalar (Binary (Icmp (size, cmp))) in
+  let fcmp size cmp = Pscalar (Binary (Fcmp (size, cmp))) in
+  let three_way_comparei_signed size =
+    Pscalar (Binary (Three_way_compare_int (Signed, size)))
+  in
+  let three_way_comparef size =
+    Pscalar (Binary (Three_way_compare_float size))
+  in
+  match comparison, comparison_kind with
+  | Equal, Compare_generic -> Pccall caml_equal
+  | Equal, Compare_ints -> Pphys_equal Eq
+  | Equal, Compare_floats -> fcmp float64 CFeq
+  | Equal, Compare_float32s -> fcmp float32 CFeq
+  | Equal, Compare_strings -> Pccall caml_string_equal
+  | Equal, Compare_bytes -> Pccall caml_bytes_equal
+  | Equal, Compare_nativeints -> icmp nativeint Ceq
+  | Equal, Compare_int32s -> icmp int32 Ceq
+  | Equal, Compare_int64s -> icmp int64 Ceq
+  | Not_equal, Compare_generic -> Pccall caml_notequal
+  | Not_equal, Compare_ints -> Pphys_equal Noteq
+  | Not_equal, Compare_floats -> fcmp float64 CFneq
+  | Not_equal, Compare_float32s -> fcmp float32 CFneq
+  | Not_equal, Compare_strings -> Pccall caml_string_notequal
+  | Not_equal, Compare_bytes -> Pccall caml_bytes_notequal
+  | Not_equal, Compare_nativeints -> icmp nativeint Cne
+  | Not_equal, Compare_int32s -> icmp int32 Cne
+  | Not_equal, Compare_int64s -> icmp int64 Cne
+  | Less_equal, Compare_generic -> Pccall caml_lessequal
+  | Less_equal, Compare_ints -> icmp int Cle
+  | Less_equal, Compare_floats -> fcmp float64 CFle
+  | Less_equal, Compare_float32s -> fcmp float32 CFle
+  | Less_equal, Compare_strings -> Pccall caml_string_lessequal
+  | Less_equal, Compare_bytes -> Pccall caml_bytes_lessequal
+  | Less_equal, Compare_nativeints -> icmp nativeint Cle
+  | Less_equal, Compare_int32s -> icmp int32 Cle
+  | Less_equal, Compare_int64s -> icmp int64 Cle
+  | Less_than, Compare_generic -> Pccall caml_lessthan
+  | Less_than, Compare_ints -> icmp int Clt
+  | Less_than, Compare_floats -> fcmp float64 CFlt
+  | Less_than, Compare_float32s -> fcmp float32 CFlt
+  | Less_than, Compare_strings -> Pccall caml_string_lessthan
+  | Less_than, Compare_bytes -> Pccall caml_bytes_lessthan
+  | Less_than, Compare_nativeints -> icmp nativeint Clt
+  | Less_than, Compare_int32s -> icmp int32 Clt
+  | Less_than, Compare_int64s -> icmp int64 Clt
+  | Greater_equal, Compare_generic -> Pccall caml_greaterequal
+  | Greater_equal, Compare_ints -> icmp int Cge
+  | Greater_equal, Compare_floats -> fcmp float64 CFge
+  | Greater_equal, Compare_float32s -> fcmp float32 CFge
+  | Greater_equal, Compare_strings -> Pccall caml_string_greaterequal
+  | Greater_equal, Compare_bytes -> Pccall caml_bytes_greaterequal
+  | Greater_equal, Compare_nativeints -> icmp nativeint Cge
+  | Greater_equal, Compare_int32s -> icmp int32 Cge
+  | Greater_equal, Compare_int64s -> icmp int64 Cge
+  | Greater_than, Compare_generic -> Pccall caml_greaterthan
+  | Greater_than, Compare_ints -> icmp int Cgt
+  | Greater_than, Compare_floats -> fcmp float64 CFgt
+  | Greater_than, Compare_float32s -> fcmp float32 CFgt
+  | Greater_than, Compare_strings -> Pccall caml_string_greaterthan
+  | Greater_than, Compare_bytes -> Pccall caml_bytes_greaterthan
+  | Greater_than, Compare_nativeints -> icmp nativeint Cgt
+  | Greater_than, Compare_int32s -> icmp int32 Cgt
+  | Greater_than, Compare_int64s -> icmp int64 Cgt
+  | Compare, Compare_generic -> Pccall caml_compare
+  | Compare, Compare_ints -> three_way_comparei_signed int
+  | Compare, Compare_floats -> three_way_comparef float64
+  | Compare, Compare_float32s -> three_way_comparef float32
+  | Compare, Compare_strings -> Pccall caml_string_compare
+  | Compare, Compare_bytes -> Pccall caml_bytes_compare
+  | Compare, Compare_nativeints -> three_way_comparei_signed nativeint
+  | Compare, Compare_int32s -> three_way_comparei_signed int32
+  | Compare, Compare_int64s -> three_way_comparei_signed int64
+
+let lambda_of_loc kind sloc =
+  let loc = to_location sloc in
+  let loc_start = loc.Location.loc_start in
+  let (file, lnum, cnum) = Location.get_pos_info loc_start in
+  let file =
+    if Filename.is_relative file then
+      file
+    else
+      Location.rewrite_absolute_path file in
+  let enum = loc.Location.loc_end.Lexing.pos_cnum -
+      loc_start.Lexing.pos_cnum + cnum in
+  match kind with
+  | Loc_POS ->
+    Lconst (Const_block (0, [
+          Const_immstring file;
+          Const_base (Const_int lnum);
+          Const_base (Const_int cnum);
+          Const_base (Const_int enum);
+        ]))
+  | Loc_FILE -> Lconst (Const_immstring file)
+  | Loc_MODULE ->
+    let filename = Filename.basename file in
+    let name = Current_unit.get_cu () in
+    let module_name =
+      match name with
+      | None -> "//"^filename^"//"
+      | Some comp_unit ->
+        Compilation_unit.name_as_string comp_unit
+    in
+    Lconst (Const_immstring module_name)
+  | Loc_LOC ->
+    let loc = Printf.sprintf "File %S, line %d, characters %d-%d"
+        file lnum cnum enum in
+    Lconst (Const_immstring loc)
+  | Loc_LINE -> Lconst (Const_base (Const_int lnum))
+  | Loc_FUNCTION ->
+    let scope_name = Debuginfo.Scoped_location.string_of_scoped_location
+                       ~include_zero_alloc:false sloc in
+    Lconst (Const_immstring scope_name)
+
+let atomic_arity op (kind : atomic_kind) =
+  let arity_of_op =
+    match op with
+    | Load -> 1
+    | Set _ -> 2
+    | Exchange _ -> 2
+    | Compare_exchange _ -> 3
+    | Compare_and_set _ -> 3
+    | Fetch_add | Add | Sub | Land | Lor | Lxor -> 2
+  in
+  let extra_kind_arity =
+    match kind with
+    | Field_like ((Ref | Loc), _) | Idx_like (Ptr, _) -> 0
+    | Field_like (Field, _) | Idx_like (Idx, _) -> 1
+  in
+  arity_of_op + extra_kind_arity
+
+let atomic_lambda_primitive op (kind : atomic_kind) : Lambda.primitive =
+  match kind with
+  | Field_like (_, immediate_or_pointer) -> begin
+      match op with
+      | Load -> Patomic_load_field { immediate_or_pointer }
+      | Set mode -> Patomic_set_field { immediate_or_pointer; mode }
+      | Exchange mode -> Patomic_exchange_field { immediate_or_pointer; mode }
+      | Compare_exchange mode ->
+        Patomic_compare_exchange_field { immediate_or_pointer; mode }
+      | Compare_and_set mode ->
+        Patomic_compare_set_field { immediate_or_pointer; mode }
+      | Fetch_add -> Patomic_fetch_add_field
+      | Add -> Patomic_add_field
+      | Sub -> Patomic_sub_field
+      | Land -> Patomic_land_field
+      | Lor -> Patomic_lor_field
+      | Lxor -> Patomic_lxor_field
+  end
+  | Idx_like (Idx, layout) -> begin
+      match op with
+      | Load -> Patomic_load_idx { layout }
+      | Set mode -> Patomic_set_idx { layout; mode }
+      | Exchange mode -> Patomic_exchange_idx { layout; mode }
+      | Compare_exchange mode ->
+        Patomic_compare_exchange_idx { layout; mode }
+      | Compare_and_set mode ->
+        Patomic_compare_set_idx { layout; mode }
+      | Fetch_add -> Patomic_fetch_add_idx
+      | Add -> Patomic_add_idx
+      | Sub -> Patomic_sub_idx
+      | Land -> Patomic_land_idx
+      | Lor -> Patomic_lor_idx
+      | Lxor -> Patomic_lxor_idx
+  end
+  | Idx_like (Ptr, layout) -> begin
+      match op with
+      | Load -> Patomic_load_ptr { layout }
+      | Set mode -> Patomic_set_ptr { layout; mode }
+      | Exchange mode -> Patomic_exchange_ptr { layout; mode }
+      | Compare_exchange mode ->
+        Patomic_compare_exchange_ptr { layout; mode }
+      | Compare_and_set mode ->
+        Patomic_compare_set_ptr { layout; mode }
+      | Fetch_add -> Patomic_fetch_add_ptr
+      | Add -> Patomic_add_ptr
+      | Sub -> Patomic_sub_ptr
+      | Land -> Patomic_land_ptr
+      | Lor -> Patomic_lor_ptr
+      | Lxor -> Patomic_lxor_ptr
+  end
+
+let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
+  if List.length args <> atomic_arity op kind then
+    raise (Error (to_location loc, Wrong_arity_builtin_primitive prim_name)) ;
+  let split = function
+    | [] ->
+        (* split is only called when [arity >= 1] *)
+        assert false
+    | first :: rest ->
+        first, rest
+  in
+  let prim = atomic_lambda_primitive op kind in
+  match kind with
+  | Field_like (Ref, _) ->
+      (* the primitive application
+           [Lprim(%atomic_exchange, [ref; v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ref; 0; v])]
+      *)
+      let ref_arg, rest = split args in
+      let args = ref_arg :: tagged_immediate 0  :: rest in
+      Lprim (prim, args, loc)
+  | Field_like (Loc, _) ->
+      (* the primitive application
+           [Lprim(%atomic_exchange_loc, [(ptr, ofs); v])]
+         becomes
+           [Lprim(caml_atomic_exchange_field, [ptr; ofs; v])]
+         and in the general case of a non-tuple expression <loc>
+           [Lprim(%atomic_exchange_loc, [loc; v])]
+         becomes
+           [Llet(p, loc,
+              Lprim(caml_atomic_exchange_field, [Field(p, 0); Field(p, 1); v]))]
+      *)
+      let loc_arg, rest = split args in
+      begin match loc_arg with
+      | Lprim (Pmakeblock _, [ptr; ofs], _argloc) ->
+          let args = ptr :: ofs :: rest in
+          Lprim (prim, args, loc)
+      | _ ->
+          let varg = Ident.create_local "atomic_arg" in
+          let ptr =
+            Lprim (Pfield (0, Pointer, Reads_agree), [Lvar varg], loc)
+          in
+          let ofs =
+            Lprim (Pfield (1, Immediate, Reads_agree), [Lvar varg], loc)
+          in
+          let args = ptr :: ofs :: rest in
+          Llet (
+            Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
+            varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
+      end
+  | Field_like (Field, _)
+  | Idx_like _ ->
+      Lprim (prim, args, loc)
+
+let caml_restore_raw_backtrace =
+  Lambda.simple_prim_on_values ~name:"caml_restore_raw_backtrace" ~arity:2
+    ~alloc:false
+
+let try_ids = Hashtbl.create 8
+
+let add_exception_ident id =
+  Hashtbl.replace try_ids id ()
+
+let remove_exception_ident id =
+  Hashtbl.remove try_ids id
+
+let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
+  match prim, args with
+  | Primitive (prim, arity), args when arity = List.length args ->
+      Lprim(prim, args, loc)
+  | Sys_argv, [] ->
+      Lprim(Pccall prim_sys_argv, [lambda_unit], loc)
+  | External prim, args ->
+      Lprim(Pccall prim, args, loc)
+  | Comparison(comp, knd), ([_;_] as args) ->
+      let prim = comparison_primitive comp knd in
+      Lprim(prim, args, loc)
+  | Raise kind, [arg] ->
+      let kind =
+        match kind, arg with
+        | Raise_regular, Lvar argv when Hashtbl.mem try_ids argv ->
+            Raise_reraise
+        | _, _ ->
+            kind
+      in
+      let arg =
+        match arg_exps with
+        | None -> arg
+        | Some [arg_exp] -> event_after loc arg_exp arg
+        | Some _ -> assert false
+      in
+      Lprim(Praise kind, [arg], loc)
+  | Raise_with_backtrace, [exn; bt] ->
+      let vexn = Ident.create_local "exn" in
+      let vexn_duid = Lambda.debug_uid_none in
+      let raise_arg =
+        match arg_exps with
+        | None -> Lvar vexn
+        | Some [exn_exp; _] -> event_after loc exn_exp (Lvar vexn)
+        | Some _ -> assert false
+      in
+      Llet(Strict, Lambda.layout_block, vexn, vexn_duid, exn,
+           Lsequence(Lprim(Pccall caml_restore_raw_backtrace,
+                           [Lvar vexn; bt],
+                           loc),
+                     Lprim(Praise Raise_reraise, [raise_arg], loc)))
+  | Lazy_force pos, [arg] ->
+      Matching.inline_lazy_force arg pos loc
+  | Loc kind, [] ->
+      lambda_of_loc kind loc
+  | Loc kind, [arg] ->
+      let lam = lambda_of_loc kind loc in
+      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+            [lam; arg], loc)
+  | Send (pos, layout), [obj; meth] ->
+      Lsend(Public, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
+  | Send_self (pos, layout), [obj; meth] ->
+      Lsend(Self, meth, obj, [], pos, not_alloc_stack,
+            loc, layout, Unyielding)
+  | Send_cache (apos, layout), [obj; meth; cache; pos] ->
+      (* Cached mode only works in the native backend *)
+      if !Clflags.native_code then
+        Lsend(Cached, meth, obj, [cache; pos], apos,
+              not_alloc_stack, loc, layout,
+              Unyielding)
+      else
+        Lsend(Public, meth, obj, [], apos, not_alloc_stack,
+              loc, layout, Unyielding)
+  | Frame_pointers, [] ->
+     (of_bool (!Clflags.native_code && Config.with_frame_pointers))
+  | Identity, [arg] -> arg
+  | Apply (pos, layout), [func; arg]
+  | Revapply (pos, layout), [arg; func] ->
+      Lapply {
+        ap_func = func;
+        ap_args = [arg];
+        ap_result_layout = layout;
+        ap_loc = loc;
+        (* CR-someday lwhite: it would be nice to be able to give
+           application attributes to functions applied with the application
+           operators. *)
+        ap_tailcall = Default_tailcall;
+        ap_inlined = Default_inlined;
+        ap_specialised = Default_specialise;
+        ap_probe = None;
+        ap_region_close = pos;
+        ap_mode = not_alloc_stack;
+        (* [yielding] is the joined yielding mode of the application of the
+           [%apply] / [%revapply] primitive itself. *)
+        ap_yielding = yielding;
+      }
+  | Peek None, _ | Poke None, _ ->
+      raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))
+  | Peek (Some layout), [ptr] ->
+      Lprim (Ppeek layout, [ptr], loc)
+  | Poke (Some layout), [ptr; new_value] ->
+      Lprim (Ppoke layout, [ptr; new_value], loc)
+  | Unsupported prim, _ ->
+      let exn =
+        transl_extension_path loc (Lazy.force Env.initial)
+          Predef.path_invalid_argument
+      in
+      let msg =
+        Format.asprintf "Unsupported primitive %a" Printlambda.primitive prim
+      in
+      Lprim (
+        Praise Raise_regular,
+        [Lprim (
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
+          [exn; Lconst (Const_immstring msg)],
+          loc)],
+        loc)
+  | Atomic (op, kind), args ->
+      lambda_of_atomic prim_name loc op kind args
+  | (Raise _ | Raise_with_backtrace
+    | Lazy_force _ | Loc _ | Primitive _ | Sys_argv | Comparison _
+    | Send _ | Send_self _ | Send_cache _ | Frame_pointers | Identity
+    | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
+      raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
+
+let get_default_poly_mode_sort p =
+  let mode =
+    match p.prim_native_repr_res with
+    | Prim_global, _ | Prim_poly, _ -> Some Mode.Locality.global
+    | Prim_local, _ -> Some Mode.Locality.local
+  in
+  let sort = Some (Jkind.Sort.of_base Scannable) in
+  mode, sort
+
+let check_primitive_arity loc p =
+  (* We assume all primitives are compiled to have the same arity for
+     different modes and types, so just pick one of the modes in the
+     [Prim_poly] case.
+     By a similar assumption, the sort shouldn't change the arity.  So it's ok
+     to lie here. *)
+  let mode, sort = get_default_poly_mode_sort p in
+  let prim =
+    lookup_primitive_unspecialized loc
+      ~poly_mode:mode ~poly_sort:sort Rc_normal p
+  in
+  let ok =
+    match prim with
+    | Primitive (_,arity) -> arity = p.prim_arity
+    | External _ -> true
+    | Sys_argv -> p.prim_arity = 0
+    | Comparison _ -> p.prim_arity = 2
+    | Raise _ -> p.prim_arity = 1
+    | Raise_with_backtrace -> p.prim_arity = 2
+    | Lazy_force _ -> p.prim_arity = 1
+    | Loc _ -> p.prim_arity = 1 || p.prim_arity = 0
+    | Send _ | Send_self _ -> p.prim_arity = 2
+    | Send_cache _ -> p.prim_arity = 4
+    | Frame_pointers -> p.prim_arity = 0
+    | Identity | Peek _ -> p.prim_arity = 1
+    | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
+    | Atomic (op, kind) -> p.prim_arity = atomic_arity op kind
+    | Unsupported _ -> true
+  in
+  if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
+
+(* Eta-expand a primitive *)
+
+let transl_primitive_common loc ~poly_mode ~poly_sort
+      pos p env ty path arg_exps =
+  let prim =
+    let loc = to_location loc in
+    match lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p with
+    | External _ as e -> add_used_primitive loc env path; e
+    | x -> x
+  in
+  let has_constant_constructor =
+    match arg_exps with
+    | [_; {exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}]
+    | [{exp_desc = Texp_construct(_, {cstr_constant}, _, _, _)}; _] ->
+        cstr_constant
+    | [_; {exp_desc = Texp_variant(_, None)}]
+    | [{exp_desc = Texp_variant(_, None)}; _] -> true
+    | _ -> false
+  in
+  if should_specialize_primitive p then
+    match specialize_primitive env loc ty ~has_constant_constructor prim with
+    | None -> prim
+    | Some prim -> prim
+  else
+    prim
+
+let transl_primitive
+      loc p env ty ~poly_mode ~poly_sort ~yielding ~zero_alloc_check path =
+  let prim =
+    transl_primitive_common loc
+      ~poly_mode ~poly_sort Rc_normal p env ty path []
+  in
+  let to_locality = to_locality ~poly:poly_mode in
+  let error_loc = to_location loc in
+  let rec make_params ty repr_args repr_res =
+    match repr_args, repr_res with
+    | [], (_, res_repr) ->
+      let res_sort = sort_of_native_repr res_repr ~poly_sort in
+      [], Typeopt.layout env error_loc res_sort ty
+    | (((_, arg_repr) as arg) :: repr_args), _ ->
+      match Typeopt.is_function_type env ty with
+      | None ->
+          Misc.fatal_errorf "Primitive %s type does not correspond to arity"
+            (Primitive.byte_name p)
+      | Some (arg_ty, ret_ty) ->
+          let arg_sort = sort_of_native_repr arg_repr ~poly_sort in
+          let arg_layout =
+            Typeopt.layout env error_loc arg_sort arg_ty
+          in
+          let arg_mode = to_locality arg in
+          let params, return =
+            make_params ret_ty repr_args repr_res
+          in
+          { name = Ident.create_local "prim";
+            debug_uid = Lambda.debug_uid_none;
+            (* The eta expansion is not actually visible at the source level,
+               so we do not generate a fresh [debug_uid] here. *)
+            layout = arg_layout;
+            attributes = Lambda.default_param_attribute;
+            mode = arg_mode }
+          :: params, return
+  in
+  let params, return =
+    make_params ty p.prim_native_repr_args p.prim_native_repr_res
+  in
+  let args = List.map (fun p -> Lvar p.name) params in
+  let yielding = transl_yielding_mode_l yielding in
+  match params with
+  | [] -> lambda_of_prim p.prim_name prim ~yielding loc args None
+  | _ ->
+     let loc =
+       Debuginfo.Scoped_location.map_scopes
+         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
+         loc
+     in
+     let body =
+       lambda_of_prim p.prim_name prim ~yielding loc args None
+     in
+     let locality_mode = to_locality p.prim_native_repr_res in
+     let () =
+       (* CR mshinwell: Write a version of [primitive_may_allocate] that
+          works on the [prim] type. *)
+       match body with
+       | Lprim (prim, _, _) ->
+         (match Lambda.primitive_may_allocate prim with
+          | None ->
+            (* We don't check anything in this case; if the primitive doesn't
+               allocate, then after [Lambda] it will be translated to a term
+               not involving any region variables, meaning there would be
+               no concern about potentially unbound region variables. *)
+            ()
+          | Some lambda_alloc_mode ->
+            (* In this case we add a check to ensure the middle end has
+               the correct information as to whether a region was inserted
+               at this point. *)
+            match locality_mode, lambda_alloc_mode with
+            | Alloc_heap, Alloc_heap
+            | Alloc_local, Alloc_local -> ()
+            | Alloc_local, Alloc_heap ->
+              (* This case is ok: the Lambda-derived information is more
+                 precise.  A region will be inserted, likely unused, and
+                 deleted by the middle end. *)
+              ()
+            | Alloc_heap, Alloc_local ->
+              Misc.fatal_errorf "Locality mode incompatibility for:@ %a@ \
+                  (from to_locality, %a; from primitive_may_allocate, %a)"
+                Printlambda.lambda body
+                Printlambda.locality_mode locality_mode
+                Printlambda.locality_mode lambda_alloc_mode
+         )
+       | _ -> ()
+     in
+     let region =
+       match locality_mode with
+       | Alloc_heap -> true
+       | Alloc_local -> false
+     in
+     let rec count_nlocal = function
+       | [] -> assert false
+       | [_] -> if region then 0 else 1
+       | Alloc_heap :: args -> count_nlocal args
+       | (Alloc_local :: _) as args -> List.length args
+     in
+     let nlocal = count_nlocal (List.map to_locality p.prim_native_repr_args) in
+     let zero_alloc : Lambda.zero_alloc_attribute =
+       match (zero_alloc_check : Zero_alloc.check option) with
+       | None -> Default_zero_alloc
+       | Some { strict; opt; arity = _; loc; custom_error_msg } ->
+         if Builtin_attributes.is_zero_alloc_check_enabled ~opt
+         then Check { strict; loc; custom_error_msg }
+         else Default_zero_alloc
+     in
+     lfunction
+       ~kind:(Curried {nlocal})
+       ~params
+       ~return
+       ~attr:{ default_stub_attribute with zero_alloc }
+       ~loc
+       ~body
+       ~mode:alloc_heap
+       ~ret_mode:(to_return_mode ~poly:poly_mode p.prim_native_repr_res)
+
+let lambda_primitive_needs_event_after = function
+  (* We add an event after any primitive resulting in a C call that MAY raise
+     an exception or allocate (this is approximated conservatively). These are
+     places where we may
+     collect the call stack. *)
+  | Pscalar op ->
+    let { can_raise; result } : _  Scalar.Operation.info =
+      Scalar.Operation.info op
+    in
+    let may_allocate =
+      match Scalar.ignore_locality result with
+      | Value x | Naked x ->
+        (* Note this is only for bytecode! *)
+        match x with
+        | Floating (Float32 _ | Float64 _)
+        | Integral (Boxable _) -> true
+        | Integral (Taggable _) -> false
+    in
+    can_raise || may_allocate
+  | Pduprecord _ | Pccall _
+  | Pstringrefs | Pbytesrefs
+  | Pbytessets | Pmakearray (Pgenarray, _, _) | Pduparray _
+  | Pmakearray_dynamic (Pgenarray, _, _)
+  | Parrayrefu ((Pgenarray_ref _ | Pfloatarray_ref _), _, _)
+  | Parrayrefs _ | Parraysets _
+  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+  | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+  | Pstring_load_vec _
+  | Pstring_load_mask _
+  | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
+  | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_load_mask _
+  | Pbytes_set_8 _ | Pbytes_set_16 _
+  | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+  | Pbytes_set_mask _
+  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
+  | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
+  | Pbigstring_load_vec _
+  | Pbigstring_load_mask _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
+  | Pbigstring_set_mask _
+  | Pfloatarray_load_vec _ | Pint_array_load_vec _
+  | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
+  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+  | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+  | Punboxed_nativeint_array_load_vec _
+  | Pfloatarray_set_vec _ | Pint_array_set_vec _
+  | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
+  | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
+  | Punboxed_nativeint_array_set_vec _
+  | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
+  | Pget_idx _ | Pset_idx _
+  | Pget_ptr _ | Pset_ptr _
+  | Pget_ext_ptr _ | Pset_ext_ptr _
+  | Pwith_stack | Pwith_stack_preemptible
+  | Pperform | Preperform
+  | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
+  | Ppoll | Pobj_dup | Pget_header _ -> true
+  (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
+     bytecode, because int64_u is actually represented as a boxed value. *)
+  | Preinterpret_tagged_int63_as_unboxed_int64 -> true
+
+  | Pphys_equal _
+  | Pbytes_to_string | Pbytes_of_string
+  | Parray_to_iarray | Parray_of_iarray
+  | Pignore
+  | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
+  | Pmakeufloatblock _ | Pmakelazyblock _
+  | Pmake_unboxed_product _ | Punboxed_product_field _
+  | Parray_element_size_in_bytes _
+  | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
+  | Pidx_deepen _
+
+  | Pfield _ | Pfield_computed _ | Psetfield _
+  | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
+  | Pufloatfield _ | Psetufloatfield _ | Pmixedfield _ | Psetmixedfield _
+  | Poffsetref _
+  | Psequor | Psequand | Pnot
+  | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
+  | Pbytessetu
+  | Pmakearray ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+                 | Punboxedfloatarray _
+      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ | Punboxedmaskarray
+      | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
+  | Pmakearray_dynamic
+      ((Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
+        | Punboxedfloatarray _
+       | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
+       | Punboxedmaskarray
+       | Pgcscannableproductarray _ | Pgcignorableproductarray _), _, _)
+  | Parrayblit _
+  | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint _ | Pisnull | Pisout
+  | Pprobe_is_enabled _
+  | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+  | Patomic_compare_set_field _ | Patomic_fetch_add_field
+  | Patomic_add_field | Patomic_sub_field
+  | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
+  | Patomic_load_field _ | Patomic_load_mixed_field _
+  | Patomic_set_field _ | Patomic_set_mixed_field _
+  | Patomic_load_idx _ | Patomic_set_idx _
+  | Patomic_exchange_idx _ | Patomic_compare_exchange_idx _
+  | Patomic_compare_set_idx _ | Patomic_fetch_add_idx
+  | Patomic_add_idx | Patomic_sub_idx
+  | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+  | Patomic_load_ptr _ | Patomic_set_ptr _
+  | Patomic_exchange_ptr _ | Patomic_compare_exchange_ptr _
+  | Patomic_compare_set_ptr _ | Patomic_fetch_add_ptr
+  | Patomic_add_ptr | Patomic_sub_ptr
+  | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
+  | Pdls_get
+  | Ptls_get
+  | Pdomain_index
+  | Pobj_magic _ | Punbox_vector _ | Punbox_mask
+  | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
+  (* These don't allocate in bytecode; they're just identity functions: *)
+  | Pbox_vector (_, _)
+  | Pbox_mask _
+  | Punbox_unit
+    -> false
+  | Pmakearray (Punspecializedarray, _, _)
+  | Pmakearray_dynamic (Punspecializedarray, _, _) ->
+    Misc.fatal_error
+      "Translprim.lambda_primitive_needs_event_after: Punspecializedarray"
+
+(* Determine if a primitive should be surrounded by an "after" debug event *)
+let primitive_needs_event_after = function
+  | Primitive (prim,_) -> lambda_primitive_needs_event_after prim
+  | External _ | Sys_argv -> true
+  | Comparison(comp, knd) ->
+      lambda_primitive_needs_event_after (comparison_primitive comp knd)
+  | Lazy_force _ | Send _ | Send_self _ | Send_cache _
+  | Apply _ | Revapply _ -> true
+  | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
+  | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
+
+let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
+    ~yielding path exp args arg_exps pos =
+  let prim =
+    transl_primitive_common
+      loc ~poly_mode ~poly_sort pos p env ty (Some path) arg_exps
+  in
+  if stack then begin
+    match prim with
+    | Primitive (prim, _) ->
+        begin match Lambda.primitive_may_allocate prim with
+        (*
+        Assumption: If a primitive allocates, the allocation mode is the return mode.
+
+        Here we are only checking (not enforcing) stack allocation, because:
+
+        - If the primitive has [@local_opt] as its return mode, then the mode is
+        registered as allocation in [Typecore.type_ident], and pushed towards local before
+        lambda stage.
+
+        - If the primitive does not have [@local_opt] as its return mode, then its return
+        mode is constant, and therefore its allocation mode, if any, is already constant.
+          *)
+        | Some Alloc_local -> ()
+        | Some Alloc_heap ->
+            raise (Error (to_location loc, Invalid_stack_primitive Allocating_on_heap))
+        | None -> raise (Error (to_location loc, Invalid_stack_primitive Not_allocating))
+        end
+    | _ -> raise (Error (to_location loc, Invalid_stack_primitive Not_primitive))
+  end;
+  let lam =
+    lambda_of_prim p.prim_name prim ~yielding loc args (Some arg_exps)
+  in
+  let lam =
+    if primitive_needs_event_after prim then begin
+      match exp with
+      | None -> lam
+      | Some exp -> event_after loc exp lam
+    end else begin
+      lam
+    end
+  in
+  lam
+
+(* Whether a primitive allocates when fully applied.
+   Exception should be raised at later stage, so here we just be conservative
+   when there are exceptions.
+
+   This mirrors, for the allocation axis only, what [lambda_of_prim] above
+   builds for each [prim].  Keep the two in step. *)
+let prim_may_allocate ~arity prim =
+  let primitive_may_allocate prim =
+    try Option.is_some (Lambda.primitive_may_allocate prim) with
+    | _ -> true
+  in
+  match prim with
+  | Primitive (prim, _) -> primitive_may_allocate prim
+  | Sys_argv -> primitive_may_allocate (Pccall prim_sys_argv)
+  | External prim -> primitive_may_allocate (Pccall prim)
+  | Comparison (comp, knd) ->
+      primitive_may_allocate (comparison_primitive comp knd)
+  | Raise _ -> false
+  | Raise_with_backtrace -> false
+  | Lazy_force _ -> true
+  | Loc _ -> arity > 0
+  | Send _ | Send_self _ | Send_cache _ -> true
+  | Frame_pointers -> false
+  | Identity -> false
+  | Apply _ | Revapply _ -> false
+  | Peek None | Poke None -> true
+  | Peek (Some _) -> false
+  | Poke (Some _) -> false
+  | Unsupported _ -> true
+  | Atomic (op, kind) ->
+      primitive_may_allocate (atomic_lambda_primitive op kind)
+
+let fully_applied_may_allocate env loc p ~ty ~arg_exps =
+  let snap = Btype.snapshot () in
+  let result =
+    try
+      let sloc = of_location ~scopes:empty_scopes loc in
+      let poly_mode, poly_sort = get_default_poly_mode_sort p in
+      let prim =
+        transl_primitive_common sloc ~poly_mode ~poly_sort Rc_normal p env ty
+          None arg_exps
+      in
+      prim_may_allocate ~arity:p.prim_arity prim
+    with
+    | _ -> true
+  in
+  Btype.backtrack snap;
+  result
+
+let is_omitted = function
+  | Arg _ -> false
+  | Omitted _ -> true
+
+let can_apply_primitive p pmode pos args ~check_poly_mode =
+  if List.exists (fun (_, arg) -> is_omitted arg) args then false
+  else begin
+    let nargs = List.length args in
+    if nargs = p.prim_arity then true
+    else if nargs < p.prim_arity then false
+    else if pos <> Typedtree.Tail then true
+    else begin
+      (* Cannot directly apply primitive under this case if pmode is local *)
+      if check_poly_mode then
+        let return_mode =
+          Ctype.prim_mode pmode p.prim_native_repr_res ~level:0
+        in
+        is_heap_mode (transl_locality_mode_l return_mode)
+      else
+        match p.prim_native_repr_res with
+        | Prim_global, _ -> true
+        (* Being conservative if not checking pmode *)
+        | Prim_poly, _
+        | Prim_local, _ -> false
+    end
+  end
+
+type allocation_registration =
+  | No_allocation
+  | Allocation_at_locality of Mode.Locality.lr
+
+let result_allocation p ~poly_mode =
+  match p.prim_native_repr_res, poly_mode with
+  | (Prim_poly, _), Some mode -> Allocation_at_locality mode
+  | (Prim_poly, _), None -> assert false
+  | (Prim_global, _), _ -> Allocation_at_locality Mode.Locality.global
+  | (Prim_local, _), _ -> No_allocation
+
+let application_allocation env loc p pos args ~poly_mode ~ty =
+  if can_apply_primitive p poly_mode pos args ~check_poly_mode:false then
+    let rec cut_args n args =
+      match n, args with
+      | 0, _ -> []
+      | _, [] -> failwith "Translprim cut_args"
+      | _, ((_, Arg (x, _)) :: oargs) -> x :: (cut_args (n - 1) oargs)
+      | _, ((_, Omitted _) :: _) -> assert false
+    in
+    let arg_exps = cut_args p.prim_arity args in
+    if fully_applied_may_allocate env loc p ~ty ~arg_exps then
+      result_allocation p ~poly_mode
+    else No_allocation
+  else
+    Allocation_at_locality Mode.Locality.global
+
+let non_arrow_prim_allocates loc p =
+  let poly_mode, poly_sort = get_default_poly_mode_sort p in
+  lookup_primitive_unspecialized loc ~poly_mode ~poly_sort Rc_normal p
+    = Sys_argv
+
+(* Error report *)
+
+open Format_doc
+module Style = Misc.Style
+
+let report_error_doc ppf = function
+  | Unknown_builtin_primitive prim_name ->
+      fprintf ppf "Unknown builtin primitive %a" Style.inline_code prim_name
+  | Wrong_arity_builtin_primitive prim_name ->
+      fprintf ppf "Wrong arity for builtin primitive %a"
+        Style.inline_code prim_name
+  | Wrong_layout_for_peek_or_poke prim_name ->
+      fprintf ppf "Unsupported layout for the %s primitive" prim_name
+  | Invalid_floatarray_glb ->
+      fprintf ppf
+        "@[Floatarray primitives can't be used on arrays containing@ \
+         unboxed types.@]"
+  | Invalid_array_kind_for_uninitialized_makearray_dynamic ->
+      fprintf ppf
+        "%%makearray_dynamic_uninit can only be used for GC-ignorable arrays@ \
+         not involving tagged immediates; and arrays of unboxed numbers.@ Use \
+         %%makearray instead, providing an initializer."
+  | Invalid_stack_primitive Not_allocating ->
+      fprintf ppf
+        "This cannot be marked as stack_,@ \
+        because this primitive does not allocate."
+  | Invalid_stack_primitive Not_primitive ->
+      fprintf ppf
+        "This cannot be marked as stack_,@ \
+        because it is either not a primitive,@ \
+        or the primitive does not allocate."
+  | Invalid_stack_primitive Allocating_on_heap ->
+      fprintf ppf
+        "This primitive always allocates on heap@ \
+        (maybe it should be declared with %a or %a?)"
+        Style.inline_code "[@local_opt]" Style.inline_code "@ local"
+  | Unable_to_specialize_array_idx_primitive _ty ->
+      fprintf ppf
+        "@[Unable to determine the array kind for array index primitive: \
+         the@ result type should be equal to a %a or %a@ \
+         whose first parameter is equal to %a or %a.@]"
+        Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
+        Style.inline_code "_ array" Style.inline_code "_ iarray"
+  | Element_would_be_reordered_in_record ->
+      fprintf ppf
+        "Block indices into arrays of unboxed products containing a@ \
+         non-value before a value are not yet supported."
+
+let () =
+  Location.register_error_of_exn
+    (function
+      | Error (loc, err) ->
+          Some (Location.error_of_printer ~loc report_error_doc err)
+      | _ ->
+        None
+    )
+
+let report_error = Format_doc.compat report_error_doc
