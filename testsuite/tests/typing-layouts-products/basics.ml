@@ -2172,16 +2172,6 @@ let g (type a) (x : a) = f () x
 
 [%%expect{|
 val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
-Line 3, characters 25-31:
-3 | let g (type a) (x : a) = f () x
-                             ^^^^^^
-Error:
-       The layout of a is value
-         because it is or unifies with an unannotated universal variable.
-       But the layout of a must be representable
-         because we must know concretely how to pass a function argument.
-|}, Principal{|
-val f : ('a : any separable & value). unit -> 'a -> 'a = <fun>
 Line 3, characters 30-31:
 3 | let g (type a) (x : a) = f () x
                                   ^

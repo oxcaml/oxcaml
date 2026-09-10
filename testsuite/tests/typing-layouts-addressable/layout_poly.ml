@@ -40,17 +40,6 @@ val i : #(int64_u * string) -> #(int64_u * string) = <fun>
 (* Rejected at unaddressable kinds *)
 let bad (x : b8) = id_addressable x
 [%%expect{|
-Line 1, characters 19-35:
-1 | let bad (x : b8) = id_addressable x
-                       ^^^^^^^^^^^^^^^^
-Error:
-       The layout of b8 is bits8
-         because of the definition of b8 at line 3, characters 0-15.
-       But the layout of b8 must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-|}, Principal{|
 Line 1, characters 34-35:
 1 | let bad (x : b8) = id_addressable x
                                       ^
@@ -66,17 +55,6 @@ Error: The value "x" has type "b8" but an expression was expected of type
 
 let bad (x : float#) = id_addressable x
 [%%expect{|
-Line 1, characters 23-39:
-1 | let bad (x : float#) = id_addressable x
-                           ^^^^^^^^^^^^^^^^
-Error:
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-|}, Principal{|
 Line 1, characters 38-39:
 1 | let bad (x : float#) = id_addressable x
                                           ^
@@ -93,19 +71,6 @@ Error: The value "x" has type "float#" but an expression was expected of type
 (* ...including at an unboxed product with an unaddressable component *)
 let bad (x : #(float# * string)) = id_addressable x
 [%%expect{|
-Line 1, characters 35-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                       ^^^^^^^^^^^^^^^^
-Error:
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 1, characters 50-51:
 1 | let bad (x : #(float# * string)) = id_addressable x
                                                       ^
@@ -134,16 +99,6 @@ let bad x =
   let _ = id_addressable x in
   (x : float#)
 [%%expect{|
-Line 3, characters 3-4:
-3 |   (x : float#)
-       ^
-Error: The value "x" has type "('a : '_representable_layout_1 addressable)"
-       but an expression was expected of type "float#"
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be addressable
-         because it's the type of a variable bound by a `let`.
-|}, Principal{|
 Line 3, characters 3-4:
 3 |   (x : float#)
        ^
@@ -347,19 +302,6 @@ val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
 
 let bad (y : b8 mixed_pair) = id_addressable y
 [%%expect{|
-Line 1, characters 30-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                  ^^^^^^^^^^^^^^^^
-Error:
-       The layout of b8 mixed_pair is bits8 & value non_float
-         because of the definition of mixed_pair at line 1, characters 0-52.
-       But the layout of b8 mixed_pair must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 1, characters 45-46:
 1 | let bad (y : b8 mixed_pair) = id_addressable y
                                                  ^

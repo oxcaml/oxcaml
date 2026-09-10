@@ -83,14 +83,6 @@ val v5 : float32_u array = [|<abstr>|]
 
 let f (x : float# array) = x.(0)
 [%%expect{|
-Line 1, characters 27-32:
-1 | let f (x : float# array) = x.(0)
-                               ^^^^^
-Error:
-       The layout of float# is float64
-         because it is the unboxed version of the primitive type float.
-       But the layout of float# must be a value layout.
-|}, Principal{|
 Line 1, characters 27-28:
 1 | let f (x : float# array) = x.(0)
                                ^
