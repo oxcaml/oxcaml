@@ -5,9 +5,7 @@
          : imm tagged =
    cont k1 (0)
  in
- let $camlUnboxed_closure_not_needed__s0 =
-   closure fn_3 @fn &toplevel.alloc_region
- in
+ let $camlUnboxed_closure_not_needed__s0 = closure fn_3 @fn &toplevel in
  let code inline(never) size(1)
        g_1 (y : imm tagged)
          my_closure &my_alloc_region my_depth
@@ -40,14 +38,13 @@
  in
  let $camlUnboxed_closure_not_needed__s1 = Block 0 () in
  let bind = %opaque (0) in
- let f = closure f_0 @f &toplevel.alloc_region
- and g = closure g_1 @g &toplevel.alloc_region
+ let f = closure f_0 @f &toplevel
+ and g = closure g_1 @g &toplevel
  with { bind = bind }
  in
- apply direct(g_1 &toplevel.alloc_region)  (0) -> k1 * error
+ apply direct(g_1 &toplevel)  (0) -> k1 * error
    where k1 (apply_result : val) =
-     (apply direct(f_0 &toplevel.alloc_region)
-        (f : _ -> imm tagged) (0) -> k1 * error
+     (apply direct(f_0 &toplevel) (f : _ -> imm tagged) (0) -> k1 * error
         where k1 (apply_result_1 : imm tagged) =
           cont k ($camlUnboxed_closure_not_needed__s1)))
   where k define_root_symbol (module_block) =

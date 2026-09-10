@@ -26,6 +26,8 @@ val joined_env : t -> env_id -> Typing_env.t
 
 val machine_width : t -> Target_system.Machine_width.t
 
+val import_type : t -> Type_grammar.t -> t
+
 val n_way_join_simples :
   t -> Flambda_kind.t -> Simple.t join_arg list -> Simple.t Or_bottom.t * t
 

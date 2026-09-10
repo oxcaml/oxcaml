@@ -64,10 +64,27 @@ module Metadata = struct
 end
 
 type t =
+<<<<<<< HEAD
   { body : Flambda.Expr.t;
     metadata : Metadata.t
+||||||| bf88f1f836
+  { return_continuation : Continuation.t;
+    exn_continuation : Continuation.t;
+    toplevel_my_region : Variable.t;
+    toplevel_my_ghost_region : Variable.t;
+    toplevel_my_alloc_region : Variable.t;
+    body : Flambda.Expr.t;
+    module_symbol : Symbol.t
+=======
+  { return_continuation : Continuation.t;
+    exn_continuation : Continuation.t;
+    toplevel_my_alloc_region : Variable.t;
+    body : Flambda.Expr.t;
+    module_symbol : Symbol.t
+>>>>>>> origin/main
   }
 
+<<<<<<< HEAD
 let create ~return_continuation ~exn_continuation ~toplevel_my_region
     ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol =
   { body;
@@ -79,12 +96,32 @@ let create ~return_continuation ~exn_continuation ~toplevel_my_region
         toplevel_my_alloc_region;
         module_symbol
       }
+||||||| bf88f1f836
+let create ~return_continuation ~exn_continuation ~toplevel_my_region
+    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~body ~module_symbol =
+  { return_continuation;
+    exn_continuation;
+    toplevel_my_region;
+    toplevel_my_ghost_region;
+    toplevel_my_alloc_region;
+    body;
+    module_symbol
+=======
+let create ~return_continuation ~exn_continuation ~toplevel_my_alloc_region
+    ~body ~module_symbol =
+  { return_continuation;
+    exn_continuation;
+    toplevel_my_alloc_region;
+    body;
+    module_symbol
+>>>>>>> origin/main
   }
 
 let create_of_metadata_and_body metadata body = { body; metadata }
 
 let metadata t = t.metadata
 
+<<<<<<< HEAD
 let return_continuation t = t.metadata.return_continuation
 
 let exn_continuation t = t.metadata.exn_continuation
@@ -94,6 +131,15 @@ let toplevel_my_region t = t.metadata.toplevel_my_region
 let toplevel_my_ghost_region t = t.metadata.toplevel_my_ghost_region
 
 let toplevel_my_alloc_region t = t.metadata.toplevel_my_alloc_region
+||||||| bf88f1f836
+let toplevel_my_region t = t.toplevel_my_region
+
+let toplevel_my_ghost_region t = t.toplevel_my_ghost_region
+
+let toplevel_my_alloc_region t = t.toplevel_my_alloc_region
+=======
+let toplevel_my_alloc_region t = t.toplevel_my_alloc_region
+>>>>>>> origin/main
 
 let body t = t.body
 
@@ -102,23 +148,30 @@ let module_symbol t = t.metadata.module_symbol
 let with_body t body = { t with body }
 
 let [@ocamlformat "disable"] print ppf
+<<<<<<< HEAD
       { body; metadata = { return_continuation; exn_continuation;
         toplevel_my_region; toplevel_my_ghost_region;
         toplevel_my_alloc_region; module_symbol;
       } } =
+||||||| bf88f1f836
+      { return_continuation; exn_continuation; toplevel_my_region;
+        toplevel_my_ghost_region; toplevel_my_alloc_region; body;
+        module_symbol;
+      } =
+=======
+      { return_continuation; exn_continuation; toplevel_my_alloc_region; body;
+        module_symbol;
+      } =
+>>>>>>> origin/main
   Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(module_symbol@ %a)@]@ \
         @[<hov 1>(return_continuation@ %a)@]@ \
         @[<hov 1>(exn_continuation@ %a)@]@ \
-        @[<hov 1>(toplevel_my_region@ %a)@]@ \
-        @[<hov 1>(toplevel_my_ghost_region@ %a)@]@ \
         @[<hov 1>(toplevel_my_alloc_region@ %a)@]@ \
         @[<hov 1>%a@]\
       )@]"
     Symbol.print module_symbol
     Continuation.print return_continuation
     Continuation.print exn_continuation
-    Variable.print toplevel_my_region
-    Variable.print toplevel_my_ghost_region
     Variable.print toplevel_my_alloc_region
     Flambda.Expr.print body

@@ -94,6 +94,7 @@ type calling_convention_change =
         params_decisions : param_decision list;
         return_decisions : param_decision list
       }
+<<<<<<< HEAD
 
 (** Calling-convention changes and metadata with unknown result types. *)
 type code_changes
@@ -130,7 +131,12 @@ val code_changes_apply_renaming :
   code_changes
 
 val pp_result : Format.formatter -> result -> unit
+||||||| bf88f1f836
+val pp_result : Format.formatter -> result -> unit
+=======
+>>>>>>> origin/main
 
+<<<<<<< HEAD
 val unboxed_fields_ids_for_export :
   unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
 
@@ -166,8 +172,22 @@ val cannot_change_calling_convention_table :
 *)
 val cannot_change_calling_convention :
   analysis_scope:Analysis_scope.t -> result -> Code_id.t -> bool
+||||||| bf88f1f836
+val cannot_change_calling_convention : result -> Code_id.t -> bool
+=======
+type code_changes
+
+val get_calling_convention_change :
+  code_changes -> Code_id.t -> calling_convention_change
+
+(* Should only be called on code_ids from the current unit. *)
+val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
+
+val pp_result : Format.formatter -> result -> unit
+>>>>>>> origin/main
 
 val perform_analysis :
+<<<<<<< HEAD
   Datalog.database ->
   stats:Datalog.Schedule.stats ->
   analysis_scope:Analysis_scope.t ->
@@ -178,5 +198,21 @@ val compute_code_changes :
   analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
+||||||| bf88f1f836
+  Datalog.database -> stats:Datalog.Schedule.stats -> result
+=======
+  Datalog.database -> stats:Datalog.Schedule.stats -> result
+
+val compute_code_changes :
+  result ->
+  rewrite_kind_with_subkind:
+    (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
+  rewrite_result_types:
+    (my_closure:Variable.t ->
+    params:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    Result_types.t ->
+    Result_types.t Or_unknown_or_bottom.t) ->
+>>>>>>> origin/main
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   code_changes

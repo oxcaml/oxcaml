@@ -68,20 +68,18 @@ let create_discontiguous_range_list_entry state ~start_of_code_symbol
   let start_inclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (start_pos |> Label.to_int))
-      ~adjustment:start_pos_offset ~start_of_code_symbol
+      ~adjustment:start_pos_offset
   in
   let end_exclusive =
     Address_table.add (DS.address_table state)
       (Asm_label.create_int Text (end_pos |> Label.to_int))
-      ~adjustment:end_pos_offset ~start_of_code_symbol
+      ~adjustment:end_pos_offset
   in
   let range_list_entry : Range_list_entry.entry =
     (* DWARF-5 spec page 54 line 1. *)
     Startx_endx { start_inclusive; end_exclusive; payload = () }
   in
-  let range_list_entry =
-    Range_list_entry.create range_list_entry ~start_of_code_symbol
-  in
+  let range_list_entry = Range_list_entry.create range_list_entry in
   (* We still use the [Range_list] when emitting DWARF-4 (even though it is a
      DWARF-5 structure) for the purposes of de-duplicating ranges. *)
   let range_list = Range_list.add range_list range_list_entry in
@@ -212,7 +210,7 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
         ~high_pc_offset_in_bytes:end_pos_offset
     in
     [low_pc; high_pc], all_summaries
-  | Some (Discontiguous (dwarf_4_range_list_entries, _range_list, summary)) -> (
+  | Some (Discontiguous (dwarf_4_range_list_entries, range_list, summary)) -> (
     match All_summaries.Map.find summary all_summaries with
     | exception Not_found ->
       let range_list_attributes =
@@ -227,10 +225,10 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
           in
           [range_list_attribute]
         | Five ->
-          (* CR mshinwell: implement DWARF-5 support *)
-          (* let range_list_index = Range_list_table.add (DS.range_list_table
-             state) range_list in DAH.create_ranges range_list_index *)
-          Misc.fatal_error "not yet implemented"
+          let range_list_index =
+            Range_list_table.add (DS.range_list_table state) range_list
+          in
+          [DAH.create_ranges range_list_index]
       in
       let all_summaries =
         All_summaries.Map.add summary range_list_attributes all_summaries

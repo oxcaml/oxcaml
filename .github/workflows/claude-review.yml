@@ -56,7 +56,7 @@ jobs:
       actions: read # let the review consider CI results
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: true # zizmor: ignore[artipacked]
             # anthropics/claude-code-action runs `git fetch` before configuring
@@ -67,7 +67,7 @@ jobs:
             # persist-credentials to false once that issue is resolved.
 
       - name: Run Claude Review
-        uses: anthropics/claude-code-action@ba0aafd4308cbba7165f9f2cdb0cfbed5a3c99ce # v1.0.168
+        uses: anthropics/claude-code-action@6b082c41935b4c8a3b8b0ef85ba4ba4d9eeb8975 # v1.0.189
         with:
           # Workload Identity Federation identifiers, not credentials (see the
           # WIF section in .github/claude-code-security.md).
@@ -131,7 +131,12 @@ jobs:
           # no additional safety, only capability gaps.
           # Inline review comments still go through the inline-comment MCP
           # tool, same as claude.yml.
+          # The model and effort come from the CLAUDE_MODEL and CLAUDE_EFFORT
+          # repository variables so maintainers can change them from
+          # Settings -> Actions -> Variables without a PR. When unset they
+          # default to the latest Fable model at xhigh effort ('fable' is a
+          # Claude Code alias that tracks new Fable releases).
           claude_args: |
-            --model claude-fable-5
-            --effort xhigh
+            --model ${{ vars.CLAUDE_MODEL || 'fable' }}
+            --effort ${{ vars.CLAUDE_EFFORT || 'xhigh' }}
             --allowedTools "mcp__github_inline_comment__create_inline_comment,mcp__github_ci__get_ci_status,mcp__github_ci__get_workflow_run_details,mcp__github_ci__download_job_log,Bash"

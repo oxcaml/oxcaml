@@ -52,7 +52,7 @@ module type Check =
 |}]
 
 (* CR layouts: Inference for addressable is incomplete! These tests show that.
-   See [Jkind.Sort.equate_sort_addressable].
+   See the [Addressable] cases in [Sort.equate].
 
    We should make these complete through "fixing the kind system." *)
 

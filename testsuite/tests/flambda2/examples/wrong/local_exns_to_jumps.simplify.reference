@@ -50,9 +50,7 @@ apply ccall noalloc
             | 0 -> k1 pop(reraise k1) (`exn`)
             | 1 -> k (42)
     in
-    let $camlLocal_exns_to_jumps__f1_3 =
-      closure f1_0_1 @f1 &toplevel.alloc_region
-    in
+    let $camlLocal_exns_to_jumps__f1_3 = closure f1_0_1 @f1 &toplevel in
     let code loopify(never) size(48) newer_version_of(f2_1)
           f2_1_1 (x : imm tagged, g : val)
             my_closure &my_alloc_region my_depth
@@ -99,9 +97,7 @@ apply ccall noalloc
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
           cont k (42)
     in
-    let $camlLocal_exns_to_jumps__f2_4 =
-      closure f2_1_1 @f2 &toplevel.alloc_region
-    in
+    let $camlLocal_exns_to_jumps__f2_4 = closure f2_1_1 @f2 &toplevel in
     let code loopify(never) size(48) newer_version_of(f3_2)
           f3_2_1 (x : imm tagged, g : val)
             my_closure &my_alloc_region my_depth
@@ -148,9 +144,7 @@ apply ccall noalloc
           let unit_1 = %end_try_ghost_region (try_ghost_region) in
           cont k (42)
     in
-    let $camlLocal_exns_to_jumps__f3_5 =
-      closure f3_2_1 @f3 &toplevel.alloc_region
-    in
+    let $camlLocal_exns_to_jumps__f3_5 = closure f3_2_1 @f3 &toplevel in
     (apply ccall noalloc
        ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
        where k (Pccall_1) =
@@ -216,9 +210,7 @@ apply ccall noalloc
                let int_add_2 = %int_barith.add (cse_param_1, cse_param) in
                cont k (int_add_2)
          in
-         let $camlLocal_exns_to_jumps__f4_7 =
-           closure f4_3_1 @f4 &toplevel.alloc_region
-         in
+         let $camlLocal_exns_to_jumps__f4_7 = closure f4_3_1 @f4 &toplevel in
          let $camlLocal_exns_to_jumps =
            Block 0 ($camlLocal_exns_to_jumps__Exit_2,
                     $camlLocal_exns_to_jumps__f1_3,

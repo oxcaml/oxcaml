@@ -390,6 +390,7 @@ module M = struct
         sub.modes sub mm
     | Pmod_unpack e -> sub.expr sub e
     | Pmod_extension x -> sub.extension sub x
+    | Pmod_hole -> ()
     | Pmod_instance _ -> ()
         (* CR lmaurer: Implement this. Might want to change the [instance] type
            to have Ids with locations in them rather than just raw strings. *)

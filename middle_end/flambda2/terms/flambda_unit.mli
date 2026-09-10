@@ -33,8 +33,6 @@ val print : Format.formatter -> t -> unit
 val create :
   return_continuation:Continuation.t ->
   exn_continuation:Continuation.t ->
-  toplevel_my_region:Variable.t ->
-  toplevel_my_ghost_region:Variable.t ->
   toplevel_my_alloc_region:Variable.t ->
   body:Flambda.Expr.t ->
   module_symbol:Symbol.t ->
@@ -47,10 +45,6 @@ val metadata : t -> Metadata.t
 val return_continuation : t -> Continuation.t
 
 val exn_continuation : t -> Continuation.t
-
-val toplevel_my_region : t -> Variable.t
-
-val toplevel_my_ghost_region : t -> Variable.t
 
 val toplevel_my_alloc_region : t -> Variable.t
 
