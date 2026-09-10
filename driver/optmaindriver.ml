@@ -168,8 +168,6 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
     end
     else if !reaper_rebuild then begin
       Compmisc.init_path ();
-      (* CR mvellacott: change validation: should take one .ltosol and many
-         .cmx files (potentially other files too?). *)
       let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
       let ltosol_file, (other_inputs : string list) = match
         List.partition (fun f -> Filename.check_suffix f ".ltosol") inputs
@@ -181,19 +179,23 @@ let main unix argv ppf ~flambda2 ~reaped_flambda2_to_cmm ~reaper_lto_solve =
              (found %d: [%s])"
             (List.length ltosol_files) (String.concat ", " ltosol_files)
       in
-      let cmr_file, (_other_inputs : string list) = match
+      let cmr_files, (_other_inputs : string list) =
         List.partition (fun f -> Filename.check_suffix f ".cmr") other_inputs
-      with
-        | [cmr_file], inputs -> cmr_file, inputs
-        | cmr_files, _ ->
-          Printf.ksprintf Compenv.fatal
-            "Must specify exactly one .cmr file with -reaper-rebuild (found \
-             %d: [%s])"
-            (List.length cmr_files) (String.concat ", " cmr_files)
       in
-      Compiler.reaper_rebuild ~ltosol_file ~cmr_file
-        ~output_prefix:(Compenv.output_prefix cmr_file ^ ".reaped")
-        ~keep_symbol_tables:false;
+      (match cmr_files with
+       | [] ->
+         Compenv.fatal
+           "Must specify at least one .cmr file with -reaper-rebuild"
+       | _ :: _ -> ());
+      (* [cmr_files] is in command-line order, which is required to be
+         dependency order (dependencies first). *)
+      let units =
+        List.map
+          (fun cmr_file ->
+            cmr_file, Compenv.output_prefix cmr_file ^ ".reaped")
+          cmr_files
+      in
+      Compiler.reaper_rebuild ~ltosol_file ~units ~keep_symbol_tables:false;
       Warnings.check_fatal ();
     end
     else if !reaper_solve then begin
