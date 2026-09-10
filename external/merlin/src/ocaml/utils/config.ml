@@ -45,6 +45,10 @@ let interface_suffix = ref ".mli"
 
 let max_tag = 245
 let flat_float_array = false
+let stack_allocation = true
+let poll_insertion = false
+let with_frame_pointers = false
+let lazy_tag = 246
 
 let reserved_header_bits = 8
 let syntax_quotations = true
