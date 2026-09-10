@@ -2029,24 +2029,21 @@ module Const = struct
       | Box
   end
 
-  let apply_scannable_axis env (axis : Scannable_axis.t option) t =
-    match axis with
-    | None -> t
-    | Some axis -> (
-      let t = Base_and_axes.fully_expand_aliases_const env t in
-      match t.base with
-      | Kconstr (p, sa, op) ->
-        { t with base = Kconstr (p, Scannable_axis.lower_axes sa axis, op) }
-      | Layout layout -> (
-        match Layout.Const.get_root_scannable_axes layout with
-        | None -> t
-        | Some sa ->
-          { t with
-            base =
-              Layout
-                (Layout.Const.set_root_scannable_axes layout
-                   (Scannable_axis.lower_axes sa axis))
-          }))
+  (* The [apply_*] functions expect [t] to be fully expanded. *)
+  let apply_scannable_axis axis (t : _ jkind_const_desc) =
+    match t.base with
+    | Kconstr (p, sa, op) ->
+      { t with base = Kconstr (p, Scannable_axis.lower_axes sa axis, op) }
+    | Layout layout -> (
+      match Layout.Const.get_root_scannable_axes layout with
+      | None -> t
+      | Some sa ->
+        { t with
+          base =
+            Layout
+              (Layout.Const.set_root_scannable_axes layout
+                 (Scannable_axis.lower_axes sa axis))
+        })
 
   (* The mod bounds of [k box], given [k]'s mod bounds. *)
   let box_mod_bounds mod_bounds =
@@ -2058,8 +2055,7 @@ module Const = struct
        [immutable_data]. *)
     Mod_bounds.join Builtin.mutable_data.jkind.mod_bounds mod_bounds
 
-  let apply_box ~loc env t =
-    let t = Base_and_axes.fully_expand_aliases_const env t in
+  let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
       { base = Layout (Layout.Const.box layout Scannable_axes.max);
@@ -2068,8 +2064,7 @@ module Const = struct
       }
     | Kconstr (p, _, _) -> raise ~loc (Box_on_abstract_kind p)
 
-  let apply_addressable env t =
-    let t = Base_and_axes.fully_expand_aliases_const env t in
+  let apply_addressable (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
       { t with base = Layout (Layout.Const.addressable layout) }
@@ -2521,17 +2516,18 @@ module Const = struct
         Typemode.transl_mod_bounds ~warn modifiers
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
+      let apply_axis_annot to_axis annot jkind =
+        match annot with
+        | None -> jkind
+        | Some ({ txt; _ } : _ Location.loc) ->
+          apply_scannable_axis (to_axis txt)
+            (Base_and_axes.fully_expand_aliases_const env jkind)
+      in
       { base = base.base; mod_bounds; with_bounds = No_with_bounds }
       (* For scannable axes in mod bounds, we do not print redundancy warnings,
          as scannable axes in mod bounds will be deprecated anyway *)
-      |> apply_scannable_axis env
-           (Option.map
-              (fun (a : _ Location.loc) -> Scannable_axis.Nullability a.txt)
-              nullability)
-      |> apply_scannable_axis env
-           (Option.map
-              (fun (a : _ Location.loc) -> Scannable_axis.Separability a.txt)
-              separability)
+      |> apply_axis_annot (fun n -> Scannable_axis.Nullability n) nullability
+      |> apply_axis_annot (fun s -> Scannable_axis.Separability s) separability
     | Pjk_operator (base, op_annot) ->
       let base_jkind =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
@@ -2548,10 +2544,9 @@ module Const = struct
             let jkind = Base_and_axes.fully_expand_aliases_const env jkind in
             let jkind' =
               match op.txt with
-              | Scannable_axis axis ->
-                apply_scannable_axis env (Some axis) jkind
-              | Addressable -> apply_addressable env jkind
-              | Box -> apply_box ~loc:op.loc env jkind
+              | Scannable_axis axis -> apply_scannable_axis axis jkind
+              | Addressable -> apply_addressable jkind
+              | Box -> apply_box ~loc:op.loc jkind
             in
             (* Operators never change the with-bounds *)
             (if warn && equal_ignoring_with_bounds jkind jkind'
