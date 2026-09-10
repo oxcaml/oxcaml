@@ -48,7 +48,7 @@ exception Error of error
 type link_action =
     Link_object of string * compilation_unit_descr
       (* Name of .cmo file and descriptor of the unit *)
-  | Link_archive of string * compilation_unit_descr list
+  | Link_archive of string * (file_position compilation_unit_descr_gen) list
       (* Name of .cma file and descriptors of the units to be linked. *)
 
 (* Add C objects and options from a library descriptor *)
@@ -116,12 +116,12 @@ let linkdeps_unit ldeps ~filename compunit =
   let compunit = compunit.cu_name in
   Linkdeps.add ldeps ~filename ~compunit ~requires ~provides
 
+let find_file name =
+  try Load_path.find name
+  with Not_found -> raise(Error(File_not_found name))
+
 let scan_file ldeps obj_name tolink =
-  let file_name =
-    try
-      Load_path.find obj_name
-    with Not_found ->
-      raise(Error(File_not_found obj_name)) in
+  let file_name = find_file obj_name in
   let ic = open_in_bin file_name in
   try
     let buffer = really_input_string ic (String.length cmo_magic_number) in
@@ -207,9 +207,9 @@ let debug_info = ref ([] : (int * Instruct.debug_event list * string list) list)
 
 (* Link in a compilation unit *)
 
-let link_compunit output_fun currpos_fun inchan file_name compunit =
+let link_compunit output_fun currpos_fun inchan file_name offset compunit =
   check_consistency file_name compunit;
-  seek_in inchan compunit.cu_pos;
+  seek_in inchan offset;
   let code_block =
     Bigarray.Array1.create Bigarray.Char Bigarray.c_layout compunit.cu_codesize
   in
@@ -246,10 +246,18 @@ let link_compunit output_fun currpos_fun inchan file_name compunit =
 
 (* Link in a .cmo file *)
 
-let link_object output_fun currpos_fun file_name compunit =
-  let inchan = open_in_bin file_name in
+let link_object ?(dir="") output_fun currpos_fun file_name compunit =
+  let file, offset =
+    match compunit.cu_pos with
+    | Pos_internal offset -> file_name, offset
+    | Pos_external { filename; offset } ->
+       match Misc.find_in_path [dir] filename with
+       | fn -> fn, offset
+       | exception Not_found -> find_file filename, offset
+  in
+  let inchan = open_in_bin file in
   try
-    link_compunit output_fun currpos_fun inchan file_name compunit;
+    link_compunit output_fun currpos_fun inchan file_name offset compunit;
     close_in inchan
   with
     Symtable.Error msg ->
@@ -261,6 +269,7 @@ let link_object output_fun currpos_fun file_name compunit =
 
 let link_archive output_fun currpos_fun file_name units_required =
   let inchan = open_in_bin file_name in
+  let dir = Filename.dirname file_name in
   try
     List.iter
       (fun cu ->
@@ -268,7 +277,11 @@ let link_archive output_fun currpos_fun file_name units_required =
            file_name ^ "(" ^ (CU.full_path_as_string cu.cu_name) ^ ")"
          in
          try
-           link_compunit output_fun currpos_fun inchan name cu
+           match cu.cu_pos with
+           | Pos_internal offset ->
+             link_compunit output_fun currpos_fun inchan name offset cu
+           | Pos_external _ ->
+             link_object ~dir output_fun currpos_fun file_name cu
          with Symtable.Error msg ->
            raise(Error(Symbol_error(name, msg))))
       units_required;
@@ -279,6 +292,7 @@ let link_archive output_fun currpos_fun file_name units_required =
 
 let link_file output_fun currpos_fun = function
     Link_object(file_name, unit) ->
+      let unit = {unit with cu_pos = Pos_internal unit.cu_pos} in
       link_object output_fun currpos_fun file_name unit
   | Link_archive(file_name, units) ->
       link_archive output_fun currpos_fun file_name units

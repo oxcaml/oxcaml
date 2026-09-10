@@ -30,7 +30,7 @@ module Bytecode = struct
   type filename = string
 
   module Unit_header = struct
-    type t = Cmo_format.compilation_unit_descr
+    type t = Cmo_format.(file_position compilation_unit_descr_gen)
 
     let name (t : t) = Compilation_unit.full_path_as_string t.cu_name
     let crc _t = None
@@ -127,10 +127,17 @@ module Bytecode = struct
     Obj.t * (unit -> Obj.t)
     = "caml_reify_bytecode"
 
+  let get_internal_pos (compunit : Unit_header.t) =
+    match compunit.cu_pos with
+    | Pos_internal ofs -> ofs
+    | Pos_external _ ->
+       let name = Compilation_unit.(Name.to_string (name compunit.cu_name)) in
+       raise (DT.Error (Unavailable_unit name))
+
   let run lock (ic, file_name, file_digest, _old_st) ~unit_header ~priv:_ =
     let clos = Mutex.protect lock (fun () ->
-        let compunit : Cmo_format.compilation_unit_descr = unit_header in
-        seek_in ic compunit.cu_pos;
+        let compunit : Unit_header.t = unit_header in
+        seek_in ic (get_internal_pos compunit);
         let code =
           Bigarray.Array1.create Bigarray.Char Bigarray.c_layout
             compunit.cu_codesize
@@ -208,7 +215,7 @@ module Bytecode = struct
         let compunit_pos = input_binary_int ic in  (* Go to descriptor *)
         seek_in ic compunit_pos;
         let cu = (input_value ic : Cmo_format.compilation_unit_descr) in
-        handle, [cu]
+        handle, [{cu with cu_pos = Pos_internal cu.cu_pos}]
       end else
       if buffer = Config.cma_magic_number then begin
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
