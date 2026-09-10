@@ -1,6 +1,6 @@
-t1: uniform
-t2: uniform
+nested_unboxed_tuple_gets_flattened: uniform
+void_void_int: uniform
 all_unit_u: uniform
-t3: mixed (scannable_prefix_len = 2)
-int t4: uniform
-float# t4: mixed (scannable_prefix_len = 1)
+large_nested_mixed: mixed (scannable_prefix_len = 2)
+mixed any tuple inst with int: uniform
+mixed any tuple inst with float#: mixed (scannable_prefix_len = 1)

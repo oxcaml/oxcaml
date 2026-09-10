@@ -340,3 +340,21 @@ let _ =
 type rec_constr = C of (#(rec_constr option * float#) * int)
 - : unit = ()
 |}]
+
+(* tuples and layout poly *)
+(* CR zeisbach: buff this up, and move it to the right place. *)
+
+(*= external box_float : float# -> float = "%box_float"
+
+let poly_ my_pair_f x y = Sys.opaque_identity (x + 1, y)
+
+let _ =
+  let x, y = my_pair_f 42 #42.0 in
+  let () = Printf.printf "%d, %f\n" x (box_float y) in
+  let z1, z2 = my_pair_f 43 "hi" in
+  let () = Printf.printf "%d, %s\n" z1 z2 in
+  ()
+[%%expect{|
+type rec_constr = C of (#(rec_constr option * float#) * int)
+- : unit = ()
+|}] *)
