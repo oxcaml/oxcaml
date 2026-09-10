@@ -1594,3 +1594,72 @@ Lines 10-12, characters 11-4:
 Error: In the signature of this functor application: The type "y"
        has no unboxed version.
 |}]
+
+(* Test 45: [box] of an unboxed version has the boxed version's variance *)
+
+(* The following declarations must be rejected: ['a t# box] reduces to
+   ['a t], which is invariant in ['a] due to the mutable field. Accepting them
+   would be unsound. *)
+
+type 'a t = { mutable a : 'a }
+type +'a u = 'a t# box
+[%%expect{|
+type 'a t = { mutable a : 'a; }
+Line 2, characters 0-22:
+2 | type +'a u = 'a t# box
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type +'a v = 'a ref#
+[%%expect{|
+Line 1, characters 0-20:
+1 | type +'a v = 'a ref#
+    ^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+module M : sig
+  type +'a u
+  val make : 'a -> 'a u
+  val get : 'a u -> 'a
+  val set : 'a u -> 'a -> unit
+end = struct
+  type 'a u = 'a t# box
+  let make a = { a }
+  let get u = u.a
+  let set u v = u.a <- v
+end
+[%%expect{|
+Lines 6-11, characters 6-3:
+ 6 | ......struct
+ 7 |   type 'a u = 'a t# box
+ 8 |   let make a = { a }
+ 9 |   let get u = u.a
+10 |   let set u v = u.a <- v
+11 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a u = 'a t
+           val make : 'a -> 'a t
+           val get : 'a t -> 'a
+           val set : 'a t -> 'a -> unit
+         end
+       is not included in
+         sig
+           type +'a u
+           val make : 'a -> 'a u
+           val get : 'a u -> 'a
+           val set : 'a u -> 'a -> unit
+         end
+       Type declarations do not match:
+         type 'a u = 'a t
+       is not included in
+         type +'a u
+       Their variances do not agree.
+|}]
