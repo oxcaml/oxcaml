@@ -3370,7 +3370,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         Value.join
           [Value.disallow_right mode;
            Value.min_with_monadic Staticity
-              (Staticity.of_const Staticity.Dynamic) ]
+              (Staticity.of_const ~hint:Mod_unpack Staticity.Dynamic) ]
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
