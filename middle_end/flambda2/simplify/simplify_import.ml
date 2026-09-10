@@ -64,3 +64,4 @@ module TEE = Flambda2_types.Typing_env_extension
 module UA = Upwards_acc
 module UE = Upwards_env
 module VB = Bound_var
+module D = Simplify_defunct

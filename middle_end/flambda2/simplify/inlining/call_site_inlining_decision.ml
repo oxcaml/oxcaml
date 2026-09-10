@@ -21,6 +21,7 @@ module T = Flambda2_types
 module TE = T.Typing_env
 module UA = Upwards_acc
 module UE = Upwards_env
+module D = Simplify_defunct
 
 (* CR mshinwell for poechsel: We need to emit [Warnings.Inlining_impossible] as
    required.
@@ -121,7 +122,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         let uacc =
           UA.create ~flow_result ~compute_slot_offsets:false uenv dacc
         in
-        rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
+        D.apply_rebuild rebuild uacc ~after_rebuild:D.After_rebuild_id)
   in
   let cost_metrics_of_lifted_constants =
     if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()

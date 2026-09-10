@@ -331,7 +331,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
         |> UA.with_lifted_constants uacc
     in
     let body, uacc = put_bindings_around_body uacc ~body in
-    after_rebuild body uacc
+    D.apply_after_rebuild after_rebuild body uacc
   else
     let uacc, lifted_constants_from_body =
       UA.get_and_clear_lifted_constants uacc
@@ -340,7 +340,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
       EB.place_lifted_constants uacc ~lifted_constants_from_defining_expr
         ~lifted_constants_from_body ~put_bindings_around_body ~body
     in
-    after_rebuild body uacc
+    D.apply_after_rebuild after_rebuild body uacc
 
 let record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id
     data_flow (binding : Expr_builder.binding_to_place) : Flow.Acc.t =
@@ -371,6 +371,11 @@ let update_data_flow dacc closure_info ~lifted_constants_from_defining_expr
     ~init:data_flow
     ~f:(record_new_defining_expression_binding_for_data_flow dacc ~rewrite_id)
 
+let after_rebuild_let D.{ simplify_named_result; removed_operations; lifted_constants_from_defining_expr; at_unit_toplevel; closure_info; after_rebuild; rewrite_id } body uacc =
+  rebuild_let simplify_named_result removed_operations
+    ~lifted_constants_from_defining_expr ~at_unit_toplevel
+    ~closure_info ~body uacc ~after_rebuild ~rewrite_id
+
 let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
     ~down_to_up bound_pattern ~body =
   let module L = Flambda.Let in
@@ -393,11 +398,11 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
        similar. To avoid this we don't traverse [body]. *)
     match simplify_named_result with
     | Invalid ->
-      down_to_up original_dacc ~rebuild:(fun uacc ~after_rebuild ->
+      down_to_up original_dacc ~rebuild:(D.Rebuild (fun uacc ~after_rebuild ->
           let uacc = UA.notify_removed ~operation:removed_operations uacc in
           EB.rebuild_invalid uacc
             (Defining_expr_of_let (bound_pattern, defining_expr))
-            ~after_rebuild)
+            ~after_rebuild))
     | Ok simplify_named_result ->
       let dacc = Simplify_named_result.dacc simplify_named_result in
       (* First accumulate variable, symbol and code ID usage information. *)
@@ -442,19 +447,18 @@ let simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
          body. *)
       let down_to_up dacc ~rebuild:rebuild_body =
         let rebuild uacc ~after_rebuild =
-          let after_rebuild body uacc =
-            rebuild_let simplify_named_result removed_operations
-              ~lifted_constants_from_defining_expr ~at_unit_toplevel
-              ~closure_info ~body uacc ~after_rebuild ~rewrite_id
+          let after_rebuild_let_data : Simplify_named_result.t D.after_rebuild_let_data =
+            { simplify_named_result; removed_operations; lifted_constants_from_defining_expr;
+              at_unit_toplevel; closure_info; after_rebuild; rewrite_id }
           in
-          rebuild_body uacc ~after_rebuild
+          D.apply_rebuild rebuild_body uacc ~after_rebuild:(D.After_rebuild_let (after_rebuild_let_data, after_rebuild_let))
         in
-        down_to_up dacc ~rebuild
+        down_to_up dacc ~rebuild:(D.Rebuild rebuild)
       in
       simplify_expr dacc body ~down_to_up)
 
-let simplify_let ~simplify_expr ~simplify_function_body dacc let_expr
-    ~down_to_up =
+let simplify_let ~simplify_expr ~simplify_function_body = fun dacc let_expr
+    ~down_to_up ->
   let module L = Flambda.Let in
   L.pattern_match let_expr
     ~f:
