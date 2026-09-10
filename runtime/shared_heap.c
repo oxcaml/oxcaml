@@ -178,10 +178,6 @@ struct caml_heap_state {
 static void orphan_heap_stats_with_lock(struct caml_heap_state *);
 static void adopt_pool_stats_with_lock(struct caml_heap_state *,
                                        pool *, sizeclass_t);
-typedef void(*compaction_driver)(caml_domain_state* domain_state,
-                                 int participating_count,
-                                 caml_domain_state** participants);
-static compaction_driver compact_driver(void);
 
 shared_heap_fast_data_p caml_shared_fast_data(struct caml_heap_state *heap)
 {
@@ -202,7 +198,6 @@ static void adopt_all_pool_stats_with_lock(struct caml_heap_state *adopter);
 
 
 struct caml_heap_state* caml_init_shared_heap (void) {
-  (void)compact_driver(); /* to validate the OCAMLRUNPARAM flag */
   struct caml_heap_state* heap =
     caml_stat_alloc_noexc(sizeof(struct caml_heap_state));
   if(heap != NULL) {
@@ -441,15 +436,6 @@ static void pool_release(struct caml_heap_state* local,
   pool_freelist.free = pool;
   pool_freelist.active_pools--;
   caml_plat_unlock(&pool_freelist.lock);
-}
-
-/* free the memory of [pool], giving it back to the OS */
-static void pool_free(struct caml_heap_state* local,
-                      pool* pool)
-{
-    local->stats.pool_words -= POOL_WSIZE;
-    local->stats.pool_frag_words -= POOL_SLAB_WOFFSET(pool->sz);
-    caml_mem_unmap(pool, Bsize_wsize(POOL_WSIZE));
 }
 
 static void calc_pool_stats(pool* a, sizeclass_t sz, struct heap_stats* s)
@@ -1321,9 +1307,6 @@ void caml_verify_heap_from_stw(caml_domain_state *domain) {
 
 /* Compaction starts here. See [caml_compact_heap] for entry. */
 
-/* Whether compaction should actually unmap memory. */
-uintnat caml_compact_unmap = 0;
-
 #ifdef DEBUG
 
 /* Checks that all blocks in a pool have the right size class,
@@ -1626,319 +1609,6 @@ uintnat compact_count_pools(pool* pool)
   }
   return count;
 }
-
-/* Compact a heap according to the "5.2 algorithm" (as present in
-   upstream OCaml 5.2). Note that this is not exactly the same as
-   upstream OCaml 5.2, as pools are now allocated in multi-pool
-   chunks, and have larger pool headers than in OCaml 5.2.
-
-   The algorithm is similar to Edward's Two-Finger algorithm from the
-   original 1974 LISP book (The Programming Language LISP). At a high
-   level the algorithm works as a series of parallel (using all
-   running domains) phases separated by global barriers:
-
-  1. For each size class
-    a. Compute the number of live blocks in partially filled pools
-    b. Keep enough pools to fully contain the number of live blocks and
-       set the rest to be evacuated
-    c. For each live block in each evacuating pool, allocate and copy into a
-       non-evacuating pool.
-  2. Proceed through the roots and the heap, updating pointers to evacuated
-     blocks to point to the new location of the block. Update finalisers and
-     ephemerons too.
-  3. Go through evacuated pools and release them. Finally free all but
-      one pool in the freelist.
-  4. One domain needs to release the pools in the freelist back to the OS.
-
-  The algorithm requires one full pass through the whole heap (pools,
-  large allocations, and extents) to rewrite pointers, as well as two
-  passes through the partially-occupied pools in the heap to compute
-  the number of live blocks and evacuate them.
-*/
-
-static void compact_algorithm_52(caml_domain_state* domain_state,
-                                 int participating_count,
-                                 caml_domain_state** participants)
-{
-  /* First phase. Here we compute the number of live blocks in partially
-  filled pools, determine pools to be evacuated and then evacuate from them.
-  For the first phase we need not consider full pools, they
-  cannot be evacuated to or from. */
-  CAML_EV_BEGIN(EV_COMPACT_EVACUATE);
-  caml_global_barrier(participating_count);
-
-  struct caml_heap_state* heap = Caml_state->shared_heap;
-  /* All evacuated pools (of every size class) */
-  pool *evacuated_pools = NULL;
-
-  for (sizeclass_t sz_class = 1; sz_class < NUM_SIZECLASSES; sz_class++) {
-    /* We only care about moving things in pools that aren't full (we cannot
-    evacuate to or from a full pool) */
-    pool* cur_pool = heap->unswept_avail_pools[sz_class];
-
-    if (!cur_pool) {
-      /* No partially filled pools for this size, nothing to do */
-      continue;
-    }
-
-    uintnat num_pools = compact_count_pools(cur_pool);
-    struct compact_pool_stat {
-      uintnat free_blocks;
-      uintnat live_blocks;
-    } *pool_stats = caml_stat_alloc_noexc(
-      sizeof(struct compact_pool_stat) * num_pools);
-
-    /* if we're unable to allocate pool_stats here then we should avoid
-      evacuating this size class. It's unlikely but it may be that we had
-      better success with an earlier size class and that results in some
-      memory being freed up. */
-    if (pool_stats == NULL) {
-      CAML_GC_MESSAGE(COMPACT,
-                      "Unable to allocate pool_stats for size class %d\n",
-                      sz_class);
-      continue;
-    }
-
-    cur_pool = heap->unswept_avail_pools[sz_class];
-
-    /* Count the number of free and live blocks in each pool. Note that a live
-       block here currently has the header status UNMARKED (because it was
-       MARKED in the previous cycle). After compaction the shared pools will
-       contain UNMARKED and GARBAGE from the "to" pools and UNMARKED from the
-       "from" pools which were evacuated.
-
-       At the cost of some complexity or an additional pass we could compute the
-       exact amount of space needed or even sweep all pools in this counting
-       pass.
-    */
-    int k = 0;
-    uintnat total_live_blocks = 0;
-#ifdef DEBUG
-    uintnat total_free_blocks = 0;
-#endif
-    while (cur_pool) {
-      header_t* p = POOL_FIRST_BLOCK(cur_pool, sz_class);
-      header_t* end = POOL_END(cur_pool);
-      mlsize_t wh = whsize_sizeclass[sz_class];
-
-      pool_stats[k].free_blocks = 0;
-      pool_stats[k].live_blocks = 0;
-
-      while (p + wh <= end) {
-        header_t h = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
-
-        /* A zero header in a shared heap pool indicates an empty space */
-        if (!h) {
-          pool_stats[k].free_blocks++;
-#ifdef DEBUG
-          total_free_blocks++;
-#endif
-        } else if (Has_status_hd(h, caml_global_heap_state.UNMARKED)) {
-          total_live_blocks++;
-          pool_stats[k].live_blocks++;
-        }
-        p += wh;
-      }
-
-      cur_pool = cur_pool->next;
-      k++;
-    }
-
-    /* Note that partially filled pools must have at least some free space*/
-#ifdef DEBUG
-    CAMLassert(total_free_blocks > 0);
-#endif
-
-    if (!total_live_blocks) {
-      /* No live (i.e unmarked) blocks in partially filled pools, nothing to do
-         for this size class */
-      continue;
-    }
-
-    /* Now we use the pool stats to calculate which pools will be evacuated. We
-       want to walk through the pools and check whether we have enough free
-       blocks in the pools behind us to accommodate all the remaining live
-       blocks. */
-    uintnat free_blocks = 0;
-    int j = 0;
-    intnat remaining_live_blocks = total_live_blocks;
-
-    cur_pool = heap->unswept_avail_pools[sz_class];
-    /* [last_pool_p] will be a pointer to the next field of the last
-       non-evacuating pool. We need this so we can snip the list of evacuating
-       pools from [unswept_avail_pools] and eventually attach them all to
-       [evacuated_pools]. */
-    pool **last_pool_p = &heap->unswept_avail_pools[sz_class];
-    while (cur_pool) {
-      if (free_blocks >= remaining_live_blocks) {
-        break;
-      }
-
-      free_blocks += pool_stats[j].free_blocks;
-      remaining_live_blocks -= pool_stats[j].live_blocks;
-      last_pool_p = &cur_pool->next;
-      cur_pool = cur_pool->next;
-      j++;
-    }
-
-    /* We're done with the pool stats. */
-    caml_stat_free(pool_stats);
-
-    /* `cur_pool` now points to the first pool we are evacuating, or NULL if
-        we could not compact this particular size class (for this domain) */
-
-    /* Snip the evacuating pools from list of pools we are retaining */
-    *last_pool_p = NULL;
-
-    /* Evacuate marked blocks from the evacuating pools into the
-       avail pools. */
-    while (cur_pool) {
-      header_t* p = POOL_FIRST_BLOCK(cur_pool, sz_class);
-      header_t* end = POOL_END(cur_pool);
-      mlsize_t wh = whsize_sizeclass[sz_class];
-
-      while (p + wh <= end) {
-        header_t hd = (header_t)atomic_load_relaxed((atomic_uintnat*)p);
-
-        /* A zero header in a shared heap pool indicates an empty space */
-        if (hd) {
-          CAMLassert (!Has_status_hd(hd, caml_global_heap_state.MARKED));
-          CAMLassert (!Has_status_hd(hd, NOT_MARKABLE));
-
-          /* Reminder: since colours have rotated, UNMARKED indicates a MARKED
-          (i.e live) block */
-          if (Has_status_hd(hd, caml_global_heap_state.UNMARKED)) {
-            /* live block in an evacuating pool, so we evacuate it to
-             * the first available block */
-            pool* to_pool = heap->unswept_avail_pools[sz_class];
-            value* new_p = to_pool->next_obj;
-            CAMLassert(new_p);
-            value *next = (value*)new_p[1];
-            to_pool->next_obj = next;
-
-            if (!next) {
-              /* This pool is full. Move it to unswept_full_pools */
-              heap->unswept_avail_pools[sz_class] = to_pool->next;
-              to_pool->next = heap->unswept_full_pools[sz_class];
-              heap->unswept_full_pools[sz_class] = to_pool;
-            }
-
-            /* Copy the block to the new location */
-            memcpy(new_p, p, Whsize_hd(hd) * sizeof(value));
-
-            /* Set first field of p to a forwarding pointer */
-            Field(Val_hp(p), 0) = Val_hp(new_p);
-
-            /* Since there can be no blocks with the MARKED status, we use this
-              to indicate that a block has been evacuated and any pointers to
-              it should be updated. */
-            *p = With_status_hd(hd, caml_global_heap_state.MARKED);
-          } else if (Has_status_hd(hd, caml_global_heap_state.GARBAGE)) {
-            clear_garbage(p, hd, wh, heap);
-          }
-        }
-
-        p += wh;
-      }
-      /* move pool to evacuated pools list, continue to next pool */
-      pool *next = cur_pool->next;
-      cur_pool->next = evacuated_pools;
-      evacuated_pools = cur_pool;
-      cur_pool = next;
-    }
-  }
-  CAML_EV_END(EV_COMPACT_EVACUATE);
-
-  caml_global_barrier(participating_count);
-  compact_fix(participants[0] == Caml_state);
-  caml_global_barrier(participating_count);
-
-  CAML_EV_BEGIN(EV_COMPACT_RELEASE);
-  /* Third phase: free all evacuated pools and release the mappings back to
-      the OS.
-
-      Note that we may have no "available" pools left, if all
-      remaining pools have been filled up by evacuated blocks. */
-
-  if (caml_compact_unmap) {
-    pool* cur_pool = evacuated_pools;
-    uintnat freed_pools = 0;
-
-    while (cur_pool) {
-      pool* next_pool = cur_pool->next;
-
-      #ifdef DEBUG
-      for (header_t *p = POOL_FIRST_BLOCK(cur_pool, cur_pool->sz);
-           p < POOL_END(cur_pool); p++) {
-        *p = Debug_free_major;
-      }
-      #endif
-
-      pool_free(heap, cur_pool);
-      cur_pool = next_pool;
-      ++ freed_pools;
-    }
-
-    caml_plat_lock_blocking(&pool_freelist.lock);
-    pool_freelist.chunk_words -= POOL_WSIZE * freed_pools;
-    pool_freelist.active_pools -= freed_pools;
-    caml_plat_unlock(&pool_freelist.lock);
-    CAML_GC_MESSAGE(COMPACT, "Freed (and unmapped) %lu pools.\n", freed_pools);
-  } else { /* not unmapping */
-    pool* cur_pool = evacuated_pools;
-    pool* last = NULL;
-    uintnat freed_pools = 0;
-    while (cur_pool) {
-      sizeclass_t sz = cur_pool->sz;
-      heap->stats.pool_words -= POOL_WSIZE;
-      heap->stats.pool_frag_words -= POOL_SLAB_WOFFSET(sz);
-      last = cur_pool;
-      cur_pool->owner = NULL;
-      cur_pool = cur_pool->next;
-      ++ freed_pools;
-    }
-
-    if (evacuated_pools) {
-      caml_plat_lock_blocking(&pool_freelist.lock);
-      last->next = pool_freelist.free;
-      pool_freelist.free = evacuated_pools;
-      pool_freelist.active_pools -= freed_pools;
-      caml_plat_unlock(&pool_freelist.lock);
-    }
-    CAML_GC_MESSAGE(COMPACT, "Freed %lu pools.\n", freed_pools);
-  }
-
-  caml_global_barrier(participating_count);
-
-  if (participants[0] == Caml_state) {
-  /* Fourth phase: one domain also needs to release the free list */
-    if (caml_compact_unmap) {
-      pool* cur_pool;
-      pool* next_pool;
-      uintnat unmapped = 0;
-
-      caml_plat_lock_blocking(&pool_freelist.lock);
-      cur_pool = pool_freelist.free;
-
-      while (cur_pool) {
-        next_pool = cur_pool->next;
-        /* No stats to update so just unmap */
-        caml_mem_unmap(cur_pool, Bsize_wsize(POOL_WSIZE));
-        ++ unmapped;
-        pool_freelist.chunk_words -= POOL_WSIZE;
-        /* We can't sensibly maintain pool_freelist.chunks. */
-        cur_pool = next_pool;
-      }
-
-      pool_freelist.free = NULL;
-      caml_plat_unlock(&pool_freelist.lock);
-      CAML_GC_MESSAGE(COMPACT, "Also unmapped %lu pools from free list.\n", unmapped);
-    }
-  }
-  CAML_EV_END(EV_COMPACT_RELEASE);
-}
-
-/* Compaction "new" (default) algorithm. */
 
 /* Add all the pools on a list to an array of pool pointers */
 
@@ -2507,9 +2177,9 @@ void compact_run_phase(struct caml_heap_state* heap,
 
 static bool should_run_phase_two = false;
 
-/* New algorithm main driver. Run in parallel for all domains.
+/* Compaction main driver. Run in parallel for all domains.
 
-   This compaction algorithm operates in two phases. In the first
+   Compaction operates in two phases. In the first
    phase we sort pools in each class size for each domain, prefering
    pools from larger chunks. We then compact each size class in
    parallel across all domains, creating a list of free pools.
@@ -2534,13 +2204,21 @@ static bool should_run_phase_two = false;
   3. Go through pools evacuated and release them. Finally free all but
       one pool in the freelist.
   4. One domain needs to release the pools in the freelist back to the OS.
+
+  Warning: caml_compact_heap must only be called from
+  [cycle_all_domains_callback] in major_gc.c as there are
+  very specific conditions the compaction algorithm expects.
 */
 
-static void compact_new_algorithm(caml_domain_state* domain_state,
-                                  int participating_count,
-                                  caml_domain_state** participants)
+void caml_compact_heap(caml_domain_state* domain_state,
+                       int participating_count,
+                       caml_domain_state** participants)
 {
   struct caml_heap_state* heap = Caml_state->shared_heap;
+
+  CAML_GC_MESSAGE(COMPACT, "Compacting heap.\n");
+  CAML_EV_BEGIN(EV_COMPACT);
+  compact_debug_check_heap_start(heap, participants[0] == Caml_state);
 
   CAML_EV_BEGIN(EV_COMPACT_EVACUATE);
   caml_global_barrier(participating_count);
@@ -2569,66 +2247,14 @@ static void compact_new_algorithm(caml_domain_state* domain_state,
   if (participants[0] == Caml_state) {
     compact_release_freelist();
   }
-}
-
-/* Support for several compaction algorithms, selected by
- * OCAMLRUNPARAM=Xcompaction=<N> */
-
-uintnat caml_compaction_algorithm = 0;
-
-struct {
-  uintnat switch_value;
-  compaction_driver driver;
-} compaction_drivers[] = {
-  {52, compact_algorithm_52},
-  {0, compact_new_algorithm},
-};
-
-static compaction_driver compact_driver(void)
-{
-  /* Could do this once-for-all but it should be incredibly cheap */
-  compaction_driver driver = NULL;
-  for (size_t idx = 0;
-       idx < sizeof(compaction_drivers)/sizeof(compaction_drivers[0]);
-       ++idx) {
-    if (caml_compaction_algorithm == compaction_drivers[idx].switch_value) {
-      driver = compaction_drivers[idx].driver;
-    }
-  }
-  if (!driver) {
-    caml_fatal_error
-      ("Unknown compaction algorithm %lu selected by OCAMLRUNPARAM.",
-       caml_compaction_algorithm);
-  }
-  return driver;
-}
-
-/* Overall compaction control. Runs one of the compaction algorithms */
-
-void caml_compact_heap(caml_domain_state* domain_state,
-                         int participating_count,
-                         caml_domain_state** participants)
-{
-  CAML_GC_MESSAGE(COMPACT, "Compacting heap.\n");
-  CAML_EV_BEGIN(EV_COMPACT);
-  /* Warning: caml_compact_heap must only be called from
-     [cycle_all_domains_callback] in major_gc.c as there are
-     very specific conditions the compaction algorithm expects.
-  */
-  compact_debug_check_heap_start(Caml_state->shared_heap,
-                                 participants[0] == Caml_state);
-
-  compaction_driver driver = compact_driver();
-  driver(domain_state, participating_count, participants);
 
   caml_global_barrier(participating_count);
   if (participants[0] == Caml_state) {
      /* We are done, increment the compaction count */
     (void)caml_atomic_counter_incr(&caml_compactions_count);
     CAML_GC_MESSAGE(COMPACT,
-                    "Compaction %lu completed (algorithm %lu).\n",
-                    caml_compactions_count,
-                    caml_compaction_algorithm);
+                    "Compaction %lu completed.\n",
+                    caml_compactions_count);
   }
   CAML_EV_END(EV_COMPACT);
 }
