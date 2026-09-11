@@ -709,3 +709,117 @@ module Atomic_field_locality = struct
       ignore (atomic_compare_and_set_field t 0 "foo" "bar")
     )
 end
+
+module Ext_ptr_atomic = struct
+  module Int64_u = struct
+    external to_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
+    external of_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
+    let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
+  end
+
+  external addr_of_value : ('a : value_or_null). 'a @ local -> int64_u
+    = "" "caml_native_pointer_of_value"
+
+  external ext_load : ('a : value_or_null). int64_u -> 'a
+    = "%unsafe_atomic_load_ext_ptr"
+  external ext_set : ('a : value_or_null). int64_u -> 'a -> unit
+    = "%unsafe_atomic_set_ext_ptr"
+  external ext_exchange : ('a : value_or_null). int64_u -> 'a -> 'a
+    = "%unsafe_atomic_exchange_ext_ptr"
+  external ext_compare_and_set :
+    ('a : value_or_null). int64_u -> 'a -> 'a -> bool
+    = "%unsafe_atomic_cas_ext_ptr"
+  external ext_compare_exchange :
+    ('a : value_or_null). int64_u -> 'a -> 'a -> 'a
+    = "%unsafe_atomic_compare_exchange_ext_ptr"
+  external ext_fetch_and_add : int64_u -> int -> int
+    = "%unsafe_atomic_fetch_add_ext_ptr"
+  external ext_add : int64_u -> int -> unit = "%unsafe_atomic_add_ext_ptr"
+  external ext_sub : int64_u -> int -> unit = "%unsafe_atomic_sub_ext_ptr"
+  external ext_logand : int64_u -> int -> unit = "%unsafe_atomic_land_ext_ptr"
+  external ext_logor : int64_u -> int -> unit = "%unsafe_atomic_lor_ext_ptr"
+  external ext_logxor : int64_u -> int -> unit = "%unsafe_atomic_lxor_ext_ptr"
+
+  type t = { mutable imm: int [@atomic]; mutable ptr: string [@atomic] }
+
+  let imm_addr t = addr_of_value t
+  let ptr_addr t = Int64_u.add (addr_of_value t) #8L
+
+  (* Immediate operations skip runtime calls. *)
+  let () =
+    let t = { imm = 1; ptr = "two" } in
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      ext_set (imm_addr t) 3;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 3);
+    test_atomic_exchange_field ~expected:0 (fun () ->
+      assert (ext_exchange (imm_addr t) 4 = 3);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 4);
+    test_atomic_cas_field ~expected:0 (fun () ->
+      assert (ext_compare_and_set (imm_addr t) 4 5);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 5);
+    test_atomic_compare_exchange_field ~expected:0 (fun () ->
+      assert (ext_compare_exchange (imm_addr t) 5 6 = 5);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 6);
+    test_atomic_fetch_add_field ~expected:0 (fun () ->
+      assert (ext_fetch_and_add (imm_addr t) 1 = 6);
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 7);
+    test_atomic_add_field ~expected:0 (fun () ->
+      ext_add (imm_addr t) 1;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 8);
+    test_atomic_sub_field ~expected:0 (fun () ->
+      ext_sub (imm_addr t) 2;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 6);
+    test_atomic_land_field ~expected:0 (fun () ->
+      ext_logand (imm_addr t) 0b100;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 4);
+    test_atomic_lor_field ~expected:0 (fun () ->
+      ext_logor (imm_addr t) 0b011;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 7);
+    test_atomic_lxor_field ~expected:0 (fun () ->
+      ext_logxor (imm_addr t) 0b101;
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.imm = 2)
+
+  (* Pointer operations call the runtime functions, with a null base. *)
+  let () =
+    let t = { imm = 1; ptr = "two" } in
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ext_set (ptr_addr t) "three";
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "three");
+    test_atomic_exchange_field ~expected:1 (fun () ->
+      ignore (ext_exchange (ptr_addr t) "four");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "four");
+    test_atomic_cas_field ~expected:1 (fun () ->
+      assert (ext_compare_and_set (ptr_addr t) t.ptr "five");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "five");
+    test_atomic_compare_exchange_field ~expected:1 (fun () ->
+      ignore (ext_compare_exchange (ptr_addr t) t.ptr "six");
+      ignore (Sys.opaque_identity t)
+    );
+    assert (t.ptr = "six")
+end
