@@ -2,39 +2,3 @@ type ('a : any) t = Foo
 val poly_ print_nothing : 'a -> 'b -> unit = <lpoly>
 >> Fatal error: Jkind_types.instance_var: free genvar
 Fatal error: exception Misc.Fatal_error
-Raised at Misc.fatal_errorf.(fun) in file "utils/misc.ml", line 22, characters 14-31
-Called from Jkind.instance_layout in file "typing/jkind.ml", line 2507, characters 26-41
-Called from Jkind.instance in file "typing/jkind.ml", line 2516, characters 54-73
-Called from Ctype.copy in file "typing/ctype.ml", line 1614, characters 31-51
-Called from Btype.copy_type_desc in file "typing/btype.ml", line 620, characters 13-17
-Called from Ctype.copy in file "typing/ctype.ml", line 1627, characters 8-54
-Called from Btype.copy_type_desc in file "typing/btype.ml", line 598, characters 31-36
-Called from Ctype.copy in file "typing/ctype.ml", line 1627, characters 8-54
-Called from Btype.copy_type_desc in file "typing/btype.ml", line 598, characters 38-43
-Called from Ctype.copy in file "typing/ctype.ml", line 1627, characters 8-54
-Called from Stdlib__Fun.protect in file "fun.ml", line 39, characters 8-15
-Re-raised at Stdlib__Fun.protect in file "fun.ml", line 44, characters 6-52
-Called from Stdlib__Fun.protect in file "fun.ml", line 39, characters 8-15
-Re-raised at Stdlib__Fun.protect in file "fun.ml", line 44, characters 6-52
-Called from Topprinters.match_simple_printer_type.(fun) in file "toplevel/topprinters.ml", line 74, characters 8-27
-Called from Misc.try_finally in file "utils/misc.ml", line 36, characters 8-15
-Re-raised at Misc.try_finally in file "utils/misc.ml", line 50, characters 10-56
-Called from Ctype.with_local_level_gen.(fun) in file "typing/ctype.ml", line 212, characters 19-33
-Called from Stdlib__Fun.protect in file "fun.ml", line 39, characters 8-15
-Re-raised at Stdlib__Fun.protect in file "fun.ml", line 44, characters 6-52
-Called from Btype.with_new_pool in file "typing/btype.ml", line 151, characters 4-47
-Called from Ctype.with_local_level_gen in file "typing/ctype.ml", lines 211-215, characters 4-170
-Called from Topprinters.match_simple_printer_type in file "toplevel/topprinters.ml", lines 67-76, characters 4-301
-Called from Topprinters.match_printer_type in file "toplevel/topprinters.ml", line 151, characters 8-60
-Called from Topprinters.find_printer in file "toplevel/topprinters.ml", line 174, characters 10-46
-Called from Topdirs.dir_install_printer in file "toplevel/topdirs.ml", line 223, characters 8-50
-Called from Topcommon.try_run_directive in file "toplevel/topcommon.ml", line 441, characters 65-70
-Called from Topeval.execute_phrase in file "toplevel/byte/topeval.ml", line 198, characters 6-42
-Re-raised at Topeval.execute_phrase in file "toplevel/byte/topeval.ml", line 201, characters 4-13
-Called from Toploop.process_phrase in file "toplevel/toploop.ml", line 362, characters 8-37
-Called from Toploop.process_phrases in file "toplevel/toploop.ml", line 375, characters 4-31
-Called from Toploop.loop in file "toplevel/toploop.ml", line 411, characters 6-35
-Re-raised at Location.report_exception.loop in file "parsing/location.ml", line 1179, characters 14-25
-Called from Toploop.loop in file "toplevel/toploop.ml", line 416, characters 11-42
-Called from Topmain.main in file "toplevel/byte/topmain.ml", line 206, characters 8-15
-Called from Topstart in file "toplevel/topstart.ml", line 16, characters 20-36
