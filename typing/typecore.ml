@@ -10490,7 +10490,6 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
               type_option_none env (instance (tpoly_get_mono ty_arg))
                 sarg.pexp_loc
             in
-            (* CR zeisbach: is there a bug here or is this comment stale? *)
             (* CR layouts v5: change value assumption below when we allow
                non-values in structures. *)
             make_args ((l, Arg (ty, Jkind.Sort.scannable)) :: args) ty_fun
@@ -10873,8 +10872,7 @@ and type_application env app_loc expected_mode position_and_mode
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
-  (* CR zeisbach: consider sharing code with [type_unboxed_tuple] below when
-     we allow non-values in boxed tuples. *)
+  (* CR zeisbach: consider sharing code with [type_unboxed_tuple] below *)
   let arity = List.length sexpl in
   assert (arity >= 2);
   Option.iter
@@ -10932,7 +10930,6 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
     assign_children arity (fun _loc typ mode ->
       let labels_types_and_sorts = unify_as_tuple typ in
       List.map
-        (* CR zeisbach: confirmation on whether to take sorts into account *)
         (fun (_, typ, _) -> Assigning(typ, mode))
         labels_types_and_sorts)
     overwrite

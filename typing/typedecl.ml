@@ -1929,8 +1929,7 @@ let assert_mixed_product_support =
 
 let assert_mixed_block_shape_support loc mixed_product_kind shape =
   (* CR zeisbach: we should do a check for splice variables after slambda.
-     This isn't currently present, but Joe has a PR that will do this. That PR
-     also has a helper that should be used here instead. *)
+     This isn't currently present, but Joe has a PR that will do this. *)
   if not (Lambda.mixed_block_shape_has_splices shape) then begin
     let mpb = Mixed_product_bytes.count (Product shape) in
     (* All-value/void shapes compile to uniform blocks (products of values are

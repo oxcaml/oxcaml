@@ -1081,9 +1081,8 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
 (* CR zeisbach: it makes me sad to add YET ANOTHER one of these conversion
-   functions, since there already are so many. Maybe we could refactor some of
-   Element_repr and use this in there? Or vice-verse?
-   This organization is something that's definitely considering again. *)
+   functions, since there already are so many. This organization is something
+   that's definitely considering again. *)
 let rec mixed_block_element_of_layout_const
     (layout : Jkind_types.Layout.Const.t) : mixed_block_element option =
   match layout with
