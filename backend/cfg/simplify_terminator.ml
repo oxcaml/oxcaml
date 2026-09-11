@@ -249,16 +249,25 @@ let interpret_basic (known_values : known_value Loc_map.t)
     remove_destroyed_at_basic known_values instr
   in
   match instr.desc with
-  | Op (Const_int c) -> replace instr.res.(0) (Const_int c) known_values
+  | Op (Const_int c) ->
+    remove_destroyed_at_basic
+      (replace instr.res.(0) (Const_int c) known_values)
+      instr
   | Op (Const_float32 c) ->
-    if !Oxcaml_flags.cfg_value_propagation_float
-    then replace instr.res.(0) (Const_float32 c) known_values
-    else known_values
+    let known_values =
+      if !Oxcaml_flags.cfg_value_propagation_float
+      then replace instr.res.(0) (Const_float32 c) known_values
+      else Loc_map.remove instr.res.(0) known_values
+    in
+    remove_destroyed_at_basic known_values instr
   | Op (Const_float c) ->
-    if !Oxcaml_flags.cfg_value_propagation_float
-    then replace instr.res.(0) (Const_float c) known_values
-    else known_values
-  | Op Move -> (
+    let known_values =
+      if !Oxcaml_flags.cfg_value_propagation_float
+      then replace instr.res.(0) (Const_float c) known_values
+      else Loc_map.remove instr.res.(0) known_values
+    in
+    remove_destroyed_at_basic known_values instr
+  | Op Move ->
     (* The machtype guard below makes the tracking robust to the per-type
        encodings of moves in `Emit`: `Emit`'s move performs no conversions and
        rejects moves between differing types (except within the bit-preserving
@@ -267,11 +276,14 @@ let interpret_basic (known_values : known_value Loc_map.t)
        copies exactly the bits the tracked value describes (e.g. a `Float32`
        move copies the 32-bit payload, which is all that `Const_float32`
        asserts). *)
-    match Loc_map.find_opt instr.arg.(0) known_values with
-    | Some value
-      when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ ->
-      replace instr.res.(0) value known_values
-    | Some _ | None -> Loc_map.remove instr.res.(0) known_values)
+    let known_values =
+      match Loc_map.find_opt instr.arg.(0) known_values with
+      | Some value
+        when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ ->
+        replace instr.res.(0) value known_values
+      | Some _ | None -> Loc_map.remove instr.res.(0) known_values
+    in
+    remove_destroyed_at_basic known_values instr
   | Op (Intop_imm _ | Intop _) ->
     let known_values =
       match known_int_op_result known_values instr with
