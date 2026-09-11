@@ -682,3 +682,30 @@ Error: Abstract kinds are not yet supported in products.
  *       layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
  *   end
  * |}] *)
+
+(** Nested generalize **)
+
+(* both [val poly_] and the inclusion check for unifying packages generalizes *)
+module type A = sig val x : int end
+module type B = sig val x : int end
+module type T = sig
+  val poly_ f : ((module A) as 'a) -> ((module B) as 'a) -> 'b
+end
+[%%expect {|
+module type A = sig val x : int end
+module type B = sig val x : int end
+>> Fatal error: Jkind_types.generalize_with: nested generalize
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(** Classes and objects **)
+
+module type Class = module type of struct
+  class c = let poly_ id x = x in object end
+end
+[%%expect {|
+>> Fatal error: Jkind_types.instance_var: free genvar
+Uncaught exception: Misc.Fatal_error
+
+|}]
