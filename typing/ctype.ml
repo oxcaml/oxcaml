@@ -6526,18 +6526,29 @@ let submode_with_cross env ~is_ret ty l r =
   Alloc.submode l r'
 
 let moregen_alloc_mode env ~is_ret ty v a1 a2 =
+  let tighten () =
+    match v with
+    | Covariant -> Alloc.Guts.zap_towards_floor_of a1 ~towards:a2 |> ignore
+    | Contravariant ->
+      Alloc.Guts.zap_towards_ceil_of a1 ~towards:a2 |> ignore
+    | Invariant | Bivariant -> ()
+  in
   match
     match v with
     | Invariant ->
         Result.bind (submode_with_cross env ~is_ret ty a1 a2)
           (fun _ -> submode_with_cross env ~is_ret ty a2 a1)
-        |> Result.map_error ignore
-    | Covariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a1 a2)
-    | Contravariant -> Result.map_error ignore (submode_with_cross env ~is_ret ty a2 a1)
+    | Covariant -> submode_with_cross env ~is_ret ty a1 a2
+    | Contravariant -> submode_with_cross env ~is_ret ty a2 a1
     | Bivariant -> Ok ()
   with
   | Ok () -> ()
-  | Error _  -> raise_unexplained_for Moregen
+  | Error e ->
+    tighten ();
+    let pos : Errortrace.arrow_position =
+      if is_ret then Return else Argument
+    in
+    raise_for Moregen (Mode_mismatch (pos, e))
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
