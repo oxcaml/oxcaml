@@ -162,6 +162,30 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
   let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
+  (* Deletes the instruction in [cell] if all it does is write [value] to [dst]
+     while [dst] is already known to contain [value]; returns whether the
+     instruction was deleted. Only integer constants are considered. Deleting
+     the instruction makes the (unchanged) `live` fields an under-approximation
+     of actual liveness: the destination register now carries its value from the
+     previous write of the constant, across instructions whose `live` sets do
+     not mention it. This is safe for the current consumers of `live`: the
+     register is an integer register holding a compile-time integer constant, so
+     omitting it from the frame descriptors of the GC points it now crosses is
+     harmless (its value is never a heap pointer), and its liveness cannot
+     change the decision to save SIMD registers at such points. Extending the
+     deletion to other kinds of constants requires revisiting this reasoning. *)
+  let delete_if_redundant (cell : Cfg.basic Cfg.instruction Dll.cell)
+      (dst : Reg.t) (value : known_value) : bool =
+    match value with
+    | Const_int c ->
+      begin match find_opt dst with
+      | Some (Const_int c') when Nativeint.equal c c' ->
+        Dll.delete_curr cell;
+        true
+      | Some (Const_int _ | Const_float32 _ | Const_float _) | None -> false
+      end
+    | Const_float32 _ | Const_float _ -> false
+  in
   let remove_destroyed (instr : Cfg.basic Cfg.instruction) =
     let destroyed_regs = Proc.destroyed_at_basic instr.desc in
     Reg.UsingLocEquality.Tbl.filter_map_inplace
@@ -266,25 +290,8 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       in
       match instr.desc with
       | Op (Const_int c) ->
-        begin match find_opt instr.res.(0) with
-        | Some (Const_int c') ->
-          (* Deleting the move makes the (unchanged) `live` fields an
-             under-approximation of actual liveness: the destination register
-             now carries its value from the previous write of the constant,
-             across instructions whose `live` sets do not mention it. This is
-             safe for the current consumers of `live`: the register is an
-             integer register holding a compile-time integer constant, so
-             omitting it from the frame descriptors of the GC points it now
-             crosses is harmless (its value is never a heap pointer), and its
-             liveness cannot change the decision to save SIMD registers at such
-             points. Extending the deletion to other kinds of constants requires
-             revisiting this reasoning. *)
-          if Nativeint.equal c c'
-          then Dll.delete_curr cell
-          else replace instr.res.(0) (Const_int c)
-        | Some (Const_float32 _ | Const_float _) | None ->
-          replace instr.res.(0) (Const_int c)
-        end
+        if not (delete_if_redundant cell instr.res.(0) (Const_int c))
+        then replace instr.res.(0) (Const_int c)
       | Op (Const_float32 c) ->
         if !Oxcaml_flags.cfg_value_propagation_float
         then replace instr.res.(0) (Const_float32 c)
@@ -298,7 +305,8 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         | Some value
           when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
           ->
-          replace instr.res.(0) value
+          if not (delete_if_redundant cell instr.res.(0) value)
+          then replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
       | Op (Intop_imm (op, imm)) ->
         apply_int_op op (Some (Nativeint.of_int imm))
