@@ -56,6 +56,17 @@ val mark_unused_functions_as_deleted :
   find_code_metadata:(Code_id.t -> Code_metadata.t) ->
   t
 
+(** Rebuild a site inside a closure, filtering its synthetic value slots and
+    marking dead siblings [Deleted] if any code is live. The boolean says to
+    keep the site for later specialisation even without uses of its binders.
+    [names_available_for_hints] must exclude variables removed by unboxing. *)
+val rebuild_specialisation_site :
+  t ->
+  live_code_ids:Code_id.Set.t ->
+  names_available_for_hints:Name.Set.t ->
+  find_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  t * bool
+
 val print : Format.formatter -> t -> unit
 
 val cost_metrics : t -> Cost_metrics.t

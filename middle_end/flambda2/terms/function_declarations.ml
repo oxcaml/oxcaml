@@ -39,6 +39,18 @@ let create in_order =
     in_order
   }
 
+let mark_as_deleted t ~should_delete ~function_slot_size_and_dbg =
+  let in_order =
+    Function_slot.Lmap.map_sharing
+      (function
+        | Code_id { code_id; _ } when should_delete code_id ->
+          let function_slot_size, dbg = function_slot_size_and_dbg code_id in
+          Deleted { function_slot_size; dbg }
+        | (Code_id _ | Deleted _) as decl -> decl)
+      t.in_order
+  in
+  if in_order == t.in_order then t else create in_order
+
 let funs t = t.funs
 
 let funs_in_order t = t.in_order

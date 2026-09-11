@@ -53,11 +53,12 @@ val create :
     does prevent specialisation of the enclosing continuation handler (see
     [Specialization_cost]).
 
-    Design decision: a site with no synthetic value slots left is deleted,
-    although re-simplifying its code could still specialise the callee-less
-    calls inside it on the assumptions of other sites in scope. No real program
-    has been found to need this, and keeping such sites costs .cmx size and
-    compile time. *)
+    Design decision: a site with no synthetic value slots left is not retained
+    for specialisation, although an ordinary callee use can still keep it.
+    Re-simplifying its code could still specialise the callee-less calls inside
+    it on the assumptions of other sites in scope. No real program has been
+    found to need this, and keeping such sites costs .cmx size and compile time.
+*)
 val is_specialisation_site : t -> bool
 
 (** The function declarations associated with the set of closures. *)

@@ -934,30 +934,23 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
             (Set_of_closures.value_slots set_of_closures)
         in
         let function_decls =
-          Function_slot.Lmap.map
-            (fun (func : Function_declarations.code_id_in_function_declaration)
-               ->
-              match func with
-              | Deleted _ -> func
-              | Code_id { code_id; _ } ->
-                let code_metadata =
-                  (try DE.find_code_exn (DA.denv dacc) code_id
-                   with Not_found ->
-                     Misc.fatal_errorf "Could not find code for %a"
-                       Code_id.print code_id)
-                  |> Code_or_metadata.code_metadata
-                in
-                Function_declarations.Deleted
-                  { function_slot_size =
-                      Code_metadata.function_slot_size code_metadata;
-                    dbg = Code_metadata.dbg code_metadata
-                  })
-            (Function_declarations.funs_in_order
-               (Set_of_closures.function_decls set_of_closures))
+          Function_declarations.mark_as_deleted
+            (Set_of_closures.function_decls set_of_closures)
+            ~should_delete:(fun _ -> true)
+            ~function_slot_size_and_dbg:(fun code_id ->
+              let code_metadata =
+                (try DE.find_code_exn (DA.denv dacc) code_id
+                 with Not_found ->
+                   Misc.fatal_errorf "Could not find code for %a" Code_id.print
+                     code_id)
+                |> Code_or_metadata.code_metadata
+              in
+              ( Code_metadata.function_slot_size code_metadata,
+                Code_metadata.dbg code_metadata ))
         in
         Set_of_closures.create ~is_specialisation_site:false
           ~synthetic_value_slots:Value_slot.Map.empty ~value_slots
-          (Function_declarations.create function_decls)
+          function_decls
       in
       { set_of_closures; dacc }
   in

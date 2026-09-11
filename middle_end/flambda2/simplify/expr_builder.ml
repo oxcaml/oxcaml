@@ -176,8 +176,10 @@ let make_new_let_bindings uacc ~bindings_outermost_first ~body =
     match (original_defining_expr : Named.t option) with
     | Some (Prim (prim, _dbg)) ->
       UA.notify_removed ~operation:(Removed_operations.prim prim) uacc
-    | Some (Set_of_closures _) ->
-      UA.notify_removed ~operation:Removed_operations.alloc uacc
+    | Some (Set_of_closures (set, _)) ->
+      if Set_of_closures.is_specialisation_site set
+      then uacc
+      else UA.notify_removed ~operation:Removed_operations.alloc uacc
     | Some (Simple _ | Static_consts _ | Rec_info _) | None -> uacc
   in
   ListLabels.fold_left (List.rev bindings_outermost_first) ~init:(body, uacc)

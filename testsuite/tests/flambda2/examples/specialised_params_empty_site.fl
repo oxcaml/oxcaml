@@ -6,8 +6,9 @@
  fexpr with dump-simplify, dump-reaper;
 *)
 
-(* A site with no synthetic value slots is deleted, whether or not its code is
-   called (see [Set_of_closures]); the call keeps using the generic code. *)
+(* A site with no synthetic value slots is not retained for specialisation.
+   Here neither site has a callee use, so both are deleted even though [helper]
+   is called; the callee-less call keeps using the generic code. *)
 
 let code inline(never) size(10) helper (f : val, x : val)
       specialised { f = f_slot }

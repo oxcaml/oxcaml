@@ -113,6 +113,16 @@ let analyze ?(speculative = false) ?print_name ~machine_width ~is_toplevel
         Mutable_unboxing.make_result reference_analysis ~dom:aliases
           ~compute_unboxed_vars:has_specialisation_sites
       in
+      let specialisation_site_info =
+        if not has_specialisation_sites
+        then specialisation_site_info
+        else
+          { specialisation_site_info with
+            names_available_for_hints =
+              Name.Set.diff specialisation_site_info.names_available_for_hints
+                (Name.set_of_var_set reference_result.unboxed_vars)
+          }
+      in
       let continuation_parameters =
         Control_flow_graph.compute_continuation_extra_args_for_aliases
           ~speculative ~source_info:t aliases control

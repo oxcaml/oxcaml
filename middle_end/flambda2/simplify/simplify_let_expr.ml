@@ -107,64 +107,6 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                         Simplified_named.create ~machine_width
                           (Named.create_prim prim dbg)
                     }))
-            | Set_of_closures (set, _)
-              when Set_of_closures.is_specialisation_site set -> (
-              match Closure_info.in_or_out_of_closure closure_info with
-              | Not_in_a_closure ->
-                (* Nothing simplifies the toplevel of the unit again. *)
-                let simplified_defining_expr =
-                  Simplified_named.filter_synthetic_value_slots
-                    simplified_defining_expr ~f:(fun _ -> false)
-                in
-                let simplified_defining_expr =
-                  match UA.reachable_code_ids uacc with
-                  | Unknown -> simplified_defining_expr
-                  | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
-                    let denv = DA.denv (UA.creation_dacc uacc) in
-                    Simplified_named.mark_unused_functions_as_deleted
-                      simplified_defining_expr ~live_code_ids
-                      ~find_code_metadata:(DE.find_code_metadata_exn denv)
-                in
-                Keep_binding { kept_binding with simplified_defining_expr }
-              | In_a_closure ->
-                let { Flow_types.Specialisation_site_info
-                      .names_available_for_hints;
-                      live_code_ids
-                    } =
-                  UA.specialisation_site_info uacc
-                in
-                let { Flow_types.Mutable_unboxing_result.unboxed_vars; _ } =
-                  UA.mutable_unboxing_result uacc
-                in
-                let simplified_defining_expr =
-                  Simplified_named.filter_synthetic_value_slots
-                    simplified_defining_expr ~f:(fun simple ->
-                      Name_occurrences.fold_names (Simple.free_names simple)
-                        ~init:true ~f:(fun available name ->
-                          available
-                          && Name.Set.mem name names_available_for_hints
-                          &&
-                          match Name.must_be_var_opt name with
-                          | None -> true
-                          | Some var -> not (Variable.Set.mem var unboxed_vars)))
-                in
-                (* Keep dead siblings' slots and binders for imported layouts
-                   and phantom uses. Leave an entirely dead site for ordinary
-                   deletion or phantom handling below. *)
-                let simplified_defining_expr =
-                  if
-                    List.exists
-                      (fun code_id -> Code_id.Set.mem code_id live_code_ids)
-                      (Function_declarations.code_ids
-                         (Set_of_closures.function_decls set))
-                  then
-                    let denv = DA.denv (UA.creation_dacc uacc) in
-                    Simplified_named.mark_unused_functions_as_deleted
-                      simplified_defining_expr ~live_code_ids
-                      ~find_code_metadata:(DE.find_code_metadata_exn denv)
-                  else simplified_defining_expr
-                in
-                Keep_binding { kept_binding with simplified_defining_expr })
             | Simple _ | Rec_info _ | Set_of_closures _ -> binding))
         bindings
     in
@@ -197,6 +139,48 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                  simplified_defining_expr;
                  original_defining_expr
                } as binding) ->
+            let simplified_defining_expr, keep_for_specialisation =
+              match simplified_defining_expr.named with
+              | Set_of_closures (set, _)
+                when Set_of_closures.is_specialisation_site set -> (
+                match Closure_info.in_or_out_of_closure closure_info with
+                | Not_in_a_closure ->
+                  (* Top-level sites are not retained for later enclosing-code
+                     simplification. Their hints were consumed on the downward
+                     pass and are cleared here. *)
+                  let simplified_defining_expr =
+                    Simplified_named.filter_synthetic_value_slots
+                      simplified_defining_expr ~f:(fun _ -> false)
+                  in
+                  let simplified_defining_expr =
+                    match UA.reachable_code_ids uacc with
+                    | Unknown -> simplified_defining_expr
+                    | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
+                      let denv = DA.denv (UA.creation_dacc uacc) in
+                      Simplified_named.mark_unused_functions_as_deleted
+                        simplified_defining_expr ~live_code_ids
+                        ~find_code_metadata:(DE.find_code_metadata_exn denv)
+                  in
+                  simplified_defining_expr, false
+                | In_a_closure ->
+                  let { Flow_types.Specialisation_site_info
+                        .names_available_for_hints;
+                        live_code_ids
+                      } =
+                    UA.specialisation_site_info uacc
+                  in
+                  let denv = DA.denv (UA.creation_dacc uacc) in
+                  Simplified_named.rebuild_specialisation_site
+                    simplified_defining_expr ~live_code_ids
+                    ~names_available_for_hints
+                    ~find_code_metadata:(DE.find_code_metadata_exn denv))
+              | Simple _ | Prim _ | Rec_info _ | Set_of_closures _ ->
+                simplified_defining_expr, false
+            in
+            let binding_to_place =
+              Expr_builder.Keep_binding
+                { binding with simplified_defining_expr }
+            in
             let greatest_name_mode = compute_greatest_name_mode bound_vars in
             let declared_name_mode = Bound_pattern.name_mode bound_vars in
             let mismatched_modes =
@@ -239,31 +223,8 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                 in
                 not is_used, is_used
             in
-            let is_live_specialisation_site =
-              match
-                defining_expr, Closure_info.in_or_out_of_closure closure_info
-              with
-              | Set_of_closures (set, _), In_a_closure
-                when Set_of_closures.is_specialisation_site set ->
-                let { Flow_types.Specialisation_site_info.live_code_ids;
-                      names_available_for_hints = _
-                    } =
-                  UA.specialisation_site_info uacc
-                in
-                (not
-                   (Value_slot.Map.is_empty
-                      (Set_of_closures.synthetic_value_slots set)))
-                && List.exists
-                     (fun code_id -> Code_id.Set.mem code_id live_code_ids)
-                     (Function_declarations.code_ids
-                        (Set_of_closures.function_decls set))
-              | ( ( Set_of_closures _ | Simple _ | Prim _ | Static_consts _
-                  | Rec_info _ ),
-                  (In_a_closure | Not_in_a_closure) ) ->
-                false
-            in
             let must_be_kept =
-              is_end_region_for_used_region || is_live_specialisation_site
+              is_end_region_for_used_region || keep_for_specialisation
               || (not is_end_region_for_unused_region)
                  && not (Named.at_most_generative_effects defining_expr)
             in
@@ -322,7 +283,10 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                   Bound_pattern.with_name_mode bound_vars name_mode
                 in
                 Expr_builder.Keep_binding
-                  { binding with let_bound = bound_vars })
+                  { binding with
+                    let_bound = bound_vars;
+                    simplified_defining_expr
+                  })
         bindings
     in
     let uacc, bindings =

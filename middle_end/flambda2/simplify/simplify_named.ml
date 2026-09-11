@@ -259,10 +259,11 @@ let removed_operations ~min_name_mode ~(original : Named.t) dacc
     zero
   | Ok result -> (
     match original with
-    | Set_of_closures _ ->
+    | Set_of_closures (set, _) ->
       if
-        Simplify_named_result.was_lifted_set_of_closures result
-        || Simplify_named_result.no_bindings result
+        (not (Set_of_closures.is_specialisation_site set))
+        && (Simplify_named_result.was_lifted_set_of_closures result
+           || Simplify_named_result.no_bindings result)
       then Removed_operations.alloc
       else zero
     | Static_consts _ ->

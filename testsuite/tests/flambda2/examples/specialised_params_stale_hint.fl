@@ -9,11 +9,11 @@
  fexpr with dump-simplify;
 *)
 
-(* Known limitation: [names_available_for_hints] is computed before mutable
-   unboxing, so a synthetic slot can keep alive a value whose only runtime use
-   was a field of an unboxed block. The extra simplify pass repairs this in
-   ordinary compilation, but not during speculative inlining, where the kept
-   allocation changes the inlining decision: [caller_hint] still calls
+(* Known limitation: reachability for [names_available_for_hints] is computed
+   before mutable unboxing, so a synthetic slot can keep alive a value whose
+   only use was a field of an unboxed block. The extra simplify pass repairs
+   this in ordinary compilation, but not during speculative inlining, where
+   the kept allocation changes the inlining decision: [caller_hint] still calls
    [outer_hint], which keeps both allocations, while [caller_control] (the
    same code without the synthetic slot) reduces to the helper call. The site
    is the callee so that it stays live; its slot models one for a capture

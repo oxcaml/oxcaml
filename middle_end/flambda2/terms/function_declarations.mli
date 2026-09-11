@@ -39,6 +39,14 @@ val is_empty : t -> bool
 (** Create a set of function declarations in the given order. *)
 val create : code_id_in_function_declaration Function_slot.Lmap.t -> t
 
+(** Preserve slots and their order, returning the same value if no declaration
+    changes. The callback is called only for code IDs being marked [Deleted]. *)
+val mark_as_deleted :
+  t ->
+  should_delete:(Code_id.t -> bool) ->
+  function_slot_size_and_dbg:(Code_id.t -> int * Debuginfo.t) ->
+  t
+
 (** The function(s) defined by the set of function declarations, indexed by
     function slot. *)
 val funs : t -> code_id_in_function_declaration Function_slot.Map.t
