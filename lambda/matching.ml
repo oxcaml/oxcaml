@@ -4761,8 +4761,6 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
-  | Lsplice _ as lam ->
-      fatal_error_invalid_constructor lam
 
 (* The 'opt' reference indicates if the optimization is worthy.
 

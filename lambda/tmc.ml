@@ -685,7 +685,7 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+    | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
     | Linstantiate _ ->
       fatal_error_invalid_constructor t
 

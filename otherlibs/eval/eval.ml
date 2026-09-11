@@ -209,7 +209,7 @@ let eval (expr : 'a expr) =
      }] *)
   let lambda =
     let _static_data, raw_lambda =
-      Slambda.eval ~cu_static_data:Compilenv.get_static_data Fun.id
+      Slambda.eval ~cu_static_data:Compilenv.get_static_data
         tlambda_program.code
     in
     Simplif.simplify_lambda

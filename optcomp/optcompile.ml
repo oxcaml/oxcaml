@@ -17,7 +17,6 @@
 
 open Misc
 open Compile_common
-module SL = Slambda
 
 module type S = sig
   include Optcomp_intf.File_extensions
@@ -99,7 +98,6 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         program.code
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
         |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
-             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
         |> fun (static_data, lambda) ->
         { program with Lambda.code = lambda }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->

@@ -1206,45 +1206,10 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of scoped_location * slambda
   | Lkindtemplate of lkindtemplate
   | Lkindinstantiate of lkindinstantiate
   | Ltemplate of ltemplate
   | Linstantiate of lambda_apply
-
-and slambda =
-  | SLlayout of layout
-  | SLglobal of Compilation_unit.t
-  | SLvar of Slambdaident.t
-  | SLmissing
-  | SLrecord of slambda list
-  | SLfield of slambda * int
-  | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-  | SLtemplate of slambda_function
-  | SLinstantiate of slambda_apply
-  | SLlet of slambda_let
-
-and slambda_halves =
-  { sval_comptime: slambda;
-    sval_runtime: lambda
-  }
-
-and slambda_function =
-  { sfun_params: Slambdaident.t array;
-    sfun_body: slambda
-  }
-
-and slambda_apply =
-  { sapp_func: slambda;
-    sapp_args: slambda array
-  }
-
-and slambda_let =
-  { slet_name: Slambdaident.t;
-    slet_value: slambda;
-    slet_body: slambda
-  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1353,8 +1318,7 @@ let rec try_to_find_location lam =
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _, _)
-  | Levent (_, { lev_loc = loc; _ })
-  | Lsplice (loc, _) ->
+  | Levent (_, { lev_loc = loc; _ }) ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)
@@ -1404,7 +1368,6 @@ let fatal_error_invalid_constructor lambda =
     | Lifused _ -> "Lifused"
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
-    | Lsplice _ -> "Lsplice"
     | Lkindtemplate _ -> "Lkindtemplate"
     | Lkindinstantiate _ -> "Lkindinstantiate"
     | Ltemplate _ -> "Ltemplate"
@@ -1829,8 +1792,6 @@ let make_key e =
    may include cyclic structure of type Type.typexpr *)
     | Levent _ ->
         raise Not_simple
-    | Lsplice _ ->
-        fatal_error_invalid_constructor e
 
   and tr_recs env es = List.map (tr_rec env) es
 
@@ -1879,8 +1840,7 @@ let iter_opt f = function
 let shallow_iter ~tail ~non_tail:f = function
     Lvar _
   | Lmutvar _
-  | Lconst _
-  | Lsplice _ -> ()
+  | Lconst _ -> ()
   | Lapply{ap_func = fn; ap_args = args} ->
       f fn; List.iter f args
   | Lfunction{body} ->
@@ -2032,7 +1992,6 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice _ as l -> fatal_error_invalid_constructor l
   | Lkindtemplate {ktmpl_env} ->
       Ident.Map.fold
         (fun _ (lam, _) acc -> Ident.Set.union (free_variables lam) acc)
@@ -2431,7 +2390,6 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice _ -> fatal_error_invalid_constructor lam
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -2511,8 +2469,7 @@ let shallow_map ~tail ~non_tail:f lam =
   match lam with
   | Lvar _
   | Lmutvar _
-  | Lconst _
-  | Lsplice _ -> lam
+  | Lconst _ -> lam
   | Lapply { ap_func = old_func; ap_args = old_args; ap_result_layout;
              ap_region_close; ap_mode; ap_yielding; ap_loc; ap_tailcall;
              ap_inlined; ap_specialised; ap_probe } ->
@@ -3922,7 +3879,6 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _  | Lkindinstantiate _ | Linstantiate _ | Llet _ | Lmutlet _
       | Lletrec _ | Lswitch _ | Lstringswitch _ | Lstaticraise _

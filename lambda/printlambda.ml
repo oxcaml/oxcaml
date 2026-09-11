@@ -1597,8 +1597,6 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lsplice (_, slambda) ->
-      fprintf ppf "$%a" slam slambda
   | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode;
                    ktmpl_loc = _} ->
       let pr_params ppf params =
@@ -1613,7 +1611,7 @@ let rec lam ppf = function
                       kinst_mode = _; kinst_loc = _} ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
-      fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
+      fprintf ppf "@[<2>(kinstantiate@ %a%a)@]"
         lam kinst_func lams kinst_args
   | Ltemplate {tmpl_func = {kind; params; return; body; attr; ret_mode; mode};
                tmpl_env} ->
@@ -1631,52 +1629,6 @@ let rec lam ppf = function
         apply_inlined_attribute ap.ap_inlined
         apply_specialised_attribute ap.ap_specialised
         apply_probe ap.ap_probe
-
-and slam ppf = function
-  | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
-  | SLglobal cu ->
-    fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
-  | SLvar id -> Slambdaident.print ppf id
-  | SLmissing -> fprintf ppf "(missing)"
-  | SLrecord fields ->
-    let print_fields ppf =
-      List.iter (fun value -> fprintf ppf "%a;@ " slam value) fields
-    in
-    fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
-  | SLfield (container, field) ->
-    fprintf ppf "%a.%i" slam container field
-  | SLhalves { sval_comptime; sval_runtime } ->
-    fprintf ppf "@[<hv>@[<2>{ c =@ %a@]@,@[<2>; r =@ ⟪%a⟫@] }@]"
-      slam sval_comptime lam sval_runtime
-  | SLproj_comptime value -> fprintf ppf "%a.c" slam value
-  | SLtemplate func -> slambda_function ppf func
-  | SLinstantiate apply -> fprintf ppf "(%a)" slambda_apply apply
-  | SLlet { slet_body = SLlet _ } as slet ->
-    let rec letbody ~sp = function
-    | SLlet { slet_name; slet_value; slet_body} ->
-        if sp then fprintf ppf "@ ";
-        fprintf ppf "@[<2>%a =@ %a@]"
-          Slambdaident.print slet_name slam slet_value;
-        letbody ~sp:true slet_body
-    | e -> e in
-    fprintf ppf "@[<2>(let@ @[<hv 1>(";
-    let expr = letbody ~sp:false slet in
-    fprintf ppf ")@]@ %a)@]" slam expr
-  | SLlet { slet_name; slet_value; slet_body } ->
-    fprintf ppf "@[<2>(@[<2>let (%a =@ %a)@]@ %a)@]"
-      Slambdaident.print slet_name slam slet_value slam slet_body
-
-and slambda_function ppf { sfun_params; sfun_body } =
-  let print_params ppf =
-    Array.iter (fun id -> fprintf ppf "%a@ " Slambdaident.print id) sfun_params
-  in
-  fprintf ppf "@[<2>(template @[<2>%t->@]@ %a)@]" print_params slam sfun_body
-
-and slambda_apply ppf { sapp_func; sapp_args } =
-  let print_args ppf =
-    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_args
-  in
-  fprintf ppf "@[<2>%a%t@]" slam sapp_func print_args
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->
@@ -1732,6 +1684,5 @@ and template_env ppf env =
 let structured_constant = struct_const
 
 let lambda = lam
-let slambda = slam
 
 let program ppf { code } = lambda ppf code

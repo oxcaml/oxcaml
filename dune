@@ -326,9 +326,7 @@
   runtimedef
   tmc
   simplif
-  slambda_fracture
   slambda
-  slambdaeval
   slambdaident
   switch
   value_rec_compiler

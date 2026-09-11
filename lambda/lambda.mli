@@ -980,17 +980,16 @@ type pop_region =
   Compilation looks like: {[
     typedtree
     ---transl--> tlambda
-    --fracture-> slambda
     ----eval---> rawlambda
     ---simplif-> lambda
   ]}
-  where [tlambda], [slambda], [rawlambda], and [lambda] are all represented
-  using this type.
+  where [tlambda], [rawlambda], and [lambda] are all represented using this
+  type.
 
   Most constructors are valid at all stages, the constructors that aren't
   document this. The only other difference is that [layout] can contain
-  variables before eval ([tlambda] and [slambda]) and not after eval
-  ([rawlambda] and [lambda]).
+  variables before eval ([tlambda]) and not after eval ([rawlambda] and
+  [lambda]).
 *)
 type lambda =
     Lvar of Ident.t
@@ -1040,8 +1039,6 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  (* [Lsplice] should only exist in the slambda stage. *)
-  | Lsplice of scoped_location * slambda
   (* [Lkindtemplate] should only exist in the tlambda stage. *)
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
@@ -1050,41 +1047,6 @@ type lambda =
   | Ltemplate of ltemplate
   (* [Linstantiate] should only exist in the tlambda stage. *)
   | Linstantiate of lambda_apply
-
-and slambda =
-  | SLlayout of layout
-  | SLglobal of Compilation_unit.t
-  | SLvar of Slambdaident.t
-  | SLmissing
-  | SLrecord of slambda list
-  | SLfield of slambda * int
-  | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-    (** Project out the compiletime half of a [slambda_halves] *)
-  | SLtemplate of slambda_function
-  | SLinstantiate of slambda_apply
-  | SLlet of slambda_let
-
-and slambda_halves =
-  { sval_comptime: slambda;
-    sval_runtime: lambda
-  }
-
-and slambda_function =
-  { sfun_params: Slambdaident.t array;
-    sfun_body: slambda
-  }
-
-and slambda_apply =
-  { sapp_func: slambda;
-    sapp_args: slambda array
-  }
-
-and slambda_let =
-  { slet_name: Slambdaident.t;
-    slet_value: slambda;
-    slet_body: slambda
-  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1409,8 +1371,8 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
     expression.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val shallow_iter:
@@ -1421,8 +1383,8 @@ val shallow_iter:
     sub-terms which are in tail position or not.
 
     Callers should note that you will need to handle stage specific
-    constructors ([Lsplice], etc) depending on what stage you are calling this
-    from.
+    constructors ([Lkindtemplate], etc) depending on what stage you are
+    calling this from.
 *)
 
 val transl_prim: string -> string -> lambda

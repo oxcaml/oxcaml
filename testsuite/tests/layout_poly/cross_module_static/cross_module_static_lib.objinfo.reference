@@ -16,29 +16,46 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  Cross_module_static_lib/body/0[
+  Cross_module_static_lib//0[
     Cross_module_static_lib/id/0;
     Cross_module_static_lib/pair/1;
     (missing);
     Cross_module_static_lib/counted_id/2;
+    Cross_module_static_lib/Capture/3;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure ⟨env⟩ layout_16 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/351 x/342[$layout_16] : $layout_16
-           (let (calls/348 =a (mixedfield 0  (*) closure/351))
-             (seq (+:=1 calls/348) x/342)))⟫ }))
+    (closure ⟨env⟩
+      (ktemplate heap{calls/370=calls/339;} layout_16
+        (function {nlocal = 0} x/342[$layout_16] : $layout_16
+          (seq (+:=1 calls/370) x/342)))))
   (Cross_module_static_lib/id/0
-    (closure ⟨env⟩ layout_2 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/349 x/334[$layout_2] : $layout_2
-           x/334)⟫ }))
+    (closure ⟨env⟩
+      (ktemplate heap{} layout_2
+        (function {nlocal = 0} x/334[$layout_2] : $layout_2 x/334))))
+  (Cross_module_static_lib/Capture/3
+    (closure ⟨env⟩
+      (template {calls/369=calls/339;} {nlocal = 0} X/368 is_a_functor
+        never_inline never_loop
+        (let
+          (X/345 =a X/368
+           *match*/367 =[value<int>]
+             (seq (+:=1 calls/369) (+:=1 (field_imm 1 X/345)))
+           initial/346 =[value<int>] (field_int 0 (field_imm 1 X/345))
+           capture/347 =
+             (ktemplate
+               heap{X/364=X/345;initial/365=[value<int>]initial/346;}
+               layout_29
+               (function {nlocal = 0} x/349[$layout_29] never_inline
+                 : #(?, $layout_29)
+                 (seq (+:=1 (field_imm 1 X/364))
+                   (make_unboxed_product #(value<int>, $layout_29)
+                     (%int_add (%int_add (field_imm 0 X/364) initial/365)
+                       (field_int 0 (field_imm 1 X/364)))
+                     x/349)))))
+          (makeblock 0 initial/346 capture/347)))))
   (Cross_module_static_lib/pair/1
-    (closure ⟨env⟩ layout_5 layout_7 ->
-      { c = (missing)
-      ; r =
-        ⟪(function {nlocal = 0} closure/350 x/337[$layout_5] y/338[$layout_7]
-           : #($layout_5, $layout_7)
-           (make_unboxed_product #($layout_5, $layout_7) x/337 y/338))⟫ }))
+    (closure ⟨env⟩
+      (ktemplate heap{} layout_5 layout_7
+        (function {nlocal = 0} x/337[$layout_5] y/338[$layout_7]
+          : #($layout_5, $layout_7)
+          (make_unboxed_product #($layout_5, $layout_7) x/337 y/338)))))
