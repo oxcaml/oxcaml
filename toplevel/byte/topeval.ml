@@ -77,7 +77,7 @@ let load_lambda ppf tlam =
       ~cu_static_data:(fun _ ->
         Misc.fatal_errorf_doc
           "Cross-module static evaluation not implemented in the toplevel")
-      (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
+      tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam = Simplif.simplify_lambda_for_bytecode rawlam in
