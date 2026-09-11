@@ -1,0 +1,519 @@
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"generating-code"}< Generating AST nodes}{%html: </div><div>%}{{!"ast-traversal"}Traversing the AST >}{%html: </div></div>%}
+
+{0 Destructing AST Nodes}
+
+In the previous chapter, we have seen how to generate code. However, the
+transformation function should depend on its input (the payload and maybe the
+derived item), which we have to be able to inspect.
+
+Once again, directly inspecting the {{!Ppxlib.Parsetree}[Parsetree]} value that
+we get as input is not a good option because it is very big to manipulate and can
+break at every new OCaml release. For instance, let's consider the case of
+{{:https://github.com/janestreet/ppx_inline_test}[ppx_inline_test]}. We want to
+recognize and extract the name and expression only from the form patterns:
+
+{[
+  [%%test let "name" = expr]
+]}
+
+If we wrote a function accepting the payload of [[%%test]], and extracting the
+name and expression from it, using normal pattern matching we would have:
+
+{[
+ # let match_payload ~loc payload =
+     match payload with
+     | PStr
+         [
+           {
+             pstr_desc =
+               Pstr_value
+                 ( Nonrecursive,
+                   [
+                     {
+                       pvb_pat =
+                         {
+                           ppat_desc =
+                             Ppat_constant (Pconst_string (name, _, None));
+                           _;
+                         };
+                       pvb_expr = expr;
+                       _;
+                     };
+                   ] );
+             _;
+           };
+         ] ->
+         Ok (name, expr)
+     | _ -> Error (Location.Error.createf ~loc "Wrong pattern") ;;
+  val match_payload :
+    loc:location -> payload -> (string * expression, Location.Error.t) result =
+]}
+
+[ppxlib]'s solution to the verbosity and stability problem is to provide helpers
+to {e match} the AST, in a very similar way to what it does for generating AST
+nodes.
+
+{1 The Different Options}
+
+In this chapter, we will often mention the similarities between matching code
+and generating code (from the {{!"generating-code"}previous chapter}). Indeed, the
+options provided by [ppxlib] to match AST nodes mirror the ones for generating
+nodes:
+
+- {{!Ppxlib.Ast_pattern}[Ast_pattern]}, the {{!Ppxlib.Ast_builder}[Ast_builder]} sibling,
+- {{!Ppxlib_metaquot}[Metaquot]} again.
+
+{{!Ppxlib.Ast_pattern}[Ast_pattern]} is used in {{!Ppxlib.Extension.V3.declare}[Extension.V3.declare]}, so you will need it to write
+extenders. {!Ppxlib_metaquot} is, as for generating nodes, more natural to use but also
+restricted to some cases.
+
+{1:ast_pattern_intro The [Ast_pattern] Module}
+
+A match is a "structural destruction" of a value into multiple subvalues to
+continue the computation. For instance, in the example above from the single
+variable [payload], we structurally extract two variables: [name] and [expr].
+
+Destruction is very similar to construction, but in reverse. Instead of using
+several values to build a bigger one, we use one big value to define smaller
+ones. As an illustration, note how in OCaml the following construction and
+destruction are close:
+
+{[
+  let big = { x ; y }      (** Construction from [x] and [y]      *)
+  let { x ; y } = big      (** Destruction recovering [x] and [y] *)
+]}
+
+For the same reason, building AST nodes using {{!Ppxlib.Ast_builder}[Ast_builder]} and destructing AST
+nodes using {{!Ppxlib.Ast_pattern}[Ast_pattern]} look very similar. The difference is that in the construction "leaf," {{!Ppxlib.Ast_builder}[Ast_builder]} uses actual values, while {{!Ppxlib.Ast_pattern}[Ast_pattern]} has
+"wildcards" at the leafs.
+
+Consider the example in the introduction matching [[%%test let "name" = expr]].
+Building such an expression with {{!Ppxlib.Ast_builder}[Ast_builder]} could look like:
+
+{[
+  # let build_payload_test ~loc name expr =
+      let (module B) = Ast_builder.make loc in
+      let open B in
+      Parsetree.PStr
+        (pstr_value Nonrecursive
+          (value_binding ~pat:(pstring name) ~expr :: [])
+        :: []) ;;
+  val build_payload_test :
+    loc:location -> string -> expression -> payload =
+    <abstr>
+]}
+
+Constructing a first-class pattern is almost as simple as replacing
+[Ast_builder] with [Ast_pattern], as well as replacing the base values [name] and [expr] with a
+capturing wildcard:
+
+{[
+  # let destruct_payload_test () =
+      let open Ast_pattern in
+      pstr
+        (pstr_value nonrecursive
+           (value_binding ~pat:(pstring __) ~expr:__ ^:: nil)
+        ^:: nil) ;;
+  val destruct_payload_test :
+    unit -> (payload, string -> expression -> 'a, 'a) Ast_pattern.t =
+    <abstr>
+]}
+
+Note that to facilitate viewing the similarity, we wrote [[v]] as [v :: []], and
+we added a [unit] argument to avoid
+{{:https://v2.ocaml.org/manual/polymorphism.html#ss:valuerestriction}value
+restriction} to mess with the type (that we explained right in the next section).
+
+{2 The Type for Patterns}
+
+The {{!Ppxlib.Ast_pattern.t}[Ast_pattern.t]} type reflects the fact that a pattern-match or destruction
+is taking a value, extracting other values from it, and using them to finally
+output something. So, a value [v] of type [(matched, cont, res) Ast_pattern.t]
+means that:
+
+- The type of values matched by [v] is [matched]. For instance, [matched] could
+  be {{!Ppxlib.Parsetree.payload}[payload]}.
+- The continuation (what to do with the extracted values) has type [cont]. The
+  values extracted from the destruction are passed as an argument to the
+  continuation, therefore [cont] includes information about them. For instance,
+  for a pattern that captures an [int] and a [string], [cont] could be
+  [int ->  string -> structure]. The continuation is not part of [v]; it will
+  be given with the value to match.
+- The result of the computation has type [res]. Note that this is additional information
+  than what we have in [cont]: {{!Ppxlib.Ast_pattern.map_result}[Ast_pattern.map_result]}
+  allows mapping the continuation result through a function! This allows users to add a
+  "construction" post-processing to the continuation. A value of type
+  [(pattern, int -> int, expression) Ast_pattern.t] would contain how to extract an integer from a [pattern] and how to map a modified [int] into an [expression].
+  
+
+In the case of the example above, [destruct_payload_test] has type:
+{[
+  # destruct_payload_test ;;
+  val destruct_payload_test :
+    (payload, string -> expression -> 'a, 'a) Ast_pattern.t =
+    <abstr>
+]}
+ as it destructs values
+of type [pattern] extracts two values, respectively, of type [string] and
+[expression], so the continuation has type [string -> expression -> 'a]. Then the
+result type is ['a] since no mapping on the result is made. Now that the type of {{!Ppxlib.Ast_pattern.t}[Ast_pattern.t]} is explained, the type of
+{{!Ppxlib.Ast_pattern.parse_res}[Ast_pattern.parse_res]}, the function for applying patterns, should make sense:
+
+{@ocaml[
+  # Ast_pattern.parse_res ;;
+  val parse_res :
+    ( 'matched, 'cont, 'res ) t ->
+    Location.t ->
+    ?on_error:( unit -> 'res) ->
+    'matched ->
+    'cont ->
+    ( 'res, Location.Error.t Stdppx.NonEmptyList.t ) result =
+    <fun>
+]}
+
+This function takes a pattern expecting values of type ['matched], continuations of
+type ['cont] and output values of type [('res, _) result] (where the error case is when the ['matched] value does not have the expected structure).
+The types of the function's other arguments correspond to this understanding: the argument of type ['matched] is
+the value to match, the one of type ['cont] is the continuation, and the result
+of applying the pattern to those two values is of type ['res]!
+
+Composing construction and destruction yield the identity:
+
+{@ocaml[
+  # let f name expr = 
+      Ast_pattern.parse_res
+        (destruct_payload_test ()) Location.none
+        (build_payload_test ~loc name expr)
+        (fun name expr -> (name, expr)) ;;
+  val f :
+    string ->
+    expression ->
+    (string * expression, _) result = <fun>
+  # f "name" [%expr ()] ;;
+  Ok
+   ("name",
+    {pexp_desc =
+      Pexp_construct
+       ({txt = Lident "()";
+    ...}...)...}...)
+]}
+
+While the {{!Ppxlib.Ast_pattern.parse_res}[Ast_pattern.parse_res]} function is useful to match an AST node, you
+will also need the {{!Ppxlib.Ast_pattern.t}[Ast_pattern.t]} value in other contexts. For instance, it is
+used when declaring extenders with {{!Ppxlib.Extension.declare}[Extension.declare]} to tell how to extract
+arguments from the payload to give them to the extender, or when parsing with {{!Ppxlib.Deriving.Args.arg}deriving arguments}.
+
+{2 Building Patterns}
+
+Now that we know what these patterns represent and how to use them, and have seen an
+example in the {{!ast_pattern_intro}introduction} on {{!Ppxlib.Ast_pattern}[Ast_pattern]}, the
+combinators in the {{!Ppxlib.Ast_pattern}API} should be much more easily
+understandable. So, for a comprehensive list of the different values in the
+module, the reader should directly refer to the API. In this guide; however, we
+explain in more detail a few important values with examples.
+
+{b The wildcard pattern [| x -> ]}. The simplest way to extract a value from something
+is just to return it! In {{!Ppxlib.Ast_pattern}[Ast_pattern]}, it corresponds to the value
+{{!Ppxlib.Ast_pattern.__}[__]} (of type [('a, 'a -> 'b, 'b)]), which extract the
+value it's given: {{!Ppxlib.Ast_pattern.parse_res}matching} a value [v]
+with this pattern and a continuation [k] would simply call [k v].
+
+This pattern is useful in combination with other combinators.
+
+{b The wildcard-dropping pattern [| _ -> ]}. Despite their name ressemblance,
+{{!Ppxlib.Ast_pattern.__}[__]} is very different from the OCaml pattern-match
+wildcard [_], which accepts everything but {e ignores} its input. In {{!Ppxlib.Ast_pattern}[Ast_pattern]},
+the wildcard-dropping pattern is {{!Ppxlib.Ast_pattern.drop}[drop]}. Again, it
+is useful in conjunction with other combinators, where one needs
+to accept all input in some places, but the value is not relevant.
+
+{b The [| p as name -> ] combinator}. The combinator {{!Ppxlib.Ast_pattern.as__}[as__]}
+allows passing a node to the continuation while still extracting values from
+this node. For instance, [as__ (some __)] corresponds to the OCaml pattern-match
+[ Some n2 as n1], where the continuation is called with [k n1 n2].
+
+{b The [| (p1 | p2) -> ] combinator}. The combinator {{!Ppxlib.Ast_pattern.alt}[alt]}
+combines two patterns with the same type for extracted values into one pattern
+by first trying to apply the first, and if it fails, by applying the second one.
+For instance, [alt (pair (some __) drop) (pair drop (some __))] corresponds to
+the OCaml pattern [(Some a, _) | (_, Some b)].
+
+{b The constant patterns [| "constant" -> ]}. Using {{!Ppxlib.Ast_pattern.cst}[Ast_pattern.cst]} it is
+possible to create patterns matching only fixed values, such as the ["constant"]
+string. No values are extracted from this matching. The functions for creating
+such values are {{!Ppxlib.Ast_pattern.int}[Ast_pattern.int]}, {{!Ppxlib.Ast_pattern.string}[Ast_pattern.string]}, {{!Ppxlib.Ast_pattern.bool}[Ast_pattern.bool]}, ...
+
+{b The common deconstructors}. Many usual common constructors have
+"deconstructors" in {{!Ppxlib.Ast_pattern}[Ast_pattern]}. For instance:
+-  [some __] corresponds to [Some a],
+- [__ ^:: drop ^:: nil] correspnds to [a :: _ :: []],
+-  [pair __ __] (or equivalently [__ ** __]) corresponds to [(a,b)], etc.
+
+{b The Parsetree deconstructors}. All constructors from {{!Ppxlib.Ast_builder}[Ast_builder]} have a
+"deconstructor" in {{!Ppxlib.Ast_pattern}[Ast_pattern]} with the same name. For instance, since
+{{!Ppxlib.Ast_builder}[Ast_builder]} has a constructor {{!Ppxlib.Ast_builder.Default.pstr_value}[pstr_value]} to build a structure
+item from a [rec_flag] and a [value_binding] list. {{!Ppxlib.Ast_pattern}[Ast_pattern]} has an equally
+named {{!Ppxlib.Ast_pattern.pstr_value}[pstr_value]} which, given ways to destruct rec flags and
+[value_binding] lists, creates a destructor for structure items.
+
+{b The continuation modifiers}. Many {{!Ppxlib.Ast_pattern}[Ast_pattern]} values allow modifying the
+continuation. It can be it a map on the continuation itself, the argument to the
+continuation, or the result of the continuation. So, {{!Ppxlib.Ast_pattern.map}[Ast_pattern.map]} transforms the
+continuation itself, e.g., [map ~f:Fun.flip] will switch the arguments of
+the function. {{!Ppxlib.Ast_pattern.map1}[map<i>]} modifies the arguments to a
+continuation of arity [i]: [map2 ~f:combine] is equivalent to
+[map ~f:(fun k -> (fun x y -> k (combine x y)))]. Finally, {{!Ppxlib.Ast_pattern.map_result}[Ast_pattern.map_result]} modifies
+the continuation's result, and [map_result ~f:ignore] would ignore the continuation's result.
+
+{b Common patterns} Some patterns are sufficiently common that, although they can be built from smaller bricks, they are already defined in {{!Ppxlib.Ast_pattern}[Ast_pattern]}. For instance, matching a single expression in a payload is given as {{!Ppxlib.Ast_pattern.single_expr_payload}[Ast_pattern.single_expr_payload]}.
+
+{2:pattern_examples Useful patterns and examples}
+
+Below, is a list of patterns that are commonly needed when using {{!Ppxlib.Ast_pattern}[Ast_pattern]}:
+
+{@ocaml[
+  open Ast_pattern
+]}
+
+- A pattern to extract an expression from an extension point payload:
+
+{@ocaml[
+  # let extractor () = single_expr_payload __ ;
+  val extractor : unit -> (payload, expression -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a string from an extension point payload:
+
+{@ocaml[
+  # let extractor () = single_expr_payload (estring __) ;
+  val extractor : unit -> (payload, string -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a pair [int * float] from an extension point payload:
+
+{@ocaml[
+  # let extractor () = single_expr_payload (pexp_tuple (eint __ ^:: efloat __ ^:: nil)) ;;
+  val extractor : unit -> (payload, int -> string -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a list of integers from an extension point payload, given
+  as a tuple (of unfixed length):
+
+{@ocaml[
+  # let extractor () = single_expr_payload (pexp_tuple (many (eint __))) ;;
+  val extractor : unit -> (payload, int -> string -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a list of integers from an extension point payload, given
+  as a list:
+
+{@ocaml[
+  # let extractor () = single_expr_payload (elist (eint __)) ;;
+  val extractor : unit -> (payload, int list -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract the [pattern] and the [expression] in a let-binding, from a structure item:
+
+{@ocaml[
+  # let extractor_in_let () = pstr_value drop ((value_binding ~pat:__ ~expr:__) ^:: nil);;
+  val extractor_in_let : unit -> (structure_item, pattern -> expression -> 'a, 'a) t =
+    <fun>
+]}
+
+- A pattern to extract the [pattern] and the [expression] in a let-binding, from an extension point payload:
+
+{@ocaml[
+  # let extractor () = pstr @@ extractor_in_let ^:: nil;;
+  val extractor : unit -> (payload, pattern -> expression -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a core type, from an extension point payload (with a comma in the extension node, such as [[%ext_name: core_type]]):
+
+{@ocaml[
+  # let extractor () = ptyp __
+  val extractor : unit -> (payload, core_type -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a string from an expression, either from an identifier or from a string. That is, it will extract the string ["foo"] from both the AST nodes [foo] and ["foo"].
+
+{@ocaml[
+  # let extractor () = alt (pexp_ident (lident __)) (estring __) ;;
+  val extractor : unit -> (expression, string -> 'a, 'a) t = <fun>
+]}
+
+- A pattern to extract a sequence of two idents, as strings (will extract ["foo"], ["bar"] from [[%ext_name foo bar]]):
+
+{@ocaml[
+  let extractor () =
+    single_expr_payload @@
+      pexp_apply
+        (pexp_ident (lident __))
+        ((no_label (pexp_ident (lident __))) ^:: nil) ;;
+  val extractor : unit -> (payload, string -> string -> 'a, 'a) t = <fun>]}
+
+{1:metaquot [Metaquot]}
+{2 [Metaquot] for Patterns}
+
+Recall that [ppxlib] provides a rewriter to generate code explained in
+{{!page-"generating-code".metaquot}the corresponding chapter}. The same PPX can
+also generate patterns when the extension nodes are used patterns: for
+instance, in what follows, the extension node will be replaced by a value of {{!Ppxlib.Parsetree.expression}[expression]} type:
+
+{[
+  let f = [%expr 1 + 1]
+]}
+
+While in the following, it would be replaced by a pattern matching on values of {{!Ppxlib.Parsetree.expression}[expression]} type:
+
+{[
+  let f x = match x with
+    | [%expr 1 + 1] -> ...
+    | _ -> ...
+]}
+
+The produced pattern matches regardless of location and attributes. For
+the previous example, it will produce the following pattern:
+
+{[
+    {
+      pexp_desc =
+        (Pexp_apply
+           ({
+              pexp_desc = (Pexp_ident { txt = (Lident "+"); loc = _ });
+              pexp_loc = _;
+              pexp_attributes = _
+            },
+             [(Nolabel,
+                {
+                  pexp_desc = (Pexp_constant (Pconst_integer ("1", None)));
+                  pexp_loc = _;
+                  pexp_attributes = _
+                });
+             (Nolabel,
+               {
+                 pexp_desc = (Pexp_constant (Pconst_integer ("1", None)));
+                 pexp_loc = _;
+                 pexp_attributes = _
+               })]));
+      pexp_loc = _;
+      pexp_attributes = _
+    }
+]}
+
+While being less general than {{!Ppxlib.Ast_pattern}[Ast_pattern]}, this allows users to write
+patterns in a more natural way. Due to the OCaml AST, {{!Ppxlib.Parsetree.payload}payloads} can only
+take the form of a {{!Ppxlib.Parsetree.structure}[structure]}, a {{!Ppxlib.Parsetree.signature}[signature]}, a {{!Ppxlib.Parsetree.core_type}[core type]}, or a {{!Ppxlib.Parsetree.pattern}[pattern]}. We might
+want to generate pattern matching for other kinds of nodes, such as expressions or
+structure item. The same extension nodes that [Metaquot] provides
+for building can be used for matching:
+
+- The [expr] extension node to match on {{!Ppxlib.Parsetree.expression}[expressions]}:
+  {[match expr with [%expr 1 + 1] -> ...]}
+- The [pat] extension node to match on {{!Ppxlib.Parsetree.pattern}[patterns]}: 
+{[match pattern with [%pat? ("", _)] -> ...]}
+- The [type] extension node to match on for {{!Ppxlib.Parsetree.core_type}[core types]}:
+  {[match typ with [%type: int -> string] -> ...]}
+- The [stri] and [sigi] extension nodes to match on {{!Ppxlib.Parsetree.structure_item}[structure_item]} and {{!Ppxlib.Parsetree.signature_item}[signature_item]}:
+  {[match stri with [%stri let a = 1] -> ...
+  match sigi with [%sigi: val a : int] -> ...]}
+- The [str] and [sig] extension nodes to match on
+  {{!Ppxlib.Parsetree.structure}[structure]}
+  and {{!Ppxlib.Parsetree.signature}[signature]}.
+  {[
+let _ =
+  match str with
+  | [%str
+      let a = 1
+      let b = 2.1] ->
+      ()
+
+let _ =
+  match sigi with
+  | [%sigi:
+      val a : int
+      val b : float] ->
+      ()
+
+]}
+
+{2:antiquotations Anti-Quotations}
+
+{{!page-"generating-code".antiquotations}Similarly} to the [expression] context, these extension nodes have a limitation: when using these extensions alone, you can't
+bind variables. [Metaquot] also solves
+this problem using anti-quotation.
+In the [pattern] context, anti-quotation is not used to insert values but to insert
+patterns. That way you can include a wildcard or variable-binding pattern.
+
+Consider the following example, which matches expression nodes corresponding to
+the sum of three expressions: starting with the constant 1, followed by anything,
+followed by anything bound to the [third] variable, which has type
+[expression]:
+
+{[
+          match some_expr_node with
+          | [%expr 1 + [%e? _] + [%e? third]] -> do_something_with third
+]}
+
+The syntax for anti-quotation depends on the type of the node you wish to insert
+(which must also correspond to the context of the anti-quotation extension node):
+
+- The extension point [e] is used to anti-quote values of type
+  {{!Ppxlib.Parsetree.expression}[expression]}:
+  {[match e with [%expr 1 + [%e? some_expr_pattern]] -> ...]}
+- The extension point [p] is used to anti-quote values of type
+  {{!Ppxlib.Parsetree.pattern}[pattern]}:
+  {[match pat with [%stri let [%p? x] = [%e? y]] -> do_something_with x y]}
+- The extension point [t] is used to anti-quote values of type
+  {{!Ppxlib.Parsetree.core_type}[core_type]}:
+  {[match t with [%type: int -> [%t? _]] -> ...]}
+- The extension point [m] is used to anti-quote values of type
+  {{!Ppxlib.Parsetree.module_expr}[module_expr]}
+  or {{!Ppxlib.Parsetree.module_type}[module_type]}:
+  {[
+let [%expr
+      let module M = [%m? extracted_m] in
+      M.x] =
+  some_expr
+in
+do_something_with extracted_m
+
+let _ = fun [%sigi: module M : [%m? input]] -> do_something_with input
+]}
+- The extension point [i] is used to anti-quote values of type
+  {{!Ppxlib.Parsetree.structure_item}[structure_item]} or
+  {{!Ppxlib.Parsetree.signature_item}[signature_item]}:
+  {[
+let [%str
+      let a = 1
+
+      [%%i? stri2]] =
+  e
+in
+do_something_with stri2
+;;
+
+let [%sig:
+      val a : int
+
+      [%%i? sigi2]] =
+  s
+in
+do_something_with sigi2
+]}
+
+Remember, since we are inserting patterns (and not expressions), we always use
+patterns as payload, as in [[%e? x]].
+
+If an anti-quote extension node is in the wrong context, it won't be rewritten
+by [Metaquot]. For instance, in [fun [%expr 1 + [%p? x]] -> x] the
+anti-quote extension node for the expression is put in a pattern context, and
+it won't be rewritten.
+On the contrary, you should use anti-quotes whose kind ([[%e ...]], [[%p ...]])
+match the context. For example, you should write:
+
+{@ocaml[
+fun [%stri let ([%p pat] : [%t type_]) = [%e expr]] ->
+  do_something_with pat type_ expr
+]}
+
+{%html: <div style="display: flex; justify-content:space-between"><div>%}{{!"generating-code"}< Generating AST nodes}{%html: </div><div>%}{{!"ast-traversal"}Traversing the AST >}{%html: </div></div>%}
