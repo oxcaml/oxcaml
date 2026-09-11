@@ -168,16 +168,16 @@ let index_of_artifact ~into ~root ~rewrite_root ~build_path
       | None ->
         let store, h = Union_find.new_root store uid (Uid_set.singleton uid) in
         (store, (Uid_map.add uid h acc, h))
-  in
-  List.fold_left
+    in
+    List.fold_left
       (fun (store, acc) (_, uid1, uid2) ->
-        let store, (acc, h1) = get_or_create store acc uid1 in
-        let store, (acc, h2) = get_or_create store acc uid2 in
-        let store, _ = Union_find.union store h1 h2 in
-        (store, acc))
+         let store, (acc, h1) = get_or_create store acc uid1 in
+         let store, (acc, h2) = get_or_create store acc uid2 in
+         let store, _ = Union_find.union store h1 h2 in
+         (store, acc))
       (into.related_uids_store, into.related_uids)
       cmt_declaration_dependencies
-      in
+  in
   { defs;
     approximated;
     cu_shape;
