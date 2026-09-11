@@ -45,17 +45,17 @@ let rec with_afl_logging b dbg =
     Clet(VP.create afl_area,
          op (Cload ({memory_chunk=Word_int;
                      mutability=Asttypes.Mutable;
-                     is_atomic=false})) [afl_area_ptr dbg],
+                     atomic=None})) [afl_area_ptr dbg],
          Clet(VP.create cur_pos, op Cxor [op (Cload {memory_chunk=Word_int;
                                                      mutability=Asttypes.Mutable;
-                                                     is_atomic=false})
+                                                     atomic=None})
         [afl_prev_loc dbg]; Cconst_int (cur_location, dbg)],
       Csequence(
         op (Cstore(Byte_unsigned, Assignment))
           [op Cadda [Cvar afl_area; Cvar cur_pos];
            op Cadda [op (Cload {memory_chunk=Byte_unsigned;
                                 mutability=Asttypes.Mutable;
-                                is_atomic=false})
+                                atomic=None})
                         [op Cadda [Cvar afl_area; Cvar cur_pos]];
                       Cconst_int (1, dbg)]],
         op (Cstore(Word_int, Assignment))

@@ -216,6 +216,20 @@ module Block_access_field_kind : sig
   val from_kind : Flambda_kind.With_subkind.full_kind -> t
 end
 
+module Memory_order : sig
+  (** Memory ordering of an atomic load or store: [Acq_rel] is an acquire load
+      or a release store. *)
+  type t =
+    | Seq_cst
+    | Acq_rel
+
+  val print : Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
+
+  val from_lambda : Lambda.atomic_memory_order -> t
+end
+
 module Mixed_block_access_field_kind : sig
   type t =
     | Value_prefix of Block_access_field_kind.t
@@ -573,7 +587,8 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_load of atomic_offset_units * Block_access_field_kind.t
+  | Atomic_load of
+      atomic_offset_units * Block_access_field_kind.t * Memory_order.t
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
      deleting [Atomic_load] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
@@ -607,6 +622,7 @@ type ternary_primitive =
   | Atomic_set of
       atomic_offset_units
       * Block_access_field_kind.t
+      * Memory_order.t
       * Alloc_mode.For_assignments.t
   | Atomic_exchange of
       atomic_offset_units

@@ -3324,10 +3324,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Unary (Obj_dup { alloc_region = current_alloc_region }, v)]
   | Pget_header m, [[obj]] ->
     [get_header obj m ~current_alloc_region ~current_region]
-  | Patomic_load_field { immediate_or_pointer }, [[atomic]; [field]] ->
+  | ( Patomic_load_field { immediate_or_pointer; memory_order },
+      [[atomic]; [field]] ) ->
     [ Binary
         ( Atomic_load
-            (Field_index, convert_block_access_field_kind immediate_or_pointer),
+            ( Field_index,
+              convert_block_access_field_kind immediate_or_pointer,
+              P.Memory_order.from_lambda memory_order ),
           atomic,
           field ) ]
   | Patomic_load_mixed_field { index; shape }, [[atomic]] ->
@@ -3336,15 +3339,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~prim_name:"Patomic_load_mixed_field" index shape
     in
     [ Binary
-        ( Atomic_load (Field_index, field_kind),
+        ( Atomic_load (Field_index, field_kind, Seq_cst),
           atomic,
           H.Simple (Simple.const_int imm) ) ]
-  | ( Patomic_set_field { immediate_or_pointer; mode },
+  | ( Patomic_set_field { immediate_or_pointer; memory_order; mode },
       [[atomic]; [field]; [new_value]] ) ->
     [ Ternary
         ( Atomic_set
             ( Field_index,
               convert_block_access_field_kind immediate_or_pointer,
+              P.Memory_order.from_lambda memory_order,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           field,
@@ -3358,6 +3362,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Atomic_set
             ( Field_index,
               field_kind,
+              Seq_cst,
               Alloc_mode.For_assignments.from_lambda mode ),
           atomic,
           H.Simple (Simple.const_int imm),
@@ -3409,12 +3414,17 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [Ternary (Atomic_int_arith (Field_index, Or), atomic, field, i)]
   | Patomic_lxor_field, [[atomic]; [field]; [i]] ->
     [Ternary (Atomic_int_arith (Field_index, Xor), atomic, field, i)]
-  | Patomic_load_idx { layout }, [[ptr]; [idx]] ->
+  | Patomic_load_idx { layout; memory_order }, [[ptr]; [idx]] ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
-  | Patomic_set_idx { layout; mode }, [[ptr]; [idx]; [new_value]] ->
+    [ Binary
+        ( Atomic_load
+            (Byte_offset, field_kind, P.Memory_order.from_lambda memory_order),
+          ptr,
+          offset ) ]
+  | Patomic_set_idx { layout; memory_order; mode }, [[ptr]; [idx]; [new_value]]
+    ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
@@ -3422,6 +3432,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Atomic_set
             ( Byte_offset,
               field_kind,
+              P.Memory_order.from_lambda memory_order,
               Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
           offset,
@@ -3502,7 +3513,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
     in
-    [Binary (Atomic_load (Byte_offset, field_kind), ptr, offset)]
+    [Binary (Atomic_load (Byte_offset, field_kind, Seq_cst), ptr, offset)]
   | Patomic_set_ptr { layout; mode }, [[ptr; idx]; [new_value]] ->
     let offset, field_kind =
       idx_atomic_offset_and_field_kind ~machine_width prim dbg layout ~idx
@@ -3511,6 +3522,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( Atomic_set
             ( Byte_offset,
               field_kind,
+              Seq_cst,
               Alloc_mode.For_assignments.from_lambda mode ),
           ptr,
           offset,
