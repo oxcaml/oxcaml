@@ -44,7 +44,7 @@ module Staged : sig
   end
 
   type solution =
-    { uses : Unboxing_analysis.result;
+    { uses : Analysis.result;
       code_changes : Unboxing_analysis.code_changes
     }
 

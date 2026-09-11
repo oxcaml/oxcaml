@@ -44,7 +44,7 @@ val rebuild :
   types_rewrite_context:Types_rewriter.rewrite_context Lazy.t ->
   code_changes:Unboxing_analysis.code_changes ->
   code_deps_for_result_types:Traverse_acc.code_dep Code_id.Map.t option ->
-  Unboxing_analysis.result ->
+  Analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
   Rev_expr.rev_code Code_id.Map.t ->

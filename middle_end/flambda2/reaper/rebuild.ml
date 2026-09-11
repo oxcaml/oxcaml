@@ -51,7 +51,7 @@ type should_preserve_direct_calls =
 
 type env =
   { machine_width : Target_system.Machine_width.t;
-    uses : Unboxing_analysis.result;
+    uses : Analysis.result;
     code_changes : Unboxing_analysis.code_changes;
     code_deps_for_result_types : Traverse_acc.code_dep Code_id.Map.t option;
     get_code_metadata : Code_id.t -> Code_metadata.t;
@@ -1703,7 +1703,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.uses bound_name ks
+        Types_rewriter.rewrite_kind_with_subkind env.uses.db bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -2365,8 +2365,8 @@ let rebuild ~machine_width ~ordered_code_ids
       then
         Keep
           ( param,
-            Types_rewriter.rewrite_kind_with_subkind solved_dep (Name.var param)
-              kind )
+            Types_rewriter.rewrite_kind_with_subkind solved_dep.db
+              (Name.var param) kind )
       else Delete
     | Some fields -> Unbox fields
   in

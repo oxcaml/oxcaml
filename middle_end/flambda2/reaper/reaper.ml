@@ -178,7 +178,7 @@ module Staged = struct
   end
 
   type solution =
-    { uses : Unboxing_analysis.result;
+    { uses : Analysis.result;
       code_changes : Unboxing_analysis.code_changes
     }
 
@@ -306,19 +306,18 @@ module Staged = struct
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
-      then (
-        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
-        Dot_printer.print_solved_dep uses deps)
+      then Dot_printer.print_solved_dep uses deps
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes uses ~analysis_scope
+      Unboxing_analysis.compute_code_changes ~db:uses.db uses.unboxing
+        ~analysis_scope
         ~rewrite_kind_with_subkind:
-          (Types_rewriter.rewrite_kind_with_subkind uses)
+          (Types_rewriter.rewrite_kind_with_subkind uses.db)
         ~code_deps
     in
     let slot_offsets =
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
-        ~code_changes uses
+        ~code_changes ~db:uses.db uses.unboxing
     in
     { uses; code_changes }, slot_offsets
 
@@ -336,7 +335,9 @@ module Staged = struct
       traverse_rebuild
     in
     let types_rewrite_context =
-      lazy (Types_rewriter.prepare_rewrite_context uses all_sets_of_closures)
+      lazy
+        (Types_rewriter.prepare_rewrite_context ~db:uses.db uses.unboxing
+           all_sets_of_closures)
     in
     let Rebuild.{ body; all_code = rebuilt_code; code_ids_to_remember } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids

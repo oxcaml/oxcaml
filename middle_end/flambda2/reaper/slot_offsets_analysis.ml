@@ -143,10 +143,8 @@ module Inputs = struct
     { free_names; closure_function_decls; code_info }
 end
 
-let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
-    ~analysis_scope ~get_code_info ~closure_function_decls
-    ~function_slot_rewrites ~function_slots =
-  let db = uses.db in
+let function_slots_to_be_built ~db ~code_changes ~analysis_scope ~get_code_info
+    ~closure_function_decls ~function_slot_rewrites ~function_slots =
   List.fold_left
     (fun new_slots (slot, closure_name) ->
       let slot' =
@@ -228,14 +226,12 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
    closures after rewriting. Returns [None] if the set of closures will not get
    built at all, e.g. if it has no usages. [closure_name] should be the name of
    any one of the closures in the set. *)
-let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
-    ~code_changes ~analysis_scope ~get_code_info ~closure_function_decls
-    ~unboxed_fields
+let slots_to_be_built_for_set_of_closures ~db ~code_changes ~analysis_scope
+    ~get_code_info ~closure_function_decls ~unboxed_fields
     ~(changed_representation :
        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
     =
-  let db = uses.db in
   let any_member_has_usage =
     List.exists (fun (_, member) -> PTA.has_use db member) set.function_slots
   in
@@ -262,14 +258,13 @@ let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
         Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
-      ( function_slots_to_be_built ~uses ~code_changes ~analysis_scope
+      ( function_slots_to_be_built ~db ~code_changes ~analysis_scope
           ~get_code_info ~closure_function_decls ~function_slot_rewrites
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
-    ({ db; unboxed_fields; changed_representation; _ } as uses :
-      Unboxing_analysis.result) =
+let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes ~db
+    ({ unboxed_fields; changed_representation; _ } : Unboxing_analysis.result) =
   let { Inputs.free_names; closure_function_decls; code_info } = inputs in
   let get_code_info code_id : Inputs.code_info =
     match Unboxing_analysis.find_code_metadata code_changes code_id with
@@ -306,7 +301,7 @@ let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
             in
             let set_slots' =
               match
-                slots_to_be_built_for_set_of_closures ~uses ~code_changes
+                slots_to_be_built_for_set_of_closures ~db ~code_changes
                   ~analysis_scope ~get_code_info ~closure_function_decls
                   ~unboxed_fields ~changed_representation ~closure_name set
               with

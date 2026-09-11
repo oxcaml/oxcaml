@@ -77,5 +77,6 @@ val compute :
   inputs:Inputs.t ->
   analysis_scope:Analysis_scope.t ->
   code_changes:Unboxing_analysis.code_changes ->
+  db:Datalog.database ->
   Unboxing_analysis.result ->
   Slot_offsets.result

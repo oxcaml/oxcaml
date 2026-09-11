@@ -622,9 +622,9 @@ let partition_by_cu map =
 
 let save ~filename ~participants
     ~solution:({ uses; code_changes } : Reaper.Staged.solution) ~slot_offsets =
-  let ({ db; unboxed_fields; changed_representation }
-        : Unboxing_analysis.result) =
-    uses
+  let { Analysis.db; unboxing } = uses in
+  let { Unboxing_analysis.unboxed_fields; changed_representation; _ } =
+    unboxing
   in
   let tables_by_cu =
     Solution_tables.partition_by_compilation_unit
@@ -849,9 +849,12 @@ let solution_for_members { header; sections } ~members =
       ~total:(List.length header.Header.index)
       ~loaded:(List.rev rev_loaded);
   { Reaper.Staged.uses =
-      { Unboxing_analysis.db = Solution_tables.to_database tables;
-        unboxed_fields;
-        changed_representation
+      { Analysis.db = Solution_tables.to_database tables;
+        unboxing =
+          { unboxed_fields;
+            changed_representation;
+            cannot_change_calling_convention = Code_id_or_name.Map.empty
+          }
       };
     code_changes
   }

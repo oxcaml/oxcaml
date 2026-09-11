@@ -119,7 +119,7 @@ type rewrite_context =
            have a given function slot *)
   }
 
-let prepare_rewrite_context result all_sets_of_closures =
+let prepare_rewrite_context ~db unboxing all_sets_of_closures =
   let sets_of_closures_by_function_slot =
     List.fold_left
       (fun acc set_of_closures ->
@@ -138,7 +138,7 @@ let prepare_rewrite_context result all_sets_of_closures =
           acc set_of_closures)
       Function_slot.Map.empty all_sets_of_closures
   in
-  { db = result.UA.db; unboxing = result; sets_of_closures_by_function_slot }
+  { db; unboxing; sets_of_closures_by_function_slot }
 
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
@@ -221,15 +221,15 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom db usages kind =
          { consts; non_consts })
       (Flambda_kind.With_subkind.nullable kind)
 
-let rewrite_kind_with_subkind (uses : UA.result) var kind =
+let rewrite_kind_with_subkind db var kind =
   let var = Code_id_or_name.name var in
-  match PTA.get_usages uses.db var with
+  match PTA.get_usages db var with
   | Bottom -> erase kind
   | Unknown -> kind
   | Ok usages ->
     (* We don't need to add usages through function slots, since functions never
        appear in value_kinds. *)
-    rewrite_kind_with_subkind_not_top_not_bottom uses.db usages kind
+    rewrite_kind_with_subkind_not_top_not_bottom db usages kind
 
 let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
