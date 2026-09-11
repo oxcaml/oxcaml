@@ -769,22 +769,14 @@ let reading_from_a_block mutable_or_immutable : Effects_and_coeffects.t =
   in
   effects, coeffects, Strict, Can't_move_before_any_branch
 
-let reading_from_an_array (array_kind : Array_kind.t)
+let reading_from_an_array
     (mutable_or_immutable : Mutability.t) : Effects_and_coeffects.t =
-  let effects : Effects.t =
-    match array_kind with
-    | Immediates | Values | Gc_ignorable_values | Naked_floats | Naked_float32s
-    | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_int64s
-    | Naked_nativeints | Naked_vec128s | Naked_vec256s | Naked_vec512s
-    | Naked_masks | Unboxed_product _ ->
-      No_effects
-  in
   let coeffects =
     match mutable_or_immutable with
     | Immutable | Immutable_unique -> Coeffects.No_coeffects
     | Mutable -> Coeffects.Has_coeffects
   in
-  effects, coeffects, Strict, Can't_move_before_any_branch
+  No_effects, coeffects, Strict, Can't_move_before_any_branch
 
 let reading_from_a_string_or_bigstring mutable_or_immutable =
   reading_from_a_block mutable_or_immutable
@@ -2155,8 +2147,8 @@ let result_kind_of_binary_primitive p : result_kind =
 let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   match p with
   | Block_set _ -> writing_to_a_block
-  | Array_load (array_kind, _load_kind, mut) ->
-    reading_from_an_array array_kind mut
+  | Array_load (_array_kind, _load_kind, mut) ->
+    reading_from_an_array mut
   | Bigarray_load (_, kind, _) -> reading_from_a_bigarray kind
   | String_or_bigstring_load (String, _) ->
     reading_from_a_string_or_bigstring Immutable
