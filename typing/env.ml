@@ -3675,12 +3675,14 @@ type _ load =
 
 let lookup_global_name_module_no_locks
       (type a) (load : a load) ~errors ~use ~loc name env =
-  let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
+      let name = Persistent_env.with_located_cmi_path !persistent_env name in
+      let path = Pident(Ident.create_global name) in
       check_pers_mod ~allow_hidden:false ~loc name;
       path, (() : a)
   | Load -> begin
+      let path = Pident(Ident.create_global name) in
       match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;
