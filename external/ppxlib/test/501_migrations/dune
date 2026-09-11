@@ -1,3 +1,9 @@
+(test
+ (name module_holes)
+ (package ppxlib_ast)
+ (modules module_holes)
+ (libraries ppxlib_ast.astlib ocaml-compiler-libs.common compiler-libs.common))
+
 (executable
  (name identity_driver)
  (modules identity_driver)

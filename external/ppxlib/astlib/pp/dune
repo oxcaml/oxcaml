@@ -1,5 +1,6 @@
 (executables
  (names pp)
+ (libraries ocaml-compiler-libs.common compiler-libs.common)
  (flags :standard -w -3))
 
 (ocamllex pp_rewrite)

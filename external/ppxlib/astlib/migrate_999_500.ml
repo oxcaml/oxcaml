@@ -1075,6 +1075,10 @@ and copy_module_expr_desc loc :
       Ast_500.Parsetree.Pmod_unpack (copy_expression x0)
   | Ast_999.Parsetree.Pmod_extension x0 ->
       Ast_500.Parsetree.Pmod_extension (copy_extension x0)
+  (* Module holes use the otherwise invalid module identifier [_] in our AST. *)
+  (*IF_MODULE_HOLES | Ast_999.Parsetree.Pmod_hole ->
+      Ast_500.Parsetree.Pmod_ident { txt = Longident.Lident "_"; loc }
+  *)
   | Ast_999.Parsetree.Pmod_instance x0 ->
       Ast_500.Parsetree.Pmod_instance (copy_module_instance x0)
 

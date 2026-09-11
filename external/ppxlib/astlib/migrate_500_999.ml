@@ -1035,6 +1035,10 @@ and copy_module_expr :
 and copy_module_expr_desc :
     Ast_500.Parsetree.module_expr_desc -> Ast_999.Parsetree.module_expr_desc =
   function
+  (*IF_MODULE_HOLES | Ast_500.Parsetree.Pmod_ident
+      { txt = Longident.Lident "_"; _ } ->
+      Ast_999.Parsetree.Pmod_hole
+  *)
   | Ast_500.Parsetree.Pmod_ident x0 ->
       Ast_999.Parsetree.Pmod_ident (copy_loc (copy_Longident_t ~loc:x0.loc) x0)
   | Ast_500.Parsetree.Pmod_structure x0 ->
