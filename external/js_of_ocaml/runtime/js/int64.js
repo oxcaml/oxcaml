@@ -162,7 +162,9 @@ class MlInt64 {
     var sign = (this.hi << 16) >> 31;
     if (s < 48)
       return new MlInt64(
-        (this.mi >> (s - 24)) | (this.hi << (48 - s)),
+        // [h] is sign-extended: for s > 40 the sign bits reach
+        // into the low limb
+        (this.mi >> (s - 24)) | (h << (48 - s)),
         ((this.hi << 16) >> (s - 24)) >> 16,
         sign & 0xffff,
       );
@@ -262,7 +264,7 @@ function caml_int64_ult(x, y) {
 }
 
 //Provides: caml_int64_compare const
-function caml_int64_compare(x, y, total) {
+function caml_int64_compare(x, y, _total) {
   return x.compare(y);
 }
 
@@ -352,25 +354,29 @@ function caml_int64_to_int32(x) {
   return x.toInt();
 }
 
-//Provides: caml_checked_int64_to_int const
-//Requires: caml_int64_of_int32, caml_failwith
-function caml_checked_int64_to_int (x) {
-  if (x.compare(caml_int64_of_int32(0x7FFFFFFF)) == 1
-    || x.compare(caml_int64_of_int32(0x80000000)) == -1)
-    caml_failwith("error while converting from int64")
-  return x.toInt()
+//Provides: caml_checked_int64_to_int
+//Requires: caml_int64_of_int32, caml_array_bound_error
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_checked_int64_to_int(x) {
+  var y = x.toInt();
+  if (x.compare(caml_int64_of_int32(y)) !== 0) caml_array_bound_error();
+  return y;
 }
 
-//Provides: caml_array_unsafe_get_indexed_by_int64 (mutable, const)
-//Requires: caml_int64_to_int32, caml_array_get
-function caml_array_unsafe_get_indexed_by_int64 (array, index) {
-  return caml_array_get(array, caml_int64_to_int32(index));
+//Provides: caml_array_unsafe_get_indexed_by_int64 mutable (mutable, const)
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_array_unsafe_get_indexed_by_int64(array, index) {
+  return array[index.toInt() + 1];
 }
 
 //Provides: caml_array_unsafe_set_indexed_by_int64 (mutable, const, mutable)
-//Requires: caml_int64_to_int32, caml_array_set
-function caml_array_unsafe_set_indexed_by_int64 (array, index, newval) {
-  return caml_array_set(array, caml_int64_to_int32(index), newval)
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_array_unsafe_set_indexed_by_int64(array, index, newval) {
+  array[index.toInt() + 1] = newval;
+  return 0;
 }
 
 //Provides: caml_int64_to_float const
@@ -497,4 +503,14 @@ function caml_int64_to_bytes(x) {
 //Provides: caml_int64_hash const
 function caml_int64_hash(v) {
   return v.lo32() ^ v.hi32();
+}
+
+//Provides: caml_reinterpret_unboxed_int64_as_tagged_int63
+//Requires: caml_failwith
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_reinterpret_unboxed_int64_as_tagged_int63(_v) {
+  caml_failwith(
+    "caml_reinterpret_unboxed_int64_as_tagged_int63 is not supported in javascript.",
+  );
 }

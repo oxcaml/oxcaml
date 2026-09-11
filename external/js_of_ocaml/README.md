@@ -1,6 +1,7 @@
 # Js_of_ocaml (jsoo)
 
-[![Build Status](https://github.com/ocsigen/js_of_ocaml/workflows/build/badge.svg?branch=master)](https://github.com/ocsigen/js_of_ocaml/actions)
+[![Build js_of_ocaml](https://github.com/ocsigen/js_of_ocaml/actions/workflows/js_of_ocaml.yml/badge.svg)](https://github.com/ocsigen/js_of_ocaml/actions/workflows/js_of_ocaml.yml)
+[![Build wasm_of_ocaml](https://github.com/ocsigen/js_of_ocaml/actions/workflows/wasm_of_ocaml.yml/badge.svg)](https://github.com/ocsigen/js_of_ocaml/actions/workflows/wasm_of_ocaml.yml)
 [![Update Web site - build](https://github.com/ocsigen/js_of_ocaml/actions/workflows/siteupdate.yml/badge.svg)](https://github.com/ocsigen/js_of_ocaml/actions/workflows/siteupdate.yml)
 [![Update Web site - deploy](https://github.com/ocsigen/js_of_ocaml/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/ocsigen/js_of_ocaml/actions/workflows/pages/pages-build-deployment)
 
@@ -11,7 +12,7 @@ Node.js.
 - It is easy to install and use as it works with an existing installation of
   OCaml, with no need to recompile any library.
 - It comes with bindings for a large part of the browser APIs.
-- According to our benchmarks, the generated programs runs typically faster than
+- According to our benchmarks, the generated programs run typically faster than
   with the OCaml bytecode interpreter.
 - We believe this compiler will prove much easier to maintain than a retargeted
   OCaml compiler, as the bytecode provides a very stable API.
@@ -23,20 +24,28 @@ Js_of_ocaml is composed of multiple packages:
 - js_of_ocaml-ppx_deriving_json
 - js_of_ocaml-lwt, lwt support.
 - js_of_ocaml-tyxml, tyxml support.
-- js_of_ocaml-toplevel, lib and tools to build an ocaml toplevel to
-  javascript.
+- js_of_ocaml-toplevel, lib and tools to build an OCaml toplevel to
+  JavaScript.
 - wasm_of_ocaml-compiler, [the Wasm_of_ocaml compiler](README_wasm_of_ocaml.md).
 
 ## Requirements
 
-See
+See the
 [opam](https://github.com/ocsigen/js_of_ocaml/blob/master/js_of_ocaml-compiler.opam)
-file for version constraints.
+files for version constraints.
+
+wasm_of_ocaml-compiler additionally depends on a system installation of binaryen (version 119 or later)
 
 ## Supported engines
 
-The generated code works with Node.js 16 or any recent web-browser compatible with ECMAScript 6.
+The generated code and runtime target ECMAScript 2020 (ES2020). Out of the box
+they run on Node.js 18 or later and any evergreen web browser released since
+early 2020 (Chrome 80+, Firefox 74+, Safari 13.4+, Edge 80+). QuickJS-NG is also
+supported.
+
 We optionally rely on js `WeakRef`, which is part of ECMAScript 2021, to implement `Stdlib.Weak` and `Stdlib.Ephemeron`.
+For older engines, the output can be transpiled down to ES5 — see the
+[browser compatibility](https://ocsigen.org/js_of_ocaml/latest/manual/browser-compat) section of the manual.
 
 ### Toplevel requirements
 
@@ -90,7 +99,7 @@ optimized:
 - self recursive functions (when the tail calls are the function itself) are
   compiled using a loop.
 - trampolines are used otherwise.
-  [More](http://ocsigen.org/js_of_ocaml/dev/manual/tailcall) about tail call
+  [More](https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/tailcall.html) about tail call
   optimization.
 
 Effect handlers are supported with the `--effects={cps,double-translation}`
@@ -104,12 +113,12 @@ JavaScript, and floats are not boxed. As a consequence, marshalling, polymorphic
 comparison, and hashing functions can yield results different from usual:
 
 - marshalling floats might generate different output. Such output should not be
-  unmarshalled using the standard ocaml runtime (native or bytecode).
+  unmarshalled using the standard OCaml runtime (native or bytecode).
 - the polymorphic hash function will not give the same results on datastructures
   containing floats;
 - these functions may be more prone to stack overflow.
 
-| OCaml | javascript |
+| OCaml | JavaScript |
 | ------------- | ------------- |
 | int   | number (32bit int)  |
 | int32 | number (32bit int)  |

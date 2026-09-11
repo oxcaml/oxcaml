@@ -83,7 +83,7 @@ type int_un_op =
   | Ctz
   | Popcnt
   | Eqz
-  | TruncSatF64 of signage
+  | TruncSat of [ `F32 | `F64 ] * signage
   | ReinterpretF
 
 type int_bin_op =
@@ -171,6 +171,7 @@ type expression =
   | IfExpr of value_type * expression * expression * expression
   | Try of func_type * instruction list * (var * int * value_type) list
   | ExternConvertAny of expression
+  | AnyConvertExtern of expression
 
 and instruction =
   | Drop of expression

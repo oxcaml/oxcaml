@@ -17,6 +17,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
+(* The In_channel/Out_channel APIs exercised here require OCaml 4.14. *)
+[@@@if ocaml_version >= (4, 14, 0)]
+
 let%expect_test "unicode" =
   let () = print_endline "the • and › characters" in
   [%expect {| the • and › characters |}]
@@ -101,3 +104,47 @@ let%expect_test _ =
   [%expect {| this is a test |}];
   Sys.remove fname;
   ()
+
+(* Each call to in_channel_of_descr / out_channel_of_descr must
+   allocate a fresh channel, like the C runtime. They used to share
+   one channel record per fd, so the two channels were physically
+   equal and reading after writing looped forever. *)
+let%expect_test "channel_of_descr channels are distinct" =
+  let f = Filename.temp_file "jsoo_chan" ".txt" in
+  let fd = Unix.openfile f [ Unix.O_RDWR; Unix.O_CREAT ] 0o644 in
+  let oc = Unix.out_channel_of_descr fd in
+  let ic = Unix.in_channel_of_descr fd in
+  Printf.printf "%b\n" (Obj.repr ic == Obj.repr oc);
+  close_out oc;
+  Sys.remove f;
+  [%expect {| false |}]
+
+(* flush_all must reach every open output channel, not just stdout/stderr;
+   a buffered user channel is flushed to disk by flush_all alone. *)
+let%expect_test "flush_all flushes user channels" =
+  let f = Filename.temp_file "jsoo_flushall" ".txt" in
+  let oc = open_out f in
+  output_string oc "hello";
+  flush_all ();
+  let ic = open_in f in
+  let s = really_input_string ic (in_channel_length ic) in
+  close_in ic;
+  close_out oc;
+  Sys.remove f;
+  print_endline s;
+  [%expect {| hello |}]
+
+(* [Out_channel.is_binary_mode] was added in OCaml 5.2. *)
+let%expect_test "is_binary_mode" =
+  let f = Filename.temp_file "jsoo_bin" ".txt" in
+  let oc = open_out f in
+  (* On Unix (and the js/wasm runtimes) text channels report binary mode;
+     native Windows reports them as non-binary. *)
+  Printf.printf
+    "%b %b\n"
+    (Sys.win32 || Out_channel.is_binary_mode oc)
+    (Sys.win32 || Out_channel.is_binary_mode stdout);
+  close_out oc;
+  Sys.remove f;
+  [%expect {| true true |}]
+[@@if ocaml_version >= (5, 2, 0)]

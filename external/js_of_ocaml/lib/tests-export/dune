@@ -1,0 +1,70 @@
+(executables
+ (names a b)
+ (modes byte)
+ (libraries js_of_ocaml))
+
+(rule
+ (target a.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   %{dep:./a.bc}
+   --wrap-with-fun
+   implemA
+   -o
+   a.js
+   --pretty
+   --target-env
+   browser
+   --no-extern-fs)))
+
+(rule
+ (target a-iife.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   %{dep:./a.bc}
+   -o
+   a-iife.js
+   --target-env
+   browser
+   --no-extern-fs)))
+
+(rule
+ (target b.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   %{dep:./b.bc}
+   --wrap-with-fun
+   implemB
+   -o
+   b.js
+   --pretty
+   --target-env
+   browser
+   --no-extern-fs)))
+
+(alias
+ (name default)
+ (deps a.js b.js a-iife.js index.html))
+
+; for-node.js loads modules via CommonJS-style relative-path
+; `require("./a.js")`, which the QuickJS shim does not implement.
+
+(rule
+ (target for-node.actual)
+ (enabled_if
+  (<> %{profile} quickjs))
+ (deps a.js b.js a-iife.js for-node.js)
+ (action
+  (with-outputs-to
+   %{target}
+   (run node for-node.js))))
+
+(rule
+ (alias runtest-js)
+ (enabled_if
+  (<> %{profile} quickjs))
+ (action
+  (diff %{dep:for-node.expected} %{dep:for-node.actual})))

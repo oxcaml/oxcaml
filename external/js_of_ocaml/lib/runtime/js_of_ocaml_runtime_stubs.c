@@ -32,8 +32,16 @@ void caml_ba_to_typed_array () {
   caml_fatal_error("Unimplemented Javascript primitive caml_ba_to_typed_array!");
 }
 
+void caml_bytes_of_uint8_array () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_bytes_of_uint8_array!");
+}
+
 void caml_create_file () {
   caml_fatal_error("Unimplemented Javascript primitive caml_create_file!");
+}
+
+void caml_custom_identifier () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_custom_identifier!");
 }
 
 void caml_exn_with_js_backtrace () {
@@ -200,12 +208,28 @@ void caml_jsbytes_of_string () {
   caml_fatal_error("Unimplemented Javascript primitive caml_jsbytes_of_string!");
 }
 
+void caml_jsoo_build_config () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_build_config!");
+}
+
 void caml_jsoo_flags_effects () {
   caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_flags_effects!");
 }
 
 void caml_jsoo_flags_use_js_string () {
   caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_flags_use_js_string!");
+}
+
+void caml_jsoo_promise_unwrap () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_promise_unwrap!");
+}
+
+void caml_jsoo_promise_wrap () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_promise_wrap!");
+}
+
+void caml_jsoo_runtime_value () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_jsoo_runtime_value!");
 }
 
 void caml_jsstring_of_string () {
@@ -274,6 +298,10 @@ void caml_string_of_uint8_array () {
 
 void caml_throw_js_exception () {
   caml_fatal_error("Unimplemented Javascript primitive caml_throw_js_exception!");
+}
+
+void caml_uint8_array_of_bytes () {
+  caml_fatal_error("Unimplemented Javascript primitive caml_uint8_array_of_bytes!");
 }
 
 void caml_unmount () {

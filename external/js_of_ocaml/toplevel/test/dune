@@ -1,5 +1,5 @@
 (executables
- (names test_toplevel1 test_toplevel2)
+ (names test_toplevel1 test_toplevel2 test_toplevel_wrapped)
  (libraries js_of_ocaml js_of_ocaml_toplevel re)
  (flags
   (:standard -linkall))
@@ -10,12 +10,24 @@
  (deps
   (package js_of_ocaml-toplevel))
  (action
-  (run jsoo_listunits -o %{targets} stdlib js_of_ocaml-toplevel re)))
+  (run
+   jsoo_listunits
+   -o
+   %{targets}
+   stdlib
+   js_of_ocaml-toplevel
+   js_of_ocaml-toplevel.common
+   re)))
 
 (rule
  (target re.cmis.js)
  (action
   (run jsoo_mkcmis -o %{target} re)))
+
+(rule
+ (target stdlib.cmis.js)
+ (action
+  (run jsoo_mkcmis -o %{target} stdlib)))
 
 (rule
  (targets test_toplevel1.js)
@@ -27,6 +39,8 @@
    --toplevel
    --disable
    shortvar
+   -w
+   no-missing-effects-backend
    %{dep:test_toplevel1.bc}
    -o
    %{targets})))
@@ -40,6 +54,8 @@
    --no-cmis
    --disable
    shortvar
+   -w
+   no-missing-effects-backend
    %{dep:test_toplevel2.bc}
    -o
    %{targets})))
@@ -53,8 +69,37 @@
    (run node ./test_toplevel1.js))))
 
 (rule
+ (targets test_toplevel_wrapped.js)
+ (action
+  (run
+   %{bin:js_of_ocaml}
+   --export
+   %{dep:export.txt}
+   --toplevel
+   --disable
+   shortvar
+   -w
+   no-missing-effects-backend
+   %{dep:test_toplevel_wrapped.bc}
+   -o
+   %{targets})))
+
+(rule
+ (target test_toplevel_wrapped.actual)
+ (deps test_toplevel_wrapped.js)
+ (action
+  (with-stdout-to
+   %{target}
+   (run node ./test_toplevel_wrapped.js))))
+
+; test_toplevel2 loads CMI bundles via CommonJS `require("./stdlib.cmis.js")`,
+; which the QuickJS shim does not implement.
+
+(rule
  (target test_toplevel2.actual)
- (deps test_toplevel2.js re.cmis.js)
+ (enabled_if
+  (<> %{profile} quickjs))
+ (deps test_toplevel2.js stdlib.cmis.js re.cmis.js)
  (action
   (with-stdout-to
    %{target}
@@ -67,6 +112,13 @@
 
 (rule
  (alias runtest-js)
+ (action
+  (diff test_toplevel_wrapped.expected test_toplevel_wrapped.actual)))
+
+(rule
+ (alias runtest-js)
+ (enabled_if
+  (<> %{profile} quickjs))
  (action
   (diff test_toplevel.expected test_toplevel2.actual)))
 

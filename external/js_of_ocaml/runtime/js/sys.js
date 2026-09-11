@@ -20,7 +20,10 @@
 //Provides: caml_raise_sys_error (const)
 //Requires: caml_raise_with_arg, caml_global_data, caml_string_of_jsstring
 function caml_raise_sys_error(msg) {
-  caml_raise_with_arg(caml_global_data.Sys_error, caml_string_of_jsstring(msg));
+  caml_raise_with_arg(
+    caml_global_data["predef:Sys_error"],
+    caml_string_of_jsstring(msg),
+  );
 }
 
 //Provides: caml_sys_exit
@@ -31,6 +34,8 @@ function caml_sys_exit(code) {
   if (globalThis.quit) globalThis.quit(code);
   //nodejs
   if (globalThis.process?.exit) globalThis.process.exit(code);
+  //QuickJS (with --std)
+  if (globalThis.std?.exit) globalThis.std.exit(code);
   caml_invalid_argument("Function 'exit' not implemented");
 }
 
@@ -112,11 +117,16 @@ function caml_set_static_env(k, v) {
 //Provides: jsoo_sys_getenv (const)
 //Requires: jsoo_static_env
 function jsoo_sys_getenv(n) {
-  if (jsoo_static_env[n]) return jsoo_static_env[n];
+  if (Object.hasOwn(jsoo_static_env, n)) return jsoo_static_env[n];
   var process = globalThis.process;
   //nodejs env
-  if (process && process.env && process.env[n] !== undefined)
-    return process.env[n];
+  if (process?.env && Object.hasOwn(process.env, n)) return process.env[n];
+  //QuickJS: no `process`, but the host environment is reachable via `std`.
+  var std = globalThis.std;
+  if (std && typeof std.getenviron === "function") {
+    var v = std.getenviron()[n];
+    if (v !== undefined) return v;
+  }
   if (globalThis.jsoo_env && typeof globalThis.jsoo_env[n] === "string") {
     return globalThis.jsoo_env[n];
   }
@@ -131,6 +141,29 @@ function caml_sys_getenv(name) {
   var r = jsoo_sys_getenv(caml_jsstring_of_string(name));
   if (r === undefined) caml_raise_not_found();
   return caml_string_of_jsstring(r);
+}
+
+//Provides: caml_sys_getenv_opt (const)
+//Requires: caml_string_of_jsstring
+//Requires: caml_jsstring_of_string
+//Requires: jsoo_sys_getenv
+//Version: >= 5.4
+function caml_sys_getenv_opt(name) {
+  var r = jsoo_sys_getenv(caml_jsstring_of_string(name));
+  if (r === undefined) return 0;
+  return [0, caml_string_of_jsstring(r)];
+}
+
+//Provides: caml_sys_getenv_opt (const)
+//Requires: caml_string_of_jsstring
+//Requires: caml_jsstring_of_string
+//Requires: jsoo_sys_getenv
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_sys_getenv_opt(name) {
+  var r = jsoo_sys_getenv(caml_jsstring_of_string(name));
+  if (r === undefined) return 0;
+  return [0, caml_string_of_jsstring(r)];
 }
 
 //Provides: caml_sys_unsafe_getenv
@@ -151,6 +184,13 @@ var caml_argv = (function () {
     //nodejs
     main = argv[1];
     args = argv.slice(2);
+  } else if (
+    Array.isArray(globalThis.scriptArgs) &&
+    globalThis.scriptArgs.length > 0
+  ) {
+    //QuickJS: scriptArgs is [script, ...userArgs]
+    main = globalThis.scriptArgs[0];
+    args = globalThis.scriptArgs.slice(1);
   }
 
   var p = caml_string_of_jsstring(main);
@@ -166,13 +206,13 @@ var caml_executable_name = caml_argv[1];
 
 //Provides: caml_sys_get_argv
 //Requires: caml_argv
-function caml_sys_get_argv(a) {
+function caml_sys_get_argv(_unit) {
   return [0, caml_argv[1], caml_argv];
 }
 
 //Provides: caml_sys_argv
 //Requires: caml_argv
-function caml_sys_argv(a) {
+function caml_sys_argv(_unit) {
   return caml_argv;
 }
 
@@ -185,7 +225,7 @@ function caml_sys_modify_argv(arg) {
 
 //Provides: caml_sys_executable_name const
 //Requires: caml_executable_name
-function caml_sys_executable_name(a) {
+function caml_sys_executable_name(_unit) {
   return caml_executable_name;
 }
 
@@ -200,28 +240,43 @@ function caml_sys_system_command(cmd) {
         child_process.execSync(cmd, { stdio: "inherit" });
         return 0;
       } catch (e) {
-        return 1;
+        // execSync throws on non-zero exit; e.status is the exit code,
+        // or e.signal is set when the child was killed by a signal
+        if (typeof e.status === "number") return e.status;
+        if (e.signal) return 1;
+        return 127;
       }
-  } else return 127;
+  }
+  // QuickJS: spawn `sh -c <cmd>` via os.exec. With block:true the
+  // returned wait status is the exit code on normal exit, or
+  // 128+signum on signal -- the same shape POSIX system(3) gives us.
+  if (typeof globalThis.os?.exec === "function") {
+    try {
+      return globalThis.os.exec(["sh", "-c", cmd], { block: true }) | 0;
+    } catch (_e) {
+      return 127;
+    }
+  }
+  return 127;
 }
 
 //Provides: caml_sys_system_command
 //Requires: caml_jsstring_of_string
 //If: browser
-function caml_sys_system_command(cmd) {
+function caml_sys_system_command(_cmd) {
   return 127;
 }
 
 //Provides: caml_sys_time mutable
-var caml_initial_time = new Date().getTime() * 0.001;
+var caml_initial_time = Date.now() * 0.001;
 function caml_sys_time() {
-  var now = new Date().getTime();
+  var now = Date.now();
   return now * 0.001 - caml_initial_time;
 }
 
 //Provides: caml_sys_time_include_children
 //Requires: caml_sys_time
-function caml_sys_time_include_children(b) {
+function caml_sys_time_include_children(_b) {
   return caml_sys_time();
 }
 
@@ -237,7 +292,7 @@ function caml_sys_random_seed() {
       return [0, a[0], a[1], a[2], a[3]];
     }
   }
-  var now = new Date().getTime();
+  var now = Date.now();
   var x = now ^ (0xffffffff * Math.random());
   return [0, x];
 }
@@ -287,7 +342,8 @@ function caml_sys_const_backend_type() {
 }
 
 //Provides: os_type
-var os_type = globalThis.process?.platform === "win32" ? "Win32" : "Unix";
+//Requires: jsoo_is_win32
+var os_type = jsoo_is_win32 ? "Win32" : "Unix";
 
 //Provides: caml_sys_get_config const
 //Requires: caml_string_of_jsbytes, os_type
@@ -296,28 +352,47 @@ function caml_sys_get_config() {
 }
 
 //Provides: caml_sys_isatty
-function caml_sys_isatty(_chan) {
+//Requires: caml_ml_channel_get
+function caml_sys_isatty(chan) {
+  var info = caml_ml_channel_get(chan);
+  if (info?.file && typeof info.file.isatty === "function")
+    return info.file.isatty();
   return 0;
 }
 
 //Provides: caml_sys_const_runtime5 const
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sys_const_runtime5(_unit) {
-    return 0;
+  return 1;
 }
 
 //Provides: arch
-var arch = globalThis.process?.arch === "arm64?" ? "arm64" : "amd64";
+//Version: >= 5.2, < 5.3
+//OxCaml
+var arch = globalThis.process?.arch === "arm64" ? "arm64" : "amd64";
 
 //Provides: caml_sys_const_arch_amd64 const
 //Requires: arch
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sys_const_arch_amd64(_unit) {
-    return arch === "amd64" ? 1 : 0;
+  return arch === "amd64" ? 1 : 0;
 }
 
 //Provides: caml_sys_const_arch_arm64 const
 //Requires: arch
+//Version: >= 5.2, < 5.3
+//OxCaml
 function caml_sys_const_arch_arm64(_unit) {
-    return arch === "arm64" ? 1 : 0;
+  return arch === "arm64" ? 1 : 0;
+}
+
+//Provides: caml_is_boot_compiler
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_is_boot_compiler(_unit) {
+  return 0;
 }
 
 //Provides: caml_runtime_variant
@@ -370,6 +445,76 @@ function caml_sys_is_regular_file(name) {
   var root = resolve_fs_device(name);
   return root.device.isFile(root.rest);
 }
+
+//Provides: caml_io_buffer_size
+var caml_io_buffer_size = 65536;
+
+//Provides: caml_sys_io_buffer_size
+//Requires: caml_io_buffer_size
+//Version: >= 5.4
+function caml_sys_io_buffer_size(_unit) {
+  return caml_io_buffer_size;
+}
+
+//Provides: caml_sys_io_buffer_size
+//Requires: caml_io_buffer_size
+//Version: >= 5.2, < 5.3
+//OxCaml
+function caml_sys_io_buffer_size(_unit) {
+  return caml_io_buffer_size;
+}
+
+//Provides: caml_sys_temp_dir_name
+//Requires: os_type
+//Requires: caml_string_of_jsstring
+//Version: >= 5.4
+function caml_sys_temp_dir_name(_unit) {
+  if (os_type === "Win32") {
+    return caml_string_of_jsstring(require("node:os").tmpdir());
+  } else {
+    return caml_string_of_jsstring("");
+  }
+}
+
+//Provides: caml_sys_temp_dir_name
+//Requires: caml_string_of_jsstring
+//Version: >= 5.4
+//If: browser
+function caml_sys_temp_dir_name(_unit) {
+  return caml_string_of_jsstring("");
+}
+
+//Provides: caml_sys_convert_signal_number
+//Version: >= 5.4
+function caml_sys_convert_signal_number(signo) {
+  return signo;
+}
+
+//Provides: caml_sys_rev_convert_signal_number
+//Version: >= 5.4
+function caml_sys_rev_convert_signal_number(signo) {
+  return signo;
+}
+
+//Provides: caml_sys_proc_self_exe const
+//Version: >= 5.5
+function caml_sys_proc_self_exe(_unit) {
+  return 0;
+}
+
+//Provides: caml_sys_get_stdlib_dirs
+//Version: >= 5.5
+function caml_sys_get_stdlib_dirs(stdlib_default) {
+  return [0, stdlib_default, 0];
+}
+
+//Provides: caml_sys_const_standard_library_default const
+//Requires: caml_string_of_jsstring
+//Version: >= 5.5
+function caml_sys_const_standard_library_default(_unit) {
+  return caml_string_of_jsstring("/static/cmis/");
+}
+
 //Always
 //Requires: caml_fatal_uncaught_exception
 //If: !wasm

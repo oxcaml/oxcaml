@@ -48,6 +48,10 @@ module Flag : sig
 
   val compact_vardecl : unit -> bool
 
+  val constant_sinking : unit -> bool
+
+  val var_coalescing : unit -> bool
+
   val debugger : unit -> bool
 
   val pretty : unit -> bool
@@ -59,8 +63,6 @@ module Flag : sig
   val excwrap : unit -> bool
 
   val improved_stacktrace : unit -> bool
-
-  val warn_unused : unit -> bool
 
   val inline_callgen : unit -> bool
 
@@ -76,6 +78,12 @@ module Flag : sig
 
   val es6 : unit -> bool
 
+  val load_shapes_auto : unit -> bool
+
+  val toplevel : unit -> bool
+
+  val wasi : unit -> bool
+
   val enable : string -> unit
 
   val disable : string -> unit
@@ -85,7 +93,7 @@ end
 module Param : sig
   val set : string -> string -> unit
 
-  val all : unit -> (string * string) list
+  val all : unit -> (string * string * (string -> (unit, string) Result.t)) list
 
   val switch_max_case : unit -> int
 
@@ -94,6 +102,8 @@ module Param : sig
   val tailcall_max_depth : unit -> int
 
   val constant_max_depth : unit -> int
+
+  val merge_node_max : unit -> int
 
   type tc =
     | TcNone
@@ -122,6 +132,7 @@ type effects_backend =
   | `Cps
   | `Double_translation
   | `Jspi
+  | `Native
   ]
 
 val effects : unit -> effects_backend

@@ -42,9 +42,8 @@ function caml_ba_get_size(dims) {
   return size;
 }
 
-//Provides: caml_unpackFloat16
-//Alias: caml_double_of_float16
-var caml_unpackFloat16 = (function () {
+//Provides: caml_double_of_float16 pure
+var caml_double_of_float16 = (function () {
   var pow = Math.pow;
 
   var EXP_MASK16 = 31; // 2 ** 5 - 1
@@ -73,112 +72,37 @@ var caml_unpackFloat16 = (function () {
   };
 })();
 
-//Provides: caml_packFloat16
-//Alias: caml_float16_of_double
-var caml_packFloat16 = (function () {
-  const INVERSE_OF_EPSILON = 1 / Number.EPSILON;
-
-  function roundTiesToEven(num) {
-    return num + INVERSE_OF_EPSILON - INVERSE_OF_EPSILON;
-  }
-
-  const FLOAT16_MIN_VALUE = 6.103515625e-5;
-  const FLOAT16_MAX_VALUE = 65504;
-  const FLOAT16_EPSILON = 0.0009765625;
-
-  const FLOAT16_EPSILON_MULTIPLIED_BY_FLOAT16_MIN_VALUE =
-    FLOAT16_EPSILON * FLOAT16_MIN_VALUE;
-  const FLOAT16_EPSILON_DEVIDED_BY_EPSILON =
-    FLOAT16_EPSILON * INVERSE_OF_EPSILON;
-
-  function roundToFloat16(num) {
-    const number = +num;
-
-    // NaN, Infinity, -Infinity, 0, -0
-    if (!Number.isFinite(number) || number === 0) {
-      return number;
-    }
-
-    // finite except 0, -0
-    const sign = number > 0 ? 1 : -1;
-    const absolute = Math.abs(number);
-
-    // small number
-    if (absolute < FLOAT16_MIN_VALUE) {
-      return (
-        sign *
-        roundTiesToEven(
-          absolute / FLOAT16_EPSILON_MULTIPLIED_BY_FLOAT16_MIN_VALUE,
-        ) *
-        FLOAT16_EPSILON_MULTIPLIED_BY_FLOAT16_MIN_VALUE
-      );
-    }
-
-    const temp = (1 + FLOAT16_EPSILON_DEVIDED_BY_EPSILON) * absolute;
-    const result = temp - (temp - absolute);
-
-    // large number
-    if (result > FLOAT16_MAX_VALUE || Number.isNaN(result)) {
-      return sign * Number.POSITIVE_INFINITY;
-    }
-
-    return sign * result;
-  }
-
-  // base algorithm: http://fox-toolkit.org/ftp/fasthalffloatconversion.pdf
-
-  const baseTable = new Uint16Array(512);
-  const shiftTable = new Uint8Array(512);
-
-  for (let i = 0; i < 256; ++i) {
-    const e = i - 127;
-
-    // very small number (0, -0)
-    if (e < -24) {
-      baseTable[i] = 0x0000;
-      baseTable[i | 0x100] = 0x8000;
-      shiftTable[i] = 24;
-      shiftTable[i | 0x100] = 24;
-
-      // small number (denorm)
-    } else if (e < -14) {
-      baseTable[i] = 0x0400 >> (-e - 14);
-      baseTable[i | 0x100] = (0x0400 >> (-e - 14)) | 0x8000;
-      shiftTable[i] = -e - 1;
-      shiftTable[i | 0x100] = -e - 1;
-
-      // normal number
-    } else if (e <= 15) {
-      baseTable[i] = (e + 15) << 10;
-      baseTable[i | 0x100] = ((e + 15) << 10) | 0x8000;
-      shiftTable[i] = 13;
-      shiftTable[i | 0x100] = 13;
-
-      // large number (Infinity, -Infinity)
-    } else if (e < 128) {
-      baseTable[i] = 0x7c00;
-      baseTable[i | 0x100] = 0xfc00;
-      shiftTable[i] = 24;
-      shiftTable[i | 0x100] = 24;
-
-      // stay (NaN, Infinity, -Infinity)
-    } else {
-      baseTable[i] = 0x7c00;
-      baseTable[i | 0x100] = 0xfc00;
-      shiftTable[i] = 13;
-      shiftTable[i | 0x100] = 13;
-    }
-  }
-
+//Provides: caml_float16_of_double pure
+var caml_float16_of_double = (function () {
+  // Faithful port of the native runtime's float_to_half_fast3_rtne
+  // (caml_float_to_float16 in runtime/bigarray.c). The double is first
+  // rounded to a float32 (the `(float) x` cast native performs), then to a
+  // float16, each step round-to-nearest-ties-to-even. Rounding the double
+  // straight onto the float16 grid would double-round differently from
+  // native and the wasm runtime on tie cases (e.g. 65519.99999958789 must
+  // give 0x7c00, not 0x7bff).
   const buffer = new ArrayBuffer(4);
-  const floatView = new Float32Array(buffer);
-  const uint32View = new Uint32Array(buffer);
-
-  return function (num) {
-    floatView[0] = roundToFloat16(num);
-    const f = uint32View[0];
-    const e = (f >> 23) & 0x1ff;
-    return baseTable[e] + ((f & 0x007fffff) >> shiftTable[e]);
+  const f32 = new Float32Array(buffer);
+  const u32 = new Uint32Array(buffer);
+  return function (f) {
+    f32[0] = f; // round to float32
+    let x = u32[0] >>> 0;
+    const sign = x & 0x80000000;
+    x = (x ^ sign) >>> 0;
+    let o;
+    if (x >= 0x47800000) {
+      // |x| >= 2^16: infinity, or NaN if the float32 was a NaN
+      o = x > 0x7f800000 ? 0x7e00 : 0x7c00;
+    } else if (x < 0x38800000) {
+      // |x| < 2^-14: subnormal, rounded via the magic-number add
+      u32[0] = x;
+      f32[0] = f32[0] + 0.5;
+      o = (u32[0] - 0x3f000000) >>> 0;
+    } else {
+      // normal: round-to-nearest-even over the 13 dropped mantissa bits
+      o = (x + 0xc8000fff + ((x >>> 13) & 1)) >>> 13;
+    }
+    return (o | (sign >>> 16)) & 0xffff;
   };
 })();
 
@@ -254,7 +178,7 @@ var caml_ba_custom_name = "_bigarr02";
 //Provides: Ml_Bigarray
 //Requires: caml_array_bound_error, caml_invalid_argument, caml_ba_custom_name
 //Requires: caml_int64_create_lo_hi, caml_int64_hi32, caml_int64_lo32
-//Requires: caml_packFloat16, caml_unpackFloat16
+//Requires: caml_float16_of_double, caml_double_of_float16
 class Ml_Bigarray {
   constructor(kind, layout, dims, buffer) {
     this.kind = kind;
@@ -301,7 +225,7 @@ class Ml_Bigarray {
         var i = this.data[ofs * 2 + 1];
         return [254, r, i];
       case 13:
-        return caml_unpackFloat16(this.data[ofs]);
+        return caml_double_of_float16(this.data[ofs]);
       default:
         return this.data[ofs];
     }
@@ -321,7 +245,7 @@ class Ml_Bigarray {
         this.data[ofs * 2 + 1] = v[2];
         break;
       case 13:
-        this.data[ofs] = caml_packFloat16(v);
+        this.data[ofs] = caml_float16_of_double(v);
         break;
       default:
         this.data[ofs] = v;
@@ -358,7 +282,7 @@ class Ml_Bigarray {
         }
         break;
       case 13:
-        this.data.fill(caml_packFloat16(v));
+        this.data.fill(caml_float16_of_double(v));
         break;
       default:
         this.data.fill(v);
@@ -408,10 +332,15 @@ class Ml_Bigarray {
         break;
       case 13:
         for (var i = 0; i < this.data.length; i++) {
-          var aa = caml_unpackFloat16(this.data[i]);
-          var bb = caml_unpackFloat16(b.data[i]);
+          var aa = caml_double_of_float16(this.data[i]);
+          var bb = caml_double_of_float16(b.data[i]);
           if (aa < bb) return -1;
           if (aa > bb) return 1;
+          if (aa !== bb) {
+            if (!total) return Number.NaN;
+            if (!Number.isNaN(aa)) return 1;
+            if (!Number.isNaN(bb)) return -1;
+          }
         }
         break;
       case 2:
@@ -550,14 +479,16 @@ function caml_ba_get_generic(ba, i) {
   return ba.get(ofs);
 }
 
-//Provides: caml_ba_get_raw_unsafe
-function caml_ba_get_raw_unsafe(ba, i) {
-  return ba.get(i);
+//Provides: caml_ba_uint8_get16u
+//Version: >= 5.6
+function caml_ba_uint8_get16u(ba, i0) {
+  var ofs = ba.offset(i0);
+  var b1 = ba.get(ofs);
+  var b2 = ba.get(ofs + 1);
+  return b1 | (b2 << 8);
 }
 
 //Provides: caml_ba_uint8_get16
-//Alias: caml_ba_uint8_get16_indexed_by_int32
-//Alias: caml_ba_uint8_get16_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_get16(ba, i0) {
   var ofs = ba.offset(i0);
@@ -567,15 +498,18 @@ function caml_ba_uint8_get16(ba, i0) {
   return b1 | (b2 << 8);
 }
 
-//Provides: caml_ba_uint8_get16_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_get16
-function caml_ba_uint8_get16_indexed_by_int64(s, i) {
-  return caml_ba_uint8_get16(s, caml_checked_int64_to_int(i))
+//Provides: caml_ba_uint8_get32u
+//Version: >= 5.2
+function caml_ba_uint8_get32u(ba, i0) {
+  var ofs = ba.offset(i0);
+  var b1 = ba.get(ofs + 0);
+  var b2 = ba.get(ofs + 1);
+  var b3 = ba.get(ofs + 2);
+  var b4 = ba.get(ofs + 3);
+  return (b1 << 0) | (b2 << 8) | (b3 << 16) | (b4 << 24);
 }
 
 //Provides: caml_ba_uint8_get32
-//Alias: caml_ba_uint8_get32_indexed_by_int32
-//Alias: caml_ba_uint8_get32_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_get32(ba, i0) {
   var ofs = ba.offset(i0);
@@ -587,15 +521,23 @@ function caml_ba_uint8_get32(ba, i0) {
   return (b1 << 0) | (b2 << 8) | (b3 << 16) | (b4 << 24);
 }
 
-//Provides: caml_ba_uint8_get32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_get32
-function caml_ba_uint8_get32_indexed_by_int64(s, i) {
-  return caml_ba_uint8_get32(s, caml_checked_int64_to_int(i))
+//Provides: caml_ba_uint8_get64u
+//Version: >= 5.6
+//Requires: caml_int64_of_bytes
+function caml_ba_uint8_get64u(ba, i0) {
+  var ofs = ba.offset(i0);
+  var b1 = ba.get(ofs + 0);
+  var b2 = ba.get(ofs + 1);
+  var b3 = ba.get(ofs + 2);
+  var b4 = ba.get(ofs + 3);
+  var b5 = ba.get(ofs + 4);
+  var b6 = ba.get(ofs + 5);
+  var b7 = ba.get(ofs + 6);
+  var b8 = ba.get(ofs + 7);
+  return caml_int64_of_bytes([b8, b7, b6, b5, b4, b3, b2, b1]);
 }
 
 //Provides: caml_ba_uint8_get64
-//Alias: caml_ba_uint8_get64_indexed_by_int32
-//Alias: caml_ba_uint8_get64_indexed_by_nativeint
 //Requires: caml_array_bound_error, caml_int64_of_bytes
 function caml_ba_uint8_get64(ba, i0) {
   var ofs = ba.offset(i0);
@@ -611,23 +553,20 @@ function caml_ba_uint8_get64(ba, i0) {
   return caml_int64_of_bytes([b8, b7, b6, b5, b4, b3, b2, b1]);
 }
 
-//Provides: caml_ba_uint8_get64_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_get64
-function caml_ba_uint8_get64_indexed_by_int64(s, i) {
-  return caml_ba_uint8_get64(s, caml_checked_int64_to_int(i))
-}
-
 //Provides: caml_ba_get_1
+//Alias: caml_ba_float32_get_1
 function caml_ba_get_1(ba, i0) {
   return ba.get(ba.offset(i0));
 }
 
 //Provides: caml_ba_get_2
+//Alias: caml_ba_float32_get_2
 function caml_ba_get_2(ba, i0, i1) {
   return ba.get(ba.offset([i0, i1]));
 }
 
 //Provides: caml_ba_get_3
+//Alias: caml_ba_float32_get_3
 function caml_ba_get_3(ba, i0, i1, i2) {
   return ba.get(ba.offset([i0, i1, i2]));
 }
@@ -639,15 +578,16 @@ function caml_ba_set_generic(ba, i, v) {
   return 0;
 }
 
-//Provides: caml_ba_set_raw_unsafe
-function caml_ba_set_raw_unsafe(ba, i, v) {
-  ba.set(i, v);
+//Provides: caml_ba_uint8_set16u
+//Version: >= 5.6
+function caml_ba_uint8_set16u(ba, i0, v) {
+  var ofs = ba.offset(i0);
+  ba.set(ofs + 0, v & 0xff);
+  ba.set(ofs + 1, (v >>> 8) & 0xff);
   return 0;
 }
 
 //Provides: caml_ba_uint8_set16
-//Alias: caml_ba_uint8_set16_indexed_by_int32
-//Alias: caml_ba_uint8_set16_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_set16(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -657,15 +597,17 @@ function caml_ba_uint8_set16(ba, i0, v) {
   return 0;
 }
 
-//Provides: caml_ba_uint8_set16_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_set16
-function caml_ba_uint8_set16_indexed_by_int64(s, i, v) {
-  return caml_ba_uint8_set16(s, caml_checked_int64_to_int(i), v)
+//Provides: caml_ba_uint8_set32u
+//Version: >= 5.2
+function caml_ba_uint8_set32u(ba, i0, v) {
+  var ofs = ba.offset(i0);
+  ba.set(ofs + 0, v & 0xff);
+  ba.set(ofs + 1, (v >>> 8) & 0xff);
+  ba.set(ofs + 2, (v >>> 16) & 0xff);
+  ba.set(ofs + 3, (v >>> 24) & 0xff);
+  return 0;
 }
-
 //Provides: caml_ba_uint8_set32
-//Alias: caml_ba_uint8_set32_indexed_by_int32
-//Alias: caml_ba_uint8_set32_indexed_by_nativeint
 //Requires: caml_array_bound_error
 function caml_ba_uint8_set32(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -677,15 +619,17 @@ function caml_ba_uint8_set32(ba, i0, v) {
   return 0;
 }
 
-//Provides: caml_ba_uint8_set32_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_set32
-function caml_ba_uint8_set32_indexed_by_int64(s, i, v) {
-  return caml_ba_uint8_set32(s, caml_checked_int64_to_int(i), v)
+//Provides: caml_ba_uint8_set64u
+//Version: >= 5.6
+//Requires: caml_int64_to_bytes
+function caml_ba_uint8_set64u(ba, i0, v) {
+  var ofs = ba.offset(i0);
+  var v = caml_int64_to_bytes(v);
+  for (var i = 0; i < 8; i++) ba.set(ofs + i, v[7 - i]);
+  return 0;
 }
 
 //Provides: caml_ba_uint8_set64
-//Alias: caml_ba_uint8_set64_indexed_by_int32
-//Alias: caml_ba_uint8_set64_indexed_by_nativeint
 //Requires: caml_array_bound_error, caml_int64_to_bytes
 function caml_ba_uint8_set64(ba, i0, v) {
   var ofs = ba.offset(i0);
@@ -695,25 +639,22 @@ function caml_ba_uint8_set64(ba, i0, v) {
   return 0;
 }
 
-//Provides: caml_ba_uint8_set64_indexed_by_int64
-//Requires: caml_checked_int64_to_int, caml_ba_uint8_set64
-function caml_ba_uint8_set64_indexed_by_int64(s, i, v) {
-  return caml_ba_uint8_set64(s, caml_checked_int64_to_int(i), v)
-}
-
 //Provides: caml_ba_set_1
+//Alias: caml_ba_float32_set_1
 function caml_ba_set_1(ba, i0, v) {
   ba.set(ba.offset(i0), v);
   return 0;
 }
 
 //Provides: caml_ba_set_2
+//Alias: caml_ba_float32_set_2
 function caml_ba_set_2(ba, i0, i1, v) {
   ba.set(ba.offset([i0, i1]), v);
   return 0;
 }
 
 //Provides: caml_ba_set_3
+//Alias: caml_ba_float32_set_3
 function caml_ba_set_3(ba, i0, i1, i2, v) {
   ba.set(ba.offset([i0, i1, i2]), v);
   return 0;
@@ -824,7 +765,7 @@ function caml_ba_reshape(ba, vind) {
 //Provides: caml_ba_serialize
 //Requires: caml_int64_bits_of_float, caml_int64_to_bytes
 //Requires: caml_int32_bits_of_float
-//Requires: caml_packFloat16
+//Requires: caml_float16_of_double
 function caml_ba_serialize(writer, ba, sz) {
   writer.write(32, ba.dims.length);
   writer.write(32, ba.kind | (ba.layout << 8));
@@ -914,7 +855,7 @@ function caml_ba_serialize(writer, ba, sz) {
 //Requires: caml_int64_of_bytes, caml_int64_float_of_bits
 //Requires: caml_int32_float_of_bits
 //Requires: caml_ba_create_buffer
-//Requires: caml_unpackFloat16
+//Requires: caml_double_of_float16
 function caml_ba_deserialize(reader, sz, name) {
   var num_dims = reader.read32s();
   if (num_dims < 0 || num_dims > 16)
@@ -1026,10 +967,10 @@ function caml_ba_deserialize(reader, sz, name) {
   return caml_ba_create_unsafe(kind, layout, dims, data);
 }
 
-//Deprecated
 //Provides: caml_ba_create_from
 //Requires: caml_ba_create_unsafe, caml_invalid_argument, caml_ba_get_size_per_element
-function caml_ba_create_from(data1, data2, jstyp, kind, layout, dims) {
+//Deprecated: Use [caml_ba_create_unsafe] instead
+function caml_ba_create_from(data1, data2, _jstyp, kind, layout, dims) {
   if (data2 || caml_ba_get_size_per_element(kind) === 2) {
     caml_invalid_argument(
       "caml_ba_create_from: use return caml_ba_create_unsafe",
@@ -1040,7 +981,7 @@ function caml_ba_create_from(data1, data2, jstyp, kind, layout, dims) {
 
 //Provides: caml_ba_hash const
 //Requires: caml_ba_get_size, caml_hash_mix_int, caml_hash_mix_float
-//Requires: caml_unpackFloat16, caml_hash_mix_float16, caml_hash_mix_float32
+//Requires: caml_double_of_float16, caml_hash_mix_float16, caml_hash_mix_float32
 function caml_ba_hash(ba) {
   var num_elts = caml_ba_get_size(ba.dims);
   var h = 0;
@@ -1061,16 +1002,16 @@ function caml_ba_hash(ba) {
       }
       w = 0;
       switch (num_elts & 3) {
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
         case 3:
-          // biome-ignore lint/suspicious/noFallthroughSwitchClause:
-          w = ba.data[i + 2] << 16;
-        // fallthrough
+          w = (ba.data[i + 2] & 0xff) << 16;
+        // falls through
+        // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
         case 2:
-          // biome-ignore lint/suspicious/noFallthroughSwitchClause:
-          w |= ba.data[i + 1] << 8;
-        // fallthrough
+          w |= (ba.data[i + 1] & 0xff) << 8;
+        // falls through
         case 1:
-          w |= ba.data[i + 0];
+          w |= ba.data[i + 0] & 0xff;
           h = caml_hash_mix_int(h, w);
       }
       break;
@@ -1083,7 +1024,7 @@ function caml_ba_hash(ba) {
         w = (ba.data[i + 0] & 0xffff) | (ba.data[i + 1] << 16);
         h = caml_hash_mix_int(h, w);
       }
-      if ((num_elts & 1) !== 0) h = caml_hash_mix_int(h, ba.data[i]);
+      if ((num_elts & 1) !== 0) h = caml_hash_mix_int(h, ba.data[i] & 0xffff);
       break;
     case 6: // Int32Array (int32)
       if (num_elts > 64) num_elts = 64;
@@ -1101,19 +1042,19 @@ function caml_ba_hash(ba) {
         h = caml_hash_mix_int(h, ba.data[i]);
       }
       break;
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 10: // Float32Array (complex32)
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       num_elts *= 2;
-    // fallthrough
+    // falls through
     case 0: // Float32Array
       if (num_elts > 64) num_elts = 64;
       for (var i = 0; i < num_elts; i++)
         h = caml_hash_mix_float32(h, ba.data[i]);
       break;
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 11: // Float64Array (complex64)
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       num_elts *= 2;
-    // fallthrough
+    // falls through
     case 1: // Float64Array
       if (num_elts > 32) num_elts = 32;
       for (var i = 0; i < num_elts; i++) h = caml_hash_mix_float(h, ba.data[i]);

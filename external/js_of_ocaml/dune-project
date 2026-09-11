@@ -1,15 +1,16 @@
-(lang dune 3.17)
+(lang dune 3.20)
 (using menhir 3.0)
+(using directory-targets 0.1)
+(using oxcaml 0.1)
 (name js_of_ocaml)
-(generate_opam_files false)
-(subst disabled)
+(generate_opam_files true)
 (executables_implicit_empty_intf true)
 
 (authors "Ocsigen team <dev@ocsigen.org>")
 (maintainers "Ocsigen team <dev@ocsigen.org>")
 (source (github ocsigen/js_of_ocaml))
-(homepage "https://ocsigen.org/js_of_ocaml/latest/manual/overview")
-(documentation "https://ocsigen.org/js_of_ocaml/latest/manual/overview")
+(homepage "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html")
+(documentation "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html")
 (license "GPL-2.0-or-later" "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception")
 
 (package
@@ -18,16 +19,16 @@
  (description
   "Js_of_ocaml is a compiler from OCaml bytecode to JavaScript. It makes it possible to run pure OCaml programs in JavaScript environment like browsers and Node.js")
  (depends
-  (ocaml (and (>= 4.13) (< 5.4)))
-  time_now
+  (ocaml (and (>= 4.13) (< 5.7)))
   (num :with-test)
-  (ppx_expect (and (>= v0.16.1) :with-test))
-  (ppxlib (>= 0.15))
+  (out-channel-redirect :with-test)
+  (ppxlib (>= 0.33))
+  (ocaml-compiler-libs (>= v0.12.4))
   (re :with-test)
-  (cmdliner (>= 1.1.0))
+  (cmdliner (>= 2.0))
   (sedlex (>= 3.3))
   (qcheck :with-test)
-  menhir
+  (menhir (>= 20180523))
   menhirLib
   menhirSdk
   (yojson (>= 2.1)))
@@ -47,15 +48,11 @@
   (ocaml (>= 4.13))
   (js_of_ocaml (= :version))
   (js_of_ocaml-ppx (= :version))
-  (lwt (>= 2.4.4))
+  (lwt (and (>= 2.4.4) (<> 5.9.2)))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
-  (ppxlib (and (>= 0.22.0) :with-test))
   (re (and (>= 1.9.0) :with-test)))
  (depopts
-  graphics
-  lwt_log
-))
+  graphics))
 
 (package
  (name js_of_ocaml-ppx_deriving_json)
@@ -65,9 +62,9 @@
  (depends
   (ocaml (>= 4.13))
   (js_of_ocaml (= :version))
-  (ppxlib (>= 0.15))
+  (ppxlib (>= 0.33))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
+  (out-channel-redirect :with-test)
   (re (and (>= 1.9.0) :with-test))
 ))
 
@@ -79,10 +76,8 @@
  (depends
   (ocaml (>= 4.13))
   (js_of_ocaml (= :version))
-  (ppxlib (>= 0.15))
-  (ppxlib (and (< 0.36) :with-test))
+  (ppxlib (>= 0.33))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
   (re (and (>= 1.9.0) :with-test))
 ))
 
@@ -94,14 +89,15 @@
  (depends
   (ocaml (>= 4.13))
   (js_of_ocaml-compiler (= :version))
+  (js_of_ocaml (= :version))
   (ocamlfind (>= 1.5.1))
 ;;(cohttp-lwt-unix (and (>= 6.0.0) :with-test))
   (graphics :with-test)
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
-  (ppxlib (>= 0.15))
-  (re (and (>= 1.9.0) :with-test))
-))
+  (ppxlib (>= 0.33))
+  (re (and (>= 1.9.0) :with-test)))
+ (depopts
+  lwt))
 
 (package
  (name js_of_ocaml-tyxml)
@@ -116,8 +112,6 @@
   (reactiveData (>= 0.2))
   (tyxml (>= 4.6))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
-  (ppxlib (and (>= 0.22.0) :with-test))
   (re (and (>= 1.9.0) :with-test))
 ))
 
@@ -129,9 +123,9 @@
  (depends
   (ocaml (>= 4.13))
   (js_of_ocaml-compiler (= :version))
-  (ppxlib (>= 0.15))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
+  (out-channel-redirect :with-test)
+  (ppxlib (>= 0.33))
   (re (and (>= 1.9.0) :with-test))
 ))
 
@@ -144,19 +138,19 @@
   (ocaml (>= 4.14))
   (js_of_ocaml (= :version))
   (num :with-test)
-  (ppx_expect (and (>= v0.14.2) :with-test))
-  (ppxlib (>= 0.15))
+  (out-channel-redirect :with-test)
+  (ppxlib (>= 0.33))
   (re :with-test)
-  (cmdliner (>= 1.1.0))
-  (opam-format :with-test)
+  (cmdliner (>= 2.0))
   (sedlex (>= 2.3))
-  menhir
+  (menhir (>= 20180523))
   menhirLib
   menhirSdk
   (yojson (>= 2.1))
-  binaryen-bin)
+  conf-binaryen)
  (depopts
-  ocamlfind)
+  ocamlfind
+  opam-format)
  (conflicts
   (ocamlfind (< 1.5.1))
   (js_of_ocaml (< 3.0))

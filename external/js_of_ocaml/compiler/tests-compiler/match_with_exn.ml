@@ -77,30 +77,30 @@ let fun2 () =
      {
       try{var i$1 = caml_call1(Stdlib_Random[5], 2);}
       catch(exn$0){
-       var exn = caml_wrap_exception(exn$0), tag = exn[1];
-       if(tag !== A) throw caml_maybe_attach_backtrace(exn, 0);
+       var exn = caml_wrap_exception(exn$0);
+       if(exn[1] !== A) throw caml_maybe_attach_backtrace(exn, 0);
        var i = exn[2];
        if(2 !== i) return i + 2 | 0;
        var i$0 = i;
        break a;
       }
       if(0 !== i$1) return i$1 + 1 | 0;
-      var i$0 = i$1;
+      i$0 = i$1;
      }
      return i$0;
     }
     //end
-    function fun2(param){
+    function fun2(_a_){
      a:
      {
       try{var i$0 = caml_call1(Stdlib_Random[5], 2);}
       catch(_c_){
-       var _a_ = caml_wrap_exception(_c_);
+       _a_ = caml_wrap_exception(_c_);
        if(_a_[1] === A){var _b_ = _a_[2]; if(2 === _b_){var i = _b_; break a;}}
        throw caml_maybe_attach_backtrace(_a_, 0);
       }
       if(0 !== i$0) return i$0 + 1 | 0;
-      var i = i$0;
+      i = i$0;
      }
      return i;
     }

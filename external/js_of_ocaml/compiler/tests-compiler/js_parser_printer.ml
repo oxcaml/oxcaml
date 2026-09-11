@@ -48,14 +48,13 @@ let print ?(debuginfo = true) ?(report = false) ?(invalid = false) ~compact sour
   Pretty_print.set_compact pp compact;
   let lexed = Parse_js.Lexer.of_string ~filename:"fake" source in
   try
-    let parsed = Parse_js.parse lexed in
+    let parsed = Parse_js.parse `Module lexed in
     (if debuginfo then Config.Flag.enable else Config.Flag.disable) "debuginfo";
     let _ = Js_output.program pp parsed in
-    Config.Flag.disable "debuginfo";
     let s = Buffer.contents buffer in
     print_endline s;
     (let lexed = Parse_js.Lexer.of_string ~filename:"fake" s in
-     let parsed2 = Parse_js.parse lexed in
+     let parsed2 = Parse_js.parse `Module lexed in
      let p1 = remove_loc parsed in
      let p2 = remove_loc parsed2 in
      if not (Poly.equal p1 p2) then print_endline "<roundtrip issue>");
@@ -203,7 +202,8 @@ let%expect_test "ops" =
     /*<<fake:15:4>>*/ y = a?.b?.s?.[a] ?? c ?? d;
     /*<<fake:17:4>>*/ a?.b;
     /*<<fake:18:4>>*/ a?.[b];
-    /*<<fake:19:4>>*/ a?.(b); |}]
+    /*<<fake:19:4>>*/  /*<<fake:19:5>>*/ a?.(b);
+    |}]
 
 let%expect_test "arrow" =
   print
@@ -250,7 +250,7 @@ let%expect_test "arrow" =
     var
      a =
         /*<<fake:16:10>>*/ x=>
-           /*<<fake:16:17>>*/ y=> /*<<fake:16:22>>*/ x + y /*<<fake:16:27>>*/ ;
+           /*<<fake:16:17>>*/ y=> /*<<fake:16:22>>*/ x + y /*<<fake:16:27>>*/  /*<<?>>*/ ;
     var
      a =
         /*<<fake:17:10>>*/ x=>
@@ -260,7 +260,8 @@ let%expect_test "arrow" =
     var
      a =
         /*<<fake:20:10>>*/ async (a, b)=>
-           /*<<fake:20:27>>*/ a + b /*<<fake:20:32>>*/ ; |}]
+           /*<<fake:20:27>>*/ a + b /*<<fake:20:32>>*/ ;
+    |}]
 
 let%expect_test "trailing comma" =
   (* GH#989 *)
@@ -481,6 +482,104 @@ let%expect_test "for loops" =
      /*<<fake:3:4>>*/ for(x of 3) ;
     async function f(x){ /*<<fake:5:4>>*/ for await(x of 3) ; /*<<fake:4:4>>*/ } |}]
 
+let%expect_test "for loop with async of" =
+  (* 'async' can be a for-of binding identifier *)
+  print
+    ~report:true
+    ~compact:false
+    {|
+    for ((async) of collection); // for (async of collection) is a syntax error
+    for (let async of collection);
+ |};
+
+  [%expect
+    {|
+    /*<<fake:2:4>>*/ for((async) of collection) ;
+    /*<<fake:3:4>>*/ for(let async of collection) ;
+    |}]
+
+let%expect_test "arrow function in for loop initializer" =
+  (* GH#2139 *)
+  print
+    ~report:true
+    ~compact:false
+    {|
+    for (var t = () => 1; false; undefined) {
+      console.log("test");
+    }
+ |};
+  [%expect
+    {|
+     /*<<fake:2:4>>*/ for
+    (var t =  /*<<fake:2:15>>*/ ()=> /*<<fake:2:23>>*/ 1 /*<<fake:2:24>>*/ ;
+     false;
+     undefined){ /*<<fake:3:6>>*/ console.log("test");}
+    |}]
+
+let%expect_test "in operator in arrow concise body" =
+  (* Per ECMAScript spec, [In] parameter propagates through:
+     ArrowFunction -> ConciseBody -> AssignmentExpression
+     In for-loop initializers, 'in' is disallowed in concise bodies *)
+  print
+    ~report:true
+    ~compact:false
+    {|
+    for (let f = x => { return x in obj; }; ; );
+ |};
+  (* 'in' in block body is allowed because block body uses [+In] context *)
+  [%expect
+    {|
+     /*<<fake:2:4>>*/ for
+    (let
+      f =
+         /*<<fake:2:15>>*/ x=>{
+          /*<<fake:2:24>>*/ return x in obj /*<<fake:2:39>>*/ ; /*<<fake:2:17>>*/ };;)
+     ;
+    |}]
+
+(* The tests below feed invalid JS through [node --check]; QuickJS's parser
+   reports different (or no) errors, so they are gated to non-quickjs engines. *)
+let%expect_test
+    ("in operator in arrow concise body - parsing error"
+     [@when target_engine <> "quickjs"]) =
+  (* Per ECMAScript spec, 'in' is disallowed in arrow concise body within for-loop initializer *)
+  print
+    ~report:true
+    ~compact:false
+    ~invalid:true
+    {|
+    for (let f = x => x in obj; ; );
+ |};
+  (* This should be a parsing error per spec - 'in' in concise body inherits [~In] context *)
+  [%expect {| cannot parse js (from l:2, c:24)@. |}]
+
+let%expect_test
+    ("in operator in nested arrow concise body" [@when target_engine <> "quickjs"]) =
+  (* Nested arrows also propagate [~In] context through concise bodies *)
+  print
+    ~report:true
+    ~compact:false
+    ~invalid:true
+    {|
+    for (let f = x => y => x in obj; ; );
+ |};
+  [%expect {| cannot parse js (from l:2, c:29)@. |}]
+
+let%expect_test "in operator in conditional within for-loop arrow" =
+  (* Per ECMAScript spec, the 'then' branch of ?: uses [+In] context *)
+  print ~report:true ~compact:false {|
+    for (let f = x => cond ? x in obj : x; ; );
+ |};
+  [%expect
+    {|
+     /*<<fake:2:4>>*/ for
+    (let
+      f =
+         /*<<fake:2:15>>*/ x=>
+            /*<<fake:2:22>>*/ cond ? x in obj : x /*<<fake:2:41>>*/ ;;)
+     ;
+    |}]
+
 let%expect_test "string template" =
   (* GH#1017 *)
   print
@@ -578,22 +677,23 @@ class x extends p {
   [%expect
     {|
     class x extends p {
-       constructor(){ /*<<fake:4:6>>*/ super(a, b, c); /*<<fake:3:4>>*/ }
-       foo(){
-        var s =  /*<<fake:8:12>>*/ super[d];
-        var s =  /*<<fake:9:12>>*/ super.d;
-        /*<<fake:6:4>>*/ }
-       static
-       bar(){
-        var s =  /*<<fake:14:12>>*/ super[d];
-        var s =  /*<<fake:15:12>>*/ super.d;
-        /*<<fake:12:11>>*/ }
-       x =  /*<<fake:17:5>>*/ 3;
-       static y =  /*<<fake:19:12>>*/ 5;
-       #z =  /*<<fake:21:6>>*/ 6;
-       static #t =  /*<<fake:23:13>>*/ 2;
-       static {var x =  /*<<fake:25:18>>*/ 3;}
-     } |}]
+      constructor(){ /*<<fake:4:6>>*/ super(a, b, c); /*<<fake:3:4>>*/ }
+      foo(){
+       var s =  /*<<fake:8:12>>*/ super[d];
+       var s =  /*<<fake:9:12>>*/ super.d;
+       /*<<fake:6:4>>*/ }
+      static
+      bar(){
+       var s =  /*<<fake:14:12>>*/ super[d];
+       var s =  /*<<fake:15:12>>*/ super.d;
+       /*<<fake:12:11>>*/ }
+      x =  /*<<fake:17:5>>*/ 3;
+      static y =  /*<<fake:19:12>>*/ 5;
+      #z =  /*<<fake:21:6>>*/ 6;
+      static #t =  /*<<fake:23:13>>*/ 2;
+      static {var x =  /*<<fake:25:18>>*/ 3;}
+    }
+    |}]
 
 let%expect_test "ite" =
   print
@@ -705,7 +805,7 @@ const as = () => () => ts(void 0, void 0, void 0, function* () {})
   [%expect {|
     const as = ()=>()=>ts(void 0, void 0, void 0, function*(){}); |}]
 
-let%expect_test "error reporting" =
+let%expect_test ("error reporting" [@when target_engine <> "quickjs"]) =
   (try
      print ~invalid:true ~compact:false {|
     var x = 2;
@@ -728,7 +828,7 @@ let check_vs_string s toks =
     then ()
     else
       match s.[a] with
-      | ' ' | '\n' | '\t' -> space (succ a) b
+      | ' ' | '\n' | '\t' | '\r' -> space (succ a) b
       | c -> Printf.printf "pos:%d, expecting space until %d, found %C\n" a b c
   in
   let text pos str =
@@ -750,6 +850,8 @@ let check_vs_string s toks =
     | [] -> space pos (String.length s)
     | (Js_token.(T_VIRTUAL_SEMICOLON | T_VIRTUAL_SEMICOLON_DO_WHILE), _) :: rest ->
         loop offset pos rest
+    | (Js_token.(T_YIELDOFF | T_AWAITOFF | T_YIELDON | T_AWAITON | T_YIELD_AWAIT_POP), _)
+      :: rest -> loop offset pos rest
     | ((Js_token.T_STRING (_, codepoint_len) as x), loc) :: rest ->
         let p1 = Loc.p1 loc in
         let { Parse_info.idx = codepoint_idx; _ } = Parse_info.t_of_pos p1 in
@@ -795,29 +897,32 @@ let parse_print_token ?(invalid = false) ?(extra = false) s =
   | true, "" -> print_endline "invalid file but node --check didn't complain"
   | true, _ -> ());
   let lex = Parse_js.Lexer.of_string ~filename:"fake" s in
-  let _p, tokens =
-    try Parse_js.parse' lex
-    with Parse_js.Parsing_error pi as e ->
-      Printf.eprintf "cannot parse l:%d:%d@." pi.Parse_info.line pi.Parse_info.col;
-      raise e
-  in
-  check_vs_string s tokens;
-  let prev = ref 0 in
-  let rec loop tokens =
-    match tokens with
-    | [ (Js_token.T_EOF, _) ] | [] -> Printf.printf "\n"
-    | (tok, loc) :: xs ->
-        let p1 = Loc.p1 loc in
-        let pos = Parse_info.t_of_pos p1 in
-        let s = if extra then Js_token.to_string_extra tok else Js_token.to_string tok in
-        (match !prev <> pos.Parse_info.line && pos.Parse_info.line <> 0 with
-        | true -> Printf.printf "\n%2d: " pos.Parse_info.line
-        | false -> ());
-        if pos.Parse_info.line <> 0 then prev := pos.Parse_info.line;
-        Printf.printf "%d:%s, " pos.Parse_info.col s;
-        loop xs
-  in
-  loop tokens
+  match Parse_js.parse' `Module lex with
+  | exception Parse_js.Parsing_error pi ->
+      Printf.eprintf "cannot parse l:%d:%d@." pi.Parse_info.line pi.Parse_info.col
+  | _p, tokens ->
+      check_vs_string s tokens;
+      let prev = ref 0 in
+      let rec loop tokens =
+        match tokens with
+        | [ (Js_token.T_EOF, _) ] | [] -> Printf.printf "\n"
+        | ( Js_token.(T_YIELDOFF | T_AWAITOFF | T_AWAITON | T_YIELDON | T_YIELD_AWAIT_POP)
+          , _ )
+          :: xs -> loop xs
+        | (tok, loc) :: xs ->
+            let p1 = Loc.p1 loc in
+            let pos = Parse_info.t_of_pos p1 in
+            let s =
+              if extra then Js_token.to_string_extra tok else Js_token.to_string tok
+            in
+            (match !prev <> pos.Parse_info.line && pos.Parse_info.line <> 0 with
+            | true -> Printf.printf "\n%2d: " pos.Parse_info.line
+            | false -> ());
+            if pos.Parse_info.line <> 0 then prev := pos.Parse_info.line;
+            Printf.printf "%d:%s, " pos.Parse_info.col s;
+            loop xs
+      in
+      loop tokens
 
 let%expect_test "tokens" =
   parse_print_token
@@ -844,7 +949,7 @@ let%expect_test "tokens" =
      9: 4:var, 8:s, 10:=, 12:tag, 15:`, 16:asd , 20:${, 23:test, 28:}, 29: te, 32:`, 0:;,
     11: 4:var, 8:s, 10:=, 12:`, 13:asd , 17:${, 20:f, 21:(, 22:`, 23:space , 29:${, 31:test, 35:}, 36: space, 42:`, 43:,, 45:32, 47:), 49:}, 50: te, 53:`, 0:;, |}]
 
-let%expect_test "invalid ident" =
+let%expect_test ("invalid ident" [@when target_engine <> "quickjs"]) =
   parse_print_token
     ~invalid:true
     {|
@@ -853,10 +958,10 @@ let%expect_test "invalid ident" =
 |};
   [%expect
     {|
-     2: 4:var, 8:\uD83B\uDE62, 21:=, 23:42, 25:;, 27:// invalid surrogate escape sequence,
-     3: 4:var, 8:\u{1F42B}, 18:=, 20:2, 21:;, 23:// U+1F42B is not a valid id,
     Lexer error: fake:2:8: Illegal Unicode escape
-    Lexer error: fake:3:8: Unexpected "\240\159\144\171" is not a valid identifier |}]
+    Lexer error: fake:3:8: Unexpected "\\u{1F42B}" (🐫) is not a valid identifier
+    cannot parse l:3:8@.
+    |}]
 
 let%expect_test "string" =
   parse_print_token
@@ -873,13 +978,14 @@ let%expect_test "string" =
     4: 4:var, 8:a, 10:=, 12:"munpi\207\128\207\128\207\128qtex", 26:;,
     5: 4:var, 8:a, 10:=, 12:"munpi\207\128\207\128\207\128qtex", 26:;, |}]
 
-let%expect_test "multiline string" =
-  parse_print_token ~invalid:true {|
+let%expect_test ("multiline string" [@when target_engine <> "quickjs"]) =
+  let clean s = Str.global_replace (Str.regexp "\r\n") "\n" s in
+  parse_print_token ~invalid:true (clean {|
     42;
     "
     ";
     42
-|};
+|});
   [%expect
     {|
      2: 4:42, 6:;,
@@ -887,24 +993,24 @@ let%expect_test "multiline string" =
      4: 5:;,
      5: 4:42, 0:;,
     Lexer error: fake:3:5: Unexpected token ILLEGAL |}];
-  parse_print_token {|
+  parse_print_token (clean {|
     42;
     "\
     ";
     42
-|};
+|});
   [%expect {|
     2: 4:42, 6:;,
     3: 4:"    ",
     4: 5:;,
     5: 4:42, 0:;, |}];
-  parse_print_token ~invalid:true {|
+  parse_print_token ~invalid:true (clean {|
     42;
     "
 
     ";
     42
-|};
+|});
   [%expect
     {|
      2: 4:42, 6:;,
@@ -1169,3 +1275,115 @@ get:{of:{from:{async:{break async}break from}break of}break get}
 |};
   [%expect
     {| 2: 0:get, 3::, 4:{, 5:of, 7::, 8:{, 9:from, 13::, 14:{, 15:async, 20::, 21:{, 22:break, 28:async, 0:; (virtual), 33:}, 34:break, 40:from, 0:; (virtual), 44:}, 45:break, 51:of, 0:; (virtual), 53:}, 54:break, 60:get, 0:; (virtual), 63:}, |}]
+
+let%expect_test "using" =
+  parse_print_token
+    ~extra:true
+    {|
+async function f() {
+  for (await using of of []) { }
+}
+|};
+  [%expect
+    {|
+    2: 0:async, 6:function, 15:f (identifier), 16:(, 17:), 19:{,
+    3: 2:for, 6:(, 7:await, 13:using, 19:of (identifier), 22:of, 25:[, 26:], 27:), 29:{, 31:},
+    4: 0:},
+    |}]
+
+let%expect_test "html comments" =
+  (* <!-- is always a single-line comment *)
+  parse_print_token
+    ~extra:true
+    {|
+var a = 1;
+<!-- html open comment
+c = 2<!-- html open comment
+var b = 2;
+|};
+  [%expect
+    {|
+    2: 0:var, 4:a (identifier), 6:=, 8:1, 9:;,
+    3: 0:<!-- html open comment,
+    4: 0:c (identifier), 2:=, 4:2, 0:; (virtual), 5:<!-- html open comment,
+    5: 0:var, 4:b (identifier), 6:=, 8:2, 9:;,
+    |}];
+  (* --> at start of line is a comment *)
+  parse_print_token
+    ~extra:true
+    {|
+var a = 1;
+--> html close comment
+     --> html close comment
+   /* asd */ --> html close comment
+var b = 2;
+    function f (x) { x-->x }
+
+|};
+  [%expect
+    {|
+    2: 0:var, 4:a (identifier), 6:=, 8:1, 9:;,
+    3: 0:--> html close comment,
+    4: 5:--> html close comment,
+    5: 3:/* asd */, 13:--> html close comment,
+    6: 0:var, 4:b (identifier), 6:=, 8:2, 9:;,
+    7: 4:function, 13:f (identifier), 15:(, 16:x (identifier), 17:), 19:{, 21:x (identifier), 22:-- (DECR_NB), 24:>, 25:x (identifier), 0:; (virtual), 27:},
+    |}];
+  (* --> after code on the same line is NOT a comment, it's -- then > *)
+  parse_print_token ~extra:true {|
+var x = a --> b;
+|};
+  [%expect
+    {|
+    2: 0:var, 4:x (identifier), 6:=, 8:a (identifier), 10:-- (DECR_NB), 12:>, 14:b (identifier), 15:;, |}];
+  print ~debuginfo:false ~compact:false ~report:true {|
+    a-->a
+    |};
+  [%expect {| a-- > a; |}]
+
+let%expect_test "in operator in for-init needs parentheses" =
+  (* ECond else-branch is an assignment containing `in` *)
+  print ~compact:true ~report:true "for (var x = (c ? d : y = \"a\" in o);;);";
+  [%expect
+    {|
+    /*<<fake:1:0>>*/for(var
+    x=/*<<fake:1:11>>*/(c?d:y="a"in
+    o);;);
+    |}];
+  (* arrow concise body *)
+  print ~compact:true ~report:true "for (var f = (() => \"a\" in o);;);";
+  [%expect
+    {|
+    /*<<fake:1:0>>*/for(var
+    f=/*<<fake:1:11>>*/(()=>/*<<fake:1:20>>*/"a"in
+    o/*<<fake:1:28>>*/);;);
+    |}];
+  (* yield payload inside a generator *)
+  print ~compact:true ~report:true "function* g(o){ for (var x = (yield \"a\" in o);;); }";
+  [%expect
+    {|
+    function*g(o){/*<<fake:1:16>>*/for(var
+    x=/*<<fake:1:27>>*/(yield"a"in
+    o);;);/*<<fake:1:0>>*/}
+    |}];
+  (* comma sequence: the printer already parenthesizes it, so no extra
+     pair of parentheses should be added around the initializer *)
+  print ~compact:true ~report:true "for (var x = (a, \"b\" in o);;);";
+  [%expect
+    {|
+    /*<<fake:1:0>>*/for(var
+    x=/*<<fake:1:11>>*/(a,"b"in
+    o);;);
+    |}]
+
+let%expect_test "in operator in conditional then-branch needs no parentheses" =
+  (* The then-branch of a conditional is parsed at [+In] (delimited by `?`
+     and `:`), so an `in` there is unambiguous and needs no parentheses,
+     even when it sits inside an assignment. *)
+  print ~compact:true ~report:true "for (var x = (c ? z = \"a\" in b : d);;);";
+  [%expect
+    {|
+    /*<<fake:1:0>>*/for(var
+    x=/*<<fake:1:11>>*/c?z="a"in
+    b:d;;);
+    |}]
