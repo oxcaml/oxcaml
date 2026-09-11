@@ -15,11 +15,11 @@
 
 type rewrite_context
 
-(** [rewrite_kind_with_subkind uses var kind_with_subkind] For
+(** [rewrite_kind_with_subkind db var kind_with_subkind] For
     [kind_with_subkind] the kind associated to variable [var], removes the
     subkinds on the parts that are not used. *)
 val rewrite_kind_with_subkind :
-  Unboxing_analysis.result ->
+  Datalog.database ->
   Name.t ->
   Flambda_kind.With_subkind.t ->
   Flambda_kind.With_subkind.t
@@ -27,9 +27,16 @@ val rewrite_kind_with_subkind :
    that *)
 
 val prepare_rewrite_context :
+  db:Datalog.database ->
   Unboxing_analysis.result ->
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
   rewrite_context
+
+val rewrite_kind_in_context :
+  rewrite_context ->
+  Name.t ->
+  Flambda_kind.With_subkind.t ->
+  Flambda_kind.With_subkind.t
 
 val rewrite_typing_env :
   rewrite_context -> unit_symbol:Symbol.t -> typing_env -> typing_env

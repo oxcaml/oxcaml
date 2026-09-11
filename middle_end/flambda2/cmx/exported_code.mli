@@ -58,6 +58,9 @@ val prepare_for_export :
   canonicalise:(Simple.t -> Simple.t) ->
   t
 
+(** Fold over stored metadata without loading any code bodies. *)
+val fold_code_metadata : t -> init:'a -> f:(Code_metadata.t -> 'a -> 'a) -> 'a
+
 val iter_code : t -> f:(Code.t -> unit) -> unit
 
 val from_raw : sections:File_sections.t -> raw -> t

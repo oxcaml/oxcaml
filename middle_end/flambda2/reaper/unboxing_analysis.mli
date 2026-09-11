@@ -81,10 +81,10 @@ type my_closure_param_decision =
 val print_param_decision : Format.formatter -> param_decision -> unit
 
 type result =
-  { db : Datalog.database;
-    unboxed_fields : unboxed Code_id_or_name.Map.t;
+  { unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    cannot_change_calling_convention : unit Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -129,8 +129,6 @@ val code_changes_apply_renaming :
   rename_field:(Field.t -> Field.t) ->
   code_changes
 
-val pp_result : Format.formatter -> result -> unit
-
 val unboxed_fields_ids_for_export :
   unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
 
@@ -174,6 +172,7 @@ val perform_analysis :
   result
 
 val compute_code_changes :
+  db:Datalog.database ->
   result ->
   analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:

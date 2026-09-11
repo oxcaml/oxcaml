@@ -15,9 +15,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** An .ltosol file whose header has been read. The solution itself is stored in
-    one file section per compilation unit and is only read by
-    [solution_for_members]. *)
+(** A solution header and a cache of sections imported during one rebuild batch.
+    Do not reuse the cache after resetting the identifier tables. *)
 type t
 
 type error =
@@ -28,31 +27,24 @@ type error =
 
 exception Error of error
 
-(** Write an .ltosol file with the given solution to disk, sharded into one file
-    section per compilation unit. [participants] should list the compilation
-    units included in the solution, each paired with the compilation units its
-    dependency graph references; these determine which sections the unit's
-    rebuild will need to read. *)
+(** Store rebuild answers, code changes, and offsets in sections keyed by their
+    compilation unit. Each section carries its own identifier and field data. *)
 val save :
   filename:string ->
-  participants:(Compilation_unit.t * Compilation_unit.Set.t) list ->
+  participants:Compilation_unit.t list ->
   solution:Reaper.Staged.solution ->
   slot_offsets:Slot_offsets.result ->
   unit
 
-(** Read the header of an ltosol file from disk. *)
+(** Read only the header. *)
 val load : string -> t
 
 val id_stamp_counters : t -> Id_stamp_counters.t
 
-(** The compilation units included in the solution. *)
 val participants : t -> Compilation_unit.t list
 
-(** The slot offsets computed from the solution for the sets of closures of all
-    participants. *)
-val slot_offsets : t -> Slot_offsets.result
-
-(** Deserialise the solution needed to rebuild [members], inserting the
-    necessary objects into the global hashcons tables. *)
+(** Check that [members] participated in the solve and provide lookups that
+    import their owning compilation unit's section on demand. Imported sections
+    are shared across the batch. *)
 val solution_for_members :
-  t -> members:Compilation_unit.t list -> Reaper.Staged.solution
+  t -> members:Compilation_unit.t list -> Rebuild_solution.t

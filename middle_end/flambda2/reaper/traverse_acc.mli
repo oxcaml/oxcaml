@@ -94,6 +94,12 @@ val add_external_apply :
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
 
+(** Record rebuild queries for an original application, before traversal creates
+    any auxiliary call witnesses. *)
+val record_apply_for_rebuild : t -> Flambda.Apply.t -> unit
+
+val rebuild_queries : t -> Rebuild_queries.Requests.t
+
 (** Mark a continuation as having fixed arity (mostly function return
     continuations): the rebuild pass may not change its number of parameters. *)
 val fixed_arity_continuation : t -> Continuation.t -> unit

@@ -18,7 +18,6 @@
 (* CR mvellacott: get rid of CMR files, and put the data in CMX instead *)
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
-    final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
@@ -32,20 +31,17 @@ module Serialisable : sig
 
   type t
 
-  (** Turn serialised file contents back into usable data types, inserting the
-      necessary objects into the global hashcons tables and then updating
-      hashcons IDs as appropriate. The resuming invocation must use the same
-      machine width and compilation unit as the one that wrote the field.*)
-  val deserialise :
-    machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  (** Import only the inputs needed to rebuild the unit. Code is imported as
+      metadata without result types; bodies are stored in [Traverse_rebuild].
+      Solve inputs are not reconstructed. *)
+  val deserialise_for_rebuild :
     t ->
-    cmr_format
+    Flambda_unit.Metadata.t * Exported_code.t * Reaper.Staged.Traverse_rebuild.t
 
-  (** Like [deserialise], but only deserialises what the solve invocation needs:
-      the dependency graph, the slot offsets inputs and the per-unit solve
-      inputs (including the hashcons restore and rename process), together with
-      the stored imported offsets. *)
+  (** Deserialises only what the solve invocation needs: the dependency graph,
+      the slot offsets inputs and the per-unit solve inputs (including the
+      hashcons restore and rename process), together with the stored imported
+      offsets. *)
   val deserialise_for_solve :
     t ->
     Global_flow_graph.graph
@@ -66,9 +62,8 @@ type error =
 
 exception Error of error
 
-(** [used_value_slots] is the set computed by [Slot_offsets.finalize_offsets]
-    for the unit being stored; it describes the data written alongside it. *)
-val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
+(** Save backend-only data without modifying the live code or solve inputs. *)
+val save : filename:string -> t -> unit
 
 (** Read and unmarshal a cmr file from disk. *)
 val load : string -> Serialisable.t * Id_stamp_counters.t

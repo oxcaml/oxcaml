@@ -132,6 +132,12 @@ let apply_renaming code_id_importer renaming t =
         Code_id.Map.add code_id code_or_metadata all_code)
       t Code_id.Map.empty
 
+let fold_code_metadata t ~init ~f =
+  Code_id.Map.fold
+    (fun _code_id code_or_metadata acc ->
+      f (Code_or_metadata.code_metadata code_or_metadata) acc)
+    t init
+
 let iter_code t ~f =
   Code_id.Map.iter
     (fun _code_id code_or_metadata ->

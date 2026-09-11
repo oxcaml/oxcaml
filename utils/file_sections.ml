@@ -64,13 +64,16 @@ let length = function
   | From_file { sections; _ } -> Array.length sections
   | In_memory sections -> Array.length sections
 
+let read_section_from_file channel byte_offset_in_file =
+  let channel = File_lru_cache.load_slot channel file_lru in
+  seek_in channel byte_offset_in_file;
+  (input_value channel : Obj.t)
+
 let read_section sections channel index =
   match sections.(index) with
   | Loaded section_contents -> section_contents
   | Pending { byte_offset_in_file } ->
-    let channel = File_lru_cache.load_slot channel file_lru in
-    seek_in channel byte_offset_in_file;
-    let section_contents : Obj.t = input_value channel in
+    let section_contents = read_section_from_file channel byte_offset_in_file in
     sections.(index) <- Loaded section_contents;
     section_contents
 
@@ -87,6 +90,22 @@ let get t index =
       "File_sections.get index out of bounds: index is %d, but length is %d"
       index len;
   unsafe_get t index
+
+let get_uncached t index =
+  let len = length t in
+  if index < 0 || index >= len
+  then
+    Misc.fatal_errorf
+      "File_sections.get_uncached index out of bounds: index is %d, but length \
+       is %d"
+      index len;
+  match t with
+  | From_file { sections; channel } -> (
+    match sections.(index) with
+    | Loaded section_contents -> section_contents
+    | Pending { byte_offset_in_file } ->
+      read_section_from_file channel byte_offset_in_file)
+  | In_memory sections -> sections.(index)
 
 let unsafe_blit_to_array t dest start_index =
   match t with
