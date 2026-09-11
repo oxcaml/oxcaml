@@ -1010,9 +1010,9 @@ let rec generalize stage_offset ty =
     | Tsplice ty' ->
         generalize (stage_offset - 1) ty'
     (* Normalize the variable to be at [stage_offset = 0] *)
-    | Tvar name ->
-        update_variable_stage stage_offset ty name.name name.jkind;
-        Jkind.generalize ~current_level name.jkind
+    | Tvar { name; jkind } ->
+        update_variable_stage stage_offset ty name jkind;
+        Jkind.generalize ~current_level jkind
     (* Do not generalize cross-stage row-polymorphic types, as we cannot
        quote or splice row variables.
        Weak type variables that arise here are considered cross-stage,
@@ -1611,9 +1611,8 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
           end
       | Tvar { name; jkind } ->
           let name = if keep_names = Some true then name else None in
-          Tvar { name; jkind = Jkind.instance jkind }
-      | Tunivar { name; jkind } ->
-          Tunivar { name; jkind = Jkind.instance jkind }
+          let jkind = Jkind.instance jkind in
+          Tvar { name; jkind }
       | Tobject (ty1, _) when partial <> None ->
           Tobject (copy ty1, ref None)
       | _ ->
@@ -6346,18 +6345,23 @@ let subject_level = generic_level - 1
    Update the level of [ty]. First check that the levels of generic
    variables from the subject are not lowered.
 *)
-let moregen_occur env level ty =
+let moregen_occur env level jkind_level ty =
   with_type_mark begin fun mark ->
     let rec occur ty =
       let lv = get_level ty in
-      if lv <= level then () else
-      if is_Tvar ty && lv >= subject_level then raise Occur else
-      if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
+      begin match get_desc ty with
+      | Tvar { jkind } ->
+        let jkind_lv = Jkind.get_level jkind in
+        if level < lv && lv >= subject_level then
+          raise_unexplained_for Moregen
+        else if jkind_level < jkind_lv && jkind_lv = subject_level then
+          raise_for Moregen (Weaken_sort ty)
+      | _ -> ()
+      end;
+      if level < lv && try_mark_node mark ty then
+        iter_type_expr occur (Fun.const ()) ty
     in
-    try
-      occur ty
-    with Occur ->
-      raise_unexplained_for Moregen
+    occur ty
   end;
   (* also check for free univars *)
   occur_univar_for Moregen env ty;
@@ -6551,7 +6555,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
     match (get_desc t1, get_desc t2) with
       (Tvar { jkind }, _) when may_instantiate inst_nongen t1
                             && not (deep_occur t1 t2) ->
-        moregen_occur env (get_level t1) t2;
+        moregen_occur env (get_level t1) (Jkind.get_level jkind) t2;
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
@@ -6570,7 +6574,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
               let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
-              moregen_occur env (get_level t1') t2;
+              moregen_occur env (get_level t1') (Jkind.get_level jkind) t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
@@ -6760,7 +6764,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
                     (create_row ~fields:r2 ~more:rm2 ~name:None
                        ~fixed:row2_fixed ~closed:row2_closed))
       in
-      moregen_occur env (get_level rm1) ext;
+      moregen_occur env (get_level rm1) generic_level ext;
       update_scope_for Moregen (get_scope rm1) ext;
       (* This [link_type] has to be undone if the rest of the function fails *)
       link_type rm1 ext

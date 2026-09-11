@@ -97,6 +97,10 @@ module Sort : sig
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
+  val update_level : int -> t -> unit
+
+  val get_level : t -> int
+
   (** Determines if the sort is [Scannable] or an unfilled sort variable,
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
