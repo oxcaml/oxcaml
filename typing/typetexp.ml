@@ -901,8 +901,11 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
         with
         | Error.In_context _
         | Env.Error.In_context _ ->
-            let ty = new_global_var
-                (Jkind.Builtin.value ~why:(Unknown "typing_recovery"))
+            let ty =
+              new_global_var
+                (Jkind.of_new_sort
+                   ~why:Typing_recovery
+                   ~level:(Ctype.get_current_level ()))
             in
             Typing_recovery.erroneous_type_register ty;
             { ctyp_desc = Ttyp_var (None, None);
