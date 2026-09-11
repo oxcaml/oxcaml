@@ -2010,7 +2010,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_tuple rs) p.pat_type p.pat_env
 | Tpat_unboxed_tuple ps, Tpat_unboxed_tuple qs ->
-    let rs = unboxed_tuple_lubs ps qs in
+    let rs = tuple_lubs ps qs in
     make_pat (Tpat_unboxed_tuple rs) p.pat_type p.pat_env
 | Tpat_lazy p, Tpat_lazy q ->
     let r = lub p q in
@@ -2064,19 +2064,11 @@ and record_lubs l1 l2 =
         (lid1, lbl1,lub p1 p2)::lub_rec rem1 rem2 in
   lub_rec l1 l2
 
-(* CR zeisbach: check this! wrt below. and consider combining. *)
 and tuple_lubs ps qs = match ps,qs with
 | [], [] -> []
 | (p_label, p, sort)::ps, (q_label, q, _)::qs
       when Option.equal String.equal p_label q_label ->
     (p_label, lub p q, sort) :: tuple_lubs ps qs
-| _,_ -> raise Empty
-
-and unboxed_tuple_lubs ps qs = match ps,qs with
-| [], [] -> []
-| (p_label, p, sort)::ps, (q_label, q, _)::qs
-      when Option.equal String.equal p_label q_label ->
-    (p_label, lub p q, sort) :: unboxed_tuple_lubs ps qs
 | _,_ -> raise Empty
 
 and arg_lubs ps qs = match ps,qs with

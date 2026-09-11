@@ -5789,10 +5789,6 @@ let rec type_approx env sexp ty_expected =
       type_approx_constraint env (Pconstraint sty) ~loc ty_expected
   | _ -> ()
 
-(* CR zeisbach: important!! this can either (a) go away entirely, or (b) use
-   any... i think. but right now the creation reason is bad for the any. also,
-   i'm not sure if it is being constrained to be representable?
-   I should see what other approx functions do with such any. *)
 and type_tuple_approx (env: Env.t) loc ty_expected l =
   let labeled_tys = List.map
     (fun (label, _) -> label, newvar (Jkind.Builtin.any ~why:Dummy_jkind)) l

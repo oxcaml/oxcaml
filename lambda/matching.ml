@@ -319,7 +319,6 @@ end = struct
       | `Unboxed_unit -> `Unboxed_unit
       | `Unboxed_bool b -> `Unboxed_bool b
       | `Tuple ps ->
-          (* CR zeisbach: one of many places to consider refactoring *)
           `Tuple
             (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
       | `Unboxed_tuple ps ->
@@ -2489,42 +2488,43 @@ let divide_lazy ~scopes head ctx pm =
 let get_pat_args_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
-  | { pat_desc = Tpat_tuple args } -> (List.map (fun (_, p, _) -> p) args) @ rem
+  | { pat_desc = Tpat_tuple args }
+  | { pat_desc = Tpat_unboxed_tuple args } -> (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
-(* CR zeisbach: maybe this is a place to deduplicate code. *)
-let get_pat_args_unboxed_tuple arity p rem =
-  match p with
-  | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
-  | { pat_desc = Tpat_unboxed_tuple args } ->
-    (List.map (fun (_, p, _) -> p) args) @ rem
-  | _ -> assert false
-
-let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
+let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
-  let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
-  let sem = add_barrier_to_read ubr Reads_agree in
-  let binding_kind = add_barrier_to_let_kind ubr Alias in
   let shape =
     List.map (fun (_, sort) ->
       let sort = Jkind.Sort.default_for_transl_and_get sort in
       sort,
+      (* CR layouts v7.1: consider whether more accurate [Lambda.layout]s here
+         would make a difference for later optimizations. *)
       Typeopt.layout_of_sort (Scoped_location.to_location loc) sort
     ) shape
   in
-  let read =
-    let block_shape =
-      Array.of_list
-        (List.map (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
-          shape)
-    in
-    (* CR zeisbach: this isn't strictly necessary (backend won't fail here), but
-       I don't know enough about how [Pmixedfield] is lowered to determine
-       whether emitting it would lead to performance regressions. Regardless, I
-       think the longer-term goal is to combine these two anyways. *)
-    if Lambda.shape_has_only_value_elements block_shape
-    then fun pos -> Pfield (pos, Pointer, sem)
-    else fun pos -> Pmixedfield ([pos], block_shape, sem)
+  let read, binding_kind =
+    let layouts = List.map (fun (_, layout) -> layout) shape in
+    if is_unboxed
+    then (fun pos -> Punboxed_product_field (pos, layouts)), Alias
+    else begin
+      let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
+      let sem = add_barrier_to_read ubr Reads_agree in
+      let block_shape =
+        Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+      in
+      let read =
+        (* CR zeisbach: this isn't strictly necessary (backend won't fail here),
+           but I don't know enough about how [Pmixedfield] is lowered to
+           determine whether emitting it would lead to performance regressions.
+           Regardless, I think the longer-term goal is to combine these two
+           anyways. *)
+        if Lambda.shape_has_only_value_elements block_shape
+        then fun pos -> Pfield (pos, Pointer, sem)
+        else fun pos -> Pmixedfield ([pos], block_shape, sem)
+      in
+      read, add_barrier_to_let_kind ubr Alias
+    end
   in
   List.mapi (fun pos (sort, layout) ->
     {
@@ -2536,40 +2536,11 @@ let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
     }) shape
   @ rem
 
-let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
-  let loc = head_loc ~scopes head in
-  let shape =
-    List.map (fun (_, sort) ->
-      let sort = Jkind.Sort.default_for_transl_and_get sort in
-      sort,
-      (* CR layouts v7.1: consider whether more accurate [Lambda.layout]s here
-         would make a difference for later optimizations. *)
-      Typeopt.layout_of_sort (Scoped_location.to_location loc) sort
-    ) shape
-  in
-  let layouts = List.map (fun (_, layout) -> layout) shape in
-  List.mapi (fun pos (sort, layout) ->
-    {
-      arg = Lprim (Punboxed_product_field (pos, layouts), [ arg ], loc);
-      binding_kind = Alias;
-      mut = compose_mut mut Immutable;
-      sort;
-      layout;
-    }) shape
-  @ rem
-
-let divide_tuple ~scopes head shape ctx pm =
+let divide_tuple ~is_unboxed ~scopes head shape ctx pm =
   let arity = Patterns.Head.arity head in
   divide_line (Context.specialize head)
-    (get_expr_args_tuple ~scopes shape)
+    (get_expr_args_tuple ~is_unboxed ~scopes shape)
     (get_pat_args_tuple arity)
-    head ctx pm
-
-let divide_unboxed_tuple ~scopes head shape ctx pm =
-  let arity = Patterns.Head.arity head in
-  divide_line (Context.specialize head)
-    (get_expr_args_unboxed_tuple ~scopes shape)
-    (get_pat_args_unboxed_tuple arity)
     head ctx pm
 
 (* Matching against a record pattern *)
@@ -4501,11 +4472,11 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             (combine_unboxed_bool value_kind ploc arg arg_partial)
       | Tuple shape ->
           compile_no_test
-            (divide_tuple ~scopes ph shape)
+            (divide_tuple ~is_unboxed:false ~scopes ph shape)
             Context.combine
       | Unboxed_tuple shape ->
           compile_no_test
-            (divide_unboxed_tuple ~scopes ph shape)
+            (divide_tuple ~is_unboxed:true ~scopes ph shape)
             Context.combine
       | Record ([], _) | Record_unboxed_product ([], _) -> assert false
       | Record ((lbl :: _), _) ->
@@ -5026,10 +4997,6 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode
   let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-    (* CR zeisbach: this technically tracks more information than the previous
-       code (which used [All_value]). I think this information is just
-       duplicating that which already exists. But it should not lead to any perf
-       regressions, and has cleaner code right here. *)
     let shape =
       Array.of_list
         (List.map
