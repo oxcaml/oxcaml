@@ -14,6 +14,8 @@
    ocamlopt.byte;
    debugger_script = "${test_source_directory}/gdb-script";
    gdb;
+   stdout = "";
+   stderr = "";
    script = "sh ${test_source_directory}/sanitize.sh linux-gdb-amd64";
    script;
    check-program-output;

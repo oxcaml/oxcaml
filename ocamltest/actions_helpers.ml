@@ -235,20 +235,23 @@ let run
     begin if arguments="" then "without any argument"
     else "with arguments " ^ arguments
     end in
-    let env =
+    let stdout_variable, stderr_variable =
       if redirect_output
       then begin
-        let output = Environments.safe_lookup Builtin_variables.output env in
-        let env =
-          Environments.add_if_undefined Builtin_variables.stdout output env
-        in
-        Environments.add_if_undefined Builtin_variables.stderr output env
-      end else env
+        (if Environments.is_variable_defined Builtin_variables.stdout env
+         then Some Builtin_variables.stdout
+         else Some Builtin_variables.output),
+        (if Environments.is_variable_defined Builtin_variables.stderr env
+         then Some Builtin_variables.stderr
+         else Some Builtin_variables.output)
+      end else None, None
     in
     let expected_exit_status =
       exit_status_of_variable env Builtin_variables.exit_status
     in
-    let exit_status = run_cmd ~full_environment log env commandline in
+    let exit_status =
+      run_cmd ~full_environment ?stdout_variable ?stderr_variable
+        log env commandline in
     if exit_status=expected_exit_status
     then (Result.pass, env)
     else begin
