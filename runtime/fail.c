@@ -19,6 +19,7 @@
 
 #include "caml/alloc.h"
 #include "caml/fail.h"
+#include "caml/fiber.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/callback.h"
@@ -126,6 +127,13 @@ CAMLexport void caml_raise_out_of_fibers(void)
 
 CAMLexport void caml_raise_stack_overflow(void)
 {
+   /* The Caml SP may be pointing at a guard page. Before we raise the
+      exception it must point somewhere readable (although it will
+      soon be replaced by the exception-handler frame), so we point it
+      at Stack_base. */
+  struct stack_info* stack = Caml_state->current_stack;
+  if ((char*)stack->sp < (char*)Stack_base(stack))
+    stack->sp = Stack_base(stack);
   caml_raise_async(caml_exception_stack_overflow());
 }
 

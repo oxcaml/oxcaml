@@ -154,6 +154,12 @@ typedef enum {
     EV_C_MAJOR_SLICE_TOTAL_WORK,
     EV_C_MAJOR_SLICE_BUDGET,
     EV_C_MAJOR_SLICE_WORK_DONE,
+
+    /* Fiber stack lifecycle */
+    EV_C_STACK_CREATED,
+    EV_C_STACK_FREED,
+    EV_C_STACK_IDLED,
+    EV_C_STACK_WOKEN,
 } ev_runtime_counter;
 
 typedef enum {
