@@ -1196,13 +1196,10 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       of_shape num_nodes_visited fields
     end
 
-(* CR zeisbach: we don't store enough information in TTuple, meaning we have to
-   recompute some layout-related information here, which is sad (because it can
-   be expensive). For now, I am trying it out and going to benchmark it. *)
-(* CR zeisbach: also confirm that falling back to Pgenval for the whole thing
-   is ok when we have even one any component... *)
 and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
   let compute_mbe_if_repr (_, ty) =
+    (* CR zeisbach: this needs to be benchmarked, since it could be expensive.
+       If it is, [Ttuple] will need to store more information *)
     Option.bind (Ctype.type_jkind env ty |> Jkind.get_layout env)
       Types.mixed_block_element_of_layout_const
   in
