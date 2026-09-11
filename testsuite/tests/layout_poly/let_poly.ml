@@ -32,6 +32,21 @@ val c : float = 42.
 val d : string = "d"
 |}]
 
+let (a, b, c, d, e, f) =
+  let poly_ tuple x y = Sys.opaque_identity (x + 1, y) in
+  let (a, b) = tuple 1 #1L in
+  let (c, d) = tuple 2 #42.0 in
+  let (e, f) = tuple 3 "hi" in
+  (a, to_int64 b, c, to_float d, e, f)
+[%%expect{|
+val a : int = 2
+val b : int64 = 1L
+val c : int = 3
+val d : float = 42.
+val e : int = 4
+val f : string = "hi"
+|}]
+
 let (a, b, c, d) =
   let poly_ tuple_u x y = #(x, y) in
   let #(a, b) = tuple_u "a" #1L in
@@ -444,9 +459,21 @@ val b : float = 43.
 
 (* let poly_ instantiation with multiple variables *)
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple #42s #43.0 in
-  let #(c, d) = tuple #44L #45n in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple #42s #43.0 in
+  let (c, d) = tuple #44L #45n in
+  (to_int8 a, to_float b, to_int64 c, to_nativeint d)
+[%%expect{|
+val a : int8 = 42s
+val b : float = 43.
+val c : int64 = 44L
+val d : nativeint = 45n
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u #42s #43.0 in
+  let #(c, d) = tuple_u #44L #45n in
   (to_int8 a, to_float b, to_int64 c, to_nativeint d)
 [%%expect{|
 val a : int8 = 42s

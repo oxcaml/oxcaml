@@ -85,5 +85,3 @@ let () =
   assert (equal_any_float mixed (#6.0, 7));
   print_block_kind "mixed any tuple inst with int" uniform;
   print_block_kind "mixed any tuple inst with float#" mixed
-
-(* CR zeisbach: add more deeply nested tests. *)
