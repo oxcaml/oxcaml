@@ -26,7 +26,8 @@ type printers = (exn -> string option) Modes.Portable.t list
 
 let printers : printers Atomic.t = Atomic.make []
 
-let locfmt () = format_of_string "File \"%s\", line %d, characters %d-%d: %s"
+let[@zero_alloc strict] locfmt () =
+  format_of_string "File \"%s\", line %d, characters %d-%d: %s"
 
 let field x i =
   let f = Obj.field x i in
@@ -280,7 +281,7 @@ module Slot = struct
   let name = backtrace_slot_defname
 end
 
-let raw_backtrace_length bt = iarray_length bt
+let (raw_backtrace_length @ noalloc_strict) bt = iarray_length bt
 
 external get_raw_backtrace_slot :
   raw_backtrace -> int -> raw_backtrace_slot @@ portable = "caml_raw_backtrace_slot"
@@ -352,10 +353,10 @@ let default_uncaught_exception_handler exn raw_backtrace =
 let uncaught_exception_handler =
   Atomic.make { Modes.Portable.portable = default_uncaught_exception_handler }
 
-let set_uncaught_exception_handler_safe fn =
+let[@zero_alloc strict] set_uncaught_exception_handler_safe fn =
   Atomic.set uncaught_exception_handler { Modes.Portable.portable = fn }
 
-let set_uncaught_exception_handler_unsafe fn =
+let[@zero_alloc strict] set_uncaught_exception_handler_unsafe fn =
   set_uncaught_exception_handler_safe (Obj.magic_portable fn)
 
 let empty_backtrace : raw_backtrace = [: :]

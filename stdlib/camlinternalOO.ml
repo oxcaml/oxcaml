@@ -19,10 +19,10 @@ open! Stdlib
 [@@@ocaml.inline 0]
 [@@@ocaml.afl_inst_ratio 0]
 
-let magic x = Sys.opaque_identity (Obj.magic x)
-let of_repr x = Sys.opaque_identity (Obj.obj x)
+let (magic @ noalloc_strict) x = Sys.opaque_identity (Obj.magic x)
+let (of_repr @ noalloc_strict) x = Sys.opaque_identity (Obj.obj x)
 
-let set_object_field (arr : _ array) field new_value =
+let (set_object_field @ noalloc_strict) (arr : _ array) field new_value =
   Array.unsafe_set (Sys.opaque_identity arr) field new_value
 
 let get_object_field (arr : _ array) field =
@@ -80,7 +80,7 @@ external ret : (obj -> 'a) -> closure @@ portable = "%identity"
 
 (**** Labels ****)
 
-let public_method_label s : tag =
+let (public_method_label @ noalloc_strict) s : tag =
   let accu = ref 0 in
   for i = 0 to String.length s - 1 do
     accu := 223 * !accu + Char.code s.[i]
@@ -135,7 +135,7 @@ let dummy_met : item = Obj.magic_portable (of_repr (Obj.new_block 0 0))
 (* if debugging is needed, this could be a good idea: *)
 (* let dummy_met () = failwith "Undefined method" *)
 
-let rec fit_size n =
+let rec (fit_size @ noalloc_strict) n =
   if n <= 2 then n else
   fit_size ((n+1)/2) * 2
 
@@ -266,7 +266,7 @@ let widen table =
        table.hidden_meths
        saved_hidden_meths
 
-let new_slot table =
+let (new_slot @ noalloc_strict) table =
   let index = table.size in
   table.size <- index + 1;
   index
@@ -294,7 +294,7 @@ let new_methods_variables table meths vals =
   done;
   res
 
-let get_variable table name =
+let[@zero_alloc strict] get_variable table name =
   try Vars.find name table.vars with Not_found -> assert false
 
 let get_variables table names =
@@ -422,10 +422,10 @@ type tables =
   | Empty
   | Cons of {key : closure; mutable data: tables; mutable next: tables}
 
-let set_data tables v = match tables with
+let (set_data @ noalloc_strict) tables v = match tables with
   | Empty -> assert false
   | Cons tables -> tables.data <- v
-let set_next tables v = match tables with
+let (set_next @ noalloc_strict) tables v = match tables with
   | Empty -> assert false
   | Cons tables -> tables.next <- v
 let get_key = function

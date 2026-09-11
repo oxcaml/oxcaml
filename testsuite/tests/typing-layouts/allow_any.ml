@@ -419,9 +419,9 @@ Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
          the original has: mod forkable unyielding many stateless immutable
-         portable contended with 'a
+         portable contended noalloc_strict with 'a
          but this has: mod forkable unyielding many stateless immutable
-         portable contended
+         portable contended noalloc_strict
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -440,9 +440,9 @@ Error: This variant or record definition does not match that of type
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
          the original has: mod forkable unyielding many stateless immutable
-         portable contended with 'b
+         portable contended noalloc_strict with 'b
          but this has: mod forkable unyielding many stateless immutable
-         portable contended with 'a
+         portable contended noalloc_strict with 'a
 |}]
 
 type 'a unsafe_saturated : value mod shared with 'a = { mutable x : 'a }
@@ -548,9 +548,9 @@ Error: This variant or record definition does not match that of type
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
          the original has: mod forkable unyielding many stateless immutable
-         portable contended with 'a @@ shared
+         portable contended noalloc_strict with 'a @@ shared
          but this has: mod forkable unyielding many stateless immutable
-         portable contended with 'a @@ corrupted
+         portable contended noalloc_strict with 'a @@ corrupted
 |}]
 
 (* mcomp *)

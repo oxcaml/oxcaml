@@ -26,30 +26,30 @@ Part 1: Test in various syntactic positions
   > let f foo =
   >   foo
   > EOF
-  1:6-1:9: @ portable stateless unique static
+  1:6-1:9: @ portable stateless unique static noalloc_strict
 
   $ run 2:4 <<EOF
   > let f foo =
   >   foo
   > EOF
-  2:2-2:5: @ portable stateless unique static
+  2:2-2:5: @ portable stateless unique static noalloc_strict
 
   $ run 1:5 <<EOF
   > let foo () = ()
   > EOF
-  1:4-1:7: @ portable stateless unique static
+  1:4-1:7: @ portable stateless unique static noalloc_strict
 
   $ run 2:7 <<EOF
   > let f () =
   >   let foo () = () in
   >   ()
   > EOF
-  2:6-2:9: @ portable stateless unique static
+  2:6-2:9: @ portable stateless unique static noalloc_strict
 
   $ run 1:5 <<EOF
   > let foo = ()
   > EOF
-  1:4-1:7: @ portable stateless unique static
+  1:4-1:7: @ portable stateless unique static noalloc_strict
 
 Part 2: Display some interesting modes
 
@@ -59,7 +59,7 @@ Part 2: Display some interesting modes
   > let f () =
   >   f_nonportable ()
   > EOF
-  4:2-4:15: @ unique static
+  4:2-4:15: @ unique static noalloc_strict
 
 In this test, the cursor is on a node causing an error
   $ run 4:5 <<EOF
@@ -68,7 +68,7 @@ In this test, the cursor is on a node causing an error
   > let (f @ portable) () =
   >   f_nonportable ()
   > EOF
-  4:2-4:15: @ unique static
+  4:2-4:15: @ unique static noalloc_strict
 
   $ run 3:12 <<EOF
   > let counter = ref 0
@@ -76,14 +76,14 @@ In this test, the cursor is on a node causing an error
   >   let _ = counter in
   >   ()
   > EOF
-  3:10-3:17: @ portable contended stateless
+  3:10-3:17: @ portable contended stateless noalloc_strict
 
   $ run 1:5 <<EOF
   > let counter = ref 0
   > let (f @ portable) () =
   >  counter := !counter + 1
   > EOF
-  1:4-1:11: @ portable stateless
+  1:4-1:11: @ portable stateless noalloc_strict
 
 In this test, bar has all legacy modes
   $ run 4:5 <<EOF

@@ -15,7 +15,7 @@
 
 (* Auxiliaries for type-based optimizations, e.g. array kinds *)
 
-(* open Path *)
+open Path
 open Types
 open Typedtree
 open Lambda
@@ -34,7 +34,6 @@ type error =
   | Opaque_array_non_value of
       { array_type: type_expr;
         elt_kinding_failure: (Env.t * type_expr * Jkind.Violation.t) option }
-[@@warning "-37"]
 
 exception Error of Location.t * error
 
@@ -442,12 +441,10 @@ let array_type_kind ~elt_ty env loc ty =
         }))
     end
 
-(*
 let array_type_mut env ty =
   match scrape_poly env ty with
   | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
-*)
 
 let array_kind exp =
   array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
@@ -455,7 +452,6 @@ let array_kind exp =
 let array_pattern_kind pat =
   array_type_kind ~elt_ty:None pat.pat_env pat.pat_loc pat.pat_type
 
-(*
 let bigarray_decode_type env ty tbl dfl =
   match scrape env ty with
   | Some (Tconstr(Pdot(Pident mod_id, type_name), [], _))
@@ -463,6 +459,44 @@ let bigarray_decode_type env ty tbl dfl =
       begin try List.assoc type_name tbl with Not_found -> dfl end
   | _ ->
       dfl
+
+let kind_table =
+  ["float16_elt", Pbigarray_float16;
+   "float32_elt", Pbigarray_float32;
+   "float64_elt", Pbigarray_float64;
+   "int8_signed_elt", Pbigarray_sint8;
+   "int8_unsigned_elt", Pbigarray_uint8;
+   "int16_signed_elt", Pbigarray_sint16;
+   "int16_unsigned_elt", Pbigarray_uint16;
+   "int32_elt", Pbigarray_int32;
+   "int64_elt", Pbigarray_int64;
+   "int_elt", Pbigarray_caml_int;
+   "nativeint_elt", Pbigarray_native_int;
+   "complex32_elt", Pbigarray_complex32;
+   "complex64_elt", Pbigarray_complex64]
+
+let layout_table =
+  ["c_layout", Pbigarray_c_layout;
+   "fortran_layout", Pbigarray_fortran_layout]
+
+let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
+  match scrape env typ with
+  | Some (Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev)) ->
+      let kind =
+        match kind with
+        | Pbigarray_unknown ->
+          bigarray_decode_type env elt_type kind_table Pbigarray_unknown
+        | _ -> kind
+      in
+      let layout =
+        match layout with
+        | Pbigarray_unknown_layout ->
+          bigarray_decode_type env layout_type layout_table Pbigarray_unknown_layout
+        | _ -> layout
+      in
+      (kind, layout)
+  | _ ->
+      (kind, layout)
 
 let value_kind_of_scannable_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
@@ -1325,7 +1359,6 @@ let function_arg_layout env loc sort ty =
   match is_function_type env ty with
   | Some (arg_type, _) -> layout env loc sort arg_type
   | None -> Misc.fatal_error "function_arg_layout called on non-function type"
-*)
 
 (** Whether a forward block is needed for a lazy thunk on a value, i.e.
     if the value can be represented as a float/forward/lazy *)

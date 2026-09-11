@@ -22,7 +22,7 @@ let alloc x = { i = x }
 type 'a myref = { mutable i : 'a; }
 val alloc :
   'a @ [< 'm mod aliased dynamic & global many] ->
-  'a myref @ [> 'm | stateful] = <fun>
+  'a myref @ [> 'm | stateful alloc] = <fun>
 |}]
 
 let store_local (x @ local) y = x.i <- y
@@ -124,5 +124,5 @@ let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
   'a @ [< 'm mod aliased dynamic & global many > contended] ->
-  'a myref @ [> 'm | contended stateful dynamic] = <fun>
+  'a myref @ [> 'm | contended stateful dynamic alloc] = <fun>
 |}]

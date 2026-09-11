@@ -232,11 +232,11 @@
       {
         "file": "result.mli",
         "start": {
-          "line": 64,
+          "line": 65,
           "col": 0
         },
         "end": {
-          "line": 65,
+          "line": 66,
           "col": 63
         },
         "name": "Result.bind",
@@ -248,11 +248,11 @@
       {
         "file": "result.mli",
         "start": {
-          "line": 76,
+          "line": 77,
           "col": 0
         },
         "end": {
-          "line": 77,
+          "line": 78,
           "col": 60
         },
         "name": "Result.product",
@@ -264,11 +264,11 @@
       {
         "file": "result.mli",
         "start": {
-          "line": 158,
+          "line": 159,
           "col": 2
         },
         "end": {
-          "line": 158,
+          "line": 159,
           "col": 75
         },
         "name": "Result.Syntax.and*",
@@ -280,11 +280,11 @@
       {
         "file": "result.mli",
         "start": {
-          "line": 164,
+          "line": 165,
           "col": 2
         },
         "end": {
-          "line": 164,
+          "line": 165,
           "col": 75
         },
         "name": "Result.Syntax.and+",

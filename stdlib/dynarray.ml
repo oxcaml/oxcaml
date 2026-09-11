@@ -527,9 +527,9 @@ let set (Pack a) i x =
   if i >= length then Error.index_out_of_bounds "set" ~i ~length
   else arr.(i) <- Dummy.of_val x
 
-let length (Pack a) = a.length
+let (length @ noalloc_strict) (Pack a) = a.length
 
-let is_empty (Pack a) = (a.length = 0)
+let (is_empty @ noalloc_strict) (Pack a) = (a.length = 0)
 
 let copy (type a) (Pack {length; arr; dummy} : a t) : a t =
   check_valid_length length arr;
@@ -573,7 +573,7 @@ let pop_last_opt a =
   | exception Not_found -> None
   | x -> Some x
 
-let remove_last (Pack a) =
+let[@zero_alloc strict] remove_last (Pack a) =
   let last = a.length - 1 in
   if last >= 0 then begin
     a.length <- last;
@@ -594,9 +594,9 @@ let clear a = truncate a 0
 
 (** {1:capacity Backing array and capacity} *)
 
-let capacity (Pack a) = Array.length a.arr
+let (capacity @ noalloc_strict) (Pack a) = Array.length a.arr
 
-let next_capacity n =
+let[@zero_alloc strict] next_capacity n =
   let n' =
     (* For large values of n, we use 1.5 as our growth factor.
 
@@ -674,7 +674,7 @@ let set_capacity (Pack a) n =
       Dummy.Array.extend arr ~length:a.length ~dummy:a.dummy ~new_capacity:n;
   end
 
-let reset (Pack a) =
+let[@zero_alloc strict] reset (Pack a) =
   a.length <- 0;
   a.arr <- [||]
 

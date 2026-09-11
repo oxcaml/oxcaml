@@ -172,7 +172,7 @@ Line 1, characters 0-66:
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
-                 stateless immutable.
+                 stateless immutable noalloc_strict.
 |}]
 type ('a, 'b) u : immutable_data with 'a = [> `X | `Y of 'a] as 'b
 [%%expect{|
@@ -182,7 +182,7 @@ Line 1, characters 0-66:
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
-                 stateless immutable.
+                 stateless immutable noalloc_strict.
 |}]
 
 (* less-than rows *)
@@ -210,7 +210,7 @@ Line 2, characters 2-83:
 Error: This type definition does not satisfy its kind annotation
          immutable_data with 'a,
        because polymorphic variants are not mod forkable unyielding many
-                 stateless immutable.
+                 stateless immutable noalloc_strict.
 |}]
 
 (* Tunivar-ified row variables *)

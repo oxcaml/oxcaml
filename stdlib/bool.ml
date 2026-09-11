@@ -47,4 +47,4 @@ external seeded_hash_param :
   int -> int -> int -> bool -> int @@ portable = "caml_hash_exn" [@@noalloc]
 
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x
