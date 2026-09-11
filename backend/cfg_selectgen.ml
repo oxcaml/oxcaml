@@ -20,7 +20,7 @@
 
 open! Int_replace_polymorphic_compare
 
-[@@@ocaml.warning "+a-4-40-41-42"]
+[@@@ocaml.warning "+a-40-41-42"]
 
 module DLL = Doubly_linked_list
 module Or_never_returns = Select_utils.Or_never_returns
@@ -90,8 +90,28 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           } ->
         List.for_all is_simple_expr args
         (* The following may have side effects *)
-      | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ | Catomic _
-      | Cprobe _ | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = Arbitrary_effects;
+            coeffects = _
+          }
+      | Cextcall
+          { func = _;
+            ty = _;
+            ty_args = _;
+            alloc = _;
+            builtin = _;
+            returns = _;
+            effects = No_effects;
+            coeffects = Has_coeffects
+          }
+      | Capply _ | Calloc _ | Cstore _ | Craise _ | Catomic _ | Cprobe _
+      | Cprobe_is_enabled _ | Copaque | Cpoll | Cpause ->
         false
       | Cprefetch _ | Cbeginregion | Cendregion ->
         false
@@ -190,7 +210,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Use_default -> (
       match op with
       | Ilsl | Ilsr | Iasr -> n >= 0 && n < Arch.size_int * 8
-      | _ -> false)
+      | Iadd | Isub | Imul | Imulh _ | Idiv _ | Imod _ | Iand | Ior | Ixor
+      | Iclz | Ictz | Ipopcnt | Icomp _ ->
+        false)
 
   let is_immediate_test cmp n =
     match Target.is_immediate_test cmp n with
@@ -205,13 +227,18 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cconst_natint (n, dbg)
       when Nativeint.equal (Nativeint.of_int (Nativeint.to_int n)) n ->
       Cconst_int (Nativeint.to_int n, dbg)
-    | _ -> expr
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_mask _
+    | Cconst_symbol _ | Cvar _ | Clet _ | Cphantom_let _ | Cname_for_debugger _
+    | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
+    | Cexit _ | Cinvalid _ ->
+      expr
 
   (* Instruction selection for conditionals *)
 
   let select_condition (arg : Cmm.expression) : Operation.test * Cmm.expression
       =
-    match arg with
+    match[@ocaml.warning "-fragile-match"] arg with
     | Cop (Ccmpi cmp, [arg1; arg2], _) -> (
       match normalize_int_constant arg1, normalize_int_constant arg2 with
       | arg1, Cconst_int (n, _) when is_immediate_test cmp n ->
@@ -226,7 +253,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | _ -> Itruetest, arg
 
   let is_store (op : Operation.t) =
-    match op with Store (_, _, _) -> true | _ -> false
+    match op with
+    | Store (_, _, _) -> true
+    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Const_mask _ | Stackoffset _ | Load _ | Intop _ | Int128op _ | Intop_imm _
+    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
+    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
+    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll | Pause
+    | Alloc _ ->
+      false
 
   let bind_let (env : SU.environment) sub_cfg v r1 =
     let env =
@@ -275,7 +311,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comm (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | [Cconst_int (n, _); arg] when is_immediate op n ->
@@ -285,7 +323,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith (op : Operation.integer_operation)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate op n ->
       SU.basic_op (Intop_imm (op, n)), [arg]
     | _ -> SU.basic_op (Intop op), args
@@ -293,7 +333,9 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
   let select_arith_comp (cmp : Operation.integer_comparison)
       (args : Cmm.expression list) :
       Cfg.basic_or_terminator * Cmm.expression list =
-    match List.map normalize_int_constant args with
+    match[@ocaml.warning "-fragile-match"]
+      List.map normalize_int_constant args
+    with
     | [arg; Cconst_int (n, _)] when is_immediate (Operation.Icomp cmp) n ->
       SU.basic_op (Intop_imm (Icomp cmp, n)), [arg]
     | [Cconst_int (n, _); arg]
@@ -873,7 +915,19 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           Array.sub loc_exp size_before (Array.length fields_layout.(field))
         in
         Ok field_slice)
-    | Cop (op, args, dbg) -> emit_expr_op env sub_cfg bound_name op args dbg
+    | Cop
+        ( (( Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi
+           | Csubi | Cmuli | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128
+           | Cmuli64 _ | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _
+           | Ccsel _ | Cclz | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _
+           | Caddv | Cadda | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
+           | Cdivf _ | Cpackf32 | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _
+           | Cprobe _ | Cprobe_is_enabled _ | Cbeginregion | Cendregion
+           | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+           | Cpause ) as op),
+          args,
+          dbg ) ->
+      emit_expr_op env sub_cfg bound_name op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
       | Never_returns -> Never_returns
@@ -900,8 +954,10 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       let env = SU.env_add_phantom_let var defining_expr env in
       emit_tail env sub_cfg body
     | Cname_for_debugger (_, body) -> emit_tail env sub_cfg body
-    | Cop ((Capply { result_type = ty; region = Rc_normal; _ } as op), args, dbg)
-      ->
+    | Cop
+        ( (Capply { result_type = ty; region = Rc_normal; callees = _ } as op),
+          args,
+          dbg ) ->
       emit_tail_apply env sub_cfg ty op args dbg
     | Csequence (e1, e2) -> (
       match emit_expr env sub_cfg e1 ~bound_name:None with
@@ -917,7 +973,24 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
     | Cinvalid { message; symbol } ->
       let ok = emit_invalid env sub_cfg message symbol in
       insert_return env sub_cfg ok (SU.pop_all_traps env)
-    | Cop _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
+    | Cop
+        ( ( Capply
+              { result_type = _;
+                region = Rc_nontail | Rc_close_at_apply;
+                callees = _
+              }
+          | Cextcall _ | Cload _ | Calloc _ | Cstore _ | Caddi | Csubi | Cmuli
+          | Cmulhi _ | Cdivi _ | Cmodi _ | Caddi128 | Csubi128 | Cmuli64 _
+          | Cand | Cor | Cxor | Clsl | Clsr | Casr | Cbswap _ | Ccsel _ | Cclz
+          | Cctz | Cpopcnt | Cprefetch _ | Catomic _ | Ccmpi _ | Caddv | Cadda
+          | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
+          | Creinterpret_cast _ | Cstatic_cast _ | Ccmpf _ | Craise _ | Cprobe _
+          | Cprobe_is_enabled _ | Copaque | Cbeginregion | Cendregion
+          | Ctuple_field _ | Cdls_get | Ctls_get | Cdomain_index | Cpoll
+          | Cpause ),
+          _,
+          _ )
+    | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
     | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
     | Cconst_mask _ | Cvar _ | Ctuple _ | Cexit _ ->
       emit_return env sub_cfg exp (SU.pop_all_traps env)
@@ -1093,14 +1166,28 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
         Misc.fatal_errorf
           "Selection Alloc: expected a single placehold in dbginfo, found %d"
           (List.length dbginfo)
-      | Basic (Op op) ->
+      | Basic
+          (Op
+             (( Move | Spill | Reload | Const_int _ | Const_float32 _
+              | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+              | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+              | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+              | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+              | Opaque | Begin_region | End_region | Specific _
+              | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+              | Pause ) as op)) ->
         let* r1 = emit_tuple env sub_cfg new_args in
         let rd = Reg.createv ty in
         add_naming_op_for_bound_name sub_cfg rd;
         Ok (insert_op_debug env sub_cfg op dbg r1 rd)
-      | Basic basic ->
+      | Basic
+          (( Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+           | Stack_check _ ) as basic) ->
         Misc.fatal_errorf "unexpected basic (%a)" Printcfg.basic_desc basic
-      | Terminator term ->
+      | Terminator
+          (( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+           | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+           | Tailcall_func _ | Invalid _ ) as term) ->
         Misc.fatal_errorf "unexpected terminator (%a)"
           (Printcfg.terminator_desc ~sep:"")
           term)
@@ -1414,7 +1501,12 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
           SU.set_traps_for_raise env;
           SU.insert_move_results env sub_cfg loc_res rd stack_ofs;
           insert_return env sub_cfg (Ok rd) (SU.pop_all_traps env))
-      | _ -> Misc.fatal_error "Cfg_selectgen.emit_tail")
+      | Basic _
+      | Terminator
+          ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
+          | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Invalid _ | Call_no_return _ | Prim _ ) ->
+        Misc.fatal_error "Cfg_selectgen.emit_tail")
 
   and emit_tail_ifthenelse env sub_cfg econd (_ifso_dbg : Debuginfo.t) eif
       (_ifnot_dbg : Debuginfo.t) eelse (_dbg : Debuginfo.t) =
