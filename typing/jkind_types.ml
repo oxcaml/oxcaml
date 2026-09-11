@@ -489,14 +489,17 @@ module Sort = struct
       log_change (v, Clevel v.level);
       v.level <- level)
 
-  let rec update_level level = function
-    | Var v -> (
-      match v.contents with
-      | Some t -> update_level level t
-      | None -> set_var_level v level)
+  let rec iter_var f = function
+    | Var { contents = Some t } -> iter_var f t
+    | Var ({ contents = None } as v) -> f v
     | Base _ | Univar _ -> ()
-    | Product ts -> List.iter (update_level level) ts
-    | Addressable t -> update_level level t
+    | Product ts -> List.iter (iter_var f) ts
+    | Addressable t -> iter_var f t
+
+  let update_level level =
+    iter_var (fun v ->
+        assert (v.contents = None);
+        set_var_level v level)
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -777,6 +780,8 @@ module Sort = struct
         match sort with
         | Var v ->
           assert (Option.is_none v.contents);
+          (* Format.printf "generalize? %a > %d@." Debug_printers.var v
+            current_level; *)
           if v.level > current_level && v.level <> generic_level
           then begin
             v.level <- generic_level;
@@ -1298,6 +1303,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level sa =
-    let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa), sort
+    let var = Sort.new_var ~level in
+    Sort (Sort.of_var var, sa), var
 end
