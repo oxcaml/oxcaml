@@ -19,16 +19,26 @@ include Int_ids.Symbol
 let is_predefined_exception t =
   Compilation_unit.equal (compilation_unit t) Compilation_unit.predef_exn
 
-let manufacture =
-  let c = ref (-1) in
-  fun cu name ->
-    let suffix =
-      incr c;
-      string_of_int !c
-    in
-    let name =
-      if Flambda_features.Expert.shorten_symbol_names ()
-      then "s" ^ suffix
-      else name ^ "_" ^ suffix
-    in
-    create cu (Linkage_name.of_string name)
+let manufacture_counter = ref (-1)
+
+let manufacture cu name =
+  let suffix =
+    incr manufacture_counter;
+    string_of_int !manufacture_counter
+  in
+  let name =
+    if Flambda_features.Expert.shorten_symbol_names ()
+    then "s" ^ suffix
+    else name ^ "_" ^ suffix
+  in
+  create cu (Linkage_name.of_string name)
+
+let export_manufacture_counter () = !manufacture_counter
+
+let restore_manufacture_counter counter =
+  if !manufacture_counter = -1
+  then manufacture_counter := counter
+  else
+    Misc.fatal_errorf
+      "Restoring symbol manufacture counter would overwrite modified value %d"
+      !manufacture_counter

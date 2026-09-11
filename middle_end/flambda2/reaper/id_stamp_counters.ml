@@ -30,7 +30,8 @@ type t =
     code_ids : int;
     continuations : int;
     function_slots : int;
-    value_slots : int
+    value_slots : int;
+    symbols : int
   }
 
 let save () =
@@ -38,16 +39,19 @@ let save () =
     code_ids = Code_id.export_name_stamp_counter ();
     continuations = Continuation.export_stamp_counter ();
     function_slots = Function_slot.export_stamp_counter ();
-    value_slots = Value_slot.export_stamp_counter ()
+    value_slots = Value_slot.export_stamp_counter ();
+    symbols = Symbol.export_manufacture_counter ()
   }
 
 let restore_for_resume
-    { variables; code_ids; continuations; function_slots; value_slots } =
+    { variables; code_ids; continuations; function_slots; value_slots; symbols }
+    =
   Variable.restore_name_stamp_counter variables;
   Code_id.restore_name_stamp_counter code_ids;
   Continuation.restore_stamp_counter continuations;
   Function_slot.restore_stamp_counter function_slots;
-  Value_slot.restore_stamp_counter value_slots
+  Value_slot.restore_stamp_counter value_slots;
+  Symbol.restore_manufacture_counter symbols
 
 (* CR mvellacott: instead of taking the maximum, consider keeping separate
    per-unit stamp counters. *)
@@ -59,22 +63,26 @@ let restore_for_merge all_counters =
           code_ids = max acc.code_ids counters.code_ids;
           continuations = max acc.continuations counters.continuations;
           function_slots = max acc.function_slots counters.function_slots;
-          value_slots = max acc.value_slots counters.value_slots
+          value_slots = max acc.value_slots counters.value_slots;
+          symbols = max acc.symbols counters.symbols
         })
       { variables = 0;
         code_ids = 0;
         continuations = 0;
         function_slots = 0;
-        value_slots = 0
+        value_slots = 0;
+        symbols = 0
       }
       all_counters
   in
   restore_for_resume max_counters
 
 let any_greater_than
-    { variables; code_ids; continuations; function_slots; value_slots } other =
+    { variables; code_ids; continuations; function_slots; value_slots; symbols }
+    other =
   variables > other.variables
   || code_ids > other.code_ids
   || continuations > other.continuations
   || function_slots > other.function_slots
   || value_slots > other.value_slots
+  || symbols > other.symbols
