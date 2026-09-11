@@ -209,7 +209,13 @@ module Specialisation_site_info : sig
     { names_available_for_hints : Name.Set.t;
           (** Names required without non-normal (phantom or in-types) roots or
               code dependencies. Synthetic value slots may mention these, except
-              variables removed by unboxing. *)
+              variables removed by unboxing. Computed before mutable unboxing,
+              this may include a value whose only runtime use is a field of a
+              block that unboxing removes; a hint mentioning it keeps it alive
+              until the next simplification pass. During speculative inlining
+              this can change the decision (see
+              [specialised_params_stale_hint.fl] and
+              [specialise_lifted_stale_hint.ml]). *)
       live_code_ids : Code_id.Set.t
           (** Code IDs reachable through the recorded normal code and symbol
               dependencies, also inside closures; a site declaring one is kept.

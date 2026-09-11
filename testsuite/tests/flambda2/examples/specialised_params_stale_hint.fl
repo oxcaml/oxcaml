@@ -1,0 +1,72 @@
+(* TEST
+ compile_only = "true";
+ ocamlopt_flags += " -no-flambda2-reaper -dflambda-invariants";
+ ocamlopt_flags += " -flambda2-inline-small-function-size 0";
+ ocamlopt_flags += " -flambda2-inline-large-function-size 100";
+ ocamlopt_flags += " -flambda2-inline-threshold 5";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+*)
+
+(* Known limitation: [names_available_for_hints] is computed before mutable
+   unboxing, so a synthetic slot can keep alive a value whose only runtime use
+   was a field of an unboxed block. The extra simplify pass repairs this in
+   ordinary compilation, but not during speculative inlining, where the kept
+   allocation changes the inlining decision: [caller_hint] still calls
+   [outer_hint], which keeps both allocations, while [caller_control] (the
+   same code without the synthetic slot) reduces to the helper call. The site
+   is the callee so that it stays live; its slot models one for a capture
+   that the called function does not take, as in the source-level test
+   [specialise_lifted_stale_hint.ml]. *)
+
+let code inline(never) size(10) helper (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(30) outer_hint (x : val, b : imm tagged)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let r = %block.mut.[`0`].my_alloc_region (x, captured) in
+  let site = closure specialisation_site helper &my_alloc_region
+    synthetic { unread_slot = captured }
+  in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> load
+    | 1 -> escape
+  where load =
+    let value = %block_load.mut.[`0`] (r) in
+    apply direct(helper &my_alloc_region) site (value) -> k * e
+  where escape = cont k (r)
+in
+let code size(30) caller_hint (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let f = closure outer_hint &my_alloc_region in
+  apply direct(outer_hint &my_alloc_region) f (x, 0) -> k * e
+in
+let code size(30) outer_control (x : val, b : imm tagged)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let r = %block.mut.[`0`].my_alloc_region (x, captured) in
+  let site = closure specialisation_site helper &my_alloc_region in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> load
+    | 1 -> escape
+  where load =
+    let value = %block_load.mut.[`0`] (r) in
+    apply direct(helper &my_alloc_region) site (value) -> k * e
+  where escape = cont k (r)
+in
+let code size(30) caller_control (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let f = closure outer_control &my_alloc_region in
+  apply direct(outer_control &my_alloc_region) f (x, 0) -> k * e
+in
+let $caller_hint = closure caller_hint &toplevel in
+let $caller_control = closure caller_control &toplevel in
+let $camlSpecialised_params_stale_hint =
+  Block 0 ($caller_hint, $caller_control)
+in
+cont done ($camlSpecialised_params_stale_hint)

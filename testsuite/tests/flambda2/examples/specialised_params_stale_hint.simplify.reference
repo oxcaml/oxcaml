@@ -1,0 +1,62 @@
+let code inline(never) size(10)
+      helper (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code outer_hint deleted in
+let code caller_hint deleted in
+let code caller_control deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(helper)
+      helper_1 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code loopify(never) size(29) newer_version_of(outer_hint)
+      outer_hint_1 (x : val, b : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let captured = %block.[`0`].my_alloc_region (x) in
+  let r = %block.mut.[`0`].my_alloc_region (x, captured) in
+  let site =
+    closure specialisation_site helper_1 @helper &my_alloc_region
+      synthetic { unread_slot = captured }
+  in
+  let ub = %untag_imm (b) in
+  switch ub
+    | 0 -> load
+    | 1 -> k (r)
+    where load =
+      let value = %block_load.mut.[`0`] (r) in
+      apply direct(helper_1 &my_alloc_region) site (value) -> k * e
+in
+let $camlSpecialised_params_stale_hint__outer_hint_0 =
+  closure outer_hint_1 @outer_hint &toplevel
+in
+let code loopify(never) size(4) newer_version_of(caller_hint)
+      caller_hint_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  apply direct(outer_hint_1 &my_alloc_region)
+    $camlSpecialised_params_stale_hint__outer_hint_0 (x, 0) -> k * e
+in
+let $caller_hint = closure caller_hint_1 @caller_hint &toplevel in
+let code helper_2 deleted in
+let code helper_3 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(helper_3)
+      helper_4 (x : val) my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code loopify(never) size(4) newer_version_of(caller_control)
+      caller_control_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * e
+        : val =
+  let site = closure specialisation_site helper_4 @helper &my_alloc_region in
+  apply direct(helper_4 &my_alloc_region) inlining_state(depth(10))
+    site (x) -> k * e
+in
+let $caller_control = closure caller_control_1 @caller_control &toplevel in
+let $camlSpecialised_params_stale_hint =
+  Block 0 ($caller_hint, $caller_control)
+in
+cont done ($camlSpecialised_params_stale_hint)
