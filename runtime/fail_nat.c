@@ -18,20 +18,15 @@
 /* Raising exceptions from C. */
 
 #include <stdio.h>
-#include <signal.h>
-#include "caml/alloc.h"
 #include "caml/callback.h"
 #include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/io.h"
-#include "caml/gc.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
 #include "caml/printexc.h"
 #include "caml/signals.h"
-#include "caml/stack.h"
-#include "caml/roots.h"
 #include "caml/callback.h"
 #include "caml/signals.h"
 #include "caml/tsan.h"

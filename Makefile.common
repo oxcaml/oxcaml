@@ -43,6 +43,7 @@ V ?= 0
 ifeq "$(V)" "0"
 
 V_CC         = @$(info $   CC $@)
+V_CXX        = @$(info $   CXX $@)
 V_CCDEPS     = @$(info $   CCDEPS $@)
 V_OCAMLC     = @$(info $   OCAMLC $@)
 V_OCAMLOPT   = @$(info $   OCAMLOPT $@)
@@ -63,6 +64,7 @@ V_ODOC       = @$(info $   ODOC $@)
 else
 
 V_CC         =
+V_CXX        =
 V_CCDEPS     =
 V_OCAMLC     =
 V_OCAMLOPT   =

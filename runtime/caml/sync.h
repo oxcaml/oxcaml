@@ -22,6 +22,7 @@
 
 #include "mlvalues.h"
 #include "platform.h"
+#include "misc.h"
 
 /* OCaml mutexes and condition variables can also be manipulated from
    C code with non-raising primitives from caml/platform.h. In this

@@ -17,6 +17,7 @@
 #define CAML_GC_H
 
 
+#include "config.h"
 #include "mlvalues.h"
 
 /* This depends on the layout of the header.  See [mlvalues.h]. */

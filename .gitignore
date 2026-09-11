@@ -291,6 +291,7 @@ ocaml/primitives.new
 /parsing/camlinternalMenhirLib.mli
 
 /runtime/domain_state.inc
+/runtime/api-testing
 /runtime/caml/m.h
 /runtime/caml/s.h
 /runtime/primitives

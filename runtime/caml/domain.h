@@ -25,6 +25,7 @@
 #include "config.h"
 #include "mlvalues.h"
 #include "domain_state.h"
+#include "misc.h"
 
 #ifdef MULTIDOMAIN
 #ifdef ARCH_SIXTYFOUR
