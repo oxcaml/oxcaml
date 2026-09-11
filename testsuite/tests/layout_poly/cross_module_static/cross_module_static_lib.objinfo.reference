@@ -16,29 +16,29 @@ Apply functions:
 Send functions:
 Force link: no
 Static data:
-  [
+  Cross_module_static_lib/body/0[
     Cross_module_static_lib/id/0;
     Cross_module_static_lib/pair/1;
-    [ (missing); ];
+    (missing);
     Cross_module_static_lib/counted_id/2;
   ]
   (Cross_module_static_lib/counted_id/2
     (closure ⟨env⟩ layout_16 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/335[L] x/326[$layout_16] : $layout_16
+        ⟪(function {nlocal = 0} closure/335 x/326[$layout_16] : $layout_16
            (let (calls/332 =a (mixedfield 0  (*) closure/335))
              (seq (+:=1 calls/332) x/326)))⟫ }))
   (Cross_module_static_lib/id/0
     (closure ⟨env⟩ layout_2 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/333[L] x/318[$layout_2] : $layout_2
+        ⟪(function {nlocal = 0} closure/333 x/318[$layout_2] : $layout_2
            x/318)⟫ }))
   (Cross_module_static_lib/pair/1
     (closure ⟨env⟩ layout_5 layout_7 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/334[L] x/321[$layout_5]
-           y/322[$layout_7] : #($layout_5, $layout_7)
+        ⟪(function {nlocal = 0} closure/334 x/321[$layout_5] y/322[$layout_7]
+           : #($layout_5, $layout_7)
            (make_unboxed_product #($layout_5, $layout_7) x/321 y/322))⟫ }))

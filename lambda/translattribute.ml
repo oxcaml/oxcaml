@@ -308,15 +308,17 @@ let check_opaque_local loc attr =
       ()
 
 
-let lfunction_with_attr ~attr
+let lfunction'_with_attr ~attr
   { kind; params; return; body; attr=_; loc; mode; ret_mode } =
-  lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+  lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+
+let lfunction_with_attr ~attr funct =
+  Lfunction (lfunction'_with_attr ~attr funct)
 
 let add_inline_attribute expr loc attributes =
-  match expr with
-  | Lfunction({ attr = { stub = false } as attr } as funct) ->
-    begin match get_inline_attribute attributes with
-      | Default_inline -> expr
+  let add_inline_attribute funct attr =
+    match get_inline_attribute attributes with
+      | Default_inline -> funct
       | (Always_inline | Available_inline | Never_inline | Unroll _)
           as inline ->
         begin match attr.inline with
@@ -328,8 +330,14 @@ let add_inline_attribute expr loc attributes =
         let attr = { attr with inline } in
         check_local_inline loc attr;
         check_poll_inline loc attr;
-        lfunction_with_attr ~attr funct
-    end
+        lfunction'_with_attr ~attr funct
+  in
+  match expr with
+  | Lfunction({ attr = { stub = false } as attr } as funct) ->
+    Lfunction(add_inline_attribute funct attr)
+  | Ltemplate
+      {tmpl_func = ({ attr = { stub = false } as attr } as funct); tmpl_env } ->
+    Ltemplate{ tmpl_func = add_inline_attribute funct attr; tmpl_env }
   | _ -> expr
 
 let add_specialise_attribute expr loc attributes =

@@ -1046,6 +1046,10 @@ type lambda =
   | Lkindtemplate of lkindtemplate
   (* [Lkindinstantiate] should only exist in the tlambda stage. *)
   | Lkindinstantiate of lkindinstantiate
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of ltemplate
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1123,6 +1127,11 @@ and lkindinstantiate =
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
+  }
+
+and ltemplate =
+  { tmpl_func: lfunction;
+    tmpl_env: (lambda * layout) Ident.Map.t;
   }
 
 and lambda_while =
@@ -1305,6 +1314,7 @@ val layout_int : layout
 val layout_array : array_kind -> layout
 val layout_block : layout
 val layout_list : layout
+val layout_extensible_variant_constructor : layout
 val layout_exception : layout
 val layout_function : layout
 val layout_object : layout
@@ -1497,6 +1507,17 @@ val map : (lambda -> lambda) -> lambda -> lambda
 
 val map_lfunction : (lambda -> lambda) -> lfunction -> lfunction
   (** Apply the given transformation on the function's body *)
+
+val extract_free_var_env :
+  layout_of_ident:(Ident.t -> layout option) ->
+  lfunction ->
+  lfunction * (lambda * layout) Ident.Map.t
+(** [extract_free_var_env ~layout_of_ident lfun] computes an environment for the
+    provided function by renaming the free variables of [lfun] to fresh idents,
+    and returning the freshened function together with the mapping from new
+    idents to (lambda that evaluates to) the old idents.
+    Free variables for which [layout_of_ident] returns [None] are not
+    freshened. *)
 
 val shallow_map  :
   tail:(lambda -> lambda) ->

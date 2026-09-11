@@ -61,7 +61,7 @@ module Mode_axis_pair = struct
     | Left Refl -> Atom (Comonadic Areality, Const.locality_as_regionality a)
     | Right ax -> Atom (ax, a)
 
-  let of_string s : t =
+  let of_string ~loc s : t =
     let comonadic (type a) (ax : a Alloc.Comonadic.Axis.t) (a : a) : t =
       Atom (Comonadic ax, a)
     in
@@ -96,7 +96,10 @@ module Mode_axis_pair = struct
     | "read" -> monadic Visibility Read
     | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
-    | "static" -> monadic Staticity Static
+    | "static" ->
+      Language_extension.assert_enabled ~loc Layout_poly
+        Language_extension.Alpha;
+      monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
     | _ -> raise Not_found
 end
@@ -104,9 +107,9 @@ end
 module Modality_axis_pair = struct
   type t = Modality.atom
 
-  let of_string s : t =
+  let of_string ~loc s : t =
     match[@warning "-18"]
-      Mode_axis_pair.to_value (Mode_axis_pair.of_string s)
+      Mode_axis_pair.to_value (Mode_axis_pair.of_string ~loc s)
     with
     | Atom (Monadic ax, mode) -> Atom (Monadic ax, Join_const mode)
     | Atom (Comonadic ax, mode) -> Atom (Comonadic ax, Meet_const mode)
@@ -246,7 +249,7 @@ let transl_mode_annots annots =
     List.map
       (fun { txt = Parsetree.Mode txt; loc } ->
         Language_extension.assert_enabled ~loc Mode Language_extension.Stable;
-        try { txt = Mode_axis_pair.of_string txt; loc }
+        try { txt = Mode_axis_pair.of_string ~loc txt; loc }
         with Not_found ->
           raise (Error (loc, Unrecognized_modifier (Mode, txt))))
       annots
@@ -278,7 +281,7 @@ let mode_annot_to_modality_annot mode_annot =
 let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
   Language_extension.assert_enabled ~loc Mode maturity;
   let mode =
-    try Mode_axis_pair.(of_string modality)
+    try Mode_axis_pair.(of_string ~loc modality)
     with Not_found ->
       raise (Error (loc, Unrecognized_modifier (Modality, modality)))
   in
@@ -526,7 +529,7 @@ let transl_with_bound_modifiers annots =
     List.fold_left
       (fun (modal_annots, externality)
            ({ txt = Parsetree.Modality modality; loc } as annot) ->
-        match Modality_axis_pair.of_string modality with
+        match Modality_axis_pair.of_string ~loc modality with
         | Atom (_, _) -> annot :: modal_annots, externality
         | exception Not_found -> (
           match Nonmodal_axis_pair.of_string modality with
@@ -635,7 +638,7 @@ let transl_mod_bounds ?(warn = true) annots =
   let nonmodal, base_modality, modal_atoms =
     List.fold_left
       (fun (nonmodal, base, atoms, seen_ev) { txt = Parsetree.Mode txt; loc } ->
-        match Modality_axis_pair.of_string txt with
+        match Modality_axis_pair.of_string ~loc txt with
         | Atom (_, _) as atom ->
           if (seen_ev && not (is_staticity atom)) || has_modal_axis atom atoms
           then raise_dup_modal loc atom;
@@ -794,8 +797,8 @@ let () =
 module Modifier_axis_pair = struct
   type t = P : 'a Jkind_axis.Axis.t * 'a -> t
 
-  let of_string s =
-    match Modality_axis_pair.of_string s with
+  let of_string ~loc s =
+    match Modality_axis_pair.of_string ~loc s with
     | Atom (Monadic axis, modality) ->
       P (Modal (Monadic axis), Modality modality)
     | Atom (Comonadic axis, modality) ->

@@ -136,7 +136,7 @@ let get_jkind_abbrev_doc (abbrev : Longident.t) =
      }
     : syntax_info)
 
-let get_mod_bound_doc mod_bound =
+let get_mod_bound_doc ~loc mod_bound =
   let open Option.Infix in
   let open struct
     type parse_result =
@@ -144,7 +144,7 @@ let get_mod_bound_doc mod_bound =
       | Everything
   end in
   let* parsed =
-    match Typemode.Modifier_axis_pair.of_string mod_bound with
+    match Typemode.Modifier_axis_pair.of_string ~loc mod_bound with
     | exception Not_found -> (
       match mod_bound with
       | "everything" -> Some Everything
@@ -676,7 +676,8 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
       get_modality_doc modality
     | _ -> get_modality_doc modality)
   (* Jkinds *)
-  | Mod_bound { txt = Mode mod_bound; _ } :: _ -> get_mod_bound_doc mod_bound
+  | Mod_bound { txt = Mode mod_bound; loc } :: _ ->
+    get_mod_bound_doc ~loc mod_bound
   | Scannable_axis_annotation { txt = annot; _ } :: _ ->
     get_scannable_axis_annotation_doc annot
   | Jkind_annotation { pjka_desc = Pjk_abbreviation abbrev; _ } :: _ ->

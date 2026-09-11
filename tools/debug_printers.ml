@@ -3,6 +3,7 @@ let type_set : _ Format_doc.format_printer = Btype.TypeSet.debug_print
 let row_field : _ Format_doc.format_printer = Rawprinttyp.row_field
 let row_desc : _ Format_doc.format_printer = Rawprinttyp.row_desc
 let ident : _ Format_doc.format_printer = Format_doc.compat Ident.print_with_scope
+let slambdaident : _ Format_doc.format_printer = Slambdaident.print
 let path : _ Format_doc.format_printer = Format_doc.compat Path.print
 let ctype_global_state : _ Format_doc.format_printer = Ctype.print_global_state
 let sort : _ Format_doc.format_printer = Jkind.Sort.Debug_printers.t
