@@ -22,6 +22,7 @@ type result =
     continuation_info : Traverse_acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     code_references : Traverse_acc.code_reference list;
+    rebuild_queries : Rebuild_queries.Requests.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
     closure_function_decls :

@@ -26,11 +26,13 @@ module Staged = struct
     type t =
       { code_deps : Traverse_acc.code_dep Code_id.Map.t;
         code_references : Traverse_acc.code_reference list;
+        rebuild_queries : Rebuild_queries.Requests.t;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
 
-    let ids_for_export { code_deps; code_references; all_sets_of_closures } =
+    let ids_for_export
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures } =
       let ids =
         Code_id.Map.fold
           (fun code_id code_dep ids ->
@@ -51,13 +53,16 @@ module Staged = struct
               set_of_closures ids)
           ids all_sets_of_closures
       in
-      Ids_for_export.union ids
-        (Traverse_acc.ids_for_export_code_references code_references)
+      Ids_for_export.union_list
+        [ ids;
+          Traverse_acc.ids_for_export_code_references code_references;
+          Rebuild_queries.Requests.ids_for_export rebuild_queries ]
 
     let referenced_compilation_units t =
       Traverse_acc.code_references_compilation_units t.code_references
 
-    let apply_renaming { code_deps; code_references; all_sets_of_closures }
+    let apply_renaming
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
         renaming =
       let code_deps =
         Code_id.Map.fold
@@ -78,7 +83,10 @@ module Staged = struct
       let code_references =
         Traverse_acc.apply_renaming_code_references code_references renaming
       in
-      { code_deps; code_references; all_sets_of_closures }
+      let rebuild_queries =
+        Rebuild_queries.Requests.apply_renaming rebuild_queries renaming
+      in
+      { code_deps; code_references; rebuild_queries; all_sets_of_closures }
 
     let map_result_types t ~f =
       (* The code metadata stored in [code_deps] is the only part of the solve
@@ -192,6 +200,7 @@ module Staged = struct
             continuation_info;
             code_deps;
             code_references;
+            rebuild_queries;
             all_sets_of_closures;
             closure_function_decls
           } =
@@ -203,7 +212,8 @@ module Staged = struct
         ~get_code_metadata:(get_code_metadata ~cmx_loader ~all_code)
     in
     let solve_inputs =
-      Solve_inputs.{ code_deps; code_references; all_sets_of_closures }
+      Solve_inputs.
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
     in
     let rebuild_data =
       { Traverse_rebuild.toplevel_expr;

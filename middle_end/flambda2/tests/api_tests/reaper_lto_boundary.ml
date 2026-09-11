@@ -8,6 +8,9 @@ open Flambda2_reaper
 module Acc = Traverse_acc
 module Graph = Global_flow_graph
 module Solve_inputs = Reaper.Staged.Solve_inputs
+module Queries = Rebuild_queries
+module Requests = Queries.Requests
+module PTA = Points_to_analysis
 
 let unit_a = Compilation_unit.of_string "Reaper_boundary_a"
 
@@ -41,7 +44,12 @@ let graph acc = Acc.deps acc ~all_constants:(Name.var (var "all_constants"))
 
 let link_and_solve graph ~code_deps ~code_references ~analysis_scope =
   let solve_inputs =
-    Solve_inputs.{ code_deps; code_references; all_sets_of_closures = [] }
+    Solve_inputs.
+      { code_deps;
+        code_references;
+        rebuild_queries = Requests.empty;
+        all_sets_of_closures = []
+      }
   in
   let solution, _ =
     Reaper.Staged.solve ~slot_offsets_inputs:Slot_offsets_analysis.Inputs.empty
@@ -337,6 +345,7 @@ let test_foreign_closure entry_point =
     Solve_inputs.
       { code_deps = Code_id.Map.empty;
         code_references;
+        rebuild_queries = Requests.empty;
         all_sets_of_closures = []
       }
   in
@@ -455,6 +464,7 @@ let test_graph_renaming_and_union () =
     Solve_inputs.
       { code_deps = Code_id.Map.empty;
         code_references;
+        rebuild_queries = Requests.empty;
         all_sets_of_closures = []
       }
   in
@@ -516,6 +526,219 @@ let test_graph_renaming_and_union () =
     not (Analysis.any_source result (Code_id_or_name.var closure_code_witness)));
   assert (not (Analysis.has_use result (Code_id_or_name.var closure)))
 
+let rebuild_apply callee call_kind widths =
+  let args_arity =
+    let open Flambda_arity.Component_for_creation in
+    Flambda_arity.create
+      (List.map
+         (fun width ->
+           Unboxed_product
+             (List.init width (fun _ ->
+                  Singleton Flambda_kind.With_subkind.any_value)))
+         widths)
+  in
+  Flambda.Apply.create ~callee ~continuation:Never_returns
+    (Exn_continuation.create ~exn_handler:(Continuation.create ())
+       ~extra_args:[])
+    ~args:
+      (List.init (Flambda_arity.cardinal_unarized args_arity) (fun _ ->
+           Simple.var (var "arg")))
+    ~args_arity ~return_arity:Flambda_arity.nullary ~call_kind
+    ~return_mode:
+      (Alloc_mode.For_applications.not_alloc_stack
+         ~alloc_region:(Variable.create "alloc_region" Flambda_kind.region))
+    Debuginfo.none ~inlined:Default_inlined
+    ~inlining_state:(Inlining_state.default ~round:0)
+    ~probe:None ~position:Normal
+    ~relative_history:Inlining_history.Relative.empty
+
+let test_rebuild_queries () =
+  set_current_unit unit_b;
+  let absent = Name.var (var "absent_callee") in
+  set_current_unit unit_a;
+  let top = Name.var (var "top_callee") in
+  let precise = Name.var (var "precise_callee") in
+  let callees = [absent; top; precise] in
+  let acc = Acc.create () in
+  let target = code_id unit_a "query_target" in
+  ignore (interface acc target);
+  Acc.add_set_of_closures_dep acc precise ~closure_code_id:target
+    ~only_full_applications:false ~defined_in_code_id:None;
+  List.iter
+    (fun (callee, entry_point) ->
+      let witness, _, _ = call acc in
+      Acc.add_accessor_dep acc
+        ~base:(Code_id_or_name.name callee)
+        entry_point ~to_:witness)
+    [ precise, Field.known_arity_call_witness;
+      precise, Field.unknown_arity_call_witness;
+      top, Field.known_arity_call_witness ];
+  Acc.add_any_source acc (Code_id_or_name.name top);
+  let known = Call_kind.indirect_function_call_known_arity ~code_ids:Unknown in
+  let unknown = Call_kind.indirect_function_call_unknown_arity in
+  let add requests callee kind widths =
+    Requests.add_apply requests
+      (rebuild_apply (Some (Simple.name callee)) kind widths)
+  in
+  let requests =
+    List.fold_left
+      (fun requests callee ->
+        let left = add Requests.empty callee known [3] in
+        let left = add left callee unknown [1; 0; 2] in
+        let right = add Requests.empty callee known [1] in
+        let right = add right callee unknown [2; 0; 1; 1] in
+        Requests.union requests (Requests.union left right))
+      Requests.empty callees
+  in
+  let graph = graph acc in
+  let solve graph =
+    Analysis.fixpoint graph ~analysis_scope:(Lto_participants lto_participants)
+  in
+  let analysis = solve graph in
+  let summary = Queries.create analysis.db ~requests in
+  let known_args = [0; 1; 2] in
+  let unknown_args = [[0; 1]; []; [2; 3]; [4]] in
+  let check summary db renaming =
+    List.iter
+      (fun callee ->
+        let callee = Renaming.apply_name renaming callee in
+        let node = Code_id_or_name.name callee in
+        assert (
+          match
+            ( Queries.code_id_actually_directly_called summary callee,
+              PTA.code_id_actually_directly_called db callee )
+          with
+          | Unknown, Unknown -> true
+          | Known a, Known b -> Code_id.Set.equal a b
+          | Unknown, Known _ | Known _, Unknown -> false);
+        List.iter
+          (fun args ->
+            assert (
+              Queries.arguments_used_by_known_arity_call summary node args
+              = PTA.arguments_used_by_known_arity_call db node args))
+          [[]; [0]; known_args];
+        List.iter
+          (fun args ->
+            assert (
+              Queries.arguments_used_by_unknown_arity_call summary node args
+              = PTA.arguments_used_by_unknown_arity_call db node args))
+          [[]; [[0]]; unknown_args])
+      callees;
+    let ids =
+      Ids_for_export.union
+        (Graph.ids_for_export graph)
+        (Requests.ids_for_export requests)
+    in
+    Variable.Set.iter
+      (fun var ->
+        let node = Code_id_or_name.var (Renaming.apply_variable renaming var) in
+        assert (Queries.has_use summary node = PTA.has_use db node);
+        assert (Queries.has_source summary node = PTA.has_source_query db node);
+        List.iter
+          (fun field ->
+            assert (
+              Queries.field_used summary node field
+              = PTA.field_used db node field))
+          [ Field.known_arity_call_witness;
+            Field.unknown_arity_call_witness;
+            Field.normal_return_of_call 0 ])
+      ids.variables
+  in
+  check summary analysis.db Renaming.empty;
+  assert (
+    Queries.arguments_used_by_known_arity_call summary
+      (Code_id_or_name.name precise)
+      known_args
+    = [0, PTA.Keep; 1, PTA.Delete; 2, PTA.Delete]);
+  assert (
+    Queries.arguments_used_by_unknown_arity_call summary
+      (Code_id_or_name.name precise)
+      unknown_args
+    = [ [0, PTA.Keep; 1, PTA.Delete];
+        [];
+        [2, PTA.Keep; 3, PTA.Keep];
+        [4, PTA.Keep] ]);
+  assert (Code_id.Set.mem target (Queries.ids_for_export summary).code_ids);
+  let inputs =
+    Solve_inputs.
+      { code_deps = Code_id.Map.empty;
+        code_references = [];
+        rebuild_queries = requests;
+        all_sets_of_closures = []
+      }
+  in
+  let request_ids = Requests.ids_for_export requests in
+  assert (
+    Variable.Set.equal request_ids.variables
+      (Solve_inputs.ids_for_export inputs).variables);
+  let ids = Queries.ids_for_export summary in
+  let renaming =
+    Variable.Set.fold
+      (fun v renaming ->
+        Renaming.add_fresh_variable renaming v ~guaranteed_fresh:(var "fresh"))
+      ids.variables Renaming.empty
+  in
+  let inputs : Solve_inputs.t =
+    Marshal.from_string (Marshal.to_string inputs []) 0
+  in
+  let renamed_inputs = Solve_inputs.apply_renaming inputs renaming in
+  assert (
+    Variable.Set.equal
+      (Renaming.apply_variable_set renaming request_ids.variables)
+      (Solve_inputs.ids_for_export renamed_inputs).variables);
+  let renamed_graph =
+    Graph.apply_renaming graph renaming ~rename_field:Fun.id
+  in
+  let renamed_analysis = solve renamed_graph in
+  let renamed_summary =
+    Queries.apply_renaming summary renaming ~rename_field:Fun.id
+  in
+  check renamed_summary renamed_analysis.db renaming;
+  check
+    (Queries.create renamed_analysis.db ~requests:renamed_inputs.rebuild_queries)
+    renamed_analysis.db renaming;
+  let partitions = Queries.partition_by_compilation_unit summary in
+  assert (Compilation_unit.Map.mem unit_a partitions);
+  assert (Compilation_unit.Map.mem unit_b partitions);
+  let reunited =
+    Compilation_unit.Map.fold
+      (fun _ part acc -> Queries.disjoint_union acc part)
+      partitions Queries.empty
+  in
+  check reunited analysis.db Renaming.empty;
+  (* Nullary requests must not disappear, even though their masks are empty. *)
+  let nullary = symbol unit_b "nullary" in
+  let apply = rebuild_apply (Some (Simple.symbol nullary)) known [] in
+  let nullary_acc = Acc.create () in
+  Acc.record_apply_for_rebuild nullary_acc apply;
+  let requests =
+    Requests.union Requests.empty (Acc.rebuild_queries nullary_acc)
+  in
+  let requests = Requests.union requests Requests.empty in
+  assert (Symbol.Set.mem nullary (Requests.ids_for_export requests).symbols);
+  let unit =
+    Flambda_unit.create
+      ~return_continuation:(Continuation.create ~sort:Toplevel_return ())
+      ~exn_continuation:
+        (Exn_continuation.exn_handler (Flambda.Apply.exn_continuation apply))
+      ~toplevel_my_alloc_region:
+        (Alloc_mode.For_applications.alloc_region
+           (Flambda.Apply.return_mode apply))
+      ~body:(Flambda.Expr.create_apply apply)
+      ~module_symbol:(symbol unit_a "query_module")
+  in
+  let traversed = Traverse.run ~closed_world:true unit in
+  assert (
+    Symbol.Set.mem nullary
+      (Requests.ids_for_export traversed.rebuild_queries).symbols);
+  let summary = Queries.create analysis.db ~requests in
+  assert (
+    Queries.arguments_used_by_known_arity_call summary
+      (Code_id_or_name.symbol nullary)
+      []
+    = []);
+  assert (not (Queries.has_use Queries.empty (Code_id_or_name.symbol nullary)))
+
 let () =
   Oxcaml_flags.Flambda2.reaper_unbox := Oxcaml_flags.Set false;
   Oxcaml_flags.Flambda2.reaper_change_calling_conventions
@@ -535,4 +758,5 @@ let () =
       Field.function_slot
         (Function_slot.create unit ~name ~is_always_immediate:false
            Flambda_kind.value));
-  test_graph_renaming_and_union ()
+  test_graph_renaming_and_union ();
+  test_rebuild_queries ()

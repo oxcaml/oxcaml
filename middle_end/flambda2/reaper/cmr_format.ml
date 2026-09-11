@@ -280,6 +280,9 @@ type error =
 
 exception Error of error
 
+(* Version the staged payload independently of the compiler's other formats. *)
+let payload_version = 1
+
 let save ~filename ~used_value_slots t =
   let serialisable = Serialisable.create ~used_value_slots t in
   (* We need to store ID stamp counters so that stamp-based identifiers in the
@@ -289,6 +292,7 @@ let save ~filename ~used_value_slots t =
   Misc.try_finally
     (fun () ->
       output_string oc Config.cmr_magic_number;
+      output_binary_int oc payload_version;
       output_value oc (serialisable, id_stamp_counters))
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
@@ -302,7 +306,11 @@ let load filename =
       let buffer = really_input_string ic (String.length magic) in
       if String.equal buffer magic
       then
-        try (input_value ic : Serialisable.t * Id_stamp_counters.t) with
+        try
+          if input_binary_int ic <> payload_version
+          then raise (Error (Wrong_version filename));
+          (input_value ic : Serialisable.t * Id_stamp_counters.t)
+        with
         | End_of_file | Failure _ -> raise (Error (Corrupted filename))
         | Error e -> raise (Error e)
       else if String.starts_with ~prefix:format_code buffer
