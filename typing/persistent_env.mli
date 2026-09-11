@@ -140,6 +140,11 @@ val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> loc:Location.t -> Global_module.Name.t -> unit
 
+(* Locate the .cmi for [name], without reading it, and attach the path found
+   to [name]'s head. For references that never load the interface, such as
+   module aliases under -no-alias-deps. *)
+val with_located_cmi_path : 'a t -> Global_module.Name.t -> Global_module.Name.t
+
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
    been imported as a non-parameter. *)

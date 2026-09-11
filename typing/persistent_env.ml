@@ -1078,6 +1078,23 @@ let check ~allow_hidden penv f ~loc name =
         (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
   end
 
+let with_located_cmi_path penv (name : Global_module.Name.t) =
+  let intf = CUI.Found.intf name.head in
+  let cmi_path =
+    match find_import_info_in_cache penv intf with
+    | Some import -> Some import.imp_filename
+    | None ->
+      match
+        Load_path.find_normalized_with_visibility ~allow_hidden:false
+          (CUI.to_string intf ^ ".cmi")
+      with
+      | filename, Visible _ -> Some filename
+      | _, Hidden | exception Not_found -> None
+  in
+  match cmi_path with
+  | Some cmi_path -> Global_module.Name.with_head_cmi_path name cmi_path
+  | None -> name
+
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
   | Some (_impl, crc) -> crc
