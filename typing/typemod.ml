@@ -3648,8 +3648,6 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         | Pmod_ident l -> Includemod.Named_leftmost_functor l.txt
         | _ -> Includemod.Anonymous_functor
       in
-      (* In Merlin, we can recover because we can synthesize an
-         artificial module with a typed hole. *)
       Typing_recovery.log_and_raise
         (Includemod.Apply_error {loc=apply_loc;env;app_name;mty_f;args})
 
