@@ -1647,6 +1647,13 @@ let emit_nop b n =
   done;
   emit_single_nop b (n mod 15)
 
+(* The value of a subterm of a [Delta_uleb128] constant expression.  [Const] is
+   a section-independent value; [Offset_in_section] is an offset in bytes from
+   the start of the given section. *)
+type evaluated_constant =
+  | Section_independent of Int64.t
+  | Offset_in_section of Section_name.t * Int64.t
+
 let assemble_line b loc ins =
   try
     match ins with
@@ -1714,9 +1721,11 @@ let assemble_line b loc ins =
             buf_int8 b 0
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Delta_uleb128 { delta }) -> (
-      (* ULEB128 difference of two points in the same section: either two
-         labels, or a label plus a constant offset and a symbol. *)
+    | Directive (D.Delta_uleb128 { delta }) ->
+      (* An assembly-time constant expression over labels and symbols, e.g. the
+         difference of two points in the same section.  Evaluated with the
+         sections of the operands tracked, so that only differences within a
+         single section (which are link-time invariant) are accepted. *)
       let resolve name =
         let local =
           match String.Tbl.find b.labels name with
@@ -1735,34 +1744,75 @@ let assemble_line b loc ins =
                    defined in any assembled section"
                   name)
       in
-      let emit_delta ~upper ~upper_offset ~lower =
-        let sec_u, pos_u = resolve upper in
-        let sec_l, pos_l = resolve lower in
-        if not (Section_name.equal sec_u sec_l) then
-          Misc.fatal_error
-            "x86_binary_emitter: Delta_uleb128 operands in different \
-             sections";
-        let delta =
-          Int64.add (Int64.of_int (pos_u - pos_l)) upper_offset
-        in
-        if Int64.compare delta 0L < 0 then
-          Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
-        D.emit_uleb128 b.buf delta
+      let invalid fmt =
+        Misc.fatal_errorf
+          ("x86_binary_emitter: invalid Delta_uleb128 expression %a: " ^^ fmt)
+          C.print_debug delta
       in
-      match delta with
-      | C.Sub (C.Label upper, C.Label lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
-            ~lower:(Asm_label.encode lower)
-      | C.Sub (C.Label upper, C.Symbol lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
-            ~lower:(Asm_symbol.encode lower)
-      | C.Sub (C.Add (C.Label upper, C.Signed_int upper_offset),
-               C.Symbol lower) ->
-          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset
-            ~lower:(Asm_symbol.encode lower)
-      | C.Signed_int _ | C.Unsigned_int _ | C.This | C.Label _ | C.Symbol _
-      | C.Variable _ | C.Add _ | C.Sub _ ->
-          Misc.fatal_error "x86_binary_emitter: malformed Delta_uleb128")
+      let rec eval (c : C.t) =
+        match c with
+        | C.Signed_int i -> Section_independent i
+        | C.Unsigned_int u ->
+            Section_independent (Numbers.Uint64.to_int64_checked u)
+        | C.Label lbl ->
+            let sec, pos = resolve (Asm_label.encode lbl) in
+            Offset_in_section (sec, Int64.of_int pos)
+        | C.Symbol sym ->
+            let sec, pos = resolve (Asm_symbol.encode sym) in
+            Offset_in_section (sec, Int64.of_int pos)
+        | C.Add (c1, c2) ->
+            eval_binary ~op:Numbers.Int64.add_exn
+              ~const_op_offset:(fun i sec pos ->
+                Offset_in_section (sec, Numbers.Int64.add_exn i pos))
+              ~offset_op_offset:(fun sec1 _ sec2 _ ->
+                invalid "cannot add offsets in sections %s and %s"
+                  (Section_name.to_string sec1)
+                  (Section_name.to_string sec2))
+              c1 c2
+        | C.Sub (c1, c2) ->
+            eval_binary ~op:Numbers.Int64.sub_exn
+              ~const_op_offset:(fun _ sec _ ->
+                invalid
+                  "cannot subtract an offset in section %s from a constant"
+                  (Section_name.to_string sec))
+              ~offset_op_offset:(fun sec1 pos1 sec2 pos2 ->
+                (* Only a difference within one section is link-time
+                   invariant. *)
+                if Section_name.equal sec1 sec2 then
+                  Section_independent (Numbers.Int64.sub_exn pos1 pos2)
+                else
+                  invalid
+                    "cannot subtract offsets in the different sections %s and \
+                     %s"
+                    (Section_name.to_string sec1)
+                    (Section_name.to_string sec2))
+              c1 c2
+        | C.This -> invalid "[This] is not supported"
+        | C.Variable name -> invalid "the variable %s is not supported" name
+      (* [Add] and [Sub] agree on the handling of two constants, and of an
+         offset adjusted by a constant; they differ only on a constant combined
+         with an offset on the right, and on two offsets. *)
+      and eval_binary ~op ~const_op_offset ~offset_op_offset c1 c2 =
+        match eval c1, eval c2 with
+        | Section_independent i1, Section_independent i2 ->
+            Section_independent (op i1 i2)
+        | Offset_in_section (sec, pos), Section_independent i ->
+            Offset_in_section (sec, op pos i)
+        | Section_independent i, Offset_in_section (sec, pos) ->
+            const_op_offset i sec pos
+        | Offset_in_section (sec1, pos1), Offset_in_section (sec2, pos2) ->
+            offset_op_offset sec1 pos1 sec2 pos2
+      in
+      (match eval delta with
+      | Section_independent value ->
+          if Int64.compare value 0L < 0 then
+            invalid "evaluates to the negative value %Ld" value;
+          D.emit_uleb128 b.buf value
+      | Offset_in_section (sec, pos) ->
+          invalid
+            "evaluates to offset %Ld in section %s, which is not a \
+             link-time-invariant constant"
+            pos (Section_name.to_string sec))
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;

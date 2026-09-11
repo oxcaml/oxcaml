@@ -156,6 +156,21 @@ module Directive = struct
 
     let print_using_decimals = print_aux ~force_decimal:true
 
+    (* Unlike [print], this does not depend on the assembler in use, so it is
+       suitable for error messages. *)
+    let rec print_debug ppf t =
+      match t with
+      | Signed_int n -> Format.fprintf ppf "%Ld" n
+      | Unsigned_int n -> Format.fprintf ppf "0x%Lx" (Uint64.to_int64 n)
+      | This -> Format.pp_print_string ppf "<this>"
+      | Label lbl -> Format.pp_print_string ppf (Asm_label.encode lbl)
+      | Symbol sym -> Format.pp_print_string ppf (Asm_symbol.encode sym)
+      | Variable name -> Format.fprintf ppf "<variable %s>" name
+      | Add (c1, c2) ->
+        Format.fprintf ppf "(%a + %a)" print_debug c1 print_debug c2
+      | Sub (c1, c2) ->
+        Format.fprintf ppf "(%a - %a)" print_debug c1 print_debug c2
+
     let rec eval ~this ~lookup_label ~lookup_symbol ~lookup_variable t =
       match t with
       | Signed_int n -> Some n
