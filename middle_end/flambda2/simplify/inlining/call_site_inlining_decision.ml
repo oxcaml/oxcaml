@@ -135,8 +135,23 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     let roots = UA.roots_for_lifted_constant_costs uacc in
     (* These definitions have not been placed, so their creation costs have not
        been charged to [uacc]. Existing code and discarded specialisations are
-       excluded. Symbol-projection costs and unused slots of ordinary lifted
-       closures still follow the existing lifted-constant tracking policy. *)
+       excluded. *)
+    (* CR-someday bclement: Ideally we would simply call
+       [place_lifted_constants] in [after_rebuild] above so that we can share
+       the code with the non-speculative inlining code path; however, that
+       function expects to be called at toplevel and there could be unintended
+       consequences -- notably regarding the validity of the used value slots.
+
+       At the time of writing, this means that we incorrectly:
+
+       - Ignore the size of the symbol projections created during speculative
+       inlining;
+
+       - Count the size of unused value slots of lifted sets of closures
+       created during speculative inlining (but again, it is not clear that it
+       is always possible to compute a correct set of "used value slots" at
+       the time we are doing speculative inlining, because some value slots
+       could be used later in the compilation unit). *)
     Lifted_constant_state.cost_metrics (UA.lifted_constants uacc) ~roots
   in
   Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants

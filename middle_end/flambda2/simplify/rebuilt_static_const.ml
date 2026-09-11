@@ -69,6 +69,9 @@ let cost_metrics t =
     cost_metrics
 
 let cost_metrics_for_inlining t =
+  (* Creation of specialised code must always be charged. Other static constants
+     historically had zero cost; their existing flag controls the progressive
+     rollout of accounting for them during speculative inlining. *)
   if
     is_code t
     || Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()

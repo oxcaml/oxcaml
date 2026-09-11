@@ -655,9 +655,10 @@ let () =
   different "missing specialised parameters" base missing;
   different "missing one specialised parameter" base missing_one;
   different "swapped specialised parameters" base swapped;
-  different "ordinary versus synthetic slots" ordinary missing;
+  different "ordinary versus synthetic slots" ordinary (unmark_site missing);
   equivalent "alpha-renamed parameters and slots" base renamed;
   equivalent "reordered annotation entries" base reordered;
+  different "specialisation-site marker" (unmark_site base) base;
   different "empty specialisation-site marker" empty empty_site;
   equivalent "reordered equal-valued slots" duplicate_values
     duplicate_values_reordered;
@@ -728,6 +729,7 @@ let () =
   check_approximant_both_directions "missing annotation" missing base;
   check_approximant_both_directions "missing one annotation" missing_one base;
   check_approximant_both_directions "swapped annotations" base swapped;
+  check_approximant_both_directions "marker difference" (unmark_site base) base;
   check_approximant_both_directions "empty marker difference" empty empty_site;
   check_approximant_both_directions "equal-valued slot approximant" missing_one
     duplicate_values_reordered;
