@@ -201,10 +201,16 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
         index_file;
       let external_locs =
         try
+          (* TODO: partial results when some stores are outdated or missing. *)
+
           let external_index = Index_cache.read index_file in
           Index_format.Uid_map.find_opt uid external_index.defs
           |> Option.map ~f:(fun uid_locs -> (external_index, uid_locs))
-        with Index_format.Not_an_index _ | Sys_error _ ->
+        with
+        | Index_format.Not_an_index _
+        | Sys_error _
+        | Granular_marshal.Outdated_store _
+        ->
           log ~title "Could not load index %s" index_file;
           None
       in
@@ -255,21 +261,26 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
 let lookup_related_uids_in_indexes ~(config : Mconfig.t) uid =
   let title = "lookup_related_uids_in_indexes" in
   let open Index_format in
-  let related_uids =
-    List.fold_left ~init:(Uid_map.empty ()) config.merlin.index_files
-      ~f:(fun acc index_file ->
+  let store, related_uids =
+    List.fold_left
+      ~init:(Uid_map.empty (), Uid_map.empty ())
+      config.merlin.index_files
+      ~f:(fun (store, acc) index_file ->
         try
           let index = Index_cache.read index_file in
-          Uid_map.union
-            (fun _ a b -> Some (Union_find.union a b))
-            index.related_uids acc
-        with Index_format.Not_an_index _ | Sys_error _ ->
+          Union_find.merge_union store index.related_uids
+            index.related_uids_store acc
+        with
+        | Index_format.Not_an_index _
+        | Sys_error _
+        | Granular_marshal.Outdated_store _
+        ->
           log ~title "Could not load index %s" index_file;
-          acc)
+          (store, acc))
   in
   Uid_map.find_opt uid related_uids
   |> Option.value_map ~default:[] ~f:(fun x ->
-      x |> Union_find.get |> Uid_set.to_list)
+      x |> Union_find.get store |> Uid_set.elements)
 
 let find_linked_uids ~config ~scope ~name uid =
   let title = "find_linked_uids" in
