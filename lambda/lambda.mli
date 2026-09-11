@@ -440,34 +440,6 @@ type primitive =
   | Patomic_land_idx
   | Patomic_lor_idx
   | Patomic_lxor_idx
-  | Patomic_load_ptr of { layout : layout }
-  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ptr
-  | Patomic_add_ptr
-  | Patomic_sub_ptr
-  | Patomic_land_ptr
-  | Patomic_lor_ptr
-  | Patomic_lxor_ptr
-  | Patomic_load_ext_ptr of { layout : layout }
-  | Patomic_set_ext_ptr of { layout : layout; mode : modify_mode }
-  | Patomic_exchange_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_exchange_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_compare_set_ext_ptr of
-    { layout : layout; mode : modify_mode }
-  | Patomic_fetch_add_ext_ptr
-  | Patomic_add_ext_ptr
-  | Patomic_sub_ext_ptr
-  | Patomic_land_ext_ptr
-  | Patomic_lor_ext_ptr
-  | Patomic_lxor_ext_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
