@@ -284,6 +284,7 @@ module type Sort = sig
 
   val undo_change : change -> unit
 
+  (** Create a new sort variable with the given level. *)
   val new_var : level:int -> var
 
   (** Create a generic sort variable. *)

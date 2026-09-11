@@ -694,9 +694,11 @@ end
 [%%expect {|
 module type A = sig val x : int end
 module type B = sig val x : int end
->> Fatal error: Jkind_types.generalize_with: nested generalize
-Uncaught exception: Misc.Fatal_error
-
+module type T = sig val poly_ f : (module B) -> (module B) -> 'b end
+|}, Principal{|
+module type A = sig val x : int end
+module type B = sig val x : int end
+module type T = sig val poly_ f : (module A) -> (module B) -> 'b end
 |}]
 
 (** Classes and objects **)
@@ -705,7 +707,8 @@ module type Class = module type of struct
   class c = let poly_ id x = x in object end
 end
 [%%expect {|
->> Fatal error: Jkind_types.instance_var: free genvar
-Uncaught exception: Misc.Fatal_error
-
+Line 4, characters 12-30:
+4 |   class c = let poly_ id x = x in object end
+                ^^^^^^^^^^^^^^^^^^
+Error: Defining layout-polymorphic values is not yet supported in classes.
 |}]
