@@ -1647,6 +1647,13 @@ let emit_nop b n =
   done;
   emit_single_nop b (n mod 15)
 
+(* The value of a subterm of a [Delta_uleb128] constant expression.  [Const] is
+   a section-independent value; [Offset_in_section] is an offset in bytes from
+   the start of the given section. *)
+type evaluated_constant =
+  | Section_independent of Int64.t
+  | Offset_in_section of Section_name.t * Int64.t
+
 let assemble_line b loc ins =
   try
     match ins with
@@ -1737,54 +1744,75 @@ let assemble_line b loc ins =
                    defined in any assembled section"
                   name)
       in
-      (* [`Const] is a section-independent value; [`In_section] is a position
-         within the given section. *)
+      let invalid fmt =
+        Misc.fatal_errorf
+          ("x86_binary_emitter: invalid Delta_uleb128 expression %a: " ^^ fmt)
+          C.print_debug delta
+      in
       let rec eval (c : C.t) =
         match c with
-        | C.Signed_int i -> `Const i
-        | C.Unsigned_int u -> `Const (Numbers.Uint64.to_int64 u)
+        | C.Signed_int i -> Section_independent i
+        | C.Unsigned_int u ->
+            Section_independent (Numbers.Uint64.to_int64_checked u)
         | C.Label lbl ->
             let sec, pos = resolve (Asm_label.encode lbl) in
-            `In_section (sec, Int64.of_int pos)
+            Offset_in_section (sec, Int64.of_int pos)
         | C.Symbol sym ->
             let sec, pos = resolve (Asm_symbol.encode sym) in
-            `In_section (sec, Int64.of_int pos)
-        | C.Add (c1, c2) -> (
-            match eval c1, eval c2 with
-            | `Const i1, `Const i2 -> `Const (Int64.add i1 i2)
-            | `In_section (sec, pos), `Const i
-            | `Const i, `In_section (sec, pos) ->
-                `In_section (sec, Int64.add pos i)
-            | `In_section _, `In_section _ ->
-                Misc.fatal_error
-                  "x86_binary_emitter: Delta_uleb128 adds two addresses")
-        | C.Sub (c1, c2) -> (
-            match eval c1, eval c2 with
-            | `Const i1, `Const i2 -> `Const (Int64.sub i1 i2)
-            | `In_section (sec, pos), `Const i ->
-                `In_section (sec, Int64.sub pos i)
-            | `In_section (sec1, pos1), `In_section (sec2, pos2) ->
-                if not (Section_name.equal sec1 sec2) then
-                  Misc.fatal_error
-                    "x86_binary_emitter: Delta_uleb128 operands in different \
-                     sections";
-                `Const (Int64.sub pos1 pos2)
-            | `Const _, `In_section _ ->
-                Misc.fatal_error
-                  "x86_binary_emitter: Delta_uleb128 subtracts an address \
-                   from a constant")
-        | C.This | C.Variable _ ->
-            Misc.fatal_error "x86_binary_emitter: malformed Delta_uleb128"
+            Offset_in_section (sec, Int64.of_int pos)
+        | C.Add (c1, c2) ->
+            eval_binary ~op:Numbers.Int64.add_exn
+              ~const_op_offset:(fun i sec pos ->
+                Offset_in_section (sec, Numbers.Int64.add_exn i pos))
+              ~offset_op_offset:(fun sec1 _ sec2 _ ->
+                invalid "cannot add offsets in sections %s and %s"
+                  (Section_name.to_string sec1)
+                  (Section_name.to_string sec2))
+              c1 c2
+        | C.Sub (c1, c2) ->
+            eval_binary ~op:Numbers.Int64.sub_exn
+              ~const_op_offset:(fun _ sec _ ->
+                invalid
+                  "cannot subtract an offset in section %s from a constant"
+                  (Section_name.to_string sec))
+              ~offset_op_offset:(fun sec1 pos1 sec2 pos2 ->
+                (* Only a difference within one section is link-time
+                   invariant. *)
+                if Section_name.equal sec1 sec2 then
+                  Section_independent (Numbers.Int64.sub_exn pos1 pos2)
+                else
+                  invalid
+                    "cannot subtract offsets in the different sections %s and \
+                     %s"
+                    (Section_name.to_string sec1)
+                    (Section_name.to_string sec2))
+              c1 c2
+        | C.This -> invalid "[This] is not supported"
+        | C.Variable name -> invalid "the variable %s is not supported" name
+      (* [Add] and [Sub] agree on the handling of two constants, and of an
+         offset adjusted by a constant; they differ only on a constant combined
+         with an offset on the right, and on two offsets. *)
+      and eval_binary ~op ~const_op_offset ~offset_op_offset c1 c2 =
+        match eval c1, eval c2 with
+        | Section_independent i1, Section_independent i2 ->
+            Section_independent (op i1 i2)
+        | Offset_in_section (sec, pos), Section_independent i ->
+            Offset_in_section (sec, op pos i)
+        | Section_independent i, Offset_in_section (sec, pos) ->
+            const_op_offset i sec pos
+        | Offset_in_section (sec1, pos1), Offset_in_section (sec2, pos2) ->
+            offset_op_offset sec1 pos1 sec2 pos2
       in
       (match eval delta with
-      | `Const value ->
+      | Section_independent value ->
           if Int64.compare value 0L < 0 then
-            Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
+            invalid "evaluates to the negative value %Ld" value;
           D.emit_uleb128 b.buf value
-      | `In_section _ ->
-          Misc.fatal_error
-            "x86_binary_emitter: Delta_uleb128 does not evaluate to a \
-             link-time-invariant constant")
+      | Offset_in_section (sec, pos) ->
+          invalid
+            "evaluates to offset %Ld in section %s, which is not a \
+             link-time-invariant constant"
+            pos (Section_name.to_string sec))
     | Directive
         (D.Reloc
           { name = D.R_X86_64_PLT32;
