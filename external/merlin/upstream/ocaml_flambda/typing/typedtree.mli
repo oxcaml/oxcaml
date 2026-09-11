@@ -635,8 +635,8 @@ and expression_desc =
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
             [extended_expression] carries the representation of E0, which can
-            differ from [representation] when the record type has fields whose
-            layout varies with the type parameters.
+            differ from [representation] under a polymorphic update where the
+            changed field's type changes its layout.
             [alloc_mode] is the allocation mode of the record,
             or [None] if it is [Record_unboxed],
             in which case it does not need allocation.
