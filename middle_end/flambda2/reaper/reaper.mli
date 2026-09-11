@@ -76,19 +76,17 @@ module Staged : sig
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
       with dead code removed. [solution.code_changes] must cover the current
       unit and the other participating units whose code ids occur in it.
-      [code_deps_for_result_types] supplies the original metadata for rewriting
-      result types for export; LTO passes [None] to leave them unknown. *)
+      [typing] enables precise subkind and export-type rewriting for normal
+      Reaper. LTO passes [None] for backend-only rebuilding, which needs no type
+      database and leaves export types unknown. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     traverse_rebuild:Traverse_rebuild.t ->
     solution:solution ->
-    code_deps_for_result_types:Traverse_acc.code_dep Code_id.Map.t option ->
-    all_sets_of_closures:
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
+    typing:Rebuild.typing option ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    final_typing_env:Typing_env.t option ->
     Flambda_unit.t * Exported_code.t * Typing_env.t option
 end
 

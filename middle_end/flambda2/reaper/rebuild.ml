@@ -49,11 +49,17 @@ type should_preserve_direct_calls =
   | No
   | Auto
 
+type typing =
+  { context : Types_rewriter.rewrite_context;
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    env : Typing_env.t option
+  }
+
 type env =
   { machine_width : Target_system.Machine_width.t;
     uses : Analysis.result;
     code_changes : Unboxing_analysis.code_changes;
-    code_deps_for_result_types : Traverse_acc.code_dep Code_id.Map.t option;
+    typing : typing option;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -61,9 +67,7 @@ type env =
     should_keep_param :
       Continuation.t -> Variable.t -> KS.t -> Unboxing_analysis.param_decision;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    old_typing_env : Typing_env.t option;
-    inside_code_definition : bool;
-    types_rewrite_context : Types_rewriter.rewrite_context Lazy.t
+    inside_code_definition : bool
   }
 
 type rebuild_result =
@@ -78,6 +82,13 @@ let freshen_decisions :
   | Keep (v, kind) -> Keep (Variable.rename v, kind)
   | Unbox fields ->
     Unbox (Unboxed_fields.map (fun v -> Variable.rename v) fields)
+
+(* Poison is a tagged immediate. Richer subkinds may no longer hold after
+   poisoning, and the backend does not need them. *)
+let backend_kind kind =
+  match[@ocaml.warning "-fragile-match"] KS.non_null_value_subkind kind with
+  | Anything | Tagged_immediate -> kind
+  | _ -> KS.create (KS.kind kind) Anything (KS.nullable kind)
 
 let is_used (env : env) cn = Analysis.has_use env.uses cn
 
@@ -1690,9 +1701,11 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
   in
   let _tag, block_shape = P.Block_kind.to_shape block_kind in
   let block_kind =
-    match block_kind with
-    | Mixed _ | Naked_floats -> block_kind
-    | Values (tag, subkinds) -> (
+    match block_kind, env.typing with
+    | (Mixed _ | Naked_floats), _ -> block_kind
+    | Values (tag, subkinds), None ->
+      P.Block_kind.Values (tag, List.map backend_kind subkinds)
+    | Values (tag, subkinds), Some typing -> (
       let ks =
         KS.create K.value
           (Variant
@@ -1703,7 +1716,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind env.uses.db bound_name ks
+        Types_rewriter.rewrite_kind_in_context typing.context bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -2110,16 +2123,16 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     Unboxing_analysis.get_calling_convention_change env.code_changes code_id
   in
   let code_metadata =
-    match env.code_deps_for_result_types with
+    match env.typing with
     | None -> code_metadata
-    | Some code_deps ->
-      let code_dep = Code_id.Map.find code_id code_deps in
+    | Some typing ->
+      let code_dep = Code_id.Map.find code_id typing.code_deps in
       let result_types =
         match Code_metadata.result_types code_dep.code_metadata with
         | Unknown -> Or_unknown_or_bottom.Unknown
         | Bottom -> Or_unknown_or_bottom.Bottom
         | Ok result_types -> (
-          match env.old_typing_env with
+          match typing.env with
           | None -> Or_unknown_or_bottom.Unknown
           | Some old_typing_env ->
             if Flambda_features.debug_reaper "forget-types"
@@ -2151,8 +2164,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                     with_decisions code_dep.return return_decisions )
               in
               Or_unknown_or_bottom.Ok
-                (Types_rewriter.rewrite_result_types
-                   (Lazy.force env.types_rewrite_context)
+                (Types_rewriter.rewrite_result_types typing.context
                    ~old_typing_env ~my_closure ~params:params_vars_and_keep
                    ~results:results_vars_and_keep result_types))
       in
@@ -2341,9 +2353,8 @@ type result =
 
 let rebuild ~machine_width ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
-    ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
-    ~code_changes ~code_deps_for_result_types (solved_dep : Analysis.result)
-    get_code_metadata toplevel_expr code =
+    ~fixed_arity_continuations ~typing ~code_changes
+    (solved_dep : Analysis.result) get_code_metadata toplevel_expr code =
   let should_keep_param cont param kind : Unboxing_analysis.param_decision =
     let keep_all_parameters =
       Continuation.Set.mem cont fixed_arity_continuations
@@ -2363,10 +2374,14 @@ let rebuild ~machine_width ~ordered_code_ids
         let info = Continuation.Map.find cont continuation_info in
         info.is_exn_handler && Variable.equal param (List.hd info.params)
       then
-        Keep
-          ( param,
-            Types_rewriter.rewrite_kind_with_subkind solved_dep.db
-              (Name.var param) kind )
+        let kind =
+          match typing with
+          | None -> backend_kind kind
+          | Some typing ->
+            Types_rewriter.rewrite_kind_in_context typing.context
+              (Name.var param) kind
+        in
+        Keep (param, kind)
       else Delete
     | Some fields -> Unbox fields
   in
@@ -2386,14 +2401,12 @@ let rebuild ~machine_width ~ordered_code_ids
     { machine_width;
       uses = solved_dep;
       code_changes;
-      code_deps_for_result_types;
+      typing;
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;
       should_preserve_direct_calls;
-      old_typing_env = final_typing_env;
-      inside_code_definition = false;
-      types_rewrite_context
+      inside_code_definition = false
     }
   in
   let res =

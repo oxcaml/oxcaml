@@ -231,6 +231,9 @@ let rewrite_kind_with_subkind db var kind =
        appear in value_kinds. *)
     rewrite_kind_with_subkind_not_top_not_bottom db usages kind
 
+let rewrite_kind_in_context context var kind =
+  rewrite_kind_with_subkind context.db var kind
+
 let forget_all_types = lazy (Flambda_features.debug_reaper "forget-types")
 
 let debug_types = lazy (Flambda_features.debug_reaper "types")

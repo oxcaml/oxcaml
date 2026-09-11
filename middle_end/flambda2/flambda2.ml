@@ -564,9 +564,8 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     (* CR mvellacott: add debug printing code. *)
     let flambda, all_code, _final_typing_env =
       Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
-        ~traverse_rebuild:rebuild_data ~solution
-        ~code_deps_for_result_types:None ~all_sets_of_closures:[] ~machine_width
-        ~cmx_loader ~all_code ~final_typing_env:None
+        ~traverse_rebuild:rebuild_data ~solution ~typing:None ~machine_width
+        ~cmx_loader ~all_code
     in
     (* Reaped CMXs are only used for linking, so leave their Flambda export
        information empty, as for opaque compilation. The backend still needs the

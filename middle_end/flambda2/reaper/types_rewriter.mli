@@ -32,6 +32,12 @@ val prepare_rewrite_context :
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
   rewrite_context
 
+val rewrite_kind_in_context :
+  rewrite_context ->
+  Name.t ->
+  Flambda_kind.With_subkind.t ->
+  Flambda_kind.With_subkind.t
+
 val rewrite_typing_env :
   rewrite_context -> unit_symbol:Symbol.t -> typing_env -> typing_env
 
