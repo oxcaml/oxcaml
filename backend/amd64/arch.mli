@@ -70,6 +70,8 @@ type addressing_mode =
 
 val equal_addressing_mode : addressing_mode -> addressing_mode -> bool
 
+val compare_addressing_mode : addressing_mode -> addressing_mode -> int
+
 type prefetch_temporal_locality_hint = Nonlocal | Low | Moderate | High
 
 type prefetch_info = {
@@ -181,6 +183,12 @@ val print_specific_operation :
 val win64 : bool
 
 val operation_is_pure : specific_operation -> bool
+
+(** [true] iff the operation is guaranteed not to read from memory, not to
+    raise (including via a hardware trap), and not to trigger the execution
+    of arbitrary code; it may write to memory. Used by dead store
+    elimination ([Cfg_dse]); [false] is always a safe answer. *)
+val operation_is_pure_except_memory_writes : specific_operation -> bool
 
 val operation_allocates : specific_operation -> bool
 

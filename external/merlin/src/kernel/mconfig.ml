@@ -681,6 +681,8 @@ let ocaml_ignored_flags =
     "-no-cfg-block-layout";
     "-cfg-cse-join-points";
     "-no-cfg-cse-join-points";
+    "-cfg-dse";
+    "-no-cfg-dse";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";
