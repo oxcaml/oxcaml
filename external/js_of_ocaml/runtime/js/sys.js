@@ -300,11 +300,6 @@ function caml_sys_isatty(_chan) {
   return 0;
 }
 
-//Provides: caml_sys_const_runtime5 const
-function caml_sys_const_runtime5(_unit) {
-    return 0;
-}
-
 //Provides: arch
 var arch = globalThis.process?.arch === "arm64?" ? "arm64" : "amd64";
 

@@ -71,21 +71,11 @@ let empty_state = {
 
 (* Record a relocation, updating its offset. *)
 
+(* upstream, rename_relocation unique-izes dotted global names and remaps
+   relocations We don't need that because [Reloc_getcompunit] carries a
+   [Compilation_unit.t] whose pack prefix is already structural. *)
 let rename_relocation base (rel, ofs) =
-  (* Nothing to do here following the symbols patches *)
   rel, base + ofs
-
-(* XXX mshinwell: the above function in runtime5 has:
-
-  (* PR#5276: unique-ize dotted global names, which appear if one of
-    the units being consolidated is itself a packed module. *)
-  let make_compunit_name_unique cu =
-    if CU.is_packed cu
-    then CU (packagename ^ "." ^ (CU.name cu))
-    else cu
-  in
-
-*)
 
 (* Record and update a debugging event *)
 
