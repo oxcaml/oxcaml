@@ -476,7 +476,10 @@ module Mixed_tuple = struct
     | Labeled (label, type_) ->
         sprintf "~%s:(%s)" label (type_to_creation_function type_)
 
-  let tuple_value { index = _; elements } =
+  let elements_to_type_decl elements =
+    String.concat ~sep:" * " (List.map elements ~f:element_type_to_string)
+
+  let tuple_value_of_elements elements =
     let elems_str =
       String.concat ~sep:", " (List.map elements ~f:element_value)
     in
@@ -484,43 +487,49 @@ module Mixed_tuple = struct
     | [] -> elems_str
     | _ -> sprintf "(%s)" elems_str
 
-  let type_decl t =
-    sprintf
-      "type %s = %s"
-      (type_ t)
-      (String.concat ~sep:" * "
-         (List.map t.elements ~f:element_type_to_string))
+  let tuple_value t = tuple_value_of_elements t.elements
 
-  let check_field_integrity t =
-    let elem_var i ~base = sprintf "%s%i" base i in
-    let elem_pattern i elem ~base =
-      match elem with
-      | Not_labeled _ -> elem_var i ~base
-      | Labeled (label, _) -> sprintf "~%s:%s" label (elem_var i ~base)
+  let type_decl t =
+    sprintf "type %s = %s" (type_ t) (elements_to_type_decl t.elements)
+
+  let element_var i ~base = sprintf "%s%i" base i
+
+  (* A pattern binding each element of the tuple to [<base><i>]. *)
+  let elements_pattern elements ~base =
+    let element_pattern i = function
+      | Not_labeled _ -> element_var i ~base
+      | Labeled (label, _) -> sprintf "~%s:%s" label (element_var i ~base)
     in
-    let elem_patterns ~base =
-      sprintf "(%s)"
-        (String.concat ~sep:", "
-           (List.mapi t.elements ~f:(fun i elem -> elem_pattern i elem ~base)))
-    in
-    let elem_name i = function
+    sprintf "(%s)"
+      (String.concat ~sep:", " (List.mapi elements ~f:element_pattern))
+  ;;
+
+  (* Checks comparing the elements bound by [elements_pattern ~base:base1]
+     against those bound by [elements_pattern ~base:base2]. *)
+  let check_elements_integrity elements ~base1 ~base2 ~value =
+    let element_name i = function
       | Not_labeled _ -> sprintf "%i" i
       | Labeled (label, _) -> label
     in
+    List.mapi elements ~f:(fun i elem ->
+      type_to_field_integrity_check
+        (element_type elem)
+        ~access1:(element_var i ~base:base1)
+        ~access2:(element_var i ~base:base2)
+        ~message:(sprintf "%s.%s" value (element_name i elem)))
+  ;;
+
+  let check_field_integrity t =
     sprintf {|let () = match %s, %s with
       | %s, %s -> %s
     in|}
       (value t)
       (value t ~base:"t_orig")
-      (elem_patterns ~base:"a")
-      (elem_patterns ~base:"b")
+      (elements_pattern t.elements ~base:"a")
+      (elements_pattern t.elements ~base:"b")
       (String.concat ~sep:"\n"
-         (List.mapi t.elements ~f:(fun i elem ->
-              type_to_field_integrity_check
-                (element_type elem)
-                ~access1:(elem_var i ~base:"a")
-                ~access2:(elem_var i ~base:"b")
-                ~message:(sprintf "%s.%s" (value t) (elem_name i elem)))))
+         (check_elements_integrity t.elements ~base1:"a" ~base2:"b"
+            ~value:(value t)))
   ;;
 end
 
@@ -551,6 +560,10 @@ module Mixed_variant = struct
     { name; args; index }
   ;;
 
+  (* Constructor arguments can't be labeled. *)
+  let tuple_elements args =
+    List.map args ~f:(fun type_ -> Mixed_tuple.Not_labeled type_)
+
   let of_variant index cstrs =
     let constructors =
       Nonempty_list.to_list cstrs
@@ -566,7 +579,7 @@ module Mixed_variant = struct
       cstr.name
       (match cstr.args with
        | Args_tuple args ->
-           String.concat ~sep:" * " (List.map args ~f:type_to_string)
+           Mixed_tuple.elements_to_type_decl (tuple_elements args)
        | Args_record fields ->
            sprintf "{ %s }" (Mixed_record.fields_to_type_decl fields))
   ;;
@@ -580,14 +593,7 @@ module Mixed_variant = struct
       (match args with
        | Args_record fields -> Mixed_record.record_value_of_fields fields
        | Args_tuple args ->
-           let args_str =
-             String.concat
-               ~sep:", "
-               (List.map args ~f:type_to_creation_function)
-           in
-           match args with
-           | [] -> args_str
-           | _ -> sprintf "(%s)" args_str)
+           Mixed_tuple.tuple_value_of_elements (tuple_elements args))
 
   let type_decl t =
     sprintf
@@ -598,15 +604,11 @@ module Mixed_variant = struct
 
   let check_field_integrity cstr ~index ~catchall =
     let value = value ~index in
-    let arg_var i ~base = sprintf "%s%i" base i in
     let arg_vars cstr ~base =
       match cstr.args with
       | Args_record _ -> base
       | Args_tuple args ->
-          sprintf "(%s)"
-            (String.concat ~sep:", "
-              (List.mapi args ~f:(fun i _ ->
-                  arg_var i ~base)))
+          Mixed_tuple.elements_pattern (tuple_elements args) ~base
     in
     sprintf {|let () = match %s, %s with
       | %s %s, %s %s -> %s
@@ -626,12 +628,8 @@ module Mixed_variant = struct
                   ~access2:(sprintf "b.%s" field.name)
                   ~message:(sprintf "%s.%s" (value cstr) field.name))
         | Args_tuple args ->
-            List.mapi args ~f:(fun i type_ ->
-                type_to_field_integrity_check
-                  type_
-                  ~access1:(arg_var i ~base:"a")
-                  ~access2:(arg_var i ~base:"b")
-                  ~message:(sprintf "%s.%i" (value cstr) i))))
+            Mixed_tuple.check_elements_integrity (tuple_elements args)
+              ~base1:"a" ~base2:"b" ~value:(value cstr)))
     (if catchall then "| _ -> assert false" else "")
   ;;
 end
@@ -992,8 +990,8 @@ let check_reachable_words expected actual message =
     seq_print_in_test "    - Checking [Obj.reachable_words]";
     per_value (fun t ->
       match t with
+      (* CR layouts: maybe we should check reachable words for these too...? *)
       | Constructor _ -> ()
-      (* CR zeisbach: consider buffing this up? *)
       | Tuple _ -> ()
       | Record t ->
         let is_all_floats = Mixed_record.is_all_floats t in
