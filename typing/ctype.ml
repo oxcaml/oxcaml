@@ -6899,9 +6899,11 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
           let sorts =
             List.map
               (fun v ->
-                 v
-                 |> Jkind_types.Sort.get_representable_var
-                 |> Option.map (Jkind_types.Sort.subst subst_map))
+                (* We check whether the pattern variable [v] is unbound,
+                   which happens when it does not occur in the subject. *)
+                if Jkind.Sort.Var.is_root v
+                then None
+                else Some (Jkind_types.Sort.subst subst_map (Var v)))
               pat_sorts
           in
           subj_inst, Ok sorts
