@@ -228,7 +228,7 @@ let get_unit_export_info comp_unit =
 let get_static_data comp_unit =
   Option.map
     (fun ui ->
-      Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
+      Slambda.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
     (get_unit comp_unit)
 
 let which_cmx_file comp_unit =
@@ -327,7 +327,7 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   let static_data =
-    Slambdaeval.CU_data.write
+    Slambda.CU_data.write
       ~sections:current_unit.uib_file_sections
       static_data
   in
