@@ -30,6 +30,7 @@ module Counters : sig
   val get : string -> t -> int
   val set : string -> int -> t -> t
   val incr : string -> t -> t
+  val add : string -> int -> t -> t
   val union : t -> t -> t
   val to_string : t -> string
 end
