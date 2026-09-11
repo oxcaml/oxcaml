@@ -72,10 +72,16 @@ module Persistent_signature = struct
 
   let load = ref (fun ~allow_hidden ~unit_name ->
     match CUI.Found.cmi_path unit_name with
-    | Some filename when allow_hidden && Sys.file_exists filename ->
+    | Some filename when allow_hidden ->
       (* Loaded through the attached path without consulting the load path at
          all. The result is marked [Hidden] so that a later direct reference
-         checks visibility against the load path (see [check_visibility]). *)
+         checks visibility against the load path (see [check_visibility]).
+
+         For debugging, the attached path is a hard requirement: if it cannot
+         be loaded, error out rather than fall back to the load path. *)
+      if not (Sys.file_exists filename) then
+        Misc.fatal_errorf "Attached cmi path %s for %s does not exist" filename
+          (CUI.to_string (CUI.Found.intf unit_name));
       Some { filename; cmi = read_cmi_lazy filename; visibility = Hidden }
     | Some _ | None ->
       let unit_name = CUI.to_string (CUI.Found.intf unit_name) in
