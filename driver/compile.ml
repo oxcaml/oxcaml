@@ -46,7 +46,6 @@ let tlambda_to_bytecode i tlambda =
             ~cu_static_data:(fun _ ->
               Misc.fatal_errorf
                 "Cross-module static evaluation not implemented in bytecode")
-            (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
        |> fun (_static_data, lambda) ->
           (* CR layout poly: Drop the comptime part until top-level modules can
              be static. *)

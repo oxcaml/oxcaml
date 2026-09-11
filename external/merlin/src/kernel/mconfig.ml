@@ -468,7 +468,6 @@ let ocaml_ignored_flags =
     "-dparsetree-loc-ghost-invariants";
     "-dshape";
     "-dtlambda";
-    "-dslambda";
     "-drawclambda";
     "-drawflambda";
     "-drawlambda";
