@@ -679,6 +679,8 @@ let ocaml_ignored_flags =
     "-no-cfg-merge-blocks";
     "-cfg-block-layout";
     "-no-cfg-block-layout";
+    "-cfg-cse-join-points";
+    "-no-cfg-cse-join-points";
     "-cfg-value-propagation";
     "-no-cfg-value-propagation";
     "-cfg-value-propagation-float";

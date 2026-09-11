@@ -209,6 +209,24 @@ val get_block_exn : t -> Label.t -> basic_block
 
 val iter_blocks_dfs : t -> f:(Label.t -> basic_block -> unit) -> unit
 
+(** [iter_blocks_postorder_from t ~from ~visited ~f] traverses depth-first the
+    blocks reachable from [from] through normal and exceptional edges, skipping
+    the blocks whose labels are in [visited] and adding to it the labels of the
+    traversed blocks. [f] is called on each traversed block in postorder, i.e.
+    after all of its successors have been traversed. *)
+val iter_blocks_postorder_from :
+  t ->
+  from:Label.t ->
+  visited:unit Label.Tbl.t ->
+  f:(basic_block -> unit) ->
+  unit
+
+(** [reverse_postorder t] returns the blocks reachable from the entry block
+    through normal and exceptional edges, in reverse postorder: every block
+    appears before its successors, except for the successors it reaches through
+    back edges. Blocks not reachable from the entry block are omitted. *)
+val reverse_postorder : t -> basic_block list
+
 val iter_blocks : t -> f:(Label.t -> basic_block -> unit) -> unit
 
 val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
