@@ -18,7 +18,6 @@
 (* CR mvellacott: get rid of CMR files, and put the data in CMX instead *)
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
-    final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
@@ -32,9 +31,9 @@ module Serialisable : sig
 
   type t
 
-  (** Import only the inputs needed to rebuild the unit. LTO rebuild does not
-      export types, so the typing environment and solve inputs are not
-      reconstructed. *)
+  (** Import only the inputs needed to rebuild the unit. Code is imported as
+      metadata without result types; bodies are stored in [Traverse_rebuild].
+      Solve inputs are not reconstructed. *)
   val deserialise_for_rebuild :
     t ->
     Flambda_unit.Metadata.t * Exported_code.t * Reaper.Staged.Traverse_rebuild.t
@@ -63,9 +62,8 @@ type error =
 
 exception Error of error
 
-(** [used_value_slots] is the set computed by [Slot_offsets.finalize_offsets]
-    for the unit being stored; it describes the data written alongside it. *)
-val save : filename:string -> used_value_slots:Value_slot.Set.t -> t -> unit
+(** Save backend-only data without modifying the live code or solve inputs. *)
+val save : filename:string -> t -> unit
 
 (** Read and unmarshal a cmr file from disk. *)
 val load : string -> Serialisable.t * Id_stamp_counters.t

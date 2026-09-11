@@ -30,10 +30,6 @@ module Staged : sig
     val referenced_compilation_units : t -> Compilation_unit.Set.t
 
     val apply_renaming : t -> Renaming.t -> t
-
-    (** Map over the result types of the stored code metadata. Used for
-        canonicalisation. *)
-    val map_result_types : t -> f:(Flambda2_types.t -> Flambda2_types.t) -> t
   end
 
   module Traverse_rebuild : sig

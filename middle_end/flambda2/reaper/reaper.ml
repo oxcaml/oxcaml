@@ -87,17 +87,6 @@ module Staged = struct
         Rebuild_queries.Requests.apply_renaming rebuild_queries renaming
       in
       { code_deps; code_references; rebuild_queries; all_sets_of_closures }
-
-    let map_result_types t ~f =
-      (* The code metadata stored in [code_deps] is the only part of the solve
-         inputs holding Flambda types. *)
-      let map_code_dep (code_dep : Traverse_acc.code_dep) =
-        { code_dep with
-          code_metadata =
-            Code_metadata.map_result_types code_dep.code_metadata ~f
-        }
-      in
-      { t with code_deps = Code_id.Map.map map_code_dep t.code_deps }
   end
 
   module Traverse_rebuild = struct

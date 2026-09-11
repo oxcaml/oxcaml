@@ -92,7 +92,6 @@ type run_result =
     unit : Flambda_unit.t;
     all_code : Exported_code.t;
     exported_offsets : Exported_offsets.t;
-    used_value_slots : Flambda2_identifiers.Value_slot.Set.t;
     reachable_names : NO.t
   }
 
@@ -103,7 +102,7 @@ let build_run_result unit ~prepare_cmx ~all_code
   let reachable_names, cmx =
     prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets all_code
   in
-  { cmx; unit; all_code; exported_offsets; used_value_slots; reachable_names }
+  { cmx; unit; all_code; exported_offsets; reachable_names }
 
 type flambda_result =
   { flambda : Flambda_unit.t;
@@ -272,7 +271,6 @@ let flambda_to_flambda0 : type m.
             Some
               { Flambda2_reaper.Cmr_format.unit_metadata =
                   Flambda_unit.metadata flambda;
-                final_typing_env;
                 all_code;
                 imported_offsets = Exported_offsets.imported_offsets ();
                 deps;
@@ -297,18 +295,11 @@ let flambda_to_flambda0 : type m.
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
-  let { unit = flambda;
-        exported_offsets;
-        cmx;
-        all_code;
-        used_value_slots;
-        reachable_names
-      } =
+  let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
   Option.iter
-    (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr")
-       ~used_value_slots)
+    (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr"))
     cmr_payload;
   (match cmx with
   | None ->
