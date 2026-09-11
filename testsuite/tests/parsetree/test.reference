@@ -1,0 +1,8 @@
+source_known_broken.ml: FAIL, CANNOT REPARSE (test.ml 135:2)
+File "<str>", line 1, characters 7-16:
+Error: Syntax error
+let f1 exception e = ()
+let f2 effect E,  k = ()
+let f3 = function | (lazy exception e) -> () | _ -> ()
+
+=====================================================
