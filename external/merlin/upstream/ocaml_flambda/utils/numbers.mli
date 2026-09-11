@@ -118,6 +118,10 @@ module Uint64 : sig
 
   val to_int64 : t -> Int64.t
 
+  (** As [to_int64], but raises a fatal error unless the value fits in the
+      non-negative range of a signed 64-bit integer. *)
+  val to_int64_checked : t -> Int64.t
+
   include Identifiable.S with type t := t
 end
 
@@ -127,5 +131,12 @@ module Float : Identifiable.S with type t = float
 module Int64 : sig
 
   val to_int32_exn: int64 -> int32
+
+  (** Addition, raising a fatal error on overflow of the signed 64-bit range. *)
+  val add_exn: int64 -> int64 -> int64
+
+  (** Subtraction, raising a fatal error on overflow of the signed 64-bit
+      range. *)
+  val sub_exn: int64 -> int64 -> int64
 
 end
