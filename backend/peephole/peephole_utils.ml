@@ -7,6 +7,9 @@ let are_equal_regs (reg1 : Reg.t) (reg2 : Reg.t) =
       "peephole optimization should be run after register allocation"
     reg1 reg2
 
+let debuginfo_allows_merging fst snd =
+  (not !Dwarf_flags.gdwarf_may_alter_codegen) || Debuginfo.compare fst snd = 0
+
 (* CR-soon gtulba-lecu: Delete this when implementing auto-generated rules. *)
 let go_back_const = 1
 

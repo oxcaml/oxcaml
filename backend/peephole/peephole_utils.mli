@@ -4,6 +4,15 @@ module DLL = Doubly_linked_list
 
 val are_equal_regs : Reg.t -> Reg.t -> bool
 
+(** [debuginfo_allows_merging fst snd] is [true] when two instructions carrying
+    debug info [fst] and [snd] may be replaced by a single one, which can only
+    carry one of them: the source location of the other one is then no longer
+    reachable by a debugger. This is always allowed unless the user has asked
+    for debugging to take precedence over code generation
+    ([-gdwarf-may-alter-codegen]), in which case the debug info must be
+    identical (as in [Cfg_merge_blocks]). *)
+val debuginfo_allows_merging : Debuginfo.t -> Debuginfo.t -> bool
+
 val go_back_const : int
 
 val prev_at_most : int -> 'a DLL.cell -> 'a DLL.cell

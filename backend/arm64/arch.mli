@@ -128,6 +128,15 @@ val fold_delta_into_specific_operation :
   specific_operation -> arg_is_folded_reg:bool array -> delta:int ->
   specific_operation option
 
+(** [merge_adjacent_specific_operations op1 op2] is used by the peephole
+    optimizer to replace two adjacent instructions carrying [op1] and [op2],
+    both without results and reading exactly the same registers, by a single
+    instruction. Returns [Some op] where [op], executed once, has the same
+    effect as [op1] followed by [op2]; returns [None] when they cannot be
+    merged. *)
+val merge_adjacent_specific_operations :
+  specific_operation -> specific_operation -> specific_operation option
+
 val addressing_displacement_for_llvmize : addressing_mode -> int
 
 (* Printing operations and addressing modes *)
