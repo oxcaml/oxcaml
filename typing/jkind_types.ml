@@ -564,6 +564,62 @@ module Sort = struct
         | Addressable c -> Addressable (of_const c)
     end
 
+    module T_option = struct
+      let scannable = Some T.scannable
+
+      let void = Some T.void
+
+      let untagged_immediate = Some T.untagged_immediate
+
+      let float64 = Some T.float64
+
+      let float32 = Some T.float32
+
+      let word = Some T.word
+
+      let bits8 = Some T.bits8
+
+      let bits16 = Some T.bits16
+
+      let bits32 = Some T.bits32
+
+      let bits64 = Some T.bits64
+
+      let vec128 = Some T.vec128
+
+      let vec256 = Some T.vec256
+
+      let vec512 = Some T.vec512
+
+      let mask = Some T.mask
+
+      let of_base = function
+        | Void -> void
+        | Scannable -> scannable
+        | Untagged_immediate -> untagged_immediate
+        | Float64 -> float64
+        | Float32 -> float32
+        | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
+        | Bits32 -> bits32
+        | Bits64 -> bits64
+        | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
+        | Mask -> mask
+
+      let rec of_const : Const.t -> t option = function
+        | Base b -> of_base b
+        | Product cs ->
+          Option.map
+            (fun x -> Product x)
+            (Misc.Stdlib.List.map_option of_const cs)
+        | Univar uv -> Some (Univar uv)
+        | Genvar v -> Some (Var v)
+        | Addressable c -> Option.map (fun s -> Addressable s) (of_const c)
+    end
+
     module Const = struct
       open Const
 
@@ -826,16 +882,23 @@ module Sort = struct
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_scannable_and_get ts)
     | Univar uv -> Univar uv
-    | Var { contents = Some s } -> default_to_scannable_and_get s
-    | Var ({ contents = None } as v) ->
-      if is_genvar v
-      then Genvar v
-      else if equate_var v Static.T.scannable
-      then Static.Const.scannable
-      else
-        Misc.fatal_error
-          "Jkind_types.default_to_scannable_and_get: cannot default rigid \
-           variables"
+    | Var v ->
+      let compress_to s =
+        set_var_contents v (Static.T_option.of_const s);
+        s
+      in
+      begin match v.contents with
+      | Some s -> compress_to (default_to_scannable_and_get s)
+      | None ->
+        if is_genvar v
+        then Const.Genvar v
+        else if equate_var v Static.T.scannable
+        then compress_to Static.Const.scannable
+        else
+          Misc.fatal_error
+            "Jkind_types.default_to_scannable_and_get: cannot default rigid \
+             variables"
+      end
     | Addressable s -> Const.addressable (default_to_scannable_and_get s)
 
   let get_concrete_defaulting_to_scannable s =
