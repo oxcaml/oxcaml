@@ -5554,7 +5554,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
@@ -5751,7 +5751,7 @@ module Monadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
