@@ -1976,7 +1976,7 @@ let assert_mixed_block_shape_support loc mixed_product_kind shape =
   (* CR zeisbach: we should do a check for splice variables after slambda.
      This isn't currently present, but Joe has a PR that will do this. That PR
      also has a helper that should be used here instead. *)
-  if not (Lambda.shape_has_splice_variable shape) then begin
+  if not (Lambda.mixed_block_shape_has_splices shape) then begin
     let mpb = Mixed_product_bytes.count (Product shape) in
     (* All-value/void shapes compile to uniform blocks (products of values are
        flattened), so the scannable prefix length limit doesn't apply.

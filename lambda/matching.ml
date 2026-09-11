@@ -492,9 +492,9 @@ let matcher discr (p : Simple.pattern) rem =
       (* List lengths can differ with GADT refinements.
          see [basic-more/robustmatch.ml] module [M7] for an example *)
       yesif (List.length l1 = List.length l2 &&
-              (* CR zeisbach: I'm not sure whether we can rely on the same
-                 invariant as unboxed tuples to ignore the sort variables,
-                 or whether we should be using a sort equality function. *)
+              (* CR zeisbach: ignoring the sort variables here is a little
+                 suspicious, but I couldn't manage to break it. It's probably
+                 OK (see unboxed version below), but worth thinking about. *)
              List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
       yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -2518,12 +2518,11 @@ let get_expr_args_tuple ~scopes shape head { arg; mut; _ } rem =
         (List.map (fun (_, layout) -> Lambda.mixed_block_element_of_layout layout)
           shape)
     in
-    (* CR zeisbach: it is sad that we yet again have to compute this. especially
-       since the computation here and in translcore (and elsewhere) could
-       potentially get out-of-sync. this should probably be at least factored
-       into a helper, and we can potentially store more info somewhere... *)
+    (* CR zeisbach: this isn't strictly necessary (backend won't fail here), but
+       I don't know enough about how [Pmixedfield] is lowered to determine
+       whether emitting it would lead to performance regressions. Regardless, I
+       think the longer-term goal is to combine these two anyways. *)
     if Lambda.shape_has_only_value_elements block_shape
-    (* CR zeisbach: maybe this is ok to always be a Pmixedfield? *)
     then fun pos -> Pfield (pos, Pointer, sem)
     else fun pos -> Pmixedfield ([pos], block_shape, sem)
   in
