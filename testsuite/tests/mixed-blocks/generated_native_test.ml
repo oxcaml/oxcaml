@@ -479,6 +479,81 @@ type t148 =
 type t149 =
   | A of string * int64x2#
   | B of { mutable int64x4_u0 : int64x4# }
+type t150 = int64x4# * str1:string
+type t151 = float * int64x4_u1:int64x4#
+type t152 = int64x2# * str1:string
+type t153 = string * string * int64x4_u2:int64x4#
+type t154 = float * int64x2#
+type t155 = string * float#
+type t156 = int64x4_u0:int64x4# * float * string
+type t157 = int64x2_u0:int64x2# * string * string
+type t158 = float0:float * float_u1:float#
+type t159 = string * float32_u1:float32_u
+type t160 = string * int * int64x4#
+type t161 = str0:string * float1:float * int64x2_u2:int64x2#
+type t162 = str0:string * str1:string * float_u2:float#
+type t163 = float32_u * float1:float
+type t164 = str0:string * int32_u
+type t165 = string * float * int64x4#
+type t166 = string * imm1:int * int64x2#
+type t167 = string * float * float_u2:float#
+type t168 = string * float32_u * string
+type t169 = float * int32_u
+type t170 = string * int64_u
+type t171 = float0:float * int64x4# * float
+type t172 = str0:string * int64x2_u1:int64x2# * float
+type t173 = float# * imm1:int * string
+type t174 = str0:string * float1:float * float32_u
+type t175 = str0:string * int32_u * str2:string
+type t176 = int64_u * float
+type t177 = nativeint_u * string
+type t178 = int64x4_u0:int64x4# * int64x4_u1:int64x4#
+type t179 = float0:float * imm1:int * int64x4_u2:int64x4#
+type t180 = float * int64x2# * float2:float
+type t181 = str0:string * float * float_u2:float#
+type t182 = string * float32_u * imm2:int
+type t183 = str0:string * int32_u * float
+type t184 = str0:string * string * int64_u
+type t185 = float * n1:nativeint_u
+type t186 = str0:string * int64x4# * int64x4_u2:int64x4#
+type t187 = int64x4# * int64x2#
+type t188 = str0:string * str1:string * string * int64x4#
+type t189 = float0:float * int64x2_u1:int64x2# * imm2:int
+type t190 = float_u0:float# * float * float
+type t191 = float32_u * float * string
+type t192 = string * i32_1:int32_u * int
+type t193 = float0:float * i64_1:int64_u * string
+type t194 = nativeint_u * str1:string * string
+type t195 = float0:float * int64x4# * int64x4_u2:int64x4#
+type t196 = int64x4_u0:int64x4# * int64x2_u1:int64x2# * str2:string
+type t197 = int64x4# * float#
+type t198 = int64x4# * str1:string * string * float3:float
+type t199 = string * string * str2:string * int64x2#
+type t200 = float0:float * float# * int
+type t201 = float32_u0:float32_u * float * float2:float
+type t202 = string * float * int32_u
+type t203 = string * i64_1:int64_u * imm2:int
+type t204 = float * n1:nativeint_u * str2:string
+type t205 = str0:string * int64x4# * string * int64x4_u3:int64x4#
+type t206 = int64x2# * int64x4_u1:int64x4# * float
+type t207 = str0:string * int64x4_u1:int64x4# * float#
+type t208 = int64x4_u0:int64x4# * float32_u1:float32_u
+type t209 = string * string * int64x4# * imm3:int
+type t210 = str0:string * float * int64x2# * string
+type t211 = string * float_u1:float# * string * str3:string
+type t212 = float0:float * float32_u * int
+type t213 = float0:float * float * int32_u
+type t214 = float * string * i64_2:int64_u
+type t215 = str0:string * nativeint_u * int
+type t216 = float * int64x4# * int64x4# * str3:string
+type t217 = int64x4_u0:int64x4# * int64x2# * str2:string * str3:string
+type t218 = int64x4# * float1:float * float#
+type t219 = float32_u * str1:string * int64x4_u2:int64x4#
+type t220 = float * int64x4#
+type t221 = int64x4# * str1:string * str2:string * float3:float
+type t222 = int * string * string * int64x2_u3:int64x2#
+type t223 = string * str1:string * float * float_u3:float#
+type t224 = string * string * string * float32_u
 
 external opaque_ignore : ('a [@local_opt]) -> unit = "%opaque"
 
@@ -750,6 +825,81 @@ let t148_C : t148 = (C (create_int64x4 ())) in
 let t148_D : t148 = (D (create_int64x4 ())) in
 let t149_A : t149 = (A (create_string (), create_int64x2 ())) in
 let t149_B : t149 = (B { int64x4_u0 = create_int64x4 () }) in
+let t150 : t150 = (create_int64x4 (), ~str1:(create_string ())) in
+let t151 : t151 = (create_float (), ~int64x4_u1:(create_int64x4 ())) in
+let t152 : t152 = (create_int64x2 (), ~str1:(create_string ())) in
+let t153 : t153 = (create_string (), create_string (), ~int64x4_u2:(create_int64x4 ())) in
+let t154 : t154 = (create_float (), create_int64x2 ()) in
+let t155 : t155 = (create_string (), create_float_u ()) in
+let t156 : t156 = (~int64x4_u0:(create_int64x4 ()), create_float (), create_string ()) in
+let t157 : t157 = (~int64x2_u0:(create_int64x2 ()), create_string (), create_string ()) in
+let t158 : t158 = (~float0:(create_float ()), ~float_u1:(create_float_u ())) in
+let t159 : t159 = (create_string (), ~float32_u1:(create_float32_u ())) in
+let t160 : t160 = (create_string (), create_int (), create_int64x4 ()) in
+let t161 : t161 = (~str0:(create_string ()), ~float1:(create_float ()), ~int64x2_u2:(create_int64x2 ())) in
+let t162 : t162 = (~str0:(create_string ()), ~str1:(create_string ()), ~float_u2:(create_float_u ())) in
+let t163 : t163 = (create_float32_u (), ~float1:(create_float ())) in
+let t164 : t164 = (~str0:(create_string ()), create_int32_u ()) in
+let t165 : t165 = (create_string (), create_float (), create_int64x4 ()) in
+let t166 : t166 = (create_string (), ~imm1:(create_int ()), create_int64x2 ()) in
+let t167 : t167 = (create_string (), create_float (), ~float_u2:(create_float_u ())) in
+let t168 : t168 = (create_string (), create_float32_u (), create_string ()) in
+let t169 : t169 = (create_float (), create_int32_u ()) in
+let t170 : t170 = (create_string (), create_int64_u ()) in
+let t171 : t171 = (~float0:(create_float ()), create_int64x4 (), create_float ()) in
+let t172 : t172 = (~str0:(create_string ()), ~int64x2_u1:(create_int64x2 ()), create_float ()) in
+let t173 : t173 = (create_float_u (), ~imm1:(create_int ()), create_string ()) in
+let t174 : t174 = (~str0:(create_string ()), ~float1:(create_float ()), create_float32_u ()) in
+let t175 : t175 = (~str0:(create_string ()), create_int32_u (), ~str2:(create_string ())) in
+let t176 : t176 = (create_int64_u (), create_float ()) in
+let t177 : t177 = (create_nativeint_u (), create_string ()) in
+let t178 : t178 = (~int64x4_u0:(create_int64x4 ()), ~int64x4_u1:(create_int64x4 ())) in
+let t179 : t179 = (~float0:(create_float ()), ~imm1:(create_int ()), ~int64x4_u2:(create_int64x4 ())) in
+let t180 : t180 = (create_float (), create_int64x2 (), ~float2:(create_float ())) in
+let t181 : t181 = (~str0:(create_string ()), create_float (), ~float_u2:(create_float_u ())) in
+let t182 : t182 = (create_string (), create_float32_u (), ~imm2:(create_int ())) in
+let t183 : t183 = (~str0:(create_string ()), create_int32_u (), create_float ()) in
+let t184 : t184 = (~str0:(create_string ()), create_string (), create_int64_u ()) in
+let t185 : t185 = (create_float (), ~n1:(create_nativeint_u ())) in
+let t186 : t186 = (~str0:(create_string ()), create_int64x4 (), ~int64x4_u2:(create_int64x4 ())) in
+let t187 : t187 = (create_int64x4 (), create_int64x2 ()) in
+let t188 : t188 = (~str0:(create_string ()), ~str1:(create_string ()), create_string (), create_int64x4 ()) in
+let t189 : t189 = (~float0:(create_float ()), ~int64x2_u1:(create_int64x2 ()), ~imm2:(create_int ())) in
+let t190 : t190 = (~float_u0:(create_float_u ()), create_float (), create_float ()) in
+let t191 : t191 = (create_float32_u (), create_float (), create_string ()) in
+let t192 : t192 = (create_string (), ~i32_1:(create_int32_u ()), create_int ()) in
+let t193 : t193 = (~float0:(create_float ()), ~i64_1:(create_int64_u ()), create_string ()) in
+let t194 : t194 = (create_nativeint_u (), ~str1:(create_string ()), create_string ()) in
+let t195 : t195 = (~float0:(create_float ()), create_int64x4 (), ~int64x4_u2:(create_int64x4 ())) in
+let t196 : t196 = (~int64x4_u0:(create_int64x4 ()), ~int64x2_u1:(create_int64x2 ()), ~str2:(create_string ())) in
+let t197 : t197 = (create_int64x4 (), create_float_u ()) in
+let t198 : t198 = (create_int64x4 (), ~str1:(create_string ()), create_string (), ~float3:(create_float ())) in
+let t199 : t199 = (create_string (), create_string (), ~str2:(create_string ()), create_int64x2 ()) in
+let t200 : t200 = (~float0:(create_float ()), create_float_u (), create_int ()) in
+let t201 : t201 = (~float32_u0:(create_float32_u ()), create_float (), ~float2:(create_float ())) in
+let t202 : t202 = (create_string (), create_float (), create_int32_u ()) in
+let t203 : t203 = (create_string (), ~i64_1:(create_int64_u ()), ~imm2:(create_int ())) in
+let t204 : t204 = (create_float (), ~n1:(create_nativeint_u ()), ~str2:(create_string ())) in
+let t205 : t205 = (~str0:(create_string ()), create_int64x4 (), create_string (), ~int64x4_u3:(create_int64x4 ())) in
+let t206 : t206 = (create_int64x2 (), ~int64x4_u1:(create_int64x4 ()), create_float ()) in
+let t207 : t207 = (~str0:(create_string ()), ~int64x4_u1:(create_int64x4 ()), create_float_u ()) in
+let t208 : t208 = (~int64x4_u0:(create_int64x4 ()), ~float32_u1:(create_float32_u ())) in
+let t209 : t209 = (create_string (), create_string (), create_int64x4 (), ~imm3:(create_int ())) in
+let t210 : t210 = (~str0:(create_string ()), create_float (), create_int64x2 (), create_string ()) in
+let t211 : t211 = (create_string (), ~float_u1:(create_float_u ()), create_string (), ~str3:(create_string ())) in
+let t212 : t212 = (~float0:(create_float ()), create_float32_u (), create_int ()) in
+let t213 : t213 = (~float0:(create_float ()), create_float (), create_int32_u ()) in
+let t214 : t214 = (create_float (), create_string (), ~i64_2:(create_int64_u ())) in
+let t215 : t215 = (~str0:(create_string ()), create_nativeint_u (), create_int ()) in
+let t216 : t216 = (create_float (), create_int64x4 (), create_int64x4 (), ~str3:(create_string ())) in
+let t217 : t217 = (~int64x4_u0:(create_int64x4 ()), create_int64x2 (), ~str2:(create_string ()), ~str3:(create_string ())) in
+let t218 : t218 = (create_int64x4 (), ~float1:(create_float ()), create_float_u ()) in
+let t219 : t219 = (create_float32_u (), ~str1:(create_string ()), ~int64x4_u2:(create_int64x4 ())) in
+let t220 : t220 = (create_float (), create_int64x4 ()) in
+let t221 : t221 = (create_int64x4 (), ~str1:(create_string ()), ~str2:(create_string ()), ~float3:(create_float ())) in
+let t222 : t222 = (create_int (), create_string (), create_string (), ~int64x2_u3:(create_int64x2 ())) in
+let t223 : t223 = (create_string (), ~str1:(create_string ()), create_float (), ~float_u3:(create_float_u ())) in
+let t224 : t224 = (create_string (), create_string (), create_string (), create_float32_u ()) in
 print_endline " - Doing GC";
 Gc.full_major ();
 
@@ -1020,9 +1170,84 @@ let t_orig148_C = t148_C in
 let t_orig148_D = t148_D in
 let t_orig149_A = t149_A in
 let t_orig149_B = t149_B in
+let t_orig150 = t150 in
+let t_orig151 = t151 in
+let t_orig152 = t152 in
+let t_orig153 = t153 in
+let t_orig154 = t154 in
+let t_orig155 = t155 in
+let t_orig156 = t156 in
+let t_orig157 = t157 in
+let t_orig158 = t158 in
+let t_orig159 = t159 in
+let t_orig160 = t160 in
+let t_orig161 = t161 in
+let t_orig162 = t162 in
+let t_orig163 = t163 in
+let t_orig164 = t164 in
+let t_orig165 = t165 in
+let t_orig166 = t166 in
+let t_orig167 = t167 in
+let t_orig168 = t168 in
+let t_orig169 = t169 in
+let t_orig170 = t170 in
+let t_orig171 = t171 in
+let t_orig172 = t172 in
+let t_orig173 = t173 in
+let t_orig174 = t174 in
+let t_orig175 = t175 in
+let t_orig176 = t176 in
+let t_orig177 = t177 in
+let t_orig178 = t178 in
+let t_orig179 = t179 in
+let t_orig180 = t180 in
+let t_orig181 = t181 in
+let t_orig182 = t182 in
+let t_orig183 = t183 in
+let t_orig184 = t184 in
+let t_orig185 = t185 in
+let t_orig186 = t186 in
+let t_orig187 = t187 in
+let t_orig188 = t188 in
+let t_orig189 = t189 in
+let t_orig190 = t190 in
+let t_orig191 = t191 in
+let t_orig192 = t192 in
+let t_orig193 = t193 in
+let t_orig194 = t194 in
+let t_orig195 = t195 in
+let t_orig196 = t196 in
+let t_orig197 = t197 in
+let t_orig198 = t198 in
+let t_orig199 = t199 in
+let t_orig200 = t200 in
+let t_orig201 = t201 in
+let t_orig202 = t202 in
+let t_orig203 = t203 in
+let t_orig204 = t204 in
+let t_orig205 = t205 in
+let t_orig206 = t206 in
+let t_orig207 = t207 in
+let t_orig208 = t208 in
+let t_orig209 = t209 in
+let t_orig210 = t210 in
+let t_orig211 = t211 in
+let t_orig212 = t212 in
+let t_orig213 = t213 in
+let t_orig214 = t214 in
+let t_orig215 = t215 in
+let t_orig216 = t216 in
+let t_orig217 = t217 in
+let t_orig218 = t218 in
+let t_orig219 = t219 in
+let t_orig220 = t220 in
+let t_orig221 = t221 in
+let t_orig222 = t222 in
+let t_orig223 = t223 in
+let t_orig224 = t224 in
 
 (* Checks *)
-  let run_checks (t0 : t0) (t1 : t1) (t2 : t2) (t3 : t3) (t4 : t4) (t5 : t5) (t6 : t6) (t7 : t7) (t8 : t8) (t9 : t9) (t10 : t10) (t11 : t11) (t12 : t12) (t13 : t13) (t14 : t14) (t15 : t15) (t16 : t16) (t17 : t17) (t18 : t18) (t19 : t19) (t20 : t20) (t21 : t21) (t22 : t22) (t23 : t23) (t24 : t24) (t25 : t25) (t26 : t26) (t27 : t27) (t28 : t28) (t29 : t29) (t30 : t30) (t31 : t31) (t32 : t32) (t33 : t33) (t34 : t34) (t35 : t35) (t36 : t36) (t37 : t37) (t38 : t38) (t39 : t39) (t40 : t40) (t41 : t41) (t42 : t42) (t43 : t43) (t44 : t44) (t45 : t45) (t46 : t46) (t47 : t47) (t48 : t48) (t49 : t49) (t50 : t50) (t51 : t51) (t52 : t52) (t53 : t53) (t54 : t54) (t55 : t55) (t56 : t56) (t57 : t57) (t58 : t58) (t59 : t59) (t60 : t60) (t61 : t61) (t62 : t62) (t63 : t63) (t64 : t64) (t65 : t65) (t66 : t66) (t67 : t67) (t68 : t68) (t69 : t69) (t70 : t70) (t71 : t71) (t72 : t72) (t73 : t73) (t74 : t74) (t75_A : t75) (t76_A : t76) (t76_B : t76) (t77_A : t77) (t78_A : t78) (t78_B : t78) (t78_C : t78) (t79_A : t79) (t79_B : t79) (t80_A : t80) (t81_A : t81) (t81_B : t81) (t82_A : t82) (t82_B : t82) (t82_C : t82) (t83_A : t83) (t83_B : t83) (t84_A : t84) (t85_A : t85) (t85_B : t85) (t85_C : t85) (t85_D : t85) (t86_A : t86) (t86_B : t86) (t87_A : t87) (t87_B : t87) (t87_C : t87) (t88_A : t88) (t88_B : t88) (t89_A : t89) (t90_A : t90) (t90_B : t90) (t90_C : t90) (t91_A : t91) (t91_B : t91) (t91_C : t91) (t91_D : t91) (t92_A : t92) (t92_B : t92) (t93_A : t93) (t93_B : t93) (t93_C : t93) (t94_A : t94) (t94_B : t94) (t95_A : t95) (t96_A : t96) (t96_B : t96) (t97_A : t97) (t97_B : t97) (t97_C : t97) (t98_A : t98) (t98_B : t98) (t98_C : t98) (t98_D : t98) (t99_A : t99) (t99_B : t99) (t100_A : t100) (t100_B : t100) (t100_C : t100) (t101_A : t101) (t101_B : t101) (t102_A : t102) (t103_A : t103) (t103_B : t103) (t103_C : t103) (t104_A : t104) (t104_B : t104) (t105_A : t105) (t105_B : t105) (t105_C : t105) (t106_A : t106) (t106_B : t106) (t106_C : t106) (t106_D : t106) (t107_A : t107) (t107_B : t107) (t108_A : t108) (t108_B : t108) (t108_C : t108) (t109_A : t109) (t109_B : t109) (t110_A : t110) (t111_A : t111) (t111_B : t111) (t111_C : t111) (t111_D : t111) (t112_A : t112) (t112_B : t112) (t112_C : t112) (t113_A : t113) (t113_B : t113) (t114_A : t114) (t114_B : t114) (t114_C : t114) (t115_A : t115) (t115_B : t115) (t115_C : t115) (t115_D : t115) (t116_A : t116) (t116_B : t116) (t117_A : t117) (t117_B : t117) (t117_C : t117) (t118_A : t118) (t118_B : t118) (t119_A : t119) (t120_A : t120) (t120_B : t120) (t120_C : t120) (t121_A : t121) (t121_B : t121) (t121_C : t121) (t121_D : t121) (t122_A : t122) (t122_B : t122) (t122_C : t122) (t123_A : t123) (t123_B : t123) (t124_A : t124) (t124_B : t124) (t124_C : t124) (t125_A : t125) (t125_B : t125) (t125_C : t125) (t125_D : t125) (t126_A : t126) (t126_B : t126) (t127_A : t127) (t127_B : t127) (t127_C : t127) (t128_A : t128) (t128_B : t128) (t129_A : t129) (t130_A : t130) (t130_B : t130) (t131_A : t131) (t131_B : t131) (t131_C : t131) (t132_A : t132) (t132_B : t132) (t132_C : t132) (t132_D : t132) (t133_A : t133) (t133_B : t133) (t133_C : t133) (t134_A : t134) (t134_B : t134) (t135_A : t135) (t135_B : t135) (t135_C : t135) (t136_A : t136) (t136_B : t136) (t136_C : t136) (t136_D : t136) (t137_A : t137) (t137_B : t137) (t138_A : t138) (t138_B : t138) (t138_C : t138) (t139_A : t139) (t139_B : t139) (t140_A : t140) (t141_A : t141) (t141_B : t141) (t141_C : t141) (t141_D : t141) (t141_E : t141) (t142_A : t142) (t142_B : t142) (t143_A : t143) (t143_B : t143) (t143_C : t143) (t144_A : t144) (t144_B : t144) (t144_C : t144) (t144_D : t144) (t145_A : t145) (t145_B : t145) (t145_C : t145) (t146_A : t146) (t146_B : t146) (t147_A : t147) (t147_B : t147) (t147_C : t147) (t148_A : t148) (t148_B : t148) (t148_C : t148) (t148_D : t148) (t149_A : t149) (t149_B : t149) =
+  let run_checks (t0 : t0) (t1 : t1) (t2 : t2) (t3 : t3) (t4 : t4) (t5 : t5) (t6 : t6) (t7 : t7) (t8 : t8) (t9 : t9) (t10 : t10) (t11 : t11) (t12 : t12) (t13 : t13) (t14 : t14) (t15 : t15) (t16 : t16) (t17 : t17) (t18 : t18) (t19 : t19) (t20 : t20) (t21 : t21) (t22 : t22) (t23 : t23) (t24 : t24) (t25 : t25) (t26 : t26) (t27 : t27) (t28 : t28) (t29 : t29) (t30 : t30) (t31 : t31) (t32 : t32) (t33 : t33) (t34 : t34) (t35 : t35) (t36 : t36) (t37 : t37) (t38 : t38) (t39 : t39) (t40 : t40) (t41 : t41) (t42 : t42) (t43 : t43) (t44 : t44) (t45 : t45) (t46 : t46) (t47 : t47) (t48 : t48) (t49 : t49) (t50 : t50) (t51 : t51) (t52 : t52) (t53 : t53) (t54 : t54) (t55 : t55) (t56 : t56) (t57 : t57) (t58 : t58) (t59 : t59) (t60 : t60) (t61 : t61) (t62 : t62) (t63 : t63) (t64 : t64) (t65 : t65) (t66 : t66) (t67 : t67) (t68 : t68) (t69 : t69) (t70 : t70) (t71 : t71) (t72 : t72) (t73 : t73) (t74 : t74) (t75_A : t75) (t76_A : t76) (t76_B : t76) (t77_A : t77) (t78_A : t78) (t78_B : t78) (t78_C : t78) (t79_A : t79) (t79_B : t79) (t80_A : t80) (t81_A : t81) (t81_B : t81) (t82_A : t82) (t82_B : t82) (t82_C : t82) (t83_A : t83) (t83_B : t83) (t84_A : t84) (t85_A : t85) (t85_B : t85) (t85_C : t85) (t85_D : t85) (t86_A : t86) (t86_B : t86) (t87_A : t87) (t87_B : t87) (t87_C : t87) (t88_A : t88) (t88_B : t88) (t89_A : t89) (t90_A : t90) (t90_B : t90) (t90_C : t90) (t91_A : t91) (t91_B : t91) (t91_C : t91) (t91_D : t91) (t92_A : t92) (t92_B : t92) (t93_A : t93) (t93_B : t93) (t93_C : t93) (t94_A : t94) (t94_B : t94) (t95_A : t95) (t96_A : t96) (t96_B : t96) (t97_A : t97) (t97_B : t97) (t97_C : t97) (t98_A : t98) (t98_B : t98) (t98_C : t98) (t98_D : t98) (t99_A : t99) (t99_B : t99) (t100_A : t100) (t100_B : t100) (t100_C : t100) (t101_A : t101) (t101_B : t101) (t102_A : t102) (t103_A : t103) (t103_B : t103) (t103_C : t103) (t104_A : t104) (t104_B : t104) (t105_A : t105) (t105_B : t105) (t105_C : t105) (t106_A : t106) (t106_B : t106) (t106_C : t106) (t106_D : t106) (t107_A : t107) (t107_B : t107) (t108_A : t108) (t108_B : t108) (t108_C : t108) (t109_A : t109) (t109_B : t109) (t110_A : t110) (t111_A : t111) (t111_B : t111) (t111_C : t111) (t111_D : t111) (t112_A : t112) (t112_B : t112) (t112_C : t112) (t113_A : t113) (t113_B : t113) (t114_A : t114) (t114_B : t114) (t114_C : t114) (t115_A : t115) (t115_B : t115) (t115_C : t115) (t115_D : t115) (t116_A : t116) (t116_B : t116) (t117_A : t117) (t117_B : t117) (t117_C : t117) (t118_A : t118) (t118_B : t118) (t119_A : t119) (t120_A : t120) (t120_B : t120) (t120_C : t120) (t121_A : t121) (t121_B : t121) (t121_C : t121) (t121_D : t121) (t122_A : t122) (t122_B : t122) (t122_C : t122) (t123_A : t123) (t123_B : t123) (t124_A : t124) (t124_B : t124) (t124_C : t124) (t125_A : t125) (t125_B : t125) (t125_C : t125) (t125_D : t125) (t126_A : t126) (t126_B : t126) (t127_A : t127) (t127_B : t127) (t127_C : t127) (t128_A : t128) (t128_B : t128) (t129_A : t129) (t130_A : t130) (t130_B : t130) (t131_A : t131) (t131_B : t131) (t131_C : t131) (t132_A : t132) (t132_B : t132) (t132_C : t132) (t132_D : t132) (t133_A : t133) (t133_B : t133) (t133_C : t133) (t134_A : t134) (t134_B : t134) (t135_A : t135) (t135_B : t135) (t135_C : t135) (t136_A : t136) (t136_B : t136) (t136_C : t136) (t136_D : t136) (t137_A : t137) (t137_B : t137) (t138_A : t138) (t138_B : t138) (t138_C : t138) (t139_A : t139) (t139_B : t139) (t140_A : t140) (t141_A : t141) (t141_B : t141) (t141_C : t141) (t141_D : t141) (t141_E : t141) (t142_A : t142) (t142_B : t142) (t143_A : t143) (t143_B : t143) (t143_C : t143) (t144_A : t144) (t144_B : t144) (t144_C : t144) (t144_D : t144) (t145_A : t145) (t145_B : t145) (t145_C : t145) (t146_A : t146) (t146_B : t146) (t147_A : t147) (t147_B : t147) (t147_C : t147) (t148_A : t148) (t148_B : t148) (t148_C : t148) (t148_D : t148) (t149_A : t149) (t149_B : t149) (t150 : t150) (t151 : t151) (t152 : t152) (t153 : t153) (t154 : t154) (t155 : t155) (t156 : t156) (t157 : t157) (t158 : t158) (t159 : t159) (t160 : t160) (t161 : t161) (t162 : t162) (t163 : t163) (t164 : t164) (t165 : t165) (t166 : t166) (t167 : t167) (t168 : t168) (t169 : t169) (t170 : t170) (t171 : t171) (t172 : t172) (t173 : t173) (t174 : t174) (t175 : t175) (t176 : t176) (t177 : t177) (t178 : t178) (t179 : t179) (t180 : t180) (t181 : t181) (t182 : t182) (t183 : t183) (t184 : t184) (t185 : t185) (t186 : t186) (t187 : t187) (t188 : t188) (t189 : t189) (t190 : t190) (t191 : t191) (t192 : t192) (t193 : t193) (t194 : t194) (t195 : t195) (t196 : t196) (t197 : t197) (t198 : t198) (t199 : t199) (t200 : t200) (t201 : t201) (t202 : t202) (t203 : t203) (t204 : t204) (t205 : t205) (t206 : t206) (t207 : t207) (t208 : t208) (t209 : t209) (t210 : t210) (t211 : t211) (t212 : t212) (t213 : t213) (t214 : t214) (t215 : t215) (t216 : t216) (t217 : t217) (t218 : t218) (t219 : t219) (t220 : t220) (t221 : t221) (t222 : t222) (t223 : t223) (t224 : t224) =
   print_endline "    - Marshaling";
   marshal_expect_failure t0;
   marshal_expect_failure t1;
@@ -1289,6 +1514,81 @@ let t_orig149_B = t149_B in
   marshal_expect_failure t148_D;
   marshal_expect_failure t149_A;
   marshal_expect_failure t149_B;
+  marshal_expect_failure t150;
+  marshal_expect_failure t151;
+  marshal_expect_failure t152;
+  marshal_expect_failure t153;
+  marshal_expect_failure t154;
+  marshal_expect_failure t155;
+  marshal_expect_failure t156;
+  marshal_expect_failure t157;
+  marshal_expect_failure t158;
+  marshal_expect_failure t159;
+  marshal_expect_failure t160;
+  marshal_expect_failure t161;
+  marshal_expect_failure t162;
+  marshal_expect_failure t163;
+  marshal_expect_failure t164;
+  marshal_expect_failure t165;
+  marshal_expect_failure t166;
+  marshal_expect_failure t167;
+  marshal_expect_failure t168;
+  marshal_expect_failure t169;
+  marshal_expect_failure t170;
+  marshal_expect_failure t171;
+  marshal_expect_failure t172;
+  marshal_expect_failure t173;
+  marshal_expect_failure t174;
+  marshal_expect_failure t175;
+  marshal_expect_failure t176;
+  marshal_expect_failure t177;
+  marshal_expect_failure t178;
+  marshal_expect_failure t179;
+  marshal_expect_failure t180;
+  marshal_expect_failure t181;
+  marshal_expect_failure t182;
+  marshal_expect_failure t183;
+  marshal_expect_failure t184;
+  marshal_expect_failure t185;
+  marshal_expect_failure t186;
+  marshal_expect_failure t187;
+  marshal_expect_failure t188;
+  marshal_expect_failure t189;
+  marshal_expect_failure t190;
+  marshal_expect_failure t191;
+  marshal_expect_failure t192;
+  marshal_expect_failure t193;
+  marshal_expect_failure t194;
+  marshal_expect_failure t195;
+  marshal_expect_failure t196;
+  marshal_expect_failure t197;
+  marshal_expect_failure t198;
+  marshal_expect_failure t199;
+  marshal_expect_failure t200;
+  marshal_expect_failure t201;
+  marshal_expect_failure t202;
+  marshal_expect_failure t203;
+  marshal_expect_failure t204;
+  marshal_expect_failure t205;
+  marshal_expect_failure t206;
+  marshal_expect_failure t207;
+  marshal_expect_failure t208;
+  marshal_expect_failure t209;
+  marshal_expect_failure t210;
+  marshal_expect_failure t211;
+  marshal_expect_failure t212;
+  marshal_expect_failure t213;
+  marshal_expect_failure t214;
+  marshal_expect_failure t215;
+  marshal_expect_failure t216;
+  marshal_expect_failure t217;
+  marshal_expect_failure t218;
+  marshal_expect_failure t219;
+  marshal_expect_failure t220;
+  marshal_expect_failure t221;
+  marshal_expect_failure t222;
+  marshal_expect_failure t223;
+  marshal_expect_failure t224;
   print_endline "    - Hashing";
   hash_expect_failure t0;
   hash_expect_failure t1;
@@ -1555,6 +1855,81 @@ let t_orig149_B = t149_B in
   hash_expect_failure t148_D;
   hash_expect_failure t149_A;
   hash_expect_failure t149_B;
+  hash_expect_failure t150;
+  hash_expect_failure t151;
+  hash_expect_failure t152;
+  hash_expect_failure t153;
+  hash_expect_failure t154;
+  hash_expect_failure t155;
+  hash_expect_failure t156;
+  hash_expect_failure t157;
+  hash_expect_failure t158;
+  hash_expect_failure t159;
+  hash_expect_failure t160;
+  hash_expect_failure t161;
+  hash_expect_failure t162;
+  hash_expect_failure t163;
+  hash_expect_failure t164;
+  hash_expect_failure t165;
+  hash_expect_failure t166;
+  hash_expect_failure t167;
+  hash_expect_failure t168;
+  hash_expect_failure t169;
+  hash_expect_failure t170;
+  hash_expect_failure t171;
+  hash_expect_failure t172;
+  hash_expect_failure t173;
+  hash_expect_failure t174;
+  hash_expect_failure t175;
+  hash_expect_failure t176;
+  hash_expect_failure t177;
+  hash_expect_failure t178;
+  hash_expect_failure t179;
+  hash_expect_failure t180;
+  hash_expect_failure t181;
+  hash_expect_failure t182;
+  hash_expect_failure t183;
+  hash_expect_failure t184;
+  hash_expect_failure t185;
+  hash_expect_failure t186;
+  hash_expect_failure t187;
+  hash_expect_failure t188;
+  hash_expect_failure t189;
+  hash_expect_failure t190;
+  hash_expect_failure t191;
+  hash_expect_failure t192;
+  hash_expect_failure t193;
+  hash_expect_failure t194;
+  hash_expect_failure t195;
+  hash_expect_failure t196;
+  hash_expect_failure t197;
+  hash_expect_failure t198;
+  hash_expect_failure t199;
+  hash_expect_failure t200;
+  hash_expect_failure t201;
+  hash_expect_failure t202;
+  hash_expect_failure t203;
+  hash_expect_failure t204;
+  hash_expect_failure t205;
+  hash_expect_failure t206;
+  hash_expect_failure t207;
+  hash_expect_failure t208;
+  hash_expect_failure t209;
+  hash_expect_failure t210;
+  hash_expect_failure t211;
+  hash_expect_failure t212;
+  hash_expect_failure t213;
+  hash_expect_failure t214;
+  hash_expect_failure t215;
+  hash_expect_failure t216;
+  hash_expect_failure t217;
+  hash_expect_failure t218;
+  hash_expect_failure t219;
+  hash_expect_failure t220;
+  hash_expect_failure t221;
+  hash_expect_failure t222;
+  hash_expect_failure t223;
+  hash_expect_failure t224;
   print_endline "    - Comparing";
   compare_expect_failure t0 t1;
   compare_expect_failure t1 t2;
@@ -1820,7 +2195,82 @@ let t_orig149_B = t149_B in
   compare_expect_success t148_C t148_D;
   compare_expect_success t148_D t149_A;
   compare_expect_success t149_A t149_B;
-  compare_expect_success t149_B t0;
+  compare_expect_success t149_B t150;
+  compare_expect_failure t150 t151;
+  compare_expect_failure t151 t152;
+  compare_expect_failure t152 t153;
+  compare_expect_failure t153 t154;
+  compare_expect_failure t154 t155;
+  compare_expect_failure t155 t156;
+  compare_expect_failure t156 t157;
+  compare_expect_failure t157 t158;
+  compare_expect_failure t158 t159;
+  compare_expect_failure t159 t160;
+  compare_expect_failure t160 t161;
+  compare_expect_failure t161 t162;
+  compare_expect_failure t162 t163;
+  compare_expect_failure t163 t164;
+  compare_expect_failure t164 t165;
+  compare_expect_failure t165 t166;
+  compare_expect_failure t166 t167;
+  compare_expect_failure t167 t168;
+  compare_expect_failure t168 t169;
+  compare_expect_failure t169 t170;
+  compare_expect_failure t170 t171;
+  compare_expect_failure t171 t172;
+  compare_expect_failure t172 t173;
+  compare_expect_failure t173 t174;
+  compare_expect_failure t174 t175;
+  compare_expect_failure t175 t176;
+  compare_expect_failure t176 t177;
+  compare_expect_failure t177 t178;
+  compare_expect_failure t178 t179;
+  compare_expect_failure t179 t180;
+  compare_expect_failure t180 t181;
+  compare_expect_failure t181 t182;
+  compare_expect_failure t182 t183;
+  compare_expect_failure t183 t184;
+  compare_expect_failure t184 t185;
+  compare_expect_failure t185 t186;
+  compare_expect_failure t186 t187;
+  compare_expect_failure t187 t188;
+  compare_expect_failure t188 t189;
+  compare_expect_failure t189 t190;
+  compare_expect_failure t190 t191;
+  compare_expect_failure t191 t192;
+  compare_expect_failure t192 t193;
+  compare_expect_failure t193 t194;
+  compare_expect_failure t194 t195;
+  compare_expect_failure t195 t196;
+  compare_expect_failure t196 t197;
+  compare_expect_failure t197 t198;
+  compare_expect_failure t198 t199;
+  compare_expect_failure t199 t200;
+  compare_expect_failure t200 t201;
+  compare_expect_failure t201 t202;
+  compare_expect_failure t202 t203;
+  compare_expect_failure t203 t204;
+  compare_expect_failure t204 t205;
+  compare_expect_failure t205 t206;
+  compare_expect_failure t206 t207;
+  compare_expect_failure t207 t208;
+  compare_expect_failure t208 t209;
+  compare_expect_failure t209 t210;
+  compare_expect_failure t210 t211;
+  compare_expect_failure t211 t212;
+  compare_expect_failure t212 t213;
+  compare_expect_failure t213 t214;
+  compare_expect_failure t214 t215;
+  compare_expect_failure t215 t216;
+  compare_expect_failure t216 t217;
+  compare_expect_failure t217 t218;
+  compare_expect_failure t218 t219;
+  compare_expect_failure t219 t220;
+  compare_expect_failure t220 t221;
+  compare_expect_failure t221 t222;
+  compare_expect_failure t222 t223;
+  compare_expect_failure t223 t224;
+  compare_expect_failure t224 t0;
   print_endline "    - Checking field values";
   check_float t0.float0 t_orig0.float0 ~message:"t0.float0";
   check_float (Stdlib_upstream_compatible.Float_u.to_float t0.float_u1) (Stdlib_upstream_compatible.Float_u.to_float t_orig0.float_u1) ~message:"t0.float_u1";
@@ -2802,6 +3252,375 @@ check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t149_A.1";
       | B a, B b -> check_int64x4 (box_int64x4 a.int64x4_u0) (box_int64x4 b.int64x4_u0) ~message:"t149_B.int64x4_u0";
       | _ -> assert false
     in
+  let () = match t150, t_orig150 with
+      | (a0, ~str1:a1), (b0, ~str1:b1) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t150.0";
+check_string a1 b1 ~message:"t150.str1";
+    in
+  let () = match t151, t_orig151 with
+      | (a0, ~int64x4_u1:a1), (b0, ~int64x4_u1:b1) -> check_float a0 b0 ~message:"t151.0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t151.int64x4_u1";
+    in
+  let () = match t152, t_orig152 with
+      | (a0, ~str1:a1), (b0, ~str1:b1) -> check_int64x2 (box_int64x2 a0) (box_int64x2 b0) ~message:"t152.0";
+check_string a1 b1 ~message:"t152.str1";
+    in
+  let () = match t153, t_orig153 with
+      | (a0, a1, ~int64x4_u2:a2), (b0, b1, ~int64x4_u2:b2) -> check_string a0 b0 ~message:"t153.0";
+check_string a1 b1 ~message:"t153.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t153.int64x4_u2";
+    in
+  let () = match t154, t_orig154 with
+      | (a0, a1), (b0, b1) -> check_float a0 b0 ~message:"t154.0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t154.1";
+    in
+  let () = match t155, t_orig155 with
+      | (a0, a1), (b0, b1) -> check_string a0 b0 ~message:"t155.0";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a1) (Stdlib_upstream_compatible.Float_u.to_float b1) ~message:"t155.1";
+    in
+  let () = match t156, t_orig156 with
+      | (~int64x4_u0:a0, a1, a2), (~int64x4_u0:b0, b1, b2) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t156.int64x4_u0";
+check_float a1 b1 ~message:"t156.1";
+check_string a2 b2 ~message:"t156.2";
+    in
+  let () = match t157, t_orig157 with
+      | (~int64x2_u0:a0, a1, a2), (~int64x2_u0:b0, b1, b2) -> check_int64x2 (box_int64x2 a0) (box_int64x2 b0) ~message:"t157.int64x2_u0";
+check_string a1 b1 ~message:"t157.1";
+check_string a2 b2 ~message:"t157.2";
+    in
+  let () = match t158, t_orig158 with
+      | (~float0:a0, ~float_u1:a1), (~float0:b0, ~float_u1:b1) -> check_float a0 b0 ~message:"t158.float0";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a1) (Stdlib_upstream_compatible.Float_u.to_float b1) ~message:"t158.float_u1";
+    in
+  let () = match t159, t_orig159 with
+      | (a0, ~float32_u1:a1), (b0, ~float32_u1:b1) -> check_string a0 b0 ~message:"t159.0";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a1) (Stdlib_stable.Float32_u.to_float32 b1) ~message:"t159.float32_u1";
+    in
+  let () = match t160, t_orig160 with
+      | (a0, a1, a2), (b0, b1, b2) -> check_string a0 b0 ~message:"t160.0";
+check_int a1 b1 ~message:"t160.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t160.2";
+    in
+  let () = match t161, t_orig161 with
+      | (~str0:a0, ~float1:a1, ~int64x2_u2:a2), (~str0:b0, ~float1:b1, ~int64x2_u2:b2) -> check_string a0 b0 ~message:"t161.str0";
+check_float a1 b1 ~message:"t161.float1";
+check_int64x2 (box_int64x2 a2) (box_int64x2 b2) ~message:"t161.int64x2_u2";
+    in
+  let () = match t162, t_orig162 with
+      | (~str0:a0, ~str1:a1, ~float_u2:a2), (~str0:b0, ~str1:b1, ~float_u2:b2) -> check_string a0 b0 ~message:"t162.str0";
+check_string a1 b1 ~message:"t162.str1";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a2) (Stdlib_upstream_compatible.Float_u.to_float b2) ~message:"t162.float_u2";
+    in
+  let () = match t163, t_orig163 with
+      | (a0, ~float1:a1), (b0, ~float1:b1) -> check_float32 (Stdlib_stable.Float32_u.to_float32 a0) (Stdlib_stable.Float32_u.to_float32 b0) ~message:"t163.0";
+check_float a1 b1 ~message:"t163.float1";
+    in
+  let () = match t164, t_orig164 with
+      | (~str0:a0, a1), (~str0:b0, b1) -> check_string a0 b0 ~message:"t164.str0";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a1) (Stdlib_upstream_compatible.Int32_u.to_int32 b1) ~message:"t164.1";
+    in
+  let () = match t165, t_orig165 with
+      | (a0, a1, a2), (b0, b1, b2) -> check_string a0 b0 ~message:"t165.0";
+check_float a1 b1 ~message:"t165.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t165.2";
+    in
+  let () = match t166, t_orig166 with
+      | (a0, ~imm1:a1, a2), (b0, ~imm1:b1, b2) -> check_string a0 b0 ~message:"t166.0";
+check_int a1 b1 ~message:"t166.imm1";
+check_int64x2 (box_int64x2 a2) (box_int64x2 b2) ~message:"t166.2";
+    in
+  let () = match t167, t_orig167 with
+      | (a0, a1, ~float_u2:a2), (b0, b1, ~float_u2:b2) -> check_string a0 b0 ~message:"t167.0";
+check_float a1 b1 ~message:"t167.1";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a2) (Stdlib_upstream_compatible.Float_u.to_float b2) ~message:"t167.float_u2";
+    in
+  let () = match t168, t_orig168 with
+      | (a0, a1, a2), (b0, b1, b2) -> check_string a0 b0 ~message:"t168.0";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a1) (Stdlib_stable.Float32_u.to_float32 b1) ~message:"t168.1";
+check_string a2 b2 ~message:"t168.2";
+    in
+  let () = match t169, t_orig169 with
+      | (a0, a1), (b0, b1) -> check_float a0 b0 ~message:"t169.0";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a1) (Stdlib_upstream_compatible.Int32_u.to_int32 b1) ~message:"t169.1";
+    in
+  let () = match t170, t_orig170 with
+      | (a0, a1), (b0, b1) -> check_string a0 b0 ~message:"t170.0";
+check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a1) (Stdlib_upstream_compatible.Int64_u.to_int64 b1) ~message:"t170.1";
+    in
+  let () = match t171, t_orig171 with
+      | (~float0:a0, a1, a2), (~float0:b0, b1, b2) -> check_float a0 b0 ~message:"t171.float0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t171.1";
+check_float a2 b2 ~message:"t171.2";
+    in
+  let () = match t172, t_orig172 with
+      | (~str0:a0, ~int64x2_u1:a1, a2), (~str0:b0, ~int64x2_u1:b1, b2) -> check_string a0 b0 ~message:"t172.str0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t172.int64x2_u1";
+check_float a2 b2 ~message:"t172.2";
+    in
+  let () = match t173, t_orig173 with
+      | (a0, ~imm1:a1, a2), (b0, ~imm1:b1, b2) -> check_float (Stdlib_upstream_compatible.Float_u.to_float a0) (Stdlib_upstream_compatible.Float_u.to_float b0) ~message:"t173.0";
+check_int a1 b1 ~message:"t173.imm1";
+check_string a2 b2 ~message:"t173.2";
+    in
+  let () = match t174, t_orig174 with
+      | (~str0:a0, ~float1:a1, a2), (~str0:b0, ~float1:b1, b2) -> check_string a0 b0 ~message:"t174.str0";
+check_float a1 b1 ~message:"t174.float1";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a2) (Stdlib_stable.Float32_u.to_float32 b2) ~message:"t174.2";
+    in
+  let () = match t175, t_orig175 with
+      | (~str0:a0, a1, ~str2:a2), (~str0:b0, b1, ~str2:b2) -> check_string a0 b0 ~message:"t175.str0";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a1) (Stdlib_upstream_compatible.Int32_u.to_int32 b1) ~message:"t175.1";
+check_string a2 b2 ~message:"t175.str2";
+    in
+  let () = match t176, t_orig176 with
+      | (a0, a1), (b0, b1) -> check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a0) (Stdlib_upstream_compatible.Int64_u.to_int64 b0) ~message:"t176.0";
+check_float a1 b1 ~message:"t176.1";
+    in
+  let () = match t177, t_orig177 with
+      | (a0, a1), (b0, b1) -> check_int (Stdlib_upstream_compatible.Nativeint_u.to_int a0) (Stdlib_upstream_compatible.Nativeint_u.to_int b0) ~message:"t177.0";
+check_string a1 b1 ~message:"t177.1";
+    in
+  let () = match t178, t_orig178 with
+      | (~int64x4_u0:a0, ~int64x4_u1:a1), (~int64x4_u0:b0, ~int64x4_u1:b1) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t178.int64x4_u0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t178.int64x4_u1";
+    in
+  let () = match t179, t_orig179 with
+      | (~float0:a0, ~imm1:a1, ~int64x4_u2:a2), (~float0:b0, ~imm1:b1, ~int64x4_u2:b2) -> check_float a0 b0 ~message:"t179.float0";
+check_int a1 b1 ~message:"t179.imm1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t179.int64x4_u2";
+    in
+  let () = match t180, t_orig180 with
+      | (a0, a1, ~float2:a2), (b0, b1, ~float2:b2) -> check_float a0 b0 ~message:"t180.0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t180.1";
+check_float a2 b2 ~message:"t180.float2";
+    in
+  let () = match t181, t_orig181 with
+      | (~str0:a0, a1, ~float_u2:a2), (~str0:b0, b1, ~float_u2:b2) -> check_string a0 b0 ~message:"t181.str0";
+check_float a1 b1 ~message:"t181.1";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a2) (Stdlib_upstream_compatible.Float_u.to_float b2) ~message:"t181.float_u2";
+    in
+  let () = match t182, t_orig182 with
+      | (a0, a1, ~imm2:a2), (b0, b1, ~imm2:b2) -> check_string a0 b0 ~message:"t182.0";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a1) (Stdlib_stable.Float32_u.to_float32 b1) ~message:"t182.1";
+check_int a2 b2 ~message:"t182.imm2";
+    in
+  let () = match t183, t_orig183 with
+      | (~str0:a0, a1, a2), (~str0:b0, b1, b2) -> check_string a0 b0 ~message:"t183.str0";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a1) (Stdlib_upstream_compatible.Int32_u.to_int32 b1) ~message:"t183.1";
+check_float a2 b2 ~message:"t183.2";
+    in
+  let () = match t184, t_orig184 with
+      | (~str0:a0, a1, a2), (~str0:b0, b1, b2) -> check_string a0 b0 ~message:"t184.str0";
+check_string a1 b1 ~message:"t184.1";
+check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a2) (Stdlib_upstream_compatible.Int64_u.to_int64 b2) ~message:"t184.2";
+    in
+  let () = match t185, t_orig185 with
+      | (a0, ~n1:a1), (b0, ~n1:b1) -> check_float a0 b0 ~message:"t185.0";
+check_int (Stdlib_upstream_compatible.Nativeint_u.to_int a1) (Stdlib_upstream_compatible.Nativeint_u.to_int b1) ~message:"t185.n1";
+    in
+  let () = match t186, t_orig186 with
+      | (~str0:a0, a1, ~int64x4_u2:a2), (~str0:b0, b1, ~int64x4_u2:b2) -> check_string a0 b0 ~message:"t186.str0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t186.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t186.int64x4_u2";
+    in
+  let () = match t187, t_orig187 with
+      | (a0, a1), (b0, b1) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t187.0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t187.1";
+    in
+  let () = match t188, t_orig188 with
+      | (~str0:a0, ~str1:a1, a2, a3), (~str0:b0, ~str1:b1, b2, b3) -> check_string a0 b0 ~message:"t188.str0";
+check_string a1 b1 ~message:"t188.str1";
+check_string a2 b2 ~message:"t188.2";
+check_int64x4 (box_int64x4 a3) (box_int64x4 b3) ~message:"t188.3";
+    in
+  let () = match t189, t_orig189 with
+      | (~float0:a0, ~int64x2_u1:a1, ~imm2:a2), (~float0:b0, ~int64x2_u1:b1, ~imm2:b2) -> check_float a0 b0 ~message:"t189.float0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t189.int64x2_u1";
+check_int a2 b2 ~message:"t189.imm2";
+    in
+  let () = match t190, t_orig190 with
+      | (~float_u0:a0, a1, a2), (~float_u0:b0, b1, b2) -> check_float (Stdlib_upstream_compatible.Float_u.to_float a0) (Stdlib_upstream_compatible.Float_u.to_float b0) ~message:"t190.float_u0";
+check_float a1 b1 ~message:"t190.1";
+check_float a2 b2 ~message:"t190.2";
+    in
+  let () = match t191, t_orig191 with
+      | (a0, a1, a2), (b0, b1, b2) -> check_float32 (Stdlib_stable.Float32_u.to_float32 a0) (Stdlib_stable.Float32_u.to_float32 b0) ~message:"t191.0";
+check_float a1 b1 ~message:"t191.1";
+check_string a2 b2 ~message:"t191.2";
+    in
+  let () = match t192, t_orig192 with
+      | (a0, ~i32_1:a1, a2), (b0, ~i32_1:b1, b2) -> check_string a0 b0 ~message:"t192.0";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a1) (Stdlib_upstream_compatible.Int32_u.to_int32 b1) ~message:"t192.i32_1";
+check_int a2 b2 ~message:"t192.2";
+    in
+  let () = match t193, t_orig193 with
+      | (~float0:a0, ~i64_1:a1, a2), (~float0:b0, ~i64_1:b1, b2) -> check_float a0 b0 ~message:"t193.float0";
+check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a1) (Stdlib_upstream_compatible.Int64_u.to_int64 b1) ~message:"t193.i64_1";
+check_string a2 b2 ~message:"t193.2";
+    in
+  let () = match t194, t_orig194 with
+      | (a0, ~str1:a1, a2), (b0, ~str1:b1, b2) -> check_int (Stdlib_upstream_compatible.Nativeint_u.to_int a0) (Stdlib_upstream_compatible.Nativeint_u.to_int b0) ~message:"t194.0";
+check_string a1 b1 ~message:"t194.str1";
+check_string a2 b2 ~message:"t194.2";
+    in
+  let () = match t195, t_orig195 with
+      | (~float0:a0, a1, ~int64x4_u2:a2), (~float0:b0, b1, ~int64x4_u2:b2) -> check_float a0 b0 ~message:"t195.float0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t195.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t195.int64x4_u2";
+    in
+  let () = match t196, t_orig196 with
+      | (~int64x4_u0:a0, ~int64x2_u1:a1, ~str2:a2), (~int64x4_u0:b0, ~int64x2_u1:b1, ~str2:b2) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t196.int64x4_u0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t196.int64x2_u1";
+check_string a2 b2 ~message:"t196.str2";
+    in
+  let () = match t197, t_orig197 with
+      | (a0, a1), (b0, b1) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t197.0";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a1) (Stdlib_upstream_compatible.Float_u.to_float b1) ~message:"t197.1";
+    in
+  let () = match t198, t_orig198 with
+      | (a0, ~str1:a1, a2, ~float3:a3), (b0, ~str1:b1, b2, ~float3:b3) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t198.0";
+check_string a1 b1 ~message:"t198.str1";
+check_string a2 b2 ~message:"t198.2";
+check_float a3 b3 ~message:"t198.float3";
+    in
+  let () = match t199, t_orig199 with
+      | (a0, a1, ~str2:a2, a3), (b0, b1, ~str2:b2, b3) -> check_string a0 b0 ~message:"t199.0";
+check_string a1 b1 ~message:"t199.1";
+check_string a2 b2 ~message:"t199.str2";
+check_int64x2 (box_int64x2 a3) (box_int64x2 b3) ~message:"t199.3";
+    in
+  let () = match t200, t_orig200 with
+      | (~float0:a0, a1, a2), (~float0:b0, b1, b2) -> check_float a0 b0 ~message:"t200.float0";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a1) (Stdlib_upstream_compatible.Float_u.to_float b1) ~message:"t200.1";
+check_int a2 b2 ~message:"t200.2";
+    in
+  let () = match t201, t_orig201 with
+      | (~float32_u0:a0, a1, ~float2:a2), (~float32_u0:b0, b1, ~float2:b2) -> check_float32 (Stdlib_stable.Float32_u.to_float32 a0) (Stdlib_stable.Float32_u.to_float32 b0) ~message:"t201.float32_u0";
+check_float a1 b1 ~message:"t201.1";
+check_float a2 b2 ~message:"t201.float2";
+    in
+  let () = match t202, t_orig202 with
+      | (a0, a1, a2), (b0, b1, b2) -> check_string a0 b0 ~message:"t202.0";
+check_float a1 b1 ~message:"t202.1";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a2) (Stdlib_upstream_compatible.Int32_u.to_int32 b2) ~message:"t202.2";
+    in
+  let () = match t203, t_orig203 with
+      | (a0, ~i64_1:a1, ~imm2:a2), (b0, ~i64_1:b1, ~imm2:b2) -> check_string a0 b0 ~message:"t203.0";
+check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a1) (Stdlib_upstream_compatible.Int64_u.to_int64 b1) ~message:"t203.i64_1";
+check_int a2 b2 ~message:"t203.imm2";
+    in
+  let () = match t204, t_orig204 with
+      | (a0, ~n1:a1, ~str2:a2), (b0, ~n1:b1, ~str2:b2) -> check_float a0 b0 ~message:"t204.0";
+check_int (Stdlib_upstream_compatible.Nativeint_u.to_int a1) (Stdlib_upstream_compatible.Nativeint_u.to_int b1) ~message:"t204.n1";
+check_string a2 b2 ~message:"t204.str2";
+    in
+  let () = match t205, t_orig205 with
+      | (~str0:a0, a1, a2, ~int64x4_u3:a3), (~str0:b0, b1, b2, ~int64x4_u3:b3) -> check_string a0 b0 ~message:"t205.str0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t205.1";
+check_string a2 b2 ~message:"t205.2";
+check_int64x4 (box_int64x4 a3) (box_int64x4 b3) ~message:"t205.int64x4_u3";
+    in
+  let () = match t206, t_orig206 with
+      | (a0, ~int64x4_u1:a1, a2), (b0, ~int64x4_u1:b1, b2) -> check_int64x2 (box_int64x2 a0) (box_int64x2 b0) ~message:"t206.0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t206.int64x4_u1";
+check_float a2 b2 ~message:"t206.2";
+    in
+  let () = match t207, t_orig207 with
+      | (~str0:a0, ~int64x4_u1:a1, a2), (~str0:b0, ~int64x4_u1:b1, b2) -> check_string a0 b0 ~message:"t207.str0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t207.int64x4_u1";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a2) (Stdlib_upstream_compatible.Float_u.to_float b2) ~message:"t207.2";
+    in
+  let () = match t208, t_orig208 with
+      | (~int64x4_u0:a0, ~float32_u1:a1), (~int64x4_u0:b0, ~float32_u1:b1) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t208.int64x4_u0";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a1) (Stdlib_stable.Float32_u.to_float32 b1) ~message:"t208.float32_u1";
+    in
+  let () = match t209, t_orig209 with
+      | (a0, a1, a2, ~imm3:a3), (b0, b1, b2, ~imm3:b3) -> check_string a0 b0 ~message:"t209.0";
+check_string a1 b1 ~message:"t209.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t209.2";
+check_int a3 b3 ~message:"t209.imm3";
+    in
+  let () = match t210, t_orig210 with
+      | (~str0:a0, a1, a2, a3), (~str0:b0, b1, b2, b3) -> check_string a0 b0 ~message:"t210.str0";
+check_float a1 b1 ~message:"t210.1";
+check_int64x2 (box_int64x2 a2) (box_int64x2 b2) ~message:"t210.2";
+check_string a3 b3 ~message:"t210.3";
+    in
+  let () = match t211, t_orig211 with
+      | (a0, ~float_u1:a1, a2, ~str3:a3), (b0, ~float_u1:b1, b2, ~str3:b3) -> check_string a0 b0 ~message:"t211.0";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a1) (Stdlib_upstream_compatible.Float_u.to_float b1) ~message:"t211.float_u1";
+check_string a2 b2 ~message:"t211.2";
+check_string a3 b3 ~message:"t211.str3";
+    in
+  let () = match t212, t_orig212 with
+      | (~float0:a0, a1, a2), (~float0:b0, b1, b2) -> check_float a0 b0 ~message:"t212.float0";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a1) (Stdlib_stable.Float32_u.to_float32 b1) ~message:"t212.1";
+check_int a2 b2 ~message:"t212.2";
+    in
+  let () = match t213, t_orig213 with
+      | (~float0:a0, a1, a2), (~float0:b0, b1, b2) -> check_float a0 b0 ~message:"t213.float0";
+check_float a1 b1 ~message:"t213.1";
+check_int32 (Stdlib_upstream_compatible.Int32_u.to_int32 a2) (Stdlib_upstream_compatible.Int32_u.to_int32 b2) ~message:"t213.2";
+    in
+  let () = match t214, t_orig214 with
+      | (a0, a1, ~i64_2:a2), (b0, b1, ~i64_2:b2) -> check_float a0 b0 ~message:"t214.0";
+check_string a1 b1 ~message:"t214.1";
+check_int64 (Stdlib_upstream_compatible.Int64_u.to_int64 a2) (Stdlib_upstream_compatible.Int64_u.to_int64 b2) ~message:"t214.i64_2";
+    in
+  let () = match t215, t_orig215 with
+      | (~str0:a0, a1, a2), (~str0:b0, b1, b2) -> check_string a0 b0 ~message:"t215.str0";
+check_int (Stdlib_upstream_compatible.Nativeint_u.to_int a1) (Stdlib_upstream_compatible.Nativeint_u.to_int b1) ~message:"t215.1";
+check_int a2 b2 ~message:"t215.2";
+    in
+  let () = match t216, t_orig216 with
+      | (a0, a1, a2, ~str3:a3), (b0, b1, b2, ~str3:b3) -> check_float a0 b0 ~message:"t216.0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t216.1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t216.2";
+check_string a3 b3 ~message:"t216.str3";
+    in
+  let () = match t217, t_orig217 with
+      | (~int64x4_u0:a0, a1, ~str2:a2, ~str3:a3), (~int64x4_u0:b0, b1, ~str2:b2, ~str3:b3) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t217.int64x4_u0";
+check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t217.1";
+check_string a2 b2 ~message:"t217.str2";
+check_string a3 b3 ~message:"t217.str3";
+    in
+  let () = match t218, t_orig218 with
+      | (a0, ~float1:a1, a2), (b0, ~float1:b1, b2) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t218.0";
+check_float a1 b1 ~message:"t218.float1";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a2) (Stdlib_upstream_compatible.Float_u.to_float b2) ~message:"t218.2";
+    in
+  let () = match t219, t_orig219 with
+      | (a0, ~str1:a1, ~int64x4_u2:a2), (b0, ~str1:b1, ~int64x4_u2:b2) -> check_float32 (Stdlib_stable.Float32_u.to_float32 a0) (Stdlib_stable.Float32_u.to_float32 b0) ~message:"t219.0";
+check_string a1 b1 ~message:"t219.str1";
+check_int64x4 (box_int64x4 a2) (box_int64x4 b2) ~message:"t219.int64x4_u2";
+    in
+  let () = match t220, t_orig220 with
+      | (a0, a1), (b0, b1) -> check_float a0 b0 ~message:"t220.0";
+check_int64x4 (box_int64x4 a1) (box_int64x4 b1) ~message:"t220.1";
+    in
+  let () = match t221, t_orig221 with
+      | (a0, ~str1:a1, ~str2:a2, ~float3:a3), (b0, ~str1:b1, ~str2:b2, ~float3:b3) -> check_int64x4 (box_int64x4 a0) (box_int64x4 b0) ~message:"t221.0";
+check_string a1 b1 ~message:"t221.str1";
+check_string a2 b2 ~message:"t221.str2";
+check_float a3 b3 ~message:"t221.float3";
+    in
+  let () = match t222, t_orig222 with
+      | (a0, a1, a2, ~int64x2_u3:a3), (b0, b1, b2, ~int64x2_u3:b3) -> check_int a0 b0 ~message:"t222.0";
+check_string a1 b1 ~message:"t222.1";
+check_string a2 b2 ~message:"t222.2";
+check_int64x2 (box_int64x2 a3) (box_int64x2 b3) ~message:"t222.int64x2_u3";
+    in
+  let () = match t223, t_orig223 with
+      | (a0, ~str1:a1, a2, ~float_u3:a3), (b0, ~str1:b1, b2, ~float_u3:b3) -> check_string a0 b0 ~message:"t223.0";
+check_string a1 b1 ~message:"t223.str1";
+check_float a2 b2 ~message:"t223.2";
+check_float (Stdlib_upstream_compatible.Float_u.to_float a3) (Stdlib_upstream_compatible.Float_u.to_float b3) ~message:"t223.float_u3";
+    in
+  let () = match t224, t_orig224 with
+      | (a0, a1, a2, a3), (b0, b1, b2, b3) -> check_string a0 b0 ~message:"t224.0";
+check_string a1 b1 ~message:"t224.1";
+check_string a2 b2 ~message:"t224.2";
+check_float32 (Stdlib_stable.Float32_u.to_float32 a3) (Stdlib_stable.Float32_u.to_float32 b3) ~message:"t224.3";
+    in
   print_endline "    - Checking [Obj.reachable_words]";
   check_reachable_words (Obj.reachable_words (Obj.repr t0)) (3) "Reachable words 0";
   check_reachable_words (Obj.reachable_words (Obj.repr t1)) (3) "Reachable words 1";
@@ -2881,11 +3700,11 @@ check_int64x2 (box_int64x2 a1) (box_int64x2 b1) ~message:"t149_A.1";
   ()
 in
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 print_endline " - Doing GC";
 Gc.full_major ();
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 print_endline "Copying values via [Stdlib.Weak]";
 let t0 : t0 = copy_via_weak t0 in
 let t1 : t1 = copy_via_weak t1 in
@@ -3152,12 +3971,87 @@ let t148_C : t148 = copy_via_weak t148_C in
 let t148_D : t148 = copy_via_weak t148_D in
 let t149_A : t149 = copy_via_weak t149_A in
 let t149_B : t149 = copy_via_weak t149_B in
+let t150 : t150 = copy_via_weak t150 in
+let t151 : t151 = copy_via_weak t151 in
+let t152 : t152 = copy_via_weak t152 in
+let t153 : t153 = copy_via_weak t153 in
+let t154 : t154 = copy_via_weak t154 in
+let t155 : t155 = copy_via_weak t155 in
+let t156 : t156 = copy_via_weak t156 in
+let t157 : t157 = copy_via_weak t157 in
+let t158 : t158 = copy_via_weak t158 in
+let t159 : t159 = copy_via_weak t159 in
+let t160 : t160 = copy_via_weak t160 in
+let t161 : t161 = copy_via_weak t161 in
+let t162 : t162 = copy_via_weak t162 in
+let t163 : t163 = copy_via_weak t163 in
+let t164 : t164 = copy_via_weak t164 in
+let t165 : t165 = copy_via_weak t165 in
+let t166 : t166 = copy_via_weak t166 in
+let t167 : t167 = copy_via_weak t167 in
+let t168 : t168 = copy_via_weak t168 in
+let t169 : t169 = copy_via_weak t169 in
+let t170 : t170 = copy_via_weak t170 in
+let t171 : t171 = copy_via_weak t171 in
+let t172 : t172 = copy_via_weak t172 in
+let t173 : t173 = copy_via_weak t173 in
+let t174 : t174 = copy_via_weak t174 in
+let t175 : t175 = copy_via_weak t175 in
+let t176 : t176 = copy_via_weak t176 in
+let t177 : t177 = copy_via_weak t177 in
+let t178 : t178 = copy_via_weak t178 in
+let t179 : t179 = copy_via_weak t179 in
+let t180 : t180 = copy_via_weak t180 in
+let t181 : t181 = copy_via_weak t181 in
+let t182 : t182 = copy_via_weak t182 in
+let t183 : t183 = copy_via_weak t183 in
+let t184 : t184 = copy_via_weak t184 in
+let t185 : t185 = copy_via_weak t185 in
+let t186 : t186 = copy_via_weak t186 in
+let t187 : t187 = copy_via_weak t187 in
+let t188 : t188 = copy_via_weak t188 in
+let t189 : t189 = copy_via_weak t189 in
+let t190 : t190 = copy_via_weak t190 in
+let t191 : t191 = copy_via_weak t191 in
+let t192 : t192 = copy_via_weak t192 in
+let t193 : t193 = copy_via_weak t193 in
+let t194 : t194 = copy_via_weak t194 in
+let t195 : t195 = copy_via_weak t195 in
+let t196 : t196 = copy_via_weak t196 in
+let t197 : t197 = copy_via_weak t197 in
+let t198 : t198 = copy_via_weak t198 in
+let t199 : t199 = copy_via_weak t199 in
+let t200 : t200 = copy_via_weak t200 in
+let t201 : t201 = copy_via_weak t201 in
+let t202 : t202 = copy_via_weak t202 in
+let t203 : t203 = copy_via_weak t203 in
+let t204 : t204 = copy_via_weak t204 in
+let t205 : t205 = copy_via_weak t205 in
+let t206 : t206 = copy_via_weak t206 in
+let t207 : t207 = copy_via_weak t207 in
+let t208 : t208 = copy_via_weak t208 in
+let t209 : t209 = copy_via_weak t209 in
+let t210 : t210 = copy_via_weak t210 in
+let t211 : t211 = copy_via_weak t211 in
+let t212 : t212 = copy_via_weak t212 in
+let t213 : t213 = copy_via_weak t213 in
+let t214 : t214 = copy_via_weak t214 in
+let t215 : t215 = copy_via_weak t215 in
+let t216 : t216 = copy_via_weak t216 in
+let t217 : t217 = copy_via_weak t217 in
+let t218 : t218 = copy_via_weak t218 in
+let t219 : t219 = copy_via_weak t219 in
+let t220 : t220 = copy_via_weak t220 in
+let t221 : t221 = copy_via_weak t221 in
+let t222 : t222 = copy_via_weak t222 in
+let t223 : t223 = copy_via_weak t223 in
+let t224 : t224 = copy_via_weak t224 in
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 print_endline " - Doing GC";
 Gc.full_major ();
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 print_endline "Copying values via [Obj.with_tag]";
 let t0 : t0 = copy_via_tag t0 in
 let t1 : t1 = copy_via_tag t1 in
@@ -3424,12 +4318,87 @@ let t148_C : t148 = copy_via_tag t148_C in
 let t148_D : t148 = copy_via_tag t148_D in
 let t149_A : t149 = copy_via_tag t149_A in
 let t149_B : t149 = copy_via_tag t149_B in
+let t150 : t150 = copy_via_tag t150 in
+let t151 : t151 = copy_via_tag t151 in
+let t152 : t152 = copy_via_tag t152 in
+let t153 : t153 = copy_via_tag t153 in
+let t154 : t154 = copy_via_tag t154 in
+let t155 : t155 = copy_via_tag t155 in
+let t156 : t156 = copy_via_tag t156 in
+let t157 : t157 = copy_via_tag t157 in
+let t158 : t158 = copy_via_tag t158 in
+let t159 : t159 = copy_via_tag t159 in
+let t160 : t160 = copy_via_tag t160 in
+let t161 : t161 = copy_via_tag t161 in
+let t162 : t162 = copy_via_tag t162 in
+let t163 : t163 = copy_via_tag t163 in
+let t164 : t164 = copy_via_tag t164 in
+let t165 : t165 = copy_via_tag t165 in
+let t166 : t166 = copy_via_tag t166 in
+let t167 : t167 = copy_via_tag t167 in
+let t168 : t168 = copy_via_tag t168 in
+let t169 : t169 = copy_via_tag t169 in
+let t170 : t170 = copy_via_tag t170 in
+let t171 : t171 = copy_via_tag t171 in
+let t172 : t172 = copy_via_tag t172 in
+let t173 : t173 = copy_via_tag t173 in
+let t174 : t174 = copy_via_tag t174 in
+let t175 : t175 = copy_via_tag t175 in
+let t176 : t176 = copy_via_tag t176 in
+let t177 : t177 = copy_via_tag t177 in
+let t178 : t178 = copy_via_tag t178 in
+let t179 : t179 = copy_via_tag t179 in
+let t180 : t180 = copy_via_tag t180 in
+let t181 : t181 = copy_via_tag t181 in
+let t182 : t182 = copy_via_tag t182 in
+let t183 : t183 = copy_via_tag t183 in
+let t184 : t184 = copy_via_tag t184 in
+let t185 : t185 = copy_via_tag t185 in
+let t186 : t186 = copy_via_tag t186 in
+let t187 : t187 = copy_via_tag t187 in
+let t188 : t188 = copy_via_tag t188 in
+let t189 : t189 = copy_via_tag t189 in
+let t190 : t190 = copy_via_tag t190 in
+let t191 : t191 = copy_via_tag t191 in
+let t192 : t192 = copy_via_tag t192 in
+let t193 : t193 = copy_via_tag t193 in
+let t194 : t194 = copy_via_tag t194 in
+let t195 : t195 = copy_via_tag t195 in
+let t196 : t196 = copy_via_tag t196 in
+let t197 : t197 = copy_via_tag t197 in
+let t198 : t198 = copy_via_tag t198 in
+let t199 : t199 = copy_via_tag t199 in
+let t200 : t200 = copy_via_tag t200 in
+let t201 : t201 = copy_via_tag t201 in
+let t202 : t202 = copy_via_tag t202 in
+let t203 : t203 = copy_via_tag t203 in
+let t204 : t204 = copy_via_tag t204 in
+let t205 : t205 = copy_via_tag t205 in
+let t206 : t206 = copy_via_tag t206 in
+let t207 : t207 = copy_via_tag t207 in
+let t208 : t208 = copy_via_tag t208 in
+let t209 : t209 = copy_via_tag t209 in
+let t210 : t210 = copy_via_tag t210 in
+let t211 : t211 = copy_via_tag t211 in
+let t212 : t212 = copy_via_tag t212 in
+let t213 : t213 = copy_via_tag t213 in
+let t214 : t214 = copy_via_tag t214 in
+let t215 : t215 = copy_via_tag t215 in
+let t216 : t216 = copy_via_tag t216 in
+let t217 : t217 = copy_via_tag t217 in
+let t218 : t218 = copy_via_tag t218 in
+let t219 : t219 = copy_via_tag t219 in
+let t220 : t220 = copy_via_tag t220 in
+let t221 : t221 = copy_via_tag t221 in
+let t222 : t222 = copy_via_tag t222 in
+let t223 : t223 = copy_via_tag t223 in
+let t224 : t224 = copy_via_tag t224 in
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 print_endline " - Doing GC";
 Gc.full_major ();
 print_endline " - Running checks";
-let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B in
+let () = run_checks t0 t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23 t24 t25 t26 t27 t28 t29 t30 t31 t32 t33 t34 t35 t36 t37 t38 t39 t40 t41 t42 t43 t44 t45 t46 t47 t48 t49 t50 t51 t52 t53 t54 t55 t56 t57 t58 t59 t60 t61 t62 t63 t64 t65 t66 t67 t68 t69 t70 t71 t72 t73 t74 t75_A t76_A t76_B t77_A t78_A t78_B t78_C t79_A t79_B t80_A t81_A t81_B t82_A t82_B t82_C t83_A t83_B t84_A t85_A t85_B t85_C t85_D t86_A t86_B t87_A t87_B t87_C t88_A t88_B t89_A t90_A t90_B t90_C t91_A t91_B t91_C t91_D t92_A t92_B t93_A t93_B t93_C t94_A t94_B t95_A t96_A t96_B t97_A t97_B t97_C t98_A t98_B t98_C t98_D t99_A t99_B t100_A t100_B t100_C t101_A t101_B t102_A t103_A t103_B t103_C t104_A t104_B t105_A t105_B t105_C t106_A t106_B t106_C t106_D t107_A t107_B t108_A t108_B t108_C t109_A t109_B t110_A t111_A t111_B t111_C t111_D t112_A t112_B t112_C t113_A t113_B t114_A t114_B t114_C t115_A t115_B t115_C t115_D t116_A t116_B t117_A t117_B t117_C t118_A t118_B t119_A t120_A t120_B t120_C t121_A t121_B t121_C t121_D t122_A t122_B t122_C t123_A t123_B t124_A t124_B t124_C t125_A t125_B t125_C t125_D t126_A t126_B t127_A t127_B t127_C t128_A t128_B t129_A t130_A t130_B t131_A t131_B t131_C t132_A t132_B t132_C t132_D t133_A t133_B t133_C t134_A t134_B t135_A t135_B t135_C t136_A t136_B t136_C t136_D t137_A t137_B t138_A t138_B t138_C t139_A t139_B t140_A t141_A t141_B t141_C t141_D t141_E t142_A t142_B t143_A t143_B t143_C t144_A t144_B t144_C t144_D t145_A t145_B t145_C t146_A t146_B t147_A t147_B t147_C t148_A t148_B t148_C t148_D t149_A t149_B t150 t151 t152 t153 t154 t155 t156 t157 t158 t159 t160 t161 t162 t163 t164 t165 t166 t167 t168 t169 t170 t171 t172 t173 t174 t175 t176 t177 t178 t179 t180 t181 t182 t183 t184 t185 t186 t187 t188 t189 t190 t191 t192 t193 t194 t195 t196 t197 t198 t199 t200 t201 t202 t203 t204 t205 t206 t207 t208 t209 t210 t211 t212 t213 t214 t215 t216 t217 t218 t219 t220 t221 t222 t223 t224 in
 
 (* Testing local allocation *)
 let go () =
@@ -3698,6 +4667,81 @@ let go () =
   let local_ t148_D : t148 = (D (create_int64x4 ())) in
   let local_ t149_A : t149 = (A (create_string (), create_int64x2 ())) in
   let local_ t149_B : t149 = (B { int64x4_u0 = create_int64x4 () }) in
+  let local_ t150 : t150 = (create_int64x4 (), ~str1:(create_string ())) in
+  let local_ t151 : t151 = (create_float (), ~int64x4_u1:(create_int64x4 ())) in
+  let local_ t152 : t152 = (create_int64x2 (), ~str1:(create_string ())) in
+  let local_ t153 : t153 = (create_string (), create_string (), ~int64x4_u2:(create_int64x4 ())) in
+  let local_ t154 : t154 = (create_float (), create_int64x2 ()) in
+  let local_ t155 : t155 = (create_string (), create_float_u ()) in
+  let local_ t156 : t156 = (~int64x4_u0:(create_int64x4 ()), create_float (), create_string ()) in
+  let local_ t157 : t157 = (~int64x2_u0:(create_int64x2 ()), create_string (), create_string ()) in
+  let local_ t158 : t158 = (~float0:(create_float ()), ~float_u1:(create_float_u ())) in
+  let local_ t159 : t159 = (create_string (), ~float32_u1:(create_float32_u ())) in
+  let local_ t160 : t160 = (create_string (), create_int (), create_int64x4 ()) in
+  let local_ t161 : t161 = (~str0:(create_string ()), ~float1:(create_float ()), ~int64x2_u2:(create_int64x2 ())) in
+  let local_ t162 : t162 = (~str0:(create_string ()), ~str1:(create_string ()), ~float_u2:(create_float_u ())) in
+  let local_ t163 : t163 = (create_float32_u (), ~float1:(create_float ())) in
+  let local_ t164 : t164 = (~str0:(create_string ()), create_int32_u ()) in
+  let local_ t165 : t165 = (create_string (), create_float (), create_int64x4 ()) in
+  let local_ t166 : t166 = (create_string (), ~imm1:(create_int ()), create_int64x2 ()) in
+  let local_ t167 : t167 = (create_string (), create_float (), ~float_u2:(create_float_u ())) in
+  let local_ t168 : t168 = (create_string (), create_float32_u (), create_string ()) in
+  let local_ t169 : t169 = (create_float (), create_int32_u ()) in
+  let local_ t170 : t170 = (create_string (), create_int64_u ()) in
+  let local_ t171 : t171 = (~float0:(create_float ()), create_int64x4 (), create_float ()) in
+  let local_ t172 : t172 = (~str0:(create_string ()), ~int64x2_u1:(create_int64x2 ()), create_float ()) in
+  let local_ t173 : t173 = (create_float_u (), ~imm1:(create_int ()), create_string ()) in
+  let local_ t174 : t174 = (~str0:(create_string ()), ~float1:(create_float ()), create_float32_u ()) in
+  let local_ t175 : t175 = (~str0:(create_string ()), create_int32_u (), ~str2:(create_string ())) in
+  let local_ t176 : t176 = (create_int64_u (), create_float ()) in
+  let local_ t177 : t177 = (create_nativeint_u (), create_string ()) in
+  let local_ t178 : t178 = (~int64x4_u0:(create_int64x4 ()), ~int64x4_u1:(create_int64x4 ())) in
+  let local_ t179 : t179 = (~float0:(create_float ()), ~imm1:(create_int ()), ~int64x4_u2:(create_int64x4 ())) in
+  let local_ t180 : t180 = (create_float (), create_int64x2 (), ~float2:(create_float ())) in
+  let local_ t181 : t181 = (~str0:(create_string ()), create_float (), ~float_u2:(create_float_u ())) in
+  let local_ t182 : t182 = (create_string (), create_float32_u (), ~imm2:(create_int ())) in
+  let local_ t183 : t183 = (~str0:(create_string ()), create_int32_u (), create_float ()) in
+  let local_ t184 : t184 = (~str0:(create_string ()), create_string (), create_int64_u ()) in
+  let local_ t185 : t185 = (create_float (), ~n1:(create_nativeint_u ())) in
+  let local_ t186 : t186 = (~str0:(create_string ()), create_int64x4 (), ~int64x4_u2:(create_int64x4 ())) in
+  let local_ t187 : t187 = (create_int64x4 (), create_int64x2 ()) in
+  let local_ t188 : t188 = (~str0:(create_string ()), ~str1:(create_string ()), create_string (), create_int64x4 ()) in
+  let local_ t189 : t189 = (~float0:(create_float ()), ~int64x2_u1:(create_int64x2 ()), ~imm2:(create_int ())) in
+  let local_ t190 : t190 = (~float_u0:(create_float_u ()), create_float (), create_float ()) in
+  let local_ t191 : t191 = (create_float32_u (), create_float (), create_string ()) in
+  let local_ t192 : t192 = (create_string (), ~i32_1:(create_int32_u ()), create_int ()) in
+  let local_ t193 : t193 = (~float0:(create_float ()), ~i64_1:(create_int64_u ()), create_string ()) in
+  let local_ t194 : t194 = (create_nativeint_u (), ~str1:(create_string ()), create_string ()) in
+  let local_ t195 : t195 = (~float0:(create_float ()), create_int64x4 (), ~int64x4_u2:(create_int64x4 ())) in
+  let local_ t196 : t196 = (~int64x4_u0:(create_int64x4 ()), ~int64x2_u1:(create_int64x2 ()), ~str2:(create_string ())) in
+  let local_ t197 : t197 = (create_int64x4 (), create_float_u ()) in
+  let local_ t198 : t198 = (create_int64x4 (), ~str1:(create_string ()), create_string (), ~float3:(create_float ())) in
+  let local_ t199 : t199 = (create_string (), create_string (), ~str2:(create_string ()), create_int64x2 ()) in
+  let local_ t200 : t200 = (~float0:(create_float ()), create_float_u (), create_int ()) in
+  let local_ t201 : t201 = (~float32_u0:(create_float32_u ()), create_float (), ~float2:(create_float ())) in
+  let local_ t202 : t202 = (create_string (), create_float (), create_int32_u ()) in
+  let local_ t203 : t203 = (create_string (), ~i64_1:(create_int64_u ()), ~imm2:(create_int ())) in
+  let local_ t204 : t204 = (create_float (), ~n1:(create_nativeint_u ()), ~str2:(create_string ())) in
+  let local_ t205 : t205 = (~str0:(create_string ()), create_int64x4 (), create_string (), ~int64x4_u3:(create_int64x4 ())) in
+  let local_ t206 : t206 = (create_int64x2 (), ~int64x4_u1:(create_int64x4 ()), create_float ()) in
+  let local_ t207 : t207 = (~str0:(create_string ()), ~int64x4_u1:(create_int64x4 ()), create_float_u ()) in
+  let local_ t208 : t208 = (~int64x4_u0:(create_int64x4 ()), ~float32_u1:(create_float32_u ())) in
+  let local_ t209 : t209 = (create_string (), create_string (), create_int64x4 (), ~imm3:(create_int ())) in
+  let local_ t210 : t210 = (~str0:(create_string ()), create_float (), create_int64x2 (), create_string ()) in
+  let local_ t211 : t211 = (create_string (), ~float_u1:(create_float_u ()), create_string (), ~str3:(create_string ())) in
+  let local_ t212 : t212 = (~float0:(create_float ()), create_float32_u (), create_int ()) in
+  let local_ t213 : t213 = (~float0:(create_float ()), create_float (), create_int32_u ()) in
+  let local_ t214 : t214 = (create_float (), create_string (), ~i64_2:(create_int64_u ())) in
+  let local_ t215 : t215 = (~str0:(create_string ()), create_nativeint_u (), create_int ()) in
+  let local_ t216 : t216 = (create_float (), create_int64x4 (), create_int64x4 (), ~str3:(create_string ())) in
+  let local_ t217 : t217 = (~int64x4_u0:(create_int64x4 ()), create_int64x2 (), ~str2:(create_string ()), ~str3:(create_string ())) in
+  let local_ t218 : t218 = (create_int64x4 (), ~float1:(create_float ()), create_float_u ()) in
+  let local_ t219 : t219 = (create_float32_u (), ~str1:(create_string ()), ~int64x4_u2:(create_int64x4 ())) in
+  let local_ t220 : t220 = (create_float (), create_int64x4 ()) in
+  let local_ t221 : t221 = (create_int64x4 (), ~str1:(create_string ()), ~str2:(create_string ()), ~float3:(create_float ())) in
+  let local_ t222 : t222 = (create_int (), create_string (), create_string (), ~int64x2_u3:(create_int64x2 ())) in
+  let local_ t223 : t223 = (create_string (), ~str1:(create_string ()), create_float (), ~float_u3:(create_float_u ())) in
+  let local_ t224 : t224 = (create_string (), create_string (), create_string (), create_float32_u ()) in
   print_endline " - Doing GC";
   Gc.full_major ();
   opaque_ignore t0;
@@ -3965,6 +5009,81 @@ let go () =
   opaque_ignore t148_D;
   opaque_ignore t149_A;
   opaque_ignore t149_B;
+  opaque_ignore t150;
+  opaque_ignore t151;
+  opaque_ignore t152;
+  opaque_ignore t153;
+  opaque_ignore t154;
+  opaque_ignore t155;
+  opaque_ignore t156;
+  opaque_ignore t157;
+  opaque_ignore t158;
+  opaque_ignore t159;
+  opaque_ignore t160;
+  opaque_ignore t161;
+  opaque_ignore t162;
+  opaque_ignore t163;
+  opaque_ignore t164;
+  opaque_ignore t165;
+  opaque_ignore t166;
+  opaque_ignore t167;
+  opaque_ignore t168;
+  opaque_ignore t169;
+  opaque_ignore t170;
+  opaque_ignore t171;
+  opaque_ignore t172;
+  opaque_ignore t173;
+  opaque_ignore t174;
+  opaque_ignore t175;
+  opaque_ignore t176;
+  opaque_ignore t177;
+  opaque_ignore t178;
+  opaque_ignore t179;
+  opaque_ignore t180;
+  opaque_ignore t181;
+  opaque_ignore t182;
+  opaque_ignore t183;
+  opaque_ignore t184;
+  opaque_ignore t185;
+  opaque_ignore t186;
+  opaque_ignore t187;
+  opaque_ignore t188;
+  opaque_ignore t189;
+  opaque_ignore t190;
+  opaque_ignore t191;
+  opaque_ignore t192;
+  opaque_ignore t193;
+  opaque_ignore t194;
+  opaque_ignore t195;
+  opaque_ignore t196;
+  opaque_ignore t197;
+  opaque_ignore t198;
+  opaque_ignore t199;
+  opaque_ignore t200;
+  opaque_ignore t201;
+  opaque_ignore t202;
+  opaque_ignore t203;
+  opaque_ignore t204;
+  opaque_ignore t205;
+  opaque_ignore t206;
+  opaque_ignore t207;
+  opaque_ignore t208;
+  opaque_ignore t209;
+  opaque_ignore t210;
+  opaque_ignore t211;
+  opaque_ignore t212;
+  opaque_ignore t213;
+  opaque_ignore t214;
+  opaque_ignore t215;
+  opaque_ignore t216;
+  opaque_ignore t217;
+  opaque_ignore t218;
+  opaque_ignore t219;
+  opaque_ignore t220;
+  opaque_ignore t221;
+  opaque_ignore t222;
+  opaque_ignore t223;
+  opaque_ignore t224;
   ()
 in
 print_endline "Testing local allocations";
