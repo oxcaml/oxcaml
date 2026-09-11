@@ -41,6 +41,13 @@
  file = "reaper_rebuild_sections_dep.reaped.cmx";
  file-exists;
 
+ flags = "-reaper-rebuild reaper_rebuild_sections.cmr reaper_rebuild_sections_dep.cmr reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
+ compiler_output2 = "batch.sections";
+ ocamlopt.opt;
+ script = "awk '/^ltosol: loaded section Reaper_rebuild_sections_dep$/ {dep++} /^ltosol: loaded section Reaper_rebuild_sections$/ {caller++} END {exit (dep != 1 || caller != 1)}' batch.sections";
+ script;
+
+ compiler_output2 = "ocamlopt.opt.output";
  flags = "";
  all_modules = "reaper_rebuild_sections_dep.reaped.cmx reaper_rebuild_sections.reaped.cmx";
  ocamlopt.opt;
@@ -51,10 +58,10 @@
 *)
 
 (* The solution is sharded per compilation unit; each rebuild must read only
-   the sections for the units it needs. The reference file checks, via the
-   debug output, that rebuilding the independent unit does not read this unit's
-   or the dependency's sections, and that rebuilding the dependency does not
-   read the independent unit's section.
+   the sections it queries. The reference file checks that rebuilding the
+   independent unit or the dependency does not read the caller's section.
+   The batched rebuild checks that a section loaded for the caller is reused
+   when rebuilding the dependency, rather than imported a second time.
 
    The caller is rebuilt before the dependency, so its direct call must use
    the solved foreign code metadata without a dependency .reaped.cmx file.
