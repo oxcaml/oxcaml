@@ -3,7 +3,6 @@
  { expect; expect.opt; }
 *)
 
-(* CR zeisbach: maybe we should try to do better than this. *)
 (* There is a cap on the number of elements in the scannable prefix. The error
    is reported when the mixed tuple is built, since [t_capped] doesn't get a
    decl. *)
@@ -247,8 +246,6 @@ Lines 2-20, characters 2-3:
 Error: Mixed tuples may contain at most 254 value fields prior to the flat suffix, but this one contains 255.
 |}]
 
-(* CR zeisbach: add a similar case but with [any] once Joe's PR lands *)
-
 (* regression test: partial pattern matching counterexample generation *)
 
 type t = int * float# * #((unit * string) * unit#)
@@ -340,21 +337,3 @@ let _ =
 type rec_constr = C of (#(rec_constr option * float#) * int)
 - : unit = ()
 |}]
-
-(* tuples and layout poly *)
-(* CR zeisbach: buff this up, and move it to the right place. *)
-
-(*= external box_float : float# -> float = "%box_float"
-
-let poly_ my_pair_f x y = Sys.opaque_identity (x + 1, y)
-
-let _ =
-  let x, y = my_pair_f 42 #42.0 in
-  let () = Printf.printf "%d, %f\n" x (box_float y) in
-  let z1, z2 = my_pair_f 43 "hi" in
-  let () = Printf.printf "%d, %s\n" z1 z2 in
-  ()
-[%%expect{|
-type rec_constr = C of (#(rec_constr option * float#) * int)
-- : unit = ()
-|}] *)
