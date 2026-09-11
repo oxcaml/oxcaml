@@ -1,0 +1,9 @@
+(library
+ (name sedlex_test)
+ (libraries sedlex)
+ (inline_tests
+  (deps UTF-8-test.txt))
+ (enabled_if
+  (>= %{ocaml_version} 4.14))
+ (preprocess
+  (pps sedlex.ppx ppx_expect)))
