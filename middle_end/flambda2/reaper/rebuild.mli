@@ -41,7 +41,7 @@ val rebuild :
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
-  types_rewrite_context:Types_rewriter.rewrite_context ->
+  types_rewrite_context:Types_rewriter.rewrite_context Lazy.t ->
   code_changes:Unboxing_analysis.code_changes ->
   code_deps_for_result_types:Traverse_acc.code_dep Code_id.Map.t option ->
   Unboxing_analysis.result ->

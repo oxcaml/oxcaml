@@ -63,7 +63,7 @@ type env =
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
     inside_code_definition : bool;
-    types_rewrite_context : Types_rewriter.rewrite_context
+    types_rewrite_context : Types_rewriter.rewrite_context Lazy.t
   }
 
 type rebuild_result =
@@ -2151,7 +2151,8 @@ and rebuild_function_params_and_body (env : env) res code_metadata
                     with_decisions code_dep.return return_decisions )
               in
               Or_unknown_or_bottom.Ok
-                (Types_rewriter.rewrite_result_types env.types_rewrite_context
+                (Types_rewriter.rewrite_result_types
+                   (Lazy.force env.types_rewrite_context)
                    ~old_typing_env ~my_closure ~params:params_vars_and_keep
                    ~results:results_vars_and_keep result_types))
       in

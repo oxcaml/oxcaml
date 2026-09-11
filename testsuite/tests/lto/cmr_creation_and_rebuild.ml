@@ -30,6 +30,12 @@
  file = "cmr_creation_and_rebuild.reaped.cmx";
  file-exists;
 
+ program = "cmr_creation_and_rebuild.reaped.cmx";
+ output = "reaped.objinfo";
+ ocamlobjinfo;
+ script = "grep -q 'Flambda 2 unit (with no export information)' reaped.objinfo";
+ script;
+
  script = "sh -c 'grep -a -q LTO_UNUSED_MODULE_EXPORT cmr_creation_and_rebuild.reaped.o; test $? -eq 1'";
  script;
 

@@ -112,11 +112,9 @@ module Serialisable : sig
 
   val create : used_value_slots:Value_slot.Set.t -> cmr_format -> t
 
-  val deserialise :
-    machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  val deserialise_for_rebuild :
     t ->
-    cmr_format
+    Flambda_unit.Metadata.t * Exported_code.t * Reaper.Staged.Traverse_rebuild.t
 
   val deserialise_for_solve :
     t ->
@@ -210,19 +208,19 @@ end = struct
       rebuild_data
     }
 
-  let deserialise ~machine_width ~resolver
+  let deserialise_for_rebuild
       { original_compilation_unit;
         table_data;
         used_value_slots;
         unit_metadata;
-        final_typing_env;
+        final_typing_env = _;
         all_code;
-        imported_offsets;
-        deps;
-        slot_offsets_inputs;
-        solve_inputs;
+        imported_offsets = _;
+        deps = _;
+        slot_offsets_inputs = _;
+        solve_inputs = _;
         rebuild_data
-      } : cmr_format =
+      } =
     (* Insert hashconsed objects from the paused process into this process'
        tables, and create a mapping from the IDs in the old process to the ones
        in this process. [code_ids] contains a copy of this mapping for code IDs,
@@ -233,13 +231,6 @@ end = struct
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit
     in
-    let final_typing_env =
-      Option.map
-        (fun typing_env ->
-          Typing_env.Serializable.apply_renaming typing_env renaming
-          |> Typing_env.Serializable.to_typing_env ~machine_width ~resolver)
-        final_typing_env
-    in
     let unit_metadata =
       Flambda_unit.Metadata.apply_renaming unit_metadata renaming
     in
@@ -247,25 +238,10 @@ end = struct
       All_code_with_sections.deserialise all_code
       |> Exported_code.apply_renaming code_ids renaming
     in
-    let deps = Deps_with_fields.deserialise deps renaming in
-    let slot_offsets_inputs =
-      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
-    in
-    let solve_inputs =
-      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming
-    in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
-    { unit_metadata;
-      final_typing_env;
-      all_code;
-      imported_offsets;
-      deps;
-      slot_offsets_inputs;
-      solve_inputs;
-      rebuild_data
-    }
+    unit_metadata, all_code, rebuild_data
 
   let deserialise_for_solve
       { original_compilation_unit;

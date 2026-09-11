@@ -336,7 +336,7 @@ module Staged = struct
       traverse_rebuild
     in
     let types_rewrite_context =
-      Types_rewriter.prepare_rewrite_context uses all_sets_of_closures
+      lazy (Types_rewriter.prepare_rewrite_context uses all_sets_of_closures)
     in
     let Rebuild.{ body; all_code = rebuilt_code; code_ids_to_remember } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
@@ -370,8 +370,11 @@ module Staged = struct
     in
     let final_typing_env =
       Option.map
-        (Types_rewriter.rewrite_typing_env types_rewrite_context
-           ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata))
+        (fun typing_env ->
+          Types_rewriter.rewrite_typing_env
+            (Lazy.force types_rewrite_context)
+            ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata)
+            typing_env)
         final_typing_env
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,

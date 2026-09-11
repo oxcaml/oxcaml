@@ -32,20 +32,17 @@ module Serialisable : sig
 
   type t
 
-  (** Turn serialised file contents back into usable data types, inserting the
-      necessary objects into the global hashcons tables and then updating
-      hashcons IDs as appropriate. The resuming invocation must use the same
-      machine width and compilation unit as the one that wrote the field.*)
-  val deserialise :
-    machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  (** Import only the inputs needed to rebuild the unit. LTO rebuild does not
+      export types, so the typing environment and solve inputs are not
+      reconstructed. *)
+  val deserialise_for_rebuild :
     t ->
-    cmr_format
+    Flambda_unit.Metadata.t * Exported_code.t * Reaper.Staged.Traverse_rebuild.t
 
-  (** Like [deserialise], but only deserialises what the solve invocation needs:
-      the dependency graph, the slot offsets inputs and the per-unit solve
-      inputs (including the hashcons restore and rename process), together with
-      the stored imported offsets. *)
+  (** Deserialises only what the solve invocation needs: the dependency graph,
+      the slot offsets inputs and the per-unit solve inputs (including the
+      hashcons restore and rename process), together with the stored imported
+      offsets. *)
   val deserialise_for_solve :
     t ->
     Global_flow_graph.graph

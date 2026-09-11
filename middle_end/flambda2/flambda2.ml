@@ -524,11 +524,6 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
         Flambda2_reaper.Ltosol_format.solution_for_members ltosol
           ~members:batch_members)
   in
-  (* CR sspies: These are the whole-program slot offsets (and used value slot
-     set) computed at solve time, so every rebuilt unit exports the entire table
-     in its .cmx, and value-slot pruning of the exported typing env uses the
-     whole-program set. This is correct but conservative; in the future we may
-     want to restrict both to the slots the unit actually references. *)
   let slot_offsets = Flambda2_reaper.Ltosol_format.slot_offsets ltosol in
   let participant_units =
     Compilation_unit.Set.of_list
@@ -545,7 +540,6 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     get_module_info comp_unit
   in
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  let load_cmx_file_contents = Flambda_cmx.load_cmx_file_contents cmx_loader in
   fun ~keep_symbol_tables ~cmr_filename ~ppf_dump:_ ~prefixname:_ ->
     (* We expect the stamp counters in the .cmr file to be less than the
        counters in the .ltosol file, because the -reaper-solve invocation begins
@@ -562,62 +556,27 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
       Misc.fatal_error
         "The rebuild data contains ID stamp counters greater than those in the \
          the solution file. Stamp counter monotonicity is broken.";
-    let { Flambda2_reaper.Cmr_format.unit_metadata;
-          final_typing_env;
-          all_code;
-          imported_offsets;
-          deps = _;
-          slot_offsets_inputs = _;
-          solve_inputs;
-          rebuild_data
-        } =
+    let unit_metadata, all_code, rebuild_data =
       Profile.record_call ~accumulate:true "cmr_deserialise" (fun () ->
-          Flambda2_reaper.Cmr_format.Serialisable.deserialise ~machine_width
-            ~resolver:load_cmx_file_contents cmr_serialisable)
+          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_rebuild
+            cmr_serialisable)
     in
-    (* Make the paused compilation's imported offsets available for re-export in
-       [Flambda_cmx.prepare_cmx_file_contents]. The offsets of the units
-       participating in the solve come from the solution file instead. *)
-    Exported_offsets.import_offsets imported_offsets;
     (* CR mvellacott: add debug printing code. *)
-    let flambda, all_code, final_typing_env =
+    let flambda, all_code, _final_typing_env =
       Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
         ~traverse_rebuild:rebuild_data ~solution
-        ~code_deps_for_result_types:None
-        ~all_sets_of_closures:
-          solve_inputs
-            .Flambda2_reaper.Reaper.Staged.Solve_inputs.all_sets_of_closures
-        ~machine_width ~cmx_loader ~all_code ~final_typing_env
+        ~code_deps_for_result_types:None ~all_sets_of_closures:[] ~machine_width
+        ~cmx_loader ~all_code ~final_typing_env:None
     in
-    let { unit = flambda;
-          exported_offsets = offsets;
-          cmx;
-          all_code;
-          used_value_slots = _;
-          reachable_names
-        } =
-      let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
-          all_code =
-        (* CR sspies: Offsets of participants' slots are not re-exported here;
-           they must come from the solution file's [slot_offsets] instead of the
-           (stale) imported offsets. A participant slot that occurs only in
-           exported code metadata or the typing env, but not in the used slots
-           seen by the solve, is therefore missing from the .reaped.cmx. This is
-           fine while .reaped.cmx files are only used for linking, but must be
-           revisited if rebuilds were to consume each other's metadata. *)
-        Flambda_cmx.prepare_cmx_file_contents
-          ~is_local_compilation_unit:(fun cu ->
-            Compilation_unit.Set.mem cu participant_units)
-          ~final_typing_env ~module_symbol ~used_value_slots
-          ~exported_offsets
-            (* Pass a mutable reference to the (currently empty) list of .cmx
-               sections so that the sections created here get appended. *)
-          ~sections:(Compilenv.current_sections ())
-          all_code
-      in
-      build_run_result flambda ~all_code slot_offsets ~prepare_cmx
+    (* Reaped CMXs are only used for linking, so leave their Flambda export
+       information empty, as for opaque compilation. The backend still needs the
+       rebuilt code metadata and solved closure offsets. *)
+    let offsets = slot_offsets.Slot_offsets.exported_offsets in
+    let reachable_names =
+      NO.singleton_symbol
+        (Flambda_unit.module_symbol flambda)
+        Flambda2_nominal.Name_mode.normal
     in
-    Option.iter Compilenv.set_export_info cmx;
     Compiler_hooks.execute Reaped_flambda2 flambda;
     (* CR mvellacott: in the future we'd like to always localise unreachable
        symbols, but it can cause issues with LTO if not properly handled. *)
