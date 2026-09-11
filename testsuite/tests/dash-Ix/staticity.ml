@@ -16,67 +16,67 @@
 
 subdirectories = "slib";
 readonly_files = "use_module.ml use_field.ml use_open.ml";
-setup-ocamlc.byte-build-env;
+setup-ocamlopt.byte-build-env;
 
 (* Compile the static library module S. *)
 flags = "-extension layout_poly_alpha -I slib -nocwd";
 module = "slib/s.mli";
-ocamlc.byte;
+ocamlopt.byte;
 module = "slib/s.ml";
-ocamlc.byte;
+ocamlopt.byte;
 
 (* Scenario 1: rebind the whole module S at [@ static]. *)
 {
   flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_module.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "0";
-  ocamlc.byte;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "0";
+  ocamlopt.byte;
 }
 {
   flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_module.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference = "${test_source_directory}/use_module.ocamlc.reference";
-  check-ocamlc.byte-output;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "2";
+  ocamlopt.byte;
+  compiler_reference = "${test_source_directory}/use_module.ocamlopt.reference";
+  check-ocamlopt.byte-output;
 }
 
 (* Scenario 2: use the value [S.x] at [@ static]. *)
 {
   flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_field.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "0";
-  ocamlc.byte;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "0";
+  ocamlopt.byte;
 }
 {
   flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_field.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference = "${test_source_directory}/use_field.ocamlc.reference";
-  check-ocamlc.byte-output;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "2";
+  ocamlopt.byte;
+  compiler_reference = "${test_source_directory}/use_field.ocamlopt.reference";
+  check-ocamlopt.byte-output;
 }
 
 (* Scenario 3: [open S], with the [@ static] use occurring later. *)
 {
   flags = "-extension layout_poly_alpha -Ix slib -nocwd";
   module = "use_open.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "0";
-  ocamlc.byte;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "0";
+  ocamlopt.byte;
 }
 {
   flags = "-extension layout_poly_alpha -I slib -nocwd";
   module = "use_open.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference = "${test_source_directory}/use_open.ocamlc.reference";
-  check-ocamlc.byte-output;
+  setup-ocamlopt.byte-build-env;
+  ocamlopt_byte_exit_status = "2";
+  ocamlopt.byte;
+  compiler_reference = "${test_source_directory}/use_open.ocamlopt.reference";
+  check-ocamlopt.byte-output;
 }
 
 *)

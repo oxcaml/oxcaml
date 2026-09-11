@@ -30,6 +30,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of CU.t * CU.t * string
+  | No_cmx_file of CU.t
 
 exception Error of error
 
@@ -226,10 +227,11 @@ let get_unit_export_info comp_unit =
   Option.bind (get_unit comp_unit) get_export_info
 
 let get_static_data comp_unit =
-  Option.map
-    (fun ui ->
-      Slambdaeval.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections)
-    (get_unit comp_unit)
+  match get_unit comp_unit with
+  | Some ui ->
+    Slambda.CU_data.read ui.ui_static_data ~sections:ui.ui_file_sections
+  | None ->
+    raise(Error(No_cmx_file(comp_unit)))
 
 let which_cmx_file comp_unit =
   CU.which_cmx_file comp_unit ~accessed_by:(Current_unit.get_cu_exn ())
@@ -327,7 +329,7 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
   let quoted_intfs = Env.quoted_intfs () in
   let quoted_intfs_and_deps = Env.loaded_transitive_dependencies quoted_intfs in
   let static_data =
-    Slambdaeval.CU_data.write
+    Slambda.CU_data.write
       ~sections:current_unit.uib_file_sections
       static_data
   in
@@ -391,6 +393,9 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+  | No_cmx_file name ->
+      fprintf ppf "No compilation unit found for unit %a"
+        CU.print_as_inline_code name
 
 let () =
   Location.register_error_of_exn

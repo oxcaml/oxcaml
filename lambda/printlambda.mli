@@ -19,7 +19,6 @@ open Format
 
 val structured_constant: formatter -> structured_constant -> unit
 val lambda: formatter -> lambda -> unit
-val slambda: formatter -> slambda -> unit
 val lfunction : formatter -> lfunction -> unit
 val program: formatter -> program -> unit
 val primitive: formatter -> primitive -> unit

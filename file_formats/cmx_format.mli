@@ -75,10 +75,9 @@ type unit_infos =
     ui_requires_metaprogramming: bool;
                                   (* Requires metaprogramming libs *)
     ui_external_symbols: string list; (* Set of external symbols *)
-    ui_static_data: Slambdaeval.CU_data.raw;
-                                  (* Compile-time (comptime) value of the unit's
-                                     main module block, as produced by
-                                     [Slambda.eval]. *)
+    ui_static_data: Slambda.CU_data.raw;
+                                  (* Compile-time data of the unit's main module
+                                     block, as produced by [Slambda.eval]. *)
     ui_file_sections: File_sections.t;
   }
 
@@ -100,7 +99,7 @@ type unit_infos_raw =
                                       relative to byte immediately after
                                       this record *)
     uir_external_symbols: string array;
-    uir_static_data: Slambdaeval.CU_data.raw;
+    uir_static_data: Slambda.CU_data.raw;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

@@ -25,21 +25,24 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-open Lambda
+module CU_data : sig
+  type t
 
-(** [eval ~cu_static_data inspect tlambda] fractures [tlambda] into [slambda],
-    passes it through [inspect], then evaluates it. It returns a [value_halves]
-    so that the caller can save/manipulate the compile-time part of the value
-    represented by the [tlambda].
+  type raw
 
-    [inspect] can arbitrarily modify the [slambda] but it's expected to be used
-    by drivers to print the slambda if requested and return it unchanged.
+  val empty : unit -> t
 
-    [cu_static_data] is invoked when evaluation encounters a reference to a
-    static global from another compilation unit; it should return the
-    compile-time value associated with that unit. *)
+  val write : t -> sections:File_sections.Builder.t -> raw
+
+  val read : raw -> sections:File_sections.t -> t
+
+  val print : Format_doc.formatter -> t -> unit
+end
+
+(** Expand tlambda into lambda by evaluating its static content. The returned
+    static data contains the unit's value and templates.
+    [cu_static_data] supplies the static data of other compilation units. *)
 val eval :
-  cu_static_data:(Compilation_unit.t -> Slambdaeval.CU_data.t option) ->
-  (slambda -> slambda) ->
-  lambda ->
-  Slambdaeval.CU_data.t * lambda
+  cu_static_data:(Compilation_unit.t -> CU_data.t) ->
+  Lambda.lambda ->
+  CU_data.t * Lambda.lambda

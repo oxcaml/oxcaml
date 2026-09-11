@@ -47,8 +47,8 @@ val get_unit_export_info
   : Compilation_unit.t -> Flambda2_cmx.Flambda_cmx_format.t option
 
 val get_static_data :
-  Compilation_unit.t -> Slambdaeval.CU_data.t option
-        (* Returns [None] if the .cmx file cannot be located. *)
+  Compilation_unit.t -> Slambda.CU_data.t
+        (* Throws a user error if the .cmx file cannot be located. *)
 
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
@@ -78,13 +78,13 @@ val write_unit_info: unit_infos -> string -> unit
 val build_unit_info:
   main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
-  static_data:Slambdaeval.CU_data.t ->
+  static_data:Slambda.CU_data.t ->
   unit_infos
         (* Build the infos for the current unit. *)
 val save_unit_info:
   string -> main_module_block_format:Lambda.main_module_block_format ->
   arg_descr:Lambda.arg_descr option ->
-  static_data:Slambdaeval.CU_data.t ->
+  static_data:Slambda.CU_data.t ->
   unit
         (* Save the infos for the current unit in the given file *)
 val cache_unit_info: unit_infos -> unit
@@ -111,6 +111,7 @@ type error =
     Not_a_unit_info of string
   | Corrupted_unit_info of string
   | Illegal_renaming of Compilation_unit.t * Compilation_unit.t * string
+  | No_cmx_file of Compilation_unit.t
 
 exception Error of error
 
