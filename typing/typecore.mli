@@ -126,6 +126,12 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type layout_poly_restriction =
+  | Class
+
+type layout_poly_inst_restriction =
+  | Binding_op
+
 type module_patterns_restriction =
   | Modules_allowed of { scope: int }
   | Modules_rejected
@@ -410,13 +416,10 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Let_poly_not_yet_implemented
+  | Layout_poly_not_yet_supported of layout_poly_restriction
+  | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
-  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Useless_lpoly
-
-and invalid_layout_poly_inst_context =
-  | Binding_op
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

@@ -1466,6 +1466,12 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           cl_attributes = scl.pcl_attributes;
          }
   | Pcl_let (rec_flag, sdefs, scl') ->
+      List.iter
+        (fun sdef ->
+          if sdef.pvb_is_poly then
+            raise (Typecore.Error(sdef.pvb_loc, val_env,
+                                  Layout_poly_not_yet_supported Class)))
+        sdefs;
       let (defs, val_env) =
         Typecore.type_let In_class_def val_env Immutable rec_flag sdefs in
       let (vals, met_env) =

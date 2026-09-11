@@ -475,19 +475,22 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
+  let[@inline] set_var_level (v : var) (level : int) =
+    if level < v.level
+    then (
+      log_change (v, Clevel v.level);
+      v.level <- level)
+
   let rec update_level level = function
     | Var v -> (
       match v.contents with
       | Some t -> update_level level t
-      | None when level < v.level ->
-        log_change (v, Clevel v.level);
-        v.level <- level
-      | None -> ())
+      | None -> set_var_level v level)
     | Base _ | Univar _ -> ()
     | Product ts -> List.iter (update_level level) ts
     | Addressable t -> update_level level t
 
-  let[@inline] update_contents (v : var) (contents : t option) =
+  let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
     then (
       log_change (v, Ccontents v.contents);
@@ -499,7 +502,7 @@ module Sort = struct
     if v.level != subject_level
     then (
       update_level v.level t;
-      update_contents v (Some t);
+      set_var_contents v (Some t);
       true)
     else false
 
@@ -680,7 +683,7 @@ module Sort = struct
       | Some s ->
         let result = get s in
         (* path compression *)
-        if result != s then update_contents r (Some result);
+        if result != s then set_var_contents r (Some result);
         result)
 
   let rec subst s t =
@@ -696,8 +699,8 @@ module Sort = struct
     | Product ts -> Product (List.map (subst s) ts)
     | Addressable t -> Addressable (subst s t)
 
-  (** List of variables generalized so far during a call to [generalize_with],
-      [None] otherwise. *)
+  (** During a call to [generalize_with], [!generalized] is [Some] list of
+      generalized variables. Outside of a call, [!generalized] is [None]. *)
   let generalized : var list ref option ref = ref None
 
   (** All free sort variables above the [current_level] are generalized: their
@@ -705,7 +708,7 @@ module Sort = struct
   let generalize ~current_level sort =
     match !generalized with
     | None -> () (* Not in generalization context *)
-    | Some vars_ref ->
+    | Some generalized ->
       let rec loop sort =
         match sort with
         | Var v ->
@@ -713,7 +716,7 @@ module Sort = struct
           if v.level > current_level && v.level <> generic_level
           then begin
             v.level <- generic_level;
-            vars_ref := v :: !vars_ref
+            generalized := v :: !generalized
           end
         | Product sorts -> List.iter loop sorts
         | Addressable sort -> loop sort
@@ -724,14 +727,13 @@ module Sort = struct
   (** Calls [f] with sort variable generalization enabled, returning its result
       and sort variables generalized during the call. *)
   let generalize_with f =
-    let vars_ref = ref [] in
-    match !generalized with
-    | None ->
-      generalized := Some vars_ref;
-      let result = Misc.try_finally f ~always:(fun () -> generalized := None) in
-      result, List.rev !vars_ref
-    | Some _ ->
-      Misc.fatal_error "Jkind_types.generalize_with: nested generalize"
+    let prev_generalized = !generalized in
+    let curr_generalized = ref [] in
+    generalized := Some curr_generalized;
+    let result =
+      Misc.try_finally f ~always:(fun () -> generalized := prev_generalized)
+    in
+    result, List.rev !curr_generalized
 
   let rec to_const_opt : t -> Const.t option = function
     | Base b -> Some (Static.Const.of_base b)
@@ -788,9 +790,11 @@ module Sort = struct
     | Var v1, Var v2 when v1.id = v2.id -> true
     | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
     | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
-    | Var v1, Var v2 when v1.level < v2.level -> equate ~allow_mutation s2 s1
-    | Var ({ contents = None } as v1), _ -> allow_mutation && equate_var v1 s2
-    | _, Var ({ contents = None } as v2) -> allow_mutation && equate_var v2 s1
+    | Var _, Var _ when not allow_mutation -> false
+    | Var ({ contents = None } as v1), Var ({ contents = None } as v2) ->
+      if v1.level >= v2.level then equate_var v1 s2 else equate_var v2 s1
+    | Var ({ contents = None } as v1), _ -> equate_var v1 s2
+    | _, Var ({ contents = None } as v2) -> equate_var v2 s1
     | Addressable _, _ | _, Addressable _ ->
       (* We reduce the problem to [s1 addressable = s2 addressable], since if
          one side is addressable, then the other is too. At this point we
@@ -826,7 +830,7 @@ module Sort = struct
     | Var ({ contents = None } as v) ->
       if is_genvar v
       then Genvar v
-      else if equate ~allow_mutation:true s Static.T.scannable
+      else if equate_var v Static.T.scannable
       then Static.Const.scannable
       else
         Misc.fatal_error
