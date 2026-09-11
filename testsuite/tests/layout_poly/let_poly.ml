@@ -21,9 +21,21 @@ val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple "a" #1L in
-  let #(c, d) = tuple #42.0 "d" in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple "a" #1L in
+  let (c, d) = tuple #42.0 "d" in
+  (a, to_int64 b, to_float c, d)
+[%%expect{|
+val a : string = "a"
+val b : int64 = 1L
+val c : float = 42.
+val d : string = "d"
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u "a" #1L in
+  let #(c, d) = tuple_u #42.0 "d" in
   (a, to_int64 b, to_float c, d)
 [%%expect{|
 val a : string = "a"
@@ -288,10 +300,9 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-(* CR zeisbach: write another test that does constraining *)
-let poly_ f x y = #(x, (y, y))
+let poly_ f x y = #(x, Some y)
 [%%expect{|
-val poly_ f : 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+val poly_ f : 'b. 'a -> 'b -> #('a * 'b option) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
