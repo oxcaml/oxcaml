@@ -13,6 +13,8 @@
    ocamlopt.byte;
    debugger_script = "${test_source_directory}/lldb-script";
    lldb;
+   stdout = "";
+   stderr = "";
    script = "sh ${test_source_directory}/sanitize.sh macos-lldb-arm64";
    script;
    check-program-output;

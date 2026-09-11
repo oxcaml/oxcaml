@@ -4,10 +4,6 @@
  script = "sh ${test_source_directory}/is-linux.sh";
  hasunix;
  script;
- (* Workaround for https://github.com/ocaml/ocaml/issues/7910:
-    the 'script' action sets stdout and stderr, so reset manually. *)
- stdout = "${output}";
- stderr = "${output}";
  {
    bytecode;
  }{
