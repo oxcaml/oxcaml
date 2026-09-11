@@ -1,4 +1,2 @@
-ltosol sections for [Reaper_rebuild_sections_other]: loaded 1 of 4:
-  [Reaper_rebuild_sections_other]
-ltosol sections for [Reaper_rebuild_sections_dep]: loaded 3 of 4:
-  [*predef*; Reaper_rebuild_sections; Reaper_rebuild_sections_dep]
+ltosol: loaded section Reaper_rebuild_sections_other
+ltosol: loaded section Reaper_rebuild_sections_dep

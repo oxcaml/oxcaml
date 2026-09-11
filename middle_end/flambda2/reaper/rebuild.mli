@@ -41,7 +41,8 @@ type typing =
 type result = private
   { body : Flambda.Expr.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
+    code_ids_to_remember : Code_id.Set.t;
+    free_names : Name_occurrences.t
   }
 
 val rebuild :
@@ -50,8 +51,7 @@ val rebuild :
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
   typing:typing option ->
-  code_changes:Unboxing_analysis.code_changes ->
-  Analysis.result ->
+  Rebuild_solution.t ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
   Rev_expr.rev_code Code_id.Map.t ->

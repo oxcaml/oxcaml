@@ -46,7 +46,8 @@ module Staged : sig
 
   type solution =
     { uses : Analysis.result;
-      code_changes : Unboxing_analysis.code_changes
+      code_changes : Unboxing_analysis.code_changes;
+      queries : Rebuild_queries.t
     }
 
   (** Traverse the compilation unit in preparation for Reaper analysis.
@@ -75,20 +76,21 @@ module Staged : sig
     solution * Slot_offsets.result
 
   (** Use a Reaper solution and traversed compilation unit to rebuild the unit
-      with dead code removed. [solution.code_changes] must cover the current
-      unit and the other participating units whose code ids occur in it.
-      [typing] enables precise subkind and export-type rewriting for normal
-      Reaper. LTO passes [None] for backend-only rebuilding, which needs no type
-      database and leaves export types unknown. *)
+      with dead code removed. The solution must cover the current unit and the
+      other participating units whose identifiers occur in it. [typing] enables
+      precise subkind and export-type rewriting for normal Reaper. LTO passes
+      [None] for backend-only rebuilding, which needs no type database and
+      leaves export types unknown. Returns the rebuilt unit, code, typing
+      environment, and free names. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     traverse_rebuild:Traverse_rebuild.t ->
-    solution:solution ->
+    solution:Rebuild_solution.t ->
     typing:Rebuild.typing option ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    Flambda_unit.t * Exported_code.t * Typing_env.t option
+    Flambda_unit.t * Exported_code.t * Typing_env.t option * Name_occurrences.t
 end
 
 val run :

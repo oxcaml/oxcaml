@@ -187,7 +187,8 @@ module Staged = struct
 
   type solution =
     { uses : Analysis.result;
-      code_changes : Unboxing_analysis.code_changes
+      code_changes : Unboxing_analysis.code_changes;
+      queries : Rebuild_queries.t
     }
 
   let traverse ~free_names ~cmx_loader ~all_code ~closed_world unit =
@@ -329,9 +330,16 @@ module Staged = struct
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
         ~code_changes ~db:uses.db uses.unboxing
     in
-    { uses; code_changes }, slot_offsets
+    let requests =
+      List.fold_left
+        (fun requests (inputs : Solve_inputs.t) ->
+          Rebuild_queries.Requests.union requests inputs.rebuild_queries)
+        Rebuild_queries.Requests.empty solve_inputs
+    in
+    let queries = Rebuild_queries.create uses.db ~requests in
+    { uses; code_changes; queries }, slot_offsets
 
-  let rebuild ~unit_metadata ~traverse_rebuild ~solution:{ uses; code_changes }
+  let rebuild ~unit_metadata ~traverse_rebuild ~(solution : Rebuild_solution.t)
       ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Traverse_rebuild.
@@ -343,9 +351,10 @@ module Staged = struct
           } =
       traverse_rebuild
     in
-    let Rebuild.{ body; all_code = rebuilt_code; code_ids_to_remember } =
+    let Rebuild.
+          { body; all_code = rebuilt_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
-        ~fixed_arity_continuations ~continuation_info ~typing ~code_changes uses
+        ~fixed_arity_continuations ~continuation_info ~typing solution
         get_code_metadata toplevel_expr code
     in
     let is_foreign code_id =
@@ -361,10 +370,14 @@ module Staged = struct
       |> Exported_code.filter ~f:is_foreign
     in
     let imported_code =
-      Unboxing_analysis.fold_code_metadata code_changes ~init:imported_code
-        ~f:(fun code_metadata imported_code ->
-          if is_foreign (Code_metadata.code_id code_metadata)
-          then Exported_code.add_code_metadata imported_code code_metadata
+      Name_occurrences.fold_code_ids free_names ~init:imported_code
+        ~f:(fun imported_code code_id ->
+          if is_foreign code_id
+          then
+            match Rebuild_solution.find_code_metadata solution code_id with
+            | Some code_metadata ->
+              Exported_code.add_code_metadata imported_code code_metadata
+            | None -> imported_code
           else imported_code)
     in
     let all_code =
@@ -385,7 +398,8 @@ module Staged = struct
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,
-      final_typing_env )
+      final_typing_env,
+      free_names )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
@@ -408,7 +422,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
         env = final_typing_env
       }
   in
-  let flambda, all_code, final_typing_env =
+  let rebuild_data =
+    Rebuild_solution.create_data ~queries:solution.queries
+      ~unboxing:solution.uses.unboxing ~code_changes:solution.code_changes
+      ~slot_offsets:slot_offsets.exported_offsets
+  in
+  let solution =
+    Rebuild_solution.of_data rebuild_data ~analysis_scope:Current_unit
+  in
+  let flambda, all_code, final_typing_env, _free_names =
     Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution
       ~typing:(Some typing) ~machine_width ~cmx_loader ~all_code
   in

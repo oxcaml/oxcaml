@@ -453,18 +453,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
           Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_solve cmr ))
       cmrs
   in
-  (* Reference facts are part of the graph, so they also select the solution
-     sections needed by rebuild. *)
-  let participants =
-    List.map
-      (fun (participant, (graph, _, _, inputs)) ->
-        ( participant,
-          Compilation_unit.Set.union
-            (Flambda2_reaper.Global_flow_graph.compilation_units graph)
-            (Flambda2_reaper.Reaper.Staged.Solve_inputs
-             .referenced_compilation_units inputs) ))
-      solve_data
-  in
+  let participants = List.map fst solve_data in
   let combined_graph =
     List.fold_left
       (fun combined (_participant, (graph, _, _, _)) ->
@@ -483,9 +472,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
       (fun (_participant, (_, _, _, solve_inputs)) -> solve_inputs)
       solve_data
   in
-  let participant_units =
-    Compilation_unit.Set.of_list (List.map fst participants)
-  in
+  let participant_units = Compilation_unit.Set.of_list participants in
   let analysis_scope =
     Flambda2_reaper.Analysis.Scope.Lto_participants participant_units
   in
@@ -524,7 +511,6 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
         Flambda2_reaper.Ltosol_format.solution_for_members ltosol
           ~members:batch_members)
   in
-  let slot_offsets = Flambda2_reaper.Ltosol_format.slot_offsets ltosol in
   let participant_units =
     Compilation_unit.Set.of_list
       (Flambda2_reaper.Ltosol_format.participants ltosol)
@@ -562,7 +548,7 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
             cmr_serialisable)
     in
     (* CR mvellacott: add debug printing code. *)
-    let flambda, all_code, _final_typing_env =
+    let flambda, all_code, _final_typing_env, free_names =
       Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
         ~traverse_rebuild:rebuild_data ~solution ~typing:None ~machine_width
         ~cmx_loader ~all_code
@@ -570,7 +556,10 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     (* Reaped CMXs are only used for linking, so leave their Flambda export
        information empty, as for opaque compilation. The backend still needs the
        rebuilt code metadata and solved closure offsets. *)
-    let offsets = slot_offsets.Slot_offsets.exported_offsets in
+    let offsets =
+      Flambda2_reaper.Rebuild_solution.offsets_for_free_names solution
+        free_names
+    in
     let reachable_names =
       NO.singleton_symbol
         (Flambda_unit.module_symbol flambda)
