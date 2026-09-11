@@ -24,6 +24,13 @@ module Asttypes = struct
 
   type mutable_flag (*IF_CURRENT = Asttypes.mutable_flag *) = Immutable | Mutable
 
+  type atomic_flag (*IF_CURRENT = Asttypes.atomic_flag *) = Nonatomic | Atomic
+
+  type access_flag (*IF_CURRENT = Asttypes.access_flag *) =
+    | Immutable_access
+    | Mutable_access
+    | Atomic_access
+
   type virtual_flag (*IF_CURRENT = Asttypes.virtual_flag *) = Virtual | Concrete
 
   type override_flag (*IF_CURRENT = Asttypes.override_flag *) = Override | Fresh
@@ -691,7 +698,7 @@ module Parsetree = struct
   and block_access (*IF_CURRENT = Parsetree.block_access *) =
     | Baccess_field of Longident.t loc
         (** [.foo] *)
-    | Baccess_block of mutable_flag * expression
+    | Baccess_block of access_flag * expression
         (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
             (usually followed by unboxed accesses, to deepen the index).
         *)
