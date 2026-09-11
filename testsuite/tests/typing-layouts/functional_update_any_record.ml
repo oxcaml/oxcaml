@@ -26,6 +26,17 @@ let () =
   let r = update_x { x = #2.5; y = 7 } 42 in
   Printf.printf "mixed to boxed: x=%d y=%d\n" r.x r.y
 
+(* Mixed to boxed, with the original's representation determined after the
+   update *)
+let () =
+  let update_x (r : _ r) =
+    let r' = { r with x = "hi" } in
+    let _ : float# = r.x in
+    r'
+  in
+  let r = update_x { x = #2.5; y = 7 } in
+  Printf.printf "deferred: x=%s y=%d\n" r.x r.y
+
 (* Mixed to mixed with different flat layouts *)
 type ('a : any) p = { u : 'a; v : float# }
 

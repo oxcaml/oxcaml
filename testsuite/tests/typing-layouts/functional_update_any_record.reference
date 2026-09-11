@@ -1,5 +1,6 @@
 boxed to mixed: x=2.5 y=7
 mixed to boxed: x=42 y=7
+deferred: x=hi y=7
 mixed to mixed: u=3.5 v=7.5
 inline: x=2.5 y=7
 mutable: orig.b=2 copy.b=99 copy.a=3.5
