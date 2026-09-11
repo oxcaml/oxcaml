@@ -960,7 +960,10 @@ let rec transl_type env ~policy ?(aliased=false) ~row_context mode styp =
        try
          transl_type_aux env ~policy ~aliased ~row_context mode styp
        with exn ->
-         let ty = new_global_var (Jkind.Builtin.value ~why:(Unknown "merlin")) in
+         let ty =
+           new_global_var
+             (Jkind.of_new_sort ~why:Merlin ~level:(Ctype.get_current_level ()))
+         in
          Msupport.erroneous_type_register ty;
          Msupport.raise_error exn;
            { ctyp_desc = Ttyp_var (None, None);
