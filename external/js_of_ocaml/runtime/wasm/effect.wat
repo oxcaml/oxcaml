@@ -126,7 +126,7 @@
 
    (func (export "caml_continuation_update_handler_noexc")
       (param $continuation (ref eq)) (param $value (ref eq)) (param $exn (ref eq))
-      (param $effect (ref eq)) (result (ref eq))
+      (param $effect (ref eq)) (param $tick (ref eq)) (result (ref eq))
       (local $tail (ref $generic_fiber))
       ;; Peek at the stack without consuming the continuation. If it is null
       ;; the continuation has already been taken, so we leave it untouched.
@@ -145,6 +145,15 @@
             (struct.set $generic_fiber $effect (local.get $tail)
                (local.get $effect))))
       (local.get $continuation))
+
+   (@string $update_tick_handler_not_implemented
+      "caml_continuation_update_tick_handler_noexc not implemented")
+
+   (func (export "caml_continuation_update_tick_handler_noexc")
+      (param $cont (ref eq)) (param $htick (ref eq)) (result (ref eq))
+      (call $caml_failwith
+         (global.get $update_tick_handler_not_implemented))
+      (ref.i31 (i32.const 0)))
 
    (func (export "caml_get_continuation_callstack")
       (param (ref eq) (ref eq)) (result (ref eq))
@@ -301,7 +310,7 @@
          (local.get $k)
          (struct.get $continuation $cont_func (local.get $k))))
 
-   (func $resume_prim (export "%resume")
+   (func $resume_prim
       (param $head (ref eq)) (param $f (ref eq)) (param $v (ref eq))
       (param $tail (ref eq)) (result (ref eq))
       (local $k (ref $continuation))
@@ -316,6 +325,44 @@
          (struct.new $resume_state
             (local.get $head) (local.get $tail)
             (struct.new $pair (local.get $f) (local.get $v)))))
+
+   (func $resume_identity
+      (param $x (ref eq)) (param (ref eq)) (result (ref eq))
+      (local.get $x))
+
+   (global $resume_identity (ref $closure)
+      (struct.new $closure (ref.func $resume_identity)))
+
+   (func $resume_raise
+      (param $exn (ref eq)) (param (ref eq)) (result (ref eq))
+      (throw $ocaml_exception (local.get $exn)))
+
+   (global $resume_raise (ref $closure)
+      (struct.new $closure (ref.func $resume_raise)))
+
+   ;; Resume the continuation, returning [$v] to the perform site.
+   (func (export "%continue")
+      (param $head (ref eq)) (param $v (ref eq)) (param $tail (ref eq))
+      (result (ref eq))
+      (return_call $resume_prim
+         (local.get $head) (global.get $resume_identity)
+         (local.get $v) (local.get $tail)))
+
+   ;; Resume the continuation, raising [$exn] at the perform site.
+   (func (export "%discontinue")
+      (param $head (ref eq)) (param $exn (ref eq)) (param $tail (ref eq))
+      (result (ref eq))
+      (return_call $resume_prim
+         (local.get $head) (global.get $resume_raise)
+         (local.get $exn) (local.get $tail)))
+
+   ;; As %discontinue; backtraces are not supported, so [$bt] is ignored.
+   (func (export "%discontinue_with_backtrace")
+      (param $head (ref eq)) (param $exn (ref eq)) (param $bt (ref eq))
+      (param $tail (ref eq)) (result (ref eq))
+      (return_call $resume_prim
+         (local.get $head) (global.get $resume_raise)
+         (local.get $exn) (local.get $tail)))
 
    ;; Perform
 
@@ -526,9 +573,9 @@
             (local.get $stack) (local.get $stack)
             (struct.new $pair (local.get $f) (local.get $v)))))
 
-   (func (export "%with_stack_bind")
+   (func (export "%with_stack_preemptible")
       (param $value (ref eq)) (param $exn (ref eq)) (param $effect (ref eq))
-      (param $dyn (ref eq)) (param $bind (ref eq))
+      (param $tick (ref eq))
       (param $f (ref eq)) (param $v (ref eq))
       (result (ref eq))
       (local $stack (ref $fiber))

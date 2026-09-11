@@ -52,13 +52,13 @@ let rec constant_of_const c : Code.constant =
   match c with
   | Const_base (Const_int i)
   | Const_base
-      ( Const_int8 i
+      ( Const_untagged_char i
+      | Const_int8 i
       | Const_int16 i
       | Const_untagged_int i
       | Const_untagged_int8 i
       | Const_untagged_int16 i ) -> Int (Targetint.of_int_warning_on_overflow i)
-  | Const_base (Const_char c) | Const_base (Const_untagged_char c) ->
-      Int (Targetint.of_int_exn (Char.code c))
+  | Const_base (Const_char c) -> Int (Targetint.of_int_exn (Char.code c))
   | Const_base (Const_string (s, _, _)) -> String s
   | Const_base (Const_float s) | Const_base (Const_unboxed_float s) ->
       Float (Int64.bits_of_float (float_of_string s))
@@ -67,7 +67,7 @@ let rec constant_of_const c : Code.constant =
   | Const_base (Const_int32 i) | Const_base (Const_unboxed_int32 i) -> Int32 i
   | Const_base (Const_int64 i) | Const_base (Const_unboxed_int64 i) -> Int64 i
   | Const_base (Const_nativeint i) | Const_base (Const_unboxed_nativeint i) ->
-      NativeInt (Int32.of_nativeint_warning_on_overflow i)
+      NativeInt (Targetnativeint.of_nativeint_warning_on_overflow i)
   | Const_immstring s -> String s
   | Const_float_array sl | Const_float_block sl ->
       let l = List.map ~f:(fun f -> Int64.bits_of_float (float_of_string f)) sl in

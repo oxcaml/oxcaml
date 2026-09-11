@@ -348,7 +348,7 @@ type constant =
   | Int of Targetint.t
   | Int32 of Int32.t
   | Int64 of Int64.t
-  | NativeInt of Int32.t (* Native ints are 32bit on all known backends *)
+  | NativeInt of Targetnativeint.t
   | Tuple of int * constant array * array_or_not
   | Null_
 
@@ -374,7 +374,7 @@ module Constant = struct
     | Int a, Int b -> Some (Targetint.equal a b)
     | Int32 a, Int32 b -> Some (Int32.equal a b)
     | Int64 a, Int64 b -> Some (Int64.equal a b)
-    | NativeInt a, NativeInt b -> Some (Int32.equal a b)
+    | NativeInt a, NativeInt b -> Some (Targetnativeint.equal a b)
     | Float_array a, Float_array b ->
         Some
           (Array.equal
@@ -476,11 +476,17 @@ type field_type =
   | Non_float
   | Float
 
+type yielding_kind =
+  | Unyielding
+  | May_yield
+  | Unknown
+
 type expr =
   | Apply of
       { f : Var.t
       ; args : Var.t list
       ; exact : bool
+      ; yielding : yielding_kind
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type
@@ -553,7 +559,7 @@ module Print = struct
     | Int i -> Format.fprintf f "%s" (Targetint.to_string i)
     | Int32 i -> Format.fprintf f "%ldl" i
     | Int64 i -> Format.fprintf f "%LdL" i
-    | NativeInt i -> Format.fprintf f "%ldn" i
+    | NativeInt i -> Format.fprintf f "%s" (Targetnativeint.to_string i)
     | Tuple (tag, a, _) -> (
         Format.fprintf f "<%d>" tag;
         match Array.length a with
@@ -635,10 +641,18 @@ module Print = struct
 
   let expr f e =
     match e with
-    | Apply { f = g; args; exact } ->
-        if exact
-        then Format.fprintf f "%a!(%a)" Var.print g var_list args
-        else Format.fprintf f "%a(%a)" Var.print g var_list args
+    | Apply { f = g; args; exact; yielding } ->
+        Format.fprintf
+          f
+          "%a%s%s(%a)"
+          Var.print
+          g
+          (if exact then "!" else "")
+          (match yielding with
+           | May_yield -> "~"
+           | Unyielding | Unknown -> "")
+          var_list
+          args
     | Block (t, a, _, mut) ->
         Format.fprintf
           f
