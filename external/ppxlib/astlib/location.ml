@@ -19,12 +19,13 @@ module Error = struct
   | Report_alert of string
   | Report_alert_as_error of string
 
-  type location_msg = (Format.formatter -> unit) loc
+  type location_msg = Format_doc.doc loc
 
   type location_report (*IF_AT_LEAST 408 = Ocaml_common.Location.report *) = {
     kind : location_report_kind;
     main : location_msg;
     sub : location_msg list;
+    footnote : Format_doc.t option;
   }
 
   type t (*IF_AT_LEAST 408 = Ocaml_common.Location.error *) (*IF_NOT_AT_LEAST 408 = old_t *)
@@ -42,7 +43,8 @@ module Error = struct
     | `New_error _ -> false
     | `Old_error _ -> true
 
-  let string_of_location_msg (msg : location_msg) = Format.asprintf "%t" msg.txt
+  let string_of_location_msg (msg : location_msg) =
+    Format_doc.asprintf "%a" Format_doc.pp_doc msg.txt
 
   let main_msg error =
     match version_specific_t_of_t error with
@@ -71,7 +73,7 @@ module Error = struct
   let _set_main_msg_old error msg = { error with msg }
 
   let _set_main_msg_new error msg =
-    let txt ppf = Format.pp_print_string ppf msg in
+    let txt = Format_doc.doc_printf "%s" msg in
     let main = { error.main with txt } in
     { error with main }
 
@@ -88,12 +90,13 @@ module Error = struct
     { loc; msg = txt; sub; if_highlight = txt }
 
   let _make_error_of_message_new ~sub { loc; txt } =
-    let mk_txt x ppf = Format.pp_print_string ppf x in
+    let mk_txt x = Format_doc.doc_printf "%s" x in
     let mk loc x = { loc; txt = mk_txt x } in
     {
       kind = Report_error;
       main = mk loc txt;
       sub = List.map (fun { loc; txt } -> mk loc txt) sub;
+      footnote = None;
     }
 
   let make ~sub msg =
@@ -111,4 +114,10 @@ module Error = struct
     (*IF_AT_LEAST 408 _set_main_loc_new error loc*)
 end
 
-let raise_errorf ?loc msg = raise_errorf ?loc msg
+(* Wrap raise_errorf to preserve the old Format.formatter signature for compatibility *)
+let raise_errorf ?loc fmt =
+  Format.kdprintf
+    (fun printer ->
+      Ocaml_common.Location.raise_errorf ?loc "%t"
+        (Format_doc.deprecated_printer printer))
+    fmt
