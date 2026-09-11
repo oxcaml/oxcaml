@@ -90,7 +90,6 @@ let mkTexp_tuple ?id exps =
   let labels_and_sorts, alloc =
     match id with
     | None ->
-      (* CR zeisbach: i'm assuming this is a sane sort to throw in here? *)
       List.map (fun _ -> None, dummy_scannable_sort) exps, dummy_locality_mode_r
     | Some id -> id
   in
