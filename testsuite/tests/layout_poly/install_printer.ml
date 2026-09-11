@@ -1,5 +1,6 @@
 (* TEST
  flags = "-extension layout_poly_alpha";
+ ocamlrunparam += ",b=0";
  ocaml_exit_status = "2";
  toplevel;
 *)
