@@ -1024,9 +1024,6 @@ let pats_of_type env ty =
       begin match get_desc (Ctype.expand_head env ty) with
         Ttuple tl ->
           let make_sort_var () =
-            (* CR zeisbach: trying to use a bogus sort will hit some sanity
-               check asserts. which contradicts that it "should never be used".
-               Though I still have to investigate why... *)
             Jkind.Sort.new_var ~level:(Ctype.get_current_level ())
             |> Jkind.Sort.of_var
           in

@@ -4030,8 +4030,7 @@ let apply_function (arity, result, mode) =
 let tuplify_function arity return =
   if List.exists (function [| Val |] | [| Int |] -> false | _ -> true) arity
   then
-    (* CR zeisbach: maybe this should be improved at some point. for now, we
-       have to be more conservative to avoid hitting this case. *)
+    (* CR layouts: eventually, we should support mixed tuplified functions *)
     Misc.fatal_error
       "tuplify_function is currently unsupported if arity contains non-values";
   let arity = List.length arity in
