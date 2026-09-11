@@ -21,6 +21,8 @@ type t =
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
+    slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
+    solve_inputs : Reaper.Staged.Solve_inputs.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
@@ -116,7 +118,12 @@ module Serialisable : sig
     t ->
     cmr_format
 
-  val deserialise_deps_only : t -> Global_flow_graph.graph
+  val deserialise_for_solve :
+    t ->
+    Global_flow_graph.graph
+    * Slot_offsets_analysis.Inputs.t
+    * Exported_offsets.t
+    * Reaper.Staged.Solve_inputs.t
 
   val compilation_unit : t -> Compilation_unit.t
 end = struct
@@ -131,6 +138,8 @@ end = struct
       all_code : All_code_with_sections.t;
       imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
+      slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
+      solve_inputs : Reaper.Staged.Solve_inputs.t;
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
@@ -140,6 +149,8 @@ end = struct
          all_code;
          imported_offsets;
          deps;
+         slot_offsets_inputs;
+         solve_inputs;
          rebuild_data
        } :
         cmr_format) : t =
@@ -154,17 +165,17 @@ end = struct
         fill_free_names_cache_for_typing_env env;
         Some env, canonicalise
     in
-    (* Code metadata is stored twice ([all_code] and [rebuild_data]); both must
+    (* Code metadata is stored twice ([all_code] and [solve_inputs]); both must
        have their types canonicalised. [unit_metadata] doesn't have types, so
        doesn't need canonicalising. *)
     let all_code, all_code_ids =
       All_code_with_sections.create ~used_value_slots ~canonicalise all_code
     in
     (* Apply the canonicalisation and unused value slot removal that
-       [Pre_serializable.create] applied to the typing env to the [rebuild_data]
+       [Pre_serializable.create] applied to the typing env to the [solve_inputs]
        types so that they are consistent. *)
-    let rebuild_data =
-      Reaper.Staged.Traverse_rebuild.map_result_types rebuild_data ~f:(fun ty ->
+    let solve_inputs =
+      Reaper.Staged.Solve_inputs.map_result_types solve_inputs ~f:(fun ty ->
           let ty =
             Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
               ~used_value_slots ~canonicalise
@@ -179,6 +190,8 @@ end = struct
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
           all_code_ids;
           Global_flow_graph.ids_for_export deps;
+          Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
+          Reaper.Staged.Solve_inputs.ids_for_export solve_inputs;
           Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data;
           Option.fold ~none:Ids_for_export.empty
             ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
@@ -192,6 +205,8 @@ end = struct
       (* Slots not hashconsed so we can store them as is. *)
       imported_offsets;
       deps = Deps_with_fields.create deps;
+      slot_offsets_inputs;
+      solve_inputs;
       rebuild_data
     }
 
@@ -204,6 +219,8 @@ end = struct
         all_code;
         imported_offsets;
         deps;
+        slot_offsets_inputs;
+        solve_inputs;
         rebuild_data
       } : cmr_format =
     (* Insert hashconsed objects from the paused process into this process'
@@ -231,6 +248,12 @@ end = struct
       |> Exported_code.apply_renaming code_ids renaming
     in
     let deps = Deps_with_fields.deserialise deps renaming in
+    let slot_offsets_inputs =
+      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
+    in
+    let solve_inputs =
+      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming
+    in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
@@ -239,18 +262,22 @@ end = struct
       all_code;
       imported_offsets;
       deps;
+      slot_offsets_inputs;
+      solve_inputs;
       rebuild_data
     }
 
-  let deserialise_deps_only
+  let deserialise_for_solve
       { original_compilation_unit;
         table_data;
         used_value_slots;
         unit_metadata = _;
         final_typing_env = _;
         all_code = _;
-        imported_offsets = _;
+        imported_offsets;
         deps;
+        slot_offsets_inputs;
+        solve_inputs;
         rebuild_data = _
       } =
     (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
@@ -260,7 +287,11 @@ end = struct
       Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
         ~original_compilation_unit
     in
-    Deps_with_fields.deserialise deps renaming
+    ( Deps_with_fields.deserialise deps renaming,
+      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming,
+      (* Slots are not hashconsed, so the offsets need no renaming. *)
+      imported_offsets,
+      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming )
 
   let compilation_unit t = t.original_compilation_unit
 end

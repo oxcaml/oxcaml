@@ -13,9 +13,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Scope = Analysis_scope
+
 type result = Unboxing_analysis.result
 
-val fixpoint : Global_flow_graph.graph -> result
+val fixpoint : Global_flow_graph.graph -> analysis_scope:Scope.t -> result
 
 val get_unboxed_fields :
   result -> Code_id_or_name.t -> Unboxing_analysis.unboxed option
@@ -34,8 +36,6 @@ val any_source : result -> Code_id_or_name.t -> bool
 val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
 val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
-
-val cannot_change_calling_convention : result -> Code_id.t -> bool
 
 val code_id_actually_directly_called :
   result -> Name.t -> Code_id.Set.t Or_unknown.t

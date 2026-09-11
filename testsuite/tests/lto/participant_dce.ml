@@ -1,18 +1,56 @@
+(* TEST
+ readonly_files = "participant_dce_dep.ml participant_external.ml";
+ flambda2;
+ setup-ocamlopt.opt-build-env;
+
+ flags = "-opaque";
+ compile_only = "true";
+ all_modules = "participant_external.ml";
+ ocamlopt.opt;
+
+ flags = "-flambda2-reaper -support-lto -opaque";
+ all_modules = "participant_dce_dep.ml";
+ ocamlopt.opt;
+ all_modules = "participant_dce.ml";
+ ocamlopt.opt;
+
+ script = "grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.o";
+ script;
+
+ compile_only = "false";
+ flags = "-reaper-solve participant_dce.cmr participant_dce_dep.cmr";
+ last_flags = "-o participant_dce.ltosol";
+ all_modules = "";
+ ocamlopt.opt;
+
+ flags = "-reaper-rebuild participant_dce.cmr participant_dce.ltosol";
+ last_flags = "";
+ ocamlopt.opt;
+ flags = "-reaper-rebuild participant_dce_dep.cmr participant_dce.ltosol";
+ ocamlopt.opt;
+
+ script = "sh -c 'grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.reaped.o; test $? -eq 1'";
+ script;
+
+ flags = "";
+ all_modules = "participant_external.cmx participant_dce_dep.reaped.cmx participant_dce.reaped.cmx";
+ program = "${test_build_directory}/participant_dce.exe";
+ ocamlopt.opt;
+ run;
+ check-program-output;
+*)
+
 (******************************************************************************
- *                             flambda-backend                                *
- *                                                                            *
- *             Nathanaëlle Courant, Pierre Chambart, OCamlPro                 *
- *                        Mark Shinwell, Jane Street                          *
+ *                                  OxCaml                                    *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024--2025 OCamlPro SAS                                      *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
  * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
+ * to deal in the Software without restriction, including without limitation *
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
  * and/or sell copies of the Software, and to permit persons to whom the      *
  * Software is furnished to do so, subject to the following conditions:       *
@@ -29,23 +67,6 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type result = private
-  { body : Flambda.Expr.t;
-    all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
-  }
-
-val rebuild :
-  machine_width:Target_system.Machine_width.t ->
-  ordered_code_ids:Code_id.t array ->
-  continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
-  fixed_arity_continuations:Continuation.Set.t ->
-  final_typing_env:Typing_env.t option ->
-  types_rewrite_context:Types_rewriter.rewrite_context ->
-  code_changes:Unboxing_analysis.code_changes ->
-  code_deps_for_result_types:Traverse_acc.code_dep Code_id.Map.t option ->
-  Unboxing_analysis.result ->
-  (Code_id.t -> Code_metadata.t) ->
-  Rev_expr.t ->
-  Rev_expr.rev_code Code_id.Map.t ->
-  result
+(* Opaque compilation leaves cross-unit calls indirect. This checks graph
+   joining independently of the forthcoming solve-time code metadata changes. *)
+let () = Participant_external.run Participant_dce_dep.used

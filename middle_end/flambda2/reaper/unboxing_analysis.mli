@@ -14,11 +14,27 @@
 (**************************************************************************)
 
 module Unboxed_fields : sig
+  type 'a t
+
   type 'a u =
     | Not_unboxed of 'a
     | Unboxed of 'a t
 
-  and 'a t = 'a u Field.Map.t
+  (** Fixes the traversal order, which is preserved by mapping and renaming. *)
+  val of_map : 'a u Field.Map.t -> 'a t
+
+  val to_map : 'a t -> 'a u Field.Map.t
+
+  val find : Field.t -> 'a t -> 'a u
+
+  val is_empty : 'a t -> bool
+
+  val keys : 'a t -> Field.Set.t
+
+  val fold : (Field.t -> 'a u -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  (** Map the immediate fields without changing their order. *)
+  val mapi_fields : (Field.t -> 'a u -> 'b u) -> 'a t -> 'b t
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
@@ -37,6 +53,8 @@ module Unboxed_fields : sig
 
   val fold2_subset_with_kind :
     (Flambda_kind.t -> 'a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
+
+  val equal_shape : 'a t -> 'b t -> bool
 end
 
 type unboxed = Variable.t Unboxed_fields.t
@@ -49,12 +67,67 @@ type changed_representation =
       * Function_slot.t Function_slot.Map.t
       * Function_slot.t
 
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+val arity_of_decisions : param_decision list -> [`Complex] Flambda_arity.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
+val print_param_decision : Format.formatter -> param_decision -> unit
+
 type result =
   { db : Datalog.database;
     unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
+
+type calling_convention_change =
+  | Not_changing_calling_convention
+  | Changing_calling_convention of
+      { my_closure_decision : my_closure_param_decision;
+        params_decisions : param_decision list;
+        return_decisions : param_decision list
+      }
+
+(** Calling-convention changes and metadata with unknown result types. *)
+type code_changes
+
+val get_calling_convention_change :
+  code_changes -> Code_id.t -> calling_convention_change
+
+(* Should only be called on code_ids from the current unit. *)
+val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
+
+(** Like [get_code_metadata], but returns [None] for code ids without an entry
+    (in particular those of units that did not participate in the solve). *)
+val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
+
+val fold_code_metadata :
+  code_changes -> init:'a -> f:(Code_metadata.t -> 'a -> 'a) -> 'a
+
+val empty_code_changes : code_changes
+
+val code_changes_disjoint_union : code_changes -> code_changes -> code_changes
+
+val partition_code_changes_by_compilation_unit :
+  code_changes -> code_changes Compilation_unit.Map.t
+
+val code_changes_ids_for_export :
+  code_changes -> Ids_for_export.t -> Ids_for_export.t
+
+val code_changes_fields_for_export : code_changes -> Field.Set.t -> Field.Set.t
+
+val code_changes_apply_renaming :
+  code_changes ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  code_changes
 
 val pp_result : Format.formatter -> result -> unit
 
@@ -89,7 +162,21 @@ val changed_representation_apply_renaming :
 val cannot_change_calling_convention_table :
   Datalog_helpers.Serialisation.N.table
 
-val cannot_change_calling_convention : result -> Code_id.t -> bool
+(** Calling conventions of code outside [analysis_scope] can never be changed.
+*)
+val cannot_change_calling_convention :
+  analysis_scope:Analysis_scope.t -> result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
+
+val compute_code_changes :
+  result ->
+  analysis_scope:Analysis_scope.t ->
+  rewrite_kind_with_subkind:
+    (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
+  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  code_changes

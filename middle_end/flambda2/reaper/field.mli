@@ -102,6 +102,8 @@ val must_be_function_slot : t -> Function_slot.t
 
 (* CR bclement: Should this be called [is_local_slot] instead, to make it clear
    that this relates to function/value slots? *)
-val is_local : t -> bool
+val is_local : t -> analysis_scope:Analysis_scope.t -> bool
 
 val print_for_variable_name : Format.formatter -> t -> unit
+
+val equal : t -> t -> bool

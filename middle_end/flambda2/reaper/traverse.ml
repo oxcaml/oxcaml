@@ -37,13 +37,14 @@ let apply_cont_deps denv acc apply_cont =
     params args
 
 let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
+  let result_arity = Code.result_arity code in
   let return =
     List.mapi
       (fun i kind ->
         Variable.create
           (Format.asprintf "function_return_%i_%s" i (Code_id.name code_id))
           (KS.kind kind))
-      (Flambda_arity.unarized_components (Code.result_arity code))
+      (Flambda_arity.unarized_components result_arity)
   in
   let exn = Variable.create "function_exn" K.value in
   let my_closure = Variable.create "my_closure" K.value in
@@ -64,6 +65,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     | Check _ -> true
   in
   let is_tupled = Code.is_tupled code in
+  let function_slot_size = Code.function_slot_size code in
   let known_arity_call_witness =
     Acc.create_known_arity_call_witness acc code_id ~params ~returns:return ~exn
   in
@@ -73,6 +75,8 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
   in
   let code_dep =
     { Traverse_acc.arity;
+      function_slot_size;
+      code_metadata = Code.code_metadata code;
       return;
       my_closure;
       exn;
@@ -112,6 +116,7 @@ let record_set_of_closures_deps denv names_and_function_slots set_of_closures
           (Function_slot.Map.find function_slot funs
             : Function_declarations.code_id_in_function_declaration)
         in
+        Acc.add_closure_function_decl acc name code_id;
         let code_id =
           match code_id with
           | Deleted _ -> Or_unknown.Unknown
@@ -358,6 +363,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
     let[@local] add_apply acc ~only_if_closure_any_source =
+      let participant_call = call_widget, callee in
       let callee, call_widget =
         if only_if_closure_any_source
         then (
@@ -377,11 +383,9 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         else callee, call_widget
       in
       if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
+      then
+        Acc.add_external_apply acc ~participant_call ~denv ~code_id
+          ~witness:call_widget ~closure:callee
       else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr =
@@ -405,10 +409,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | No ->
         if is_external
         then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
+          (* Rebuild can retain this foreign direct target even when the
+             closure's target is unknown, so record the explicit reference. *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -805,7 +807,7 @@ and traverse_function_params_and_body acc code_id code ~return_continuation
       my_depth
     }
   in
-  { params_and_body; code_metadata; free_names_of_params_and_body }
+  { params_and_body; free_names_of_params_and_body }
 
 and traverse (denv : denv) (acc : acc) (expr : Expr.t) : rev_expr =
   match Expr.descr expr with
@@ -824,8 +826,12 @@ type result =
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    code_references : Traverse_acc.code_reference list;
     all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    closure_function_decls :
+      Function_declarations.code_id_in_function_declaration
+      Code_id_or_name.Map.t
   }
 
 let create_symbol_and_add_any_source acc name =
@@ -834,13 +840,14 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants () =
+let run0 unit acc ~all_constants ~closed_world () =
   let le_monde_exterieur =
     create_symbol_and_add_any_source acc "le_monde_extérieur"
   in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
-  Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
+  if not closed_world
+  then Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_exn);
   let return_continuation = Flambda_unit.return_continuation unit in
   let exn_continuation = Flambda_unit.exn_continuation unit in
@@ -868,11 +875,12 @@ let run0 unit acc ~all_constants () =
        ~all_constants:(Name.symbol all_constants))
     acc (Flambda_unit.body unit)
 
-let run (unit : Flambda_unit.t) =
+let run ~closed_world (unit : Flambda_unit.t) =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+    Profile.record_call ~accumulate:false "down"
+      (run0 unit acc ~all_constants ~closed_world)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
@@ -886,5 +894,7 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
-    all_sets_of_closures = Acc.get_all_sets_of_closures acc
+    code_references = Acc.code_references acc;
+    all_sets_of_closures = Acc.get_all_sets_of_closures acc;
+    closure_function_decls = Acc.get_closure_function_decls acc
   }

@@ -32,7 +32,13 @@ val load_cmx_file_contents :
 val load_symbol_approx :
   loader -> Symbol.t -> Code_or_metadata.t Value_approximation.t
 
+(** [is_local_compilation_unit] says whether slots of the given compilation unit
+    have their offsets computed by the current process (rather than imported);
+    it defaults to [Current_unit.is_current], but the LTO rebuild of a
+    compilation unit passes membership of the set of units participating in the
+    solve, whose offsets all come from the solution file. *)
 val prepare_cmx_file_contents :
+  ?is_local_compilation_unit:(Compilation_unit.t -> bool) ->
   final_typing_env:Flambda2_types.Typing_env.t option ->
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t ->
