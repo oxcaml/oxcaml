@@ -13,7 +13,7 @@ int main(int argc, char **argv)
 
   printf("Step 1: caml_startup (no modules should initialize)\n");
   fflush(stdout);
-  caml_startup(argv);
+  caml_startup((char_os const * const *) argv);
   printf("Step 1: done\n\n");
   fflush(stdout);
 

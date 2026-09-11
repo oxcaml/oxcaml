@@ -30,9 +30,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Fetch the base for diff checks
-        run: git fetch origin "$GITHUB_SHA" --deepen 1
+          # Fetch the base for diff checks
+          fetch-depth: 2
 
       - name: Pretend we're running in a container (makes setup-ocaml go faster)
         run: sudo touch /.dockerenv

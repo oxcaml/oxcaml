@@ -23,7 +23,7 @@ Static data:
     (closure ⟨env⟩ layout_2 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/341 x/334[$layout_2] : $layout_2
+        ⟪(function {nlocal = 0} closure/325 x/318[$layout_2] : $layout_2
            $(let (#body/2 =
                { c = (missing)
                ; r =
@@ -36,5 +36,5 @@ Static data:
                          ⟪(apply[L] $#app/1
                             (field_imm 0
                               (global static Cross_module_static_lib!)))⟫ })
-                    x/334)⟫ })
+                    x/318)⟫ })
               { c = #body/2.c; r = ⟪(region $#body/2)⟫ }))⟫ }))
