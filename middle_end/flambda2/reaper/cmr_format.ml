@@ -17,7 +17,6 @@
 
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
-    final_typing_env : Typing_env.t option;
     all_code : Exported_code.t;
     imported_offsets : Exported_offsets.t;
     deps : Global_flow_graph.graph;
@@ -25,66 +24,6 @@ type t =
     solve_inputs : Reaper.Staged.Solve_inputs.t;
     rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
-
-(* CR mvellacott: Every type comes with a cache of its free names. If the cache
-   is empty, [With_cached_free_names.apply_renaming] tries to fill it by
-   traversing the type, which errors at import time because it looks up
-   pre-renaming hashcons IDs. The current fix is to make sure we always populate
-   the cache before deserialising. In the future, it would be nice to make that
-   function more robust instead. *)
-
-let fill_free_names_cache_for_exported_code code =
-  ignore (Exported_code.free_function_slots_and_value_slots code)
-
-let fill_free_names_cache_for_typing_env env =
-  ignore (Typing_env.Serializable.free_function_slots_and_value_slots env)
-
-let fill_free_names_cache_for_type ty = ignore (Flambda2_types.free_names ty)
-
-module All_code_with_sections = struct
-  type t =
-    { all_code : Exported_code.raw;
-      sections : string array
-    }
-
-  let create ~used_value_slots ~canonicalise all_code =
-    let all_code =
-      (* CR mvellacott: [Exported_code.prepare_for_export] only uses
-         [reachable_names] to prune code IDs, so it is sufficient to pass all
-         present code IDs. However an implementation change could break this, it
-         would be better to have some [prepare_all_for_export] function. *)
-      let all_names =
-        Code_id.Set.fold
-          (fun code_id names ->
-            Name_occurrences.add_code_id names code_id Name_mode.normal)
-          (Exported_code.ids_for_export all_code).code_ids
-          Name_occurrences.empty
-      in
-      Exported_code.prepare_for_export all_code ~reachable_names:all_names
-        ~used_value_slots ~canonicalise
-    in
-    fill_free_names_cache_for_exported_code all_code;
-    let ids_for_export = Exported_code.ids_for_export all_code in
-    let sections_builder = File_sections.Builder.create 0 in
-    let all_code =
-      Exported_code.to_raw
-        ~add_section:(File_sections.Builder.add sections_builder)
-        all_code
-    in
-    let sections, _toc, _total_length =
-      File_sections.serialize (File_sections.Builder.build sections_builder)
-    in
-    { all_code; sections }, ids_for_export
-
-  let deserialise { all_code; sections } =
-    let sections =
-      File_sections.from_array
-        (Array.map
-           (fun section : Obj.t -> Marshal.from_string section 0)
-           sections)
-    in
-    Exported_code.from_raw ~sections all_code
-end
 
 module Deps_with_fields = struct
   (** Fields are hashconsed per-process, so the graph is stored with views of
@@ -110,13 +49,11 @@ module Serialisable : sig
 
   type t
 
-  val create : used_value_slots:Value_slot.Set.t -> cmr_format -> t
+  val create : cmr_format -> t
 
-  val deserialise :
-    machine_width:Target_system.Machine_width.t ->
-    resolver:(Compilation_unit.t -> Typing_env.Serializable.t option) ->
+  val deserialise_for_rebuild :
     t ->
-    cmr_format
+    Flambda_unit.Metadata.t * Exported_code.t * Reaper.Staged.Traverse_rebuild.t
 
   val deserialise_for_solve :
     t ->
@@ -132,10 +69,8 @@ end = struct
   type t =
     { original_compilation_unit : Compilation_unit.t;
       table_data : Flambda_cmx_format.table_data;
-      used_value_slots : Value_slot.Set.t;
       unit_metadata : Flambda_unit.Metadata.t;
-      final_typing_env : Typing_env.Serializable.t option;
-      all_code : All_code_with_sections.t;
+      code_metadata : Code_metadata.t list;
       imported_offsets : Exported_offsets.t;
       deps : Deps_with_fields.t;
       slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
@@ -143,9 +78,8 @@ end = struct
       rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 
-  let create ~used_value_slots
+  let create
       ({ unit_metadata;
-         final_typing_env;
          all_code;
          imported_offsets;
          deps;
@@ -154,54 +88,46 @@ end = struct
          rebuild_data
        } :
         cmr_format) : t =
-    let final_typing_env, canonicalise =
-      match final_typing_env with
-      | None -> None, Fun.id
-      | Some typing_env ->
-        let env, canonicalise =
-          Typing_env.Pre_serializable.create typing_env ~used_value_slots
-        in
-        let env = Typing_env.Serializable.create_without_pruning env in
-        fill_free_names_cache_for_typing_env env;
-        Some env, canonicalise
+    (* Bodies are already stored in [rebuild_data]. Keep only metadata, without
+       export types, and do not force any unloaded code. These local copies
+       leave the live compilation's code and solve inputs unchanged. *)
+    let code_metadata =
+      Exported_code.fold_code_metadata all_code ~init:[] ~f:(fun metadata acc ->
+          Code_metadata.with_result_types Unknown metadata :: acc)
     in
-    (* Code metadata is stored twice ([all_code] and [solve_inputs]); both must
-       have their types canonicalised. [unit_metadata] doesn't have types, so
-       doesn't need canonicalising. *)
-    let all_code, all_code_ids =
-      All_code_with_sections.create ~used_value_slots ~canonicalise all_code
+    let code_metadata_ids =
+      List.fold_left
+        (fun ids code_metadata ->
+          Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata))
+        Ids_for_export.empty code_metadata
     in
-    (* Apply the canonicalisation and unused value slot removal that
-       [Pre_serializable.create] applied to the typing env to the [solve_inputs]
-       types so that they are consistent. *)
     let solve_inputs =
-      Reaper.Staged.Solve_inputs.map_result_types solve_inputs ~f:(fun ty ->
-          let ty =
-            Flambda2_types.remove_unused_value_slots_and_shortcut_aliases ty
-              ~used_value_slots ~canonicalise
-          in
-          fill_free_names_cache_for_type ty;
-          ty)
+      { solve_inputs with
+        code_deps =
+          Code_id.Map.map
+            (fun (code_dep : Traverse_acc.code_dep) ->
+              { code_dep with
+                code_metadata =
+                  Code_metadata.with_result_types Unknown code_dep.code_metadata
+              })
+            solve_inputs.code_deps;
+        (* Only normal Reaper's type rewriting needs this list. *)
+        all_sets_of_closures = []
+      }
     in
-    (* Must happen after any identifiers change, in particular, after
-       canonicalisation. *)
     let exported_ids =
       Ids_for_export.union_list
         [ Flambda_unit.Metadata.ids_for_export unit_metadata;
-          all_code_ids;
+          code_metadata_ids;
           Global_flow_graph.ids_for_export deps;
           Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
           Reaper.Staged.Solve_inputs.ids_for_export solve_inputs;
-          Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data;
-          Option.fold ~none:Ids_for_export.empty
-            ~some:Typing_env.Serializable.ids_for_export final_typing_env ]
+          Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data ]
     in
     { original_compilation_unit = Current_unit.get_cu_exn ();
       table_data = Flambda_cmx_format.create_table_data exported_ids;
-      used_value_slots;
       unit_metadata;
-      final_typing_env;
-      all_code;
+      code_metadata;
       (* Slots not hashconsed so we can store them as is. *)
       imported_offsets;
       deps = Deps_with_fields.create deps;
@@ -210,82 +136,53 @@ end = struct
       rebuild_data
     }
 
-  let deserialise ~machine_width ~resolver
+  let deserialise_for_rebuild
       { original_compilation_unit;
         table_data;
-        used_value_slots;
         unit_metadata;
-        final_typing_env;
-        all_code;
-        imported_offsets;
-        deps;
-        slot_offsets_inputs;
-        solve_inputs;
+        code_metadata;
+        imported_offsets = _;
+        deps = _;
+        slot_offsets_inputs = _;
+        solve_inputs = _;
         rebuild_data
-      } : cmr_format =
-    (* Insert hashconsed objects from the paused process into this process'
-       tables, and create a mapping from the IDs in the old process to the ones
-       in this process. [code_ids] contains a copy of this mapping for code IDs,
-       needed because [Exported_code.apply_renaming] takes that as a separate
-       argument. [used_value_slots] here was computed by [finalize_offsets] in
-       the paused process, see [Slot_offsets.result]. *)
-    let renaming, code_ids =
-      Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
-        ~original_compilation_unit
-    in
-    let final_typing_env =
-      Option.map
-        (fun typing_env ->
-          Typing_env.Serializable.apply_renaming typing_env renaming
-          |> Typing_env.Serializable.to_typing_env ~machine_width ~resolver)
-        final_typing_env
+      } =
+    (* Restore hashconsed IDs. There are no export types or Flambda code bodies
+       to prune: [Rev_expr] renaming preserves all closure value slots. *)
+    let renaming, _code_ids =
+      Flambda_cmx_format.import_renaming ~table_data
+        ~used_value_slots:Value_slot.Set.empty ~original_compilation_unit
     in
     let unit_metadata =
       Flambda_unit.Metadata.apply_renaming unit_metadata renaming
     in
     let all_code =
-      All_code_with_sections.deserialise all_code
-      |> Exported_code.apply_renaming code_ids renaming
-    in
-    let deps = Deps_with_fields.deserialise deps renaming in
-    let slot_offsets_inputs =
-      Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming
-    in
-    let solve_inputs =
-      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming
+      List.fold_left
+        (fun all_code code_metadata ->
+          Exported_code.add_code_metadata all_code
+            (Code_metadata.apply_renaming code_metadata renaming))
+        Exported_code.empty code_metadata
     in
     let rebuild_data =
       Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming
     in
-    { unit_metadata;
-      final_typing_env;
-      all_code;
-      imported_offsets;
-      deps;
-      slot_offsets_inputs;
-      solve_inputs;
-      rebuild_data
-    }
+    unit_metadata, all_code, rebuild_data
 
   let deserialise_for_solve
       { original_compilation_unit;
         table_data;
-        used_value_slots;
         unit_metadata = _;
-        final_typing_env = _;
-        all_code = _;
+        code_metadata = _;
         imported_offsets;
         deps;
         slot_offsets_inputs;
         solve_inputs;
         rebuild_data = _
       } =
-    (* [code_ids] is part of [renaming] that [Exported_code.apply_renaming]
-       requires as a separate argument. We're not deserialising any
-       [Exported_code], so we drop it here. *)
+    (* Solve inputs contain no export types or code bodies to prune. *)
     let renaming, _code_ids =
-      Flambda_cmx_format.import_renaming ~table_data ~used_value_slots
-        ~original_compilation_unit
+      Flambda_cmx_format.import_renaming ~table_data
+        ~used_value_slots:Value_slot.Set.empty ~original_compilation_unit
     in
     ( Deps_with_fields.deserialise deps renaming,
       Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming,
@@ -304,8 +201,11 @@ type error =
 
 exception Error of error
 
-let save ~filename ~used_value_slots t =
-  let serialisable = Serialisable.create ~used_value_slots t in
+(* Version the staged payload independently of the compiler's other formats. *)
+let payload_version = 2
+
+let save ~filename t =
+  let serialisable = Serialisable.create t in
   (* We need to store ID stamp counters so that stamp-based identifiers in the
      resumed process don't conflict with the ones created in this process. *)
   let id_stamp_counters = Id_stamp_counters.save () in
@@ -313,6 +213,7 @@ let save ~filename ~used_value_slots t =
   Misc.try_finally
     (fun () ->
       output_string oc Config.cmr_magic_number;
+      output_binary_int oc payload_version;
       output_value oc (serialisable, id_stamp_counters))
     ~always:(fun () -> close_out oc)
     ~exceptionally:(fun () -> raise (Error (Marshal_failed filename)))
@@ -326,7 +227,11 @@ let load filename =
       let buffer = really_input_string ic (String.length magic) in
       if String.equal buffer magic
       then
-        try (input_value ic : Serialisable.t * Id_stamp_counters.t) with
+        try
+          if input_binary_int ic <> payload_version
+          then raise (Error (Wrong_version filename));
+          (input_value ic : Serialisable.t * Id_stamp_counters.t)
+        with
         | End_of_file | Failure _ -> raise (Error (Corrupted filename))
         | Error e -> raise (Error e)
       else if String.starts_with ~prefix:format_code buffer

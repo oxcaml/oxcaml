@@ -15,7 +15,10 @@
 
 module Scope = Analysis_scope
 
-type result = Unboxing_analysis.result
+type result =
+  { db : Datalog.database;
+    unboxing : Unboxing_analysis.result
+  }
 
 val fixpoint : Global_flow_graph.graph -> analysis_scope:Scope.t -> result
 

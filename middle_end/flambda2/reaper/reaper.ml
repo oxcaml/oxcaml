@@ -26,11 +26,13 @@ module Staged = struct
     type t =
       { code_deps : Traverse_acc.code_dep Code_id.Map.t;
         code_references : Traverse_acc.code_reference list;
+        rebuild_queries : Rebuild_queries.Requests.t;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
 
-    let ids_for_export { code_deps; code_references; all_sets_of_closures } =
+    let ids_for_export
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures } =
       let ids =
         Code_id.Map.fold
           (fun code_id code_dep ids ->
@@ -51,13 +53,16 @@ module Staged = struct
               set_of_closures ids)
           ids all_sets_of_closures
       in
-      Ids_for_export.union ids
-        (Traverse_acc.ids_for_export_code_references code_references)
+      Ids_for_export.union_list
+        [ ids;
+          Traverse_acc.ids_for_export_code_references code_references;
+          Rebuild_queries.Requests.ids_for_export rebuild_queries ]
 
     let referenced_compilation_units t =
       Traverse_acc.code_references_compilation_units t.code_references
 
-    let apply_renaming { code_deps; code_references; all_sets_of_closures }
+    let apply_renaming
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
         renaming =
       let code_deps =
         Code_id.Map.fold
@@ -78,18 +83,10 @@ module Staged = struct
       let code_references =
         Traverse_acc.apply_renaming_code_references code_references renaming
       in
-      { code_deps; code_references; all_sets_of_closures }
-
-    let map_result_types t ~f =
-      (* The code metadata stored in [code_deps] is the only part of the solve
-         inputs holding Flambda types. *)
-      let map_code_dep (code_dep : Traverse_acc.code_dep) =
-        { code_dep with
-          code_metadata =
-            Code_metadata.map_result_types code_dep.code_metadata ~f
-        }
+      let rebuild_queries =
+        Rebuild_queries.Requests.apply_renaming rebuild_queries renaming
       in
-      { t with code_deps = Code_id.Map.map map_code_dep t.code_deps }
+      { code_deps; code_references; rebuild_queries; all_sets_of_closures }
   end
 
   module Traverse_rebuild = struct
@@ -178,8 +175,9 @@ module Staged = struct
   end
 
   type solution =
-    { uses : Unboxing_analysis.result;
-      code_changes : Unboxing_analysis.code_changes
+    { uses : Analysis.result;
+      code_changes : Unboxing_analysis.code_changes;
+      queries : Rebuild_queries.t
     }
 
   let traverse ~free_names ~cmx_loader ~all_code ~closed_world unit =
@@ -192,6 +190,7 @@ module Staged = struct
             continuation_info;
             code_deps;
             code_references;
+            rebuild_queries;
             all_sets_of_closures;
             closure_function_decls
           } =
@@ -203,7 +202,8 @@ module Staged = struct
         ~get_code_metadata:(get_code_metadata ~cmx_loader ~all_code)
     in
     let solve_inputs =
-      Solve_inputs.{ code_deps; code_references; all_sets_of_closures }
+      Solve_inputs.
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
     in
     let rebuild_data =
       { Traverse_rebuild.toplevel_expr;
@@ -306,25 +306,30 @@ module Staged = struct
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
-      then (
-        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
-        Dot_printer.print_solved_dep uses deps)
+      then Dot_printer.print_solved_dep uses deps
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes uses ~analysis_scope
+      Unboxing_analysis.compute_code_changes ~db:uses.db uses.unboxing
+        ~analysis_scope
         ~rewrite_kind_with_subkind:
-          (Types_rewriter.rewrite_kind_with_subkind uses)
+          (Types_rewriter.rewrite_kind_with_subkind uses.db)
         ~code_deps
     in
     let slot_offsets =
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
-        ~code_changes uses
+        ~code_changes ~db:uses.db uses.unboxing
     in
-    { uses; code_changes }, slot_offsets
+    let requests =
+      List.fold_left
+        (fun requests (inputs : Solve_inputs.t) ->
+          Rebuild_queries.Requests.union requests inputs.rebuild_queries)
+        Rebuild_queries.Requests.empty solve_inputs
+    in
+    let queries = Rebuild_queries.create uses.db ~requests in
+    { uses; code_changes; queries }, slot_offsets
 
-  let rebuild ~unit_metadata ~traverse_rebuild ~solution:{ uses; code_changes }
-      ~code_deps_for_result_types ~all_sets_of_closures ~machine_width
-      ~cmx_loader ~all_code ~final_typing_env =
+  let rebuild ~unit_metadata ~traverse_rebuild ~(solution : Rebuild_solution.t)
+      ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Traverse_rebuild.
           { toplevel_expr;
@@ -335,13 +340,10 @@ module Staged = struct
           } =
       traverse_rebuild
     in
-    let types_rewrite_context =
-      Types_rewriter.prepare_rewrite_context uses all_sets_of_closures
-    in
-    let Rebuild.{ body; all_code = rebuilt_code; code_ids_to_remember } =
+    let Rebuild.
+          { body; all_code = rebuilt_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
-        ~fixed_arity_continuations ~continuation_info ~final_typing_env
-        ~types_rewrite_context ~code_changes ~code_deps_for_result_types uses
+        ~fixed_arity_continuations ~continuation_info ~typing solution
         get_code_metadata toplevel_expr code
     in
     let is_foreign code_id =
@@ -357,10 +359,14 @@ module Staged = struct
       |> Exported_code.filter ~f:is_foreign
     in
     let imported_code =
-      Unboxing_analysis.fold_code_metadata code_changes ~init:imported_code
-        ~f:(fun code_metadata imported_code ->
-          if is_foreign (Code_metadata.code_id code_metadata)
-          then Exported_code.add_code_metadata imported_code code_metadata
+      Name_occurrences.fold_code_ids free_names ~init:imported_code
+        ~f:(fun imported_code code_id ->
+          if is_foreign code_id
+          then
+            match Rebuild_solution.find_code_metadata solution code_id with
+            | Some code_metadata ->
+              Exported_code.add_code_metadata imported_code code_metadata
+            | None -> imported_code
           else imported_code)
     in
     let all_code =
@@ -369,14 +375,20 @@ module Staged = struct
         rebuilt_code imported_code
     in
     let final_typing_env =
-      Option.map
-        (Types_rewriter.rewrite_typing_env types_rewrite_context
-           ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata))
-        final_typing_env
+      match typing with
+      | None -> None
+      | Some typing ->
+        Option.map
+          (fun typing_env ->
+            Types_rewriter.rewrite_typing_env typing.context
+              ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata)
+              typing_env)
+          typing.env
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,
-      final_typing_env )
+      final_typing_env,
+      free_names )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
@@ -389,12 +401,26 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~solve_inputs:[solve_inputs] deps
   in
   let unit_metadata = Flambda_unit.metadata unit in
-  let flambda, all_code, final_typing_env =
+  let typing =
+    Rebuild.
+      { context =
+          Types_rewriter.prepare_rewrite_context ~db:solution.uses.db
+            solution.uses.unboxing
+            solve_inputs.Staged.Solve_inputs.all_sets_of_closures;
+        code_deps = solve_inputs.Staged.Solve_inputs.code_deps;
+        env = final_typing_env
+      }
+  in
+  let rebuild_data =
+    Rebuild_solution.create_data ~queries:solution.queries
+      ~unboxing:solution.uses.unboxing ~code_changes:solution.code_changes
+      ~slot_offsets:slot_offsets.exported_offsets
+  in
+  let solution =
+    Rebuild_solution.of_data rebuild_data ~analysis_scope:Current_unit
+  in
+  let flambda, all_code, final_typing_env, _free_names =
     Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution
-      ~code_deps_for_result_types:
-        (Some solve_inputs.Staged.Solve_inputs.code_deps)
-      ~all_sets_of_closures:
-        solve_inputs.Staged.Solve_inputs.all_sets_of_closures ~machine_width
-      ~cmx_loader ~all_code ~final_typing_env
+      ~typing:(Some typing) ~machine_width ~cmx_loader ~all_code
   in
   flambda, all_code, slot_offsets, final_typing_env

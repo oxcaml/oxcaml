@@ -155,6 +155,43 @@ let filter_by_compilation_unit env ~keep =
         env.value_slot_offsets
   }
 
+let partition_by_compilation_unit env =
+  let by_compilation_unit =
+    Function_slot.Map.fold
+      (fun function_slot info by_compilation_unit ->
+        let compilation_unit =
+          Function_slot.get_compilation_unit function_slot
+        in
+        Compilation_unit.Map.update compilation_unit
+          (fun offsets ->
+            let offsets =
+              match offsets with None -> empty | Some offsets -> offsets
+            in
+            Some
+              { offsets with
+                function_slot_offsets =
+                  Function_slot.Map.add function_slot info
+                    offsets.function_slot_offsets
+              })
+          by_compilation_unit)
+      env.function_slot_offsets Compilation_unit.Map.empty
+  in
+  Value_slot.Map.fold
+    (fun value_slot info by_compilation_unit ->
+      let compilation_unit = Value_slot.get_compilation_unit value_slot in
+      Compilation_unit.Map.update compilation_unit
+        (fun offsets ->
+          let offsets =
+            match offsets with None -> empty | Some offsets -> offsets
+          in
+          Some
+            { offsets with
+              value_slot_offsets =
+                Value_slot.Map.add value_slot info offsets.value_slot_offsets
+            })
+        by_compilation_unit)
+    env.value_slot_offsets by_compilation_unit
+
 (* CR gbury: considering that the goal is to have `offsets` significantly
    smaller than the `imported_offsets`, it might be better for performance to
    check whether the function slot is already in the offsets before looking it

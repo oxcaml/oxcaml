@@ -86,6 +86,9 @@ val merge : t -> t -> t
 (** Keep only the offsets of slots whose compilation unit satisfies [keep]. *)
 val filter_by_compilation_unit : t -> keep:(Compilation_unit.t -> bool) -> t
 
+(** Partition live and dead offsets by their slots' compilation units. *)
+val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
+
 (** Ensure the offsets for the given function slots are in the given exported
     offsets. [is_local] says whether slots of the given compilation unit have
     their offsets computed by the current process (rather than imported); such

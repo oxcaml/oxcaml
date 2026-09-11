@@ -29,10 +29,20 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
+(** Full typing information for normal Reaper rebuilding and type exports.
+    Backend-only rebuilding passes [None] and conservatively erases rich
+    subkinds without querying the type database. *)
+type typing =
+  { context : Types_rewriter.rewrite_context;
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    env : Typing_env.t option
+  }
+
 type result = private
   { body : Flambda.Expr.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
+    code_ids_to_remember : Code_id.Set.t;
+    free_names : Name_occurrences.t
   }
 
 val rebuild :
@@ -40,11 +50,8 @@ val rebuild :
   ordered_code_ids:Code_id.t array ->
   continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
   fixed_arity_continuations:Continuation.Set.t ->
-  final_typing_env:Typing_env.t option ->
-  types_rewrite_context:Types_rewriter.rewrite_context ->
-  code_changes:Unboxing_analysis.code_changes ->
-  code_deps_for_result_types:Traverse_acc.code_dep Code_id.Map.t option ->
-  Unboxing_analysis.result ->
+  typing:typing option ->
+  Rebuild_solution.t ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->
   Rev_expr.rev_code Code_id.Map.t ->
