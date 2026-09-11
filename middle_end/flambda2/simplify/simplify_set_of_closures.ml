@@ -577,13 +577,18 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   in
   { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
 
-let introduce_code dacc code_id code_const =
+let introduce_code dacc code_id code_const ~from_specialisation_site =
+  let code_const =
+    if from_specialisation_site
+    then Rebuilt_static_const.charge_code_size code_const
+    else code_const
+  in
   let code = LC.create_code code_id code_const in
   DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
     (LCS.singleton code)
 
 let simplify_function context ~outer_dacc function_slot code_id
-    ~closure_bound_names_inside_function =
+    ~closure_bound_names_inside_function ~from_specialisation_site =
   let code_or_metadata =
     try DE.find_code_exn (DA.denv (C.dacc_prior_to_sets context)) code_id
     with Not_found ->
@@ -605,7 +610,10 @@ let simplify_function context ~outer_dacc function_slot code_id
         | None -> code_id, outer_dacc
         | Some (Not_rebuilding, new_code_const) ->
           (* Not rebuilding: there is no code to resimplify *)
-          let outer_dacc = introduce_code outer_dacc code_id new_code_const in
+          let outer_dacc =
+            introduce_code outer_dacc code_id new_code_const
+              ~from_specialisation_site
+          in
           code_id, outer_dacc
         | Some (Rebuilding new_code, new_code_const) ->
           let max_function_simplify_run =
@@ -620,7 +628,10 @@ let simplify_function context ~outer_dacc function_slot code_id
           if should_resimplify && count < max_function_simplify_run
           then run ~outer_dacc ~code:new_code (count + 1)
           else
-            let outer_dacc = introduce_code outer_dacc code_id new_code_const in
+            let outer_dacc =
+              introduce_code outer_dacc code_id new_code_const
+                ~from_specialisation_site
+            in
             code_id, outer_dacc
       in
       run ~outer_dacc ~code 0
@@ -647,8 +658,7 @@ type simplify_set_of_closures0_result =
   }
 
 let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
-    ~closure_bound_names ~closure_bound_names_inside ~value_slots
-    ~value_slot_types ~synthetic_value_slots =
+    ~closure_bound_names ~closure_bound_names_inside ~value_slot_types =
   let dacc = C.dacc_prior_to_sets context in
   let function_decls = Set_of_closures.function_decls set_of_closures in
   let all_function_decls_in_set =
@@ -675,6 +685,8 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
           let code_id, outer_dacc, code_ids_to_never_delete_this_set =
             simplify_function context ~outer_dacc function_slot old_code_id
               ~closure_bound_names_inside_function:closure_bound_names_inside
+              ~from_specialisation_site:
+                (Set_of_closures.is_specialisation_site set_of_closures)
           in
           let function_type =
             let rec_info =
@@ -707,27 +719,42 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
   let dacc =
     DA.add_code_ids_to_never_delete dacc code_ids_to_never_delete_this_set
   in
-  let old_code_ids_this_set =
-    Code_id.Set.of_list
-      (Function_declarations.code_ids
-         (Set_of_closures.function_decls set_of_closures))
-  in
-  let for_this_set old_code_id _ =
-    Code_id.Set.mem old_code_id old_code_ids_this_set
-  in
-  let dacc =
-    DA.map_denv dacc
-      ~f:
-        (C.record_code_specialisations
-           (Code_id.Map.filter for_this_set (C.code_specialisations context)))
-  in
   let synthetic_value_slots =
-    (* Without a new version of any of the code, the assumptions can never be
-       used: drop the slots so that a specialisation site is not kept for
-       nothing. *)
-    if Code_id.Map.exists for_this_set (C.old_to_new_code_ids_all_sets context)
-    then synthetic_value_slots
-    else Value_slot.Map.empty
+    Set_of_closures.synthetic_value_slots set_of_closures
+  in
+  let dacc, synthetic_value_slots =
+    if Value_slot.Map.is_empty synthetic_value_slots
+    then dacc, synthetic_value_slots
+    else
+      let old_code_ids =
+        Function_declarations.code_ids
+          (Set_of_closures.function_decls set_of_closures)
+      in
+      let dacc =
+        DA.map_denv dacc ~f:(fun denv ->
+            List.fold_left
+              (fun denv old_code_id ->
+                match
+                  Code_id.Map.find_opt old_code_id
+                    (C.code_specialisations context)
+                with
+                | None -> denv
+                | Some specialisation ->
+                  DE.add_code_specialisation denv ~old_code_id specialisation)
+              denv old_code_ids)
+      in
+      let synthetic_value_slots =
+        (* Without a new version of any code in this set, the hints cannot be
+           used. *)
+        if
+          List.exists
+            (fun code_id ->
+              Code_id.Map.mem code_id (C.old_to_new_code_ids_all_sets context))
+            old_code_ids
+        then synthetic_value_slots
+        else Value_slot.Map.empty
+      in
+      dacc, synthetic_value_slots
   in
   let closure_types_by_bound_name =
     let closure_types_via_aliases =
@@ -767,15 +794,16 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
     Set_of_closures.create
       ~is_specialisation_site:
         (Set_of_closures.is_specialisation_site set_of_closures)
-      ~synthetic_value_slots ~value_slots function_decls
+      ~value_slots:(Set_of_closures.value_slots set_of_closures)
+      ~synthetic_value_slots function_decls
   in
   { set_of_closures; dacc }
 
 let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
-    ~closure_bound_vars set_of_closures alloc_mode ~value_slots
-    ~synthetic_value_slots ~synthetic_value_slot_types ~symbol_projections
-    ~simplify_function_body =
+    ~closure_bound_vars set_of_closures alloc_mode ~symbol_projections
+    ~synthetic_value_slot_types ~simplify_function_body =
   let function_decls = Set_of_closures.function_decls set_of_closures in
+  let value_slots = Set_of_closures.value_slots set_of_closures in
   let closure_symbols =
     Function_slot.Lmap.mapi
       (fun function_slot _func_decl ->
@@ -821,7 +849,6 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~synthetic_value_slots_all_sets:[synthetic_value_slots]
       ~synthetic_value_slot_types_all_sets:[synthetic_value_slot_types]
   in
   let closure_bound_names_inside =
@@ -830,8 +857,7 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
   let { set_of_closures; dacc } =
     simplify_set_of_closures0 dacc context set_of_closures
       (Alloc_mode.For_allocations.as_type alloc_mode)
-      ~closure_bound_names ~closure_bound_names_inside ~value_slots
-      ~value_slot_types ~synthetic_value_slots
+      ~closure_bound_names ~closure_bound_names_inside ~value_slot_types
   in
   let closure_symbols_set =
     Symbol.Set.of_list (Function_slot.Lmap.data closure_symbols)
@@ -893,8 +919,8 @@ let simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
       (Named.create_set_of_closures ~alloc_mode set_of_closures)
 
 let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
-    set_of_closures alloc_mode ~value_slots ~value_slot_types
-    ~synthetic_value_slots ~synthetic_value_slot_types ~simplify_function_body =
+    set_of_closures alloc_mode ~value_slot_types ~synthetic_value_slot_types
+    ~simplify_function_body =
   let closure_bound_names =
     Function_slot.Map.map Bound_name.create_var closure_bound_vars
   in
@@ -904,7 +930,6 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
         [set_of_closures, Alloc_mode.For_allocations.as_type alloc_mode]
       ~closure_bound_names_all_sets:[closure_bound_names]
       ~value_slot_types_all_sets:[value_slot_types]
-      ~synthetic_value_slots_all_sets:[synthetic_value_slots]
       ~synthetic_value_slot_types_all_sets:[synthetic_value_slot_types]
   in
   let closure_bound_names_inside =
@@ -915,8 +940,7 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
     then
       simplify_set_of_closures0 dacc context set_of_closures
         (Alloc_mode.For_allocations.as_type alloc_mode)
-        ~closure_bound_names ~closure_bound_names_inside ~value_slots
-        ~value_slot_types ~synthetic_value_slots
+        ~closure_bound_names ~closure_bound_names_inside ~value_slot_types
     else
       (* If the closure is to be phantomized, mark all code as deleted *)
       let dacc =
@@ -948,9 +972,8 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
               ( Code_metadata.function_slot_size code_metadata,
                 Code_metadata.dbg code_metadata ))
         in
-        Set_of_closures.create ~is_specialisation_site:false
-          ~synthetic_value_slots:Value_slot.Map.empty ~value_slots
-          function_decls
+        Set_of_closures.create ~is_specialisation_site:false ~value_slots
+          ~synthetic_value_slots:Value_slot.Map.empty function_decls
       in
       { set_of_closures; dacc }
   in
@@ -991,9 +1014,8 @@ let simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
 
 type lifting_decision_result =
   { can_lift : bool;
-    value_slots : Simple.t Value_slot.Map.t;
+    set_of_closures : Set_of_closures.t;
     value_slot_types : T.t Value_slot.Map.t;
-    synthetic_value_slots : Simple.t Value_slot.Map.t;
     synthetic_value_slot_types : T.t Value_slot.Map.t;
     symbol_projections : Symbol_projection.t Variable.Map.t
   }
@@ -1010,7 +1032,10 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
      closure declaration. (Such deletions end up occurring during the upwards
      traversal and during [To_cmm], by which time the necessary information is
      available.) *)
-  let simplify_value_slots value_slots symbol_projections =
+  let is_specialisation_site =
+    Set_of_closures.is_specialisation_site set_of_closures
+  in
+  let simplify_value_slots slots symbol_projections =
     Value_slot.Map.fold
       (fun value_slot env_entry
            (value_slots, value_slot_types, symbol_projections) ->
@@ -1040,7 +1065,7 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
           Value_slot.Map.add value_slot ty value_slot_types
         in
         value_slots, value_slot_types, symbol_projections)
-      value_slots
+      slots
       (Value_slot.Map.empty, Value_slot.Map.empty, symbol_projections)
   in
   let value_slots, value_slot_types, symbol_projections =
@@ -1096,8 +1121,8 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
          ~var:(fun var ~coercion:_ -> variable_permits_lifting var)
   in
   let synthetic_value_slot_permits_lifting simple =
-    (* Synthetic contents are not stored in the closure, so only the scoping
-       check applies. *)
+    (* Synthetic contents are not stored in the closure, so only scoping
+       matters. *)
     can_lift_coercion (Simple.coercion simple)
     && Simple.pattern_match' simple
          ~const:(fun _ -> true)
@@ -1109,17 +1134,20 @@ let type_value_slots_and_make_lifting_decision_for_one_set dacc
   let can_lift =
     (* Sites stay in the enclosing function so that inlining can revisit
        them. *)
-    (not (Set_of_closures.is_specialisation_site set_of_closures))
+    (not is_specialisation_site)
     && Name_mode.is_normal name_mode_of_bound_vars
     && Value_slot.Map.for_all value_slot_permits_lifting value_slots
     && Value_slot.Map.for_all
          (fun _ simple -> synthetic_value_slot_permits_lifting simple)
          synthetic_value_slots
   in
+  let set_of_closures =
+    Set_of_closures.with_value_slots set_of_closures ~value_slots
+      ~synthetic_value_slots
+  in
   { can_lift;
-    value_slots;
+    set_of_closures;
     value_slot_types;
-    synthetic_value_slots;
     synthetic_value_slot_types;
     symbol_projections
   }
@@ -1142,9 +1170,8 @@ let simplify_non_lifted_set_of_closures dacc (bound_vars : Bound_pattern.t)
       closure_bound_vars
   in
   let { can_lift;
-        value_slots;
+        set_of_closures;
         value_slot_types;
-        synthetic_value_slots;
         synthetic_value_slot_types;
         symbol_projections
       } =
@@ -1155,16 +1182,14 @@ let simplify_non_lifted_set_of_closures dacc (bound_vars : Bound_pattern.t)
   if can_lift
   then
     simplify_and_lift_set_of_closures dacc ~closure_bound_vars_inverse
-      ~closure_bound_vars set_of_closures alloc_mode ~value_slots
-      ~synthetic_value_slots ~synthetic_value_slot_types ~symbol_projections
+      ~closure_bound_vars set_of_closures alloc_mode ~symbol_projections
+      ~synthetic_value_slot_types
   else
     simplify_non_lifted_set_of_closures0 dacc bound_vars ~closure_bound_vars
-      set_of_closures alloc_mode ~value_slots ~value_slot_types
-      ~synthetic_value_slots ~synthetic_value_slot_types
+      set_of_closures alloc_mode ~value_slot_types ~synthetic_value_slot_types
 
 let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
-    ~closure_bound_names_inside ~value_slots ~value_slot_types
-    ~synthetic_value_slots set_of_closures =
+    ~closure_bound_names_inside ~value_slot_types set_of_closures =
   let closure_bound_names =
     Function_slot.Lmap.map Bound_name.create_symbol closure_symbols
     |> Function_slot.Lmap.bindings |> Function_slot.Map.of_list
@@ -1172,7 +1197,7 @@ let simplify_lifted_set_of_closures0 dacc context ~closure_symbols
   let { set_of_closures; dacc } =
     simplify_set_of_closures0 dacc context set_of_closures
       Alloc_mode.For_types.heap ~closure_bound_names ~closure_bound_names_inside
-      ~value_slots ~value_slot_types ~synthetic_value_slots
+      ~value_slot_types
   in
   let find_code_metadata code_id =
     let env = DA.denv dacc in
@@ -1209,28 +1234,23 @@ end
 
 let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
     ~closure_bound_names_all_sets ~simplify_function_body =
-  let all_sets_of_closures =
-    List.map
-      (fun (_symbols, set_of_closures) ->
-        set_of_closures, Alloc_mode.For_types.heap)
-      all_sets_of_closures_and_symbols
-  in
   let value_slots_and_types_all_sets =
     List.map
-      (fun (set_of_closures, alloc_mode) ->
+      (fun (_symbols, set_of_closures) ->
         type_value_slots_and_make_lifting_decision_for_one_set dacc
-          ~name_mode_of_bound_vars:Name_mode.normal set_of_closures alloc_mode)
-      all_sets_of_closures
+          ~name_mode_of_bound_vars:Name_mode.normal set_of_closures
+          Alloc_mode.For_types.heap)
+      all_sets_of_closures_and_symbols
+  in
+  let all_sets_of_closures =
+    List.map
+      (fun (decision : lifting_decision_result) ->
+        decision.set_of_closures, Alloc_mode.For_types.heap)
+      value_slots_and_types_all_sets
   in
   let value_slot_types_all_sets =
     List.map
       (fun (decision : lifting_decision_result) -> decision.value_slot_types)
-      value_slots_and_types_all_sets
-  in
-  let synthetic_value_slots_all_sets =
-    List.map
-      (fun (decision : lifting_decision_result) ->
-        decision.synthetic_value_slots)
       value_slots_and_types_all_sets
   in
   let synthetic_value_slot_types_all_sets =
@@ -1242,21 +1262,18 @@ let simplify_lifted_sets_of_closures dacc ~all_sets_of_closures_and_symbols
   let context =
     C.create ~dacc_prior_to_sets:dacc ~simplify_function_body
       ~all_sets_of_closures ~closure_bound_names_all_sets
-      ~value_slot_types_all_sets ~synthetic_value_slots_all_sets
-      ~synthetic_value_slot_types_all_sets
+      ~value_slot_types_all_sets ~synthetic_value_slot_types_all_sets
   in
   let closure_bound_names_inside_functions_all_sets =
     C.closure_bound_names_inside_functions_all_sets context
   in
   List.fold_left3
     (fun (patterns_acc, static_consts_acc, dacc)
-         (closure_symbols, set_of_closures) closure_bound_names_inside
-         ({ value_slots; value_slot_types; synthetic_value_slots; _ } :
-           lifting_decision_result) ->
+         (closure_symbols, _set_of_closures) closure_bound_names_inside
+         ({ set_of_closures; value_slot_types; _ } : lifting_decision_result) ->
       let pattern, static_const, dacc =
         simplify_lifted_set_of_closures0 dacc context ~closure_symbols
-          ~closure_bound_names_inside ~value_slots ~value_slot_types
-          ~synthetic_value_slots set_of_closures
+          ~closure_bound_names_inside ~value_slot_types set_of_closures
       in
       (* The order doesn't matter here -- see comment in [Simplify_static_const]
          where this function is called from. *)

@@ -362,10 +362,18 @@ and named =
   | Closure of fun_decl
   | Rec_info of rec_info
 
+and code_id_or_deleted =
+  | Code_id of code_id
+  | Deleted of
+      { function_slot_size : int;
+        dbg : Debuginfo.t
+      }
+
 and fun_decl =
-  { code_id : code_id;
+  { code_id : code_id_or_deleted;
     is_specialisation_site : bool;
-    function_slot : function_slot option (* defaults to same name as code id *);
+    function_slot : function_slot option;
+        (* defaults to the code ID's name; required for deleted functions *)
     alloc : alloc_mode_for_allocations;
         (* alloc mode for set of closures (ignored except on first binding) *)
     synthetic_value_slots : value_slots option

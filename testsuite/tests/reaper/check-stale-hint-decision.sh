@@ -8,11 +8,13 @@ has_call () {
 }
 
 if test -s "$1" &&
-   has_call "$1" outer_hint &&
-   ! has_call "$1" outer_control; then
+   ! has_call "$1" outer_hint &&
+   ! has_call "$1" outer_control &&
+   has_call "$1" large &&
+   ! grep -aq 'camlSpecialise_lifted_stale_hint__large_loop_.*_code' "$1"; then
   exit "${TEST_PASS}"
 else
-  echo "Expected a call to outer_hint, but outer_control to be inlined"
+  echo "Expected both hint variants to inline, but no copy of the large helper"
   cat "$1"
   exit "${TEST_FAIL}"
 fi

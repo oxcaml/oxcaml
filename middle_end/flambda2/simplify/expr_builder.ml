@@ -231,21 +231,12 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
       name_occurrences
   in
   let cost_metrics_of_static_consts =
-    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
-    then Rebuilt_static_const.Group.cost_metrics static_consts
-    else
-      (* Static consts used to always have zero cost metrics. That is now
-         considered to be a bug, but it can have unexpected consequences on
-         speculative inlining -- the flag above is used to control a progressive
-         rollout of the fix and will be removed in due time. *)
-      Cost_metrics.zero
+    Rebuilt_static_const.Group.cost_metrics_for_inlining static_consts
   in
   let uacc =
     UA.with_name_occurrences uacc ~name_occurrences:free_names_of_let
     |> UA.add_cost_metrics
-         (Cost_metrics.increase_due_to_let_expr
-            ~is_phantom:false
-              (* Static consts always have zero cost metrics at present. *)
+         (Cost_metrics.increase_due_to_let_expr ~is_phantom:false
             ~cost_metrics_of_defining_expr:cost_metrics_of_static_consts)
   in
   if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
@@ -457,6 +448,17 @@ let place_lifted_constants uacc ~lifted_constants_from_defining_expr
       "All lifted constants of the body should have been\n\
       \                        removed from the uacc";
   let place_constants uacc ~around constants =
+    (* A dead definition must not root its dependencies when another batch is
+       placed later. Real rebuilding uses the full-unit reachability result;
+       speculation prunes its local batch before introducing any bindings. *)
+    let constants =
+      if
+        Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
+      then
+        LCS.retain_reachable_for_speculation constants
+          ~roots:(UA.roots_for_lifted_constant_costs uacc)
+      else constants
+    in
     let sorted = LCS.sort constants in
     ArrayLabels.fold_left sorted.innermost_first ~init:(around, uacc)
       ~f:(fun (body, uacc) lifted_const ->

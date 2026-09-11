@@ -1537,7 +1537,8 @@ module Named = struct
 
   let is_dynamically_allocated_set_of_closures t =
     match t with
-    | Set_of_closures _ -> true
+    | Set_of_closures (set, _) ->
+      not (Set_of_closures.is_specialisation_site set)
     | Simple _ | Prim _ | Static_consts _ | Rec_info _ -> false
 
   let is_static_consts t =

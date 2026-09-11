@@ -264,7 +264,7 @@ let bind_existing_code_to_new_code_ids denv ~old_to_new_code_ids_all_sets =
    code and to guard the redirection of callee-less calls (see
    [Simplify_apply_expr.redirect_direct_call_to_specialised_code]). *)
 let compute_code_specialisations denv ~all_sets_of_closures
-    ~synthetic_value_slots_all_sets ~old_to_new_code_ids_all_sets =
+    ~old_to_new_code_ids_all_sets =
   let assumptions_for_code old_code_id ~synthetic_value_slots =
     let code = Code_or_metadata.get_code (DE.find_code_exn denv old_code_id) in
     Function_params_and_body.pattern_match (Code.params_and_body code)
@@ -296,9 +296,11 @@ let compute_code_specialisations denv ~all_sets_of_closures
               | Some simple -> Some (value_slot, simple)))
           (Bound_parameters.to_list params))
   in
-  List.fold_left2
-    (fun code_specialisations (set_of_closures, _alloc_mode)
-         synthetic_value_slots ->
+  List.fold_left
+    (fun code_specialisations (set_of_closures, _alloc_mode) ->
+      let synthetic_value_slots =
+        Set_of_closures.synthetic_value_slots set_of_closures
+      in
       if Value_slot.Map.is_empty synthetic_value_slots
       then code_specialisations
       else
@@ -323,7 +325,7 @@ let compute_code_specialisations denv ~all_sets_of_closures
           code_specialisations
           (Function_declarations.code_ids
              (Set_of_closures.function_decls set_of_closures)))
-    Code_id.Map.empty all_sets_of_closures synthetic_value_slots_all_sets
+    Code_id.Map.empty all_sets_of_closures
 
 let record_code_specialisations code_specialisations denv =
   Code_id.Map.fold
@@ -398,7 +400,7 @@ let compute_and_erase_depth_variables ~typing_env ~denv_inside_functions
 
 let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     ~closure_bound_names_all_sets ~value_slot_types_all_sets
-    ~synthetic_value_slots_all_sets ~synthetic_value_slot_types_all_sets =
+    ~synthetic_value_slot_types_all_sets =
   let denv = DA.denv dacc_prior_to_sets in
   let denv_inside_functions =
     DE.enter_set_of_closures denv
@@ -408,13 +410,12 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
     |> DE.set_rebuild_terms
   in
   let denv_inside_functions, previously_free_depth_variables =
-    (* The contents of the synthetic value slots end up in the functions'
-       environments too, via the equations on the specialised parameters. *)
+    (* Synthetic contents also enter the functions' environments through the
+       equations on specialised parameters. They are not runtime projections. *)
     let value_slot_types_all_sets =
       List.map2
-        (fun value_slot_types synthetic_value_slot_types ->
-          Value_slot.Map.disjoint_union value_slot_types
-            synthetic_value_slot_types)
+        (fun runtime synthetic ->
+          Value_slot.Map.disjoint_union runtime synthetic)
         value_slot_types_all_sets synthetic_value_slot_types_all_sets
     in
     compute_and_erase_depth_variables ~typing_env:(DE.typing_env denv)
@@ -425,7 +426,7 @@ let create ~dacc_prior_to_sets ~simplify_function_body ~all_sets_of_closures
   in
   let code_specialisations =
     compute_code_specialisations denv ~all_sets_of_closures
-      ~synthetic_value_slots_all_sets ~old_to_new_code_ids_all_sets
+      ~old_to_new_code_ids_all_sets
   in
   let ( closure_bound_names_inside_functions_all_sets,
         closure_types_inside_functions_all_sets ) =

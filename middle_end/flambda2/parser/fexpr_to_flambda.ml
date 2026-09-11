@@ -283,45 +283,55 @@ let convert_value_slots ?(is_synthetic = false) env
       Value_slot.Map.add value_slot value slots)
     Value_slot.Map.empty value_slots
 
-let set_of_closures env fun_decls value_slots =
-  let fun_decls_flambda : Function_declarations.t =
-    let translate_fun_decl (fun_decl : Fexpr.fun_decl) :
-        Function_slot.t * Code_id.t =
-      let code_id = find_code_id env fun_decl.code_id in
-      let function_slot =
-        (* By default, pun the code id as the function slot *)
-        fun_decl.function_slot |> Option.value ~default:fun_decl.code_id
-      in
-      let function_slot = fresh_or_existing_function_slot env function_slot in
-      function_slot, code_id
-    in
-    List.map translate_fun_decl fun_decls
-    |> Function_slot.Lmap.of_list
-    |> Function_slot.Lmap.map
-         (fun code_id : Function_declarations.code_id_in_function_declaration ->
-           Code_id { code_id; only_full_applications = false })
-    |> Function_declarations.create
+let function_slot_of_fun_decl env (fun_decl : Fexpr.fun_decl) =
+  let function_slot =
+    match fun_decl.function_slot, fun_decl.code_id with
+    | Some slot, _ -> slot
+    | None, Code_id code_id -> code_id
+    | None, Deleted _ ->
+      Misc.fatal_error
+        "A deleted function declaration must specify a function slot"
   in
-  let synthetic_value_slots =
-    List.fold_left
-      (fun slots (fun_decl : Fexpr.fun_decl) ->
-        match fun_decl.synthetic_value_slots with
-        | None -> slots
-        | Some elements ->
-          Value_slot.Map.disjoint_union slots
-            (convert_value_slots ~is_synthetic:true env elements))
-      Value_slot.Map.empty fun_decls
-  in
-  let value_slots =
-    convert_value_slots env (Option.value value_slots ~default:[])
-  in
+  fresh_or_existing_function_slot env function_slot
+
+let set_of_closures ~is_static env fun_decls value_slots =
   let is_specialisation_site =
     List.exists
       (fun (decl : Fexpr.fun_decl) -> decl.is_specialisation_site)
       fun_decls
   in
-  if is_specialisation_site && not (Value_slot.Map.is_empty value_slots)
+  if is_static && is_specialisation_site
+  then Misc.fatal_error "A specialisation site must be dynamically bound";
+  let synthetic_value_slots =
+    List.concat_map
+      (fun (fun_decl : Fexpr.fun_decl) ->
+        Option.value fun_decl.synthetic_value_slots ~default:[])
+      fun_decls
+  in
+  let value_slots = Option.value value_slots ~default:[] in
+  if is_specialisation_site && List.length value_slots > 0
   then Misc.fatal_error "A specialisation site cannot have runtime value slots";
+  let fun_decls_flambda : Function_declarations.t =
+    let translate_fun_decl (fun_decl : Fexpr.fun_decl) =
+      let code_id : Function_declarations.code_id_in_function_declaration =
+        match fun_decl.code_id with
+        | Code_id code_id ->
+          let code_id = find_code_id env code_id in
+          Code_id { code_id; only_full_applications = false }
+        | Deleted { function_slot_size; dbg } ->
+          if function_slot_size <= 0
+          then Misc.fatal_error "Deleted function slot size must be positive";
+          Deleted { function_slot_size; dbg }
+      in
+      function_slot_of_fun_decl env fun_decl, code_id
+    in
+    List.map translate_fun_decl fun_decls
+    |> Function_slot.Lmap.of_list |> Function_declarations.create
+  in
+  let synthetic_value_slots =
+    convert_value_slots ~is_synthetic:true env synthetic_value_slots
+  in
+  let value_slots = convert_value_slots env value_slots in
   Set_of_closures.create ~is_specialisation_site ~synthetic_value_slots
     ~value_slots fun_decls_flambda
 
@@ -386,7 +396,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
     in
     let bound = Bound_pattern.set_of_closures bound_vars in
     let closure_bindings = List.map snd vars_and_closure_bindings in
-    let soc = set_of_closures env closure_bindings value_slots in
+    let soc =
+      set_of_closures ~is_static:false env closure_bindings value_slots
+    in
     let name_mode = Bound_pattern.name_mode bound in
     let is_phantom = Name_mode.is_phantom name_mode in
     let acc = Acc.add_set_of_closures_offsets ~is_phantom acc soc in
@@ -571,15 +583,9 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
           Bound_static.Pattern.block_like symbol, env
         | Set_of_closures soc ->
           let closure_binding env
-              ({ symbol; fun_decl = { function_slot; code_id; _ } } :
-                Fexpr.static_closure_binding) =
+              ({ symbol; fun_decl } : Fexpr.static_closure_binding) =
             let symbol = declare_symbol env symbol in
-            let function_slot =
-              function_slot |> Option.value ~default:code_id
-            in
-            let function_slot =
-              fresh_or_existing_function_slot env function_slot
-            in
+            let function_slot = function_slot_of_fun_decl env fun_decl in
             (function_slot, symbol), env
           in
           let closure_symbols, env =
@@ -687,7 +693,7 @@ let rec expr env acc (e : Fexpr.expr) : _ * Flambda.Expr.t =
             (fun (b : Fexpr.static_closure_binding) -> b.fun_decl)
             bindings
         in
-        let set = set_of_closures env fun_decls elements in
+        let set = set_of_closures ~is_static:true env fun_decls elements in
         static_const (SC.set_of_closures set)
       | Closure _ -> assert false (* should have been filtered out above *)
       | Deleted_code _ -> acc, Flambda.Static_const_or_code.deleted_code

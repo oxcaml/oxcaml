@@ -124,7 +124,8 @@ type t =
 
            CR gbury: we may not need to do this if we had free_names on handlers
            that we have not explored yet. *)
-    code_specialisations : Code_specialisation.t list Code_id.Map.t
+    code_specialisations :
+      Code_specialisation.t list Numeric_types.Int.Map.t Code_id.Map.t
   }
 
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
@@ -195,11 +196,12 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     (Format.pp_print_list ~pp_sep:Format.pp_print_space Lifted_cont_params.print) defined_variables_by_scope
     cost_of_lifting_continuations_out_of_current_one
     has_seen_a_non_liftable_continuation
-    (Code_id.Map.print (fun ppf specialisations ->
-         Format.fprintf ppf "@[<hov 1>(%a)@]"
-           (Format.pp_print_list ~pp_sep:Format.pp_print_space
-              Code_specialisation.print)
-           specialisations))
+    (Code_id.Map.print
+       (Numeric_types.Int.Map.print (fun ppf specialisations ->
+            Format.fprintf ppf "@[<hov 1>(%a)@]"
+              (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                 Code_specialisation.print)
+              specialisations)))
     code_specialisations
 
 let define_continuations ~can_be_lifted t conts =
@@ -873,17 +875,34 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     loopify_state = denv.loopify_state
   }
 
-let add_code_specialisation t ~old_code_id specialisation =
+let add_code_specialisation t ~old_code_id
+    (specialisation : Code_specialisation.t) =
+  let num_assumptions =
+    List.fold_left
+      (fun count assumption ->
+        if Option.is_some assumption then count + 1 else count)
+      0 specialisation.assumptions
+  in
   let code_specialisations =
     Code_id.Map.update old_code_id
-      (function
-        | None -> Some [specialisation]
-        | Some specialisations -> Some (specialisation :: specialisations))
+      (fun specialisations ->
+        let specialisations =
+          Option.value specialisations ~default:Numeric_types.Int.Map.empty
+        in
+        Some
+          (Numeric_types.Int.Map.update num_assumptions
+             (function
+               | None -> Some [specialisation]
+               | Some candidates -> Some (specialisation :: candidates))
+             specialisations))
       t.code_specialisations
   in
   { t with code_specialisations }
 
 let find_code_specialisations t code_id =
   match Code_id.Map.find_opt code_id t.code_specialisations with
-  | None -> []
-  | Some specialisations -> specialisations
+  | None -> Seq.empty
+  | Some specialisations ->
+    Numeric_types.Int.Map.to_rev_seq specialisations
+    |> Seq.flat_map (fun (_num_assumptions, candidates) ->
+        List.to_seq candidates)

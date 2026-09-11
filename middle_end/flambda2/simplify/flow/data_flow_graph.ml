@@ -25,7 +25,7 @@ type t =
     normal_code_id_unconditionally_used : Code_id.Set.t;
     unconditionally_used : Name.Set.t;
     non_normal_only_roots : Name.Set.t;
-    has_specialisation_sites : bool;
+    compute_specialisation_site_info : bool;
     code_id_unconditionally_used : Code_id.Set.t;
     traverse_code_dependencies : bool
   }
@@ -151,7 +151,7 @@ module Reachable = struct
 end
 
 let empty code_age_relation traverse_code_dependencies ~code_ids_to_never_delete
-    ~has_specialisation_sites =
+    ~compute_specialisation_site_info =
   { code_age_relation;
     traverse_code_dependencies;
     name_to_name = Name.Map.empty;
@@ -163,7 +163,7 @@ let empty code_age_relation traverse_code_dependencies ~code_ids_to_never_delete
     normal_code_id_unconditionally_used = code_ids_to_never_delete;
     unconditionally_used = Name.Set.empty;
     non_normal_only_roots = Name.Set.empty;
-    has_specialisation_sites;
+    compute_specialisation_site_info;
     code_id_unconditionally_used = code_ids_to_never_delete
   }
 
@@ -179,7 +179,7 @@ let [@ocamlformat "disable"] print ppf
       code_age_relation;
       unconditionally_used;
       non_normal_only_roots;
-      has_specialisation_sites;
+      compute_specialisation_site_info;
       code_id_unconditionally_used
     } =
   Format.fprintf ppf
@@ -192,7 +192,7 @@ let [@ocamlformat "disable"] print ppf
        @[<hov 1>(code_id_to_code_id@ %a)@]@ \
        @[<hov 1>(unconditionally_used@ %a)@]@ \
        @[<hov 1>(code_id_unconditionally_used@ %a)@]@ \
-       @[<hov 1>(has_specialisation_sites %b)@]@ \
+       @[<hov 1>(compute_specialisation_site_info %b)@]@ \
        @[<hov 1>(normal_code_id_to_name@ %a)@]@ \
        @[<hov 1>(normal_code_id_to_code_id@ %a)@]@ \
        @[<hov 1>(normal_code_id_unconditionally_used@ %a)@]@ \
@@ -206,7 +206,7 @@ let [@ocamlformat "disable"] print ppf
     (Code_id.Map.print Code_id.Set.print) code_id_to_code_id
     Name.Set.print unconditionally_used
     Code_id.Set.print code_id_unconditionally_used
-    has_specialisation_sites
+    compute_specialisation_site_info
     (Code_id.Map.print Name.Set.print) normal_code_id_to_name
     (Code_id.Map.print Code_id.Set.print) normal_code_id_to_code_id
     Code_id.Set.print normal_code_id_unconditionally_used
@@ -270,12 +270,12 @@ let name_occurs_normally name_occurrences name =
 let add_name_occurrences name_occurrences
     ({ unconditionally_used;
        non_normal_only_roots;
-       has_specialisation_sites;
+       compute_specialisation_site_info;
        code_id_unconditionally_used;
        _
      } as t) =
   let unconditionally_used, non_normal_only_roots =
-    if not has_specialisation_sites
+    if not compute_specialisation_site_info
     then
       ( Name_occurrences.fold_names name_occurrences
           ~f:(fun used name -> Name.Set.add name used)
@@ -301,7 +301,7 @@ let add_name_occurrences name_occurrences
       code_id_unconditionally_used
   in
   let normal_code_id_unconditionally_used =
-    if not has_specialisation_sites
+    if not compute_specialisation_site_info
     then t.normal_code_id_unconditionally_used
     else
       Code_id.Set.union t.normal_code_id_unconditionally_used
@@ -406,7 +406,7 @@ let add_continuation_info map ~return_continuation ~exn_continuation
             ~names:(fun t dst -> add_code_id_dependency ~src ~dst t)
             ~code_ids:(fun t dst -> add_code_id_to_code_id ~src ~dst t)
         in
-        if not graph.has_specialisation_sites
+        if not graph.compute_specialisation_site_info
         then graph
         else
           (* Non-normal code dependencies must not keep sites or their synthetic
@@ -502,7 +502,8 @@ let add_continuation_info map ~return_continuation ~exn_continuation
     apply_cont_args t
 
 let create ~return_continuation ~exn_continuation ~code_age_relation
-    ~used_value_slots ~code_ids_to_never_delete ~has_specialisation_sites map =
+    ~used_value_slots ~code_ids_to_never_delete
+    ~compute_specialisation_site_info map =
   (* Build the dependencies using the regular params and args of continuations,
      and the let-bindings in continuations handlers. *)
   let traverse_code_dependencies =
@@ -516,7 +517,7 @@ let create ~return_continuation ~exn_continuation ~code_age_relation
          ~used_value_slots)
       map
       (empty code_age_relation traverse_code_dependencies
-         ~code_ids_to_never_delete ~has_specialisation_sites)
+         ~code_ids_to_never_delete ~compute_specialisation_site_info)
   in
   t
 
@@ -531,7 +532,7 @@ let compute_reachability
        normal_code_id_unconditionally_used = _;
        unconditionally_used;
        non_normal_only_roots = _;
-       has_specialisation_sites = _;
+       compute_specialisation_site_info = _;
        code_id_unconditionally_used;
        traverse_code_dependencies
      } as t) =
@@ -549,7 +550,7 @@ let compute_reachability
 let required_names t =
   let all_uses = compute_reachability t in
   let specialisation_site_info : T.Specialisation_site_info.t =
-    if not t.has_specialisation_sites
+    if not t.compute_specialisation_site_info
     then T.Specialisation_site_info.empty
     else
       let t =

@@ -8,8 +8,10 @@ let base =
       my_closure &my_alloc_region my_depth -> k * e : val =
   cont k (x)
 in
-let $f = closure f &toplevel synthetic { sx = 0; sy = 1 } in
-let $camlCompare = Block 0 ($f) in
+let site = closure specialisation_site f &toplevel
+  synthetic { sx = 0; sy = 1 }
+in
+let $camlCompare = Block 0 () in
 cont done ($camlCompare)
 |}
 
@@ -62,7 +64,11 @@ let missing_one = replace_once base ~pattern:"x = sx; y = sy" ~with_:"x = sx"
 let swapped =
   replace_once base ~pattern:"x = sx; y = sy" ~with_:"x = sy; y = sx"
 
-let ordinary = replace_once missing ~pattern:" synthetic {" ~with_:" with {"
+let unmark_site text =
+  replace_once text ~pattern:"closure specialisation_site f" ~with_:"closure f"
+
+let ordinary =
+  unmark_site missing |> replace_once ~pattern:" synthetic {" ~with_:" with {"
 
 let renamed =
   base
@@ -83,15 +89,10 @@ let renamed_different_body =
 let mark_site text =
   replace_once text ~pattern:"closure f" ~with_:"closure specialisation_site f"
 
-let site = mark_site base
-
-let site_different_body =
-  replace_once site ~pattern:"cont k (x)" ~with_:"cont k (y)"
-
-let empty =
+let empty_site =
   replace_once missing ~pattern:" synthetic { sx = 0; sy = 1 }" ~with_:""
 
-let empty_site = mark_site empty
+let empty = unmark_site empty_site
 
 let empty_site_different_body =
   replace_once empty_site ~pattern:"cont k (x)" ~with_:"cont k (y)"
@@ -105,13 +106,18 @@ let duplicate_values_reordered =
     ~with_:"y = sy; x = sx"
 
 let early_slots =
-  {|let $f = closure f &toplevel synthetic { sx = 0; sy = 0 }
+  {|let code size(1) before (unused : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let site = closure specialisation_site f &my_alloc_region
+    synthetic { sx = 0; sy = 0 }
+  in
+  cont k (0)
 and code size(1) f (x : val, y : val)
       specialised { x = sx; y = sy }
       my_closure &my_alloc_region my_depth -> k * e : val =
   cont k (x)
 in
-let $camlCompare = Block 0 ($f) in
+let $camlCompare = Block 0 () in
 cont done ($camlCompare)
 |}
 
@@ -189,7 +195,10 @@ let mixed_kinds_different_body =
   replace_once mixed_kinds ~pattern:"cont k (x)" ~with_:"cont k (0)"
 
 let cyclic =
-  replace_once base ~pattern:"sx = 0; sy = 1" ~with_:"sx = $f; sy = $f"
+  base
+  |> replace_once ~pattern:"sx = 0; sy = 1" ~with_:"sx = $f; sy = $f"
+  |> replace_once ~pattern:"let site ="
+       ~with_:"let $f = closure f &toplevel with { cycle = $f } in\nlet site ="
 
 let conflicting_synthetic_values =
   replace_once base ~pattern:"sx = 0; sy = 1" ~with_:"sx = 0; sx = 1; sy = 1"
@@ -210,7 +219,7 @@ let mismatched_slot_kind =
 
 let synthetic_projection =
   replace_once base ~pattern:"let $camlCompare ="
-    ~with_:"let v = %project_value_slot.[f].[sx] ($f) in\nlet $camlCompare ="
+    ~with_:"let v = %project_value_slot.[f].[sx] (site) in\nlet $camlCompare ="
 
 let cyclic_renamed =
   cyclic
@@ -218,6 +227,81 @@ let cyclic_renamed =
   |> replace_all ~pattern:"sx" ~with_:"su"
   |> replace_all ~pattern:"sy =" ~with_:"sv ="
   |> replace_all ~pattern:"= sy" ~with_:"= sv"
+
+let overlapping_slots =
+  {|let code size(1) f (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+let code size(20) outer (x : val)
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  let first = closure specialisation_site f &my_alloc_region
+    synthetic { sa = 0; sb = 0 }
+  in
+  let second = closure specialisation_site f &my_alloc_region
+    synthetic { sa = 0; sc = 0 }
+  in
+  (apply direct(f &my_alloc_region) first (x) -> after * e)
+    where after (y : val) =
+      apply direct(f &my_alloc_region) second (y) -> k * e
+in
+let $outer = closure outer &toplevel in
+let $camlCompare = Block 0 ($outer) in
+cont done ($camlCompare)
+|}
+
+let overlapping_slots_reordered =
+  replace_once overlapping_slots ~pattern:"sa = 0; sb = 0"
+    ~with_:"sb = 0; sa = 0"
+
+let disjoint_slots =
+  replace_once overlapping_slots ~pattern:"sa = 0; sc = 0"
+    ~with_:"sd = 0; sc = 0"
+
+let split_slots =
+  {|let code size(1) f (x : val) specialised { x = sx }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+and code size(1) g (y : val) specialised { y = sy }
+      my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (y)
+in
+let first = closure specialisation_site f &toplevel synthetic { sx = 0 }
+and second = closure g &toplevel synthetic { sy = 1 }
+in
+let $camlCompare = Block 0 () in
+cont done ($camlCompare)
+|}
+
+let combined_slots =
+  split_slots
+  |> replace_once ~pattern:"synthetic { sx = 0 }"
+       ~with_:"synthetic { sx = 0; sy = 1 }"
+  |> replace_once ~pattern:" synthetic { sy = 1 }" ~with_:""
+
+let deleted_siblings =
+  replace_once base
+    ~pattern:
+      "let site = closure specialisation_site f &toplevel\n\
+      \  synthetic { sx = 0; sy = 1 }"
+    ~with_:
+      "let first = closure specialisation_site deleted size(2) @first &toplevel\n\
+      \  synthetic { sx = 0; sy = 1 }\n\
+       and middle = closure f @middle &toplevel\n\
+       and last = closure deleted size(3) @last &toplevel"
+
+let all_deleted =
+  replace_once deleted_siblings ~pattern:"closure f @middle"
+    ~with_:"closure deleted size(4) @middle"
+
+let static_deleted_siblings =
+  deleted_siblings
+  |> replace_once ~pattern:"closure specialisation_site deleted"
+       ~with_:"closure deleted"
+  |> replace_once ~pattern:"  synthetic { sx = 0; sy = 1 }" ~with_:""
+  |> replace_once ~pattern:"let first =" ~with_:"let $first ="
+  |> replace_once ~pattern:"and middle =" ~with_:"and $middle ="
+  |> replace_once ~pattern:"and last =" ~with_:"and $last ="
 
 let with_text text ~f =
   let dir = Filename.temp_dir "specialised_params_test" "" in
@@ -237,18 +321,23 @@ let parse text =
   with_text text ~f:(fun filename ->
       match Parse_flambda.parse filename with
       | Ok unit -> unit
-      | Error _ -> Misc.fatal_errorf "Could not parse:@ %s" text)
+      | Error error ->
+        Test_utils.dump_error error;
+        Misc.fatal_errorf "Could not parse:@ %s" text)
 
 let parse_fexpr text =
   with_text text ~f:(fun filename ->
       match Parse_flambda.parse_fexpr filename with
       | Ok unit -> unit
-      | Error _ -> Misc.fatal_errorf "Could not parse:@ %s" text)
+      | Error error ->
+        Test_utils.dump_error error;
+        Misc.fatal_errorf "Could not parse:@ %s" text)
 
 type summary =
   { sites : int;
     specialised_params : int;
-    synthetic_value_slots : int
+    synthetic_value_slots : int;
+    declarations : Fexpr.fun_decl list
   }
 
 let add_fun_decl summary (decl : Fexpr.fun_decl) =
@@ -259,7 +348,8 @@ let add_fun_decl summary (decl : Fexpr.fun_decl) =
       +
       match decl.synthetic_value_slots with
       | None -> 0
-      | Some slots -> List.length slots)
+      | Some slots -> List.length slots);
+    declarations = decl :: summary.declarations
   }
 
 let rec summarise summary (expr : Fexpr.expr) =
@@ -314,7 +404,11 @@ let rec summarise summary (expr : Fexpr.expr) =
 
 let summary_of_unit (unit : Fexpr.flambda_unit) =
   summarise
-    { sites = 0; specialised_params = 0; synthetic_value_slots = 0 }
+    { sites = 0;
+      specialised_params = 0;
+      synthetic_value_slots = 0;
+      declarations = []
+    }
     unit.body
 
 let failures = ref 0
@@ -348,23 +442,12 @@ let equivalent = check_both_directions ~expected:true
 
 let different = check_both_directions ~expected:false
 
-let code_in_recursive_handler () =
-  let unit =
-    parse
-      {|let code size(1) g (x : val)
-          my_closure &my_alloc_region my_depth -> k * e : val =
-  cont k (x)
-in
-(apply direct(g &toplevel) (0) -> finish * error)
-where finish (result : val) =
-  let $camlCompare = Block 0 (result) in
-  cont done ($camlCompare)
-|}
-  in
+let binding_in_recursive_handler text =
+  let unit = parse text in
   let open Flambda in
   match Expr.descr (Flambda_unit.body unit) with
-  | Let code_binding ->
-    Let.pattern_match code_binding ~f:(fun bound_static ~body ->
+  | Let binding ->
+    Let.pattern_match binding ~f:(fun bound_static ~body ->
         match Expr.descr body with
         | Let_cont (Non_recursive { handler; _ }) ->
           Non_recursive_let_cont_handler.pattern_match handler
@@ -385,12 +468,12 @@ where finish (result : val) =
               in
               let start_handler =
                 Let.create bound_static
-                  (Let.defining_expr code_binding)
+                  (Let.defining_expr binding)
                   ~body:(jump use) ~free_names_of_body:Unknown
                 |> Expr.create_let |> make_handler
               in
-              (* [g] dominates its use, but [use] precedes [start] in storage
-                 order. Comparing [use] first cannot yet match the code IDs. *)
+              (* The binding dominates its use, but [use] precedes [start] in
+                 storage order. Its correspondence is discovered later. *)
               let body =
                 Let_cont.create_recursive ~invariant_params:no_params
                   (Continuation.Lmap.of_list
@@ -407,7 +490,31 @@ where finish (result : val) =
         | Let _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ ->
           Misc.fatal_error "Expected the finish continuation")
   | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ ->
-    Misc.fatal_error "Expected the code binding"
+    Misc.fatal_error "Expected a static binding"
+
+let code_in_recursive_handler () =
+  binding_in_recursive_handler
+    {|let code size(1) g (x : val)
+          my_closure &my_alloc_region my_depth -> k * e : val =
+  cont k (x)
+in
+(apply direct(g &toplevel) (0) -> finish * error)
+where finish (result : val) =
+  let $camlCompare = Block 0 (result) in
+  cont done ($camlCompare)
+|}
+
+let symbol_in_recursive_handler () =
+  binding_in_recursive_handler
+    {|let $captured = Block 0 (0) in
+(let site = closure specialisation_site deleted size(2) @dead &toplevel
+   synthetic { sx = $captured; sy = $captured }
+ in
+ cont finish (0))
+where finish (result : val) =
+  let $camlCompare = Block 0 (result) in
+  cont done ($camlCompare)
+|}
 
 let code_in_nested_recursive_handlers () =
   let open Flambda2_bound_identifiers in
@@ -499,8 +606,8 @@ where finish (result : val) =
                 Apply.with_continuation call (Return inner_start)
                 |> Expr.create_apply
               in
-              (* [g] gates traversal of the inner handlers, where [h] is only
-                 discovered after its use. This needs a third pass. *)
+              (* The unknown correspondence for [g] must not skip the inner
+                 handlers, where [h] is only discovered after its use. *)
               let inner_handlers =
                 Continuation.Lmap.of_list
                   [inner_use, handler call; inner_start, inner_start_handler]
@@ -541,6 +648,7 @@ let () =
           | Different _ -> fail "%s: expected equivalent" name)
         [left, right; right, left])
     [ "dominator-scoped code", code_in_recursive_handler;
+      "dominator-scoped synthetic slot values", symbol_in_recursive_handler;
       "nested dominator-scoped code", code_in_nested_recursive_handlers ]
 
 let () =
@@ -550,7 +658,6 @@ let () =
   different "ordinary versus synthetic slots" ordinary missing;
   equivalent "alpha-renamed parameters and slots" base renamed;
   equivalent "reordered annotation entries" base reordered;
-  different "specialisation-site marker" base site;
   different "empty specialisation-site marker" empty empty_site;
   equivalent "reordered equal-valued slots" duplicate_values
     duplicate_values_reordered;
@@ -573,7 +680,14 @@ let () =
   different "ordinary value-slot bijection" ordinary_slots
     ordinary_value_slot_not_bijective;
   different "ordinary function-slot bijection" ordinary_slots
-    ordinary_function_slot_not_bijective
+    ordinary_function_slot_not_bijective;
+  equivalent "overlapping equal-valued slots" overlapping_slots
+    overlapping_slots_reordered;
+  different "overlapping versus disjoint slots" overlapping_slots disjoint_slots;
+  equivalent "split synthetic declarations" split_slots combined_slots;
+  different "deleted slot size" deleted_siblings
+    (replace_once deleted_siblings ~pattern:"deleted size(3)"
+       ~with_:"deleted size(4)")
 
 (* Approximants must preserve annotations as well as alpha-equivalence. *)
 let check_approximant name ~original ~changed =
@@ -609,14 +723,11 @@ let () =
   check_approximant_both_directions "different body" base different_body;
   check_approximant_both_directions "alpha-renamed different body" base
     renamed_different_body;
-  check_approximant_both_directions "specialisation-site different body" site
-    site_different_body;
   check_approximant_both_directions "empty specialisation-site roundtrip"
     empty_site empty_site_different_body;
   check_approximant_both_directions "missing annotation" missing base;
   check_approximant_both_directions "missing one annotation" missing_one base;
   check_approximant_both_directions "swapped annotations" base swapped;
-  check_approximant_both_directions "marker difference" base site;
   check_approximant_both_directions "empty marker difference" empty empty_site;
   check_approximant_both_directions "equal-valued slot approximant" missing_one
     duplicate_values_reordered;
@@ -634,7 +745,60 @@ let () =
   check_approximant_both_directions "indistinguishable slot approximant"
     indistinguishable_slots
     (replace_once indistinguishable_slots_renamed ~pattern:"cont k (x)"
-       ~with_:"cont k (y)")
+       ~with_:"cont k (y)");
+  check_approximant_both_directions "overlapping slot approximant"
+    overlapping_slots
+    (replace_once overlapping_slots_reordered ~pattern:"cont k (x)"
+       ~with_:"cont k (0)");
+  check_approximant_both_directions "different overlap approximant"
+    overlapping_slots disjoint_slots;
+  check_approximant_both_directions "deleted sibling approximant"
+    deleted_siblings
+    (replace_once deleted_siblings ~pattern:"deleted size(3)"
+       ~with_:"deleted size(4)")
+
+let check_deleted_roundtrip name text =
+  let original = parse text in
+  let converted = Flambda_to_fexpr.conv original in
+  let printed =
+    Flambda2_ui.Flambda_colours.without_colours ~f:(fun () ->
+        Format.asprintf "%a" Print_fexpr.flambda_unit converted)
+  in
+  let signature unit =
+    (summary_of_unit unit).declarations
+    |> List.rev_map (fun (decl : Fexpr.fun_decl) ->
+        let slot =
+          match decl.function_slot, decl.code_id with
+          | Some slot, _ | None, Code_id slot -> slot.txt
+          | None, Deleted _ ->
+            Misc.fatal_error "Deleted declaration lost its function slot"
+        in
+        let size =
+          match decl.code_id with
+          | Code_id _ -> None
+          | Deleted { function_slot_size; dbg } ->
+            if Debuginfo.is_none dbg
+            then fail "%s: deleted declaration lost its source location" name;
+            Some function_slot_size
+        in
+        slot, size)
+  in
+  let expected = signature (parse_fexpr text) in
+  let equal =
+    List.equal (fun (slot1, size1) (slot2, size2) ->
+        String.equal slot1 slot2 && Option.equal Int.equal size1 size2)
+  in
+  List.iter
+    (fun unit ->
+      if not (equal expected (signature unit))
+      then fail "%s: changed function-slot order or sizes" name)
+    [converted; parse_fexpr printed; Flambda_to_fexpr.conv (parse printed)];
+  check_equivalent name ~left:text ~right:printed
+
+let () =
+  check_deleted_roundtrip "deleted siblings" deleted_siblings;
+  check_deleted_roundtrip "entirely deleted site" all_deleted;
+  check_deleted_roundtrip "static deleted siblings" static_deleted_siblings
 
 let check_parse_error name text ~message =
   let ppf = Format.err_formatter in
@@ -664,6 +828,54 @@ let () =
     ~message:"A specialisation site cannot have runtime value slots";
   check_parse_error "conflicting synthetic values" conflicting_synthetic_values
     ~message:"Synthetic value slot sx is defined more than once";
+  List.iter
+    (fun value ->
+      check_parse_error "duplicate split synthetic declarations"
+        (replace_once split_slots ~pattern:"synthetic { sy = 1 }"
+           ~with_:("synthetic { sy = 1; sx = " ^ value ^ " }"))
+        ~message:"Synthetic value slot sx is defined more than once")
+    ["0"; "1"];
+  let ordinary_synthetic = unmark_site base in
+  let mixed =
+    ordinary_synthetic
+    |> replace_once ~pattern:"synthetic { sx = 0; sy = 1 }"
+         ~with_:"synthetic { sx = 0; sy = 1 } with { runtime = 2 }"
+    |> replace_once ~pattern:"cont k (x)"
+         ~with_:
+           "let r = %project_value_slot.[f].[runtime] (my_closure) in\n\
+           \  let result = %int_barith.add (x, r) in cont k (result)"
+  in
+  List.iter
+    (fun (name, text) ->
+      let printed =
+        Flambda2_ui.Flambda_colours.without_colours ~f:(fun () ->
+            Format.asprintf "%a" Print_fexpr.flambda_unit
+              (Flambda_to_fexpr.conv (parse text)))
+      in
+      check_equivalent name ~left:text ~right:printed)
+    [ "ordinary synthetic slots", ordinary_synthetic;
+      "mixed runtime and synthetic slots", mixed;
+      ( "static mixed slots",
+        replace_once mixed ~pattern:"let site =" ~with_:"let $site =" ) ];
+  check_parse_error "static specialisation site"
+    (replace_once base ~pattern:"let site =" ~with_:"let $site =")
+    ~message:"A specialisation site must be dynamically bound";
+  check_parse_error "explicit static specialisation site"
+    (base
+    |> replace_once ~pattern:"let site =" ~with_:"let set_of_closures $site ="
+    |> replace_once ~pattern:"synthetic { sx = 0; sy = 1 }"
+         ~with_:"synthetic { sx = 0; sy = 1 } end")
+    ~message:"A specialisation site must be dynamically bound";
+  check_parse_error "empty static specialisation site"
+    (replace_once empty_site ~pattern:"let site =" ~with_:"let $site =")
+    ~message:"A specialisation site must be dynamically bound";
+  check_parse_error "deleted function without a slot"
+    (replace_once deleted_siblings ~pattern:" @first" ~with_:"")
+    ~message:"A deleted function declaration must specify a function slot";
+  check_parse_error "invalid deleted slot size"
+    (replace_once deleted_siblings ~pattern:"deleted size(2)"
+       ~with_:"deleted size(0)")
+    ~message:"Deleted function slot size must be positive";
   check_parse_error "duplicate specialised parameter"
     duplicate_specialised_param
     ~message:"Specialised parameter x is given more than once";
@@ -711,12 +923,14 @@ let () =
   in
   let cost ~is_specialisation_site ?(value_slots = Value_slot.Map.empty) decls =
     let set =
-      Set_of_closures.create ~is_specialisation_site
-        ~synthetic_value_slots:Value_slot.Map.empty ~value_slots
+      Set_of_closures.create ~is_specialisation_site ~value_slots
+        ~synthetic_value_slots:Value_slot.Map.empty
         (Function_declarations.create (Function_slot.Lmap.of_list decls))
     in
     Cost_metrics.set_of_closures
       ~find_code_characteristics:(fun code_id ->
+        if is_specialisation_site
+        then Misc.fatal_error "A site must not query generic body costs";
         Code_id.Map.find code_id characteristics)
       set
   in
@@ -752,6 +966,170 @@ let () =
   check "ordinary closure charges allocation"
     (Cost_metrics.( + ) f_cost allocation_cost)
     (cost ~is_specialisation_site:false ~value_slots [f_slot, live f])
+
+(* Emission costs belong to fresh code bindings, not to their site or to the
+   stored body metrics. Pending definitions can include dead/older versions. *)
+let () =
+  let module NO = Flambda2_nominal.Name_occurrences in
+  let module NM = Flambda2_nominal.Name_mode in
+  let module RSC = Rebuilt_static_const in
+  let module LC = Lifted_constant in
+  let module LCS = Lifted_constant_state in
+  let unit =
+    parse
+      {|let code size(7) parent (x : val)
+          my_closure &my_alloc_region my_depth -> k * e : val =
+        apply direct(child &my_alloc_region) (x) -> k * e
+      and code size(11) child (x : val)
+          my_closure &my_alloc_region my_depth -> k * e : val =
+        cont k (x)
+      in
+      let $camlCompare = Block 0 (0) in
+      cont done ($camlCompare)
+      |}
+  in
+  let codes =
+    match Flambda.Expr.descr (Flambda_unit.body unit) with
+    | Let binding -> (
+      match Flambda.Let.defining_expr binding with
+      | Static_consts group ->
+        List.filter_map Flambda.Static_const_or_code.to_code
+          (Flambda.Static_const_group.to_list group)
+      | Simple _ | Prim _ | Set_of_closures _ | Rec_info _ ->
+        Misc.fatal_error "Expected code definitions")
+    | Let_cont _ | Apply _ | Apply_cont _ | Switch _ | Invalid _ ->
+      Misc.fatal_error "Expected code definitions"
+  in
+  let find name =
+    List.find
+      (fun code -> String.equal (Code_id.name (Code.code_id code)) name)
+      codes
+  in
+  let parent = find "parent" in
+  let child = find "child" in
+  let parent_id = Code.code_id parent in
+  let child_id = Code.code_id child in
+  (* Fexpr does not compute full body free names. Supply those of the direct
+     call in [parent]; [child] has no free names. *)
+  let parent =
+    Code.with_params_and_body parent
+      ~params_and_body:(Code.params_and_body parent)
+      ~free_names_of_params_and_body:(NO.singleton_code_id child_id NM.normal)
+      ~cost_metrics:(Code.cost_metrics parent)
+  in
+  let existing code =
+    LC.create_code (Code.code_id code) (RSC.create_code' code)
+  in
+  let fresh code =
+    LC.create_code (Code.code_id code)
+      (RSC.charge_code_size (RSC.create_code' code))
+  in
+  let constants = LCS.singleton_list_of_constants [fresh parent; fresh child] in
+  let roots = NO.singleton_code_id parent_id NM.normal in
+  let check name expected constants roots =
+    let actual = LCS.cost_metrics constants ~roots |> Cost_metrics.size in
+    if not (Code_size.equal actual (Code_size.of_int expected))
+    then
+      fail "%s: expected size %d, got %a" name expected Code_size.print actual
+  in
+  let tracking =
+    Oxcaml_flags.Flambda2.Inlining.speculative_inlining_track_lifted_constants
+  in
+  let previous = !tracking in
+  Fun.protect
+    ~finally:(fun () -> tracking := previous)
+    (fun () ->
+      List.iter
+        (fun track ->
+          tracking := track;
+          check "nested generated bodies" 18 constants roots;
+          check "duplicate pending definitions" 18
+            (LCS.union constants constants)
+            roots;
+          check "dead parent, live child" 11 constants
+            (NO.singleton_code_id child_id NM.normal);
+          check "dead generated bodies" 0 constants NO.empty;
+          if
+            not
+              (LCS.is_empty
+                 (LCS.retain_reachable_for_speculation constants ~roots:NO.empty))
+          then fail "Placement retained dependencies of an unused definition";
+          let retained =
+            LCS.retain_reachable_for_speculation constants ~roots
+          in
+          let placed_cost =
+            LCS.fold retained ~init:Cost_metrics.zero ~f:(fun cost constant ->
+                Cost_metrics.( + ) cost
+                  (RSC.Group.cost_metrics_for_inlining
+                     (LC.defining_exprs constant)))
+          in
+          if
+            not
+              (Code_size.equal
+                 (Cost_metrics.size placed_cost)
+                 (Code_size.of_int 18))
+          then fail "Placement did not charge each retained body exactly once";
+          check "phantom roots" 0 constants
+            (NO.singleton_code_id parent_id NM.phantom);
+          check "existing bodies are free" 0
+            (LCS.singleton_list_of_constants [existing parent; existing child])
+            roots;
+          check "existing code reaches newly generated code" 11
+            (LCS.singleton_list_of_constants [existing parent; fresh child])
+            roots;
+          let age_only =
+            Code.with_params_and_body parent
+              ~params_and_body:(Code.params_and_body child)
+              ~free_names_of_params_and_body:NO.empty
+              ~cost_metrics:(Code.cost_metrics parent)
+            |> Code.with_newer_version_of (Some child_id)
+          in
+          check "age-only ancestor" 7
+            (LCS.singleton_list_of_constants [fresh age_only; fresh child])
+            roots)
+        [false; true]);
+  let function_slot =
+    Function_slot.create
+      (Current_unit.get_cu_exn ())
+      ~name:"site" ~is_always_immediate:false Flambda2_kinds.Flambda_kind.value
+  in
+  let declarations =
+    Function_declarations.create
+      (Function_slot.Lmap.singleton function_slot
+         (Function_declarations.Code_id
+            { code_id = parent_id; only_full_applications = true }))
+  in
+  let slot =
+    Value_slot.create ~is_synthetic:true
+      (Current_unit.get_cu_exn ())
+      ~name:"unused" ~is_always_immediate:false
+      Flambda2_kinds.Flambda_kind.value
+  in
+  let unused = Variable.create "unused" Flambda2_kinds.Flambda_kind.value in
+  let site =
+    Set_of_closures.create ~is_specialisation_site:true
+      ~value_slots:Value_slot.Map.empty
+      ~synthetic_value_slots:
+        (Value_slot.Map.singleton slot (Flambda2_term_basics.Simple.var unused))
+      declarations
+  in
+  let alloc_mode =
+    Flambda2_bound_identifiers.Alloc_mode.For_allocations.heap
+      ~alloc_region:(Flambda_unit.toplevel_my_alloc_region unit)
+  in
+  let named = Flambda.Named.create_set_of_closures ~alloc_mode site in
+  let site =
+    Simplified_named.create_with_known_free_names
+      ~machine_width:Target_system.Machine_width.Sixty_four named
+      ~free_names:(Flambda.Named.free_names named)
+      ~find_code_characteristics:(fun _ ->
+        Misc.fatal_error "Site body cost lookup")
+    |> Simplified_named.for_speculative_inlining
+  in
+  if NO.mem_var site.free_names unused
+  then fail "Speculation retained a synthetic value";
+  check "erased site does not root its declarations" 11 constants
+    (NO.union site.free_names (NO.singleton_code_id child_id NM.normal))
 
 let () =
   if !failures > 0

@@ -26,7 +26,7 @@ val print_with_extra_fields :
 val is_empty : t -> bool
 
 (** Create a set of closures given the code for its functions and the closure
-    variables. *)
+    variables. Runtime and synthetic slots may coexist in an ordinary set. *)
 val create :
   is_specialisation_site:bool ->
   synthetic_value_slots:Simple.t Value_slot.Map.t ->
@@ -46,12 +46,14 @@ val create :
     [my_closure]. [To_cmm] therefore translates neither the site nor those
     callees; [To_jsir] still allocates the closures, since a JSIR call needs a
     function value. A site is closed, heap allocated, never lifted, and costs
-    nothing (see [Cost_metrics]); its synthetic value slots keep nothing alive
-    except transiently in the case described at
-    [Flow_types.Specialisation_site_info]. Inside code, it is kept while it has
-    a synthetic value slot and its code is live. Like any set of closures, it
-    does prevent specialisation of the enclosing continuation handler (see
-    [Specialization_cost]).
+    nothing (see [Cost_metrics]). Only code newly produced by re-simplifying a
+    site is charged, via [Rebuilt_static_const], not its referenced generic
+    bodies. Its synthetic slots keep nothing alive except transiently when
+    rebuilding code (see [Flow_types.Specialisation_site_info]); speculative
+    inlining discards the hints on the upward pass. Inside code, it is kept
+    while it has a synthetic value slot and its code is live. Like any set of
+    closures, it does prevent specialisation of the enclosing continuation
+    handler (see [Specialization_cost]).
 
     Design decision: a site with no synthetic value slots left is not retained
     for specialisation, although an ordinary callee use can still keep it.

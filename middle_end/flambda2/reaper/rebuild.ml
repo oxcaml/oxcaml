@@ -49,32 +49,11 @@ type should_preserve_direct_calls =
   | No
   | Auto
 
-(* Value slots indexed by field paths. *)
-module Leaf_slots = struct
-  type t =
-    { here : Value_slot.t option;
-      nested : t Field.Map.t
-    }
+module Leaf_slots = Map.Make (struct
+  type t = Field.t list
 
-  let empty = { here = None; nested = Field.Map.empty }
-
-  let rec find_opt t path =
-    match path with
-    | [] -> t.here
-    | field :: path -> (
-      match Field.Map.find_opt field t.nested with
-      | None -> None
-      | Some t -> find_opt t path)
-
-  let rec add t path slot =
-    match path with
-    | [] -> { t with here = Some slot }
-    | field :: path ->
-      let nested_t =
-        Option.value (Field.Map.find_opt field t.nested) ~default:empty
-      in
-      { t with nested = Field.Map.add field (add nested_t path slot) t.nested }
-end
+  let compare = List.compare Field.compare
+end)
 
 type specialisation_site =
   { function_decls : Function_declarations.t;
@@ -103,7 +82,7 @@ type env =
            means no site is needed. *)
     site_vars : Variable.t Variable.Map.t ref;
         (* Original closure variable to specialisation site variable. *)
-    synthetic_slots_by_path : Leaf_slots.t Value_slot.Map.t ref
+    synthetic_slots_by_path : Value_slot.t Leaf_slots.t Value_slot.Map.t ref
         (* Synthetic value slots by original value slot and field path. *)
   }
 
@@ -480,7 +459,7 @@ let synthetic_value_slot_for_leaf env value_slot (nested : Field.t list) =
       (Value_slot.Map.find_opt value_slot !(env.synthetic_slots_by_path))
       ~default:Leaf_slots.empty
   in
-  match Leaf_slots.find_opt leaf_slots nested with
+  match Leaf_slots.find_opt nested leaf_slots with
   | Some slot -> slot
   | None ->
     let print_field ppf field =
@@ -504,7 +483,7 @@ let synthetic_value_slot_for_leaf env value_slot (nested : Field.t list) =
     in
     env.synthetic_slots_by_path
       := Value_slot.Map.add value_slot
-           (Leaf_slots.add leaf_slots nested slot)
+           (Leaf_slots.add nested slot leaf_slots)
            !(env.synthetic_slots_by_path);
     slot
 

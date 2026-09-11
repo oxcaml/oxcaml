@@ -77,11 +77,15 @@ let analyze ?(speculative = false) ?print_name ~machine_width ~is_toplevel
              Flow_acc.wrong_dummy_toplevel_cont_name));
       if Flambda_features.dump_flow ()
       then Format.eprintf "SOURCE:@\n%a@\n@." T.Acc.print t;
+      (* Toplevel sites are not retained for future specialisation. *)
+      let compute_specialisation_site_info =
+        has_specialisation_sites && not is_toplevel
+      in
       (* dependency graph *)
       let deps =
         Data_flow_graph.create map ~return_continuation ~exn_continuation
           ~code_age_relation ~used_value_slots ~code_ids_to_never_delete
-          ~has_specialisation_sites
+          ~compute_specialisation_site_info
       in
       if Flambda_features.dump_flow ()
       then Format.eprintf "/// graph@\n%a@\n@." Data_flow_graph.print deps;
@@ -110,17 +114,34 @@ let analyze ?(speculative = false) ?print_name ~machine_width ~is_toplevel
       in
       let pp_node = Mutable_unboxing.pp_node reference_analysis in
       let reference_result, unboxed_blocks =
-        Mutable_unboxing.make_result reference_analysis ~dom:aliases
-          ~compute_unboxed_vars:has_specialisation_sites
+        Mutable_unboxing.make_result reference_analysis
       in
       let specialisation_site_info =
-        if not has_specialisation_sites
+        if
+          (not compute_specialisation_site_info)
+          || Simple.Set.is_empty unboxed_blocks
         then specialisation_site_info
         else
+          let unboxed_names =
+            Simple.Set.fold
+              (fun simple names ->
+                match Simple.must_be_var simple with
+                | None -> names
+                | Some (var, _) -> Name.Set.add (Name.var var) names)
+              unboxed_blocks Name.Set.empty
+          in
+          let unboxed_names =
+            Variable.Map.fold
+              (fun var alias names ->
+                if Simple.Set.mem alias unboxed_blocks
+                then Name.Set.add (Name.var var) names
+                else names)
+              aliases unboxed_names
+          in
           { specialisation_site_info with
             names_available_for_hints =
               Name.Set.diff specialisation_site_info.names_available_for_hints
-                (Name.set_of_var_set reference_result.unboxed_vars)
+                unboxed_names
           }
       in
       let continuation_parameters =

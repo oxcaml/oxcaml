@@ -801,6 +801,10 @@ let function_slots_in_normal_projections t =
       then Function_slot.Set.add function_slot acc
       else acc)
 
+let has_function_slots_in_normal_declarations t =
+  For_function_slots.fold_with_mode t.function_slots_in_declarations ~init:false
+    ~f:(fun found _function_slot mode -> found || Name_mode.is_normal mode)
+
 let all_function_slots_at_normal_mode t =
   let from_projections =
     For_function_slots.fold_with_mode t.function_slots_in_projections

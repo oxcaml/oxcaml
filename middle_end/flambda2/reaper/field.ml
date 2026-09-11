@@ -229,3 +229,5 @@ let print_for_variable_name ppf x =
         print_view view
 
 let equal (t1 : t) (t2 : t) = t1 = t2
+
+let compare (t1 : t) (t2 : t) = Int.compare t1 t2

@@ -132,38 +132,12 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
   let cost_metrics_of_lifted_constants =
-    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
-    then
-      (* If we are not at toplevel, there might still be lifted constants to be
-         placed in the accumulator whose size must be taken into account for
-         speculative inlining. *)
-      let lifted_constants = UA.lifted_constants uacc in
-      (* CR-someday bclement: Ideally we would simply call
-         [place_lifted_constants] in [after_rebuild] above so that we can share
-         the code with the non-speculative inlining code path; however, that
-         function expects to be called at toplevel and there could be unintended
-         consequences -- notably regarding the validity of the used value slots.
-
-         At the time of writing, this means that we incorrectly:
-
-         - Ignore the size of the symbol projections created during speculative
-         inlining;
-
-         - Count the size of unused value slots of lifted sets of closures
-         created during speculative inlining (but again, it is not clear that it
-         is always possible to compute a correct set of "used value slots" at
-         the time we are doing speculative inlining, because some value slots
-         could be used later in the compilation unit). *)
-      Lifted_constant_state.fold lifted_constants ~init:Cost_metrics.zero
-        ~f:(fun cost_metrics lifted_constant ->
-          List.fold_left
-            (fun cost_metrics definition ->
-              Cost_metrics.( + ) cost_metrics
-                (Rebuilt_static_const.cost_metrics
-                   (Lifted_constant.Definition.defining_expr definition)))
-            cost_metrics
-            (Lifted_constant.definitions lifted_constant))
-    else Cost_metrics.zero
+    let roots = UA.roots_for_lifted_constant_costs uacc in
+    (* These definitions have not been placed, so their creation costs have not
+       been charged to [uacc]. Existing code and discarded specialisations are
+       excluded. Symbol-projection costs and unused slots of ordinary lifted
+       closures still follow the existing lifted-constant tracking policy. *)
+    Lifted_constant_state.cost_metrics (UA.lifted_constants uacc) ~roots
   in
   Cost_metrics.( + ) (UA.cost_metrics uacc) cost_metrics_of_lifted_constants
 
@@ -225,6 +199,69 @@ let inlining_does_decrease_code_size ~code_metadata cost_metrics =
   let inlined_code_size = Cost_metrics.size cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
+let contains_specialisation_site denv code =
+  let seen = ref Code_id.Set.empty in
+  let rec in_code code =
+    let code_id = Code.code_id code in
+    if
+      Code_id.Set.mem code_id !seen
+      || not
+           (Name_occurrences.has_function_slots_in_normal_declarations
+              (Code.free_names_of_params_and_body code))
+    then false
+    else (
+      seen := Code_id.Set.add code_id !seen;
+      Function_params_and_body.pattern_match (Code.params_and_body code)
+        ~f:(fun
+            ~return_continuation:_
+            ~exn_continuation:_
+            _
+            ~body
+            ~my_closure:_
+            ~is_my_closure_used:_
+            ~my_alloc_mode:_
+            ~my_depth:_
+            ~free_names_of_body:_
+            ~specialised_params:_
+          -> in_expr body))
+  and in_set set =
+    Set_of_closures.is_specialisation_site set
+    || List.exists
+         (fun code_id ->
+           match DE.find_code_exn denv code_id with
+           | exception Not_found -> false
+           | code -> (
+             match Code_or_metadata.view code with
+             | Metadata_only _ -> false
+             | Code_present code -> in_code code))
+         (Function_declarations.code_ids (Set_of_closures.function_decls set))
+  and in_handler handler =
+    Continuation_handler.pattern_match handler ~f:(fun _ ~handler ->
+        in_expr handler)
+  and in_expr expr =
+    match Expr.descr expr with
+    | Let binding ->
+      Named.fold_code_and_sets_of_closures
+        (Let.defining_expr binding)
+        ~init:false
+        ~f_code:(fun found _ -> found)
+        ~f_set:(fun found set -> found || in_set set)
+      || Let.pattern_match binding ~f:(fun _ ~body -> in_expr body)
+    | Let_cont (Non_recursive { handler; _ }) ->
+      in_handler (Non_recursive_let_cont_handler.handler handler)
+      || Non_recursive_let_cont_handler.pattern_match handler ~f:(fun _ ~body ->
+          in_expr body)
+    | Let_cont (Recursive handlers) ->
+      Recursive_let_cont_handlers.pattern_match handlers
+        ~f:(fun ~invariant_params:_ ~body handlers ->
+          in_expr body
+          || Continuation.Lmap.exists
+               (fun _ handler -> in_handler handler)
+               (Continuation_handlers.to_map handlers))
+    | Apply _ | Apply_cont _ | Switch _ | Invalid _ -> false
+  in
+  in_code code
+
 let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     ~return_arity : Call_site_inlining_decision_type.t =
   let code_present () =
@@ -243,9 +280,29 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     | Disable_inlining Speculative_inlining -> false, true
     | Do_not_disable_inlining -> false, false
   in
+  let needs_code_size_check =
+    (not (in_a_stub || doing_speculative_inlining))
+    && Function_decl_inlining_decision_type.must_be_inlined decision
+    && (not
+          (Function_decl_inlining_decision_type.has_attribute_inline decision))
+    && (not (Code_metadata.stub code_metadata))
+    &&
+    match
+      Code_or_metadata.view
+        (DE.find_code_exn denv (Code_metadata.code_id code_metadata))
+    with
+    | Metadata_only _ -> false
+    | Code_present code ->
+      (* A small body can contain zero-cost sites, directly or in local
+         functions. Measure the code they generate before committing to
+         automatic inlining. Explicit inline requests remain unconditional. *)
+      contains_specialisation_site denv code
+  in
   if in_a_stub
   then In_a_stub
-  else if Function_decl_inlining_decision_type.must_be_inlined decision
+  else if
+    Function_decl_inlining_decision_type.must_be_inlined decision
+    && not needs_code_size_check
   then
     if code_present ()
     then
@@ -288,7 +345,9 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
               "Unexpected call site inlinine decision for speculative inlining";
           counters)
       (fun () : Call_site_inlining_decision_type.t ->
-        if not (argument_types_useful dacc ~apply ~code_metadata)
+        if
+          (not needs_code_size_check)
+          && not (argument_types_useful dacc ~apply ~code_metadata)
         then Argument_types_not_useful
         else if not (code_present ())
         then Missing_code

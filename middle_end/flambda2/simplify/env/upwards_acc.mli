@@ -104,6 +104,9 @@ val with_slot_offsets : t -> Slot_offsets.t Or_unknown.t -> t
 
 val required_names : t -> Name.Set.t
 
+(** Final body uses, plus symbols and never-delete code retained by flow. *)
+val roots_for_lifted_constant_costs : t -> Name_occurrences.t
+
 val specialisation_site_info : t -> Flow_types.Specialisation_site_info.t
 
 val reachable_code_ids : t -> Flow_types.Reachable_code_ids.t Or_unknown.t

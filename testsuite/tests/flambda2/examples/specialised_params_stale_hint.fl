@@ -9,16 +9,12 @@
  fexpr with dump-simplify;
 *)
 
-(* Known limitation: reachability for [names_available_for_hints] is computed
-   before mutable unboxing, so a synthetic slot can keep alive a value whose
-   only use was a field of an unboxed block. The extra simplify pass repairs
-   this in ordinary compilation, but not during speculative inlining, where
-   the kept allocation changes the inlining decision: [caller_hint] still calls
-   [outer_hint], which keeps both allocations, while [caller_control] (the
-   same code without the synthetic slot) reduces to the helper call. The site
-   is the callee so that it stays live; its slot models one for a capture
-   that the called function does not take, as in the source-level test
-   [specialise_lifted_stale_hint.ml]. *)
+(* Reachability is computed before mutable unboxing. Speculation must discard
+   the hints on its upward pass, rather than retaining [captured]'s dead
+   allocation and penalising [caller_hint]. Both callers should reduce to the
+   helper call, whose newly generated code is still charged. The site remains
+   the callee, and its slot models a capture that this function does not take,
+   as in [specialise_lifted_stale_hint.ml]. *)
 
 let code inline(never) size(10) helper (x : val)
       my_closure &my_alloc_region my_depth -> k * e : val =

@@ -17,6 +17,13 @@
    script = "sh ${test_source_directory}/check-specialisation-deleted-sibling.sh dead-sibling.output sibling";
    script;
  }{
+   ocamlopt_flags += " -no-flambda2-reaper";
+   program = "${ocamlsrcdir}/testsuite/tools/fexprc";
+   arguments = "-dcanonical-ids -dfexpr -color never ${ocamlopt_flags} ${test_file}";
+   stdout = "deleted-fexpr.output";
+   stderr = "deleted-fexpr.output";
+   run;
+ }{
    ocamlopt_flags += " -flambda2-reaper -no-reaper-local-fields";
    fexpr;
  }{
@@ -25,9 +32,10 @@
  }
 *)
 
-(* The redirected call keeps the site, but not [dead]'s code. Its [Deleted]
-   declaration preserves the slot and binder. Check the final raw Flambda:
-   the fexpr printer does not support deleted function declarations. *)
+(* An ordinary callee use keeps only [live]'s code, not every sibling in its
+   site. The [Deleted] declaration preserves the slot and binder. Check the
+   final raw shape and
+   exercise Fexpr printing; specialised_params_test also checks reparsing. *)
 
 let code inline(never) size(10) live (x : val) specialised { x = x_slot }
       my_closure &my_alloc_region my_depth -> k * e : val =
@@ -42,7 +50,7 @@ let code size(30) outer (y : val)
   let a = closure specialisation_site live &my_alloc_region
     synthetic { x_slot = 0 }
   and b = closure specialisation_site dead &my_alloc_region in
-  apply direct(live &my_alloc_region) (0) -> k * e
+  apply direct(live &my_alloc_region) a (0) -> k * e
 in
 let $outer = closure outer &toplevel in
 let $camlSpecialised_params_dead_sibling = Block 0 ($outer) in

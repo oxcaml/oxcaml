@@ -135,7 +135,30 @@ let add_to_denv ?maybe_already_defined denv lifted =
 module CIS = Code_id_or_symbol
 module SCC_lifted_constants = Strongly_connected_components.Make (CIS)
 
-let build_dep_graph t =
+let dependencies ~include_code_age_relation free_names =
+  let code_ids =
+    if include_code_age_relation
+    then Name_occurrences.code_ids_and_newer_version_of_code_ids free_names
+    else Name_occurrences.code_ids_in_normal_mode free_names
+  in
+  let symbols =
+    if include_code_age_relation
+    then Name_occurrences.symbols free_names
+    else
+      Name_occurrences.fold_names free_names ~init:Symbol.Set.empty
+        ~f:(fun symbols name ->
+          match Name_occurrences.greatest_name_mode_name free_names name with
+          | Present mode when Name_mode.is_normal mode ->
+            Name.pattern_match name
+              ~var:(fun _ -> symbols)
+              ~symbol:(fun symbol -> Symbol.Set.add symbol symbols)
+          | Absent | Present _ -> symbols)
+  in
+  CIS.Set.union
+    (CIS.set_of_symbol_set symbols)
+    (CIS.set_of_code_id_set code_ids)
+
+let build_dep_graph t ~include_code_age_relation =
   fold t ~init:(CIS.Lmap.empty, CIS.Map.empty)
     ~f:(fun (dep_graph, code_id_or_symbol_to_const) lifted_constant ->
       ListLabels.fold_left (LC.definitions lifted_constant)
@@ -156,16 +179,7 @@ let build_dep_graph t =
                 ~init:free_names ~f:(fun free_names (symbol, _) ->
                   Name_occurrences.add_symbol free_names symbol Name_mode.normal)
           in
-          let free_syms = Name_occurrences.symbols free_names in
-          let free_code_ids =
-            free_names
-            |> Name_occurrences.code_ids_and_newer_version_of_code_ids
-          in
-          let deps =
-            CIS.Set.union
-              (CIS.set_of_symbol_set free_syms)
-              (CIS.set_of_code_id_set free_code_ids)
-          in
+          let deps = dependencies ~include_code_age_relation free_names in
           let being_defined =
             D.bound_static definition
             |> Bound_static.everything_being_defined_as_list
@@ -181,6 +195,59 @@ let build_dep_graph t =
               dep_graph, code_id_or_symbol_to_const)
             (dep_graph, code_id_or_symbol_to_const)
             being_defined))
+
+let fold_reachable t ~roots ~init ~f =
+  (* Pending code includes dead siblings and earlier simplification attempts.
+     Follow final runtime uses, not age-relation edges or metadata roots. *)
+  let graph, constants = build_dep_graph t ~include_code_age_relation:false in
+  let rec visit pending seen acc =
+    match pending with
+    | [] -> acc
+    | name :: pending -> (
+      if CIS.Set.mem name seen
+      then visit pending seen acc
+      else
+        match CIS.Map.find_opt name constants with
+        | None -> visit pending (CIS.Set.add name seen) acc
+        | Some constant ->
+          let seen =
+            CIS.Set.union seen
+              (Bound_static.everything_being_defined (LC.bound_static constant))
+          in
+          let pending =
+            CIS.Set.fold
+              (fun name pending -> name :: pending)
+              (CIS.Lmap.find name graph) pending
+          in
+          visit pending seen (f acc constant))
+  in
+  visit
+    (CIS.Set.elements (dependencies ~include_code_age_relation:false roots))
+    CIS.Set.empty init
+
+let retain_reachable_for_speculation t ~roots =
+  fold_reachable t ~roots ~init:empty ~f:add
+
+let cost_metrics t ~roots =
+  let cost_of_constant constant =
+    List.fold_left
+      (fun cost definition ->
+        Cost_metrics.( + ) cost
+          (Rebuilt_static_const.cost_metrics_for_inlining
+             (LC.Definition.defining_expr definition)))
+      Cost_metrics.zero (LC.definitions constant)
+  in
+  let has_cost =
+    fold t ~init:false ~f:(fun has_cost constant ->
+        has_cost
+        || not
+             (Cost_metrics.equal (cost_of_constant constant) Cost_metrics.zero))
+  in
+  if not has_cost
+  then Cost_metrics.zero
+  else
+    fold_reachable t ~roots ~init:Cost_metrics.zero ~f:(fun cost constant ->
+        Cost_metrics.( + ) cost (cost_of_constant constant))
 
 let remove_values_not_in_domain (m : CIS.Set.t CIS.Lmap.t) =
   let domain =
@@ -203,7 +270,7 @@ let sort0 t =
      topological sort of groups that must be coalesced into single
      code-and-set-of-closures definitions. *)
   let lifted_constants_dep_graph, code_id_or_symbol_to_const =
-    build_dep_graph t
+    build_dep_graph t ~include_code_age_relation:true
   in
   let lifted_constants_dep_graph =
     (* This graph has vertices for all code ids and symbols that appear free in

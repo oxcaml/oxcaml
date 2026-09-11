@@ -143,37 +143,46 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               match simplified_defining_expr.named with
               | Set_of_closures (set, _)
                 when Set_of_closures.is_specialisation_site set -> (
-                match Closure_info.in_or_out_of_closure closure_info with
-                | Not_in_a_closure ->
-                  (* Top-level sites are not retained for later enclosing-code
-                     simplification. Their hints were consumed on the downward
-                     pass and are cleared here. *)
-                  let simplified_defining_expr =
-                    Simplified_named.filter_synthetic_value_slots
-                      simplified_defining_expr ~f:(fun _ -> false)
-                  in
-                  let simplified_defining_expr =
-                    match UA.reachable_code_ids uacc with
-                    | Unknown -> simplified_defining_expr
-                    | Known { live_code_ids; ancestors_of_live_code_ids = _ } ->
-                      let denv = DA.denv (UA.creation_dacc uacc) in
-                      Simplified_named.mark_unused_functions_as_deleted
-                        simplified_defining_expr ~live_code_ids
-                        ~find_code_metadata:(DE.find_code_metadata_exn denv)
-                  in
-                  simplified_defining_expr, false
-                | In_a_closure ->
-                  let { Flow_types.Specialisation_site_info
-                        .names_available_for_hints;
-                        live_code_ids
-                      } =
-                    UA.specialisation_site_info uacc
-                  in
-                  let denv = DA.denv (UA.creation_dacc uacc) in
-                  Simplified_named.rebuild_specialisation_site
-                    simplified_defining_expr ~live_code_ids
-                    ~names_available_for_hints
-                    ~find_code_metadata:(DE.find_code_metadata_exn denv))
+                if
+                  Are_rebuilding_terms.do_not_rebuild_terms
+                    (UA.are_rebuilding_terms uacc)
+                then
+                  ( Simplified_named.for_speculative_inlining
+                      simplified_defining_expr,
+                    false )
+                else
+                  match Closure_info.in_or_out_of_closure closure_info with
+                  | Not_in_a_closure ->
+                    (* Top-level sites are not retained for later enclosing-code
+                       simplification. Their hints were consumed on the downward
+                       pass and are cleared here. *)
+                    let simplified_defining_expr =
+                      Simplified_named.filter_synthetic_value_slots
+                        simplified_defining_expr ~f:(fun _ -> false)
+                    in
+                    let simplified_defining_expr =
+                      match UA.reachable_code_ids uacc with
+                      | Unknown -> simplified_defining_expr
+                      | Known { live_code_ids; ancestors_of_live_code_ids = _ }
+                        ->
+                        let denv = DA.denv (UA.creation_dacc uacc) in
+                        Simplified_named.mark_unused_functions_as_deleted
+                          simplified_defining_expr ~live_code_ids
+                          ~find_code_metadata:(DE.find_code_metadata_exn denv)
+                    in
+                    simplified_defining_expr, false
+                  | In_a_closure ->
+                    let { Flow_types.Specialisation_site_info
+                          .names_available_for_hints;
+                          live_code_ids
+                        } =
+                      UA.specialisation_site_info uacc
+                    in
+                    let denv = DA.denv (UA.creation_dacc uacc) in
+                    Simplified_named.rebuild_specialisation_site
+                      simplified_defining_expr ~live_code_ids
+                      ~names_available_for_hints
+                      ~find_code_metadata:(DE.find_code_metadata_exn denv))
               | Simple _ | Prim _ | Rec_info _ | Set_of_closures _ ->
                 simplified_defining_expr, false
             in

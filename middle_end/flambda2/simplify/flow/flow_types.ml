@@ -325,23 +325,19 @@ end
 module Mutable_unboxing_result = struct
   type t =
     { did_unbox_a_mutable_block : bool;
-      unboxed_vars : Variable.Set.t;
       additional_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
       let_rewrites : Named_rewrite.t Named_rewrite_id.Map.t
     }
 
   let [@ocamlformat "disable"] print ppf
-      { did_unbox_a_mutable_block; unboxed_vars; additional_epa;
-        let_rewrites } =
+      { did_unbox_a_mutable_block; additional_epa; let_rewrites } =
     Format.fprintf ppf
       "@[<hov 1>(\
          @[<hov 1>(did_unbox_a_mutable_block@ %b)@]@ \
-         @[<hov 1>(unboxed_vars@ %a)@]@ \
          @[<hov 1>(additional_epa@ %a)@]@ \
          @[<hov 1>(let_rewrites@ %a)@]\
        )@]"
       did_unbox_a_mutable_block
-      Variable.Set.print unboxed_vars
       (Continuation.Map.print Continuation_extra_params_and_args.print) additional_epa
       (Named_rewrite_id.Map.print Named_rewrite.print) let_rewrites
 end

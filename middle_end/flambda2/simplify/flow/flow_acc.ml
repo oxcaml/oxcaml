@@ -378,15 +378,27 @@ let record_let_binding ~rewrite_id ~generate_phantom_lets ~let_bound
               Misc.fatal_errorf
                 "Specialisation site in a region %a bound in the same body:@ %a"
                 Variable.print region Set_of_closures.print set);
-        let free_names =
-          Name_occurrences.union
-            (Function_declarations.free_names
-               (Set_of_closures.function_decls set))
-            alloc_mode_free_names
-        in
-        record_var_bindings
+        List.fold_left2
+          (fun t bound_var (function_slot, decl) ->
+            let free_names =
+              Name_occurrences.add_function_slot_in_declaration
+                alloc_mode_free_names function_slot Name_mode.normal
+            in
+            let free_names =
+              match
+                (decl : Function_declarations.code_id_in_function_declaration)
+              with
+              | Deleted _ -> free_names
+              | Code_id { code_id; only_full_applications = _ } ->
+                Name_occurrences.add_code_id free_names code_id Name_mode.normal
+            in
+            record_var_binding (Bound_var.var bound_var) free_names
+              ~generate_phantom_lets t)
           { t with has_specialisation_sites = true }
-          free_names)
+          (Bound_pattern.must_be_set_of_closures let_bound)
+          (Function_slot.Lmap.bindings
+             (Function_declarations.funs_in_order
+                (Set_of_closures.function_decls set))))
       else record_var_bindings t free_names
     | Rec_info _ -> record_var_bindings t free_names
     | Prim (original_prim, _) -> (
@@ -475,7 +487,6 @@ let record_lifted_constant_definition_aux ~being_defined elt definition =
              (Set_of_closures.function_decls set_of_closures))
       in
       let value_slots =
-        (* Lifted sets treat synthetic contents like ordinary slot contents. *)
         Value_slot.Map.disjoint_union
           (Set_of_closures.value_slots set_of_closures)
           (Set_of_closures.synthetic_value_slots set_of_closures)

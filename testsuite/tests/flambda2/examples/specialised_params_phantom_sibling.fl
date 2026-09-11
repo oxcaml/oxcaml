@@ -22,12 +22,16 @@
    stderr = "${output}";
    script = "sh ${test_source_directory}/check-specialisation-deleted-sibling.sh phantom-sibling.output phantom-sibling";
    script;
+ }{
+   ocamlopt_flags += " -g -flambda2-expert-phantom-lets";
+   arguments = "-dcanonical-ids -dfexpr -color never ${ocamlopt_flags} ${test_file}";
+   run;
  }
 *)
 
 (* Only [live]'s code is needed, but [unused = b] survives as a phantom alias.
-   Keep [b]'s binder and a [Deleted] declaration. Check raw Flambda because the
-   fexpr printer does not support deleted function declarations. *)
+   Keep [b]'s binder and a [Deleted] declaration. Check the raw binding modes
+   as well as exercising Fexpr printing of the deleted declaration. *)
 
 let code inline(never) size(1) live (x : val)
       specialised { x = x_slot }

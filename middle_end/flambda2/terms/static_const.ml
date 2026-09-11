@@ -55,7 +55,10 @@ type t =
   | Empty_array of Empty_array_kind.t
   | Immutable_string of string
 
-let set_of_closures set = Set_of_closures set
+let set_of_closures set =
+  if Set_of_closures.is_specialisation_site set
+  then Misc.fatal_error "A specialisation site cannot be a static constant";
+  Set_of_closures set
 
 let block tag mutability shape fields = Block (tag, mutability, shape, fields)
 

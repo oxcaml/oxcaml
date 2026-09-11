@@ -48,6 +48,10 @@ val create_with_known_free_names :
 (** Keep only the synthetic value slots whose contents satisfy [f]. *)
 val filter_synthetic_value_slots : t -> f:(Simple.t -> bool) -> t
 
+(** For a site whose term is not being rebuilt: discard the hints and code
+    declaration dependencies, leaving the actual calls to keep its code live. *)
+val for_speculative_inlining : t -> t
+
 (** Mark dead code in a specialisation site as [Deleted], preserving its slots
     and binders for imported offsets and phantom uses. *)
 val mark_unused_functions_as_deleted :

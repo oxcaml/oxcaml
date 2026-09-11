@@ -228,15 +228,23 @@ let value_slots env map =
       { Fexpr.var; value; kind })
     (map |> Value_slot.Map.bindings)
 
-let function_declaration env code_id function_slot alloc ~is_specialisation_site
-    ~synthetic_value_slots : Fexpr.fun_decl =
-  let code_id = Env.find_code_id_exn env code_id in
+let function_declaration env
+    (decl : Function_declarations.code_id_in_function_declaration) function_slot
+    alloc ~is_specialisation_site ~synthetic_value_slots : Fexpr.fun_decl =
   let function_slot = Env.translate_function_slot env function_slot in
-  (* Omit the function slot when possible *)
-  let function_slot =
-    if String.equal code_id.txt function_slot.txt
-    then None
-    else Some function_slot
+  let ((code_id, function_slot) : Fexpr.code_id_or_deleted * _) =
+    match decl with
+    | Code_id { code_id; only_full_applications = _ } ->
+      let code_id = Env.find_code_id_exn env code_id in
+      (* Omit the function slot when possible. *)
+      let function_slot =
+        if String.equal code_id.txt function_slot.txt
+        then None
+        else Some function_slot
+      in
+      Code_id code_id, function_slot
+    | Deleted { function_slot_size; dbg } ->
+      Deleted { function_slot_size; dbg }, Some function_slot
   in
   let synthetic_value_slots =
     match value_slots env synthetic_value_slots with
@@ -265,13 +273,7 @@ let set_of_closures env sc alloc =
             (i = 0 && Set_of_closures.is_specialisation_site sc)
           ~synthetic_value_slots)
       (Set_of_closures.function_decls sc
-      |> Function_declarations.funs_in_order
-      |> Function_slot.Lmap.map (function
-        | Function_declarations.Deleted _ -> Misc.fatal_error "todo"
-        | Function_declarations.Code_id { code_id; only_full_applications = _ }
-          ->
-          code_id)
-      |> Function_slot.Lmap.bindings)
+      |> Function_declarations.funs_in_order |> Function_slot.Lmap.bindings)
   in
   let elts = value_slots env (Set_of_closures.value_slots sc) in
   let elts = match elts with [] -> None | _ -> Some elts in

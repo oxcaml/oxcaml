@@ -189,9 +189,6 @@ end
 module Mutable_unboxing_result : sig
   type t =
     { did_unbox_a_mutable_block : bool;
-      unboxed_vars : Variable.Set.t;
-          (** Unboxed block variables and their aliases. Empty unless requested
-              (see [Mutable_unboxing.make_result]). *)
       additional_epa : Continuation_extra_params_and_args.t Continuation.Map.t;
       let_rewrites : Named_rewrite.t Named_rewrite_id.Map.t
     }
@@ -203,7 +200,8 @@ end
 (* *************************** *)
 
 (** Liveness used to keep specialisation sites (see [Set_of_closures]) and their
-    synthetic value slots. Empty unless [Acc.has_specialisation_sites]. *)
+    synthetic value slots inside closures. Empty at toplevel or without sites.
+*)
 module Specialisation_site_info : sig
   type t =
     { names_available_for_hints : Name.Set.t;
@@ -213,9 +211,8 @@ module Specialisation_site_info : sig
               before mutable unboxing, so this may still include a value whose
               only runtime use is a field of a block that unboxing removes; a
               hint mentioning it keeps it alive until the next simplification
-              pass. During speculative inlining this can change the decision
-              (see [specialised_params_stale_hint.fl] and
-              [specialise_lifted_stale_hint.ml]). *)
+              pass. Non-rebuilding speculative inlining drops the hints on the
+              upward traversal, so they do not affect its decision. *)
       live_code_ids : Code_id.Set.t
           (** Code IDs reachable through the recorded normal code and symbol
               dependencies, also inside closures; a site declaring one is kept.

@@ -582,6 +582,11 @@ let code_specialised_params ppf = function
       ppf params;
     Format.fprintf ppf "@;<1 -2>}@]"
 
+let code_id_or_deleted ppf = function
+  | Code_id id -> code_id ppf id
+  | Deleted { function_slot_size; dbg = _ } ->
+    Format.fprintf ppf "deleted size(%d)" function_slot_size
+
 let fun_decl expr_or_static ppf (decl : fun_decl) =
   let pp_at_function_slot ppf cid =
     pp_option ~space:Before (pp_like "@@%a" function_slot) ppf cid
@@ -590,8 +595,8 @@ let fun_decl expr_or_static ppf (decl : fun_decl) =
     Flambda_colours.pop
     (fun ppf is_site ->
       if is_site then Format.fprintf ppf "@ specialisation_site")
-    decl.is_specialisation_site code_id decl.code_id pp_at_function_slot
-    decl.function_slot alloc_mode_for_allocations decl.alloc
+    decl.is_specialisation_site code_id_or_deleted decl.code_id
+    pp_at_function_slot decl.function_slot alloc_mode_for_allocations decl.alloc
     (value_slots_with_keyword "synthetic" expr_or_static)
     decl.synthetic_value_slots
 

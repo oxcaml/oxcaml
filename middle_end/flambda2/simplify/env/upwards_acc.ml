@@ -170,6 +170,22 @@ let with_slot_offsets t slot_offsets = { t with slot_offsets }
 
 let required_names t = t.flow_result.data_flow_result.required_names
 
+let roots_for_lifted_constant_costs t =
+  let roots =
+    Name.Set.fold
+      (fun name roots ->
+        Name.pattern_match name
+          ~var:(fun _ -> roots)
+          ~symbol:(fun symbol ->
+            Name_occurrences.add_symbol roots symbol Name_mode.normal))
+      (required_names t) t.name_occurrences
+  in
+  Code_id.Set.fold
+    (fun code_id roots ->
+      Name_occurrences.add_code_id roots code_id Name_mode.normal)
+    (DA.code_ids_to_never_delete t.creation_dacc)
+    roots
+
 let specialisation_site_info t = t.flow_result.specialisation_site_info
 
 let reachable_code_ids t = t.flow_result.data_flow_result.reachable_code_ids

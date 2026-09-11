@@ -18,9 +18,9 @@ open! Flambda
 module ART = Are_rebuilding_terms
 module SC = Static_const
 
-(* The cost metrics for sets of closures include the code size of their
-   code_ids, like for non-lifted sets of closures. To avoid double counting, the
-   cost metrics of [Code] bindings are zero. *)
+(* Ordinary sets of closures charge their function bodies. Sites charge nothing;
+   code freshly produced by re-specialising them instead carries a transient
+   binding cost here. This is not part of [Code_metadata]. *)
 type t =
   | Normal of
       { const : Static_const_or_code.t;
@@ -35,7 +35,10 @@ type t =
       { free_names : Name_occurrences.t;
         cost_metrics : Cost_metrics.t
       }
-  | Code_not_rebuilt of Non_constructed_code.t
+  | Code_not_rebuilt of
+      { code : Non_constructed_code.t;
+        cost_metrics : Cost_metrics.t
+      }
 
 type rebuilt_static_const = t
 
@@ -61,9 +64,16 @@ let cost_metrics t =
   match t with
   | Normal { cost_metrics; _ }
   | Block_not_rebuilt { cost_metrics; _ }
-  | Set_of_closures_not_rebuilt { cost_metrics; _ } ->
+  | Set_of_closures_not_rebuilt { cost_metrics; _ }
+  | Code_not_rebuilt { cost_metrics; _ } ->
     cost_metrics
-  | Code_not_rebuilt _ -> Cost_metrics.zero
+
+let cost_metrics_for_inlining t =
+  if
+    is_code t
+    || Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+  then cost_metrics t
+  else Cost_metrics.zero
 
 let create_normal_non_code ~cost_metrics const =
   Normal
@@ -77,8 +87,11 @@ let create_code are_rebuilding ~params_and_body ~free_names_of_params_and_body =
   then
     Code_metadata.createk (fun code_metadata ->
         ( Code_not_rebuilt
-            (Non_constructed_code.create_with_metadata
-               ~free_names_of_params_and_body ~code_metadata),
+            { code =
+                Non_constructed_code.create_with_metadata
+                  ~free_names_of_params_and_body ~code_metadata;
+              cost_metrics = Cost_metrics.zero
+            },
           None ))
   else
     let params_and_body =
@@ -103,6 +116,26 @@ let create_code' code =
       free_names = Code.free_names code;
       cost_metrics = Cost_metrics.zero
     }
+
+let charge_code_size t =
+  let size_cost metadata =
+    Cost_metrics.from_size
+      (Cost_metrics.size (Code_metadata.cost_metrics metadata))
+  in
+  match t with
+  | Normal ({ const; _ } as constant) -> (
+    match Static_const_or_code.to_code const with
+    | Some code ->
+      Normal
+        { constant with cost_metrics = size_cost (Code.code_metadata code) }
+    | None -> Misc.fatal_error "Expected newly specialised code")
+  | Code_not_rebuilt { code; cost_metrics = _ } ->
+    Code_not_rebuilt
+      { code;
+        cost_metrics = size_cost (Non_constructed_code.code_metadata code)
+      }
+  | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ ->
+    Misc.fatal_error "Expected newly specialised code"
 
 let find_code_characteristics find_code_metadata code_id :
     Cost_metrics.code_characteristics =
@@ -364,7 +397,8 @@ let free_names t =
   | Block_not_rebuilt { free_names; _ }
   | Set_of_closures_not_rebuilt { free_names; _ } ->
     free_names
-  | Code_not_rebuilt code -> Non_constructed_code.free_names code
+  | Code_not_rebuilt { code; cost_metrics = _ } ->
+    Non_constructed_code.free_names code
 
 let is_fully_static t = Name_occurrences.no_variables (free_names t)
 
@@ -381,7 +415,7 @@ let [@ocamlformat "disable"] print ppf t =
     Format.fprintf ppf "Block_not_rebuilt"
   | Set_of_closures_not_rebuilt { free_names = _; cost_metrics = _} ->
     Format.fprintf ppf "Set_of_closures_not_rebuilt"
-  | Code_not_rebuilt code ->
+  | Code_not_rebuilt { code; cost_metrics = _ } ->
     Format.fprintf ppf "@[<hov 1>(Code_not_rebuilt@ %a)@]"
       Non_constructed_code.print code
 
@@ -402,7 +436,7 @@ let make_code_deleted t ~if_code_id_is_member_of =
       then deleted_code
       else t)
   | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ -> t
-  | Code_not_rebuilt code ->
+  | Code_not_rebuilt { code; cost_metrics = _ } ->
     if
       Code_id.Set.mem
         (Non_constructed_code.code_id code)
@@ -436,9 +470,10 @@ module Group = struct
       t.free_names <- Known free_names;
       free_names
 
-  let cost_metrics t =
+  let cost_metrics_for_inlining t =
     List.fold_left
-      (fun cm const -> Cost_metrics.( + ) cm (cost_metrics const))
+      (fun cost constant ->
+        Cost_metrics.( + ) cost (cost_metrics_for_inlining constant))
       Cost_metrics.zero t.consts
 
   let to_named t =
@@ -482,7 +517,7 @@ module Group = struct
         match const with
         | Normal { const; _ } -> Static_const_or_code.to_code const
         | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ -> None
-        | Code_not_rebuilt code ->
+        | Code_not_rebuilt { code; cost_metrics = _ } ->
           let module NCC = Non_constructed_code in
           (* See comment in the .mli. *)
           let params_and_body =

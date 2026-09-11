@@ -6,15 +6,27 @@
    flags = "-O4 -flambda2-reaper -reaper-local-fields -dflambda-invariants -dcmm";
    module = "specialise_lifted_function_lib.ml";
    ocamlopt.opt;
-   script = "sh ${test_source_directory}/check-no-specialisation-site-data.sh producer.cmm";
+   script = "sh ${test_source_directory}/check-no-specialisation-site-data.sh producer.cmm map_stack";
    script;
    compiler_output2 = "compiler.output";
    flags = "-O3 -no-flambda2-reaper -dflambda-invariants";
    module = "specialise_lifted_function_chain_mid.ml";
    ocamlopt.opt;
+   script = "mv specialise_lifted_function_lib.cmx specialise_lifted_function_lib.saved-cmx";
+   script;
+   compiler_output2 = "consumer.cmm";
+   flags += " -dcmm";
+   module = "specialise_lifted_function_o3.ml";
+   ocamlopt.opt;
+   script = "mv specialise_lifted_function_lib.saved-cmx specialise_lifted_function_lib.cmx";
+   script;
+   script = "sh ${test_source_directory}/check-no-specialisation-site-data.sh consumer.cmm sum_squares";
+   script;
+   compiler_output2 = "compiler.output";
+   flags = "-O3 -no-flambda2-reaper -dflambda-invariants";
    module = "";
-   all_modules = "specialise_lifted_function_o3.ml";
-   binary_modules = "specialise_lifted_function_lib specialise_lifted_function_chain_mid";
+   all_modules = "";
+   binary_modules = "specialise_lifted_function_lib specialise_lifted_function_chain_mid specialise_lifted_function_o3";
    ocamlopt.opt;
    check-ocamlopt.opt-output;
    run;
@@ -23,8 +35,9 @@
 
 [@@@ocaml.flambda_o3]
 
-(* Only the producer runs the reaper. Its specialisation site must survive
-   the -O3 intermediate unit and specialise the loop here. *)
+(* Only the producer runs the reaper. Its site must be re-exported by the -O3
+   intermediate unit: the producer's .cmx is hidden while compiling this unit.
+   Both producer and consumer must emit no closure data for [loop]. *)
 
 let[@zero_alloc] sum_squares (l @ local) =
   let squares =

@@ -105,3 +105,5 @@ val is_local : t -> bool
 val print_for_variable_name : Format.formatter -> t -> unit
 
 val equal : t -> t -> bool
+
+val compare : t -> t -> int

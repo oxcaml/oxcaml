@@ -19,6 +19,30 @@ let outer_hint x b =
     g1 4
   end
 
+(* This wrapper looks small after lifting, but copying its helper is not
+   cheap when [f] remains unknown. *)
+let large f n =
+  let[@inline never] rec large_loop n =
+    let a = f n in
+    let b = f a in
+    let c = f b in
+    let d = f c in
+    let e = f d in
+    let g = f e in
+    let h = f g in
+    let i = f h in
+    let j = f i in
+    let k = f j in
+    let l = f k in
+    let m = f l in
+    let o = f m in
+    let p = f o in
+    let q = f p in
+    let r = f q in
+    if n <= 0 then r else r + large_loop (n - 1)
+  in
+  large_loop n
+
 let outer_control x b =
   let captured1 = (x, 1) in
   let captured2 = (x, 2) in

@@ -1463,9 +1463,9 @@ let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
 let redirect_direct_call_to_specialised_code denv apply =
   match Apply.callee apply, Apply.call_kind apply with
   | None, Function { function_call = Direct code_id } -> (
-    match DE.find_code_specialisations denv code_id with
-    | [] -> apply
-    | _ :: _ as specialisations -> (
+    match DE.find_code_specialisations denv code_id () with
+    | Seq.Nil -> apply
+    | Seq.Cons (first, rest) -> (
       let typing_env = DE.typing_env denv in
       let canonical simple =
         if TE.mem_simple ~min_name_mode:NM.in_types typing_env simple
@@ -1482,35 +1482,18 @@ let redirect_direct_call_to_specialised_code denv apply =
         match assumption with
         | None -> true
         | Some (_value_slot, simple) -> (
-          match canonical arg, canonical simple with
+          match arg, canonical simple with
           | Some arg, Some simple -> Simple.equal arg simple
           | None, _ | _, None -> false)
       in
-      let args = Apply.args apply in
+      let args = List.map canonical (Apply.args apply) in
       let assumptions_hold
           ({ new_code_id = _; assumptions } : DE.Code_specialisation.t) =
         List.compare_lengths args assumptions = 0
         && List.for_all2 assumption_holds args assumptions
       in
-      let num_assumptions
-          ({ new_code_id = _; assumptions } : DE.Code_specialisation.t) =
-        List.length (List.filter Option.is_some assumptions)
-      in
-      (* Prefer the most specialised candidate; the candidates are in reverse
-         order of recording, so the most recent wins ties. *)
-      let best =
-        List.fold_left
-          (fun best specialisation ->
-            if not (assumptions_hold specialisation)
-            then best
-            else
-              match best with
-              | Some best
-                when num_assumptions best >= num_assumptions specialisation ->
-                Some best
-              | Some _ | None -> Some specialisation)
-          None specialisations
-      in
+      (* The environment orders candidates by specificity and recency. *)
+      let best = Seq.find assumptions_hold (Seq.cons first rest) in
       match best with
       | None -> apply
       | Some { new_code_id; assumptions = _ } ->

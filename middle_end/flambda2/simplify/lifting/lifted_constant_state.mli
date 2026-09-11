@@ -39,6 +39,16 @@ val all_defined_symbols : t -> Symbol.Set.t
 
 val add_to_denv : ?maybe_already_defined:unit -> DE.t -> t -> DE.t
 
+(** Cost of pending definitions reachable from the final runtime roots. Newly
+    specialised code is charged once; existing code and age-only ancestors are
+    free. Other constants follow the inlining tracking policy. *)
+val cost_metrics : t -> roots:Name_occurrences.t -> Cost_metrics.t
+
+(** Prune a placement batch during non-rebuilding speculation, before any dead
+    definition can contribute dependencies to subsequent cost roots. Age-only
+    definitions are dropped too, so this is not for rebuilding real terms. *)
+val retain_reachable_for_speculation : t -> roots:Name_occurrences.t -> t
+
 type sort_result = private { innermost_first : LC.t array }
 
 val sort : t -> sort_result

@@ -25,11 +25,6 @@ val create :
   machine_width:Target_system.Machine_width.t ->
   t
 
-(** [unboxed_vars] in the result is empty unless [compute_unboxed_vars]. *)
-val make_result :
-  t ->
-  dom:Dominator_graph.alias_map ->
-  compute_unboxed_vars:bool ->
-  Flow_types.Mutable_unboxing_result.t * Simple.Set.t
+val make_result : t -> Flow_types.Mutable_unboxing_result.t * Simple.Set.t
 
 val pp_node : t -> Format.formatter -> Continuation.t -> unit

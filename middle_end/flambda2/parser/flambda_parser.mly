@@ -224,6 +224,7 @@ let make_boxed_const_int (i, m) : static_data =
   alloc_mode_for_function_params
 %type <Fexpr.empty_array_kind> empty_array_kind
 %type <Fexpr.const> const
+%type <Fexpr.code_id_or_deleted> code_id_or_deleted
 %type <Fexpr.continuation> continuation
 %type <Fexpr.field_of_block> field_of_block
 %type <Fexpr.flambda_unit> flambda_unit
@@ -625,12 +626,19 @@ value_slot:
 fun_decl:
   | KWD_CLOSURE;
     is_specialisation_site = boption(KWD_SPECIALISATION_SITE);
-    code_id = code_id;
+    code_id = code_id_or_deleted;
     function_slot = function_slot_opt;
     alloc = alloc_mode_for_allocations;
     synthetic_value_slots = synthetic_value_slots_opt;
     { { code_id; is_specialisation_site; function_slot; alloc;
         synthetic_value_slots; } }
+;
+
+code_id_or_deleted:
+  | id = code_id { Code_id id }
+  | KWD_DELETED; KWD_SIZE; LPAREN; function_slot_size = plain_int; RPAREN
+    { let loc = make_loc ($startpos, $endpos) in
+      Deleted { function_slot_size; dbg = Debuginfo.from_location loc } }
 ;
 
 synthetic_value_slots_opt:

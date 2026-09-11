@@ -102,6 +102,12 @@ let filter_synthetic_value_slots t ~f =
       let named = Set_of_closures (set, alloc_mode) in
       { t with named; free_names = Named.free_names (to_named named) }
 
+let for_speculative_inlining t =
+  let t = filter_synthetic_value_slots t ~f:(fun _ -> false) in
+  (* No term is rebuilt. Only direct calls, not the site's declarations, should
+     root the code charged to this trial. *)
+  { t with free_names = Name_occurrences.without_code_ids t.free_names }
+
 let mark_unused_function_declarations_as_deleted function_decls ~live_code_ids
     ~find_code_metadata =
   Function_declarations.mark_as_deleted function_decls

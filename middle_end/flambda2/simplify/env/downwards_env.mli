@@ -284,5 +284,5 @@ end
 val add_code_specialisation :
   t -> old_code_id:Code_id.t -> Code_specialisation.t -> t
 
-(** Most recent first. *)
-val find_code_specialisations : t -> Code_id.t -> Code_specialisation.t list
+(** Most assumptions first, most recent first on ties. *)
+val find_code_specialisations : t -> Code_id.t -> Code_specialisation.t Seq.t
