@@ -1,4 +1,8 @@
 (cram
- (applies_to erroneous-config quoting load-config)
+ (applies_to erroneous-config quoting load-config findlib)
  (enabled_if
   (<> %{os_type} Win32)))
+
+(cram
+ (applies_to erroneous-config findlib)
+ (deps %{bin:ocamlfind}))

@@ -377,6 +377,40 @@ module Result = struct
 
   let map ~f r = Result.map f r
   let bind ~f r = Result.bind r f
+
+  module Infix = struct
+    let ( let* ) r f = bind r ~f
+    let ( let+ ) r f = map r ~f
+  end
+
+  module List = struct
+    let rec map ~f = function
+      | [] -> Ok []
+      | x :: xs ->
+        let open Infix in
+        let* y = f x in
+        let* ys = map ~f xs in
+        Ok (y :: ys)
+
+    let rec partition ~f = function
+      | [] -> Ok ([], [])
+      | head :: rest -> (
+        let open Infix in
+        let* pred = f head in
+        let* true_rest, false_rest = partition ~f rest in
+        match pred with
+        | true -> Ok (head :: true_rest, false_rest)
+        | false -> Ok (true_rest, head :: false_rest))
+  end
+
+  module Option = struct
+    let map ~f = function
+    | None -> Ok None
+    | Some x ->
+      let open Infix in
+      let* y = f x in
+      Ok (Some y)
+  end
 end
 
 module String = struct
@@ -579,6 +613,8 @@ module String = struct
     let len = length s in
     let prefix_len = length prefix in
     len >= prefix_len && check_prefix s ~prefix prefix_len 0
+
+  let is_non_empty str = not (String.equal "" str)
 end
 
 let sprintf = Printf.sprintf

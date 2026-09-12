@@ -29,23 +29,6 @@
 open Merlin_utils
 open Ocaml_utils.Misc
 open Std
-open Std.Result
-
-let findlib_ok =
-  try Ok (Findlib.init ())
-  with exn ->
-    let message =
-      match exn with
-      | Failure message -> message
-      | exn -> Printexc.to_string exn
-    in
-    (* This is a quick and dirty workaround to get Merlin to work even when
-       findlib directory has been removed. *)
-    begin match Sys.getenv "OCAMLFIND_CONF" with
-    | exception Not_found -> Unix.putenv "OCAMLFIND_CONF" "/dev/null"
-    | _ -> ()
-    end;
-    Error ("Error during findlib initialization: " ^ message)
 
 let { Logger.log } = Logger.for_section "Mconfig_dot"
 
@@ -183,38 +166,14 @@ let directives_of_files filenames =
   in
   process [] filenames
 
-let ppx_of_package ?(predicates = []) setup pkg =
-  let d = Findlib.package_directory pkg in
-  (* Determine the 'ppx' property: *)
-  let in_words ~comma s =
-    (* splits s in words separated by commas and/or whitespace *)
-    let l = String.length s in
-    let rec split i j =
-      if j < l then
-        match s.[j] with
-        | (' ' | '\t' | '\n' | '\r' | ',') as c when c <> ',' || comma ->
-          if i < j then String.sub s ~pos:i ~len:(j - i) :: split (j + 1) (j + 1)
-          else split (j + 1) (j + 1)
-        | _ -> split i (j + 1)
-      else if i < j then [ String.sub s ~pos:i ~len:(j - i) ]
-      else []
-    in
-    split 0 0
-  in
-  let resolve_path = Findlib.resolve_path ~base:d ~explicit:true in
-  let ppx =
-    try Some (resolve_path (Findlib.package_property predicates pkg "ppx"))
-    with Not_found -> None
-  and ppxopts =
-    try
-      List.map
-        ~f:(fun opt ->
-          match in_words ~comma:true opt with
-          | pkg :: opts -> (pkg, List.map ~f:resolve_path opts)
-          | _ -> assert false)
-        (in_words ~comma:false
-           (Findlib.package_property predicates pkg "ppxopt"))
-    with Not_found -> []
+let ppx_of_package ~findlib_config:config setup (package : Findlib.Package.t) =
+  let open Result.Infix in
+  let resolve_path = Findlib.resolve_path ~config ~base:package.directory in
+  let* ppx = Result.Option.map package.ppx ~f:resolve_path in
+  let* ppxopts =
+    Result.List.map package.ppxopt ~f:(fun (ppx, opts) ->
+        let* opts = Result.List.map opts ~f:resolve_path in
+        Ok (ppx, opts))
   in
   begin match ppx with
   | None -> ()
@@ -234,42 +193,17 @@ let ppx_of_package ?(predicates = []) setup pkg =
     | None -> setup
     | Some ppx -> Ppxsetup.add_ppx ppx setup
   in
-  List.fold_left ppxopts ~init:setup ~f:(fun setup (ppx, opts) ->
-      Ppxsetup.add_ppxopts ppx opts setup)
-
-let path_separator =
-  match Sys.os_type with
-  | "Cygwin" | "Win32" -> ";"
-  | _ -> ":"
-
-let set_findlib_path =
-  let findlib_cache = ref ("", [], "") in
-  fun ?(conf = "") ?(path = []) ?(toolchain = "") () ->
-    let key = (conf, path, toolchain) in
-    if key <> !findlib_cache then begin
-      let env_ocamlpath =
-        match path with
-        | [] -> None
-        | path -> Some (String.concat ~sep:path_separator path)
-      and config =
-        match conf with
-        | "" -> None
-        | s -> Some s
-      and toolchain =
-        match toolchain with
-        | "" -> None
-        | s -> Some s
-      in
-      log ~title:"set_findlib_path" "findlib_conf = %s; findlib_path = %s\n"
-        conf
-        (String.concat ~sep:path_separator path);
-      Findlib.init ?env_ocamlpath ?config ?toolchain ();
-      findlib_cache := key
-    end
+  Ok
+    (List.fold_left ppxopts ~init:setup ~f:(fun setup (ppx, opts) ->
+         Ppxsetup.add_ppxopts ppx opts setup))
 
 let standard_library =
-  set_findlib_path ();
-  Findlib.ocaml_stdlib ()
+  match Sys.getenv_opt "OCAMLLIB" with
+  | Some stdlib -> stdlib
+  | None -> (
+    match Sys.getenv_opt "CAMLLIB" with
+    | Some stdlib -> stdlib
+    | None -> Standard_library.path)
 
 let is_package_optional name =
   let last = String.length name - 1 in
@@ -280,36 +214,51 @@ let remove_option name =
   if last >= 0 && name.[last] = '?' then String.sub name ~pos:0 ~len:last
   else name
 
-let path_of_packages ?conf ?path ?toolchain packages =
-  set_findlib_path ?conf ?path ?toolchain ();
-  let recorded_packages, invalid_packages =
-    List.partition packages ~f:(fun name ->
-        match Findlib.package_directory (remove_option name) with
-        | _ -> true
-        | exception _ -> false)
-  in
-  let failures =
-    match
-      List.filter_map invalid_packages ~f:(fun pkg ->
-          if is_package_optional pkg then (
-            log ~title:"path_of_packages" "Uninstalled package %S" pkg;
-            None)
-          else Some pkg)
-    with
-    | [] -> []
-    | xs -> [ "Failed to load packages: " ^ String.concat ~sep:"," xs ]
-  in
-  let recorded_packages = List.map ~f:remove_option recorded_packages in
-  let packages, failures =
-    match Findlib.package_deep_ancestors [] recorded_packages with
-    | packages -> (packages, failures)
-    | exception exn ->
-      ([], sprintf "Findlib failure: %S" (Printexc.to_string exn) :: failures)
-  in
-  let packages = List.filter_dup packages in
-  let path = List.map ~f:Findlib.package_directory packages in
-  let ppxs = List.fold_left ~f:ppx_of_package packages ~init:Ppxsetup.empty in
-  (path, ppxs, failures)
+let path_of_packages ~findlib_config:config packages =
+  let open Result.Infix in
+  match packages with
+  | [] ->
+    (* Don't invoke findlib if there were no findlib-related directives. *)
+    ([], Ppxsetup.empty, [])
+  | _ :: _ -> (
+    let result =
+      let* installed_packages, invalid_packages =
+        Result.List.partition packages ~f:(fun name ->
+            let* directory =
+              Findlib.package_directory ~config (remove_option name)
+            in
+            Ok (Option.is_some directory))
+      in
+      let failures =
+        match
+          List.filter_map invalid_packages ~f:(fun pkg ->
+              if is_package_optional pkg then (
+                log ~title:"path_of_packages" "Uninstalled package %S" pkg;
+                None)
+              else Some pkg)
+        with
+        | [] -> []
+        | xs -> [ "Failed to load packages: " ^ String.concat ~sep:"," xs ]
+      in
+      let* packages =
+        Findlib.query ~config
+          (List.map installed_packages ~f:(fun name -> remove_option name))
+      in
+      let path =
+        List.map packages ~f:(fun (package : Findlib.Package.t) ->
+            package.directory)
+      in
+      let* ppxs =
+        List.fold_left packages ~init:(Ok Ppxsetup.empty)
+          ~f:(fun setup package ->
+            let* setup = setup in
+            ppx_of_package ~findlib_config:config setup package)
+      in
+      Ok (path, ppxs, failures)
+    in
+    match result with
+    | Ok result -> result
+    | Error message -> ([], Ppxsetup.empty, [ message ]))
 
 type config =
   { pass_forward : Merlin_dot_protocol.Directive.no_processing_required list;
@@ -318,9 +267,7 @@ type config =
     stdlib : string option;
     source_root : string option;
     packages_to_load : string list;
-    findlib : string option;
-    findlib_path : string list;
-    findlib_toolchain : string option
+    findlib : Findlib.Config.t
   }
 
 let empty_config =
@@ -329,9 +276,7 @@ let empty_config =
     stdlib = None;
     source_root = None;
     packages_to_load = [];
-    findlib = None;
-    findlib_path = [];
-    findlib_toolchain = None
+    findlib = Findlib.Config.default
   }
 
 let prepend_config ~cwd ~cfg =
@@ -367,22 +312,24 @@ let prepend_config ~cwd ~cfg =
         { cfg with source_root = Some canon_path }
       | `FINDLIB path ->
         let canon_path = canonicalize_filename ~cwd path in
-        begin match cfg.stdlib with
+        begin match cfg.findlib.conf with
         | None -> ()
         | Some p ->
           log ~title:"conflicting paths for findlib" "%s\n%s" p canon_path
         end;
-        { cfg with findlib = Some canon_path }
+        { cfg with findlib = { cfg.findlib with conf = Some canon_path } }
       | `FINDLIB_PATH path ->
         let canon_path = canonicalize_filename ~cwd path in
-        { cfg with findlib_path = canon_path :: cfg.findlib_path }
-      | `FINDLIB_TOOLCHAIN path ->
-        begin match cfg.stdlib with
+        { cfg with
+          findlib = { cfg.findlib with path = canon_path :: cfg.findlib.path }
+        }
+      | `FINDLIB_TOOLCHAIN toolchain ->
+        begin match cfg.findlib.toolchain with
         | None -> ()
-        | Some p ->
-          log ~title:"conflicting paths for findlib toolchain" "%s\n%s" p path
+        | Some t ->
+          log ~title:"conflicting findlib toolchains" "%s\n%s" t toolchain
         end;
-        { cfg with findlib_toolchain = Some path })
+        { cfg with findlib = { cfg.findlib with toolchain = Some toolchain } })
 
 let process_one ~cfg { path; directives; _ } =
   let cwd = Filename.dirname path in
@@ -404,7 +351,9 @@ let expand =
 
 let postprocess cfg =
   let stdlib = Option.value ~default:standard_library cfg.stdlib in
-  let pkg_paths, ppxsetup, failures = path_of_packages cfg.packages_to_load in
+  let pkg_paths, ppxsetup, failures =
+    path_of_packages ~findlib_config:cfg.findlib cfg.packages_to_load
+  in
   let ppx =
     match Ppxsetup.command_line ppxsetup with
     | [] -> []
@@ -446,10 +395,7 @@ let load dot_merlin_file =
     List.fold_left directives ~init:empty_config ~f:(fun cfg file ->
         process_one ~cfg file)
   in
-  let directives = postprocess cfg in
-  match (cfg.packages_to_load, findlib_ok) with
-  | [], _ | _, Ok _ -> directives
-  | _, Error msg -> `ERROR_MSG msg :: directives
+  postprocess cfg
 
 let dot_merlin_file = Filename.concat (Sys.getcwd ()) ".merlin"
 
