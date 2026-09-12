@@ -456,9 +456,7 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
     List.fold_left
       (fun m { txt = Atom (ax, a) as t; loc } ->
         let annotation =
-          { Location.txt = Format_doc.asprintf "%a" (Per_axis.print ax) a;
-            loc
-          }
+          { Location.txt = Format_doc.asprintf "%a" (Per_axis.print ax) a; loc }
         in
         let m = Const.set ~annotation ax a m in
         List.fold_left
