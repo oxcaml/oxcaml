@@ -412,10 +412,10 @@ let unary_prim_size ~machine_width prim =
     | Array_kind
         ( Immediates | Values | Gc_ignorable_values | Naked_floats
         | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
-        | Naked_vec512s | Naked_masks | Unboxed_product _ ) ->
+        | Naked_vec512s | Naked_ints | Naked_masks | Unboxed_product _ ) ->
       array_length_size
     | Array_kind
-        (Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
+        (Naked_int8s | Naked_int16s | Naked_int32s | Naked_float32s)
       ->
       (* There is some arithmetic here to see how many elements in the last
          word *)
