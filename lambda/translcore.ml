@@ -818,6 +818,16 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Typedecl.finalize_record_representation e.exp_env e.exp_loc
           representation
       in
+      let extended_expression =
+        Option.map
+          (fun (init_expr, sort, repres, ubr) ->
+             let repres =
+               Typedecl.finalize_record_representation e.exp_env e.exp_loc
+                 repres
+             in
+             (init_expr, sort, repres, ubr))
+          extended_expression
+      in
       transl_record ~scopes e.exp_loc e.exp_env
         (Option.map transl_alloc_mode_r alloc_mode)
         fields representation extended_expression
@@ -2457,8 +2467,10 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     | Some m -> is_heap_mode m
   in
   match opt_init_expr with
-  | Some (init_expr, init_expr_sort, _)
-    when on_heap && size >= Config.max_young_wosize ->
+  | Some (init_expr, init_expr_sort, init_repres, _)
+    when on_heap && size >= Config.max_young_wosize
+         && Types.equal_record_representation_up_to_scannable_axes repres
+              init_repres ->
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
@@ -2555,13 +2567,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                let sem =
                  if Types.is_mutable mut then Reads_vary else Reads_agree
                in
-               let unique_barrier = match opt_init_expr with
-                 | Some (_, _, ubr) -> Translmode.transl_unique_barrier ubr
+               let init_repres, unique_barrier = match opt_init_expr with
+                 | Some (_, _, repres, ubr) ->
+                     repres, Translmode.transl_unique_barrier ubr
                  | None -> assert false (* Kept fields only exist on extended records *)
                in
                let sem = add_barrier_to_read unique_barrier sem in
                let access =
-                 match repres with
+                 match init_repres with
                    Record_boxed
                  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                    let ptr, _ = maybe_pointer_type env typ in
@@ -2746,7 +2759,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     in
     begin match opt_init_expr with
       None -> lam
-    | Some (init_expr, init_expr_sort, _) ->
+    | Some (init_expr, init_expr_sort, _, _) ->
         let init_expr_sort =
           Jkind.Sort.default_for_transl_and_get init_expr_sort
         in
@@ -2764,6 +2777,15 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
   | Record_unboxed_product ->
     let init_id = Ident.create_local "init" in
     let init_id_duid = Lambda.debug_uid_none in
+    let opt_init_expr =
+      Option.map
+        (fun (init_expr, init_expr_sort) ->
+           let init_expr_sort =
+             Jkind.Sort.default_for_transl_and_get init_expr_sort
+           in
+           init_expr, layout_exp init_expr_sort init_expr)
+        opt_init_expr
+    in
     let shape =
       Array.map
         (fun (lbl, lbl_sort, definition) ->
@@ -2780,7 +2802,15 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
             let lbl_sort = Jkind.Sort.default_for_transl_and_get lbl_sort in
             match definition with
             | Kept (_typ, _mut, _) ->
-              let access = Punboxed_product_field (i, shape) in
+              let init_shape =
+                match opt_init_expr with
+                | Some (_, Punboxed_product init_shape) -> init_shape
+                | Some (_, _) | None ->
+                  fatal_error
+                    "transl_record_unboxed_product: expected an extended \
+                     expression of product layout"
+              in
+              let access = Punboxed_product_field (i, init_shape) in
               Lprim (access, [Lvar init_id], of_location ~scopes loc)
             | Overridden (_lid, expr) ->
               let field_layout = layout_exp lbl_sort expr in
@@ -2794,13 +2824,9 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
     in
     begin match opt_init_expr with
     | None -> lam
-    | Some (init_expr, init_expr_sort) ->
-      let init_expr_sort =
-        Jkind.Sort.default_for_transl_and_get init_expr_sort
-      in
-      let layout = layout_exp init_expr_sort init_expr in
-      let exp = transl_exp ~scopes layout init_expr in
-      Llet(Strict, layout, init_id, init_id_duid, exp, lam)
+    | Some (init_expr, init_expr_layout) ->
+      let exp = transl_exp ~scopes init_expr_layout init_expr in
+      Llet(Strict, init_expr_layout, init_id, init_id_duid, exp, lam)
     end
 
 (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)

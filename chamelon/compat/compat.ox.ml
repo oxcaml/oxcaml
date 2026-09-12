@@ -108,10 +108,16 @@ type texp_record_identifier = Types.record_representation * alloc_mode_r option
 
 type texp_record_field_identifier = Jkind.Sort.t
 
-type texp_record_extended_expression_identifier = Jkind.Sort.t
+type texp_record_extended_expression_identifier =
+  Jkind.Sort.t * Types.record_representation
 
 let mkTexp_record ~id:(representation, alloc_mode) (fields, extended_expression)
     =
+  let extended_expression =
+    Option.map
+      (fun (exp, (sort, repres), ubr) -> exp, sort, repres, ubr)
+      extended_expression
+  in
   Texp_record { fields; representation; extended_expression; alloc_mode }
 
 type texp_function_param_identifier =
@@ -302,6 +308,11 @@ let view_texp (e : expression_desc) =
   | Texp_construct (name, desc, repres, args, mode) ->
     Texp_construct (name, desc, args, (mode, repres))
   | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+    let extended_expression =
+      Option.map
+        (fun (exp, sort, repres, ubr) -> exp, (sort, repres), ubr)
+        extended_expression
+    in
     Texp_record { fields; extended_expression; id = representation, alloc_mode }
   | Texp_tuple (args, mode) ->
     let labels, args = List.split args in

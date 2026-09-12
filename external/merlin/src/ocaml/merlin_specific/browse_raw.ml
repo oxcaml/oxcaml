@@ -465,7 +465,7 @@ let rec of_expression_desc loc = function
   | Texp_setinstvar (_, _, _, e) -> of_expression e
   | Texp_setmutvar (_, _, e) -> of_expression e
   | Texp_record { fields; extended_expression } ->
-    option_fold (fun (e, _, _) -> of_expression e) extended_expression
+    option_fold (fun (e, _, _, _) -> of_expression e) extended_expression
     **
     let fold_field = function
       | _, _, Typedtree.Kept _ -> id_fold

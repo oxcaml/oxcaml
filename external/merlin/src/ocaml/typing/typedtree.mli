@@ -619,7 +619,9 @@ and expression_desc =
         ( Data_types.label_description * Jkind.sort * record_label_definition )
           array;
       representation : Types.record_representation;
-      extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
+      extended_expression :
+        (expression * Jkind.sort * Types.record_representation
+         * Unique_barrier.t) option;
       alloc_mode : alloc_mode_r option
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
@@ -632,6 +634,9 @@ and expression_desc =
             Texp_record
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
+            [extended_expression] carries the representation of E0, which can
+            differ from [representation] under a polymorphic update where the
+            changed field's type changes its layout.
             [alloc_mode] is the allocation mode of the record,
             or [None] if it is [Record_unboxed],
             in which case it does not need allocation.
