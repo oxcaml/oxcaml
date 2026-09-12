@@ -17,10 +17,8 @@
 module type S = sig
   type t
 
-  (** We don't have an interface that insists on adding continuations before
-      seeing their uses. This would be problematic when inserting wrappers,
-      where we have already advanced past the point at which such wrappers would
-      need to be defined, before knowing that a wrapper is needed. *)
+  val record_continuation :
+    t -> Continuation.t -> [`Unarized] Flambda_arity.t -> t
 
   val record_continuation_use :
     t ->

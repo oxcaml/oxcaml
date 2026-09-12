@@ -22,9 +22,14 @@ val empty : t
 
 include Continuation_uses_env_intf.S with type t := t
 
+val record_continuation_arity : t -> Original_handlers.t -> t
+
 val get_continuation_uses : t -> Continuation.t -> Continuation_uses.t option
 
 val remove : t -> Continuation.t -> t
+
+(* Remove all uses, but keep declared continuations *)
+val reset_uses : t -> t
 
 val clear_continuation_uses : t -> Continuation.t -> t
 
