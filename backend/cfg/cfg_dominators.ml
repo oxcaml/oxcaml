@@ -450,6 +450,11 @@ let build : Cfg.t -> t =
   let doms = compute_doms cfg in
   let dominance_frontiers = compute_dominance_frontiers cfg doms in
   let dominator_forest = compute_dominator_forest cfg doms in
+  if !Oxcaml_flags.cfg_dominators_validate
+  then
+    Profile.record ~accumulate:true "validate_dominators"
+      (Cfg_dominators_validate.validate_idom cfg)
+      doms;
   { entry_label = cfg.entry_label; doms; dominance_frontiers; dominator_forest }
 
 let is_dominating t left right = is_dominating t.doms left right
