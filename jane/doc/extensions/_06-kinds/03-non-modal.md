@@ -1,12 +1,10 @@
 ---
 layout: documentation-page
 collectionName: Kinds
-title: Non-modal bounds
+title: Externality
 ---
 
-# Non-modal bounds
-
-## Externality
+# Externality
 
 The externality axis records whether all a type's values may safely be ignored
 by the GC.  This may be because they are OCaml "immediates" (values represented
@@ -34,5 +32,9 @@ collector. For this reason, the layouts `bits8`, `bits16`, `bits32`, `bits64`,
 `float32`, `float64`, `untagged_immediate`, `vec128`, `vec256`, `vec512`,
 `void`, and `word` are all inherently `mod external_`.
 
-In the future, we plan to make externality a mode, rather than just a property
-of types.
+Externality is an internal mode axis. It can be written in kind modifiers
+(such as `value mod external_`) and with-bound modalities (such as
+`with 'a @@ external64`), but not as a value mode or a field modality.
+Externality is omitted when printing modes.
+Ordinary module fields always have the identity externality modality,
+including in inferred signatures and `module type of`.
