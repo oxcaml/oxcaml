@@ -33,6 +33,8 @@ val keep_test_dir_on_success : bool
 
 val show_timings : bool
 
+val runparam : string
+
 val translate : bool
 val style : Translate.style
 val compact : bool
