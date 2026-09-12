@@ -44,6 +44,23 @@ let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
 let native_code         = ref false
+let is_flambda2 () = false
+let dump_debug_uids = ref false
+let directory = ref None
+
+module Register_allocator = struct
+  type t = Cfg | Irc | Ls | Gi
+
+  let to_string = function
+    | Cfg -> "cfg"
+    | Irc -> "irc"
+    | Ls -> "ls"
+    | Gi -> "gi"
+
+  let format ppf regalloc =
+    Format.fprintf ppf "%s" (to_string regalloc)
+end
+
 let error_size          = ref 500
 let dont_write_files    = ref true
 let keep_locs           = ref true

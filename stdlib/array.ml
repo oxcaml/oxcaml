@@ -203,7 +203,7 @@ let to_list a =
   tolist (length a - 1) []
 
 (* Cannot use List.length here because the List module depends on Array. *)
-let rec list_length accu = function
+let rec (list_length @ noalloc_strict) accu = function
   | [] -> accu
   | _::t -> list_length (succ accu) t
 

@@ -288,7 +288,7 @@ val pp_print_bool : formatter -> bool -> unit
 val print_bool : bool -> unit
 (** Print a boolean in the current pretty-printing box. *)
 
-val pp_print_nothing : formatter -> unit -> unit
+val pp_print_nothing : formatter -> (unit -> unit) @ local @@ noalloc_strict
 (** Print nothing.
     @since 5.2
 *)
@@ -472,7 +472,7 @@ val set_margin : int -> unit
   See also {!pp_set_geometry}.
 *)
 
-val pp_get_margin : formatter -> unit -> int
+val pp_get_margin : formatter -> (unit -> int) @ local @@ noalloc_strict
 val get_margin : unit -> int
 (** Returns the position of the right margin. *)
 
@@ -515,7 +515,7 @@ val set_max_indent : int -> unit
   See also {!pp_set_geometry}.
 *)
 
-val pp_get_max_indent : formatter -> unit -> int
+val pp_get_max_indent : formatter -> (unit -> int) @ local @@ noalloc_strict
 val get_max_indent : unit -> int
 (** Return the maximum indentation limit (in characters). *)
 
@@ -530,6 +530,7 @@ type geometry = { max_indent:int; margin: int}
 (** @since 4.08 *)
 
 val check_geometry: geometry -> bool
+[@@zero_alloc strict]
 (** Check if the formatter geometry is valid:
   [1 < max_indent < margin < ]{!pp_infinity}
 
@@ -587,7 +588,7 @@ val get_geometry: unit -> geometry
   precisely as the text returned by {!get_ellipsis_text} [()]).
 *)
 
-val pp_set_max_boxes : formatter -> int -> unit
+val pp_set_max_boxes : formatter -> (int -> unit) @ local @@ noalloc_strict
 val set_max_boxes : int -> unit
 (** [pp_set_max_boxes ppf max] sets the maximum number of pretty-printing
     boxes simultaneously open.
@@ -598,13 +599,13 @@ val set_max_boxes : int -> unit
   Nothing happens if [max] is smaller than 2.
 *)
 
-val pp_get_max_boxes : formatter -> unit -> int
+val pp_get_max_boxes : formatter -> (unit -> int) @ local @@ noalloc_strict
 val get_max_boxes : unit -> int
 (** Returns the maximum number of pretty-printing boxes allowed before
   ellipsis.
 *)
 
-val pp_over_max_boxes : formatter -> unit -> bool
+val pp_over_max_boxes : formatter -> (unit -> bool) @ local @@ noalloc_strict
 val over_max_boxes : unit -> bool
 (** Tests if the maximum number of pretty-printing boxes allowed have already
   been opened.
@@ -678,13 +679,15 @@ val print_tbreak : int -> int -> unit
 
 (** {1 Ellipsis} *)
 
-val pp_set_ellipsis_text : formatter -> string -> unit
+val pp_set_ellipsis_text : formatter -> (string -> unit) @ local @@
+  noalloc_strict
 val set_ellipsis_text : string -> unit
 (** Set the text of the ellipsis printed when too many pretty-printing boxes
   are open (a single dot, [.], by default).
 *)
 
-val pp_get_ellipsis_text : formatter -> unit -> string
+val pp_get_ellipsis_text : formatter -> (unit -> string) @ local @@
+  noalloc_strict
 val get_ellipsis_text : unit -> string
 (** Return the text of the ellipsis. *)
 
@@ -799,25 +802,25 @@ val close_stag : unit -> unit
   @since 4.08
 *)
 
-val pp_set_tags : formatter -> bool -> unit
+val pp_set_tags : formatter -> (bool -> unit) @ local @@ noalloc_strict
 val set_tags : bool -> unit
 (** [pp_set_tags ppf b] turns on or off the treatment of semantic tags
   (default is off).
 *)
 
-val pp_set_print_tags : formatter -> bool -> unit
+val pp_set_print_tags : formatter -> (bool -> unit) @ local @@ noalloc_strict
 val set_print_tags : bool -> unit
 (** [pp_set_print_tags ppf b] turns on or off the tag-printing operations. *)
 
-val pp_set_mark_tags : formatter -> bool -> unit
+val pp_set_mark_tags : formatter -> (bool -> unit) @ local @@ noalloc_strict
 val set_mark_tags : bool -> unit
 (** [pp_set_mark_tags ppf b] turns on or off the tag-marking operations. *)
 
-val pp_get_print_tags : formatter -> unit -> bool
+val pp_get_print_tags : formatter -> (unit -> bool) @ local @@ noalloc_strict
 val get_print_tags : unit -> bool
 (** Return the current status of tag-printing operations. *)
 
-val pp_get_mark_tags : formatter -> unit -> bool
+val pp_get_mark_tags : formatter -> (unit -> bool) @ local @@ noalloc_strict
 val get_mark_tags : unit -> bool
 (** Return the current status of tag-marking operations. *)
 
@@ -833,8 +836,8 @@ val set_formatter_out_channel : Stdlib.out_channel -> unit
   {!pp_set_formatter_out_channel} [std_formatter].
 *)
 
-val pp_set_formatter_output_functions :
-  formatter -> (string -> int -> int -> unit) -> (unit -> unit) -> unit
+val pp_set_formatter_output_functions : formatter -> ((string -> int -> int ->
+  unit) -> (unit -> unit) -> unit) @ local @@ noalloc_strict
 val set_formatter_output_functions :
   (string -> int -> int -> unit) -> (unit -> unit) -> unit @@ nonportable
 (** [pp_set_formatter_output_functions ppf out flush] redirects the
@@ -909,8 +912,8 @@ type formatter_out_functions = {
   @since 4.01
 *)
 
-val pp_set_formatter_out_functions :
-  formatter -> formatter_out_functions -> unit
+val pp_set_formatter_out_functions : formatter -> (formatter_out_functions ->
+  unit) @ local @@ noalloc_strict
 val set_formatter_out_functions : formatter_out_functions -> unit @@ nonportable
 (** [pp_set_formatter_out_functions ppf out_funs]
   Set all the pretty-printer output functions of [ppf] to those of
@@ -937,6 +940,7 @@ val get_formatter_out_functions : unit -> formatter_out_functions @@ nonportable
 *)
 
 val utf_8_scalar_width: string -> pos:int -> len:int -> int
+[@@zero_alloc strict]
 (** [utf_8_scalar_width s ~pos ~len] is the number of unicode scalar values in
     the substring [String.sub s pos len]. Invalid byte sequences are implicitly
     replaced by [U+FFFD] since this yields a better width approximation for
@@ -966,8 +970,8 @@ type formatter_stag_functions = {
   @since 4.08
 *)
 
-val pp_set_formatter_stag_functions :
-  formatter -> formatter_stag_functions -> unit
+val pp_set_formatter_stag_functions : formatter -> (formatter_stag_functions
+  -> unit) @ local @@ noalloc_strict
 val set_formatter_stag_functions : formatter_stag_functions -> unit @@ nonportable
 (** [pp_set_formatter_stag_functions ppf tag_funs] changes the meaning of
   opening and closing semantic tag operations to use the functions in

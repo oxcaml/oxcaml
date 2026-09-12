@@ -53,6 +53,16 @@ val shape_format         : shape_format ref
 val store_occurrences    : bool ref
 val print_types          : bool ref
 val native_code          : bool ref
+val is_flambda2 : unit -> bool
+val dump_debug_uids : bool ref
+val directory : string option ref
+
+module Register_allocator : sig
+  type t = Cfg | Irc | Ls | Gi
+
+  val format : Format.formatter -> t -> unit
+end
+
 val dont_write_files     : bool ref
 val error_size           : int ref (* max size of module related errors *)
 val keep_locs            : bool ref

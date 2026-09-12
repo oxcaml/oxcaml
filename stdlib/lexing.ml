@@ -193,7 +193,7 @@ let set_position lexbuf position =
 let set_filename lexbuf fname =
   lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = fname}
 
-let with_positions lexbuf = lexbuf.lex_curr_p != dummy_pos
+let (with_positions @ noalloc_strict) lexbuf = lexbuf.lex_curr_p != dummy_pos
 
 let lexeme lexbuf =
   let len = lexbuf.lex_curr_pos - lexbuf.lex_start_pos in
@@ -211,7 +211,7 @@ let sub_lexeme_opt lexbuf i1 i2 =
     None
   end
 
-let sub_lexeme_char lexbuf i = Bytes.get lexbuf.lex_buffer i
+let (sub_lexeme_char @ noalloc_strict) lexbuf i = Bytes.get lexbuf.lex_buffer i
 
 let sub_lexeme_char_opt lexbuf i =
   if i >= 0 then
@@ -220,14 +220,14 @@ let sub_lexeme_char_opt lexbuf i =
     None
 
 
-let lexeme_char lexbuf i =
+let (lexeme_char @ noalloc_strict) lexbuf i =
   Bytes.get lexbuf.lex_buffer (lexbuf.lex_start_pos + i)
 
-let lexeme_start lexbuf = lexbuf.lex_start_p.pos_cnum
-let lexeme_end lexbuf = lexbuf.lex_curr_p.pos_cnum
+let (lexeme_start @ noalloc_strict) lexbuf = lexbuf.lex_start_p.pos_cnum
+let (lexeme_end @ noalloc_strict) lexbuf = lexbuf.lex_curr_p.pos_cnum
 
-let lexeme_start_p lexbuf = lexbuf.lex_start_p
-let lexeme_end_p lexbuf = lexbuf.lex_curr_p
+let (lexeme_start_p @ noalloc_strict) lexbuf = lexbuf.lex_start_p
+let (lexeme_end_p @ noalloc_strict) lexbuf = lexbuf.lex_curr_p
 
 let new_line lexbuf =
   let lcp = lexbuf.lex_curr_p in

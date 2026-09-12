@@ -24,13 +24,13 @@ exception Empty
 
 let create () = { c = []; len = 0; }
 
-let clear s = s.c <- []; s.len <- 0
+let (clear @ noalloc_strict) s = s.c <- []; s.len <- 0
 
 let copy s = { c = s.c; len = s.len; }
 
 let push x s = s.c <- x :: s.c; s.len <- s.len + 1
 
-let pop s =
+let[@zero_alloc strict] pop s =
   match s.c with
   | hd::tl -> s.c <- tl; s.len <- s.len - 1; hd
   | []     -> raise Empty
@@ -40,12 +40,12 @@ let pop_opt s =
   | hd::tl -> s.c <- tl; s.len <- s.len - 1; Some hd
   | []     -> None
 
-let drop s =
+let[@zero_alloc strict] drop s =
   match s.c with
   | _hd::tl -> s.c <- tl; s.len <- s.len - 1
   | [] -> raise Empty
 
-let top s =
+let[@zero_alloc strict] top s =
   match s.c with
   | hd::_ -> hd
   | []    -> raise Empty
@@ -55,9 +55,9 @@ let top_opt s =
   | hd::_ -> Some hd
   | []    -> None
 
-let is_empty s = (s.c = [])
+let (is_empty @ noalloc_strict) s = (s.c = [])
 
-let length s = s.len
+let (length @ noalloc_strict) s = s.len
 
 let iter f s = List.iter f s.c
 

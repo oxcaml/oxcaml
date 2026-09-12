@@ -88,6 +88,7 @@ Error: The kind of type "'a F(Ref).t" is
        The first mode-crosses less than the second along:
          portability: mod portable with 'a ≰ mod portable
          statefulness: mod stateless with 'a ≰ mod stateless
+         allocation: mod noalloc_strict with 'a ≰ mod noalloc_strict
 |}]
 
 module F (M : sig
