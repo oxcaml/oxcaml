@@ -134,7 +134,7 @@ let instantiate
         | available_params ->
           let base_unit = base_compilation_unit in
           let param = e.parameter in
-          let arg = e.value in
+          let arg = Global_module.Name.Without_prefix e.value in
           error (No_such_parameter { base_unit; available_params; param; arg })
       end
   in

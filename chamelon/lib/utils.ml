@@ -365,7 +365,7 @@ let to_module_binding { name; implementation; interface } : module_binding =
   in
   { mb_id = Some (Ident.create_local name);
     mb_name = { txt = Some name; loc = Location.none };
-    mb_uid = Uid.of_compilation_unit_name (Compilation_unit.Name.of_string name);
+    mb_uid = Uid.of_compilation_unit_id (Compilation_unit.of_string name);
     mb_presence = Mp_present;
     mb_expr = module_expr;
     mb_attributes = [];

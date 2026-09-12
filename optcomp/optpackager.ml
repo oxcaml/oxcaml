@@ -164,10 +164,22 @@ end) : S = struct
         main_module_block_format)
 
   let build_package_cmx linkenv members cmxfile main_module_block_format =
-    let unit_names = List.map (fun m -> m.pm_name) members in
-    let filter lst =
+    let unit_names =
+      List.map
+        (fun m -> CU.create_child (Current_unit.get_cu_exn ()) m.pm_name)
+        members
+    in
+    let filter_cmi lst =
       List.filter
-        (fun import -> not (List.mem (Import_info.name import) unit_names))
+        (fun import ->
+          match Import_info.Intf.view import with
+          | Parameter _ -> true
+          | Normal (cu, _) | Alias cu -> not (List.mem cu unit_names))
+        lst
+    in
+    let filter_cmx lst =
+      List.filter
+        (fun import -> not (List.mem (Import_info.cu import) unit_names))
         lst
     in
     let union lst =
@@ -206,7 +218,6 @@ end) : S = struct
       (fun info ->
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
-    let modname = Compilation_unit.name ui.ui_unit in
     let pkg_infos =
       { ui_unit = ui.ui_unit;
         ui_defines =
@@ -214,10 +225,11 @@ end) : S = struct
           @ [ui.ui_unit];
         ui_arg_descr = None;
         ui_imports_cmi =
-          Import_info.create modname
-            ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit modname))
-          :: filter (Linkenv.extract_crc_interfaces linkenv);
-        ui_imports_cmx = filter (Linkenv.extract_crc_implementations linkenv);
+          Import_info.create ui.ui_unit
+            ~crc_with_unit:(Some (ui.ui_unit, Env.crc_of_unit ui.ui_unit))
+          :: filter_cmi (Linkenv.extract_crc_interfaces linkenv);
+        ui_imports_cmx =
+          filter_cmx (Linkenv.extract_crc_implementations linkenv);
         ui_quoted_cmi = union (List.map (fun info -> info.ui_quoted_cmi) units);
         ui_quoted_cmx = union (List.map (fun info -> info.ui_quoted_cmx) units);
         ui_format = ui.ui_format;

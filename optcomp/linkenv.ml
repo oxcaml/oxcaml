@@ -33,7 +33,8 @@ type objfile_to_link =
     units : Compilation_unit.t list
   }
 
-module Cmi_consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
+module Cmi_consistbl = Consistbl.Make (CU) (Unit)
+module Cmi_intf_consistbl = Consistbl.Make (CU.Intf) (Unit)
 module Cmx_consistbl = Consistbl.Make (CU) (Unit)
 
 type error =
@@ -44,7 +45,9 @@ type error =
       }
   | Not_an_object_file of filepath
   | Missing_implementations of (Compilation_unit.t * string list) list
-  | Inconsistent_interface of Compilation_unit.Name.t * filepath * filepath
+  | Inconsistent_interface of Compilation_unit.t * filepath * filepath
+  | Inconsistent_interface_intf of
+      Compilation_unit.Intf.t * filepath * filepath
   | Inconsistent_implementation of Compilation_unit.t * filepath * filepath
   | Multiple_definition of Compilation_unit.Name.t * filepath * filepath
   | Missing_cmx of filepath * Compilation_unit.t
@@ -57,12 +60,13 @@ exception Error of error
 
 type t =
   { crc_interfaces : Cmi_consistbl.t;
+    crc_param_interfaces : Cmi_intf_consistbl.t;
     crc_implementations : Cmx_consistbl.t;
     mutable implementations : CU.Set.t;
     mutable cmx_required : CU.Set.t;
-    interfaces : unit CU.Name.Tbl.t;
+    interfaces : unit CU.Tbl.t;
     implementations_defined : string CU.Tbl.t;
-    mutable quoted_cmi : CU.Name.Set.t;
+    mutable quoted_cmi : CU.Set.t;
     mutable quoted_cmx : CU.Set.t;
     mutable lib_ccobjs : filepath list;
     mutable lib_ccopts : string list;
@@ -72,16 +76,17 @@ type t =
 let create () =
   let quoted_cmi, quoted_cmx =
     if !Clflags.nopervasives
-    then CU.Name.Set.empty, CU.Set.empty
+    then CU.Set.empty, CU.Set.empty
     else
-      ( CU.Name.Set.singleton (CU.Name.of_string "Stdlib"),
+      ( CU.Set.singleton (CU.of_string "Stdlib"),
         CU.Set.singleton (CU.of_string "Stdlib") )
   in
   { crc_interfaces = Cmi_consistbl.create ();
+    crc_param_interfaces = Cmi_intf_consistbl.create ();
     crc_implementations = Cmx_consistbl.create ();
     implementations = CU.Set.empty;
     cmx_required = CU.Set.empty;
-    interfaces = CU.Name.Tbl.create 100;
+    interfaces = CU.Tbl.create 100;
     implementations_defined = CU.Tbl.create 100;
     quoted_cmi;
     quoted_cmx;
@@ -94,7 +99,7 @@ let create () =
 
 let add_quoted_cmi t cus =
   t.quoted_cmi
-    <- List.fold_left (fun cus cu -> CU.Name.Set.add cu cus) t.quoted_cmi cus
+    <- List.fold_left (fun cus cu -> CU.Set.add cu cus) t.quoted_cmi cus
 
 let add_quoted_cmx t cus =
   t.quoted_cmx
@@ -110,19 +115,24 @@ let check_cmi_consistency t file_name cmis =
   try
     Array.iter
       (fun import ->
-        let name = Import_info.name import in
-        let info = Import_info.Intf.info import in
-        CU.Name.Tbl.replace t.interfaces name ();
-        match info with
-        | None -> ()
-        | Some (kind, crc) ->
-          Cmi_consistbl.check t.crc_interfaces name kind crc file_name)
+        match Import_info.Intf.view import with
+        | Alias name -> CU.Tbl.replace t.interfaces name ()
+        | Normal (name, crc) ->
+          CU.Tbl.replace t.interfaces name ();
+          Cmi_consistbl.check t.crc_interfaces name () crc file_name
+        | Parameter (intf, crc) ->
+          Cmi_intf_consistbl.check t.crc_param_interfaces intf () crc
+            file_name)
       cmis
   with
   | Cmi_consistbl.Inconsistency
       { unit_name = name; inconsistent_source = user; original_source = auth }
   ->
     raise (Error (Inconsistent_interface (name, user, auth)))
+  | Cmi_intf_consistbl.Inconsistency
+      { unit_name = name; inconsistent_source = user; original_source = auth }
+  ->
+    raise (Error (Inconsistent_interface_intf (name, user, auth)))
 
 let check_cmx_consistency t file_name cmxs =
   try
@@ -159,11 +169,21 @@ let check_consistency t ~unit cmis cmxs =
   then t.cmx_required <- CU.Set.add unit.name t.cmx_required
 
 let extract_crc_interfaces t =
-  CU.Name.Tbl.fold
+  let params =
+    Cmi_intf_consistbl.fold
+      (fun intf () crc acc ->
+        Import_info.Intf.create_parameter intf ~crc :: acc)
+      t.crc_param_interfaces []
+  in
+  CU.Tbl.fold
     (fun name () crcs ->
-      let crc_with_unit = Cmi_consistbl.find t.crc_interfaces name in
-      Import_info.Intf.create name crc_with_unit :: crcs)
-    t.interfaces []
+      let import =
+        match Cmi_consistbl.find t.crc_interfaces name with
+        | None -> Import_info.Intf.create_alias name
+        | Some ((), crc) -> Import_info.Intf.create_normal name ~crc
+      in
+      import :: crcs)
+    t.interfaces params
 
 let extract_crc_implementations t =
   Cmx_consistbl.fold_map t.implementations ~init:[]
@@ -210,33 +230,27 @@ let extract_missing_globals t =
     t.missing_globals;
   !mg
 
-let assume_no_prefix modname =
-  (* We're the linker, so we assume that everything's already been packed, so no
-     module needs its prefix considered. *)
-  CU.create CU.Prefix.empty modname
-
 let make_globals_map t units_list =
   (* The order in which entries appear in the globals map does not matter (see
      the natdynlink code). *)
   let find_crc name =
     Cmi_consistbl.find t.crc_interfaces name
-    |> Option.map (fun (_unit, crc) -> crc)
+    |> Option.map (fun ((), crc) -> crc)
   in
-  let interfaces = CU.Name.Tbl.copy t.interfaces in
+  let interfaces = CU.Tbl.copy t.interfaces in
   let defined =
     List.map
       (fun unit ->
-        let name = CU.name unit.name in
-        let intf_crc = find_crc name in
-        CU.Name.Tbl.remove interfaces name;
+        let intf_crc = find_crc unit.name in
+        CU.Tbl.remove interfaces unit.name;
         let syms = List.map Symbol.for_compilation_unit unit.defines in
         unit.name, intf_crc, Some unit.crc, syms)
       units_list
   in
-  CU.Name.Tbl.fold
+  CU.Tbl.fold
     (fun name () globals_map ->
       let intf_crc = find_crc name in
-      (assume_no_prefix name, intf_crc, None, []) :: globals_map)
+      (name, intf_crc, None, []) :: globals_map)
     interfaces defined
 
 let lib_ccobjs t = t.lib_ccobjs
@@ -281,7 +295,13 @@ let report_error ppf = function
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
        %a@]"
       Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
-      CU.Name.print_as_inline_code intf
+      CU.print_as_inline_code intf
+  | Inconsistent_interface_intf (intf, file1, file2) ->
+    fprintf ppf
+      "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
+       %a@]"
+      Location.Doc.quoted_filename file1 Location.Doc.quoted_filename file2
+      CU.Intf.print_as_inline_code intf
   | Inconsistent_implementation (intf, file1, file2) ->
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \

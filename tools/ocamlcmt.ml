@@ -105,7 +105,7 @@ let print_info cmt =
   let imports =
     let imports =
       Array.map (fun import ->
-          Import_info.name import, Import_info.crc import)
+          Import_info.Intf.basename import, Import_info.crc import)
         cmt.cmt_imports
     in
     Array.sort compare_imports imports;
