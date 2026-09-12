@@ -50,6 +50,8 @@ function merlin-target () {
     parsing/lexer.mll) echo preprocess/lexer_raw.mll;;
     parsing/parser.mly) echo preprocess/parser_raw.mly;;
 
+    diagnostics/*) echo "typing/${base#diagnostics/}";;
+
     # Merlin moves the modules it depends on from this directory into `typing/`
     # (as of the time of writing, that's `Cmi_format` and `Cmt_format`)
     file_formats/*) echo "${base/#file_formats/typing}";;
@@ -110,7 +112,7 @@ else
 fi
 new_files=()
 cd upstream/ocaml_flambda
-dirs=(*/)
+dirs=(diagnostics */)
 dirs=("${dirs[@]%/}")
 if [[ "$subdirectory" = "." ]]; then
   fetch_prefix=""
@@ -135,6 +137,7 @@ for file in $upstream_files; do
     case "$answer" in
       y|Y|"")
         echo "Importing $file"
+        mkdir -p "$(dirname "$file")"
         git show "$rev:$fetch_prefix$file" > "$file"
         new_files+=("$file")
         ;;

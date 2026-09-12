@@ -1260,18 +1260,17 @@ module type S = sig
         ('l * allowed) Value.t ->
         Value.r
 
-      (** [concat ~then_ t] returns the modality that is [then_] after [t].
-          It retains annotations that individually establish a resulting bound,
+      (** [concat ~then_ t] returns the modality that is [then_] after [t]. It
+          retains annotations that individually establish a resulting bound,
           preferring [then_] when both do. Bounds established only by combining
           two annotations have no single annotation. *)
       val concat : then_:t -> t -> t
 
-      (** [set ax a t] overwrites an axis of [t] to be [a]. [annotation]
-          records the written modality that imposed this bound; omitting it
-          clears any previous annotation on this axis. Identity modalities
-          introduce no bound and do not retain an annotation. *)
-      val set :
-        ?annotation:string Location.loc -> 'a Axis.t -> 'a -> t -> t
+      (** [set ax a t] overwrites an axis of [t] to be [a]. [annotation] records
+          the written modality that imposed this bound; omitting it clears any
+          previous annotation on this axis. Identity modalities introduce no
+          bound and do not retain an annotation. *)
+      val set : ?annotation:string Location.loc -> 'a Axis.t -> 'a -> t -> t
 
       (** The written modality responsible for this axis, including when the
           bound was implied by an annotation on another axis. *)
