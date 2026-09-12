@@ -57,6 +57,11 @@ type ('a : any) r = { x : 'a }
 type ('a : any) r = { x : 'a; }
 |}]
 
+let poly_ pass (_ : 'a) (r : 'a r) = r
+[%%expect{|
+val poly_ pass : 'a -> 'a r -> 'a r = <lpoly>
+|}]
+
 let poly_ mk v = { x = v }
 [%%expect{|
 Line 1, characters 17-26:
