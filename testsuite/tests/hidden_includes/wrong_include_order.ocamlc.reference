@@ -1,3 +1,5 @@
-File "libc/c1.ml", line 1:
-Error: The files libb/b.cmi and liba_alt/a.cmi make inconsistent assumptions
-       over interface A
+File "libc/c1.ml", line 1, characters 8-11:
+1 | let x = B.x + 1
+            ^^^
+Error: The value B.x has type A.t = string
+       but an expression was expected of type int
