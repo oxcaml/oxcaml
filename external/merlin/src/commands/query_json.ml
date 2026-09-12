@@ -61,6 +61,7 @@ let dump (type a) : a t -> json =
   | Type_expr (expr, pos) ->
     mk "type-expression"
       [ ("expression", `String expr); ("position", mk_position pos) ]
+  | Structured_errors -> mk "structured-errors" []
   | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
     mk "stack-or-heap-enclosing"
       [ ( "index",
@@ -526,9 +527,19 @@ let json_of_search_result list =
   in
   `List list
 
+let json_of_structured_diagnostic diagnostic : Std.Json.t =
+  Ocaml_typing.Structured_diagnostic.Json.to_value
+    ~string:(fun s -> `String s)
+    ~int:(fun n -> `Int n)
+    ~array:(fun xs -> `List xs)
+    ~object_:(fun fields -> `Assoc fields)
+    diagnostic
+
 let json_of_response (type a) (query : a t) (response : a) : json =
   match (query, response) with
   | Type_expr _, str -> `String str
+  | Structured_errors, diagnostics ->
+    `List (List.map diagnostics ~f:json_of_structured_diagnostic)
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
   | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
