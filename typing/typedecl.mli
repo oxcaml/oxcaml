@@ -37,7 +37,10 @@ type transl_value_decl_modal =
   (** A primitive in structure, in which case the modality syntax is treated as
     modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
-  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  | Sig_value of
+      { md_mode : Mode.Value.l;
+        sig_modalities : Mode.Modality.Const.t;
+        inherited_modalities : Mode.Modality.Const.t }
   (** A value description in a signature, in which case we require the mode of
       the structure that the value lives in, as well as the default modalities
       of the signature. *)
