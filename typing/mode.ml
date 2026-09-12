@@ -5516,11 +5516,11 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let newvar_above level m =
     let level = choose_level level in
-    S.newvar_above obj level m
+    with_log (S.newvar_above obj level m)
 
   let newvar_below level m =
     let level = choose_level level in
-    S.newvar_below obj level m
+    with_log (S.newvar_below obj level m)
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
     S.submode pp obj a b ~log
@@ -5711,11 +5711,11 @@ module Monadic_gen (Obj : Obj) = struct
 
   let newvar_above level m =
     let level = choose_level level in
-    S.newvar_below obj level m
+    with_log (S.newvar_below obj level m)
 
   let newvar_below level m =
     let level = choose_level level in
-    S.newvar_above obj level m
+    with_log (S.newvar_above obj level m)
 
   let submode_log ?(pp = (Location.none, Unknown : Hint.pinpoint)) a b ~log =
     S.submode pp obj b a ~log
