@@ -15,8 +15,9 @@
 
 (* To assign numbers to globals and primitives *)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
 open Cmo_format
+module Config = Dynlink_config
 
 module Style = struct
   let inline_code = Format.pp_print_string
@@ -25,8 +26,7 @@ end
 #25 "bytecomp/symtable.ml"
 module Compunit = struct
   type t = compunit
-  let name (Compunit cu_name) = cu_name
-  let is_packed (Compunit name) = String.contains name '.'
+  let name = Compilation_unit.full_path_as_string
 #32 "bytecomp/symtable.ml"
 end
 #42 "bytecomp/symtable.ml"
@@ -36,7 +36,7 @@ module Global = struct
     | Glob_predef of predef
 
   let name = function
-    | Glob_compunit (Compunit cu) -> cu
+    | Glob_compunit cu -> Compilation_unit.full_path_as_string cu
     | Glob_predef (Predef_exn exn) -> exn
 
   let quote s = "`" ^ s ^ "'"
@@ -46,9 +46,9 @@ module Global = struct
     let open Format in
 #55 "bytecomp/symtable.ml"
     match g with
-    | Glob_compunit (Compunit cu) ->
+    | Glob_compunit cu ->
         fprintf ppf "compilation unit %a"
-          Style.inline_code (quote cu)
+          Style.inline_code (Compilation_unit.full_path_as_string cu)
     | Glob_predef (Predef_exn exn) ->
         fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
@@ -69,7 +69,8 @@ module Dll = struct
 type dll_handle
 type dll_address
 #22 "bytecomp/dll.ml"
-external dll_open: string -> dll_handle = "caml_dynlink_open_lib"
+type dll_mode = For_checking [@warning "-37"] | For_execution
+external dll_open: dll_mode -> string -> dll_handle = "caml_dynlink_open_lib"
 #24 "bytecomp/dll.ml"
 external dll_sym: dll_handle -> string -> dll_address
                 = "caml_dynlink_lookup_symbol"
@@ -119,7 +120,7 @@ let open_dll name =
   match List.assoc_opt fullname !opened_dlls with
   | Some _ -> ()
   | None ->
-      begin match dll_open fullname with
+      begin match dll_open For_execution fullname with
       | dll ->
           opened_dlls := (fullname, dll) :: !opened_dlls
       | exception Failure msg ->
@@ -252,7 +253,7 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-    crcs: (string * Digest.t option) list;
+    crcs: Cmo_format.crcs;
     prim: string list;
     dlpt: string list }
 
@@ -327,5 +328,8 @@ let hide_additions (st : global_map) =
 #434 "bytecomp/symtable.ml"
 let is_defined_in_global_map (gmap : global_map) global =
   Global.Map.mem global gmap.tbl
+
+let fold_global_map f (gmap : global_map) init =
+  Global.Map.fold f gmap.tbl init
 
 let empty_global_map = GlobalMap.empty

@@ -74,6 +74,9 @@ DISTCLEAN_FILES = \
   otherlibs/dynlink/dynlink_config.ml \
   otherlibs/dynlink/dynlink_platform_intf.mli \
   otherlibs/unix/unix.ml \
+  otherlibs/dynlink/dynlink_cmo_format.mli \
+  otherlibs/dynlink/dynlink_cmxs_format.mli \
+  otherlibs/dynlink/dynlink_config.ml \
   stdlib/META \
   stdlib/runtime.info \
   stdlib/target_runtime.info \
