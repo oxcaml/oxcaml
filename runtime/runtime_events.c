@@ -870,15 +870,3 @@ CAMLexport value caml_runtime_events_user_resolve(
 
   CAMLreturn (Val_none);
 }
-
-/* Linker compatibility with unused 4 stdlib externals */
-
-CAMLprim value caml_eventlog_resume(value v)
-{
-  caml_failwith("caml_eventlog_resume: not supported in OCaml 5.");
-}
-
-CAMLprim value caml_eventlog_pause(value v)
-{
-  caml_failwith("caml_eventlog_pause: not supported in OCaml 5.");
-}

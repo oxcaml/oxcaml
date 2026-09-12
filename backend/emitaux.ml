@@ -640,7 +640,7 @@ let get_file_num ~file_emitter file_name =
     file_pos_nums := (file_name, file_num) :: !file_pos_nums;
     file_num
 
-(* The Apple assembler always builds DWARF-5 line tables. The line table header
+(* Some assemblers always build DWARF-5 line tables. The line table header
    contains a table of file names, and a ".file N" directive defines the entry
    at index N of that table; so a "file number" is nothing more than an index
    into the file name table. (".loc" directives, and attributes such as

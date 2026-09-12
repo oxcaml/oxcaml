@@ -1928,7 +1928,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~current_region
     in
     let tag = Tag.Scannable.create_exn tag in
-    let mutability = Mutability.from_lambda mutability in
+    (* Mutable zero-size blocks cannot be heap-allocated, so we treat them as
+       immutable. This is fine because their mutability is meaningless after
+       typechecking. *)
+    let mutability =
+      if List.is_empty args
+      then Mutability.Immutable
+      else Mutability.from_lambda mutability
+    in
     match L.mixed_block_of_block_shape shape with
     | None ->
       let shape =
@@ -3040,10 +3047,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [ Simple
             (Simple.const_bool machine_width
                (String.equal Config.architecture "arm64")) ]
-      | Backend_type ->
-        [Simple (Simple.const_zero machine_width)]
-        (* constructor 0 is the same as Native here *)
-      | Runtime5 -> [Simple (Simple.const_bool machine_width true)]))
+      | Backend_type -> [Simple (Simple.const_zero machine_width)]))
   | Pint_as_pointer mode, [[arg]] ->
     (* This is not a stack allocation, but nonetheless has a region
        constraint. *)
