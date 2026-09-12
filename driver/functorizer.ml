@@ -328,6 +328,9 @@ let functorize input_module_names target
         implementation input_module_names ~ext:("." ^ impl_ext) ~read_format
           ~compile_program info)
       ~exceptionally:(fun () ->
-        Misc.remove_file target;
         Misc.remove_file
-          (Unit_info.Artifact.filename (Unit_info.cmi info.target)))
+          (Unit_info.Artifact.filename
+             (Unit_info.artifact info.target ~extension:("." ^ impl_ext)));
+        if Option.is_none !Clflags.cmi_file then
+          Misc.remove_file
+            (Unit_info.Artifact.filename (Unit_info.cmi info.target)))

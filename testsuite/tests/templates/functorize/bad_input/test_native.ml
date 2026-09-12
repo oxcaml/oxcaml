@@ -109,5 +109,22 @@
 
    compiler_reference = "bad_dup_input.reference";
    check-ocamlopt.byte-output;
+ }{
+   (* Case 5: a failing [-functorize] must not delete a pre-existing
+      file at the [-o] path that it would never have written (the real
+      outputs are [out.cmx]/[out.cmi]). *)
+
+   script = "sh -c 'echo precious > out.txt'";
+   script;
+
+   flags = "$flg -functorize No_such_module";
+   module = "";
+   program = "out.txt";
+   all_modules = "";
+   ocamlopt_byte_exit_status = "2";
+   ocamlopt.byte;
+
+   script = "sh -c 'test -f out.txt'";
+   script;
  }
 *)
