@@ -1,6 +1,6 @@
 (* TEST
  poll-insertion;
- no-faulting-polls;
+ faulting-polls;
  no-stack-checks;
  no-frame_pointers;
  no-address-sanitizer;
@@ -10,6 +10,9 @@
 (* [opaque] is used (rather than [Sys.opaque_identity]) so that the local
    allocations below cannot be elided by the middle end. *)
 external opaque : ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+
+(* As polling_local_allocs.ml, but under faulting polls: a poll is a
+   load through [poll_trigger] rather than a young_limit comparison. *)
 
 (* Control: a loop with no allocation gets a poll on its back edge (this is
    what proves that poll insertion is active in this configuration). *)
@@ -30,8 +33,8 @@ no_alloc_loop:
   incq  %rbx
   cmpq  %rax, %rbx
   jg    .L2
-  cmpq  (%r14), %r15
-  jbe   .L4
+  movq  48(%r14), %rcx
+  movl  (%rcx), %ecx
 .L1:
   jmp   .L0
 .L2:
@@ -41,10 +44,6 @@ no_alloc_loop:
 .L3:
   movl  $1, %eax
   ret
-.L4:
-  call  .Lcaml_call_gc_
-.L5:
-  jmp   .L1
 |}]
 
 (* Control: a loop with a heap allocation gets no poll; the allocation's
@@ -110,7 +109,7 @@ local_alloc_loop:
   subq  $16, %rdx
   movq  %rdx, 72(%r14)
   cmpq  88(%r14), %rdx
-  jl    .L7
+  jl    .L5
 .L1:
   addq  80(%r14), %rdx
   addq  $8, %rdx
@@ -120,8 +119,8 @@ local_alloc_loop:
   incq  %rbx
   cmpq  %rax, %rbx
   jg    .L3
-  cmpq  (%r14), %r15
-  jbe   .L5
+  movq  48(%r14), %rcx
+  movl  (%rcx), %ecx
 .L2:
   jmp   .L0
 .L3:
@@ -132,10 +131,6 @@ local_alloc_loop:
   movl  $1, %eax
   ret
 .L5:
-  call  .Lcaml_call_gc_
-.L6:
-  jmp   .L2
-.L7:
   call  caml_call_local_realloc@PLT
   jmp   .L1
 |}]

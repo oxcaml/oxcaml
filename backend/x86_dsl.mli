@@ -49,6 +49,8 @@ val rax : arg
 
 val rbx : arg
 
+val rcx : arg
+
 val rdi : arg
 
 val rdx : arg
