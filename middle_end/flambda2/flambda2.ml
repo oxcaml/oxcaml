@@ -95,14 +95,10 @@ type run_result =
     reachable_names : NO.t
   }
 
-let build_run_result unit ~free_names ~prepare_cmx ~all_code slot_offsets :
-    run_result =
+let build_run_result unit ~prepare_cmx ~all_code
+    ({ used_value_slots; exported_offsets } : Slot_offsets.result) : run_result
+    =
   let module_symbol = Flambda_unit.module_symbol unit in
-  let ({ used_value_slots; exported_offsets } : Slot_offsets.result) =
-    Slot_offsets.finalize_offsets_from_free_names slot_offsets
-      ~get_code_metadata:(Exported_code.get_code_metadata all_code)
-      ~free_names
-  in
   let reachable_names, cmx =
     prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets all_code
   in
@@ -115,12 +111,17 @@ type flambda_result =
     reachable_names : NO.t
   }
 
+let finalize_offsets ~free_names ~all_code slot_offsets =
+  Slot_offsets.finalize_offsets_from_free_names slot_offsets
+    ~get_code_metadata:(Exported_code.get_code_metadata all_code)
+    ~free_names
+
 let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-    ~final_typing_env flambda =
-  let ((flambda, _, _, _, _) as result) =
+    ~final_typing_env ~free_names flambda =
+  let ((flambda, _, _, _) as result) =
     Profile.record_call ~accumulate:true "reaper" (fun () ->
         Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-          ~final_typing_env flambda)
+          ~final_typing_env ~free_names flambda)
   in
   print_flambda "reaper" (Flambda_features.dump_reaper ()) ppf flambda;
   print_fexpr "reaper"
@@ -138,6 +139,23 @@ let register_compilation_unit_callback f =
 let invoke_compilation_unit_callbacks res =
   List.iter (( |> ) res) !compilation_unit_callbacks;
   compilation_unit_callbacks := []
+
+module Reaper_mode = struct
+  (* CR mvellacott: in the future it would be nice to allow running the Reaper
+     on the present unit and supporting LTO at the same time, but at the moment
+     it isn't safe to run the Reaper twice on the same code. *)
+  type t =
+    | Single_unit_run
+    | Lto_support
+    | Disabled
+
+  let of_flags () =
+    if Flambda_features.support_lto ()
+    then Lto_support
+    else if Flambda_features.enable_reaper ()
+    then Single_unit_run
+    else Disabled
+end
 
 let reaper_oclassic = Oxcaml_args.Extra_options.bool __LOC__ "reaper-oclassic"
 
@@ -157,7 +175,8 @@ let flambda_to_flambda0 : type m.
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;
-  let flambda, free_names, all_code, slot_offsets, prepare_cmx, last_pass_name =
+  let flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, cmr_payload
+      =
     match mode, close_prog_metadata with
     | Classic, Classic (all_code, approxs, free_names, slot_offsets) ->
       (if Flambda_features.inlining_report ()
@@ -177,24 +196,27 @@ let flambda_to_flambda0 : type m.
             ~resolver:(Flambda_cmx.load_cmx_file_contents cmx_loader)
             approxs
         in
-        let flambda, free_names, all_code, slot_offsets, final_typing_env =
+        let flambda, all_code, slot_offsets, final_typing_env =
           run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-            ~final_typing_env:(Some final_typing_env) raw_flambda
+            ~final_typing_env:(Some final_typing_env) ~free_names raw_flambda
         in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
             ~used_value_slots ~exported_offsets ~sections all_code
         in
-        flambda, free_names, all_code, slot_offsets, prepare_cmx, "reaper"
+        flambda, all_code, slot_offsets, prepare_cmx, "reaper", None
       else
+        let slot_offsets =
+          finalize_offsets ~free_names ~all_code slot_offsets
+        in
         let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
             all_code =
           Flambda_cmx.prepare_cmx_from_approx ~machine_width ~approxs
             ~module_symbol ~exported_offsets ~used_value_slots ~sections
             all_code
         in
-        raw_flambda, free_names, all_code, slot_offsets, prepare_cmx, "raw"
+        raw_flambda, all_code, slot_offsets, prepare_cmx, "raw", None
     | Normal, Normal ->
       let round = 0 in
       let { Simplify.free_names;
@@ -223,31 +245,62 @@ let flambda_to_flambda0 : type m.
         (Flambda_features.dump_fexpr (This_pass "simplify"))
         ppf flambda;
       dump_fexpr_annot ~prefixname "simplify" flambda;
-      let ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
-            last_pass_name ) =
-        if Flambda_features.enable_reaper ()
-        then
+      let ( (flambda, all_code, slot_offsets, final_typing_env),
+            last_pass_name,
+            cmr_payload ) =
+        match Reaper_mode.of_flags () with
+        | Disabled ->
+          let slot_offsets =
+            finalize_offsets ~free_names ~all_code slot_offsets
+          in
+          ( (flambda, all_code, slot_offsets, final_typing_env),
+            last_pass_name,
+            None )
+        | Single_unit_run ->
           let result =
             run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
-              ~final_typing_env flambda
+              ~final_typing_env ~free_names flambda
           in
-          result, "reaper"
-        else
-          ( (flambda, free_names, all_code, slot_offsets, final_typing_env),
-            last_pass_name )
+          result, "reaper", None
+        | Lto_support ->
+          let deps, slot_offsets_inputs, solve_inputs, rebuild_data =
+            Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
+              ~all_code ~closed_world:true flambda
+          in
+          let cmr_payload =
+            Some
+              { Flambda2_reaper.Cmr_format.unit_metadata =
+                  Flambda_unit.metadata flambda;
+                all_code;
+                imported_offsets = Exported_offsets.imported_offsets ();
+                deps;
+                slot_offsets_inputs;
+                solve_inputs;
+                rebuild_data
+              }
+          in
+          let slot_offsets =
+            finalize_offsets ~free_names ~all_code slot_offsets
+          in
+          ( (flambda, all_code, slot_offsets, final_typing_env),
+            last_pass_name,
+            cmr_payload )
       in
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
           all_code =
         Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
           ~used_value_slots ~exported_offsets ~sections all_code
       in
-      flambda, free_names, all_code, slot_offsets, prepare_cmx, last_pass_name
+      flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, cmr_payload
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
   let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-    build_run_result flambda ~free_names ~all_code slot_offsets ~prepare_cmx
+    build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
+  Option.iter
+    (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr"))
+    cmr_payload;
   (match cmx with
   | None ->
     () (* Either opaque was passed, or there is no need to export offsets *)
@@ -329,16 +382,183 @@ let reset_symbol_tables () =
   Flambda2_identifiers.Continuation.reset ();
   Flambda2_identifiers.Int_ids.reset ()
 
+let flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
+    ({ flambda; all_code; offsets; reachable_names } : flambda_result) =
+  let cmm =
+    Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+      ~localise_unreachable_symbols
+  in
+  if not keep_symbol_tables then reset_symbol_tables ();
+  cmm
+
 let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     (program : Lambda.program) =
   let run () =
-    let { flambda; all_code; offsets; reachable_names } =
-      lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
+    (* Keep unreachable symbols global whenever the Reaper is involved. The
+       staged rebuild must (see [reaped_flambda2_to_cmm]); the other Reaper
+       modes follow suit so that a staged rebuild of a unit produces the same
+       object file as a direct Reaper compilation of it. *)
+    let localise_unreachable_symbols =
+      match Reaper_mode.of_flags () with
+      | Disabled -> true
+      | Single_unit_run | Lto_support -> false
     in
-    let cmm =
-      Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
-    in
-    if not keep_symbol_tables then reset_symbol_tables ();
-    cmm
+    lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
+    |> flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
   in
   Profile.record_call "flambda2" run
+
+let reaper_lto_solve ~cmr_files ~ltosol_file =
+  (* ID stamp counters are process-global monotonically increasing counters that
+     give us an easy way of creating fresh identifiers. These identifiers get
+     persisted across processes, and we need to prevent collisions when this
+     happens. There are two cases:
+
+     (1) Different processes that operate on different compilation units,
+     potentially in parallel. Collisions are prevented here by the fact that
+     identifiers are scoped to compilation units, as (CU, number) pairs.
+
+     (2) Different processes that operate on the same compilation units, which
+     must always happen in sequence. Collisions are prevented here by saving
+     stamp counters in the earlier processes and restoring them in the later
+     processes.
+
+     Here we're resuming from many processes that operated on different CUs, and
+     we're operating on all of those CUs, so we need to restore stamp counters
+     from all of those processes. However stamp counters are global for the
+     process, not per-CU. To make this work, we take the maximum across all the
+     processes we've resumed from. It is okay that this makes some unused stamps
+     get jumped over, the important thing is that they increase monotonically.
+
+     After we're done, rebuild processes will be created to do more work on the
+     CUs we touched. To keep counters monotonically increasing, we need to save
+     them after our work so that the rebuild processes can restore them. *)
+  let cmrs, counters =
+    List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
+  in
+  Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
+  let solve_data =
+    List.map
+      (fun cmr ->
+        ( Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr,
+          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_solve cmr ))
+      cmrs
+  in
+  let participants = List.map fst solve_data in
+  let combined_graph =
+    List.fold_left
+      (fun combined (_participant, (graph, _, _, _)) ->
+        Flambda2_reaper.Global_flow_graph.union combined graph)
+      (Flambda2_reaper.Global_flow_graph.create ())
+      solve_data
+  in
+  let slot_offsets_inputs =
+    List.fold_left
+      (fun combined (_participant, (_, inputs, _, _)) ->
+        Flambda2_reaper.Slot_offsets_analysis.Inputs.union combined inputs)
+      Flambda2_reaper.Slot_offsets_analysis.Inputs.empty solve_data
+  in
+  let solve_inputs =
+    List.map
+      (fun (_participant, (_, _, _, solve_inputs)) -> solve_inputs)
+      solve_data
+  in
+  let participant_units = Compilation_unit.Set.of_list participants in
+  let analysis_scope =
+    Flambda2_reaper.Analysis.Scope.Lto_participants participant_units
+  in
+  (* Make the offsets of slots defined by units outside the solve available to
+     [Slot_offsets.finalize_offsets]. The offsets of the participants' own slots
+     are recomputed from the solution, so the stale ones stored in the .cmr
+     files must not be imported. *)
+  List.iter
+    (fun (_participant, (_, _, imported_offsets, _)) ->
+      Exported_offsets.import_offsets
+        (Exported_offsets.filter_by_compilation_unit imported_offsets
+           ~keep:(fun cu ->
+             not
+               (Flambda2_reaper.Analysis.Scope.contains_unit analysis_scope cu))))
+    solve_data;
+  let solution, slot_offsets =
+    Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs ~analysis_scope
+      ~solve_inputs combined_graph
+  in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
+    ~solution ~slot_offsets
+
+let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
+  (* Everything up to the function returned below is computed once and shared by
+     the whole batch of rebuilds. *)
+  let ltosol =
+    Profile.record_call ~accumulate:true "ltosol_load" (fun () ->
+        Flambda2_reaper.Ltosol_format.load ltosol_filename)
+  in
+  let id_stamp_counters =
+    Flambda2_reaper.Ltosol_format.id_stamp_counters ltosol
+  in
+  Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
+  let solution =
+    Profile.record_call ~accumulate:true "ltosol_deserialise" (fun () ->
+        Flambda2_reaper.Ltosol_format.solution_for_members ltosol
+          ~members:batch_members)
+  in
+  let participant_units =
+    Compilation_unit.Set.of_list
+      (Flambda2_reaper.Ltosol_format.participants ltosol)
+  in
+  let get_module_info comp_unit =
+    if Compilation_unit.Set.mem comp_unit participant_units
+    then
+      Misc.fatal_errorf
+        "-reaper-rebuild: attempted to read the .cmx of %a, which participated \
+         in the solve"
+        (Format_doc.compat Compilation_unit.print)
+        comp_unit;
+    get_module_info comp_unit
+  in
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  fun ~keep_symbol_tables ~cmr_filename ~ppf_dump:_ ~prefixname:_ ->
+    (* We expect the stamp counters in the .cmr file to be less than the
+       counters in the .ltosol file, because the -reaper-solve invocation begins
+       by taking the maximum counters across the .cmr files it reads. Therefore,
+       we can ignore these counters. *)
+    let cmr_serialisable, cmr_stamp_counters =
+      Profile.record_call ~accumulate:true "cmr_load" (fun () ->
+          Flambda2_reaper.Cmr_format.load cmr_filename)
+    in
+    if
+      Flambda2_reaper.Id_stamp_counters.any_greater_than cmr_stamp_counters
+        id_stamp_counters
+    then
+      Misc.fatal_error
+        "The rebuild data contains ID stamp counters greater than those in the \
+         the solution file. Stamp counter monotonicity is broken.";
+    let unit_metadata, all_code, rebuild_data =
+      Profile.record_call ~accumulate:true "cmr_deserialise" (fun () ->
+          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_rebuild
+            cmr_serialisable)
+    in
+    (* CR mvellacott: add debug printing code. *)
+    let flambda, all_code, _final_typing_env, free_names =
+      Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+        ~traverse_rebuild:rebuild_data ~solution ~typing:None ~machine_width
+        ~cmx_loader ~all_code
+    in
+    (* Reaped CMXs are only used for linking, so leave their Flambda export
+       information empty, as for opaque compilation. The backend still needs the
+       rebuilt code metadata and solved closure offsets. *)
+    let offsets =
+      Flambda2_reaper.Rebuild_solution.offsets_for_free_names solution
+        free_names
+    in
+    let reachable_names =
+      NO.singleton_symbol
+        (Flambda_unit.module_symbol flambda)
+        Flambda2_nominal.Name_mode.normal
+    in
+    Compiler_hooks.execute Reaped_flambda2 flambda;
+    (* CR mvellacott: in the future we'd like to always localise unreachable
+       symbols, but it can cause issues with LTO if not properly handled. *)
+    flambda_result_to_cmm ~keep_symbol_tables
+      ~localise_unreachable_symbols:false
+      { flambda; all_code; offsets; reachable_names }

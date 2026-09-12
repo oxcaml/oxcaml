@@ -25,6 +25,11 @@ val print_name_modes :
 
 val empty : t
 
+(* Construct [t] with the given [names_to_types], letting [aliases] and
+   [symbol_projections] be empty. *)
+val of_names_to_types :
+  (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t -> t
+
 val names_to_types :
   t -> (Type_grammar.t * Binding_time.With_name_mode.t) Name.Map.t
 

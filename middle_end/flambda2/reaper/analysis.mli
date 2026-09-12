@@ -13,9 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type result = Unboxing_analysis.result
+module Scope = Analysis_scope
 
-val fixpoint : Global_flow_graph.graph -> result
+type result =
+  { db : Datalog.database;
+    unboxing : Unboxing_analysis.result
+  }
+
+val fixpoint : Global_flow_graph.graph -> analysis_scope:Scope.t -> result
 
 val get_unboxed_fields :
   result -> Code_id_or_name.t -> Unboxing_analysis.unboxed option

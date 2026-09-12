@@ -31,6 +31,11 @@ val free_function_slots_and_value_slots : t -> Name_occurrences.t
 
 val add_code : keep_code:(Code_id.t -> bool) -> Code.t Code_id.Map.t -> t -> t
 
+(** Add or replace an entry with metadata only, discarding any existing body. *)
+val add_code_metadata : t -> Code_metadata.t -> t
+
+val filter : t -> f:(Code_id.t -> bool) -> t
+
 val mark_as_imported : t -> t
 
 val merge : t -> t -> t
@@ -52,6 +57,9 @@ val prepare_for_export :
   used_value_slots:Value_slot.Set.t ->
   canonicalise:(Simple.t -> Simple.t) ->
   t
+
+(** Fold over stored metadata without loading any code bodies. *)
+val fold_code_metadata : t -> init:'a -> f:(Code_metadata.t -> 'a -> 'a) -> 'a
 
 val iter_code : t -> f:(Code.t -> unit) -> unit
 

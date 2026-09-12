@@ -34,6 +34,8 @@ let exec_magic_number = {magic|@EXEC_MAGIC_NUMBER@|magic}
 and cmi_magic_number = {magic|@CMI_MAGIC_NUMBER@|magic}
 and cmo_magic_number = {magic|@CMO_MAGIC_NUMBER@|magic}
 and cma_magic_number = {magic|@CMA_MAGIC_NUMBER@|magic}
+(* CR mvellacott: replace CMR magic number with LTOSOL magic number *)
+and cmr_magic_number = {magic|@CMR_MAGIC_NUMBER@|magic}
 and cmx_magic_number = {magic|@CMX_MAGIC_NUMBER@|magic}
 and cmxa_magic_number = {magic|@CMXA_MAGIC_NUMBER@|magic}
 and ast_impl_magic_number = {magic|@AST_IMPL_MAGIC_NUMBER@|magic}
@@ -45,6 +47,7 @@ and cmj_magic_number = {magic|@CMJ_MAGIC_NUMBER@|magic}
 and cmja_magic_number = {magic|@CMJA_MAGIC_NUMBER@|magic}
 and linear_magic_number = {magic|@LINEAR_MAGIC_NUMBER@|magic}
 and cfg_magic_number = {magic|@CFG_MAGIC_NUMBER@|magic}
+and ltosol_magic_number = {magic|@LTOSOL_MAGIC_NUMBER@|magic}
 
 let safe_string = true
 let default_safe_string = true

@@ -31,6 +31,7 @@ type graph =
     mutable parameter : NCN.t;
     mutable propagate : NNN.t;
     mutable alias_if_any_source : NNN.t;
+    mutable imported_symbol : N.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
     mutable zero_alloc_source : N.t;
@@ -84,6 +85,8 @@ let propagate = NNN.create ~name:"propagate"
 
 let alias_if_any_source = NNN.create ~name:"alias_if_any_source"
 
+let imported_symbol = N.create ~name:"imported_symbol"
+
 let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
@@ -101,6 +104,7 @@ let to_datalog graph =
   @@ Datalog.set_table parameter graph.parameter
   @@ Datalog.set_table propagate graph.propagate
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
+  @@ Datalog.set_table imported_symbol graph.imported_symbol
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
@@ -139,6 +143,8 @@ module Relations = struct
   let alias_if_any_source ~if_any_source ~to_ ~from =
     Datalog.atom alias_if_any_source [if_any_source; to_; from]
 
+  let imported_symbol symbol = Datalog.atom imported_symbol [symbol]
+
   let any_usage var = Datalog.atom any_usage [var]
 
   let any_source var = Datalog.atom any_source [var]
@@ -158,10 +164,32 @@ let create () =
     parameter = NCN.empty;
     propagate = NNN.empty;
     alias_if_any_source = NNN.empty;
+    imported_symbol = N.empty;
     any_usage = N.empty;
     any_source = N.empty;
     zero_alloc_source = N.empty;
     code_id_my_closure = NN.empty
+  }
+
+let union g1 g2 =
+  (* Relations can carry data on each edge, but for these types it is always
+     unit. *)
+  let keep () () = Some () in
+  { alias = NN.union keep g1.alias g2.alias;
+    use = NN.union keep g1.use g2.use;
+    accessor = NFN.union keep g1.accessor g2.accessor;
+    constructor = NFN.union keep g1.constructor g2.constructor;
+    argument = NCN.union keep g1.argument g2.argument;
+    parameter = NCN.union keep g1.parameter g2.parameter;
+    propagate = NNN.union keep g1.propagate g2.propagate;
+    alias_if_any_source =
+      NNN.union keep g1.alias_if_any_source g2.alias_if_any_source;
+    imported_symbol = N.union keep g1.imported_symbol g2.imported_symbol;
+    any_usage = N.union keep g1.any_usage g2.any_usage;
+    any_source = N.union keep g1.any_source g2.any_source;
+    zero_alloc_source = N.union keep g1.zero_alloc_source g2.zero_alloc_source;
+    code_id_my_closure =
+      NN.union keep g1.code_id_my_closure g2.code_id_my_closure
   }
 
 let add_alias t ~to_ ~from = t.alias <- NN.add_or_replace [to_; from] () t.alias
@@ -199,6 +227,10 @@ let add_opaque_let_dependency t ~to_ ~from =
   in
   Name_occurrences.fold_names bound_to ~f ~init:()
 
+let add_imported_symbol t symbol =
+  t.imported_symbol
+    <- N.add_or_replace [Code_id_or_name.symbol symbol] () t.imported_symbol
+
 let add_any_usage t (var : Code_id_or_name.t) =
   t.any_usage <- N.add_or_replace [var] () t.any_usage
 
@@ -213,3 +245,70 @@ let add_code_id_my_closure t code_id my_closure =
     <- NN.add_or_replace
          [Code_id_or_name.code_id code_id; Code_id_or_name.var my_closure]
          () t.code_id_my_closure
+
+let ids_for_export graph =
+  let open Datalog_helpers in
+  let ids = Ids_for_export.empty in
+  let ids = Serialisation.Nn.add_ids graph.alias ids in
+  let ids = Serialisation.Nn.add_ids graph.use ids in
+  let ids = Serialisation.Nfn.add_ids graph.accessor ids in
+  let ids = Serialisation.Nfn.add_ids graph.constructor ids in
+  let ids = Serialisation.Ncn.add_ids graph.argument ids in
+  let ids = Serialisation.Ncn.add_ids graph.parameter ids in
+  let ids = Serialisation.Nnn.add_ids graph.propagate ids in
+  let ids = Serialisation.Nnn.add_ids graph.alias_if_any_source ids in
+  let ids = Serialisation.N.add_ids graph.imported_symbol ids in
+  let ids = Serialisation.N.add_ids graph.any_usage ids in
+  let ids = Serialisation.N.add_ids graph.any_source ids in
+  let ids = Serialisation.N.add_ids graph.zero_alloc_source ids in
+  let ids = Serialisation.Nn.add_ids graph.code_id_my_closure ids in
+  ids
+
+let compilation_units graph =
+  let open Datalog_helpers in
+  let f cus id =
+    Compilation_unit.Set.add (Code_id_or_name.compilation_unit id) cus
+  in
+  let cus = Compilation_unit.Set.empty in
+  let cus = Serialisation.Nn.fold_ids graph.alias ~init:cus ~f in
+  let cus = Serialisation.Nn.fold_ids graph.use ~init:cus ~f in
+  let cus = Serialisation.Nfn.fold_ids graph.accessor ~init:cus ~f in
+  let cus = Serialisation.Nfn.fold_ids graph.constructor ~init:cus ~f in
+  let cus = Serialisation.Ncn.fold_ids graph.argument ~init:cus ~f in
+  let cus = Serialisation.Ncn.fold_ids graph.parameter ~init:cus ~f in
+  let cus = Serialisation.Nnn.fold_ids graph.propagate ~init:cus ~f in
+  let cus = Serialisation.Nnn.fold_ids graph.alias_if_any_source ~init:cus ~f in
+  let cus = Serialisation.N.fold_ids graph.imported_symbol ~init:cus ~f in
+  let cus = Serialisation.N.fold_ids graph.any_usage ~init:cus ~f in
+  let cus = Serialisation.N.fold_ids graph.any_source ~init:cus ~f in
+  let cus = Serialisation.N.fold_ids graph.zero_alloc_source ~init:cus ~f in
+  Serialisation.Nn.fold_ids graph.code_id_my_closure ~init:cus ~f
+
+let fields_for_export graph =
+  let open Datalog_helpers in
+  let fields = Field.Set.empty in
+  let fields = Serialisation.Nfn.add_fields graph.accessor fields in
+  let fields = Serialisation.Nfn.add_fields graph.constructor fields in
+  fields
+
+let apply_renaming graph renaming ~rename_field =
+  let open Datalog_helpers in
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  { alias = Serialisation.Nn.rename graph.alias ~rename_id;
+    use = Serialisation.Nn.rename graph.use ~rename_id;
+    accessor = Serialisation.Nfn.rename graph.accessor ~rename_id ~rename_field;
+    constructor =
+      Serialisation.Nfn.rename graph.constructor ~rename_id ~rename_field;
+    argument = Serialisation.Ncn.rename graph.argument ~rename_id;
+    parameter = Serialisation.Ncn.rename graph.parameter ~rename_id;
+    propagate = Serialisation.Nnn.rename graph.propagate ~rename_id;
+    alias_if_any_source =
+      Serialisation.Nnn.rename graph.alias_if_any_source ~rename_id;
+    imported_symbol = Serialisation.N.rename graph.imported_symbol ~rename_id;
+    any_usage = Serialisation.N.rename graph.any_usage ~rename_id;
+    any_source = Serialisation.N.rename graph.any_source ~rename_id;
+    zero_alloc_source =
+      Serialisation.N.rename graph.zero_alloc_source ~rename_id;
+    code_id_my_closure =
+      Serialisation.Nn.rename graph.code_id_my_closure ~rename_id
+  }

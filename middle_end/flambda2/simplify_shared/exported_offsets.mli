@@ -83,10 +83,20 @@ val imported_offsets : unit -> t
 (** Merge the offsets from two files *)
 val merge : t -> t -> t
 
-(** Ensure the offsets for the given function slots are in the given exported
-    offsets. *)
-val reexport_function_slots : Function_slot.Set.t -> t -> t
+(** Keep only the offsets of slots whose compilation unit satisfies [keep]. *)
+val filter_by_compilation_unit : t -> keep:(Compilation_unit.t -> bool) -> t
+
+(** Partition live and dead offsets by their slots' compilation units. *)
+val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
 
 (** Ensure the offsets for the given function slots are in the given exported
-    offsets. *)
-val reexport_value_slots : Value_slot.Set.t -> t -> t
+    offsets. [is_local] says whether slots of the given compilation unit have
+    their offsets computed by the current process (rather than imported); such
+    slots are skipped. *)
+val reexport_function_slots :
+  is_local:(Compilation_unit.t -> bool) -> Function_slot.Set.t -> t -> t
+
+(** Ensure the offsets for the given value slots are in the given exported
+    offsets. See [reexport_function_slots] regarding [is_local]. *)
+val reexport_value_slots :
+  is_local:(Compilation_unit.t -> bool) -> Value_slot.Set.t -> t -> t
