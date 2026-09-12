@@ -82,7 +82,10 @@ jobs:
         run: bash tools/ci/actions/check-conflicts.sh
 
       - name: 'Check for New "xxx" Markers'
-        if: ${{ !cancelled() }}
+        # Temporarily disabled until #7165 fixes the diff-base fetch. To
+        # restore, replace the `if:` below with:
+        #   if: ${{ !cancelled() }}
+        if: false
         run: |
           if [[ -z "${skip_xxx+x}" ]]; then
             bash scripts/check-xxx.sh
