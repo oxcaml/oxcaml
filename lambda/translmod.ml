@@ -1531,13 +1531,29 @@ let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
         "cu_of_impl: %a has no implementation (parameter module)"
         Global_module.print gm
 
-(* [gm] must have been compiled with [-as-argument-for]. *)
-let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
-      main_block =
+(* [gm] must have been compiled with [-as-argument-for] the parameter
+   [param].
+
+   CR-someday zqian: the fatal errors below are reachable with stale
+   [.cmo]/[.cmx] artifacts, which are read without consistency checks;
+   they should be user errors. *)
+let project_arg_block ~find_impl_by_name ~chain ~(param : Global_module.t)
+      ~(gm : Global_module.t) main_block =
   let _fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
   let arg_block_idx, main_repr =
     match (arg_descr : Lambda.arg_descr option) with
-    | Some { arg_block_idx; main_repr; _ } -> arg_block_idx, main_repr
+    | Some { arg_param; arg_block_idx; main_repr } ->
+        if
+          not
+            (Global_module.Name.equal
+               (Global_module.Name.of_parameter_name arg_param)
+               (Global_module.to_name param))
+        then
+          Misc.fatal_errorf_doc "project_arg_block: %a implements %a, not %a"
+            Global_module.print gm
+            Global_module.Parameter_name.print arg_param
+            Global_module.print param;
+        arg_block_idx, main_repr
     | None ->
         Misc.fatal_errorf_doc
           "project_arg_block: %a was not compiled with -as-argument-for"
@@ -1641,7 +1657,7 @@ and bind_local_instance ~(gm : Global_module.t) ~chain
                  ~find_impl_by_name ~param_map ~module_map ~rev_bindings
              in
              let arg_block =
-               project_arg_block ~find_impl_by_name ~chain
+               project_arg_block ~find_impl_by_name ~chain ~param:global
                  ~gm:arg_value main_block
              in
              ((module_map, rev_bindings), arg_block)
