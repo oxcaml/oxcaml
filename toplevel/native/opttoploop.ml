@@ -543,8 +543,7 @@ let execute_phrase print_outcome ppf phr =
         let out_phr =
           match res with
           | Result _ ->
-              Env.register_import_as_opaque
-                (Compilation_unit.name compilation_unit);
+              Env.register_impl_as_opaque compilation_unit;
               if print_outcome then
                 Printtyp.wrap_printing_env ~error:false oldenv (fun () ->
                 match str.str_items with

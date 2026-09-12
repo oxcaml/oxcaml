@@ -13,11 +13,12 @@
 (**************************************************************************)
 
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 
 type intf =
-  | Normal of CU.t * Digest.t
-  | Alias of CU.Name.t
-  | Parameter of CU.Name.t * Digest.t
+  | Normal of CUI.t * Digest.t
+  | Alias of CUI.t
+  | Parameter of CUI.t * Digest.t
 
 type impl =
   | Loaded of CU.t * Digest.t
@@ -30,22 +31,6 @@ type t =
   | Intf of intf
   | Impl of impl
 
-let check_name name cu =
-  if not (CU.Name.equal (CU.name cu) name)
-  then
-    Misc.fatal_errorf_doc
-      "@[<hv>Mismatched import name and compilation unit:@ %a != %a@]"
-      CU.Name.print name CU.print cu
-
-let create cu_name ~crc_with_unit =
-  (* This creates an [Intf] just to be minimally restrictive. Any caller that
-     cares should use the [Impl] API. *)
-  match crc_with_unit with
-  | None -> Intf (Alias cu_name)
-  | Some (cu, crc) ->
-    check_name cu_name cu;
-    Intf (Normal (cu, crc))
-
 let create_normal cu ~crc =
   match crc with
   | Some crc -> Impl (Loaded (cu, crc))
@@ -53,19 +38,18 @@ let create_normal cu ~crc =
 
 let name t =
   match t with
-  | Impl (Loaded (cu, _) | Unloaded cu) -> CU.name cu
-  | Intf (Normal (cu, _)) -> CU.name cu
-  | Intf (Alias name | Parameter (name, _)) -> name
+  | Impl (Loaded (cu, _) | Unloaded cu) -> CU.name_as_string cu
+  | Intf (Normal (name, _) | Alias name | Parameter (name, _)) ->
+    CUI.to_string name
 
 let cu t =
   match t with
-  | Intf (Normal (cu, _)) -> cu
   | Impl (Loaded (cu, _) | Unloaded cu) -> cu
-  | Intf (Alias name | Parameter (name, _)) ->
+  | Intf (Normal (name, _) | Alias name | Parameter (name, _)) ->
     Misc.fatal_errorf
       "Cannot extract [Compilation_unit.t] from [Import_info.t] (for unit %a) \
        that never received it"
-      (Format_doc.compat CU.Name.print)
+      (Format_doc.compat CUI.print)
       name
 
 let crc t =
@@ -75,14 +59,14 @@ let crc t =
   | Impl (Loaded (_, crc)) -> Some crc
   | Impl (Unloaded _) -> None
 
-let has_name t ~name:name' = CU.Name.equal (name t) name'
+let has_name t ~name:name' = String.equal (name t) name'
 
-let dummy = Intf (Alias CU.Name.dummy)
+let dummy = Intf (Alias CUI.dummy)
 
 let print_intf ppf = function
-  | Normal (cu, _digest) -> CU.print ppf cu
-  | Alias name -> CU.Name.print ppf name
-  | Parameter (name, _digest) -> CU.Name.print ppf name
+  | Normal (name, _digest) -> CUI.print ppf name
+  | Alias name -> CUI.print ppf name
+  | Parameter (name, _digest) -> CUI.print ppf name
 
 let print_impl ppf = function
   | Loaded (cu, _digest) -> CU.print ppf cu
@@ -97,13 +81,7 @@ module Intf = struct
      #1746). *)
   type nonrec t = t
 
-  let create_normal name cu ~crc =
-    if CU.instance_arguments cu <> []
-    then
-      Misc.fatal_errorf_doc "@[<hv>Interface import with arguments:@ %a@]"
-        CU.print cu;
-    check_name name cu;
-    Intf (Normal (cu, crc))
+  let create_normal name ~crc = Intf (Normal (name, crc))
 
   let create_alias name = Intf (Alias name)
 
@@ -112,7 +90,7 @@ module Intf = struct
   module Nonalias = struct
     module Kind = struct
       type t =
-        | Normal of CU.t
+        | Normal
         | Parameter
     end
 
@@ -122,7 +100,7 @@ module Intf = struct
   let create name nonalias =
     match (nonalias : Nonalias.t option) with
     | None -> create_alias name
-    | Some (Normal cu, crc) -> create_normal name cu ~crc
+    | Some (Normal, crc) -> create_normal name ~crc
     | Some (Parameter, crc) -> create_parameter name ~crc
 
   let expect_intf t =
@@ -134,12 +112,11 @@ module Intf = struct
 
   let name t =
     match expect_intf t with
-    | Normal (cu, _) -> CU.name cu
-    | Alias name | Parameter (name, _) -> name
+    | Normal (name, _) | Alias name | Parameter (name, _) -> name
 
   let info t : Nonalias.t option =
     match expect_intf t with
-    | Normal (cu, crc) -> Some (Normal cu, crc)
+    | Normal (_, crc) -> Some (Normal, crc)
     | Parameter (_, crc) -> Some (Parameter, crc)
     | Alias _ -> None
 
@@ -148,7 +125,7 @@ module Intf = struct
     | Normal (_, crc) | Parameter (_, crc) -> Some crc
     | Alias _ -> None
 
-  let has_name t ~name:name' = CU.Name.equal (name t) name'
+  let has_name t ~name:name' = CUI.equal (name t) name'
 
   let dummy = dummy
 end
@@ -172,7 +149,7 @@ module Impl = struct
     | Impl impl -> impl
     | Intf _ ->
       Misc.fatal_errorf "Expected an [Import_info.Intf.t] but found %a"
-        (Format_doc.compat CU.Name.print)
+        (Format_doc.compat CUI.print)
         (Intf.name t)
 
   let cu t = match expect_impl t with Loaded (cu, _) | Unloaded cu -> cu

@@ -17,7 +17,7 @@
 module EC = Exported_code
 module T = Flambda2_types
 module TE = Flambda2_types.Typing_env
-module Imported_unit_map = Global_module.Name.Map
+module Imported_unit_map = Compilation_unit.Map
 
 type loader =
   { get_module_info : Compilation_unit.t -> Flambda_cmx_format.t option;
@@ -26,18 +26,15 @@ type loader =
   }
 
 let load_cmx_file_contents loader comp_unit =
-  let accessible_comp_unit =
+  let cmx_file =
     Compilation_unit.which_cmx_file comp_unit
       ~accessed_by:(Current_unit.get_cu_exn ())
-  in
-  let cmx_file =
-    Compilation_unit.to_global_name_without_prefix accessible_comp_unit
   in
   match Imported_unit_map.find cmx_file loader.imported_units with
   | typing_env_or_none -> typing_env_or_none
   | exception Not_found ->
     Profile.record_call ~accumulate:true "load_cmx" (fun () ->
-        match loader.get_module_info accessible_comp_unit with
+        match loader.get_module_info cmx_file with
         | None ->
           (* To make things easier to think about, we never retry after a .cmx
              load fails. *)
@@ -100,8 +97,7 @@ let create_loader ~get_module_info =
   in
   let predefined_exception_typing_env = predefined_exception_typing_env () in
   loader.imported_units
-    <- Imported_unit_map.singleton
-         (Compilation_unit.Name.to_global_name Compilation_unit.Name.predef_exn)
+    <- Imported_unit_map.singleton Compilation_unit.predef_exn
          (Some predefined_exception_typing_env);
   loader
 

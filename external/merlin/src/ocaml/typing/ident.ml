@@ -15,6 +15,8 @@
 
 open Local_store
 
+module CUI = Compilation_unit_intf
+
 let lowest_scope  = 0
 let highest_scope = 100_000_000
   (* assumed to fit in 27 bits, see Types.scope_field *)
@@ -22,7 +24,7 @@ let highest_scope = 100_000_000
 type t =
   | Local of { name: string; stamp: int }
   | Scoped of { name: string; stamp: int; scope: int }
-  | Global of string
+  | Global of CUI.t
       (* separate from [Global_with_args] for efficiency *)
   | Predef of { name: string; stamp: int }
       (* the stamp is here only for fast comparison, but the name of
@@ -30,7 +32,7 @@ type t =
   | Global_with_args of global
       (* must have non-empty [args] *)
 and global = Global_module.Name.t = private
-  { head: string; args: Global_module.Name.argument list }
+  { head: CUI.t; args: Global_module.Name.argument list }
 
 (* A stamp of 0 denotes a persistent identifier *)
 
@@ -50,7 +52,7 @@ let create_predef s =
   Predef { name = s; stamp = !predefstamp }
 
 let create_persistent s =
-  Global s
+  Global (CUI.of_string s)
 
 let create_global glob =
   match glob with
@@ -68,8 +70,8 @@ let global_name g = Global_module.Name.to_string g
 let name = function
   | Local { name; _ }
   | Scoped { name; _ }
-  | Global name
   | Predef { name; _ } -> name
+  | Global name -> CUI.to_string name
   | Global_with_args g -> global_name g
 
 let rename_with_stamp stamp = function
@@ -90,7 +92,7 @@ let unique_name = function
       (* we're adding a fake stamp, because someone could have named his unit
          [Foo_123] and since we're using unique_name to produce symbol names,
          we might clash with an ident [Local { "Foo"; 123 }]. *)
-      name ^ "_0"
+      CUI.to_string name ^ "_0"
   | Predef { name; _ } ->
       (* we know that none of the predef names (currently) finishes in
          "_<some number>", and that their name is unique. *)
@@ -102,16 +104,17 @@ let canonical_name i = if !Clflags.canonical_ids then name i else unique_name i
 let unique_toplevel_name = function
   | Local { name; stamp }
   | Scoped { name; stamp } -> name ^ "/" ^ Int.to_string stamp
-  | Global name
+  | Global name -> CUI.to_string name
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
 
 let equal i1 i2 =
   match i1, i2 with
   | Local { name = name1; _ }, Local { name = name2; _ }
-  | Scoped { name = name1; _ }, Scoped { name = name2; _ }
-  | Global name1, Global name2 ->
+  | Scoped { name = name1; _ }, Scoped { name = name2; _ } ->
       name1 = name2
+  | Global name1, Global name2 ->
+      CUI.equal name1 name2
   | Predef { stamp = s1; _ }, Predef { stamp = s2 } ->
       (* if they don't have the same stamp, they don't have the same name *)
       s1 = s2
@@ -126,7 +129,7 @@ let same i1 i2 =
   | Predef { stamp = s1; _ }, Predef { stamp = s2 } ->
       s1 = s2
   | Global name1, Global name2 ->
-      name1 = name2
+      CUI.equal name1 name2
   | Global_with_args g1, Global_with_args g2 -> Global_module.Name.equal g1 g2
   | _ ->
       false
@@ -208,7 +211,7 @@ let print ~with_scope ppf =
   let open Format_doc in
   function
   | Global name ->
-      fprintf ppf "%s!" name
+      fprintf ppf "%a!" CUI.print name
   | Predef { name; stamp } ->
       fprintf ppf "%a!"
         pp_stamped (name, stamp)
@@ -454,7 +457,7 @@ let compare x y =
       else compare x.name y.name
   | Scoped _, _ -> 1
   | _, Scoped _ -> (-1)
-  | Global x, Global y -> compare x y
+  | Global x, Global y -> CUI.compare x y
   | Global _, _ -> 1
   | _, Global _ -> (-1)
   | Global_with_args g1, Global_with_args g2 -> Global_module.Name.compare g1 g2

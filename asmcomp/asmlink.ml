@@ -20,6 +20,7 @@ open Config
 open Cmx_format
 open Compilenv
 module CU = Compilation_unit
+module CUI = Compilation_unit_intf
 
 type error =
   | Dwarf_fission_objcopy_on_macos
@@ -32,6 +33,7 @@ exception Error of error
 
 type unit_link_info = Linkenv.unit_link_info =
   { name : Compilation_unit.t;
+    intf : CUI.t;
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
@@ -520,7 +522,7 @@ let report_error_doc ppf = function
     fprintf ppf "Error running objcopy (exit code %d)" exitcode
   | Cm_bundle_error (Missing_intf_for_quote intf) ->
     fprintf ppf "Missing interface for module %a which is required by quote"
-      CU.Name.print_as_inline_code intf
+      CUI.print_as_inline_code intf
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"

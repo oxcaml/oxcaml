@@ -2,10 +2,9 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           *)
+(*                        Zesen Qian, Jane Street                         *)
 (*                                                                        *)
-(*   Copyright 2010 Institut National de Recherche en Informatique et     *)
-(*     en Automatique                                                     *)
+(*   Copyright 2026 Jane Street Group LLC                                 *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -13,23 +12,36 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Format of .cmxs files *)
+[@@@ocaml.warning "+a-9-40-41-42"]
 
-(* Each .cmxs dynamically-loaded plugin contains a symbol
-   "caml_plugin_header" containing the following info
-   (as an externed record) *)
+module Fmt = Format_doc
 
-type dynunit = {
-  dynu_name: Compilation_unit.t;
-  dynu_crc: Digest.t;
-  dynu_imports_cmi: Import_info.t array;
-  dynu_imports_cmx: Import_info.t array;
-  dynu_quoted_cmi: Compilation_unit_intf.t array;
-  dynu_quoted_cmx: Compilation_unit.t array;
-  dynu_defines: Compilation_unit.t list;
-}
+type t = string
 
-type dynheader = {
-  dynu_magic: string;
-  dynu_units: dynunit list;
-}
+let doc_print = Fmt.pp_print_string
+
+include Identifiable.Make (struct
+  type nonrec t = t
+
+  let compare = String.compare
+
+  let equal = String.equal
+
+  let hash = Hashtbl.hash
+
+  let print ppf t = Fmt.compat doc_print ppf t
+
+  let output = Misc.output_of_doc_print doc_print
+end)
+
+let print = doc_print
+
+let of_string t = t
+
+let to_string t = t
+
+let dummy = "*dummy*"
+
+let predef_exn = "*predef*"
+
+let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)

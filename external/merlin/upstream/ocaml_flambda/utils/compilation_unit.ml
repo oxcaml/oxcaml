@@ -20,6 +20,7 @@ open! Int_replace_polymorphic_compare
 module List = Misc.Stdlib.List
 module String = Misc.Stdlib.String
 module Fmt = Format_doc
+module CUI = Compilation_unit_intf
 
 type error =
   | Invalid_character of char * string
@@ -43,7 +44,9 @@ module Name : sig
 
   val to_string : t -> string
 
-  val of_head_of_global_name : Global_module.Name.t -> t
+  val of_intf : CUI.t -> t
+
+  val to_intf : t -> CUI.t
 
   val of_parameter_name : Global_module.Parameter_name.t -> t
 
@@ -89,12 +92,14 @@ end = struct
     then raise (Error (Bad_compilation_unit_name str))
     else str
 
-  let of_head_of_global_name (name : Global_module.Name.t) = of_string name.head
+  let of_intf intf = of_string (CUI.to_string intf)
+
+  let to_intf t = CUI.of_string t
 
   let of_parameter_name (name : Global_module.Parameter_name.t) =
-    of_string (Global_module.Parameter_name.to_string name)
+    of_intf (name :> CUI.t)
 
-  let to_global_name t = Global_module.Name.create_no_args t
+  let to_global_name t = Global_module.Name.create_no_args (to_intf t)
 
   let to_parameter_name t = Global_module.Parameter_name.of_string t
 
@@ -223,8 +228,6 @@ module T0 : sig
 
   val to_global_name_exn : t -> Global_module.Name.t
 
-  val to_global_name_without_prefix : t -> Global_module.Name.t
-
   val create_full : Prefix.t -> Name.t -> argument list -> t
 
   val of_global_name : Global_module.Name.t -> t
@@ -268,7 +271,7 @@ end = struct
 
   let of_global_name (glob : Global_module.Name.t) =
     match glob with
-    | { head; args = [] } -> of_plain_name (Name.of_string head)
+    | { head; args = [] } -> of_plain_name (Name.of_intf head)
     | _ -> of_full (Global glob)
 
   let convert_arguments l =
@@ -292,7 +295,7 @@ end = struct
       | With_prefix { name; for_pack_prefix } ->
         { name; for_pack_prefix; arguments = [] }
       | Global { head; args } ->
-        let name = Name.of_string head in
+        let name = Name.of_intf head in
         let arguments = convert_arguments args in
         { name; arguments; for_pack_prefix = Prefix.empty }
 
@@ -305,7 +308,7 @@ end = struct
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
       | With_prefix { name; _ } -> name
-      | Global { head; _ } -> Name.of_string head
+      | Global { head; _ } -> Name.of_intf head
 
   let for_pack_prefix t =
     let tag = Obj.tag t in
@@ -363,7 +366,7 @@ end = struct
     if is_plain_name t
     then
       let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
+      Global_module.Name.create_no_args (Name.to_intf name)
     else
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
@@ -374,21 +377,9 @@ end = struct
   let to_global_name t =
     try Some (to_global_name_exn t) with Error (Packed_instance _) -> None
 
-  let to_global_name_without_prefix t =
-    if is_plain_name t
-    then
-      let name = Sys.opaque_identity (Obj.obj t : Name.t) in
-      Global_module.Name.create_no_args (Name.to_string name)
-    else
-      let full = Sys.opaque_identity (Obj.obj t : full) in
-      match full with
-      | With_prefix { name; _ } ->
-        Global_module.Name.create_no_args (Name.to_string name)
-      | Global glob -> glob
-
   let of_global_name (name : Global_module.Name.t) =
     match name with
-    | { head; args = [] } -> of_plain_name (head |> Name.of_string)
+    | { head; args = [] } -> of_plain_name (head |> Name.of_intf)
     | _ -> of_full (Global name)
 
   let create_full for_pack_prefix name arguments =
@@ -412,7 +403,7 @@ end = struct
     then of_plain_name name
     else if empty_prefix
     then
-      let head = Name.to_string name in
+      let head = Name.to_intf name in
       let arguments =
         ListLabels.map
           ~f:(fun { param; value } : Global_module.Name.argument ->
@@ -442,7 +433,7 @@ let to_prefix parent =
 
 let create_child parent name_ = create (to_prefix parent) name_
 
-let of_string str =
+let of_string_unsafe str =
   let for_pack_prefix, name =
     (* Also see [Name.check_as_path_component] *)
     if String.equal str ".cinaps" || String.equal str "(.cinaps)"
@@ -451,9 +442,13 @@ let of_string str =
       match String.rindex_opt str '.' with
       | None -> Prefix.empty, Name.of_string str
       | Some _ ->
-        Misc.fatal_errorf "[of_string] does not parse qualified names: %s" str
+        Misc.fatal_errorf
+          "[of_string_unsafe] does not parse qualified names: %s" str
   in
   create for_pack_prefix name
+
+let of_intf_assume_no_prefix_no_args intf =
+  create Prefix.empty (Name.of_intf intf)
 
 let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)

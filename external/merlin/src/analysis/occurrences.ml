@@ -131,8 +131,11 @@ let uid_and_loc_of_node env node =
   | _ -> None
 
 let rec comp_unit_of_uid = function
-  | Shape.Uid.Compilation_unit comp_unit | Item { comp_unit; _ } ->
-    Some comp_unit
+  | Shape.Uid.Compilation_unit comp_unit ->
+    Some (Compilation_unit.full_path_as_string comp_unit)
+  | Shape.Uid.Compilation_unit_intf intf ->
+    Some (Compilation_unit_intf.to_string intf)
+  | Item { comp_unit; _ } -> Some comp_unit
   | Unboxed_version uid -> comp_unit_of_uid uid
   | Internal | Predef _ -> None
 
