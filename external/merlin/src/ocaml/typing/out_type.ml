@@ -1179,6 +1179,7 @@ let erase_implied_axes (modes : Mode.Alloc.Const.t) :
   { areality = Some modes.areality;
     linearity = Some modes.linearity;
     uniqueness = Some modes.uniqueness;
+    externality = None;
     portability;
     contention;
     forkable;
@@ -2697,6 +2698,7 @@ let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
     let implied = erase_implied_axes modes in
     let diff = Mode.Alloc.Const.diff modes Mode.Alloc.Const.legacy in
     { diff with
+      externality = None;
       forkable = implied.forkable;
       yielding = implied.yielding;
       contention = implied.contention;
