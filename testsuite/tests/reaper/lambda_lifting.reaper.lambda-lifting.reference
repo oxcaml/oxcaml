@@ -1,0 +1,49 @@
+let code g_1 deleted in
+let code f1_0 deleted in
+let code g_3 deleted in
+let code h_4 deleted in
+let code f2_2 deleted in
+let code inline(never) loopify(never) size(3) newer_version_of(g_1)
+      g_1_1 (g_into_my_closure_field_x, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = g_into_my_closure_field_x in
+  let int_add = %int_barith.add (x, y) in
+  cont k (int_add)
+in
+let code loopify(never) size(4) newer_version_of(f1_0)
+      f1_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g_into_g_field_x = x in
+  apply direct(g_1_1 &my_alloc_region)  (g_into_g_field_x, x) -> k * k1
+in
+let $camlLambda_lifting__f1_1 = closure f1_0_1 @f1 &toplevel in
+let code inline(never) loopify(never) size(3) newer_version_of(h_4)
+      h_4_1 (h_into_my_closure_field_g_field_x, y : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g_into_g_field_x = h_into_my_closure_field_g_field_x in
+  let x = g_into_g_field_x in
+  let int_add = %int_barith.add (x, y) in
+  cont k (int_add)
+in
+let code g_3_1 deleted in
+let code loopify(never) size(4) newer_version_of(f2_2)
+      f2_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g_into_g_field_x = x in
+  let h_into_h_field_g_field_x = g_into_g_field_x in
+  apply direct(h_4_1 &my_alloc_region)
+     (h_into_h_field_g_field_x, x) -> k * k1
+in
+let $camlLambda_lifting__f2_2 = closure f2_2_1 @f2 &toplevel in
+let $camlLambda_lifting =
+  Block 0 ($camlLambda_lifting__f1_1, $camlLambda_lifting__f2_2)
+in
+cont done ($camlLambda_lifting)
