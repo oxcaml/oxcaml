@@ -178,36 +178,12 @@ G(name):
 
 /* Stack switching operations */
 
-/* struct stack_info */
-#define Stack_sp(reg)           [reg]
-#define Stack_sp_offset         0
-#define Stack_exception(reg)    [reg, #8]
-#define Stack_handler(reg)      [reg, #16]
-#define Stack_handler_from_cont(reg) [reg, #15]
-#define Stack_local_sp(reg)     [reg, #64]
-#define Stack_local_top(reg)    [reg, #72]
-#define Stack_local_limit(reg)  [reg, #80]
-
-/* struct c_stack_link */
-#define Cstack_stack(reg)       [reg]
-#define Cstack_sp(reg)          [reg, #8]
-#define Cstack_sp_offset        8
-#define Cstack_prev(reg)        [reg, #16]
-#define Cstack_async_exn_handler(reg) [reg, #24]
-
-/* struct dynamic_cache_s */
-/* If you change Dynamic_cache_entries, you must also update FLUSH_DYNAMIC_CACHE */
-#define Dynamic_cache            0 /* offset of cache in dynamic_cache_t */
-#define Dynamic_binding_size     (2*8) /* dyn, val */
-#define Dynamic_binding_var      0 /* offset of var within a single binding */
-#define Dynamic_cache_entries    8 /* must match DYNAMIC_CACHE_SIZE in dynamic.c */
-
-/* struct stack_handler */
-#define Handler_value(reg)      [reg]
-#define Handler_exception(reg)  [reg, #8]
-#define Handler_effect(reg)     [reg, #16]
-#define Handler_parent(reg)     [reg, #32]
-#define Handler_parent_offset   32
+/* Offsets into the C structs used here (stack_info, stack_handler,
+   the dynamic-binding cache, c_stack_link) are computed from the C
+   definitions at build time by gen_asm_offsets.c.  If you change
+   Dynamic_cache_entries (DYNAMIC_CACHE_BITS in caml/dynamic.h), you
+   must also update FLUSH_DYNAMIC_CACHE. */
+#include "asm_offsets.inc"
 
 /* Continuation values
  *

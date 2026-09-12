@@ -1456,6 +1456,21 @@ runtime/%_libasmrunpic.o: runtime/%.S
 runtime/domain_state.inc: runtime/caml/domain_state.tbl
 	$(V_GEN)$(CPP) $< > $@
 
+# Offsets into C structures which the assembly-language stubs need,
+# computed from the real definitions by a generated program (which
+# must run on the build machine, so no cross-compilation).
+runtime/gen_asm_offsets$(EXE): runtime/gen_asm_offsets.c \
+    $(wildcard runtime/caml/*.h)
+	$(V_MKEXE)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) \
+	  $(OC_NATIVE_CPPFLAGS) $(CPPFLAGS) -o $@ $<
+
+runtime/asm_offsets.inc: runtime/gen_asm_offsets$(EXE)
+	$(V_GEN)$< > $@
+
+runtime/amd64.o runtime/amd64.d.o runtime/amd64.i.o \
+runtime/amd64_libasmrunpic.o runtime/arm64.o runtime/arm64.d.o \
+runtime/arm64.i.o runtime/arm64_libasmrunpic.o: runtime/asm_offsets.inc
+
 runtime/amd64nt.obj: runtime/amd64nt.asm runtime/domain_state.inc
 	$(V_ASM)$(ASM)$@ $<
 
@@ -1499,6 +1514,7 @@ clean::
 	rm -f runtime/primitives runtime/primitives*.new runtime/prims.c \
 	  $(runtime_BUILT_HEADERS)
 	rm -f runtime/domain_state.inc
+	rm -f runtime/asm_offsets.inc runtime/gen_asm_offsets$(EXE)
 	rm -rf $(DEPDIR)
 	rm -f stdlib/libcamlrun.a stdlib/libcamlrun.lib
 
