@@ -552,12 +552,16 @@ let rec find_in_pending_manifests ~uncap fn =
 let find_loading_manifests fn =
   match Path_cache.find fn with
   | result -> result
-  | exception Not_found -> find_in_pending_manifests ~uncap:false fn
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "find_in_pending_manifests" (fun () ->
+      find_in_pending_manifests ~uncap:false fn)
 
 let find_uncap_loading_manifests fn_uncap =
   match Path_cache.find_uncap ~fn_already_uncapped:fn_uncap with
   | result -> result
-  | exception Not_found -> find_in_pending_manifests ~uncap:true fn_uncap
+  | exception Not_found ->
+    Profile.record_call ~accumulate:true "find_in_pending_manifests" (fun () ->
+      find_in_pending_manifests ~uncap:true fn_uncap)
 
 let init ~auto_include ~visible ~hidden =
   assert (not Config.merlin || Local_store.is_bound ());
