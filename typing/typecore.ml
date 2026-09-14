@@ -7662,11 +7662,11 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_tuple sexpl ->
-      type_tuple ~overwrite ~loc ~env ~expected_mode ~ty_expected ~explanation
-        ~attributes:sexp.pexp_attributes sexpl
+      type_tuple ~is_unboxed:false ~overwrite ~loc ~env ~expected_mode
+        ~ty_expected ~explanation ~attributes:sexp.pexp_attributes sexpl
   | Pexp_unboxed_tuple sexpl ->
-      type_unboxed_tuple ~loc ~env ~expected_mode ~ty_expected ~explanation
-        ~attributes:sexp.pexp_attributes sexpl
+      type_tuple ~is_unboxed:true ~overwrite ~loc ~env ~expected_mode
+        ~ty_expected ~explanation ~attributes:sexp.pexp_attributes sexpl
   | Pexp_construct(lid, sarg) ->
       type_construct ~overwrite ~sexp env expected_mode lid sarg
         ty_expected_explained
@@ -10843,35 +10843,47 @@ and type_application env app_loc expected_mode position_and_mode
       in
       args, ty_ret, mode_ret, position_and_mode, ap_yielding
 
-and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-    ~explanation ~attributes sexpl =
-  (* CR zeisbach: consider sharing code with [type_unboxed_tuple] below *)
+and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
+    ~ty_expected ~explanation ~attributes sexpl =
+  if is_unboxed then
+    Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
   let arity = List.length sexpl in
   assert (arity >= 2);
   Option.iter
     (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
     (Misc.repeated_label sexpl);
-  let alloc_mode, value_mode =
-    register_allocation_value_mode ~loc expected_mode.mode
+  (* wrap [register_allocation_value_mode] as unboxed tuples aren't allocated *)
+  let register_allocation mode =
+    if is_unboxed then None, mode
+    else
+      let alloc_mode, mode = register_allocation_value_mode ~loc mode in
+      Some alloc_mode, mode
   in
+  let alloc_mode, value_mode = register_allocation expected_mode.mode in
   let argument_mode =
     value_mode
     |> apply_right_is_contained_by
       {containing = Tuple; container = (loc, Expression)}
   in
+  let mk_tuple_type labeled_tys =
+    if is_unboxed then Tunboxed_tuple labeled_tys else Ttuple labeled_tys
+  in
   let unify_as_tuple ty_expected =
+    let why : Jkind_intf.History.concrete_creation_reason =
+      if is_unboxed then Unboxed_tuple_element else Tuple_element
+    in
     let labels_types_and_sorts =
       List.map (fun (label, _) ->
         let jkind, sort =
-          Jkind.of_new_sort_var ~why:Tuple_element
-            ~level:(Ctype.get_current_level ())
+          Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
         in
         label, newgenvar jkind, sort)
       sexpl
     in
     let to_unify =
       newgenty
-        (Ttuple (List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts))
+        (mk_tuple_type
+           (List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts))
     in
     with_explanation explanation (fun () ->
       unify_exp_types loc env to_unify (generic_instance ty_expected));
@@ -10888,8 +10900,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         (* If the pattern and the expression have different tuple length, it
           should be an type error. Here, we give the sound mode anyway. *)
         let tuple_modes =
-          List.map (fun (mode, _) ->
-            snd (register_allocation_value_mode ~loc mode)) tuple_modes
+          List.map (fun (mode, _) -> snd (register_allocation mode)) tuple_modes
         in
         let argument_mode = Value.meet (argument_mode :: tuple_modes) in
         List.init arity (fun _ -> argument_mode)
@@ -10899,6 +10910,8 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   let types_sorts_and_modes =
     List.combine labels_types_and_sorts argument_modes
   in
+  (* Only boxed tuples can be overwritten (see [can_be_overwritten]), so unboxed
+     tuples are always typed with [No_overwrite] *)
   let overwrites =
     assign_children arity (fun _loc typ mode ->
       let labels_types_and_sorts = unify_as_tuple typ in
@@ -10918,80 +10931,20 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
         (label, exp, sort))
       sexpl types_sorts_and_modes overwrites
   in
+  let exp_desc =
+    match alloc_mode with
+    | None -> Texp_unboxed_tuple expl
+    | Some alloc_mode ->
+        Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode)
+  in
   re {
-    exp_desc =
-      Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode);
+    exp_desc;
     exp_loc = loc; exp_extra = [];
     (* Keep sharing *)
     exp_type =
-      newty (Ttuple (List.map (fun (label, e, _) -> label, e.exp_type) expl));
-    exp_attributes = attributes;
-    exp_env = env }
-
-and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
-      ~explanation ~attributes sexpl =
-  Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
-  let arity = List.length sexpl in
-  assert (arity >= 2);
-  Option.iter
-    (fun l -> raise (Error (loc, env, Repeated_tuple_exp_label l)))
-    (Misc.repeated_label sexpl);
-  let argument_mode =
-    expected_mode.mode
-    |> apply_right_is_contained_by
-      {containing = Tuple; container = (loc, Expression)}
-  in
-  (* elements must be representable *)
-  let labels_types_and_sorts =
-    List.map (fun (label, _) ->
-      let jkind, sort =
-        Jkind.of_new_sort_var ~why:Unboxed_tuple_element
-          ~level:(Ctype.get_current_level ())
-      in
-      label, newgenvar jkind, sort)
-    sexpl
-  in
-  let labeled_subtypes =
-    List.map (fun (l, t, _) -> (l, t)) labels_types_and_sorts
-  in
-  let to_unify = newgenty (Tunboxed_tuple labeled_subtypes) in
-  with_explanation explanation (fun () ->
-    unify_exp_types loc env to_unify (generic_instance ty_expected));
-
-  let argument_modes =
-    match expected_mode.tuple_modes with
-    (* CR zqian: improve the modes of opened labeled tuple pattern. *)
-    | Some tuple_modes when List.compare_length_with tuple_modes arity = 0 ->
-        List.map (fun (mode, _) -> Value.meet [mode; argument_mode])
-          tuple_modes
-    | Some tuple_modes ->
-        (* If the pattern and the expression have different tuple length, it
-          should be an type error. Here, we give the sound mode anyway. *)
-        let argument_mode =
-          Value.meet (argument_mode :: List.map fst tuple_modes)
-        in
-        List.init arity (fun _ -> argument_mode)
-    | None ->
-        List.init arity (fun _ -> argument_mode)
-  in
-  let types_sorts_and_modes =
-    List.combine labels_types_and_sorts argument_modes
-  in
-  let expl =
-    List.map2
-      (fun (label, body) ((_, ty, sort), argument_mode) ->
-        let argument_mode = mode_default argument_mode in
-        let argument_mode = expect_mode_cross env ty argument_mode in
-          (label, type_expect env argument_mode body (mk_expected ty), sort))
-      sexpl types_sorts_and_modes
-  in
-  re {
-    exp_desc = Texp_unboxed_tuple expl;
-    exp_loc = loc; exp_extra = [];
-    (* Keep sharing *)
-    exp_type =
-      newty (Tunboxed_tuple
-               (List.map (fun (label, e, _) -> label, e.exp_type) expl));
+      newty
+        (mk_tuple_type
+           (List.map (fun (label, e, _) -> label, e.exp_type) expl));
     exp_attributes = attributes;
     exp_env = env }
 
