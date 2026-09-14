@@ -718,7 +718,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           begin match constant with
           | Some constant -> Lconst constant
           | None ->
-              let locality_mode = transl_typed_locality_mode_r (Option.get locality_mode) in
+              let locality_mode =
+                transl_typed_locality_mode_r (Option.get locality_mode)
+              in
               let makeblock =
                 match shape with
                 | Constructor_uniform_value ->
@@ -735,7 +737,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                        constructors with all-void inline records, which are
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
-                    Pmakeblock(runtime_tag, Immutable, Shape shape, locality_mode)
+                    Pmakeblock
+                      (runtime_tag, Immutable, Shape shape, locality_mode)
                 | Constructor_immediate_all_void ->
                     fatal_error
                       "transl_exp: non-constant immediate constructor"
@@ -757,7 +760,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                that the list is empty *)
             lam)
           else
-            let locality_mode = transl_typed_locality_mode_r (Option.get locality_mode) in
+            let locality_mode =
+              transl_typed_locality_mode_r (Option.get locality_mode)
+            in
             (* CR mshinwell: why are we using generic_value and not an immediate
                value kind for the poly variant hash? *)
             let makeblock =
@@ -856,7 +861,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let arg_layout = layout_exp arg_sort arg in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_layout lbl repres in
       let loc = of_location ~scopes e.exp_loc in
-      Lprim (Pmakeblock (0, Immutable, shape, transl_typed_locality_mode_r locality_mode),
+      Lprim (Pmakeblock
+               (0,
+                Immutable,
+                shape,
+                transl_typed_locality_mode_r locality_mode),
              [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort;
                  record_repres; lid = _; label = lbl; boxing = float;
@@ -2282,9 +2291,18 @@ and transl_curried_function ~scopes loc repr params body
     in
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
-and transl_function ~in_new_scope ~scopes e params body
-      ~locality_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc ~yielding =
+and transl_function
+      ~in_new_scope
+      ~scopes
+      e
+      params
+      body
+      ~locality_mode
+      ~ret_mode:sreturn_mode
+      ~ret_sort:sreturn_sort
+      ~region:sregion
+      ~zero_alloc
+      ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_typed_locality_mode_r locality_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in

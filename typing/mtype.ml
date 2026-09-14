@@ -265,7 +265,9 @@ let rec expand_paths_lazy paths env =
       | Named (name,mty,mm) ->
           let mty = expand_paths_lazy paths env mty in
           let mode =
-            Mode.(with_locality_as_regionality mm |> With_regionality.disallow_right)
+            Mode.(
+              with_locality_as_regionality mm
+              |> With_regionality.disallow_right)
           in
           let env = match name with
             | Some param when !Clflags.applicative_functors ->
@@ -510,7 +512,9 @@ let rec nondep_mty_with_presence env va ids pres mty =
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
       let mode =
-        Mode.(with_locality_as_regionality marg |> With_regionality.disallow_right)
+        Mode.(
+          with_locality_as_regionality marg
+          |> With_regionality.disallow_right)
       in
       let res_env =
         match param with

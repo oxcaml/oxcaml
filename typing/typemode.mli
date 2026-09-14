@@ -25,7 +25,8 @@ val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
     legacy if unspecified *)
-val transl_mode_with_locality : Parsetree.modes -> Mode.With_locality.Const.t modes
+val transl_mode_with_locality :
+  Parsetree.modes -> Mode.With_locality.Const.t modes
 
 (** Interpret mode syntax as modalities. Modalities occuring at different places
     requires different levels of maturity. Also takes the mutability and

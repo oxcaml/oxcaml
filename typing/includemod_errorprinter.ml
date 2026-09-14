@@ -520,7 +520,8 @@ module With_shorthand = struct
     | Unit -> Fmt.dprintf "()"
     | Named(_,short_mty, mm) ->
         match short_mty with
-        | Original mty -> dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
+        | Original mty ->
+            dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
         | Synthetic {name; item = mty} ->
             Fmt.dprintf
               "%s@ =@ %t" name (dmodtype mty)

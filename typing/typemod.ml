@@ -111,8 +111,12 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
   let mode = Mode.With_regionality.newvar 0 in
   let min = With_locality.Const.Option.value ~default:With_locality.Const.min m in
   let max = With_locality.Const.Option.value ~default:With_locality.Const.max m in
-  With_regionality.submode_exn (min |> With_locality.of_const |> with_locality_as_regionality) mode;
-  With_regionality.submode_exn mode (max |> With_locality.of_const |> with_locality_as_regionality);
+  With_regionality.submode_exn
+    (min |> With_locality.of_const |> with_locality_as_regionality)
+    mode;
+  With_regionality.submode_exn
+    mode
+    (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
 let register_allocation loc : With_locality.lr * With_regionality.lr =
@@ -123,7 +127,9 @@ let register_allocation loc : With_locality.lr * With_regionality.lr =
   in
   let mode_with_locality, _ = With_locality.newvar_below 0 upper_bound in
   let closed_over_mode =
-    with_locality_as_regionality ~allocation:({loc; txt = Unknown}) mode_with_locality
+    with_locality_as_regionality
+      ~allocation:({loc; txt = Unknown})
+      mode_with_locality
   in
   mode_with_locality, closed_over_mode
 
@@ -546,7 +552,11 @@ let iterator_with_env super env =
       | Unit -> ()
       | Named (param, mty_arg, mm_arg) ->
         self.Btype.it_module_type self mty_arg;
-        let mode = Mode.(with_locality_as_regionality mm_arg |> With_regionality.disallow_right) in
+        let mode =
+          Mode.(
+            with_locality_as_regionality mm_arg
+            |> With_regionality.disallow_right)
+        in
         match param with
         | None -> ()
         | Some id ->
@@ -2796,7 +2806,10 @@ let rec nongen_modtype env f g = function
         | Named (None, _, _) -> env
         | Named (Some id, param, mm_param) ->
             let mode =
-              Mode.(mm_param |> with_locality_as_regionality |> With_regionality.disallow_right)
+              Mode.(
+                mm_param
+                |> with_locality_as_regionality
+                |> With_regionality.disallow_right)
             in
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
@@ -3307,7 +3320,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       in
       let body_mode = mode_without_locks_exn body.mod_mode in
       let ret_mode = With_locality.newvar 0 in
-      With_regionality.submode_exn body_mode (ret_mode |> with_locality_as_regionality);
+      With_regionality.submode_exn
+        body_mode
+        (ret_mode |> with_locality_as_regionality);
       (* Apply currying constraints if the body is a functor,
          similar to constraints for functions. *)
       (match body.mod_type with
@@ -3316,7 +3331,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           | Unit -> ()
           | Named (_, _, param_mode) ->
             With_locality.submode_exn (With_locality.close_over param_mode) ret_mode);
-         With_locality.submode_exn (With_locality.partial_apply mode_with_locality) ret_mode
+         With_locality.submode_exn
+           (With_locality.partial_apply mode_with_locality)
+           ret_mode
        | _ -> ());
       { mod_desc =
           Tmod_functor (t_arg, body, Staticity.disallow_left staticity);
@@ -3556,7 +3573,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_for_generated_type_or_jkind ~funct_body env apply_loc funct.mod_type
         (fun tj -> Not_allowed_in_functor_body tj);
       check_curried_application_complete
-        ~loc:app_view.loc ~mty_res ~mode_res:(with_locality_as_regionality mm_res)
+        ~loc:app_view.loc
+        ~mty_res
+        ~mode_res:(with_locality_as_regionality mm_res)
         ~mode_arg:None;
       { mod_desc =
           Tmod_apply_unit
@@ -3564,7 +3583,10 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
              functor_application_yielding ~funct
                ~arg_mode:(With_regionality.disallow_right With_regionality.legacy));
         mod_type = mty_res;
-        mod_mode = with_locality_as_regionality (With_locality.disallow_right mm_res), None;
+        mod_mode =
+          with_locality_as_regionality
+            (With_locality.disallow_right mm_res),
+          None;
         mod_env = env;
         mod_attributes = app_view.attributes;
         mod_loc = funct.mod_loc },
