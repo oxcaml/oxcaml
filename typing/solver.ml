@@ -48,14 +48,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Id : ('a, 'a, 'l * 'r) t
             (** Short-hand for [Base (H.id, C.id)] to save memory *)
         | Adjoint_l :
-            ('a, 'b, 'l2 * allowed) t * ('b, 'a, allowed * disallowed) C.morph
+            'b C.obj * ('a, 'b, 'l2 * allowed) t * H.Pinpoint.t option
             -> ('b, 'a, 'l * disallowed) t
-            (** [Adjoint_l (h, m)] is the left adjoint of [h], deferred; [m] is
-                the (already computed) left adjoint of [h]'s morphism. *)
         | Adjoint_r :
-            ('a, 'b, allowed * 'r2) t * ('b, 'a, disallowed * allowed) C.morph
+            'b C.obj * ('a, 'b, allowed * 'r2) t * H.Pinpoint.t option
             -> ('b, 'a, disallowed * 'r) t
-            (** Right-adjoint analogue of [Adjoint_l]. *)
         constraint 'd = _ * _
       [@@ocaml.warning "-62"]
 
@@ -78,7 +75,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.allow_left morph_hint, C.allow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_left a_morph_hint, allow_left b_morph_hint)
-          | Adjoint_l (h, m) -> Adjoint_l (h, m)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
 
         let rec allow_right : type a b l r.
             (a, b, l * allowed) t -> (a, b, l * r) t =
@@ -89,7 +86,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.allow_right morph_hint, C.allow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (allow_right a_morph_hint, allow_right b_morph_hint)
-          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
 
         let rec disallow_left : type a b l r.
             (a, b, l * r) t -> (a, b, disallowed * r) t =
@@ -100,8 +97,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.disallow_left morph_hint, C.disallow_left morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_left a_morph_hint, disallow_left b_morph_hint)
-          | Adjoint_l (h, m) -> Adjoint_l (h, m)
-          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
 
         let rec disallow_right : type a b l r.
             (a, b, l * r) t -> (a, b, l * disallowed) t =
@@ -112,79 +109,102 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Base (H.Morph.disallow_right morph_hint, C.disallow_right morph)
           | Compose (a_morph_hint, b_morph_hint) ->
             Compose (disallow_right a_morph_hint, disallow_right b_morph_hint)
-          | Adjoint_l (h, m) -> Adjoint_l (h, m)
-          | Adjoint_r (h, m) -> Adjoint_r (h, m)
+          | Adjoint_l (dst, h, pinpoint) -> Adjoint_l (dst, h, pinpoint)
+          | Adjoint_r (dst, h, pinpoint) -> Adjoint_r (dst, h, pinpoint)
       end)
 
-      let rec left_adjoint : type a b l.
-          H.Pinpoint.t ->
-          b C.obj ->
-          (a, b, l * allowed) t ->
-          H.Pinpoint.t * a C.obj * (b, a, allowed * disallowed) t =
-       fun pp b_obj -> function
-        | Id -> pp, b_obj, Id
-        | Adjoint_r (h, m) -> pp, C.src b_obj m, disallow_right h
-        | Base (small_morph_hint, morph) ->
-          let pp, small_morph_hint = H.Morph.left_adjoint pp small_morph_hint in
-          ( pp,
-            C.src b_obj morph,
-            Base (small_morph_hint, C.left_adjoint b_obj morph) )
-        | Compose (f_morph_hint, g_morph_hint) ->
-          let mid_pp, mid, f_morph_hint_adj =
-            left_adjoint pp b_obj f_morph_hint
-          in
-          let src_pp, src, g_morph_hint_adj =
-            left_adjoint mid_pp mid g_morph_hint
-          in
-          src_pp, src, Compose (g_morph_hint_adj, f_morph_hint_adj)
+      let left_adjoint : type a b l.
+          b C.obj -> (a, b, l * allowed) t -> (b, a, allowed * disallowed) t =
+       fun b_obj h ->
+        match h with
+        | Id -> Id
+        | Adjoint_r (_, h, _) -> disallow_right h
+        | Base _ | Compose _ -> Adjoint_l (b_obj, h, None)
 
-      let rec right_adjoint : type a b r.
-          H.Pinpoint.t ->
-          b C.obj ->
-          (a, b, allowed * r) t ->
-          H.Pinpoint.t * a C.obj * (b, a, disallowed * allowed) t =
-       fun pp b_obj -> function
-        | Id -> pp, b_obj, Id
-        | Adjoint_l (h, m) -> pp, C.src b_obj m, disallow_left h
-        | Base (small_morph_hint, morph) ->
-          let pp, small_morph_hint =
-            H.Morph.right_adjoint pp small_morph_hint
-          in
-          ( pp,
-            C.src b_obj morph,
-            Base (small_morph_hint, C.right_adjoint b_obj morph) )
-        | Compose (f_morph_hint, g_morph_hint) ->
-          let mid_pp, mid, f_morph_hint_adj =
-            right_adjoint pp b_obj f_morph_hint
-          in
-          let src_pp, src, g_morph_hint_adj =
-            right_adjoint mid_pp mid g_morph_hint
-          in
-          src_pp, src, Compose (g_morph_hint_adj, f_morph_hint_adj)
+      let right_adjoint : type a b r.
+          b C.obj -> (a, b, allowed * r) t -> (b, a, disallowed * allowed) t =
+       fun b_obj h ->
+        match h with
+        | Id -> Id
+        | Adjoint_l (_, h, _) -> disallow_left h
+        | Base _ | Compose _ -> Adjoint_r (b_obj, h, None)
+
+      let rec src : type a b l r. b C.obj -> (a, b, l * r) t -> a C.obj =
+       fun dst -> function
+        | Id -> dst
+        | Base (_, morph) -> C.src dst morph
+        | Compose (f, g) -> src (src dst f) g
+        | Adjoint_l (dst, _, _) -> dst
+        | Adjoint_r (dst, _, _) -> dst
+
+      let apply_pinpoint pinpoint (ahint, pp) =
+        ahint, Option.value pinpoint ~default:pp
 
       let rec populate : type b a l r.
           a C.obj ->
           (b, a, l * r) t ->
-          (b C.obj -> (b, l * r) ahint) ->
-          (a, l * r) ahint =
+          (b C.obj -> (b, l * r) ahint * H.Pinpoint.t) ->
+          (a, l * r) ahint * H.Pinpoint.t =
        fun obj_a hint cont ->
         match hint with
         | Id -> cont obj_a
-        | Adjoint_l (h, m) ->
-          let obj_b = C.src obj_a m in
-          let _, _, h' = left_adjoint H.Pinpoint.unknown obj_b h in
-          populate obj_a (allow_left h') cont
-        | Adjoint_r (h, m) ->
-          let obj_b = C.src obj_a m in
-          let _, _, h' = right_adjoint H.Pinpoint.unknown obj_b h in
-          populate obj_a (allow_right h') cont
         | Base (morph_hint, morph) ->
           let obj_b = C.src obj_a morph in
-          let ahint = cont obj_b in
+          let ahint, pp = cont obj_b in
           let a = C.apply obj_a morph (fst ahint) in
-          a, Apply (morph_hint, morph, ahint)
+          (a, Apply (morph_hint, morph, ahint)), pp
         | Compose (h1, h2) ->
           populate obj_a h1 (fun obj_mid -> populate obj_mid h2 cont)
+        | Adjoint_l (dst, h, pinpoint) ->
+          populate_adjoint_l obj_a dst h (fun obj ->
+              apply_pinpoint pinpoint (cont obj))
+        | Adjoint_r (dst, h, pinpoint) ->
+          populate_adjoint_r obj_a dst h (fun obj ->
+              apply_pinpoint pinpoint (cont obj))
+
+      and populate_adjoint_l : type b a l l2.
+          a C.obj ->
+          b C.obj ->
+          (a, b, l * allowed) t ->
+          (b C.obj -> (b, l2 * disallowed) ahint * H.Pinpoint.t) ->
+          (a, l2 * disallowed) ahint * H.Pinpoint.t =
+       fun obj_a dst h cont ->
+        match h with
+        | Id -> cont obj_a
+        | Adjoint_r (_, h, _) ->
+          populate obj_a (allow_left (disallow_right h)) cont
+        | Base (morph_hint, morph) ->
+          let ahint, pp = cont dst in
+          let pp, morph_hint = H.Morph.left_adjoint pp morph_hint in
+          let morph_hint = H.Morph.allow_left morph_hint in
+          let morph = C.allow_left (C.left_adjoint dst morph) in
+          let a = C.apply obj_a morph (fst ahint) in
+          (a, Apply (morph_hint, morph, ahint)), pp
+        | Compose (f, g) ->
+          populate_adjoint_l obj_a (src dst f) g (fun obj_mid ->
+              populate_adjoint_l obj_mid dst f cont)
+
+      and populate_adjoint_r : type b a r r2.
+          a C.obj ->
+          b C.obj ->
+          (a, b, allowed * r) t ->
+          (b C.obj -> (b, disallowed * r2) ahint * H.Pinpoint.t) ->
+          (a, disallowed * r2) ahint * H.Pinpoint.t =
+       fun obj_a dst h cont ->
+        match h with
+        | Id -> cont obj_a
+        | Adjoint_l (_, h, _) ->
+          populate obj_a (allow_right (disallow_left h)) cont
+        | Base (morph_hint, morph) ->
+          let ahint, pp = cont dst in
+          let pp, morph_hint = H.Morph.right_adjoint pp morph_hint in
+          let morph_hint = H.Morph.allow_right morph_hint in
+          let morph = C.allow_right (C.right_adjoint dst morph) in
+          let a = C.apply obj_a morph (fst ahint) in
+          (a, Apply (morph_hint, morph, ahint)), pp
+        | Compose (f, g) ->
+          populate_adjoint_r obj_a (src dst f) g (fun obj_mid ->
+              populate_adjoint_r obj_mid dst f cont)
     end
 
     type ('a, 'd) t =
@@ -197,6 +217,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           (** Short-hand for [Const (H.Const.max, C.max) to save memory] *)
       | Unknown : 'a -> ('a, 'l * 'r) t
           (** Short-hand for [Const (H.Const.unknown, a) to save memory] *)
+      | Pinpointed : H.Pinpoint.t * ('a, 'l * 'r) t -> ('a, 'l * 'r) t
       constraint 'd = _ * _
     [@@ocaml.warning "-62"]
 
@@ -210,6 +231,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Branch (Join, h1, h2) -> Branch (Join, allow_left h1, allow_left h2)
         | Min -> Min
         | Unknown c -> Unknown c
+        | Pinpointed (pp, h) -> Pinpointed (pp, allow_left h)
 
       let rec allow_right : type a l r. (a, l * allowed) t -> (a, l * r) t =
         function
@@ -219,6 +241,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Branch (Meet, h1, h2) -> Branch (Meet, allow_right h1, allow_right h2)
         | Max -> Max
         | Unknown c -> Unknown c
+        | Pinpointed (pp, h) -> Pinpointed (pp, allow_right h)
 
       let rec disallow_left : type a l r. (a, l * r) t -> (a, disallowed * r) t
           = function
@@ -232,6 +255,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Min -> Min
         | Max -> Max
         | Unknown c -> Unknown c
+        | Pinpointed (pp, h) -> Pinpointed (pp, disallow_left h)
 
       let rec disallow_right : type a l r. (a, l * r) t -> (a, l * disallowed) t
           = function
@@ -245,28 +269,32 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         | Min -> Min
         | Max -> Max
         | Unknown c -> Unknown c
+        | Pinpointed (pp, h) -> Pinpointed (pp, disallow_right h)
     end)
 
     (** This is for removing compositions. This function doesn't contain any
         [assert false] as it is just for a straightforward transformation *)
-    let rec populate : type a l r. a C.obj -> (a, l * r) t -> (a, l * r) ahint =
+    let rec populate : type a l r.
+        a C.obj -> (a, l * r) t -> (a, l * r) ahint * H.Pinpoint.t =
      fun obj_a -> function
-      | Min -> C.min obj_a, Const H.Const.min
-      | Max -> C.max obj_a, Const H.Const.max
-      | Unknown c -> c, Const H.Const.unknown
-      | Const (const_hint, const) -> const, Const const_hint
+      | Min -> (C.min obj_a, Const H.Const.min), H.Pinpoint.unknown
+      | Max -> (C.max obj_a, Const H.Const.max), H.Pinpoint.unknown
+      | Unknown c -> (c, Const H.Const.unknown), H.Pinpoint.unknown
+      | Const (const_hint, const) ->
+        (const, Const const_hint), H.Pinpoint.unknown
+      | Pinpointed (pp, hint) -> fst (populate obj_a hint), pp
       | Apply (morph_hint, hint) ->
         Morph_hint.populate obj_a morph_hint (fun src -> populate src hint)
       | Branch (b, hint1, hint2) -> (
-        let ahint1 = populate obj_a hint1 in
-        let ahint2 = populate obj_a hint2 in
+        let ahint1, _ = populate obj_a hint1 in
+        let ahint2, _ = populate obj_a hint2 in
         match b with
         | Join ->
           let a = C.join obj_a (fst ahint1) (fst ahint2) in
-          a, Branch (Join, ahint1, ahint2)
+          (a, Branch (Join, ahint1, ahint2)), H.Pinpoint.unknown
         | Meet ->
           let a = C.meet obj_a (fst ahint1) (fst ahint2) in
-          a, Branch (Meet, ahint1, ahint2))
+          (a, Branch (Meet, ahint1, ahint2)), H.Pinpoint.unknown)
   end
 
   (* All keys in a particular [VarMap] should have the same destination object,
@@ -989,13 +1017,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let rec submode_cv : type a.
       allow_rigid:bool ->
       log:_ ->
-      H.Pinpoint.t ->
       a C.obj ->
       a ->
       (a, left_only) Comp_hint.t ->
       a var ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
-   fun (type a) ~allow_rigid ~log pp (obj : a C.obj) a' a'_hint v ->
+   fun (type a) ~allow_rigid ~log (obj : a C.obj) a' a'_hint v ->
     if C.le obj a' v.lower
     then Ok ()
     else if not (C.le obj a' v.upper)
@@ -1007,7 +1034,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let r =
         v.vupper
         |> find_error (fun mu ->
-            let r = submode_cmv ~allow_rigid ~log pp obj a' a'_hint mu in
+            let r = submode_cmv ~allow_rigid ~log obj a' a'_hint mu in
             (if Result.is_ok r
              then
                (* Optimization: update [v.upper] based on [mupper u].*)
@@ -1022,13 +1049,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   and submode_cmv : type a l.
       allow_rigid:bool ->
       log:_ ->
-      H.Pinpoint.t ->
       a C.obj ->
       a ->
       (a, left_only) Comp_hint.t ->
       (a, l * allowed) morphvar ->
       (unit, a * (a, right_only) Comp_hint.t) Result.t =
-   fun ~allow_rigid ~log pp obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
+   fun ~allow_rigid ~log obj a a_hint (Amorphvar (v, f, f_hint) as mv) ->
     let mlower = mlower obj mv in
     let mupper = mupper obj mv in
     let mupper_hint = mupper_hint mv in
@@ -1041,12 +1067,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          closure of [f]'s image. Therefore, asking [a <= f v] is equivalent to
          asking [f' a <= v]. *)
       let f' = C.left_adjoint obj f in
-      let src_pp, src, f'_hint =
-        Comp_hint.Morph_hint.left_adjoint pp obj f_hint
-      in
+      let src = C.src obj f in
+      let f'_hint = Comp_hint.Morph_hint.left_adjoint obj f_hint in
       let a' = C.apply src f' a in
       let a'_hint = Comp_hint.Apply (f'_hint, a_hint) in
-      match submode_cv ~allow_rigid ~log src_pp src a' a'_hint v with
+      match submode_cv ~allow_rigid ~log src a' a'_hint v with
       | Ok () -> Ok ()
       | Error (e, e_hint) ->
         Error
@@ -1060,13 +1085,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let rec submode_vc : type a.
       allow_rigid:bool ->
       log:_ ->
-      H.Pinpoint.t ->
       a C.obj ->
       a var ->
       a ->
       (a, right_only) Comp_hint.t ->
       (unit, a * (a, left_only) Comp_hint.t) Result.t =
-   fun (type a) ~allow_rigid ~log pp (obj : a C.obj) v a' a'_hint ->
+   fun (type a) ~allow_rigid ~log (obj : a C.obj) v a' a'_hint ->
     if C.le obj v.upper a'
     then Ok ()
     else if not (C.le obj v.lower a')
@@ -1078,7 +1102,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       let r =
         v.vlower
         |> find_error (fun mu ->
-            let r = submode_mvc ~allow_rigid ~log pp obj mu a' a'_hint in
+            let r = submode_mvc ~allow_rigid ~log obj mu a' a'_hint in
             (if Result.is_ok r
              then
                (* Optimization: update [v.lower] based on [mlower u].*)
@@ -1094,13 +1118,12 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       'a 'r.
       allow_rigid:bool ->
       log:change list ref option ->
-      H.Pinpoint.t ->
       'a C.obj ->
       ('a, allowed * 'r) morphvar ->
       'a ->
       ('a, right_only) Comp_hint.t ->
       (unit, 'a * ('a, left_only) Comp_hint.t) Result.t =
-   fun ~allow_rigid ~log pp obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
+   fun ~allow_rigid ~log obj (Amorphvar (v, f, f_hint) as mv) a a_hint ->
     (* See [submode_cmv] for why we need the following seemingly redundant
        lines. *)
     let mupper = mupper obj mv in
@@ -1112,16 +1135,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     then Error (mlower, mlower_hint)
     else
       let f' = C.right_adjoint obj f in
-      let src_pp, src, f'_hint =
-        Comp_hint.Morph_hint.right_adjoint pp obj f_hint
-      in
+      let src = C.src obj f in
+      let f'_hint = Comp_hint.Morph_hint.right_adjoint obj f_hint in
       let a' = C.apply src f' a in
       let a'_hint = Comp_hint.Apply (f'_hint, a_hint) in
       (* If [mlower] was precise, then the check
          [not (C.le obj (mlower obj mv) a)] should guarantee the following call
          to return [Ok ()]. However, [mlower] is not precise *)
       (* not using [Result.map_error] to avoid allocating closure *)
-      match submode_vc ~allow_rigid ~log src_pp src v a' a'_hint with
+      match submode_vc ~allow_rigid ~log src v a' a'_hint with
       | Ok () -> Ok ()
       | Error (e, e_hint) ->
         Error
@@ -1148,8 +1170,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       (* We want a hint for why [lower] is low, but we only have hint for why [lower] is
          high. There is no good hint to use. *)
       let r =
-        submode_mvc ~allow_rigid:true ~log:(Some log) H.Pinpoint.unknown obj mv
-          lower (Unknown lower)
+        submode_mvc ~allow_rigid:true ~log:(Some log) obj mv lower
+          (Unknown lower)
       in
       match r with
       | Ok () -> !log, lower
@@ -1176,8 +1198,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let rec loop upper =
       let log = ref empty_changes in
       let r =
-        submode_cmv ~allow_rigid:true ~log:(Some log) H.Pinpoint.unknown obj
-          upper (Unknown upper) mv
+        submode_cmv ~allow_rigid:true ~log:(Some log) obj upper (Unknown upper)
+          mv
       in
       match r with
       | Ok () -> !log, upper
@@ -1260,9 +1282,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       floor_reachable_morphvar dst ~stop:(C.max dst) (Amorphvar (u, g, g_hint))
     in
     match
-      submode_mvc ~allow_rigid:false ~log pp dst
+      submode_mvc ~allow_rigid:false ~log dst
         (Amorphvar (v, f, f_hint))
-        floor (Comp_hint.Unknown floor)
+        floor
+        (Comp_hint.Pinpointed (pp, Unknown floor))
     with
     | Ok () -> Ok ()
     | Error (a, a_hint) -> Error (a, a_hint, floor, Comp_hint.Unknown floor)
@@ -1287,7 +1310,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ceil_reachable_morphvar dst ~stop:(C.min dst) (Amorphvar (v, f, f_hint))
     in
     match
-      submode_cmv ~allow_rigid:false ~log pp dst ceil (Comp_hint.Unknown ceil)
+      submode_cmv ~allow_rigid:false ~log dst ceil
+        (Comp_hint.Pinpointed (pp, Unknown ceil))
         (Amorphvar (u, g, g_hint))
     with
     | Ok () -> Ok ()
@@ -1297,7 +1321,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in [u.vlower] for the relationship [f v <= g u], along with its hint and
       whether the arrow is already recorded. *)
   let vlower_recorded : type a b c l r.
-      H.Pinpoint.t ->
       b C.obj ->
       a var ->
       (a, b, allowed * r) C.morph ->
@@ -1308,9 +1331,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       bool
       * (a, c, left_only) C.morph
       * (a, c, left_only) Comp_hint.Morph_hint.t =
-   fun pp dst v f f_hint u g g_hint ->
+   fun dst v f f_hint u g g_hint ->
     let g' = C.left_adjoint dst g in
-    let _, src, g'_hint = Comp_hint.Morph_hint.left_adjoint pp dst g_hint in
+    let src = C.src dst g in
+    let g'_hint = Comp_hint.Morph_hint.left_adjoint dst g_hint in
     let g'f = C.compose src g' (C.disallow_right f) in
     let g'f_hint =
       Comp_hint.Morph_hint.compose g'_hint
@@ -1323,7 +1347,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       in [v.vupper] for the relationship [f v <= g u], along with its hint and
       whether the arrow is already recorded. *)
   let vupper_recorded : type a b c l r.
-      H.Pinpoint.t ->
       b C.obj ->
       a var ->
       (a, b, allowed * r) C.morph ->
@@ -1334,9 +1357,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       bool
       * (c, a, right_only) C.morph
       * (c, a, right_only) Comp_hint.Morph_hint.t =
-   fun pp dst v f f_hint u g g_hint ->
+   fun dst v f f_hint u g g_hint ->
     let f' = C.right_adjoint dst f in
-    let _, src, f'_hint = Comp_hint.Morph_hint.right_adjoint pp dst f_hint in
+    let src = C.src dst f in
+    let f'_hint = Comp_hint.Morph_hint.right_adjoint dst f_hint in
     let f'g = C.compose src f' (C.disallow_left g) in
     let f'g_hint =
       Comp_hint.Morph_hint.compose f'_hint
@@ -1371,18 +1395,25 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          6. If v.level > u.level adding f' (g u) to v.vupper, where f' is the right adjoint of f
          Steps 3 and 4 are implemented by [add_vlower], steps 5 and 6 by [add_vupper].
       *)
-      match submode_mvc ~allow_rigid ~log pp dst mv muupper muupper_hint with
+      match
+        submode_mvc ~allow_rigid ~log dst mv muupper
+          (Comp_hint.Pinpointed (pp, muupper_hint))
+      with
       | Error (a, a_hint) -> Error (a, a_hint, muupper, muupper_hint)
       | Ok () -> (
         let mvlower = mlower dst mv in
         let mvlower_hint = mlower_hint mv in
-        match submode_cmv ~allow_rigid ~log pp dst mvlower mvlower_hint mu with
+        match
+          submode_cmv ~allow_rigid ~log dst mvlower
+            (Comp_hint.Pinpointed (pp, mvlower_hint))
+            mu
+        with
         | Error (a, a_hint) -> Error (mvlower, mvlower_hint, a, a_hint)
         | Ok () ->
           if v.level <= u.level
           then begin
             let recorded, g'f, g'f_hint =
-              vlower_recorded pp dst v f f_hint u g g_hint
+              vlower_recorded dst v f f_hint u g g_hint
             in
             if recorded
             then Ok ()
@@ -1397,7 +1428,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           end
           else begin
             let recorded, f'g, f'g_hint =
-              vupper_recorded pp dst v f f_hint u g g_hint
+              vupper_recorded dst v f f_hint u g g_hint
             in
             if recorded
             then Ok ()
@@ -1625,7 +1656,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.left_adjoint dst f in
     let src = C.src dst f in
-    let f'_hint = Comp_hint.Morph_hint.Adjoint_l (f_hint, f') in
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_l (dst, f_hint, Some pp) in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vlower
@@ -1667,7 +1698,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
    fun ~allow_rigid ~log pp dst v u f f_hint ->
     let f' = C.right_adjoint dst f in
     let src = C.src dst f in
-    let f'_hint = Comp_hint.Morph_hint.Adjoint_r (f_hint, f') in
+    let f'_hint = Comp_hint.Morph_hint.Adjoint_r (dst, f_hint, Some pp) in
     let x = Amorphvar (u, f', f'_hint) in
     let key = get_key src x in
     if VarMap.mem key v.vupper
@@ -2153,12 +2184,15 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let submode_mvc ~log pp obj v right right_hint =
       Result.map_error
         (fun (left, left_hint) -> { left; left_hint; right; right_hint })
-        (submode_mvc ~allow_rigid:false ~log pp obj v right right_hint)
+        (submode_mvc ~allow_rigid:false ~log obj v right
+           (Comp_hint.Pinpointed (pp, right_hint)))
     in
     let submode_cmv ~log pp obj left left_hint v =
       Result.map_error
         (fun (right, right_hint) -> { left; left_hint; right; right_hint })
-        (submode_cmv ~allow_rigid:false ~log pp obj left left_hint v)
+        (submode_cmv ~allow_rigid:false ~log obj left
+           (Comp_hint.Pinpointed (pp, left_hint))
+           v)
     in
     let submode_mvmv ~log pp obj v u =
       Result.map_error
@@ -2221,7 +2255,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                     mus)))
 
   let populate_hint obj a hint =
-    let ahint = Comp_hint.populate obj hint in
+    let ahint, _ = Comp_hint.populate obj hint in
     assert (Misc.Le_result.equal ~le:(C.le obj) (fst ahint) a);
     ahint
 
@@ -2355,8 +2389,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (fun _ mv ->
           (* We want a hint for why [floor] is low. However, we only have hint
              for why [floor] is high. There is no hint to use. *)
-          submode_mvc ~allow_rigid:true H.Pinpoint.unknown obj mv floor
-            (Unknown floor) ~log
+          submode_mvc ~allow_rigid:true obj mv floor (Unknown floor) ~log
           |> Result.get_ok)
         mvs;
       floor
@@ -2387,8 +2420,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       VarMap.iter
         (fun _ mv ->
           let ok =
-            submode_cmv ~allow_rigid:true H.Pinpoint.unknown obj ceil
-              (Unknown ceil) mv ~log
+            submode_cmv ~allow_rigid:true obj ceil (Unknown ceil) mv ~log
           in
           assert (Result.is_ok ok))
         mvs;
@@ -2490,8 +2522,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_cmv ~allow_rigid:false H.Pinpoint.unknown obj ~log:None a a_hint
-          mu
+        submode_cmv ~allow_rigid:false obj ~log:None a a_hint mu
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
@@ -2550,8 +2581,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let u = fresh ~level obj in
         let mu = Amorphvar (u, C.id, Id) in
-        submode_mvc ~allow_rigid:false H.Pinpoint.unknown obj ~log:None mu a
-          a_hint
+        submode_mvc ~allow_rigid:false obj ~log:None mu a a_hint
         |> Result.get_ok;
         VarMap.iter
           (fun _ mv ->
