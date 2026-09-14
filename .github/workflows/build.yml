@@ -125,6 +125,9 @@ jobs:
             build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
             run_regalloc_tool: true
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml1
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
+            native_debugger_lldb: true
             sysdeps: gdb
 
           - name: regalloc multidomain (aarch64-linux)
@@ -338,6 +341,13 @@ jobs:
           wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
           mkdir -p oxcaml-llvm
           tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
+
+      - name: Add OxCaml LLDB to PATH
+        if: matrix.native_debugger_lldb == true
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/lldb-path"
+          ln -sf "$GITHUB_WORKSPACE/oxcaml-llvm/bin/lldb" "$GITHUB_WORKSPACE/lldb-path/lldb"
+          echo "$GITHUB_WORKSPACE/lldb-path" >> "$GITHUB_PATH"
 
       - name: Configure OxCaml
         env:
