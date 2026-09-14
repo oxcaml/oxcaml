@@ -211,7 +211,7 @@ Sometimes the kind of a type constructor depends on the kinds of the types that
 are passed as arguments.  For example, the type `'a list` can mode cross on
 the portability axis if `'a` does.
 
-We could have a `list` whose kind is restricted to work on types that more cross
+We could have a `list` whose kind is restricted to work on types that mode cross
 on the portability axis, to record this fact, as in:
 ```ocaml
 type ('a : value mod portable) portable_list : value mod portable
