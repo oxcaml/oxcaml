@@ -593,7 +593,8 @@ let expr sub x =
                         am)
     | Texp_variant (l, expo) ->
         Texp_variant (l, Option.map (fun (e, am) -> (sub.expr sub e, am)) expo)
-    | Texp_record { fields; representation; extended_expression; locality_mode } ->
+    | Texp_record
+        { fields; representation; extended_expression; locality_mode } ->
         Texp_record {
           fields = map_fields fields; representation;
           extended_expression =

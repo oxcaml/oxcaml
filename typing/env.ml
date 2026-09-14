@@ -3804,13 +3804,18 @@ let exclave_mode ~errors ~env ~pp vmode =
     (Mode.With_regionality.proj_comonadic Areality vmode)
     Mode.Regionality.regional
 with
-| Ok () -> vmode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_as_regionality
+| Ok () ->
+    vmode
+    |> Mode.with_regionality_to_locality_r2l
+    |> Mode.with_locality_as_regionality
 | Error _ ->
     may_lookup_error errors (fst pp) env
       (Local_value_used_in_exclave (snd pp))
 
 let region_mode vmode =
-  vmode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_to_regionality_l2r
+  vmode
+  |> Mode.with_regionality_to_locality_r2l
+  |> Mode.with_locality_to_regionality_l2r
 
 let unboxed_type ~errors ~env ~loc ty_and_lid =
   match ty_and_lid with
@@ -3891,7 +3896,11 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
       | Region_lock ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
-          let mode = mode |> Mode.with_regionality_to_locality_r2g |> Mode.with_locality_as_regionality in
+          let mode =
+            mode
+            |> Mode.with_regionality_to_locality_r2g
+            |> Mode.with_locality_as_regionality
+          in
           Mode.With_regionality.meet
             [mode;
              Mode.With_regionality.max_with_comonadic Areality
@@ -3901,7 +3910,9 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
-          mode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_as_regionality
+          mode
+          |> Mode.with_regionality_to_locality_r2l
+          |> Mode.with_locality_as_regionality
       | Const_closure_lock (true, _, _) ->
           mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->

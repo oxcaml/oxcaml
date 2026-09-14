@@ -5197,19 +5197,38 @@ module Report = struct
       if not (implements_regionality_to_locality Regional_to_global src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj src b a),
+      ( ~is_skip:
+          (implements_locality_to_regionality
+             Locality_as_regionality
+             obj
+             src
+             b
+             a),
         ~fixpoint )
     | Allocation_l _ ->
       (* We check that the morphism is with_regionality_to_locality_r2l *)
       if not (implements_regionality_to_locality Regional_to_local src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj src b a),
+      ( ~is_skip:
+          (implements_locality_to_regionality
+             Locality_as_regionality
+             obj
+             src
+             b
+             a),
         ~fixpoint )
     | Allocation _ ->
       (* We always want to skip an Allocation hint. Report if the hint was not
          applied to an with_locality_as_regionality morphism. *)
-      if not (implements_locality_to_regionality Locality_as_regionality src obj a b)
+      if
+        not
+          (implements_locality_to_regionality
+             Locality_as_regionality
+             src
+             obj
+             a
+             b)
       then print_bug_stderr ();
       ~is_skip:true, ~fixpoint
 
@@ -8648,18 +8667,21 @@ module Crossing = struct
     With_regionality.hint ~monadic:Crossing ~comonadic:Crossing
       (apply_right_unhint t (With_regionality.disallow_left m))
 
-  (* Our mode crossing is for [With_regionality] modes, but can be extended to [With_locality]
-     modes via [with_locality_as_regionality], defined as follows:
+  (* Our mode crossing is for [With_regionality] modes, but can be extended to
+     [With_locality] modes via [with_locality_as_regionality], defined as
+     follows:
 
-     Given a mode crossing [f] for [With_regionality], and we are to check [With_locality] submoding
-     [m1 <= m2], we will instead check
-     [f (with_locality_as_regionality m1) <= f (with_locality_as_regionality m2)].
+     Given a mode crossing [f] for [With_regionality], and we are to check
+     [With_locality] submoding [m1 <= m2], we will instead check
+     [f (with_locality_as_regionality m1) <=
+      f (with_locality_as_regionality m2)].
 
      By adjunction tricks, this is equivalent to
      - [ m1 <= regional_to_global ∘ fr ∘ f ∘ with_locality_as_regionality m2 ]
      - [ regional_to_local ∘ fl ∘ f ∘ with_locality_as_regionality m1 <= m2 ]
-     where [regional_to_global] is the right adjoint of [with_locality_as_regionality], and
-     [regional_to_local] the left adjoint. *)
+     where [regional_to_global] is the right adjoint of
+     [with_locality_as_regionality], and [regional_to_local] the left
+     adjoint. *)
 
   let with_regionality_to_locality_r2l_unhint m =
     let { comonadic; monadic } = m in
@@ -8678,11 +8700,17 @@ module Crossing = struct
     { comonadic; monadic }
 
   let apply_left_with_locality t m =
-    m |> with_locality_as_regionality |> apply_left_unhint t |> with_regionality_to_locality_r2l_unhint
+    m
+    |> with_locality_as_regionality
+    |> apply_left_unhint t
+    |> with_regionality_to_locality_r2l_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_with_locality t m =
-    m |> with_locality_as_regionality |> apply_right_unhint t |> with_regionality_to_locality_r2g_unhint
+    m
+    |> with_locality_as_regionality
+    |> apply_right_unhint t
+    |> with_regionality_to_locality_r2g_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_with_locality t m =

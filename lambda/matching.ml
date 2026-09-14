@@ -4833,7 +4833,9 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_locality_mode = Translmode.transl_typed_locality_mode_r env_locality_mode in
+    let env_locality_mode =
+      Translmode.transl_typed_locality_mode_r env_locality_mode
+    in
     let param =
       match param with
       | Lfunction lfun -> lfun

@@ -709,7 +709,8 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; locality_mode = am; ret_mode; yielding = ym } ->
+  | Texp_function
+      { params; body; locality_mode = am; ret_mode; yielding = ym } ->
       line i ppf "Texp_function\n";
       locality_mode_r i ppf am;
       yielding_mode i ppf ym;
@@ -755,7 +756,8 @@ and expression i ppf x =
   | Texp_variant (l, eo) ->
       line i ppf "Texp_variant \"%s\"\n" l;
       option i expression_locality_mode ppf eo;
-  | Texp_record { fields; representation; extended_expression; locality_mode = am } ->
+  | Texp_record
+      { fields; representation; extended_expression; locality_mode = am } ->
       line i ppf "Texp_record\n";
       let i = i+1 in
       locality_mode_option i ppf am;

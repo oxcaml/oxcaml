@@ -6509,11 +6509,15 @@ let cross_right env ?modalities ty mode =
 
 let cross_left_with_locality env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_locality.disallow_right |> Crossing.apply_left_with_locality crossing
+  mode
+  |> With_locality.disallow_right
+  |> Crossing.apply_left_with_locality crossing
 
 let cross_right_with_locality env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_locality.disallow_left |> Crossing.apply_right_with_locality crossing
+  mode
+  |> With_locality.disallow_left
+  |> Crossing.apply_right_with_locality crossing
 
 (* The locality axis of the return mode of an arrow cannot cross modes,
    because a local-returning function might allocate in the caller's region,

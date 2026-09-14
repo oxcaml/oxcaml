@@ -920,7 +920,9 @@ let create_allocation_mode_r mode =
 
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
-  let locality_mode = create_allocation_mode_r (with_regionality_to_locality_r2g mode) in
+  let locality_mode =
+    create_allocation_mode_r (with_regionality_to_locality_r2g mode)
+  in
   register_allocation_mode locality_mode;
   (* We must apply each morphism separately so that their hints correspond to
      the correct morphism *)
@@ -928,7 +930,9 @@ let register_allocation_value_mode ~loc
     with_regionality_to_locality_r2g ~allocation:({loc; txt = desc})
       (Mode.With_regionality.disallow_left mode)
   in
-  let mode = with_locality_as_regionality ~allocation:({loc; txt = desc}) mode in
+  let mode =
+    with_locality_as_regionality ~allocation:({loc; txt = desc}) mode
+  in
   locality_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -3705,10 +3709,11 @@ and type_pat_aux
             enter_variable ~lpoly tps loc name mode ~kind ty
               sp.ppat_attributes sort
           in
-          Tpat_fun_layout { id; name; uid; sort;
-                            mode = alloc_mode; lpoly;
-                            env_locality_mode =
-                              Typedtree.create_locality_mode_r env_locality_mode }
+          Tpat_fun_layout
+            { id; name; uid; sort;
+              mode = alloc_mode; lpoly;
+              env_locality_mode =
+                Typedtree.create_locality_mode_r env_locality_mode }
         | None ->
           let lpoly = Lpoly.determined [] in
           let id, uid =
@@ -5774,7 +5779,9 @@ let type_pattern_approx env spat ty_expected =
       let inferred_ty =
         match sty with
         | {ptyp_desc=Ptyp_poly _} ->
-          let arg_type_mode = Typemode.transl_mode_with_locality arg_type_mode in
+          let arg_type_mode =
+            Typemode.transl_mode_with_locality arg_type_mode
+          in
           let inferred_ty =
             Typetexp.transl_simple_type ~new_var_jkind:Any env ~closed:false
               arg_type_mode.mode_modes sty
@@ -6482,7 +6489,8 @@ type split_function_ty =
        closures have a mode greater than outer closures, and it
        needs to be a right mode for making sure
        arguments generate a lower bound for subsequent closures.
-       [locality_mode] tracks the locality component to store in the Typedtree. *)
+       [locality_mode] tracks the locality component to store in the
+       Typedtree. *)
     closure_mode: Mode.With_locality.Comonadic.lr;
     env_mode: Mode.With_locality.Monadic.r;
     locality_mode: Locality.lr;
@@ -7654,7 +7662,9 @@ and type_expect_
       in
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
-      let mode_ret = cross_left env ty_ret (with_locality_as_regionality mode_ret) in
+      let mode_ret =
+        cross_left env ty_ret (with_locality_as_regionality mode_ret)
+      in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -7838,7 +7848,9 @@ and type_expect_
               let arg =
                 type_argument ~overwrite:No_overwrite env argument_mode sarg ty ty0
               in
-              let locality_mode = Typedtree.create_locality_mode_r locality_mode in
+              let locality_mode =
+                Typedtree.create_locality_mode_r locality_mode
+              in
               re { exp_desc = Texp_variant(l, Some (arg, locality_mode));
                    exp_loc = loc; exp_extra = [];
                    exp_type = ty_expected0;

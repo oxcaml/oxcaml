@@ -1078,7 +1078,8 @@ module type S = sig
   module With_locality : Mode with module Areality := Locality
 
   module Const : sig
-    val with_locality_as_regionality : With_locality.Const.t -> With_regionality.Const.t
+    val with_locality_as_regionality :
+      With_locality.Const.t -> With_regionality.Const.t
 
     module Axis : sig
       val with_locality_as_regionality :
@@ -1471,15 +1472,19 @@ module type S = sig
     val apply_right :
       t -> ('l * allowed) With_regionality.t -> With_regionality.r
 
-    (* We extend mode crossing on [With_regionality] to [With_locality] via [with_locality_as_regionality].
-       Concretely, two [With_locality] modes are indistinguishable if their images under
-       [with_locality_as_regionality] are indistinguishable. Currently types cross locality
-       either fully or fully not, and therefore [with_locality_as_regionality] seems sufficient. *)
+    (* We extend mode crossing on [With_regionality] to [With_locality] via
+       [with_locality_as_regionality]. Concretely, two [With_locality] modes are
+       indistinguishable if their images under [with_locality_as_regionality]
+       are indistinguishable. Currently types cross locality either fully or
+       fully not, and therefore [with_locality_as_regionality] seems
+       sufficient. *)
 
-    (** Similar to [apply_left] but for [With_locality] via [with_locality_as_regionality] *)
+    (** Similar to [apply_left] but for [With_locality] via
+        [with_locality_as_regionality] *)
     val apply_left_with_locality : t -> With_locality.l -> With_locality.l
 
-    (** Similar to [apply_right] but for [With_locality] via [with_locality_as_regionality] *)
+    (** Similar to [apply_right] but for [With_locality] via
+        [with_locality_as_regionality] *)
     val apply_right_with_locality : t -> With_locality.r -> With_locality.r
 
     (** Apply mode crossong on the left comonadic fragment, and the right
