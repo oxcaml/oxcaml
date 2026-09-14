@@ -1045,7 +1045,8 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
     let tl =
       List.map
         (fun (label, t) ->
-           label, transl_type env ~policy ~row_context With_locality.Const.legacy t)
+           label,
+           transl_type env ~policy ~row_context With_locality.Const.legacy t)
         stl
     in
     let ctyp_type =
@@ -1066,7 +1067,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context With_locality.Const.legacy) stl
+        List.map
+          (transl_type env ~policy ~row_context With_locality.Const.legacy)
+          stl
       in
       let params = instance_list decl.type_params in
       let unify_param =
@@ -1128,7 +1131,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                     Type_arity_mismatch(lid.txt, decl.type_arity,
                                         List.length stl)));
       let args =
-        List.map (transl_type env ~policy ~row_context With_locality.Const.legacy) stl
+        List.map
+          (transl_type env ~policy ~row_context With_locality.Const.legacy)
+          stl
       in
       let body = Option.get decl.type_manifest in
       let (params, body) = instance_parameterized_type decl.type_params body in
@@ -1190,7 +1195,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Builtin_attributes.warning_scope rf_attributes
                 (fun () ->
                    List.map
-                     (transl_type env ~policy ~row_context With_locality.Const.legacy)
+                     (transl_type
+                        env
+                        ~policy
+                        ~row_context
+                        With_locality.Const.legacy)
                      stl)
             in
             List.iter (fun {ctyp_type; ctyp_loc} ->
@@ -1221,7 +1230,12 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               Ttag (l,c,tl)
         | Rinherit sty ->
             let cty =
-              transl_type env ~policy ~row_context With_locality.Const.legacy sty
+              transl_type
+                env
+                ~policy
+                ~row_context
+                With_locality.Const.legacy
+                sty
             in
             let ty = cty.ctyp_type in
             let nm =
@@ -1577,7 +1591,12 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-            (fun () -> transl_type env ~policy ~row_context With_locality.Const.legacy
+            (fun () ->
+              transl_type
+                env
+                ~policy
+                ~row_context
+                With_locality.Const.legacy
                 (Ast_helper.Typ.force_poly ty1))
         in
         begin
@@ -1596,7 +1615,9 @@ and transl_fields env ~policy ~row_context o fields =
         field
       end
     | Oinherit sty -> begin
-        let cty = transl_type env ~policy ~row_context With_locality.Const.legacy sty in
+        let cty =
+          transl_type env ~policy ~row_context With_locality.Const.legacy sty
+        in
         let nm =
           match get_desc cty.ctyp_type with
             Tconstr(p, _, _) -> Some p
@@ -1746,7 +1767,12 @@ let transl_type_scheme_mono env styp =
   let typ =
     with_local_level_generalize begin fun () ->
       TyVarEnv.reset ();
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false With_locality.Const.legacy styp
+      transl_simple_type
+        ~new_var_jkind:Sort
+        env
+        ~closed:false
+        With_locality.Const.legacy
+        styp
     end
     ~before_generalize:generalize_ctyp
   in
