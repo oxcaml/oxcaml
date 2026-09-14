@@ -573,9 +573,10 @@ module Helpers = struct
     let open Query_protocol.Module_type_impls in
     let read index_file =
       try
-        match (Index_cache.read index_file).module_facts with
+        let index = Index_cache.read index_file in
+        match index.module_facts with
         | None -> Error (Channel_absent index_file)
-        | Some source -> Ok (Index_format.fetch_module_facts source)
+        | Some source -> Ok (index, Index_format.fetch_module_facts source)
       with
       | ( Index_format.Not_an_index _
         | Sys_error _
@@ -588,17 +589,63 @@ module Helpers = struct
         log ~title:"module_facts" "cannot read index %s: %s" index_file message;
         Error (Index_read_error { index_file; message })
     in
-    List.fold_left mconfig.merlin.index_files ~init:(None, [])
-      ~f:(fun (facts, errors) index_file ->
+    List.fold_left mconfig.merlin.index_files ~init:(None, [], [])
+      ~f:(fun (facts, indexes, errors) index_file ->
         match read index_file with
-        | Error error -> (facts, error :: errors)
-        | Ok source ->
+        | Error error -> (facts, indexes, error :: errors)
+        | Ok (index, source) ->
           let facts =
             match facts with
             | None -> source
             | Some facts -> Facts.union facts source
           in
-          (Some facts, errors))
+          (Some facts, index :: indexes, errors))
+
+  let indexed_source_files indexes =
+    let files_of_locs locs =
+      Index_format.Lid_set.elements locs
+      |> List.filter_map ~f:(fun lid ->
+          let file =
+            (Index_format.Lid.to_lid lid).loc.loc_start.Lexing.pos_fname
+          in
+          if String.equal file "" then None else Some file)
+    in
+    let rec unit_of_uid : Shape.Uid.t -> string option = function
+      | Compilation_unit name | Item { comp_unit = name; _ } -> Some name
+      | Unboxed_version uid -> unit_of_uid uid
+      | Internal | Predef _ -> None
+    in
+    let files_by_unit =
+      lazy
+        (List.fold_left indexes ~init:String.Map.empty
+           ~f:(fun files (index : Index_format.index) ->
+             Index_format.Uid_map.fold
+               (fun uid locs files ->
+                 match unit_of_uid uid with
+                 | None -> files
+                 | Some name ->
+                   let previous =
+                     Option.value ~default:String.Set.empty
+                       (String.Map.find_opt name files)
+                   in
+                   let source_files = String.Set.of_list (files_of_locs locs) in
+                   String.Map.add ~key:name
+                     ~data:(String.Set.union previous source_files)
+                     files)
+               index.defs files))
+    in
+    fun (uid : Shape.Uid.t) ->
+      match uid with
+      | Compilation_unit name ->
+        Option.value ~default:String.Set.empty
+          (String.Map.find_opt name (Lazy.force files_by_unit))
+        |> String.Set.elements
+      | Item _ | Internal | Predef _ | Unboxed_version _ ->
+        List.concat_map indexes ~f:(fun (index : Index_format.index) ->
+            match Index_format.Uid_map.find_opt uid index.defs with
+            | None -> []
+            | Some locs -> files_of_locs locs)
+        |> List.sort_uniq ~cmp:String.compare
 
   let own_file (mconfig : Mconfig.t) =
     Misc.canonicalize_filename
@@ -707,13 +754,9 @@ let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
         })
   | Uid uid ->
     let description = Format.asprintf "%a" Shape.Uid.print uid in
-    let location =
-      try Locate.lookup_loc_of_uid ~config:mconfig ~local_defs uid
-      with Not_found -> None
-    in
     let name_and_site =
-      match location with
-      | None -> None
+      match Locate.lookup_loc_of_uid ~config:mconfig ~local_defs uid with
+      | (exception Not_found) | None -> None
       | Some (`Compilation_unit loc) ->
         Option.map (Helpers.find_source_of_loc mconfig ~description loc)
           ~f:(fun (loc : Location.t) ->
@@ -745,6 +788,50 @@ let resolve_implementation mconfig ~local_defs (node : Facts.Node.t) =
             (if String.equal name "_" then None else Some name);
           site
         })
+
+let implementation_resolver (mconfig : Mconfig.t) ~local_defs ~indexes =
+  let source_files = Helpers.indexed_source_files indexes in
+  let configs = Hashtbl.create 16 in
+  let resolved = Shape.Uid.Tbl.create 16 in
+  let resolve_in_file node file =
+    let cwd =
+      Option.value ~default:mconfig.query.directory mconfig.merlin.source_root
+    in
+    let file = Misc.canonicalize_filename ~cwd file in
+    if not (Sys.file_exists file) then None
+    else
+      let config =
+        match Hashtbl.find_opt configs file with
+        | Some config -> config
+        | None ->
+          let config = Helpers.external_config_for_file mconfig file in
+          Hashtbl.add configs file config;
+          config
+      in
+      resolve_implementation config ~local_defs node
+  in
+  fun ~check_site (node : Facts.Node.t) ->
+    match node with
+    | Location _ -> resolve_implementation mconfig ~local_defs node
+    | Uid uid -> (
+      match Shape.Uid.Tbl.find_opt resolved uid with
+      | Some implementation -> Some implementation
+      | None ->
+        let implementation =
+          match resolve_implementation mconfig ~local_defs node with
+          | Some _ as implementation -> implementation
+          | None -> (
+            match
+              List.find_map_opt (source_files uid) ~f:(resolve_in_file node)
+            with
+            | Some _ as implementation -> implementation
+            | None ->
+              Option.bind check_site ~f:(fun (loc : Location.t) ->
+                  resolve_in_file node loc.loc_start.pos_fname))
+        in
+        Option.iter implementation ~f:(fun implementation ->
+            Shape.Uid.Tbl.add resolved uid implementation);
+        implementation)
 
 type site_resolution =
   | No_recorded_site
@@ -820,15 +907,6 @@ let compare_impl_kind left right =
   | Whole_unit, Annotation_sites -> -1
   | Annotation_sites, Whole_unit -> 1
 
-let compare_check_kind left right =
-  let rank : Query_protocol.Module_type_impls.check_kind -> int = function
-    | Annotation -> 0
-    | Argument -> 1
-    | Package -> 2
-    | Interface -> 3
-  in
-  Int.compare (rank left) (rank right)
-
 let compare_implementation_identity
     (left : Query_protocol.Module_type_impls.implementation)
     (right : Query_protocol.Module_type_impls.implementation) =
@@ -857,18 +935,7 @@ let compare_implementation_identity
           else compare_impl_kind left.site.impl_kind right.site.impl_kind
 
 let unique_implementations implementations =
-  let compare left right =
-    let c = compare_implementation_identity left right in
-    if c <> 0 then c else compare_check_kind left.check right.check
-  in
-  List.sort implementations ~cmp:compare
-  |> List.fold_left ~init:[] ~f:(fun unique implementation ->
-      match unique with
-      | previous :: _
-        when compare_implementation_identity previous implementation = 0 ->
-        unique
-      | _ -> implementation :: unique)
-  |> List.rev
+  List.sort_uniq implementations ~cmp:compare_implementation_identity
 
 let error_rank : Query_protocol.Module_type_impls.error -> int = function
   | No_index_files -> 0
@@ -915,7 +982,7 @@ let pp_node fmt (node : Facts.Node.t) =
     Format.fprintf fmt "%s"
       (Compilation_unit.full_path_as_string compilation_unit)
 
-let resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
+let resolve_matching_check ~mconfig ~resolve_implementation ~target ~target_loc
     ({ target_instance; check } : Implementation_search.matching_check) =
   let open Query_protocol.Module_type_impls in
   let target_name =
@@ -937,8 +1004,10 @@ let resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
             }
         ] )
   in
-  match resolve_implementation mconfig ~local_defs check.implementation with
-  | Some { implementation_uid; implementation_name; site } ->
+  match resolve_implementation ~check_site check.implementation with
+  | Some
+      ({ implementation_uid; implementation_name; site } :
+        resolved_implementation) ->
     ( Some
         { target;
           target_loc;
@@ -964,22 +1033,16 @@ let resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
         }
       :: site_errors )
 
-let resolve_matching_checks ~mconfig ~local_defs ~target ~target_loc matches =
+let resolve_matching_checks ~mconfig ~resolve_implementation ~target ~target_loc
+    matches =
   let implementations, errors =
-    List.fold_left matches ~init:([], [])
-      ~f:(fun (implementations, errors) matching_check ->
-        let implementation, check_errors =
-          resolve_matching_check ~mconfig ~local_defs ~target ~target_loc
-            matching_check
-        in
-        let implementations =
-          match implementation with
-          | Some implementation -> implementation :: implementations
-          | None -> implementations
-        in
-        (implementations, List.rev_append check_errors errors))
+    List.map matches
+      ~f:
+        (resolve_matching_check ~mconfig ~resolve_implementation ~target
+           ~target_loc)
+    |> List.split
   in
-  (List.rev implementations, List.rev errors)
+  (List.filter_map implementations ~f:Fun.id, List.concat errors)
 
 let status_and_errors ~index_files ~facts_present ~index_errors ~omissions
     ~resolution_errors =
@@ -1013,7 +1076,10 @@ let query ?position pipeline =
   in
   let open Query_protocol.Module_type_impls in
   let index_files = mconfig.merlin.index_files in
-  let facts, index_errors = Helpers.module_facts mconfig in
+  let facts, indexes, index_errors = Helpers.module_facts mconfig in
+  let resolve_implementation =
+    implementation_resolver mconfig ~local_defs:typedtree ~indexes
+  in
   let search = Option.map facts ~f:Implementation_search.create in
   let targets, implementations =
     List.split
@@ -1029,7 +1095,7 @@ let query ?position pipeline =
              Helpers.location_in_file own_file target.target_loc
            in
            let implementations, resolution_errors =
-             resolve_matching_checks ~mconfig ~local_defs:typedtree
+             resolve_matching_checks ~mconfig ~resolve_implementation
                ~target:(Modtype target.target_name)
                ~target_loc:(Some target_loc) result.matches
            in
@@ -1053,7 +1119,7 @@ let query ?position pipeline =
         Implementation_search.find_for_anonymous_type search unit_uid
       in
       let implementations, _ =
-        resolve_matching_checks ~mconfig ~local_defs:typedtree
+        resolve_matching_checks ~mconfig ~resolve_implementation
           ~target:Own_interface ~target_loc:None result.matches
       in
       implementations

@@ -836,11 +836,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
     in
     List.concat_map ~f:loc_and_types_of_holes nodes
   | Module_type_impls position ->
-    let position =
-      match position with
-      | None -> None
-      | Some position -> Some (Mpipeline.get_lexing_pos pipeline position)
-    in
+    let position = Option.map ~f:(Mpipeline.get_lexing_pos pipeline) position in
     Merlin_analysis.Module_type_impls.query ?position pipeline
   | Construct (pos, with_values, depth) ->
     let values_scope =
