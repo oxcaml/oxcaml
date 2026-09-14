@@ -84,10 +84,7 @@ module Meaning = struct
   type t =
     | Nothing_to_say
     | Unexplained
-    | User_annotation of
-        { syntax : Mode.Hint.annotation_syntax;
-          written : string Location.loc
-        }
+    | User_annotation of Mode.Hint.annotation_source
     | Capture of capture
     | Signature_argument of argument_requirement
     | Fact of fact
@@ -101,9 +98,9 @@ module Meaning = struct
       Reroute (Allocation allocation)
 
   let annotation_meaning mode
-      ({ syntax; annotated_modes; contained_by } : Mode.Hint.annotation) =
+      ({ annotated_modes; contained_by } : Mode.Hint.annotation) =
     match List.assoc_opt (Step_mode.name mode) annotated_modes with
-    | Some written -> User_annotation { syntax; written }
+    | Some source -> User_annotation source
     | None -> (
       match contained_by with
       | Some containing -> Reroute (Contained_by containing)
@@ -370,6 +367,23 @@ let modality_annotation_reason ~mode_name ~subject:owner ?(asides = [])
       ref_source written.loc
         [term (Diagnostic_term.Written_modality_term written.txt)] ]
 
+let annotation_reason ~mode_name ~mode ~subject:owner ?(asides = [])
+    (source : Mode.Hint.annotation_source) =
+  let open Nlg in
+  match source with
+  | Written_modality written ->
+    modality_annotation_reason ~mode_name ~subject:owner ~asides written
+  | Written_mode written ->
+    note ~subject:owner ~asides
+      [ txt "because ";
+        mention ~case:Subject owner;
+        ref_source written.loc (copula :: txt " annotated as " :: mode) ]
+  | Mutable_field field ->
+    note ~asides
+      [ txt "because field ";
+        ref_source field.loc
+          [code field.txt; txt " is declared "; code "mutable"] ]
+
 let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
     term Nlg.aside list =
   let subj = Nlg.mention ~case:Subject owner in
@@ -395,13 +409,9 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
   in
   match s.says with
   | Nothing_to_say | Unexplained -> []
-  | User_annotation { syntax = `Modality; written } ->
-    [ modality_annotation_reason ~mode_name:(Step_mode.name s.mode)
-        ~subject:owner ~asides written ]
-  | User_annotation { syntax = `Mode; written } ->
-    [ about
-        [subj; ref_source written.loc (copula :: txt " annotated as " :: mode)]
-    ]
+  | User_annotation source ->
+    [ annotation_reason ~mode_name:(Step_mode.name s.mode) ~mode ~subject:owner
+        ~asides source ]
   | Capture { relation = Closes_over; details = { closed; _ }; _ } ->
     [ about
         [ subj;
@@ -824,13 +834,15 @@ let signature_reason ~axis ~subject:owner
       then []
       else
         match Mode.Modality.Const.annotation axis modalities with
-        | Some written ->
+        | Some source ->
           let mode_name =
             Format_doc.asprintf "%a"
               (Mode.Modality.Per_axis.print axis)
               modality
           in
-          [modality_annotation_reason ~mode_name ~subject:owner written]
+          [ annotation_reason ~mode_name
+              ~mode:[Nlg.code mode_name]
+              ~subject:owner source ]
         | None ->
           [ Nlg.note
               [ txt "because ";
@@ -888,7 +900,7 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
       List.exists
         (fun (step : Step.t) ->
           match step.says with
-          | User_annotation { syntax = `Modality; _ } -> true
+          | User_annotation (Written_modality _ | Mutable_field _) -> true
           | _ -> false)
         expected
     then []
