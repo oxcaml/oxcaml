@@ -1014,7 +1014,9 @@ type const_or_generic =
 
 (** The upper bound of a const_or_generic: exact for [Const],
     the constant upper bound for [Generic] *)
-let const_or_generic_upper : const_or_generic -> With_locality.Const.t = function
+let const_or_generic_upper :
+    const_or_generic ->
+    With_locality.Const.t = function
   | Const c -> c
   | Generic (_, bound) -> bound
 
@@ -1033,7 +1035,8 @@ let curry_acc : const_or_generic -> With_locality.lr -> const_or_generic =
       then
         Generic
           (Ctype.curry_mode
-             (With_locality.Comonadic.of_const (With_locality.Const.partial_apply acc))
+             (With_locality.Comonadic.of_const
+                (With_locality.Const.partial_apply acc))
              marg,
            Ctype.curry_mode_const acc (With_locality.Guts.get_ceil marg))
       else
@@ -1043,7 +1046,10 @@ let curry_acc : const_or_generic -> With_locality.lr -> const_or_generic =
 
 (** The view of a mode occurrence [m]; zaps [m] when it has to be a
     constant. *)
-let const_or_generic_of_mode : arg:bool -> With_locality.lr -> const_or_generic =
+let const_or_generic_of_mode :
+    arg:bool ->
+    With_locality.lr ->
+    const_or_generic =
   fun ~arg m ->
     match With_locality.zap_to_legacy ~arg m with
     | Some c -> Const c
@@ -1070,7 +1076,9 @@ let equate_with_curry_bounds : With_locality.lr -> const_or_generic -> bool =
        || not (mode_polymorphism_printing_enabled ())
     then
       Result.is_ok
-        (With_locality.equate m (With_locality.of_const (const_or_generic_upper acc_mode)))
+        (With_locality.equate
+           m
+           (With_locality.of_const (const_or_generic_upper acc_mode)))
     else
       With_locality.Guts.in_bounds (const_or_generic_upper acc_mode) m
 
@@ -1277,7 +1285,9 @@ end = struct
     end)
 
     type ('s, 'd) table =
-      | Monadic : (With_locality.Monadic.Const.t, With_locality.Monadic.Const.t) table
+      | Monadic :
+          (With_locality.Monadic.Const.t,
+           With_locality.Monadic.Const.t) table
           (** Tracks all paths from a visible monadic mode
           variable to another. A path is defined as follows:
             let [(v, f)] and [(u, h)] be two visible monadic
@@ -1288,11 +1298,15 @@ end = struct
 
             A path from [(v, f)] to [(u, h)] is defined as: [f ∘ g ∘ h'],
             where [h'] is the left adjoint of [h] *)
-      | Comonadic : (With_locality.Comonadic.Const.t, With_locality.Comonadic.Const.t) table
+      | Comonadic :
+          (With_locality.Comonadic.Const.t,
+           With_locality.Comonadic.Const.t) table
           (** Tracks all paths from a visible comonadic mode
           variable to another. See description of
           [Monadic] for a definition of a path *)
-      | Closing_over : (With_locality.Monadic.Const.t, With_locality.Comonadic.Const.t) table
+      | Closing_over :
+          (With_locality.Monadic.Const.t,
+           With_locality.Comonadic.Const.t) table
           (** Tracks all paths from a visible comonadic mode
           variable to visible monadic mode variable. Since
           the path goes from a comonadic to a monadic mode,
@@ -2585,7 +2599,11 @@ let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
   (* Step 1: Compute the modes to print *)
   let diff =
     let implied = erase_implied_axes modes in
-    let diff = Mode.With_locality.Const.diff modes Mode.With_locality.Const.legacy in
+    let diff =
+      Mode.With_locality.Const.diff
+        modes
+        Mode.With_locality.Const.legacy
+    in
     { diff with
       forkable = implied.forkable;
       yielding = implied.yielding;
@@ -2597,7 +2615,8 @@ let tree_of_modes_const (modes : Mode.With_locality.Const.t) =
     (fun (Mode.With_locality.Axis.P ax) ->
       diff
       |> Mode.With_locality.Const.Option.proj ax
-      |> Option.map (Fmt.asprintf "%a" (Mode.With_locality.Const.print_axis ax)))
+      |> Option.map
+           (Fmt.asprintf "%a" (Mode.With_locality.Const.print_axis ax)))
     Mode.With_locality.Axis.all
 
 let tree_of_modes : With_locality.lr -> const_or_generic -> string list =
@@ -2850,7 +2869,9 @@ let rec tree_of_modal_typexp mode modal ty =
     let alias = Variable_names.(name_of_type (new_var_name ~non_gen ty)) px in
     let tree =
       Otyp_alias
-        {non_gen; aliased = pr_typ (Const Mode.With_locality.Const.legacy); alias}
+        {non_gen;
+         aliased = pr_typ (Const Mode.With_locality.Const.legacy);
+         alias}
     in
     not_arrow tree end
   else
@@ -2931,7 +2952,8 @@ and tree_of_typlist mode tyl =
 
 and tree_of_labeled_typlist mode tyl =
   List.map
-    (fun (label, ty) -> label, tree_of_typexp mode With_locality.Const.legacy ty)
+    (fun (label, ty) ->
+      label, tree_of_typexp mode With_locality.Const.legacy ty)
     tyl
 
 and tree_of_typ_gf {ca_type=ty; ca_modalities=gf; _} =
@@ -3008,7 +3030,8 @@ and tree_of_package mode {pack_path; pack_cstrs} =
     opack_cstrs =
       List.map
         (fun (li, ty) ->
-           (String.concat "." li, tree_of_typexp mode With_locality.Const.legacy ty))
+           (String.concat "." li,
+            tree_of_typexp mode With_locality.Const.legacy ty))
         pack_cstrs }
 
 let tree_of_typexp mode ty =
@@ -3948,7 +3971,9 @@ let rec tree_of_modtype ?abbrev = function
       in
       let res = wrap_env env (tree_of_modtype ?abbrev) ty_res in
       let mres =
-        m_res |> With_locality.zap_to_legacy_exn ~arg:false |> tree_of_modes_const
+        m_res
+        |> With_locality.zap_to_legacy_exn ~arg:false
+        |> tree_of_modes_const
       in
       Omty_functor (param, res, mres))
   | Mty_alias p ->
@@ -3979,7 +4004,9 @@ and tree_of_functor_parameter ?abbrev = function
             fun k -> Env.add_module ~arg:true id Mp_present ty_arg k
       in
       let marg =
-        m_arg |> With_locality.zap_to_legacy_exn ~arg:true |> tree_of_modes_const
+        m_arg
+        |> With_locality.zap_to_legacy_exn ~arg:true
+        |> tree_of_modes_const
       in
       Some (name, tree_of_modtype ?abbrev ty_arg, marg), env
 

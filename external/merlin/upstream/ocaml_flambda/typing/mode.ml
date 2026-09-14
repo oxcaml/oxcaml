@@ -5197,37 +5197,23 @@ module Report = struct
       if not (implements_regionality_to_locality Regional_to_global src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:
-          (implements_locality_to_regionality
-             Locality_as_regionality
-             obj
-             src
-             b
-             a),
+      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj
+                    src b a),
         ~fixpoint )
     | Allocation_l _ ->
       (* We check that the morphism is with_regionality_to_locality_r2l *)
       if not (implements_regionality_to_locality Regional_to_local src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:
-          (implements_locality_to_regionality
-             Locality_as_regionality
-             obj
-             src
-             b
-             a),
+      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj
+                    src b a),
         ~fixpoint )
     | Allocation _ ->
       (* We always want to skip an Allocation hint. Report if the hint was not
          applied to an with_locality_as_regionality morphism. *)
       if
         not
-          (implements_locality_to_regionality
-             Locality_as_regionality
-             src
-             obj
-             a
+          (implements_locality_to_regionality Locality_as_regionality src obj a
              b)
       then print_bug_stderr ();
       ~is_skip:true, ~fixpoint
@@ -8700,16 +8686,12 @@ module Crossing = struct
     { comonadic; monadic }
 
   let apply_left_with_locality t m =
-    m
-    |> with_locality_as_regionality
-    |> apply_left_unhint t
+    m |> with_locality_as_regionality |> apply_left_unhint t
     |> with_regionality_to_locality_r2l_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_with_locality t m =
-    m
-    |> with_locality_as_regionality
-    |> apply_right_unhint t
+    m |> with_locality_as_regionality |> apply_right_unhint t
     |> with_regionality_to_locality_r2g_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
