@@ -68,6 +68,8 @@ module type Oxcaml_options = sig
   val no_cfg_block_layout : unit -> unit
   val cfg_cse_join_points : unit -> unit
   val no_cfg_cse_join_points : unit -> unit
+  val cfg_dse : unit -> unit
+  val no_cfg_dse : unit -> unit
   val cfg_value_propagation : unit -> unit
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit

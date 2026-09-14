@@ -52,6 +52,7 @@ val cfg_merge_blocks : bool ref
 
 val cfg_block_layout : bool ref
 val cfg_cse_join_points : bool ref
+val cfg_dse : bool ref
 
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref

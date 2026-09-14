@@ -108,6 +108,8 @@ val division_crashes_on_overflow : bool
 
 val equal_addressing_mode : addressing_mode -> addressing_mode -> bool
 
+val compare_addressing_mode : addressing_mode -> addressing_mode -> int
+
 val identity_addressing : addressing_mode
 
 val offset_addressing : addressing_mode -> int -> addressing_mode
@@ -143,6 +145,12 @@ val print_specific_operation :
 (* Specific operations that are pure *)
 
 val operation_is_pure : specific_operation -> bool
+
+(** [true] iff the operation is guaranteed not to read from memory, not to
+    raise (including via a hardware trap), and not to trigger the execution
+    of arbitrary code; it may write to memory. Used by dead store
+    elimination ([Cfg_dse]); [false] is always a safe answer. *)
+val operation_is_pure_except_memory_writes : specific_operation -> bool
 
 (* Specific operations that allocate *)
 

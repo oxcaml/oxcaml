@@ -1700,6 +1700,9 @@ module DSL : sig
     (** Equality comparison. *)
     val equal : t -> t -> bool
 
+    (** Total order, consistent with [equal]. *)
+    val compare : t -> t -> int
+
     (** The byte offset. *)
     val offset : t -> int
 
