@@ -1,6 +1,11 @@
 # Replace sections of LLDB and GDB output
 # This primarily looks for hex addresses, process ids, filepaths and
 # other specific details of the machine the test is running on.
+# Frames below main depend on the C library; drop them (LLDB only:
+# GDB frames carry no module prefix, and macOS LLDB bottoms out in dyld).
+/^frame [0-9]+: (libc\.so\.6|ld-linux[^`]*)`/ { next }
+/^frame [0-9]+: meander`_start$/ { next }
+
 {
     # Replace single quoted file paths
     gsub(/'(.*)'/,"'XXXX'")
@@ -22,6 +27,7 @@
 
     # Replace architecture identifiers
     gsub("(x86_64)", "$ARCH")
+    gsub("(aarch64)", "$ARCH")
     gsub("(arm64)", "$ARCH")
     gsub("(riscv64)", "$ARCH")
 
