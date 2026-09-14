@@ -418,6 +418,13 @@ let peephole_optimize_from pos =
     in
     X86_peephole_optimize.optimize_from_cell start
 
+let iter_sections f =
+  let iter_collected sections =
+    List.iter (fun (name, instrs) -> f name instrs) sections
+  in
+  iter_collected (collect_sections ~is_delayed:false);
+  iter_collected (collect_sections ~is_delayed:true)
+
 let generate_code asm =
   (match asm with
   | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
