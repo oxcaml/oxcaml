@@ -35,12 +35,6 @@ m4_include([build-aux/ax_compare_version.m4])
 
 AC_CONFIG_AUX_DIR([build-aux])
 
-# TODO: Remove this check
-AC_ARG_ENABLE([runtime5], [],
-  [AS_IF([test "x$enableval" != 'xyes'],
-    [AC_MSG_ERROR(m4_normalize([OxCaml 5.4 does not support runtime4 and must be
-                               configured with --enable-runtime5]))])], [])
-
 # Optionally pin to a specific opam switch for reproducible builds
 AC_PATH_PROG([opam], [opam], [])
 

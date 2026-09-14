@@ -233,6 +233,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Mod_unpack -> Mod_unpack
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -262,6 +263,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Mod_unpack -> Mod_unpack
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -291,6 +293,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Spliced Comonadic -> Spliced Comonadic
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
+        | Mod_unpack -> Mod_unpack
     end)
   end
 end
@@ -4991,6 +4994,8 @@ module Report = struct
     | Annotation _ ->
       print_bug ~explanation:"Annotation should be printed by print_ahint" ()
         ppf
+    | Mod_unpack ->
+      Fmt.fprintf ppf "unpacked first-class modules are always dynamic"
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
@@ -5554,7 +5559,7 @@ module Comonadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
@@ -5751,7 +5756,7 @@ module Monadic_gen (Obj : Obj) = struct
   let instantiate ~copy_scope ~current_level a =
     let copy_from_level = generic_level in
     let copy_below_level = generic_level + 1 in
-    let copy_to_level = current_level in
+    let copy_to_level = choose_level current_level in
     S.copy ~copy_scope ~copy_from_level ~copy_below_level ~copy_to_level obj a
 
   let copy_generic ~copy_scope a =
