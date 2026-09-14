@@ -25,30 +25,7 @@ module type Axis_ops = sig
 end
 
 module Externality = struct
-  type t =
-    | External
-    | External64
-    | Internal
-
-  include Mode.Lattices.Total (struct
-    type nonrec t = t
-
-    let min = External
-
-    let max = Internal
-
-    let ord = function External -> 0 | External64 -> 1 | Internal -> 2
-  end)
-
-  let less_or_equal s1 s2 : Misc.Le_result.t =
-    if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
-
-  let to_string = function
-    | External -> "external_"
-    | External64 -> "external64"
-    | Internal -> "internal"
-
-  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+  include Mode.Externality.Const
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting
@@ -125,135 +102,46 @@ module Separability = struct
 end
 
 module Axis = struct
-  module Nonmodal = struct
-    type 'a t = Externality : Externality.t t
-  end
-
-  type 'a t =
-    | Modal : 'a Mode.Crossing.Axis.t -> 'a t
-    | Nonmodal : 'a Nonmodal.t -> 'a t
+  include Mode.Crossing.Axis
 
   type packed = Pack : 'a t -> packed [@@unboxed]
 
+  let[@inline] index (type a) : a t -> _ = function
+    | Comonadic Areality -> 0
+    | Monadic Uniqueness -> 1
+    | Comonadic Linearity -> 2
+    | Monadic Contention -> 3
+    | Comonadic Portability -> 4
+    | Comonadic Forkable -> 5
+    | Comonadic Yielding -> 6
+    | Comonadic Statefulness -> 7
+    | Monadic Visibility -> 8
+    | Monadic Staticity -> 9
+    | Comonadic Externality -> 10
+
   let all =
-    [ Pack (Modal (Comonadic Areality));
-      Pack (Modal (Monadic Uniqueness));
-      Pack (Modal (Comonadic Linearity));
-      Pack (Modal (Monadic Contention));
-      Pack (Modal (Comonadic Portability));
-      Pack (Modal (Comonadic Forkable));
-      Pack (Modal (Comonadic Yielding));
-      Pack (Modal (Comonadic Statefulness));
-      Pack (Modal (Monadic Visibility));
-      Pack (Modal (Monadic Staticity));
-      (* CR-soon zqian: call [Mode.Crossing.Axis.all] for modal axes *)
-      Pack (Nonmodal Externality) ]
+    [ Pack (Comonadic Areality);
+      Pack (Monadic Uniqueness);
+      Pack (Comonadic Linearity);
+      Pack (Monadic Contention);
+      Pack (Comonadic Portability);
+      Pack (Comonadic Forkable);
+      Pack (Comonadic Yielding);
+      Pack (Comonadic Statefulness);
+      Pack (Monadic Visibility);
+      Pack (Monadic Staticity);
+      Pack (Comonadic Externality) ]
 
-  let equal (Pack axis1) (Pack axis2) =
-    match axis1, axis2 with
-    | Modal axis1, Modal axis2 ->
-      let axis1 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis1) in
-      let axis2 = Mode.Crossing.Axis.to_modality (Mode.Crossing.Axis.P axis2) in
-      Int.equal (Mode.Modality.Axis.compare axis1 axis2) 0
-    | Nonmodal Externality, Nonmodal Externality -> true
-    | Modal _, Nonmodal _ | Nonmodal _, Modal _ -> false
+  let equal (Pack a) (Pack b) = Mode.Crossing.Per_axis.compare_obj a b = 0
 
-  let name (type a) : a t -> string = function
-    | Modal ax ->
-      let (P ax) =
-        P ax |> Mode.Crossing.Axis.to_modality |> Mode.Modality.Axis.to_value
-      in
-      Fmt.asprintf "%a" Mode.Value.Axis.print ax
-    | Nonmodal Externality -> "externality"
+  let name ax =
+    let (Mode.Value.Axis.P ax) =
+      to_modality (P ax) |> Mode.Modality.Axis.to_value
+    in
+    Fmt.asprintf "%a" Mode.Value.Axis.print ax
 end
 
-module Per_axis = struct
-  open Axis
-
-  module Nonmodal = struct
-    open Axis.Nonmodal
-
-    let min : type a. a t -> a = function Externality -> Externality.min
-
-    let max : type a. a t -> a = function Externality -> Externality.max
-
-    let le : type a. a t -> a -> a -> bool =
-     fun ax a b -> match ax with Externality -> Externality.le a b
-
-    let equal : type a. a t -> a -> a -> bool =
-     fun ax a b -> match ax with Externality -> Externality.equal a b
-
-    let meet : type a. a t -> a -> a -> a =
-     fun ax a b -> match ax with Externality -> Externality.meet a b
-
-    let join : type a. a t -> a -> a -> a =
-     fun ax a b -> match ax with Externality -> Externality.join a b
-
-    let print : type a. a t -> Fmt.formatter -> a -> unit = function
-      | Externality -> Externality.print
-
-    let compare_obj : type a b. a t -> b t -> int =
-     fun a b -> match a, b with Externality, Externality -> 0
-
-    let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
-     fun a b -> match a, b with Externality, Externality -> Misc.Is_eq
-  end
-
-  let min : type a. a t -> a = function[@inline available]
-    | Modal ax -> (Mode.Crossing.Per_axis.min [@inlined hint]) ax
-    | Nonmodal ax -> (Nonmodal.min [@inlined hint]) ax
-
-  let max : type a. a t -> a = function[@inline available]
-    | Modal ax -> (Mode.Crossing.Per_axis.max [@inlined hint]) ax
-    | Nonmodal ax -> (Nonmodal.max [@inlined hint]) ax
-
-  let le : type a. a t -> a -> a -> bool =
-   fun[@inline available] ax a b ->
-    match ax with
-    | Modal ax -> (Mode.Crossing.Per_axis.le [@inlined hint]) ax a b
-    | Nonmodal ax -> (Nonmodal.le [@inlined hint]) ax a b
-
-  let equal : type a. a t -> a -> a -> bool =
-   fun[@inline available] ax a b ->
-    match ax with
-    | Modal ax -> (Mode.Crossing.Per_axis.equal [@inlined hint]) ax a b
-    | Nonmodal ax -> (Nonmodal.equal [@inlined hint]) ax a b
-
-  let meet : type a. a t -> a -> a -> a =
-   fun[@inline available] ax a b ->
-    match ax with
-    | Modal ax -> (Mode.Crossing.Per_axis.meet [@inlined hint]) ax a b
-    | Nonmodal ax -> (Nonmodal.meet [@inlined hint]) ax a b
-
-  let join : type a. a t -> a -> a -> a =
-   fun[@inline available] ax a b ->
-    match ax with
-    | Modal ax -> (Mode.Crossing.Per_axis.join [@inlined hint]) ax a b
-    | Nonmodal ax -> (Nonmodal.join [@inlined hint]) ax a b
-
-  let print : type a. a t -> Fmt.formatter -> a -> unit = function
-    | Modal ax -> Mode.Crossing.Per_axis.print ax
-    | Nonmodal ax -> Nonmodal.print ax
-
-  let compare_obj : type a b. a t -> b t -> int =
-   fun a b ->
-    match a, b with
-    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.compare_obj ax0 ax1
-    | Modal _, _ -> -1
-    | _, Modal _ -> 1
-    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.compare_obj ax0 ax1
-
-  let equal_obj : type a b. a t -> b t -> (a, b) Misc.is_eq =
-   fun a b ->
-    match a, b with
-    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
-    | Modal _, _ -> Misc.Is_not_eq
-    | _, Modal _ -> Misc.Is_not_eq
-    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
-
-  let print_obj : type a. Fmt.formatter -> a t -> unit =
-   fun ppf ax -> Fmt.pp_print_string ppf (name ax)
-end
+module Per_axis = Mode.Crossing.Per_axis
 
 module Axis_set = struct
   (* This could be [bool Axis_collection.t], but instead we represent it as a bitfield for
@@ -262,21 +150,7 @@ module Axis_set = struct
 
   type t = int
 
-  let[@inline] axis_index (type a) : a Axis.t -> _ = function
-    | Modal (Comonadic Areality) -> 0
-    | Modal (Monadic Uniqueness) -> 1
-    | Modal (Comonadic Linearity) -> 2
-    | Modal (Monadic Contention) -> 3
-    | Modal (Comonadic Portability) -> 4
-    | Modal (Comonadic Forkable) -> 5
-    | Modal (Comonadic Yielding) -> 6
-    | Modal (Comonadic Statefulness) -> 7
-    | Modal (Monadic Visibility) -> 8
-    | Modal (Monadic Staticity) -> 9
-    (* CR-soon zqian: call [Mode.Crossing.Axis.index] for modal axes *)
-    | Nonmodal Externality -> 10
-
-  let[@inline] axis_mask ax = 1 lsl axis_index ax
+  let[@inline] axis_mask ax = 1 lsl Axis.index ax
 
   let[@inline] set ~axis ~to_ t =
     match to_ with
@@ -294,25 +168,21 @@ module Axis_set = struct
       if f ~axis:(Axis.Pack axis) then t lor axis_mask axis else t
     in
     0
-    |> set_axis (Modal (Comonadic Areality))
-    |> set_axis (Modal (Monadic Uniqueness))
-    |> set_axis (Modal (Comonadic Linearity))
-    |> set_axis (Modal (Monadic Contention))
-    |> set_axis (Modal (Comonadic Portability))
-    |> set_axis (Modal (Comonadic Forkable))
-    |> set_axis (Modal (Comonadic Yielding))
-    |> set_axis (Modal (Comonadic Statefulness))
-    |> set_axis (Modal (Monadic Visibility))
-    |> set_axis (Modal (Monadic Staticity))
-    |> set_axis (Nonmodal Externality)
+    |> set_axis (Comonadic Areality)
+    |> set_axis (Monadic Uniqueness)
+    |> set_axis (Comonadic Linearity)
+    |> set_axis (Monadic Contention)
+    |> set_axis (Comonadic Portability)
+    |> set_axis (Comonadic Forkable)
+    |> set_axis (Comonadic Yielding)
+    |> set_axis (Comonadic Statefulness)
+    |> set_axis (Monadic Visibility)
+    |> set_axis (Monadic Staticity)
+    |> set_axis (Comonadic Externality)
 
   let all = create ~f:(fun ~axis:_ -> true)
 
   let equal = Int.equal
-
-  let all_modal_axes =
-    create ~f:(fun ~axis ->
-        match axis with Pack (Modal _) -> true | Pack (Nonmodal _) -> false)
 
   let[@inline] singleton axis = add empty axis
 
@@ -331,8 +201,6 @@ module Axis_set = struct
   let[@inline] is_empty t = Int.equal t 0
 
   let[@inline] complement t = diff all t
-
-  let all_nonmodal_axes = complement all_modal_axes
 
   let[@inline] to_seq t =
     Axis.all |> List.to_seq |> Seq.filter (fun (Axis.Pack axis) -> mem t axis)
