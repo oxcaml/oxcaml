@@ -1,0 +1,11 @@
+; Encoding tests for the x86 binary emitter. The expected output holds the
+; encodings produced by GNU as for the same instructions.
+
+(tests
+ (names test_x86_encodings)
+ (modules test_x86_encodings)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (= %{architecture} "amd64")))
+ (libraries ocamloptcomp))
