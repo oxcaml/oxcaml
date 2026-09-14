@@ -379,7 +379,13 @@ let annotation_reason ~mode_name ~mode ~subject:owner ?(asides = [])
         mention ~case:Subject owner;
         ref_source written.loc (copula :: txt " annotated as " :: mode) ]
   | Mutable_field field ->
-    note ~asides
+    let implication =
+      background
+        [ txt "mutable fields imply the ";
+          term (Diagnostic_term.Written_modality_term mode_name);
+          txt " modality by default" ]
+    in
+    note ~asides:(asides @ [implication])
       [ txt "because field ";
         ref_source field.loc
           [code field.txt; txt " is declared "; code "mutable"] ]
