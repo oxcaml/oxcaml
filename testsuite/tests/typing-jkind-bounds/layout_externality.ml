@@ -235,31 +235,17 @@ val ok_value_infer : string M.f -> string M.f = <fun>
    [non_pointer64] crosses to [external64] *)
 
 type np : value non_pointer
-type np_bad = np require_external
+type ok_np = np require_external
 [%%expect{|
 type np : value non_pointer
-Line 2, characters 14-16:
-2 | type np_bad = np require_external
-                  ^^
-Error: This type "np" should be an instance of type "('a : any mod external_)"
-       The kind of np is value non_pointer
-         because of the definition of np at line 1, characters 0-27.
-       But the kind of np must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_np = np require_external
 |}]
 
 type np64 : value non_pointer64
-type np64_bad = np64 require_external64
+type ok_np64 = np64 require_external64
 [%%expect{|
 type np64 : value non_pointer64
-Line 2, characters 16-20:
-2 | type np64_bad = np64 require_external64
-                    ^^^^
-Error: This type "np64" should be an instance of type "('a : any mod external64)"
-       The kind of np64 is value non_pointer64
-         because of the definition of np64 at line 1, characters 0-31.
-       But the kind of np64 must be a subkind of any mod external64
-         because of the definition of require_external64 at line 2, characters 0-49.
+type ok_np64 = np64 require_external64
 |}]
 
 (* ...but [non_pointer64] does not cross to [external_] *)
@@ -279,72 +265,27 @@ Error: This type "np64" should be an instance of type "('a : any mod external_)"
 (* Products of [non_pointer] components cross *)
 
 type npp : value non_pointer & value non_pointer
-type npp_bad = npp require_external
+type ok_npp = npp require_external
 [%%expect{|
 type npp : value non_pointer & value non_pointer
-Line 2, characters 15-18:
-2 | type npp_bad = npp require_external
-                   ^^^
-Error: This type "npp" should be an instance of type "('a : any mod external_)"
-       The kind of npp is value non_pointer & value non_pointer
-         because of the definition of npp at line 1, characters 0-48.
-       But the kind of npp must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_npp = npp require_external
 |}]
 
 (* With-bounds cannot raise the layout-implied externality, and no redundant
    [@@ external_] is printed *)
 
 type 'a npi : immediate with 'a
-type npi_bad = string npi require_external
+type ok_npi = string npi require_external
 [%%expect{|
 type 'a npi : immediate with 'a
-Line 2, characters 15-25:
-2 | type npi_bad = string npi require_external
-                   ^^^^^^^^^^
-Error: This type "string npi" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string npi is immutable_data non_pointer
-         because of the definition of npi at line 1, characters 0-31.
-       But the kind of string npi must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
-|}, Principal{|
-type 'a npi : immediate with 'a
-Line 2, characters 15-25:
-2 | type npi_bad = string npi require_external
-                   ^^^^^^^^^^
-Error: This type "string npi" should be an instance of type
-         "('a : any mod external_)"
-       The kind of string npi is immediate with string
-         because of the definition of npi at line 1, characters 0-31.
-       But the kind of string npi must be a subkind of any mod external_
-         because of the definition of require_external at line 1, characters 0-46.
+type ok_npi = string npi require_external
 |}]
 
 type 'a npi64 : immediate64 with 'a
-type npi64_bad = string npi64 require_external64
+type ok_npi64 = string npi64 require_external64
 [%%expect{|
 type 'a npi64 : immediate64 with 'a
-Line 2, characters 17-29:
-2 | type npi64_bad = string npi64 require_external64
-                     ^^^^^^^^^^^^
-Error: This type "string npi64" should be an instance of type
-         "('a : any mod external64)"
-       The kind of string npi64 is immutable_data non_pointer64
-         because of the definition of npi64 at line 1, characters 0-35.
-       But the kind of string npi64 must be a subkind of any mod external64
-         because of the definition of require_external64 at line 2, characters 0-49.
-|}, Principal{|
-type 'a npi64 : immediate64 with 'a
-Line 2, characters 17-29:
-2 | type npi64_bad = string npi64 require_external64
-                     ^^^^^^^^^^^^
-Error: This type "string npi64" should be an instance of type
-         "('a : any mod external64)"
-       The kind of string npi64 is immediate64 with string
-         because of the definition of npi64 at line 1, characters 0-35.
-       But the kind of string npi64 must be a subkind of any mod external64
-         because of the definition of require_external64 at line 2, characters 0-49.
+type ok_npi64 = string npi64 require_external64
 |}]
 
 (* No redundant [@@ external64] is printed on a [non_pointer64] kind's
@@ -352,7 +293,7 @@ Error: This type "string npi64" should be an instance of type
 
 type 'a npie : immediate64 with 'a @@ external_
 [%%expect{|
-type 'a npie : immediate64 with 'a @@ external64
+type 'a npie : immediate64 with 'a
 |}]
 
 (* Learn the separability-implied crossing when a constraint recorded on a
@@ -362,27 +303,7 @@ let g_np_rev y =
   (fun (_ : ('a : any mod external_)) -> ()) y;
   (y : string npi)
 [%%expect{|
-Line 3, characters 3-4:
-3 |   (y : string npi)
-       ^
-Error: The value "y" has type "('a : value_or_null mod external_)"
-       but an expression was expected of type "string npi"
-       The kind of string npi is immutable_data non_pointer
-         because of the definition of npi at line 1, characters 0-31.
-       But the kind of string npi must be a subkind of
-           value_or_null mod external_
-         because of the annotation on the type variable 'a.
-|}, Principal{|
-Line 3, characters 3-4:
-3 |   (y : string npi)
-       ^
-Error: The value "y" has type "('a : value_or_null mod external_)"
-       but an expression was expected of type "string npi"
-       The kind of string npi is immediate with string
-         because of the definition of npi at line 1, characters 0-31.
-       But the kind of string npi must be a subkind of
-           value_or_null mod external_
-         because of the annotation on the type variable 'a.
+val g_np_rev : string npi -> string npi = <fun>
 |}]
 
 (* [any non_pointer] must not cross: a product of pointerful values is a
@@ -437,12 +358,12 @@ Error: This type "X.t" should be an instance of type "('a : any mod external_)"
 
 type npe : value non_pointer mod external_
 [%%expect{|
-type npe : value non_pointer mod external_
+type npe : value non_pointer
 |}]
 
 type npe64 : value non_pointer64 mod external64
 [%%expect{|
-type npe64 : value non_pointer64 mod external64
+type npe64 : value non_pointer64
 |}]
 
 (* ...but [mod external_] is not redundant on a [non_pointer64] kind *)
