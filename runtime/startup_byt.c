@@ -44,7 +44,6 @@
 #include "caml/fiber.h"
 #include "caml/fix_code.h"
 #include "caml/gc_ctrl.h"
-#include "caml/instrtrace.h"
 #include "caml/interp.h"
 #include "caml/intext.h"
 #include "caml/io.h"

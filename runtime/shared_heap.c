@@ -21,7 +21,6 @@
 #include "caml/addrmap.h"
 #include "caml/custom.h"
 #include "caml/runtime_events.h"
-#include "caml/fail.h"
 #include "caml/fiber.h" /* for verification */
 #include "caml/gc.h"
 #include "caml/globroots.h"

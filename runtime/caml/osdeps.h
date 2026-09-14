@@ -20,6 +20,10 @@
 
 #ifdef CAML_INTERNALS
 
+#include <stddef.h>
+#include <stdint.h>
+
+#include "config.h"
 #include "misc.h"
 #include "memory.h"
 

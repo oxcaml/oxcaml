@@ -19,6 +19,9 @@
 #ifdef CAML_INTERNALS
 
 #include "domain.h"
+#include <stdint.h>
+#include "config.h"
+#include "domain_state.h"
 
 /* The Gc module provides two kind of runtime statistics:
    - Heap stats: statistics about heap memory, see shared_heap.c

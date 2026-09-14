@@ -17,7 +17,6 @@
 #include "caml/runtime_events.h"
 #include "caml/alloc.h"
 #include "caml/callback.h"
-#include "caml/custom.h"
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
@@ -27,8 +26,6 @@
 
 #include <fcntl.h>
 #include <stdatomic.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 

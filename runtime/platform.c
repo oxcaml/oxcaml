@@ -20,21 +20,17 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <errno.h>
 #include "caml/osdeps.h"
 #include "caml/platform.h"
-#include "caml/fail.h"
 #include "caml/lf_skiplist.h"
 #include "caml/misc.h"
 #include "caml/signals.h"
 #ifdef HAS_SYS_MMAN_H
-#include <sys/mman.h>
 #endif
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
-#include "caml/alloc.h"
 #include "caml/lf_skiplist.h"
 #include "sync_posix.h"
 
