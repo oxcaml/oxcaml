@@ -1,0 +1,22 @@
+File "forward_alias.ml", line 17, characters 16-40:
+17 |   module Inst = Bundle_alias.Make (P) ()
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This application of the functor Bundle_alias.Make is ill-typed.
+       These arguments:
+         P ()
+       do not match these parameters:
+         (P_alias : $T1) () -> ...
+       1. Modules do not match:
+            P :
+            sig
+              module A : sig val x : int end
+              module B : sig val x : int end
+            end
+          is not included in
+            $T1 = sig module A : sig val x : int end module B = A end
+          In module B:
+          Modules do not match:
+            sig val x : int end
+          is not included in
+            (module A)
+       2. Module () matches the expected module type
