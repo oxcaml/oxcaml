@@ -1291,12 +1291,16 @@ let has_poly_constraint spat =
   | _ -> false
 
 (** Mode cross a right monadic mode fragment *)
-let alloc_monadic_mode_cross_to_min (crossing : Crossing.t) monadic =
+let monadic_mode_cross_to_min_with_locality
+    (crossing : Crossing.t)
+    monadic =
   let monadic = With_locality.Monadic.disallow_left monadic in
   Crossing.Monadic.apply_right_with_locality crossing.monadic monadic
 
 (** Mode cross a left comonadic mode fragment *)
-let alloc_comonadic_mode_cross_to_max (crossing : Crossing.t) comonadic =
+let comonadic_mode_cross_to_max_with_locality
+    (crossing : Crossing.t)
+    comonadic =
   let comonadic = With_locality.Comonadic.disallow_right comonadic in
   Crossing.Comonadic.apply_left_with_locality crossing.comonadic comonadic
 
@@ -5726,7 +5730,8 @@ let loc_rest_of_function
    this, let's talk. *)
 let approx_type_default () = newvar (Jkind.Builtin.any ~why:Dummy_jkind)
 
-let alloc_mode_annot_empty : With_locality.Const.Option.t Typemode.modes =
+let mode_with_locality_annot_empty
+    : With_locality.Const.Option.t Typemode.modes =
   { mode_desc = []; mode_modes = With_locality.Const.Option.none }
 
 let rec approx_type env sty =
@@ -9854,11 +9859,14 @@ and type_function
                      mode-crossed differently. *)
                   let crossing = crossing_of_ty env ty_arg in
                   let arg_mode =
-                    alloc_comonadic_mode_cross_to_max crossing
+                    comonadic_mode_cross_to_max_with_locality
+                      crossing
                       arg_mode.comonadic
                   in
                   let env_mode =
-                    alloc_monadic_mode_cross_to_min crossing env_mode
+                    monadic_mode_cross_to_min_with_locality
+                      crossing
+                      env_mode
                   in
                   let cls_details : Mode.Hint.closure_details =
                     { closure = (loc, Function);
@@ -11792,11 +11800,20 @@ and type_function_cases_expect
           arg_sort; ret_sort; closure_mode;
           ty_arg_mono; expected_pat_mode; expected_inner_mode; locality_mode;
         } =
-      split_function_ty env expected_mode ty_expected loc ~arg_label:Nolabel
-        ~in_function ~has_poly:false ~mode_annots:alloc_mode_annot_empty
-        ~ret_mode_annots:alloc_mode_annot_empty
-        ~param_loc:loc ~ret_loc:loc
-        ~is_first_val_param:first ~is_final_val_param:true
+      split_function_ty
+        env
+        expected_mode
+        ty_expected
+        loc
+        ~arg_label:Nolabel
+        ~in_function
+        ~has_poly:false
+        ~mode_annots:mode_with_locality_annot_empty
+        ~ret_mode_annots:mode_with_locality_annot_empty
+        ~param_loc:loc
+        ~ret_loc:loc
+        ~is_first_val_param:first
+        ~is_final_val_param:true
     in
     let excl, expected_inner_mode =
       mode_return_from_exclave expected_inner_mode
