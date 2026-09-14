@@ -1077,6 +1077,37 @@ let prim_has_valid_reprs ~loc prim =
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]
+    | "%unsafe_atomic_load_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_set_ext_ptr"
+    | "%unsafe_atomic_exchange_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_cas_ext_ptr"
+    | "%unsafe_atomic_compare_exchange_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_fetch_add_ext_ptr"
+    | "%unsafe_atomic_add_ext_ptr"
+    | "%unsafe_atomic_sub_ext_ptr"
+    | "%unsafe_atomic_land_ext_ptr"
+    | "%unsafe_atomic_lor_ext_ptr"
+    | "%unsafe_atomic_lxor_ext_ptr" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
     | "%unsafe_get_ptr" ->
       check [
         is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
