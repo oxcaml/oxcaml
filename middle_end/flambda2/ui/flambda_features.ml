@@ -37,8 +37,8 @@ let support_lto () =
 let classic_mode () =
   (* CR sspies: This workaround is fine for testing, but we should not keep it
      before merging into main. *)
-  (* Classic mode does not run [Simplify] and hence cannot produce the .cmr
-     files needed for LTO, so -support-lto overrides classic mode. *)
+  (* Classic mode does not run [Simplify] and hence cannot produce the LTO
+     sections of the .cmx file, so -support-lto overrides classic mode. *)
   (not (support_lto ()))
   && !Oxcaml_flags.Flambda2.classic_mode
      |> with_default ~f:(fun d -> d.classic_mode)

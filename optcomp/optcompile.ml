@@ -41,7 +41,7 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
-  (** [units] are (.cmr file, output prefix) pairs, in any order. *)
+  (** [units] are (.cmx file, output prefix) pairs, in any order. *)
   val reaper_rebuild :
     ltosol_file:string ->
     units:(string * string) list ->
@@ -245,12 +245,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
          names of the batch members and are needed to resume compilation. *)
       let units =
         List.map
-          (fun (cmr_file, output_prefix) ->
+          (fun (cmx_file, output_prefix) ->
             let paused_unit_infos, (_ : Digest.t) =
-              Compilenv.read_unit_info
-                (Filename.chop_suffix cmr_file ".cmr" ^ ext_flambda_obj)
+              Compilenv.read_unit_info cmx_file
             in
-            cmr_file, output_prefix, paused_unit_infos)
+            cmx_file, output_prefix, paused_unit_infos)
           units
       in
       let batch_members =
@@ -268,13 +267,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       in
       let rec loop ~is_first = function
         | [] -> ()
-        | (cmr_file, output_prefix, paused_unit_infos) :: rest ->
+        | (cmx_file, output_prefix, paused_unit_infos) :: rest ->
           let is_last = match rest with [] -> true | _ :: _ -> false in
           (* The unit's name comes from the paused [.cmx], not the output
              prefix: the name of a parameterised-library instance cannot be
              recovered from its file name. *)
           let unit_info =
-            unit_info_from_cu_or_output_prefix ~source_file:cmr_file Impl
+            unit_info_from_cu_or_output_prefix ~source_file:cmx_file Impl
               ~output_prefix
               ~compilation_unit:(Exactly paused_unit_infos.Cmx_format.ui_unit)
           in
@@ -296,7 +295,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                shared state is no longer needed. *)
             rebuild_unit
               ~keep_symbol_tables:(keep_symbol_tables || not is_last)
-              ~may_reduce_heap:is_last ~cmr_file ~paused_unit_infos info );
+              ~may_reduce_heap:is_last ~cmx_file ~paused_unit_infos info );
           loop ~is_first:false rest
       in
       loop ~is_first:true units
@@ -351,7 +350,8 @@ let native unix
        ltosol_filename:string ->
        batch_members:Compilation_unit.t list ->
        keep_symbol_tables:bool ->
-       cmr_filename:string ->
+       cmx_filename:string ->
+       paused_unit_infos:Cmx_format.unit_infos ->
        ppf_dump:Format.formatter ->
        prefixname:string ->
        Cmm.phrase list) =
@@ -414,15 +414,16 @@ let native unix
           in
           fun ~keep_symbol_tables
             ~may_reduce_heap
-            ~cmr_file
+            ~cmx_file
             ~paused_unit_infos
             (info : Compile_common.info)
           ->
             Asmgen.compile_implementation_from_cmm unix ~may_reduce_heap
-              ~sourcefile:(Some cmr_file)
+              ~sourcefile:(Some cmx_file)
               ~prefixname:(Unit_info.prefix info.target)
               ~ppf_dump:info.ppf_dump
-              (rebuild_unit_to_cmm ~keep_symbol_tables ~cmr_filename:cmr_file);
+              (rebuild_unit_to_cmm ~keep_symbol_tables ~cmx_filename:cmx_file
+                 ~paused_unit_infos);
             (* Unlike [compile_implementation] we also create the .reaped.cmx
                file here, using the old .cmx file and data accumulated in
                [Compilenv].*)

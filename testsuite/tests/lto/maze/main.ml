@@ -8,16 +8,16 @@
  ocamlopt.opt;
 
  compile_only = "false";
- flags = "-reaper-solve position.cmr maze.cmr generate.cmr solve.cmr render.cmr main.cmr";
+ flags = "-reaper-solve position.cmx maze.cmx generate.cmx solve.cmx render.cmx main.cmx";
  last_flags = "-o maze.ltosol";
  all_modules = "";
  ocamlopt.opt;
 
- flags = "-reaper-rebuild position.cmr maze.cmr generate.cmr maze.ltosol";
+ flags = "-reaper-rebuild position.cmx maze.cmx generate.cmx maze.ltosol";
  last_flags = "";
  ocamlopt.opt;
 
- flags = "-reaper-rebuild solve.cmr render.cmr main.cmr maze.ltosol";
+ flags = "-reaper-rebuild solve.cmx render.cmx main.cmx maze.ltosol";
  last_flags = "";
  ocamlopt.opt;
 

@@ -175,7 +175,7 @@ let flambda_to_flambda0 : type m.
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;
-  let flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, cmr_payload
+  let flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, lto_sections
       =
     match mode, close_prog_metadata with
     | Classic, Classic (all_code, approxs, free_names, slot_offsets) ->
@@ -247,7 +247,7 @@ let flambda_to_flambda0 : type m.
       dump_fexpr_annot ~prefixname "simplify" flambda;
       let ( (flambda, all_code, slot_offsets, final_typing_env),
             last_pass_name,
-            cmr_payload ) =
+            lto_sections ) =
         match Reaper_mode.of_flags () with
         | Disabled ->
           let slot_offsets =
@@ -267,44 +267,53 @@ let flambda_to_flambda0 : type m.
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
               ~all_code ~closed_world:true flambda
           in
-          let cmr_payload =
-            Some
-              { Flambda2_reaper.Cmr_format.unit_metadata =
-                  Flambda_unit.metadata flambda;
-                all_code;
-                imported_offsets = Exported_offsets.imported_offsets ();
-                deps;
-                slot_offsets_inputs;
-                solve_inputs;
-                rebuild_data
-              }
+          let lto_sections =
+            Flambda2_reaper.Lto_sections.create
+              ~unit_metadata:(Flambda_unit.metadata flambda)
+              ~imported_offsets:(Exported_offsets.imported_offsets ())
+              ~deps ~slot_offsets_inputs ~solve_inputs ~rebuild_data
           in
           let slot_offsets =
             finalize_offsets ~free_names ~all_code slot_offsets
           in
           ( (flambda, all_code, slot_offsets, final_typing_env),
             last_pass_name,
-            cmr_payload )
+            Some lto_sections )
+      in
+      (* The LTO sections are renamed on import with the table of the export
+         information, so their identifiers must be exported too. *)
+      let lto_ids =
+        match lto_sections with
+        | None -> Flambda2_nominal.Ids_for_export.empty
+        | Some lto_sections ->
+          Flambda2_reaper.Lto_sections.ids_for_export lto_sections
       in
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
           all_code =
-        Flambda_cmx.prepare_cmx_file_contents ~final_typing_env ~module_symbol
-          ~used_value_slots ~exported_offsets ~sections all_code
+        Flambda_cmx.prepare_cmx_file_contents ~lto_ids ~final_typing_env
+          ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code
       in
-      flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, cmr_payload
+      flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, lto_sections
   in
   print_flambda last_pass_name (Flambda_features.dump_flambda ()) ppf flambda;
   print_fexpr last_pass_name (Flambda_features.dump_fexpr Last_pass) ppf flambda;
   let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
-  Option.iter
-    (Flambda2_reaper.Cmr_format.save ~filename:(prefixname ^ ".cmr"))
-    cmr_payload;
   (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
+  | None -> () (* Opaque compilation *)
   | Some cmx -> Compilenv.set_export_info cmx);
+  (match lto_sections, cmx with
+  | None, _ -> ()
+  | Some lto_sections, Some _ ->
+    Compilenv.set_lto_info
+      (Flambda2_reaper.Lto_sections.to_sections ~sections lto_sections)
+  | Some _, None ->
+    (* The export record is only omitted for -opaque, which [lambda_to_flambda]
+       rejects together with -support-lto. *)
+    Misc.fatal_error
+      "-support-lto with -opaque should have been rejected before reaching \
+       Flambda 2");
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
@@ -335,6 +344,13 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
      [@@@flambda_o3] attribute. *)
   if Flambda_features.classic_mode () then Clflags.use_linscan := true;
   Misc.Style.setup (Flambda_features.colour ());
+  (* The LTO sections of the .cmx file are imported with the table of the export
+     information, which -opaque omits. *)
+  if Flambda_features.support_lto () && Flambda_features.opaque ()
+  then
+    Location.raise_errorf
+      ~loc:(Location.in_file !Location.input_name)
+      "-support-lto is incompatible with -opaque";
   (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
      the length of arrays will need fixing, I don't think it only applies to the
      Cmm translation.
@@ -408,7 +424,25 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
   in
   Profile.record_call "flambda2" run
 
-let reaper_lto_solve ~cmr_files ~ltosol_file =
+(* Read what the LTO entry points need from the .cmx file of a unit compiled
+   with -support-lto. Creates no identifiers, so it may be called before the
+   stamp counters are restored. *)
+let read_lto_header_and_export_info ~filename
+    (unit_infos : Cmx_format.unit_infos) =
+  let header =
+    Flambda2_reaper.Lto_sections.read_header ~filename
+      ~sections:unit_infos.ui_file_sections unit_infos.ui_lto_info
+  in
+  let export_info =
+    match Compilenv.get_export_info unit_infos with
+    | Some export_info -> export_info
+    | None ->
+      Misc.fatal_errorf "%s has LTO information but no export information"
+        filename
+  in
+  header, export_info
+
+let reaper_lto_solve ~cmx_files ~ltosol_file =
   (* ID stamp counters are process-global monotonically increasing counters that
      give us an easy way of creating fresh identifiers. These identifiers get
      persisted across processes, and we need to prevent collisions when this
@@ -433,16 +467,29 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
      After we're done, rebuild processes will be created to do more work on the
      CUs we touched. To keep counters monotonically increasing, we need to save
      them after our work so that the rebuild processes can restore them. *)
-  let cmrs, counters =
-    List.split (List.map Flambda2_reaper.Cmr_format.load cmr_files)
+  let units =
+    List.map
+      (fun filename ->
+        let unit_infos, (_ : Digest.t) = Compilenv.read_unit_info filename in
+        let header, export_info =
+          read_lto_header_and_export_info ~filename unit_infos
+        in
+        filename, unit_infos, header, export_info)
+      cmx_files
   in
-  Flambda2_reaper.Id_stamp_counters.restore_for_merge counters;
+  Flambda2_reaper.Id_stamp_counters.restore_for_merge
+    (List.map
+       (fun (_, _, header, _) ->
+         Flambda2_reaper.Lto_sections.Header.id_stamp_counters header)
+       units);
   let solve_data =
     List.map
-      (fun cmr ->
-        ( Flambda2_reaper.Cmr_format.Serialisable.compilation_unit cmr,
-          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_solve cmr ))
-      cmrs
+      (fun (filename, (unit_infos : Cmx_format.unit_infos), header, export_info)
+         ->
+        ( unit_infos.ui_unit,
+          Flambda2_reaper.Lto_sections.read_for_solve ~filename
+            ~sections:unit_infos.ui_file_sections ~export_info header ))
+      units
   in
   let participants = List.map fst solve_data in
   let combined_graph =
@@ -469,7 +516,7 @@ let reaper_lto_solve ~cmr_files ~ltosol_file =
   in
   (* Make the offsets of slots defined by units outside the solve available to
      [Slot_offsets.finalize_offsets]. The offsets of the participants' own slots
-     are recomputed from the solution, so the stale ones stored in the .cmr
+     are recomputed from the solution, so the stale ones stored in the .cmx
      files must not be imported. *)
   List.iter
     (fun (_participant, (_, _, imported_offsets, _)) ->
@@ -517,32 +564,39 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     get_module_info comp_unit
   in
   let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  fun ~keep_symbol_tables ~cmr_filename ~ppf_dump:_ ~prefixname:_ ->
-    (* We expect the stamp counters in the .cmr file to be less than the
-       counters in the .ltosol file, because the -reaper-solve invocation begins
-       by taking the maximum counters across the .cmr files it reads. Therefore,
-       we can ignore these counters. *)
-    let cmr_serialisable, cmr_stamp_counters =
-      Profile.record_call ~accumulate:true "cmr_load" (fun () ->
-          Flambda2_reaper.Cmr_format.load cmr_filename)
+  fun ~keep_symbol_tables
+    ~cmx_filename
+    ~(paused_unit_infos : Cmx_format.unit_infos)
+    ~ppf_dump:_
+    ~prefixname:_
+  ->
+    let header, export_info =
+      read_lto_header_and_export_info ~filename:cmx_filename paused_unit_infos
     in
+    (* We expect the stamp counters in the .cmx file to be less than the
+       counters in the .ltosol file, because the -reaper-solve invocation begins
+       by taking the maximum counters across the .cmx files it reads. Therefore,
+       we can ignore these counters. *)
     if
-      Flambda2_reaper.Id_stamp_counters.any_greater_than cmr_stamp_counters
+      Flambda2_reaper.Id_stamp_counters.any_greater_than
+        (Flambda2_reaper.Lto_sections.Header.id_stamp_counters header)
         id_stamp_counters
     then
       Misc.fatal_error
         "The rebuild data contains ID stamp counters greater than those in the \
          the solution file. Stamp counter monotonicity is broken.";
-    let unit_metadata, all_code, rebuild_data =
-      Profile.record_call ~accumulate:true "cmr_deserialise" (fun () ->
-          Flambda2_reaper.Cmr_format.Serialisable.deserialise_for_rebuild
-            cmr_serialisable)
+    let unit_metadata, rebuild_data =
+      Profile.record_call ~accumulate:true "lto_sections_deserialise" (fun () ->
+          Flambda2_reaper.Lto_sections.read_for_rebuild ~filename:cmx_filename
+            ~sections:paused_unit_infos.ui_file_sections ~export_info header)
     in
     (* CR mvellacott: add debug printing code. *)
+    (* Code metadata of the participants comes from the solution and that of
+       other units from their .cmx files, loaded on demand. *)
     let flambda, all_code, _final_typing_env, free_names =
       Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
         ~traverse_rebuild:rebuild_data ~solution ~typing:None ~machine_width
-        ~cmx_loader ~all_code
+        ~cmx_loader ~all_code:Exported_code.empty
     in
     (* Reaped CMXs are only used for linking, so leave their Flambda export
        information empty, as for opaque compilation. The backend still needs the

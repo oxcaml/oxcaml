@@ -1,0 +1,5 @@
+File "pack_rejected_pack.cmx", line 1:
+Error: File pack_rejected_member.cmx
+       was compiled with -support-lto and cannot be packed
+File "pack_rejected_pack.cmx", line 1:
+Error: -pack is not supported with -support-lto

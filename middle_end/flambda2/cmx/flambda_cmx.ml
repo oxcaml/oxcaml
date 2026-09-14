@@ -52,9 +52,8 @@ let load_cmx_file_contents loader comp_unit =
           let offsets = Flambda_cmx_format.exported_offsets cmx in
           Exported_offsets.import_offsets offsets;
           loader.imported_units
-            <- Imported_unit_map.add cmx_file (Some typing_env)
-                 loader.imported_units;
-          Some typing_env)
+            <- Imported_unit_map.add cmx_file typing_env loader.imported_units;
+          typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
@@ -182,7 +181,7 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
 
 let prepare_cmx ~is_local_compilation_unit:is_local ~module_symbol
     create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
-    ~exported_offsets ~sections all_code =
+    ~exported_offsets ~lto_ids ~sections all_code =
   let reachable_names =
     compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
   in
@@ -205,7 +204,8 @@ let prepare_cmx ~is_local_compilation_unit:is_local ~module_symbol
     EC.free_function_slots_and_value_slots all_code
   in
   let slots_used_in_typing_env =
-    TE.Serializable.free_function_slots_and_value_slots final_typing_env
+    Option.fold ~none:Name_occurrences.empty
+      ~some:TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
   let exported_offsets =
     exported_offsets
@@ -223,31 +223,37 @@ let prepare_cmx ~is_local_compilation_unit:is_local ~module_symbol
   in
   let cmx =
     Flambda_cmx_format.create_raw ~final_typing_env ~all_code ~exported_offsets
-      ~used_value_slots ~sections
+      ~used_value_slots ~lto_ids ~sections
   in
   reachable_names, Some cmx
 
 let prepare_cmx_file_contents
-    ?(is_local_compilation_unit = Current_unit.is_current) ~final_typing_env
-    ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code =
+    ?(is_local_compilation_unit = Current_unit.is_current)
+    ?(lto_ids = Ids_for_export.empty) ~final_typing_env ~module_symbol
+    ~used_value_slots ~exported_offsets ~sections all_code =
   match final_typing_env with
+  | _ when Flambda_features.opaque () ->
+    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   | None ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some _ when Flambda_features.opaque () ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+    prepare_cmx ~is_local_compilation_unit ~module_symbol
+      (fun _reachable_names -> None)
+      ~free_names_of_name:(fun _name -> None)
+      ~used_value_slots
+      ~canonicalise:(fun simple -> simple)
+      ~exported_offsets ~lto_ids ~sections all_code
   | Some final_typing_env ->
     let typing_env, canonicalise =
       TE.Pre_serializable.create final_typing_env ~used_value_slots
     in
     let create_typing_env reachable_names =
-      TE.Serializable.create typing_env ~reachable_names
+      Some (TE.Serializable.create typing_env ~reachable_names)
     in
     let free_names_of_name name =
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
     prepare_cmx ~is_local_compilation_unit ~module_symbol create_typing_env
       ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
-      ~sections all_code
+      ~lto_ids ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     ~exported_offsets ~used_value_slots ~sections all_code =
@@ -260,8 +266,9 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (fun sym _ -> Name_occurrences.mem_symbol reachable_names sym)
           approxs
       in
-      TE.Serializable.create_from_closure_conversion_approx ~machine_width
-        approxs
+      Some
+        (TE.Serializable.create_from_closure_conversion_approx ~machine_width
+           approxs)
     in
     let free_names_of_name name =
       let symbol = Name.must_be_symbol name in
@@ -275,4 +282,4 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     prepare_cmx ~is_local_compilation_unit:Current_unit.is_current
       ~module_symbol create_typing_env ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
-      ~exported_offsets ~sections all_code
+      ~exported_offsets ~lto_ids:Ids_for_export.empty ~sections all_code

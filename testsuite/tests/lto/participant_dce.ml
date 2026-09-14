@@ -8,7 +8,7 @@
  all_modules = "participant_external.ml";
  ocamlopt.opt;
 
- flags = "-flambda2-reaper -support-lto -opaque";
+ flags = "-flambda2-reaper -support-lto";
  all_modules = "participant_dce_dep.ml";
  ocamlopt.opt;
  all_modules = "participant_dce.ml";
@@ -18,19 +18,21 @@
  script;
 
  compile_only = "false";
- flags = "-reaper-solve participant_dce.cmr participant_dce_dep.cmr";
+ flags = "-reaper-solve participant_dce.cmx participant_dce_dep.cmx";
  last_flags = "-o participant_dce.ltosol";
  all_modules = "";
  ocamlopt.opt;
 
- flags = "-reaper-rebuild participant_dce.cmr participant_dce.ltosol";
+ flags = "-reaper-rebuild participant_dce.cmx participant_dce.ltosol";
  last_flags = "";
  ocamlopt.opt;
- flags = "-reaper-rebuild participant_dce_dep.cmr participant_dce.ltosol";
+ flags = "-reaper-rebuild participant_dce_dep.cmx participant_dce.ltosol";
  ocamlopt.opt;
 
- script = "sh -c 'grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.reaped.o; test $? -eq 1'";
+ exit_status = "1";
+ script = "grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.reaped.o";
  script;
+ exit_status = "0";
 
  flags = "";
  all_modules = "participant_external.cmx participant_dce_dep.reaped.cmx participant_dce.reaped.cmx";
@@ -67,6 +69,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(* Opaque compilation leaves cross-unit calls indirect. This checks graph
-   joining independently of the forthcoming solve-time code metadata changes. *)
-let () = Participant_external.run Participant_dce_dep.used
+(* [Sys.opaque_identity] leaves the cross-unit call indirect. This checks graph
+   joining independently of the solve-time code metadata changes. *)
+let () =
+  Participant_external.run (Sys.opaque_identity Participant_dce_dep.used)

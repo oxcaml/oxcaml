@@ -34,12 +34,13 @@ val main
     ltosol_filename:string ->
     batch_members:Compilation_unit.t list ->
     keep_symbol_tables:bool ->
-    cmr_filename:string ->
+    cmx_filename:string ->
+    paused_unit_infos:Cmx_format.unit_infos ->
     ppf_dump:Format.formatter ->
     prefixname:string ->
     Cmm.phrase list)
   -> reaper_lto_solve:(
-    cmr_files:string list ->
+    cmx_files:string list ->
     ltosol_file:string ->
     unit)
   -> int

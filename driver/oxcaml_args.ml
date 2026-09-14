@@ -753,22 +753,20 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
-(* CR mvellacott: Update help text for the following three once fully implemented. *)
-
 let mk_support_lto f =
   ( "-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Currently unimplemented. Will eventually be used to enable support for \
-       link time optimisation.%s (Flambda2 only)"
+      " Store the Reaper's link time optimisation data in the .cmx file, for \
+       use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
       (format_default Flambda2.Default.support_lto) )
 
 let mk_no_support_lto f =
   ( "-no-support-lto",
     Arg.Unit f,
     Printf.sprintf
-      " Currently unimplemented. Will eventually be used to disable support \
-       for link time optimisation.%s (Flambda2 only)"
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
       (format_not_default Flambda2.Default.support_lto) )
 
 let mk_reaper_rebuild f =
@@ -776,14 +774,15 @@ let mk_reaper_rebuild f =
     (* CR mvellacott: instead of a boolean flag, this should ultimately take an
        .ltosol file. *)
     Arg.Unit f,
-    " Currently unimplemented. Eventually, rebuild and compile a program given \
-     its .cmx and a Reaper solution (Flambda2 only)" )
+    " Rebuild and compile the given -support-lto .cmx files according to the \
+     given .ltosol Reaper solution, producing .reaped.cmx and object files \
+     (Flambda2 only)" )
 
 let mk_reaper_solve f =
   ( "-reaper-solve",
     Arg.Unit f,
-    " Currently unimplemented. Eventually, produce a Reaper solution file from \
-     -support-lto enabled .cmx files. (Flambda 2 only)" )
+    " Produce a Reaper solution file (-o) from the given -support-lto .cmx \
+     files (Flambda 2 only)" )
 
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",

@@ -8,7 +8,7 @@
  ocamlopt.opt;
 
  compile_only = "false";
- flags = "-reaper-solve reaper_rebuild_sections_dep.cmr reaper_rebuild_sections_other.cmr reaper_rebuild_sections.cmr";
+ flags = "-reaper-solve reaper_rebuild_sections_dep.cmx reaper_rebuild_sections_other.cmx reaper_rebuild_sections.cmx";
  last_flags = "-o reaper_rebuild_sections.ltosol";
  all_modules = "";
  ocamlopt.opt;
@@ -16,14 +16,14 @@
  file = "reaper_rebuild_sections.ltosol";
  file-exists;
 
- flags = "-reaper-rebuild reaper_rebuild_sections_other.cmr reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
+ flags = "-reaper-rebuild reaper_rebuild_sections_other.cmx reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
  last_flags = "";
  ocamlopt.opt;
 
  file = "reaper_rebuild_sections_other.reaped.cmx";
  file-exists;
 
- flags = "-reaper-rebuild reaper_rebuild_sections.cmr reaper_rebuild_sections.ltosol -dcmm";
+ flags = "-reaper-rebuild reaper_rebuild_sections.cmx reaper_rebuild_sections.ltosol -dcmm";
  compiler_output2 = "reaper_rebuild_sections.cmm";
  ocamlopt.opt;
 
@@ -35,13 +35,13 @@
 
  compiler_output2 = "ocamlopt.opt.output";
 
- flags = "-reaper-rebuild reaper_rebuild_sections_dep.cmr reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
+ flags = "-reaper-rebuild reaper_rebuild_sections_dep.cmx reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
  ocamlopt.opt;
 
  file = "reaper_rebuild_sections_dep.reaped.cmx";
  file-exists;
 
- flags = "-reaper-rebuild reaper_rebuild_sections.cmr reaper_rebuild_sections_dep.cmr reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
+ flags = "-reaper-rebuild reaper_rebuild_sections.cmx reaper_rebuild_sections_dep.cmx reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
  compiler_output2 = "batch.sections";
  ocamlopt.opt;
  script = "awk '/^ltosol: loaded section Reaper_rebuild_sections_dep$/ {dep++} /^ltosol: loaded section Reaper_rebuild_sections$/ {caller++} END {exit (dep != 1 || caller != 1)}' batch.sections";

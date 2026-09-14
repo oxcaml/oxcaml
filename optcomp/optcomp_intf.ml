@@ -33,8 +33,9 @@ open Compilenv
 type emit = Compile_common.info -> unit
 
 (** Rebuild one reaped compilation unit of a batch from its reaped Flambda data.
-    [paused_unit_infos] is the contents of the unit's paused .cmx file.
-    [Compilenv.reset] must have been called for the unit first.
+    [paused_unit_infos] is the contents of the unit's paused .cmx file
+    [cmx_file], including its LTO sections. [Compilenv.reset] must have been
+    called for the unit first.
 
     The identifier tables are shared by the whole batch, so [keep_symbol_tables]
     must be [true] for all but the last unit of the batch. [may_reduce_heap]
@@ -44,7 +45,7 @@ type emit = Compile_common.info -> unit
 type rebuild_unit_from_reaped_flambda =
   keep_symbol_tables:bool ->
   may_reduce_heap:bool ->
-  cmr_file:string ->
+  cmx_file:string ->
   paused_unit_infos:Cmx_format.unit_infos ->
   Compile_common.info ->
   unit

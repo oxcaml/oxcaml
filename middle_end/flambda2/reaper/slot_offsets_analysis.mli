@@ -26,7 +26,7 @@
  ******************************************************************************)
 
 (** The per-compilation-unit inputs to [compute]. They are recorded at traverse
-    time (and, for LTO, serialised into the .cmr file) so that the solve-time
+    time (and, for LTO, serialised into the .cmx file) so that the solve-time
     computation does not need to load .cmx files for external code. *)
 module Inputs : sig
   (** The code metadata needed when laying out function slots. *)

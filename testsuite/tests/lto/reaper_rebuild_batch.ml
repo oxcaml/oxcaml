@@ -7,14 +7,8 @@
  compile_only = "true";
  ocamlopt.opt;
 
- file = "reaper_rebuild_batch_dependency.cmr";
- file-exists;
-
- file = "reaper_rebuild_batch.cmr";
- file-exists;
-
  compile_only = "false";
- flags = "-reaper-solve reaper_rebuild_batch_dependency.cmr reaper_rebuild_batch.cmr";
+ flags = "-reaper-solve reaper_rebuild_batch_dependency.cmx reaper_rebuild_batch.cmx";
  last_flags = "-o reaper_rebuild_batch.ltosol";
  all_modules = "";
  ocamlopt.opt;
@@ -22,7 +16,7 @@
  file = "reaper_rebuild_batch.ltosol";
  file-exists;
 
- flags = "-reaper-rebuild reaper_rebuild_batch_dependency.cmr reaper_rebuild_batch.cmr reaper_rebuild_batch.ltosol";
+ flags = "-reaper-rebuild reaper_rebuild_batch_dependency.cmx reaper_rebuild_batch.cmx reaper_rebuild_batch.ltosol";
  last_flags = "";
  ocamlopt.opt;
 

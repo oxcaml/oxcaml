@@ -59,6 +59,10 @@ val get_static_data :
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.raw -> unit
         (* Set the export information for the current unit. *)
 
+val set_lto_info : File_sections.Idx.t -> unit
+        (* Record the section holding the Reaper's LTO header for the
+           current unit (see [Flambda2_reaper.Lto_sections]). *)
+
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
 val need_apply_fun:

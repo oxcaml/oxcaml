@@ -13,13 +13,32 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* Import the .cmx file defining [code_id] if its metadata is not already
+   available. Only the LTO rebuild gets here: it does not run [Simplify], so the
+   metadata of code from units that did not take part in the solve is only
+   available from their .cmx files. *)
+let load_cmx_for_code_id ~cmx_loader ~all_code code_id =
+  let comp_unit = Code_id.get_compilation_unit code_id in
+  if
+    (not (Current_unit.is_current comp_unit))
+    && (not (Exported_code.mem code_id all_code))
+    && not
+         (Exported_code.mem code_id
+            (Flambda_cmx.get_imported_code cmx_loader ()))
+  then
+    ignore
+      (Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
+        : Typing_env.Serializable.t option)
+
 let get_code_metadata ~cmx_loader ~all_code =
   let load_code = Flambda_cmx.get_imported_code cmx_loader in
   fun code_id ->
     Code_or_metadata.code_metadata
       (match Exported_code.find all_code code_id with
       | Some code -> code
-      | None -> Exported_code.find_exn (load_code ()) code_id)
+      | None ->
+        load_cmx_for_code_id ~cmx_loader ~all_code code_id;
+        Exported_code.find_exn (load_code ()) code_id)
 
 module Staged = struct
   module Solve_inputs = struct
@@ -349,8 +368,21 @@ module Staged = struct
     let is_foreign code_id =
       not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
-    (* Retain foreign metadata saved in the CMR even if rebuild never reloads
-       its CMX. Local entries are replaced by rebuilt code below. *)
+    (* The metadata of foreign code comes from the solution for units that took
+       part in the solve, and from their .cmx files otherwise. *)
+    let solution_metadata =
+      Name_occurrences.fold_code_ids free_names ~init:[]
+        ~f:(fun solution_metadata code_id ->
+          if not (is_foreign code_id)
+          then solution_metadata
+          else
+            match Rebuild_solution.find_code_metadata solution code_id with
+            | Some code_metadata -> code_metadata :: solution_metadata
+            | None ->
+              load_cmx_for_code_id ~cmx_loader ~all_code code_id;
+              solution_metadata)
+    in
+    (* Local entries are replaced by rebuilt code below. *)
     let imported_code =
       Exported_code.merge
         (Exported_code.mark_as_imported all_code)
@@ -359,15 +391,8 @@ module Staged = struct
       |> Exported_code.filter ~f:is_foreign
     in
     let imported_code =
-      Name_occurrences.fold_code_ids free_names ~init:imported_code
-        ~f:(fun imported_code code_id ->
-          if is_foreign code_id
-          then
-            match Rebuild_solution.find_code_metadata solution code_id with
-            | Some code_metadata ->
-              Exported_code.add_code_metadata imported_code code_metadata
-            | None -> imported_code
-          else imported_code)
+      List.fold_left Exported_code.add_code_metadata imported_code
+        solution_metadata
     in
     let all_code =
       Exported_code.add_code
