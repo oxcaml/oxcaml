@@ -50,7 +50,7 @@ type value_mismatch =
   | Type of Errortrace.moregen_error
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
-  | Mode of Mode.Value.error
+  | Mode of Mode.With_regionality.error
   | Layout_poly_coercion of layout_poly_coercion
 
 exception Dont_match of value_mismatch
@@ -58,8 +58,8 @@ exception Dont_match of value_mismatch
 type mmodes =
   | All
   | Specific :
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      ((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      ('l * allowed) With_regionality.t ->
       mmodes
 
 let child_close_over_coercion_opt id c =
@@ -94,7 +94,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
           the parents' are; if the parents' are not, defer to the per-item
           checks, which take modalities and mode crossing into account. *)
       assert (moda0 == moda1);
-      begin match Mode.Value.submode m0 m1 with
+      begin match Mode.With_regionality.submode m0 m1 with
       | Ok () -> Ok All
       | Error _ -> Ok (Specific ((m0, c), m1))
       end
@@ -109,13 +109,13 @@ let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
   | Specific ((m0, c), m1) ->
       let m0 =
         match c with
-        | None -> m0 |> Mode.Value.disallow_right
+        | None -> m0 |> Mode.With_regionality.disallow_right
         | Some (locks, lid, loc) ->
             let m0 = Crossing.apply_left crossing m0 in
             Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
-      Mode.Value.submode m0 m1
+      Mode.With_regionality.submode m0 m1
 
 let native_repr_args nra1 nra2 =
   let rec loop i nra1 nra2 =
@@ -490,7 +490,9 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error ~pp got expected ppf e =
-  let ({ left; right } : _ Mode.simple_error) = Mode.Value.print_error pp e in
+  let ({ left; right } : _ Mode.simple_error) =
+    Mode.With_regionality.print_error pp e
+  in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in
@@ -962,7 +964,7 @@ module Record_diffing = struct
             | Atomic, Nonatomic -> Some (Atomicity First)
             | Nonatomic, Atomic -> Some (Atomicity Second)
             | Atomic, Atomic | Nonatomic, Nonatomic ->
-                let open Mode.Value.Comonadic in
+                let open Mode.With_regionality.Comonadic in
                 equate_exn m1 legacy;
                 equate_exn m2 legacy;
                 None
