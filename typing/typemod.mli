@@ -37,7 +37,7 @@ val type_module:
   Env.t -> Parsetree.module_expr -> Typedtree.module_expr * Shape.t
 val type_structure:
   Env.t -> Parsetree.structure ->
-  Typedtree.structure * Types.signature * Mode.Value.lr * Signature_names.t *
+  Typedtree.structure * Types.signature * Mode.With_regionality.lr * Signature_names.t *
   Shape.t * Env.t
 val type_toplevel_phrase:
   Env.t -> Types.signature -> Parsetree.structure ->

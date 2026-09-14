@@ -6519,7 +6519,7 @@ module Value_with (Areality : Areality) = struct
     | Monadic ax -> Monadic.proj_obj ax
     | Comonadic ax -> Comonadic.proj_obj ax
 
-  (* CR-soon zqian: make a functor [Mode.Value.Const.Make] to generalize over any type
+  (* CR-soon zqian: make a functor [Mode.With_regionality.Const.Make] to generalize over any type
      operator applied on each mode constants. *)
   type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
     { areality : 'a;
@@ -6604,7 +6604,7 @@ module Value_with (Areality : Areality) = struct
     { monadic; comonadic }
 
   module Const = struct
-    (* CR-soon zqian: make a functor [Mode.Value.Const.Make] to generalize over any type
+    (* CR-soon zqian: make a functor [Mode.With_regionality.Const.Make] to generalize over any type
        operator applied on each mode constants. *)
     type t =
       ( Areality.Const.t,
@@ -6872,12 +6872,12 @@ module Value_with (Areality : Areality) = struct
       C.Core_morph.monadic_op_to_comonadic_min
         (C.comonadic_with_obj Areality.Obj.obj)
 
-    (** See [Alloc.close_over] for explanation. *)
+    (** See [With_locality.close_over] for explanation. *)
     let close_over m =
       let { monadic; comonadic } = split m in
       Comonadic.Const.join comonadic (monadic_to_comonadic_min monadic)
 
-    (** See [Alloc.partial_apply] for explanation. *)
+    (** See [With_locality.partial_apply] for explanation. *)
     let partial_apply m =
       let { comonadic; _ } = split m in
       comonadic
@@ -7568,8 +7568,8 @@ module Value_with (Areality : Areality) = struct
 end
 [@@inline]
 
-module Value = Value_with (Regionality)
-module Alloc = Value_with (Locality)
+module With_regionality = Value_with (Regionality)
+module With_locality = Value_with (Locality)
 
 module Const = struct
   let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
@@ -7586,7 +7586,7 @@ module Const = struct
          visibility;
          staticity
        } :
-        Alloc.Const.t) : Value.Const.t =
+        With_locality.Const.t) : With_regionality.Const.t =
     let areality = locality_as_regionality areality in
     { areality;
       linearity;
@@ -7602,8 +7602,9 @@ module Const = struct
 
   module Axis = struct
     let is_areality (type a) :
-        a Alloc.Axis.t ->
-        ((a, Locality.Const.t) Misc.eq, a Value.Axis.t) Either.t = function
+        a With_locality.Axis.t ->
+        ((a, Locality.Const.t) Misc.eq, a With_regionality.Axis.t) Either.t =
+      function
       | Comonadic Areality -> Left Refl
       | Comonadic Linearity -> Right (Comonadic Linearity)
       | Comonadic Portability -> Right (Comonadic Portability)
@@ -7615,7 +7616,8 @@ module Const = struct
       | Monadic Visibility -> Right (Monadic Visibility)
       | Monadic Staticity -> Right (Monadic Staticity)
 
-    let alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed =
+    let alloc_as_value :
+        With_locality.Axis.packed -> With_regionality.Axis.packed =
      fun (P ax) ->
       match is_areality ax with
       | Left Refl -> P (Comonadic Areality)
@@ -7630,33 +7632,33 @@ let locality_as_regionality m =
 let alloc_as_value ?allocation { comonadic; monadic } =
   let hint = Option.map (fun a -> Hint.Allocation a) allocation in
   { comonadic =
-      S.apply Value.Comonadic.Obj.obj ?hint
+      S.apply With_regionality.Comonadic.Obj.obj ?hint
         (Simple (Core (Locality_full Locality_as_regionality))) comonadic;
-    monadic = Value.Monadic.apply_hint Skip monadic
+    monadic = With_regionality.Monadic.apply_hint Skip monadic
   }
 
 let alloc_to_value_l2r m =
-  let { comonadic; monadic } = Alloc.disallow_right m in
+  let { comonadic; monadic } = With_locality.disallow_right m in
   { comonadic =
-      S.apply Value.Comonadic.Obj.obj
+      S.apply With_regionality.Comonadic.Obj.obj
         (Simple (Core (Locality_full Local_to_regional))) comonadic;
-    monadic = Value.Monadic.apply_hint Skip monadic
+    monadic = With_regionality.Monadic.apply_hint Skip monadic
   }
 
 let value_to_alloc_r2g ?allocation m =
   let hint = Option.map (fun a -> Hint.Allocation_r a) allocation in
-  let { comonadic; monadic } = Value.disallow_left m in
+  let { comonadic; monadic } = With_regionality.disallow_left m in
   { comonadic =
-      S.apply Alloc.Comonadic.Obj.obj ?hint
+      S.apply With_locality.Comonadic.Obj.obj ?hint
         (Simple (Core (Locality_full Regional_to_global))) comonadic;
-    monadic = Alloc.Monadic.apply_hint Skip monadic
+    monadic = With_locality.Monadic.apply_hint Skip monadic
   }
 
 let value_to_alloc_r2l { comonadic; monadic } =
   { comonadic =
-      S.apply Alloc.Comonadic.Obj.obj
+      S.apply With_locality.Comonadic.Obj.obj
         (Simple (Core (Locality_full Regional_to_local))) comonadic;
-    monadic = Alloc.Monadic.apply_hint Skip monadic
+    monadic = With_locality.Monadic.apply_hint Skip monadic
   }
 
 module Modality = struct
@@ -7717,7 +7719,7 @@ module Modality = struct
   *)
 
   module Monadic = struct
-    module Mode = Value.Monadic
+    module Mode = With_regionality.Monadic
 
     type 'a axis = 'a Mode.Axis.t
 
@@ -7895,7 +7897,7 @@ module Modality = struct
   end
 
   module Comonadic = struct
-    module Mode = Value.Comonadic
+    module Mode = With_regionality.Comonadic
 
     type 'a axis = 'a Mode.Axis.t
 
@@ -8099,18 +8101,18 @@ module Modality = struct
 
     type packed = P : 'a t -> packed
 
-    let of_value : Value.Axis.packed -> packed = function
+    let of_value : With_regionality.Axis.packed -> packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
-    let to_value : packed -> Value.Axis.packed = function
+    let to_value : packed -> With_regionality.Axis.packed = function
       | P (Monadic ax) -> P (Monadic ax)
       | P (Comonadic ax) -> P (Comonadic ax)
 
     let compare (P ax0 : packed) (P ax1 : packed) =
       let (P ax0) = to_value (P ax0) in
       let (P ax1) = to_value (P ax1) in
-      Value.Axis.compare ax0 ax1
+      With_regionality.Axis.compare ax0 ax1
   end
 
   type atom = Atom : 'a Axis.t * 'a -> atom
@@ -8136,15 +8138,16 @@ module Modality = struct
     let le (type a) (ax : a Axis.t) (a : a) (b : a) : bool =
       match ax, a, b with
       | Monadic ax, Join_const a, Join_const b ->
-        Value.Monadic.Const.Per_axis.le ax a b
+        With_regionality.Monadic.Const.Per_axis.le ax a b
       | Comonadic ax, Meet_const a, Meet_const b ->
-        Value.Comonadic.Const.Per_axis.le ax a b
+        With_regionality.Comonadic.Const.Per_axis.le ax a b
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with
       | Comonadic ax, Meet_const t ->
-        Value.Comonadic.Const.Per_axis.print ax ppf t
-      | Monadic ax, Join_const t -> Value.Monadic.Const.Per_axis.print ax ppf t
+        With_regionality.Comonadic.Const.Per_axis.print ax ppf t
+      | Monadic ax, Join_const t ->
+        With_regionality.Monadic.Const.Per_axis.print ax ppf t
   end
 
   type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -8208,7 +8211,7 @@ module Modality = struct
           let a1 = proj ax t1 in
           let a2 = proj ax t2 in
           if a1 = a2 then None else Some (Atom (ax, a2)))
-        Value.Axis.all
+        With_regionality.Axis.all
 
     let print ppf { monadic; comonadic } =
       Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
@@ -8315,7 +8318,7 @@ module Crossing = struct
 
   module Monadic = struct
     module Modality = Modality.Monadic
-    module Mode = Value.Monadic
+    module Mode = With_regionality.Monadic
 
     module Atom = struct
       type 'a t = Modality of 'a Modality.Atom.t [@@unboxed]
@@ -8410,16 +8413,16 @@ module Crossing = struct
   end
 
   let comonadic_locality_as_regionality comonadic =
-    S.Unhint.apply Value.Comonadic.Obj.obj
+    S.Unhint.apply With_regionality.Comonadic.Obj.obj
       (Simple (Core (Locality_full Locality_as_regionality))) comonadic
 
   let comonadic_regional_to_local comonadic =
-    S.Unhint.apply Alloc.Comonadic.Obj.obj
+    S.Unhint.apply With_locality.Comonadic.Obj.obj
       (Simple (Core (Locality_full Regional_to_local))) comonadic
 
   module Comonadic = struct
     module Modality = Modality.Comonadic
-    module Mode = Value.Comonadic
+    module Mode = With_regionality.Comonadic
 
     module Atom = struct
       type 'a t = Modality of 'a Modality.Atom.t [@@unboxed]
@@ -8485,7 +8488,7 @@ module Crossing = struct
       Mode.meet_const_unhint c m
 
     let apply_left_alloc t m =
-      Alloc.Comonadic.hint ~hint:Crossing
+      With_locality.Comonadic.hint ~hint:Crossing
         (comonadic_locality_as_regionality (S.Unhint.unhint m)
         |> apply_left_unhint t |> comonadic_regional_to_local)
 
@@ -8514,8 +8517,10 @@ module Crossing = struct
 
   module Axis = struct
     type 'a t =
-      | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
-      | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
+      | Monadic : 'a With_regionality.Monadic.Axis.t -> 'a Monadic.Atom.t t
+      | Comonadic :
+          'a With_regionality.Comonadic.Axis.t
+          -> 'a Comonadic.Atom.t t
 
     type packed = P : 'a t -> packed
 
@@ -8611,8 +8616,8 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_left t m =
-    Value.hint ~monadic:Crossing ~comonadic:Crossing
-      (apply_left_unhint t (Value.disallow_right m))
+    With_regionality.hint ~monadic:Crossing ~comonadic:Crossing
+      (apply_left_unhint t (With_regionality.disallow_right m))
 
   let apply_right_unhint t { monadic; comonadic } =
     let monadic =
@@ -8622,13 +8627,13 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_right t m =
-    Value.hint ~monadic:Crossing ~comonadic:Crossing
-      (apply_right_unhint t (Value.disallow_left m))
+    With_regionality.hint ~monadic:Crossing ~comonadic:Crossing
+      (apply_right_unhint t (With_regionality.disallow_left m))
 
-  (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
+  (* Our mode crossing is for [With_regionality] modes, but can be extended to [With_locality]
      modes via [alloc_as_value], defined as follows:
 
-     Given a mode crossing [f] for [Value], and we are to check [Alloc] submoding
+     Given a mode crossing [f] for [With_regionality], and we are to check [With_locality] submoding
      [m1 <= m2], we will instead check
      [f (alloc_as_value m1) <= f (alloc_as_value m2)].
 
@@ -8641,7 +8646,7 @@ module Crossing = struct
   let value_to_alloc_r2l_unhint m =
     let { comonadic; monadic } = m in
     let comonadic =
-      S.Unhint.apply Alloc.Comonadic.Obj.obj
+      S.Unhint.apply With_locality.Comonadic.Obj.obj
         (Simple (Core (Locality_full Regional_to_local))) comonadic
     in
     { comonadic; monadic }
@@ -8649,21 +8654,21 @@ module Crossing = struct
   let value_to_alloc_r2g_unhint m =
     let { comonadic; monadic } = m in
     let comonadic =
-      S.Unhint.apply Alloc.Comonadic.Obj.obj
+      S.Unhint.apply With_locality.Comonadic.Obj.obj
         (Simple (Core (Locality_full Regional_to_global))) comonadic
     in
     { comonadic; monadic }
 
   let apply_left_alloc t m =
     m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint
-    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+    |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_right_alloc t m =
     m |> alloc_as_value |> apply_right_unhint t |> value_to_alloc_r2g_unhint
-    |> Alloc.hint ~comonadic:Crossing ~monadic:Crossing
+    |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
   let apply_left_right_alloc t m =
-    let { monadic; comonadic } = Alloc.unhint m in
+    let { monadic; comonadic } = With_locality.unhint m in
     let monadic = Monadic.apply_right_unhint t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
@@ -8671,7 +8676,8 @@ module Crossing = struct
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in
-    Alloc.hint ~monadic:Crossing ~comonadic:Crossing { monadic; comonadic }
+    With_locality.hint ~monadic:Crossing ~comonadic:Crossing
+      { monadic; comonadic }
 
   let le t1 t2 =
     Monadic.le t1.monadic t2.monadic && Comonadic.le t1.comonadic t2.comonadic
@@ -8742,7 +8748,7 @@ module Crossing = struct
           if Per_axis.(le ax (max ax) a)
           then None
           else Some (Fmt.asprintf "%a" (Per_axis.print ax) a))
-        Value.Axis.all
+        With_regionality.Axis.all
     in
     Fmt.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 

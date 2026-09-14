@@ -2195,7 +2195,7 @@ let transl_module_representation repr =
 
 let rec transl_address loc = function
   | Env.Aunit (cu, mode) ->
-    let staticity = Mode.Value.proj_monadic Staticity mode in
+    let staticity = Mode.With_regionality.proj_monadic Staticity mode in
     let staticity =
       match Mode.Staticity.zap_to_floor_exn staticity with
       | Static -> Static
@@ -2398,7 +2398,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                for printing in debugger. *)
             let vd = Env.find_value (Path.Pident id) old_env in
             let vd = {vd with val_modalities = Mode.Modality.undefined} in
-            let mode = Mode.Value.max |> Mode.Value.disallow_right in
+            let mode = Mode.With_regionality.max |> Mode.With_regionality.disallow_right in
             (vd, mode)
           in
           let rebind id id' new_env =

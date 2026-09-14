@@ -153,7 +153,7 @@ val filter_row_fields:
 
 val contains_initial_stage_splice: int -> type_expr -> bool
 val iter_type_expr_with_stages:
-        (Env.t -> type_expr -> unit) -> Env.t -> (Mode.Alloc.lr -> unit)
+        (Env.t -> type_expr -> unit) -> Env.t -> (Mode.With_locality.lr -> unit)
         -> type_expr -> unit
 
 val generalize: type_expr -> unit
@@ -295,13 +295,13 @@ val prim_params_yielding:
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
-val curry_mode_const : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+val curry_mode_const : With_locality.Const.t -> With_locality.Const.t -> With_locality.Const.t
 
 (** Applies the same logic as [curry_mode_const] over
     the comonadic mode for [m0] and the lr mode [m1] *)
 val curry_mode :
-  (allowed * 'r) Alloc.Comonadic.t -> Alloc.lr ->
-  Alloc.Comonadic.l
+  (allowed * 'r) With_locality.Comonadic.t -> With_locality.lr ->
+  With_locality.Comonadic.l
 
 val apply:
         ?use_current_level:bool ->
@@ -381,9 +381,9 @@ val unify_delaying_jkind_checks :
 
 type filtered_arrow =
   { ty_arg : type_expr;
-    arg_mode : Mode.Alloc.lr;
+    arg_mode : Mode.With_locality.lr;
     ty_ret : type_expr;
-    ret_mode : Mode.Alloc.lr
+    ret_mode : Mode.With_locality.lr
   }
 
 val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
@@ -605,11 +605,11 @@ val is_contractive: Env.t -> Path.t -> bool
 val normalize_type: type_expr -> unit
 
 val remove_mode_and_jkind_variables:
-  zap_scope:Alloc.zap_scope -> type_expr -> unit
+  zap_scope:With_locality.zap_scope -> type_expr -> unit
         (* Ensure mode and jkind variables are fully determined *)
 
 val nongen_vars_in_schema:
-  zap_scope:Alloc.zap_scope -> Env.t -> type_expr -> Btype.TypeSet.t option
+  zap_scope:With_locality.zap_scope -> Env.t -> type_expr -> Btype.TypeSet.t option
         (* Return any non-generic variables in the type scheme.  Also ensures
            mode variables are fully determined. *)
 
@@ -641,13 +641,13 @@ val closed_type_expr: ?env:Env.t -> type_expr -> bool
            eliminates the variable *)
 
 val closed_type_decl:
-  zap_scope:Alloc.zap_scope ->
+  zap_scope:With_locality.zap_scope ->
   type_declaration -> type_expr option
 val closed_extension_constructor:
-  zap_scope:Alloc.zap_scope ->
+  zap_scope:With_locality.zap_scope ->
   extension_constructor -> type_expr option
 val closed_class:
-        zap_scope:Alloc.zap_scope -> type_expr list -> class_signature ->
+        zap_scope:With_locality.zap_scope -> type_expr list -> class_signature ->
         closed_class_failure option
         (* Check whether all type variables are bound *)
 
@@ -877,8 +877,8 @@ val cross_right :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
-  Mode.Value.r ->
-  Mode.Value.r
+  Mode.With_regionality.r ->
+  Mode.With_regionality.r
 
 (** Cross a left mode according to a type wrapped in modalities. Non-principal
     types don't cross. *)
@@ -886,24 +886,24 @@ val cross_left :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
-  Mode.Value.l ->
-  Mode.Value.l
+  Mode.With_regionality.l ->
+  Mode.With_regionality.l
 
-(** Similar to [cross_right] but for [Mode.Alloc]  *)
+(** Similar to [cross_right] but for [Mode.With_locality]  *)
 val cross_right_alloc :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
-  Mode.Alloc.r ->
-  Mode.Alloc.r
+  Mode.With_locality.r ->
+  Mode.With_locality.r
 
-(** Similar to [cross_left] but for [Mode.Alloc]  *)
+(** Similar to [cross_left] but for [Mode.With_locality]  *)
 val cross_left_alloc :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
-  Mode.Alloc.l ->
-  Mode.Alloc.l
+  Mode.With_locality.l ->
+  Mode.With_locality.l
 
 (** Zap a modality to floor if the [modes] extension is enabled at a level more
     immature than the given one. Zap to id otherwise. *)
@@ -930,19 +930,19 @@ val zap_modalities_to_floor_if_at_least :
 val check_constructor_crossing_creation :
   Env.t -> Longident.t loc
   -> tag -> res:type_expr -> args:constructor_argument list
-  -> Env.locks -> (Mode.Value.r, Mode.Value.error) result
+  -> Env.locks -> (Mode.With_regionality.r, Mode.With_regionality.error) result
 
 val check_constructor_crossing_destruction :
   Env.t -> Longident.t loc
   -> tag -> res:type_expr -> args:constructor_argument list
-  -> Env.locks -> (Mode.Value.l, Mode.Value.error) result
+  -> Env.locks -> (Mode.With_regionality.l, Mode.With_regionality.error) result
 
 (** Takes the mode of a container, a child's relation to it, and an optional
     modality, returns the mode of the child. *)
 val apply_left_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
-  -> (allowed * 'r) Mode.Value.t -> Mode.Value.l
+  -> (allowed * 'r) Mode.With_regionality.t -> Mode.With_regionality.l
 
 val apply_right_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
-  -> ('l * allowed) Mode.Value.t -> Mode.Value.r
+  -> ('l * allowed) Mode.With_regionality.t -> Mode.With_regionality.r
