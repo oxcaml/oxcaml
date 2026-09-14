@@ -84,71 +84,65 @@ let summarise range =
     ~f:(fun summary subrange ->
       Subrange_summary.Set.add (subrange_summary subrange) summary)
 
-let create_discontiguous_range_list_entry ~start_of_code_symbol
-    dwarf_4_range_list_entries range_list subrange =
-  let start_pos = IF.Subrange.start_pos subrange in
-  let start_pos_offset = IF.Subrange.start_pos_offset subrange in
-  let end_pos = IF.Subrange.end_pos subrange in
-  let end_pos_offset = IF.Subrange.end_pos_offset subrange in
+(* The DWARF version is fixed for the whole compilation unit, so it is examined
+   once here rather than once per subrange. *)
+let create_discontiguous_range_list_attributes state ~start_of_code_symbol
+    ~dwarf_4_base_address_entry range =
   match !Dwarf_flags.gdwarf_version with
   | Four ->
-    let range_list_entry =
-      Dwarf_4_range_list_entry.create_range_list_entry ~start_of_code_symbol
-        ~first_address_when_in_scope:(text_label start_pos)
-        ~first_address_when_not_in_scope:(text_label end_pos)
-        ~first_address_when_not_in_scope_offset:(Some end_pos_offset)
+    let range_list_entries =
+      IF.Range.fold range ~init:[] ~f:(fun range_list_entries subrange ->
+          let start_pos = IF.Subrange.start_pos subrange in
+          let end_pos = IF.Subrange.end_pos subrange in
+          let end_pos_offset = IF.Subrange.end_pos_offset subrange in
+          let range_list_entry =
+            Dwarf_4_range_list_entry.create_range_list_entry
+              ~start_of_code_symbol
+              ~first_address_when_in_scope:(text_label start_pos)
+              ~first_address_when_not_in_scope:(text_label end_pos)
+              ~first_address_when_not_in_scope_offset:(Some end_pos_offset)
+          in
+          DS.Debug.log "range_list_entry: start=%a end=%a+%d\n%!" Label.format
+            start_pos Label.format end_pos end_pos_offset;
+          range_list_entry :: range_list_entries)
     in
-    DS.Debug.log "range_list_entry: start=%a end=%a+%d\n%!" Label.format
-      start_pos Label.format end_pos end_pos_offset;
-    range_list_entry :: dwarf_4_range_list_entries, range_list
+    let range_list =
+      Dwarf_4_range_list.create
+        ~range_list_entries:(dwarf_4_base_address_entry @ range_list_entries)
+    in
+    [Debug_ranges_table.insert (DS.debug_ranges_table state) ~range_list]
   | Five ->
-    let range_list_entry : Range_list_entry.entry =
-      (* DWARF-5 spec page 54 line 12. The offsets are relative to
-         [start_of_code_symbol], which the enclosing range list establishes as
-         its base address (see [create_discontiguous_range_list] below). *)
-      Offset_pair_between_labels
-        { start_inclusive = text_label start_pos;
-          start_adjustment_in_bytes = start_pos_offset;
-          end_exclusive = text_label end_pos;
-          end_adjustment_in_bytes = end_pos_offset;
-          payload = ()
-        }
+    (* DWARF-5 spec page 54 line 12. The offsets in the
+       [Offset_pair_between_labels] entries are relative to
+       [start_of_code_symbol], which is established here as the base address of
+       the list. *)
+    let base_index =
+      Address_table.add_symbol (DS.address_table state) start_of_code_symbol
     in
-    let range_list_entry =
-      Range_list_entry.create range_list_entry ~start_of_code_symbol
-    in
-    let range_list = Range_list.add range_list range_list_entry in
-    dwarf_4_range_list_entries, range_list
-
-let create_discontiguous_range_list state ~start_of_code_symbol
-    ~dwarf_4_base_address_entry range =
-  let range_list_init =
-    match !Dwarf_flags.gdwarf_version with
-    | Four -> Range_list.create ()
-    | Five ->
-      (* The offsets in the [Offset_pair_between_labels] entries added by
-         [create_discontiguous_range_list_entry] are relative to
-         [start_of_code_symbol]; establish it as the base address of the
-         list. *)
-      let base_index =
-        Address_table.add_symbol (DS.address_table state) start_of_code_symbol
-      in
+    let range_list =
       Range_list.add (Range_list.create ())
         (Range_list_entry.create (Base_addressx base_index)
            ~start_of_code_symbol)
-  in
-  let dwarf_4_range_list_entries, range_list =
-    IF.Range.fold range ~init:([], range_list_init)
-      ~f:(fun (dwarf_4_range_list_entries, range_list) subrange ->
-        create_discontiguous_range_list_entry ~start_of_code_symbol
-          dwarf_4_range_list_entries range_list subrange)
-  in
-  let base_address_entry =
-    match !Dwarf_flags.gdwarf_version with
-    | Four -> dwarf_4_base_address_entry
-    | Five -> []
-  in
-  base_address_entry @ dwarf_4_range_list_entries, range_list
+    in
+    let range_list =
+      IF.Range.fold range ~init:range_list ~f:(fun range_list subrange ->
+          let range_list_entry : Range_list_entry.entry =
+            Offset_pair_between_labels
+              { start_inclusive = text_label (IF.Subrange.start_pos subrange);
+                start_adjustment_in_bytes =
+                  IF.Subrange.start_pos_offset subrange;
+                end_exclusive = text_label (IF.Subrange.end_pos subrange);
+                end_adjustment_in_bytes = IF.Subrange.end_pos_offset subrange;
+                payload = ()
+              }
+          in
+          Range_list.add range_list
+            (Range_list_entry.create range_list_entry ~start_of_code_symbol))
+    in
+    let range_list_index =
+      Range_list_table.add (DS.range_list_table state) range_list
+    in
+    [DAH.create_ranges range_list_index]
 
 (* "Summaries", sets of pairs of the starting and ending points of ranges, are
    used to dedup entries in the range list table. We do this for range lists but
@@ -236,33 +230,14 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
        any address table entry need be constructed. *)
     let summary = summarise range in
     match All_summaries.Map.find summary all_summaries with
+    | range_list_attributes -> range_list_attributes, all_summaries
     | exception Not_found ->
-      let dwarf_4_range_list_entries, range_list =
-        create_discontiguous_range_list state ~start_of_code_symbol
+      let range_list_attributes =
+        create_discontiguous_range_list_attributes state ~start_of_code_symbol
           ~dwarf_4_base_address_entry range
       in
-      let range_list_attributes =
-        match !Dwarf_flags.gdwarf_version with
-        | Four ->
-          let range_list =
-            Dwarf_4_range_list.create
-              ~range_list_entries:dwarf_4_range_list_entries
-          in
-          let range_list_attribute =
-            Debug_ranges_table.insert (DS.debug_ranges_table state) ~range_list
-          in
-          [range_list_attribute]
-        | Five ->
-          let range_list_index =
-            Range_list_table.add (DS.range_list_table state) range_list
-          in
-          [DAH.create_ranges range_list_index]
-      in
-      let all_summaries =
-        All_summaries.Map.add summary range_list_attributes all_summaries
-      in
-      range_list_attributes, all_summaries
-    | range_list_attributes -> range_list_attributes, all_summaries)
+      ( range_list_attributes,
+        All_summaries.Map.add summary range_list_attributes all_summaries ))
 
 let rec create_down_to_innermost_frame fundecl state ~start_of_code_symbol
     ~dwarf_4_base_address_entry ~compilation_unit_proto_die
