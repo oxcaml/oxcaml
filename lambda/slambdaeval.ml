@@ -28,6 +28,10 @@
 open Lambda
 module Fmt = Format_doc
 
+type error = Block_index_gap_overflow_possible
+
+exception Error of Location.t * error
+
 module Or_missing = struct
   type 'a t =
     | Present of 'a
@@ -585,7 +589,7 @@ and eval_lam_shallow ctx env lam =
     let new_bindings = Misc.Stdlib.List.map_sharing eval_binding old_bindings in
     if new_bindings == old_bindings then lam else Lletrec (new_bindings, body)
   | Lprim (old_prim, args, loc) ->
-    let new_prim = eval_prim env old_prim in
+    let new_prim = eval_prim env loc old_prim in
     if new_prim == old_prim
     then lam
     else begin
@@ -811,7 +815,7 @@ and eval_lfunction_shallow env
     lfunction' ~kind ~params:new_params ~return:new_return ~body ~attr ~loc
       ~mode ~ret_mode
 
-and eval_prim env prim =
+and eval_prim env loc prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
     let new_shape = eval_block_shape env old_shape in
@@ -853,6 +857,15 @@ and eval_prim env prim =
     else Punboxed_product_field (i, new_layouts)
   | Pmake_idx_mixed_field (old_shape, i, path) ->
     let new_shape = eval_mixed_block_shape env old_shape in
+    (* We check for gap overflow after static evaluation to account for layout-
+       polymorphic blocks, but this check covers non-lpoly blocks, too. *)
+    let counts = Mixed_product_bytes.Wrt_path.count_shape new_shape i path in
+    if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
+    then
+      raise
+        (Error
+           ( Debuginfo.Scoped_location.to_location loc,
+             Block_index_gap_overflow_possible ));
     if new_shape == old_shape
     then prim
     else Pmake_idx_mixed_field (new_shape, i, path)
@@ -1004,20 +1017,12 @@ and check_evaluated_primitive loc prim =
   | Psetmixedfield (_, shape, _)
   | Patomic_load_mixed_field { shape; _ }
   | Patomic_set_mixed_field { shape; _ }
+  | Pmake_idx_mixed_field (shape, _, _)
   | Pduprecord
       ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
     ->
     check_shape shape
   | Pmixedfield (_, shape, _) -> check_shape shape
-  | Pmake_idx_mixed_field (shape, pos, path) ->
-    check_shape shape;
-    let counts = Mixed_product_bytes.Wrt_path.count_shape shape pos path in
-    if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
-    then
-      raise
-        (Translcore.Error
-           ( Debuginfo.Scoped_location.to_location loc,
-             Block_index_gap_overflow_possible ))
   | _ -> ()
 
 (* Helpers for asserting that slambda is trivial. *)
@@ -1162,3 +1167,21 @@ let eval ~cu_static_data slam =
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
       { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, slv_runtime)
+
+let report_error_doc ppf = function
+  | Block_index_gap_overflow_possible ->
+    (* This message describes a more conservative rule than we enforce; see
+       [Mixed_product_bytes.Wrt_path.offset_and_gap]. *)
+    Fmt.fprintf ppf
+      "This block index cannot be created because it refers to values@ and \
+       non-values that are separated by 2^%d or more bytes in their@ block, or \
+       could be deepened to such an index."
+      (64 - Mixed_product_bytes.block_index_offset_bits)
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (loc, err) ->
+      Some (Location.error_of_printer ~loc report_error_doc err)
+    | _ -> None)
+
+let report_error = Fmt.compat report_error_doc
