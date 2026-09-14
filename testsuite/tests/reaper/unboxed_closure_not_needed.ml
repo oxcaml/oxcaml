@@ -1,6 +1,6 @@
 (* TEST
  flambda2;
- flags += "-Oclassic -flambda2-reaper -X reaper-oclassic=1 -reaper-local-fields -reaper-debug-flags=nostamps";
+ flags += "-Oclassic -flambda2-reaper -X reaper-oclassic=1 -X reaper-lambda-lifting=1 -reaper-local-fields -reaper-debug-flags=nostamps";
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte with dump-raw, dump-reaper;
  check-fexpr-dump;
