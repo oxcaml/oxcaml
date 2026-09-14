@@ -100,30 +100,28 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
 
-(* Translate (inlined) record representations to Lambda, defaulting unfilled
-   sorts and turning generalized sorts into splices. This should not be called
-   until the end of typechecking. *)
-val finalize_record_representation:
+(* Translate record representations to Lambda, defaulting unfilled
+   sorts and turning generalized sorts into splices. *)
+val transl_record_representation:
     Env.t -> Location.t -> Types.record_representation ->
     Lambda.record_representation
 
-(* As [finalize_record_representation], also returning the fields' (now
+(* As [transl_record_representation], also returning the fields' (now
    defaulted) sorts if the representation was variable. [None] means the
    representation was already final, so the field sorts are on the
    declaration ([lbl_sort]). *)
-val finalize_record_representation_and_sorts:
+val transl_record_representation_and_sorts:
     Env.t -> Location.t -> Types.record_representation ->
     Lambda.record_representation
     * variable_sorts:Jkind.Sort.Const.t array option
 
-(* As [finalize_record_representation], for [Constructor_variable]. *)
-val finalize_constructor_representation:
+(* As [transl_record_representation], for [Constructor_variable]. *)
+val transl_constructor_representation:
     Env.t -> Location.t -> Types.constructor_representation ->
     Lambda.constructor_representation
 
-(** Compute a label's sort given its finalized representation (from
-    [finalize_record_representation_and_sorts]) *)
-val finalized_label_sort:
+(* Compute a label's sort given the representation of its record *)
+val label_sort_for_representation:
   Data_types.label_description -> Lambda.record_representation
   -> record_sort:Jkind.Sort.Const.t
   -> variable_sorts:Jkind.Sort.Const.t array option

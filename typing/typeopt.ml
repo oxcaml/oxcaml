@@ -1262,7 +1262,7 @@ let value_kind env loc ty =
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
 
-let finalize_instantiated_shape env loc sorts_and_types kind =
+let transl_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
@@ -1292,7 +1292,7 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
             |> Lambda.mixed_block_element_of_types
         | Any _ | Univar _ ->
             Misc.fatal_error
-              "Typeopt.finalize_instantiated_shape: unrepresentable layout"
+              "Typeopt.transl_instantiated_shape: unrepresentable layout"
       in
       let shape =
         Array.map (fun (_sort, ty) ->
@@ -1300,7 +1300,7 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
           | Some layout -> element layout
           | None ->
               Misc.fatal_error
-                "Typeopt.finalize_instantiated_shape: missing layout")
+                "Typeopt.transl_instantiated_shape: missing layout")
           sorts_and_types
       in
       (* Shapes containing splices are checked after static evaluation *)
@@ -1314,13 +1314,13 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
   in
   shape, consts
 
-let finalize_instantiated_constructor env loc sorts_and_types kind
+let transl_instantiated_constructor env loc sorts_and_types kind
     : Lambda.constructor_representation =
-  match finalize_instantiated_shape env loc sorts_and_types kind with
+  match transl_instantiated_shape env loc sorts_and_types kind with
   | `Not_mixed, _ -> Constructor_uniform_value
   | `Mixed shape, _ -> Constructor_mixed shape
 
-let finalize_constructor_representation env loc
+let transl_constructor_representation env loc
     (shape : Types.constructor_representation)
     : Lambda.constructor_representation =
   match shape with
@@ -1328,27 +1328,27 @@ let finalize_constructor_representation env loc
   | Constructor_mixed shape ->
       Constructor_mixed (Lambda.mixed_block_shape_of_types shape)
   | Constructor_variable sorts_and_types ->
-      finalize_instantiated_constructor env loc sorts_and_types Cstr_tuple
+      transl_instantiated_constructor env loc sorts_and_types Cstr_tuple
   | Constructor_undetermined ->
       Misc.fatal_error
-        "Typeopt.finalize_constructor_representation: representation was \
+        "Typeopt.transl_constructor_representation: representation was \
          not instantiated"
 
-let finalize_variant_representation : Types.variant_representation
+let transl_variant_representation : Types.variant_representation
     -> Lambda.variant_representation = function
   | Variant_unboxed -> Variant_unboxed
   | Variant_boxed _ -> Variant_boxed
   | Variant_extensible -> Variant_extensible
   | Variant_with_null -> Variant_with_null
 
-let finalize_record_representation_and_sorts env loc
+let transl_record_representation_and_sorts env loc
     (repres : Types.record_representation)
     : Lambda.record_representation
       * variable_sorts:Jkind.Sort.Const.t array option =
   match repres with
   | Record_variable sorts_and_types ->
       let shape, consts =
-        finalize_instantiated_shape env loc sorts_and_types Record
+        transl_instantiated_shape env loc sorts_and_types Record
       in
       let repres : Lambda.record_representation =
        match shape with
@@ -1359,26 +1359,26 @@ let finalize_record_representation_and_sorts env loc
   | Record_inlined (tag, Constructor_variable sorts_and_types,
                     vrep) ->
       let shape, consts =
-        finalize_instantiated_shape env loc sorts_and_types Cstr_record
+        transl_instantiated_shape env loc sorts_and_types Cstr_record
       in
       let shape : Lambda.constructor_representation =
         match shape with
         | `Not_mixed -> Constructor_uniform_value
         | `Mixed shape -> Constructor_mixed shape
       in
-      Record_inlined (tag, shape, finalize_variant_representation vrep),
+      Record_inlined (tag, shape, transl_variant_representation vrep),
       ~variable_sorts:(Some consts)
   | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
-        "Typeopt.finalize_record_representation: representation was not \
+        "Typeopt.transl_record_representation: representation was not \
          instantiated"
   | Record_dummy _ ->
       Misc.fatal_error
-        "Typeopt.finalize_record_representation: dummy representation"
+        "Typeopt.transl_record_representation: dummy representation"
   | Record_inlined (tag, shape, vrep) ->
       Record_inlined
-        (tag, finalize_constructor_representation env loc shape,
-         finalize_variant_representation vrep), ~variable_sorts:None
+        (tag, transl_constructor_representation env loc shape,
+         transl_variant_representation vrep), ~variable_sorts:None
   | Record_unboxed -> Record_unboxed, ~variable_sorts:None
   | Record_boxed -> Record_boxed, ~variable_sorts:None
   | Record_float -> Record_float, ~variable_sorts:None
@@ -1387,13 +1387,13 @@ let finalize_record_representation_and_sorts env loc
       Record_mixed (Lambda.mixed_block_shape_of_types shape),
       ~variable_sorts:None
 
-let finalize_record_representation env loc repres =
+let transl_record_representation env loc repres =
   let repres, ~variable_sorts:_ =
-    finalize_record_representation_and_sorts env loc repres
+    transl_record_representation_and_sorts env loc repres
   in
   repres
 
-let finalized_label_sort (label : Data_types.label_description)
+let label_sort_for_representation (label : Data_types.label_description)
       (repres : Lambda.record_representation) ~record_sort ~variable_sorts =
   match repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
