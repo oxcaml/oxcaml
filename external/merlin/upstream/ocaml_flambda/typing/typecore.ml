@@ -1356,6 +1356,7 @@ let mode_annots_from_pat pat =
   Typemode.transl_mode_annots modes
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 let apply_mode_annots
     ~loc
     kind
@@ -1389,6 +1390,13 @@ let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
 let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+||||||| parent of 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+=======
+let mode_annotation_hint (m : Alloc.Const.Option.t Typemode.modes) =
+>>>>>>> 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
   let annotated_modes =
 >>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
     List.map
@@ -1407,6 +1415,7 @@ let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
 >>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
       m.mode_desc
   in
+<<<<<<< HEAD
 <<<<<<< HEAD
   let hint = Hint.Annotation { loc = annot_loc; written_modes } in
   let min =
@@ -1430,6 +1439,20 @@ let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
     Hint.Annotation
       { syntax = `Mode; annotated_modes; contained_by = None }
   in
+||||||| parent of 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
+  let hint =
+    Hint.Annotation
+      { syntax = `Mode; annotated_modes; contained_by = None }
+  in
+=======
+  Hint.Annotation
+    { syntax = `Mode; annotated_modes; contained_by = None }
+
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+  let hint = mode_annotation_hint m in
+>>>>>>> 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
 >>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
@@ -8384,7 +8407,7 @@ and type_expect_
   | Pexp_constraint (sarg, None, modes) ->
       let modes = Typemode.transl_mode_annots modes in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
       { exp with exp_loc = loc
@@ -8425,7 +8448,7 @@ and type_expect_
         type_constraint env sty mode_with_locality
       in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let ty' = instance ty in
       let error_message_attr_opt =
@@ -12468,6 +12491,7 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
+<<<<<<< HEAD
 and type_expect_mode
     ~loc
     ~env
@@ -12498,8 +12522,27 @@ and type_expect_mode
            max)
         expected_mode
     in
+||||||| parent of 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
+and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
+    let min = Alloc.Const.Option.value ~default:Alloc.Const.min modes |> Const.alloc_as_value in
+    let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in
+    submode ~loc ~env ~reason:Other (Value.of_const min) expected_mode;
+    let expected_mode = mode_coerce (Value.of_const max) expected_mode in
+=======
+and type_expect_mode ~loc ~env
+    ~(modes : Alloc.Const.Option.t Typemode.modes) expected_mode =
+    let hint = mode_annotation_hint modes in
+    let bound default =
+      Alloc.Const.Option.value ~default modes.mode_modes
+      |> Const.alloc_as_value
+      |> Value.of_const ~hint_monadic:hint ~hint_comonadic:hint
+    in
+    submode ~loc ~env ~reason:Other (bound Alloc.Const.min) expected_mode;
+    let max = Value.disallow_left (bound Alloc.Const.max) in
+    let expected_mode = mode_coerce max expected_mode in
+>>>>>>> 09d009e501 (Automated commit: Import compiler changes from 3dc46bc289299661979050ec7d0060c02d62caa8)
     let expected_mode =
-      match modes.areality with
+      match modes.mode_modes.areality with
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
     in
