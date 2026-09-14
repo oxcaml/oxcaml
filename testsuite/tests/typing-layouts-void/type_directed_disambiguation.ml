@@ -53,25 +53,41 @@ let x =
 val x : int = 55
 |}]
 
-(* No disambiguation of unit/unit# in if statements *)
+(* Disambiguation of unit/unit# in if statements *)
 let incr_if b r =
   if b then incr r;
   !r
+let use_unit_u_if b x =
+  let #() = if b then x in
+  #()
 [%%expect{|
+val incr_if : bool -> int ref -> int = <fun>
+val use_unit_u_if : bool -> unit# -> unit# = <fun>
+|}, Principal{|
 Line 2, characters 12-18:
 2 |   if b then incr r;
                 ^^^^^^
-Error: This expression has type "unit#" but an expression was expected of type
-         "unit"
-       because it is in the result of a conditional with no else branch
+Warning 18 [not-principal]: this type-based unit# disambiguation is not
+  principal.
+
+val incr_if : bool -> int ref -> int = <fun>
+Line 5, characters 22-23:
+5 |   let #() = if b then x in
+                          ^
+Warning 18 [not-principal]: this type-based unit# disambiguation is not
+  principal.
+
+val use_unit_u_if : bool -> unit# -> unit# = <fun>
 |}]
 
 (* Principality *)
 let g #() = #()
 let f x = g x; x; 42
+let h b x = g x; if b then x
 [%%expect{|
 val g : unit# -> unit# = <fun>
 val f : unit# -> int = <fun>
+val h : bool -> unit# -> unit# = <fun>
 |}, Principal{|
 val g : unit# -> unit# = <fun>
 Line 2, characters 15-16:
@@ -81,6 +97,13 @@ Warning 18 [not-principal]: this type-based unit# disambiguation is not
   principal.
 
 val f : unit# -> int = <fun>
+Line 3, characters 27-28:
+3 | let h b x = g x; if b then x
+                               ^
+Warning 18 [not-principal]: this type-based unit# disambiguation is not
+  principal.
+
+val h : bool -> unit# -> unit# = <fun>
 |}]
 
 (* The previous example is analogous to: *)
