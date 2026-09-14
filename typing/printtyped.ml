@@ -650,7 +650,7 @@ and expression_extra i ppf (extra, loc, attrs) =
   | Texp_mode m ->
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
-      alloc_const_option_mode i ppf m.mode_modes;
+      const_option_mode_with_locality i ppf m.mode_modes;
       modes_with_locality_opt i ppf m;
   | Texp_inspected_type ti ->
       line i ppf "Texp_inspected_type\n";
@@ -680,7 +680,7 @@ and value_mode i ppf m =
   line i ppf "value_mode %a\n"
     (Format_doc.compat (Mode.With_regionality.print ())) m
 
-and alloc_const_option_mode i ppf m =
+and const_option_mode_with_locality i ppf m =
   line i ppf "alloc_const_option_mode %a\n"
     (Format_doc.compat Mode.With_locality.Const.Option.print) m
 
