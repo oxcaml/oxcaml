@@ -1249,7 +1249,7 @@ let transl_instantiated_shape env loc sorts_and_types kind =
         | Base (base, axes) ->
             Typedecl.Element_repr.classify_base base axes
             |> Typedecl.Element_repr.to_shape_element
-            |> Lambda.mixed_block_element_of_types
+            |> Lambda.transl_mixed_product_element
         | Any _ | Univar _ ->
             Misc.fatal_error
               "Typeopt.transl_instantiated_shape: unrepresentable layout"
@@ -1286,7 +1286,7 @@ let transl_constructor_representation env loc
   match shape with
   | Constructor_uniform_value -> Constructor_uniform_value
   | Constructor_mixed shape ->
-      Constructor_mixed (Lambda.mixed_block_shape_of_types shape)
+      Constructor_mixed (Lambda.transl_mixed_product_shape shape)
   | Constructor_immediate_all_void -> Constructor_immediate_all_void
   | Constructor_variable sorts_and_types ->
       transl_instantiated_constructor env loc sorts_and_types Cstr_tuple
@@ -1345,7 +1345,7 @@ let transl_record_representation_and_sorts env loc
   | Record_float -> Record_float, ~variable_sorts:None
   | Record_ufloat -> Record_ufloat, ~variable_sorts:None
   | Record_mixed shape ->
-      Record_mixed (Lambda.mixed_block_shape_of_types shape),
+      Record_mixed (Lambda.transl_mixed_product_shape shape),
       ~variable_sorts:None
 
 let transl_record_representation env loc repres =

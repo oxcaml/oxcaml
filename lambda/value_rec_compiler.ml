@@ -388,9 +388,7 @@ let compute_static_size lam =
               Block (Regular_block
                 (all_value_mixed_block_size shape))
             else
-              let size =
-                compute_mixed_block_size
-                  (Lambda.split_mixed_block_shape_vectors shape)
+              let size = compute_mixed_block_size shape
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
