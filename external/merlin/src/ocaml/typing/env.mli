@@ -454,20 +454,12 @@ val add_value_lazy:
     t ->
     t
 val add_value:
-<<<<<<< Merlin:wsturgeon.rename-alloc
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    Ident.t -> value_description -> t -> t
-||||||| Compiler:last-imported
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    Ident.t -> Types.value_description -> t -> t
-=======
     ?check:(string -> Warnings.t) ->
     mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
     Ident.t ->
-    Types.value_description ->
+    value_description ->
     t ->
     t
->>>>>>> Compiler:HEAD
 val add_type:
     check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_type_long_path:
@@ -577,25 +569,19 @@ val remove_last_open: Path.t -> t -> t option
 (* Insertion by name *)
 
 val enter_value:
-<<<<<<< Merlin:wsturgeon.rename-alloc
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    string -> value_description -> t -> Ident.t * t
-val enter_type:
-  ?long_path:bool -> scope:int ->
-  string -> type_declaration -> t -> Ident.t * t
-||||||| Compiler:last-imported
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    string -> value_description -> t -> Ident.t * t
-val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
-=======
     ?check:(string -> Warnings.t) ->
     mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
     string ->
     value_description ->
     t ->
     Ident.t * t
-val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
->>>>>>> Compiler:HEAD
+val enter_type:
+  ?long_path:bool ->
+  scope:int ->
+  string ->
+  type_declaration ->
+  t ->
+  Ident.t * t
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
