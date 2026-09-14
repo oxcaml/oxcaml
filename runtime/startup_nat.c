@@ -142,7 +142,7 @@ value caml_startup_common(char_os const * const * argv, int pooling)
 #endif
   caml_debugger_init (); /* force debugger.o stub to be linked */
 #ifdef CAML_BARE_METAL
-  static char_os * empty_argv[] = { NULL };
+  static char_os const * const empty_argv[] = { NULL };
   caml_sys_init(T(""), argv == NULL ? empty_argv : argv);
 #else
   const char_os * exe_name, * proc_self_exe;
