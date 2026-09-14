@@ -741,8 +741,17 @@ end = M
 Line 7, characters 6-7:
 7 | end = M
           ^
-Error: The module is "dynamic"
-       but is expected to be "static"
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ id : 'a -> 'a end @ dynamic
+       is not included in
+         sig val id : 'a -> 'a end @ dynamic
+       Values do not match:
+         val poly_ id : 'a -> 'a (* in a structure at dynamic *)
+       is not included in
+         val id : 'a -> 'a (* in a structure at dynamic *)
+       The first is "dynamic"
+       but the second is "static"
          because it is layout-polymorphic and being instantiated here.
 |}];;
 
@@ -781,7 +790,6 @@ Uncaught exception: Misc.Fatal_error
 
 |}];;
 
-(* CR jbachurski: This is wrong! [id] might be [dynamic]. *)
 module F_inst_static_but_item_dynamic (M : sig
   val poly_ id : 'a -> 'a @@ dynamic
   val x : int @@ dynamic
@@ -789,10 +797,21 @@ end @ static) : sig
   val id : 'a -> 'a
 end = M
 [%%expect {|
-module F_inst_static_but_item_dynamic :
-  functor
-    (M : sig val poly_ id : 'a -> 'a @@ dynamic val x : int @@ dynamic end @ static)
-    -> sig val id : 'a -> 'a end
+Line 6, characters 6-7:
+6 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ id : 'a -> 'a @@ dynamic val x : int @@ dynamic end @ static
+       is not included in
+         sig val id : 'a -> 'a end @ dynamic
+       Values do not match:
+         val poly_ id : 'a -> 'a @@ dynamic (* in a structure at static *)
+       is not included in
+         val id : 'a -> 'a (* in a structure at dynamic *)
+       The first is "dynamic"
+       but the second is "static"
+         because it is layout-polymorphic and being instantiated here.
 |}];;
 
 module F_inst_static_but_other_dynamic (M : sig

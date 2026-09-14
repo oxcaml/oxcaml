@@ -97,7 +97,7 @@ let child_modes_with_modalities id ~modalities:(moda0, moda1) = function
       Ok (Specific ((m0, c), m1))
     end
 
-let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
+let check_modes env ~crossing ~static ~item ?typ = function
   | All -> Ok ()
   | Specific ((m0, c), m1) ->
       let m0 =
@@ -108,6 +108,14 @@ let check_modes env ?(crossing = Crossing.max) ~item ?typ = function
             Env.walk_locks ~env ~loc lid ~item typ (m0, locks)
       in
       let m1 = Crossing.apply_right crossing m1 in
+      let m1 =
+        if static then
+          Mode.Value.meet [
+            m1;
+            Mode.Staticity.of_const ~hint:Lpoly_inst Static
+            |> Mode.Value.max_with_monadic Staticity]
+        else m1
+      in
       Mode.Value.submode m0 m1
 
 let native_repr_args nra1 nra2 =
@@ -200,6 +208,11 @@ let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
     in
     Some { tc_params = subj_lpoly; tc_args }
 
+let kindtemplate_coercion_instantiates { tc_args; tc_params = _ } =
+  match tc_args with
+  | _ :: _ -> true
+  | [] -> false
+
 let value_descriptions_zero_alloc
     (vd1 : Types.value_description)
     (vd2 : Types.value_description) =
@@ -231,10 +244,11 @@ let uid_is_from_current_unit uid =
       (Compilation_unit.full_path_as_string (Unit_info.modname current_unit))
   | None, _ | _, None -> false
 
-let value_descriptions ~loc env name
-    ~mmodes ~self_check
+(* [static] is [true] if the [module_coercion] requires a [static] argument *)
+let value_descriptions_without_modes ~loc env name ~self_check
     (vd1 : Types.value_description)
-    (vd2 : Types.value_description) =
+    (vd2 : Types.value_description)
+    : module_coercion * static:bool =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
     ~use:vd2.val_loc
@@ -242,17 +256,6 @@ let value_descriptions ~loc env name
     vd1.val_attributes vd2.val_attributes
     name;
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
-  let crossing = Ctype.crossing_of_ty env vd2.val_type in
-  let modalities = vd1.val_modalities, vd2.val_modalities in
-  let modes =
-    match child_modes_with_modalities name ~modalities mmodes with
-    | Ok modes -> modes
-    | Error e -> raise (Dont_match (Modality e))
-  in
-  begin match check_modes env ~crossing ~item:Value ~typ:vd1.val_type modes with
-  | Ok () -> ()
-  | Error e -> raise (Dont_match (Mode e))
-  end;
   let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
   let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
@@ -290,7 +293,7 @@ let value_descriptions ~loc env name
           ) forkable
          ) locality;
          match primitive_descriptions p1 p2 with
-         | None -> Tcoerce_none
+         | None -> Tcoerce_none, ~static:false
          | Some err -> raise (Dont_match (Primitive_mismatch err))
        end
      | _ ->
@@ -327,7 +330,8 @@ let value_descriptions ~loc env name
            pc_loc;
           }
         in
-        Tcoerce_primitive pc
+        Tcoerce_primitive pc,
+        ~static:(kindtemplate_coercion_instantiates tc)
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
@@ -338,9 +342,34 @@ let value_descriptions ~loc env name
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ ->
           match tc with
-          | Some tc -> Tcoerce_kindtemplate tc
-          | None -> Tcoerce_none
+          | Some tc ->
+            Tcoerce_kindtemplate tc,
+            ~static:(kindtemplate_coercion_instantiates tc)
+          | None -> Tcoerce_none, ~static:false
      end
+
+let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
+  let cc, ~static =
+    value_descriptions_without_modes ~loc env name ~self_check vd1 vd2
+  in
+  let () =
+    let crossing = Ctype.crossing_of_ty env vd2.val_type in
+    let modalities = vd1.val_modalities, vd2.val_modalities in
+    let modes =
+      match child_modes_with_modalities name ~modalities mmodes with
+      | Ok modes -> modes
+      | Error e -> raise (Dont_match (Modality e))
+    in
+    match
+      check_modes env ~crossing ~static ~item:Value ~typ:vd1.val_type modes
+    with
+    | Ok () -> ()
+    | Error e -> raise (Dont_match (Mode e))
+  in
+  cc
+
+let check_modes env ?(crossing = Crossing.max) ~item ?typ =
+  check_modes env ~crossing ~static:false ~item ?typ
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
