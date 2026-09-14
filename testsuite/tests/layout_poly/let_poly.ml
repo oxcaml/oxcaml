@@ -539,6 +539,18 @@ let x =
   M.id #1s |> to_int8
 [%%expect {|
 val x : int8 = 1s
+|}]
+
+(* Tupled functions *)
+let x =
+  (* CR layouts: we eagerly bail out of the tupled function optimization when
+     encountering non-[scannable] sorts, so we don't hit a fatal error here.
+     Eventually, we should properly support layout poly tupled functions. *)
+  let poly_ f = fun (g, x) -> g x in
+  f ((fun y -> y + 1), 41)
+
+[%%expect{|
+val x : int = 42
 |}];;
 
 (** Layout-polymorphic bindings in the top-level **)
