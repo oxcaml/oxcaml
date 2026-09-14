@@ -3040,9 +3040,6 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
          there. Consider adding it for unboxed tuples. *)
       assert (static_handlers = []);
       let mode = transl_typed_locality_mode_r locality_mode in
-      (* CR zeisbach: is it even OK to have non-values in here? probably yes.
-         but now i'm curious why it isn't done for unboxed tuples. maybe there
-         is now room to merge the code in these cases? *)
       let argl =
         List.map (fun (_, a, s) ->
           (a, Jkind.Sort.default_for_transl_and_get s)) argl
