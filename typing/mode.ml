@@ -7771,12 +7771,7 @@ module Modality = struct
     match annotations with
     | [] -> Option.map (fun c -> Hint.Contained_by c) is_contained_by
     | annotated_modes ->
-      Some
-        (Hint.Annotation
-           { syntax = `Modality;
-             annotated_modes;
-             contained_by = is_contained_by
-           })
+      Some (Hint.Annotation { annotated_modes; contained_by = is_contained_by })
 
   (* Inferred modalities
 
@@ -7888,7 +7883,7 @@ module Modality = struct
           Mode.join_const ?hint c (Mode.disallow_left x)
 
       let apply_left : type r.
-          ?annotations:(string * string Location.loc) list ->
+          ?annotations:(string * Hint.annotation_source) list ->
           ?is_contained_by:Hint.is_contained_by ->
           t ->
           (allowed * r) Mode.t ->
@@ -7953,7 +7948,7 @@ module Modality = struct
         Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply_left : type r.
-        ?annotations:(string * string Location.loc) list ->
+        ?annotations:(string * Hint.annotation_source) list ->
         ?is_contained_by:Hint.is_contained_by ->
         t ->
         (allowed * r) Mode.t ->
@@ -8068,7 +8063,7 @@ module Modality = struct
           Mode.meet_const ?hint c (Mode.disallow_right x)
 
       let apply_right : type l.
-          ?annotations:(string * string Location.loc) list ->
+          ?annotations:(string * Hint.annotation_source) list ->
           ?is_contained_by:Hint.is_contained_by ->
           t ->
           (l * allowed) Mode.t ->
@@ -8273,15 +8268,15 @@ module Modality = struct
 
   type annotation =
     { bound : atom;
-      written : string Location.loc
+      source : Hint.annotation_source
     }
 
   let annotation_axis { bound = Atom (axis, _); _ } = Axis.P axis
 
   let hint_annotations annotations =
     List.map
-      (fun { bound = Atom (axis, mode); written } ->
-        Fmt.asprintf "%a" (Per_axis.print axis) mode, written)
+      (fun { bound = Atom (axis, mode); source } ->
+        Fmt.asprintf "%a" (Per_axis.print axis) mode, source)
       annotations
 
   module Const = struct
@@ -8366,8 +8361,8 @@ module Modality = struct
       in
       let annotations =
         match annotation with
-        | Some written when not (Per_axis.is_id ax a) ->
-          { bound = Atom (ax, a); written } :: annotations
+        | Some source when not (Per_axis.is_id ax a) ->
+          { bound = Atom (ax, a); source } :: annotations
         | None | Some _ -> annotations
       in
       match ax with
@@ -8381,7 +8376,7 @@ module Modality = struct
         (fun annotation ->
           Axis.compare (annotation_axis annotation) (Axis.P axis) = 0)
         t.annotations
-      |> Option.map (fun annotation -> annotation.written)
+      |> Option.map (fun annotation -> annotation.source)
 
     let diff t1 t2 =
       List.filter_map

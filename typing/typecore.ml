@@ -1363,11 +1363,11 @@ let mode_annotation_hint
         let name =
           Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode
         in
-        name, { Location.txt = name; loc })
+        name, Hint.Written_mode { Location.txt = name; loc })
       m.mode_desc
   in
   Hint.Annotation
-    { syntax = `Mode; annotated_modes; contained_by = None }
+    { annotated_modes; contained_by = None }
 
 let apply_mode_annots
     ~loc
