@@ -45,6 +45,15 @@ let from_raw ~sections raw =
 let to_raw ~sections (t : t0 list) =
   File_sections.Builder.add sections (Obj.repr t)
 
+let create_table_data (exported_ids : Ids_for_export.t) =
+  let symbols = Symbol.export exported_ids.symbols in
+  let variables = Variable.export exported_ids.variables in
+  let simples = Simple.export exported_ids.simples in
+  let consts = Reg_width_const.export exported_ids.consts in
+  let code_ids = Code_id.export exported_ids.code_ids in
+  let continuations = Continuation.export exported_ids.continuations in
+  { symbols; variables; simples; consts; code_ids; continuations }
+
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
   let typing_env_exported_ids =
@@ -54,15 +63,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   let exported_ids =
     Ids_for_export.union typing_env_exported_ids all_code_exported_ids
   in
-  let symbols = Symbol.export exported_ids.symbols in
-  let variables = Variable.export exported_ids.variables in
-  let simples = Simple.export exported_ids.simples in
-  let consts = Reg_width_const.export exported_ids.consts in
-  let code_ids = Code_id.export exported_ids.code_ids in
-  let continuations = Continuation.export exported_ids.continuations in
-  let table_data =
-    { symbols; variables; simples; consts; code_ids; continuations }
-  in
+  let table_data = create_table_data exported_ids in
   let all_code =
     Exported_code.to_raw
       ~add_section:(File_sections.Builder.add sections)
@@ -79,19 +80,25 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   in
   to_raw ~sections t
 
-let import_typing_env_and_code0 ~sections t =
-  let symbols = t.table_data.symbols in
-  let variables = t.table_data.variables in
-  let simples = t.table_data.simples in
-  let consts = t.table_data.consts in
-  let code_ids = t.table_data.code_ids in
-  let continuations = t.table_data.continuations in
-  let used_value_slots = t.used_value_slots in
-  let original_compilation_unit = t.original_compilation_unit in
+let import_renaming ~table_data ~used_value_slots ~original_compilation_unit =
+  let symbols = table_data.symbols in
+  let variables = table_data.variables in
+  let simples = table_data.simples in
+  let consts = table_data.consts in
+  let code_ids = table_data.code_ids in
+  let continuations = table_data.continuations in
   let renaming =
     Profile.record_call ~accumulate:true "create_import_map" (fun () ->
         Renaming.create_import_map ~symbols ~variables ~simples ~consts
           ~code_ids ~continuations ~used_value_slots ~original_compilation_unit)
+  in
+  renaming, code_ids
+
+let import_typing_env_and_code0 ~sections t =
+  let renaming, code_ids =
+    import_renaming ~table_data:t.table_data
+      ~used_value_slots:t.used_value_slots
+      ~original_compilation_unit:t.original_compilation_unit
   in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->

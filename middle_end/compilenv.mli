@@ -21,9 +21,15 @@
 
 open Cmx_format
 
-val reset : Unit_info.t -> unit
+val reset : ?keep_cmx_caches:bool -> Unit_info.t -> unit
         (* Reset the environment and record the name of the unit being
-           compiled (including any associated -for-pack prefix). *)
+           compiled (including any associated -for-pack prefix).
+           [keep_cmx_caches] (default [false]) preserves the caches of unit
+           infos and zero_alloc info read from .cmx files, which mirror on-disk
+           data that does not change within a process. It is used when
+           compiling several units in one process (batched -reaper-rebuild)
+           together with caches above this level that would otherwise prevent
+           re-reads from repopulating the caches here. *)
 
 val reset_info_tables: unit -> unit
 
@@ -87,6 +93,12 @@ val save_unit_info:
   static_data:Slambdaeval.CU_data.t ->
   unit
         (* Save the infos for the current unit in the given file *)
+
+val save_resumed_unit_info: string -> paused:unit_infos -> unit
+        (* Like [save_unit_info] but for a resumed compilation: the fields
+           that normally come from the frontend and typechecker are taken from
+           [paused] instead. *)
+
 val cache_unit_info: unit_infos -> unit
         (* Enter the given infos in the cache.  The infos will be
            honored by [symbol_for_global] and [global_approx]

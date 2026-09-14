@@ -31,9 +31,17 @@ type 'a mode =
 
 type any_mode = Mode : _ mode -> any_mode
 
+let support_lto () =
+  !Oxcaml_flags.Flambda2.support_lto |> with_default ~f:(fun d -> d.support_lto)
+
 let classic_mode () =
-  !Oxcaml_flags.Flambda2.classic_mode
-  |> with_default ~f:(fun d -> d.classic_mode)
+  (* CR sspies: This workaround is fine for testing, but we should not keep it
+     before merging into main. *)
+  (* Classic mode does not run [Simplify] and hence cannot produce the .cmr
+     files needed for LTO, so -support-lto overrides classic mode. *)
+  (not (support_lto ()))
+  && !Oxcaml_flags.Flambda2.classic_mode
+     |> with_default ~f:(fun d -> d.classic_mode)
 
 let mode () = if classic_mode () then Mode Classic else Mode Normal
 

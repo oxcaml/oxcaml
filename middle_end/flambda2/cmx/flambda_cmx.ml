@@ -180,8 +180,9 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
   in
   fixpoint init_names Name_occurrences.empty
 
-let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
+let prepare_cmx ~is_local_compilation_unit:is_local ~module_symbol
+    create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
+    ~exported_offsets ~sections all_code =
   let reachable_names =
     compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
   in
@@ -208,15 +209,15 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   let exported_offsets =
     exported_offsets
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             free_slots_of_all_code)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode free_slots_of_all_code)
-    |> Exported_offsets.reexport_function_slots
+    |> Exported_offsets.reexport_function_slots ~is_local
          (Name_occurrences.all_function_slots_at_normal_mode
             slots_used_in_typing_env)
-    |> Exported_offsets.reexport_value_slots
+    |> Exported_offsets.reexport_value_slots ~is_local
          (Name_occurrences.all_value_slots_at_normal_mode
             slots_used_in_typing_env)
   in
@@ -226,8 +227,9 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
-    ~exported_offsets ~sections all_code =
+let prepare_cmx_file_contents
+    ?(is_local_compilation_unit = Current_unit.is_current) ~final_typing_env
+    ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code =
   match final_typing_env with
   | None ->
     Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
@@ -243,8 +245,9 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     let free_names_of_name name =
       Some (T.free_names (TE.Pre_serializable.find typing_env name))
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
+    prepare_cmx ~is_local_compilation_unit ~module_symbol create_typing_env
+      ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
+      ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     ~exported_offsets ~used_value_slots ~sections all_code =
@@ -269,7 +272,7 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots
+    prepare_cmx ~is_local_compilation_unit:Current_unit.is_current
+      ~module_symbol create_typing_env ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
       ~exported_offsets ~sections all_code

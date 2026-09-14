@@ -143,17 +143,64 @@ let merge env1 env2 =
 
 let import_offsets env = current_offsets := merge env !current_offsets
 
+let filter_by_compilation_unit env ~keep =
+  { function_slot_offsets =
+      Function_slot.Map.filter
+        (fun function_slot _ ->
+          keep (Function_slot.get_compilation_unit function_slot))
+        env.function_slot_offsets;
+    value_slot_offsets =
+      Value_slot.Map.filter
+        (fun value_slot _ -> keep (Value_slot.get_compilation_unit value_slot))
+        env.value_slot_offsets
+  }
+
+let partition_by_compilation_unit env =
+  let by_compilation_unit =
+    Function_slot.Map.fold
+      (fun function_slot info by_compilation_unit ->
+        let compilation_unit =
+          Function_slot.get_compilation_unit function_slot
+        in
+        Compilation_unit.Map.update compilation_unit
+          (fun offsets ->
+            let offsets =
+              match offsets with None -> empty | Some offsets -> offsets
+            in
+            Some
+              { offsets with
+                function_slot_offsets =
+                  Function_slot.Map.add function_slot info
+                    offsets.function_slot_offsets
+              })
+          by_compilation_unit)
+      env.function_slot_offsets Compilation_unit.Map.empty
+  in
+  Value_slot.Map.fold
+    (fun value_slot info by_compilation_unit ->
+      let compilation_unit = Value_slot.get_compilation_unit value_slot in
+      Compilation_unit.Map.update compilation_unit
+        (fun offsets ->
+          let offsets =
+            match offsets with None -> empty | Some offsets -> offsets
+          in
+          Some
+            { offsets with
+              value_slot_offsets =
+                Value_slot.Map.add value_slot info offsets.value_slot_offsets
+            })
+        by_compilation_unit)
+    env.value_slot_offsets by_compilation_unit
+
 (* CR gbury: considering that the goal is to have `offsets` significantly
    smaller than the `imported_offsets`, it might be better for performance to
    check whether the function slot is already in the offsets before looking it
    up in the imported offsets ? *)
-let reexport_function_slots function_slot_set offsets =
+let reexport_function_slots ~is_local function_slot_set offsets =
   let imported_offsets = imported_offsets () in
   Function_slot.Set.fold
     (fun function_slot offsets ->
-      if
-        Current_unit.is_current
-          (Function_slot.get_compilation_unit function_slot)
+      if is_local (Function_slot.get_compilation_unit function_slot)
       then offsets
       else
         match function_slot_offset imported_offsets function_slot with
@@ -165,11 +212,11 @@ let reexport_function_slots function_slot_set offsets =
         | Some info -> add_function_slot_offset offsets function_slot info)
     function_slot_set offsets
 
-let reexport_value_slots value_slot_set offsets =
+let reexport_value_slots ~is_local value_slot_set offsets =
   let imported_offsets = imported_offsets () in
   Value_slot.Set.fold
     (fun value_slot offsets ->
-      if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
+      if is_local (Value_slot.get_compilation_unit value_slot)
       then offsets
       else
         match value_slot_offset imported_offsets value_slot with

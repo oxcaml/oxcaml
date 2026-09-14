@@ -117,6 +117,13 @@ module Variable : sig
 
   val create : ?user_visible:unit -> string -> Flambda_kind.t -> t
 
+  val create_in_compilation_unit :
+    compilation_unit:Compilation_unit.t ->
+    ?user_visible:unit ->
+    string ->
+    Flambda_kind.t ->
+    t
+
   val compilation_unit : t -> Compilation_unit.t
 
   val name : t -> string
@@ -130,6 +137,10 @@ module Variable : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  val export_name_stamp_counter : unit -> int
+
+  val restore_name_stamp_counter : int -> unit
 end
 
 module Symbol : sig
@@ -266,6 +277,10 @@ module Code_id : sig
   val export : Set.t -> importer
 
   val import : importer -> t -> t
+
+  val export_name_stamp_counter : unit -> int
+
+  val restore_name_stamp_counter : int -> unit
 end
 
 module Code_id_or_symbol : sig

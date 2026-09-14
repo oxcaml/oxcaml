@@ -17,6 +17,16 @@ type graph
 
 val to_datalog : graph -> Datalog.database
 
+val constructor : Datalog_helpers.Serialisation.Nfn.table
+
+val parameter : Datalog_helpers.Serialisation.Ncn.table
+
+val code_id_my_closure : Datalog_helpers.Serialisation.Nn.table
+
+val any_usage : Datalog_helpers.Serialisation.N.table
+
+val any_source : Datalog_helpers.Serialisation.N.table
+
 module Relations : sig
   type 'a atom = [> `Atom of Datalog.atom] as 'a
 
@@ -87,6 +97,8 @@ module Relations : sig
     from:Code_id_or_name.t term ->
     _ atom
 
+  val imported_symbol : Code_id_or_name.t term -> _ atom
+
   val any_usage : Code_id_or_name.t term -> _ atom
 
   val any_source : Code_id_or_name.t term -> _ atom
@@ -139,6 +151,8 @@ val add_alias_if_any_source_dep :
   from:Code_id_or_name.t ->
   unit
 
+val add_imported_symbol : graph -> Symbol.t -> unit
+
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
@@ -149,6 +163,8 @@ val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
 val create : unit -> graph
 
+val union : graph -> graph -> graph
+
 val add_opaque_let_dependency :
   graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit
 
@@ -156,3 +172,18 @@ val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
   graph ->
   unit
+
+val ids_for_export : graph -> Ids_for_export.t
+
+(** The compilation units of all identifiers in the graph. *)
+val compilation_units : graph -> Compilation_unit.Set.t
+
+(** Fields are hashconsed, so for serialisation the [Field.view] of each one
+    needs serialising separately. *)
+val fields_for_export : graph -> Field.Set.t
+
+(** Rebuild the graph, applying [renaming] to all identifiers and [rename_field]
+    to all fields. The implementation assumes that the renaming is injective,
+    data will be lost otherwise. *)
+val apply_renaming :
+  graph -> Renaming.t -> rename_field:(Field.t -> Field.t) -> graph

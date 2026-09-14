@@ -32,18 +32,30 @@ type used_slots =
     all_value_slots : Value_slot.Set.t
   }
 
-let[@inline] function_slot_is_used ~used_function_slots v =
-  if Current_unit.is_current (Function_slot.get_compilation_unit v)
+type set_of_closures_slots =
+  { function_slots :
+      Function_declarations.code_id_in_function_declaration Function_slot.Map.t;
+    value_slots : Value_slot.Set.t
+  }
+
+(* [is_local] says whether slots of the given compilation unit are laid out by
+   this offsets computation (as opposed to imported slots, whose offsets are
+   fixed by their own compilation unit). This is [Current_unit.is_current] for
+   ordinary compilations, but the LTO solve invocation lays out the slots of all
+   participating units at once. *)
+
+let[@inline] function_slot_is_used ~is_local ~used_function_slots v =
+  if is_local (Function_slot.get_compilation_unit v)
   then Function_slot.Set.mem v used_function_slots
   else true
 
-let[@inline] unboxed_slot_is_used ~used_unboxed_slots v =
-  if Current_unit.is_current (Value_slot.get_compilation_unit v)
+let[@inline] unboxed_slot_is_used ~is_local ~used_unboxed_slots v =
+  if is_local (Value_slot.get_compilation_unit v)
   then Value_slot.Set.mem v used_unboxed_slots
   else true
 
-let[@inline] value_slot_is_used ~used_value_slots v =
-  if Current_unit.is_current (Value_slot.get_compilation_unit v)
+let[@inline] value_slot_is_used ~is_local ~used_value_slots v =
+  if is_local (Value_slot.get_compilation_unit v)
   then Value_slot.Set.mem v used_value_slots
   else true
 
@@ -275,11 +287,16 @@ module Greedy : sig
 
   val create_slots_for_set :
     state ->
-    get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-    Set_of_closures.t ->
+    is_local:(Compilation_unit.t -> bool) ->
+    get_function_slot_size:(Code_id.t -> int) ->
+    set_of_closures_slots ->
     unit
 
-  val finalize : used_slots:used_slots -> state -> result
+  val finalize :
+    is_local:(Compilation_unit.t -> bool) ->
+    used_slots:used_slots ->
+    state ->
+    result
 end = struct
   (* Greedy algorithm for assigning offsets (in terms of words) to slots.
 
@@ -721,17 +738,16 @@ end = struct
 
   (* Create slots (and create the cross-referencing). *)
 
-  let create_function_slot set state get_code_metadata function_slot
+  let create_function_slot set state ~is_local get_function_slot_size
+      function_slot
       (code_id : Function_declarations.code_id_in_function_declaration) =
-    if
-      Current_unit.is_current (Function_slot.get_compilation_unit function_slot)
+    if is_local (Function_slot.get_compilation_unit function_slot)
     then (
       let size =
         match code_id with
         | Deleted { function_slot_size; _ } -> function_slot_size
         | Code_id { code_id; only_full_applications = _ } ->
-          let code_metadata = get_code_metadata code_id in
-          Code_metadata.function_slot_size code_metadata
+          get_function_slot_size code_id
       in
       let s = create_slot ~size (Function_slot function_slot) Unassigned in
       add_function_slot state function_slot s;
@@ -767,8 +783,8 @@ end = struct
         add_allocated_slot_to_set s set;
         s
 
-  let create_unboxed_slot set state value_slot size =
-    if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
+  let create_unboxed_slot set state ~is_local value_slot size =
+    if is_local (Value_slot.get_compilation_unit value_slot)
     then (
       let s = create_slot ~size (Unboxed_slot value_slot) Unassigned in
       add_unboxed_slot state value_slot s;
@@ -804,8 +820,8 @@ end = struct
         add_allocated_slot_to_set s set;
         s
 
-  let create_value_slot set state value_slot =
-    if Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
+  let create_value_slot set state ~is_local value_slot =
+    if is_local (Value_slot.get_compilation_unit value_slot)
     then (
       let s =
         create_slot ~size:1 (Scannable_value_slot value_slot) Unassigned
@@ -846,15 +862,12 @@ end = struct
         add_allocated_slot_to_set s set;
         s
 
-  let create_slots_for_set state ~get_code_metadata set_of_closures =
-    let env_map = Set_of_closures.value_slots set_of_closures in
-    let closure_map =
-      let function_decls = Set_of_closures.function_decls set_of_closures in
-      Function_declarations.funs function_decls
-    in
+  let create_slots_for_set state ~is_local ~get_function_slot_size
+      ({ function_slots = closure_map; value_slots = env_set } :
+        set_of_closures_slots) =
     let set =
       create_set
-        ~num_value_slots:(Value_slot.Map.cardinal env_map)
+        ~num_value_slots:(Value_slot.Set.cardinal env_set)
         ~num_function_slots:(Function_slot.Map.cardinal closure_map)
     in
     state.sets_of_closures <- set :: state.sets_of_closures;
@@ -867,8 +880,8 @@ end = struct
             Function_slot.Map.find_opt function_slot state.function_slots
           with
           | None ->
-            create_function_slot set state get_code_metadata function_slot
-              code_id
+            create_function_slot set state ~is_local get_function_slot_size
+              function_slot code_id
           | Some s ->
             s.sets <- set :: s.sets;
             update_set_for_slot s set;
@@ -877,8 +890,8 @@ end = struct
         update_metadata_for_function_slot set s)
       closure_map;
     (* Fill value slot slots *)
-    Value_slot.Map.iter
-      (fun value_slot _ ->
+    Value_slot.Set.iter
+      (fun value_slot ->
         let kind = Value_slot.kind value_slot in
         let size, is_unboxed =
           match kind with
@@ -901,7 +914,7 @@ end = struct
         then
           let s =
             match Value_slot.Map.find_opt value_slot state.unboxed_slots with
-            | None -> create_unboxed_slot set state value_slot size
+            | None -> create_unboxed_slot set state ~is_local value_slot size
             | Some s ->
               s.sets <- set :: s.sets;
               update_set_for_slot s set;
@@ -911,14 +924,14 @@ end = struct
         else
           let s =
             match Value_slot.Map.find_opt value_slot state.value_slots with
-            | None -> create_value_slot set state value_slot
+            | None -> create_value_slot set state ~is_local value_slot
             | Some s ->
               s.sets <- set :: s.sets;
               update_set_for_slot s set;
               s
           in
           update_metadata_for_value_slot set s)
-      env_map
+      env_set
 
   (* Find the first space available to fit a given slot.
 
@@ -1017,7 +1030,7 @@ end = struct
       Misc.fatal_error
         "Slot has been explicitly removed, it cannot be assigned anymore"
 
-  let assign_function_slot_offsets ~used_function_slots state =
+  let assign_function_slot_offsets ~is_local ~used_function_slots state =
     let function_slots_to_assign =
       List.sort compare_priority state.function_slots_to_assign
     in
@@ -1025,7 +1038,7 @@ end = struct
     List.iter
       (function
         | { desc = Function_slot f; _ } as slot ->
-          if function_slot_is_used ~used_function_slots f
+          if function_slot_is_used ~is_local ~used_function_slots f
           then assign_slot_offset state slot
           else
             (* CR chambart/gbury: we currently do not track the used function
@@ -1034,7 +1047,7 @@ end = struct
             assign_slot_offset state slot)
       function_slots_to_assign
 
-  let assign_unboxed_slot_offsets ~used_unboxed_slots state =
+  let assign_unboxed_slot_offsets ~is_local ~used_unboxed_slots state =
     let unboxed_slots_to_assign =
       List.sort compare_priority state.unboxed_slots_to_assign
     in
@@ -1042,12 +1055,12 @@ end = struct
     List.iter
       (function
         | { desc = Unboxed_slot v; _ } as slot ->
-          if unboxed_slot_is_used ~used_unboxed_slots v
+          if unboxed_slot_is_used ~is_local ~used_unboxed_slots v
           then assign_slot_offset state slot
           else mark_slot_as_removed state slot)
       unboxed_slots_to_assign
 
-  let assign_value_slot_offsets ~used_value_slots state =
+  let assign_value_slot_offsets ~is_local ~used_value_slots state =
     let value_slots_to_assign =
       List.sort compare_priority state.value_slots_to_assign
     in
@@ -1055,14 +1068,14 @@ end = struct
     List.iter
       (function
         | { desc = Scannable_value_slot v; _ } as slot ->
-          if value_slot_is_used ~used_value_slots v
+          if value_slot_is_used ~is_local ~used_value_slots v
           then assign_slot_offset state slot
           else mark_slot_as_removed state slot)
       value_slots_to_assign
 
   (* Ensure function slots/value slots that appear in the code for the current
      compilation unit are present in the offsets returned by finalize *)
-  let add_used_imported_offsets ~used_slots state =
+  let add_used_imported_offsets ~is_local ~used_slots state =
     let { function_slots_in_normal_projections;
           all_function_slots;
           value_slots_in_normal_projections;
@@ -1072,17 +1085,18 @@ end = struct
     in
     state.used_offsets
       <- state.used_offsets
-         |> EO.reexport_function_slots function_slots_in_normal_projections
-         |> EO.reexport_function_slots all_function_slots
-         |> EO.reexport_value_slots value_slots_in_normal_projections
-         |> EO.reexport_value_slots all_value_slots
+         |> EO.reexport_function_slots ~is_local
+              function_slots_in_normal_projections
+         |> EO.reexport_function_slots ~is_local all_function_slots
+         |> EO.reexport_value_slots ~is_local value_slots_in_normal_projections
+         |> EO.reexport_value_slots ~is_local all_value_slots
 
   (* We only want to keep value slots that appear in the creation of a set of
      closures, *and* appear as projection (at normal name mode). And we need to
      mark value_slots/ids that are not live, as dead in the exported_offsets, so
      that later compilation unit do not mistake that for a missing offset info
      on a value_slot/id. *)
-  let live_slots state
+  let live_slots state ~is_local
       { value_slots_in_normal_projections;
         function_slots_in_normal_projections;
         _
@@ -1090,9 +1104,7 @@ end = struct
     let live_function_slots =
       Function_slot.Set.filter
         (fun function_slot ->
-          if
-            Current_unit.is_current
-              (Function_slot.get_compilation_unit function_slot)
+          if is_local (Function_slot.get_compilation_unit function_slot)
           then (
             match find_function_slot state function_slot with
             | Some _ -> true
@@ -1107,8 +1119,7 @@ end = struct
     let live_value_slots =
       Value_slot.Set.filter
         (fun value_slot ->
-          if
-            Current_unit.is_current (Value_slot.get_compilation_unit value_slot)
+          if is_local (Value_slot.get_compilation_unit value_slot)
           then
             (* a value slot appears in a set of closures iff it has a slot *)
             match
@@ -1133,40 +1144,65 @@ end = struct
 
   (* Transform an internal accumulator state for slots into an actual mapping
      that assigns offsets. *)
-  let finalize ~used_slots state =
-    add_used_imported_offsets ~used_slots state;
+  let finalize ~is_local ~used_slots state =
+    add_used_imported_offsets ~is_local ~used_slots state;
     let used_function_slots, used_unboxed_slots, used_value_slots =
-      live_slots state used_slots
+      live_slots state ~is_local used_slots
     in
-    assign_function_slot_offsets ~used_function_slots state;
-    assign_unboxed_slot_offsets ~used_unboxed_slots state;
-    assign_value_slot_offsets ~used_value_slots state;
+    assign_function_slot_offsets ~is_local ~used_function_slots state;
+    assign_unboxed_slot_offsets ~is_local ~used_unboxed_slots state;
+    assign_value_slot_offsets ~is_local ~used_value_slots state;
     { used_value_slots =
         Value_slot.Set.union used_value_slots used_unboxed_slots;
       exported_offsets = state.used_offsets
     }
 end
 
-type t = Set_of_closures.t list
+type t = set_of_closures_slots list
+
+let print_code_id_in_function_declaration ppf
+    (code_id : Function_declarations.code_id_in_function_declaration) =
+  match code_id with
+  | Deleted _ -> Format.fprintf ppf "[deleted]"
+  | Code_id { code_id; only_full_applications } ->
+    Format.fprintf ppf "%a%s" Code_id.print code_id
+      (if only_full_applications then "[only_full_applications]" else "")
+
+let print_set_of_closures fmt { function_slots; value_slots } =
+  Format.fprintf fmt
+    "@[<hov 1>(@[<hov 1>(function_slots@ %a)@]@ @[<hov 1>(value_slots@ %a)@])@]"
+    (Function_slot.Map.print print_code_id_in_function_declaration)
+    function_slots Value_slot.Set.print value_slots
 
 let print fmt l =
-  Format.fprintf fmt "@[<hv>%a@]" (Format.pp_print_list Set_of_closures.print) l
+  Format.fprintf fmt "@[<hv>%a@]" (Format.pp_print_list print_set_of_closures) l
 
 let empty = []
 
+let add_set_of_closures_slots l ~is_phantom ~function_slots ~value_slots =
+  if is_phantom then l else { function_slots; value_slots } :: l
+
 let add_set_of_closures l ~is_phantom set_of_closures =
-  if is_phantom then l else set_of_closures :: l
+  add_set_of_closures_slots l ~is_phantom
+    ~function_slots:
+      (Function_declarations.funs
+         (Set_of_closures.function_decls set_of_closures))
+    ~value_slots:
+      (Value_slot.Map.keys (Set_of_closures.value_slots set_of_closures))
 
 let add_offsets_from_function l1 ~from_function:l2 =
   (* Order is irrelevant *)
   List.rev_append l2 l1
 
-let finalize_offsets ~get_code_metadata ~used_slots l =
+let finalize_offsets ~is_local_compilation_unit:is_local ~get_function_slot_size
+    ~used_slots l =
   let state = Greedy.create_initial_state () in
   Misc.try_finally
     (fun () ->
-      List.iter (Greedy.create_slots_for_set state ~get_code_metadata) l;
-      Greedy.finalize ~used_slots state)
+      List.iter
+        (Greedy.create_slots_for_set state ~is_local ~get_function_slot_size)
+        l;
+      Greedy.finalize ~is_local ~used_slots state)
     ~always:(fun () ->
       if Flambda_features.dump_slot_offsets ()
       then Format.eprintf "%a@." Greedy.print state)
@@ -1183,4 +1219,8 @@ let finalize_offsets_from_free_names l ~get_code_metadata ~free_names =
         Name_occurrences.all_value_slots_at_normal_mode free_names
     }
   in
-  finalize_offsets ~get_code_metadata ~used_slots l
+  let get_function_slot_size code_id =
+    Code_metadata.function_slot_size (get_code_metadata code_id)
+  in
+  finalize_offsets ~is_local_compilation_unit:Current_unit.is_current
+    ~get_function_slot_size ~used_slots l

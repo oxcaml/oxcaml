@@ -40,3 +40,13 @@
  (instrumentation (backend bisect_ppx))
  (modules datalog)
  (libraries flambda2_datalog))
+
+(test
+ (name reaper_lto_boundary)
+ (modes native)
+ (instrumentation (backend bisect_ppx))
+ (modules reaper_lto_boundary)
+ (libraries
+  ocamloptcomp ocamlfrontend
+  flambda2_bound_identifiers flambda2_identifiers flambda2_kinds
+  flambda2_nominal flambda2_reaper flambda2_term_basics flambda2_terms))

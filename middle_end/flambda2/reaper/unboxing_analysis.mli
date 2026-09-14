@@ -14,11 +14,27 @@
 (**************************************************************************)
 
 module Unboxed_fields : sig
+  type 'a t
+
   type 'a u =
     | Not_unboxed of 'a
     | Unboxed of 'a t
 
-  and 'a t = 'a u Field.Map.t
+  (** Fixes the traversal order, which is preserved by mapping and renaming. *)
+  val of_map : 'a u Field.Map.t -> 'a t
+
+  val to_map : 'a t -> 'a u Field.Map.t
+
+  val find : Field.t -> 'a t -> 'a u
+
+  val is_empty : 'a t -> bool
+
+  val keys : 'a t -> Field.Set.t
+
+  val fold : (Field.t -> 'a u -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  (** Map the immediate fields without changing their order. *)
+  val mapi_fields : (Field.t -> 'a u -> 'b u) -> 'a t -> 'b t
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
@@ -28,6 +44,8 @@ module Unboxed_fields : sig
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val map_u : ('a -> 'b) -> 'a u -> 'b u
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
   val fold2_subset : ('a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
 
@@ -63,10 +81,10 @@ type my_closure_param_decision =
 val print_param_decision : Format.formatter -> param_decision -> unit
 
 type result =
-  { db : Datalog.database;
-    unboxed_fields : unboxed Code_id_or_name.Map.t;
+  { unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    cannot_change_calling_convention : unit Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -77,6 +95,7 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
+(** Calling-convention changes and metadata with unknown result types. *)
 type code_changes
 
 val get_calling_convention_change :
@@ -85,20 +104,78 @@ val get_calling_convention_change :
 (* Should only be called on code_ids from the current unit. *)
 val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
 
-val pp_result : Format.formatter -> result -> unit
+(** Like [get_code_metadata], but returns [None] for code ids without an entry
+    (in particular those of units that did not participate in the solve). *)
+val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
+
+val fold_code_metadata :
+  code_changes -> init:'a -> f:(Code_metadata.t -> 'a -> 'a) -> 'a
+
+val empty_code_changes : code_changes
+
+val code_changes_disjoint_union : code_changes -> code_changes -> code_changes
+
+val partition_code_changes_by_compilation_unit :
+  code_changes -> code_changes Compilation_unit.Map.t
+
+val code_changes_ids_for_export :
+  code_changes -> Ids_for_export.t -> Ids_for_export.t
+
+val code_changes_fields_for_export : code_changes -> Field.Set.t -> Field.Set.t
+
+val code_changes_apply_renaming :
+  code_changes ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  code_changes
+
+val unboxed_fields_ids_for_export :
+  unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
+
+val unboxed_fields_fields_for_export :
+  unboxed Code_id_or_name.Map.t -> Field.Set.t -> Field.Set.t
+
+val unboxed_fields_apply_renaming :
+  unboxed Code_id_or_name.Map.t ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  unboxed Code_id_or_name.Map.t
+
+val changed_representation_ids_for_export :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Ids_for_export.t ->
+  Ids_for_export.t
+
+val changed_representation_fields_for_export :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Field.Set.t ->
+  Field.Set.t
+
+val changed_representation_apply_renaming :
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t ->
+  Renaming.t ->
+  rename_field:(Field.t -> Field.t) ->
+  (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+
+val cannot_change_calling_convention_table :
+  Datalog_helpers.Serialisation.N.table
+
+(** Calling conventions of code outside [analysis_scope] can never be changed.
+*)
+val cannot_change_calling_convention :
+  analysis_scope:Analysis_scope.t -> result -> Code_id.t -> bool
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> result
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  result
 
 val compute_code_changes :
+  db:Datalog.database ->
   result ->
+  analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
-  rewrite_result_types:
-    (my_closure:Variable.t ->
-    params:(Variable.t * Points_to_analysis.keep_or_delete) list ->
-    results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
-    Result_types.t ->
-    Result_types.t Or_unknown_or_bottom.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   code_changes

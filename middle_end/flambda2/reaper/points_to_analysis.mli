@@ -64,11 +64,7 @@ module Relations : sig
 
   val has_source : Code_id_or_name.t term -> _ atom
 
-  val field_of_constructor_is_used_tbl :
-    ( unit Field.Map.t Code_id_or_name.Map.t,
-      Code_id_or_name.t -> Field.t -> Datalog.nil,
-      unit )
-    Datalog.table
+  val field_of_constructor_is_used_tbl : Datalog_helpers.Serialisation.Nf.table
 
   val field_of_constructor_is_used :
     Code_id_or_name.t term -> Field.t term -> _ atom
@@ -78,6 +74,24 @@ module Relations : sig
 
   val dominated_by_allocation_point :
     Code_id_or_name.t term -> Code_id_or_name.t term -> _ atom
+
+  val usages_table : Datalog_helpers.Serialisation.Nn.table
+
+  val sources_table : Datalog_helpers.Serialisation.Nn.table
+
+  val rev_accessor_table : Datalog_helpers.Serialisation.Nfn.table
+
+  val has_usage_table : Datalog_helpers.Serialisation.N.table
+
+  val has_source_table : Datalog_helpers.Serialisation.N.table
+
+  val field_of_constructor_is_used_top_table :
+    Datalog_helpers.Serialisation.Nf.table
+
+  val field_of_constructor_is_used_as_table :
+    Datalog_helpers.Serialisation.Nfn.table
+
+  val allocation_point_dominator_table : Datalog_helpers.Serialisation.Nn.table
 end
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
@@ -122,12 +136,26 @@ val get_fields_usage_of_constructors :
   unit Code_id_or_name.Map.t ->
   unit Code_id_or_name.Map.t Or_unknown.t Field.Map.t
 
-type set_of_closures_def =
+type 'a set_of_closures_def =
   | Not_a_set_of_closures
-  | Set_of_closures of (Function_slot.t * Code_id_or_name.t) list
+  | Set_of_closures of 'a
 
 val get_set_of_closures_def :
-  Datalog.database -> Code_id_or_name.t -> set_of_closures_def
+  Datalog.database ->
+  Code_id_or_name.t ->
+  (Function_slot.t * Code_id_or_name.t) list set_of_closures_def
+
+type function_and_value_slots =
+  { function_slots : (Function_slot.t * Code_id_or_name.t) list;
+    value_slots : (Value_slot.t * Code_id_or_name.t) list
+  }
+
+val get_set_of_closures_def_with_value_slots :
+  Datalog.database ->
+  Code_id_or_name.t ->
+  function_and_value_slots set_of_closures_def
+
+val all_closure_names : Datalog.database -> Code_id_or_name.Set.t
 
 val any_usage : Datalog.database -> Code_id_or_name.t -> bool
 
@@ -166,7 +194,10 @@ val get_allocation_point :
   Datalog.database -> Code_id_or_name.t -> Code_id_or_name.t option
 
 val perform_analysis :
-  Datalog.database -> stats:Datalog.Schedule.stats -> Datalog.database
+  Datalog.database ->
+  stats:Datalog.Schedule.stats ->
+  analysis_scope:Analysis_scope.t ->
+  Datalog.database
 
 val get_usages :
   Datalog.database -> Code_id_or_name.t -> usages Or_unknown_or_bottom.t
