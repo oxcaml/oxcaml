@@ -532,11 +532,8 @@ module Gen = struct
                 }
               in
               let env =
-                Env.add_value
-                  ~mode:Mode.With_regionality.legacy
-                  (Ident.create_local name)
-                  value_description
-                  env
+                Env.add_value ~mode:Mode.With_regionality.legacy
+                  (Ident.create_local name) value_description env
               in
               left_types (arg :: acc) env tyright
             | _ -> (List.rev acc, ty, env)
