@@ -298,7 +298,7 @@ let mutable_ (mut : Types.mutability) : mutable_flag =
   match mut with
   | Immutable -> Immutable
   | Mutable { mode; atomic = _ } ->
-      let open Mode.Value.Comonadic in
+      let open Mode.With_regionality.Comonadic in
       equate_exn mode legacy;
       Mutable
 

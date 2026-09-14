@@ -42,11 +42,11 @@ type locks
 
 type summary =
     Env_empty
-  | Env_value of summary * Ident.t * value_description * Mode.Value.l
+  | Env_value of summary * Ident.t * value_description * Mode.With_regionality.l
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
   | Env_module of summary * Ident.t * module_presence * module_declaration *
-      Mode.Value.l * locks
+      Mode.With_regionality.l * locks
   (* CR zqian: change to [locks option], so for module aliases it could be
   [Some []]. *)
   | Env_modtype of summary * Ident.t * modtype_declaration
@@ -65,7 +65,7 @@ type summary =
   (* CR zqian: track [add_lock] as well *)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t * Mode.Value.l
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Jkind_types.Sort.t array * int
 
@@ -104,7 +104,7 @@ val without_cmis: ('a -> 'b) -> 'a -> 'b
 (* Lookup by paths *)
 
 val find_value_no_locks_exn: Ident.t -> t ->
-  Subst.Lazy.value_description * Mode.Value.l
+  Subst.Lazy.value_description * Mode.With_regionality.l
 (** Find a value by an [Ident.t]. Raises if encounters any locks. *)
 
 val find_value: Path.t -> t -> Subst.Lazy.value_description
@@ -222,7 +222,7 @@ type unbound_value_hint =
   | No_hint
   | Missing_rec of Location.t
 
-type mode_with_locks = Mode.Value.l * locks
+type mode_with_locks = Mode.With_regionality.l * locks
 (** Sometimes we get the locks for something, but either want to walk them later, or
 walk them for something else. The [Longident.t] and [Location.t] are only for error
 messages, and point to the variable for which we actually want to walk the locks. *)
@@ -311,7 +311,7 @@ val lookup_error: Location.t -> t -> lookup_error -> 'a
     modules and classes as well, for which [ty] should be [None]. *)
 val walk_locks : env:t -> loc:Location.t -> Longident.t ->
   item:Mode.Hint.lock_item ->
-  type_expr option -> mode_with_locks -> Mode.Value.l
+  type_expr option -> mode_with_locks -> Mode.With_regionality.l
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -334,7 +334,7 @@ val lookup_modtype:
   Path.t * modtype_declaration
 val lookup_class:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
-  Path.t * class_declaration * Mode.Value.l
+  Path.t * class_declaration * Mode.With_regionality.l
 val lookup_cltype:
   ?use:bool -> loc:Location.t -> Longident.t -> t ->
   Path.t * class_type_declaration
@@ -377,7 +377,11 @@ val lookup_all_labels_from_type:
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
+  | Mutable_variable of
+      Ident.t
+      * Mode.With_regionality.r
+      * type_expr
+      * Jkind_types.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
     variable, it means mark as used. *)
@@ -443,11 +447,27 @@ val global_of_instance_compilation_unit : Compilation_unit.t -> Global_module.t
 (* Insertion by identifier *)
 
 val add_value_lazy:
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
-    Ident.t -> Subst.Lazy.value_description -> t -> t
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    Ident.t ->
+    Subst.Lazy.value_description ->
+    t ->
+    t
 val add_value:
+<<<<<<< Merlin:wsturgeon.rename-alloc
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> value_description -> t -> t
+||||||| Compiler:last-imported
+    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
+    Ident.t -> Types.value_description -> t -> t
+=======
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    Ident.t ->
+    Types.value_description ->
+    t ->
+    t
+>>>>>>> Compiler:HEAD
 val add_type:
     check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_type_long_path:
@@ -456,17 +476,29 @@ val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
 (* Modules can be added without modes, which defaults to the max mode *)
-val add_module: ?arg:bool -> ?shape:Shape.t ->
-  Ident.t -> module_presence -> module_type -> ?mode:Mode.Value.l -> t -> t
-val add_module_lazy: update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_type -> ?mode:Mode.Value.l ->
-  t -> t
+val add_module:
+  ?arg:bool ->
+  ?shape:Shape.t ->
+  Ident.t ->
+  module_presence ->
+  module_type ->
+  ?mode:Mode.With_regionality.l ->
+  t ->
+  t
+val add_module_lazy:
+  update_summary:bool ->
+  Ident.t ->
+  module_presence ->
+  Subst.Lazy.module_type ->
+  ?mode:Mode.With_regionality.l ->
+  t ->
+  t
 val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool ->
   Ident.t -> module_presence -> module_declaration ->
-  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_module_declaration_lazy: ?arg:bool -> update_summary:bool ->
   Ident.t -> module_presence -> Subst.Lazy.module_declaration ->
-  ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks -> t -> t
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
 val add_modtype: Ident.t -> modtype_declaration -> t -> t
 val add_modtype_lazy: update_summary:bool ->
    Ident.t -> Subst.Lazy.modtype_declaration -> t -> t
@@ -545,20 +577,40 @@ val remove_last_open: Path.t -> t -> t option
 (* Insertion by name *)
 
 val enter_value:
+<<<<<<< Merlin:wsturgeon.rename-alloc
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     string -> value_description -> t -> Ident.t * t
 val enter_type:
   ?long_path:bool -> scope:int ->
   string -> type_declaration -> t -> Ident.t * t
+||||||| Compiler:last-imported
+    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
+    string -> value_description -> t -> Ident.t * t
+val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
+=======
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    string ->
+    value_description ->
+    t ->
+    Ident.t * t
+val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
+>>>>>>> Compiler:HEAD
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
 val enter_module:
-  scope:int -> ?arg:bool -> string -> module_presence ->
-  module_type -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> Ident.t * t
+  scope:int ->
+  ?arg:bool ->
+  string ->
+  module_presence ->
+  module_type ->
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+  t ->
+  Ident.t * t
 val enter_module_declaration:
   scope:int -> ?arg:bool -> ?shape:Shape.t -> string -> module_presence ->
-  module_declaration -> ?mode:(Mode.allowed * 'r) Mode.Value.t ->
+  module_declaration -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
   ?locks:locks -> t -> Ident.t * t
 val enter_modtype:
   scope:int -> string -> modtype_declaration -> t -> Ident.t * t
@@ -571,13 +623,18 @@ val enter_jkind:
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)
 val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature ->
-  ?mode:(Mode.allowed * 'r) Mode.Value.t -> t -> signature * t
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> t -> signature * t
 
 (* Same as [enter_signature] but also extends the shape map ([parent_shape])
    with all the the items from the signature, their shape being a projection
    from the given shape. *)
-val enter_signature_and_shape: scope:int -> parent_shape:Shape.Map.t ->
-  Shape.t -> signature -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> t ->
+val enter_signature_and_shape:
+  scope:int ->
+  parent_shape:Shape.Map.t ->
+  Shape.t ->
+  signature ->
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+  t ->
   signature * Shape.Map.t * t
 
 val enter_unbound_value : string -> value_unbound_reason -> t -> t
@@ -587,14 +644,14 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 (* Lock the environment *)
 
 val add_closure_lock : Mode.Hint.pinpoint
-  -> ('l * Mode.allowed) Mode.Value.Comonadic.t -> t -> t
+  -> ('l * Mode.allowed) Mode.With_regionality.Comonadic.t -> t -> t
 
 (** A variant of [add_closure_lock] where the mode of the closure is a constant
 due to the nature of the pinpoint. As a result, the mode is not printed in error
 messages. [ghost = true] means the closure is not a value (such as
 a loop) *)
 val add_const_closure_lock : ?ghost:bool -> Mode.Hint.pinpoint ->
-  Mode.Value.Comonadic.Const.t -> t -> t
+  Mode.With_regionality.Comonadic.Const.t -> t -> t
 
 val add_region_lock : t -> t
 val add_exclave_lock : t -> t
@@ -779,8 +836,16 @@ val shorten_module_path : (t -> Path.t -> Path.t) ref
 (** Folding over all identifiers (for analysis purpose) *)
 
 val fold_values:
-  (string -> Path.t -> Subst.Lazy.value_description -> Mode.Value.l -> 'a -> 'a)
-  -> Longident.t option -> t -> 'a -> 'a
+  (string ->
+   Path.t ->
+   Subst.Lazy.value_description ->
+   Mode.With_regionality.l ->
+   'a ->
+   'a) ->
+  Longident.t option ->
+  t ->
+  'a ->
+  'a
 val fold_types:
   (string -> Path.t -> type_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a

@@ -196,7 +196,9 @@ let rec constructor_type constr cty =
   | Cty_signature _ ->
       constr
   | Cty_arrow (l, ty, cty) ->
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc =
+        l, Mode.With_locality.legacy, Mode.With_locality.legacy
+      in
       let ty = Ctype.newmono ty in
       Ctype.newty
         (Tarrow (arrow_desc, ty, constructor_type constr cty, commu_ok))
@@ -262,9 +264,23 @@ let unify_delayed_method_type loc env label ty expected_ty=
       raise(Error(loc, env, Field_type_mismatch ("method", label, trace)))
 
 let type_constraint val_env sty sty' loc =
-  let cty  = transl_simple_type ~new_var_jkind:Any val_env ~closed:false Alloc.Const.legacy sty in
+  let cty =
+    transl_simple_type
+      ~new_var_jkind:Any
+      val_env
+      ~closed:false
+      With_locality.Const.legacy
+      sty
+  in
   let ty = cty.ctyp_type in
-  let cty' = transl_simple_type ~new_var_jkind:Sort val_env ~closed:false Alloc.Const.legacy sty' in
+  let cty' =
+    transl_simple_type
+      ~new_var_jkind:Sort
+      val_env
+      ~closed:false
+      With_locality.Const.legacy
+      sty'
+  in
   let ty' = cty'.ctyp_type in
   begin
     try Ctype.unify val_env ty ty' with Ctype.Unify err ->
@@ -310,7 +326,14 @@ let rec class_type_field env sign self_scope ctf =
   | Pctf_val ({txt=lab}, mut, virt, sty) ->
       mkctf_with_attrs
         (fun () ->
-          let cty = transl_simple_type ~new_var_jkind:Sort env ~closed:false Alloc.Const.legacy sty in
+          let cty =
+            transl_simple_type
+              ~new_var_jkind:Sort
+              env
+              ~closed:false
+              With_locality.Const.legacy
+              sty
+          in
           let ty = cty.ctyp_type in
           begin match
             Ctype.constrain_type_jkind
@@ -345,7 +368,14 @@ let rec class_type_field env sign self_scope ctf =
                  ) :: !delayed_meth_specs;
                Tctf_method (lab, priv, virt, returned_cty)
            | _ ->
-               let cty = transl_simple_type ~new_var_jkind:Any env ~closed:false Alloc.Const.legacy sty in
+               let cty =
+                 transl_simple_type
+                   ~new_var_jkind:Any
+                   env
+                   ~closed:false
+                   With_locality.Const.legacy
+                   sty
+               in
                let ty = cty.ctyp_type in
                add_method loc env lab priv virt ty sign;
                Tctf_method (lab, priv, virt, cty))
@@ -369,7 +399,14 @@ and class_signature virt env pcsig self_scope loc =
   (* Introduce a dummy method preventing self type from being closed. *)
   Ctype.add_dummy_method env ~scope:self_scope sign;
 
-  let self_cty = transl_simple_type ~new_var_jkind:Any env ~closed:false Alloc.Const.legacy sty in
+  let self_cty =
+    transl_simple_type
+      ~new_var_jkind:Any
+      env
+      ~closed:false
+      With_locality.Const.legacy
+      sty
+  in
   let self_type = self_cty.ctyp_type in
   begin try
     Ctype.unify env self_type sign.csig_self
@@ -419,7 +456,14 @@ and class_type_aux env virt self_scope scty =
                                                    List.length styl)));
       let ctys = List.map2
         (fun sty ty ->
-          let cty' = transl_simple_type ~new_var_jkind:Any env ~closed:false Alloc.Const.legacy sty in
+          let cty' =
+            transl_simple_type
+              ~new_var_jkind:Any
+              env
+              ~closed:false
+              With_locality.Const.legacy
+              sty
+          in
           let ty' = cty'.ctyp_type in
           begin
            try Ctype.unify env ty' ty with Ctype.Unify err ->
@@ -448,7 +492,12 @@ and class_type_aux env virt self_scope scty =
         match l with
         | Position _ -> ctyp Ttyp_call_pos (Ctype.newconstr Predef.path_lexing_position [])
         | Optional _ | Labelled _ | Nolabel ->
-          transl_simple_type ~new_var_jkind:Any env ~closed:false Alloc.Const.legacy sty
+          transl_simple_type
+            ~new_var_jkind:Any
+            env
+            ~closed:false
+            With_locality.Const.legacy
+            sty
       in
       let ty = cty.ctyp_type in
       let ty =
@@ -496,7 +545,7 @@ let enter_ancestor_met ~loc name ~sign ~meths ~cl_num ~ty ~attrs met_env =
       Types.val_loc = loc;
       val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
   in
-  Env.enter_value ~check ~mode:Mode.Value.legacy name desc met_env
+  Env.enter_value ~check ~mode:Mode.With_regionality.legacy name desc met_env
 
 let add_self_met loc id sign self_var_kind vars cl_num
       as_var ty attrs met_env =
@@ -513,7 +562,7 @@ let add_self_met loc id sign self_var_kind vars cl_num
       Types.val_loc = loc;
       val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
   in
-  Env.add_value ~check ~mode:Mode.Value.legacy id desc met_env
+  Env.add_value ~check ~mode:Mode.With_regionality.legacy id desc met_env
 
 let add_instance_var_met loc label id sign cl_num attrs met_env =
   let mut, ty =
@@ -530,7 +579,7 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
       val_zero_alloc = Zero_alloc.default;
       val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
   in
-  Env.add_value ~mode:Mode.Value.legacy id desc met_env
+  Env.add_value ~mode:Mode.With_regionality.legacy id desc met_env
 
 let add_instance_vars_met loc vars sign cl_num met_env =
   List.fold_left
@@ -691,7 +740,7 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                ~before_generalize:(fun cty ->
                  Ctype.generalize_structure cty.ctyp_type)
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
-                            ~closed:false Alloc.Const.legacy styp)
+                            ~closed:false With_locality.Const.legacy styp)
            in
            begin
              match
@@ -779,7 +828,14 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
       with_attrs
         (fun () ->
            let sty = Ast_helper.Typ.force_poly sty in
-           let cty = transl_simple_type ~new_var_jkind:Any val_env ~closed:false Alloc.Const.legacy sty in
+           let cty =
+             transl_simple_type
+               ~new_var_jkind:Any
+               val_env
+               ~closed:false
+               With_locality.Const.legacy
+               sty
+           in
            let ty = cty.ctyp_type in
            add_method loc val_env label.txt priv Virtual ty sign;
            let field =
@@ -819,7 +875,12 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
              | Some sty ->
                  let sty = Ast_helper.Typ.force_poly sty in
                  let cty' =
-                   Typetexp.transl_simple_type ~new_var_jkind:Any val_env ~closed:false Alloc.Const.legacy sty
+                   Typetexp.transl_simple_type
+                     ~new_var_jkind:Any
+                     val_env
+                     ~closed:false
+                     With_locality.Const.legacy
+                     sty
                  in
                  cty'.ctyp_type
            in
@@ -965,7 +1026,9 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let ty = Btype.method_type label.txt sign in
            let self_type = sign.Types.csig_self in
-           let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
+           let arrow_desc =
+             Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy
+           in
            let self_param_type = Btype.newgenty (Tpoly(self_type, [])) in
            let meth_type =
              Typecore.mk_expected (Btype.newgenty
@@ -985,7 +1048,9 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let unit_type = Ctype.instance Predef.type_unit in
            let self_param_type = Ctype.newmono sign.Types.csig_self in
-           let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
+           let arrow_desc =
+             Nolabel, Mode.With_locality.legacy, Mode.With_locality.legacy
+           in
            let meth_type =
              Typecore.mk_expected (Ctype.newty
                (Tarrow (arrow_desc, self_param_type, unit_type, commu_ok)))
@@ -1037,12 +1102,16 @@ and class_structure cl_num virt self_scope final val_env met_env loc
   let val_env =
     val_env
     |> Env.add_unboxed_lock
-    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+    |> Env.add_const_closure_lock
+         pp
+         Mode.With_regionality.Comonadic.Const.legacy
   in
   let met_env =
     met_env
     |> Env.add_unboxed_lock
-    |> Env.add_const_closure_lock pp Mode.Value.Comonadic.Const.legacy
+    |> Env.add_const_closure_lock
+         pp
+         Mode.With_regionality.Comonadic.Const.legacy
   in
   let par_env = met_env in
 
@@ -1147,11 +1216,17 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let (path, decl, mode) =
         Env.lookup_class ~loc:scl.pcl_loc lid.txt val_env
       in
-      Mode.Value.submode_exn mode Mode.Value.legacy;
+      Mode.With_regionality.submode_exn mode Mode.With_regionality.legacy;
       if Path.same decl.cty_path unbound_class then
         raise(Error(scl.pcl_loc, val_env, Unbound_class_2 lid.txt));
       let tyl = List.map
-          (fun sty -> transl_simple_type ~new_var_jkind:Any val_env ~closed:false Alloc.Const.legacy sty)
+          (fun sty ->
+            transl_simple_type
+              ~new_var_jkind:Any
+              val_env
+              ~closed:false
+              With_locality.Const.legacy
+              sty)
           styl
       in
       let (params, clty) =
@@ -1270,7 +1345,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                            desc = vd; kind = Id_value;
                            unique_use = aliased_many_use;
                            staticity = Mode.Staticity.(disallow_left legacy);
-                           mode = Mode.Value.(disallow_right legacy) };
+                           mode = Mode.With_regionality.(disallow_right
+                             legacy) };
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
               exp_attributes = []; (* check *)
@@ -1291,7 +1367,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       let val_env' =
         val_env'
         |> Env.add_const_closure_lock (scl.pcl_loc, Class)
-            Value.Comonadic.Const.legacy
+            With_regionality.Comonadic.Const.legacy
       in
       let cl =
         Ctype.with_raised_nongen_level
@@ -1415,11 +1491,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                     else begin
                       let mode_closure =
                         Mode.Locality.disallow_left Mode.Locality.legacy
-                        |> Typedtree.create_alloc_mode_r
+                        |> Typedtree.create_locality_mode_r
                       in
                       let mode_arg =
                         Mode.Locality.disallow_right Mode.Locality.legacy
-                        |> Typedtree.create_alloc_mode_l
+                        |> Typedtree.create_locality_mode_l
                       in
                       let mode_ret =
                         Mode.Locality.disallow_right Mode.Locality.legacy
@@ -1499,7 +1575,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                              unique_use = aliased_many_use;
                              staticity =
                                Mode.Staticity.(disallow_left legacy);
-                             mode = Mode.Value.(disallow_right legacy) };
+                             mode = Mode.With_regionality.(disallow_right
+                               legacy) };
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;
                 exp_attributes = [];
@@ -1520,7 +1597,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              let id' = Ident.create_local (Ident.name id) in
              ((id', expr)
               :: vals,
-              Env.add_value ~mode:Mode.Value.legacy id' desc met_env))
+              Env.add_value
+                ~mode:Mode.With_regionality.legacy
+                id'
+                desc
+                met_env))
           (let_bound_idents_with_modes_sorts_and_checks defs)
           ([], met_env)
       in
@@ -1615,7 +1696,9 @@ let rec approx_declaration cl =
            classes to work with jkinds *)
       in
       let arg = Ctype.newmono arg in
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc =
+        l, Mode.With_locality.legacy, Mode.With_locality.legacy
+      in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_declaration cl, commu_ok))
   | Pcl_let (_, _, cl) ->
@@ -1635,7 +1718,9 @@ let rec approx_description ct =
            relax jkinds in classes *)
       in
       let arg = Ctype.newmono arg in
-      let arrow_desc = l, Mode.Alloc.legacy, Mode.Alloc.legacy in
+      let arrow_desc =
+        l, Mode.With_locality.legacy, Mode.With_locality.legacy
+      in
       Ctype.newty
         (Tarrow (arrow_desc, arg, approx_description ct, commu_ok))
   | _ -> Ctype.newvar (Jkind.Builtin.value ~why:Object)
@@ -1943,8 +2028,13 @@ let final_decl env define_class
                  , Non_generalizable_class { id; clty; nongen_vars }));
     );
   begin match
-    Alloc.with_zap_scope (fun ~zap_scope -> Ctype.closed_class ~zap_scope
-      clty.cty_params (Btype.signature_of_class_type clty.cty_type))
+    With_locality.with_zap_scope
+      (fun ~zap_scope ->
+        Ctype.closed_class
+          ~zap_scope
+          clty.cty_params
+          (Btype.signature_of_class_type
+             clty.cty_type))
   with
     None        -> ()
   | Some reason ->
