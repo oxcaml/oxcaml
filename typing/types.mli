@@ -35,7 +35,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
         (** Mode of new field value in mutation. *)
       ; atomic : atomic
       }
@@ -49,7 +49,7 @@ val is_mutable : mutability -> bool
 val is_atomic : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
-val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
+val mutable_mode : ('l * 'r) Mode.With_regionality.Comonadic.t -> ('l * 'r) Mode.With_regionality.t
 
 (** Type expressions for the core language.
 
@@ -314,7 +314,7 @@ and arg_label =
   | Position of string (** [label:[%call_pos] -> ...] *)
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 (** [package] corresponds to the type of a first-class module *)
 and package =
@@ -755,7 +755,7 @@ module Vars  : Map.S with type key = string
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -1246,20 +1246,20 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
   (** A left mode instead of a constant mode, in order to encode mode hints.
       Note that cmi record constant modes anyway. *)
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -1429,5 +1429,5 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
-val class_mode : Mode.Value.lr
-val toplevel_mode : Mode.Value.lr
+val class_mode : Mode.With_regionality.lr
+val toplevel_mode : Mode.With_regionality.lr

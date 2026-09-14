@@ -108,7 +108,7 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Mode.Alloc.generic_level
+let generic_level = Mode.With_locality.generic_level
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)
@@ -451,7 +451,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -634,14 +634,14 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_saving : copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_restoring : copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
@@ -658,19 +658,19 @@ end = struct
 
   let mode_instantiate copy_scope ~current_level m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.instantiate ~copy_scope ~current_level m
+    Mode.With_locality.instantiate ~copy_scope ~current_level m
 
   let mode_copy_generic copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_generic ~copy_scope m
+    Mode.With_locality.copy_generic ~copy_scope m
 
   let mode_copy_for_saving copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_saving ~copy_scope m
+    Mode.With_locality.copy_for_saving ~copy_scope m
 
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_restoring ~copy_scope m
+    Mode.With_locality.copy_for_restoring ~copy_scope m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =

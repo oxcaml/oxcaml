@@ -40,7 +40,7 @@ type kind_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : For_copy.copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr;
+        prepare_mode : For_copy.copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr;
         prepare_modality : Mode.Modality.t -> Mode.Modality.t;
         prepare_ident : Ident.t -> Ident.t
       }
@@ -304,9 +304,9 @@ let with_additional_action =
         (* modes and modalities should have been zapped already *)
         (* if a mode is generic we copy it persistently for saving *)
         let prepare_mode copy_scope mode =
-          if Mode.Alloc.check_generic mode
+          if Mode.With_locality.check_generic mode
           then For_copy.mode_copy_for_saving copy_scope mode
-          else Mode.Alloc.(mode |> to_const_exn |> of_const)
+          else Mode.With_locality.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
           Mode.Modality.(modality |> to_const_exn|> of_const)

@@ -31,7 +31,7 @@ open Mode
 
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 
-let dummy_value_mode = Value.disallow_right Value.legacy
+let dummy_value_mode = With_regionality.disallow_right With_regionality.legacy
 
 let dummy_scannable_sort = Jkind.Sort.scannable
 
@@ -54,13 +54,13 @@ let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
   let label = Typetexp.transl_label label None in
-  Tarrow ((label, Alloc.legacy, Alloc.legacy), t1, t2, comm)
+  Tarrow ((label, With_locality.legacy, With_locality.legacy), t1, t2, comm)
 
 type texp_ident_identifier = ident_kind * unique_use
 
 let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
     (path, lid, desc) =
-  let mode = Mode.Value.(disallow_right legacy) in
+  let mode = Mode.With_regionality.(disallow_right legacy) in
   let staticity = Mode.Staticity.(disallow_left legacy) in
   Texp_ident { path; lid; desc; kind; unique_use; staticity; mode }
 
@@ -379,14 +379,14 @@ let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
     pat_unique_barrier = Unique_barrier.not_computed ()
   }
 
-type tpat_var_identifier = Jkind.Sort.t * Value.l
+type tpat_var_identifier = Jkind.Sort.t * With_regionality.l
 
 let mkTpat_var ?id:(sort, mode = dummy_scannable_sort, dummy_value_mode)
     (ident, name) =
   Tpat_var
     { id = ident; name; uid = Uid.internal_not_actually_unique; sort; mode }
 
-type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
+type tpat_alias_identifier = Jkind.Sort.t * With_regionality.l * Types.type_expr
 
 let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
   Tpat_alias
@@ -403,7 +403,8 @@ type tpat_array_identifier = mutability * Jkind.sort
 
 let mkTpat_array
     ?id:(mut, arg_sort =
-        ( Mutable { mode = Value.Comonadic.legacy; atomic = Nonatomic },
+        ( Mutable
+            { mode = With_regionality.Comonadic.legacy; atomic = Nonatomic },
           Jkind.Sort.scannable )) l =
   Tpat_array (mut, arg_sort, l)
 

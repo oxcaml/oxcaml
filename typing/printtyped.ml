@@ -114,10 +114,10 @@ let fmt_mutable_mode_flag f (x : Types.mutability) =
   | Immutable -> fprintf f "Immutable"
   | Mutable { mode; atomic = Nonatomic } ->
     fprintf f "Mutable(%a)"
-      (Format_doc.compat (Mode.Value.Comonadic.print ())) mode
+      (Format_doc.compat (Mode.With_regionality.Comonadic.print ())) mode
   | Mutable { mode; atomic = Atomic } ->
     fprintf f "Atomic(%a)"
-      (Format_doc.compat (Mode.Value.Comonadic.print ())) mode
+      (Format_doc.compat (Mode.With_regionality.Comonadic.print ())) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -301,10 +301,10 @@ let jkind_annotation i ppf jkind =
   line i ppf "%a" Pprintast.jkind_annotation jkind
 
 let mode_desc i ppf modes_annot =
-  let print_mode_annot i ppf { txt = (Mode.Alloc.Atom (ax, mode)); loc = _ } =
+  let print_mode_annot i ppf { txt = (Mode.With_locality.Atom (ax, mode)); loc = _ } =
     line i ppf "%a: %a\n"
-      (Format_doc.compat Mode.Alloc.Axis.print) ax
-      (Format_doc.compat (Mode.Alloc.Const.print_axis ax)) mode
+      (Format_doc.compat Mode.With_locality.Axis.print) ax
+      (Format_doc.compat (Mode.With_locality.Const.print_axis ax)) mode
   in
   list i print_mode_annot ppf modes_annot
 
@@ -314,13 +314,13 @@ let modes ~pr i ppf { mode_modes = mm; mode_desc = md } =
 
 let alloc_modes i ppf ms =
   let print_alloc_modes i ppf m =
-    line i ppf "%a\n" (Format_doc.compat Mode.Alloc.Const.print) m
+    line i ppf "%a\n" (Format_doc.compat Mode.With_locality.Const.print) m
   in
   modes ~pr:print_alloc_modes i ppf ms
 
 let alloc_modes_opt i ppf ms =
   let print_alloc_modes_opt i ppf m =
-    line i ppf "%a\n" (Format_doc.compat Mode.Alloc.Const.Option.print) m
+    line i ppf "%a\n" (Format_doc.compat Mode.With_locality.Const.Option.print) m
   in
   modes ~pr:print_alloc_modes_opt i ppf ms
 
@@ -338,12 +338,12 @@ let return_modes i ppf ms =
 
 let value_modes_var i ppf ms =
   let print_value_modes_var i ppf m =
-    line i ppf "%a\n" (Format_doc.compat (Mode.Value.print ())) m
+    line i ppf "%a\n" (Format_doc.compat (Mode.With_regionality.print ())) m
   in
   modes ~pr:print_value_modes_var i ppf ms
 
 let moda_desc i ppf modalities_annot =
-  let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
+  let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.With_regionality.atom =
     match ax, modality with
     | Comonadic ax, Meet_const mode -> Atom (Comonadic ax, mode)
     | Monadic ax, Join_const mode -> Atom (Monadic ax, mode)
@@ -351,10 +351,10 @@ let moda_desc i ppf modalities_annot =
   let as_modes_annot =
     List.map (Location.map modality_as_mode) modalities_annot
   in
-  let print_mode_annot i ppf { txt = (Mode.Value.Atom (ax, mode)); loc = _ } =
+  let print_mode_annot i ppf { txt = (Mode.With_regionality.Atom (ax, mode)); loc = _ } =
     line i ppf "%a: %a\n"
-      (Format_doc.compat Mode.Value.Axis.print) ax
-      (Format_doc.compat (Mode.Value.Const.print_axis ax)) mode
+      (Format_doc.compat Mode.With_regionality.Axis.print) ax
+      (Format_doc.compat (Mode.With_regionality.Const.print_axis ax)) mode
   in
   list i print_mode_annot ppf as_modes_annot
 
@@ -673,11 +673,11 @@ and yielding_mode i ppf m =
      | Mode.Yielding.Const.Yielding -> "yielding")
 
 and value_mode i ppf m =
-  line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
+  line i ppf "value_mode %a\n" (Format_doc.compat (Mode.With_regionality.print ())) m
 
 and alloc_const_option_mode i ppf m =
   line i ppf "alloc_const_option_mode %a\n"
-    (Format_doc.compat Mode.Alloc.Const.Option.print) m
+    (Format_doc.compat Mode.With_locality.Const.Option.print) m
 
 and expression_alloc_mode i ppf (expr, am) =
   alloc_mode i ppf am;

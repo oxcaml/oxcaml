@@ -148,7 +148,7 @@ val print_return_mode : Format.formatter -> return_mode -> unit
    value_modes type. *)
 type 'a modes = 'a Typemode.modes =
   { mode_modes : 'a;
-    mode_desc : Mode.Alloc.atom Location.loc list
+    mode_desc : Mode.With_locality.atom Location.loc list
   }
 
 type modalities = Typemode.modalities =
@@ -218,7 +218,7 @@ and 'a pattern_data =
    }
 
 and pat_extra =
-  | Tpat_constraint of core_type option * Mode.Alloc.Const.t modes
+  | Tpat_constraint of core_type option * Mode.With_locality.Const.t modes
         (** P : T          { pat_desc = P
                            ; pat_extra = (Tpat_constraint T, _, _) :: ... }
          *)
@@ -251,7 +251,7 @@ and 'k pattern_desc =
       name: string loc;
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
-      mode: Mode.Value.l;
+      mode: Mode.With_regionality.l;
     } -> value pattern_desc
         (** x *)
   | Tpat_alias : {
@@ -260,7 +260,7 @@ and 'k pattern_desc =
       name: string loc;
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
-      mode: Mode.Value.l;
+      mode: Mode.With_regionality.l;
       type_expr: Types.type_expr;
     } -> value pattern_desc
         (** P as a *)
@@ -270,7 +270,7 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       (** the sort of the layout function body *)
-      mode: Mode.Value.l;
+      mode: Mode.With_regionality.l;
       (** the mode of the layout function body *)
       lpoly: Types.Lpoly.t;
       (** The sort variables abstracted over by this compile-time function, and
@@ -435,7 +435,7 @@ and exp_extra =
         them here, as the cost of tracking this additional information is minimal. *)
   | Texp_stack
         (** stack_ E *)
-  | Texp_mode of Mode.Alloc.Const.Option.t modes
+  | Texp_mode of Mode.With_locality.Const.Option.t modes
         (** E : _ @@ M  *)
   | Texp_inspected_type of [ `exp ] type_inspection
         (** Inserted when type inspection was necessary to resolve types
@@ -486,7 +486,7 @@ and expression_desc =
         kind : ident_kind;
         unique_use : unique_use;
         staticity : Mode.Staticity.r;
-        mode : Mode.Value.l }
+        mode : Mode.With_regionality.l }
         (** x
             M.x
          *)
@@ -1000,7 +1000,7 @@ and class_field_desc =
 
 and held_locks = Env.locks * Longident.t * Location.t
 
-and mode_with_locks = Mode.Value.l * held_locks option
+and mode_with_locks = Mode.With_regionality.l * held_locks option
 
 (* Value expressions for the module language *)
 
@@ -1023,7 +1023,7 @@ and module_expr =
 and module_type_constraint =
   | Tmodtype_implicit
   (** The module type constraint has been synthesized during typechecking. *)
-  | Tmodtype_explicit of module_type * Mode.Value.lr modes
+  | Tmodtype_explicit of module_type * Mode.With_regionality.lr modes
   (** The module type was in the source file. *)
 
 and functor_parameter =
@@ -1031,7 +1031,7 @@ and functor_parameter =
   (* CR sspies: We should add an additional [debug_uid] here to support functor
      arguments in the debugger. *)
   | Named of Ident.t option * string option loc * module_type *
-             Mode.Alloc.Const.t modes
+             Mode.With_locality.Const.t modes
 
 
 (* Note [Staticity of functors]
@@ -1167,7 +1167,7 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type * Mode.Alloc.Const.t modes
+  | Tmty_functor of functor_parameter * module_type * Mode.With_locality.Const.t modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc
@@ -1326,8 +1326,8 @@ and core_type =
 
 and core_type_desc =
   | Ttyp_var of string option * Parsetree.jkind_annotation option
-  | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
-                  core_type * Mode.Alloc.Const.t modes
+  | Ttyp_arrow of arg_label * core_type * Mode.With_locality.Const.t modes *
+                  core_type * Mode.With_locality.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
@@ -1384,7 +1384,7 @@ and object_field_desc =
     See the comments on [Typedecl.transl_value_decl_modal] for more info. *)
 and value_description_modal_info =
   | Valmi_sig_value of modalities
-  | Valmi_str_primitive of Mode.Alloc.Const.Option.t modes
+  | Valmi_str_primitive of Mode.With_locality.Const.Option.t modes
 
 and value_description =
   { val_id: Ident.t;
@@ -1652,7 +1652,7 @@ val let_bound_idents_full:
 *)
 val let_bound_idents_with_modes_sorts_and_checks:
   value_binding list
-  -> (Ident.t * (Location.t * Mode.Value.l * Jkind.sort) list
+  -> (Ident.t * (Location.t * Mode.With_regionality.l * Jkind.sort) list
               * Zero_alloc.t) list
 
 (** Alpha conversion of patterns *)
@@ -1682,7 +1682,7 @@ val loc_of_decl : uid:Shape.Uid.t -> item_declaration -> string Location.loc
 val min_mode_with_locks : mode_with_locks
 
 (** Get the mode, asserting no held locks. *)
-val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
+val mode_without_locks_exn : mode_with_locks -> Mode.With_regionality.l
 
 val map_apply_arg:
   ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted

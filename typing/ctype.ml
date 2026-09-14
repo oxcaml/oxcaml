@@ -254,8 +254,8 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
                  this mode is to reduce sharing *)
               abbrev := Mnil
           | Tarrow ((_, marg, mret), _, _, _) when not structure ->
-              Alloc.generalize_topology ~current_level:!current_level marg;
-              Alloc.generalize_topology ~current_level:!current_level mret
+              With_locality.generalize_topology ~current_level:!current_level marg;
+              With_locality.generalize_topology ~current_level:!current_level mret
           | _ -> ()
         end
   end pool;
@@ -750,11 +750,11 @@ let remove_mode_and_jkind_variables ~zap_scope ty =
       | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
          if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
-          Alloc.add_mode_to_zap_scope ~arg:true marg zap_scope;
-          Alloc.add_mode_to_zap_scope ~arg:false mret zap_scope
+          With_locality.add_mode_to_zap_scope ~arg:true marg zap_scope;
+          With_locality.add_mode_to_zap_scope ~arg:false mret zap_scope
          end else begin
-          Alloc.zap_to_legacy_force ~arg:true marg |> ignore;
-          Alloc.zap_to_legacy_force ~arg:false mret |> ignore
+          With_locality.zap_to_legacy_force ~arg:true marg |> ignore;
+          With_locality.zap_to_legacy_force ~arg:false mret |> ignore
          end;
          go targ; go tret
       | _ -> iter_type_expr go (Fun.const ()) ty
@@ -870,7 +870,7 @@ let close_type ~zap_scope mark ty =
 let closed_parameterized_type params ty =
   with_type_mark begin fun mark ->
     List.iter (mark_type mark) params;
-    try Alloc.with_zap_scope (fun ~zap_scope -> close_type ~zap_scope mark ty);
+    try With_locality.with_zap_scope (fun ~zap_scope -> close_type ~zap_scope mark ty);
     true with Non_closed _ -> false
   end
 
@@ -1026,12 +1026,12 @@ let rec generalize stage_offset ty =
         lower_all ty
     (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
-        let mgen m = Mode.Alloc.generalize ~current_level m in
+        let mgen m = Mode.With_locality.generalize ~current_level m in
         iter_abbrev (generalize stage_offset) !abbrev;
         iter_type_expr (generalize stage_offset) mgen ty
     | _ ->
 
-      let mgen m = Mode.Alloc.generalize ~current_level m in
+      let mgen m = Mode.With_locality.generalize ~current_level m in
       iter_type_expr (generalize stage_offset) mgen ty
     end;
   end
@@ -1055,7 +1055,7 @@ let rec generalize_structure ty =
       | _ -> ()
       end;
       set_level ty generic_level;
-      let mgen m = Mode.Alloc.generalize_structure ~current_level m in
+      let mgen m = Mode.With_locality.generalize_structure ~current_level m in
       iter_type_expr generalize_structure mgen ty
     end
   end
@@ -1245,7 +1245,7 @@ let rec update_level env level expand ty =
         with Cannot_expand ->
           set_level ();
           iter_type_expr (update_level env level expand)
-            (Mode.Alloc.update_level level) ty
+            (Mode.With_locality.update_level level) ty
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
         let p' = normalize_package_path env p in
@@ -1264,7 +1264,7 @@ let rec update_level env level expand ty =
         end;
         set_level ();
         iter_type_expr (update_level env level expand)
-          (Mode.Alloc.update_level level) ty
+          (Mode.With_locality.update_level level) ty
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
@@ -1273,7 +1273,7 @@ let rec update_level env level expand ty =
         (* XXX what about abbreviations in Tconstr ? *)
         iter_type_expr_with_stages
           (fun env -> update_level env level expand) env
-          (Mode.Alloc.update_level level) ty
+          (Mode.With_locality.update_level level) ty
   end
 
 (* First try without expanding, then expand everything,
@@ -1336,8 +1336,8 @@ let rec lower_contravariant env var_level visited contra ty =
     | Tpackage p ->
         List.iter (fun (_n, ty) -> lower_rec true ty) p.pack_cstrs
     | Tarrow ((_, m1, m2), t1, t2, _) ->
-        Mode.Alloc.update_level var_level m1;
-        if contra then Mode.Alloc.update_level var_level m2;
+        Mode.With_locality.update_level var_level m1;
+        if contra then Mode.With_locality.update_level var_level m2;
         lower_rec true t1;
         lower_rec contra t2
     | _ ->
@@ -2078,24 +2078,24 @@ let prim_mode mvar prim ~level =
 let with_locality_and_forkable_yielding (locality, fy) m =
   let forkable = Option.map fst fy in
   let yielding = Option.map snd fy in
-  let m' = Alloc.newvar 0 in
-  Locality.equate_exn (Alloc.proj_comonadic Areality m') locality;
+  let m' = With_locality.newvar 0 in
+  Locality.equate_exn (With_locality.proj_comonadic Areality m') locality;
   let forkable =
-    Option.value ~default:(Alloc.proj_comonadic Forkable m) forkable
+    Option.value ~default:(With_locality.proj_comonadic Forkable m) forkable
   in
   let yielding =
-    Option.value ~default:(Alloc.proj_comonadic Yielding m) yielding
+    Option.value ~default:(With_locality.proj_comonadic Yielding m) yielding
   in
-  Forkable.equate_exn (Alloc.proj_comonadic Forkable m') forkable;
-  Yielding.equate_exn (Alloc.proj_comonadic Yielding m') yielding;
+  Forkable.equate_exn (With_locality.proj_comonadic Forkable m') forkable;
+  Yielding.equate_exn (With_locality.proj_comonadic Yielding m') yielding;
   let c =
-    { Alloc.Comonadic.Const.max with
+    { With_locality.Comonadic.Const.max with
       areality = Locality.Const.min;
       forkable = Forkable.Const.min;
       yielding = Yielding.Const.min}
   in
-  Alloc.submode_exn (Alloc.meet_const c m') m;
-  Alloc.submode_exn (Alloc.meet_const c m) m';
+  With_locality.submode_exn (With_locality.meet_const c m') m;
+  With_locality.submode_exn (With_locality.meet_const c m) m';
   m'
 
 (* When user writes an (uncurried) arrow type [A -> B -> C], the corresponding
@@ -2106,17 +2106,17 @@ On the other hand, the monadic axes of [fun b -> ...] won't be constrained by
 this (but maybe constrained by other things); therefore, we take it to be legacy
 for compatibility. *)
 let curry_mode (type r)
-    (alloc : (allowed * r) Alloc.Comonadic.t)
-    (arg : Alloc.lr) : Alloc.Comonadic.l =
-  Alloc.Comonadic.join
-    [(Alloc.close_over arg).comonadic; (Alloc.Comonadic.disallow_right alloc)]
-let curry_mode_const alloc arg : Alloc.Const.t =
+    (alloc : (allowed * r) With_locality.Comonadic.t)
+    (arg : With_locality.lr) : With_locality.Comonadic.l =
+  With_locality.Comonadic.join
+    [(With_locality.close_over arg).comonadic; (With_locality.Comonadic.disallow_right alloc)]
+let curry_mode_const alloc arg : With_locality.Const.t =
   let acc =
-    Alloc.Comonadic.Const.join
-      (Alloc.Const.close_over arg)
-      (Alloc.Const.partial_apply alloc)
+    With_locality.Comonadic.Const.join
+      (With_locality.Const.close_over arg)
+      (With_locality.Const.partial_apply alloc)
   in
-  Alloc.Const.merge {comonadic = acc; monadic = Alloc.Monadic.Const.legacy}
+  With_locality.Const.merge {comonadic = acc; monadic = With_locality.Monadic.Const.legacy}
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
@@ -2125,10 +2125,10 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
       (prim_mode' (Some (mvar_l, mvar_y)) l) marg
      in
      let macc =
-       Alloc.join [
-        Alloc.disallow_right mret;
-        Alloc.close_over marg;
-        Alloc.partial_apply macc
+       With_locality.join [
+        With_locality.disallow_right mret;
+        With_locality.close_over marg;
+        With_locality.partial_apply macc
        ]
      in
      let mret =
@@ -2139,7 +2139,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
        | _ :: _ ->
           (* curried arrow *)
           let mret', _ =
-            Alloc.newvar_above (get_current_level ()) macc
+            With_locality.newvar_above (get_current_level ()) macc
           in
           mret'
      in
@@ -2246,7 +2246,7 @@ let instance_prim_mode (desc : Primitive.description) ty =
       prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
     in
     instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_fy (Alloc.disallow_right Alloc.legacy) finalret ty,
+      mode_l mode_fy (With_locality.disallow_right With_locality.legacy) finalret ty,
     Some mode_l, Some mode_fy
   else
     ty, None, None
@@ -2824,7 +2824,7 @@ let prim_params_yielding env ty ~arity =
       match get_desc (expand_head_opt env ty) with
       | Tarrow ((_, marg, _), _, ret, _) ->
         let yielding =
-          Yielding.disallow_right (Alloc.proj_comonadic Yielding marg)
+          Yielding.disallow_right (With_locality.proj_comonadic Yielding marg)
         in
         arg_yieldings (yielding :: acc) ret (n - 1)
       | _ -> None
@@ -5039,7 +5039,7 @@ let compare_package env unify_list lv1 pack1 lv2 pack2 =
       (fun () -> !package_subtype env pack2 pack1)
 
 let unify_alloc_mode_for tr_exn a b =
-  match Alloc.equate a b with
+  match With_locality.equate a b with
   | Ok () -> ()
   | Error _ -> raise_unexplained_for tr_exn
 
@@ -5883,9 +5883,9 @@ exception Filter_arrow_failed of filter_arrow_failure
 
 type filtered_arrow =
   { ty_arg : type_expr;
-    arg_mode : Mode.Alloc.lr;
+    arg_mode : Mode.With_locality.lr;
     ty_ret : type_expr;
-    ret_mode : Mode.Alloc.lr
+    ret_mode : Mode.With_locality.lr
   }
 
 let filter_arrow env t l ~force_tpoly =
@@ -5914,8 +5914,8 @@ let filter_arrow env t l ~force_tpoly =
       end
     in
     let ty_ret = newvar2 level k_res in
-    let arg_mode = Alloc.newvar level in
-    let ret_mode = Alloc.newvar level in
+    let arg_mode = With_locality.newvar level in
+    let ret_mode = With_locality.newvar level in
     let t' =
       newty2 ~level (Tarrow ((l, arg_mode, ret_mode), ty_arg, ty_ret, commu_ok))
     in
@@ -6487,19 +6487,19 @@ let crossing_of_ty env ?modalities ty =
 
 let cross_left env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> Value.disallow_right |> Crossing.apply_left crossing
+  mode |> With_regionality.disallow_right |> Crossing.apply_left crossing
 
 let cross_right env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> Value.disallow_left |> Crossing.apply_right crossing
+  mode |> With_regionality.disallow_left |> Crossing.apply_right crossing
 
 let cross_left_alloc env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> Alloc.disallow_right |> Crossing.apply_left_alloc crossing
+  mode |> With_locality.disallow_right |> Crossing.apply_left_alloc crossing
 
 let cross_right_alloc env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> Alloc.disallow_left |> Crossing.apply_right_alloc crossing
+  mode |> With_locality.disallow_left |> Crossing.apply_right_alloc crossing
 
 (* The locality axis of the return mode of an arrow cannot cross modes,
    because a local-returning function might allocate in the caller's region,
@@ -6508,22 +6508,22 @@ let cross_right_alloc env ?modalities ty mode =
 
 let cross_left_alloc_ret env ?modalities ty mode =
   let mode' = cross_left_alloc env ?modalities ty mode in
-  Alloc.join
+  With_locality.join
     [mode';
-     Alloc.min_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+     With_locality.min_with_comonadic Areality (With_locality.proj_comonadic Areality mode)]
 
 let cross_right_alloc_ret env ?modalities ty mode =
   let mode' = cross_right_alloc env ?modalities ty mode in
-  Alloc.meet
+  With_locality.meet
     [mode';
-     Alloc.max_with_comonadic Areality (Alloc.proj_comonadic Areality mode)]
+     With_locality.max_with_comonadic Areality (With_locality.proj_comonadic Areality mode)]
 
 let submode_with_cross env ~is_ret ty l r =
   let r' =
     if is_ret then cross_right_alloc_ret env ty r
     else cross_right_alloc env ty r
   in
-  Alloc.submode l r'
+  With_locality.submode l r'
 
 let moregen_alloc_mode env ~is_ret ty v a1 a2 =
   match
@@ -7693,12 +7693,12 @@ let has_constr_row' env t =
   has_constr_row (expand_abbrev env t)
 
 let build_submode_pos level m =
-  let m', changed = Alloc.newvar_below level m in
+  let m', changed = With_locality.newvar_below level m in
   let c = if changed then Changed else Unchanged in
   m', c
 
 let build_submode_neg level m =
-  let m', changed = Alloc.newvar_above level m in
+  let m', changed = With_locality.newvar_above level m in
   let c = if changed then Changed else Unchanged in
   m', c
 
@@ -7977,7 +7977,7 @@ let subtype_error ~env ~trace ~unification_trace =
                     ~unification_trace))
 
 let subtype_alloc_mode env trace a1 a2 =
-  match Alloc.submode a1 a2 with
+  match With_locality.submode a1 a2 with
   | Ok () -> ()
   | Error _ -> subtype_error ~env ~trace ~unification_trace:[]
 
@@ -8413,7 +8413,7 @@ let nongen_class_declaration zap_scope cty =
   |> nongen_class_type zap_scope cty.cty_type
 
 let nongen_vars_in_class_declaration cty =
-  let result = Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+  let result = Mode.With_locality.with_zap_scope (fun ~zap_scope ->
     nongen_class_declaration zap_scope cty) in
   if TypeSet.is_empty result
   then None
@@ -8978,7 +8978,7 @@ let constrain_decl_jkind env decl jkind =
 let exn_constructor_crossing env lid ~args locks =
   let vmode =
     Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Constructor
-      None ((Mode.Value.(disallow_right min)), locks)
+      None ((Mode.With_regionality.(disallow_right min)), locks)
   in
   (* Exceptions cross contention and visibility on the monadic side, and
      portability and statefulness on the comonadic side, so we project those
@@ -8986,26 +8986,26 @@ let exn_constructor_crossing env lid ~args locks =
   let monadic_mode = vmode.monadic in
   let monadic =
     [ monadic_mode
-      |> Mode.Value.Monadic.proj Contention
-      |> Mode.Value.Monadic.min_with Contention;
+      |> Mode.With_regionality.Monadic.proj Contention
+      |> Mode.With_regionality.Monadic.min_with Contention;
       monadic_mode
-      |> Mode.Value.Monadic.proj Visibility
-      |> Mode.Value.Monadic.min_with Visibility
+      |> Mode.With_regionality.Monadic.proj Visibility
+      |> Mode.With_regionality.Monadic.min_with Visibility
     ]
-    |> Mode.Value.Monadic.join
+    |> Mode.With_regionality.Monadic.join
   in
   let comonadic_source =
-    Mode.Value.monadic_to_comonadic_max monadic_mode
+    Mode.With_regionality.monadic_to_comonadic_max monadic_mode
   in
   let comonadic =
     [ comonadic_source
-      |> Mode.Value.Comonadic.proj Portability
-      |> Mode.Value.Comonadic.max_with Portability;
+      |> Mode.With_regionality.Comonadic.proj Portability
+      |> Mode.With_regionality.Comonadic.max_with Portability;
       comonadic_source
-      |> Mode.Value.Comonadic.proj Statefulness
-      |> Mode.Value.Comonadic.max_with Statefulness
+      |> Mode.With_regionality.Comonadic.proj Statefulness
+      |> Mode.With_regionality.Comonadic.max_with Statefulness
     ]
-    |> Mode.Value.Comonadic.meet
+    |> Mode.With_regionality.Comonadic.meet
   in
   let mode_crossing =
     List.map (
@@ -9016,11 +9016,11 @@ let exn_constructor_crossing env lid ~args locks =
   in
   let min_bound =
     { monadic;
-      comonadic = Mode.Value.Comonadic.(disallow_right min) }
+      comonadic = Mode.With_regionality.Comonadic.(disallow_right min) }
   in
   let max_bound =
     { comonadic;
-      monadic = Mode.Value.Monadic.(disallow_left max)}
+      monadic = Mode.With_regionality.Monadic.(disallow_left max)}
   in
   (mode_crossing, min_bound, max_bound)
 
@@ -9041,27 +9041,27 @@ let check_constructor_crossing ~default_mode ~for_extensible_variant
 let check_constructor_crossing_creation
     env lid tag ~res ~args held_locks =
   check_constructor_crossing
-    ~default_mode:Mode.Value.(disallow_left max)
+    ~default_mode:Mode.With_regionality.(disallow_left max)
     ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
       (* Creating a constructor under a lock is safe if the arguments
          submode on the comonadic axis and cross the monadic axis. *)
       Result.bind
-        (Mode.Value.submode
+        (Mode.With_regionality.submode
           (Mode.Crossing.apply_left mode_crossing min_bound)
-          Mode.Value.(disallow_left min))
+          Mode.With_regionality.(disallow_left min))
         (fun () -> Ok max_bound))
     env lid tag ~res ~args held_locks
 
 let check_constructor_crossing_destruction
     env lid tag ~res ~args held_locks =
   check_constructor_crossing
-    ~default_mode:Mode.Value.(disallow_right min)
+    ~default_mode:Mode.With_regionality.(disallow_right min)
     ~for_extensible_variant:(fun mode_crossing min_bound max_bound ->
       (* Destroying a constructor under a lock is safe if the arguments
          submode on the monadic axis and cross the comonadic axis. *)
       Result.bind
-        (Mode.Value.submode
-          Mode.Value.(disallow_right max)
+        (Mode.With_regionality.submode
+          Mode.With_regionality.(disallow_right max)
           (Mode.Crossing.apply_right mode_crossing max_bound))
         (fun () -> Ok min_bound))
     env lid tag ~res ~args held_locks
