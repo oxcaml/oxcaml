@@ -1931,7 +1931,8 @@ and transl_tupled_function
      thought it through. *)
   (* CR layouts: We also currently require every component of the tuple pattern
      to have the value sort, since the backend does not currently support
-     optimizing mixed tupled functions. *)
+     optimizing mixed tupled functions. This should change, especially to
+     properly support layout poly tupled functions. *)
   let all_components_are_values pl =
     List.for_all
       (fun (_, _, sort) ->

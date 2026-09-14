@@ -554,13 +554,23 @@ val x : int8 = 1s
 |}]
 
 (* Tupled functions *)
-let poly_ f = fun (g, x) -> g x
-let x = f ((fun y -> y + 1), 41)
-
+(* arguments here are [value], so the function still gets tupled *)
+let poly_ f = fun (g, ()) -> g ()
 [%%expect{|
 >> Fatal error: Slambda does not currently support poly tupled functions
 Uncaught exception: Misc.Fatal_error
 
+|}]
+
+let x =
+  (* CR layouts: we eagerly bail out of the tupled function optimization when
+     encountering non-[scannable] sorts, so we don't hit a fatal error here.
+     Eventually, we should properly support layout poly tupled functions. *)
+  let poly_ f = fun (g, x) -> g x in
+  f ((fun y -> y + 1), 41)
+
+[%%expect{|
+val x : int = 42
 |}]
 
 (* Environment arg shouldn't push things over the maximum arity *)
