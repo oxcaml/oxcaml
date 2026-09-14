@@ -36,6 +36,12 @@ let archive_magic = "!<arch>\n"
 
 let archive_magic_size = 8
 
+let is_archive buf =
+  size buf >= archive_magic_size
+  && String.equal
+       (Read.fixed_string (cursor buf) archive_magic_size)
+       archive_magic
+
 let header_size = 60
 
 let header_terminator = "`\n"

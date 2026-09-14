@@ -14,10 +14,9 @@ val use_uncontended : 'a -> 'a = <fun>
 Line 5, characters 0-60:
 5 | type t : value mod contended = { mutable contents : string }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is mutable_data
-         because it's a boxed record type.
-       But the kind of type "t" must be a subkind of value mod contended
-         because of the annotation on the declaration of the type t.
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because mutable fields are not mod contended.
 |}]
 
 (* On the other hand, if we set the attribute, we shouldn't get an error. *)
@@ -31,11 +30,11 @@ val f : t @ contended -> t = <fun>
 |}]
 
 (* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
-type t : value mod many portable uncontended = string
+type t : value mod many portable = string
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
 Lines 1-2, characters 0-34:
-1 | type t : value mod many portable uncontended = string
+1 | type t : value mod many portable = string
 2 | [@@unsafe_allow_any_mode_crossing]
 Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
        Only records, unboxed products, and variants are supported.
@@ -336,7 +335,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unyielding
+  type t : value mod external_ global portable many
 end = struct
   type t = int
 end
@@ -419,10 +418,10 @@ Lines 1-2, characters 0-34:
 Error: This variant or record definition does not match that of type "'a t"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended
 |}]
 
 type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
@@ -440,10 +439,118 @@ Error: This variant or record definition does not match that of type
          "('a, 'b) arity_2"
        They have different unsafe mode crossing behavior:
        Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
-         the original has: mod forkable unyielding many stateless portable
-         immutable contended with 'b
-         but this has: mod forkable unyielding many stateless portable
-         immutable contended with 'a
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'b
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+|}]
+
+type 'a unsafe_saturated : value mod shared with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_saturated_reexport
+  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared = 'a unsafe_parameter_saturated =
+  { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated
+  : value mod shared with 'a @@ external64 = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated_reexport
+  : value mod shared with 'a = 'a unsafe_externality_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared =
+  'a unsafe_parameter_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_externality_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+
+type unsafe_middle_original
+  : immutable_data
+    with unsafe_middle_payload @@ shared
+    with unsafe_middle_alias @@ corrupted = { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload = unsafe_middle_original =
+  { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+type unsafe_middle_original
+  : immutable_data
+      with unsafe_middle_alias @@ corrupted
+      with unsafe_middle_payload @@ shared = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload =
+  unsafe_middle_original = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_corrupted
+  : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+Lines 4-6, characters 0-34:
+4 | type 'a unsafe_corrupted
+5 |   : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+6 | [@@unsafe_allow_any_mode_crossing]
+Error: This variant or record definition does not match that of type
+         "'a unsafe_shared"
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ shared
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ corrupted
 |}]
 
 (* mcomp *)

@@ -1,0 +1,2 @@
+has_deps.ml: Bar Foo
+no_deps.ml:

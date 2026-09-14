@@ -491,8 +491,8 @@ module M (A : sig
 end) = struct
   external[@layout_poly] id : ('a : any). 'a A.t -> 'a = "%identity"
   let f1 (): float# = id (assert false : float# A.t)
-  let f2 (): int64# = id (assert false : int64# A.t)
-  let f3 (): int32# = id (assert false : int32# A.t)
+  let f2 (): int64_u = id (assert false : int64_u A.t)
+  let f3 (): int32_u = id (assert false : int32_u A.t)
 end
 
 [%%expect{|
@@ -501,8 +501,8 @@ module M :
     sig
       external id : ('a : any). 'a A.t -> 'a = "%identity" [@@layout_poly]
       val f1 : unit -> float#
-      val f2 : unit -> int64#
-      val f3 : unit -> int32#
+      val f2 : unit -> int64_u
+      val f3 : unit -> int32_u
     end
 |}]
 
@@ -532,18 +532,18 @@ Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 (* All type vars get the same sort *)
 
 external[@layout_poly] id : ('a : any) ('b : any). 'a -> 'b = "%identity"
-let f (x: float#): int64# = id x
+let f (x: float#): int64_u = id x
 
 [%%expect{|
 external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
-Line 2, characters 28-32:
-2 | let f (x: float#): int64# = id x
-                                ^^^^
+Line 2, characters 29-33:
+2 | let f (x: float#): int64_u = id x
+                                 ^^^^
 Error: This expression has type "('a : float64)"
-       but an expression was expected of type "int64#"
-       The layout of int64# is bits64
-         because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of float64
+       but an expression was expected of type "int64_u"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a sublayout of float64
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -589,30 +589,30 @@ Error: Cannot use "float" in conjunction with types of non-value layouts.
 external[@layout_poly] id : ('a : any). 'a t_with_any -> 'a t_with_any = "%identity"
 
 let f (x: float#): float# = id x
-let f (x: int64#): int64# = id x
-let f (x: int32#): int32# = id x
+let f (x: int64_u): int64_u = id x
+let f (x: int32_u): int32_u = id x
 
 [%%expect{|
 external id : ('a : any). 'a t_with_any -> 'a t_with_any = "%identity"
   [@@layout_poly]
 val f : float# -> float# = <fun>
-val f : int64# -> int64# = <fun>
-val f : int32# -> int32# = <fun>
+val f : int64_u -> int64_u = <fun>
+val f : int32_u -> int32_u = <fun>
 |}]
 
 
 external[@layout_poly] id : ('a : any). 'a M_any.t -> 'a M_any.t = "%identity"
 
 let f (): float# M_any.t = id (assert false : float# M_any.t)
-let f (): int64# M_any.t = id (assert false : int64# M_any.t)
-let f (): int32# M_any.t = id (assert false : int32# M_any.t)
+let f (): int64_u M_any.t = id (assert false : int64_u M_any.t)
+let f (): int32_u M_any.t = id (assert false : int32_u M_any.t)
 
 [%%expect{|
 external id : ('a : any). 'a M_any.t -> 'a M_any.t = "%identity"
   [@@layout_poly]
 val f : unit -> float# M_any.t = <fun>
-val f : unit -> int64# M_any.t = <fun>
-val f : unit -> int32# M_any.t = <fun>
+val f : unit -> int64_u M_any.t = <fun>
+val f : unit -> int32_u M_any.t = <fun>
 |}]
 
 
@@ -633,8 +633,8 @@ Error: The universal type variable 'a was declared to have kind any.
 external[@layout_poly] id : ('a : any). 'a M_any.t r -> 'a M_any.t r = "%identity"
 
 let f (): float# M_any.t r = id (assert false : float# M_any.t r)
-let f (): int64# M_any.t r = id (assert false : int64# M_any.t r)
-let f (): int32# M_any.t r = id (assert false : int32# M_any.t r) *)
+let f (): int64_u M_any.t r = id (assert false : int64_u M_any.t r)
+let f (): int32_u M_any.t r = id (assert false : int32_u M_any.t r) *)
 
 
 (********************************************)

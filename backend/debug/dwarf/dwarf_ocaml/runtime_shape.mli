@@ -28,6 +28,42 @@
 
 module Sort = Jkind_types.Sort
 
+(** De Bruijn indices for recursive binders in runtime shapes. *)
+module DeBruijn_index : sig
+  type t
+
+  (** The top-level index. *)
+  val zero : t
+
+  val move_under_binder : t -> t
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
+  val print : Format.formatter -> t -> unit
+end
+
+(** De Bruijn environment for working with recursive binders. *)
+module DeBruijn_env : sig
+  type 'a t
+
+  val empty : 'a t
+
+  val push : 'a t -> 'a -> 'a t
+
+  val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
+
+  val length : 'a t -> int
+
+  (** [truncate t ~depth] keeps only the innermost [depth] binders. *)
+  val truncate : 'a t -> depth:int -> 'a t
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
+  val hash : ('a -> int) -> 'a t -> int
+end
+
 module Or_void : sig
   type 'a t =
     | Other of 'a
@@ -57,6 +93,7 @@ module Runtime_layout : sig
     | Vec128
     | Vec256
     | Vec512
+    | Mask
     | Word
     | Untagged_immediate
 
@@ -101,7 +138,8 @@ end
 type t = private
   { desc : desc;
     runtime_layout : Runtime_layout.t;
-    hash : int
+    hash : int;
+    free_depth : int  (** See the [free_depth] accessor below. *)
   }
 
 and desc = private
@@ -121,9 +159,7 @@ and desc = private
       }
   | Func
   | Mu of t
-  | Rec_var of Shape.DeBruijn_index.t * Runtime_layout.t
-(* CR sspies: Use regular identifiers beforehand and only switch to DeBruijn at
-   this level. *)
+  | Rec_var of DeBruijn_index.t * Runtime_layout.t
 
 and tuple_kind = private
   | Tuple_boxed
@@ -147,10 +183,12 @@ and 'label mixed_block_field = private
 and constructor = private
   | Constructor_with_tuple_arg of
       { name : string;
+        is_constant : bool;
         args : unit mixed_block_field list
       }
   | Constructor_with_record_arg of
       { name : string;
+        is_constant : bool;
         args : string mixed_block_field list
       }
 
@@ -170,6 +208,7 @@ and predef =
   | Int32
   | Int64
   | Lazy_t of t
+  | Mask
   | Nativeint
   | String
   | Simd of simd_vec_split
@@ -188,6 +227,7 @@ and unboxed =
   | Unboxed_int32
   | Unboxed_int16
   | Unboxed_int8
+  | Unboxed_mask
   | Unboxed_simd of simd_vec_split
 
 and simd_vec_split =
@@ -234,14 +274,20 @@ val map_mixed_block_field_label :
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_tuple_arg :
-  name:string -> args:unit mixed_block_field list -> constructor
+  name:string ->
+  is_constant:bool ->
+  args:unit mixed_block_field list ->
+  constructor
 
 (** Create a constructor with record-style arguments for use in variants.
 
     Note that in [args], the order matters for the runtime memory layout. Ensure
     fields are in the correct order (i.e., values occur before non-values). *)
 val constructor_with_record_arg :
-  name:string -> args:string mixed_block_field list -> constructor
+  name:string ->
+  is_constant:bool ->
+  args:string mixed_block_field list ->
+  constructor
 
 (** Get the name of a constructor. *)
 val constructor_name : constructor -> string
@@ -250,6 +296,10 @@ val constructor_name : constructor -> string
     Tuple-style constructors have [None] labels, record-style constructors have
     [Some name] labels. *)
 val constructor_args : constructor -> string option mixed_block_field list
+
+(** Whether the constructor is represented as a runtime constant (a tagged
+    immediate) rather than a block. *)
+val constructor_is_constant : constructor -> bool
 
 (** Create an unknown shape with the given runtime layout. Used when more
     precise type information is unavailable. *)
@@ -290,16 +340,20 @@ val func : t
 *)
 val mu : t -> t
 
-(** Create a reference to a recursive binding using de Bruijn indexing. *)
-val rec_var : Shape.DeBruijn_index.t -> Runtime_layout.t -> t
+(** Create a reference to a recursive binding. *)
+val rec_var : DeBruijn_index.t -> Runtime_layout.t -> t
 
 (** Project the runtime layout of a shape. *)
 val runtime_layout : t -> Runtime_layout.t
+
+(** Number of enclosing [Mu] binders that the shape can reference: one more than
+    the largest free de Bruijn index, or zero if the shape is closed. A shape's
+    meaning depends only on the first [free_depth] entries of any enclosing
+    environment. O(1). *)
+val free_depth : t -> int
 
 val print : Format.formatter -> t -> unit
 
 val equal : t -> t -> bool
 
 val hash : t -> int
-
-module Cache : Hashtbl.S with type key = t

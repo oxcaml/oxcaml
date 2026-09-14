@@ -20,7 +20,7 @@
  }
 *)
 
-(* This file contains various tests for [int32#].  It's not an expect test
+(* This file contains various tests for [int32_u].  It's not an expect test
    to make sure it gets tested for native code. *)
 
 (*****************************************)
@@ -220,9 +220,9 @@ let _ =
      minus_four #3l)
 
 (**********************************)
-(* Test 3: int32# in closures *)
+(* Test 3: int32_u in closures *)
 
-(* [go]'s closure should haave an [int] (immediate), a [int32#] (bits32) and a
+(* [go]'s closure should haave an [int] (immediate), a [int32_u] (bits32) and a
    [int32 array] (value). *)
 let[@inline never] f3 n m steps () =
   let[@inline never] rec go k =
@@ -301,14 +301,14 @@ let[@inline never] test4 () =
   print_int32u "Test 4, 1 + 2" (Int32_u.of_int32 x1);
   print_int32u "Test 4, 1 - 2" (Int32_u.of_int32 x2);
 
-  (* partial application to int32# *)
+  (* partial application to int32_u *)
   let steps = Array.init 10 (fun _ -> 0l) in
   let f = Sys.opaque_identity (f3 5 #3l) in
   let five_times_three = f steps in
   print_int32u "Test 4, 5 * 3: " (five_times_three ());
   Array.iteri (Printf.printf "  Test 4, step %d: %ld\n") steps;
 
-  (* partial application with int32# remaining *)
+  (* partial application with int32_u remaining *)
   let steps = Array.init 10 (fun _ -> 0l) in
   let f = Sys.opaque_identity (f3 6) in
   let six_times_three = f #3l steps in
@@ -338,7 +338,7 @@ let _ = test4 ()
 
 let[@inline never] f5 n m =
   let open Int32_u in
-  (* Also testing a closure with only int32# values *)
+  (* Also testing a closure with only int32_u values *)
   let[@inline never] go f =
     f (n + m)
   in
@@ -361,7 +361,7 @@ let _ = test5 ()
 (* CR layouts: add tests that capture int32s in objects, once that is
    allowed. *)
 
-(* int32# args and returns *)
+(* int32_u args and returns *)
 let f6_1 () = object
   method f6_m1 f1 f2 f3 =
     let open Int32_u in
@@ -376,7 +376,7 @@ let f6_2 n = object(self)
     else f (self#f6_m2 (n3+1) m1 f)
 end
 
-(* overapplication to int32# and non-int32# args *)
+(* overapplication to int32_u and non-int32_u args *)
 let f6_3 n k = object
   method f6_m3 n3 m1 f =
     let n = ((Sys.opaque_identity fst) n) + ((Sys.opaque_identity snd) n) in
@@ -410,7 +410,7 @@ let test6 () =
 let _ = test6 ()
 
 (*****************************************)
-(* Test 7: int32# and assert false joins *)
+(* Test 7: int32_u and assert false joins *)
 
 module M = struct
   open Int32_u

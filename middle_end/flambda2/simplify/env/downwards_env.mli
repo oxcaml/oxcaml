@@ -36,8 +36,6 @@ val create :
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
   unit_toplevel_return_continuation:Continuation.t ->
-  toplevel_my_region:Variable.t ->
-  toplevel_my_ghost_region:Variable.t ->
   toplevel_my_alloc_region:Variable.t ->
   t
 
@@ -141,6 +139,9 @@ val mem_code : t -> Code_id.t -> bool
 (** This function raises if the code ID is unbound. *)
 val find_code_exn : t -> Code_id.t -> Code_or_metadata.t
 
+(** This function raises if the code ID is unbound. *)
+val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
+
 val set_inlined_debuginfo : t -> from:t -> t
 
 val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
@@ -189,7 +190,11 @@ end
 
 val disable_inlining : t -> Disable_inlining.t
 
-val enter_set_of_closures : t -> in_stub:bool -> t
+val disable_partial_application_stub_generation : t -> bool
+
+val enter_set_of_closures : t -> t
+
+val enter_stub_function : t -> t
 
 val set_rebuild_terms : t -> t
 

@@ -56,3 +56,11 @@ Line 1, characters 9-18:
 Error: Unbound type constructor "float64x2"
 Hint:              Did you mean "float32"?
 |}];;
+
+type t = mask;;
+[%%expect{|
+Line 1, characters 9-13:
+1 | type t = mask;;
+             ^^^^
+Error: Unbound type constructor "mask"
+|}];;

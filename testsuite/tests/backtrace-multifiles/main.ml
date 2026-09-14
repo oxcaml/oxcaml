@@ -21,61 +21,32 @@ let () =
 
 (* TEST
  readonly_files = "foo.ml";
- {
-   compiler_directory_suffix = ".O3";
-   setup-ocamlopt.opt-build-env;
-   module = "foo.ml";
-   flags = "-g -O3";
-   ocamlopt.opt;
-   module = "main.ml";
-   flags = "-g -O3";
-   ocamlopt.opt;
-   module = "";
-   all_modules = "foo.cmx main.cmx";
-   ocamlopt.opt;
-   run;
-   check-program-output;
- }{
-   compiler_directory_suffix = ".Oclassic";
-   setup-ocamlopt.opt-build-env;
-   module = "foo.ml";
-   flags = "-g -Oclassic";
-   ocamlopt.opt;
-   module = "main.ml";
-   flags = "-g -Oclassic";
-   ocamlopt.opt;
-   module = "";
-   all_modules = "foo.cmx main.cmx";
-   ocamlopt.opt;
-   run;
-   check-program-output;
- }{
-   compiler_directory_suffix = ".O3-Oclassic";
-   setup-ocamlopt.opt-build-env;
-   module = "foo.ml";
-   flags = "-g -O3";
-   ocamlopt.opt;
-   module = "main.ml";
-   flags = "-g -Oclassic";
-   ocamlopt.opt;
-   module = "";
-   all_modules = "foo.cmx main.cmx";
-   ocamlopt.opt;
-   run;
-   check-program-output;
- }{
-   compiler_directory_suffix = ".Oclassic-O3";
-   setup-ocamlopt.opt-build-env;
-   module = "foo.ml";
-   flags = "-g -Oclassic";
-   ocamlopt.opt;
-   module = "main.ml";
-   flags = "-g -O3";
-   ocamlopt.opt;
-   module = "";
-   all_modules = "foo.cmx main.cmx";
-   ocamlopt.opt;
-   run;
-   check-program-output;
- }
+ set foo_flags = "";
+ set main_flags = "";
+ split [
+ | compiler_directory_suffix = ".O3";
+   foo_flags = "-O3";
+   main_flags = "-O3";
+ | compiler_directory_suffix = ".Oclassic";
+   foo_flags = "-Oclassic";
+   main_flags = "-Oclassic";
+ | compiler_directory_suffix = ".O3-Oclassic";
+   foo_flags = "-O3";
+   main_flags = "-Oclassic";
+ | compiler_directory_suffix = ".Oclassic-O3";
+   foo_flags = "-Oclassic";
+   main_flags = "-O3";
+ ]
+ setup-ocamlopt.opt-build-env;
+ module = "foo.ml";
+ flags = "-g ${foo_flags}";
+ ocamlopt.opt;
+ module = "main.ml";
+ flags = "-g ${main_flags}";
+ ocamlopt.opt;
+ module = "";
+ all_modules = "foo.cmx main.cmx";
+ ocamlopt.opt;
+ run;
+ check-program-output;
 *)

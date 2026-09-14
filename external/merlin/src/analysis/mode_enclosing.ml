@@ -6,7 +6,7 @@ module Mode_info = struct
   let to_string ~verbosity mode =
     (* Zap mode variables to floor. *)
     let snap = Btype.snapshot () in
-    let const = Mode.Value.zap_to_floor mode in
+    let const = Mode.Value.zap_to_floor_force mode in
     Btype.backtrack snap;
     (* Convert modes into a list of modes. *)
     let verbose =

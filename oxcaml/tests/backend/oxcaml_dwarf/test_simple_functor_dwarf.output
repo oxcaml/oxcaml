@@ -1,4 +1,4 @@
-    frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_start(param=0 : ocaml_value)
+    frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_start(param=() : unit @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_int_set(x={ root = Empty; count = 0 } : IntSet.t @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_int_set(x={ root = Node { value = 42; left = Empty; right = Empty; height = 1 }; count = 1 } : IntSet.t @ value)
     frame #N: <ADDRESS> test_simple_functor_dwarf.exe`Test_simple_functor_dwarf.f_int_set(x={ root = Node { value = 30; left = Node { value = 20; left = Node { value = 10; left = Empty; right = Empty; height = 1 }; right = Empty; height = 2 }; right = Empty; height = 3 }; count = 3 } : IntSet.t @ value)

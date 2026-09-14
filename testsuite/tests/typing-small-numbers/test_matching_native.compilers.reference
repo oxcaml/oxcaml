@@ -99,4 +99,10 @@ Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: #11S
 
 val five_hundred_partial : int = 500
+external int8_u_of_int : int -> int8# = "%int8#_of_int"
+external char_u_of_int8_u : int8# -> char# = "%identity"
+val char_u_of_code : int -> char# = <fun>
+val f_count_in_hexstring : char# -> int = <fun>
+val f_count_in_0xff : int = 2
+val f_count_in_'xff' : int = 2
 

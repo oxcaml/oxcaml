@@ -80,10 +80,12 @@ and debug_event_kind = Debug_event.debug_event_kind =
     Event_before
   | Event_after of Types.type_expr
   | Event_pseudo
+  | Event_after_untyped
 
 and debug_event_info = Debug_event.debug_event_info =
     Event_function
   | Event_return of int
+  | Event_unyielding_call of int
   | Event_other
 
 and debug_event_repr = Debug_event.debug_event_repr =

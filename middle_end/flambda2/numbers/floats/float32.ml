@@ -57,6 +57,10 @@ external to_float : t -> float
   = "compiler_float32_to_float_boxed" "compiler_float32_to_float"
 [@@unboxed]
 
+external of_int64 : int64 -> t
+  = "compiler_float32_of_int64_boxed" "compiler_float32_of_int64"
+[@@unboxed]
+
 external of_string : string -> t = "compiler_float32_of_string"
 
 external format : string -> t -> string = "compiler_float32_format"

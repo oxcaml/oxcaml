@@ -72,6 +72,7 @@ module Array_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
     | Unboxed_product of t list
         (** Accesses to arrays of unboxed products are unarized on the way into
             Flambda 2. The float array optimization never applies for these
@@ -126,6 +127,7 @@ module Array_load_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   val print : Format.formatter -> t -> unit
 
@@ -155,6 +157,7 @@ module Array_set_kind : sig
     | Naked_vec128s
     | Naked_vec256s
     | Naked_vec512s
+    | Naked_masks
 
   val print : Format.formatter -> t -> unit
 
@@ -193,6 +196,7 @@ module Duplicate_array_kind : sig
     | Naked_vec128s of { length : Target_ocaml_int.t option }
     | Naked_vec256s of { length : Target_ocaml_int.t option }
     | Naked_vec512s of { length : Target_ocaml_int.t option }
+    | Naked_masks of { length : Target_ocaml_int.t option }
 
   val print : Format.formatter -> t -> unit
 
@@ -208,6 +212,8 @@ module Block_access_field_kind : sig
   val print : Format.formatter -> t -> unit
 
   val compare : t -> t -> int
+
+  val from_kind : Flambda_kind.With_subkind.full_kind -> t
 end
 
 module Mixed_block_access_field_kind : sig
@@ -325,6 +331,7 @@ type string_accessor_width =
   | One_twenty_eight of { aligned : bool }
   | Two_fifty_six of { aligned : bool }
   | Five_twelve of { aligned : bool }
+  | Mask
 
 val byte_width_of_string_accessor_width : string_accessor_width -> int
 
@@ -538,6 +545,10 @@ type binary_float_arith_op =
   | Mul
   | Div
 
+type atomic_offset_units =
+  | Field_index
+  | Byte_offset
+
 (** Primitives taking exactly two arguments. *)
 type binary_primitive =
   | Block_set of
@@ -562,9 +573,9 @@ type binary_primitive =
   | Float_arith of float_bitwidth * binary_float_arith_op
   | Float_comp of float_bitwidth * unit comparison_behaviour
   | Bigarray_get_alignment of int
-  | Atomic_load_field of Block_access_field_kind.t
+  | Atomic_load of atomic_offset_units * Block_access_field_kind.t
   (* CR mshinwell: consider putting atomicity onto [Peek] and [Poke] then
-     deleting [Atomic_load_field] *)
+     deleting [Atomic_load] *)
   | Poke of Flambda_kind.Standard_int_or_float.t
   | Read_offset of Flambda_kind.With_subkind.t * Asttypes.mutable_flag
 
@@ -592,9 +603,15 @@ type ternary_primitive =
           more details on the unarization. *)
   | Bytes_or_bigstring_set of bytes_like_value * string_accessor_width
   | Bigarray_set of num_dimensions * Bigarray_kind.t * Bigarray_layout.t
-  | Atomic_field_int_arith of int_atomic_op
-  | Atomic_set_field of Block_access_field_kind.t
-  | Atomic_exchange_field of Block_access_field_kind.t
+  | Atomic_int_arith of atomic_offset_units * int_atomic_op
+  | Atomic_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_exchange of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
   | Write_offset of
       Write_offset_kind.t
       * Flambda_kind.With_subkind.t
@@ -611,15 +628,20 @@ type ternary_primitive =
 
 (** Primitives taking exactly four arguments. *)
 type quaternary_primitive =
-  | Atomic_compare_and_set_field of Block_access_field_kind.t
-  | Atomic_compare_exchange_field of
-      { atomic_kind : Block_access_field_kind.t;
+  | Atomic_compare_and_set of
+      atomic_offset_units
+      * Block_access_field_kind.t
+      * Alloc_mode.For_assignments.t
+  | Atomic_compare_exchange of
+      { offset_units : atomic_offset_units;
+        atomic_kind : Block_access_field_kind.t;
             (** The kind of values which the atomic can hold. *)
-        args_kind : Block_access_field_kind.t
+        args_kind : Block_access_field_kind.t;
             (** The kind of values which the compare-exchange operation is to be
                 used with on this particular occasion. Note that this might be
                 [Immediate] even though the atomic is marked as [Any_value], for
                 example. *)
+        mode : Alloc_mode.For_assignments.t
       }
 
 (** Primitives taking zero or more arguments. *)

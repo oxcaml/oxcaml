@@ -6,24 +6,12 @@
  check-fexpr-dump;
 *)
 
-(* Variant unboxing of a loop-carried option accumulator must not be affected
-   by the parameter of [option] having kind [any]. Here ['a] is used at sort
-   [value] (it is the return type of [h] and the type of [default]), so
-   [Typeopt.value_kind] recomputes the precise variant kind for the option
-   even though [option]'s parameter kind is [any].
+(* Check that changing the parameter kind of [option] to [any] isn't interfering
+   with unboxing through loops. These two functions must produce the same
+   flambda (modulo types). In particular, neither form should actually construct
+   a [Some]/[Just] for the loop accumulator. *)
 
-   [last_custom] is an isomorphic control: ['a opt] has a [value] parameter
-   kind, so it behaves exactly like [option] did before its parameter kind was
-   changed to [any]. The simplified code of the two functions must be
-   structurally identical (modulo kind annotations): in particular, in both,
-   the accumulator must be unboxed into [is_int]/field continuation
-   parameters, leaving no [Make_block] for [Some]/[Just] in the loop. *)
-
-type 'a opt =
-  | Nothing
-  | Just of 'a
-
-let[@inline never] last_option (h : int -> 'a) (default : 'a) n =
+let[@inline never] last_any (h : int -> 'a) (default : 'a) n =
   let r = ref None in
   for i = 0 to n - 1 do
     r := Some (h i)
@@ -32,7 +20,11 @@ let[@inline never] last_option (h : int -> 'a) (default : 'a) n =
   | None -> default
   | Some x -> x
 
-let[@inline never] last_custom (h : int -> 'a) (default : 'a) n =
+type ('a : value) value_option =
+  | Nothing
+  | Just of 'a
+
+let[@inline never] last_value (h : int -> 'a) (default : 'a) n =
   let r = ref Nothing in
   for i = 0 to n - 1 do
     r := Just (h i)

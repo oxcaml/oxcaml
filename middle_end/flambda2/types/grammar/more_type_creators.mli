@@ -51,6 +51,8 @@ val these_naked_vec256s :
 val these_naked_vec512s :
   Vector_types.Vec512.Bit_pattern.Set.t -> Type_grammar.t
 
+val these_naked_masks : Vector_types.Mask.Bit_pattern.Set.t -> Type_grammar.t
+
 val any_tagged_immediate : Type_grammar.t
 
 val any_tagged_immediate_or_null : Type_grammar.t
@@ -90,6 +92,9 @@ val this_boxed_vec256 :
 
 val this_boxed_vec512 :
   Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
+
+val this_boxed_mask :
+  Vector_types.Mask.Bit_pattern.t -> Alloc_mode.For_types.t -> Type_grammar.t
 
 val these_boxed_float32s :
   Numeric_types.Float32_by_bit_pattern.Set.t ->

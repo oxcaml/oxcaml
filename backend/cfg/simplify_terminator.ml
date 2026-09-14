@@ -61,7 +61,11 @@ let simplify_switch (block : C.basic_block) labels =
         { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
     in
     block.terminator <- { block.terminator with desc }
-  | [(l0, m); (l1, 1); (l2, _)] when Label.equal l0 l2 ->
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
     let desc =
       C.Int_test
         { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
@@ -134,7 +138,7 @@ let find_unique_index : 'a array -> f:('a -> bool) -> int option =
       begin if f (Array.unsafe_get arr idx)
       then
         begin match acc with
-        | None -> find arr (idx - 1) f None
+        | None -> find arr (idx - 1) f (Some idx)
         | Some _ -> None
         end
       else find arr (idx - 1) f acc
@@ -287,8 +291,8 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
         end
       | Op
           ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Int128op _
-          | Intop_atomic _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Int128op _ | Intop_atomic _
           | Floatop (Float32, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Opaque | Begin_region | End_region | Specific _
@@ -444,6 +448,12 @@ let block_known_values (cfg : Cfg.t) (block : C.basic_block)
       true)
   else false
 
+(* [block cfg b] simplifies the terminator of [b], and returns [true] when the
+    simplification may have changed the set of successor labels of [b]. In that
+    case it is the caller's responsibility to make predecessor sets consistent
+    again, e.g. via [Cfg.register_predecessors_for_all_blocks].  If it returns
+    [false], successor sets are unchanged, even though the terminator may have
+    been rewritten. *)
 (* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
    single terminator when the argments are the same. Enables reordering of
    branch instructions and save cmp instructions. The main problem is that it

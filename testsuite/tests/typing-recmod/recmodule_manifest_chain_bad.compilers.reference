@@ -1,0 +1,24 @@
+File "recmodule_manifest_chain_bad.ml", line 18, characters 2-51:
+18 |   struct type b1 = A.anchor type checked = A.a1 end
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type b1 = A.anchor type checked = A.a1 end
+       is not included in
+         sig type b1 = A.anchor type checked = A.anchor end
+       Type declarations do not match:
+         type checked = A.a1
+       is not included in
+         type checked = A.anchor
+       The type A/1.a1 = A/2.anchor is not equal to the type
+         A/1.anchor = A/3.anchor
+       File "_none_", line 1:
+         Definition of module A/1
+       File "recmodule_manifest_chain_bad.ml", lines 15-16, characters 0-46:
+         Definition of module A/2
+       File "_none_", line 1:
+         Definition of module A/3
+       File "recmodule_manifest_chain_bad.ml", line 17, characters 31-54:
+         Expected declaration
+       File "recmodule_manifest_chain_bad.ml", line 18, characters 28-47:
+         Actual declaration

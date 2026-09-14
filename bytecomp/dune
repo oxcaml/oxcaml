@@ -14,10 +14,17 @@
 
 (rule
  (targets opcodes.ml)
- (mode    fallback)
- (deps    (:instr (file ../runtime/caml/instruct.h)))
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c opcodes.ml.c)
+  (:tbl
+   ../runtime/caml/opcodes.h))
  (action
-  (bash "%{dep:../tools/make_opcodes.exe} -opcodes < %{instr} > %{targets}")))
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime %{c}"))))
 
 (rule
  (targets opcodes.mli)

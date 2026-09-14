@@ -505,6 +505,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         ap_result_layout;
         ap_region_close;
         ap_mode;
+        ap_yielding = _;
         ap_loc;
         ap_tailcall = _;
         ap_inlined;
@@ -626,7 +627,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             | Psplicevar ident ->
               Lambda.fatal_error_unevaluated_splice_var ident
             | Pvalue _ | Punboxed_or_untagged_integer _ | Punboxed_float _
-            | Punboxed_vector _ ->
+            | Punboxed_vector _ | Punboxed_mask ->
               ( env,
                 [ ( id,
                     Flambda_debug_uid.of_lambda_debug_uid duid,
@@ -775,7 +776,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       let result_layout = L.primitive_result_layout prim in
       (match result_layout with
       | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-      | Punboxed_vector _ | Punboxed_product _ ->
+      | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
         ()
       | Ptop | Pbottom ->
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
@@ -877,7 +878,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         let body acc ccenv = cps_tail acc body_env ccenv body k k_exn in
         CC.close_let_cont acc ccenv ~name:continuation ~is_exn_handler:false
           ~params ~recursive ~body ~handler)
-  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout) ->
+  | Lsend (meth_kind, meth, obj, args, pos, mode, loc, layout, _yielding) ->
     cps_non_tail_simple acc env ccenv obj
       (fun acc env ccenv obj _obj_arity ->
         let obj = must_be_singleton_simple obj in
@@ -1208,7 +1209,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1394,10 +1396,10 @@ and cps_function_bindings env (bindings : Lambda.rec_binding list) =
 
 and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     ?precomputed_free_idents
-    ({ kind; params; return; body; attr; loc; mode; ret_mode } : L.lfunction) :
-    Function_decl.t =
+    ({ kind; params; return; body; attr; loc; mode; ret_mode; yielding = _ } :
+      L.lfunction) : Function_decl.t =
   let contains_no_escaping_local_allocs =
-    match ret_mode with Alloc_heap -> true | Alloc_local -> false
+    match ret_mode with Not_alloc_stack -> true | Maybe_alloc_stack -> false
   in
   let first_complex_local_param =
     List.length params
@@ -1436,7 +1438,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
             | Pboxedfloatval Boxed_float64 -> true
             | Pboxedfloatval Boxed_float32
             | Pgenval | Pintval | Pboxedintval _ | Pvariant _ | Parrayval _
-            | Pboxedvectorval _ ->
+            | Pboxedvectorval _ | Pboxedmaskval ->
               false)
           field_kinds);
       Some (Unboxed_float_record (List.length field_kinds))
@@ -1462,13 +1464,15 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         | Boxed_vec512 -> Naked_vec512
       in
       Some (Unboxed_number bn)
+    | Pvalue { nullable = Non_nullable; raw_kind = Pboxedmaskval } ->
+      Some (Unboxed_number Naked_mask)
     | Pvalue
         { nullable = Non_nullable;
           raw_kind = Pgenval | Pintval | Pvariant _ | Parrayval _
         }
     | Pvalue { nullable = Nullable; raw_kind = _ }
     | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
-    | Punboxed_vector _ | Punboxed_product _ ->
+    | Punboxed_vector _ | Punboxed_mask | Punboxed_product _ ->
       Location.prerr_warning
         (Debuginfo.Scoped_location.to_location loc)
         Warnings.Unboxing_impossible;
@@ -1488,7 +1492,9 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
     let is_a_param_unboxed =
       List.exists (fun (p : Lambda.lparam) -> p.attributes.unbox_param) params
     in
-    if attr.stub || ((not attr.unbox_return) && not is_a_param_unboxed)
+    if
+      attr.stub
+      || ((not (Option.is_some attr.unbox_return)) && not is_a_param_unboxed)
     then Normal_calling_convention
     else
       let unboxed_function_slot =
@@ -1497,15 +1503,17 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~name:(Ident.name fid ^ "_unboxed")
           ~is_always_immediate:false Flambda_kind.value
       in
-      let unboxed_return =
-        if attr.unbox_return then unboxing_kind return else None
+      let return_unboxing =
+        match unboxing_kind return, attr.unbox_return with
+        | Some kind, Some mode -> Some (kind, mode)
+        | _, _ -> None
       in
       let unboxed_param (param : Lambda.lparam) =
         if param.attributes.unbox_param
         then unboxing_kind param.layout
         else None
       in
-      let unboxed_params =
+      let params_unboxing =
         List.concat
           (List.map2
              (fun param kinds ->
@@ -1516,15 +1524,35 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                  Misc.fatal_error "Trying to unbox an unboxed product.")
              params unarized_per_param)
       in
+      (* If an unboxable parameter is locally-allocated, but this function is
+         [not_alloc_stack], we need to introduce a wrapper after the return to
+         close the local region introduced for the parameter. We can't allocate
+         the parameter on the heap instead, because the parameter might contain
+         pointers to locally-allocated blocks, for instance if it is a block
+         itself. *)
+      let needs_region_wrapper =
+        Lambda.is_not_alloc_stack ret_mode
+        && List.exists
+             (fun (param : Lambda.lparam) ->
+               param.attributes.unbox_param && Lambda.is_local_mode param.mode)
+             params
+      in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot)
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper
+        }
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
+    | Normal_calling_convention
+    | Unboxed_calling_convention
+        { return_unboxing = None; needs_region_wrapper = false; _ } ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _) ->
-      Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
+    | Unboxed_calling_convention { needs_region_wrapper = true; _ }
+    | Unboxed_calling_convention { return_unboxing = Some _; _ } ->
+      Continuation.create ~sort:Normal_or_exn ~name:"return_wrapper" ()
   in
   let body_exn_cont = Continuation.create () in
   let free_idents_of_body =
@@ -1711,7 +1739,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ -> Lambda.fatal_error_invalid_constructor action)
+        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+          Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee
@@ -1844,13 +1873,9 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
-    ~compilation_unit ~module_repr ~sections (lam : Lambda.lambda) =
+    ~compilation_unit ~module_repr (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
-  let toplevel_my_region = Ident.create_local "toplevel_my_region" in
-  let toplevel_my_ghost_region =
-    Ident.create_local "toplevel_my_ghost_region"
-  in
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
@@ -1864,5 +1889,5 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
-    ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections
+    ~prog_return_cont:return_continuation ~exn_continuation
+    ~toplevel_my_alloc_region

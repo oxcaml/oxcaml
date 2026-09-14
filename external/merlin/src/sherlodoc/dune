@@ -4,7 +4,7 @@
 
 (menhir
  (modules type_parser)
- (enabled_if (<> %{profile} "release"))
+ (enabled_if (and (<> %{profile} "release") (= %{context_name} "default")))
  (mode promote)
  (flags :standard --explain --lalr))
 

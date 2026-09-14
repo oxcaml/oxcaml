@@ -167,6 +167,12 @@ let merge_infos ev ev' =
   match ev.ev_info, ev'.ev_info with
   | Event_other, info -> info
   | info, Event_other -> info
+  (* Two call infos can collide at the same position, e.g. for [(f ()) x] in
+     tail position the [Event_after] of the inner call sits right at the
+     [Kappterm] where an [Event_unyielding_call] marker may be placed. Drop
+     the unyielding marker: its absence is the conservative "may yield". *)
+  | Event_unyielding_call _, info -> info
+  | info, Event_unyielding_call _ -> info
   | _ -> fatal_error "Bytegen.merge_infos"
 
 let merge_repr ev ev' =
@@ -184,19 +190,22 @@ let merge_events ev ev' =
     | Event_pseudo, _ -> ev', ev
     | _, Event_pseudo -> ev, ev'
     (* Keep following event, supposedly more informative *)
-    | Event_before, (Event_after _ | Event_before) -> ev', ev
+    | Event_before, (Event_after _ | Event_after_untyped | Event_before) ->
+      ev', ev
     (* Discard following events, supposedly less informative *)
-    | Event_after _, (Event_after _ | Event_before) -> ev, ev'
+    | ( (Event_after _ | Event_after_untyped),
+        (Event_after _ | Event_after_untyped | Event_before) ) ->
+      ev, ev'
   in
   copy_event maj maj.ev_kind (merge_infos maj min) (merge_repr maj min)
 
 let weaken_event ev cont =
   match ev.ev_kind with
-  | Event_after _ -> (
+  | Event_after _ | Event_after_untyped -> (
     match cont with
     | Kpush :: Kevent ({ ev_repr = Event_none } as ev') :: c -> (
       match ev.ev_info with
-      | Event_return _ ->
+      | Event_return _ | Event_unyielding_call _ ->
         (* Weaken event *)
         let repr = ref 1 in
         let ev = copy_event ev Event_pseudo ev.ev_info (Event_parent repr)
@@ -211,6 +220,10 @@ let weaken_event ev cont =
 let add_event ev = function
   | Kevent ev' :: cont -> weaken_event (merge_events ev ev') cont
   | cont -> weaken_event ev cont
+
+let strip_event_kind = function
+  | Event_after _ -> Event_after_untyped
+  | (Event_after_untyped | Event_before | Event_pseudo) as k -> k
 
 (**** Compilation of a lambda expression ****)
 
@@ -343,6 +356,15 @@ let rec contains_float32s_or_nulls = function
     Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
   | _ -> false
 
+let send_lookup method_kind met obj args =
+  let obj_and_args = obj :: args in
+  match (method_kind : Blambda.method_kind) with
+  | Self -> Kgetmethod, met :: obj_and_args
+  | Public -> (
+    match met with
+    | Const (Const_base (Const_int n)) -> Kgetpubmet n, obj_and_args
+    | _ -> Kgetdynmet, met :: obj_and_args)
+
 let rec translate_float32s_or_nulls stack_info env cst sz cont =
   match cst with
   | Const_base (Const_float32 f | Const_unboxed_float32 f) ->
@@ -384,49 +406,37 @@ and comp_expr stack_info env exp sz cont =
     if is_boot_compiler ()
     then translate_float32s_or_nulls stack_info env cst sz cont
     else add_const cst cont
-  | Apply { func; args; nontail } ->
-    let nargs = List.length args in
+  | Apply { func; args; nontail; yielding = _ } ->
     if (not nontail) && is_tailcall cont
-    then
-      comp_args stack_info env args sz
-        (Kpush
-        :: comp_expr stack_info env func (sz + nargs)
-             (Kappterm (nargs, sz + nargs) :: discard_dead_code cont))
-    else if nargs < 4
-    then
-      comp_args stack_info env args sz
-        (Kpush
-        :: comp_expr stack_info env func (sz + nargs) (Kapply nargs :: cont))
+    then comp_tail_apply stack_info env func args sz cont
     else
-      let lbl, cont1 = label_code cont in
-      Kpush_retaddr lbl
-      :: comp_args stack_info env args (sz + 3)
-           (Kpush
-           :: comp_expr stack_info env func
-                (sz + 3 + nargs)
-                (Kapply nargs :: cont1))
-  | Send { method_kind; met; obj; args; nontail } ->
-    let obj_and_args = obj :: args in
-    let nargs = List.length obj_and_args in
-    let getmethod, args' =
-      match method_kind with
-      | Self -> Kgetmethod, met :: obj_and_args
-      | Public -> (
-        match met with
-        | Const (Const_base (Const_int n)) -> Kgetpubmet n, obj_and_args
-        | _ -> Kgetdynmet, met :: obj_and_args)
-    in
-    if is_tailcall cont && not nontail
-    then
-      comp_args stack_info env args' sz
-        (getmethod :: Kappterm (nargs, sz + nargs) :: discard_dead_code cont)
-    else if nargs < 4
-    then comp_args stack_info env args' sz (getmethod :: Kapply nargs :: cont)
+      let nargs = List.length args in
+      if nargs < 4
+      then
+        comp_args stack_info env args sz
+          (Kpush
+          :: comp_expr stack_info env func (sz + nargs) (Kapply nargs :: cont))
+      else
+        let lbl, cont1 = label_code cont in
+        Kpush_retaddr lbl
+        :: comp_args stack_info env args (sz + 3)
+             (Kpush
+             :: comp_expr stack_info env func
+                  (sz + 3 + nargs)
+                  (Kapply nargs :: cont1))
+  | Send { method_kind; met; obj; args; nontail; yielding = _ } ->
+    if (not nontail) && is_tailcall cont
+    then comp_tail_send stack_info env method_kind met obj args sz cont
     else
-      let lbl, cont1 = label_code cont in
-      Kpush_retaddr lbl
-      :: comp_args stack_info env args' (sz + 3)
-           (getmethod :: Kapply nargs :: cont1)
+      let nargs = List.length (obj :: args) in
+      let getmethod, args' = send_lookup method_kind met obj args in
+      if nargs < 4
+      then comp_args stack_info env args' sz (getmethod :: Kapply nargs :: cont)
+      else
+        let lbl, cont1 = label_code cont in
+        Kpush_retaddr lbl
+        :: comp_args stack_info env args' (sz + 3)
+             (getmethod :: Kapply nargs :: cont1)
   | Function { params; body; free_variables } ->
     (* assume kind = Curried *)
     let lbl = new_label () in
@@ -705,14 +715,19 @@ and comp_expr stack_info env exp sz cont =
       string_of_scoped_location ~include_zero_alloc:false lev.lev_loc
     in
     let event kind info =
+      let ev_typenv, ev_kind =
+        if !Clflags.debug_ocamldebug_types
+        then Env.summary lev.lev_env, kind
+        else Env.Env_empty, strip_event_kind kind
+      in
       { ev_pos = 0;
         (* patched in emitcode *)
         ev_module = Compilation_unit.full_path_as_string !compunit_name;
         ev_loc = to_location lev.lev_loc;
-        ev_kind = kind;
+        ev_kind;
         ev_defname;
         ev_info = info;
-        ev_typenv = Env.summary lev.lev_env;
+        ev_typenv;
         ev_typsubst = Subst.identity;
         ev_compenv = env;
         ev_stacksize = sz;
@@ -750,12 +765,41 @@ and comp_expr stack_info env exp sz cont =
         | _ -> true
       in
       if preserve_tailcall && is_tailcall cont
-      then (* don't destroy tail call opt *)
-        comp_expr stack_info env lam sz cont
+      then
+        (* don't destroy tail call opt *)
+        (* A tail call has no "after" point to attach the event to.
+           Instead, place a pseudo event right at the [Kappterm]
+           instruction recording that the call is unyielding. [Kevent]
+           emits no instruction (it only records the position), so the
+           tail call is preserved. *)
+        let unyielding_call_event nargs =
+          { (event Event_pseudo (Event_unyielding_call nargs)) with
+            ev_stacksize = sz + nargs
+          }
+        in
+        match lam with
+        | Apply { func; args; nontail = false; yielding = Unyielding } ->
+          comp_tail_apply stack_info env func args sz cont
+            ~event:(unyielding_call_event (List.length args))
+        | Send
+            { method_kind;
+              met;
+              obj;
+              args;
+              nontail = false;
+              yielding = Unyielding
+            } ->
+          comp_tail_send stack_info env method_kind met obj args sz cont
+            ~event:(unyielding_call_event (List.length (obj :: args)))
+        | _ -> comp_expr stack_info env lam sz cont
       else
         let info =
           match lam with
+          | Apply { args; yielding = Unyielding; _ } ->
+            Event_unyielding_call (List.length args)
           | Apply { args; _ } -> Event_return (List.length args)
+          | Send { obj; args; yielding = Unyielding; _ } ->
+            Event_unyielding_call (List.length (obj :: args))
           | Send { obj; args; _ } -> Event_return (List.length (obj :: args))
           | Prim (_, args) | Context_switch (_, args) ->
             Event_return (List.length args)
@@ -800,9 +844,24 @@ and comp_expr stack_info env exp sz cont =
 (* Compile a list of arguments [e1; ...; eN] to a primitive operation.
    The values of eN ... e2 are pushed on the stack, e2 at top of stack,
    then e3, then ... The value of e1 is left in the accumulator. *)
-
 and comp_args stack_info env argl sz cont =
   comp_expr_list stack_info env (List.rev argl) sz cont
+
+(* Compile a call in tail position, replacing the frame via [Kappterm].
+   [event] is placed at the [Kappterm] *)
+and comp_tail_apply ?event stack_info env func args sz cont =
+  let nargs = List.length args in
+  let cont = Kappterm (nargs, sz + nargs) :: discard_dead_code cont in
+  let cont = match event with None -> cont | Some ev -> Kevent ev :: cont in
+  comp_args stack_info env args sz
+    (Kpush :: comp_expr stack_info env func (sz + nargs) cont)
+
+and comp_tail_send ?event stack_info env method_kind met obj args sz cont =
+  let nargs = List.length (obj :: args) in
+  let getmethod, args' = send_lookup method_kind met obj args in
+  let cont = Kappterm (nargs, sz + nargs) :: discard_dead_code cont in
+  let cont = match event with None -> cont | Some ev -> Kevent ev :: cont in
+  comp_args stack_info env args' sz (getmethod :: cont)
 
 and comp_expr_list stack_info env exprl sz cont =
   match exprl with

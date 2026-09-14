@@ -50,12 +50,15 @@ external make_contended
 external get : ('a : value_or_null). 'a t @ local -> 'a = "%atomic_load"
 
 (** Set a new value for the atomic reference. *)
-external set : ('a : value_or_null). 'a t @ local -> 'a -> unit = "%atomic_set"
+external set
+  : ('a : value_or_null).
+  ('a t [@local_opt]) -> 'a -> unit
+  = "%atomic_set"
 
 (** Set a new value for the atomic reference, and return the current value. *)
 external exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a
   = "%atomic_exchange"
 
 (** [compare_and_set r seen v] sets the new value of [r] to [v] only if its
@@ -64,7 +67,7 @@ external exchange
     happened) and [false] otherwise. *)
 external compare_and_set
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> bool
+  ('a t [@local_opt]) -> 'a -> 'a -> bool
   = "%atomic_cas"
 
 (** [compare_exchange r seen v] sets the new value of [r] to [v] only if its
@@ -72,7 +75,7 @@ external compare_and_set
     occur atomically. Returns the previous value. *)
 external compare_exchange
   : ('a : value_or_null).
-  'a t @ local -> 'a -> 'a -> 'a
+  ('a t [@local_opt]) -> 'a -> 'a -> 'a
   = "%atomic_compare_exchange"
 
 (** [fetch_and_add r n] atomically increments the value of [r] by [n], and
@@ -130,16 +133,16 @@ module Loc : sig
     'a t @ contended local -> 'a @ contended = "%atomic_load_loc"
 
   external set : ('a : value_or_null).
-    'a t @ local -> 'a -> unit = "%atomic_set_loc"
+    ('a t [@local_opt]) -> 'a -> unit = "%atomic_set_loc"
 
   external exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a = "%atomic_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a = "%atomic_exchange_loc"
 
   external compare_and_set : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> bool = "%atomic_cas_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> bool = "%atomic_cas_loc"
 
   external compare_exchange : ('a : value_or_null).
-    'a t @ local -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
+    ('a t [@local_opt]) -> 'a -> 'a -> 'a = "%atomic_compare_exchange_loc"
 
   external fetch_and_add
     : int t @ local -> int -> int = "%atomic_fetch_add_loc"

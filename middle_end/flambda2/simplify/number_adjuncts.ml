@@ -254,7 +254,7 @@ module For_tagged_immediates : Int_number_kind = struct
     let to_immediate t _machine_width = t
 
     let to_naked_float32 t =
-      Float32_by_bit_pattern.create (Target_ocaml_int.to_float t)
+      Float32_by_bit_pattern.of_int64 (Target_ocaml_int.to_int64 t)
 
     let to_naked_float t =
       Float_by_bit_pattern.create (Target_ocaml_int.to_float t)
@@ -346,7 +346,7 @@ module For_naked_immediates : Int_number_kind = struct
     let to_immediate t _machine_width = t
 
     let to_naked_float32 t =
-      Float32_by_bit_pattern.create (Target_ocaml_int.to_float t)
+      Float32_by_bit_pattern.of_int64 (Target_ocaml_int.to_int64 t)
 
     let to_naked_float t =
       Float_by_bit_pattern.create (Target_ocaml_int.to_float t)
@@ -582,7 +582,8 @@ module For_int8s : Int_number_kind = struct
     let to_immediate t machine_width =
       Target_ocaml_int.of_int machine_width (to_int t)
 
-    let to_naked_float32 t = Float32_by_bit_pattern.create (to_float t)
+    let to_naked_float32 t =
+      Float32_by_bit_pattern.of_int64 (Int64.of_int (to_int t))
 
     let to_naked_float t = Float_by_bit_pattern.create (to_float t)
 
@@ -705,7 +706,8 @@ module For_int16s : Int_number_kind = struct
     let to_immediate t machine_width =
       Target_ocaml_int.of_int machine_width (to_int t)
 
-    let to_naked_float32 t = Float32_by_bit_pattern.create (to_float t)
+    let to_naked_float32 t =
+      Float32_by_bit_pattern.of_int64 (Int64.of_int (to_int t))
 
     let to_naked_float t = Float_by_bit_pattern.create (to_float t)
 
@@ -800,7 +802,7 @@ module For_int32s : Boxable_int_number_kind = struct
 
     let to_immediate t machine_width = Target_ocaml_int.of_int32 machine_width t
 
-    let to_naked_float32 t = Float32_by_bit_pattern.create (Int32.to_float t)
+    let to_naked_float32 t = Float32_by_bit_pattern.of_int64 (Int64.of_int32 t)
 
     let to_naked_float t = Float_by_bit_pattern.create (Int32.to_float t)
 
@@ -889,7 +891,7 @@ module For_int64s : Boxable_int_number_kind = struct
 
     let to_immediate t machine_width = Target_ocaml_int.of_int64 machine_width t
 
-    let to_naked_float32 t = Float32_by_bit_pattern.create (Int64.to_float t)
+    let to_naked_float32 t = Float32_by_bit_pattern.of_int64 t
 
     let to_naked_float t = Float_by_bit_pattern.create (Int64.to_float t)
 
@@ -978,7 +980,7 @@ module For_nativeints : Boxable_int_number_kind = struct
       Target_ocaml_int.of_targetint machine_width t
 
     let to_naked_float32 t =
-      Float32_by_bit_pattern.create (Targetint_32_64.to_float t)
+      Float32_by_bit_pattern.of_int64 (Targetint_32_64.to_int64 t)
 
     let to_naked_float t =
       Float_by_bit_pattern.create (Targetint_32_64.to_float t)

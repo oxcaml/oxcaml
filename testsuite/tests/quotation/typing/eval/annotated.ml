@@ -18,7 +18,7 @@ type nonrec 'a eval' = 'a eval
 val eval : 'a expr @ once -> 'a eval = <fun>
 type nonrec 'a eval' = 'a eval
 |}]
-#mark_toplevel_in_quotations
+#mark_persistent_in_quotations
 
 (* The [eval] argument is annotated at introduction, and its result is typed *)
 let f (e : <[int list]> expr) : int list = eval e

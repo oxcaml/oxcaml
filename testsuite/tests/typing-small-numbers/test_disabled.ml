@@ -107,13 +107,13 @@ Error: Found 32-bit float literal 0.0s, but float32 is not enabled. You must ena
 
 (* Unboxed float32 *)
 
-type t = float32#;;
+type t = float32_u;;
 [%%expect{|
-Line 1, characters 9-17:
-1 | type t = float32#;;
-             ^^^^^^^^
-Error: Unbound type constructor "float32"
-Hint:              Did you mean "float", "float32x4" or "float32x8"?
+Line 1, characters 9-18:
+1 | type t = float32_u;;
+             ^^^^^^^^^
+Error: Unbound type constructor "float32_u"
+Hint:              Did you mean "float32x4" or "float32x8"?
 |}];;
 
 let () = ignore #1.0s;;
@@ -228,6 +228,51 @@ Line 1, characters 9-14:
              ^^^^^
 Error: Unbound type constructor "int16"
 Hint:              Did you mean "int", "int16x8", "int32", "int64" or "int8x16"?
+|}];;
+
+type t = uint8_u;;
+[%%expect{|
+Line 1, characters 9-16:
+1 | type t = uint8_u;;
+             ^^^^^^^
+Error: Unbound type constructor "uint8_u"
+Hint:              Did you mean "int32_u" or "int64_u"?
+|}];;
+
+type t = uint16_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint16_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint16_u"
+Hint:              Did you mean "int16x8", "int32_u" or "int64_u"?
+|}];;
+
+type t = uint32_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint32_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint32_u"
+Hint:              Did you mean "int32_u"?
+|}];;
+
+type t = uint64_u;;
+[%%expect{|
+Line 1, characters 9-17:
+1 | type t = uint64_u;;
+             ^^^^^^^^
+Error: Unbound type constructor "uint64_u"
+Hint:              Did you mean "int64_u"?
+|}];;
+
+type t = unativeint_u;;
+[%%expect{|
+Line 1, characters 9-21:
+1 | type t = unativeint_u;;
+             ^^^^^^^^^^^^
+Error: Unbound type constructor "unativeint_u"
+Hint:              Did you mean "nativeint_u"?
 |}];;
 
 let f () = #'a';;

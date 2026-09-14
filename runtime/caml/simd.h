@@ -20,6 +20,7 @@
 // SIMD is only supported on 64-bit targets
 #define Words_per_vec128 2
 #define Words_per_vec256 4
+#define Words_per_vec512 8
 
 #include "mlvalues.h"
 #include "alloc.h"
@@ -31,6 +32,10 @@
 
 #if defined(__AVX__) || defined(__AVX2__)
 #define ARCH_AVX
+#endif
+
+#if defined(__AVX512F__)
+#define ARCH_AVX512
 #endif
 
 #ifdef ARCH_SSE2
@@ -92,6 +97,36 @@ Caml_inline value caml_copy_vec256d(__m256d v) {
 }
 
 #endif /* ARCH_AVX */
+
+#ifdef ARCH_AVX512
+#include <immintrin.h>
+
+#define Vec512_val(v) _mm512_loadu_ps((const float *)Bp_val(v))
+#define Vec512_vald(v) _mm512_loadu_pd((const double *)Bp_val(v))
+#define Vec512_vali(v) _mm512_loadu_si512((const void *)Bp_val(v))
+#define Store_vec512_val(v, x) _mm512_storeu_ps((float *)Bp_val(v), x)
+#define Store_vec512_vald(v, x) _mm512_storeu_pd((double *)Bp_val(v), x)
+#define Store_vec512_vali(v, x) _mm512_storeu_si512((void *)Bp_val(v), x)
+
+Caml_inline value caml_copy_vec512(__m512 v) {
+    value res = caml_alloc_small_with_reserved(Words_per_vec512, 0, Reserved_mixed_block_scannable_wosize_native(0));
+    Store_vec512_val(res, v);
+    return res;
+}
+
+Caml_inline value caml_copy_vec512i(__m512i v) {
+    value res = caml_alloc_small_with_reserved(Words_per_vec512, 0, Reserved_mixed_block_scannable_wosize_native(0));
+    Store_vec512_vali(res, v);
+    return res;
+}
+
+Caml_inline value caml_copy_vec512d(__m512d v) {
+    value res = caml_alloc_small_with_reserved(Words_per_vec512, 0, Reserved_mixed_block_scannable_wosize_native(0));
+    Store_vec512_vald(res, v);
+    return res;
+}
+
+#endif /* ARCH_AVX512 */
 
 #ifdef __ARM_NEON
 #include <arm_neon.h>

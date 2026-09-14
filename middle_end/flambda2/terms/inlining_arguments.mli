@@ -30,6 +30,12 @@ val print : Format.formatter -> t -> unit
    [A] and [B] would *)
 val meet : t -> t -> t
 
+(* [combine ~from_env ~from_metadata] is the set of inlining arguments to use,
+   where [from_env] is the set of arguments from the environment (ultimately
+   from the command line), and [from_metadata] is a set of arguments in
+   code/apply metadata. *)
+val combine : from_env:t -> from_metadata:t -> t
+
 val equal : t -> t -> bool
 
 val max_inlining_depth : t -> int

@@ -21,7 +21,7 @@ open Format
 val link :
   (module Compiler_owee.Unix_intf.S) ->
   Linkenv.t ->
-  string list ->
+  Linkenv.objfile_to_link list ->
   string ->
   cached_genfns_imports:Generic_fns.Partition.Set.t ->
   genfns:Generic_fns.Tbl.t ->

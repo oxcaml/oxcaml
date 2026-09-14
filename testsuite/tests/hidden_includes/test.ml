@@ -60,16 +60,12 @@ ocamlc.byte;
   compiler_reference = "${test_source_directory}/not_included.ocamlc.reference";
   check-ocamlc.byte-output;
 }
+(* Test transitive use of A's cmi, both with -I and with -H. *)
 {
-  (* Test transitive use of A's cmi with -I. *)
-  flags = "-I liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  (* Test transitive use of A's cmi with -H. *)
-  flags = "-H liba -I libb -nocwd";
+  split [
+  | flags = "-I liba -I libb -nocwd";
+  | flags = "-H liba -I libb -nocwd";
+  ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
@@ -90,31 +86,20 @@ ocamlc.byte;
    order on the command line.
 *)
 {
-  flags = "-H liba_alt -I liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  flags = "-I liba -H liba_alt -I libb -nocwd";
+  split [
+  | flags = "-H liba_alt -I liba -I libb -nocwd";
+  | flags = "-I liba -H liba_alt -I libb -nocwd";
+  ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 {
   not-target-windows;
-  flags = "-H liba -I liba_alt -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-{
-  not-target-windows;
-  flags = "-I liba_alt -H liba -I libb -nocwd";
+  split [
+  | flags = "-H liba -I liba_alt -I libb -nocwd";
+  | flags = "-I liba_alt -H liba -I libb -nocwd";
+  ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
@@ -178,17 +163,12 @@ ocamlc.byte;
 }
 
 (* Test that [-open-cmi] reads the cmi from the given path without
-   consulting the include path. *)
+   consulting the include path, and that it works alongside -H. *)
 {
-  flags = "-nocwd -open-cmi liba/a.cmi";
-  module = "libb/b_open.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-
-(* Test that [-open-cmi] works alongside -H. *)
-{
-  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
+  split [
+  | flags = "-nocwd -open-cmi liba/a.cmi";
+  | flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
+  ]
   module = "libb/b_open.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;

@@ -31,6 +31,7 @@ type t =
   | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t Or_variable.t
   | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t Or_variable.t
   | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t Or_variable.t
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.t Or_variable.t
   | Immutable_float_block of
       Numeric_types.Float_by_bit_pattern.t Or_variable.t list
   | Immutable_float_array of
@@ -49,9 +50,9 @@ type t =
       Vector_types.Vec256.Bit_pattern.t Or_variable.t list
   | Immutable_vec512_array of
       Vector_types.Vec512.Bit_pattern.t Or_variable.t list
+  | Immutable_mask_array of Vector_types.Mask.Bit_pattern.t Or_variable.t list
   | Immutable_value_array of Simple.With_debuginfo.t list
   | Empty_array of Empty_array_kind.t
-  | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
 let set_of_closures set = Set_of_closures set
@@ -73,6 +74,8 @@ let boxed_vec128 or_var = Boxed_vec128 or_var
 let boxed_vec256 or_var = Boxed_vec256 or_var
 
 let boxed_vec512 or_var = Boxed_vec512 or_var
+
+let boxed_mask or_var = Boxed_mask or_var
 
 let immutable_float_block fields = Immutable_float_block fields
 
@@ -131,14 +134,17 @@ let immutable_vec512_array fields =
   | [] -> Empty_array Naked_vec512s
   | _ :: _ -> Immutable_vec512_array fields
 
+let immutable_mask_array fields =
+  match fields with
+  | [] -> Empty_array Naked_masks
+  | _ :: _ -> Immutable_mask_array fields
+
 let immutable_value_array fields =
   match fields with
   | [] -> Empty_array Values_or_immediates_or_naked_floats
   | _ :: _ -> Immutable_value_array fields
 
 let empty_array kind = Empty_array kind
-
-let mutable_string ~initial_value = Mutable_string { initial_value }
 
 let immutable_string str = Immutable_string str
 
@@ -207,6 +213,11 @@ let [@ocamlformat "disable"] print ppf t =
       Flambda_colours.static_part
       Flambda_colours.pop
       (Or_variable.print Vector_types.Vec512.Bit_pattern.print) or_var
+  | Boxed_mask (or_var) ->
+    fprintf ppf "@[<hov 1>(%tBoxed_mask%t@ %a)@]"
+      Flambda_colours.static_part
+      Flambda_colours.pop
+      (Or_variable.print Vector_types.Mask.Bit_pattern.print) or_var
   | Immutable_float_block fields ->
     fprintf ppf "@[<hov 1>(%tImmutable_float_block%t@ @[[| %a |]@])@]"
       Flambda_colours.static_part
@@ -303,6 +314,14 @@ let [@ocamlformat "disable"] print ppf t =
         ~pp_sep:(fun ppf () -> Format.pp_print_string ppf "@; ")
         (Or_variable.print Vector_types.Vec512.Bit_pattern.print))
       fields
+  | Immutable_mask_array fields ->
+    fprintf ppf "@[<hov 1>(%tImmutable_mask_array%t@ @[[| %a |]@])@]"
+      Flambda_colours.static_part
+      Flambda_colours.pop
+      (Format.pp_print_list
+        ~pp_sep:(fun ppf () -> Format.pp_print_string ppf "@; ")
+        (Or_variable.print Vector_types.Mask.Bit_pattern.print))
+      fields
   | Immutable_value_array fields ->
     fprintf ppf "@[<hov 1>(%tImmutable_value_array%t@ (%a))@]"
       Flambda_colours.static_part
@@ -314,11 +333,6 @@ let [@ocamlformat "disable"] print ppf t =
       Flambda_colours.static_part
       Empty_array_kind.print array_kind
       Flambda_colours.pop
-  | Mutable_string { initial_value = s; } ->
-    fprintf ppf "@[<hov 1>(%tMutable_string%t@ %S)@]"
-      Flambda_colours.static_part
-      Flambda_colours.pop
-      s
   | Immutable_string s ->
     fprintf ppf "@[<hov 1>(%tImmutable_string%t@ %S)@]"
       Flambda_colours.static_part
@@ -371,6 +385,8 @@ include Container_types.Make (struct
     | Boxed_vec512 or_var1, Boxed_vec512 or_var2 ->
       Or_variable.compare Vector_types.Vec512.Bit_pattern.compare or_var1
         or_var2
+    | Boxed_mask or_var1, Boxed_mask or_var2 ->
+      Or_variable.compare Vector_types.Mask.Bit_pattern.compare or_var1 or_var2
     | Immutable_float_block fields1, Immutable_float_array fields2 ->
       Misc.Stdlib.List.compare
         (Or_variable.compare Numeric_types.Float_by_bit_pattern.compare)
@@ -419,14 +435,15 @@ include Container_types.Make (struct
       Misc.Stdlib.List.compare
         (Or_variable.compare Vector_types.Vec512.Bit_pattern.compare)
         fields1 fields2
+    | Immutable_mask_array fields1, Immutable_mask_array fields2 ->
+      Misc.Stdlib.List.compare
+        (Or_variable.compare Vector_types.Mask.Bit_pattern.compare)
+        fields1 fields2
     | Immutable_value_array fields1, Immutable_value_array fields2 ->
       Misc.Stdlib.List.compare Simple.With_debuginfo.compare fields1 fields2
     | Empty_array array_kind1, Empty_array array_kind2 ->
       Empty_array_kind.compare array_kind1 array_kind2
-    | ( Mutable_string { initial_value = s1 },
-        Mutable_string { initial_value = s2 } )
-    | Immutable_string s1, Immutable_string s2 ->
-      String.compare s1 s2
+    | Immutable_string s1, Immutable_string s2 -> String.compare s1 s2
     | Block _, _ -> -1
     | _, Block _ -> 1
     | Set_of_closures _, _ -> -1
@@ -447,6 +464,8 @@ include Container_types.Make (struct
     | _, Boxed_vec256 _ -> 1
     | Boxed_vec512 _, _ -> -1
     | _, Boxed_vec512 _ -> 1
+    | Boxed_mask _, _ -> -1
+    | _, Boxed_mask _ -> 1
     | Immutable_float_block _, _ -> -1
     | _, Immutable_float_block _ -> 1
     | Immutable_float_array _, _ -> -1
@@ -471,12 +490,12 @@ include Container_types.Make (struct
     | _, Immutable_vec256_array _ -> 1
     | Immutable_vec512_array _, _ -> -1
     | _, Immutable_vec512_array _ -> 1
+    | Immutable_mask_array _, _ -> -1
+    | _, Immutable_mask_array _ -> 1
     | Immutable_value_array _, _ -> -1
     | _, Immutable_value_array _ -> 1
     | Empty_array _, _ -> -1
     | _, Empty_array _ -> 1
-    | Mutable_string _, _ -> -1
-    | _, Mutable_string _ -> 1
 
   let equal t1 t2 = compare t1 t2 = 0
 
@@ -509,8 +528,8 @@ let free_names t =
   | Boxed_vec128 or_var -> Or_variable.free_names or_var
   | Boxed_vec256 or_var -> Or_variable.free_names or_var
   | Boxed_vec512 or_var -> Or_variable.free_names or_var
-  | Mutable_string { initial_value = _ } | Immutable_string _ | Empty_array _ ->
-    Name_occurrences.empty
+  | Boxed_mask or_var -> Or_variable.free_names or_var
+  | Immutable_string _ | Empty_array _ -> Name_occurrences.empty
   | Immutable_float_block fields | Immutable_float_array fields ->
     free_names_for_numeric_fields fields
   | Immutable_float32_array fields -> free_names_for_numeric_fields fields
@@ -523,6 +542,7 @@ let free_names t =
   | Immutable_vec128_array fields -> free_names_for_numeric_fields fields
   | Immutable_vec256_array fields -> free_names_for_numeric_fields fields
   | Immutable_vec512_array fields -> free_names_for_numeric_fields fields
+  | Immutable_mask_array fields -> free_names_for_numeric_fields fields
   | Immutable_value_array fields -> free_names_of_fields fields
 
 let apply_renaming_number_array_fields renaming fields =
@@ -574,7 +594,10 @@ let apply_renaming t renaming =
     | Boxed_vec512 or_var ->
       let or_var' = Or_variable.apply_renaming or_var renaming in
       if or_var == or_var' then t else Boxed_vec512 or_var'
-    | Mutable_string { initial_value = _ } | Immutable_string _ -> t
+    | Boxed_mask or_var ->
+      let or_var' = Or_variable.apply_renaming or_var renaming in
+      if or_var == or_var' then t else Boxed_mask or_var'
+    | Immutable_string _ -> t
     | Immutable_float_block fields ->
       let fields' = apply_renaming_number_array_fields renaming fields in
       if fields' == fields then t else Immutable_float_block fields'
@@ -611,6 +634,9 @@ let apply_renaming t renaming =
     | Immutable_vec512_array fields ->
       let fields' = apply_renaming_number_array_fields renaming fields in
       if fields' == fields then t else Immutable_vec512_array fields'
+    | Immutable_mask_array fields ->
+      let fields' = apply_renaming_number_array_fields renaming fields in
+      if fields' == fields then t else Immutable_mask_array fields'
     | Immutable_value_array fields ->
       let fields' =
         Misc.Stdlib.List.map_sharing
@@ -645,7 +671,8 @@ let ids_for_export t =
   | Boxed_nativeint (Var (var, _dbg))
   | Boxed_vec128 (Var (var, _dbg))
   | Boxed_vec256 (Var (var, _dbg))
-  | Boxed_vec512 (Var (var, _dbg)) ->
+  | Boxed_vec512 (Var (var, _dbg))
+  | Boxed_mask (Var (var, _dbg)) ->
     Ids_for_export.add_variable Ids_for_export.empty var
   | Boxed_float (Const _)
   | Boxed_float32 (Const _)
@@ -655,7 +682,7 @@ let ids_for_export t =
   | Boxed_vec128 (Const _)
   | Boxed_vec256 (Const _)
   | Boxed_vec512 (Const _)
-  | Mutable_string { initial_value = _ }
+  | Boxed_mask (Const _)
   | Immutable_string _ ->
     Ids_for_export.empty
   | Immutable_float_block fields -> ids_for_export_number_array_fields fields
@@ -671,6 +698,7 @@ let ids_for_export t =
   | Immutable_vec128_array fields -> ids_for_export_number_array_fields fields
   | Immutable_vec256_array fields -> ids_for_export_number_array_fields fields
   | Immutable_vec512_array fields -> ids_for_export_number_array_fields fields
+  | Immutable_mask_array fields -> ids_for_export_number_array_fields fields
   | Immutable_value_array fields -> ids_for_export_fields fields
   | Empty_array _ -> Ids_for_export.empty
 
@@ -681,24 +709,25 @@ let block_field_kind t i =
   | Immutable_value_array _ -> Flambda_kind.value
   | Set_of_closures _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _
   | Boxed_int64 _ | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _
-  | Boxed_vec512 _ | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
-  | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-  | Mutable_string _ | Immutable_string _ ->
+  | Boxed_vec512 _ | Boxed_mask _ | Immutable_float_block _
+  | Immutable_float_array _ | Immutable_float32_array _ | Immutable_int_array _
+  | Immutable_int8_array _ | Immutable_int16_array _ | Immutable_int32_array _
+  | Immutable_int64_array _ | Immutable_nativeint_array _
+  | Immutable_vec128_array _ | Immutable_vec256_array _
+  | Immutable_vec512_array _ | Immutable_mask_array _ | Empty_array _
+  | Immutable_string _ ->
     Misc.fatal_errorf "Unexpected static const %a in [block_field_kind]" print t
 
 let is_block t =
   match t with
   | Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _
   | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Immutable_float_block _ | Immutable_float_array _
+  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
   | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
   | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
   | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_string _
-  | Mutable_string _ | Empty_array _ | Immutable_value_array _ ->
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
+  | Immutable_string _ | Empty_array _ | Immutable_value_array _ ->
     true
   | Set_of_closures _ -> false
 
@@ -707,12 +736,12 @@ let is_set_of_closures t =
   | Set_of_closures _ -> true
   | Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _
   | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Immutable_float_block _ | Immutable_float_array _
+  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
   | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
   | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
   | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_string _
-  | Mutable_string _ | Empty_array _ | Immutable_value_array _ ->
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
+  | Immutable_string _ | Empty_array _ | Immutable_value_array _ ->
     false
 
 let is_fully_static t = free_names t |> Name_occurrences.no_variables
@@ -722,15 +751,15 @@ let can_share0 t =
   | Block (_, Immutable, _, _)
   | Set_of_closures _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
   | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-  | Immutable_float32_array _ | Immutable_string _ | Empty_array _
-  | Immutable_int_array _ | Immutable_int8_array _ | Immutable_int16_array _
-  | Immutable_int32_array _ | Immutable_int64_array _
+  | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
+  | Immutable_float_array _ | Immutable_float32_array _ | Immutable_string _
+  | Empty_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
   | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
   | Immutable_value_array _ ->
     true
-  | Block (_, (Mutable | Immutable_unique), _, _) | Mutable_string _ -> false
+  | Block (_, (Mutable | Immutable_unique), _, _) -> false
 
 let can_share t = can_share0 t && is_fully_static t
 
@@ -739,12 +768,12 @@ let must_be_set_of_closures t =
   | Set_of_closures set -> set
   | Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _ | Boxed_int64 _
   | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-  | Immutable_float_block _ | Immutable_float_array _
+  | Boxed_mask _ | Immutable_float_block _ | Immutable_float_array _
   | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
   | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
   | Immutable_nativeint_array _ | Immutable_vec128_array _
-  | Immutable_vec256_array _ | Immutable_vec512_array _ | Empty_array _
-  | Immutable_value_array _ | Immutable_string _ | Mutable_string _ ->
+  | Immutable_vec256_array _ | Immutable_vec512_array _ | Immutable_mask_array _
+  | Empty_array _ | Immutable_value_array _ | Immutable_string _ ->
     Misc.fatal_errorf "Not a set of closures:@ %a" print t
 
 let match_against_bound_static_pattern t (pat : Bound_static.Pattern.t)
@@ -769,27 +798,27 @@ let match_against_bound_static_pattern t (pat : Bound_static.Pattern.t)
     set_of_closures_callback ~closure_symbols set_of_closures
   | ( ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int_array _
-      | Immutable_int8_array _ | Immutable_int16_array _
+      | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
+      | Immutable_float_array _ | Immutable_float32_array _
+      | Immutable_int_array _ | Immutable_int8_array _ | Immutable_int16_array _
       | Immutable_int32_array _ | Immutable_int64_array _
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _
-      | Immutable_value_array _ | Empty_array _ | Immutable_string _
-      | Mutable_string _ ),
+      | Immutable_mask_array _ | Immutable_value_array _ | Empty_array _
+      | Immutable_string _ ),
       Block_like symbol ) ->
     block_like_callback symbol t
   | Set_of_closures _, (Block_like _ | Code _)
   | ( ( Block _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-      | Boxed_nativeint _ | Immutable_float_block _ | Immutable_float_array _
-      | Immutable_float32_array _ | Immutable_int_array _
-      | Immutable_int8_array _ | Immutable_int16_array _
+      | Boxed_mask _ | Boxed_nativeint _ | Immutable_float_block _
+      | Immutable_float_array _ | Immutable_float32_array _
+      | Immutable_int_array _ | Immutable_int8_array _ | Immutable_int16_array _
       | Immutable_int32_array _ | Immutable_int64_array _
       | Immutable_nativeint_array _ | Immutable_vec128_array _
       | Immutable_vec256_array _ | Immutable_vec512_array _
-      | Immutable_value_array _ | Empty_array _ | Immutable_string _
-      | Mutable_string _ ),
+      | Immutable_mask_array _ | Immutable_value_array _ | Empty_array _
+      | Immutable_string _ ),
       (Set_of_closures _ | Code _) ) ->
     Misc.fatal_errorf "Mismatch on variety of [Static_const]:@ %a@ =@ %a"
       Bound_static.Pattern.print pat print t

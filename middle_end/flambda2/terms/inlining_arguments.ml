@@ -316,6 +316,22 @@ let meet t1 t2 =
   then t2
   else Args.meet t1 t2
 
+type combine_inlining_arguments =
+  | Env
+  | Meet
+  | Metadata
+
+let combine_inlining_arguments =
+  Oxcaml_args.Extra_options.symbol __LOC__ "flambda2-combine-inlining-arguments"
+    Meet
+    ["env", Env; "meet", Meet; "metadata", Metadata]
+
+let combine ~from_env ~from_metadata =
+  match combine_inlining_arguments () with
+  | Meet -> meet from_env from_metadata
+  | Metadata -> from_metadata
+  | Env -> from_env
+
 let create ~round = Args.create ~round
 
 let equal t1 t2 = Args.equal t1 t2

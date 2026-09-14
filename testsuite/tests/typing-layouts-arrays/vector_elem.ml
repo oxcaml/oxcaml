@@ -94,7 +94,7 @@ module Int64x4 = struct
     let #(l,h) = split (unbox v) in
     box_128 l, box_128 h
 
-  external const1_128 : int64# -> int64x2 = "caml_vec128_unreachable" "caml_int64x2_const1"
+  external const1_128 : int64_u -> int64x2 = "caml_vec128_unreachable" "caml_int64x2_const1"
     [@@noalloc] [@@unboxed] [@@builtin]
 
   external low_of : int64 -> int64x2 = "caml_vec128_unreachable" "caml_int64x2_low_of_int64"

@@ -796,7 +796,7 @@ and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
   | Some lbl, Some simple_name when String.equal simple_name lbl ->
     pp f "~%s" lbl
   (* Labeled component general case *)
-  | Some lbl, _ -> pp f "~%s:%a" lbl (pattern1 ctxt) x
+  | Some lbl, _ -> pp f "~%s:%a" lbl (simple_pattern ctxt) x
   (* Unlabeled component *)
   | None, _ -> pattern1 ctxt f x
 
@@ -1186,8 +1186,6 @@ and expression ctxt f x =
           (binding_op ctxt) let_
           (list ~sep:"@," (binding_op ctxt)) ands
           (expression ctxt) body
-    | Pexp_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
-        pp f "%a" (simple_expr ctxt) x
     | Pexp_extension e -> extension ctxt f e
     | Pexp_unreachable -> pp f "."
     | Pexp_overwrite (e1, e2) ->
@@ -1292,8 +1290,6 @@ and simple_expr ctxt f x =
         let expression = expression ctxt in
         pp f fmt (pattern ctxt) s expression e1 direction_flag
           df expression e2 expression e3
-    | Pexp_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
-        pp f "_"
     | Pexp_hole -> pp f "_"
     | _ ->  paren true (expression ctxt) f x
 
@@ -1679,10 +1675,11 @@ and signature_item ctxt f x : unit =
               (list ~sep:"@," (class_description "and")) xs
       end
   | Psig_module ({pmd_type={pmty_desc=Pmty_alias alias;
-                            pmty_attributes=[]; _}; _} as pmd) ->
-      pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
+                            pmty_attributes; _}; _} as pmd) ->
+      pp f "@[<hov>module@ %s@ =@ %a%a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
         value_longident_loc alias
+        (attributes ctxt) pmty_attributes
         optional_space_atat_modalities pmd.pmd_modalities
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
@@ -1781,9 +1778,8 @@ and module_expr ctxt f x =
         pp f "(%a)()" (module_expr ctxt) me1
     | Pmod_unpack e ->
         pp f "(val@ %a)" (expression ctxt) e
-    | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
-        pp f "_"
     | Pmod_extension e -> extension ctxt f e
+    | Pmod_hole -> pp f "_"
     | Pmod_instance i ->
         pp f "(%a [@jane.non_erasable.instances])"(instance ctxt) i
 
@@ -2336,8 +2332,9 @@ and block_access ctxt f = function
   | Baccess_block (mut, index) ->
     let s =
       match mut with
-      | Mutable -> "idx_mut"
-      | Immutable -> "idx_imm"
+      | Immutable_access -> "idx_imm"
+      | Mutable_access -> "idx_mut"
+      | Atomic_access -> "idx_atomic"
     in
     pp f ".%s(%a)" s (expression ctxt) index
 

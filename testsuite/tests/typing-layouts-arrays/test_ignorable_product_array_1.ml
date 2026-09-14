@@ -21,7 +21,7 @@ open Stdlib_upstream_compatible
    change the bit between here and the next comment. See README.md in this
    test directory. *)
 type boxed_t = float * int * int64
-type unboxed_t = #(float# * int * int64#)
+type unboxed_t = #(float# * int * int64_u)
 
 let elem : boxed_t elem = Tup3 (float_elem, int_elem, int64_elem)
 let words_wide : int = 3

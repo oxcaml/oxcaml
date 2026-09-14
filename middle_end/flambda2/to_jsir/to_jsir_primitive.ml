@@ -141,7 +141,7 @@ let block_access_kind_exn (kind : Flambda_primitive.Block_access_kind.t) :
       { field_kind =
           Flat_suffix
             ( Naked_int8 | Naked_int16 | Naked_vec128 | Naked_vec256
-            | Naked_vec512 );
+            | Naked_vec512 | Naked_mask );
         _
       } ->
     raise Primitive_not_supported
@@ -341,10 +341,11 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     match kind, load_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks
+        | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
       use_prim' Array_get
     | (Naked_vec128s | Naked_vec256s | Naked_vec512s), _
     | _, (Naked_vec128s | Naked_vec256s | Naked_vec512s) ->
@@ -360,7 +361,7 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Thirty_two -> "get32"
       | Single -> "getf32"
       | Sixty_four -> "get64"
-      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+      | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ | Mask ->
         raise Primitive_not_supported
     in
     let extern_name =
@@ -371,7 +372,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         match width with
         | Eight -> "caml_ba_get_1"
         | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
-        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
+        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _
+        | Mask ->
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
@@ -506,14 +508,14 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
         | Float32 -> "caml_float32_compare")
     in
     use_prim' (Extern extern_name)
-  | Atomic_load_field _ -> use_prim' (Extern "caml_atomic_load_field")
+  | Atomic_load (Field_index, _) -> use_prim' (Extern "caml_atomic_load_field")
   | Bigarray_get_alignment _ ->
     (* Only used for SIMD *)
     raise Primitive_not_supported
   | Poke _ ->
     (* Unsupported in bytecode *)
     raise Primitive_not_supported
-  | Read_offset _ ->
+  | Atomic_load (Byte_offset, _) | Read_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
     raise Primitive_not_supported
@@ -525,10 +527,11 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     match kind, set_kind with
     | ( ( Immediates | Gc_ignorable_values | Values | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints | Unboxed_product _ ),
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks
+        | Unboxed_product _ ),
         ( Immediates | Gc_ignorable_values | Values _ | Naked_floats
         | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s
-        | Naked_int32s | Naked_int64s | Naked_nativeints ) ) ->
+        | Naked_int32s | Naked_int64s | Naked_nativeints | Naked_masks ) ) ->
       let arr, res =
         match prim_arg ~env ~res x with
         | Pv v, res -> v, res
@@ -546,7 +549,8 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
   | Bytes_or_bigstring_set (value, width) ->
     let extern_name =
       match value, width with
-      | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ ->
+      | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ | _, Mask
+        ->
         (* No SIMD *)
         raise Primitive_not_supported
       | Bytes, (Eight | Eight_signed) -> "caml_bytes_unsafe_set"
@@ -565,7 +569,7 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
     (* The index calculation is already done in Flambda, so we are free to
        ignore the parameters. *)
     use_prim' (Extern "caml_ba_set_raw_unsafe")
-  | Atomic_field_int_arith op ->
+  | Atomic_int_arith (Field_index, op) ->
     let extern_name =
       match op with
       | Fetch_add -> "caml_atomic_fetch_add_field"
@@ -576,10 +580,14 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | Xor -> "caml_atomic_lxor_field"
     in
     use_prim' (Extern extern_name)
-  | Atomic_set_field _ ->
+  | Atomic_set (Field_index, _, _) ->
     let _var, env, res = use_prim' (Extern "caml_atomic_exchange_field") in
     unit ~env ~res
-  | Atomic_exchange_field _ -> use_prim' (Extern "caml_atomic_exchange_field")
+  | Atomic_exchange (Field_index, _, _) ->
+    use_prim' (Extern "caml_atomic_exchange_field")
+  | Atomic_int_arith (Byte_offset, _)
+  | Atomic_set (Byte_offset, _, _)
+  | Atomic_exchange (Byte_offset, _, _)
   | Write_offset _ ->
     (* CR selee: This is for block indices, which likely requires changes to
        JSOO to support. We will leave this for now. *)
@@ -589,9 +597,13 @@ let quaternary_exn ~env ~res (f : Flambda_primitive.quaternary_primitive) w x y
     z =
   let use_prim' prim = use_prim' ~env ~res prim [w; x; y; z] in
   match f with
-  | Atomic_compare_and_set_field _ -> use_prim' (Extern "caml_atomic_cas_field")
-  | Atomic_compare_exchange_field _ ->
+  | Atomic_compare_and_set (Field_index, _, _) ->
+    use_prim' (Extern "caml_atomic_cas_field")
+  | Atomic_compare_exchange { offset_units = Field_index; _ } ->
     use_prim' (Extern "caml_atomic_compare_exchange_field")
+  | Atomic_compare_and_set (Byte_offset, _, _)
+  | Atomic_compare_exchange { offset_units = Byte_offset; _ } ->
+    raise Primitive_not_supported
 
 let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
   match f with
@@ -625,6 +637,8 @@ let variadic_exn ~env ~res (f : Flambda_primitive.variadic_primitive) xs =
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_int64_array_tag
       | Naked_nativeints ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_nativeint_array_tag
+      | Naked_masks ->
+        Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_mask_array_tag
       | Naked_floats -> Tag.double_array_tag |> Tag.to_int
       | Naked_float32s ->
         Cmm_helpers.Unboxed_or_untagged_array_tags.unboxed_float32_array_tag

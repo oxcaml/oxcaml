@@ -56,26 +56,26 @@ let ref_to_force_heap_allocation : packed ref = ref (P 0)
 
 type t0 = { mutable a0 : int; mutable b0 : int } (* { int; int } *)
 type t1 = { mutable a1 : int; mutable b1 : int; mutable c1 : float } (* { int; int; float } *)
-type t2 = { mutable a2 : int; mutable b2 : int32# } (* { int; int32# } *)
-type t3 = #{ a3 : int; b3 : int32# } (* #{ int; int32# } *)
-type t4 = { mutable a4 : int; mutable b4 : t3 } (* { int; #{ int; int32# } } *)
-type t5 = #{ a5 : int32# } (* #{ int32# } *)
-type t6 = { mutable a6 : int; mutable b6 : t5 } (* { int; #{ int32# } } *)
+type t2 = { mutable a2 : int; mutable b2 : int32_u } (* { int; int32_u } *)
+type t3 = #{ a3 : int; b3 : int32_u } (* #{ int; int32_u } *)
+type t4 = { mutable a4 : int; mutable b4 : t3 } (* { int; #{ int; int32_u } } *)
+type t5 = #{ a5 : int32_u } (* #{ int32_u } *)
+type t6 = { mutable a6 : int; mutable b6 : t5 } (* { int; #{ int32_u } } *)
 type t7 = #{ a7 : float; b7 : float } (* #{ float; float } *)
 type t8 = { mutable a8 : int; mutable b8 : t7 } (* { int; #{ float; float } } *)
-type t9 = { mutable a9 : int64#; mutable b9 : nativeint# } (* { int64#; nativeint# } *)
-type t10 = { mutable a10 : int32# } (* { int32# } *)
-type t11 = { mutable a11 : int32#; mutable b11 : int } (* { int32#; int } *)
-type t12 = { mutable a12 : int32#; mutable b12 : int; mutable c12 : int } (* { int32#; int; int } *)
-type t13 = { mutable a13 : int32#; mutable b13 : int32# } (* { int32#; int32# } *)
-type t14 = #{ a14 : int32#; b14 : int32# } (* #{ int32#; int32# } *)
-type t15 = { mutable a15 : int32#; mutable b15 : t14 } (* { int32#; #{ int32#; int32# } } *)
-type t16 = { mutable a16 : nativeint#; mutable b16 : nativeint# } (* { nativeint#; nativeint# } *)
+type t9 = { mutable a9 : int64_u; mutable b9 : nativeint_u } (* { int64_u; nativeint_u } *)
+type t10 = { mutable a10 : int32_u } (* { int32_u } *)
+type t11 = { mutable a11 : int32_u; mutable b11 : int } (* { int32_u; int } *)
+type t12 = { mutable a12 : int32_u; mutable b12 : int; mutable c12 : int } (* { int32_u; int; int } *)
+type t13 = { mutable a13 : int32_u; mutable b13 : int32_u } (* { int32_u; int32_u } *)
+type t14 = #{ a14 : int32_u; b14 : int32_u } (* #{ int32_u; int32_u } *)
+type t15 = { mutable a15 : int32_u; mutable b15 : t14 } (* { int32_u; #{ int32_u; int32_u } } *)
+type t16 = { mutable a16 : nativeint_u; mutable b16 : nativeint_u } (* { nativeint_u; nativeint_u } *)
 type t17 = { mutable a17 : float } (* { float } *)
 type t18 = { mutable a18 : float; mutable b18 : int } (* { float; int } *)
 type t19 = { mutable a19 : float; mutable b19 : int; mutable c19 : int } (* { float; int; int } *)
 type t20 = { mutable a20 : float; mutable b20 : int; mutable c20 : float } (* { float; int; float } *)
-type t21 = { mutable a21 : float; mutable b21 : int32# } (* { float; int32# } *)
+type t21 = { mutable a21 : float; mutable b21 : int32_u } (* { float; int32_u } *)
 type t22 = { mutable a22 : float; mutable b22 : float; mutable c22 : float } (* { float; float; float } *)
 type t23 = { mutable a23 : string; mutable b23 : string } (* { string; string } *)
 type t24 = { mutable a24 : string; mutable b24 : string; mutable c24 : string } (* { string; string; string } *)
@@ -86,9 +86,9 @@ type t28 = #{ a28 : int; b28 : int } (* #{ int; int } *)
 type t29 = { mutable a29 : t28; mutable b29 : int } (* { #{ int; int }; int } *)
 type t30 = #{ a30 : int; b30 : float } (* #{ int; float } *)
 type t31 = { mutable a31 : t30 } (* { #{ int; float } } *)
-type t32 = { mutable a32 : t5; mutable b32 : int } (* { #{ int32# }; int } *)
-type t33 = { mutable a33 : t5; mutable b33 : int32# } (* { #{ int32# }; int32# } *)
-type t34 = { mutable a34 : t14; mutable b34 : int } (* { #{ int32#; int32# }; int } *)
+type t32 = { mutable a32 : t5; mutable b32 : int } (* { #{ int32_u }; int } *)
+type t33 = { mutable a33 : t5; mutable b33 : int32_u } (* { #{ int32_u }; int32_u } *)
+type t34 = { mutable a34 : t14; mutable b34 : int } (* { #{ int32_u; int32_u }; int } *)
 type t35 = #{ a35 : float } (* #{ float } *)
 type t36 = { mutable a36 : t35; mutable b36 : int } (* { #{ float }; int } *)
 type t37 = { mutable a37 : t35; mutable b37 : float } (* { #{ float }; float } *)
@@ -257,9 +257,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************)
-  (*   t2 = { int; int32# }   *)
-  (****************************)
+  (*****************************)
+  (*   t2 = { int; int32_u }   *)
+  (*****************************)
   let r = stack_ { a2 = 0; b2 = #1l } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -323,9 +323,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (**************************************)
-  (*   t4 = { int; #{ int; int32# } }   *)
-  (**************************************)
+  (***************************************)
+  (*   t4 = { int; #{ int; int32_u } }   *)
+  (***************************************)
   let r = stack_ { a4 = 0; b4 = #{ a3 = 1; b3 = #2l } } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -406,9 +406,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************)
-  (*   t6 = { int; #{ int32# } }   *)
-  (*********************************)
+  (**********************************)
+  (*   t6 = { int; #{ int32_u } }   *)
+  (**********************************)
   let r = stack_ { a6 = 0; b6 = #{ a5 = #1l } } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -562,9 +562,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (***********************************)
-  (*   t9 = { int64#; nativeint# }   *)
-  (***********************************)
+  (*************************************)
+  (*   t9 = { int64_u; nativeint_u }   *)
+  (*************************************)
   let r = stack_ { a9 = #0L; b9 = #1n } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -628,9 +628,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (************************)
-  (*   t10 = { int32# }   *)
-  (************************)
+  (*************************)
+  (*   t10 = { int32_u }   *)
+  (*************************)
   let r = stack_ { a10 = #0l } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -672,9 +672,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*****************************)
-  (*   t11 = { int32#; int }   *)
-  (*****************************)
+  (******************************)
+  (*   t11 = { int32_u; int }   *)
+  (******************************)
   let r = stack_ { a11 = #0l; b11 = 1 } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -738,9 +738,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (**********************************)
-  (*   t12 = { int32#; int; int }   *)
-  (**********************************)
+  (***********************************)
+  (*   t12 = { int32_u; int; int }   *)
+  (***********************************)
   let r = stack_ { a12 = #0l; b12 = 1; c12 = 2 } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -826,9 +826,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (********************************)
-  (*   t13 = { int32#; int32# }   *)
-  (********************************)
+  (**********************************)
+  (*   t13 = { int32_u; int32_u }   *)
+  (**********************************)
   let r = stack_ { a13 = #0l; b13 = #1l } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -892,9 +892,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*********************************************)
-  (*   t15 = { int32#; #{ int32#; int32# } }   *)
-  (*********************************************)
+  (************************************************)
+  (*   t15 = { int32_u; #{ int32_u; int32_u } }   *)
+  (************************************************)
   let r = stack_ { a15 = #0l; b15 = #{ a14 = #1l; b14 = #2l } } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -975,9 +975,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (****************************************)
-  (*   t16 = { nativeint#; nativeint# }   *)
-  (****************************************)
+  (******************************************)
+  (*   t16 = { nativeint_u; nativeint_u }   *)
+  (******************************************)
   let r = stack_ { a16 = #0n; b16 = #1n } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -1327,9 +1327,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*******************************)
-  (*   t21 = { float; int32# }   *)
-  (*******************************)
+  (********************************)
+  (*   t21 = { float; int32_u }   *)
+  (********************************)
   let r = stack_ { a21 = 0.; b21 = #1l } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -1903,9 +1903,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (**********************************)
-  (*   t32 = { #{ int32# }; int }   *)
-  (**********************************)
+  (***********************************)
+  (*   t32 = { #{ int32_u }; int }   *)
+  (***********************************)
   let r = stack_ { a32 = #{ a5 = #0l }; b32 = 1 } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -1976,9 +1976,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (*************************************)
-  (*   t33 = { #{ int32# }; int32# }   *)
-  (*************************************)
+  (***************************************)
+  (*   t33 = { #{ int32_u }; int32_u }   *)
+  (***************************************)
   let r = stack_ { a33 = #{ a5 = #0l }; b33 = #1l } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)
@@ -2049,9 +2049,9 @@ let to_run () =
 let () = to_run ();;
 
 let to_run () =
-  (******************************************)
-  (*   t34 = { #{ int32#; int32# }; int }   *)
-  (******************************************)
+  (********************************************)
+  (*   t34 = { #{ int32_u; int32_u }; int }   *)
+  (********************************************)
   let r = stack_ { a34 = #{ a14 = #0l; b14 = #1l }; b34 = 2 } in
   (* 1. Test field get *)
   (* Paths of depth 1 *)

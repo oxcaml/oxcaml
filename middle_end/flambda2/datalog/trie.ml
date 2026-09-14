@@ -42,18 +42,21 @@ let is_empty : type t k v. (t, k, v) is_trie -> t -> bool = function
   | Nested_trie _ -> Int.Map.is_empty
 
 let rec find0 : type t k r v.
-    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> v =
+    (t, k -> r, v) is_trie -> k -> r Constant.hlist -> t -> v Or_null.t =
  fun w k ks t ->
   match ks, w with
   | [], Nested_trie _ -> .
-  | [], Map_is_trie -> Int.Map.find k t
-  | k' :: ks', Nested_trie w' -> find0 w' k' ks' (Int.Map.find k t)
+  | [], Map_is_trie -> Int.Map.find_or_null k t
+  | k' :: ks', Nested_trie w' -> (
+    match Int.Map.find_or_null k t with
+    | Null -> Or_null.null
+    | This datum -> find0 w' k' ks' datum)
 
-let find : type t k v. (t, k, v) is_trie -> k Constant.hlist -> t -> v =
+let find_or_null : type t k v.
+    (t, k, v) is_trie -> k Constant.hlist -> t -> v Or_null.t =
  fun w k t -> match k, w with [], _ -> . | k :: ks, _ -> find0 w k ks t
 
-let find_opt w k t =
-  match find w k t with exception Not_found -> None | datum -> Some datum
+let find_opt w k t = Or_null.to_option (find_or_null w k t)
 
 let rec singleton0 : type t k r v.
     (t, k -> r, v) is_trie -> k -> r Constant.hlist -> v -> t =
@@ -73,9 +76,9 @@ let rec add0 : type t k r v.
   | [], Nested_trie _ -> .
   | [], Map_is_trie -> Int.Map.add k v t
   | k' :: ks', Nested_trie w' -> (
-    match Int.Map.find_opt k t with
-    | Some m -> Int.Map.add k (add0 w' k' ks' v m) t
-    | None -> Int.Map.add k (singleton0 w' k' ks' v) t)
+    match Int.Map.find_or_null k t with
+    | This m -> Int.Map.add k (add0 w' k' ks' v m) t
+    | Null -> Int.Map.add k (singleton0 w' k' ks' v) t)
 
 let add_or_replace : type t k v.
     (t, k, v) is_trie -> k Constant.hlist -> v -> t -> t =
@@ -88,9 +91,9 @@ let rec remove0 : type t k r v.
   | [], Nested_trie _ -> .
   | [], Map_is_trie -> Int.Map.remove k t
   | k' :: ks', Nested_trie w' -> (
-    match Int.Map.find_opt k t with
-    | None -> t
-    | Some m ->
+    match Int.Map.find_or_null k t with
+    | Null -> t
+    | This m ->
       let m' = remove0 w' k' ks' m in
       if is_empty w' m' then Int.Map.remove k t else Int.Map.add k m' t)
 
@@ -130,22 +133,10 @@ let rec fold : type t k v.
 module Iterator = struct
   include Leapfrog.Map (Int)
 
-  include Heterogenous_list.Make (struct
-    type nonrec 'a t = 'a t
-  end)
-
-  let create_iterator = create
-
-  let rec create : type m k v.
-      (m, k, v) is_trie -> m Channel.receiver -> v Channel.sender -> k hlist =
-   fun is_trie this_ref value_handler ->
-    match is_trie with
-    | Map_is_trie -> [create_iterator this_ref value_handler]
-    | Nested_trie next_trie ->
-      let send_next, recv_next = Channel.create (empty next_trie) in
-      create_iterator this_ref send_next
-      :: create next_trie recv_next value_handler
-
-  let create is_trie this_ref value_handler =
-    create is_trie this_ref value_handler
+  let create : type m k v.
+      (m, k -> nil, v) is_trie ->
+      m Channel.or_null_receiver ->
+      v Channel.or_null_sender ->
+      k t =
+   fun Map_is_trie -> create
 end

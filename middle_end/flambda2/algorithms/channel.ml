@@ -38,3 +38,23 @@ let create v =
 external send : 'a sender -> 'a -> unit = "%setfield0"
 
 external recv : 'a receiver -> 'a = "%field0"
+
+(* In OxCaml ['a Or_null.t] has layout [value_or_null] but type variables by
+   default are inferred to have layout [value]. Since there is no
+   upstream-compatible syntax for annotating a type variable with layout
+   [value_or_null], we need to have a separate copy of the API for the [or_null]
+   case -- fortunately, it is tiny. *)
+
+type 'a or_null_ref = 'a Or_null.t ref
+
+type 'a or_null_sender = 'a or_null_ref
+
+type 'a or_null_receiver = 'a or_null_ref
+
+let create_or_null (v : _ Or_null.t) =
+  let r = ref v in
+  r, r
+
+external send_or_null : 'a or_null_sender -> 'a Or_null.t -> unit = "%setfield0"
+
+external recv_or_null : 'a or_null_receiver -> 'a Or_null.t = "%field0"

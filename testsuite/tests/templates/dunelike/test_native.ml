@@ -82,10 +82,14 @@
    dst = "util/";
    copy;
 
-   set flg_alias_deps = "-w -53";
+   set flg_base = "-w -53";
+   set flg_alias_deps = "$flg_base -nocwd";
    set flg = "$flg_alias_deps -no-alias-deps";
    set flg_int_iface = "$flg -w -49";
    set flg_instance = "-H instances -w -24 -w -58";
+
+   (* dune does not pass [-nocwd] to link *)
+   set flg_link = "$flg_base -no-alias-deps";
 
    (* Need to turn off the fallback inlining heuristic because it marks all
    instantiating functors as [@inline never] in classic mode *)
@@ -95,7 +99,7 @@
    module = "p/p__.ml";
    ocamlopt.byte;
 
-   flags = "$flg -as-parameter -I p -open P__ -open No_direct_access_to_p";
+   flags = "$flg -as-parameter -H p -open-cmi p/p__.cmi";
    module = "p/p.mli";
    ocamlopt.byte;
 
@@ -103,13 +107,13 @@
    module = "q/q__.ml";
    ocamlopt.byte;
 
-   flags = "$flg -as-parameter -I q -open Q__ -open No_direct_access_to_q";
+   flags = "$flg -as-parameter -H q -open-cmi q/q__.cmi";
    module = "q/q.mli";
    ocamlopt.byte;
 
    set flg_basic = "\
-     $flg -parameter P -I p -I basic \
-     -open Basic__ -open No_direct_access_to_basic \
+     $flg -parameter P -I p -H basic \
+     -open-cmi basic/basic__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -121,8 +125,8 @@
    ocamlopt.byte;
 
    set flg_fancy = "\
-     $flg -parameter P -parameter Q -I p -I q -I basic -I fancy -I util \
-     -open Fancy__ -open No_direct_access_to_fancy \
+     $flg -parameter P -parameter Q -I p -I q -I basic -H fancy -I util \
+     -open-cmi fancy/fancy__.cmi \
    ";
 
    flags = "$flg_int_iface -parameter P -parameter Q -I p -I q";
@@ -169,8 +173,8 @@
    ocamlopt.byte;
 
    set flg_p_int = "\
-     $flg -I p -I p_int \
-     -open P_int__ -open No_direct_access_to_p_int \
+     $flg -I p -H p_int \
+     -open-cmi p_int/p_int__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -182,8 +186,8 @@
    ocamlopt.byte;
 
    set flg_p_string = "\
-     $flg -I p -I p_string \
-     -open P_string__ -open No_direct_access_to_p_string \
+     $flg -I p -H p_string \
+     -open-cmi p_string/p_string__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -211,8 +215,8 @@
    ocamlopt.byte;
 
    set flg_main_basic = "\
-     $flg -I p_int -I p_string -I basic -I main_basic -I instances \
-     -open Main_basic__ -open No_direct_access_to_main_basic \
+     $flg -I p_int -I p_string -I basic -H main_basic -I instances \
+     -open-cmi main_basic/main_basic__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -244,8 +248,8 @@
 
  {
    set flg_q_impl = "\
-     $flg -I q -I q_impl \
-     -open Q_impl__ -open No_direct_access_to_q_impl \
+     $flg -I q -H q_impl \
+     -open-cmi q_impl/q_impl__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -311,8 +315,8 @@
    ocamlopt.byte;
 
    set flg_util = "\
-     $flg -parameter P -I p -I q_impl -I basic -I fancy -I util \
-     -open Util__ -open No_direct_access_to_util \
+     $flg -parameter P -I p -I q_impl -I basic -I fancy -H util \
+     -open-cmi util/util__.cmi \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -351,8 +355,8 @@
 
    set flg_export_fancy_q_impl = "\
      $flg -parameter P -I p -I q_impl -I basic -I fancy \
-     -I export_fancy_q_impl -I util \
-     -open Export_fancy_q_impl__ -open No_direct_access_to_export_fancy_q_impl \
+     -H export_fancy_q_impl -I util \
+     -open-cmi export_fancy_q_impl/export_fancy_q_impl__.cmi \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -383,8 +387,8 @@
 
    set flg_use_fancy_q_impl = "\
      $flg -parameter P -I p -I q_impl -I basic -I fancy \
-     -I export_fancy_q_impl -I use_fancy_q_impl -I util \
-     -open Use_fancy_q_impl__ -open No_direct_access_to_use_fancy_q_impl \
+     -I export_fancy_q_impl -H use_fancy_q_impl -I util \
+     -open-cmi use_fancy_q_impl/use_fancy_q_impl__.cmi \
    ";
 
    flags = "$flg_int_iface -parameter P -I p";
@@ -411,9 +415,9 @@
    ocamlopt.byte;
 
    set flg_main = "\
-     $flg -I p_int -I p_string -I q_impl -I fancy -I basic -I main \
+     $flg -I p_int -I p_string -I q_impl -I fancy -I basic -H main \
      -H export_fancy_q_impl -I use_fancy_q_impl -I util -I instances \
-     -open Main__ -open No_direct_access_to_main \
+     -open-cmi main/main__.cmi \
    ";
 
    flags = "$flg_int_iface";
@@ -443,7 +447,7 @@
    module = "test_native.ml";
    ocamlopt.byte;
 
-   flags = "$flg";
+   flags = "$flg_link";
    module = "";
    program = "$test_build_directory/test_native.exe";
    all_modules = "\

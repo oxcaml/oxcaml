@@ -38,10 +38,13 @@ let imported_variables = 2
 
 let earliest_var = 3
 
+(* Two bits are used by the [With_name_mode] encoding. *)
+let max_binding_time = max_int lsr 2
+
 let succ (t : t) =
   if t < earliest_var
   then Misc.fatal_error "Cannot increment binding time for symbols"
-  else if t = max_int
+  else if t = max_binding_time
   then Misc.fatal_error "Have run out of binding times"
   else t + 1
 
@@ -50,7 +53,7 @@ module With_name_mode = struct
 
   let[@inline always] create binding_time (name_mode : Name_mode.t) =
     let name_mode =
-      match name_mode with Normal -> 0 | In_types -> 1 | Phantom -> 2
+      match name_mode with Normal -> 0 | Phantom -> 1 | In_types -> 2
     in
     (binding_time lsl 2) lor name_mode
 
@@ -65,8 +68,8 @@ module With_name_mode = struct
   let[@inline always] name_mode t =
     match t land 3 with
     | 0 -> Name_mode.normal
-    | 1 -> Name_mode.in_types
-    | 2 -> Name_mode.phantom
+    | 1 -> Name_mode.phantom
+    | 2 -> Name_mode.in_types
     | _ -> assert false
 
   let scoped_name_mode t ~min_binding_time =

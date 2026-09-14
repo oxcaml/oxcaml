@@ -129,31 +129,10 @@ module Builder = struct
     Dynarray.ensure_capacity sections capacity;
     sections
 
-  let of_file_sections file_sections =
-    let length = length file_sections in
-    let t = create length in
-    for i = 0 to length - 1 do
-      Dynarray.add_last t (unsafe_get file_sections i)
-    done;
-    t
-
   let add t section =
     let idx = Dynarray.length t in
     Dynarray.add_last t section;
     idx
-
-  let add_all t sections =
-    let offset = Dynarray.length t in
-    (match sections with
-    | From_file { sections; channel } ->
-      let num_new_sections = Array.length sections in
-      Dynarray.ensure_extra_capacity t num_new_sections;
-      for i = 0 to num_new_sections - 1 do
-        Dynarray.add_last t (read_section sections channel i)
-      done;
-    | In_memory sections ->
-      Dynarray.append_array t sections);
-    (fun i -> i + offset)
 
   let build t = In_memory (Dynarray.to_array t)
 

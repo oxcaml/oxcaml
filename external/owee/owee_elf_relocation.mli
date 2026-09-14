@@ -109,26 +109,11 @@ type rela_entry =
     (** Addend for the relocation. *)
   }
 
-(** [iter_rela_entries ~rela_body ~f] iterates over all RELA entries in
-    the given section body, calling [f] for each entry. *)
-val iter_rela_entries : rela_body:Owee_buf.t -> f:(rela_entry -> unit) -> unit
-
-(** {1 Symbol Name Lookup} *)
-
-(** [read_symbol_name ~symtab_body ~strtab_body ~sym_index] reads the name
-    of the symbol at the given index from the symbol table.
-
-    Returns [None] if the index is out of bounds or the name cannot be read. *)
-val read_symbol_name :
-  symtab_body:Owee_buf.t -> strtab_body:Owee_buf.t -> sym_index:int -> string option
-
-(** [read_symbol_shndx ~symtab_body ~sym_index] reads the section header index
-    (st_shndx) of the symbol at the given index.
-
-    Returns [None] if the index is out of bounds.
-    Use [Section_index.is_undef] to check for undefined symbols. *)
-val read_symbol_shndx :
-  symtab_body:Owee_buf.t -> sym_index:int -> Section_index.t option
+(** [iteri_rela_entries ~rela_body ~f] iterates over all RELA entries in
+    the given section body, calling [f] with each entry and its index within
+    the section (the entry lies at byte offset [index * rela_entry_size]). *)
+val iteri_rela_entries :
+  rela_body:Owee_buf.t -> f:(index:int -> rela_entry -> unit) -> unit
 
 (** {1 Entry Sizes} *)
 
@@ -197,7 +182,7 @@ type sym_entry =
     (** Symbol type and binding. *)
     st_other : int;
     (** Symbol visibility. *)
-    st_shndx : int;
+    st_shndx : Section_index.t;
     (** Section header index. *)
     st_value : int64;
     (** Symbol value. *)

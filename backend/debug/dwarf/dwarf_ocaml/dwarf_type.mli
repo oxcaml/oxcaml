@@ -18,6 +18,11 @@ open! Dwarf_low
 open! Dwarf_high
 module Uid = Flambda2_identifiers.Flambda_debug_uid
 
+(** Create the shared immediate-or-pointer enumeration DIEs for a compilation
+    unit (see [Dwarf_state.Die_gen_ctx.imm_or_ptr_enums]). *)
+val create_imm_or_ptr_enum_dies :
+  parent_proto_die:Proto_die.t -> Dwarf_state.Die_gen_ctx.imm_or_ptr_enums
+
 val variable_to_die :
   Dwarf_state.t ->
   value_type_proto_die:Proto_die.t ->
