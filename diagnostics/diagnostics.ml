@@ -99,7 +99,7 @@ let typedecl_diagnostic report loc (error : Typedecl.error) =
   | Rebind_private _ | Variance _ | Unavailable_type_constructor _
   | Unbound_type_var_ext _ | Val_in_structure | Multiple_native_repr_attributes
   | Cannot_unbox_or_untag_type _ | Deep_unbox_or_untag_attribute _
-  | Jkind_mismatch_due_to_bad_inference _ | Jkind_sort _ | Jkind_empty_record
+  | Jkind_mismatch_due_to_bad_inference _ | Jkind_sort _
   | Non_representable_in_module _ | Invalid_jkind_in_block _
   | Illegal_mixed_product _ | Separability _ | Bad_unboxed_attribute _
   | Poly_not_yet_implemented | Boxed_and_unboxed | Nonrec_gadt

@@ -51,6 +51,7 @@ module Meaning = struct
     | Lazy_allocated_on_heap
     | Lazy_forced
     | Module_allocated_on_heap
+    | Unpacked_module
     | Legacy_construct of Mode.Hint.legacy
     | Toplevel_expression
     | Tailcall_function
@@ -149,6 +150,7 @@ module Meaning = struct
     | Const Function_return -> Fact Function_return_default
     | Const Stack_expression -> Fact Stack_allocated
     | Const Module_allocated_on_heap -> Fact Module_allocated_on_heap
+    | Const Mod_unpack -> Fact Unpacked_module
     | Const (Always_dynamic x) -> Fact (Always_dynamic x)
     | Const Branching -> Fact Has_branches
     | Const Lpoly_inst -> Fact Layout_poly_instantiated
@@ -168,11 +170,11 @@ module Meaning = struct
   let is_region_escape : fact -> bool = function
     | Region_escape _ -> true
     | Mutable_read _ | Mutable_write _ | Lazy_allocated_on_heap | Lazy_forced
-    | Module_allocated_on_heap | Legacy_construct _ | Toplevel_expression
-    | Tailcall_function | Tailcall_argument | Function_return_default
-    | Stack_allocated | Always_dynamic _ | Has_branches
-    | Layout_poly_instantiated | Borrowed | Quoted_computation | Spliced
-    | Static_not_guaranteed _ ->
+    | Module_allocated_on_heap | Unpacked_module | Legacy_construct _
+    | Toplevel_expression | Tailcall_function | Tailcall_argument
+    | Function_return_default | Stack_allocated | Always_dynamic _
+    | Has_branches | Layout_poly_instantiated | Borrowed | Quoted_computation
+    | Spliced | Static_not_guaranteed _ ->
       false
 end
 
@@ -433,6 +435,8 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
     [about [subj; copula; txt " a lazy expression allocated on the heap"]]
   | Fact Module_allocated_on_heap ->
     [about [subj; copula; txt " a module allocated on the heap"]]
+  | Fact Unpacked_module ->
+    [say [txt "unpacked first-class modules are always dynamic"]]
   | Fact (Legacy_construct legacy) ->
     let what =
       match (legacy : Mode.Hint.legacy) with
