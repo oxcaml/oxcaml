@@ -38,7 +38,6 @@ type error =
   | Unboxed_vector_or_mask_in_array_comprehension
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
-  | Block_index_gap_overflow_possible
   | Mixed_record_atomic_loc of Longident.t
 
 exception Error of Location.t * error
@@ -2782,17 +2781,6 @@ and transl_idx ~scopes loc env ba uas =
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
-      (* Check to make sure the gap never overflows.
-         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-      if not (mixed_block_shape_has_splices shape) then begin
-        let cts =
-          Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
-        in
-        if Option.is_none
-             (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
-        then
-          raise (Error (loc, Block_index_gap_overflow_possible))
-      end;
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     end
@@ -3249,14 +3237,6 @@ let report_error_doc ppf = function
   | Unboxed_product_in_let_mutable ->
       fprintf ppf
         "Mutable lets are not yet supported with unboxed products."
-  | Block_index_gap_overflow_possible ->
-      (* This error message describes a more conservative rule than we actually
-         enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
-      fprintf ppf
-        "This block index cannot be created because it refers to values@ \
-         and non-values that are separated by 2^%d or more bytes in their@ \
-         block, or could be deepened to such an index."
-        (64 - Mixed_product_bytes.block_index_offset_bits)
   | Mixed_record_atomic_loc lid ->
       fprintf ppf
         "Use of %a with mixed record fields (here %a) is forbidden."
