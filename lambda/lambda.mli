@@ -1461,8 +1461,8 @@ val mixed_block_element_of_types :
 val mixed_block_shape_of_types :
   Types.mixed_product_shape -> mixed_block_shape
 
-val split_mixed_block_shape_vectors :
-  'a mixed_block_element array -> 'a mixed_block_element array
+val transl_mixed_product_element :
+  Types.mixed_block_element -> unit mixed_block_element
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 

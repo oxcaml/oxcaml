@@ -691,9 +691,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                      constructors with all-void inline records, which are stored
                      as immediates *)
                   if !Clflags.native_code then
-                    let shape =
-                      Lambda.split_mixed_block_shape_vectors shape
-                    in
                     Some (Const_mixed_block(runtime_tag, shape, constants))
                   else
                     (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -722,9 +719,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     (* CR layouts v5: once all-void records are allowed, handle
                        constructors with all-void inline records, which are
                        stored as immediates *)
-                    let shape =
-                      Lambda.split_mixed_block_shape_vectors shape
-                    in
                     Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
               in
               Lprim (makeblock, ll, of_location ~scopes e.exp_loc)
@@ -760,7 +754,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
                      as immediates *)
-                  let shape = Lambda.split_mixed_block_shape_vectors shape in
                   let shape =
                     (* This corresponds to the poly variant hash.  This will
                        always stay in the same place because the reordering
@@ -1035,7 +1028,6 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             Typeopt.refine_mixed_block_element newval.exp_env newval.exp_loc
               newval.exp_type shape.(lbl.lbl_pos)
           in
-          let shape = Lambda.split_mixed_block_shape_vectors shape in
           (* Update the shape with details for the modified field. *)
           shape.(lbl.lbl_pos) <- field_shape;
           if Types.is_atomic lbl.lbl_mut then
@@ -2475,7 +2467,6 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                   Typeopt.refine_mixed_block_element expr.exp_env expr.exp_loc
                     expr.exp_type shape.(lbl.lbl_pos)
                 in
-                let shape = Lambda.split_mixed_block_shape_vectors shape in
                 (* Update the shape with details for the modified field. *)
                 shape.(lbl.lbl_pos) <- field_shape;
                 Psetmixedfield
@@ -2602,7 +2593,6 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             raise Not_constant
         | Record_mixed shape ->
             if !Clflags.native_code then
-              let shape = Lambda.split_mixed_block_shape_vectors shape in
               Lconst(Const_mixed_block(0, shape, cl))
             else
               (* CR layouts v5.9: Structured constants for mixed blocks should
@@ -2663,14 +2653,12 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (Ordinary _, _, Variant_extensible) ->
             assert false
         | Record_mixed shape ->
-            let shape = Lambda.split_mixed_block_shape_vectors shape in
             Lprim (Pmakeblock (0, mut, Shape shape, Option.get mode), ll, loc)
         | Record_inlined (Ordinary { runtime_tag },
                           Constructor_mixed shape, Variant_boxed) ->
             (* CR layouts v5: once all-void records are allowed, handle
               constructors with all-void inline records, which are stored as
               immediates *)
-            let shape = Lambda.split_mixed_block_shape_vectors shape in
             Lprim (Pmakeblock (runtime_tag, mut, Shape shape, Option.get mode),
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -2793,7 +2781,6 @@ and transl_idx ~scopes loc env ba uas =
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
-      let shape = Lambda.split_mixed_block_shape_vectors shape in
       (* Check to make sure the gap never overflows.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
       if not (mixed_block_shape_has_splices shape) then begin
