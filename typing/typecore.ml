@@ -9316,25 +9316,23 @@ and type_function
               | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
-            let ty_default_arg = newvar Predef.option_argument_jkind in
-            begin
-              try unify env (type_option ty_default_arg) ty_arg_mono
-              with Unify _ -> assert false;
-            end;
             (* The default is projected out of the [option], so its type must
                be representable even though optional argument types in general
                needn't be. *)
-            let default_arg_sort =
-              match
-                Ctype.type_jkind_and_sort env ty_default_arg ~fixed:false
-                  ~why:Optional_arg_default
-              with
-              | Ok (_, sort) -> sort
-              | Error err ->
-                raise
-                  (Error (pat.ppat_loc, env,
-                          Optional_arg_default_not_rep (ty_default_arg, err)))
+            let ty_default_arg = extract_option_type env ty_arg_mono in
+            let default_arg_jkind, default_arg_sort =
+              Jkind.of_new_sort_var ~why:Optional_arg_default
+                ~level:(Ctype.get_current_level ())
             in
+            begin match
+              Ctype.constrain_type_jkind env ty_default_arg default_arg_jkind
+            with
+            | Ok () -> ()
+            | Error err ->
+              raise
+                (Error (pat.ppat_loc, env,
+                        Optional_arg_default_not_rep (ty_default_arg, err)))
+            end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
             *)
