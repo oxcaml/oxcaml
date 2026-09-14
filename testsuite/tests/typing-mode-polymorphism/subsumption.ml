@@ -531,3 +531,28 @@ end
 module Self_simplified_self :
   sig val f : 'a @ local -> ('a @ local -> unit) -> unit end
 |}]
+
+module Foo = struct
+  module F (X : sig type t val consume : t @ local -> unit end) = struct
+    let f x () = X.consume x
+  end
+  module M = F(struct type t = string let consume (x @ local) = () end)
+  module Check : sig val f : string @ local -> unit -> unit end = M
+end
+[%%expect{|
+module Foo :
+  sig
+    module F :
+      functor (X : sig type t val consume : t @ local -> unit end) ->
+        sig
+          val f :
+            X.t @ [< many read_write] -> unit @ 'm -> unit @ [> dynamic]
+        end
+    module M :
+      sig
+        val f :
+          string @ [< many read_write] -> unit @ 'm -> unit @ [> dynamic]
+      end
+    module Check : sig val f : string @ local -> unit -> unit end
+  end
+|}]
