@@ -3177,8 +3177,13 @@ let proj_shape map mod_shape item =
       Shape.Map.add map item shape, Some shape
 
 module Add_signature(T : Types.Wrapped)(M : sig
-  val add_value: ?shape:Shape.t -> mode:(Mode.allowed * 'r0) Mode.With_regionality.t -> Ident.t ->
-    T.value_description  -> t -> t
+  val add_value:
+    ?shape:Shape.t ->
+    mode:(Mode.allowed * 'r0) Mode.With_regionality.t ->
+    Ident.t ->
+    T.value_description ->
+    t ->
+    t
   val add_module_declaration: ?arg:bool -> ?shape:Shape.t
     -> full_env:t ref -> check:bool
     -> Ident.t -> module_presence -> T.module_declaration
@@ -3216,8 +3221,12 @@ end) = struct
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
 
-  let add_signature map mod_shape sg ?(mode = Mode.With_regionality.(allow_right max))
-    env =
+  let add_signature
+      map
+      mod_shape
+      sg
+      ?(mode = Mode.With_regionality.(allow_right max))
+      env =
     let full_env = ref env in
     let rec go map env = function
       | [] -> map, env
@@ -3304,7 +3313,8 @@ let enter_unbound_module name reason env =
 let read_signature modname cmi =
   let mty, mode = read_pers_mod modname cmi in
   (* [mode] read from the cmi is always a constant *)
-  Subst.Lazy.force_signature mty, (Mode.With_regionality.zap_to_floor_exn mode).staticity
+  Subst.Lazy.force_signature mty,
+  (Mode.With_regionality.zap_to_floor_exn mode).staticity
 
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
@@ -3740,15 +3750,21 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
-  Mode.With_regionality.Comonadic.submode_err pp
-    comonadic (Mode.With_regionality.Comonadic.apply_hint hint_comonadic comonadic0);
+  Mode.With_regionality.Comonadic.submode_err
+    pp
+    comonadic
+    (Mode.With_regionality.Comonadic.apply_hint
+       hint_comonadic
+       comonadic0);
   let hint_monadic : _ Mode.Hint.morph =
     Is_closed_by (Monadic, {closure = closure_context; closed = pp})
   in
   let monadic =
     Mode.With_regionality.Monadic.join
       [ monadic;
-        Mode.With_regionality.comonadic_to_monadic_min ~hint:hint_monadic comonadic0 ]
+        Mode.With_regionality.comonadic_to_monadic_min
+          ~hint:hint_monadic
+          comonadic0 ]
   in
   {Mode.monadic; comonadic}
 
@@ -3830,8 +3846,13 @@ let walk_locks_for_legacy_construct ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
   ignore
-    (walk_locks ~errors:true ~env ~pp
-       (Mode.With_regionality.disallow_right Mode.With_regionality.legacy) None locks
+    (walk_locks
+       ~errors:true
+       ~env
+       ~pp
+       (Mode.With_regionality.disallow_right Mode.With_regionality.legacy)
+       None
+       locks
       : Mode.With_regionality.l)
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
@@ -4783,7 +4804,11 @@ let lookup_all_labels_from_type ?(use=true) ~record_form ~loc usage ty_path env
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.With_regionality.r * type_expr * Jkind_types.Sort.t
+  | Mutable_variable of
+      Ident.t
+      * Mode.With_regionality.r
+      * type_expr
+      * Jkind_types.Sort.t
 
 let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with

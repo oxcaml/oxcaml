@@ -264,7 +264,9 @@ let rec expand_paths_lazy paths env =
         Unit -> Unit, env
       | Named (name,mty,mm) ->
           let mty = expand_paths_lazy paths env mty in
-          let mode = Mode.(alloc_as_value mm |> With_regionality.disallow_right) in
+          let mode =
+            Mode.(alloc_as_value mm |> With_regionality.disallow_right)
+          in
           let env = match name with
             | Some param when !Clflags.applicative_functors ->
                 Env.add_module_lazy ~update_summary:false param Mp_present mty
@@ -507,7 +509,9 @@ let rec nondep_mty_with_presence env va ids pres mty =
   | Mty_functor(Named (param, arg, marg), res, mres) ->
       let var_inv =
         match va with Co -> Contra | Contra -> Co | Strict -> Strict in
-      let mode = Mode.(alloc_as_value marg |> With_regionality.disallow_right) in
+      let mode =
+        Mode.(alloc_as_value marg |> With_regionality.disallow_right)
+      in
       let res_env =
         match param with
         | None -> env
@@ -923,7 +927,9 @@ let lower_nongen nglev mty =
           super.it_do_type_expr it ty
     in
   let it_mode_expr m =
-    if not (Mode.With_locality.check_generic m) then Mode.With_locality.update_level nglev m in
+    if not (Mode.With_locality.check_generic m) then
+      Mode.With_locality.update_level nglev m
+  in
   let it = {super with it_do_type_expr; it_mode_expr} in
   it.it_module_type it mty
   end

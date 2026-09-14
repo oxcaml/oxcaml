@@ -713,7 +713,10 @@ let mode_lazy expected_mode =
       yielding = Yielding.Const.Unyielding }
   in
   let expected_mode =
-    mode_coerce (With_regionality.of_const ~hint_comonadic:Lazy_allocated_on_heap mode)
+    mode_coerce
+      (With_regionality.of_const
+         ~hint_comonadic:Lazy_allocated_on_heap
+         mode)
       expected_mode
   in
   let mode_crossing =
@@ -746,13 +749,19 @@ let mode_trywith expected_mode =
    preserving outer expectations that are stricter than legacy modes. *)
 let mode_effect_handler_body expected_mode =
   let expected_mode =
-    mode_coerce (With_regionality.of_const With_regionality.Const.legacy) expected_mode
+    mode_coerce
+      (With_regionality.of_const
+         With_regionality.Const.legacy)
+      expected_mode
   in
   let mode = as_single_mode expected_mode in
   { expected_mode with
     position =
       RTail
-        ( Regionality.disallow_left (With_regionality.proj_comonadic Areality mode),
+        ( Regionality.disallow_left
+            (With_regionality.proj_comonadic
+               Areality
+               mode),
           FTail ) }
 
 let mode_tuple mode tuple_modes =
@@ -764,11 +773,12 @@ let mode_tuple mode tuple_modes =
   { (mode_default mode) with
     tuple_modes }
 
-(** Takes [marg:With_locality.lr] extracted from the arrow type and returns the real
-mode of argument, after taking into consideration partial application and
-tail-call. Returns [expected_mode] and [With_regionality.lr] which are backed by the same
-mode variable. We encode extra position information in the former. We need the
-latter to the both left and right mode because of how it will be used. *)
+(** Takes [marg:With_locality.lr] extracted from the arrow type and returns the
+real mode of argument, after taking into consideration partial application and
+tail-call. Returns [expected_mode] and [With_regionality.lr] which are backed by
+the same mode variable. We encode extra position information in the former.
+We need the latter to the both left and right mode
+because of how it will be used. *)
 let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   let vmode , _ =
     With_regionality.newvar_below
@@ -791,8 +801,11 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
   | _, _, (Nontail | Default) ->
      mode_default vmode, vmode
   | _, _, Tail -> begin
-    With_regionality.submode_exn vmode With_regionality.(of_const ~hint_comonadic:Tailcall_argument
-      { Const.max with areality = Regional});
+    With_regionality.submode_exn
+      vmode
+      With_regionality.(of_const
+        ~hint_comonadic:Tailcall_argument
+        { Const.max with areality = Regional});
     mode_default vmode, vmode
   end
 
@@ -800,7 +813,11 @@ let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
    shared_context explains why mode.uniqueness is high *)
 let submode ~loc ~env ?(reason = Other) mode expected_mode =
   let res =
-    With_regionality.submode ~pp:(loc, Expression) mode (as_single_mode expected_mode)
+    With_regionality.submode
+      ~pp:(loc, Expression)
+      mode
+      (as_single_mode
+         expected_mode)
   in
   match res with
   | Ok () -> ()
@@ -831,9 +848,16 @@ let tuple_pat_mode mode tuple_modes =
 let effect_handler_modes pinpoint env expected_mode =
   Env.walk_locks_for_legacy_construct ~env pinpoint;
   let env =
-    Env.add_const_closure_lock pinpoint With_regionality.Comonadic.Const.legacy env
+    Env.add_const_closure_lock
+      pinpoint
+      With_regionality.Comonadic.Const.legacy
+      env
   in
-  env, simple_pat_mode With_regionality.legacy, mode_effect_handler_body mode_legacy,
+  env,
+  simple_pat_mode
+    With_regionality.legacy,
+  mode_effect_handler_body
+    mode_legacy,
   mode_effect_handler_body expected_mode
 
 let global_pat_mode {mode; _}=
@@ -973,8 +997,8 @@ type label_overwrite =
   | No_overwrite_label
   | Overwrite_label of
       Types.type_expr * (* the type of the record *)
-      With_regionality.l           (* the mode of the label expression, already accounting
-                           for modalities *)
+      With_regionality.l
+      (* the mode of the label expression, already accounting for modalities *)
 
 let assign_children ~no n f = function
   | No_overwrite
@@ -1292,9 +1316,21 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
-let apply_mode_annots ~loc kind (m : With_locality.Const.Option.t Typemode.modes) mode =
-  let min = With_locality.Const.Option.value ~default:With_locality.Const.min m.mode_modes in
-  let max = With_locality.Const.Option.value ~default:With_locality.Const.max m.mode_modes in
+let apply_mode_annots
+    ~loc
+    kind
+    (m : With_locality.Const.Option.t Typemode.modes)
+    mode =
+  let min =
+    With_locality.Const.Option.value
+      ~default:With_locality.Const.min
+      m.mode_modes
+  in
+  let max =
+    With_locality.Const.Option.value
+      ~default:With_locality.Const.max
+      m.mode_modes
+  in
   let annot_loc =
     if List.is_empty m.mode_desc then loc else
     Location.merge (List.map (fun a -> a.loc) m.mode_desc)
@@ -1306,8 +1342,18 @@ let apply_mode_annots ~loc kind (m : With_locality.Const.Option.t Typemode.modes
       m.mode_desc
   in
   let hint = Hint.Annotation { loc = annot_loc; written_modes } in
-  let min = With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
-  let max = With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
+  let min =
+    With_locality.of_const
+      ~hint_monadic:hint
+      ~hint_comonadic:hint
+      min
+  in
+  let max =
+    With_locality.of_const
+      ~hint_monadic:hint
+      ~hint_comonadic:hint
+      max
+  in
   let pp : Hint.pinpoint = loc, kind in
   With_locality.submode_err pp min mode;
   With_locality.submode_err pp mode max
@@ -1385,14 +1431,19 @@ let mode_in_quotes : With_regionality.lr =
   let open Mode_hint in
   let hint_monadic = Legacy Quoted
   and hint_comonadic = Legacy Quoted in
-  With_regionality.Const.legacy |> With_regionality.of_const ~hint_monadic ~hint_comonadic
+  With_regionality.Const.legacy
+  |> With_regionality.of_const
+       ~hint_monadic
+       ~hint_comonadic
 
 (** The [expected_mode] of the result of an expression in a quote. *)
 let mode_quoted : expected_mode = mode_default mode_in_quotes
 
 (** The left-mode of the result of an expression that was quoted.
     Note: we must have that [mode_quoted <= mode_splice] for soundness. *)
-and mode_splice : With_regionality.l = With_regionality.disallow_right mode_in_quotes
+and mode_splice : With_regionality.l =
+  With_regionality.disallow_right
+    mode_in_quotes
 
 (** Lower bound for the mode of a quoted expression that
     might have side-effects. *)
@@ -2256,7 +2307,10 @@ let solve_constructor_annotation
     with_local_level_generalize_structure
       ~before_generalize:(fun (_, ty, _) -> generalize_structure ty)
       (fun () ->
-         Typetexp.transl_simple_type_delayed !!penv With_locality.Const.legacy sty)
+         Typetexp.transl_simple_type_delayed
+           !!penv
+           With_locality.Const.legacy
+           sty)
   in
   tps.tps_pattern_force <- force :: tps.tps_pattern_force;
   (* Only unify the return type after generating the ids *)
@@ -3630,7 +3684,10 @@ and type_pat_aux
         match mutable_flag with
         | Immutable -> alloc_mode, Val_reg sort
         | Mutable ->
-            let m0 = With_regionality.Comonadic.newvar (Ctype.get_current_level ()) in
+            let m0 =
+              With_regionality.Comonadic.newvar
+                (Ctype.get_current_level ())
+            in
             let mode =
               mutvar_mode ~loc ~env:!!penv
                 (Ctype.get_current_level ()) m0 alloc_mode
@@ -4960,8 +5017,8 @@ let check_curried_application_complete ~env ~app_loc args =
    [collect_apply_args]) by collecting up passed [Arg]s until an [Omitted] is
    encountered, and then doing a submode check on each collected [Arg] against
    the expected mode of the final closure. In addition, we use the [close_over]
-   and [partial_apply] functions from [Mode.With_locality] to make sure that the modes
-   of the constructed arrows themselves are correct. This algorithm is
+   and [partial_apply] functions from [Mode.With_locality] to make sure that the
+   modes of the constructed arrows themselves are correct. This algorithm is
    quadratic, looking at each previously seen [Arg] for every [Omitted]. (It
    seems to be easy to make this not quadratic, though.)
 *)
@@ -5245,7 +5302,10 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              let mode_ret_eta =
                if Language_extension.(is_at_least Mode_polymorphism Alpha)
                then
-                fst (With_locality.newvar_above (Ctype.get_current_level ()) mode_ret)
+                fst
+                  (With_locality.newvar_above
+                     (Ctype.get_current_level ())
+                     mode_ret)
                else mode_ret
              in
              let arrow_desc = (lbl, mode_arg, mode_ret_eta) in
@@ -5269,11 +5329,17 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
              in
              let closed_args = new_closed_args @ closed_args in
              let open_args = [] in
-             let mode_closed_args = List.map With_locality.close_over closed_args in
+             let mode_closed_args =
+               List.map
+                 With_locality.close_over
+                 closed_args
+             in
              let mode_partial_fun = With_locality.partial_apply mode_fun in
              let mode_cls, _ =
-               With_locality.newvar_above (Ctype.get_current_level ()) (With_locality.join
-                (mode_partial_fun:: mode_closed_args))
+               With_locality.newvar_above
+                 (Ctype.get_current_level ())
+                 (With_locality.join
+                    (mode_partial_fun:: mode_closed_args))
              in
              let mode_closure =
                create_allocation_mode_r mode_cls
@@ -6332,7 +6398,11 @@ let unique_use ~loc ~env mode_l mode_r  =
     (* if unique extension is not enabled, we will not run uniqueness analysis;
        instead, we force all uses to be aliased and many. This is equivalent to
        running a UA which forces everything *)
-    submode ~loc ~env With_regionality.(of_const {Const.min with uniqueness = Aliased})
+    submode
+      ~loc
+      ~env
+      With_regionality.(of_const
+        {Const.min with uniqueness = Aliased})
       (mode_default mode_r);
     submode ~loc ~env mode_l (mode_default With_regionality.(of_const
       {Const.max with linearity = Many}));
@@ -6344,7 +6414,10 @@ let unique_use ~loc ~env mode_l mode_r  =
       Uniqueness.disallow_left (With_regionality.proj_monadic Uniqueness mode_r)
     in
     let linearity =
-      Linearity.disallow_right (With_regionality.proj_comonadic Linearity mode_l)
+      Linearity.disallow_right
+        (With_regionality.proj_comonadic
+           Linearity
+           mode_l)
     in
     (uniqueness, linearity)
 
@@ -6633,9 +6706,9 @@ type type_function_result =
     params_contain_gadt: contains_gadt;
     (* The alloc mode of the "rest of the function". None only for recursive
        calls to [type_function] when there are no parameters left. This needs to
-       carry the full [With_locality] closure mode, against which the curry constraints
-       are checked, together with the locality component stored as [fp_curry]'s
-       [partial_mode].
+       carry the full [With_locality] closure mode, against which the curry
+       constraints are checked, together with the locality component stored as
+       [fp_curry]'s [partial_mode].
     *)
     fun_alloc_mode: fun_alloc_mode option;
     (* Information about the return of the function. None only for
@@ -6754,7 +6827,10 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
       let exp_mode =
         (* [env_mode] guaranteed to be lower than [exp_mode], but prioritize
            [exp_mode] for mode error hints. *)
-        Mode.With_regionality.meet (List.map as_single_mode [exp_mode; env_mode])
+        Mode.With_regionality.meet
+          (List.map
+             as_single_mode
+             [exp_mode; env_mode])
       in
       Some env_alloc_mode, mode_default exp_mode
     else None, exp_mode
@@ -6853,7 +6929,10 @@ and type_expect_
                 ~before_generalize:(fun (exp, _) ->
                   generalize_structure_exp exp)
                 begin fun () ->
-                let mode = With_regionality.newvar (Ctype.get_current_level ()) in
+                let mode =
+                  With_regionality.newvar
+                    (Ctype.get_current_level ())
+                in
                 let exp = type_exp ~recarg env (mode_default mode) sexp in
                 exp, mode
               end
@@ -7681,7 +7760,11 @@ and type_expect_
       let env, arg_mode, body_mode, expected_mode =
         match eff_caselist with
         | [] ->
-          env, simple_pat_mode With_regionality.legacy, mode_trywith expected_mode,
+          env,
+          simple_pat_mode
+            With_regionality.legacy,
+          mode_trywith
+            expected_mode,
           expected_mode
         | _ :: _ ->
           let env, arg_mode, _, expected_mode =
@@ -7922,7 +8005,11 @@ and type_expect_
       in
       let modality, _ =
         Mode.Locality.newvar_above 0
-          (Mode.With_locality.proj_comonadic Areality (value_to_alloc_r2l rmode)) in
+          (Mode.With_locality.proj_comonadic
+             Areality
+             (value_to_alloc_r2l
+                rmode))
+      in
       unify_exp ~sexp env record ty_record;
       let record_repres =
         update_labels env Legacy ~representative_label:label ~loc
@@ -8050,11 +8137,13 @@ and type_expect_
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ }, _)
       | Baccess_block (Mutable_access, _) ->
-        Mutable { mode = Mode.With_regionality.Comonadic.legacy; atomic = Nonatomic }
+        Mutable { mode = Mode.With_regionality.Comonadic.legacy;
+                  atomic = Nonatomic }
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }, _)
       | Baccess_block (Atomic_access, _) ->
-        Mutable { mode = Mode.With_regionality.Comonadic.legacy; atomic = Atomic }
+        Mutable { mode = Mode.With_regionality.Comonadic.legacy;
+                  atomic = Atomic }
     in
     let (el_ty, modality), uas =
       List.fold_left_map
@@ -8216,7 +8305,12 @@ and type_expect_
       ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
       }
   | Pexp_constraint (sarg, Some sty, []) ->
-      let (ty, exp_extra) = type_constraint env sty Mode.With_locality.Const.legacy in
+      let (ty, exp_extra) =
+        type_constraint
+          env
+          sty
+          Mode.With_locality.Const.legacy
+      in
       let ty' = instance ty in
       let error_message_attr_opt =
         Builtin_attributes.error_message_attr sexp.pexp_attributes in
@@ -8325,8 +8419,10 @@ and type_expect_
       let (cl_path, cl_decl, cl_mode) =
         Env.lookup_class ~loc:cl.loc cl.txt env
       in
-      With_regionality.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
-        cl_mode With_regionality.legacy;
+      With_regionality.submode_exn
+        ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
+        cl_mode
+        With_regionality.legacy;
       let pm = position_and_mode env expected_mode sexp in
       begin match cl_decl.cty_new with
           None ->
@@ -8704,7 +8800,9 @@ and type_expect_
             loop slet.pbop_pat (newvar initial_jkind) initial_sort sands
           in
           let ty_func_result, body_sort = new_rep_var ~why:Function_result () in
-          let arrow_desc = Nolabel, With_locality.legacy, With_locality.legacy in
+          let arrow_desc =
+            Nolabel, With_locality.legacy, With_locality.legacy
+          in
           let ty_func =
             newty (Tarrow(arrow_desc, newmono ty_params, ty_func_result,
                           commu_ok))
@@ -8731,15 +8829,27 @@ and type_expect_
         type_andops env slet.pbop_exp sands sort_andops ty_andops
       in
       let body_env =
-        Env.add_const_closure_lock (loc, Letop) With_regionality.Comonadic.Const.legacy
+        Env.add_const_closure_lock
+          (loc, Letop)
+          With_regionality.Comonadic.Const.legacy
           env
       in
       let scase = Ast_helper.Exp.case spat_params sbody in
       let cases, partial =
-        type_cases Value body_env
-          (simple_pat_mode With_regionality.legacy) (mode_return With_regionality.legacy)
-          ty_params param_sort (mk_expected ty_func_result)
-          ~check_if_total:true loc [scase]
+        type_cases
+          Value
+          body_env
+          (simple_pat_mode
+             With_regionality.legacy)
+          (mode_return
+             With_regionality.legacy)
+          ty_params
+          param_sort
+          (mk_expected
+             ty_func_result)
+          ~check_if_total:true
+          loc
+          [scase]
       in
       let body =
         match cases with
@@ -8966,7 +9076,8 @@ and type_expect_
         With_regionality.newvar_below
           (get_current_level ())
           (With_regionality.meet [
-            With_regionality.of_const {With_regionality.Const.max with uniqueness = Unique};
+            With_regionality.of_const
+              {With_regionality.Const.max with uniqueness = Unique};
             With_regionality.max_with_comonadic Areality
               (With_regionality.proj_comonadic Areality expected_mode.mode)])
       in
@@ -9730,7 +9841,9 @@ and type_function
                     Is_closed_by (Monadic, cls_details)
                   in
                   With_locality.Monadic.submode_err (pparam_loc, Pattern)
-                    (With_locality.comonadic_to_monadic_min ~hint fun_closure_mode)
+                    (With_locality.comonadic_to_monadic_min
+                       ~hint
+                       fun_closure_mode)
                     env_mode;
                   begin match
                     With_locality.Comonadic.submode arg_mode fun_closure_mode
@@ -9744,7 +9857,9 @@ and type_function
                         Uncurried_function_escapes_comonadic e))
                   end;
                   begin match
-                      With_locality.Comonadic.submode closure_mode fun_closure_mode
+                      With_locality.Comonadic.submode
+                        closure_mode
+                        fun_closure_mode
                     with
                     | Ok () ->
                         Locality.submode_exn
@@ -9825,7 +9940,10 @@ and type_function
             param_uid
       in
       let param_yielding =
-        With_locality.proj_comonadic Yielding (With_locality.disallow_right arg_mode)
+        With_locality.proj_comonadic
+          Yielding
+          (With_locality.disallow_right
+             arg_mode)
       in
       let arg_locality =
         create_allocation_mode_l arg_mode
@@ -10578,7 +10696,10 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
           (get_current_level ()) (alloc_as_value marg)
       in
       Regionality.submode_exn
-        (With_regionality.proj_comonadic Areality eta_mode) Regionality.regional;
+        (With_regionality.proj_comonadic
+           Areality
+           eta_mode)
+        Regionality.regional;
       let type_sort ~why ty =
         match type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
@@ -10930,7 +11051,10 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
           List.map (fun (mode, _) ->
             snd (register_allocation_value_mode ~loc mode)) tuple_modes
         in
-        let argument_mode = With_regionality.meet (argument_mode :: tuple_modes) in
+        let argument_mode =
+          With_regionality.meet
+            (argument_mode :: tuple_modes)
+        in
         List.init arity (fun _ -> argument_mode)
     | None ->
         List.init arity (fun _ -> argument_mode)
@@ -11576,7 +11700,10 @@ and type_cases
     if n_non_refute > 1 then begin
       Staticity.submode_err (loc, Cases_result)
         (Staticity.of_const ~hint:Branching Dynamic)
-        (expr_mode |> as_single_mode |> With_regionality.proj_monadic Staticity);
+        (expr_mode
+         |> as_single_mode
+         |> With_regionality.proj_monadic
+              Staticity);
       dynamic_pat_mode pat_mode
     end else pat_mode
   in
@@ -11663,7 +11790,10 @@ and type_function_cases_expect
       |> Typedtree.create_alloc_mode_l
     in
     let yielding_mode =
-      With_locality.proj_comonadic Yielding (With_locality.disallow_right arg_mode)
+      With_locality.proj_comonadic
+        Yielding
+        (With_locality.disallow_right
+           arg_mode)
     in
     let param , param_uid =
       name_cases ~pattern_kind:Value_pattern_in_argument "param" cases
@@ -11727,8 +11857,18 @@ and type_effect_cases
         let conts = List.map (type_continuation_pat env ty_cont) conts in
         let sort_eff = Jkind.Sort.(of_const Const.for_effect) in
         let cases, _ =
-          type_cases category new_env (simple_pat_mode With_regionality.legacy) rhs_mode
-            ty_arg sort_eff ty_res_explained ~conts ~check_if_total:false loc
+          type_cases
+            category
+            new_env
+            (simple_pat_mode
+               With_regionality.legacy)
+            rhs_mode
+            ty_arg
+            sort_eff
+            ty_res_explained
+            ~conts
+            ~check_if_total:false
+            loc
             caselist
         in
           cases
@@ -12193,7 +12333,9 @@ and type_andops env sarg sands expected_sort expected_ty =
             let ty_result, op_result_sort =
               new_rep_var ~why:Function_result ()
             in
-            let arrow_desc = (Nolabel, With_locality.legacy, With_locality.legacy) in
+            let arrow_desc =
+              (Nolabel, With_locality.legacy, With_locality.legacy)
+            in
             let ty_rest_fun =
               newty (Tarrow(arrow_desc, newmono ty_arg, ty_result, commu_ok)) in
             let ty_op =
@@ -12233,11 +12375,36 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode ~loc ~env ~(modes : With_locality.Const.Option.t) expected_mode =
-    let min = With_locality.Const.Option.value ~default:With_locality.Const.min modes |> Const.alloc_as_value in
-    let max = With_locality.Const.Option.value ~default:With_locality.Const.max modes |> Const.alloc_as_value in
-    submode ~loc ~env ~reason:Other (With_regionality.of_const min) expected_mode;
-    let expected_mode = mode_coerce (With_regionality.of_const max) expected_mode in
+and type_expect_mode
+    ~loc
+    ~env
+    ~(modes : With_locality.Const.Option.t)
+    expected_mode =
+    let min =
+      With_locality.Const.Option.value
+        ~default:With_locality.Const.min
+        modes
+      |> Const.alloc_as_value
+    in
+    let max =
+      With_locality.Const.Option.value
+        ~default:With_locality.Const.max
+        modes
+      |> Const.alloc_as_value
+    in
+    submode
+      ~loc
+      ~env
+      ~reason:Other
+      (With_regionality.of_const
+         min)
+      expected_mode;
+    let expected_mode =
+      mode_coerce
+        (With_regionality.of_const
+           max)
+        expected_mode
+    in
     let expected_mode =
       match modes.areality with
       | Some Local -> mode_strictly_local expected_mode
@@ -12378,7 +12545,8 @@ and type_n_ary_function
       create_yielding_mode_l
         (Yielding.join
            (With_locality.Comonadic.proj Yielding
-              (With_locality.Comonadic.disallow_right fun_alloc_mode.fun_closure_mode)
+              (With_locality.Comonadic.disallow_right
+                 fun_alloc_mode.fun_closure_mode)
             :: param_yieldings))
     in
     re
@@ -13023,7 +13191,10 @@ let escaping_submode_reason_hint =
         match get_desc ty with
         | Tarrow ((_, _, res_mode), _, res_ty, _) ->
           begin match
-            Locality.Guts.check_const (With_locality.proj_comonadic Areality res_mode)
+            Locality.Guts.check_const
+              (With_locality.proj_comonadic
+                 Areality
+                 res_mode)
           with
           | Some Global ->
             Some (n+1, true)
@@ -13810,7 +13981,10 @@ let report_error ~loc env =
        forbidden."
       quoted_longident lid
   | Submode_failed(e, submode_reason) ->
-    let Mode.With_regionality.Error (ax, _) = Mode.With_regionality.to_simple_error e in
+    let Mode.With_regionality.Error (ax, _) =
+      Mode.With_regionality.to_simple_error
+        e
+    in
     (* CR-soon zqian: move the following hints into the new hint system, then
       we can invoke [submode_err] instead of [submode], and remove this
       exception. *)
@@ -13845,7 +14019,10 @@ let report_error ~loc env =
     fprintf ppf ".@]"
       ) e
   | Curried_application_complete (lbl, e, loc_kind) ->
-      let Mode.With_locality.Error (ax, {left; _}) = Mode.With_locality.to_simple_error e in
+      let Mode.With_locality.Error (ax, {left; _}) =
+        Mode.With_locality.to_simple_error
+          e
+      in
       let sub =
         match loc_kind with
         | `Prefix ->
@@ -13882,8 +14059,14 @@ let report_error ~loc env =
         Location.errorf ~loc
             "This function when partially applied returns a value which is %a,@ \
               but expected to be %a."
-            (Style.as_inline_code (With_locality.Const.print_axis (Comonadic ax))) left
-            (Style.as_inline_code (With_locality.Const.print_axis (Comonadic ax))) right
+            (Style.as_inline_code
+               (With_locality.Const.print_axis
+                  (Comonadic ax)))
+            left
+            (Style.as_inline_code
+               (With_locality.Const.print_axis
+                  (Comonadic ax)))
+            right
     end
   | Uncurried_function_escapes_locality -> begin
       Location.errorf ~loc

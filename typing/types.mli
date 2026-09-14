@@ -49,7 +49,9 @@ val is_mutable : mutability -> bool
 val is_atomic : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
-val mutable_mode : ('l * 'r) Mode.With_regionality.Comonadic.t -> ('l * 'r) Mode.With_regionality.t
+val mutable_mode :
+  ('l * 'r) Mode.With_regionality.Comonadic.t ->
+  ('l * 'r) Mode.With_regionality.t
 
 (** Type expressions for the core language.
 

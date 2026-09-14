@@ -281,7 +281,9 @@ module Is_modal = struct
   open Err
   let rec module_type_symptom = function
     | Mode e ->
-       let Mode.With_regionality.Error (ax, _) = Mode.With_regionality.to_simple_error e in
+       let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
         Some (Mode.With_regionality.Axis.P ax)
     | Signature s -> signature_symptom s
     | Functor _ | Invalid_module_alias _ | After_alias_expansion _ | Mt_core _
@@ -304,13 +306,17 @@ module Is_modal = struct
 
   and class_declaration_symptom = function
     | Class_mode e ->
-        let Mode.With_regionality.Error (ax, _) = Mode.With_regionality.to_simple_error e in
+        let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
         Some (Mode.With_regionality.Axis.P ax)
     | Class_type _ -> None
 
   and value_mismatch : Includecore.value_mismatch -> _ = function
     | Mode e ->
-        let Mode.With_regionality.Error (ax, _) = Mode.With_regionality.to_simple_error e in
+        let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
         Some (Mode.With_regionality.Axis.P ax)
     | _ -> None
 
@@ -382,7 +388,8 @@ let print_modes ?in_structure ax (modes : Includemod.modes) =
     match modes with
     | All -> assert false
     | Specific ((mode1, _), mode2) ->
-        Mode.With_regionality.disallow_right mode1, Mode.With_regionality.disallow_left mode2
+        Mode.With_regionality.disallow_right mode1,
+        Mode.With_regionality.disallow_left mode2
   in
   let mode1 =
     mode1

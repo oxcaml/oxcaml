@@ -1121,7 +1121,9 @@ let build_other ext env =
                        name = {txt="*extension*"; loc = d.pat_loc};
                        uid = Uid.internal_not_actually_unique;
                        sort = Jkind.Sort.(of_const Const.for_constructor);
-                       mode = Mode.With_regionality.disallow_right Mode.With_regionality.max })
+                       mode =
+                         Mode.With_regionality.disallow_right
+                           Mode.With_regionality.max })
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with

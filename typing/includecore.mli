@@ -158,8 +158,8 @@ type mmodes =
   | All
   (** Check module inclusion [M1 : MT1 @ m <= MT2 @ m] for all [m]. *)
   | Specific:
-      ((Mode.allowed * 'r) Mode.With_regionality.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.With_regionality.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       mmodes
   (** Check module inclusion [M1 : MT1 @ m1 <= MT2 @ m2].
 
@@ -250,7 +250,11 @@ val report_modality_sub_error :
 
 val report_mode_sub_error :
   pp:Mode.Hint.pinpoint ->
-  string -> string -> Format_doc.formatter -> Mode.With_regionality.error -> unit
+  string ->
+  string ->
+  Format_doc.formatter ->
+  Mode.With_regionality.error ->
+  unit
 
 val report_extension_constructor_mismatch :
   string -> string -> string ->

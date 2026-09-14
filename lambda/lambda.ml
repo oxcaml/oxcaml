@@ -2398,7 +2398,10 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                for printing in debugger. *)
             let vd = Env.find_value (Path.Pident id) old_env in
             let vd = {vd with val_modalities = Mode.Modality.undefined} in
-            let mode = Mode.With_regionality.max |> Mode.With_regionality.disallow_right in
+            let mode =
+               Mode.With_regionality.max
+               |> Mode.With_regionality.disallow_right
+             in
             (vd, mode)
           in
           let rebind id id' new_env =

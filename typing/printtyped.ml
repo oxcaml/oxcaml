@@ -301,7 +301,8 @@ let jkind_annotation i ppf jkind =
   line i ppf "%a" Pprintast.jkind_annotation jkind
 
 let mode_desc i ppf modes_annot =
-  let print_mode_annot i ppf { txt = (Mode.With_locality.Atom (ax, mode)); loc = _ } =
+  let print_mode_annot i ppf
+      { txt = (Mode.With_locality.Atom (ax, mode)); loc = _ } =
     line i ppf "%a: %a\n"
       (Format_doc.compat Mode.With_locality.Axis.print) ax
       (Format_doc.compat (Mode.With_locality.Const.print_axis ax)) mode
@@ -320,7 +321,8 @@ let alloc_modes i ppf ms =
 
 let alloc_modes_opt i ppf ms =
   let print_alloc_modes_opt i ppf m =
-    line i ppf "%a\n" (Format_doc.compat Mode.With_locality.Const.Option.print) m
+    line i ppf "%a\n"
+      (Format_doc.compat Mode.With_locality.Const.Option.print) m
   in
   modes ~pr:print_alloc_modes_opt i ppf ms
 
@@ -343,7 +345,8 @@ let value_modes_var i ppf ms =
   modes ~pr:print_value_modes_var i ppf ms
 
 let moda_desc i ppf modalities_annot =
-  let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.With_regionality.atom =
+  let modality_as_mode (Mode.Modality.Atom (ax, modality))
+      : Mode.With_regionality.atom =
     match ax, modality with
     | Comonadic ax, Meet_const mode -> Atom (Comonadic ax, mode)
     | Monadic ax, Join_const mode -> Atom (Monadic ax, mode)
@@ -351,7 +354,8 @@ let moda_desc i ppf modalities_annot =
   let as_modes_annot =
     List.map (Location.map modality_as_mode) modalities_annot
   in
-  let print_mode_annot i ppf { txt = (Mode.With_regionality.Atom (ax, mode)); loc = _ } =
+  let print_mode_annot i ppf
+      { txt = (Mode.With_regionality.Atom (ax, mode)); loc = _ } =
     line i ppf "%a: %a\n"
       (Format_doc.compat Mode.With_regionality.Axis.print) ax
       (Format_doc.compat (Mode.With_regionality.Const.print_axis ax)) mode
@@ -673,7 +677,8 @@ and yielding_mode i ppf m =
      | Mode.Yielding.Const.Yielding -> "yielding")
 
 and value_mode i ppf m =
-  line i ppf "value_mode %a\n" (Format_doc.compat (Mode.With_regionality.print ())) m
+  line i ppf "value_mode %a\n"
+    (Format_doc.compat (Mode.With_regionality.print ())) m
 
 and alloc_const_option_mode i ppf m =
   line i ppf "alloc_const_option_mode %a\n"
