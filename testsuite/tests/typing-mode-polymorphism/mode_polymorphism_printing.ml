@@ -671,3 +671,89 @@ val call_and_return :
    'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | 'o | aliased dynamic]) @ [> close('o)] =
   <fun>
 |}]
+
+(* CR dkalinichenko: the second definition should retain the [global] upper
+   bound on its intermediate closure. *)
+
+let opaque_return x y = Sys.opaque_identity x
+let global_opaque_return x : _ @ global = fun y -> Sys.opaque_identity x
+[%%expect{|
+val opaque_return :
+  'a @ [< global many read_write] ->
+  'b @ 'm -> 'a @ [> aliased stateful dynamic] = <fun>
+val global_opaque_return :
+  'a @ [< global many read_write] ->
+  'b @ 'm -> 'a @ [> aliased stateful dynamic] = <fun>
+|}]
+
+let _ : (string -> (unit -> string) @ local) ref = ref opaque_return
+[%%expect{|
+- : (string -> (unit -> string) @ local) ref = {contents = <fun>}
+|}]
+
+let _ : (string -> (unit -> string) @ local) ref = ref global_opaque_return
+[%%expect{|
+Line 1, characters 51-75:
+1 | let _ : (string -> (unit -> string) @ local) ref = ref global_opaque_return
+                                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a -> 'b -> 'a) ref"
+       but an expression was expected of type
+         "(string -> (unit -> string) @ local) ref"
+       Type "'a -> 'b -> 'a" is not compatible with type
+         "string -> (unit -> string) @ local"
+Hint: This function application is partial, maybe some arguments are missing.
+|}]
+
+(* CR dkalinichenko: with [-principal], [past('p)] on the final closure
+   should also appear as an upper bound on [c]. *)
+
+type 'a cell = { mutable v : 'a }
+
+let store_and_read c x () =
+  c.v <- x;
+  let _ = c.v in
+  ()
+[%%expect{|
+type 'a cell = { mutable v : 'a; }
+val store_and_read :
+  'a cell @ [< past('n) & global read_write] ->
+  ('a @ [< past('m) & global many read_write] ->
+   (unit @ 'mm0 -> unit @ 'q) @ [> past('o) | past('p) mod many forkable unyielding | stateful]) @ [> past('m) | past('n) mod many forkable unyielding | stateful] =
+  <fun>
+|}, Principal{|
+type 'a cell = { mutable v : 'a; }
+val store_and_read :
+  'a cell @ [< past('n) & global read_write] ->
+  ('a @ [< past('m) & global many read_write] ->
+   (unit @ 'mm0 -> unit @ 'q) @ [> past('o) | past('p) | stateful]) @ [> past('m) | past('n) | stateful] =
+  <fun>
+|}]
+
+let _ :
+    (string cell @ once ->
+     (string -> (unit -> unit) @ once) @ once) ref =
+  ref store_and_read
+[%%expect{|
+- : (string cell @ once -> string -> unit -> unit) ref = {contents = <fun>}
+|}]
+
+(* With [-principal], the underlying constraint prevents a [many] final closure
+   when [c] is [once]. The surrounding [ref] prevents subsumption. *)
+let _ :
+    (string cell @ once ->
+     (string -> (unit -> unit) @ many) @ once) ref =
+  ref store_and_read
+[%%expect{|
+- : (string cell @ once -> string -> (unit -> unit)) ref = {contents = <fun>}
+|}, Principal{|
+Line 4, characters 2-20:
+4 |   ref store_and_read
+      ^^^^^^^^^^^^^^^^^^
+Error: This expression has type
+         "(string cell @ once -> string -> unit -> unit) ref"
+       but an expression was expected of type
+         "(string cell @ once -> string -> (unit -> unit)) ref"
+       Type "string -> (unit -> unit) @ once" is not compatible with type
+         "string -> unit -> unit"
+Hint: This function application is partial, maybe some arguments are missing.
+|}]
