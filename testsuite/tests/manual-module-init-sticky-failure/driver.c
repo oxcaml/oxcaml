@@ -6,7 +6,7 @@
 
 int main(int argc, char **argv)
 {
-  caml_startup(argv);
+  caml_startup((char_os const * const *) argv);
   caml_init_module("Sticky_failure_test");
   return 0;
 }

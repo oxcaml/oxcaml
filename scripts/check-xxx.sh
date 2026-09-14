@@ -44,9 +44,11 @@ check_marker() {
 }
 
 should_check_file() {
-  # Don't check the external directory, which holds vendored code.
+  # Don't check the external directory (which holds vendored code) or test
+  # outputs (where the marker can be e.g. program output or a sanitized stamp in
+  # a DWARF test)
   case "$1" in
-    external/*)
+    external/*|*.reference|*.output|*.expected)
       return 1 ;;
   esac
   return 0

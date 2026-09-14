@@ -293,8 +293,17 @@ val between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> unit
 
 (** Emit the difference [upper - lower] of two same-section labels as a ULEB128
-    value. Supported only on the GAS text backend. *)
+    value. Supported on the text and binary emitters for all Unix-like targets,
+    but not with MASM. *)
 val delta_uleb128 : upper:Asm_label.t -> lower:Asm_label.t -> unit
+
+(** The ULEB128-encoded distance from the [lower] symbol to the [upper] label
+    plus [upper_offset]. The value must be a non-negative assembly-time
+    constant; the [lower] symbol must be in the current compilation unit and in
+    the same section as [upper]. Supported on the text and binary emitters for
+    all Unix-like targets, but not with MASM. *)
+val delta_uleb128_label_minus_symbol :
+  upper:Asm_label.t -> upper_offset:Int64.t -> lower:Asm_symbol.t -> unit
 
 (** Like [between_symbols], but for two labels with additional offsets, emitting
     a 32-bit-wide reference. The assembler checks that the value does not
@@ -418,7 +427,9 @@ module Directive : sig
     | Code
     | Machine_width_data
 
-  type label_or_symbol = private
+  (* CR mshinwell: use [Asm_label_or_symbol.t] directly everywhere and delete
+     this alias. *)
+  type label_or_symbol = Asm_label_or_symbol.t =
     | Label of Asm_label.t
     | Symbol of Asm_symbol.t
 

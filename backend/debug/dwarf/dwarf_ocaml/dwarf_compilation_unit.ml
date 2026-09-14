@@ -87,7 +87,9 @@ let code_ranges_attributes ~code_layout
                   payload = ()
                 }
             in
-            Range_list.add range_list (Range_list_entry.create entry))
+            Range_list.add range_list
+              (Range_list_entry.create entry
+                 ~start_of_code_symbol:range.function_symbol))
           (Range_list.create ()) ranges
       in
       [DAH.create_ranges (Range_list_table.add range_list_table range_list)])

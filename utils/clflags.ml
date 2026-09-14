@@ -142,7 +142,7 @@ let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
-let shape_format = ref Debugging_shapes (* -shape-format *)
+let shape_format = ref Old_merlin (* -shape-format *)
 (* CR sspies: The default here uses the DWARF default (10) for simplicity. It's
    unclear whether this is the right choice. For type shapes without DWARF, a
    lower default (like 2) might be more appropriate to limit the work done. *)

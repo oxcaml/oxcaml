@@ -37,6 +37,13 @@ type 'payload entry =
         end_offset_exclusive : Targetint.t;
         payload : 'payload
       }
+  | Offset_pair_between_labels of
+      { start_inclusive : Asm_label.t;
+        start_adjustment_in_bytes : int;
+        end_exclusive : Asm_label.t;
+        end_adjustment_in_bytes : int;
+        payload : 'payload
+      }
   | Base_address of Asm_symbol.t
   | Start_end of
       { start_inclusive : Asm_label.t;
@@ -57,7 +64,7 @@ module type S = sig
 
   type t
 
-  val create : entry -> t
+  val create : entry -> start_of_code_symbol:Asm_symbol.t -> t
 
   val section : Asm_section.dwarf_section
 
@@ -78,9 +85,14 @@ struct
 
   type nonrec entry = Payload.t entry
 
-  type t = { entry : entry }
+  type t =
+    { entry : entry;
+      (* The base address established for the enclosing list, from which
+         [Offset_pair_between_labels] offsets are computed. *)
+      start_of_code_symbol : Asm_symbol.t
+    }
 
-  let create entry = { entry }
+  let create entry ~start_of_code_symbol = { entry; start_of_code_symbol }
 
   let section = P.section
 
@@ -94,12 +106,13 @@ struct
         (Dwarf_int.add
            (Address_index.size end_exclusive)
            (Payload.size payload))
-    | Startx_length { start_inclusive; length = _; payload } ->
+    | Startx_length { start_inclusive; length; payload } ->
+      let length =
+        Dwarf_value.uleb128 (Targetint.nonnegative_to_uint64_exn length)
+      in
       Dwarf_int.add
         (Address_index.size start_inclusive)
-        (Dwarf_int.add
-           (Dwarf_int.of_targetint_exn Targetint.size_in_bytes_as_targetint)
-           (Payload.size payload))
+        (Dwarf_int.add (Dwarf_value.size length) (Payload.size payload))
     | Offset_pair { start_offset_inclusive; end_offset_exclusive; payload } ->
       let start_offset_inclusive =
         Dwarf_value.uleb128
@@ -114,6 +127,13 @@ struct
         (Dwarf_int.add
            (Dwarf_value.size end_offset_exclusive)
            (Payload.size payload))
+    | Offset_pair_between_labels _ ->
+      (* The offsets are ULEB128-encoded label differences, whose sizes are only
+         known at assembly time. Emission strategies that require sizes cannot
+         be used with such entries (see [Location_or_range_list_table]). *)
+      Misc.fatal_error
+        "The size of [Offset_pair_between_labels] entries is not known at \
+         compile time"
     | Base_address _sym -> Dwarf_int.of_host_int_exn Dwarf_arch_sizes.size_addr
     | Start_end
         { start_inclusive = _; end_exclusive = _; end_adjustment = _; payload }
@@ -146,6 +166,7 @@ struct
           | Startx_endx _ -> "Startx_endx"
           | Startx_length _ -> "Startx_length"
           | Offset_pair _ -> "Offset_pair"
+          | Offset_pair_between_labels _ -> "Offset_pair_between_labels"
           | Base_address _ -> "Base_address"
           | Start_end _ -> "Start_end"
           | Start_length _ -> "Start_length"
@@ -166,18 +187,35 @@ struct
     | Startx_length { start_inclusive; length; payload } ->
       Address_index.emit ~asm_directives ~comment:"start_inclusive"
         start_inclusive;
-      (* CR mshinwell: DWARF-5 defines this length operand as ULEB128, so it
-         should be emitted as in [Start_length] below, with [size0] updated to
-         match. There are currently no users of [Startx_length]. *)
-      A.targetint ~comment:"length" length;
+      (* The length is unsigned LEB128 (DWARF-5 spec sections 2.6.2 and 2.17.3),
+         matching [size0] above. *)
+      Dwarf_value.emit ~asm_directives
+        (Dwarf_value.uleb128 ~comment:"length"
+           (Targetint.nonnegative_to_uint64_exn length));
       Payload.emit ~asm_directives payload
     | Offset_pair { start_offset_inclusive; end_offset_exclusive; payload } ->
+      (* The offsets are unsigned LEB128 (DWARF-5 spec page 44 line 30 and page
+         54 line 12), matching [size0] above. *)
       Dwarf_value.emit ~asm_directives
-        (Dwarf_value.sleb128 ~comment:"start_offset_inclusive"
-           (Targetint.to_int64 start_offset_inclusive));
+        (Dwarf_value.uleb128 ~comment:"start_offset_inclusive"
+           (Targetint.nonnegative_to_uint64_exn start_offset_inclusive));
       Dwarf_value.emit ~asm_directives
-        (Dwarf_value.sleb128 ~comment:"end_offset_exclusive"
-           (Targetint.to_int64 end_offset_exclusive));
+        (Dwarf_value.uleb128 ~comment:"end_offset_exclusive"
+           (Targetint.nonnegative_to_uint64_exn end_offset_exclusive));
+      Payload.emit ~asm_directives payload
+    | Offset_pair_between_labels
+        { start_inclusive;
+          start_adjustment_in_bytes;
+          end_exclusive;
+          end_adjustment_in_bytes;
+          payload
+        } ->
+      A.delta_uleb128_label_minus_symbol ~upper:start_inclusive
+        ~upper_offset:(Int64.of_int start_adjustment_in_bytes)
+        ~lower:t.start_of_code_symbol;
+      A.delta_uleb128_label_minus_symbol ~upper:end_exclusive
+        ~upper_offset:(Int64.of_int end_adjustment_in_bytes)
+        ~lower:t.start_of_code_symbol;
       Payload.emit ~asm_directives payload
     | Base_address sym -> A.symbol sym
     | Start_end { start_inclusive; end_exclusive; end_adjustment; payload } ->

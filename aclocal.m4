@@ -233,6 +233,36 @@ camlPervasives__loop_1128:
         AC_MSG_RESULT([no])])])
   ])])
 
+dnl Probe whether the assembler accepts the DWARF-5 ".file 0" and ".loc 0"
+dnl directives, which define the line table's primary source file entry.
+dnl LLVM-based assemblers (including Apple's) accept them, upgrading the line
+dnl table to DWARF-5 if necessary; the GNU assembler only supports them in
+dnl DWARF-5 mode from binutils 2.34.
+AC_DEFUN([OCAML_AS_HAS_FILE_ZERO_DIRECTIVE], [
+  AC_MSG_CHECKING([whether the assembler supports .file 0 directives])
+  OCAML_CC_SAVE_VARIABLES
+
+  # Modify C-compiler variables to use the assembler
+  CC="$AS"
+  CFLAGS="-o conftest.$ac_objext"
+  CPPFLAGS=""
+  ac_ext="S"
+  ac_compile='$CC $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+
+  AC_COMPILE_IFELSE(
+    [AC_LANG_SOURCE([
+camlConftest__entry:
+        .file   0       "conftest.ml"
+        .loc    0       1
+    ])],
+    [asm_file0_supported=true
+    AC_MSG_RESULT([yes])],
+    [asm_file0_supported=false
+    AC_MSG_RESULT([no])])
+
+  OCAML_CC_RESTORE_VARIABLES
+])
+
 AC_DEFUN([OCAML_MMAP_SUPPORTS_MAP_STACK], [
   AC_MSG_CHECKING([whether mmap supports MAP_STACK])
   AC_RUN_IFELSE(

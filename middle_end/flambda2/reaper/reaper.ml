@@ -51,6 +51,13 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     Unboxing_analysis.compute_code_changes solved_dep
       ~rewrite_kind_with_subkind:
         (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~rewrite_result_types:(fun ~my_closure ~params ~results types ->
+        match final_typing_env with
+        | None -> Or_unknown_or_bottom.Unknown
+        | Some old_typing_env ->
+          Or_unknown_or_bottom.Ok
+            (Types_rewriter.rewrite_result_types types_rewrite_context
+               ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
   let Rebuild.{ body; free_names; all_code; code_ids_to_remember; slot_offsets }

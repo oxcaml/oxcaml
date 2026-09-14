@@ -125,7 +125,6 @@ type error =
       ; typ : type_expr
       ; err : Jkind.Violation.t
       }
-  | Jkind_empty_record
   | Non_representable_in_module of Env.t * Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
@@ -1847,83 +1846,40 @@ let all_void_sort_option sort =
   | Some sort -> Jkind.Sort.Const.all_void sort
   | None -> false
 
-(* CR layouts v5: it wouldn't be too hard to support records that are all
-   void.  just needs a bit of refactoring in translcore *)
-let check_record_not_all_void_defaulting loc sorts =
-  if
-    List.for_all
-      (fun sort ->
-         Jkind.Sort.Const.maybe_all_void
-           (Jkind.Sort.default_for_transl_and_get sort))
-      sorts
-  then raise (Error (loc, Jkind_empty_record))
-
-(* Check a record's sorts to see if it is surely all-void, i.e. if all uses
-   of the record would cause [check_record_not_all_void_defaulting] to fire.
-   We still need that check, as this treats missing/variable sorts
-   conservatively, but this allows for errors on e.g. declarations. *)
-let eagerly_check_record_not_all_void loc sorts =
-  let field_is_void (sort : Jkind.Sort.t option) =
-    match sort with
-    | None -> false
-    | Some sort ->
-      (match Jkind.Sort.to_const_opt sort with
-       | Some const when Jkind.Sort.Const.is_concrete const ->
-         Jkind.Sort.Const.all_void const
-       | Some _ | None -> false)
-  in
-  if List.for_all field_is_void sorts then
-    raise (Error (loc, Jkind_empty_record))
-
 (* The [update_x_sorts] functions infer more precise jkinds in the type kind,
    including which fields of a record are void.  This would be hard to do during
    [transl_declaration] due to mutually recursive types.
 *)
-(* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
-  let sorts_and_jkinds =
-    List.map (fun ld_type ->
-      let jkind = Ctype.type_jkind env ld_type in
-      let sort = Jkind.sort_option_of_jkind env jkind in
-      let ld_sort =
-        (* CR-soon rtjoa: Declaration checking (this function, and
-           [Element_repr.classify ~default_to_scannable:true]) defaults unfilled
-           sort variables to scannable, but shouldn't need to.
+(* [update_label_sorts] returns the labels with their [ld_sort]s updated,
+   each paired with its jkind. *)
+let update_label_sorts env lbls =
+  List.map (fun (lbl : Types.label_declaration) ->
+    let jkind = Ctype.type_jkind env lbl.ld_type in
+    let sort = Jkind.sort_option_of_jkind env jkind in
+    let ld_sort =
+      (* CR-soon rtjoa: Declaration checking (this function, and
+          [Element_repr.classify ~default_to_scannable:true]) defaults unfilled
+          sort variables to scannable, but shouldn't need to.
 
-          In [transl_type_decl], sort variables are already defaulted with
-          [Ctype.closed_type_decl]. But the reason that this function still
-          defaults is that in [transl_extension_constructor_decl], the
-          constructor representation is computed *before* defaulting, causing
-          fatal errors if we don't default here; for other declarations the
-          defaulting is a no-op. We should fix this, so declaration checking
-          never needs to default.
-        *)
-        Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
-      in
-      sort, (ld_sort, jkind)
-    ) types
-  in
-  let live_sorts, sorts_and_jkinds = List.split sorts_and_jkinds in
-  let sorts, jkinds = List.split sorts_and_jkinds in
-  (match form with
-   | Legacy -> eagerly_check_record_not_all_void loc live_sorts
-   | Unboxed_product -> ());
-  sorts, jkinds
-
-let update_label_sorts_in_place env loc lbls ~form =
-  let types = List.map (fun lbl -> lbl.Types.ld_type) lbls in
-  let sorts, jkinds = update_label_sorts env loc types ~form in
-  let lbls =
-    List.map2 (fun lbl sort -> { lbl with ld_sort = sort }) lbls sorts
-  in
-  lbls, jkinds
+        In [transl_type_decl], sort variables are already defaulted with
+        [Ctype.closed_type_decl]. But the reason that this function still
+        defaults is that in [transl_extension_constructor_decl], the
+        constructor representation is computed *before* defaulting, causing
+        fatal errors if we don't default here; for other declarations the
+        defaulting is a no-op. We should fix this, so declaration checking
+        never needs to default.
+      *)
+      Option.bind sort Jkind.Sort.get_concrete_defaulting_to_scannable
+    in
+    { lbl with ld_sort }, jkind
+  ) lbls
 
 (* In addition to updated constructor arguments, returns whether
    all arguments are void, useful for detecting enumerations that
    can be [immediate]. Also returns the jkinds and
    [match cd_args with | Cstr_tuple _ -> the sort of each argument
                        | Cstr_record -> the single sort value] *)
-let update_constructor_arguments_sorts env loc cd_args =
+let update_constructor_arguments_sorts env cd_args =
   match cd_args with
   | Types.Cstr_tuple args ->
     let args_and_jkinds =
@@ -1944,9 +1900,7 @@ let update_constructor_arguments_sorts env loc cd_args =
     (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args)
       |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
-    let lbls, jkinds =
-      update_label_sorts_in_place env loc lbls ~form:Legacy
-    in
+    let lbls, jkinds = update_label_sorts env lbls |> List.split in
     Types.Cstr_record lbls, false, jkinds, Some [| Jkind.Sort.Const.scannable |]
 
 let assert_mixed_product_support =
@@ -2086,12 +2040,10 @@ module Element_repr = struct
         | Value_element _ | Float_element -> false
         | Addressable t -> is_mixed_element t
       in
-      List.exists (fun (t, _) -> is_mixed_element t) ts
+      List.exists is_mixed_element ts
     in
     if not mixed then `Not_mixed else begin
-      let shape =
-        List.map (fun (t,_) -> to_shape_element t) ts |> Array.of_list
-      in
+      let shape = List.map to_shape_element ts |> Array.of_list in
       (* All-value/void shapes will compile to uniform blocks, so the
          scannable prefix length limit doesn't apply. *)
       let mpb = Mixed_product_bytes.count_types_shape shape in
@@ -2109,9 +2061,9 @@ module Element_repr = struct
   let mixed_product_shape loc ts kind =
     let ts =
       Misc.Stdlib.List.mapi_result
-        (fun i (t, ty) ->
+        (fun i t ->
            match t with
-           | Some t -> Ok (t, ty)
+           | Some t -> Ok t
            | None -> Error (Unrepresentable_element i))
         ts
     in
@@ -2127,6 +2079,16 @@ let mixed_block_element env ty jkind =
     Element_repr.classify env ty jkind ~default_to_scannable:true
   in
   Option.map Element_repr.to_shape_element unboxed_element
+
+(* Everything computed about a record label that is needed to choose the
+   record's representation and jkind. Produced by [compute_repr_summary]. *)
+type label_repr =
+  { jkind : jkind_l;
+    lbl : Types.label_declaration;
+    (* With its [ld_sort] updated by [update_label_sorts]. *)
+    repr : Element_repr.t option;
+    (* [None] if the label's layout is not representable, e.g. [any]. *)
+  }
 
 (* Atomic fields must have layout value. *)
 let check_atomic_fields reprs lbls =
@@ -2156,8 +2118,7 @@ let update_constructor_representation
         let arg_reprs =
           List.map2 (fun {Types.ca_type=arg_type; _} arg_jkind ->
             Element_repr.classify env arg_type arg_jkind
-              ~default_to_scannable:true,
-            arg_type)
+              ~default_to_scannable:true)
             arg_types_and_modes arg_jkinds
         in
         Element_repr.mixed_product_shape loc arg_reprs Cstr_tuple
@@ -2167,11 +2128,10 @@ let update_constructor_representation
         let arg_reprs =
           List.map2 (fun ld arg_jkind ->
             Element_repr.classify env ld.Types.ld_type arg_jkind
-              ~default_to_scannable:true,
-            ld.Types.ld_type)
+              ~default_to_scannable:true)
             fields arg_jkinds
         in
-        check_atomic_fields (List.map fst arg_reprs) fields;
+        check_atomic_fields arg_reprs fields;
         Element_repr.mixed_product_shape loc arg_reprs Cstr_record
         |> Result.map_error (fun (Element_repr.Unrepresentable_element i) ->
              let bad_field = List.nth fields i in
@@ -2191,7 +2151,7 @@ let update_constructor_representation
 let update_constructor_representation env loc args
       ~is_extension_constructor =
   let args, constant, jkinds, arg_sorts =
-    update_constructor_arguments_sorts env loc args
+    update_constructor_arguments_sorts env args
   in
   let constructor_shape =
     update_constructor_representation env args jkinds ~loc
@@ -2203,14 +2163,15 @@ type unrepresentable_record =
   | Unrepresentable_field of string
 
 let compute_record_repr
-    loc reprs lbls ~warn
+    loc lbl_reprs ~warn
     ~values ~floats ~atomic_floats ~float64s ~non_float64_unboxed_fields
     ~atomic_fields ~voids ~first_any
     ~represent_as_float_array
     ~flatten_floats
   =
+  let reprs = List.map (fun { repr; _ } -> repr) lbl_reprs in
   (* Reject atomic fields with a non-value layout. *)
-  check_atomic_fields (List.map fst reprs) (List.map fst lbls);
+  check_atomic_fields reprs (List.map (fun { lbl; _ } -> lbl) lbl_reprs);
   let mixed_record () =
     let shape =
       Element_repr.mixed_product_shape loc reprs Record
@@ -2249,7 +2210,7 @@ let compute_record_repr
       in
       let shape =
         List.map
-          (fun ((repr : Element_repr.t option), _lbl) ->
+          (fun (repr : Element_repr.t option) ->
             match repr with
             | Some repr -> of_repr repr
             | None -> Misc.fatal_error "Expected only floats and float64s")
@@ -2272,10 +2233,8 @@ let compute_record_repr
   (* For other mixed blocks, float fields are stored as flat
       only when they're unboxed.
   *)
-  | ~values:true, ~voids:true, ..
-  | ~floats:true, ~voids:true, ..
+  | ~voids:true, ..
   | ~floats:true, ~float64s:true, ..
-  | ~float64s:true, ~voids:true, ..
   | ~values:true, ~float64s:true, ..
   | ~non_float64_unboxed_fields:true, .. ->
     mixed_record ()
@@ -2297,7 +2256,7 @@ let compute_record_repr
     Ok Record_boxed
   | ~values:false, ~floats:false, ~atomic_floats:false,
       ~float64s:false, ~non_float64_unboxed_fields:false,
-      ~voids:_, ~atomic_fields:_, ~first_any:None ->
+      ~voids:false, ~atomic_fields:_, ~first_any:None ->
     Misc.fatal_error "Typedecl.compute_record_repr: empty record"
 
 (* For tracking what types appear in record blocks. All product layouts
@@ -2319,13 +2278,15 @@ type element_repr_summary =
      mutable first_any : Ident.t option;
   }
 
-let compute_repr_summary env lbls jkinds =
+let compute_repr_summary env lbls =
   let reprs =
-    List.map2
-      (fun (_lbl, ld_type) jkind ->
-          Element_repr.classify env ld_type jkind ~default_to_scannable:true,
-          ld_type)
-      lbls jkinds
+    List.map
+      (fun ((lbl : Types.label_declaration), jkind) ->
+        let repr =
+          Element_repr.classify env lbl.ld_type jkind ~default_to_scannable:true
+        in
+        { lbl; jkind; repr })
+      (update_label_sorts env lbls)
   in
   let repr_summary =
     { values = false; floats = false; atomic_floats = false;
@@ -2338,8 +2299,8 @@ let compute_repr_summary env lbls jkinds =
     | Some _ -> ()
     | None -> repr_summary.first_any <- Some name
   in
-  List.iter2
-    (fun ((repr : Element_repr.t option), _lbl_type) (lbl, _) ->
+  List.iter
+    (fun { lbl; repr } ->
         if Types.is_atomic lbl.Types.ld_mutable
         then repr_summary.atomic_fields <- true;
         match repr with
@@ -2366,19 +2327,19 @@ let compute_repr_summary env lbls jkinds =
           in
           summarize repr
           end)
-    reprs lbls;
+    reprs;
   reprs, repr_summary
 
 (* Given a record with a temporary representation from [transl_declaration]
    computes updated labels, updated rep, and updated jkind *)
 let compute_record_kind (type rep) env loc (form : rep record_form)
-      lbls (rep : rep) ~warn :
-    _ * rep * _ =
+      (lbls : Types.label_declaration list) (rep : rep) ~warn :
+    Types.label_declaration list * rep * _ =
   match form, lbls, rep with
-  | Legacy, [(lbl, ld_type)], Record_unboxed ->
+  | Legacy, [lbl], Record_unboxed ->
     let jkind =
-      Ctype.type_jkind env ld_type |>
-      Jkind.apply_modality_l lbl.Types.ld_modalities
+      Ctype.type_jkind env lbl.ld_type |>
+      Jkind.apply_modality_l lbl.ld_modalities
     in
     let sort = Jkind.sort_option_of_jkind env jkind in
     let ld_sort =
@@ -2392,33 +2353,28 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       if Option.is_none sort then assert_any_args_support loc;
       Record_unboxed
     in
-    [ld_sort], rep, jkind
+    [{ lbl with ld_sort }], rep, jkind
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
-    let types = List.map snd lbls in
-    let sorts, jkinds = update_label_sorts env loc types ~form in
-    let reprs, repr_summary = compute_repr_summary env lbls jkinds in
+    let reprs, repr_summary = compute_repr_summary env lbls in
     let jkind =
       match form with
       | Legacy ->
-          let lbls_with_sorts =
-            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-          in
-          Jkind.for_boxed_record_with_updates lbls_with_sorts
+          Jkind.for_boxed_record (List.map (fun { lbl; _ } -> lbl) reprs)
       | Unboxed_product ->
         let lbls_with_layouts =
-          List.map2
-            (fun (lbl, ty) jkind ->
+          List.map
+            (fun { lbl; jkind; _ } ->
                 let layout =
                   match Jkind.extract_layout env jkind with
                   | Ok layout -> layout
                   | Error _ ->
                       Jkind.Layout.Any Jkind_types.Scannable_axes.max
                 in
-                lbl, ty, layout)
-            lbls jkinds
+                lbl, layout)
+            reprs
         in
-        Jkind.for_unboxed_record_with_updates lbls_with_layouts
+        Jkind.for_unboxed_record lbls_with_layouts
     in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
@@ -2435,7 +2391,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           | _ -> assert false (* outer match *)
         in
         let rep =
-          compute_record_repr loc reprs lbls ~represent_as_float_array
+          compute_record_repr loc reprs ~represent_as_float_array
             ~flatten_floats ~warn ~values ~floats
             ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
             ~voids ~first_any
@@ -2462,7 +2418,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
          | Legacy -> Record_undetermined
          | Unboxed_product -> Record_unboxed_product_undetermined)
     in
-    sorts, rep, jkind
+    List.map (fun { lbl; _ } -> lbl) reprs, rep, jkind
   | Legacy, _,
     (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
           | Record_ufloat | Record_unboxed | Record_undetermined
@@ -2497,14 +2453,9 @@ let instance_record_representation
     List.map2 (fun sort (_lbl, ty) -> sort, ty) sorts lbls_and_types
     |> Array.of_list
   in
-  let add_delayed_all_void_check () =
-    !Env.add_delayed_check_forward (fun () ->
-      check_record_not_all_void_defaulting loc sorts)
-  in
   let rep : rep =
     match form, old_repres with
     | Legacy, Record_undetermined ->
-      add_delayed_all_void_check ();
       Record_variable (sorts_and_types ())
     | Legacy, Record_inlined (tag, Constructor_undetermined, vrep) ->
       (match vrep with
@@ -2513,7 +2464,6 @@ let instance_record_representation
             [Constructor_uniform_value], as at declaration time. *)
          Record_inlined (tag, Constructor_uniform_value, Variant_unboxed)
        | Variant_boxed _ ->
-         add_delayed_all_void_check ();
          Record_inlined
            (tag, Constructor_variable (sorts_and_types ()), vrep)
        | Variant_extensible | Variant_with_null ->
@@ -2570,8 +2520,7 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
         Array.to_list sorts_and_types
         |> List.map (fun (_sort, ty) ->
              Element_repr.classify env ty (Ctype.type_jkind env ty)
-               ~default_to_scannable:false,
-             ty)
+               ~default_to_scannable:false)
       in
       match Element_repr.mixed_product_shape loc ts kind with
       | Ok shape -> shape
@@ -2855,12 +2804,8 @@ let rec update_decl_jkind env dpath decl =
         | Record_dummy _ | Record_unboxed as rep -> rep
         | _ -> Misc.fatal_error "not created by transl_declaration"
       in
-      let sorts, rep, type_jkind =
-        let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
+      let lbls, rep, type_jkind =
         compute_record_kind env decl.type_loc Legacy lbls rep ~warn:true
-      in
-      let lbls =
-        List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
       in
       (* See Note [Quality of jkinds during inference] for more information about when we
          mark jkinds as best *)
@@ -2880,13 +2825,9 @@ let rec update_decl_jkind env dpath decl =
     | Type_record_unboxed_product (lbls, _rep, umc) ->
         (* CR-soon lmaurer: This is now nearly identical to the previous case
            and should be factored out *)
-        let sorts, rep, type_jkind =
-          let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
+        let lbls, rep, type_jkind =
           compute_record_kind env decl.type_loc Unboxed_product lbls
             Types.Record_unboxed_product ~warn:true
-        in
-        let lbls =
-          List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
         in
         (* See Note [Quality of jkinds during inference] for more information
            about when we mark jkinds as best *)
@@ -5981,8 +5922,6 @@ let report_error ~loc = function
       (Jkind.Violation.report_with_offender
          ~offender:(fun ppf -> Printtyp.type_expr ppf typ)
          env) err
-  | Jkind_empty_record ->
-    Location.errorf ~loc "Records must contain at least one runtime value."
   | Non_representable_in_module (env, err, ty) ->
     let offender ppf = fprintf ppf "type %a" Printtyp.type_expr ty in
     Location.errorf ~loc "The type of a module-level value must have a@ \

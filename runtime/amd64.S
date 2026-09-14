@@ -803,6 +803,7 @@ CFI_STARTPROC
            for the code here to be reached via a segfault from C, but
            in practice this seems most unlikely.  The current situation will
            suffice as this patch is only a temporary measure in any case. */
+        movq    %r15, Caml_state(young_ptr)
         SWITCH_OCAML_TO_C
     /* Enter the C function, using [call] to ensure stack alignment. This
        call never returns. */

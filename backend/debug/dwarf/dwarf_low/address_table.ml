@@ -21,7 +21,7 @@ module A = Asm_directives
 
 module Entry = struct
   type t =
-    { addr : Asm_label.t;
+    { addr : Asm_label_or_symbol.t;
       adjustment : int
     }
 
@@ -30,13 +30,13 @@ module Entry = struct
 
     let compare { addr = addr1; adjustment = adjustment1 }
         { addr = addr2; adjustment = adjustment2 } =
-      let c = Asm_label.compare addr1 addr2 in
+      let c = Asm_label_or_symbol.compare addr1 addr2 in
       if c <> 0 then c else Stdlib.compare adjustment1 adjustment2
 
     let equal t1 t2 = compare t1 t2 = 0
 
     let hash { addr; adjustment } =
-      Hashtbl.hash (Asm_label.hash addr, adjustment)
+      Hashtbl.hash (Asm_label_or_symbol.hash addr, adjustment)
 
     let print _ _ = Misc.fatal_error "Not yet implemented"
 
@@ -58,8 +58,7 @@ let create () =
     rev_table = Entry.Map.empty
   }
 
-let add ?(adjustment = 0) t addr =
-  let entry : Entry.t = { addr; adjustment } in
+let add_entry t (entry : Entry.t) =
   match Entry.Map.find entry t.rev_table with
   | exception Not_found ->
     let index = t.next_index in
@@ -68,6 +67,10 @@ let add ?(adjustment = 0) t addr =
     t.table <- Address_index.Map.add index entry t.table;
     index
   | index -> index
+
+let add ?(adjustment = 0) t addr = add_entry t { addr = Label addr; adjustment }
+
+let add_symbol t symbol = add_entry t { addr = Symbol symbol; adjustment = 0 }
 
 let base_addr t = t.base_addr
 
@@ -85,14 +88,12 @@ let size t =
     (Initial_length.to_dwarf_int initial_length)
 
 let entry_to_dwarf_value (entry : Entry.t) =
-  (* DWARF-5 spec section 7.27: the entries in [.debug_addr] are relocatable
-     absolute addresses, not offsets from a base. *)
-  match entry.adjustment with
-  | 0 -> Dwarf_value.code_address_from_label ~comment:"address" entry.addr
-  | adjustment ->
-    Dwarf_value.code_address_from_label_plus_offset ~comment:"address"
-      entry.addr
-      ~offset_in_bytes:(Targetint.of_int_exn adjustment)
+  (* The table must contain relocatable absolute addresses: on ELF the static
+     linker relocates them directly, and DWARF linkers such as dsymutil
+     translate them using the debug map. *)
+  Dwarf_value.code_address_from_label_or_symbol_plus_offset ~comment:"address"
+    entry.addr
+    ~offset_in_bytes:(Targetint.of_int_exn entry.adjustment)
 
 let emit ~asm_directives t =
   Initial_length.emit ~asm_directives (initial_length t);
