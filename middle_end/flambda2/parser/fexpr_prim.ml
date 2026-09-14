@@ -110,6 +110,11 @@ let block_access_field_kind =
     default ~def:P.Block_access_field_kind.Any_value
     @@ constructor_flag ["imm", P.Block_access_field_kind.Immediate])
 
+let memory_order =
+  D.(
+    default ~def:P.Memory_order.Seq_cst
+    @@ constructor_flag ["acq_rel", P.Memory_order.Acq_rel])
+
 let flat_suffix_element =
   D.constructor_flag
     K.
@@ -953,8 +958,9 @@ let duplicate_block =
 let atomic_load =
   D.(
     binary "%atomic_load"
-      ~params:(param2 atomic_offset_units block_access_field_kind)
-      (fun _ (offset_units, kind) -> P.Atomic_load (offset_units, kind)))
+      ~params:(param3 atomic_offset_units block_access_field_kind memory_order)
+      (fun _ (offset_units, kind, memory_order) ->
+        P.Atomic_load (offset_units, kind, memory_order)))
 
 let block_set =
   D.(
@@ -1237,10 +1243,10 @@ let atomic_set =
   D.(
     ternary "%atomic_set"
       ~params:
-        (param3 atomic_offset_units block_access_field_kind
+        (param4 atomic_offset_units block_access_field_kind memory_order
            alloc_mode_for_assignments)
-      (fun _ (offset_units, field_kind, mode) ->
-        P.Atomic_set (offset_units, field_kind, mode)))
+      (fun _ (offset_units, field_kind, memory_order, mode) ->
+        P.Atomic_set (offset_units, field_kind, memory_order, mode)))
 
 let bigarray_set =
   D.(
@@ -1393,7 +1399,8 @@ module OfFlambda = struct
 
   let binop env (op : P.binary_primitive) =
     match op with
-    | Atomic_load (offset_units, ak) -> atomic_load env (offset_units, ak)
+    | Atomic_load (offset_units, ak, mo) ->
+      atomic_load env (offset_units, ak, mo)
     | Block_set { kind; init; field } -> block_set env (kind, init, field)
     | Array_load (ak, width, mut) -> array_load env (ak, width, mut)
     | Bigarray_load (d, k, l) -> bigarray_load env (d, k, l)
@@ -1418,8 +1425,8 @@ module OfFlambda = struct
       atomic_exchange env (offset_units, a, mode)
     | Atomic_int_arith (offset_units, o) ->
       atomic_int_arith env (offset_units, o)
-    | Atomic_set (offset_units, a, mode) ->
-      atomic_set env (offset_units, a, mode)
+    | Atomic_set (offset_units, a, mo, mode) ->
+      atomic_set env (offset_units, a, mo, mode)
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset (wok, kind, alloc_mode) ->
