@@ -39,9 +39,8 @@ val all_defined_symbols : t -> Symbol.Set.t
 
 val add_to_denv : ?maybe_already_defined:unit -> DE.t -> t -> DE.t
 
-(** Cost of pending definitions reachable from the final runtime roots. Newly
-    specialised code is charged once; existing code and age-only ancestors are
-    free. Other constants follow the inlining tracking policy. *)
+(** Cost of pending definitions reachable from the final runtime roots. Code
+    bindings have zero cost to avoid double counting sets of closures. *)
 val cost_metrics : t -> roots:Name_occurrences.t -> Cost_metrics.t
 
 (** Prune a placement batch during non-rebuilding speculation, before any dead

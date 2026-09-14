@@ -888,9 +888,10 @@ let () =
   check_parse_error "synthetic slot projection" synthetic_projection
     ~message:"is used both as a synthetic and as an ordinary value slot"
 
-(* Sites cost nothing; ordinary sets charge their bodies and allocation. *)
+(* Sites charge their bodies only when the original set would not be lifted. *)
 let () =
   let open Flambda2_kinds in
+  let module Simple = Flambda2_term_basics.Simple in
   let compilation_unit = Current_unit.get_cu_exn () in
   let code_id name =
     Code_id.create ~name ~debug:Debuginfo.none compilation_unit
@@ -923,16 +924,15 @@ let () =
   let deleted : Function_declarations.code_id_in_function_declaration =
     Deleted { function_slot_size = 3; dbg = Debuginfo.none }
   in
-  let cost ~is_specialisation_site ?(value_slots = Value_slot.Map.empty) decls =
+  let cost ~is_specialisation_site ?(value_slots = Value_slot.Map.empty)
+      ?(synthetic_value_slots = Value_slot.Map.empty) decls =
     let set =
       Set_of_closures.create ~is_specialisation_site ~value_slots
-        ~synthetic_value_slots:Value_slot.Map.empty
+        ~synthetic_value_slots
         (Function_declarations.create (Function_slot.Lmap.of_list decls))
     in
     Cost_metrics.set_of_closures
       ~find_code_characteristics:(fun code_id ->
-        if is_specialisation_site
-        then Misc.fatal_error "A site must not query generic body costs";
         Code_id.Map.find code_id characteristics)
       set
   in
@@ -942,9 +942,6 @@ let () =
       fail "%s: expected %a, got %a" name Cost_metrics.print expected
         Cost_metrics.print actual
   in
-  check "site costs nothing" Cost_metrics.zero
-    (cost ~is_specialisation_site:true
-       [f_slot, live f; g_slot, live g; dead_slot, deleted]);
   check "ordinary closed set charges its bodies"
     (Cost_metrics.( + )
        (Cost_metrics.( + ) f_cost g_cost)
@@ -967,10 +964,45 @@ let () =
   in
   check "ordinary closure charges allocation"
     (Cost_metrics.( + ) f_cost allocation_cost)
-    (cost ~is_specialisation_site:false ~value_slots [f_slot, live f])
+    (cost ~is_specialisation_site:false ~value_slots [f_slot, live f]);
+  let synthetic_slot =
+    Value_slot.create compilation_unit ~name:"synthetic" ~is_synthetic:true
+      ~is_always_immediate:false Flambda_kind.value
+  in
+  let tracking =
+    Oxcaml_flags.Flambda2.Inlining.speculative_inlining_track_lifted_constants
+  in
+  let previous = !tracking in
+  Fun.protect
+    ~finally:(fun () -> tracking := previous)
+    (fun () ->
+      List.iter
+        (fun track ->
+          tracking := track;
+          let body_cost = Cost_metrics.( + ) f_cost g_cost in
+          let static_cost = if track then body_cost else Cost_metrics.zero in
+          let declarations =
+            [f_slot, live f; g_slot, live g; dead_slot, deleted]
+          in
+          check "site with empty slots" static_cost
+            (cost ~is_specialisation_site:true declarations);
+          List.iter
+            (fun simple ->
+              check "site with static slot" static_cost
+                (cost ~is_specialisation_site:true
+                   ~synthetic_value_slots:
+                     (Value_slot.Map.singleton synthetic_slot simple)
+                   declarations))
+            [ Simple.const_zero Target_system.Machine_width.Sixty_four;
+              Simple.symbol (Symbol.manufacture compilation_unit "static") ];
+          check "site with variable slot excludes allocation" body_cost
+            (cost ~is_specialisation_site:true
+               ~synthetic_value_slots:
+                 (Value_slot.Map.singleton synthetic_slot (Simple.var captured))
+               declarations))
+        [false; true])
 
-(* Emission costs belong to fresh code bindings, not to their site or to the
-   stored body metrics. Pending definitions can include dead/older versions. *)
+(* Speculative placement must not retain dead or age-only definitions. *)
 let () =
   let module NO = Flambda2_nominal.Name_occurrences in
   let module NM = Flambda2_nominal.Name_mode in
@@ -1022,74 +1054,32 @@ let () =
   let existing code =
     LC.create_code (Code.code_id code) (RSC.create_code' code)
   in
-  let fresh code =
-    LC.create_code (Code.code_id code)
-      (RSC.charge_code_size (RSC.create_code' code))
+  let constants =
+    LCS.singleton_list_of_constants [existing parent; existing child]
   in
-  let constants = LCS.singleton_list_of_constants [fresh parent; fresh child] in
   let roots = NO.singleton_code_id parent_id NM.normal in
   let check name expected constants roots =
-    let actual = LCS.cost_metrics constants ~roots |> Cost_metrics.size in
-    if not (Code_size.equal actual (Code_size.of_int expected))
-    then
-      fail "%s: expected size %d, got %a" name expected Code_size.print actual
+    let retained = LCS.retain_reachable_for_speculation constants ~roots in
+    let actual = LCS.fold retained ~init:0 ~f:(fun count _ -> count + 1) in
+    if actual <> expected
+    then fail "%s: expected %d definitions, got %d" name expected actual
   in
-  let tracking =
-    Oxcaml_flags.Flambda2.Inlining.speculative_inlining_track_lifted_constants
+  check "nested bodies" 2 constants roots;
+  check "duplicate pending definitions" 2 (LCS.union constants constants) roots;
+  check "dead parent, live child" 1 constants
+    (NO.singleton_code_id child_id NM.normal);
+  check "dead bodies" 0 constants NO.empty;
+  check "phantom roots" 0 constants (NO.singleton_code_id parent_id NM.phantom);
+  let age_only =
+    Code.with_params_and_body parent
+      ~params_and_body:(Code.params_and_body child)
+      ~free_names_of_params_and_body:NO.empty
+      ~cost_metrics:(Code.cost_metrics parent)
+    |> Code.with_newer_version_of (Some child_id)
   in
-  let previous = !tracking in
-  Fun.protect
-    ~finally:(fun () -> tracking := previous)
-    (fun () ->
-      List.iter
-        (fun track ->
-          tracking := track;
-          check "nested generated bodies" 18 constants roots;
-          check "duplicate pending definitions" 18
-            (LCS.union constants constants)
-            roots;
-          check "dead parent, live child" 11 constants
-            (NO.singleton_code_id child_id NM.normal);
-          check "dead generated bodies" 0 constants NO.empty;
-          if
-            not
-              (LCS.is_empty
-                 (LCS.retain_reachable_for_speculation constants ~roots:NO.empty))
-          then fail "Placement retained dependencies of an unused definition";
-          let retained =
-            LCS.retain_reachable_for_speculation constants ~roots
-          in
-          let placed_cost =
-            LCS.fold retained ~init:Cost_metrics.zero ~f:(fun cost constant ->
-                Cost_metrics.( + ) cost
-                  (RSC.Group.cost_metrics_for_inlining
-                     (LC.defining_exprs constant)))
-          in
-          if
-            not
-              (Code_size.equal
-                 (Cost_metrics.size placed_cost)
-                 (Code_size.of_int 18))
-          then fail "Placement did not charge each retained body exactly once";
-          check "phantom roots" 0 constants
-            (NO.singleton_code_id parent_id NM.phantom);
-          check "existing bodies are free" 0
-            (LCS.singleton_list_of_constants [existing parent; existing child])
-            roots;
-          check "existing code reaches newly generated code" 11
-            (LCS.singleton_list_of_constants [existing parent; fresh child])
-            roots;
-          let age_only =
-            Code.with_params_and_body parent
-              ~params_and_body:(Code.params_and_body child)
-              ~free_names_of_params_and_body:NO.empty
-              ~cost_metrics:(Code.cost_metrics parent)
-            |> Code.with_newer_version_of (Some child_id)
-          in
-          check "age-only ancestor" 7
-            (LCS.singleton_list_of_constants [fresh age_only; fresh child])
-            roots)
-        [false; true]);
+  check "age-only ancestor" 1
+    (LCS.singleton_list_of_constants [existing age_only; existing child])
+    roots;
   let function_slot =
     Function_slot.create
       (Current_unit.get_cu_exn ())
@@ -1125,12 +1115,15 @@ let () =
       ~machine_width:Target_system.Machine_width.Sixty_four named
       ~free_names:(Flambda.Named.free_names named)
       ~find_code_characteristics:(fun _ ->
-        Misc.fatal_error "Site body cost lookup")
+        Cost_metrics.
+          { cost_metrics = Code.cost_metrics parent;
+            function_slot_size = Code.function_slot_size parent
+          })
     |> Simplified_named.for_speculative_inlining
   in
   if NO.mem_var site.free_names unused
   then fail "Speculation retained a synthetic value";
-  check "erased site does not root its declarations" 11 constants
+  check "erased site does not root its declarations" 1 constants
     (NO.union site.free_names (NO.singleton_code_id child_id NM.normal))
 
 let () =

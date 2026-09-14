@@ -85,15 +85,29 @@ let set_of_closures0 ~find_code_characteristics set_of_closures =
             Stdlib.( + ) num_words (Stdlib.( + ) function_slot_size 1) ))
       funs (zero, num_clos_vars)
   in
-  let alloc_size =
-    Code_size.( + ) Code_size.alloc_size (Code_size.of_int (num_words - 1))
-  in
-  cost_metrics + from_size alloc_size
+  if Set_of_closures.is_specialisation_site set_of_closures
+  then cost_metrics
+  else
+    let alloc_size =
+      Code_size.( + ) Code_size.alloc_size (Code_size.of_int (num_words - 1))
+    in
+    cost_metrics + from_size alloc_size
 
 let set_of_closures ~find_code_characteristics set_of_closures =
-  (* Specialisation sites must not affect inlining decisions (see
-     [Set_of_closures.is_specialisation_site]). *)
-  if Set_of_closures.is_specialisation_site set_of_closures
+  (* The reaper's lifting must not change inlining decisions: charge a site like
+     the set it replaced, minus the allocation. Closed sets would have been
+     lifted, so are free unless tracking lifted constants. *)
+  if
+    Set_of_closures.is_specialisation_site set_of_closures
+    && (not
+          (Flambda_features.Inlining.speculative_inlining_track_lifted_constants
+             ()))
+    && Value_slot.Map.for_all
+         (fun _ simple ->
+           Simple.pattern_match simple
+             ~const:(fun _ -> true)
+             ~name:(fun name ~coercion:_ -> Name.is_symbol name))
+         (Set_of_closures.synthetic_value_slots set_of_closures)
   then zero
   else set_of_closures0 ~find_code_characteristics set_of_closures
 

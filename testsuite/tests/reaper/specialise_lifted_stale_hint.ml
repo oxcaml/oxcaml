@@ -30,7 +30,7 @@
      flags = "-O3 -no-flambda2-reaper -dflambda-invariants -dcmm";
      flags += " -flambda2-inline-small-function-size 0";
      flags += " -flambda2-inline-large-function-size 100";
-     flags += " -flambda2-inline-threshold 10";
+     flags += " -flambda2-inline-threshold 20";
      module = "";
      ocamlopt.opt;
      script = "sh ${test_source_directory}/check-stale-hint-decision.sh consumer.cmm";
@@ -41,10 +41,10 @@
  *)
 
 (* Stale hints must not retain [captured1]'s allocation during speculation:
-   [outer_hint] and [outer_control] should both inline. Conversely, newly
-   specialised code must be charged: [large] must not be copied with an unknown
-   callback, even when its producer classified the wrapper as small. The two
-   builds exercise the automatic-small and ordinary speculative paths. *)
+   [outer_hint] and [outer_control] should both inline. Their speculative cost
+   is 15.5, including the site's code. Conversely, [large]'s site must keep it
+   from being copied with an unknown callback. The two builds exercise the
+   automatic-small and ordinary speculative paths for the hint wrappers. *)
 
 let f_hint x = Specialise_lifted_stale_hint_lib.outer_hint x true
 let f_control x = Specialise_lifted_stale_hint_lib.outer_control x true

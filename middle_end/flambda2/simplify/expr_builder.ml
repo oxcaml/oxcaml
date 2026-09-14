@@ -231,7 +231,14 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
       name_occurrences
   in
   let cost_metrics_of_static_consts =
-    Rebuilt_static_const.Group.cost_metrics_for_inlining static_consts
+    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+    then Rebuilt_static_const.Group.cost_metrics static_consts
+    else
+      (* Static consts used to always have zero cost metrics. That is now
+         considered to be a bug, but it can have unexpected consequences on
+         speculative inlining -- the flag above is used to control a progressive
+         rollout of the fix and will be removed in due time. *)
+      Cost_metrics.zero
   in
   let uacc =
     UA.with_name_occurrences uacc ~name_occurrences:free_names_of_let

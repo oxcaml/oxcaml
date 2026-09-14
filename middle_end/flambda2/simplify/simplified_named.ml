@@ -104,8 +104,8 @@ let filter_synthetic_value_slots t ~f =
 
 let for_speculative_inlining t =
   let t = filter_synthetic_value_slots t ~f:(fun _ -> false) in
-  (* No term is rebuilt. Only direct calls, not the site's declarations, should
-     root the code charged to this trial. *)
+  (* Keep the site's cost, but let only actual calls root pending code. No term
+     is rebuilt, so the hints and declarations need not keep code live. *)
   { t with free_names = Name_occurrences.without_code_ids t.free_names }
 
 let mark_unused_function_declarations_as_deleted function_decls ~live_code_ids
@@ -140,8 +140,15 @@ let mark_unused_functions_as_deleted t ~live_code_ids ~find_code_metadata =
           function_decls'
       in
       let named = Set_of_closures (set, alloc_mode) in
-      (* The cost metrics of a specialisation site are zero. *)
-      { t with named; free_names = Named.free_names (to_named named) }
+      let cost_metrics =
+        Cost_metrics.set_of_closures set
+          ~find_code_characteristics:(fun code_id ->
+            let metadata = find_code_metadata code_id in
+            { cost_metrics = Code_metadata.cost_metrics metadata;
+              function_slot_size = Code_metadata.function_slot_size metadata
+            })
+      in
+      { named; cost_metrics; free_names = Named.free_names (to_named named) }
 
 let rebuild_specialisation_site t ~live_code_ids ~names_available_for_hints
     ~find_code_metadata =
@@ -194,8 +201,15 @@ let rebuild_specialisation_site t ~live_code_ids ~names_available_for_hints
             ~synthetic_value_slots:synthetic_value_slots' function_decls'
         in
         let named = Set_of_closures (set, alloc_mode) in
-        (* The cost metrics of a specialisation site are zero. *)
-        { t with named; free_names = Named.free_names (to_named named) }
+        let cost_metrics =
+          Cost_metrics.set_of_closures set
+            ~find_code_characteristics:(fun code_id ->
+              let metadata = find_code_metadata code_id in
+              { cost_metrics = Code_metadata.cost_metrics metadata;
+                function_slot_size = Code_metadata.function_slot_size metadata
+              })
+        in
+        { named; cost_metrics; free_names = Named.free_names (to_named named) }
     in
     t, keep
 

@@ -577,18 +577,13 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
   in
   { code_id; code = Some (code, code_const); outer_dacc; should_resimplify }
 
-let introduce_code dacc code_id code_const ~charge_specialised_code =
-  let code_const =
-    if charge_specialised_code
-    then Rebuilt_static_const.charge_code_size code_const
-    else code_const
-  in
+let introduce_code dacc code_id code_const =
   let code = LC.create_code code_id code_const in
   DA.add_to_lifted_constant_accumulator ~also_add_to_env:() dacc
     (LCS.singleton code)
 
 let simplify_function context ~outer_dacc function_slot code_id
-    ~closure_bound_names_inside_function ~charge_specialised_code =
+    ~closure_bound_names_inside_function =
   let code_or_metadata =
     try DE.find_code_exn (DA.denv (C.dacc_prior_to_sets context)) code_id
     with Not_found ->
@@ -610,10 +605,7 @@ let simplify_function context ~outer_dacc function_slot code_id
         | None -> code_id, outer_dacc
         | Some (Not_rebuilding, new_code_const) ->
           (* Not rebuilding: there is no code to resimplify *)
-          let outer_dacc =
-            introduce_code outer_dacc code_id new_code_const
-              ~charge_specialised_code
-          in
+          let outer_dacc = introduce_code outer_dacc code_id new_code_const in
           code_id, outer_dacc
         | Some (Rebuilding new_code, new_code_const) ->
           let max_function_simplify_run =
@@ -628,10 +620,7 @@ let simplify_function context ~outer_dacc function_slot code_id
           if should_resimplify && count < max_function_simplify_run
           then run ~outer_dacc ~code:new_code (count + 1)
           else
-            let outer_dacc =
-              introduce_code outer_dacc code_id new_code_const
-                ~charge_specialised_code
-            in
+            let outer_dacc = introduce_code outer_dacc code_id new_code_const in
             code_id, outer_dacc
       in
       run ~outer_dacc ~code 0
@@ -661,21 +650,6 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
     ~closure_bound_names ~closure_bound_names_inside ~value_slot_types =
   let dacc = C.dacc_prior_to_sets context in
   let function_decls = Set_of_closures.function_decls set_of_closures in
-  let charge_specialised_code =
-    Set_of_closures.is_specialisation_site set_of_closures
-    &&
-    (* Match the original set's code-size charge. Closed sets would be lifted
-       and free unless tracking lifted constants. These synthetic values have
-       already been simplified. *)
-    (Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
-    || not
-         (Value_slot.Map.for_all
-            (fun _ simple ->
-              Simple.pattern_match simple
-                ~const:(fun _ -> true)
-                ~name:(fun name ~coercion:_ -> Name.is_symbol name))
-            (Set_of_closures.synthetic_value_slots set_of_closures)))
-  in
   let all_function_decls_in_set =
     Function_declarations.funs_in_order function_decls
   in
@@ -700,7 +674,6 @@ let simplify_set_of_closures0 outer_dacc context set_of_closures alloc_mode
           let code_id, outer_dacc, code_ids_to_never_delete_this_set =
             simplify_function context ~outer_dacc function_slot old_code_id
               ~closure_bound_names_inside_function:closure_bound_names_inside
-              ~charge_specialised_code
           in
           let function_type =
             let rec_info =

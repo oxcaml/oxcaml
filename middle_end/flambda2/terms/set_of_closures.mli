@@ -45,15 +45,16 @@ val create :
     variables occur only as the callee of direct calls to code that does not use
     [my_closure]. [To_cmm] therefore translates neither the site nor those
     callees; [To_jsir] still allocates the closures, since a JSIR call needs a
-    function value. A site is closed, heap allocated, never lifted, and costs
-    nothing (see [Cost_metrics]). Only code newly produced by re-simplifying a
-    site is charged, via [Rebuilt_static_const], not its referenced generic
-    bodies. Its synthetic slots keep nothing alive except transiently when
-    rebuilding code (see [Flow_types.Specialisation_site_info]); speculative
-    inlining discards the hints on the upward pass. Inside code, it is kept
-    while it has a synthetic value slot and its code is live. Like any set of
-    closures, it does prevent specialisation of the enclosing continuation
-    handler (see [Specialization_cost]).
+    function value. A site is closed, heap allocated and never lifted. Its
+    inlining cost is the code cost of the set it replaced, without allocation;
+    sites with all-static synthetic slots are free unless tracking lifted
+    constants (see [Cost_metrics]). Its synthetic slots keep nothing alive
+    except transiently when rebuilding code (see
+    [Flow_types.Specialisation_site_info]); speculative inlining discards the
+    hints on the upward pass. Inside code, it is kept while it has a synthetic
+    value slot and its code is live. Like any set of closures, it does prevent
+    specialisation of the enclosing continuation handler (see
+    [Specialization_cost]).
 
     Design decision: a site with no synthetic value slots left is not retained
     for specialisation, although an ordinary callee use can still keep it.

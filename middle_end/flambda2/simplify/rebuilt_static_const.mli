@@ -28,10 +28,6 @@ val print : Format.formatter -> t -> unit
 
 val cost_metrics : t -> Cost_metrics.t
 
-(** Costs recorded by [charge_code_size] are always charged. Other constants
-    follow the [speculative_inlining_track_lifted_constants] policy. *)
-val cost_metrics_for_inlining : t -> Cost_metrics.t
-
 val create_code :
   Are_rebuilding_terms.t ->
   params_and_body:Rebuilt_expr.Function_params_and_body.t ->
@@ -43,12 +39,6 @@ val create_code :
    constructed. In the latter case, use [create_code] above, so that [Code]
    values are not constructed unnecessarily. *)
 val create_code' : Code.t -> t
-
-(** Charge the size of newly specialised code to this simplification only.
-    Use when the site's synthetic values are not all static, or when tracking
-    lifted constants, to match the cost of the set of closures it replaces.
-    Existing code introduced by [create_code'] is otherwise free. *)
-val charge_code_size : t -> t
 
 val create_set_of_closures :
   Are_rebuilding_terms.t ->
@@ -210,7 +200,7 @@ module Group : sig
 
   val free_names : t -> Name_occurrences.t
 
-  val cost_metrics_for_inlining : t -> Cost_metrics.t
+  val cost_metrics : t -> Cost_metrics.t
 
   (** This function may only be used when rebuilding terms (a fatal error will
       be produced otherwise). *)

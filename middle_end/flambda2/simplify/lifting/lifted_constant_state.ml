@@ -233,7 +233,7 @@ let cost_metrics t ~roots =
     List.fold_left
       (fun cost definition ->
         Cost_metrics.( + ) cost
-          (Rebuilt_static_const.cost_metrics_for_inlining
+          (Rebuilt_static_const.cost_metrics
              (LC.Definition.defining_expr definition)))
       Cost_metrics.zero (LC.definitions constant)
   in
