@@ -750,7 +750,10 @@ and acknowledge_new_pers_name penv check global_name global import =
 and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   let {persistent_names; _} = penv in
   match Global_module.Name.Tbl.find persistent_names name with
-  | pn -> pn
+  | pn ->
+      check_visibility ~allow_hidden
+        ~intf:(CUI.Found.intf name.Global_module.Name.head) pn.pn_import;
+      pn
   | exception Not_found ->
       let unit_name = name.Global_module.Name.head in
       let import = find_import ~allow_hidden penv ~check unit_name in

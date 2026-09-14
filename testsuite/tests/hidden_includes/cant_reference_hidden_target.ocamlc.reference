@@ -1,0 +1,4 @@
+File "libc/c10.ml", line 3, characters 8-9:
+3 | let y = A.x
+            ^
+Error: Unbound module A

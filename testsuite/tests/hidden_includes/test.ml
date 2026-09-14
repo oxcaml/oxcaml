@@ -20,7 +20,7 @@
    precedence order of the includes.
 *)
 
-subdirectories = "liba liba_alt libb libc";
+subdirectories = "liba liba_alt libb libc libd";
 setup-ocamlc.byte-build-env;
 
 flags = "-I liba -nocwd";
@@ -37,6 +37,14 @@ ocamlc.byte;
 
 flags = "-nocwd";
 module = "libb/with_sub.ml";
+ocamlc.byte;
+
+flags = "-I liba -no-alias-deps -w -49 -nocwd";
+module = "libd/aliases.ml";
+ocamlc.byte;
+
+flags = "-I liba -no-alias-deps -w -49 -nocwd";
+module = "libd/aliases_a.ml";
 ocamlc.byte;
 {
   (* Test hiding A completely. You can't do much with types from it because
@@ -162,58 +170,62 @@ ocamlc.byte;
   ocamlc.byte;
 }
 
-(* Test that [-open-cmi] reads the cmi from the given path without
-   consulting the include path, and that it works alongside -H. *)
+(* Test that [-open-cmi] reads the cmi from the given path without consulting
+   the include path ([libd] is never on it), that its members resolve directly
+   to their alias targets, and that this works whether the targets are on the
+   visible or the hidden include path... *)
 {
   split [
-  | flags = "-nocwd -open-cmi liba/a.cmi";
-  | flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
+  | flags = "-I liba -nocwd -open-cmi libd/aliases.cmi";
+  | flags = "-H liba -nocwd -open-cmi libd/aliases.cmi";
   ]
-  module = "libb/b_open.ml";
+  module = "libc/c8.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 
-(* Test that [-open-cmi] of a hidden module does not make user-code
-   references to that module legal. *)
+(* ... without making the hidden targets' own names legal in user code. *)
 {
-  flags = "-H liba -I libb -nocwd -open-cmi liba/a.cmi";
-  module = "libc/c3.ml";
+  flags = "-H liba -nocwd -open-cmi libd/aliases.cmi";
+  module = "libc/c10.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";
   ocamlc.byte;
   compiler_reference =
-    "${test_source_directory}/cant_reference_hidden.ocamlc.reference";
+    "${test_source_directory}/cant_reference_hidden_target.ocamlc.reference";
   check-ocamlc.byte-output;
 }
 
-(* Test that an [-open] following an earlier [-open-cmi] can refer to a
-   module brought into scope by it: command-line order is preserved. *)
+(* Test that [-open] and [-open-cmi] are processed in command-line order: a
+   trailing [-open] shadows a rebinding from an earlier [-open-cmi]... *)
 {
-  flags = "-nocwd -open-cmi libb/with_sub.cmi -open A";
-  module = "libb/uses_float.ml";
+  flags =
+    "-H liba -I libb -nocwd -open-cmi libd/aliases_a.cmi -open With_sub";
+  module = "libb/order_open_last.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 
-(* Test that [-open-cmi] loads the cmi at the given path and ignores any
-   in-scope module of the same name: the sub-module [A] brought into scope
-   by [-open-cmi libb/with_sub.cmi] does not shadow the subsequent
-   [-open-cmi liba/a.cmi]. *)
+(* ... and vice versa. *)
 {
-  flags = "-nocwd -open-cmi libb/with_sub.cmi -open-cmi liba/a.cmi";
-  module = "libb/uses_int.ml";
+  flags =
+    "-H liba -I libb -nocwd -open With_sub -open-cmi libd/aliases_a.cmi";
+  module = "libb/order_open_cmi_last.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 
-(* Test that a trailing [-open-cmi] overrides an earlier [-open]:
-   command-line order is preserved across the two flag kinds. *)
+(* Test that the opened interface itself is not nameable, since [libd] is not
+   on the include path. *)
 {
-  flags = "-I liba -nocwd -open A -open-cmi libb/with_sub.cmi";
-  module = "libb/uses_string.ml";
+  flags = "-H liba -nocwd -open-cmi libd/aliases.cmi";
+  module = "libc/c9.ml";
   setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "2";
   ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/cant_reference_open_cmi.ocamlc.reference";
+  check-ocamlc.byte-output;
 }
 
 *)
