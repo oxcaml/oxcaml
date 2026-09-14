@@ -675,6 +675,26 @@ let compare_addressing_mode left right =
   | (Ibased _ | Iindexed _ | Iindexed2 _ | Iscaled _ | Iindexed2scaled _), _ ->
     Int.compare (addressing_mode_rank left) (addressing_mode_rank right)
 
+let merge_adjacent_specific_operations op1 op2 =
+  match op1, op2 with
+  | Ioffset_loc (n1, addr1), Ioffset_loc (n2, addr2)
+    when equal_addressing_mode addr1 addr2 ->
+    (* Two additions of constants to the same memory location, with nothing in
+       between, amount to a single addition of their sum (arithmetic is modulo
+       2^64 in both cases), provided the sum fits in a 32-bit immediate. *)
+    if not (Misc.no_overflow_add n1 n2)
+    then None
+    else
+      let n = n1 + n2 in
+      if n < -0x8000_0000 || n > 0x7FFF_FFFF
+      then None
+      else Some (Ioffset_loc (n, addr1))
+  | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _
+    | Isextend32 | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence
+    | Imfence | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
+    | Illvm_intrinsic _), _ ->
+    None
+
 let equal_prefetch_temporal_locality_hint left right =
   match left, right with
   | Nonlocal, Nonlocal -> true
