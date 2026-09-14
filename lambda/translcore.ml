@@ -633,7 +633,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match List.map extract_constant ll with
         | exception Not_constant -> None
         | constants ->
-            if List.for_all (fun (_, _, s) -> Jkind.Sort.Const.is_scannable s) el
+            if
+              List.for_all (fun (_, _, s) -> Jkind.Sort.Const.is_scannable s) el
             then
               (* Ensure that existing uniform tuple constants are optimized *)
               Some (Const_block(0, constants))

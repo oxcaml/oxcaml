@@ -2494,7 +2494,8 @@ let get_pat_args_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
   | { pat_desc = Tpat_tuple args }
-  | { pat_desc = Tpat_unboxed_tuple args } -> (List.map (fun (_, p, _) -> p) args) @ rem
+  | { pat_desc = Tpat_unboxed_tuple args } ->
+    (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
 let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
