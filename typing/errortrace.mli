@@ -89,6 +89,8 @@ type first_class_module =
     | Package_inclusion of Format_doc.doc
     | Package_coercion of Format_doc.doc
 
+type arrow_position = Argument | Return
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -106,6 +108,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Mode_mismatch : arrow_position * Mode.Alloc.error -> ('a, comparison) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 

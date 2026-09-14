@@ -5683,7 +5683,8 @@ let report_error ~loc = function
         quoted_type ty
         err
   | Constraint_failed (env, err) ->
-      let get_jkind_error : _ Errortrace.elt -> _ = function
+      let get_jkind_error
+          : (_, Errortrace.unification) Errortrace.elt -> _ = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _

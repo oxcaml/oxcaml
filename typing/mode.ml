@@ -5628,6 +5628,8 @@ module Comonadic_gen (Obj : Obj) = struct
     if check_generic m then raise Cannot_get_constant_from_generic;
     S.to_const_exn obj m
 
+  let to_of_const_exn m = S.to_of_const_exn obj m
+
   let unhint = S.Unhint.unhint
 
   let hint ?hint = S.Unhint.hint obj ?hint
@@ -5826,6 +5828,8 @@ module Monadic_gen (Obj : Obj) = struct
   let to_const_exn m =
     if check_generic m then raise Cannot_get_constant_from_generic;
     S.to_const_exn obj m
+
+  let to_of_const_exn m = S.to_of_const_exn obj m
 
   let unhint = S.Unhint.unhint
 
@@ -6587,6 +6591,12 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.to_const_exn comonadic in
     let monadic = Monadic.to_const_exn monadic in
     { comonadic; monadic } |> merge
+
+  let to_of_const_exn m =
+    let { comonadic; monadic } = m in
+    let comonadic = Comonadic.to_of_const_exn comonadic in
+    let monadic = Monadic.to_of_const_exn monadic in
+    { comonadic; monadic }
 
   let unhint { monadic; comonadic } =
     let comonadic = Comonadic.unhint comonadic in
@@ -7549,6 +7559,11 @@ module Value_with (Areality : Areality) = struct
       let* comonadic = Comonadic.Guts.check_const comonadic in
       Some (merge { comonadic; monadic })
 
+    let get_floor { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_floor monadic in
+      let comonadic = Comonadic.Guts.get_floor comonadic in
+      merge { monadic; comonadic }
+
     let get_ceil { monadic; comonadic } =
       let monadic = Monadic.Guts.get_ceil monadic in
       let comonadic = Comonadic.Guts.get_ceil comonadic in
@@ -7559,6 +7574,22 @@ module Value_with (Areality : Areality) = struct
       let monadic = Monadic.Guts.in_bounds c.monadic monadic in
       let comonadic = Comonadic.Guts.in_bounds c.comonadic comonadic in
       monadic && comonadic
+
+    let zap_towards_floor_of a1 ~towards:a2 =
+      if check_generic a1
+      then None
+      else
+        let a2_floor = get_floor a2 in
+        zap_to_ceil_force (meet [a1; of_const a2_floor]) |> ignore;
+        Some (zap_to_floor_force a1)
+
+    let zap_towards_ceil_of a1 ~towards:a2 =
+      if check_generic a1
+      then None
+      else
+        let a2_ceil = get_ceil a2 in
+        zap_to_floor_force (join [a1; of_const a2_ceil]) |> ignore;
+        Some (zap_to_ceil_force a1)
   end
 end
 [@@inline]
