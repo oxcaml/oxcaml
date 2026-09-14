@@ -129,8 +129,8 @@ let () =
           Printf.printf "File stats for index %S:\n" file;
           Stats.iter
             (fun file { mtime; size; source_digest } ->
-              Printf.printf "  %S: { mtime=%f; size=%d; source_digest=%S }\n" file
-                mtime size
+              Printf.printf "  %S: { mtime=%f; size=%d; source_digest=%S }\n"
+                file mtime size
                 (Option.value source_digest ~default:"none"))
             index.stats)
         (List.rev !input_files_rev)
@@ -145,15 +145,15 @@ let () =
           in
           Printf.printf
             "Index %S contains:\n\
-            - %i definitions\n\
-            - %i locations\n\
-            - %i approximated definitions\n\
-            - %i compilation units shapes\n\
-            - root dir: %s\n\n"
+             - %i definitions\n\
+             - %i locations\n\
+             - %i approximated definitions\n\
+             - %i compilation units shapes\n\
+             - root dir: %s\n\n"
             file (Uid_map.cardinal defs)
             (Uid_map.fold
-              (fun _uid locs acc -> acc + Lid_set.cardinal locs)
-              defs 0)
+               (fun _uid locs acc -> acc + Lid_set.cardinal locs)
+               defs 0)
             (Uid_map.cardinal approximated)
             (Hashtbl.length cu_shape)
             (Option.value ~default:"none" root_directory))
@@ -163,8 +163,8 @@ let () =
       Yojson.Basic.to_channel stdout json;
       print_newline ()
     | None -> Printf.printf "Nothing to do.\n%!");
-      if !debug then Granular_marshal.get_lru () |> Dbllist.pp_stats;
-      exit 0
+    if !debug then Granular_marshal.get_lru () |> Dbllist.pp_stats;
+    exit 0
   with Granular_marshal.Outdated_store { filename; reason } ->
     let msg =
       match reason with

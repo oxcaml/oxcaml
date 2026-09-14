@@ -92,4 +92,3 @@ let cases =
       ] )
 
 let () = Alcotest.run "merlin-lib.index_format.union_find" [ cases ]
-

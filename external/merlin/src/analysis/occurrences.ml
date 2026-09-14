@@ -202,7 +202,6 @@ let get_external_locs ~(config : Mconfig.t) ~current_buffer_path uid :
       let external_locs =
         try
           (* TODO: partial results when some stores are outdated or missing. *)
-
           let external_index = Index_cache.read index_file in
           Index_format.Uid_map.find_opt uid external_index.defs
           |> Option.map ~f:(fun uid_locs -> (external_index, uid_locs))

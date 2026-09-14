@@ -153,7 +153,10 @@ let pp (fmt : Format.formatter) pl =
     (Uid_map.cardinal pl.approximated)
     pp_partials pl.approximated;
   Format.fprintf fmt "and shapes for CUS %s.@ "
-    (String.concat ";@," (Hashtbl.to_seq_keys pl.cu_shape |> List.of_seq  |> List.map Compilation_unit.full_path_as_string));
+    (String.concat ";@,"
+       (Hashtbl.to_seq_keys pl.cu_shape
+       |> List.of_seq
+       |> List.map Compilation_unit.full_path_as_string));
   Format.fprintf fmt "and related uids:@[{%a}@]"
     (pp_related_uids pl.related_uids_store)
     pl.related_uids
