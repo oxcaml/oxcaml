@@ -41,8 +41,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   (* In order to produce a bytecode structure that follows the bytecode
      structure of loops, all opcodes that take a destination labels, except for
-     [Advance], fall through if the condition *fails*, and jumps to the label if
-     the condition succeeds.
+     [Advance], fall through if the condition *succeeeds*, and jumps to the label if
+     the condition fails.
 
      This is a bit counter-intuitive: one could reasonably expect that an opcode
      called e.g. [absent] would jump if the value is absent. However, this makes
@@ -246,7 +246,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
 
   let emit insn st = Dynarray.add_last st.code (Late (fun _ -> insn))
 
-  let emit_goto label f st =
+  let emit_with_label label f st =
     Dynarray.add_last st.code (Late (fun len -> f (get_label len label)))
 
   (* Note: [break 0] doesn't break out of any loops *)
@@ -254,7 +254,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     if n > 0
     then
       match List.nth st.after_loops (n - 1) with
-      | lab -> emit_goto lab (fun lab -> Goto lab) st
+      | lab -> emit_with_label lab (fun lab -> Goto lab) st
       | exception Not_found -> Misc.fatal_error "cannot break"
 
   let with_binding repr receiver body st =
@@ -270,29 +270,29 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       }
 
   let init receiver iterator label =
-    emit_goto label (fun label ->
+    emit_with_label label (fun label ->
         Init
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
   let advance receiver iterator label =
-    emit_goto label (fun label ->
+    emit_with_label label (fun label ->
         Advance
           (receiver.value, receiver.name, iterator.values, iterator.names, label))
 
   let absent is_trie { value = trie; name } { values = args; names } label =
-    emit_goto label (fun label ->
+    emit_with_label label (fun label ->
         Absent (is_trie, trie, name, args, names, label))
 
   let distinct repr key1 key2 label =
-    emit_goto label (fun label ->
+    emit_with_label label (fun label ->
         Distinct (repr, key1.value, key1.name, key2.value, key2.name, label))
 
   let seek iterator { value = receiver; name } label =
-    emit_goto label (fun label ->
+    emit_with_label label (fun label ->
         Seek (iterator.values, iterator.names, receiver, name, label))
 
   let filter { value = fn; name } { values = args; names } label =
-    emit_goto label (fun label -> Filter (fn, name, args, names, label))
+    emit_with_label label (fun label -> Filter (fn, name, args, names, label))
 
   let ( ++ ) fn1 fn2 code =
     fn1 code;
