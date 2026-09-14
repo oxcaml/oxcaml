@@ -1647,9 +1647,10 @@ let emit_nop b n =
   done;
   emit_single_nop b (n mod 15)
 
-(* The value of a subterm of a [Delta_uleb128] constant expression.  [Const] is
-   a section-independent value; [Offset_in_section] is an offset in bytes from
-   the start of the given section. *)
+(* The value of a subterm of a [Delta_uleb128] constant expression.
+   [Section_independent] is a value that does not depend on any section;
+   [Offset_in_section] is an offset in bytes from the start of the given
+   section. *)
 type evaluated_constant =
   | Section_independent of Int64.t
   | Offset_in_section of Section_name.t * Int64.t
@@ -1765,7 +1766,9 @@ let assemble_line b loc ins =
               ~const_op_offset:(fun i sec pos ->
                 Offset_in_section (sec, Numbers.Int64.add_exn i pos))
               ~offset_op_offset:(fun sec1 _ sec2 _ ->
-                invalid "cannot add offsets in sections %s and %s"
+                invalid
+                  "cannot add two section-relative offsets (in sections %s \
+                   and %s)"
                   (Section_name.to_string sec1)
                   (Section_name.to_string sec2))
               c1 c2
@@ -1782,8 +1785,7 @@ let assemble_line b loc ins =
                   Section_independent (Numbers.Int64.sub_exn pos1 pos2)
                 else
                   invalid
-                    "cannot subtract offsets in the different sections %s and \
-                     %s"
+                    "cannot subtract offsets in different sections %s and %s"
                     (Section_name.to_string sec1)
                     (Section_name.to_string sec2))
               c1 c2
