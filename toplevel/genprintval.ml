@@ -736,26 +736,26 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               in
               try_map_all label_params_and_types (fun (_, ty) -> with_sort ty)
             in
-            (* Finalize the representation just to be able to print it *)
-            let finalize rep =
-              Typeopt.finalize_record_representation env Location.none rep
+            (* Translate the representation just to be able to print it *)
+            let transl rep =
+              Typeopt.transl_record_representation env Location.none rep
             in
             let rep =
               match rep with
               | Record_undetermined ->
                 Option.map
-                  (fun l -> finalize (Record_variable l))
+                  (fun l -> transl (Record_variable l))
                   (sorts_and_types ())
               | Record_inlined (tag, Constructor_undetermined, vrep) ->
                 Option.map
                   (fun l ->
-                     finalize
+                     transl
                        (Record_inlined (tag, Constructor_variable l, vrep)))
                   (sorts_and_types ())
               | Record_variable _
               | Record_inlined (_, Constructor_variable _, _) ->
                   Misc.fatal_error "variable record representation"
-              | _ -> Some (finalize rep)
+              | _ -> Some (transl rep)
             in
             match rep with
             | None -> Oval_stuff "<abstr>"

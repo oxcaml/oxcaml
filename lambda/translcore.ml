@@ -646,7 +646,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         | _ -> assert false
       end else begin
         let shape =
-          Typeopt.finalize_constructor_representation e.exp_env e.exp_loc
+          Typeopt.transl_constructor_representation e.exp_env e.exp_loc
             shape
         in
         let ll =
@@ -804,7 +804,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       end
   | Texp_record {fields; representation; extended_expression; alloc_mode} ->
       let representation =
-        Typeopt.finalize_record_representation e.exp_env e.exp_loc
+        Typeopt.transl_record_representation e.exp_env e.exp_loc
           representation
       in
       transl_record ~scopes e.exp_loc e.exp_env
@@ -824,7 +824,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       let record_repres =
-        Typeopt.finalize_record_representation e.exp_env e.exp_loc
+        Typeopt.transl_record_representation e.exp_env e.exp_loc
           record_repres
       in
       let repres = match record_repres with
@@ -849,7 +849,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  record_repres; lid = _; label = lbl; boxing = float;
                  unique_barrier = ubr } ->
       let record_repres =
-        Typeopt.finalize_record_representation arg.exp_env e.exp_loc
+        Typeopt.transl_record_representation arg.exp_env e.exp_loc
           record_repres
       in
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -987,12 +987,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         Jkind.Sort.Const.for_boxed_record
       in
       let record_repres, ~variable_sorts =
-        Typeopt.finalize_record_representation_and_sorts arg.exp_env
+        Typeopt.transl_record_representation_and_sorts arg.exp_env
           e.exp_loc record_repres
       in
       let sort_newval =
-        Typeopt.finalized_label_sort lbl record_repres ~record_sort:sort_arg
-          ~variable_sorts
+        Typeopt.label_sort_for_representation lbl record_repres
+          ~record_sort:sort_arg ~variable_sorts
       in
       let arg_layout = layout_exp sort_arg arg in
       let arg_lambda = transl_exp ~scopes arg_layout arg in
@@ -2777,7 +2777,7 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
   | Baccess_field (_id, lbl, repres) ->
-    let repres = Typeopt.finalize_record_representation env loc repres in
+    let repres = Typeopt.transl_record_representation env loc repres in
     begin match repres with
     | Record_boxed
     | Record_float | Record_ufloat ->
