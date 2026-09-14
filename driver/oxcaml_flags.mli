@@ -34,7 +34,9 @@ val cfg_peephole_optimize: bool ref
 val x86_peephole_optimize : bool ref
 val x86_peephole_remove_mov_to_dead_register : bool ref
 val x86_peephole_remove_redundant_cmp : bool ref
+val x86_peephole_remove_redundant_extension : bool ref
 val x86_peephole_combine_add_rsp : bool ref
+val x86_peephole_remove_redundant_test : bool ref
 
 val cfg_stack_checks : bool ref
 val cfg_stack_checks_threshold : int ref
@@ -48,6 +50,8 @@ val omit_leaf_frame_pointers : bool ref
 
 val cfg_merge_blocks : bool ref
 
+val cfg_block_layout : bool ref
+
 val cfg_value_propagation : bool ref
 val cfg_value_propagation_float : bool ref
 val cfg_value_propagation_flow : bool ref
@@ -58,7 +62,6 @@ val module_entry_functions_section : bool ref
 
 val dasm_comments : bool ref
 
-val frametables_in_rodata : bool ref
 
 val default_heap_reduction_threshold : int
 val heap_reduction_threshold : int ref

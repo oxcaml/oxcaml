@@ -29,6 +29,8 @@
 
 type _ repr
 
+include Heterogenous_list.S with type 'a t := 'a repr
+
 val int_repr : print:(Format.formatter -> int -> unit) -> int repr
 
 val equal_repr : 'a repr -> 'a -> 'a -> bool

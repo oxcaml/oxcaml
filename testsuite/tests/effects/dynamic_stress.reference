@@ -7,11 +7,6 @@ after all pops [expect null]: null
 bound 25, visible 25, all correct: true
 visible after unwind [expect 0]: 0
 
-# hash collision: linear probing and rehash on pop
-both bound: a=111 b=222
-after pop a: a=null [expect null]
-after pop a: b=222 [expect 222]
-
 # GC root scanning of live bindings
 top after GC [expect yyyyyy]: yyyyyy
 below after GC [expect xxxx]: xxxx

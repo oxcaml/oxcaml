@@ -103,6 +103,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Addressable of 'sort t  (** See Note [Addressable kinds] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
@@ -112,9 +113,17 @@ module Layout : sig
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
+
+    (** Whether the layout mentions a genvar anywhere (including inside a
+        product). *)
+    val has_genvar : t -> bool
   end
 
   val sub : Sort.t t -> Sort.t t -> Sub_result.t
+
+  val is_surely_addressable_flat : Sort.Flat.t t -> bool
+
+  val crosses_externality : Sort.t t -> bool
 
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
@@ -463,7 +472,10 @@ val of_annotation_option_default :
     Raises if a disallowed or unknown jkind is present.
 
     [use_abstract_jkinds] controls whether references to other kinds here count
-    as uses of them for unused abstract kind warnings. *)
+    as uses of them for unused abstract kind warnings.
+
+    [warn] controls whether redundant-modifier and redundant-kind-modifier
+    warnings are emitted while parsing the annotation. *)
 val of_type_decl :
   ?use_abstract_jkinds:bool ->
   ?warn:bool ->
@@ -489,15 +501,9 @@ val of_type_decl_overapproximate_unknown :
 (** Choose an appropriate jkind for a boxed record type *)
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
-(** Choose an appropriate jkind for a boxed record type *)
-val for_boxed_record_with_updates :
-  (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
-  Types.jkind_l
-
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record_with_updates :
-  (Types.label_declaration * Types.type_expr * Sort.t Layout.t) list ->
-  Types.jkind_l
+val for_unboxed_record :
+  (Types.label_declaration * Sort.t Layout.t) list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type.
 
@@ -517,8 +523,26 @@ val for_boxed_variant :
     Types.type_expr list ->
     Types.type_expr) ->
   get_free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  cstr_layouts:Types.cstr_layout array ->
   Types.constructor_declaration list ->
   Types.jkind_l
+
+(** Choose an appropriate jkind for a user-defined [@@or_null] variant (a
+    [Variant_with_null]), given [payload_jkind], the inferred jkind of its
+    payload [payload_type]. Like the builtin ['a or_null], the result has the
+    builtin's mod-bounds (crossing everything except staticity) with the payload
+    added as a with-bound under [modality]; its layout is the payload's layout
+    adjusted by [apply_or_null_l]. Both the input and the output are [jkind_l]
+    because both are inferred, actual kinds of types (the payload's and the
+    declaration's), not requirements imposed on them. The result is marked best.
+    Returns [Error ()] if the payload's kind is maybe-null or has no known
+    scannable layout. *)
+val for_or_null_variant :
+  Env.t ->
+  payload_type:Types.type_expr ->
+  modality:Mode.Modality.Const.t ->
+  payload_jkind:Types.jkind_l ->
+  (Types.jkind_l, unit) result
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l
@@ -624,6 +648,14 @@ val get_mode_crossing :
 
 val to_unsafe_mode_crossing : Types.jkind_l -> Types.unsafe_mode_crossing
 
+val equal_unsafe_mode_crossing :
+  type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
+  context:jkind_context ->
+  Env.t ->
+  Types.unsafe_mode_crossing ->
+  Types.unsafe_mode_crossing ->
+  bool
+
 val get_externality_upper_bound :
   context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Externality.t
 
@@ -646,8 +678,8 @@ val apply_modality_l :
   Mode.Modality.Const.t -> (allowed * 'r) Types.jkind -> Types.jkind_l
 
 (** Change a jkind to be appropriate for an expectation of a type under a
-    modality. This means that the jkind's axes affected by the modality will all
-    be top. The with-bounds are left unchanged. *)
+    modality. Relax direct bounds so applying the modality on the left meets the
+    original expectation. With-bounds are unchanged. *)
 val apply_modality_r :
   Mode.Modality.Const.t -> ('l * allowed) Types.jkind -> Types.jkind_r
 
@@ -663,11 +695,15 @@ val apply_or_null_l : Env.t -> Types.jkind_l -> (Types.jkind_l, unit) result
     jkind is already [Non_null], fails. *)
 val apply_or_null_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
 
-(** Extract out component jkinds from the product. Because there are no product
-    jkinds, this is a bit of a lie: instead, this decomposes the layout but just
-    reuses the non-layout parts of the original jkind. Never does any mutation.
-    Because it just reuses the mode information, the resulting jkinds are higher
-    in the jkind lattice than they might need to be. *)
+(** Given a jkind [k], produce a list of jkinds [ks] such that [k] is equivalent
+    to [Product ks]. In practice, [k] is the kind of, or required kind of, a
+    tuple/record being inspected in [Ctype.constrain_type_jkind].
+
+    Because there are no product jkinds, the resulting jkinds are higher in the
+    jkind lattice than they might need to be. (This decomposes the layout but
+    just reuses the non-layout parts of the original jkind.)
+
+    Never does any mutation. *)
 val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
 
 (** Get an annotation (that a user might write) for this [t]. *)
@@ -712,9 +748,16 @@ val set_printtyp_path : (Format_doc.formatter -> Path.t -> unit) -> unit
     module. *)
 val set_print_type_expr : Types.type_expr Format_doc.printer -> unit
 
+val format_type_expr : Types.type_expr Format_doc.printer
+
 (** Provides the [raw_type_expr] formatter back up the dependency chain to this
     module. *)
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
+
+(** Provides [Ctype.estimate_type_jkind] back up the dependency chain to this
+    module. *)
+val set_estimate_type_jkind :
+  (Env.t -> Types.type_expr -> Types.jkind_l) -> unit
 
 val format : Env.t -> Format_doc.formatter -> 'd Types.jkind -> unit
 
@@ -896,7 +939,8 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 
 (** Fully expands the jkind's base - useful to avoid expanding twice for clients
     that both want to inspect the mod bounds and apply other functions to the
-    jkind that would expand it. *)
+    jkind that would expand it. Also lowers the resulting externality bound to
+    the bound implied by the layout. *)
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)

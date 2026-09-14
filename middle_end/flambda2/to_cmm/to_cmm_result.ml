@@ -178,14 +178,16 @@ let to_cmm r =
   (* Make sure we do not forget any current data *)
   let r = archive_data r in
   let sorted_functions =
+    let functions = List.rev r.functions in
     match !Oxcaml_flags.function_layout with
-    | Topological -> List.rev r.functions
+    | Topological -> functions
     | Source ->
-      (* Sort functions according to debuginfo, to get a stable ordering *)
+      (* Sort functions according to debuginfo, to get a stable ordering. Use
+         reversed r.functions to preserve order for equal debuginfos *)
       List.sort
         (fun (f1 : Cmm.fundecl) (f2 : Cmm.fundecl) ->
           Debuginfo.compare f1.fun_dbg f2.fun_dbg)
-        r.functions
+        functions
   in
   let function_phrases = List.map (fun f -> C.cfunction f) sorted_functions in
   (* Translate roots to Cmm symbols *)

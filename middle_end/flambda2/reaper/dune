@@ -40,7 +40,7 @@
    (:include %{project_root}/ocamlopt_flags.sexp)
    -O3))
  (libraries
-  ocamlcommon
+  ocamlfrontend
   flambda2_algorithms
   flambda2_bound_identifiers
   flambda2_cmx

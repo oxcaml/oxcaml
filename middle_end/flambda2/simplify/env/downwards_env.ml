@@ -224,49 +224,38 @@ let define_extra_variable t var kind =
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region =
+    ~toplevel_my_alloc_region =
   let typing_env = TE.create ~machine_width ~resolver in
-  let t =
-    { round;
-      machine_width;
-      typing_env;
-      inlined_debuginfo = Inlined_debuginfo.none;
-      disable_inlining = Do_not_disable_inlining;
-      disable_partial_application_stub_generation = false;
-      inlining_state = Inlining_state.default ~round;
-      propagating_float_consts;
-      at_unit_toplevel = true;
-      unit_toplevel_return_continuation;
-      unit_toplevel_exn_continuation;
-      unit_toplevel_alloc_region = toplevel_my_alloc_region;
-      variables_defined_at_toplevel = Variable.Set.empty;
-      cse = CSE.empty;
-      comparison_results = Variable.Map.empty;
-      are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
-      closure_info = Closure_info.not_in_a_closure;
-      all_code = Code_id.Map.empty;
-      get_imported_code;
-      inlining_history_tracker =
-        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
-      loopify_state = Loopify_state.do_not_loopify;
-      replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
-      defined_variables_by_scope = [Lifted_cont_params.empty];
-      lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0;
-      has_seen_a_non_liftable_continuation = false;
-      join_analysis = None
-    }
-  in
-  let my_region_duid = Flambda_debug_uid.none in
-  let my_ghost_region_duid = Flambda_debug_uid.none in
-  define_variable
-    (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
-       K.region)
-    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
-       Name_mode.normal)
-    K.region
+  { round;
+    machine_width;
+    typing_env;
+    inlined_debuginfo = Inlined_debuginfo.none;
+    disable_inlining = Do_not_disable_inlining;
+    disable_partial_application_stub_generation = false;
+    inlining_state = Inlining_state.default ~round;
+    propagating_float_consts;
+    at_unit_toplevel = true;
+    unit_toplevel_return_continuation;
+    unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region = toplevel_my_alloc_region;
+    variables_defined_at_toplevel = Variable.Set.empty;
+    cse = CSE.empty;
+    comparison_results = Variable.Map.empty;
+    are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
+    closure_info = Closure_info.not_in_a_closure;
+    all_code = Code_id.Map.empty;
+    get_imported_code;
+    inlining_history_tracker =
+      Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
+    loopify_state = Loopify_state.do_not_loopify;
+    replay_history = Replay_history.first_pass;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
+    defined_variables_by_scope = [Lifted_cont_params.empty];
+    lifted = Variable.Set.empty;
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    has_seen_a_non_liftable_continuation = false;
+    join_analysis = None
+  }
 
 let all_code t = t.all_code
 
@@ -543,6 +532,23 @@ let check_simple_is_bound t (simple : Simple.t) =
 
 let mem_code t id =
   Code_id.Map.mem id t.all_code || Exported_code.mem id (t.get_imported_code ())
+
+let find_code_metadata_exn t id =
+  match Code_id.Map.find id t.all_code with
+  | code -> Code.code_metadata code
+  | exception Not_found -> (
+    (* We don't care which unit the metadata is coming from, so if we have
+       already loaded the metadata in imported code, return it. *)
+    match Exported_code.find_exn (t.get_imported_code ()) id with
+    | code_or_metadata -> Code_or_metadata.code_metadata code_or_metadata
+    | exception Not_found ->
+      (* Sometimes the metadata is not properly reexported; try to force loading
+         it. *)
+      let (_ : TE.Serializable.t option) =
+        TE.resolver t.typing_env (Code_id.get_compilation_unit id)
+      in
+      Code_or_metadata.code_metadata
+        (Exported_code.find_exn (t.get_imported_code ()) id))
 
 let find_code_exn t id =
   match Code_id.Map.find_or_null id t.all_code with

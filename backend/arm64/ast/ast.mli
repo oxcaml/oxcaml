@@ -314,12 +314,12 @@ end
 (** Immediates used in instruction operands. *)
 module Immediate : sig
   type 'width t = private
-    | Six : int -> [`Six] t
-    | Twelve : int -> [`Twelve] t
-    | Sixteen_unsigned : int -> [`Sixteen_unsigned] t
-    | Sym : 'w Symbol.t -> [`Sym of 'w] t
-    | Float : float -> [`Sixty_four] t
-    | Nativeint : nativeint -> [`Sixty_four] t
+    | Six : int -> [> `Six] t
+    | Twelve : int -> [> `Twelve] t
+    | Sixteen_unsigned : int -> [> `Sixteen_unsigned] t
+    | Sym : 'w Symbol.t -> [> `Sym of 'w] t
+    | Float : float -> [> `Sixty_four] t
+    | Nativeint : nativeint -> [> `Sixty_four] t
 end
 
 (** Offsets used in addressing modes. *)
@@ -605,7 +605,7 @@ module Instruction_name : sig
         t
     | ADDV :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of ([< `B | `H | `S] as 'w)]]]
+          [`Reg of [`Neon of [`Scalar of ([< `B | `H | `S] as 'w)]]]
           * [ `Reg of
               [ `Neon of
                 [`Vector of [< `V8B | `V16B | `V4H | `V8H | `V2S | `V4S] * 'w]
@@ -617,7 +617,7 @@ module Instruction_name : sig
         ( quad,
           [`Reg of [`GP of [< `X | `SP | `FP]]]
           * [`Reg of [`GP of [< `X | `SP | `FP]]]
-          * [`Imm of [< `Twelve | `Sym of [`Twelve]]]
+          * [`Imm of [`Twelve | `Sym of [`Twelve]]]
           * [`Optional of [`Fixed_shift of [`Lsl_by_twelve]] option] )
         t
     | ADD_shifted_register :
@@ -828,8 +828,8 @@ module Instruction_name : sig
         t
     | FCVT :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTL_vector :
         ( pair,
@@ -841,7 +841,7 @@ module Instruction_name : sig
     | FCVTNS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTNS_vector :
         ( pair,
@@ -861,7 +861,7 @@ module Instruction_name : sig
     | FCVTZS :
         ( pair,
           [`Reg of [`GP of [< `X]]]
-          * [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]] )
+          * [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] )
         t
     | FCVTZS_vector :
         ( pair,
@@ -945,18 +945,16 @@ module Instruction_name : sig
         t
     | FMOV_fp_to_gp_32 :
         ( pair,
-          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [< `Scalar of [< `S]]]]
-        )
+          [`Reg of [`GP of [`W]]] * [`Reg of [`Neon of [`Scalar of [< `S]]]] )
         t
     | FMOV_fp_to_gp_64 :
         ( pair,
-          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [< `Scalar of [< `D]]]]
-        )
+          [`Reg of [`GP of [`X]]] * [`Reg of [`Neon of [`Scalar of [< `D]]]] )
         t
     | FMOV_scalar_immediate :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
-          * [`Imm of [`Sixty_four]] )
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]] * [`Imm of [`Sixty_four]]
+        )
         t
     | FMSUB :
         ( quad,
@@ -1110,7 +1108,7 @@ module Instruction_name : sig
         (pair, [`Reg of [`GP of [< `X]]] * [`Mem of Addressing_mode.single]) t
     | LDR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | LSLV :
@@ -1233,7 +1231,7 @@ module Instruction_name : sig
             modelled here. *)
     | SCVTF :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `S | `D]]]]
+          [`Reg of [`Neon of [`Scalar of [< `S | `D]]]]
           * [`Reg of [`GP of [< `X]]] )
         t
     | SCVTF_vector :
@@ -1365,7 +1363,7 @@ module Instruction_name : sig
         (pair, [`Reg of [`GP of [< `W]]] * [`Mem of Addressing_mode.single]) t
     | STR_simd_and_fp :
         ( pair,
-          [`Reg of [`Neon of [< `Scalar of [< `D | `S | `Q]]]]
+          [`Reg of [`Neon of [`Scalar of [< `D | `S | `Q]]]]
           * [`Mem of Addressing_mode.single] )
         t
     | SUBS_immediate :
@@ -1606,7 +1604,7 @@ end
 module DSL : sig
   val reg_op : 'a Reg.t -> [`Reg of 'a] Operand.t
 
-  val imm : int -> [`Imm of [`Twelve]] Operand.t
+  val imm : int -> [`Imm of [> `Twelve]] Operand.t
 
   val imm_six : int -> [`Imm of [`Six]] Operand.t
 
@@ -1623,7 +1621,7 @@ module DSL : sig
 
   val bitmask : nativeint -> [`Bitmask] Operand.t
 
-  val symbol : 'w Symbol.t -> [`Imm of [`Sym of 'w]] Operand.t
+  val symbol : 'w Symbol.t -> [`Imm of [> `Sym of 'w]] Operand.t
 
   val shift :
     kind:'op Operand.Shift.Kind.t ->

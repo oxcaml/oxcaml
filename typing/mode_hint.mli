@@ -29,8 +29,11 @@ type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Parameter  (** A function parameter *)
+  | Return  (** A function return *)
   | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Functor_parameter  (** A functor parameter *)
   | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Quote  (** A quoted expression *)
@@ -58,6 +61,7 @@ type mutable_part =
 type always_dynamic =
   | Application
   | Try_with
+  | Generative_functor
 
 type legacy =
   | Compilation_unit
@@ -100,6 +104,11 @@ type is_contained_by =
     container : pinpoint
   }
 
+type annotation =
+  { loc : Location.t;
+    written_modes : string Location.loc list
+  }
+
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
 printed. *)
@@ -133,6 +142,7 @@ type 'd const =
   | Quoted_computation : ('l * disallowed) pos const
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
+  | Annotation : annotation -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
@@ -170,6 +180,19 @@ type 'd morph =
      submode calls, each constructor only needs to store the info of its source
      pinpoint. *)
   | Crossing : ('l * 'r) morph
+  | Functor_to_parameter : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a functor's staticity to its
+          parameter's. Carries the functor's location. *)
+  | Parameter_to_functor : Location.t -> ('l * 'r) morph
+      (** The identity morphism connecting a parameter's staticity to the
+          functor's. Carries the parameter's location. *)
+  | Functor_to_application : Location.t -> ('l * disallowed) neg morph
+      (** The identity morphism from a functor's staticity to its application
+          result's staticity (a monadic axis, hence [neg]). Carries the
+          functor's location. *)
+  | Application_to_functor : Location.t -> (disallowed * 'r) neg morph
+      (** The dual of [Functor_to_application]: from the result's staticity back
+          to the functor's. Carries the application's location. *)
   | Allocation_r : allocation -> (disallowed * 'r) morph
   | Allocation_l : allocation -> ('l * disallowed) morph
   | Allocation : allocation -> ('l * 'r) morph

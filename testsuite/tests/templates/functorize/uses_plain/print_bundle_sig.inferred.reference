@@ -1,0 +1,10 @@
+module type T =
+  sig
+    module Uses_plain :
+      sig
+        val greet : P_int.t -> Plain.t @@ stateless
+        module Plain_alias = Plain
+        module Basic_int = Basic(P)(P_int) [@jane.non_erasable.instances]
+        val from_basic_int : Basic_int.t
+      end
+  end

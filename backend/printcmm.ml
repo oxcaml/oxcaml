@@ -240,6 +240,8 @@ let reinterpret_cast : Cmm.reinterpret_cast -> string = function
   | Int64_of_float -> "float as int64"
   | Float32_of_int32 -> "int32 as float32"
   | Int32_of_float32 -> "float32 as int32"
+  | Mask_of_int64 -> "int64 as mask"
+  | Int64_of_mask -> "mask as int64"
 
 let static_cast : Cmm.static_cast -> string = function
   | Int_of_float Float64 -> "float->int"
@@ -388,6 +390,8 @@ let rec expr ppf = function
   | Cphantom_let (var, def, body) ->
     fprintf ppf "@[<2>(let?@ @[<2>%a@ %a@]@ %a)@]" VP.print var
       phantom_defining_expr_opt def sequence body
+  | Cname_for_debugger (var, body) ->
+    fprintf ppf "@[<2>(name_for_debugger@ %a@ %a)@]" VP.print var expr body
   | Ctuple el ->
     let tuple ppf el =
       let first = ref true in

@@ -19,7 +19,7 @@ let () = print_endline "Test: basic first-class mixed module"
 
 module type S1 = sig
   val unboxed_float : float#
-  val unboxed_int64 : int64#
+  val unboxed_int64 : int64_u
   val boxed_int : int
   val boxed_string : string
 end
@@ -169,8 +169,8 @@ let () =
 
 module type S6 = sig
   val boxed_tuple : int * string
-  val unboxed_tuple : #(float# * string * int64# * void)
-  type unboxed_record = #{ x : float#; y : int64#; z : string; v : void }
+  val unboxed_tuple : #(float# * string * int64_u * void)
+  type unboxed_record = #{ x : float#; y : int64_u; z : string; v : void }
   val unboxed_rec : unboxed_record
   val f : int -> float#
 end
@@ -178,7 +178,7 @@ end
 module M6 : S6 = struct
   let boxed_tuple = (42, "answer")
   let unboxed_tuple = #(#3.14, "foo", #271828L, void ())
-  type unboxed_record = #{ x : float#; y : int64#; z : string; v : void }
+  type unboxed_record = #{ x : float#; y : int64_u; z : string; v : void }
   let unboxed_rec = #{ x = #2.718; y = #314159L; z = "bar"; v = void () }
   let f n = Float_u.of_float (float_of_int (n * n))
 end
@@ -253,7 +253,7 @@ module type S8 = sig
   module F : functor (X : S1) -> S1
 
   module S : sig
-    val baz : int64#
+    val baz : int64_u
     val qux : string
   end
 end
@@ -373,11 +373,11 @@ end
 
 let m9_extended = (module struct
   type t = string
-  type u = int64#
+  type u = int64_u
   type v = #(bool * float#)
   let x = 42
   let y = #3.14
-end : S9_extended with type t = string and type u = int64#
+end : S9_extended with type t = string and type u = int64_u
                    and type v = #(bool * float#))
 
 let m9_base = (m9_extended :> (module S9_base with type t = string))
@@ -432,7 +432,7 @@ let () = print_endline "Test: subtype with unboxed type in forgotten types"
 
 module type S11_many_unboxed = sig
   type t = float#
-  type u = int64#
+  type u = int64_u
   type v
 
   val x : t
@@ -446,7 +446,7 @@ end
 
 let m11_many = (module struct
   type t = float#
-  type u = int64#
+  type u = int64_u
   type v = string
   let x = #99.9
 end : S11_many_unboxed with type v = string)

@@ -25,6 +25,8 @@
 
 open! Int_replace_polymorphic_compare
 
+[@@@ocaml.warning "+a-4-40-41-42"]
+
 (** Interface to be satisfied by target-specific code, for instruction
     selection. *)
 

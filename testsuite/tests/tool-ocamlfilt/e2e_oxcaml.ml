@@ -73,8 +73,8 @@ let consume_unique (x @ unique) = ignore x
 let pi_u : float# = #3.14
 let twice_u (x : float#) : float# = x
 
-let zero64 : int64# = #0L
-let pass_int64u (x : int64#) : int64# = x
+let zero64 : int64_u = #0L
+let pass_int64u (x : int64_u) : int64_u = x
 
 (* {1 Polymorphic parameter (rank-2 type)} *)
 
@@ -166,7 +166,7 @@ let () =
   ignore (portable_id 42);
   consume_unique 1;
   let _ : float# = twice_u pi_u in
-  let _ : int64# = pass_int64u zero64 in
+  let _ : int64_u = pass_int64u zero64 in
   ignore (apply_poly (fun x -> x));
   ignore (lt_sum lt_point);
   ignore (make_lt 1 2);

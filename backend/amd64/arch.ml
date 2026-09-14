@@ -147,10 +147,15 @@ module Extension = struct
     | SSE4_2, AVX
     | AVX, AVX2
     | AVX2, AVX512F
-    | AVX512F, AVX512DQ
+    (* AVX512F, CD, VL, DQ and BW are mutually required. *)
     | AVX512F, AVX512CD
+    | AVX512CD, AVX512F
+    | AVX512F, AVX512DQ
+    | AVX512DQ, AVX512F
     | AVX512F, AVX512BW
+    | AVX512BW, AVX512F
     | AVX512F, AVX512VL
+    | AVX512VL, AVX512F
     | BMI, BMI2 -> true
     | (POPCNT | LZCNT | PREFETCHW | PREFETCHWT1 | SSE3 | SSSE3 | SSE4_1 |
        SSE4_2 | CLMUL | BMI | BMI2 | AVX | AVX2 | F16C | FMA | AVX512F |
@@ -294,6 +299,7 @@ type specific_operation =
                                           extension *)
   | Izextend32                         (* 32 to 64 bit conversion with zero
                                           extension *)
+  | Ineg                               (* integer negation *)
   | Irdtsc                             (* read timestamp *)
   | Irdpmc                             (* read performance counter *)
   | Ilfence                            (* load fence *)
@@ -335,6 +341,14 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
+(* The eight registers that the short frame-descriptor format can record in
+   its hot-register bitmap, numbered as in [compute_live_offset] (see
+   [Emitaux.emit_frames]). Chosen by measuring which registers are most often
+   live across allocation points. Must agree exactly with
+   [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h: a mismatch
+   makes the GC scan the wrong registers (silent heap corruption). *)
+let frame_hot_regs = [| 0; 1; 2; 3; 4; 5; 6; 8 |]
+
 let allow_unaligned_access = true
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
@@ -364,6 +378,52 @@ let num_args_addressing = function
   | Iindexed2 _ -> 2
   | Iscaled _ -> 1
   | Iindexed2scaled _ -> 2
+
+let fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta =
+  match op with
+  | Ilea addr ->
+    (* The delta is absorbed into the displacement of the addressing
+       expression, multiplied by the total scale with which the folded
+       register contributes to the address. *)
+    let displ, arg_weights =
+      match addr with
+      | Ibased (_, _, displ) -> displ, [||]
+      | Iindexed displ -> displ, [| 1 |]
+      | Iindexed2 displ -> displ, [| 1; 1 |]
+      | Iscaled (scale, displ) -> displ, [| scale |]
+      | Iindexed2scaled (scale, displ) -> displ, [| 1; scale |]
+    in
+    if Array.length arg_is_folded_reg <> Array.length arg_weights
+    then
+      Misc.fatal_errorf
+        "Arch.fold_delta_into_specific_operation: addressing mode expects %d \
+         argument(s) but the instruction has %d"
+        (Array.length arg_weights)
+        (Array.length arg_is_folded_reg);
+    let multiplier =
+      Misc.Stdlib.Array.fold_lefti
+        (fun i multiplier is_folded_reg ->
+          if is_folded_reg then multiplier + arg_weights.(i) else multiplier)
+        0 arg_is_folded_reg
+    in
+    (* Only fold if the operation actually reads the register: deleting the
+       preceding addition must not shrink the register's live range. *)
+    if multiplier = 0
+    then None
+    else begin
+      (* Cannot overflow: the multiplier is at most 9 and [delta] comes from
+         an amd64 instruction immediate, which fits in 32 bits. *)
+      let displ_delta = multiplier * delta in
+      let new_displ = displ + displ_delta in
+      if new_displ < -0x8000_0000 || new_displ > 0x7FFF_FFFF
+      then None
+      else Some (Ilea (offset_addressing addr displ_delta))
+    end
+  | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ | Isextend32
+  | Izextend32 | Ineg | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence
+  | Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _
+  | Illvm_intrinsic _ ->
+    None
 
 let addressing_displacement_for_llvmize addr =
   if not !Clflags.llvm_backend
@@ -444,6 +504,8 @@ let print_specific_operation printreg op ppf arg =
       fprintf ppf "sextend32 %a" printreg arg.(0)
   | Izextend32 ->
       fprintf ppf "zextend32 %a" printreg arg.(0)
+  | Ineg ->
+      fprintf ppf "neg %a" printreg arg.(0)
   | Irdtsc ->
       fprintf ppf "rdtsc"
   | Ilfence ->
@@ -481,6 +543,7 @@ let specific_operation_name : specific_operation -> string = fun op ->
       "bswap " ^ (bitwidth |> int_of_bswap_bitwidth |> string_of_int)
   | Isextend32 -> "sextend32"
   | Izextend32 -> "zextend32"
+  | Ineg -> "neg"
   | Irdtsc -> "rdtsc"
   | Ilfence -> "lfence"
   | Isfence -> "sfence"
@@ -503,7 +566,7 @@ let win64 =
 (* Specific operations that are pure *)
 (* Keep in sync with [Vectorize_specific] *)
 let operation_is_pure = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _  -> true
   | Irdtsc | Irdpmc
   | Ilfence | Isfence | Imfence
@@ -519,7 +582,7 @@ let operation_is_pure = function
 
 (* Keep in sync with [Vectorize_specific] *)
 let operation_allocates = function
-  | Ilea _ | Ibswap _ | Isextend32 | Izextend32
+  | Ilea _ | Ibswap _ | Isextend32 | Izextend32 | Ineg
   | Ifloatarithmem _
   | Irdtsc | Irdpmc  | Ipackf32
   | Isimd _ | Isimd_mem _
@@ -598,6 +661,8 @@ let equal_specific_operation left right =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ineg, Ineg ->
+    true
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -622,7 +687,8 @@ let equal_specific_operation left right =
     Simd.Mem.equal_operation l r && equal_addressing_mode al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Isextend32 | Izextend32 | Ineg |
+     Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false
@@ -710,6 +776,8 @@ let isomorphic_specific_operation op1 op2 =
     true
   | Izextend32, Izextend32 ->
     true
+  | Ineg, Ineg ->
+    true
   | Irdtsc, Irdtsc ->
     true
   | Irdpmc, Irdpmc ->
@@ -734,7 +802,8 @@ let isomorphic_specific_operation op1 op2 =
     Simd.Mem.equal_operation l r && equal_addressing_mode_without_displ al ar
   | Illvm_intrinsic l, Illvm_intrinsic r -> String.equal l r
   | (Ilea _ | Istore_int _ | Ioffset_loc _ | Ifloatarithmem _ | Ibswap _ |
-     Isextend32 | Izextend32 | Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
+     Isextend32 | Izextend32 | Ineg |
+     Irdtsc | Irdpmc | Ilfence | Isfence | Imfence |
      Ipackf32 | Isimd _ | Isimd_mem _ | Icldemote _ | Iprefetch _ |
      Illvm_intrinsic _), _ ->
     false

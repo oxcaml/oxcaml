@@ -1283,15 +1283,7 @@ let x13f v =
   | Some v -> f_id v
   | None -> assert false
 [%%expect{|
-Line 3, characters 19-20:
-3 |   | Some v -> f_id v
-                       ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_float64"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a value layout
-         because it's the type of a constructor argument being projected.
+val x13f : t_float64 option -> t_float64 = <fun>
 |}];;
 
 (* list *)
@@ -2528,38 +2520,38 @@ Error: The primitive [%box_int32] is used in an invalid declaration.
 |}]
 
 (* can't use primitives for jkind conversions *)
-external f : float# -> int32# = "%identity";;
+external f : float# -> int32_u = "%identity";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%identity";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%identity";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%identity] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external f : float# -> int32# = "%opaque";;
+external f : float# -> int32_u = "%opaque";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%opaque";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%opaque";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%opaque] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
-external f : float# -> int32# = "%obj_magic";;
+external f : float# -> int32_u = "%obj_magic";;
 [%%expect{|
-Line 1, characters 13-29:
-1 | external f : float# -> int32# = "%obj_magic";;
-                 ^^^^^^^^^^^^^^^^
+Line 1, characters 13-30:
+1 | external f : float# -> int32_u = "%obj_magic";;
+                 ^^^^^^^^^^^^^^^^^
 Error: The primitive [%obj_magic] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
 (* not smart enough to stop this
    but the middle end should error in this case *)
-external f : (float# -> int32#) -> int32# -> int32# = "%apply";;
+external f : (float# -> int32_u) -> int32_u -> int32_u = "%apply";;
 [%%expect{|
-external f : (float# -> int32#) -> int32# -> int32# = "%apply"
+external f : (float# -> int32_u) -> int32_u -> int32_u = "%apply"
 |}]
 
 external f : float# -> int -> int = "%send";;
@@ -2945,7 +2937,7 @@ Error: This function application uses an expression with type "'a"
 |}]
 
 let f (x : ('a : value)) = x ()
-let f (x : ('a : value mod uncontended)) = x ()
+let f (x : ('a : value mod aliased)) = x ()
 
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>

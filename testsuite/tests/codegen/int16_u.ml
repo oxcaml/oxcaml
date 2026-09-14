@@ -140,13 +140,10 @@ bswap:
   ret
 |}]
 
-(* CR-someday jrayman: Could use a [neg] instruction instead *)
 let neg x = Int16_u.neg x
 [%%expect_asm X86_64{|
 neg:
-  xorl  %ebx, %ebx
-  subq  %rax, %rbx
-  movq  %rbx, %rax
+  neg   %rax
   salq  $48, %rax
   sarq  $48, %rax
   ret

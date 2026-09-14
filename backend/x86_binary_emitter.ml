@@ -1715,37 +1715,51 @@ let assemble_line b loc ins =
           done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
     | Directive (D.Delta_uleb128 { delta }) -> (
-      (* ULEB128 difference of two labels in the same section. *)
+      (* ULEB128 difference of two points in the same section: either two
+         labels, or a label plus a constant offset and a symbol. *)
+      let resolve name =
+        let local =
+          match String.Tbl.find b.labels name with
+          | { sy_pos = Some pos; _ } -> Some (b.sec.sec_name, pos)
+          | _ -> None
+          | exception Not_found -> None
+        in
+        match local with
+        | Some entry -> entry
+        | None -> (
+            match String.Tbl.find cross_section_labels name with
+            | entry -> entry
+            | exception Not_found ->
+                Misc.fatal_errorf
+                  "x86_binary_emitter: Delta_uleb128 label or symbol %s not \
+                   defined in any assembled section"
+                  name)
+      in
+      let emit_delta ~upper ~upper_offset ~lower =
+        let sec_u, pos_u = resolve upper in
+        let sec_l, pos_l = resolve lower in
+        if not (Section_name.equal sec_u sec_l) then
+          Misc.fatal_error
+            "x86_binary_emitter: Delta_uleb128 operands in different \
+             sections";
+        let delta =
+          Int64.add (Int64.of_int (pos_u - pos_l)) upper_offset
+        in
+        if Int64.compare delta 0L < 0 then
+          Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
+        D.emit_uleb128 b.buf delta
+      in
       match delta with
       | C.Sub (C.Label upper, C.Label lower) ->
-          let resolve lbl =
-            let name = Asm_label.encode lbl in
-            let local =
-              match String.Tbl.find b.labels name with
-              | { sy_pos = Some pos; _ } -> Some (b.sec.sec_name, pos)
-              | _ -> None
-              | exception Not_found -> None
-            in
-            match local with
-            | Some entry -> entry
-            | None -> (
-                match String.Tbl.find cross_section_labels name with
-                | entry -> entry
-                | exception Not_found ->
-                    Misc.fatal_errorf
-                      "x86_binary_emitter: Delta_uleb128 label %s not \
-                       defined in any assembled section"
-                      name)
-          in
-          let sec_u, pos_u = resolve upper in
-          let sec_l, pos_l = resolve lower in
-          if not (Section_name.equal sec_u sec_l) then
-            Misc.fatal_error
-              "x86_binary_emitter: Delta_uleb128 labels in different \
-               sections";
-          if pos_u < pos_l then
-            Misc.fatal_error "x86_binary_emitter: negative Delta_uleb128";
-          D.emit_uleb128 b.buf (Int64.of_int (pos_u - pos_l))
+          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
+            ~lower:(Asm_label.encode lower)
+      | C.Sub (C.Label upper, C.Symbol lower) ->
+          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset:0L
+            ~lower:(Asm_symbol.encode lower)
+      | C.Sub (C.Add (C.Label upper, C.Signed_int upper_offset),
+               C.Symbol lower) ->
+          emit_delta ~upper:(Asm_label.encode upper) ~upper_offset
+            ~lower:(Asm_symbol.encode lower)
       | C.Signed_int _ | C.Unsigned_int _ | C.This | C.Label _ | C.Symbol _
       | C.Variable _ | C.Add _ | C.Sub _ ->
           Misc.fatal_error "x86_binary_emitter: malformed Delta_uleb128")
@@ -1755,10 +1769,13 @@ let assemble_line b loc ins =
             target_symbol;
             addend = 4L;
             offset = C.Sub (C.This, C.Signed_int 4L)
-          })
-      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+          }) ->
+      (* This [.reloc] directive creates an R_X86_64_PLT32 relocation for the
+         preceding 4-byte field.  Representing it as [REL32 (sym, 0L)] gives an
+         ELF addend of [-4], because the ELF writer subtracts the width of the
+         PC-relative field from the addend. *)
       let sym = Asm_symbol.encode target_symbol in
-      record_local_reloc b ~offset:(-4) (RelocCall sym)
+      record_reloc b (Buffer.length b.buf - 4) (Relocation.Kind.REL32 (sym, 0L))
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->

@@ -64,20 +64,11 @@ end = struct
   let poly_ g = M.f
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 16-19:
 4 |   let poly_ g = M.f
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ g : 'a -> 'b -> unit end
-       is not included in
-         sig val g : int end
-       Values do not match:
-         val poly_ g : 'a -> 'b -> unit
-       is not included in
-         val g : int
-       The type "'a -> 'b -> unit" is not compatible with the type "int"
+                    ^^^
+Error: This expression is not allowed in a "let poly_" definition;
+       it must be a function.
 |}]
 
 module F (M : S @ static) = struct
@@ -167,7 +158,7 @@ Line 6, characters 16-22:
 6 |   let poly_ g = M.f 42
                     ^^^^^^
 Error: This expression is not allowed in a "let poly_" definition;
-       it must be a function, constructor, tuple, record, or constant.
+       it must be a function.
 |}]
 
 

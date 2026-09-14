@@ -21,6 +21,12 @@ module type S = sig
   type _ hlist =
     | [] : nil hlist
     | ( :: ) : 'a t * 'b hlist -> ('a -> 'b) hlist
+
+  type t_ = Any : 'a t -> t_
+
+  val hlist_to_list : 'a hlist -> t_ list
+
+  val iter_hlist : (t_ -> unit) -> 'a hlist -> unit
 end
 
 module Make (X : sig
@@ -31,6 +37,21 @@ end) : S with type 'a t := 'a X.t = struct
   type _ hlist =
     | [] : nil hlist
     | ( :: ) : 'a t * 'b hlist -> ('a -> 'b) hlist
+
+  type t_ = Any : 'a t -> t_
+
+  let[@tail_mod_cons] rec hlist_to_list : type t. t hlist -> t_ list = function
+    | [] -> []
+    | x :: xs -> Any x :: hlist_to_list xs
+
+  let iter_hlist f =
+    let rec loop : type t. t hlist -> unit = function
+      | [] -> ()
+      | x :: xs ->
+        (f [@inlined hint]) (Any x);
+        loop xs
+    in
+    loop
 end
 
 module Constant = Make (struct

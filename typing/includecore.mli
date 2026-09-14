@@ -100,6 +100,8 @@ type constructor_mismatch =
   | Explicit_return_type of position
   | Modality of int * Mode.Modality.equate_error
   | Fixed_representation of position
+  | Immediate_representation of position
+  | Constructor_representation_shape_mismatch
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -144,7 +146,7 @@ type type_mismatch =
   | Extensible_representation of position
   | With_null_representation of position
   | Fixed_representation of position
-  | Jkind of Jkind.Violation.t
+  | Jkind of Ikind.subjkind_error
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
 type jkind_mismatch =
@@ -194,7 +196,7 @@ val check_modes : Env.t -> ?crossing:Mode.Crossing.t ->
 
 val value_descriptions:
   loc:Location.t -> Env.t -> string ->
-  mmodes:mmodes ->
+  mmodes:mmodes -> self_check:bool ->
   value_description -> value_description -> module_coercion
 
 val type_declarations:

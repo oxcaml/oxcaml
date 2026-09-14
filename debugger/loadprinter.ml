@@ -69,7 +69,7 @@ let loadfile ppf name =
    the debuggee. *)
 
 let rec eval_address = function
-  | Env.Aunit cu ->
+  | Env.Aunit (cu, _) ->
     let bytecode_or_asm_symbol =
       Ident.name (cu |> Compilation_unit.to_global_ident_for_bytecode)
     in

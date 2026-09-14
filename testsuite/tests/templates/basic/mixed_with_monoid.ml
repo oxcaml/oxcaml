@@ -1,14 +1,14 @@
 external box_float : float# -> float = "%box_float"
 external unbox_float : float -> float# = "%unbox_float"
-external box_int64 : int64# -> int64 = "%box_int64"
-external unbox_int64 : int64 -> int64# = "%unbox_int64"
+external box_int64 : int64_u -> int64 = "%box_int64"
+external unbox_int64 : int64 -> int64_u = "%unbox_int64"
 external int_of_int64 : int64 -> int = "%int_of_int64"
 external int64_of_int : int -> int64 = "%int64_of_int"
 
 let of_int x = unbox_int64 (int64_of_int x)
 let to_int x = int_of_int64 (box_int64 x)
 
-type t = #(float# * Monoid.t * int64#)
+type t = #(float# * Monoid.t * int64_u)
 
 let empty = #(#0.0, Monoid.empty, #0L)
 

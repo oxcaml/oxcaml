@@ -16,13 +16,13 @@
  (name topstart)
  (modes byte)
  (flags (:standard -linkall))
- (libraries ocamlbytecomp ocamlcommon ocamltoplevel)
+ (libraries ocamlbytecomp ocamlfrontend ocamltoplevel)
  (modules topstart))
 
 (executable
  (name expunge)
  (modes byte)
- (libraries ocamlbytecomp ocamlcommon)
+ (libraries ocamlbytecomp ocamlfrontend)
  (modules expunge))
 
 (install

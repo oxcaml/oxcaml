@@ -30,6 +30,7 @@ open! Int_replace_polymorphic_compare
 type label =
   | Int of int
   | String of string
+  | Private_symbol of int
 
 type t =
   { section : Asm_section.t;
@@ -37,7 +38,10 @@ type t =
   }
 
 let encode_label label =
-  match label with Int i -> string_of_int i | String s -> s
+  match label with
+  | Int i -> string_of_int i
+  | String s -> s
+  | Private_symbol i -> "l_caml" ^ string_of_int i
 
 include Identifiable.Make (struct
   type nonrec t = t
@@ -54,6 +58,7 @@ include Identifiable.Make (struct
     match t.label with
     | Int i -> Format.fprintf ppf "L%d" i
     | String s -> Format.fprintf ppf "L%s" s
+    | Private_symbol i -> Format.fprintf ppf "l_caml%d" i
 
   let output _ _ = Misc.fatal_error "Not yet implemented"
 end)
@@ -61,6 +66,10 @@ end)
 let create_int section label =
   assert (label >= 0);
   { section; label = Int label }
+
+let create_private_int section label =
+  assert (label >= 0);
+  { section; label = Private_symbol label }
 
 let contains_escapable_char label =
   let found_escapable_char = ref false in
@@ -86,6 +95,7 @@ let encode (t : t) =
   match t.label with
   | Int label -> label_prefix ^ string_of_int label
   | String label -> label_prefix ^ label
+  | Private_symbol label -> "l_caml" ^ string_of_int label
 
 let section t = t.section
 

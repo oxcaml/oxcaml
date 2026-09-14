@@ -673,10 +673,10 @@ and function_constraint =
 and block_access =
   | Baccess_field of Longident.t loc
       (** [.foo] *)
-  | Baccess_block of mutable_flag * expression
-      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)]
-          (usually followed by unboxed accesses, to deepen the index).
-      *)
+  | Baccess_block of access_flag * expression
+      (** Access using another block index: [.idx_imm(E)], [.idx_mut(E)],
+          [.idx_atomic(E)] (usually followed by unboxed accesses,
+          to deepen the index). *)
 
 and unboxed_access =
   | Uaccess_unboxed_field of Longident.t loc
@@ -1286,6 +1286,13 @@ and module_expr_desc =
       *)
   | Pmod_unpack of expression  (** [(val E)] *)
   | Pmod_extension of extension  (** [[%id]] *)
+  | Pmod_hole
+      (** [_], a "hole".
+
+          Holes are recognized by the parser anywhere a module
+          expression is allowed, but they are unconditionally
+          rejected by the type-checker: they are intended to be
+          eliminated by a ppx rewriter before type-checking. *)
   | Pmod_instance of module_instance
       (** [Foo(Param1)(Arg1(Param2)(Arg2)) [@jane.non_erasable.instances]]
 

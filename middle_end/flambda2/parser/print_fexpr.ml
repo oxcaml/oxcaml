@@ -139,9 +139,7 @@ let result_continuation ppf rcont =
 let region ppf (r : region) =
   match r with
   | Named v -> variable ppf v
-  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel.alloc_region"
-  | Toplevel_region -> Format.pp_print_string ppf "toplevel.region"
-  | Toplevel_ghost_region -> Format.pp_print_string ppf "toplevel.ghost_region"
+  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel"
 
 let cfprintf directive ppf fmt =
   directive ppf;
@@ -391,8 +389,9 @@ let empty_array_kind ~space ppf (ak : empty_array_kind) =
 let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
     ~space =
   match alloc with
-  | Heap { alloc_region } -> pp_spaced ~space ppf "&%a" pp alloc_region
-  | Local { alloc_region; region; ghost_region } ->
+  | Not_alloc_stack { alloc_region } ->
+    pp_spaced ~space ppf "&%a" pp alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
     pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
 
 let boxed_variable ppf var ~kind =
@@ -879,7 +878,9 @@ and code_binding ppf
     exn_cont
     (pp_option ~space:Before (pp_like ": %a" arity))
     ret_arity
-    (match result_mode with Heap -> "" | Local -> " local")
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " stack")
     (expr Outer) body
 
 let flambda_unit ppf ({ body } : flambda_unit) =

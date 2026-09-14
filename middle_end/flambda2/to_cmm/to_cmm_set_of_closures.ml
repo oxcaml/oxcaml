@@ -503,8 +503,8 @@ let params_and_body0 env res code_id ~result_arity ~fun_dbg
   let env, my_region_var, my_ghost_region_var =
     (* CR alloc_regions: my_alloc_region should be propagated as well. *)
     match (my_alloc_mode : Alloc_mode.For_applications.t) with
-    | Heap { alloc_region = _ } -> env, None, None
-    | Local
+    | Not_alloc_stack { alloc_region = _ } -> env, None, None
+    | Maybe_alloc_stack
         { alloc_region = _; region = my_region; ghost_region = my_ghost_region }
       ->
       let my_region_duid = Flambda_debug_uid.none in
@@ -720,9 +720,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set
     List.map2
       (fun cid v ->
         let v = Bound_var.var v in
-        (* Rename v to have different names for the symbol and variable *)
-        let name = Variable.unique_name (Variable.rename v) in
-        cid, Symbol.create comp_unit (Linkage_name.of_string name))
+        let name = Variable.canonical_name v in
+        cid, Symbol.manufacture comp_unit name)
       cids bound_vars
     |> Function_slot.Map.of_list
   in
