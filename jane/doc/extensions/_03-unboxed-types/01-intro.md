@@ -299,7 +299,11 @@ versions.
 * Unboxed products may only be stored in blocks via records (i.e. they are not
   supported in tuples, polymorphic variants, etc.).
   We plan to lift this restriction in the near future.
-* Unboxed record fields may not be mutable.
+* Unboxed record fields may be declared `mutable` (and unboxed versions of
+  mutable records have mutable fields), but there is no way to mutate them:
+  an unboxed record is a copy without identity. Mutability still affects the
+  type, e.g. by making it invariant in type parameters appearing in mutable
+  fields.
   We plan to allow mutating unboxed records within boxed records
   (the design will differ from boxed record mutability, as unboxed types don't have the
   same notion of identity).

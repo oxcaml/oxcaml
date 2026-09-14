@@ -2764,8 +2764,8 @@ and store_constructor ~check type_decl type_id cstr_id cstr env =
   }
 
 and store_label
-  : 'rep. record_form:'rep record_form -> check:_ -> _ -> _ -> _ ->
-    'rep gen_label_description -> _ -> _ =
+  : type rep. record_form:rep record_form -> check:_ -> _ -> _ -> _ ->
+    rep gen_label_description -> _ -> _ =
   fun  ~record_form ~check type_decl type_id lbl_id lbl env ->
   Builtin_attributes.warning_scope lbl.lbl_attributes (fun () ->
   if check && not type_decl.type_loc.Location.loc_ghost
@@ -2776,7 +2776,13 @@ and store_label
     let priv = type_decl.type_private in
     let name = lbl.lbl_name in
     let loc = lbl.lbl_loc in
-    let mut = lbl.lbl_mut in
+    let mut : Types.mutability =
+      (* Unboxed record fields can never be mutated, so don't warn that they
+         weren't. *)
+      match record_form with
+      | Legacy -> lbl.lbl_mut
+      | Unboxed_product -> Immutable
+    in
     let k = lbl.lbl_uid in
     match k with
     | Unboxed_version k_boxed ->

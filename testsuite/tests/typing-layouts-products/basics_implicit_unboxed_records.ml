@@ -677,3 +677,78 @@ Error: The layout of type "r#" is value non_pointer & value non_pointer
          because of the definition of b at line 2, characters 0-28.
        Note: The layout of immediate is value non_pointer.
 |}]
+
+(*******************************************)
+(* Variance of unboxed versions of records *)
+
+(* An unboxed version has the same variance as its boxed version, which is
+   invariant here due to the mutable field. Accepting the following
+   declarations involving [mv#] would be unsound because ['a mv# box] reduces
+   to ['a mv]. *)
+
+type 'a mv = { mutable a : 'a }
+type +'a mv_u = 'a mv#
+[%%expect{|
+type 'a mv = { mutable a : 'a; }
+Line 2, characters 0-22:
+2 | type +'a mv_u = 'a mv#
+    ^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+type ('a, 'b) mv2 = { mutable a : 'a; b : 'b }
+type (+'a, +'b) mv2_u = ('a, 'b) mv2#
+[%%expect{|
+type ('a, 'b) mv2 = { mutable a : 'a; b : 'b; }
+Line 2, characters 0-37:
+2 | type (+'a, +'b) mv2_u = ('a, 'b) mv2#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+let f (x : [`A] mv#) = (x :> [`A | `B] mv#)
+[%%expect{|
+Line 1, characters 23-43:
+1 | let f (x : [`A] mv#) = (x :> [`A | `B] mv#)
+                           ^^^^^^^^^^^^^^^^^^^^
+Error: Type "[ `A ] mv#" is not a subtype of "[ `A | `B ] mv#"
+       The first variant type does not allow tag(s) "`B"
+|}]
+
+(* Recursive group: [s] uses [mv3#] while its variance is being computed *)
+type 'a mv3 = { mutable a : 'a }
+and +'b s = { s : 'b mv3# }
+[%%expect{|
+Line 2, characters 0-27:
+2 | and +'b s = { s : 'b mv3# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: In this definition, expected parameter variances are not satisfied.
+       The 1st type parameter was expected to be covariant,
+       but it is injective invariant.
+|}]
+
+(* Parameters only occurring in immutable fields may still be covariant *)
+type ('a, +'b) mv2_u' = ('a, 'b) mv2#
+[%%expect{|
+type ('a, 'b) mv2_u' = ('a, 'b) mv2#
+|}]
+
+(* Unboxed versions of immutable records are covariant *)
+type 'a imm = { a : 'a }
+type +'a imm_u = 'a imm#
+[%%expect{|
+type 'a imm = { a : 'a; }
+type 'a imm_u = 'a imm#
+|}]
+
+(* Unboxed versions of mutable records have mutable fields *)
+type r = { mutable i : int }
+type u = r# = #{ mutable i : int }
+[%%expect{|
+type r = { mutable i : int; }
+type u = r# = #{ mutable i : int; }
+|}]
