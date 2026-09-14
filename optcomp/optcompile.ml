@@ -270,9 +270,13 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         | [] -> ()
         | (cmr_file, output_prefix, paused_unit_infos) :: rest ->
           let is_last = match rest with [] -> true | _ :: _ -> false in
+          (* The unit's name comes from the paused [.cmx], not the output
+             prefix: the name of a parameterised-library instance cannot be
+             recovered from its file name. *)
           let unit_info =
             unit_info_from_cu_or_output_prefix ~source_file:cmr_file Impl
-              ~output_prefix ~compilation_unit:Inferred_from_output_prefix
+              ~output_prefix
+              ~compilation_unit:(Exactly paused_unit_infos.Cmx_format.ui_unit)
           in
           ( with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
             if !Oxcaml_flags.internal_assembler
