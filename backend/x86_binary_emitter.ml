@@ -1754,7 +1754,7 @@ let assemble_line b loc ins =
         match c with
         | C.Signed_int i -> Section_independent i
         | C.Unsigned_int u ->
-            Section_independent (Numbers.Uint64.to_int64_checked u)
+            Section_independent (Numbers.Uint64.to_int64_exn u)
         | C.Label lbl ->
             let sec, pos = resolve (Asm_label.encode lbl) in
             Offset_in_section (sec, Int64.of_int pos)
@@ -1776,7 +1776,8 @@ let assemble_line b loc ins =
             eval_binary ~op:Numbers.Int64.sub_exn
               ~const_op_offset:(fun _ sec _ ->
                 invalid
-                  "cannot subtract an offset in section %s from a constant"
+                  "cannot subtract a section-relative offset (in section %s) \
+                   from a constant"
                   (Section_name.to_string sec))
               ~offset_op_offset:(fun sec1 pos1 sec2 pos2 ->
                 (* Only a difference within one section is link-time
@@ -1785,7 +1786,8 @@ let assemble_line b loc ins =
                   Section_independent (Numbers.Int64.sub_exn pos1 pos2)
                 else
                   invalid
-                    "cannot subtract offsets in different sections %s and %s"
+                    "cannot subtract two section-relative offsets (in \
+                     different sections %s and %s)"
                     (Section_name.to_string sec1)
                     (Section_name.to_string sec2))
               c1 c2
