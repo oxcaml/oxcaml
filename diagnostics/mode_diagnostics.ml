@@ -372,12 +372,12 @@ let annotation_reason ~mode_name ~mode ~subject:owner ?(asides = [])
   let open Nlg in
   match source with
   | Written_modality written ->
-    modality_annotation_reason ~mode_name ~subject:owner ~asides written
+    [modality_annotation_reason ~mode_name ~subject:owner ~asides written]
   | Written_mode written ->
-    note ~subject:owner ~asides
-      [ txt "because ";
-        mention ~case:Subject owner;
-        ref_source written.loc (copula :: txt " annotated as " :: mode) ]
+    [ note ~subject:owner ~asides
+        [ txt "because ";
+          mention ~case:Subject owner;
+          ref_source written.loc (copula :: txt " annotated as " :: mode) ] ]
   | Mutable_field field ->
     let implication =
       background
@@ -385,10 +385,11 @@ let annotation_reason ~mode_name ~mode ~subject:owner ?(asides = [])
           term (Diagnostic_term.Written_modality_term mode_name);
           txt " modality by default" ]
     in
-    note ~asides:(asides @ [implication])
-      [ txt "because field ";
-        ref_source field.loc
-          [code field.txt; txt " is declared "; code "mutable"] ]
+    [ note ~asides
+        [ txt "because field ";
+          ref_source field.loc
+            [code field.txt; txt " is declared "; code "mutable"] ];
+      implication ]
 
 let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
     term Nlg.aside list =
@@ -416,8 +417,8 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
   match s.says with
   | Nothing_to_say | Unexplained -> []
   | User_annotation source ->
-    [ annotation_reason ~mode_name:(Step_mode.name s.mode) ~mode ~subject:owner
-        ~asides source ]
+    annotation_reason ~mode_name:(Step_mode.name s.mode) ~mode ~subject:owner
+      ~asides source
   | Capture { relation = Closes_over; details = { closed; _ }; _ } ->
     [ about
         [ subj;
@@ -846,9 +847,9 @@ let signature_reason ~axis ~subject:owner
               (Mode.Modality.Per_axis.print axis)
               modality
           in
-          [ annotation_reason ~mode_name
-              ~mode:[Nlg.code mode_name]
-              ~subject:owner source ]
+          annotation_reason ~mode_name
+            ~mode:[Nlg.code mode_name]
+            ~subject:owner source
         | None ->
           [ Nlg.note
               [ txt "because ";
