@@ -923,17 +923,6 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
 
-let shape_has_only_value_elements (shape : _ mixed_block_element array) =
-  Array.for_all
-    (fun (elt : _ mixed_block_element) ->
-      match elt with
-      | Value _ -> true
-      | Splice_variable var -> fatal_error_unevaluated_splice_var var
-      | Product _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
-      | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-        false)
-    shape
-
 let mixed_block_shape_has_splices shape =
   let rec has_splices : 'a mixed_block_element -> bool = function
     | Splice_variable _ -> true
@@ -2192,15 +2181,7 @@ let transl_module_representation repr =
          |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
+  if Array.for_all Types.mixed_block_element_is_scannable shape
   then Module_value_only { field_count = Array.length shape }
   else
     Module_mixed

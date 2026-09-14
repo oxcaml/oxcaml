@@ -113,6 +113,10 @@ module type Sort = sig
         layout-poly any-fields *)
     val is_concrete : t -> bool
 
+    (** True if the sort is [scannable], possibly under [Addressable]. Products
+        (even of scannables), univars, and genvars are not scannable. *)
+    val is_scannable : t -> bool
+
     val is_surely_addressable : t -> bool
 
     val addressable : t -> t

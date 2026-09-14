@@ -2524,7 +2524,8 @@ let get_expr_args_tuple ~is_unboxed ~scopes shape head { arg; mut; _ } rem =
            determine whether emitting it would lead to performance regressions.
            Regardless, I think the longer-term goal is to combine these two
            anyways. *)
-        if Lambda.shape_has_only_value_elements block_shape
+        if List.for_all (fun (sort, _) -> Jkind.Sort.Const.is_scannable sort)
+             shape
         then fun pos -> Pfield (pos, Pointer, sem)
         else fun pos -> Pmixedfield ([pos], block_shape, sem)
       in

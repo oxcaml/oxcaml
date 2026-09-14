@@ -633,7 +633,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         match List.map extract_constant ll with
         | exception Not_constant -> None
         | constants ->
-            if Lambda.shape_has_only_value_elements shape then
+            if List.for_all (fun (_, _, s) -> Jkind.Sort.Const.is_scannable s) el
+            then
               (* Ensure that existing uniform tuple constants are optimized *)
               Some (Const_block(0, constants))
             else if !Clflags.native_code then
@@ -1932,16 +1933,10 @@ and transl_tupled_function
      to have the value sort, since the backend does not currently support
      optimizing mixed tupled functions. *)
   let all_components_are_values pl =
-    let rec is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      (* CR zeisbach: I think this shouldn't be hit but it might at some point?
-         I can check. Also, a little bit of sad repetition here... *)
-      | Addressable s -> is_scannable s
-      | Base _ | Product _ | Univar _ | Genvar _ -> false
-    in
     List.for_all
       (fun (_, _, sort) ->
-         is_scannable (Jkind.Sort.default_for_transl_and_get sort))
+         Jkind.Sort.Const.is_scannable
+           (Jkind.Sort.default_for_transl_and_get sort))
       pl
   in
   match eligible_cases with

@@ -1053,6 +1053,14 @@ let cstr_layout_is_constant (layout : cstr_layout) =
     Array.length sorts = 0
   | Cstr_layout_undetermined -> false
 
+let rec mixed_block_element_is_scannable (elt : mixed_block_element) =
+  match elt with
+  | Scannable _ -> true
+  | Addressable elt -> mixed_block_element_is_scannable elt
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Product _
+  | Void -> false
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
@@ -1079,24 +1087,6 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Addressable sort -> Addressable (mixed_block_element_of_const_sort sort)
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
   | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
-
-(* CR zeisbach: it makes me sad to add YET ANOTHER one of these conversion
-   functions, since there already are so many. This organization is something
-   that's definitely considering again. *)
-let rec mixed_block_element_of_layout_const
-    (layout : Jkind_types.Layout.Const.t) : mixed_block_element option =
-  match layout with
-  | Any _ | Univar _ | Genvar _ -> None
-  | Base (Scannable, scannable_axes) -> Some (Scannable scannable_axes)
-  | Base (base, _) ->
-    Some
-      (mixed_block_element_of_const_sort (Jkind_types.Sort.Const.base base))
-  | Product layouts ->
-    Option.map (fun elements -> Product (Array.of_list elements))
-      (Misc.Stdlib.List.map_option mixed_block_element_of_layout_const layouts)
-  | Addressable layout ->
-    Option.map (fun element -> Addressable element)
-      (mixed_block_element_of_layout_const layout)
 
 let find_unboxed_type decl =
   match decl.type_kind with

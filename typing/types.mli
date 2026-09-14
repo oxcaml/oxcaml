@@ -1359,14 +1359,10 @@ val equal_constructor_representation_up_to_scannable_axes :
 (** Whether the constructor is represented as a constant rather than a block:
     it is nullary, or its shape is [Constructor_immediate_all_void]. *)
 val cstr_layout_is_constant : cstr_layout -> bool
+val mixed_block_element_is_scannable : mixed_block_element -> bool
 
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
-
-(** Returns [None] if the layout is not representable.
-    Unlike with sorts, we get precise scannable axis information. *)
-val mixed_block_element_of_layout_const :
-  Jkind_types.Layout.Const.t -> mixed_block_element option
 
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that

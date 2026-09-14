@@ -242,6 +242,15 @@ module Sort = struct
       | Univar _ | Genvar _ -> false
       | Addressable t -> is_concrete t
 
+    let rec is_scannable = function
+      | Base Scannable -> true
+      | Base
+          ( Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
+          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
+        false
+      | Product _ | Univar _ | Genvar _ -> false
+      | Addressable t -> is_scannable t
+
     let scannable = Base Scannable
 
     let untagged_immediate = Base Untagged_immediate

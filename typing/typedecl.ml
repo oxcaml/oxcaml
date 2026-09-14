@@ -2516,14 +2516,8 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
      importantly, testing. *)
   if not (Array.for_all Jkind.Sort.Const.is_concrete consts) then
     raise (Error (loc, Layout_poly_variable_representation));
-  let all_scannable =
-    Array.for_all
-      (fun (const : Jkind.Sort.Const.t) ->
-         match const with
-         | Base Scannable -> true
-         | _ -> false)
-      consts
-  in
+  (* CR zeisbach: double-check this when rebasing *)
+  let all_scannable = Array.for_all Jkind.Sort.Const.is_scannable consts in
   let shape =
     if all_scannable then
       (* Optimization: the other branch would also compute [`Not_mixed] *)
@@ -4380,17 +4374,12 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let rec sort_is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Base _ | Product _ -> false
-      | Addressable s -> sort_is_scannable s
-      | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
-    in
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort s -> sort_is_scannable s
+      (* CR zeisbach: technically this differs in fatal_error behavior from
+         previous helper. Not sure what is the trade-off to make... *)
+      | Sort s -> Jkind.Sort.Const.is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)

@@ -1456,11 +1456,6 @@ val block_shape_of_value_kinds : value_kind list option -> block_shape
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
 
-(* CR zeisbach: determine if this is the right function to have...
-   and if so, maybe we want a types version too...? but i'm not sure what the
-   actual intended layout is *)
-val shape_has_only_value_elements : _ mixed_block_element array -> bool
-
 val mixed_block_shape_has_splices : _ mixed_block_element array -> bool
 
 (* Returns [None] if contains all values (including products of values

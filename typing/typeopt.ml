@@ -1173,10 +1173,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
   let compute_mbe_if_repr (_, ty) =
-    (* CR zeisbach: this needs to be benchmarked, since it could be expensive.
-       If it is, [Ttuple] will need to store more information *)
-    Option.bind (Ctype.type_jkind env ty |> Jkind.get_layout env)
-      Types.mixed_block_element_of_layout_const
+    Typedecl.mixed_block_element env ty (Ctype.type_jkind env ty)
   in
   match Misc.Stdlib.List.map_option compute_mbe_if_repr elements with
   | None ->
@@ -1184,16 +1181,11 @@ and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
        a more precise value kind is useless. This arises from [any] in tuples *)
     num_nodes_visited, non_nullable Pgenval
   | Some mixed_block_elements ->
-    let rec is_scannable : Types.mixed_block_element -> bool = function
-      | Scannable _ -> true
-      | Addressable mbe -> is_scannable mbe
-      | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-      | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Product _
-      | Void -> false
-    in
     let num_nodes_visited, constructor_shape =
       (* if we are not in a mixed tuple, match existing value kind exactly *)
-      if List.for_all is_scannable mixed_block_elements then
+      if List.for_all Types.mixed_block_element_is_scannable
+           mixed_block_elements
+      then
         let num_nodes_visited, fields =
           List.fold_left_map (fun num_nodes_visited (_, field) ->
             let num_nodes_visited = num_nodes_visited + 1 in
