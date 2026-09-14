@@ -1869,8 +1869,10 @@ let class_mode =
 
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
-<<<<<<< Merlin:wsturgeon.rename-alloc
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 (* Merlin specific *)
 let linked_variables () = !linked_variables
@@ -1882,11 +1884,3 @@ let is_valid (changes, _old) =
 
 let on_backtrack f =
   log_change (Cfun f)
-||||||| Compiler:last-imported
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
-=======
-  Mode.With_regionality.(of_const
-    ~hint_monadic:hint
-    ~hint_comonadic:hint
-    Const.legacy)
->>>>>>> Compiler:HEAD

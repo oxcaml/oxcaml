@@ -973,32 +973,21 @@ let transl_declaration env sdecl (id, uid) =
   in
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
-<<<<<<< Merlin:wsturgeon.rename-alloc
       (fun (sty, sty', loc) ->
-          transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
-          transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          sty,
+        transl_simple_type
+          ~new_var_jkind:Sort
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          sty',
+        loc)
       sdecl.ptype_cstrs
-||||||| Compiler:last-imported
-    (fun (sty, sty', loc) ->
-      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
-    sdecl.ptype_cstrs
-=======
-    (fun (sty, sty', loc) ->
-      transl_simple_type
-        ~new_var_jkind:Any
-        env
-        ~closed:false
-        Mode.With_locality.Const.legacy
-        sty,
-      transl_simple_type
-        ~new_var_jkind:Sort
-        env
-        ~closed:false
-        Mode.With_locality.Const.legacy
-        sty', loc)
-    sdecl.ptype_cstrs
->>>>>>> Compiler:HEAD
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
   let represent_as_float_array =

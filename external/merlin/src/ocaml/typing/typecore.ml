@@ -6981,14 +6981,9 @@ let pat_modes ~force_toplevel rec_mode_var ~is_lpoly (attrs, spat) =
     | None -> begin
         match pat_tuple_arity spat with
         | Not_local_tuple | Maybe_local_tuple ->
-<<<<<<< Merlin:wsturgeon.rename-alloc
-            (* TODO: mode can be more relaxed than this if fields are global *)
-            let mode = Value.newvar (get_current_level ()) in
-||||||| Compiler:last-imported
-            let mode = Value.newvar (get_current_level ()) in
-=======
+            (* TODO: mode can be more relaxed than this if fields are
+               global *)
             let mode = With_regionality.newvar (get_current_level ()) in
->>>>>>> Compiler:HEAD
             simple_pat_mode mode, mode_default mode
         | Local_tuple locs ->
             let modes =
@@ -8652,18 +8647,10 @@ and type_expect_
         exp_extra = (exp_extra, loc, sexp.pexp_attributes) :: arg.exp_extra;
       }
   | Pexp_send (e, met) ->
-<<<<<<< Merlin:wsturgeon.rename-alloc
-    submode ~loc ~env Mode.Value.legacy expected_mode;
+    submode ~loc ~env Mode.With_regionality.legacy expected_mode;
     let obj = type_exp env mode_legacy e in
     let pm = position_and_mode env expected_mode sexp in
     begin try
-||||||| Compiler:last-imported
-      submode ~loc ~env Mode.Value.legacy expected_mode;
-      let pm = position_and_mode env expected_mode sexp in
-=======
-      submode ~loc ~env Mode.With_regionality.legacy expected_mode;
-      let pm = position_and_mode env expected_mode sexp in
->>>>>>> Compiler:HEAD
       let (obj,meth,typ) =
         with_local_level_generalize_structure_if_principal
           ~before_generalize:(fun (_, _, typ) -> generalize_structure typ)
@@ -12868,22 +12855,12 @@ and type_andops env sarg sands expected_sort expected_ty =
             let op_type = op_desc.val_type in
             let ty_arg, sort_arg = new_rep_var ~why:Function_argument () in
             let ty_rest, sort_rest = new_rep_var ~why:Function_argument () in
-<<<<<<< Merlin:wsturgeon.rename-alloc
-            let ty_result, op_result_sort = new_rep_var ~why:Function_result () in
-            let arrow_desc = (Nolabel,Alloc.legacy,Alloc.legacy) in
-||||||| Compiler:last-imported
-            let ty_result, op_result_sort =
-              new_rep_var ~why:Function_result ()
-            in
-            let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
-=======
             let ty_result, op_result_sort =
               new_rep_var ~why:Function_result ()
             in
             let arrow_desc =
               (Nolabel, With_locality.legacy, With_locality.legacy)
             in
->>>>>>> Compiler:HEAD
             let ty_rest_fun =
               newty (Tarrow(arrow_desc, newmono ty_arg, ty_result, commu_ok))
             in

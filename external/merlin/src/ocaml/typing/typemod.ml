@@ -4389,21 +4389,16 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
-<<<<<<< Merlin:wsturgeon.rename-alloc
   let (str, sg, mode, _to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env
-      sig_acc s
+    type_structure
+      ~toplevel:(Some sig_acc)
+      ~funct_body:false
+      None
+      env
+      sig_acc
+      s
   in
-  Value.submode_err (Location.none, Structure) mode toplevel_mode;
-||||||| Compiler:last-imported
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
-  Value.submode_err (Location.none, Structure) mode toplevel_mode;
-=======
-  let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
->>>>>>> Compiler:HEAD
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
   Typecore.optimise_allocations ();

@@ -2810,37 +2810,18 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
         Otyp_unboxed_tuple (tree_of_labeled_typlist mode labeled_tyl)
-<<<<<<< Merlin:wsturgeon.rename-alloc
     | Tconstr(p, tyl, _abbrev) -> begin
         match best_type_path p with
         | Nth n ->
-            tree_of_typexp mode Alloc.Const.legacy (apply_nth n tyl)
+            tree_of_typexp
+              mode
+              With_locality.Const.legacy
+              (apply_nth n tyl)
         | Path (nso, p') ->
             Internal_names.add p';
             let tyl' = apply_subst_opt nso tyl in
             Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
       end
-||||||| Compiler:last-imported
-    | Tconstr(p, tyl, _abbrev) ->
-        let p', s = best_type_path p in
-        let tyl' = apply_subst s tyl in
-        if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode Alloc.Const.legacy (List.hd tyl')
-        else begin
-          Internal_names.add p';
-          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
-        end
-=======
-    | Tconstr(p, tyl, _abbrev) ->
-        let p', s = best_type_path p in
-        let tyl' = apply_subst s tyl in
-        if is_nth s && not (tyl'=[])
-        then tree_of_typexp mode With_locality.Const.legacy (List.hd tyl')
-        else begin
-          Internal_names.add p';
-          Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl')
-        end
->>>>>>> Compiler:HEAD
     | Tvariant row ->
         let { fields; name; closed; present; all_present; tags } =
           tree_of_typvariant_repr row

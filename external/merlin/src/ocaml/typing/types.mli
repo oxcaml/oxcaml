@@ -1432,9 +1432,8 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
-<<<<<<< Merlin:wsturgeon.rename-alloc
-val class_mode : Mode.Value.lr
-val toplevel_mode : Mode.Value.lr
+val class_mode : Mode.With_regionality.lr
+val toplevel_mode : Mode.With_regionality.lr
 
 (* Merlin specific *)
 
@@ -1447,10 +1446,3 @@ val on_backtrack: (unit -> unit) -> unit
 (** Number of unification variables that have been linked so far.
    Used to estimate the "cost" of unification. *)
 val linked_variables: unit -> int
-||||||| Compiler:last-imported
-val class_mode : Mode.Value.lr
-val toplevel_mode : Mode.Value.lr
-=======
-val class_mode : Mode.With_regionality.lr
-val toplevel_mode : Mode.With_regionality.lr
->>>>>>> Compiler:HEAD
