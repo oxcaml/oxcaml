@@ -84,6 +84,19 @@ struct
 
     let of_float f = of_int (Float.to_int f)
 
+    let leading_zeros i =
+      (* The top [extra_bits] bits are always [0] but must not count as leading
+         zeros. *)
+      let extra_bits = Sys.int_size - num_bits in
+      Misc.Stdlib.Int.leading_zeros (unsigned_to_int i) - extra_bits
+
+    let trailing_zeros i =
+      (* Must set the next bit to [1] for [trailing_zeros zero] to return the
+         correct value. *)
+      Misc.Stdlib.Int.trailing_zeros (unsigned_to_int i lor (1 lsl num_bits))
+
+    let popcount i = Misc.Stdlib.Int.popcount (unsigned_to_int i)
+
     let compare = Int.compare
 
     let equal = Int.equal
@@ -106,7 +119,7 @@ module Int16 = Short_int (struct
 end)
 
 module Int32 = struct
-  include Int32
+  include Misc.Stdlib.Int32
 
   external swap_byte_endianness : t -> t = "%bswap_int32"
 
@@ -146,7 +159,7 @@ module Int32 = struct
 end
 
 module Int64 = struct
-  include Int64
+  include Misc.Stdlib.Int64
 
   external swap_byte_endianness : t -> t = "%bswap_int64"
 

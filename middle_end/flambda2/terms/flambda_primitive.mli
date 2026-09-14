@@ -399,6 +399,11 @@ type unary_int_arith_op = Swap_byte_endianness
 (* CR mshinwell/jvanburen: we should consider splitting this swapping primitive
    into two, based on the semantics *)
 
+type unary_int_bit_counting_op =
+  | Leading_zeros
+  | Trailing_zeros
+  | Popcount
+
 (** Naked float unary arithmetic operations. *)
 type unary_float_arith_op =
   | Abs
@@ -455,6 +460,7 @@ type unary_primitive =
       }
   | Int_arith of Flambda_kind.Standard_int.t * unary_int_arith_op
   | Float_arith of float_bitwidth * unary_float_arith_op
+  | Int_bit_counting of Flambda_kind.Standard_int.t * unary_int_bit_counting_op
   | Num_conv of
       { src : Flambda_kind.Standard_int_or_float.t;
         dst : Flambda_kind.Standard_int_or_float.t
