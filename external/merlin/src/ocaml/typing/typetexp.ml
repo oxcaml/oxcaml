@@ -1604,18 +1604,6 @@ and transl_fields env ~policy ~row_context o fields =
     | Otag (s, ty1) -> begin
         let ty1 =
           Builtin_attributes.warning_scope of_attributes
-<<<<<<< Merlin:wsturgeon.rename-alloc
-            (fun () ->
-               transl_type
-                 env
-                 ~policy
-                 ~row_context
-                 With_locality.Const.legacy
-                 (Ast_helper.Typ.force_poly ty1))
-||||||| Compiler:last-imported
-            (fun () -> transl_type env ~policy ~row_context With_locality.Const.legacy
-                (Ast_helper.Typ.force_poly ty1))
-=======
             (fun () ->
               transl_type
                 env
@@ -1623,7 +1611,6 @@ and transl_fields env ~policy ~row_context o fields =
                 ~row_context
                 With_locality.Const.legacy
                 (Ast_helper.Typ.force_poly ty1))
->>>>>>> Compiler:HEAD
         in
         begin
           match
