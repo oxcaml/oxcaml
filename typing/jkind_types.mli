@@ -101,7 +101,8 @@ module Sort : sig
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
 
-  val crosses_externality : t -> bool
+  val implied_externality :
+    separability:Jkind_axis.Separability.t -> t -> Jkind_axis.Externality.t
 
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
@@ -203,7 +204,7 @@ module Layout : sig
 
     val is_scannable_or_any : t -> bool
 
-    val crosses_externality : t -> bool
+    val implied_externality : t -> Jkind_axis.Externality.t
 
     val is_surely_addressable : t -> bool
 
