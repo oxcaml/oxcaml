@@ -259,7 +259,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -1411,28 +1410,17 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc_of_finalized_repr ~loc ~env label
-    (record_repres : Lambda.record_representation) lid =
+let check_atomic_loc ~loc ~env label lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (Error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
     raise (Error (loc, env, Polymorphic_atomic_loc lid));
-  (match
-     Mode.Modality.Const.equate label.lbl_modalities
-       (Typemode.atomic_mutable_modalities)
-   with
-   | Ok () -> ()
-   | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid)));
-  match record_repres with
-  | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
-  | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
-      raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
-  | Record_unboxed
-  (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat ->
-      Misc.fatal_error
-        "check_atomic_loc_of_finalized_repr: unexpected record representation"
+  match
+    Mode.Modality.Const.equate label.lbl_modalities
+      (Typemode.atomic_mutable_modalities)
+  with
+  | Ok () -> ()
+  | Error _ -> raise (Error (loc, env, Modalities_on_atomic_field lid))
 
 (* Mutable indices to polymorphic fields cannot be taken, as they would allow
    writing non-polymorphic values. *)
@@ -8882,14 +8870,7 @@ and type_expect_
               Legacy lid
           in
           Env.mark_label_used Env.Projection label.lbl_uid;
-          (* A variable representation is not determined until the end of
-             typechecking. *)
-          add_delayed_check (fun () ->
-            let record_repres =
-              Typeopt.transl_record_representation env loc record_repres
-            in
-            check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
-              lid.txt);
+          check_atomic_loc ~loc ~env label lid.txt;
           let alloc_mode, argument_mode =
             register_allocation ~loc expected_mode
           in
@@ -13618,11 +13599,6 @@ let report_error ~loc env =
          of an atomic field, do so explicitly:@ %a"
         Style.inline_code l
         Style.inline_code ("{ t with " ^ l ^ " = t." ^ l ^ " }")
-  | Mixed_record_atomic_loc lid ->
-      Location.errorf ~loc
-        "Use of %a with mixed record fields (here %a) is forbidden."
-        Style.inline_code "[%atomic.loc]"
-        quoted_longident lid
   | Polymorphic_atomic_loc lid ->
       Location.errorf ~loc
         "Use of %a with polymorphic record fields@ (here %a) is forbidden."

@@ -39,6 +39,7 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
+  | Mixed_record_atomic_loc of Longident.t
 
 exception Error of Location.t * error
 
@@ -807,7 +808,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
   | Texp_atomic_loc { record = arg; record_sort = arg_sort; record_repres;
-                      lid = _; label = lbl; alloc_mode; } ->
+                      lid; label = lbl; alloc_mode; } ->
       let shape =
         (Shape
             [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
@@ -822,12 +823,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let repres = match record_repres with
         | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) ->
             record_repres
-
-        (* Expect that usage of atomic.loc with mixed/variable records was
-           rejected during typechecking. *)
+        | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
+            raise (Error (e.exp_loc, Mixed_record_atomic_loc lid.txt))
+        (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
         | Record_unboxed
-        | Record_inlined (_, Constructor_mixed _, _) | Record_float
-        | Record_ufloat | Record_mixed _ ->
+        (* [@atomic] fields disable float record optimization. *)
+        | Record_float | Record_ufloat ->
           Misc.fatal_error
             "transl: Texp_atomic_loc got unexpected record representation"
       in
@@ -3256,6 +3257,11 @@ let report_error_doc ppf = function
          and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
         (64 - Mixed_product_bytes.block_index_offset_bits)
+  | Mixed_record_atomic_loc lid ->
+      fprintf ppf
+        "Use of %a with mixed record fields (here %a) is forbidden."
+        Style.inline_code "[%atomic.loc]"
+        (Style.as_inline_code Pprintast.Doc.longident) lid
 let () =
   Location.register_error_of_exn
     (function
