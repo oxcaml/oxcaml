@@ -51,6 +51,7 @@ module Meaning = struct
     | Lazy_allocated_on_heap
     | Lazy_forced
     | Module_allocated_on_heap
+    | Unpacked_module
     | Legacy_construct of Mode.Hint.legacy
     | Toplevel_expression
     | Tailcall_function
@@ -83,8 +84,10 @@ module Meaning = struct
   type t =
     | Nothing_to_say
     | Unexplained
-    | User_annotation of Location.t
-    | User_modality_annotation of string Location.loc
+    | User_annotation of
+        { syntax : Mode.Hint.annotation_syntax;
+          written : string Location.loc
+        }
     | Capture of capture
     | Signature_argument of argument_requirement
     | Fact of fact
@@ -97,16 +100,14 @@ module Meaning = struct
     | Lpoly_captured_environment ->
       Reroute (Allocation allocation)
 
-  let annotation_meaning mode ({ written_modes; _ } : Mode.Hint.annotation) =
-    let mode_name = Step_mode.name mode in
-    match
-      List.find_opt
-        (fun (written_mode : string Location.loc) ->
-          String.equal written_mode.txt mode_name)
-        written_modes
-    with
-    | Some written_mode -> User_annotation written_mode.loc
-    | None -> Unexplained
+  let annotation_meaning mode
+      ({ syntax; annotated_modes; contained_by } : Mode.Hint.annotation) =
+    match List.assoc_opt (Step_mode.name mode) annotated_modes with
+    | Some written -> User_annotation { syntax; written }
+    | None -> (
+      match contained_by with
+      | Some containing -> Reroute (Contained_by containing)
+      | None -> Unexplained)
 
   let interpret (s : mismatch_step) : t =
     match s.kind with
@@ -136,13 +137,6 @@ module Meaning = struct
       Signature_argument { parameter; callee; argument = s.pinpoint }
     | Morph (Argument_to_parameter (_, { parameter; argument })) ->
       Signature_argument { parameter; callee = s.pinpoint; argument }
-    | Const (Modality_annotation { annotated_modes; contained_by }) -> (
-      match List.assoc_opt (Step_mode.name s.mode) annotated_modes with
-      | Some written -> User_modality_annotation written
-      | None -> (
-        match contained_by with
-        | Some containing -> Reroute (Contained_by containing)
-        | None -> Unexplained))
     | Const Unknown -> Unexplained
     | Const (Annotation annotation) -> annotation_meaning s.mode annotation
     | Const Lazy_allocated_on_heap -> Fact Lazy_allocated_on_heap
@@ -156,6 +150,7 @@ module Meaning = struct
     | Const Function_return -> Fact Function_return_default
     | Const Stack_expression -> Fact Stack_allocated
     | Const Module_allocated_on_heap -> Fact Module_allocated_on_heap
+    | Const Mod_unpack -> Fact Unpacked_module
     | Const (Always_dynamic x) -> Fact (Always_dynamic x)
     | Const Branching -> Fact Has_branches
     | Const Lpoly_inst -> Fact Layout_poly_instantiated
@@ -175,11 +170,11 @@ module Meaning = struct
   let is_region_escape : fact -> bool = function
     | Region_escape _ -> true
     | Mutable_read _ | Mutable_write _ | Lazy_allocated_on_heap | Lazy_forced
-    | Module_allocated_on_heap | Legacy_construct _ | Toplevel_expression
-    | Tailcall_function | Tailcall_argument | Function_return_default
-    | Stack_allocated | Always_dynamic _ | Has_branches
-    | Layout_poly_instantiated | Borrowed | Quoted_computation | Spliced
-    | Static_not_guaranteed _ ->
+    | Module_allocated_on_heap | Unpacked_module | Legacy_construct _
+    | Toplevel_expression | Tailcall_function | Tailcall_argument
+    | Function_return_default | Stack_allocated | Always_dynamic _
+    | Has_branches | Layout_poly_instantiated | Borrowed | Quoted_computation
+    | Spliced | Static_not_guaranteed _ ->
       false
 end
 
@@ -195,8 +190,8 @@ module Step = struct
       (fun (s : mismatch_step) ->
         match Meaning.interpret s with
         | Nothing_to_say -> None
-        | ( Unexplained | User_annotation _ | User_modality_annotation _
-          | Capture _ | Signature_argument _ | Fact _ | Reroute _ ) as says ->
+        | ( Unexplained | User_annotation _ | Capture _ | Signature_argument _
+          | Fact _ | Reroute _ ) as says ->
           Some { pinpoint = s.pinpoint; mode = s.mode; says })
       chain
 
@@ -215,40 +210,36 @@ module Step = struct
   let is_capture (s : t) =
     match s.says with
     | Capture _ -> true
-    | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Signature_argument _ | Fact _ | Reroute _ ->
+    | Nothing_to_say | Unexplained | User_annotation _ | Signature_argument _
+    | Fact _ | Reroute _ ->
       false
 
   let is_region_escape (s : t) =
     match s.says with
     | Fact fact -> Meaning.is_region_escape fact
-    | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
-      ->
+    | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+    | Signature_argument _ | Reroute _ ->
       false
 
   let mutable_read (s : t) : Mode.Hint.mutable_part option =
     match s.says with
     | Fact (Mutable_read part) -> Some part
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
-      ->
+    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+    | Signature_argument _ | Reroute _ ->
       None
 
   let mutable_write (s : t) : Mode.Hint.mutable_part option =
     match s.says with
     | Fact (Mutable_write part) -> Some part
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
-      ->
+    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+    | Signature_argument _ | Reroute _ ->
       None
 
   let is_function_return (s : t) =
     match s.says with
     | Fact Function_return_default -> true
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _
-    | User_modality_annotation _ | Capture _ | Signature_argument _ | Reroute _
-      ->
+    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
+    | Signature_argument _ | Reroute _ ->
       false
 end
 
@@ -404,12 +395,12 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
   in
   match s.says with
   | Nothing_to_say | Unexplained -> []
-  | User_modality_annotation annotation ->
+  | User_annotation { syntax = `Modality; written } ->
     [ modality_annotation_reason ~mode_name:(Step_mode.name s.mode)
-        ~subject:owner ~asides annotation ]
-  | User_annotation annotation ->
+        ~subject:owner ~asides written ]
+  | User_annotation { syntax = `Mode; written } ->
     [ about
-        [subj; ref_source annotation (copula :: txt " annotated as " :: mode)]
+        [subj; ref_source written.loc (copula :: txt " annotated as " :: mode)]
     ]
   | Capture { relation = Closes_over; details = { closed; _ }; _ } ->
     [ about
@@ -444,6 +435,8 @@ let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
     [about [subj; copula; txt " a lazy expression allocated on the heap"]]
   | Fact Module_allocated_on_heap ->
     [about [subj; copula; txt " a module allocated on the heap"]]
+  | Fact Unpacked_module ->
+    [say [txt "unpacked first-class modules are always dynamic"]]
   | Fact (Legacy_construct legacy) ->
     let what =
       match (legacy : Mode.Hint.legacy) with
@@ -894,7 +887,9 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
     if
       List.exists
         (fun (step : Step.t) ->
-          match step.says with User_modality_annotation _ -> true | _ -> false)
+          match step.says with
+          | User_annotation { syntax = `Modality; _ } -> true
+          | _ -> false)
         expected
     then []
     else signature_reason ~axis ~subject expected_declaration
