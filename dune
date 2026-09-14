@@ -124,6 +124,8 @@
    ))
  (ocamlopt_flags
   (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+ (library_flags
+  (:include comprmarsh_flags.sexp))
  (preprocess
   (per_module
    ((action
@@ -134,6 +136,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  compression
   arrayset
   config
   build_path_prefix_map
@@ -470,6 +473,22 @@
    (= %{context_name} "runtime_stdlib")))
  (action
   (copy %{project_root}/ocamlopt_oxcaml_flags.sexp %{targets})))
+
+; C libraries needed to resolve [caml_zstd_initialize] when linking
+; ocamlcommon.cmxa. -lcomprmarsh is always needed, along with the context's
+; compression libraries. Note that ocamlcommon.cmxa built with the system
+; compiler needs this even though OxCaml doesn't at present use compression
+; because the executable links with the _system_'s libcomprmarsh.a which will
+; need -lzstd if the system compiler was configured with compressed marshalling.
+(rule
+ (targets comprmarsh_flags.sexp)
+ (action
+  (with-stdout-to
+   %{targets}
+   (bash
+    "printf '(-cclib -lcomprmarsh'; \
+     for l in $(ocamlopt -config-var compression_c_libraries); do \
+       printf ' -cclib %s' \"$l\"; done; printf ')'"))))
 
 (install
  (files ocamlyacc)
