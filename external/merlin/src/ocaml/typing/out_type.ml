@@ -2849,7 +2849,11 @@ let rec tree_of_modal_typexp mode modal ty =
         | Some(p, tyl) when nameable_row row ->
             let out_variant =
               match best_type_path p with
-              | Nth n -> tree_of_typexp mode Alloc.Const.legacy (apply_nth n tyl)
+              | Nth n ->
+                  tree_of_typexp
+                    mode
+                    With_locality.Const.legacy
+                    (apply_nth n tyl)
               | Path (s, p) ->
                   let id = tree_of_path (Some Type) p in
                   let args = tree_of_typlist mode (apply_subst_opt s tyl) in
@@ -2887,7 +2891,7 @@ let rec tree_of_modal_typexp mode modal ty =
         let ty = newgenty (Tquote ty) in
         begin match best_type_path Predef.path_eval with
         | Nth n ->
-            tree_of_typexp mode Alloc.Const.legacy (apply_nth n [ty])
+            tree_of_typexp mode With_locality.Const.legacy (apply_nth n [ty])
         | Path (s, p') ->
             Internal_names.add p';
             let tyl = apply_subst_opt s [ty] in
@@ -2976,7 +2980,7 @@ let rec tree_of_modal_typexp mode modal ty =
          so path shortening and shadowing (e.g. [box/2]) work uniformly. *)
         match best_type_path Predef.path_box with
         | Nth n ->
-            tree_of_typexp mode Alloc.Const.legacy (apply_nth n [ty])
+            tree_of_typexp mode With_locality.Const.legacy (apply_nth n [ty])
         | Path (nso, p') ->
             Internal_names.add p';
             let tyl' = apply_subst_opt nso [ty] in

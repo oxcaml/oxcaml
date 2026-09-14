@@ -5309,8 +5309,8 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
                     extra_arg_loc = sarg.pexp_loc; }))
     with Msupport.Resume ->
       let ty_arg, kind_arg = new_rep_var ~why:Function_argument () in
-      kind_arg, Mode.Alloc.newvar (get_current_level ()), ty_arg,
-      Mode.Alloc.newvar (get_current_level ()), ty_fun
+      kind_arg, Mode.With_locality.newvar (get_current_level ()), ty_arg,
+      Mode.With_locality.newvar (get_current_level ()), ty_fun
     in
     let arg = Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg } in
     loop ty_res mode_ret ((lbl, Arg arg) :: rev_args) rest
@@ -6710,9 +6710,9 @@ let split_function_ty
         let arg_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         let ret_kind = Jkind.Builtin.any ~why:Inside_of_Tarrow in
         { ty_arg = newty (Tpoly (newvar2 level arg_kind, []))
-        ; arg_mode = Mode.Alloc.newvar level
+        ; arg_mode = Mode.With_locality.newvar level
         ; ty_ret = newvar2 level ret_kind
-        ; ret_mode = Mode.Alloc.newvar level
+        ; ret_mode = Mode.With_locality.newvar level
         }
     end
   in
@@ -7040,7 +7040,7 @@ let create_merlin_type_error_node loc env ty_expected ~attributes =
             kind = Id_value;
             unique_use = (Uniqueness.newvar (get_current_level ()),
                           Linearity.newvar (get_current_level ()));
-            mode = Mode.Value.newvar (get_current_level ());
+            mode = Mode.With_regionality.newvar (get_current_level ());
             staticity = Staticity.newvar (get_current_level ())
           };
       exp_loc = loc;
@@ -7497,7 +7497,7 @@ and type_expect_
         exp_desc = Texp_record {
             fields = [||]; representation = Record_boxed;
             extended_expression = None;
-            alloc_mode = None
+            locality_mode = None
           };
         exp_loc = loc; exp_extra = [];
         exp_type = instance ty_expected;
@@ -9977,9 +9977,9 @@ and type_function
         newtypes = [];
         params_contain_gadt = No_gadt;
         fun_alloc_mode =
-          Some { alloc_mode = Locality.newvar 0;
+          Some { locality_mode = Locality.newvar 0;
                  fun_closure_mode =
-                   Alloc.Comonadic.newvar (get_current_level ()) };
+                   With_locality.Comonadic.newvar (get_current_level ()) };
         ret_info = Some ret_info;
         calling_convention_sorts = []
       })
@@ -10048,10 +10048,10 @@ and type_function_
                        mode_desc = [] },
                      Var (Jkind.Sort.new_var ~level:(Ctype.get_current_level ())))
                 in
-                let alloc_mode =
-                  Typedtree.create_alloc_mode_r @@ Locality.disallow_left @@
+                let locality_mode =
+                  Typedtree.create_locality_mode_r @@ Locality.disallow_left @@
                   match fun_alloc_mode with
-                  | Some { alloc_mode; _ } -> alloc_mode
+                  | Some { locality_mode; _ } -> locality_mode
                   | None -> Locality.newvar 0
                 in
                 Texp_function
@@ -10059,7 +10059,7 @@ and type_function_
                     body;
                     ret_mode;
                     ret_sort;
-                    alloc_mode;
+                    locality_mode;
                     zero_alloc=Zero_alloc.default;
                     yielding = Yielding.newvar 0
                   });
@@ -10310,9 +10310,9 @@ and type_function_
                 in
                 Texp_function
                   { params; body; ret_mode; ret_sort;
-                    alloc_mode =
-                      Typedtree.create_alloc_mode_r
-                        (Locality.disallow_left alloc_mode);
+                    locality_mode =
+                      Typedtree.create_locality_mode_r
+                        (Locality.disallow_left locality_mode);
                     zero_alloc = Zero_alloc.default;
                     yielding = Yielding.newvar 0 });
               exp_loc = loc;
@@ -10604,7 +10604,10 @@ and type_label_access
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
-        lbl_mut = Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic };
+        lbl_mut =
+          Mutable
+            { mode = Mode.With_regionality.Comonadic.legacy;
+              atomic = Nonatomic };
         lbl_modalities = Mode.Modality.Const.id;
         lbl_pos = 0;
         lbl_all = [||];
@@ -10619,7 +10622,7 @@ and type_label_access
         lbl_sort = None;
       }
     in
-    (record, record_sort, Mode.Value.disallow_right mode,
+    (record, record_sort, Mode.With_regionality.disallow_right mode,
      make_fake_label record_form, expected_type, Unambiguous)
 
 and solve_Pexp_field
@@ -12309,9 +12312,9 @@ and type_function_cases_expect
                         |> Typedtree.create_return_mode;
                       mode_desc = []};
                   ret_sort;
-                  alloc_mode =
-                    Typedtree.create_alloc_mode_r
-                      (Locality.disallow_left alloc_mode);
+                  locality_mode =
+                    Typedtree.create_locality_mode_r
+                      (Locality.disallow_left locality_mode);
                   zero_alloc = Zero_alloc.default;
                   yielding = Yielding.newvar 0
                 };

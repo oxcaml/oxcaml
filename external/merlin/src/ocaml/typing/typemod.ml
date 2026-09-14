@@ -3274,7 +3274,7 @@ and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
     Msupport.raise_error exn;
     { mod_desc = Tmod_typed_hole;
       mod_type = Mty_for_hole;
-      mod_mode = Value.(disallow_right min), None;
+      mod_mode = With_regionality.(disallow_right min), None;
       mod_env = env;
       mod_attributes = Msupport.flush_saved_types () @ smod.pmod_attributes;
       mod_loc = smod.pmod_loc },
@@ -3447,7 +3447,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             {
               mod_desc = Tmod_typed_hole;
               mod_type = Mty_for_hole;
-              mod_mode = Value.(disallow_right min), None;
+              mod_mode = With_regionality.(disallow_right min), None;
               mod_loc = sarg.pmod_loc;
               mod_env = env;
               mod_attributes = sarg.pmod_attributes;
@@ -3500,7 +3500,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
   | Pmod_hole ->
       { mod_desc = Tmod_typed_hole;
         mod_type = Mty_for_hole;
-        mod_mode = Value.(disallow_right min), None;
+        mod_mode = With_regionality.(disallow_right min), None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
@@ -3699,7 +3699,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           Msupport.raise_error (apply_error ());
           { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
             mod_type = mty_res;
-            mod_mode = Value.(disallow_right min), None;
+            mod_mode = With_regionality.(disallow_right min), None;
             mod_env = env;
             mod_attributes = app_attributes;
             mod_loc = app_loc },
