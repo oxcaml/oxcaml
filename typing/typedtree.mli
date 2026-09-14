@@ -310,10 +310,11 @@ and 'k pattern_desc =
   | Tpat_unboxed_bool : bool -> value pattern_desc
         (** #false, #true *)
   | Tpat_tuple :
-      (string option * value general_pattern * Jkind.sort) list -> value pattern_desc
-        (** (P1, ..., Pn)                  [(None,P1,s1); ...; (None,Pn,sn)])
-            (L1:P1, ... Ln:Pn)             [(Some L1,P1,s1); ...; (Some Ln,Pn,sn)])
-            Any mix, e.g. (L1:P1, P2)      [(Some L1,P1,s1); ...; (None,P2,s2)])
+      (string option * value general_pattern * Jkind.sort) list ->
+          value pattern_desc
+        (** (P1, ..., Pn)               [(None,P1,s1); ...; (None,Pn,sn)])
+            (L1:P1, ... Ln:Pn)          [(Some L1,P1,s1); ...; (Some Ln,Pn,sn)])
+            Any mix, e.g. (L1:P1, P2)   [(Some L1,P1,s1); ...; (None,P2,s2)])
 
             Invariant: n >= 2
          *)
