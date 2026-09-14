@@ -1105,8 +1105,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-  : value non_pointer mod global external_
-    & (float64 mod global & value non_pointer mod global external_)
+  : value non_pointer mod global
+    & (float64 mod global & value non_pointer mod global)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
