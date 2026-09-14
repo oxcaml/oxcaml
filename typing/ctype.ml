@@ -546,61 +546,57 @@ let contains_initial_stage_splice stage ty =
 
 (* Returns [true] iff [t] is valid at any stage. Equivalently:
    [<[t]> expr = t] up to beta-reductions in [try_reduce_quote_eval]. *)
-let rec type_is_persistent_in_quotations env t =
-  let types_are_persistent_in_quotations env tl =
-    List.fold_left
-      (fun acc t -> acc && type_is_persistent_in_quotations env t)
-      true tl
-  in
-  match get_desc t with
-  | Tvar _ | Tunivar _ ->
-    false
-  | Tarrow (_, t1, t2, _) ->
-    type_is_persistent_in_quotations env t1 &&
-    type_is_persistent_in_quotations env t2
-  | Ttuple tl ->
-    List.map (fun (_, t) -> t) tl
-    |> types_are_persistent_in_quotations env
-  | Tbox t ->
-    type_is_persistent_in_quotations env t
-  | Tunboxed_tuple tl ->
-    List.map (fun (_, t) -> t) tl
-    |> types_are_persistent_in_quotations env
-  | Tconstr (path, tl, _) ->
-    Env.path_is_persistent_in_quotations env path &&
-    types_are_persistent_in_quotations env tl
-  | Tmod (t, _) ->
-    type_is_persistent_in_quotations env t
-  | Tobject (t, ct) ->
-    type_is_persistent_in_quotations env t &&
-    Option.map
-      (fun (p, tl) ->
-        Env.path_is_persistent_in_quotations env p &&
-        types_are_persistent_in_quotations env tl) !ct
-    |> Option.value ~default:true
-  | Tfield (_, _, t_method, t_rest) ->
-    type_is_persistent_in_quotations env t_method &&
-    type_is_persistent_in_quotations env t_rest
-  | Tnil ->
-    true
-  | Tquote _ | Tsplice _ | Tquote_eval _ ->
-    (* [eval] does not reduce on these *)
-    false
-  | Tvariant row ->
-    row_more row |> type_is_persistent_in_quotations env
-  | Tpoly (_, []) ->
-    true
-  | Tpoly (_, _::_) ->
-    false
-  | Trepr (t, _) ->
-    type_is_persistent_in_quotations env t
-  | Tpackage { pack_path; pack_cstrs } ->
-    Env.path_is_persistent_in_quotations env pack_path &&
-    types_are_persistent_in_quotations env
-      (List.map (fun (_, t) -> t) pack_cstrs)
-  | Tof_kind _ ->
-    true
-  | Tlink _ | Tsubst _ -> assert false
+let type_is_persistent_in_quotations env t =
+  with_type_mark begin fun mark ->
+    let rec loop t =
+      if not (try_mark_node mark t) then true
+      else match get_desc t with
+      | Tvar _ | Tunivar _ ->
+        false
+      | Tarrow (_, t1, t2, _) ->
+        loop t1 && loop t2
+      | Ttuple tl ->
+        List.map (fun (_, t) -> t) tl |> loop_list
+      | Tbox t ->
+        loop t
+      | Tunboxed_tuple tl ->
+        List.map (fun (_, t) -> t) tl |> loop_list
+      | Tconstr (path, tl, _) ->
+        Env.path_is_persistent_in_quotations env path && loop_list tl
+      | Tmod (t, _) ->
+        loop t
+      | Tobject (t, ct) ->
+        loop t &&
+        Option.map
+          (fun (p, tl) ->
+            Env.path_is_persistent_in_quotations env p && loop_list tl)
+          !ct
+        |> Option.value ~default:true
+      | Tfield (_, _, t_method, t_rest) ->
+        loop t_method && loop t_rest
+      | Tnil ->
+        true
+      | Tquote _ | Tsplice _ | Tquote_eval _ ->
+        (* [eval] does not reduce on these *)
+        false
+      | Tvariant row ->
+        row_more row |> loop
+      | Tpoly (_, []) ->
+        true
+      | Tpoly (_, _::_) ->
+        false
+      | Trepr (t, _) ->
+        loop t
+      | Tpackage { pack_path; pack_cstrs } ->
+        Env.path_is_persistent_in_quotations env pack_path &&
+        loop_list (List.map (fun (_, t) -> t) pack_cstrs)
+      | Tof_kind _ ->
+        true
+      | Tlink _ | Tsubst _ -> assert false
+    and loop_list tl = List.fold_left (fun acc t -> acc && loop t) true tl in
+    loop t
+  end
+
 
 (* Update unification environment stage *)
 let unify_with_incr_stage uenv f =
