@@ -242,7 +242,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Lpoly_inst -> Lpoly_inst
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
-        | Modality_annotation annotation -> Modality_annotation annotation
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
@@ -267,7 +266,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
         | Mod_unpack -> Mod_unpack
-        | Modality_annotation annotation -> Modality_annotation annotation
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
@@ -298,7 +296,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
         | Mod_unpack -> Mod_unpack
-        | Modality_annotation annotation -> Modality_annotation annotation
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
@@ -329,7 +326,6 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Contained_by c -> Contained_by c
         | Annotation annotation -> Annotation annotation
         | Mod_unpack -> Mod_unpack
-        | Modality_annotation annotation -> Modality_annotation annotation
     end)
   end
 end
@@ -5024,10 +5020,10 @@ module Report = struct
       Fmt.pp_print_string ppf
         "it is layout-polymorphic and being instantiated here"
     | Spliced _ -> Fmt.fprintf ppf "it is spliced"
-    | Contained_by c | Modality_annotation { contained_by = Some c; _ } ->
+    | Contained_by c | Annotation { contained_by = Some c; _ } ->
       let print_mod ppf Modality = Fmt.fprintf ppf " (with some modality)" in
       Fmt.fprintf ppf "it %t" (print_containing print_mod c)
-    | Annotation _ | Modality_annotation { contained_by = None; _ } ->
+    | Annotation { contained_by = None; _ } ->
       print_bug ~explanation:"Annotation should be printed by print_ahint" ()
         ppf
     | Mod_unpack ->
@@ -5291,7 +5287,7 @@ module Report = struct
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
-    | Const (Annotation _ | Modality_annotation { contained_by = None; _ }) ->
+    | Const (Annotation { contained_by = None; _ }) ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
     | Irrelevant ->
@@ -7776,8 +7772,11 @@ module Modality = struct
     | [] -> Option.map (fun c -> Hint.Contained_by c) is_contained_by
     | annotated_modes ->
       Some
-        (Hint.Modality_annotation
-           { annotated_modes; contained_by = is_contained_by })
+        (Hint.Annotation
+           { syntax = `Modality;
+             annotated_modes;
+             contained_by = is_contained_by
+           })
 
   (* Inferred modalities
 

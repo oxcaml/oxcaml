@@ -1370,28 +1370,24 @@ let apply_mode_annots
       ~default:With_locality.Const.max
       m.mode_modes
   in
-  let annot_loc =
-    if List.is_empty m.mode_desc then loc else
-    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
-  in
-  let written_modes =
+  let annotated_modes =
     List.map
-      (Location.map (fun (With_locality.Atom (axis, mode)) ->
-         Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode))
+      (fun { txt = With_locality.Atom (axis, mode); loc } ->
+        let name =
+          Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode
+        in
+        name, { Location.txt = name; loc })
       m.mode_desc
   in
-  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let hint =
+    Hint.Annotation
+      { syntax = `Mode; annotated_modes; contained_by = None }
+  in
   let min =
-    With_locality.of_const
-      ~hint_monadic:hint
-      ~hint_comonadic:hint
-      min
+    With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint min
   in
   let max =
-    With_locality.of_const
-      ~hint_monadic:hint
-      ~hint_comonadic:hint
-      max
+    With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint max
   in
   let pp : Hint.pinpoint = loc, kind in
   With_locality.submode_err pp min mode;
