@@ -6494,7 +6494,7 @@ type ('mo, 'como) monadic_comonadic =
     comonadic : 'como
   }
 
-module Value_with (Areality : Areality) = struct
+module Mode_with (Areality : Areality) = struct
   module Comonadic = Comonadic_with (Areality)
   module Monadic = Monadic
 
@@ -7586,8 +7586,8 @@ module Value_with (Areality : Areality) = struct
 end
 [@@inline]
 
-module With_regionality = Value_with (Regionality)
-module With_locality = Value_with (Locality)
+module With_regionality = Mode_with (Regionality)
+module With_locality = Mode_with (Locality)
 
 module Const = struct
   let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
