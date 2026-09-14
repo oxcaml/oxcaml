@@ -667,3 +667,81 @@ let () =
                     Printf.printf "inner child d_worker [expect 200]: %s\n"
                       (get d_worker)))))))
         (fun () -> ())))
+
+(* use_scope must not discard bindings already pushed on the mounting fiber:
+   the scope is linked in beneath them, so the fiber's own pushes shadow the
+   scope, unshadowed scope bindings show through, pops peel back down into
+   the scope, and freezes from the mounted task publish the merged chain. *)
+
+let () =
+  reset ();
+  print_endline "\n# Test 18: use_scope beneath existing bindings";
+  handle_task (fun () ->
+    with_temp d_lex 1 ~f:(fun () ->
+      with_temp d_both 2 ~f:(fun () ->
+        let s = freeze_scope () in
+        (* a live rebinding above the freeze: visible to the child before
+           the mount, hidden by the scope after it *)
+        with_temp d_lex 9 ~f:(fun () ->
+          passthrough (fun () ->
+            (* fiber S: the child's own "worker" *)
+            with_temp d_worker 100 ~f:(fun () ->
+              passthrough (fun () ->
+                (* fiber C: pushes bindings, then mounts the scope *)
+                with_temp d_both 3 ~f:(fun () ->
+                  with_temp d_child 4 ~f:(fun () ->
+                    Printf.printf
+                      "child d_lex before mount [expect 9]: %s\n" (get d_lex);
+                    use_scope s;
+                    Printf.printf "child d_lex via scope [expect 1]: %s\n"
+                      (get d_lex);
+                    Printf.printf "own push shadows scope [expect 3]: %s\n"
+                      (get d_both);
+                    Printf.printf "own push kept [expect 4]: %s\n"
+                      (get d_child);
+                    Printf.printf "child d_worker [expect 100]: %s\n"
+                      (get d_worker);
+                    (* a grandchild frozen from the merged chain *)
+                    let s2 = freeze_scope () in
+                    passthrough (fun () ->
+                      with_temp d_worker 200 ~f:(fun () ->
+                        passthrough (fun () ->
+                          use_scope s2;
+                          Printf.printf "grandchild own push [expect 4]: %s\n"
+                            (get d_child);
+                          Printf.printf "grandchild shadow [expect 3]: %s\n"
+                            (get d_both);
+                          Printf.printf "grandchild scope [expect 1]: %s\n"
+                            (get d_lex);
+                          Printf.printf "grandchild d_worker [expect 200]: %s\n"
+                            (get d_worker)))));
+                  Printf.printf "child d_child after pop [expect null]: %s\n"
+                    (get d_child));
+                Printf.printf "child d_both after pops [expect 2]: %s\n"
+                  (get d_both);
+                Printf.printf "child d_lex after pops [expect 1]: %s\n"
+                  (get d_lex))))))))
+
+(* Mounting a root task on a fiber that already has bindings keeps them:
+   they stay visible to the task and are captured by freezes from it, while
+   the freeze still stops at the task base. *)
+
+let () =
+  reset ();
+  print_endline "\n# Test 19: root mount keeps existing bindings";
+  with_temp d_worker 111 ~f:(fun () ->
+    passthrough (fun () ->
+      (* fiber T: pushes, then mounts itself as a root task *)
+      with_temp d_lex 1 ~f:(fun () ->
+        use_scope Null;
+        Printf.printf "task keeps binding [expect 1]: %s\n" (get d_lex);
+        let t = freeze_scope () in
+        passthrough (fun () ->
+          with_temp d_worker 222 ~f:(fun () ->
+            passthrough (fun () ->
+              use_scope t;
+              Printf.printf "child d_lex via scope [expect 1]: %s\n"
+                (get d_lex);
+              Printf.printf
+                "child d_worker stops at base [expect 222]: %s\n"
+                (get d_worker)))))))
