@@ -222,7 +222,7 @@ G(name):
  */
 #define Cont_fiber(reg)      [reg]
 #define Cont_last_fiber(reg) [reg, #8]
-#define Stack_idled_from(reg) [reg, #96]
+#define Stack_idled_from(reg) [reg, #104]
 #define Cont_gc_regs(reg)    [reg, #16]
 
 .macro WOSIZE_BLOCK_VAL dst, src
