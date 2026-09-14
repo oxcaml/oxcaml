@@ -1068,30 +1068,14 @@ Error: The value "v" has type "('a : value)"
 |}];;
 
 (* option *)
-(* CR layouts v5: allow this *)
 type t13 = t_void option;;
 [%%expect{|
-Line 1, characters 11-17:
-1 | type t13 = t_void option;;
-               ^^^^^^
-Error: This type "t_void" should be an instance of type "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+type t13 = t_void option
 |}];;
 
 let x13 (VV v) = Some v;;
 [%%expect{|
-Line 1, characters 22-23:
-1 | let x13 (VV v) = Some v;;
-                          ^
-Error: The value "v" has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+val x13 : void_variant -> t_void option = <fun>
 |}];;
 
 let x13 v =
@@ -1099,42 +1083,18 @@ let x13 v =
   | Some v -> VV v
   | None -> assert false
 [%%expect{|
-Line 3, characters 17-18:
-3 |   | Some v -> VV v
-                     ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_void"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+val x13 : t_void option -> void_variant = <fun>
 |}];;
 
 (* list *)
-(* CR layouts: should work after relaxing the mixed block restriction. *)
 type t13 = t_void list;;
 [%%expect{|
-Line 1, characters 11-17:
-1 | type t13 = t_void list;;
-               ^^^^^^
-Error: This type "t_void" should be an instance of type "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+type t13 = t_void list
 |}];;
 
 let x13 (VV v) = [v];;
 [%%expect{|
-Line 1, characters 18-19:
-1 | let x13 (VV v) = [v];;
-                      ^
-Error: The value "v" has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : void_variant -> t_void list = <fun>
 |}];;
 
 let x13 v =
@@ -1142,15 +1102,7 @@ let x13 v =
   | [v] -> VV v
   | _ -> assert false
 [%%expect{|
-Line 3, characters 14-15:
-3 |   | [v] -> VV v
-                  ^
-Error: The value "v" has type "('a : value_or_null)"
-       but an expression was expected of type "t_void"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of list has layout value_or_null.
+val x13 : t_void list -> void_variant = <fun>
 |}];;
 
 (* array *)
@@ -1188,17 +1140,21 @@ type t14 = foo14 list
 and foo14 = string
 |}];;
 
-type t14 = foo14 list
+(* Needed for testing because [list] now takes an [any] parameter *)
+type ('a : value_or_null) value_list = 'a list
+
+type t14 = foo14 value_list
 and foo14 = t_void;;
 [%%expect{|
-Line 2, characters 0-18:
-2 | and foo14 = t_void;;
+type ('a : value_or_null) value_list = 'a list
+Line 4, characters 0-18:
+4 | and foo14 = t_void;;
     ^^^^^^^^^^^^^^^^^^
 Error:
        The layout of foo14 is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of foo14 must be a value layout
-         because the type argument of list has layout value_or_null.
+         because of the definition of value_list at line 1, characters 0-46.
 |}];;
 
 (****************************************************)
@@ -1355,19 +1311,19 @@ val f : ('a. 'a t2_void) -> 'b t2_void = <fun>
 (* Test 25: Optional parameter with exotic layout *)
 
 let f (x : t_void) =
-  let g ?(x2 = x) () = () in
+  let _g ?(x2 = x) () = () in
   ()
 
 [%%expect{|
-Line 2, characters 15-16:
-2 |   let g ?(x2 = x) () = () in
-                   ^
+Line 2, characters 16-17:
+2 |   let _g ?(x2 = x) () = () in
+                    ^
 Error: The value "x" has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
        But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 (*********************************************************)
