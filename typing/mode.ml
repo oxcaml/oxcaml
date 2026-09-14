@@ -5130,7 +5130,7 @@ module Report = struct
     | Misc.Is_eq -> implements_morph obj (Simple Id) a b
     | Misc.Is_not_eq -> false
 
-  let implements_value_to_alloc : type l r a b.
+  let implements_regionality_to_locality : type l r a b.
       (C.Regionality.t, C.Locality.t, l * r) C.Locality_morph.t ->
       a C.obj ->
       b C.obj ->
@@ -5146,7 +5146,7 @@ module Report = struct
       implements_morph obj (Simple (Core (Locality_full locality_morph))) a b
     | _, _ -> implements_identity src obj a b
 
-  let implements_alloc_to_value : type l r a b.
+  let implements_locality_to_regionality : type l r a b.
       (C.Locality.t, C.Regionality.t, l * r) C.Locality_morph.t ->
       a C.obj ->
       b C.obj ->
@@ -5193,23 +5193,23 @@ module Report = struct
       (* We only skip when the morphism changes the mode *)
       ~is_skip:fixpoint, ~fixpoint
     | Allocation_r _ ->
-      (* We check that the morphism is value_to_alloc_r2g *)
-      if not (implements_value_to_alloc Regional_to_global src obj a b)
+      (* We check that the morphism is with_regionality_to_locality_r2g *)
+      if not (implements_regionality_to_locality Regional_to_global src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation_l _ ->
-      (* We check that the morphism is value_to_alloc_r2l *)
-      if not (implements_value_to_alloc Regional_to_local src obj a b)
+      (* We check that the morphism is with_regionality_to_locality_r2l *)
+      if not (implements_regionality_to_locality Regional_to_local src obj a b)
       then print_bug_stderr ();
       (* We only skip when the morphism changes the mode, but allow for axis changes *)
-      ( ~is_skip:(implements_alloc_to_value Locality_as_regionality obj src b a),
+      ( ~is_skip:(implements_locality_to_regionality Locality_as_regionality obj src b a),
         ~fixpoint )
     | Allocation _ ->
       (* We always want to skip an Allocation hint. Report if the hint was not
-         applied to an alloc_as_value morphism. *)
-      if not (implements_alloc_to_value Locality_as_regionality src obj a b)
+         applied to an with_locality_as_regionality morphism. *)
+      if not (implements_locality_to_regionality Locality_as_regionality src obj a b)
       then print_bug_stderr ();
       ~is_skip:true, ~fixpoint
 
@@ -7574,7 +7574,7 @@ module With_locality = Mode_with (Locality)
 module Const = struct
   let locality_as_regionality = C.Locality_morph.apply Locality_as_regionality
 
-  let alloc_as_value
+  let with_locality_as_regionality
       ({ areality;
          linearity;
          portability;
@@ -7616,7 +7616,7 @@ module Const = struct
       | Monadic Visibility -> Right (Monadic Visibility)
       | Monadic Staticity -> Right (Monadic Staticity)
 
-    let alloc_as_value :
+    let with_locality_as_regionality :
         With_locality.Axis.packed -> With_regionality.Axis.packed =
      fun (P ax) ->
       match is_areality ax with
@@ -7629,7 +7629,7 @@ let locality_as_regionality m =
   S.apply C.Regionality
     (Simple (Core (Locality_restricted Locality_as_regionality))) m
 
-let alloc_as_value ?allocation { comonadic; monadic } =
+let with_locality_as_regionality ?allocation { comonadic; monadic } =
   let hint = Option.map (fun a -> Hint.Allocation a) allocation in
   { comonadic =
       S.apply With_regionality.Comonadic.Obj.obj ?hint
@@ -7637,7 +7637,7 @@ let alloc_as_value ?allocation { comonadic; monadic } =
     monadic = With_regionality.Monadic.apply_hint Skip monadic
   }
 
-let alloc_to_value_l2r m =
+let with_locality_to_regionality_l2r m =
   let { comonadic; monadic } = With_locality.disallow_right m in
   { comonadic =
       S.apply With_regionality.Comonadic.Obj.obj
@@ -7645,7 +7645,7 @@ let alloc_to_value_l2r m =
     monadic = With_regionality.Monadic.apply_hint Skip monadic
   }
 
-let value_to_alloc_r2g ?allocation m =
+let with_regionality_to_locality_r2g ?allocation m =
   let hint = Option.map (fun a -> Hint.Allocation_r a) allocation in
   let { comonadic; monadic } = With_regionality.disallow_left m in
   { comonadic =
@@ -7654,7 +7654,7 @@ let value_to_alloc_r2g ?allocation m =
     monadic = With_locality.Monadic.apply_hint Skip monadic
   }
 
-let value_to_alloc_r2l { comonadic; monadic } =
+let with_regionality_to_locality_r2l { comonadic; monadic } =
   { comonadic =
       S.apply With_locality.Comonadic.Obj.obj
         (Simple (Core (Locality_full Regional_to_local))) comonadic;
@@ -8381,7 +8381,7 @@ module Crossing = struct
       (* The right adjoint of join is a restriction of identity *)
       Mode.join_const_unhint c m
 
-    let apply_right_alloc t m =
+    let apply_right_with_locality t m =
       Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
@@ -8487,7 +8487,7 @@ module Crossing = struct
       (* The left adjoint of meet is a restriction of identity *)
       Mode.meet_const_unhint c m
 
-    let apply_left_alloc t m =
+    let apply_left_with_locality t m =
       With_locality.Comonadic.hint ~hint:Crossing
         (comonadic_locality_as_regionality (S.Unhint.unhint m)
         |> apply_left_unhint t |> comonadic_regional_to_local)
@@ -8631,19 +8631,19 @@ module Crossing = struct
       (apply_right_unhint t (With_regionality.disallow_left m))
 
   (* Our mode crossing is for [With_regionality] modes, but can be extended to [With_locality]
-     modes via [alloc_as_value], defined as follows:
+     modes via [with_locality_as_regionality], defined as follows:
 
      Given a mode crossing [f] for [With_regionality], and we are to check [With_locality] submoding
      [m1 <= m2], we will instead check
-     [f (alloc_as_value m1) <= f (alloc_as_value m2)].
+     [f (with_locality_as_regionality m1) <= f (with_locality_as_regionality m2)].
 
      By adjunction tricks, this is equivalent to
-     - [ m1 <= regional_to_global ∘ fr ∘ f ∘ alloc_as_value m2 ]
-     - [ regional_to_local ∘ fl ∘ f ∘ alloc_as_value m1 <= m2 ]
-     where [regional_to_global] is the right adjoint of [alloc_as_value], and
+     - [ m1 <= regional_to_global ∘ fr ∘ f ∘ with_locality_as_regionality m2 ]
+     - [ regional_to_local ∘ fl ∘ f ∘ with_locality_as_regionality m1 <= m2 ]
+     where [regional_to_global] is the right adjoint of [with_locality_as_regionality], and
      [regional_to_local] the left adjoint. *)
 
-  let value_to_alloc_r2l_unhint m =
+  let with_regionality_to_locality_r2l_unhint m =
     let { comonadic; monadic } = m in
     let comonadic =
       S.Unhint.apply With_locality.Comonadic.Obj.obj
@@ -8651,7 +8651,7 @@ module Crossing = struct
     in
     { comonadic; monadic }
 
-  let value_to_alloc_r2g_unhint m =
+  let with_regionality_to_locality_r2g_unhint m =
     let { comonadic; monadic } = m in
     let comonadic =
       S.Unhint.apply With_locality.Comonadic.Obj.obj
@@ -8659,15 +8659,15 @@ module Crossing = struct
     in
     { comonadic; monadic }
 
-  let apply_left_alloc t m =
-    m |> alloc_as_value |> apply_left_unhint t |> value_to_alloc_r2l_unhint
+  let apply_left_with_locality t m =
+    m |> with_locality_as_regionality |> apply_left_unhint t |> with_regionality_to_locality_r2l_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_right_alloc t m =
-    m |> alloc_as_value |> apply_right_unhint t |> value_to_alloc_r2g_unhint
+  let apply_right_with_locality t m =
+    m |> with_locality_as_regionality |> apply_right_unhint t |> with_regionality_to_locality_r2g_unhint
     |> With_locality.hint ~comonadic:Crossing ~monadic:Crossing
 
-  let apply_left_right_alloc t m =
+  let apply_left_right_with_locality t m =
     let { monadic; comonadic } = With_locality.unhint m in
     let monadic = Monadic.apply_right_unhint t.monadic monadic in
     let comonadic =

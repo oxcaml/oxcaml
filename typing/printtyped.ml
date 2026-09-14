@@ -313,24 +313,24 @@ let modes ~pr i ppf { mode_modes = mm; mode_desc = md } =
   pr i ppf mm;
   mode_desc i ppf md
 
-let alloc_modes i ppf ms =
-  let print_alloc_modes i ppf m =
+let modes_with_locality i ppf ms =
+  let print_modes_with_locality i ppf m =
     line i ppf "%a\n" (Format_doc.compat Mode.With_locality.Const.print) m
   in
-  modes ~pr:print_alloc_modes i ppf ms
+  modes ~pr:print_modes_with_locality i ppf ms
 
-let alloc_modes_opt i ppf ms =
-  let print_alloc_modes_opt i ppf m =
+let modes_with_locality_opt i ppf ms =
+  let print_modes_with_locality_opt i ppf m =
     line i ppf "%a\n"
       (Format_doc.compat Mode.With_locality.Const.Option.print) m
   in
-  modes ~pr:print_alloc_modes_opt i ppf ms
+  modes ~pr:print_modes_with_locality_opt i ppf ms
 
-let alloc_modes_var i ppf ms =
-  let print_alloc_modes_var i ppf m =
-    line i ppf "%a\n" print_alloc_mode_l m
+let locality_modes_var i ppf ms =
+  let print_locality_modes_var i ppf m =
+    line i ppf "%a\n" print_locality_mode_l m
   in
-  modes ~pr:print_alloc_modes_var i ppf ms
+  modes ~pr:print_locality_modes_var i ppf ms
 
 let return_mode i ppf m =
   line i ppf "return_mode %a\n" print_return_mode m
@@ -368,7 +368,7 @@ let modalities i ppf { moda_modalities = mm; moda_desc = md } =
 
 let val_description_modal_info i ppf = function
   | Valmi_sig_value ms -> modalities i ppf ms
-  | Valmi_str_primitive ms -> alloc_modes_opt i ppf ms
+  | Valmi_str_primitive ms -> modes_with_locality_opt i ppf ms
 
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
     { strict; never_returns_normally; never_raises; arity; loc = _ } ->
@@ -390,9 +390,9 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
-      alloc_modes i ppf m1;
+      modes_with_locality i ppf m1;
       core_type i ppf ct2;
-      alloc_modes i ppf m2;
+      modes_with_locality i ppf m2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
@@ -588,7 +588,7 @@ and pattern_extra i ppf (extra_pat, loc, attrs) =
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
      option i core_type ppf cty;
-     alloc_modes i ppf m;
+     modes_with_locality i ppf m;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;
      attributes i ppf attrs;
@@ -614,7 +614,7 @@ and function_body i ppf (body : function_body) =
         fmt_partiality fc_partial
         fmt_location fc_loc;
       let i = i+1 in
-      alloc_mode_l i ppf fc_arg_mode;
+      locality_mode_l i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes i ppf fc_attributes;
       List.iter (fun e -> expression_extra i ppf (e, fc_loc, [])) fc_exp_extra;
@@ -651,19 +651,19 @@ and expression_extra i ppf (extra, loc, attrs) =
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
       alloc_const_option_mode i ppf m.mode_modes;
-      alloc_modes_opt i ppf m;
+      modes_with_locality_opt i ppf m;
   | Texp_inspected_type ti ->
       line i ppf "Texp_inspected_type\n";
       attributes i ppf attrs;
       type_inspection (i+1) ppf ti
 
-and alloc_mode i ppf (m : alloc_mode_r) =
-  line i ppf "alloc_mode %a\n" print_alloc_mode_r m
+and locality_mode_r i ppf (m : locality_mode_r) =
+  line i ppf "alloc_mode %a\n" print_locality_mode_r m
 
-and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
+and locality_mode_option i ppf m = Option.iter (locality_mode_r i ppf) m
 
-and alloc_mode_l i ppf (m : alloc_mode_l) =
-  line i ppf "locality_mode %a\n" print_alloc_mode_l m
+and locality_mode_l i ppf (m : locality_mode_l) =
+  line i ppf "locality_mode %a\n" print_locality_mode_l m
 
 and locality_mode : type l r. _ -> _ -> (l * r) Mode.Locality.t -> _ =
  fun i ppf m ->
@@ -684,8 +684,8 @@ and alloc_const_option_mode i ppf m =
   line i ppf "alloc_const_option_mode %a\n"
     (Format_doc.compat Mode.With_locality.Const.Option.print) m
 
-and expression_alloc_mode i ppf (expr, am) =
-  alloc_mode i ppf am;
+and expression_locality_mode i ppf (expr, am) =
+  locality_mode_r i ppf am;
   expression i ppf expr
 
 and expression i ppf x =
@@ -709,9 +709,9 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am; ret_mode; yielding = ym } ->
+  | Texp_function { params; body; locality_mode = am; ret_mode; yielding = ym } ->
       line i ppf "Texp_function\n";
-      alloc_mode i ppf am;
+      locality_mode_r i ppf am;
       yielding_mode i ppf ym;
       return_modes i ppf ret_mode;
       list i function_param ppf params;
@@ -743,22 +743,22 @@ and expression i ppf x =
   | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
-      alloc_mode i ppf am;
+      locality_mode_r i ppf am;
       list i labeled_expression ppf l;
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
   | Texp_construct (li, _, _, eo, am) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
-      alloc_mode_option i ppf am;
+      locality_mode_option i ppf am;
       list i expression ppf (List.map snd eo);
   | Texp_variant (l, eo) ->
       line i ppf "Texp_variant \"%s\"\n" l;
-      option i expression_alloc_mode ppf eo;
-  | Texp_record { fields; representation; extended_expression; alloc_mode = am } ->
+      option i expression_locality_mode ppf eo;
+  | Texp_record { fields; representation; extended_expression; locality_mode = am } ->
       line i ppf "Texp_record\n";
       let i = i+1 in
-      alloc_mode_option i ppf am;
+      locality_mode_option i ppf am;
       line i ppf "fields =\n";
       array (i+1) record_field ppf fields;
       line i ppf "representation =\n";
@@ -794,19 +794,19 @@ and expression i ppf x =
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
       line i ppf "%a\n" fmt_sort sort;
-      alloc_mode i ppf amode;
+      locality_mode_r i ppf amode;
       list i expression ppf l;
   | Texp_idx (ba, uas) ->
       line i ppf "Texp_idx\n";
       block_access i ppf ba;
       List.iter (unboxed_access i ppf) uas;
   | Texp_atomic_loc { record = e; record_sort = sort; lid = li;
-                      alloc_mode = amode } ->
+                      locality_mode = amode } ->
       line i ppf "Texp_atomic_loc\n";
       expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;
       longident i ppf li;
-      alloc_mode i ppf amode
+      locality_mode_r i ppf amode
   | Texp_list_comprehension comp ->
       line i ppf "Texp_list_comprehension\n";
       comprehension i ppf comp
@@ -939,7 +939,7 @@ and function_param i ppf x =
       line i ppf "%a\n" fmt_sort sort;
       pattern (i+1) ppf pat;
       expression (i+1) ppf expr);
-  alloc_modes_var (i+1) ppf x.fp_mode
+  locality_modes_var (i+1) ppf x.fp_mode
 
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
@@ -1188,13 +1188,13 @@ and module_type i ppf x =
   | Tmty_functor (Unit, mt2, ma2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-      alloc_modes i ppf ma2;
+      modes_with_locality i ppf ma2;
   | Tmty_functor (Named (s, _, mt1, ma1), mt2, ma2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
-      alloc_modes i ppf ma1;
+      modes_with_locality i ppf ma1;
       module_type i ppf mt2;
-      alloc_modes i ppf ma2;
+      modes_with_locality i ppf ma2;
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1323,7 +1323,7 @@ and module_expr i ppf x =
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
       module_expr i ppf me;
-      alloc_modes i ppf ma;
+      modes_with_locality i ppf ma;
   | Tmod_apply (me1, me2, _, _, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;

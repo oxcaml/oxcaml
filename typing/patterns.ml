@@ -93,7 +93,7 @@ module General = struct
         Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
-                   * alloc_mode_r
+                   * locality_mode_r
     | `Alias of
         pattern
         * Ident.t
@@ -111,8 +111,8 @@ module General = struct
     | Tpat_var { id; name = str; uid; sort; mode } ->
        `Var (id, str, uid, sort, mode)
     | Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                        env_alloc_mode } ->
-       `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode)
+                        env_locality_mode } ->
+       `Fun_layout (id, str, uid, sort, mode, lpoly, env_locality_mode)
     | Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                    type_expr = ty } ->
        `Alias (p, id, str, uid, sort, mode, ty)
@@ -145,9 +145,9 @@ module General = struct
     | `Any -> Tpat_any
     | `Var (id, str, uid, sort, mode) ->
        Tpat_var { id; name = str; uid; sort; mode }
-    | `Fun_layout (id, str, uid, sort, mode, lpoly, env_alloc_mode) ->
+    | `Fun_layout (id, str, uid, sort, mode, lpoly, env_locality_mode) ->
        Tpat_fun_layout { id; name = str; uid; sort; mode; lpoly;
-                         env_alloc_mode }
+                         env_locality_mode }
     | `Alias (p, id, str, uid, sort, mode, ty) ->
        Tpat_alias { pattern = p; id; name = str; uid; sort; mode;
                     type_expr = ty }

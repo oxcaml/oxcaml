@@ -78,7 +78,7 @@ module General : sig
         Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.With_regionality.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.With_regionality.l * Types.Lpoly.t
-                   * alloc_mode_r
+                   * locality_mode_r
     | `Alias of
         pattern
         * Ident.t

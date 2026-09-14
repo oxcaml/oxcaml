@@ -760,8 +760,8 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             var, Shape.app orig_shape ~arg:shape_var
       in
       let cc_res : (_, _ Error.mdiff) result =
-        let mres1 = Mode.alloc_as_value mres1 in
-        let mres2 = Mode.alloc_as_value mres2 in
+        let mres1 = Mode.with_locality_as_regionality mres1 in
+        let mres2 = Mode.with_locality_as_regionality mres2 in
         modtypes ~core ~direction ~loc env subst res1 res2 res_shape
           ~modes:(Specific ((mres1, None), mres2))
       in
@@ -870,8 +870,8 @@ and functor_param ~core ~direction ~loc env subst param1 param2 =
       Ok Tcoerce_none, env, subst
   | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
-      let marg1 = Mode.alloc_as_value marg1 in
-      let marg2 = Mode.alloc_as_value marg2 in
+      let marg1 = Mode.with_locality_as_regionality marg1 in
+      let marg2 = Mode.with_locality_as_regionality marg2 in
       let cc_arg =
         match
           modtypes ~core ~direction ~loc env Subst.identity arg2' arg1
@@ -1594,7 +1594,7 @@ module Functor_app_diff = struct
                 Result.Error (Error.Incompatible_params(arg,param))
             | ( Anonymous | Named _ | Empty_struct ),
               Named (_, param, param_m) ->
-               let param_m = Mode.alloc_as_value param_m in
+               let param_m = Mode.with_locality_as_regionality param_m in
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~core:core_inclusion ~direction ~loc state.env
