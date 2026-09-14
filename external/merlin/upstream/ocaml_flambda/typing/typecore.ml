@@ -1411,8 +1411,14 @@ let mode_annotation_hint (m : Alloc.Const.Option.t Typemode.modes) =
         let name =
           Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode
         in
+<<<<<<< HEAD
         name, { Location.txt = name; loc })
 >>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
+||||||| parent of 331b7b6cb1 (Automated commit: Import compiler changes from a18da4e2d41f636bc2b5311439c1c746a25516e8)
+        name, { Location.txt = name; loc })
+=======
+        name, Hint.Written_mode { Location.txt = name; loc })
+>>>>>>> 331b7b6cb1 (Automated commit: Import compiler changes from a18da4e2d41f636bc2b5311439c1c746a25516e8)
       m.mode_desc
   in
 <<<<<<< HEAD
@@ -1446,7 +1452,7 @@ let mode_annotation_hint (m : Alloc.Const.Option.t Typemode.modes) =
   in
 =======
   Hint.Annotation
-    { syntax = `Mode; annotated_modes; contained_by = None }
+    { annotated_modes; contained_by = None }
 
 let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in

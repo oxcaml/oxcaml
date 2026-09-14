@@ -1238,14 +1238,14 @@ module type S = sig
       val concat : then_:t -> t -> t
 
       (** [set ax a t] overwrites an axis of [t] to be [a]. [annotation] records
-          the written modality that imposed this bound; omitting it clears any
-          previous annotation on this axis. Identity modalities introduce no
-          bound and do not retain an annotation. *)
-      val set : ?annotation:string Location.loc -> 'a Axis.t -> 'a -> t -> t
+          the source that imposed this bound; omitting it clears any previous
+          annotation on this axis. Identity modalities introduce no bound and do
+          not retain an annotation. *)
+      val set : ?annotation:Hint.annotation_source -> 'a Axis.t -> 'a -> t -> t
 
-      (** The written modality responsible for this axis, including when the
-          bound was implied by an annotation on another axis. *)
-      val annotation : 'a Axis.t -> t -> string Location.loc option
+      (** The source responsible for this axis, including when the bound was
+          implied by an annotation on another axis. *)
+      val annotation : 'a Axis.t -> t -> Hint.annotation_source option
 
       (** [proj ax t] projects out the axis [ax] of [t]. *)
       val proj : 'a Axis.t -> t -> 'a

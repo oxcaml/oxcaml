@@ -587,7 +587,8 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
          in
          let modalities =
-          Typemode.transl_modalities ~maturity:Stable mut modalities
+          Typemode.transl_modalities ~mutable_field:{name with loc}
+            ~maturity:Stable mut modalities
          in
          check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in

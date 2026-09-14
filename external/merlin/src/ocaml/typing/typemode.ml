@@ -323,10 +323,10 @@ let[@warning "-18"] mutable_implied_modalities ~for_mutable_variable mut =
   then if for_mutable_variable then monadic else monadic @ comonadic
   else []
 
-let mutable_implied_modalities ~for_mutable_variable mut =
+let mutable_implied_modalities ?annotation ~for_mutable_variable mut =
   let l = mutable_implied_modalities ~for_mutable_variable mut in
   List.fold_left
-    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ax a t)
+    (fun t (Modality.Atom (ax, a)) -> Modality.Const.set ?annotation ax a t)
     Modality.Const.id l
 
 let idx_expected_modalities ~(mut : bool) =
@@ -463,7 +463,10 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
     List.fold_left
       (fun m { txt = Atom (ax, a) as t; loc } ->
         let annotation =
-          { Location.txt = Format_doc.asprintf "%a" (Per_axis.print ax) a; loc }
+          Hint.Written_modality
+            { Location.txt = Format_doc.asprintf "%a" (Per_axis.print ax) a;
+              loc
+            }
         in
         let m = Const.set ~annotation ax a m in
         List.fold_left
@@ -509,11 +512,13 @@ let transl_modalities_with_default ?(allow_redundant_staticity = false)
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
 
-let mutable_modalities mut =
-  mutable_implied_modalities (Types.is_mutable mut) ~for_mutable_variable:false
+let mutable_modalities ?field mut =
+  let annotation = Option.map (fun field -> Hint.Mutable_field field) field in
+  mutable_implied_modalities ?annotation (Types.is_mutable mut)
+    ~for_mutable_variable:false
 
-let transl_modalities ~maturity mut annots =
-  let default = mutable_modalities mut in
+let transl_modalities ?mutable_field ~maturity mut annots =
+  let default = mutable_modalities ?field:mutable_field mut in
   transl_modalities_with_default ~maturity ~default annots
 
 let let_mutable_modalities =
