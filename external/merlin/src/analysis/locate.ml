@@ -915,16 +915,16 @@ let lookup_loc_of_uid ~config:mconfig ~local_defs (uid : Shape.Uid.t) =
     match uid with
     | Unboxed_version uid -> dispatch uid
     | Internal | Predef _ -> None
-    | Item { comp_unit; _ } ->
-      let local_declaration =
-        if Misc_utils.is_current_unit comp_unit then
-          find_loc_of_local_item ~local_defs uid
-        else None
+    | Item { comp_unit; from; _ } ->
+      let local_kind =
+        match local_defs with
+        | `Interface _ -> Unit_info.Intf
+        | `Implementation _ -> Unit_info.Impl
       in
       let declaration =
-        match local_declaration with
-        | Some _ -> local_declaration
-        | None -> lookup_uid_loc_of_decl ~config:mconfig uid
+        if Misc_utils.is_current_unit comp_unit && from = local_kind then
+          find_loc_of_local_item ~local_defs uid
+        else lookup_uid_loc_of_decl ~config:mconfig uid
       in
       Option.map declaration ~f:(fun declaration -> `Declaration declaration)
     | Compilation_unit comp_unit -> (
