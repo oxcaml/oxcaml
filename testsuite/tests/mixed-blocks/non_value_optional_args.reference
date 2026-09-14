@@ -27,3 +27,12 @@
 (40, 40., 5., true)
 (4, 41., 50., false)
 (40, 41., 50., true)
+
+--- Printing through a signature ---
+6.
+6.
+60.
+61.
+
+--- Eliminating an optional argument ---
+6.
