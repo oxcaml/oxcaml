@@ -3692,9 +3692,8 @@ let lookup_global_name_module_no_locks
       (type a) (load : a load) ~allow_hidden ~errors ~use ~loc name env =
   match load with
   | Don't_load ->
-      let name = Persistent_env.with_located_cmi_path !persistent_env name in
+      let name = check_pers_mod ~allow_hidden ~loc name in
       let path = Pident(Ident.create_global name) in
-      check_pers_mod ~allow_hidden ~loc name;
       path, (() : a)
   | Load -> begin
       let path = Pident(Ident.create_global name) in
