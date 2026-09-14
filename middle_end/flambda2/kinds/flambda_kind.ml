@@ -1266,6 +1266,21 @@ end
 module Flat_suffix_element = struct
   include Flat_suffix_element0
 
+  let of_naked_number_kind (kind : Naked_number_kind.t) : t =
+    match kind with
+    | Naked_immediate -> Naked_immediate
+    | Naked_float32 -> Naked_float32
+    | Naked_float -> Naked_float
+    | Naked_int8 -> Naked_int8
+    | Naked_int16 -> Naked_int16
+    | Naked_int32 -> Naked_int32
+    | Naked_int64 -> Naked_int64
+    | Naked_nativeint -> Naked_nativeint
+    | Naked_vec128 -> Naked_vec128
+    | Naked_vec256 -> Naked_vec256
+    | Naked_vec512 -> Naked_vec512
+    | Naked_mask -> Naked_mask
+
   let to_kind_with_subkind t =
     match t with
     | Naked_float -> With_subkind.naked_float

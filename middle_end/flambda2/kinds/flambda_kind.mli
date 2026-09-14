@@ -376,6 +376,9 @@ module Flat_suffix_element : sig
   val from_singleton_mixed_block_element :
     _ Mixed_block_lambda_shape.Singleton_mixed_block_element.t -> t
 
+  (** The flat suffix element holding a naked number of the given kind. *)
+  val of_naked_number_kind : Naked_number_kind.t -> t
+
   val print : Format.formatter -> t -> unit
 
   val compare : t -> t -> int
