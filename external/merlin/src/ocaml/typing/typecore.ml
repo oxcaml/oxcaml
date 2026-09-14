@@ -1471,6 +1471,7 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
+<<<<<<< HEAD
 let apply_mode_annots
     ~loc
     kind
@@ -1491,11 +1492,38 @@ let apply_mode_annots
     Location.merge (List.map (fun a -> a.loc) m.mode_desc)
   in
   let written_modes =
+||||||| parent of f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+  let annot_loc =
+    if List.is_empty m.mode_desc then loc else
+    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
+  in
+  let written_modes =
+=======
+let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
+  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
+  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
+  let annotated_modes =
+>>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
     List.map
+<<<<<<< HEAD
       (Location.map (fun (With_locality.Atom (axis, mode)) ->
          Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode))
+||||||| parent of f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
+      (Location.map (fun (Alloc.Atom (axis, mode)) ->
+         Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
+=======
+      (fun { txt = Alloc.Atom (axis, mode); loc } ->
+        let name =
+          Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode
+        in
+        name, { Location.txt = name; loc })
+>>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
       m.mode_desc
   in
+<<<<<<< HEAD
   let hint = Hint.Annotation { loc = annot_loc; written_modes } in
   let min =
     With_locality.of_const
@@ -1509,6 +1537,18 @@ let apply_mode_annots
       ~hint_comonadic:hint
       max
   in
+||||||| parent of f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
+  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
+  let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
+=======
+  let hint =
+    Hint.Annotation
+      { syntax = `Mode; annotated_modes; contained_by = None }
+  in
+  let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
+  let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
+>>>>>>> f65b434977 (Automated commit: Import compiler changes from 37b525e04725c3ae8054b41c5bc9f7ae66aef45f)
   let pp : Hint.pinpoint = loc, kind in
   With_locality.submode_err pp min mode;
   With_locality.submode_err pp mode max

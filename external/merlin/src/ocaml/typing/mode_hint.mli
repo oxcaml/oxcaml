@@ -104,14 +104,14 @@ type is_contained_by =
     container : pinpoint
   }
 
-type annotation =
-  { loc : Location.t;
-    written_modes : string Location.loc list
-  }
+type annotation_syntax =
+  [ `Mode
+  | `Modality ]
 
-type modality_annotation =
-  { annotated_modes : (string * string Location.loc) list;
-        (** Each bound's mode name and the written modality that imposed it.
+type annotation =
+  { syntax : annotation_syntax;
+    annotated_modes : (string * string Location.loc) list;
+        (** Each bound's mode name and the written annotation that imposed it.
             Implied bounds point to the annotation that implies them. *)
     contained_by : is_contained_by option
   }
@@ -151,7 +151,6 @@ type 'd const =
   | Contained_by : is_contained_by -> ('l * 'r) const
   | Annotation : annotation -> ('l * 'r) const
   | Mod_unpack : ('l * disallowed) neg const
-  | Modality_annotation : modality_annotation -> ('l * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 
