@@ -68,6 +68,8 @@ module type S = sig
 
   val set_fresh_regs : numbering -> Reg.t array -> rhs -> op_class -> numbering
 
+  val add_equation : op_class -> numbering -> rhs -> valnum array -> numbering
+
   val set_unknown_regs : numbering -> Reg.t array -> numbering
 
   val remove_mutable_load_numbering : numbering -> numbering
@@ -224,6 +226,14 @@ module Make (Op : Operation) : S with type op = Op.t = struct
     let n1, vs = fresh_valnum_regs n rs in
     { n1 with num_eqs = Equations.add op_class rhs vs n.num_eqs }
 
+  (* Record the equation [vres = rhs] without modifying the register-to-valnum
+     mapping. Used for store-to-load forwarding, where the recorded equation
+     concerns a hypothetical load rather than the instruction being
+     processed. *)
+
+  let add_equation op_class n rhs vres =
+    { n with num_eqs = Equations.add op_class rhs vres n.num_eqs }
+
   (* Forget everything we know about the given result registers, which are
      receiving unpredictable values at run-time. *)
 
@@ -360,6 +370,83 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
 
+  (* Load chunks under which a store of chunk [memory_chunk], whose stored value
+     lives in a register of machtype [typ], may be forwarded to a subsequent
+     load of the same address; empty if the store is not eligible for
+     store-to-load forwarding.
+
+     Forwarding is only correct when storing then reloading is the identity on
+     the register: chunks narrower than the register's machtype are excluded
+     (the reload sign- or zero-extends), as is [Single] (a lossy round trip when
+     the register is [Float64]); [Addr]-typed values are conservatively
+     excluded.
+
+     [Word_int] and [Word_val] both denote a full-word location and round-trip
+     the register bits exactly; they are used asymmetrically (e.g. an immediate
+     record field is stored with [Word_int] but loaded with [Word_val]), so a
+     word store is forwardable under both chunks. *)
+  let forwardable_load_chunks (memory_chunk : Cmm.memory_chunk)
+      (typ : Cmm.machtype_component) : Cmm.memory_chunk list =
+    match memory_chunk, typ with
+    | (Word_int | Word_val), (Int | Val) -> [Word_int; Word_val]
+    | Double, Float -> [Double]
+    | (Onetwentyeight_unaligned | Onetwentyeight_aligned), Vec128
+    | (Twofiftysix_unaligned | Twofiftysix_aligned), Vec256
+    | (Fivetwelve_unaligned | Fivetwelve_aligned), Vec512 ->
+      [memory_chunk]
+    | ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask
+        | Word_val | Single _ | Double | Onetwentyeight_unaligned
+        | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+        | Fivetwelve_unaligned | Fivetwelve_aligned ),
+        ( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+        | Valx2 ) ) ->
+      []
+
+  (* If [instr] is an eligible plain store (see [forwardable_load_chunks]),
+     return equations stating that a subsequent non-atomic mutable load from the
+     same address would yield the stored value (store-to-load forwarding).
+     [varg] must be the value numbers of [instr]'s arguments, computed from the
+     numbering in force just before the store. The equations must be added to
+     the mutable-load equations after the store's own invalidation, so that
+     later stores, atomics, fences, allocations, polls and calls remove them
+     through the existing invalidation logic. *)
+  let store_to_load_forwarding_equations (instr : Cfg.basic Cfg.instruction)
+      (varg : valnum array) : (rhs * valnum array) list =
+    match instr.desc with
+    | Op (Store (memory_chunk, addressing_mode, _)) ->
+      let vaddr = Array.sub varg ~pos:1 ~len:(Array.length varg - 1) in
+      List.map (forwardable_load_chunks memory_chunk instr.arg.(0).Reg.typ)
+        ~f:(fun memory_chunk ->
+          let load : Operation.t =
+            Load
+              { memory_chunk;
+                addressing_mode;
+                mutability = Mutable;
+                is_atomic = false
+              }
+          in
+          (load, vaddr), [| varg.(0) |])
+    | Op
+        ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Const_mask _ | Stackoffset _ | Load _ | Intop _ | Int128op _
+        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+        | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Alloc _ )
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
+      []
+
+  (* Add to [n] the store-to-load forwarding equations for [instr] (see
+     [store_to_load_forwarding_equations] above for the requirements on [varg]
+     and on the point at which this must be called). *)
+  let add_store_to_load_forwarding_equations (n : numbering)
+      (instr : Cfg.basic Cfg.instruction) (varg : valnum array) : numbering =
+    List.fold_left (store_to_load_forwarding_equations instr varg) ~init:n
+      ~f:(fun n (rhs, vres) -> add_equation (Op_load Mutable) n rhs vres)
+
   let cse_instruction :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.cell -> numbering =
    fun state n cell ->
@@ -433,16 +520,18 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       | Op_store false | Op_other ->
         (* An initializing store or an "other" operation do not invalidate any
            equations, but we do not know anything about the results. *)
-        let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
-        let n2 = set_unknown_regs n1 i.res in
-        n2
+        let n1, varg = valnum_regs n i.arg in
+        let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+        let n3 = set_unknown_regs n2 i.res in
+        add_store_to_load_forwarding_equations n3 i varg
       | Op_store true ->
         (* A non-initializing store can invalidate anything we know about prior
            mutable loads. *)
-        let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
-        let n2 = set_unknown_regs n1 i.res in
-        let n3 = kill_loads n2 in
-        n3)
+        let n1, varg = valnum_regs n i.arg in
+        let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+        let n3 = set_unknown_regs n2 i.res in
+        let n4 = kill_loads n3 in
+        add_store_to_load_forwarding_equations n4 i varg)
 
   let cse_body :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.t -> numbering =
