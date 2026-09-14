@@ -856,20 +856,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
-  | Float_boxed () -> num_nodes_visited, Float_boxed ()
-  | Float64 -> num_nodes_visited, Float64
-  | Float32 -> num_nodes_visited, Float32
-  | Bits8 -> num_nodes_visited, Bits8
-  | Bits16 -> num_nodes_visited, Bits16
-  | Bits32 -> num_nodes_visited, Bits32
-  | Bits64 -> num_nodes_visited, Bits64
-  | Vec128 -> num_nodes_visited, Vec128
-  | Vec256 -> num_nodes_visited, Vec256
-  | Vec512 -> num_nodes_visited, Vec512
-  | Mask -> num_nodes_visited, Mask
-  | Word -> num_nodes_visited, Word
-  | Untagged_immediate -> num_nodes_visited, Untagged_immediate
-  | Product [||] -> num_nodes_visited, Product [||]
+  | Product [||] -> num_nodes_visited, field
   | Product fs ->
     let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
@@ -917,7 +904,10 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | Splice_variable id -> num_nodes_visited, Splice_variable id
+  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+    | Splice_variable _ ) as field ->
+    num_nodes_visited, field
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
