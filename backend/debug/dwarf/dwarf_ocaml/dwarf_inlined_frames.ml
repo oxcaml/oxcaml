@@ -91,12 +91,14 @@ let create_discontiguous_range_list_attributes state ~start_of_code_symbol
     let range_list_entries =
       IF.Range.fold range ~init:[] ~f:(fun range_list_entries subrange ->
           let start_pos = IF.Subrange.start_pos subrange in
+          let start_pos_offset = IF.Subrange.start_pos_offset subrange in
           let end_pos = IF.Subrange.end_pos subrange in
           let end_pos_offset = IF.Subrange.end_pos_offset subrange in
           let range_list_entry =
             Dwarf_4_range_list_entry.create_range_list_entry
               ~start_of_code_symbol
               ~first_address_when_in_scope:(text_label start_pos)
+              ~first_address_when_in_scope_offset:(Some start_pos_offset)
               ~first_address_when_not_in_scope:(text_label end_pos)
               ~first_address_when_not_in_scope_offset:(Some end_pos_offset)
           in
