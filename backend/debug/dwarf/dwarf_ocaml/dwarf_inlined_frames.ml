@@ -70,6 +70,13 @@ module Subrange_summary = struct
   include Identifiable.Make (T0)
 end
 
+(* CR-someday mshinwell: a label paired with an offset in bytes from it recurs
+   throughout the DWARF code, for example as [start_pos] and [start_pos_offset]
+   here, as [first_address_when_in_scope] and
+   [first_address_when_in_scope_offset] in [Dwarf_4_range_list_entry], and as
+   [start_inclusive] and [start_adjustment_in_bytes] in [Range_list_entry].
+   These would be better as a single type. *)
+
 let text_label pos = Asm_label.create_int Text (Label.to_int pos)
 
 let subrange_summary subrange : Subrange_summary.t =
