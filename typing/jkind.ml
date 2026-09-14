@@ -726,7 +726,8 @@ module With_bounds = struct
         |> Bounds_mask.join explicit_bounds_mask
       in
       (* An externality contribution at or above the bound implied by the
-         type's layout is redundant and not printed. *)
+         type's layout (or the enclosing kind's layout) is redundant and not
+         printed. *)
       if Externality.le implied_externality (Axis_lattice.externality mask)
       then
         Bounds_mask.join mask
@@ -1909,6 +1910,11 @@ module Const = struct
     | Layout l -> Layout.Const.get_root_scannable_axes l
     | Kconstr (_, sa, _) -> Some sa
 
+  let implied_externality_of_fully_expanded jk =
+    match jk.base with
+    | Layout l -> Layout.Const.implied_externality l
+    | Kconstr _ -> Externality.Internal
+
   let expand_once env t =
     match Base_and_axes.expand_base_once_const env t with
     | Expanded t -> Some t
@@ -2032,6 +2038,23 @@ module Const = struct
         Base_and_axes.fully_expand_aliases_const env base.jkind
       in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
+      let actual_implied_externality =
+        implied_externality_of_fully_expanded actual
+      in
+      let denoted_mod_bounds =
+        (* Mod-bounds are printed relative to the kind the printed base and
+           operators denote: [base] under [actual]'s scannable axes, whose
+           layout may imply lower bounds than [base]'s alone. *)
+        let denoted =
+          match get_scannable_axes_of_fully_expanded actual with
+          | Some sa ->
+            { base_jkind with
+              base = Base_and_axes.meet_scannable_axes base_jkind.base sa
+            }
+          | None -> base_jkind
+        in
+        (Base_and_axes.refresh_layout_implied_crossing_const denoted).mod_bounds
+      in
       let matching_layouts, addressable =
         match base_jkind.base, actual.base with
         | Kconstr (p1, _, op1), Kconstr (p2, _, op2) ->
@@ -2052,8 +2075,7 @@ module Const = struct
           (get_scannable_axes_of_fully_expanded actual)
       in
       let modal_bounds =
-        get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
-          actual.mod_bounds
+        get_modal_bounds ~verbosity ~base:denoted_mod_bounds actual.mod_bounds
       in
       let printable_with_bounds =
         (* This match statement is a bit of a hack. One usage of this function
@@ -2075,7 +2097,9 @@ module Const = struct
               let bounds_mask =
                 With_bounds.Type_info.printable_bounds_mask
                   ~mod_bounds:actual.mod_bounds
-                  ~implied_externality:(layout_implied_externality env ty)
+                  ~implied_externality:
+                    (Externality.meet actual_implied_externality
+                       (layout_implied_externality env ty))
                   ~type_info
               in
               let modal_modality, nonmodal_axes =
@@ -3612,11 +3636,17 @@ module Violation = struct
       in
       let has_modalities =
         let jkind_has_modalities jkind =
+          let jkind_implied_externality =
+            Base_and_axes.implied_externality_of_fully_expanded
+              (Base_and_axes.fully_expand_aliases env jkind.jkind)
+          in
           List.exists
             (fun (ty, type_info) ->
               With_bounds.Type_info.has_non_id_modalities
                 ~mod_bounds:jkind.jkind.mod_bounds
-                ~implied_externality:(layout_implied_externality env ty)
+                ~implied_externality:
+                  (Externality.meet jkind_implied_externality
+                     (layout_implied_externality env ty))
                 ~type_info)
             (With_bounds.to_list jkind.jkind.with_bounds)
         in

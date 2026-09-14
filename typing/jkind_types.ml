@@ -128,9 +128,13 @@ module Sort = struct
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
 
-  let base_implied_externality ~separability:(_ : Jkind_axis.Separability.t) :
-      base -> Jkind_axis.Externality.t = function
-    | Scannable -> Internal
+  let base_implied_externality ~separability : base -> Jkind_axis.Externality.t
+      = function
+    | Scannable -> (
+      match (separability : Jkind_axis.Separability.t) with
+      | Non_pointer -> External
+      | Non_pointer64 -> External64
+      | Non_float | Separable | Maybe_separable -> Internal)
     | Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
     | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
       External
