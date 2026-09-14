@@ -2109,19 +2109,37 @@ let rec mixed_block_element_of_types (elt : Types.mixed_block_element) =
 and mixed_block_shape_of_types shape =
   Array.map mixed_block_element_of_types shape
 
-let rec split_mixed_block_element_vectors elt =
-  match elt with
-  | Vec256 when split_vectors -> Product [|Vec128; Vec128|]
-  | Product shape -> Product (split_mixed_block_shape_vectors shape)
-  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
-  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-  | Untagged_immediate | Splice_variable _ -> elt
+let rec transl_mixed_product_element (element : Types.mixed_block_element)
+  : unit mixed_block_element
+  = match element with
+  | Scannable { separability; _ } ->
+    let raw_kind =
+      value_kind_of_pointerness (pointerness_of_separability separability)
+    in
+    Value { generic_value with raw_kind }
+  | Float_boxed -> Float_boxed ()
+  | Float64 -> Float64
+  | Float32 -> Float32
+  | Bits8 -> Bits8
+  | Bits16 -> Bits16
+  | Bits32 -> Bits32
+  | Bits64 -> Bits64
+  | Vec128 -> Vec128
+  | Vec256 when split_vectors -> Product [| Vec128; Vec128 |]
+  | Vec256 -> Vec256
+  | Vec512 -> Vec512
+  | Mask -> Mask
+  | Word -> Word
+  | Untagged_immediate -> Untagged_immediate
+  | Product shape -> Product (transl_mixed_product_shape shape)
+  | Void -> Product [||]
+  | Addressable elt ->
+    (* CR box: Addressability should be preserved here once it affects boxed
+       representations *)
+    transl_mixed_product_element elt
 
-and split_mixed_block_shape_vectors shape =
-  Array.map split_mixed_block_element_vectors shape
-
-let transl_mixed_product_shape shape =
-  split_mixed_block_shape_vectors (mixed_block_shape_of_types shape)
+and transl_mixed_product_shape shape =
+  Array.map transl_mixed_product_element shape
 
 let mixed_block_shape_has_splices shape =
   let rec has_splices : 'a mixed_block_element -> bool = function
