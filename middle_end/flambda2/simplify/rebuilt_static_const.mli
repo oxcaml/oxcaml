@@ -28,8 +28,8 @@ val print : Format.formatter -> t -> unit
 
 val cost_metrics : t -> Cost_metrics.t
 
-(** Newly generated code is always charged. Other constants follow the
-    [speculative_inlining_track_lifted_constants] policy. *)
+(** Costs recorded by [charge_code_size] are always charged. Other constants
+    follow the [speculative_inlining_track_lifted_constants] policy. *)
 val cost_metrics_for_inlining : t -> Cost_metrics.t
 
 val create_code :
@@ -45,6 +45,8 @@ val create_code :
 val create_code' : Code.t -> t
 
 (** Charge the size of newly specialised code to this simplification only.
+    Use when the site's synthetic values are not all static, or when tracking
+    lifted constants, to match the cost of the set of closures it replaces.
     Existing code introduced by [create_code'] is otherwise free. *)
 val charge_code_size : t -> t
 

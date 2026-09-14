@@ -18,9 +18,9 @@ open! Flambda
 module ART = Are_rebuilding_terms
 module SC = Static_const
 
-(* Ordinary sets of closures charge their function bodies. Sites charge nothing;
-   code freshly produced by re-specialising them instead carries a transient
-   binding cost here. This is not part of [Code_metadata]. *)
+(* Ordinary sets of closures charge their function bodies. Sites charge
+   nothing; freshly specialised code can instead carry a transient binding
+   cost here. This is not part of [Code_metadata]. *)
 type t =
   | Normal of
       { const : Static_const_or_code.t;
@@ -69,9 +69,10 @@ let cost_metrics t =
     cost_metrics
 
 let cost_metrics_for_inlining t =
-  (* Creation of specialised code must always be charged. Other static constants
-     historically had zero cost; their existing flag controls the progressive
-     rollout of accounting for them during speculative inlining. *)
+  (* Specialised code carries a charge when the set of closures it replaces
+     would have been charged. Other static constants historically had zero
+     cost; their flag controls the progressive rollout of accounting for them
+     during speculative inlining. *)
   if
     is_code t
     || Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
