@@ -84,8 +84,6 @@ let summarise range =
     ~f:(fun summary subrange ->
       Subrange_summary.Set.add (subrange_summary subrange) summary)
 
-(* The DWARF version is fixed for the whole compilation unit, so it is examined
-   once here rather than once per subrange. *)
 let create_discontiguous_range_list_attributes state ~start_of_code_symbol
     ~dwarf_4_base_address_entry range =
   match !Dwarf_flags.gdwarf_version with
