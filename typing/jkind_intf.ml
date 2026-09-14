@@ -378,6 +378,7 @@ module History = struct
     | Statement
     | Optional_arg_default
     | Layout_poly_in_external
+    (* CR zeisbach: maybe these two should be merged *)
     | Tuple_element
     | Unboxed_tuple_element
     | Peek_or_poke

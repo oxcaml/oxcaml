@@ -2176,7 +2176,6 @@ let solve_Ppat_tuple ~is_unboxed ~alloc_mode loc env args expected_ty =
     List.map2
       (fun (label, _) mode ->
          let why =
-           (* CR zeisbach: annoying, should probably change, but keep for now *)
            if is_unboxed then Jkind.History.Unboxed_tuple_element
            else Jkind.History.Tuple_element
          in
@@ -3430,8 +3429,10 @@ and type_pat_aux
   let rp = crp
   and rvp x = crp (pure category x)
   and rcp x = crp (only_impure category x) in
-  let type_tuple_pat spl closed =
-    (* CR zeisbach: refactor this properly *)
+  let type_tuple_pat ~is_unboxed spl closed =
+    (* CR zeisbach: we might want to gate mixed tuples behind a flag *)
+    if is_unboxed then
+      Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
     assert (closed = Open || List.length spl >= 2);
     Option.iter
       (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
@@ -3441,38 +3442,6 @@ and type_pat_aux
       (* If it's a principally-known tuple pattern, try to reorder *)
       | Ttuple labeled_tl when is_principal expected_ty ->
         reorder_pat loc penv spl closed labeled_tl expected_ty
-      (* If not, it's not allowed to be open (partial) *)
-      | _ ->
-        match closed with
-        | Open -> raise (Error (loc, !!penv, Partial_tuple_pattern_bad_type))
-        | Closed -> spl
-    in
-    let expected_tys =
-      solve_Ppat_tuple ~is_unboxed:false ~alloc_mode loc penv args expected_ty
-    in
-    let pl =
-      List.map2 (fun (lbl, t, alloc_mode, sort) (_, p) ->
-        lbl, type_pat tps Value ~alloc_mode p t sort, sort)
-        expected_tys args
-    in
-    rvp {
-      pat_desc = Tpat_tuple pl;
-      pat_loc = loc; pat_extra=[];
-      pat_type = newty (Ttuple (List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl));
-      pat_attributes = sp.ppat_attributes;
-      pat_env = !!penv;
-      pat_unique_barrier = Unique_barrier.not_computed () }
-  in
-  let type_unboxed_tuple_pat spl closed =
-    Language_extension.assert_enabled ~loc Layouts
-      Language_extension.Stable;
-    assert (closed = Open || List.length spl >= 2);
-    Option.iter
-      (fun l -> raise (Error (loc, !!penv, Repeated_tuple_pat_label l)))
-      (Misc.repeated_label spl);
-    let args =
-      match get_desc (expand_head !!penv expected_ty) with
-      (* If it's a principally-known tuple pattern, try to reorder *)
       | Tunboxed_tuple labeled_tl when is_principal expected_ty ->
         reorder_pat loc penv spl closed labeled_tl expected_ty
       (* If not, it's not allowed to be open (partial) *)
@@ -3482,20 +3451,24 @@ and type_pat_aux
         | Closed -> spl
     in
     let expected_tys =
-      solve_Ppat_tuple ~is_unboxed:true ~alloc_mode loc penv args expected_ty
+      solve_Ppat_tuple ~is_unboxed ~alloc_mode loc penv args expected_ty
     in
     let pl =
       List.map2 (fun (lbl, t, alloc_mode, sort) (_, p) ->
         lbl, type_pat tps Value ~alloc_mode p t sort, sort)
         expected_tys args
     in
-    let ty =
-      newty (Tunboxed_tuple (List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl))
+    let elem_tys = List.map (fun (lbl, p, _) -> lbl, p.pat_type) pl in
+    let pat_desc, pat_type =
+      if is_unboxed then
+        Tpat_unboxed_tuple pl, newty (Tunboxed_tuple elem_tys)
+      else
+        Tpat_tuple pl, newty (Ttuple elem_tys)
     in
     rvp {
-      pat_desc = Tpat_unboxed_tuple pl;
+      pat_desc;
       pat_loc = loc; pat_extra=[];
-      pat_type = ty;
+      pat_type;
       pat_attributes = sp.ppat_attributes;
       pat_env = !!penv;
       pat_unique_barrier = Unique_barrier.not_computed () }
@@ -3751,9 +3724,9 @@ and type_pat_aux
         raise (Error (loc, !!penv, Invalid_interval))
       end
   | Ppat_tuple (spl, closed) ->
-      type_tuple_pat spl closed
-  | Ppat_unboxed_tuple (spl, oc) ->
-      type_unboxed_tuple_pat spl oc
+      type_tuple_pat ~is_unboxed:false spl closed
+  | Ppat_unboxed_tuple (spl, closed) ->
+      type_tuple_pat ~is_unboxed:true spl closed
   | Ppat_construct(lid, sarg) ->
       let expected_type =
         match extract_concrete_variant !!penv expected_ty with
