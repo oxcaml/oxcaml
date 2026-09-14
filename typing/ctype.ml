@@ -254,8 +254,12 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
                  this mode is to reduce sharing *)
               abbrev := Mnil
           | Tarrow ((_, marg, mret), _, _, _) when not structure ->
-              With_locality.generalize_topology ~current_level:!current_level marg;
-              With_locality.generalize_topology ~current_level:!current_level mret
+              With_locality.generalize_topology
+                ~current_level:!current_level
+                marg;
+              With_locality.generalize_topology
+                ~current_level:!current_level
+                mret
           | _ -> ()
         end
   end pool;
@@ -870,7 +874,9 @@ let close_type ~zap_scope mark ty =
 let closed_parameterized_type params ty =
   with_type_mark begin fun mark ->
     List.iter (mark_type mark) params;
-    try With_locality.with_zap_scope (fun ~zap_scope -> close_type ~zap_scope mark ty);
+    try
+      With_locality.with_zap_scope
+        (fun ~zap_scope -> close_type ~zap_scope mark ty);
     true with Non_closed _ -> false
   end
 
@@ -2109,14 +2115,17 @@ let curry_mode (type r)
     (alloc : (allowed * r) With_locality.Comonadic.t)
     (arg : With_locality.lr) : With_locality.Comonadic.l =
   With_locality.Comonadic.join
-    [(With_locality.close_over arg).comonadic; (With_locality.Comonadic.disallow_right alloc)]
+    [(With_locality.close_over arg).comonadic;
+     (With_locality.Comonadic.disallow_right alloc)]
 let curry_mode_const alloc arg : With_locality.Const.t =
   let acc =
     With_locality.Comonadic.Const.join
       (With_locality.Const.close_over arg)
       (With_locality.Const.partial_apply alloc)
   in
-  With_locality.Const.merge {comonadic = acc; monadic = With_locality.Monadic.Const.legacy}
+  With_locality.Const.merge
+    {comonadic = acc;
+     monadic = With_locality.Monadic.Const.legacy}
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
@@ -2245,8 +2254,13 @@ let instance_prim_mode (desc : Primitive.description) ty =
     let finalret =
       prim_mode' (Some (mode_l, mode_fy)) desc.prim_native_repr_res
     in
-    instance_prim_locals desc.prim_native_repr_args
-      mode_l mode_fy (With_locality.disallow_right With_locality.legacy) finalret ty,
+    instance_prim_locals
+      desc.prim_native_repr_args
+      mode_l
+      mode_fy
+      (With_locality.disallow_right With_locality.legacy)
+      finalret
+      ty,
     Some mode_l, Some mode_fy
   else
     ty, None, None
@@ -6510,13 +6524,17 @@ let cross_left_alloc_ret env ?modalities ty mode =
   let mode' = cross_left_alloc env ?modalities ty mode in
   With_locality.join
     [mode';
-     With_locality.min_with_comonadic Areality (With_locality.proj_comonadic Areality mode)]
+     With_locality.min_with_comonadic
+       Areality
+       (With_locality.proj_comonadic Areality mode)]
 
 let cross_right_alloc_ret env ?modalities ty mode =
   let mode' = cross_right_alloc env ?modalities ty mode in
   With_locality.meet
     [mode';
-     With_locality.max_with_comonadic Areality (With_locality.proj_comonadic Areality mode)]
+     With_locality.max_with_comonadic
+       Areality
+       (With_locality.proj_comonadic Areality mode)]
 
 let submode_with_cross env ~is_ret ty l r =
   let r' =

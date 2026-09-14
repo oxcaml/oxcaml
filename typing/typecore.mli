@@ -163,8 +163,11 @@ val check_partial:
         ?lev:int -> Env.t -> type_expr ->
         Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
 val type_expect:
-        Env.t -> ?mode:Mode.With_regionality.r -> Parsetree.expression -> type_expected ->
-          Typedtree.expression
+        Env.t ->
+        ?mode:Mode.With_regionality.r ->
+        Parsetree.expression ->
+        type_expected ->
+        Typedtree.expression
 val type_exp:
         Env.t -> ?mode: Mode.With_regionality.r -> Parsetree.expression ->
           Typedtree.expression
@@ -230,7 +233,12 @@ type submode_reason =
       (* Check that this constructor is allowed in this context. *)
   | Other (* add more cases here for better hints *)
 
-val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.With_regionality.t -> unit
+val escape :
+  loc:Location.t ->
+  env:Env.t ->
+  reason:submode_reason ->
+  (Mode.allowed * 'r) Mode.With_regionality.t ->
+  unit
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 

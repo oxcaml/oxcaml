@@ -58,8 +58,8 @@ exception Dont_match of value_mismatch
 type mmodes =
   | All
   | Specific :
-      ((Mode.allowed * 'r) Mode.With_regionality.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.With_regionality.t ->
+      ((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      ('l * allowed) With_regionality.t ->
       mmodes
 
 let child_close_over_coercion_opt id c =
@@ -492,7 +492,9 @@ let report_modality_sub_error first second ppf e =
     (print_modality "not") left
 
 let report_mode_sub_error ~pp got expected ppf e =
-  let ({ left; right } : _ Mode.simple_error) = Mode.With_regionality.print_error pp e in
+  let ({ left; right } : _ Mode.simple_error) =
+    Mode.With_regionality.print_error pp e
+  in
   let open Format_doc in
   let open_box = dprintf "@[<hov 2>" in
   let reopen_box = dprintf "@]@ %t" open_box in

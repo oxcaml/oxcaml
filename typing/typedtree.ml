@@ -748,7 +748,8 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type * Mode.With_locality.Const.t modes
+  | Tmty_functor of
+      functor_parameter * module_type * Mode.With_locality.Const.t modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc
@@ -1316,7 +1317,13 @@ let rec iter_bound_idents
        d
 
 type 'sort full_bound_ident_action =
-  Ident.t -> string loc -> type_expr -> Uid.t -> Mode.With_regionality.l -> 'sort -> unit
+  Ident.t ->
+  string loc ->
+  type_expr ->
+  Uid.t ->
+  Mode.With_regionality.l ->
+  'sort ->
+  unit
 
 (* A few of the functions below should work both over [Jkind.Sort.t] and
    [Jkind.Sort.Const.t], so they take conversion functions

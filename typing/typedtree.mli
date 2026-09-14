@@ -1167,7 +1167,8 @@ and module_type =
 and module_type_desc =
     Tmty_ident of Path.t * Longident.t loc
   | Tmty_signature of signature
-  | Tmty_functor of functor_parameter * module_type * Mode.With_locality.Const.t modes
+  | Tmty_functor of
+      functor_parameter * module_type * Mode.With_locality.Const.t modes
   | Tmty_with of module_type * (Path.t * Longident.t loc * with_constraint) list
   | Tmty_typeof of module_expr
   | Tmty_alias of Path.t * Longident.t loc

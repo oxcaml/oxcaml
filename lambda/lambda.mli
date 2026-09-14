@@ -1474,9 +1474,14 @@ val transl_module_representation :
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
 val subst:
-  (Ident.t -> Subst.Lazy.value_description * Mode.With_regionality.l -> Env.t -> Env.t) ->
+  (Ident.t ->
+   Subst.Lazy.value_description * Mode.With_regionality.l ->
+   Env.t ->
+   Env.t) ->
   ?freshen_bound_variables:bool ->
-  lambda Ident.Map.t -> lambda -> lambda
+  lambda Ident.Map.t ->
+  lambda ->
+  lambda
 (** [subst update_env ?freshen_bound_variables s lt]
     applies a substitution [s] to the lambda-term [lt].
 

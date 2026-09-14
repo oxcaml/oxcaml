@@ -590,7 +590,15 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          in
          check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in
-         let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.With_locality.Const.legacy arg in
+         let cty =
+           transl_simple_type
+             ~new_var_jkind
+             env
+             ?univars
+             ~closed
+             Mode.With_locality.Const.legacy
+             arg
+         in
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -704,7 +712,12 @@ let make_constructor
               env loc univars closed sargs
           in
           let tret_type =
-            transl_simple_type ~new_var_jkind:Sort env ?univars ~closed Mode.With_locality.Const.legacy
+            transl_simple_type
+              ~new_var_jkind:Sort
+              env
+              ?univars
+              ~closed
+              Mode.With_locality.Const.legacy
               sret_type
           in
           let ret_type = tret_type.ctyp_type in
@@ -958,8 +971,18 @@ let transl_declaration env sdecl (id, uid) =
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
-      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.With_locality.Const.legacy sty,
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.With_locality.Const.legacy sty', loc)
+      transl_simple_type
+        ~new_var_jkind:Any
+        env
+        ~closed:false
+        Mode.With_locality.Const.legacy
+        sty,
+      transl_simple_type
+        ~new_var_jkind:Sort
+        env
+        ~closed:false
+        Mode.With_locality.Const.legacy
+        sty', loc)
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
@@ -1026,7 +1049,14 @@ let transl_declaration env sdecl (id, uid) =
       None -> None, None
     | Some sty ->
       let no_row = not (is_fixed_type sdecl) in
-      let cty = transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.With_locality.Const.legacy sty in
+      let cty =
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:no_row
+          Mode.With_locality.Const.legacy
+          sty
+      in
       Some cty, Some cty.ctyp_type
   in
   (* jkind_default is the jkind to use for now as the type_jkind when there
@@ -4986,10 +5016,20 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   let constraints =
     List.map (fun (ty, ty', loc) ->
       let cty =
-        transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.With_locality.Const.legacy ty
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          ty
       in
       let cty' =
-        transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.With_locality.Const.legacy ty'
+        transl_simple_type
+          ~new_var_jkind:Sort
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          ty'
       in
       (* Note: We delay the unification of those constraints
          after the unification of parameters, so that clashing
@@ -5003,7 +5043,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       None -> Misc.fatal_error "Typedecl.transl_with_constraint: no manifest"
     | Some sty ->
       let cty =
-        transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.With_locality.Const.legacy sty
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:no_row
+          Mode.With_locality.Const.legacy
+          sty
       in
       cty, cty.ctyp_type
   in
@@ -6094,7 +6139,9 @@ let report_error ~loc = function
         "The label %a must be mutable to be declared atomic."
         Style.inline_code name
   | Constructor_submode_failed e ->
-      let Mode.With_regionality.Error (ax, {left; right}) = Mode.With_regionality.to_simple_error e in
+      let Mode.With_regionality.Error (ax, {left; right}) =
+        Mode.With_regionality.to_simple_error e
+      in
       Location.errorf ~loc "This constructor is at mode %a, \
         but expected to be at mode %a.@]"
         (Style.as_inline_code (Mode.With_regionality.Const.print_axis ax)) left

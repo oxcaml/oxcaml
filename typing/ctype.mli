@@ -295,7 +295,10 @@ val prim_params_yielding:
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
-val curry_mode_const : With_locality.Const.t -> With_locality.Const.t -> With_locality.Const.t
+val curry_mode_const :
+  With_locality.Const.t ->
+  With_locality.Const.t ->
+  With_locality.Const.t
 
 (** Applies the same logic as [curry_mode_const] over
     the comonadic mode for [m0] and the lr mode [m1] *)
@@ -609,7 +612,10 @@ val remove_mode_and_jkind_variables:
         (* Ensure mode and jkind variables are fully determined *)
 
 val nongen_vars_in_schema:
-  zap_scope:With_locality.zap_scope -> Env.t -> type_expr -> Btype.TypeSet.t option
+  zap_scope:With_locality.zap_scope ->
+  Env.t ->
+  type_expr ->
+  Btype.TypeSet.t option
         (* Return any non-generic variables in the type scheme.  Also ensures
            mode variables are fully determined. *)
 
@@ -647,7 +653,9 @@ val closed_extension_constructor:
   zap_scope:With_locality.zap_scope ->
   extension_constructor -> type_expr option
 val closed_class:
-        zap_scope:With_locality.zap_scope -> type_expr list -> class_signature ->
+        zap_scope:With_locality.zap_scope ->
+        type_expr list ->
+        class_signature ->
         closed_class_failure option
         (* Check whether all type variables are bound *)
 

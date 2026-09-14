@@ -379,7 +379,11 @@ val lookup_all_labels_from_type:
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.With_regionality.r * type_expr * Jkind_types.Sort.t
+  | Mutable_variable of
+      Ident.t
+      * Mode.With_regionality.r
+      * type_expr
+      * Jkind_types.Sort.t
 
 (** For a mutable variable, [use] means mark as mutated. For an instance
     variable, it means mark as used. *)
@@ -445,22 +449,42 @@ val global_of_instance_compilation_unit : Compilation_unit.t -> Global_module.t
 (* Insertion by identifier *)
 
 val add_value_lazy:
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
-    Ident.t -> Subst.Lazy.value_description -> t -> t
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    Ident.t ->
+    Subst.Lazy.value_description ->
+    t ->
+    t
 val add_value:
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
-    Ident.t -> Types.value_description -> t -> t
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    Ident.t ->
+    Types.value_description ->
+    t ->
+    t
 val add_type:
   check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
 (* Modules can be added without modes, which defaults to the max mode *)
-val add_module: ?arg:bool -> ?shape:Shape.t ->
-  Ident.t -> module_presence -> module_type -> ?mode:Mode.With_regionality.l -> t -> t
-val add_module_lazy: update_summary:bool ->
-  Ident.t -> module_presence -> Subst.Lazy.module_type -> ?mode:Mode.With_regionality.l ->
-  t -> t
+val add_module:
+  ?arg:bool ->
+  ?shape:Shape.t ->
+  Ident.t ->
+  module_presence ->
+  module_type ->
+  ?mode:Mode.With_regionality.l ->
+  t ->
+  t
+val add_module_lazy:
+  update_summary:bool ->
+  Ident.t ->
+  module_presence ->
+  Subst.Lazy.module_type ->
+  ?mode:Mode.With_regionality.l ->
+  t ->
+  t
 val add_module_declaration: ?arg:bool -> ?shape:Shape.t -> check:bool ->
   Ident.t -> module_presence -> module_declaration ->
   ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks -> t -> t
@@ -545,15 +569,25 @@ val remove_last_open: Path.t -> t -> t option
 (* Insertion by name *)
 
 val enter_value:
-    ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
-    string -> value_description -> t -> Ident.t * t
+    ?check:(string -> Warnings.t) ->
+    mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+    string ->
+    value_description ->
+    t ->
+    Ident.t * t
 val enter_type: scope:int -> string -> type_declaration -> t -> Ident.t * t
 val enter_extension:
   scope:int -> rebind:bool -> string ->
   extension_constructor -> t -> Ident.t * t
 val enter_module:
-  scope:int -> ?arg:bool -> string -> module_presence ->
-  module_type -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> t -> Ident.t * t
+  scope:int ->
+  ?arg:bool ->
+  string ->
+  module_presence ->
+  module_type ->
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+  t ->
+  Ident.t * t
 val enter_module_declaration:
   scope:int -> ?arg:bool -> ?shape:Shape.t -> string -> module_presence ->
   module_declaration -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
@@ -574,8 +608,13 @@ val enter_signature: ?mod_shape:Shape.t -> scope:int -> signature ->
 (* Same as [enter_signature] but also extends the shape map ([parent_shape])
    with all the the items from the signature, their shape being a projection
    from the given shape. *)
-val enter_signature_and_shape: scope:int -> parent_shape:Shape.Map.t ->
-  Shape.t -> signature -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> t ->
+val enter_signature_and_shape:
+  scope:int ->
+  parent_shape:Shape.Map.t ->
+  Shape.t ->
+  signature ->
+  ?mode:(Mode.allowed * 'r) Mode.With_regionality.t ->
+  t ->
   signature * Shape.Map.t * t
 
 val enter_unbound_value : string -> value_unbound_reason -> t -> t
@@ -766,8 +805,16 @@ val report_jkind_violation_with_offender:
 (** Folds *)
 
 val fold_values:
-  (string -> Path.t -> Subst.Lazy.value_description -> Mode.With_regionality.l -> 'a -> 'a)
-  -> Longident.t option -> t -> 'a -> 'a
+  (string ->
+   Path.t ->
+   Subst.Lazy.value_description ->
+   Mode.With_regionality.l ->
+   'a ->
+   'a) ->
+  Longident.t option ->
+  t ->
+  'a ->
+  'a
 val fold_types:
   (string -> Path.t -> type_declaration -> 'a -> 'a) ->
   Longident.t option -> t -> 'a -> 'a

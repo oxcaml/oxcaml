@@ -31,8 +31,8 @@ type pos =
 type modes = Includecore.mmodes =
   | All
   | Specific:
-      ((Mode.allowed * 'r) Mode.With_regionality.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.With_regionality.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       modes
 
 module Error = struct
@@ -784,14 +784,16 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             let param_yielding =
               match (param2 : Subst.Lazy.functor_parameter) with
               | Named (_, _, mm) ->
-                [Yielding.disallow_right (With_locality.proj_comonadic Yielding mm)]
+                [Yielding.disallow_right
+                   (With_locality.proj_comonadic Yielding mm)]
               | Unit -> []
             in
             let funct_yielding =
               match modes with
               | All -> Yielding.disallow_right Yielding.max
               | Specific ((m, _locks), _) ->
-                Yielding.disallow_right (With_regionality.proj_comonadic Yielding m)
+                Yielding.disallow_right
+                  (With_regionality.proj_comonadic Yielding m)
             in
             Ctype.create_yielding_mode_l
               (Yielding.join (funct_yielding :: param_yielding))

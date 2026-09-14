@@ -639,9 +639,11 @@ module For_copy : sig
   val mode_copy_generic :
     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
+  val mode_copy_for_saving :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
+  val mode_copy_for_restoring :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct

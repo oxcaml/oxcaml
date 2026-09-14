@@ -40,7 +40,8 @@ type kind_replacement =
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
-        prepare_mode : For_copy.copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr;
+        prepare_mode :
+          For_copy.copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr;
         prepare_modality : Mode.Modality.t -> Mode.Modality.t;
         prepare_ident : Ident.t -> Ident.t
       }
