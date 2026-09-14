@@ -118,9 +118,9 @@ module Uint64 : sig
 
   val to_int64 : t -> Int64.t
 
-  (** As [to_int64], but raises a fatal error unless the value fits in the
+  (** As [to_int64], but raises a fatal error if the value does not fit in the
       non-negative range of a signed 64-bit integer. *)
-  val to_int64_checked : t -> Int64.t
+  val to_int64_exn : t -> Int64.t
 
   include Identifiable.S with type t := t
 end

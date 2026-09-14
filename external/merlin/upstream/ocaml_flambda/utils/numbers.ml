@@ -185,11 +185,11 @@ module Uint64 = struct
 
   let to_int64 t = t
 
-  let to_int64_checked t =
+  let to_int64_exn t =
     if Int64.compare t 0L < 0
     then
       Misc.fatal_errorf
-        "Uint64.to_int64_checked: 0x%Lx does not fit in the non-negative range \
+        "Uint64.to_int64_exn: 0x%Lx does not fit in the non-negative range \
          of a signed 64-bit integer"
         t;
     t
