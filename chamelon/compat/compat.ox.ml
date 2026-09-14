@@ -111,8 +111,7 @@ type texp_record_field_identifier = Jkind.Sort.t
 
 type texp_record_extended_expression_identifier = Jkind.Sort.t
 
-let mkTexp_record
-    ~id:(representation, locality_mode)
+let mkTexp_record ~id:(representation, locality_mode)
     (fields, extended_expression) =
   Texp_record { fields; representation; extended_expression; locality_mode }
 
@@ -303,8 +302,8 @@ let view_texp (e : expression_desc) =
     Texp_apply (exp, args, (pos, mode, yielding, za))
   | Texp_construct (name, desc, repres, args, mode) ->
     Texp_construct (name, desc, args, (mode, repres))
-  | Texp_record
-      { fields; representation; extended_expression; locality_mode } ->
+  | Texp_record { fields; representation; extended_expression; locality_mode }
+    ->
     Texp_record
       { fields; extended_expression; id = representation, locality_mode }
   | Texp_tuple (args, mode) ->
@@ -355,10 +354,8 @@ let view_texp (e : expression_desc) =
     in
     Texp_function
       ( { params; body },
-        { locality_mode;
-          ret_sort;
-          ret_mode = ret_mode.mode_modes;
-          zero_alloc } )
+        { locality_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc }
+      )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, _, partial) ->
     Texp_match (e, cases, partial, sort)

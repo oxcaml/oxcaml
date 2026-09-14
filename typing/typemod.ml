@@ -109,8 +109,12 @@ exception Error_forward of Location.error
 
 let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
   let mode = Mode.With_regionality.newvar 0 in
-  let min = With_locality.Const.Option.value ~default:With_locality.Const.min m in
-  let max = With_locality.Const.Option.value ~default:With_locality.Const.max m in
+  let min =
+    With_locality.Const.Option.value ~default:With_locality.Const.min m
+  in
+  let max =
+    With_locality.Const.Option.value ~default:With_locality.Const.max m
+  in
   With_regionality.submode_exn
     (min |> With_locality.of_const |> with_locality_as_regionality)
     mode;
@@ -179,7 +183,9 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
       To achieve that, the mode of [foo] to be exposed as [M.foo] should be a
       flexible mode variable weaker than its actual mode.
     *)
-    let mode, _ = Mode.With_regionality.newvar_above (Ctype.get_current_level ()) mode in
+    let mode, _ =
+      Mode.With_regionality.newvar_above (Ctype.get_current_level ()) mode
+    in
     (* Upon construction, for comonadic (prescriptive) axes, module
     must be weaker than the values therein, for otherwise operations
     would be allowed to performed on the module (and extended to the
@@ -2306,7 +2312,8 @@ and transl_signature ?(interface_toplevel = false) env
         let (tdesc, _, newenv) =
           Typedecl.transl_value_decl env loc sdesc
             ~modal:(Sig_value
-              (With_regionality.disallow_right md_mode, sig_modalities.moda_modalities))
+              (With_regionality.disallow_right md_mode,
+               sig_modalities.moda_modalities))
             ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
@@ -2731,7 +2738,8 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
               (* CR zqian: mode annotations on rec modules default to legacy for
               now. We can remove this workaround once [module type of] doesn't
               require zapping. *)
-              |> With_locality.Const.Option.value ~default:With_locality.Const.legacy
+              |> With_locality.Const.Option.value
+                   ~default:With_locality.Const.legacy
               |> With_locality.of_const
               |> with_locality_as_regionality
             in
@@ -3011,7 +3019,8 @@ let check_recmodule_inclusion env bindings =
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
                 Tmodtype_explicit (mty_decl, mode_decl), coercion);
               mod_type = mty_decl.mty_type;
-              mod_mode = With_regionality.disallow_right mode_decl.mode_modes, None;
+              mod_mode =
+                With_regionality.disallow_right mode_decl.mode_modes, None;
               mod_env = env;
               mod_loc = modl.mod_loc;
               mod_attributes = [];
@@ -3269,7 +3278,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
-      let staticity = With_regionality.proj_monadic Staticity closed_over_mode in
+      let staticity =
+        With_regionality.proj_monadic Staticity closed_over_mode
+      in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
@@ -3330,7 +3341,9 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
          (match ty_arg with
           | Unit -> ()
           | Named (_, _, param_mode) ->
-            With_locality.submode_exn (With_locality.close_over param_mode) ret_mode);
+            With_locality.submode_exn
+              (With_locality.close_over param_mode)
+              ret_mode);
          With_locality.submode_exn
            (With_locality.partial_apply mode_with_locality)
            ret_mode
@@ -3360,9 +3373,13 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         match smty with
         | None ->
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
-            With_regionality.submode_err (sarg.pmod_loc, Module) arg_mode mode.mode_modes;
+            With_regionality.submode_err
+              (sarg.pmod_loc, Module)
+              arg_mode
+              mode.mode_modes;
             { arg with
-              mod_mode = (Mode.With_regionality.disallow_right mode.mode_modes, None)},
+              mod_mode =
+                (Mode.With_regionality.disallow_right mode.mode_modes, None)},
             arg_shape
         | Some smty ->
             let mty = transl_modtype env smty in
@@ -3546,7 +3563,10 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     match Mtype.scrape_alias env mty_res with
     | Mty_functor _ ->
         let mode_fun = mode_without_locks_exn funct.mod_mode in
-        With_regionality.submode_err (loc, Module) (With_regionality.partial_apply mode_fun) mode_res;
+        With_regionality.submode_err
+          (loc, Module)
+          (With_regionality.partial_apply mode_fun)
+          mode_res;
         Option.iter
           (fun mode_arg ->
             With_regionality.submode_err (loc, Module)
@@ -3581,7 +3601,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           Tmod_apply_unit
             (funct,
              functor_application_yielding ~funct
-               ~arg_mode:(With_regionality.disallow_right With_regionality.legacy));
+               ~arg_mode:
+                 (With_regionality.disallow_right With_regionality.legacy));
         mod_type = mty_res;
         mod_mode =
           with_locality_as_regionality
@@ -3674,7 +3695,9 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
       let mode_funct = mode_without_locks_exn funct.mod_mode in
-      let funct_staticity = With_regionality.proj_monadic Staticity mode_funct in
+      let funct_staticity =
+        With_regionality.proj_monadic Staticity mode_funct
+      in
       (* The following [submode] recovers the functor's original staticity [m].
          See Note [Staticity of functors] in [typedtree.mli] *)
       let staticity =
@@ -4883,7 +4906,9 @@ let functorize_signature ~params ~modules : Types.signature =
         let sign, _ = swg.sign in
         let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
         Mty_functor
-          (Named (Some param_id, param_type, With_locality.legacy), body, With_locality.legacy))
+          (Named (Some param_id, param_type, With_locality.legacy),
+           body,
+           With_locality.legacy))
       params body
   in
   let body =
