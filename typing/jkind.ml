@@ -3226,8 +3226,6 @@ module Format_history = struct
     | Optional_arg_default ->
       fprintf ppf "it's the type of an optional argument default"
     | Tuple_element -> fprintf ppf "it's the type of a tuple element"
-    | Unboxed_tuple_element ->
-      fprintf ppf "it's the type of an unboxed tuple element"
     | Layout_poly_in_external ->
       fprintf ppf
         "it's the layout polymorphic type in an external declaration@ \
@@ -4383,7 +4381,6 @@ module Debug_printers = struct
     | Optional_arg_default -> fprintf ppf "Optional_arg_default"
     | Layout_poly_in_external -> fprintf ppf "Layout_poly_in_external"
     | Tuple_element -> fprintf ppf "Tuple_element"
-    | Unboxed_tuple_element -> fprintf ppf "Unboxed_tuple_element"
     | Peek_or_poke -> fprintf ppf "Peek_or_poke"
     | Array_element -> fprintf ppf "Array_element"
     | Idx_element -> fprintf ppf "Idx_element"

@@ -2175,12 +2175,9 @@ let solve_Ppat_tuple ~is_unboxed ~alloc_mode loc env args expected_ty =
   let ann =
     List.map2
       (fun (label, _) mode ->
-         let why =
-           if is_unboxed then Jkind.History.Unboxed_tuple_element
-           else Jkind.History.Tuple_element
-         in
          let jkind, sort =
-           Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
+           Jkind.of_new_sort_var ~why:Jkind.History.Tuple_element
+             ~level:(Ctype.get_current_level ())
          in
         ( label,
           newgenvar jkind,
@@ -4465,6 +4462,29 @@ let rec check_counter_example_pat
         (fun fields ->
            mkp k (Tpat_record_unboxed_product (fields, rep, closed)))
   in
+  let type_tuple_pats ~is_unboxed tpl =
+    let expected_tys =
+      solve_Ppat_tuple ~is_unboxed ~alloc_mode loc penv
+        (List.map (fun (l,t,_) -> l, t) tpl) expected_ty
+    in
+    List.iter2
+      (fun (_, _, orig_sort) (_, _, _, sort) ->
+         (* Sanity check *)
+         assert (Jkind.Sort.equate ~allow_mutation:true orig_sort sort))
+      tpl expected_tys;
+    let tpl_ann = List.combine tpl expected_tys in
+    map_fold_cont
+      (fun ((l,p,_),(_,t,_,sort)) k ->
+         check_rec p t (fun p -> k (l, p, sort)))
+      tpl_ann
+      (fun pl ->
+         let elem_tys = List.map (fun (l,p,_) -> (l,p.pat_type)) pl in
+         if is_unboxed then
+           mkp k (Tpat_unboxed_tuple pl)
+             ~pat_type:(newty (Tunboxed_tuple elem_tys))
+         else
+           mkp k (Tpat_tuple pl) ~pat_type:(newty (Ttuple elem_tys)))
+  in
   match tp.pat_desc with
     Tpat_any | Tpat_var _ | Tpat_fun_layout _ ->
       let k' () = mkp k tp.pat_desc in
@@ -4498,44 +4518,9 @@ let rec check_counter_example_pat
       let cst = constant_or_raise !!penv loc (Untypeast.constant cst) in
       k @@ solve_expected (mp (Tpat_constant cst) ~pat_type:(type_constant cst))
   | Tpat_tuple tpl ->
-      let expected_tys =
-        solve_Ppat_tuple ~is_unboxed:false ~alloc_mode loc penv
-          (List.map (fun (l,t,_) -> l, t) tpl) expected_ty
-      in
-      List.iter2
-        (fun (_, _, orig_sort) (_, _, _, sort) ->
-           (* Sanity check *)
-           assert (Jkind.Sort.equate orig_sort sort))
-        tpl expected_tys;
-      let tpl_ann = List.combine tpl expected_tys in
-      map_fold_cont (fun ((l,p,_),(_,t,_,sort)) k -> check_rec p t (fun p -> k (l, p, sort)))
-        tpl_ann
-        (fun pl ->
-           let pat_type =
-             newty (Ttuple (List.map (fun (l,p,_) -> (l,p.pat_type)) pl))
-           in
-           mkp k (Tpat_tuple pl) ~pat_type)
+      type_tuple_pats ~is_unboxed:false tpl
   | Tpat_unboxed_tuple tpl ->
-      let expected_tys =
-        solve_Ppat_tuple ~is_unboxed:true ~alloc_mode loc penv
-          (List.map (fun (l,t,_) -> l, t) tpl) expected_ty
-      in
-      List.iter2
-        (fun (_, _, orig_sort) (_, _, _, sort) ->
-           (* Sanity check *)
-           assert (Jkind.Sort.equate ~allow_mutation:true orig_sort sort))
-        tpl expected_tys;
-      let tpl_ann = List.combine tpl expected_tys in
-      map_fold_cont
-        (fun ((l,p,_),(_,t,_,sort)) k ->
-          check_rec p t (fun p -> k (l, p, sort)))
-        tpl_ann
-        (fun pl ->
-           let pat_type =
-             newty (Tunboxed_tuple
-                      (List.map (fun (l,p,_) -> (l,p.pat_type)) pl))
-           in
-           mkp k (Tpat_unboxed_tuple pl) ~pat_type)
+      type_tuple_pats ~is_unboxed:true tpl
   | Tpat_construct(cstr_lid, constr, repr, targs, _) ->
       if constr.cstr_generalized && must_backtrack_on_gadt then
         raise Need_backtrack;
@@ -10869,13 +10854,11 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
     if is_unboxed then Tunboxed_tuple labeled_tys else Ttuple labeled_tys
   in
   let unify_as_tuple ty_expected =
-    let why : Jkind_intf.History.concrete_creation_reason =
-      if is_unboxed then Unboxed_tuple_element else Tuple_element
-    in
     let labels_types_and_sorts =
       List.map (fun (label, _) ->
         let jkind, sort =
-          Jkind.of_new_sort_var ~why ~level:(Ctype.get_current_level ())
+          Jkind.of_new_sort_var ~why:Jkind_intf.History.Tuple_element
+            ~level:(Ctype.get_current_level ())
         in
         label, newgenvar jkind, sort)
       sexpl
@@ -10933,6 +10916,7 @@ and type_tuple ~is_unboxed ~overwrite ~loc ~env ~(expected_mode : expected_mode)
   in
   let exp_desc =
     match alloc_mode with
+    (* [alloc_mode] is [None] iff [is_unboxed] *)
     | None -> Texp_unboxed_tuple expl
     | Some alloc_mode ->
         Texp_tuple (expl, Typedtree.create_alloc_mode_r alloc_mode)
