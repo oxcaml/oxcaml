@@ -1,6 +1,5 @@
 (* Parameters: P_alias *)
 
-(* Reads through the alias: [P_alias.B.x] compiles to a read of [A]'s
-   runtime field, since [module B = A] in the parameter interface is
-   [Mp_absent] (no field of its own). *)
+(* [-as-parameter] scrapes [module B = A] to a concrete declaration, so
+   [B] has its own runtime field and this reads it (not [A]'s). *)
 let x = P_alias.B.x

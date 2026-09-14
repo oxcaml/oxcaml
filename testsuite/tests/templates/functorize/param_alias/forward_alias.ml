@@ -1,9 +1,7 @@
-(* Forwarding an abstract functor argument into the bundle.  [S] is
-   exactly the parameter's interface, yet the application is rejected:
-   [(P : S)] scrapes the alias from [P]'s type
-   ([Mtype.scrape_for_functor_arg]), while [Make]'s parameter type
-   retains [module B = A] verbatim from the parameter's cmi.  No
-   abstract argument can ever satisfy it. *)
+(* Forwarding an abstract functor argument into the bundle.  [S] matches
+   the parameter's interface up to scraping: [-as-parameter] scrapes the
+   alias from the parameter interface just as [(P : S)] scrapes it from
+   [P]'s type, so the application is accepted. *)
 
 module type S = sig
   module A : sig
@@ -18,3 +16,15 @@ module Forward (P : S) () = struct
 
   let x = Inst.Uses_alias.x
 end
+
+module Arg = struct
+  module A = struct
+    let x = 42
+  end
+
+  module B = A
+end
+
+module Res = Forward (Arg) ()
+
+let () = print_endline (string_of_int Res.x)

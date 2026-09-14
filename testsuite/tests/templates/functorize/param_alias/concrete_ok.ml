@@ -1,6 +1,4 @@
-(* A concrete argument whose [B] is a genuine alias of [A] satisfies
-   [Make]'s parameter type, and the bundle's alias-normalized reads
-   ([B.x] reading through [A]'s field) are coherent at runtime. *)
+(* A concrete argument whose [B] is a genuine alias of [A]. *)
 
 module Arg = struct
   module A = struct
