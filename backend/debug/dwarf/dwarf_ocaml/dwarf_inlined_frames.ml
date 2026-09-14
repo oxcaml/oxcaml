@@ -232,13 +232,15 @@ let create_range_list_attributes_and_summarise state ~start_of_code_symbol
     in
     [low_pc; high_pc], all_summaries
   | More_than_one_subrange -> (
-    let dwarf_4_range_list_entries, range_list =
-      create_discontiguous_range_list state ~start_of_code_symbol
-        ~dwarf_4_base_address_entry range
-    in
+    (* Summarise before building anything: on a hit, neither the range list nor
+       any address table entry need be constructed. *)
     let summary = summarise range in
     match All_summaries.Map.find summary all_summaries with
     | exception Not_found ->
+      let dwarf_4_range_list_entries, range_list =
+        create_discontiguous_range_list state ~start_of_code_symbol
+          ~dwarf_4_base_address_entry range
+      in
       let range_list_attributes =
         match !Dwarf_flags.gdwarf_version with
         | Four ->
