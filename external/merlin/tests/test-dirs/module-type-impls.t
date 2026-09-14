@@ -1,11 +1,4 @@
-The [module-type-impls] query answers from the compiler facts recorded in the
-configured indexes.  Compile test programs with the compiler under test so the
-resulting artifacts contain the facts channel.
-
-Every expected block below is the contract: it states exactly the correct
-answer for its case.  A failing diff is an open defect; inspect it, decide
-what the correct answer is, and fix the implementation until that answer is
-produced.  Never promote a failure into the expectations.
+Module-type implementation queries using indexed compiler facts.
 
   $ print_results () {
   >   local module_type="${1-}"
@@ -41,11 +34,6 @@ produced.  Never promote a failure into the expectations.
   >     | print_results "$module_type"
   > }
 
-Multi-file scenarios follow one shape: compile the files in dependency order,
-aggregate their artifacts into an index, then query one module type by the
-position of its declaration, computed from the source so the tests never
-hard-code coordinates.
-
   $ setup_index () (
   >   for file in "$@"; do
   >     $OCAMLC -bin-annot -c "$file" || exit
@@ -73,19 +61,17 @@ hard-code coordinates.
   >     | print_results "$target"
   > }
 
-Every module checked against [S] is returned.  Named modules carry their UID
-and source name in the raw response; expression-based implementation sites are
-shown as [<anon>].
+Named implementations of [S].
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module M : S = struct
   >   type t = int
   > end
-  >
+  > 
   > module N : S = struct
   >   type t = string
   > end
@@ -94,23 +80,22 @@ shown as [<anon>].
   M 5:7 5:8 annotation
   N 9:7 9:8 annotation
 
-Nested module-type aliases retain their dependency on the top-level [S]: a
-module ascribed to the nested alias implements [S].  The module that merely
-provides the alias as a member does not.
+A nested alias of [S] makes [P] an implementer; declaring the alias in [O]
+does not.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type u
   > end
-  >
+  > 
   > module type Outer = sig
   >   module type Inner = S
   > end
-  >
+  > 
   > module O : Outer = struct
   >   module type Inner = S
   > end
-  >
+  > 
   > module P : O.Inner = struct
   >   type u = bool
   > end
@@ -118,16 +103,16 @@ provides the alias as a member does not.
   complete
   P 13:7 13:8 annotation
 
-Module-type aliases can form a chain before reaching an implementation.
+Chains of module-type aliases.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Alias = S
   > module type Alias_of_alias = Alias
-  >
+  > 
   > module M : Alias_of_alias = struct
   >   type t = int
   > end
@@ -135,19 +120,18 @@ Module-type aliases can form a chain before reaching an implementation.
   complete
   M 8:7 8:8 annotation
 
-Including a module type should retain the relationship with the included
-module type.
+Includes preserve module-type requirements.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Extended = sig
   >   include S
   >   val make : unit -> t
   > end
-  >
+  > 
   > module M : Extended = struct
   >   type t = int
   >   let make () = 0
@@ -156,14 +140,13 @@ module type.
   complete
   M 10:7 10:8 annotation
 
-An anonymous ascription checks its module members just like a named binding
-does.  The member [N] implements [S], not the containing structure.
+An anonymous ascription makes the member [N] an implementer of [S].
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > include (struct
   >   module N = struct
   >     type t = bool
@@ -173,51 +156,49 @@ does.  The member [N] implements [S], not the containing structure.
   complete
   N 6:9 6:10 annotation
 
-Including the result of a functor application combines include, application,
-projection, and alias contexts.
+Including a functor result and aliasing its member.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module Make (X : sig type t end) = struct
   >   module Result : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  >
+  > 
   > module Argument = struct
   >   type t = int
   > end
-  >
+  > 
   > module Reexported = struct
   >   include Make (Argument)
   > end
-  >
+  > 
   > module Alias = Reexported.Result
   > EOF
   complete
   Result 6:9 6:15 annotation
 
-A module type obtained through [module type of] should preserve the provenance
-of the module whose type was inspected.
+[module type of] preserves the original module's requirements.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   >   val value : t
   > end
-  >
+  > 
   > module Prototype : S = struct
   >   type t = int
   >   let value = 0
   > end
-  >
+  > 
   > module type Derived = module type of struct
   >   include Prototype
   > end
-  >
+  > 
   > module Copy : Derived = struct
   >   type t = Prototype.t
   >   let value = Prototype.value
@@ -231,16 +212,16 @@ of the module whose type was inspected.
   > module type S = sig
   >   type t = int
   > end
-  >
+  > 
   > module M1 : S = struct
   >   type t = int
   > end
-  >
+  > 
   > module M2 = struct
   >   include M1
   >   type u = t
   > end
-  >
+  > 
   > module M3 : (module type of M2) = struct
   >   type t = int
   >   type u = int
@@ -250,8 +231,7 @@ of the module whose type was inspected.
   M1 5:7 5:9 annotation
   M3 14:7 14:9 annotation
 
-Requirements survive successive structure includes, including anonymous
-structures.  Forwarding modules do not themselves introduce checks.
+Requirements survive successive includes, including anonymous structures.
 
   $ impls_of S <<'EOF'
   > module type S = sig val value : int end
@@ -267,8 +247,7 @@ structures.  Forwarding modules do not themselves introduce checks.
   Original 2:7 2:15 annotation
   Copy 8:7 8:11 annotation
 
-Shadowing an included requirement must not connect an incompatible annotation
-to the original module type.  A later include can also shadow declarations.
+Shadowing an included declaration replaces its requirements.
 
   $ impls_of S <<'EOF'
   > module type S = sig type t = int val value : int end
@@ -292,8 +271,7 @@ to the original module type.  A later include can also shadow declarations.
   complete
   Original 2:7 2:15 annotation
 
-Names in different namespaces do not shadow included declarations.  Local
-module bindings preserve the same requirements as structure-level bindings.
+Declarations in different namespaces do not shadow each other.
 
   $ impls_of S <<'EOF'
   > module type S = sig type t = int val value : int end
@@ -311,22 +289,21 @@ module bindings preserve the same requirements as structure-level bindings.
   Original 2:7 2:15 annotation
   Copy 9:13 9:17 annotation
 
-Destructive module-type substitution should connect the substituted signature
-member to the replacement module type.
+Destructive module-type substitution.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Carrier = sig
   >   module type Element
   >   module Value : Element
   > end
-  >
+  > 
   > module type Specialized =
   >   Carrier with module type Element := S
-  >
+  > 
   > module M : Specialized = struct
   >   module Value : S = struct
   >     type t = int
@@ -340,20 +317,20 @@ member to the replacement module type.
   > module type S = sig
   >   type t
   >   val foo : t
-  >
+  > 
   >   val bar : t -> unit
   > end
-  >
+  > 
   > module U : S = struct
   >   type t = string
-  >
+  > 
   >   let foo = ""
-  >
+  > 
   >   let bar _s = ()
   > end
-  >
+  > 
   > module type Subbed = S with type t := int
-  >
+  > 
   > module Impl : Subbed = struct
   >   let foo = 0
   >   let bar _i = ()
@@ -367,15 +344,15 @@ member to the replacement module type.
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Carrier = sig
   >   module type Element
   >   module Value : Element
   > end
-  >
+  > 
   > module type Specialized =
   >   Carrier with module type Element := S
-  >
+  > 
   > module M : Specialized = struct
   >   module Value = struct
   >     type t = int
@@ -385,16 +362,16 @@ member to the replacement module type.
   complete
   Value 14:9 14:14 annotation
 
-Checking against a signature derived from [S] retains the relationship to [S],
-even when destructive substitution removes every declaration.
+Requirements survive destructive substitution, even when it removes every
+declaration.
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Removed = S with type t := int
-  >
+  > 
   > module Gone : Removed = struct end
   > EOF
   complete
@@ -404,14 +381,14 @@ even when destructive substitution removes every declaration.
   > module type S = sig
   >   val value : int
   > end
-  >
+  > 
   > module type Base = sig
   >   include S
   >   type t
   > end
-  >
+  > 
   > module type Removed = Base with type t := int
-  >
+  > 
   > module M : Removed = struct
   >   let value = 0
   > end
@@ -421,7 +398,7 @@ even when destructive substitution removes every declaration.
 
   $ impls_of S <<'EOF'
   > module type S = sig val value : int end
-  >
+  > 
   > module Outer = struct
   >   module type Alias = S
   >   module type Base = sig
@@ -435,72 +412,69 @@ even when destructive substitution removes every declaration.
   complete
   M 10:9 10:10 annotation
 
-Repeated applications of an applicative functor exercise congruence and
-deduplication of application contexts.
+Repeated applications of an applicative functor are deduplicated.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Argument = sig
   >   type t
   > end
-  >
+  > 
   > module Make (X : Argument) : S with type t = X.t = struct
   >   type t = X.t
   > end
-  >
+  > 
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module First = Make (A)
   > module Second = Make (A)
   > EOF
   complete
   <anon> 9:27 11:3 annotation
 
-Projecting a result from an applied functor combines application and projection
-contexts.
+Projecting a member from a functor result.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   val value : int
   > end
-  >
+  > 
   > module type Argument = sig
   >   val value : int
   > end
-  >
+  > 
   > module Make (X : Argument) = struct
   >   module Result : S = struct
   >     let value = X.value
   >   end
   > end
-  >
+  > 
   > module A = struct
   >   let value = 1
   > end
-  >
+  > 
   > module Built = Make (A)
   > module Projected = Built.Result
   > EOF
   complete
   Result 10:9 10:15 annotation
 
-Functor applications with anonymous arguments should still produce stable
-query results.
+Functor applications with anonymous arguments.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   val value : int
   > end
-  >
+  > 
   > module Make (X : sig val value : int end) : S = struct
   >   let value = X.value
   > end
-  >
+  > 
   > module M = Make (struct
   >   let value = 1
   > end)
@@ -508,27 +482,25 @@ query results.
   complete
   <anon> 5:42 7:3 annotation
 
-Passing a module to a functor checks its members against the parameter's
-signature.  [A.M] implements [S] even without a direct annotation on [M];
-[A] itself does not implement [S].
+Passing [A] to a functor makes its member [A.M] an implementer of [S].
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Outer = sig
   >   module M : S
   > end
-  >
+  > 
   > module A = struct
   >   module M = struct
   >     type t = int
   >   end
   > end
-  >
+  > 
   > module F (X : Outer) = struct end
-  >
+  > 
   > module R = F (A)
   > EOF
   complete
@@ -538,13 +510,13 @@ signature.  [A.M] implements [S] even without a direct annotation on [M];
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Outer = sig
   >   module M : S
   > end
-  >
+  > 
   > module F (X : Outer) = struct end
-  >
+  > 
   > module R = F (struct
   >   module M = struct
   >     type t = int
@@ -575,9 +547,7 @@ signature.  [A.M] implements [S] even without a direct annotation on [M];
   partial
   M 7:29 7:30 argument
 
-A nested argument member implements [S] when its signature is reached through
-a module-type alias declared inside the parameter signature.  [A.N.M]
-implements [S]; neither [A] nor [A.N] does.
+A parameter signature's nested alias makes [A.N.M] an implementer of [S].
 
   $ impls_of S <<'EOF'
   > module type S = sig val x : int end
@@ -596,19 +566,19 @@ implements [S]; neither [A] nor [A.N] does.
   complete
   M 9:11 9:12 argument
 
-Packing and unpacking a module crosses the first-class module boundary.
+Packing and unpacking modules.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   >   val value : t
   > end
-  >
+  > 
   > module Original : S = struct
   >   type t = int
   >   let value = 0
   > end
-  >
+  > 
   > let packed = (module Original : S)
   > module Unpacked = (val packed : S)
   > EOF
@@ -616,14 +586,13 @@ Packing and unpacking a module crosses the first-class module boundary.
   Original 6:7 6:15 annotation
   <anon> 11:21 11:29 package
 
-Mutually recursive modules put multiple annotations in the same recursive
-group.
+Mutually recursive modules.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   val value : unit -> int
   > end
-  >
+  > 
   > module rec Left : S = struct
   >   let value () = Right.value ()
   > end
@@ -635,64 +604,62 @@ group.
   Left 5:11 5:15 annotation
   Right 8:4 8:9 annotation
 
-A higher-order functor receives an applicative functor, applies it inside its
-body, and exposes the result through a second application context.
+Higher-order functor applications.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Argument = sig
   >   type t
   > end
-  >
+  > 
   > module type Producer =
   >   functor (X : Argument) -> S with type t = X.t
-  >
+  > 
   > module Base (X : Argument) : S with type t = X.t = struct
   >   type t = X.t
   > end
-  >
+  > 
   > module Apply (F : Producer) (X : Argument) : S with type t = X.t =
   >   F (X)
-  >
+  > 
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module Result = Apply (Base) (A)
   > EOF
   complete
   <anon> 12:27 14:3 annotation
   <anon> 16:43 17:7 annotation
 
-Independently repeated applications of a functor returning another functor
-should converge on the same nested result family.
+Repeated applications of a functor returning another functor.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Argument = sig
   >   type t
   > end
-  >
+  > 
   > module Outer (X : Argument) = struct
   >   module Inner (Y : Argument) : S with type t = X.t * Y.t = struct
   >     type t = X.t * Y.t
   >   end
   > end
-  >
+  > 
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module B = struct
   >   type t = string
   > end
-  >
+  > 
   > module Partial = Outer (A)
   > module Via_partial = Partial.Inner (B)
   > module Partial_again = Outer (A)
@@ -701,59 +668,57 @@ should converge on the same nested result family.
   complete
   <anon> 10:30 12:5 annotation
 
-A functor parameter carries both a module-type member and a module checked
-against that member; the result reexports the member under a new projection.
+Reexporting a functor parameter's module type and module.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Input = sig
   >   module type T = S
   >   module Value : T
   > end
-  >
+  > 
   > module Consume (X : Input) = struct
   >   module type T = X.T
   >   module Copy : T = X.Value
   > end
-  >
+  > 
   > module A = struct
   >   module type T = S
   >   module Value : T = struct
   >     type t = int
   >   end
   > end
-  >
+  > 
   > module Built = Consume (A)
   > module Alias = Built.Copy
   > EOF
   complete
   Value 17:9 17:14 annotation
 
-[module type of] follows a projection from an applicative functor result, then
-the captured type constrains another alias of that projection.
+[module type of] applied to a projected functor result.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Argument = sig
   >   type t
   > end
-  >
+  > 
   > module Make (X : Argument) = struct
   >   module Witness : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  >
+  > 
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module Built = Make (A)
   > module type Snapshot = module type of Built.Witness
   > module Copy : Snapshot = Built.Witness
@@ -762,30 +727,29 @@ the captured type constrains another alias of that projection.
   Witness 10:9 10:16 annotation
   Copy 21:7 21:11 annotation
 
-Multiple nested [with module] constraints force two signature projections to
-the same implementation before the constrained signature is implemented.
+Nested [with module] constraints.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module Concrete = struct
   >   type t = int
   > end
-  >
+  > 
   > module type Container = sig
   >   module Selected : S
   >   module Nested : sig
   >     module Item : S
   >   end
   > end
-  >
+  > 
   > module type Fixed =
   >   Container
   >   with module Selected = Concrete
   >    and module Nested.Item = Concrete
-  >
+  > 
   > module M : Fixed = struct
   >   module Selected = Concrete
   >   module Nested = struct
@@ -796,25 +760,23 @@ the same implementation before the constrained signature is implemented.
   complete
   Concrete 5:7 5:15 annotation
 
-A [with module] constraint on a member does not make the containing module
-implement that member's type.  [Concrete] and [M.N] implement [S], but [M]
-does not provide the required type [t].
+A [with module] constraint makes [Concrete] and [M.N] implementers of [S].
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module Concrete : S = struct
   >   type t = int
   > end
-  >
+  > 
   > module type Outer = sig
   >   module N : S
   > end
-  >
+  > 
   > module type Fixed = Outer with module N = Concrete
-  >
+  > 
   > module M : Fixed = struct
   >   module N = Concrete
   > end
@@ -823,9 +785,8 @@ does not provide the required type [t].
   Concrete 5:7 5:15 annotation
   N 16:9 16:10 annotation
 
-A [with module type] constraint determines the type implemented by a member
-whose annotation refers to that module type.  The constraint is specific to
-each instance: [A.M] implements [S], while [B.M] implements [U].
+[with module type] constraints apply per instance: [A.M] implements [S], and
+[B.M] implements [U].
 
   $ impls_of S <<'EOF'
   > module type S = sig val x : int end
@@ -853,28 +814,26 @@ each instance: [A.M] implements [S], while [B.M] implements [U].
   complete
   M 13:9 13:10 annotation
 
-Two signature includes form a diamond whose leaves independently refer to the
-same module type; the implementation relies on member pairing rather than
-direct annotations.
+Diamond-shaped signature includes with unannotated implementations.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Left = sig
   >   module L : S
   > end
-  >
+  > 
   > module type Right = sig
   >   module R : S
   > end
-  >
+  > 
   > module type Diamond = sig
   >   include Left
   >   include Right
   > end
-  >
+  > 
   > module M : Diamond = struct
   >   module L = struct
   >     type t = int
@@ -888,29 +847,27 @@ direct annotations.
   L 19:9 19:10 annotation
   R 22:9 22:10 annotation
 
-Including a doubly applied functor exports an alias of [S]; a module ascribed
-to the exported alias implements [S].  The functor body that merely provides
-the alias as a member does not.
+An alias exported by a doubly applied functor makes [M] an implementer of [S].
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Result = sig
   >   module type T = S
   > end
-  >
+  > 
   > module Build
   >     (X : sig type t end)
   >     (Y : sig type u end) : Result = struct
   >   module type T = S
   > end
-  >
+  > 
   > include Build
   >     (struct type t = int end)
   >     (struct type u = string end)
-  >
+  > 
   > module M : T = struct
   >   type t = int * string
   > end
@@ -918,28 +875,27 @@ the alias as a member does not.
   complete
   M 19:7 19:8 annotation
 
-Generative applications of the same partially applied functor must remain
-distinct while their projected result modules retain the same family.
+Generative applications remain distinct while sharing a module-type family.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Argument = sig
   >   type t
   > end
-  >
+  > 
   > module Make (X : Argument) () = struct
   >   module Result : S with type t = X.t = struct
   >     type t = X.t
   >   end
   > end
-  >
+  > 
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module First = Make (A) ()
   > module Second = Make (A) ()
   > module First_result = First.Result
@@ -948,28 +904,27 @@ distinct while their projected result modules retain the same family.
   complete
   Result 10:9 10:15 annotation
 
-Alias-preserving and alias-removing forms of [module type of] derive signatures
-from the same module and are both used in later annotations.
+Alias-preserving and alias-removing forms of [module type of].
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module Base = struct
   >   module Inner : S = struct
   >     type t = int
   >   end
   > end
-  >
+  > 
   > module type Preserved = module type of struct
   >   include Base
   > end
-  >
+  > 
   > module type Removed = module type of struct
   >   include Base
   > end [@remove_aliases]
-  >
+  > 
   > module P : Preserved = Base
   > module R : Removed = struct
   >   module Inner = Base.Inner
@@ -979,46 +934,43 @@ from the same module and are both used in later annotations.
   Inner 6:9 6:14 annotation
   Inner 21:9 21:14 annotation
 
-An implementation ascribed to a functor module type joins parameter members,
-result members, aliases, and the eventual application instance.
+Ascription to a functor module type.
 
   $ impls_of S <<EOF
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module type Input = sig
   >   module type T = S
   >   module Value : T
   > end
-  >
+  > 
   > module type Transformer =
   >   functor (X : Input) -> sig
   >     module type T = X.T
   >     module Value : T
   >   end
-  >
+  > 
   > module Transform : Transformer = functor (X : Input) -> struct
   >   module type T = X.T
   >   module Value : T = X.Value
   > end
-  >
+  > 
   > module A = struct
   >   module type T = S
   >   module Value : T = struct
   >     type t = int
   >   end
   > end
-  >
+  > 
   > module Result = Transform (A)
   > module Alias = Result.Value
   > EOF
   complete
   Value 23:9 23:14 annotation
 
-With [-position], the query answers for exactly one module type: the
-innermost module-type declaration enclosing the position.  The buffer is
-still what identifies the declaration, so the selection is deterministic.
+[-position] selects the innermost enclosing module-type declaration.
 
   $ cat > one.ml <<'EOF'
   > module type S = sig
@@ -1040,8 +992,7 @@ still what identifies the declaration, so the selection is deterministic.
   >   | jq -r '.value.targets[].target'
   S
 
-Inside [Outer]'s body the innermost enclosing declaration is [Outer.Inner],
-not [Outer].
+Inside [Outer.Inner], the selected declaration is [Outer.Inner].
 
   $ $MERLIN single module-type-impls \
   >   -position 5:14 \
@@ -1050,8 +1001,7 @@ not [Outer].
   >   | jq -r '.value.targets[].target'
   Outer.Inner
 
-A position enclosed by no module-type declaration is an explicit failure,
-never an empty answer.
+A position outside any module-type declaration fails.
 
   $ $MERLIN single module-type-impls \
   >   -position 8:2 \
@@ -1060,11 +1010,8 @@ never an empty answer.
   >   | jq -r '"\(.class): \(.value)"'
   failure: No module-type declaration at this position
 
-The [_intf.ml] pattern: a signature lives in its own unit and an [.mli]
-includes it.  Selecting [S] by position in [foo_intf.ml] is how the module
-type [Foo_intf.S] is specified, and the implementers of the signature it
-denotes are the module annotated with it directly and the unit whose
-interface includes it.
+The [_intf.ml] pattern: [Foo] implements [S] through its interface;
+[Another] has a direct annotation.
 
   $ cat > foo_intf.ml <<'EOF'
   > module type S = sig
@@ -1088,15 +1035,13 @@ interface includes it.
   Foo 0:-1 0:-1 interface
   Another 1:7 1:14 annotation
 
-A module bound in an expression implements a module type like a structure
-binding does: the check is attributed to the binding's own declaration, so it
-is reported under the binding's name and position.
+A local module is reported at its binding.
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > let f () =
   >   let module Local : S = struct
   >     type t = int
@@ -1106,15 +1051,14 @@ is reported under the binding's name and position.
   complete
   Local 6:13 6:18 annotation
 
-The scope of a [let module] is the bound module expression alone.  A module
-type declared inside a binding is a member of that binding only, not of an
-earlier sibling, so an annotation against it still joins its declaration.
+A local module type belongs to its enclosing binding, not an earlier
+sibling.
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > let f () =
   >   let module M = struct
   >     type t = int
@@ -1130,29 +1074,26 @@ earlier sibling, so an annotation against it still joins its declaration.
   complete
   Impl 12:13 12:17 annotation
 
-A module unpacked by a pattern is checked against its package type just like
-a module packed by an expression, so both sites implement [S].
+Module packing and unpacking patterns both implement the package type.
 
   $ impls_of S <<'EOF'
   > module type S = sig
   >   type t
   > end
-  >
+  > 
   > module M = struct
   >   type t = int
   > end
-  >
+  > 
   > let packed = (module M : S)
-  >
+  > 
   > let unpack (module X : S) = ()
   > EOF
   complete
   <anon> 9:21 9:22 package
   <anon> 11:19 11:20 package
 
-The result signature of a functor declared in an [.mli] is what a client's
-applications instantiate: a client checked against [F(A).T] implements the
-[S] that [T] aliases, and the argument implements the parameter's [S].
+Functor argument and result requirements declared in an [.mli].
 
   $ cat > ifun.mli <<'EOF'
   > module type S = sig
@@ -1175,7 +1116,7 @@ applications instantiate: a client checked against [F(A).T] implements the
   > module A = struct
   >   type t = int
   > end
-  >
+  > 
   > module Z : Ifun.F(A).T = struct
   >   type t = int
   > end
@@ -1186,10 +1127,7 @@ applications instantiate: a client checked against [F(A).T] implements the
   A 1:7 1:8 argument
   Z 5:7 5:8 annotation
 
-A declaration nested inside a module-type body is paired with the [.mli]'s
-declaration during the interface check, exactly like its toplevel siblings,
-so implementations checked in the [.ml] surface when the query resolves the
-buffer's [Container.Local] declaration.
+Querying [Container.Local] in an [.mli] finds implementations in the [.ml].
 
   $ cat > cont.mli <<'EOF'
   > module type S = sig
@@ -1224,8 +1162,8 @@ buffer's [Container.Local] declaration.
   complete
   Impl 14:7 14:11 annotation
 
-Duplicate filenames must resolve to the correct directory. Each [shared.ml]
-contains a named implementation ([Uid]) and an anonymous package ([Location]).
+Duplicate filenames: resolve both named ([Uid]) and anonymous ([Location])
+implementations.
 
   $ mkdir -p path-resolution/query path-resolution/left path-resolution/right
   $ path_test_root="$(cd path-resolution && pwd -P)"
@@ -1241,9 +1179,8 @@ contains a named implementation ([Uid]) and an anonymous package ([Location]).
   > EOF
   > done
 
-Compile each source under a distinct unit name and root its index at the
-source directory. Display project-relative paths, checking that every
-check-site path matches its implementation's path.
+Distinct compilation-unit names and rooted indexes. Check-site and
+implementation paths must agree.
 
   $ index_source () (
   >   local directory="$1" unit="$2" source="$3"
@@ -1273,7 +1210,7 @@ check-site path matches its implementation's path.
   $ index_source left left shared.ml
   $ index_source right right shared.ml
 
-Separate directory indexes, queried with [SOURCE_ROOT] from [query/].
+Separate directory indexes with [SOURCE_ROOT].
 
   $ cat > path-resolution/query/.merlin <<'EOF'
   > INDEX stanza.ocaml-index
@@ -1290,8 +1227,7 @@ Separate directory indexes, queried with [SOURCE_ROOT] from [query/].
   Uid right/shared.ml
   Location right/shared.ml
 
-The merged index gives the same paths from the project root, even when the
-source-path order is reversed.
+Global and stanza indexes give the same results without duplicates.
 
   $ (cd path-resolution && \
   >  ocaml-index aggregate query/stanza.ocaml-index right/stanza.ocaml-index \
@@ -1310,8 +1246,8 @@ source-path order is reversed.
   Uid right/shared.ml
   Location right/shared.ml
 
-A partial artifact has no facts channel.  When queried alongside an index
-with facts, it makes the answer partial without losing known implementations.
+An index without a facts channel makes discovery partial without losing
+known implementations.
 
   $ cat > channel.ml <<'EOF'
   > module type S = sig val x : int end
@@ -1334,9 +1270,8 @@ with facts, it makes the answer partial without losing known implementations.
   partial
   Kept 2:7 2:11 annotation
 
-Aggregation retains the available facts in either order, both for artifacts
-and existing indexes.  It does not record which inputs lacked a channel, so
-the resulting index has a usable channel and the answer is complete.
+Aggregation keeps available facts but does not track inputs with missing
+channels.
 
   $ for suffix in cmt ocaml-index; do
   >   ocaml-index aggregate channel.$suffix incomplete.$suffix \
@@ -1355,7 +1290,7 @@ the resulting index has a usable channel and the answer is complete.
   complete
   Kept 2:7 2:11 annotation
 
-When every input lacks a facts channel, aggregation leaves it absent.
+If every input lacks a facts channel, the aggregate has none.
 
   $ for suffix in cmt ocaml-index; do
   >   ocaml-index aggregate incomplete.$suffix incomplete.$suffix \
@@ -1365,8 +1300,7 @@ When every input lacks a facts channel, aggregation leaves it absent.
   unavailable
   unavailable
 
-Facts from multiple inputs are unioned even with a missing channel between
-them.  Both implementations survive aggregation and merging indexes.
+Aggregation unions facts across inputs with missing channels.
 
   $ cat > additional.ml <<'EOF'
   > module Also : Channel.S = struct let x = 2 end
@@ -1385,9 +1319,7 @@ them.  Both implementations survive aggregation and merging indexes.
   Also 1:7 1:11 annotation
   Kept 2:7 2:11 annotation
 
-A name that is not a module-type declaration of the buffer selects nothing:
-the query only ever answers for the buffer's own declarations, identified by
-their uids.
+An unknown module-type name selects nothing.
 
   $ impls_of Nonexistent <<'EOF'
   > module type S = sig
