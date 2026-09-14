@@ -31,13 +31,13 @@ module App = F(List)
 module M : sig end
 {
  "F"[module] -> Abs<.9>(X, {
-                            "t"[type] -> ((? ) : value)<.8>;
+                            "t"[type] -> <.8>;
                             });
  }
 module F : functor (X : sig end) -> sig type t end
 {
  "App"[module] -> {<.10>
-                   "t"[type] -> ((? ) : value)<.8>;
+                   "t"[type] -> <.8>;
                    };
  }
 module App : sig type t = F(List).t end

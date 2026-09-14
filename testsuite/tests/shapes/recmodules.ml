@@ -17,12 +17,13 @@ module rec A : sig
    = struct type t = int end
 [%%expect{|
 {
- "A"[module] ->
-   {
-    "t"[type] -> Variant<.12> Leaf<.13> of (B<.1> . "t"[type] );
-    };
+ "A"[module] -> {
+                 "t"[type] -> {<.12>
+                               "Leaf"[constructor] -> {<.13>};
+                               };
+                 };
  "B"[module] -> {
-                 "t"[type] -> int<.14>;
+                 "t"[type] -> <.14>;
                  };
  }
 module rec A : sig type t = Leaf of B.t end
@@ -80,8 +81,10 @@ end = Set.Make(A)
    {
     "compare"[value] -> <.50>;
     "t"[type] ->
-      Variant<.47> Leaf<.48> of string
-      | Node<.49> of (ASet<.28> . "t"[type] );
+      {<.47>
+       "Leaf"[constructor] -> {<.48>};
+       "Node"[constructor] -> {<.49>};
+       };
     };
  "ASet"[module] ->
    {

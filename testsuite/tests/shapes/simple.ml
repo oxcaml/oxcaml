@@ -23,14 +23,12 @@ type t = A of foo
 and foo = Bar
 [%%expect{|
 {
- "foo"[type] ->
-   (Mutrec t/0 := Variant<.2> A<.4> of (foo/0  );
-           foo/0 := Variant<.3> Bar<.5>;
-    ).foo/0;
- "t"[type] ->
-   (Mutrec t/0 := Variant<.2> A<.4> of (foo/0  );
-           foo/0 := Variant<.3> Bar<.5>;
-    ).t/0;
+ "foo"[type] -> {<.3>
+                 "Bar"[constructor] -> {<.5>};
+                 };
+ "t"[type] -> {<.2>
+               "A"[constructor] -> {<.4>};
+               };
  }
 type t = A of foo
 and foo = Bar
@@ -49,7 +47,7 @@ module type S = sig type t end
 exception E
 [%%expect{|
 {
- "E"[extension constructor] -> <.9>;
+ "E"[extension constructor] -> {<.9>};
  }
 exception E
 |}]
@@ -57,7 +55,7 @@ exception E
 type ext = ..
 [%%expect{|
 {
- "ext"[type] -> ((? ) : value)<.10>;
+ "ext"[type] -> <.10>;
  }
 type ext = ..
 |}]
@@ -65,8 +63,8 @@ type ext = ..
 type ext += A | B
 [%%expect{|
 {
- "A"[extension constructor] -> <.11>;
- "B"[extension constructor] -> <.12>;
+ "A"[extension constructor] -> {<.11>};
+ "B"[extension constructor] -> {<.12>};
  }
 type ext += A | B
 |}]
@@ -77,7 +75,7 @@ end
 [%%expect{|
 {
  "M"[module] -> {<.14>
-                 "C"[extension constructor] -> <.13>;
+                 "C"[extension constructor] -> {<.13>};
                  };
  }
 module M : sig type ext += C end
@@ -105,14 +103,18 @@ end = struct
 end
 [%%expect{|
 {
- "M1"[module] ->
-   {
-    "t"[type] -> Variant<.32> C<.33> of (M2<.19> . "t"[type] );
-    };
- "M2"[module] -> {
-                  "t"[type] -> Variant<.34> T<.35>;
-                  "x"[value] -> <.36>;
+ "M1"[module] -> {
+                  "t"[type] -> {<.32>
+                                "C"[constructor] -> {<.33>};
+                                };
                   };
+ "M2"[module] ->
+   {
+    "t"[type] -> {<.34>
+                  "T"[constructor] -> {<.35>};
+                  };
+    "x"[value] -> <.36>;
+    };
  }
 module rec M1 : sig type t = C of M2.t end
 and M2 : sig type t val x : t end
@@ -140,10 +142,7 @@ class type c = object  end
 type u = t
 [%%expect{|
 {
- "u"[type] ->
-   ((Mutrec t/0 := Variant<.2> A<.4> of (foo/0  );
-            foo/0 := Variant<.3> Bar<.5>;
-     ).t/0)<.41>;
+ "u"[type] -> <.41>;
  }
 type u = t
 |}]
