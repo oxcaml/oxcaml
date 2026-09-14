@@ -143,6 +143,7 @@ type 'd const =
   | Spliced : ('l * 'r, 'd) polarity -> 'd const
   | Contained_by : is_contained_by -> ('l * 'r) const
   | Annotation : annotation -> ('l * 'r) const
+  | Mod_unpack : ('l * disallowed) neg const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
 

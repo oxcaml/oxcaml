@@ -105,10 +105,15 @@ module rec Types : sig
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   val print_closure : Fmt.formatter -> closure -> unit
@@ -126,10 +131,15 @@ end = struct
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   let print_closure ppf { clo_params; clo_body; clo_env = _ } =
@@ -151,13 +161,13 @@ end = struct
         slv_runtime
     | SLVlayout layout ->
       Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
-    | SLVrecord fields ->
+    | SLVrecord { id; values } ->
       let print_fields ppf =
         Array.iter
           (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
-          fields
+          values
       in
-      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
+      Fmt.fprintf ppf "@[<hv 2>%s[%t@;<1 -2>]@]" id print_fields
     | SLVclosure id -> Template_id.print ppf id
 
   and print_value_or_missing ppf = function
@@ -267,8 +277,10 @@ end = struct
   let symbol_arg_of_value (v : Types.value) =
     match v with
     | SLVlayout l -> symbol_arg_of_layout l
-    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
-      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+    | SLVrecord { id; values = _ } -> id
+    | SLVhalves _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected halves"
+    | SLVclosure id -> Fmt.asprintf "%a" Template_id.print id
 end
 
 module CU_data = struct
@@ -290,12 +302,45 @@ module CU_data = struct
       Template_store.print templates
 end
 
-module Ctx = struct
+module Ctx : sig
+  type t
+
+  (** [cu_static_data] is used to look up the [CU_data.t] for a give compilation
+      unit, calls to it are memoized. *)
+  val create : cu_static_data:(Compilation_unit.t -> CU_data.t option) -> t
+
+  (** Memoized fetch of the compile-time data for the given unit. *)
+  val cu_static_data : t -> Compilation_unit.t -> Types.value Or_missing.t
+
+  (** A template store, used to store the templates for the current unit. *)
+  val store : t -> Template_store.t
+
+  (** Instantiate a template. This is memoized so if this template has already
+      been instantiated with these arguments it just returns the previously
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated function. *)
+  val instantiate :
+    t ->
+    eval_apply:(Types.closure -> Types.value array -> Types.halves) ->
+    Template_id.t ->
+    Types.value array ->
+    Types.value Or_missing.t
+
+  (** All of the template instantiations cached by [instantiate]. These are in
+      dependency order; entries earlier in the list may depend on later ones. *)
+  val instantiations : t -> (Ident.t * lambda) list
+
+  (** Makes the given string unique in the context of this [Ctx.t] by adding a
+      stamp to the end. It should already be unique across [Ctx.t]s, which is
+      usually achievable by including the [Compilation_unit.t]. *)
+  val uniqueify : t -> string -> string
+end = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
-      mutable instantiated_template_ids : Ident.Set.t;
-      mutable instantiations : (Ident.t * lambda) list
+      instantiated_templates : Types.value Or_missing.t option Ident.Tbl.t;
+      mutable instantiations : (Ident.t * lambda) list;
+      uniqueify : int Misc.Stdlib.String.Tbl.t
     }
 
   let create ~cu_static_data =
@@ -303,8 +348,9 @@ module Ctx = struct
     { cu_static_data =
         (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
       store = Template_store.empty ();
-      instantiated_template_ids = Ident.Set.empty;
-      instantiations = []
+      instantiated_templates = Ident.Tbl.create 10;
+      instantiations = [];
+      uniqueify = Misc.Stdlib.String.Tbl.create 10
     }
 
   let cu_static_data t cu =
@@ -312,10 +358,8 @@ module Ctx = struct
     | Some { cu; _ } -> cu
     | None -> Or_missing.Missing
 
-  (** Instantiate a template. This is memoized so if this template has already
-      been instantiated with these arguments it just returns the previously
-      computed results, otherwise it uses [eval_apply] to evaluate the closure.
-      The returned runtime half is a reference to the instantiated function. *)
+  let store t = t.store
+
   let instantiate t ~eval_apply (id : Template_id.t) args :
       Types.value Or_missing.t =
     let closure =
@@ -343,18 +387,36 @@ module Ctx = struct
         arg_names
       |> Ident.create_persistent
     in
-    if not (Ident.Set.mem name t.instantiated_template_ids)
-    then begin
-      (* f might recursively call this function so make sure to mark this name
-         as visited before calling it. *)
-      t.instantiated_template_ids
-        <- Ident.Set.add name t.instantiated_template_ids;
-      let lam = eval_apply closure args in
-      t.instantiations <- (name, lam) :: t.instantiations
-    end;
-    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+    let slv_comptime =
+      match Ident.Tbl.find_opt t.instantiated_templates name with
+      | Some (Some value) -> value
+      | Some None ->
+        Misc.fatal_errorf "Recursive template instantiation of %a" Ident.print
+          name
+      | None -> begin
+        (* eval_apply might recursively call this function so mark this name as
+           visited before calling it. *)
+        Ident.Tbl.replace t.instantiated_templates name None;
+        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
+        let instantiation =
+          Lambda.subst
+            (fun _ _ env -> env)
+            ~freshen_bound_variables:true Ident.Map.empty slv_runtime
+        in
+        t.instantiations <- (name, instantiation) :: t.instantiations;
+        slv_comptime
+        end
+    in
+    Present (SLVhalves { slv_comptime; slv_runtime = Lvar name })
 
   let instantiations t = t.instantiations
+
+  let uniqueify t id =
+    let counter = Misc.Stdlib.String.Tbl.find_opt t.uniqueify id in
+    let counter = Option.value counter ~default:0 in
+    Misc.Stdlib.String.Tbl.replace t.uniqueify id (counter + 1);
+    Fmt.asprintf "%s/%i" id counter
 end
 
 include Types
@@ -366,7 +428,7 @@ let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
-  | Trecord : value Or_missing.t array value_type
+  | Trecord : record value_type
   | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
@@ -423,10 +485,18 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   | SLmissing -> Missing
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
-    Present (SLVrecord values)
+    let id =
+      Fmt.asprintf "%a/%a"
+        (Fmt.pp_print_option Compilation_unit.print)
+        (Current_unit.get_cu ())
+        (Fmt.pp_print_option Fmt.pp_print_string)
+        (Option.map Slambdaident.name name)
+    in
+    let id = Ctx.uniqueify ctx id in
+    Present (SLVrecord { id; values })
   | SLfield (slam, i) ->
     let* fields = eval_slam ctx env slam |>> expect Trecord in
-    fields.(i)
+    fields.values.(i)
   | SLproj_comptime slam ->
     let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
@@ -435,7 +505,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
       { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
     let cu = Current_unit.get_cu () in
-    let closure_id = Template_store.add ctx.store ~cu ~name closure in
+    let closure_id = Template_store.add (Ctx.store ctx) ~cu ~name closure in
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
@@ -446,13 +516,14 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     Ctx.instantiate ctx closure args
       ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
         let env_body =
-          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          try
+            Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          with Invalid_argument _ ->
+            Misc.fatal_error
+              "Slambda eval doesn't support partial or over application of \
+               functors."
         in
-        let { slv_comptime = _; slv_runtime } =
-          eval_slam ctx env_body clo_body
-          |> expect_not_missing |> expect Thalves
-        in
-        slv_runtime)
+        eval_slam ctx env_body clo_body |> expect_not_missing |> expect Thalves)
 
 and eval_var env id = Env.find env id
 
@@ -566,7 +637,7 @@ and eval_lam_shallow ctx env lam =
       eval_slam ctx env slam |> expect_not_missing |> expect Thalves
     in
     halves.slv_runtime
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     (* These constructors only exist in tlambda, fracturing has removed them
        (and replaced them with SLtemplate and SLinstantiate). *)
     Lambda.fatal_error_invalid_constructor lam
@@ -994,7 +1065,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
@@ -1020,4 +1091,4 @@ let eval ~cu_static_data slam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
+      { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, slv_runtime)
