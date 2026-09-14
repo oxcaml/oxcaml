@@ -210,17 +210,17 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       in_counterexample : bool;
       (* true iff checking counter examples *)
-      mutable env_alloc_mode : Mode.Locality.r option;
+      mutable env_locality_mode : Mode.Locality.r option;
       (** [Some m] if the pattern is under [let poly_], where [m] is the
          allocation mode of the captured environment *)
     }
   val make:
-    ?env_alloc_mode:Mode.Locality.r
+    ?env_locality_mode:Mode.Locality.r
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Mode.Locality.r option -> unit
+  val set_env_locality_mode : t -> Mode.Locality.r option -> unit
 end
 
 type existential_treatment =
@@ -898,7 +898,7 @@ val cross_left :
   Mode.With_regionality.l
 
 (** Similar to [cross_right] but for [Mode.With_locality]  *)
-val cross_right_alloc :
+val cross_right_with_locality :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->
@@ -906,7 +906,7 @@ val cross_right_alloc :
   Mode.With_locality.r
 
 (** Similar to [cross_left] but for [Mode.With_locality]  *)
-val cross_left_alloc :
+val cross_left_with_locality :
   Env.t ->
   ?modalities:Mode.Modality.Const.t ->
   Types.type_expr ->

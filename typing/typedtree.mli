@@ -113,28 +113,28 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode_r
+type locality_mode_r
 
-val create_alloc_mode_r : Mode.Locality.r -> alloc_mode_r
+val create_locality_mode_r : Mode.Locality.r -> locality_mode_r
 
-val alloc_mode_r_zap_to_ceil : alloc_mode_r -> Mode.Locality.Const.t
+val locality_mode_r_zap_to_ceil : locality_mode_r -> Mode.Locality.Const.t
 
-val alloc_mode_r_submode_err :
-  Mode.Hint.pinpoint -> Mode.Locality.l -> alloc_mode_r -> unit
+val locality_mode_r_submode_err :
+  Mode.Hint.pinpoint -> Mode.Locality.l -> locality_mode_r -> unit
 
-val alloc_mode_r_map : (Mode.Locality.r -> 'a) -> alloc_mode_r -> 'a
+val locality_mode_r_map : (Mode.Locality.r -> 'a) -> locality_mode_r -> 'a
 
-val print_alloc_mode_r : Format.formatter -> alloc_mode_r -> unit
+val print_locality_mode_r : Format.formatter -> locality_mode_r -> unit
 
-type alloc_mode_l
+type locality_mode_l
 
-val create_alloc_mode_l : Mode.Locality.l -> alloc_mode_l
+val create_locality_mode_l : Mode.Locality.l -> locality_mode_l
 
-val alloc_mode_l_zap_to_floor : alloc_mode_l -> Mode.Locality.Const.t
+val locality_mode_l_zap_to_floor : locality_mode_l -> Mode.Locality.Const.t
 
-val alloc_mode_l_map : (Mode.Locality.l -> 'a) -> alloc_mode_l -> 'a
+val locality_mode_l_map : (Mode.Locality.l -> 'a) -> locality_mode_l -> 'a
 
-val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
+val print_locality_mode_l : Format.formatter -> locality_mode_l -> unit
 
 type return_mode
 
@@ -157,7 +157,7 @@ type modalities = Typemode.modalities =
   }
 
 type texp_field_boxing =
-  | Boxing of alloc_mode_r * unique_use
+  | Boxing of locality_mode_r * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
       unboxed field as argument to boxing. *)
   | Non_boxing of unique_use
@@ -277,7 +277,7 @@ and 'k pattern_desc =
       the allocation mode of the captured environment. [pending] during
       type-checking; guaranteed [determined] of a non-empty list of generic sort
       variables after [type_let] returns. *)
-      env_alloc_mode: alloc_mode_r;
+      env_locality_mode: locality_mode_r;
       (** The allocation mode of the environment captured by the layout
       function.
 
@@ -516,7 +516,7 @@ and expression_desc =
            region: [local] for ['a -> 'b @ local], [global] for ['a -> 'b].
            Becomes [Lambda.return_mode] via [Translmode.transl_ret_mode]. *)
         ret_sort : Jkind.sort;
-        alloc_mode : alloc_mode_r;
+        locality_mode : locality_mode_r;
         (* Mode at which the closure is allocated *)
         yielding : Mode.Yielding.l;
         (* Whether fully applying this function can perform a free effect. This
@@ -579,7 +579,7 @@ and expression_desc =
         (** #() *)
   | Texp_unboxed_bool of bool
         (** #false, #true *)
-  | Texp_tuple of (string option * expression) list * alloc_mode_r
+  | Texp_tuple of (string option * expression) list * locality_mode_r
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
                 when [el] is [(None, E1);...;(None, En)],
@@ -600,17 +600,17 @@ and expression_desc =
   | Texp_construct of
       Longident.t loc * Data_types.constructor_description *
       Types.constructor_representation * (Jkind.sort * expression) list *
-      alloc_mode_r option
+      locality_mode_r option
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
 
-            [alloc_mode] is the allocation mode of the construct,
+            [locality_mode] is the allocation mode of the construct,
             or [None] if the constructor is [Cstr_unboxed] or [Cstr_constant],
             in which case it does not need allocation.
          *)
-  | Texp_variant of label * (expression * alloc_mode_r) option
-        (** [alloc_mode] is the allocation mode of the variant,
+  | Texp_variant of label * (expression * locality_mode_r) option
+        (** [locality_mode] is the allocation mode of the variant,
             or [None] if the variant has no argument,
             in which case it does not need allocation.
           *)
@@ -622,7 +622,7 @@ and expression_desc =
       extended_expression :
         (expression * Jkind.sort * Types.record_representation
          * Unique_barrier.t) option;
-      alloc_mode : alloc_mode_r option
+      locality_mode : locality_mode_r option
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
             { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
@@ -637,7 +637,7 @@ and expression_desc =
             [extended_expression] carries the representation of E0, which can
             differ from [representation] under a polymorphic update where the
             changed field's type changes its layout.
-            [alloc_mode] is the allocation mode of the record,
+            [locality_mode] is the locality mode of the record,
             or [None] if it is [Record_unboxed],
             in which case it does not need allocation.
           *)
@@ -664,7 +664,7 @@ and expression_desc =
       record_repres : Types.record_representation;
       lid : Longident.t loc;
       label : Data_types.label_description;
-      alloc_mode : alloc_mode_r;
+      locality_mode : locality_mode_r;
     }
   | Texp_field of {
       record : expression;
@@ -695,9 +695,9 @@ and expression_desc =
       label : Data_types.label_description;
       newval : expression;
     }
-    (** [alloc_mode] translates to the [modify_mode] of the record *)
+    (** [locality_mode] translates to the [modify_mode] of the record *)
   | Texp_array of
-      Types.mutability * Jkind.Sort.t * expression list * alloc_mode_r
+      Types.mutability * Jkind.Sort.t * expression list * locality_mode_r
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   (* CR layouts-scannable: The sort here is no longer used. Instead, a layout is
@@ -770,7 +770,7 @@ and meth =
   | Tmeth_ancestor of Ident.t * Path.t
 
 and function_curry =
-  | More_args of { partial_mode : alloc_mode_l }
+  | More_args of { partial_mode : locality_mode_l }
   | Final_arg
 
 and 'k case =
@@ -797,7 +797,7 @@ and function_param =
     *)
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: alloc_mode_l modes;
+    fp_mode: locality_mode_l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -838,7 +838,7 @@ and function_cases =
     (** [fc_env] contains entries from all parameters except
         for the last one being matched by the cases.
     *)
-    fc_arg_mode: alloc_mode_l;
+    fc_arg_mode: locality_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
@@ -931,8 +931,8 @@ and ('a, 'b) arg_or_omitted =
 and apply_arg = (expression * Jkind.sort, omitted_parameter) arg_or_omitted
 
 and omitted_parameter =
-  { mode_closure : alloc_mode_r;
-    mode_arg : alloc_mode_l;
+  { mode_closure : locality_mode_r;
+    mode_arg : locality_mode_l;
     mode_ret : return_mode;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }

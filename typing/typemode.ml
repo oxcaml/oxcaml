@@ -548,7 +548,7 @@ let transl_with_bound_modifiers annots =
   in
   modality, externality
 
-let transl_alloc_mode annots =
+let transl_mode_with_locality annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
     transl_mode_annots annots
   in

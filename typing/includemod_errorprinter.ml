@@ -410,12 +410,12 @@ let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
 let dthen_mode_l ~is_modal mm t =
   Fmt.dprintf "%t%t" t (maybe_print_mode_l ~is_modal mm)
 
-let maybe_print_alloc_mode_r ~is_modal mm =
-  let mm = Mode.alloc_as_value mm in
+let maybe_print_mode_with_locality_r ~is_modal mm =
+  let mm = Mode.with_locality_as_regionality mm in
   maybe_print_mode_r ~is_modal mm
 
-let dthen_alloc_mode_r ~is_modal mm t =
-  Fmt.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
+let dthen_mode_with_locality_r ~is_modal mm t =
+  Fmt.dprintf "%t%t" t (maybe_print_mode_with_locality_r ~is_modal mm)
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -520,30 +520,30 @@ module With_shorthand = struct
     | Unit -> Fmt.dprintf "()"
     | Named(_,short_mty, mm) ->
         match short_mty with
-        | Original mty -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
+        | Original mty -> dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
         | Synthetic {name; item = mty} ->
             Fmt.dprintf
               "%s@ =@ %t" name (dmodtype mty)
-            |> dthen_alloc_mode_r ~is_modal mm
+            |> dthen_mode_with_locality_r ~is_modal mm
 
   let param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (_, short_mty, mm) ->
         pp dmodtype short_mty
-        |> dthen_alloc_mode_r ~is_modal mm
+        |> dthen_mode_with_locality_r ~is_modal mm
 
   let qualified_param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (None, Original (Mty_signature []), mm) ->
         Fmt.dprintf "(sig end%t)"
-          (maybe_print_alloc_mode_r ~is_modal mm)
+          (maybe_print_mode_with_locality_r ~is_modal mm)
     | Named (None, short_mty, mm) ->
         pp dmodtype short_mty
-        |> dthen_alloc_mode_r ~is_modal mm
+        |> dthen_mode_with_locality_r ~is_modal mm
     | Named (Some p, short_mty, mm) ->
         Fmt.dprintf "(%s : %t)"
           (Ident.name p) (pp dmodtype short_mty
-          |> dthen_alloc_mode_r ~is_modal mm)
+          |> dthen_mode_with_locality_r ~is_modal mm)
 
   let definition_of_argument ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
@@ -761,7 +761,7 @@ module Functor_suberror = struct
         match e.With_shorthand.item with
         | Types.Unit -> Fmt.dprintf "()"
         | Types.Named(_, mty, mm) ->
-            dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
+            dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
       in
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\

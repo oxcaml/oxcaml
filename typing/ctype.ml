@@ -374,31 +374,31 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Mode.Locality.r option; }
+      mutable env_locality_mode : Mode.Locality.r option; }
   val make:
-    ?env_alloc_mode:Mode.Locality.r
+    ?env_locality_mode:Mode.Locality.r
     -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Mode.Locality.r option -> unit
+  val set_env_locality_mode : t -> Mode.Locality.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Mode.Locality.r option; }
-  let make ?env_alloc_mode env ~equations_scope ~in_counterexample =
+      mutable env_locality_mode : Mode.Locality.r option; }
+  let make ?env_locality_mode env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
       in_counterexample;
-      env_alloc_mode; }
+      env_locality_mode; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
-  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
+  let set_env_locality_mode penv m = penv.env_locality_mode <- m
 end
 
 (**** unification mode ****)
@@ -5052,7 +5052,7 @@ let compare_package env unify_list lv1 pack1 lv2 pack2 =
       (!package_subtype env pack1 pack2)
       (fun () -> !package_subtype env pack2 pack1)
 
-let unify_alloc_mode_for tr_exn a b =
+let unify_mode_with_locality_for tr_exn a b =
   match With_locality.equate a b with
   | Ok () -> ()
   | Error _ -> raise_unexplained_for tr_exn
@@ -5300,8 +5300,8 @@ and unify3 uenv t1 t1' t2 t2' =
       begin match (d1, d2) with
         (Tarrow ((l1,a1,r1), t1, u1, c1), Tarrow ((l2,a2,r2), t2, u2, c2)) ->
           eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
-          unify_alloc_mode_for Unify a1 a2;
-          unify_alloc_mode_for Unify r1 r2;
+          unify_mode_with_locality_for Unify a1 a2;
+          unify_mode_with_locality_for Unify r1 r2;
           unify uenv t1 t2; unify uenv u1 u2;
           begin match is_commu_ok c1, is_commu_ok c2 with
           | false, true -> set_commu_ok c1
@@ -6507,29 +6507,29 @@ let cross_right env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
   mode |> With_regionality.disallow_left |> Crossing.apply_right crossing
 
-let cross_left_alloc env ?modalities ty mode =
+let cross_left_with_locality env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_locality.disallow_right |> Crossing.apply_left_alloc crossing
+  mode |> With_locality.disallow_right |> Crossing.apply_left_with_locality crossing
 
-let cross_right_alloc env ?modalities ty mode =
+let cross_right_with_locality env ?modalities ty mode =
   let crossing = crossing_of_ty env ?modalities ty in
-  mode |> With_locality.disallow_left |> Crossing.apply_right_alloc crossing
+  mode |> With_locality.disallow_left |> Crossing.apply_right_with_locality crossing
 
 (* The locality axis of the return mode of an arrow cannot cross modes,
    because a local-returning function might allocate in the caller's region,
    and this info must be preserved. The [_ret] variants below cross modes on
    all axes except locality and are to be used on return modes. *)
 
-let cross_left_alloc_ret env ?modalities ty mode =
-  let mode' = cross_left_alloc env ?modalities ty mode in
+let cross_left_with_locality_ret env ?modalities ty mode =
+  let mode' = cross_left_with_locality env ?modalities ty mode in
   With_locality.join
     [mode';
      With_locality.min_with_comonadic
        Areality
        (With_locality.proj_comonadic Areality mode)]
 
-let cross_right_alloc_ret env ?modalities ty mode =
-  let mode' = cross_right_alloc env ?modalities ty mode in
+let cross_right_with_locality_ret env ?modalities ty mode =
+  let mode' = cross_right_with_locality env ?modalities ty mode in
   With_locality.meet
     [mode';
      With_locality.max_with_comonadic
@@ -6538,12 +6538,12 @@ let cross_right_alloc_ret env ?modalities ty mode =
 
 let submode_with_cross env ~is_ret ty l r =
   let r' =
-    if is_ret then cross_right_alloc_ret env ty r
-    else cross_right_alloc env ty r
+    if is_ret then cross_right_with_locality_ret env ty r
+    else cross_right_with_locality env ty r
   in
   With_locality.submode l r'
 
-let moregen_alloc_mode env ~is_ret ty v a1 a2 =
+let moregen_mode_with_locality env ~is_ret ty v a1 a2 =
   match
     match v with
     | Invariant ->
@@ -6604,9 +6604,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                  [typing-modes/crossing.ml]. *)
               (* CR zqian: should use the meet of [t1] and [t2] for mode
               crossing. Similar for [u1] and [u2]. *)
-              moregen_alloc_mode env t2 ~is_ret:false
+              moregen_mode_with_locality env t2 ~is_ret:false
                 (neg_variance variance) a1 a2;
-              moregen_alloc_mode env u2 ~is_ret:true variance r1 r2
+              moregen_mode_with_locality env u2 ~is_ret:true variance r1 r2
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
@@ -7131,8 +7131,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
               eq_labels Equality ~in_pattern_mode:false l1 l2;
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check:true;
               eqtype rename type_pairs subst env u1 u2 ~do_jkind_check:true;
-              eqtype_alloc_mode a1 a2;
-              eqtype_alloc_mode r1 r2
+              eqtype_mode_with_locality a1 a2;
+              eqtype_mode_with_locality r1 r2
           | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
               eqtype_labeled_list rename type_pairs subst env labeled_tl1
                 labeled_tl2
@@ -7343,9 +7343,9 @@ and eqtype_row rename type_pairs subst env row1 row2 =
            raise_for Equality (Variant (No_tags (Second, [l, f1]))))
     pairs
 
-and eqtype_alloc_mode m1 m2 =
+and eqtype_mode_with_locality m1 m2 =
   (* FIXME implement properly *)
-  unify_alloc_mode_for Equality m1 m2
+  unify_mode_with_locality_for Equality m1 m2
 
 (* Must empty univar_pairs first *)
 let eqtype_list_same_length
@@ -7748,10 +7748,10 @@ let rec build_subtype env (visited : transient_expr list)
           let t1 = if posi then t1 else t1' in
           let posi_arg = not posi in
           if posi_arg then begin
-            let a = cross_right_alloc env t1 a in
+            let a = cross_right_with_locality env t1 a in
             build_submode_pos level a
           end else begin
-            let a = cross_left_alloc env t1 a in
+            let a = cross_left_with_locality env t1 a in
             build_submode_neg level a
           end
         end else a, Unchanged
@@ -7760,10 +7760,10 @@ let rec build_subtype env (visited : transient_expr list)
         if level > 2 then begin
           (* As for the argument mode above, pick the smaller type. *)
           if posi then begin
-            let r = cross_right_alloc_ret env t2' r in
+            let r = cross_right_with_locality_ret env t2' r in
             build_submode_pos level r
           end else begin
-            let r = cross_left_alloc_ret env t2 r in
+            let r = cross_left_with_locality_ret env t2 r in
             build_submode_neg level r
           end
         end else r, Unchanged
@@ -7994,7 +7994,7 @@ let subtype_error ~env ~trace ~unification_trace =
                     ~trace:(expand_subtype_trace env (List.rev trace))
                     ~unification_trace))
 
-let subtype_alloc_mode env trace a1 a2 =
+let subtype_mode_with_locality env trace a1 a2 =
   match With_locality.submode a1 a2 with
   | Ok () -> ()
   | Error _ -> subtype_error ~env ~trace ~unification_trace:[]
@@ -8019,10 +8019,10 @@ let rec subtype_rec env trace t1 t2 cstrs =
             t2 t1
             cstrs
         in
-        let a2 = cross_left_alloc env t2 a2 in
-        subtype_alloc_mode env trace a2 a1;
-        let r2 = cross_right_alloc_ret env u2 r2 in
-        subtype_alloc_mode env trace r1 r2;
+        let a2 = cross_left_with_locality env t2 a2 in
+        subtype_mode_with_locality env trace a2 a1;
+        let r2 = cross_right_with_locality_ret env u2 r2 in
+        subtype_mode_with_locality env trace r1 r2;
         subtype_rec
           env
           (Subtype.Diff {got = u1; expected = u2} :: trace)

@@ -4833,7 +4833,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
           |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.With_locality.of_const
-          |> Mode.alloc_as_value
+          |> Mode.with_locality_as_regionality
         in
         mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->

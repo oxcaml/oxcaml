@@ -1078,10 +1078,10 @@ module type S = sig
   module With_locality : Mode with module Areality := Locality
 
   module Const : sig
-    val alloc_as_value : With_locality.Const.t -> With_regionality.Const.t
+    val with_locality_as_regionality : With_locality.Const.t -> With_regionality.Const.t
 
     module Axis : sig
-      val alloc_as_value :
+      val with_locality_as_regionality :
         With_locality.Axis.packed -> With_regionality.Axis.packed
 
       val is_areality :
@@ -1096,21 +1096,21 @@ module type S = sig
   val locality_as_regionality : Locality.l -> Regionality.l
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value :
+  val with_locality_as_regionality :
     ?allocation:Hint.allocation ->
     ('l * 'r) With_locality.t ->
     ('l * 'r) With_regionality.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
-  val alloc_to_value_l2r :
+  val with_locality_to_regionality_l2r :
     ('l * 'r) With_locality.t -> ('l * disallowed) With_regionality.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l :
+  val with_regionality_to_locality_r2l :
     ('l * 'r) With_regionality.t -> ('l * 'r) With_locality.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g :
+  val with_regionality_to_locality_r2g :
     ?allocation:Hint.allocation ->
     ('l * 'r) With_regionality.t ->
     (disallowed * 'r) With_locality.t
@@ -1361,7 +1361,7 @@ module type S = sig
         t
 
       (** Apply mode crossing on a right monadic [With_locality] fragment. *)
-      val apply_right_alloc :
+      val apply_right_with_locality :
         t ->
         (disallowed * 'r) With_locality.Monadic.t ->
         (disallowed * 'r) With_locality.Monadic.t
@@ -1399,7 +1399,7 @@ module type S = sig
       val always_constructed_at : With_regionality.Comonadic.Const.t -> t
 
       (** Apply mode crossing on a left comonadic [With_locality] fragment. *)
-      val apply_left_alloc :
+      val apply_left_with_locality :
         t ->
         ('l * disallowed) With_locality.Comonadic.t ->
         ('l * disallowed) With_locality.Comonadic.t
@@ -1471,20 +1471,20 @@ module type S = sig
     val apply_right :
       t -> ('l * allowed) With_regionality.t -> With_regionality.r
 
-    (* We extend mode crossing on [With_regionality] to [With_locality] via [alloc_as_value].
+    (* We extend mode crossing on [With_regionality] to [With_locality] via [with_locality_as_regionality].
        Concretely, two [With_locality] modes are indistinguishable if their images under
-       [alloc_as_value] are indistinguishable. Currently types cross locality
-       either fully or fully not, and therefore [alloc_as_value] seems sufficient. *)
+       [with_locality_as_regionality] are indistinguishable. Currently types cross locality
+       either fully or fully not, and therefore [with_locality_as_regionality] seems sufficient. *)
 
-    (** Similar to [apply_left] but for [With_locality] via [alloc_as_value] *)
-    val apply_left_alloc : t -> With_locality.l -> With_locality.l
+    (** Similar to [apply_left] but for [With_locality] via [with_locality_as_regionality] *)
+    val apply_left_with_locality : t -> With_locality.l -> With_locality.l
 
-    (** Similar to [apply_right] but for [With_locality] via [alloc_as_value] *)
-    val apply_right_alloc : t -> With_locality.r -> With_locality.r
+    (** Similar to [apply_right] but for [With_locality] via [with_locality_as_regionality] *)
+    val apply_right_with_locality : t -> With_locality.r -> With_locality.r
 
     (** Apply mode crossong on the left comonadic fragment, and the right
         monadic fragment. *)
-    val apply_left_right_alloc :
+    val apply_left_right_with_locality :
       t ->
       (With_locality.Monadic.r, With_locality.Comonadic.l) monadic_comonadic ->
       (With_locality.Monadic.r, With_locality.Comonadic.l) monadic_comonadic

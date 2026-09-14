@@ -2864,8 +2864,8 @@ let rec tree_of_modal_typexp mode modal ty =
 and tree_of_acc_typexp mode acc_mode ty =
   tree_of_modal_typexp mode (Other acc_mode) ty
 
-and tree_of_typexp mode alloc_mode ty =
-  tree_of_acc_typexp mode (Const alloc_mode) ty
+and tree_of_typexp mode mode_with_locality ty =
+  tree_of_acc_typexp mode (Const mode_with_locality) ty
 
 and tree_of_qtv v jkind =
     (* CR layouts: We ignore nullability here to avoid needlessly printing

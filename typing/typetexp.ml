@@ -878,8 +878,8 @@ let get_type_param_name styp =
 let rec extract_params styp =
   match styp.ptyp_desc with
   | Ptyp_arrow (l, a, r, ma, mr) ->
-      let arg_mode = Typemode.transl_alloc_mode ma in
-      let ret_mode = Typemode.transl_alloc_mode mr in
+      let arg_mode = Typemode.transl_mode_with_locality ma in
+      let ret_mode = Typemode.transl_mode_with_locality mr in
       let params, ret, ret_mode =
         match r.ptyp_desc with
         | Ptyp_arrow _ when not (Builtin_attributes.has_curry r.ptyp_attributes) ->
