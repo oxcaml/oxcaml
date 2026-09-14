@@ -70,6 +70,8 @@ module Subrange_summary = struct
   include Identifiable.Make (T0)
 end
 
+let text_label pos = Asm_label.create_int Text (Label.to_int pos)
+
 type ranges =
   | Contiguous of
       { start_pos : Asm_label.t;
@@ -86,9 +88,9 @@ let create_contiguous_range_list_and_summarise subrange =
   let end_pos = IF.Subrange.end_pos subrange in
   let end_pos_offset = IF.Subrange.end_pos_offset subrange in
   Contiguous
-    { start_pos = Asm_label.create_int Text (start_pos |> Label.to_int);
+    { start_pos = text_label start_pos;
       start_pos_offset;
-      end_pos = Asm_label.create_int Text (end_pos |> Label.to_int);
+      end_pos = text_label end_pos;
       end_pos_offset
     }
 
@@ -111,10 +113,8 @@ let create_discontiguous_range_list_entry ~start_of_code_symbol
   | Four ->
     let range_list_entry =
       Dwarf_4_range_list_entry.create_range_list_entry ~start_of_code_symbol
-        ~first_address_when_in_scope:
-          (Asm_label.create_int Text (start_pos |> Label.to_int))
-        ~first_address_when_not_in_scope:
-          (Asm_label.create_int Text (end_pos |> Label.to_int))
+        ~first_address_when_in_scope:(text_label start_pos)
+        ~first_address_when_not_in_scope:(text_label end_pos)
         ~first_address_when_not_in_scope_offset:(Some end_pos_offset)
     in
     DS.Debug.log "range_list_entry: start=%a end=%a+%d\n%!" Label.format
@@ -127,9 +127,9 @@ let create_discontiguous_range_list_entry ~start_of_code_symbol
          its base address (see [create_discontiguous_range_list_and_summarise]
          below). *)
       Offset_pair_between_labels
-        { start_inclusive = Asm_label.create_int Text (start_pos |> Label.to_int);
+        { start_inclusive = text_label start_pos;
           start_adjustment_in_bytes = start_pos_offset;
-          end_exclusive = Asm_label.create_int Text (end_pos |> Label.to_int);
+          end_exclusive = text_label end_pos;
           end_adjustment_in_bytes = end_pos_offset;
           payload = ()
         }
