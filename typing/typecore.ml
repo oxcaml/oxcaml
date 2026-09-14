@@ -1295,17 +1295,19 @@ let mode_annots_from_pat pat =
 let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
-  let annot_loc =
-    if List.is_empty m.mode_desc then loc else
-    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
-  in
-  let written_modes =
+  let annotated_modes =
     List.map
-      (Location.map (fun (Alloc.Atom (axis, mode)) ->
-         Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
+      (fun { txt = Alloc.Atom (axis, mode); loc } ->
+        let name =
+          Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode
+        in
+        name, { Location.txt = name; loc })
       m.mode_desc
   in
-  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let hint =
+    Hint.Annotation
+      { syntax = `Mode; annotated_modes; contained_by = None }
+  in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
   let pp : Hint.pinpoint = loc, kind in
