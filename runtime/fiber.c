@@ -63,8 +63,8 @@
 
 static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 #if defined(TARGET_amd64) || defined(TARGET_arm64)
-/* caml_reperform (in asm) reads [idled_from] at Stack_idled_from. */
-static_assert(offsetof(struct stack_info, idled_from) == 104, "");
+/* caml_reperform (in asm) reads [idled_from_high] at Stack_idled_from_high. */
+static_assert(offsetof(struct stack_info, idled_from_high) == 112, "");
 #endif
 
 static _Atomic int64_t fiber_id_global = 0;
