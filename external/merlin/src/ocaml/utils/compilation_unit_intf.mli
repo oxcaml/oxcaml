@@ -14,9 +14,9 @@
 
 (* Handling of the names of compilation unit interfaces.
 
-   While a compilation unit ([Compilation_unit.t]) represents a reference to an implementation
-   (a .cmo or .cmx file), a compilation
-   unit interface stands for a reference to a compiled interface (a .cmi file).
+   While a compilation unit ([Compilation_unit.t]) represents a reference to
+   an implementation (a .cmo or .cmx file), a compilation unit interface
+   stands for a reference to a compiled interface (a .cmi file).
 
    Currently each file is not allowed to refer to prefixed modules.
 
