@@ -26,12 +26,13 @@ module Counters = struct
   let create () = String.Map.empty
   let get name t = String.Map.find_opt name t |> Option.value ~default:0
   let set name count t = String.Map.add name count t
-  let incr name t =
+  let add name n t =
     String.Map.update name
       (fun count_opt ->
         let count = Option.value ~default:0 count_opt in
-        Some (succ count))
+        Some (count + n))
       t
+  let incr name t = add name 1 t
   let is_empty = String.Map.is_empty
   let union = String.Map.union (fun _ count1 count2 -> Some (count1 + count2))
   let to_string t =
