@@ -594,7 +594,8 @@ let compute_static_size lam =
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
     | Preinterpret_boxed_vector_as_tuple _
-    | Preinterpret_tuple_as_boxed_vector _ ->
+    | Preinterpret_tuple_as_boxed_vector _
+    | Pbox _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam

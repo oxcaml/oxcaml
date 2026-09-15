@@ -3662,6 +3662,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  | Pbox layout, [args] ->
+    (* CR zeisbach: implement this translation! need to look at what we know
+       about the args at this point (can we get their layout? should we be
+       checking for consistency? the checks have to happen somewhere.) *)
+    ignore layout;
+    ignore args;
+    Misc.fatal_errorf "implement this!"
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3688,7 +3695,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ | Pbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \

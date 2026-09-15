@@ -2733,7 +2733,8 @@ let lambda_primitive_needs_event_after = function
   | Pwith_stack | Pwith_stack_preemptible
   | Pperform | Preperform
   | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
-  | Ppoll | Pobj_dup | Pget_header _ -> true
+  | Ppoll | Pobj_dup | Pget_header _
+  | Pbox _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64_u is actually represented as a boxed value. *)
   | Preinterpret_tagged_int63_as_unboxed_int64 -> true

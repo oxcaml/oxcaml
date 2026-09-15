@@ -1192,7 +1192,11 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       match args with
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
-      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
+      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
+    | Pbox layout ->
+      ignore layout;
+      (* CR zeisbach: implement! also, ordering? *)
+      Misc.fatal_errorf "implement this!")
 
 and comp_binary_scalar_intrinsic : type a.
     a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
