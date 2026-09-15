@@ -10,13 +10,13 @@
 
 external get_ext_ptr
   : ('a : any).
-  int64# @ local -> 'a @ local
+  int64_u @ local -> 'a @ local
   = "%unsafe_get_ext_ptr"
 [@@layout_poly]
 
 external set_ext_ptr
   : ('a : any).
-  int64# @ local -> 'a @ local -> unit
+  int64_u @ local -> 'a @ local -> unit
   = "%unsafe_set_ext_ptr"
 [@@layout_poly]
 

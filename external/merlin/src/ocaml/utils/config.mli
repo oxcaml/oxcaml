@@ -44,6 +44,7 @@ val flat_float_array: bool
 
 val reserved_header_bits : int
 val syntax_quotations : bool
+(** Whether quote [<[_]>] and splice [$] syntax is enabled. *)
 
 val default_keyword_edition : (int * int) option * string list
 

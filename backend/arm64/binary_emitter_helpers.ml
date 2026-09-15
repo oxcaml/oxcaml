@@ -129,10 +129,16 @@ let save_sections_to_files sections section_tbl =
       close_out oc;
       (* Save relocations if any *)
       let relocs = BE.Section_state.relocations state in
+      let reloc_filename = Filename.concat dir (safe_name ^ ".relocs") in
       match relocs with
-      | [] -> ()
+      | [] ->
+        (* No relocations file is written in this case, so remove any left over
+           from a previous compilation with the same output prefix (e.g. when a
+           test compiles the same file twice with different flags). Otherwise
+           the stale file would be wrongly attributed to the current compilation
+           during verification. *)
+        Misc.remove_file reloc_filename
       | _ ->
-        let reloc_filename = Filename.concat dir (safe_name ^ ".relocs") in
         let oc = open_out reloc_filename in
         let module R = Arm64_binary_emitter.Relocation in
         let module ED = BE.Encode_directive in

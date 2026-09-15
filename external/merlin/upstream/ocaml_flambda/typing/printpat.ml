@@ -27,7 +27,7 @@ let is_cons = function
 let pretty_const c = match c with
 | Const_int i -> Printf.sprintf "%d" i
 | Const_char c -> Printf.sprintf "%C" c
-| Const_untagged_char c -> Printf.sprintf "#%C" c
+| Const_untagged_char c -> Printf.sprintf "#%C" (Char.chr (c land 0xff))
 | Const_string (s, _, _) -> Printf.sprintf "%S" s
 | Const_float f -> Printf.sprintf "%s" f
 | Const_float32 f -> Printf.sprintf "%s" f
@@ -125,8 +125,8 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "`%s" l
   | Tpat_variant (l, Some w, _) ->
       fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
-  | Tpat_record (lvs,_,_,_) -> pretty_record ~unboxed:false lvs
-  | Tpat_record_unboxed_product (lvs,_,_,_) -> pretty_record ~unboxed:true lvs
+  | Tpat_record (lvs,_,_) -> pretty_record ~unboxed:false lvs
+  | Tpat_record_unboxed_product (lvs,_,_) -> pretty_record ~unboxed:true lvs
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct

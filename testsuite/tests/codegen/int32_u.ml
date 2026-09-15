@@ -24,7 +24,7 @@ add:
   ret
 |}]
 
-(* CR ttebbi: Unnecessary moves at the beginning. *)
+(* CR ttebbi: This should be branchfree. *)
 let min x y = Int32_u.min x y
 [%%expect_asm X86_64{|
 min:

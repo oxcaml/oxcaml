@@ -123,6 +123,7 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Base _ -> true
   | Product sorts ->
     List.for_all layout_is_representable sorts
+  | Addressable layout -> layout_is_representable layout
 
 (* CR layouts-scannable: calling [type_jkind] here in [typeopt] is not ideal.
    Removing this function requires more careful tracking of representable
@@ -187,6 +188,7 @@ type 'a classification =
   | Unboxed_float of unboxed_float
   | Unboxed_int of Primitive.unboxed_or_untagged_integer
   | Unboxed_vector of unboxed_vector
+  | Unboxed_mask
   | Lazy
   | Addr  (* any value except a float or a lazy *)
   | Any
@@ -195,8 +197,9 @@ type 'a classification =
 (* Classify a ty into a [classification]. Looks through synonyms, using
    [scrape_ty].  Returning [Any] is safe, though may skip some optimizations.
    See comment on [classification] above to understand [classify_product]. *)
-let classify ~classify_product env ty layout : _ classification =
+let rec classify ~classify_product env ty layout : _ classification =
   match (layout : Jkind.Layout.Const.t) with
+  | Addressable layout -> classify ~classify_product env ty layout
   | Any _ -> Misc.fatal_error "classify called with non-representable layout"
   | Base (Scannable, _sa) -> begin
   (* CR layouts-scannable: Consider using the scannable axes here to avoid
@@ -211,6 +214,7 @@ let classify ~classify_product env ty layout : _ classification =
   else match get_desc ty with
   | Tvar _ | Tunivar _ | Tof_kind _ ->
       Any
+  | Tmod _ -> Misc.fatal_error "Typeopt.classify: unexpected Tmod"
   | Tconstr (p, _args, _abbrev) ->
       begin match Predef.find_type_constr p with
       | Some `Float -> Float
@@ -248,7 +252,7 @@ let classify ~classify_product env ty layout : _ classification =
              | `Float64x8
              )
         -> Addr
-      | Some (`Lexing_position | `Code | `Eval | `Box)
+      | Some (`Lexing_position | `Expr | `Eval | `Box)
       | Some (#Predef.data_type_constr | #Predef.abstract_non_value_type_constr)
       | None ->
         try
@@ -284,9 +288,12 @@ let classify ~classify_product env ty layout : _ classification =
   | Base (Vec128, _) -> Unboxed_vector Unboxed_vec128
   | Base (Vec256, _) ->
     if split_vectors
-    then Product (Pgcignorableproductarray ())
+    then Product (Pgcignorableproductarray
+                    [ Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128 ])
     else Unboxed_vector Unboxed_vec256
   | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
+  | Base (Mask, _) -> Unboxed_mask
   | Base (Word, _) -> Unboxed_int Unboxed_nativeint
   | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
   | Base (Void, _) -> Void
@@ -294,9 +301,68 @@ let classify ~classify_product env ty layout : _ classification =
   | Univar _ -> Misc.fatal_error "classify: Univar"
   | Genvar _ -> Misc.fatal_error "classify: Genvar"
 
-let scannable_product_array_kind _ _ _ = ()
+let rec scannable_product_array_kind elt_ty_for_error loc layouts =
+  List.map (sort_to_scannable_product_element_kind elt_ty_for_error loc) layouts
 
-let ignorable_product_array_kind _ _ = ()
+and sort_to_scannable_product_element_kind elt_ty_for_error loc
+      (layout : Jkind.Layout.Const.t) =
+  match layout with
+  | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
+                               with non-representable layout"
+  | Base (Scannable, { separability; _ }) ->
+      let open Jkind_axis.Separability in
+      if le separability (upper_bound_if_is_always_gc_ignorable ())
+        then Pint_scannable else Paddr_scannable
+  | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
+          Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask), _) as c ->
+    raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
+  | Base (Void, _) ->
+    raise (Error (loc, Unsupported_void_in_array))
+  | Product sorts ->
+    Pproduct_scannable (scannable_product_array_kind elt_ty_for_error loc sorts)
+  | Addressable layout ->
+    sort_to_scannable_product_element_kind elt_ty_for_error loc layout
+  | Univar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_scannable_product_element_kind: Genvar"
+
+let rec ignorable_product_array_kind loc (sorts : Jkind.Layout.Const.t list) =
+  match sorts with
+  | [Base (Vec128, _); Base (Vec128, _)] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | [Base (Vec128, _); Base (Vec128, _); Base (Vec128, _); Base (Vec128, _)] ->
+    [ Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128;
+      Punboxedvector_ignorable Unboxed_vec128 ]
+  | _ -> List.map (sort_to_ignorable_product_element_kind loc) sorts
+
+and sort_to_ignorable_product_element_kind loc (layout : Jkind.Layout.Const.t) =
+  match layout with
+  | Any _ -> Misc.fatal_error "sort_to_ignorable_product_element_kind called \
+                               with non-representable layout"
+  (* Scannable axes are irrelevant, since we already know we can ignore *)
+  | Base (Scannable, _sa) -> Pint_ignorable
+  | Base (Float64, _) -> Punboxedfloat_ignorable Unboxed_float64
+  | Base (Float32, _) -> Punboxedfloat_ignorable Unboxed_float32
+  | Base (Bits8, _) -> Punboxedoruntaggedint_ignorable Untagged_int8
+  | Base (Bits16, _) -> Punboxedoruntaggedint_ignorable Untagged_int16
+  | Base (Bits32, _) -> Punboxedoruntaggedint_ignorable Unboxed_int32
+  | Base (Bits64, _) -> Punboxedoruntaggedint_ignorable Unboxed_int64
+  | Base (Word, _) -> Punboxedoruntaggedint_ignorable Unboxed_nativeint
+  | Base (Untagged_immediate, _) -> Punboxedoruntaggedint_ignorable Untagged_int
+  | Base ((Vec128 | Vec256 | Vec512), _) ->
+    raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base (Mask, _) -> raise (Error (loc, Unsupported_vector_in_product_array))
+  | Base (Void, _) -> raise (Error (loc, Unsupported_void_in_array))
+  | Product sorts -> Pproduct_ignorable (ignorable_product_array_kind loc sorts)
+  | Addressable layout -> sort_to_ignorable_product_element_kind loc layout
+  | Univar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Univar"
+  | Genvar _ ->
+    Misc.fatal_error "sort_to_ignorable_product_element_kind: Genvar"
 
 let array_kind_of_elt env loc ty =
   let ty = match scrape_ty env ty with Some ty -> ty | None -> ty in
@@ -330,6 +396,7 @@ let array_kind_of_elt env loc ty =
   | Unboxed_int Untagged_int16 -> Punboxedoruntaggedintarray Untagged_int16
   | Unboxed_int Untagged_int8 -> Punboxedoruntaggedintarray Untagged_int8
   | Unboxed_vector v -> Punboxedvectorarray v
+  | Unboxed_mask -> Punboxedmaskarray
   | Product c -> c
   | Void ->
     raise (Error (loc, Unsupported_void_in_array))
@@ -405,23 +472,29 @@ let value_kind_of_scannable_jkind env jkind =
   let externality_upper_bound =
     Jkind.get_externality_upper_bound ~context env jkind
   in
+  let rec of_layout : Jkind.Layout.Const.t -> _ = function
+    | Base (Scannable, { separability; _ }) -> (
+      (* use the better of the two [immediate_or_pointer]s *)
+      match pointerness_of_separability separability,
+            pointerness_of_scannable_with_externality externality_upper_bound
+      with
+      | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate ->
+        Pintval
+      | Pointer, Pointer -> Pgenval)
+    | Addressable layout -> of_layout layout
+    | Any _
+    | Product _
+    | Univar _
+    | Genvar _
+    | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
+             | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
+             | Vec512 | Mask ),
+             _ ) ->
+      Misc.fatal_error "expected a layout of scannable"
+  in
   match layout with
-  | Some (Base (Scannable, { separability; _ })) -> (
-    (* use the better of the two [immediate_or_pointer]s *)
-    match pointerness_of_separability separability,
-          pointerness_of_scannable_with_externality externality_upper_bound with
-    | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate -> Pintval
-    | Pointer, Pointer -> Pgenval)
-  | None
-  | Some ( Any _
-         | Product _
-         | Univar _
-         | Genvar _
-         | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
-                  | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-                  | Vec512 ),
-                  _ )) ->
-    Misc.fatal_error "expected a layout of scannable"
+  | Some layout -> of_layout layout
+  | None -> Misc.fatal_error "expected a layout of scannable"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
@@ -614,6 +687,8 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
   | Tconstr(p, _, _) when Path.same p Predef.path_float64x8 ->
     num_nodes_visited, non_nullable (Pboxedvectorval Boxed_vec512)
+  | Tconstr(p, _, _) when Path.same p Predef.path_mask ->
+    num_nodes_visited, non_nullable Pboxedmaskval
   | Tconstr(p, [arg], _)
     when (Path.same p Predef.path_array
           || Path.same p Predef.path_iarray) ->
@@ -648,7 +723,9 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
                          ~num_nodes_visited ~params:decl.type_params ~args
                          cstrs rep)
         | Type_record
-            (_, (Record_variable | Record_inlined (_, Constructor_variable, _)),
+            (_,
+             (Record_undetermined
+             | Record_inlined (_, Constructor_undetermined, _)),
              _) ->
           num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
@@ -657,8 +734,13 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
                          ~num_nodes_visited labels rep)
-        | Type_record_unboxed_product (_, Record_unboxed_product_variable, _) ->
+        | Type_record_unboxed_product
+            (_, Record_unboxed_product_undetermined, _) ->
           num_nodes_visited, nullable Pgenval
+        | Type_record_unboxed_product
+            (_, Record_unboxed_product_variable _, _) ->
+          Misc.fatal_error
+            "Typeopt.value_kind: variable representation in a declaration"
         | Type_record_unboxed_product ([{ld_type}],
                                        Record_unboxed_product, _) ->
           let depth = depth + 1 in
@@ -704,6 +786,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if Btype.tvariant_not_immediate row
     then non_nullable Pgenval
     else non_nullable Pintval
+  | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+    num_nodes_visited,
+    add_nullability_from_ty env scty
+      (value_kind_of_scannable_jkind env (Jkind.disallow_right jkind))
   | _ ->
     num_nodes_visited,
     add_nullability_from_ty env scty Pgenval
@@ -713,17 +799,28 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   : int * unit Lambda.mixed_block_element =
   match field with
   | Scannable { separability } ->
+    let pointerness = pointerness_of_separability separability in
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
         value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
+      (* The declared shape's separability can be more precise than what
+         [value_kind] computes here (e.g. for existential type variables), so
+         take the better of the two. *)
+      (* CR layouts: The most precise thing would be a real meet of value kinds
+         (e.g. a pointerness of [Immediate] could remove the non-constant
+         constructors from [Pvariant _]) *)
+      let kind =
+        match pointerness, kind.raw_kind with
+        | Immediate, Pgenval -> { kind with raw_kind = Pintval }
+        | Immediate, _ | Pointer, _ -> kind
+      in
       num_nodes_visited, Value kind
     | None ->
-      let raw_kind =
-        value_kind_of_pointerness (pointerness_of_separability separability)
-      in
-      num_nodes_visited, Value { generic_value with raw_kind }
+      num_nodes_visited,
+      Value
+        { generic_value with raw_kind = value_kind_of_pointerness pointerness }
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
@@ -737,6 +834,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
   | Vec128 -> num_nodes_visited, Vec128
   | Vec256 -> num_nodes_visited, Vec256
   | Vec512 -> num_nodes_visited, Vec512
+  | Mask -> num_nodes_visited, Mask
   | Word -> num_nodes_visited, Word
   | Untagged_immediate -> num_nodes_visited, Untagged_immediate
   | Product fs ->
@@ -751,6 +849,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         match get_desc ty with
         | Tunboxed_tuple fields ->
           Misc.Stdlib.Array.of_list_map (fun (_, field) -> Some field) fields
+        | Tmod _ -> Misc.fatal_error "Typeopt: unexpected Tmod"
         | Tconstr(p, args, _) ->
           begin match Env.find_type p env with
           | exception Not_found -> unknown ()
@@ -786,6 +885,9 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     in
     num_nodes_visited, Product kinds
   | Void -> num_nodes_visited, Product [||]
+  | Addressable field ->
+    value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
+      field ty
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
@@ -866,7 +968,10 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
-          | Constructor_variable ->
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
+          | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -887,39 +992,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
-          | Constructor_variable ->
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
+          | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (is_mutable, num_nodes_visited), fields
     in
-    let is_constant (cstr: Types.constructor_declaration) =
-      let all_void_opt sort =
-        match sort with
-        | Some sort -> Jkind.Sort.Const.all_void sort
-        | None ->
-          (* CR rtjoa: It's important to NOT treat constructors with
-             any-args-refined-to-void as constant, as those are represented as
-             blocks rather than immediates. This footgun should no longer exist
-             once we make all-void constructors no longer immediate. *)
-          false
-      in
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple args ->
-        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
-      | Cstr_record lbls ->
-        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
-    in
-    let rec mixed_block_shape_is_empty shape =
-      Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ mixed_block_element) =
-      match element with
-      | Product shape -> mixed_block_shape_is_empty shape
-      | _ -> false
-    in
     let num_nodes_visited, raw_kind =
-    if List.for_all is_constant cstrs then
+    if Array.for_all Types.cstr_layout_is_constant cstr_layouts then
       (num_nodes_visited, Pintval)
     else
       let _idx, result =
@@ -930,53 +1013,34 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let ~variable_repr, cstr_shape_opt, constructor =
-              match cstr_layouts.(idx) with
-              | Cstr_layout_known { shape; _ } ->
-                ~variable_repr:false, Some shape, constructor
-              | Cstr_layout_variable ->
-                (match substitute_cd_args constructor.cd_args with
-                 | exception Ctype.Cannot_apply ->
-                   ~variable_repr:true, None, constructor
-                 | cd_args ->
-                   let cd_args, ~constant:_, repr, _arg_sorts =
-                     Typedecl.update_constructor_representation_and_arg_sorts
-                       env loc cd_args ~is_extension_constructor:false
-                   in
-                   ~variable_repr:true, Result.to_option repr,
-                   { constructor with cd_args })
-            in
-            match cstr_shape_opt with
-            | None -> None
-            | Some cstr_shape ->
-                let (is_mutable, num_nodes_visited), fields =
-                  for_one_constructor constructor ~depth ~num_nodes_visited
-                    ~cstr_shape
-                in
-                if is_mutable then None
-                else match fields with
-                | Constructor_uniform xs
-                    when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape
-                         && not variable_repr ->
-                  (* CR rtjoa: We gate on [variable_repr] because it's important
-                     to NOT treat constructors with any-args-refined-to-void as
-                     constant, as those are represented as blocks rather than
-                     immediates. This footgun should no longer exist once we
-                     make all-void constructors no longer immediate. *)
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed _ | Constructor_uniform _ ->
-                  let non_consts =
-                    (next_tag, fields) :: non_consts
+            if Types.cstr_layout_is_constant cstr_layouts.(idx) then
+              Some (num_nodes_visited,
+                    next_const + 1, next_const :: consts, next_tag, non_consts)
+            else
+              let cstr_shape_opt, constructor =
+                match cstr_layouts.(idx) with
+                | Cstr_layout_known { shape; _ } -> Some shape, constructor
+                | Cstr_layout_undetermined ->
+                  (match substitute_cd_args constructor.cd_args with
+                   | exception Ctype.Cannot_apply -> None, constructor
+                   | cd_args ->
+                     let cd_args, ~constant:_, repr, _arg_sorts =
+                       Typedecl.update_constructor_representation
+                         env loc cd_args ~is_extension_constructor:false
+                     in
+                     Result.to_option repr, { constructor with cd_args })
+              in
+              match cstr_shape_opt with
+              | None -> None
+              | Some cstr_shape ->
+                  let (is_mutable, num_nodes_visited), fields =
+                    for_one_constructor constructor ~depth ~num_nodes_visited
+                      ~cstr_shape
                   in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
+                  if is_mutable then None
+                  else
+                    Some (num_nodes_visited, next_const, consts, next_tag + 1,
+                          (next_tag, fields) :: non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -985,9 +1049,6 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
         | [] ->
-          (* CR rtjoa: An refined any-constructor shouldn't become constant.
-             This footgun should no longer exist once we make all-void
-             constructors no longer immediate. *)
           Misc.fatal_error "Typeopt.value_kind_variant: became all-constant"
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
@@ -1010,7 +1071,9 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_variable | Record_inlined (_, Constructor_variable, _) ->
+  | Record_undetermined | Record_variable _
+  | Record_inlined (_, (Constructor_undetermined
+                       | Constructor_variable _), _) ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
@@ -1025,8 +1088,11 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       else
         let num_nodes_visited, fields =
           match rep with
-          | Record_unboxed | Record_dummy _ | Record_variable
-          | Record_inlined (_, Constructor_variable, _) ->
+          | Record_unboxed | Record_dummy _ | Record_undetermined
+          | Record_variable _
+          | Record_inlined (_, (Constructor_undetermined
+                               | Constructor_variable _
+                               | Constructor_immediate_all_void), _) ->
               (* The outer match guards against this *)
               assert false
           | Record_inlined (_, Constructor_uniform_value, _)
@@ -1048,7 +1114,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_variable ->
+                      | Record_undetermined | Record_variable _ ->
                           (* The outer match guards against this *)
                           assert false
                     in
@@ -1077,7 +1143,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
           | Record_unboxed -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
-          | Record_variable -> assert false
+          | Record_undetermined | Record_variable _ -> assert false
         in
         (num_nodes_visited,
          non_nullable (Pvariant { consts = []; non_consts }))
@@ -1135,8 +1201,11 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
                      Language_extension.(is_at_least SIMD Stable) ->
     Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
-                     Language_extension.(is_at_least SIMD Alpha) ->
+                     Language_extension.(is_at_least SIMD Beta) ->
     Lambda.layout_unboxed_vector Unboxed_vec512
+  | Base Mask when Language_extension.(is_at_least Layouts Stable) &&
+                   Language_extension.(is_at_least SIMD Beta) ->
+    Lambda.layout_unboxed_mask
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
@@ -1146,12 +1215,16 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
       (List.map (layout_of_const_sort_generic
                    ~value_kind:(lazy Lambda.generic_value) ~error)
          consts)
+  | Addressable const ->
+    (* CR box: This may have to be updated once addressability affects boxed
+       representations *)
+    layout_of_const_sort_generic ~value_kind ~error const
   | ((  Base (Void | Float32 | Float64 | Word | Bits8 |
-             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
+             Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask)
       | Product _) as const) ->
     error const
   | Univar _ -> Misc.fatal_error "layout: unexpected univar"
-  | Genvar _ -> Misc.fatal_error "layout: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1165,7 +1238,7 @@ let layout env loc sort ty =
       | Base Float32 as const ->
         raise (Error (loc, Small_number_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
-      | Base (Vec128 | Vec256 | Vec512) as const ->
+      | Base (Vec128 | Vec256 | Vec512 | Mask) as const ->
         raise (Error (loc, Simd_sort_without_extension
                              (Jkind.Sort.of_const const, Some ty)))
       | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
@@ -1174,9 +1247,33 @@ let layout env loc sort ty =
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
+      | Addressable _ -> assert false
       | Univar _ -> assert false
       | Genvar _ -> assert false
     )
+
+let layout_of_ident env ident =
+  let path = Path.Pident ident in
+  match Env.find_module path env with
+  | _ -> Some layout_any_value
+  | exception Not_found ->
+    let value_desc =
+      try Env.find_value path env
+      with Not_found ->
+        Misc.fatal_errorf "Failed to find value_desc for %a"
+          Ident.print ident
+    in
+    let { val_type; val_kind; val_loc; _ } =
+      Subst.Lazy.force_value_description value_desc
+    in
+    match val_kind with
+    | Val_reg sort | Val_mut (_, sort) ->
+      let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout env val_loc const_sort val_type in
+      Some layout
+    | Val_prim _ -> None
+    | Val_ivar _ | Val_self _ | Val_anc _ ->
+      Some layout_any_value
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)
@@ -1189,7 +1286,7 @@ let layout_of_sort loc sort =
     | Base Float32 as const ->
       raise (Error (loc, Small_number_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
-    | Base (Vec128 | Vec256 | Vec512) as const ->
+    | Base (Vec128 | Vec256 | Vec512 | Mask) as const ->
       raise (Error (loc, Simd_sort_without_extension
                            (Jkind.Sort.of_const const, None)))
     | (Base (Float64 | Word | Untagged_immediate | Bits8 | Bits16 | Bits32 |
@@ -1197,6 +1294,7 @@ let layout_of_sort loc sort =
       as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
+    | Addressable _ -> assert false
     | Univar _ -> assert false
     | Genvar _ -> assert false
     )
@@ -1208,6 +1306,10 @@ let layout_of_non_void_sort c =
     ~error:(fun const ->
       Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
+
+let layout_or_sort env loc sort ty =
+  try layout env loc sort ty
+  with Error (_, Non_value_layout _) -> layout_of_sort loc sort
 
 let function_return_layout env loc sort ty =
   match is_function_type env ty with
@@ -1236,7 +1338,7 @@ let lazy_val_requires_forward env loc ty =
       Jkind_types.Scannable_axes.max
   in
   let classify_product _ layouts =
-    let layout = Jkind_types.Layout.Const.Product layouts in
+    let layout = Jkind_types.Layout.Const.product layouts in
     raise (Error (loc, Unsupported_product_in_lazy layout))
   in
   match classify ~classify_product env ty layout with
@@ -1245,7 +1347,7 @@ let lazy_val_requires_forward env loc ty =
      Blocks with forward_tag can get scanned by the gc thus can't
      store unboxed values. Not boxing is also incorrect since the lazy
      type has layout [value] which is different from these unboxed layouts. *)
-  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
+  | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Unboxed_mask | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
   | Float -> Config.flat_float_array
   | Addr | Immediate | Immediate_or_null -> false

@@ -27,21 +27,21 @@
    ocamltest predicate is reliable for testing whether this is an
    oxcaml build. *)
 
-(* This file tests using external C functions with float32#. *)
+(* This file tests using external C functions with float32_u. *)
 
 external to_float : float32 -> float = "%floatoffloat32"
-external to_float32 : float32# -> (float32[@local_opt]) = "%box_float32"
+external to_float32 : float32_u -> (float32[@local_opt]) = "%box_float32"
 
 let print_floatu s f = Printf.printf "%s: %.2f\n" s (to_float (to_float32 f))
 let print_float s f = Printf.printf "%s: %.2f\n" s (to_float f)
 
-(* Various combinations of arguments float, float [@unboxed], and float32# *)
-external sin_U_U : float32# -> float32# = "sin_byte" "sin_U_U"
-external sin_B_U : float32 -> float32# = "sin_byte" "sin_B_U"
-external sin_U_B : float32# -> float32 = "sin_byte" "sin_U_B"
+(* Various combinations of arguments float, float [@unboxed], and float32_u *)
+external sin_U_U : float32_u -> float32_u = "sin_byte" "sin_U_U"
+external sin_B_U : float32 -> float32_u = "sin_byte" "sin_B_U"
+external sin_U_B : float32_u -> float32 = "sin_byte" "sin_U_B"
 
-external sin_BU_U : (float32[@unboxed]) -> float32# = "sin_byte" "sin_U_U"
-external sin_U_BU : float32# -> (float32[@unboxed]) = "sin_byte" "sin_U_U"
+external sin_BU_U : (float32[@unboxed]) -> float32_u = "sin_byte" "sin_U_U"
+external sin_U_BU : float32_u -> (float32[@unboxed]) = "sin_byte" "sin_U_U"
 
 let sin_two =
   let f = sin_U_U #2.s in
@@ -66,7 +66,7 @@ let sin_six =
 (* If there are more than 5 args, you get an array in the bytecode version,
    which is fine since the floats are boxed for bytecode. *)
 external sum_7 :
-  float32# -> float32 -> float32# -> float32 -> float32# -> float32 -> float32# -> float32# =
+  float32_u -> float32 -> float32_u -> float32 -> float32_u -> float32 -> float32_u -> float32_u =
   "sum_7_byte" "sum_7"
 
 let sum_of_one_to_seven =

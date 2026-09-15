@@ -146,7 +146,7 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
   Profile.(record_call (annotate_file_name (
     Unit_info.raw_source_file info.target))) @@ fun () ->
   let { ast; info } : _ Parse_result.t = parse_intf info in
-  hook_parse_tree ast;
+  let ast = hook_parse_tree ast in
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
     hook_typed_tree tsg;
@@ -189,7 +189,7 @@ let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
   let exceptionally = Misc.remove_successful_output_files in
   Misc.try_finally ?always:None ~exceptionally (fun () ->
     let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
-    hook_parse_tree parsed;
+    let parsed = hook_parse_tree parsed in
     if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
       let typed = typecheck_impl info parsed in
       hook_typed_tree typed;

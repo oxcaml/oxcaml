@@ -55,13 +55,11 @@ f:
   ret
 |}]
 
-(* CR ttebbi: We could merge the and and test instructions *)
 let do_intersect t1 t2 =
   Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
 [%%expect_asm X86_64{|
 do_intersect:
   andq  %rbx, %rax
-  testq %rax, %rax
   jne   .L0
   movl  $100, %eax
   ret
@@ -113,8 +111,8 @@ combine_comparisons:
   ret
 |}]
 
-(* CR ttebbi: We branch twice on the same comparison, even though we realise
-   it is the same one. *)
+(* CR ttebbi: We branch twice on the same comparison, materializing a boolean
+   for the second branch. *)
 let repeat_comparisons r _f =
   let a = !r > 5 in
   let b = !r > 5 in
@@ -125,7 +123,6 @@ repeat_comparisons:
   xorl  %eax, %eax
   cmpq  $11, %rbx
   setg  %al
-  cmpq  $11, %rbx
   jle   .L0
   testq %rax, %rax
   je    .L0
@@ -259,14 +256,13 @@ constant_folding:
 
 
 
-type ptr = nativeint#
+type ptr = nativeint_u
 external memcmp :
-  ptr -> ptr -> len:nativeint# -> int32#
+  ptr -> ptr -> len:nativeint_u -> int32_u
   @@ portable
   = "caml_no_bytecode_impl" "memcmp"
 [@@noalloc]
 
-(* CR ttebbi: Double sign extension instructions. *)
 let int32_box_unbox_after_call (a : ptr) (b : ptr) =
   Int32_u.of_int (Int32_u.to_int (memcmp a b ~len:#5n))
 [%%expect_asm X86_64{|
@@ -276,7 +272,6 @@ int32_box_unbox_after_call:
   movq  %rbx, %rsi
   movl  $5, %edx
   call  memcmp@PLT
-  movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
   ret
@@ -437,7 +432,7 @@ branch_or_tailcall:
 
 
 (* CR ttebbi: The final bitwise or is unnecessary. *)
-let shift_of_logand (a : int64#) =
+let shift_of_logand (a : int64_u) =
   let b = Int64_u.logand a #1L in
   let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
   reinterpret_unboxed_int64_as_tagged_int63 c

@@ -269,6 +269,12 @@ val symbol_plus_offset : Asm_symbol.t -> offset_in_bytes:Targetint.t -> unit
 val between_symbols_in_current_unit :
   upper:Asm_symbol.t -> lower:Asm_symbol.t -> unit
 
+(** As [between_symbols_in_current_unit], but emitting a 32-bit-wide reference
+    regardless of the target address size. The assembler checks that the value
+    does not overflow. *)
+val between_symbols_in_current_unit_32_bit :
+  ?comment:string -> upper:Asm_symbol.t -> lower:Asm_symbol.t -> unit -> unit
+
 (** Like [between_symbols], but for two labels, emitting a 16-bit-wide
     reference. The behaviour upon overflow is unspecified. The labels must be in
     the same section. *)
@@ -287,12 +293,22 @@ val between_labels_64_bit :
   ?comment:string -> upper:Asm_label.t -> lower:Asm_label.t -> unit -> unit
 
 (** Emit the difference [upper - lower] of two same-section labels as a ULEB128
-    value. Supported only on the GAS text backend. *)
+    value. Supported on the text and binary emitters for all Unix-like targets,
+    but not with MASM. *)
 val delta_uleb128 : upper:Asm_label.t -> lower:Asm_label.t -> unit
 
+(** The ULEB128-encoded distance from the [lower] symbol to the [upper] label
+    plus [upper_offset]. The value must be a non-negative assembly-time
+    constant; the [lower] symbol must be in the current compilation unit and in
+    the same section as [upper]. Supported on the text and binary emitters for
+    all Unix-like targets, but not with MASM. *)
+val delta_uleb128_label_minus_symbol :
+  upper:Asm_label.t -> upper_offset:Int64.t -> lower:Asm_symbol.t -> unit
+
 (** Like [between_symbols], but for two labels with additional offsets, emitting
-    a 64-bit-wide reference. The labels must be in the same section. *)
-val between_labels_64_bit_with_offsets :
+    a 32-bit-wide reference. The assembler checks that the value does not
+    overflow. The labels must be in the same section. *)
+val between_labels_32_bit_with_offsets :
   ?comment:string ->
   upper:Asm_label.t ->
   upper_offset:Targetint.t ->
@@ -313,6 +329,17 @@ val between_this_and_label_offset_32bit_expr :
     The [lower] symbol must be in the current compilation unit. The [upper]
     label must be in the same section as the [lower] symbol. *)
 val between_symbol_in_current_unit_and_label_offset :
+  ?comment:string ->
+  upper:Asm_label.t ->
+  lower:Asm_symbol.t ->
+  offset_upper:Targetint.t ->
+  unit ->
+  unit
+
+(** As [between_symbol_in_current_unit_and_label_offset], but emitting a
+    32-bit-wide reference. The assembler checks that the value does not
+    overflow. *)
+val between_symbol_in_current_unit_and_label_offset_32_bit :
   ?comment:string ->
   upper:Asm_label.t ->
   lower:Asm_symbol.t ->
@@ -400,7 +427,9 @@ module Directive : sig
     | Code
     | Machine_width_data
 
-  type label_or_symbol = private
+  (* CR mshinwell: use [Asm_label_or_symbol.t] directly everywhere and delete
+     this alias. *)
+  type label_or_symbol = Asm_label_or_symbol.t =
     | Label of Asm_label.t
     | Symbol of Asm_symbol.t
 

@@ -3,8 +3,8 @@
    native;
 *)
 
-external box_int32 : int32# -> (int32[@local_opt]) = "%box_int32"
-external box_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
+external box_int32 : int32_u -> (int32[@local_opt]) = "%box_int32"
+external box_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
 external box_float : float# -> (float[@local_opt]) = "%box_float"
 
 let size x =
@@ -39,7 +39,7 @@ module T01 = struct
 
   (* All values in inner record are unboxed, all values in outer record are boxed. *)
 
-  type sub = #{ i32 : int32#; i64 : int64#; }
+  type sub = #{ i32 : int32_u; i64 : int64_u; }
 
   type record = { str : string; sub : sub; }
 
@@ -62,7 +62,7 @@ module T02 = struct
 
   type sub = #{ i32 : int32; i64 : int64; }
 
-  type record = { i : int32#; sub : sub; }
+  type record = { i : int32_u; sub : sub; }
 
   let run () =
     let value = Sys.opaque_identity {
@@ -81,9 +81,9 @@ module T03 = struct
 
   (* All values in inner record are unboxed, all values in outer record are unboxed. *)
 
-  type sub = #{ i32 : int32#; i64 : int64#; }
+  type sub = #{ i32 : int32_u; i64 : int64_u; }
 
-  type record = { i : int32#; sub : sub; }
+  type record = { i : int32_u; sub : sub; }
 
   let run () =
     let value = Sys.opaque_identity {
@@ -102,9 +102,9 @@ module T04 = struct
 
   (* Both inner and outer records have boxed and unboxed values. *)
 
-  type sub = #{ i32 : int32#; i64 : int64#; s : string; }
+  type sub = #{ i32 : int32_u; i64 : int64_u; s : string; }
 
-  type record = { str : string; sub : sub; i: int32#; }
+  type record = { str : string; sub : sub; i: int32_u; }
 
   let run () =
     let value = Sys.opaque_identity {
@@ -126,7 +126,7 @@ module T05 = struct
 
   (* Inner record has only one element (`Product` expects at least two elements). *)
 
-  type sub = #{ i32 : int32#; }
+  type sub = #{ i32 : int32_u; }
 
   type record = { str : string; sub : sub; }
 
@@ -146,9 +146,9 @@ module T06 = struct
 
   (* Three levels of nesting. *)
 
-  type aux = #{ i64 : int64#; }
+  type aux = #{ i64 : int64_u; }
 
-  type sub = #{ i32 : int32#; aux : aux; }
+  type sub = #{ i32 : int32_u; aux : aux; }
 
   type record = { str : string; sub : sub; }
 

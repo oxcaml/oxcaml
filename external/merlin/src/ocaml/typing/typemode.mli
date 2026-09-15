@@ -17,6 +17,9 @@ type modalities =
 *)
 val transl_mode_annots : Parsetree.modes -> Mode.Alloc.Const.Option.t modes
 
+val apply_mode_implications :
+  Mode.Alloc.Const.Option.t -> Mode.Alloc.Const.Option.t
+
 val untransl_mode : _ modes -> Parsetree.modes
 
 (** Interpret mode syntax as alloc mode (on arrow types), where axes are set to
@@ -75,10 +78,18 @@ val transl_with_bound_modifiers :
 
 (** Interpret a mod-bounds. *)
 val transl_mod_bounds :
+  ?warn:bool ->
   Parsetree.modes ->
   Jkind.Mod_bounds.t
   * (Jkind_axis.Nullability.t Location.loc option
     * Jkind_axis.Separability.t Location.loc option)
+
+(** Close mod-bounds under implied modalities, as [transl_mod_bounds] does for
+    user-written annotations (e.g. a [global] bound also bounds [aliased],
+    [forkable] and [unyielding]). Bounds computed axis-by-axis may lack these
+    implications, which [untransl_mod_bounds] relies on to omit implied modes
+    when printing. *)
+val close_implied_mod_bounds : Jkind.Mod_bounds.t -> Jkind.Mod_bounds.t
 
 (** Translate an algebraic representation of mod bounds into user syntax. If
     [verbose] is true, redundant annotations are included. *)

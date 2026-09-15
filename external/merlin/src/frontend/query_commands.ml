@@ -250,9 +250,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
             ret (`String ("not an allocation (" ^ reason ^ ")"))
           | Stack_or_heap_enclosing.Alloc_mode alloc_mode, true ->
             let locality =
-              alloc_mode
-              |> Mode.Alloc.proj_comonadic Areality
-              |> Mode.Locality.Guts.check_const_conservative
+              Typedtree.alloc_mode_r_map
+                Mode.Locality.Guts.check_const_conservative alloc_mode
             in
             let str =
               match locality with
@@ -547,7 +546,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       else
         let local_defs = Mtyper.get_typedtree typer in
         Some
-          (Locate.get_doc ~config ~env ~local_defs
+          (Locate.get_doc ~buffer_source:(Msource.text source) ~config ~env
+             ~local_defs
              ~comments:(Mpipeline.reader_comments pipeline)
              ~pos)
     in
@@ -633,7 +633,11 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           else
             let comments = Mpipeline.reader_comments pipeline in
             let local_defs = Mtyper.get_typedtree typer in
-            Type_search.get_doc ~config ~env ~local_defs ~comments ~pos name
+            let buffer_source =
+              Msource.text (Mpipeline.input_source pipeline)
+            in
+            Type_search.get_doc ~buffer_source ~config ~env ~local_defs
+              ~comments ~pos name
         in
         { v with typ; doc })
   | Refactor_open (mode, pos) ->
@@ -665,7 +669,8 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       in
       if path = "" then `Invalid_context
       else
-        Locate.get_doc ~config ~env ~local_defs ~comments ~pos
+        let buffer_source = Msource.text (Mpipeline.input_source pipeline) in
+        Locate.get_doc ~buffer_source ~config ~env ~local_defs ~comments ~pos
           (`User_input path))
   | Syntax_document pos -> (
     let typer = Mpipeline.typer_result pipeline in

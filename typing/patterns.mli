@@ -51,10 +51,10 @@ module Simple : sig
     | `Variant of label * pattern option * row_desc ref
     | `Record of
         (Longident.t loc * label_description * pattern) list
-        * record_sorts * record_representation * closed_flag
+        * record_representation * closed_flag
     | `Record_unboxed_product of
         (Longident.t loc * unboxed_label_description * pattern) list
-        * record_sorts * record_unboxed_product_representation * closed_flag
+        * record_unboxed_product_representation * closed_flag
     | `Array of mutability * Jkind.sort * pattern list
     | `Lazy of pattern
   ]
@@ -77,7 +77,7 @@ module General : sig
     | `Var of Ident.t * string loc * Uid.t * Jkind.Sort.t * Mode.Value.l
     | `Fun_layout of Ident.t * string loc * Uid.t
                    * Jkind.Sort.t * Mode.Value.l * Types.Lpoly.t
-                   * alloc_mode
+                   * alloc_mode_r
     | `Alias of pattern * Ident.t * string loc * Uid.t
                 * Jkind.Sort.t * Mode.Value.l * Types.type_expr
   ]
@@ -100,9 +100,9 @@ module Head : sig
     | Tuple of string option list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
-        label_description list * record_sorts * record_representation
+        label_description list * record_representation
     | Record_unboxed_product of
-        unboxed_label_description list * record_sorts *
+        unboxed_label_description list *
         record_unboxed_product_representation
     | Variant of
         { tag: label; has_arg: bool;

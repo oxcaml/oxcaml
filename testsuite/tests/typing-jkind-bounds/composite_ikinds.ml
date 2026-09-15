@@ -162,8 +162,6 @@ type ('a : immutable_data) t = { x : 'a list; }
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
-|}, Principal{|
-val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
 
 let foo (t : int t @ contended) = use_uncontended t
@@ -371,8 +369,6 @@ val foo : int t @ contended -> unit = <fun>
 
 let foo (t : _ t @ contended) = use_uncontended t
 [%%expect {|
-val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
-|}, Principal{|
 val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
 |}]
 

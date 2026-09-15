@@ -26,7 +26,7 @@ function get_current_libs() {
 //Provides: caml_dynlink_open_lib
 //Requires: get_current_libs, caml_failwith
 //Requires: caml_jsstring_of_string
-function caml_dynlink_open_lib(_mode, file) {
+function caml_dynlink_open_lib(file) {
   var name = caml_jsstring_of_string(file);
   console.log("Dynlink: try to open ", name);
   //caml_failwith("file not found: "+name)

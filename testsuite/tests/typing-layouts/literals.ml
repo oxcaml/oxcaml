@@ -2,7 +2,11 @@
  include stdlib_upstream_compatible;
  include stdlib_stable;
  flags = "-extension layouts_beta";
- expect;
+ {
+   expect;
+ }{
+   expect.opt;
+ }
 *)
 
 (*****************************************)
@@ -161,7 +165,7 @@ let () = test_nativeint "invalid_nativeint" (#0x10000000000000000n)
 Line 1, characters 44-67:
 1 | let () = test_nativeint "invalid_nativeint" (#0x10000000000000000n)
                                                 ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Integer literal exceeds the range of representable integers of type "nativeint#"
+Error: Integer literal exceeds the range of representable integers of type "nativeint_u"
 |}]
 
 let () = test_int64 "invalid_int64" (#0x10000000000000000L)
@@ -169,7 +173,33 @@ let () = test_int64 "invalid_int64" (#0x10000000000000000L)
 Line 1, characters 36-59:
 1 | let () = test_int64 "invalid_int64" (#0x10000000000000000L)
                                         ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Integer literal exceeds the range of representable integers of type "int64#"
+Error: Integer literal exceeds the range of representable integers of type "int64_u"
+|}]
+
+let () = test_int64 "max_int" (#9223372036854775807L)
+[%%expect{|
+max_int: 9223372036854775807
+|}]
+
+let () = test_int64 "max_int + 1" (#9223372036854775808L)
+[%%expect{|
+Line 1, characters 34-57:
+1 | let () = test_int64 "max_int + 1" (#9223372036854775808L)
+                                      ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int64_u"
+|}]
+
+let () = test_int64 "min_int" (-#9223372036854775808L)
+[%%expect{|
+min_int: -9223372036854775808
+|}]
+
+let () = test_int64 "min_int - 1" (-#9223372036854775809L)
+[%%expect{|
+Line 1, characters 34-58:
+1 | let () = test_int64 "min_int - 1" (-#9223372036854775809L)
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int64_u"
 |}]
 
 let () = test_int32 "invalid_int32" (#0x100000000l)
@@ -177,7 +207,33 @@ let () = test_int32 "invalid_int32" (#0x100000000l)
 Line 1, characters 36-51:
 1 | let () = test_int32 "invalid_int32" (#0x100000000l)
                                         ^^^^^^^^^^^^^^^
-Error: Integer literal exceeds the range of representable integers of type "int32#"
+Error: Integer literal exceeds the range of representable integers of type "int32_u"
+|}]
+
+let () = test_int32 "max_int" (#2147483647l)
+[%%expect{|
+max_int: 2147483647
+|}]
+
+let () = test_int32 "max_int + 1" (#2147483648l)
+[%%expect{|
+Line 1, characters 34-48:
+1 | let () = test_int32 "max_int + 1" (#2147483648l)
+                                      ^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int32_u"
+|}]
+
+let () = test_int32 "min_int" (-#2147483648l)
+[%%expect{|
+min_int: -2147483648
+|}]
+
+let () = test_int32 "min_int - 1" (-#2147483649l)
+[%%expect{|
+Line 1, characters 34-49:
+1 | let () = test_int32 "min_int - 1" (-#2147483649l)
+                                      ^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int32_u"
 |}]
 
 let () = test_int "invalid_int" (#0x8000000000000000m)
@@ -188,9 +244,17 @@ Line 1, characters 32-54:
 Error: Integer literal exceeds the range of representable integers of type "int#"
 |}]
 
+let () = test_int "max_int" (#4611686018427387903m)
+[%%expect{|
+max_int: 4611686018427387903
+|}]
+
 let () = test_int "max_int + 1" (#4611686018427387904m)
 [%%expect{|
-max_int + 1: -4611686018427387904
+Line 1, characters 32-55:
+1 | let () = test_int "max_int + 1" (#4611686018427387904m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
 |}]
 
 let () = test_int "max_int + 2" (#4611686018427387905m)
@@ -198,6 +262,19 @@ let () = test_int "max_int + 2" (#4611686018427387905m)
 Line 1, characters 32-55:
 1 | let () = test_int "max_int + 2" (#4611686018427387905m)
                                     ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Integer literal exceeds the range of representable integers of type "int#"
+|}]
+
+let () = test_int "min_int" (-#4611686018427387904m)
+[%%expect{|
+min_int: -4611686018427387904
+|}]
+
+let () = test_int "min_int - 1" (-#4611686018427387905m)
+[%%expect{|
+Line 1, characters 32-56:
+1 | let () = test_int "min_int - 1" (-#4611686018427387905m)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Integer literal exceeds the range of representable integers of type "int#"
 |}]
 
@@ -233,7 +310,7 @@ let f x =
 
 f #4L;;
 [%%expect {|
-val f : int64# -> [> `Five | `Four | `Other ] = <fun>
+val f : int64_u -> [> `Five | `Four | `Other ] = <fun>
 - : [> `Five | `Four | `Other ] = `Four
 |}];;
 
@@ -246,7 +323,7 @@ let f x =
 
 test_int64 "result" (f #7L);;
 [%%expect {|
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 result: 7
 - : unit = ()
 |}];;
@@ -273,7 +350,7 @@ Lines 2-7, characters 2-14:
 Warning 8 [partial-match]: this pattern-matching is not exhaustive.
   Here is an example of a case that is not matched: "#3L"
 
-val f : int64# -> int64# = <fun>
+val f : int64_u -> int64_u = <fun>
 Exception: Match_failure ("", 2, 2).
 |}];;
 
@@ -355,7 +432,7 @@ Exception: Match_failure ("", 2, 2).
 (* Lexing edge cases *)
 
 (* Unboxed literals at the beginning of the line aren't directives. *)
-let f1 (_ : float#) (_ : int64#) = ();;
+let f1 (_ : float#) (_ : int64_u) = ();;
 let f2 (_ : float#) (_ : float#) = ();;
 let () = f1
 #2.
@@ -367,7 +444,7 @@ let () = f2
 ;;
 
 [%%expect{|
-val f1 : float# -> int64# -> unit = <fun>
+val f1 : float# -> int64_u -> unit = <fun>
 val f2 : float# -> float# -> unit = <fun>
 |}];;
 

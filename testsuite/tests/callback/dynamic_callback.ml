@@ -29,5 +29,5 @@ let () =
     on_fresh_stack (fun () ->
       Printf.printf "before callback [expect 17]: %s\n" (print_dyn d);
       call_from_c (fun () ->
-        Printf.printf "inside callback [expect null]: %s\n" (print_dyn d));
+        Printf.printf "inside callback [expect 17]: %s\n" (print_dyn d));
       Printf.printf "after callback [expect 17]: %s\n" (print_dyn d)))

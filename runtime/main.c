@@ -34,7 +34,7 @@ int main_os(int argc, char_os **argv)
   caml_expand_command_line(&argc, &argv);
 #endif
 
-  caml_main(argv);
+  caml_main((char_os const * const *) argv);
   caml_do_exit(0);
   return 0; /* not reached */
 }

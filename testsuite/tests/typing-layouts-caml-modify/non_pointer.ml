@@ -247,9 +247,9 @@ let () =
   let open struct
     module M : sig
       type t : value & value
-      type r = { mutable t : t; i : int64# }
+      type r = { mutable t : t; i : int64_u }
     end with type t := #(int * string) = struct
-      type r = { mutable t : #(int * string); i : int64# }
+      type r = { mutable t : #(int * string); i : int64_u }
     end
   end in
   test ~expect_caml_modifies:1
@@ -317,10 +317,10 @@ let () =
       type t : k
       val x : t
       val y : t
-      type r = { mutable t : t; i : int64# }
+      type r = { mutable t : t; i : int64_u }
     end with kind_ k := value non_pointer = struct
       type t = int
-      type r = { mutable t : t; i : int64# }
+      type r = { mutable t : t; i : int64_u }
       let x = 1
       let y = 2
     end

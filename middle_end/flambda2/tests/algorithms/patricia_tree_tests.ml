@@ -553,6 +553,36 @@ module Map_specs (V : Value) = struct
       (m |> Map.to_seq |> List.of_seq)
       (m |> Map.bindings)
 
+  let iterator_to_list it =
+    let rec aux it acc =
+      match Map.Mutable_iterator.current it with
+      | None -> List.rev acc
+      | Some (key, datum) ->
+        Map.Mutable_iterator.advance it;
+        aux it ((key, datum) :: acc)
+    in
+    aux it []
+
+  let bindings_vs_iterator m =
+    let it = Map.Mutable_iterator.create () in
+    Map.Mutable_iterator.init it m;
+    List.equal equal_bindings (m |> Map.bindings) (iterator_to_list it)
+
+  let split_vs_seek m k =
+    let it = Map.Mutable_iterator.create () in
+    Map.Mutable_iterator.init it m;
+    Map.Mutable_iterator.seek it k;
+    let exact_iterator =
+      match Map.Mutable_iterator.current it with
+      | Some (key, datum) when key = k ->
+        Map.Mutable_iterator.advance it;
+        Some datum
+      | _ -> None
+    in
+    let _, exact, after = Map.split k m in
+    Option.equal V.equal exact exact_iterator
+    && List.equal equal_bindings (after |> Map.bindings) (iterator_to_list it)
+
   let of_list_valid l = Map.valid (Map.of_list l)
 
   module Equality_on_bindings = struct
@@ -1210,6 +1240,8 @@ let () =
     c "filter_map_sharing vs. filter_map" filter_map_sharing_vs_filter_map
       [key_and_value_to_value_option; map];
     c "filter_map_sharing of id" filter_map_sharing_id [map];
+    c "bindings_vs_iterator" bindings_vs_iterator [map];
+    c "split_vs_seek" split_vs_seek [map; key];
     ()
   in
   let () =

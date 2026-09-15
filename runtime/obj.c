@@ -430,9 +430,9 @@ CAMLprim value caml_alloc_dummy_float (value size)
   return caml_alloc (wosize, 0);
 }
 
-/* [size] is a [value] representing the number of fields.
-   [scannable_size] is a [value] representing the length of the prefix of
-   fields that contains pointer values.
+/* [size] is a [value] representing the total size of the block in words (not
+   necessarily the number of fields). [scannable_size] is a [value] representing
+   the length of the prefix of fields that contains pointer values.
 */
 CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
 {

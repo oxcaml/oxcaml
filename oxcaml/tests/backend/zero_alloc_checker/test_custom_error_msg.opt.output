@@ -11,14 +11,14 @@ Warning 47 [attribute-payload]: illegal payload for attribute zero_alloc.
   It must be either 'assume', 'assume_unless_opt', 'strict', 'opt', 'opt strict', 'assume strict', 'assume never_returns_normally', 'assume never_returns_normally strict', 'assume error', 'ignore', 'arity <int_constant>', 'custom_error_message <string_constant>' or empty
 
 File "test_custom_error_msg.ml", line 2, characters 3-13:
-Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.foo (camlTest_custom_error_msg.foo_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.foo (camlTest_custom_error_msg__foo_HIDE_STAMP).
 This annotation is for testing custom error messages.
 
 File "test_custom_error_msg.ml", line 1, characters 12-16:
 Error: allocation of 24 bytes
 
 File "test_custom_error_msg.ml", line 6, characters 3-13:
-Error: Annotation check for zero_alloc strict failed on function Test_custom_error_msg.bar (camlTest_custom_error_msg.bar_HIDE_STAMP).
+Error: Annotation check for zero_alloc strict failed on function Test_custom_error_msg.bar (camlTest_custom_error_msg__bar_HIDE_STAMP).
 This annotation is for testing custom error messages.
 
 File "stdlib.ml", line 280, characters 2-19:
@@ -30,7 +30,7 @@ File "test_custom_error_msg.ml", line 5, characters 43-70:
 Error: allocation of 24 bytes on a path to exceptional return
 
 File "test_custom_error_msg.ml", line 13, characters 3-13:
-Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.fast (camlTest_custom_error_msg.fast_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.fast (camlTest_custom_error_msg__fast_HIDE_STAMP).
 This annotation is for testing custom error messages 
 in combination with "opt" payload and newlines.
 
@@ -43,7 +43,7 @@ File "test_custom_error_msg.ml", line 12, characters 5-11:
 Error: called function may allocate (external call to caml_equal)
 
 File "test_custom_error_msg.ml", line 41, characters 10-18:
-Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T1.M1.f (camlTest_custom_error_msg.f_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T1.M1.f (camlTest_custom_error_msg__f_HIDE_STAMP).
 foo
 bar
 
@@ -51,13 +51,13 @@ File "test_custom_error_msg.ml", line 41, characters 14-18:
 Error: allocation of 24 bytes
 
 File "test_custom_error_msg.ml", line 62, characters 9-19:
-Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T2.M2.f (camlTest_custom_error_msg.f_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T2.M2.f (camlTest_custom_error_msg__f_HIDE_STAMP).
 
 File "test_custom_error_msg.ml", line 62, characters 27-31:
 Error: allocation of 24 bytes
 
 File "test_custom_error_msg.ml", line 80, characters 9-19:
-Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T3.M3.f (camlTest_custom_error_msg.f_HIDE_STAMP).
+Error: Annotation check for zero_alloc failed on function Test_custom_error_msg.T3.M3.f (camlTest_custom_error_msg__f_HIDE_STAMP).
 use this, throw the others away
 
 File "test_custom_error_msg.ml", line 82, characters 6-10:

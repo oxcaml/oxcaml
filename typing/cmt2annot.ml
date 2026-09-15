@@ -188,5 +188,5 @@ let gen_annot target_filename ~sourcefile ~use_summaries annots =
   | Partial_implementation parts ->
       Array.iter (binary_part iter) parts;
       Stypes.dump target_filename
-  | Interface _ | Packed _ | Partial_interface _ ->
+  | Interface _ | Packed _ | Partial_interface _ | Functorize ->
       ()

@@ -33,7 +33,6 @@ type compile_time_constant =
   | Ostype_win32
   | Ostype_cygwin
   | Backend_type
-  | Runtime5
   | Arch_amd64
   | Arch_arm64
 
@@ -47,18 +46,32 @@ type locality_mode = private
   | Alloc_heap
   | Alloc_local
 
+type return_mode = private
+  | Maybe_alloc_stack
+  | Not_alloc_stack
+
 type modify_mode = private
   | Modify_heap
   | Modify_maybe_stack
 
 val alloc_heap : locality_mode
 
-(* Actually [Alloc_heap] if [Config.stack_allocation] is [false] *)
 val alloc_local : locality_mode
+
+val not_alloc_stack : return_mode
+
+val maybe_alloc_stack : return_mode
 
 val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
+
+val return_mode_to_locality_mode : return_mode -> locality_mode
+(** [return_mode_to_locality_mode] takes a return_mode and returns a
+    locality_mode.
+    WARNING: a return_mode is in general not sufficient to determine whether
+    an allocation can be done on the stack. Use this transformation with
+    caution. *)
 
 type staticity =
   | Static
@@ -252,6 +265,8 @@ type primitive =
   | Pstring_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                           mode : locality_mode; boxed : bool }
   | Pbytes_load_i8 of { unsafe : bool; index_kind : array_index_kind;
                         tagged : bool }
   | Pbytes_load_i16 of { unsafe : bool; index_kind : array_index_kind;
@@ -266,6 +281,8 @@ type primitive =
   | Pbytes_load_vec of
       { size : boxed_vector; unsafe : bool; index_kind : array_index_kind;
         mode : locality_mode; boxed : bool }
+  | Pbytes_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                          mode : locality_mode; boxed : bool }
   | Pbytes_set_8 of { unsafe : bool; index_kind : array_index_kind;
                       tagged : bool }
   | Pbytes_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -278,6 +295,8 @@ type primitive =
       boxed : bool }
   | Pbytes_set_vec of { size : boxed_vector; unsafe : bool;
                         index_kind : array_index_kind; boxed : bool }
+  | Pbytes_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                         boxed : bool }
   (* load/set 8,16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   (* load_i8/i16 is sign-extended *)
@@ -300,6 +319,8 @@ type primitive =
       mode : locality_mode;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_load_mask of { unsafe : bool; index_kind : array_index_kind;
+                              mode : locality_mode; boxed : bool }
   | Pbigstring_set_8 of { unsafe : bool; index_kind : array_index_kind;
                           tagged : bool }
   | Pbigstring_set_16 of { unsafe : bool; index_kind : array_index_kind;
@@ -317,6 +338,8 @@ type primitive =
       index_kind : array_index_kind;
       aligned : bool;
       boxed : bool }
+  | Pbigstring_set_mask of { unsafe : bool; index_kind : array_index_kind;
+                             boxed : bool }
   (* load/set SIMD vectors in GC-managed arrays *)
   | Pfloatarray_load_vec of { size : boxed_vector; unsafe : bool;
                               index_kind : array_index_kind;
@@ -383,21 +406,53 @@ type primitive =
         into [shape] -- not a field index. *)
     shape : mixed_block_shape;
   }
-  | Patomic_set_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_set_mixed_field of {
     index : int;
     shape : mixed_block_shape;
+    mode : modify_mode;
   }
-  | Patomic_exchange_field of { immediate_or_pointer : immediate_or_pointer }
+  | Patomic_exchange_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_compare_exchange_field of
-    { immediate_or_pointer : immediate_or_pointer }
-  | Patomic_compare_set_field of { immediate_or_pointer : immediate_or_pointer }
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
+  | Patomic_compare_set_field of
+    { immediate_or_pointer : immediate_or_pointer; mode : modify_mode }
   | Patomic_fetch_add_field
   | Patomic_add_field
   | Patomic_sub_field
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
+  | Patomic_load_idx of { layout : layout }
+  | Patomic_set_idx of { layout : layout; mode : modify_mode }
+  | Patomic_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_idx of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_idx
+  | Patomic_add_idx
+  | Patomic_sub_idx
+  | Patomic_land_idx
+  | Patomic_lor_idx
+  | Patomic_lxor_idx
+  | Patomic_load_ptr of { layout : layout }
+  | Patomic_set_ptr of { layout : layout; mode : modify_mode }
+  | Patomic_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_exchange_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_compare_set_ptr of
+    { layout : layout; mode : modify_mode }
+  | Patomic_fetch_add_ptr
+  | Patomic_add_ptr
+  | Patomic_sub_ptr
+  | Patomic_land_ptr
+  | Patomic_lor_ptr
+  | Patomic_lxor_ptr
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -408,6 +463,8 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Punbox_mask
+  | Pbox_mask of locality_mode
   | Pjoin_vec256
   | Psplit_vec256
   | Preinterpret_boxed_vector_as_tuple of boxed_vector
@@ -861,6 +918,8 @@ type shared_code = (int * int) list     (* stack size -> code label *)
 
 type static_label = Static_label.t
 
+type unbox_return_attribute = locality_mode option
+
 type function_attribute = {
   inline : inline_attribute;
   specialise : specialise_attribute;
@@ -880,7 +939,7 @@ type function_attribute = {
      [fun x y -> e]. This fusion is allowed only when the [may_fuse_arity] field
      on *both* functions involved is [true]. *)
   may_fuse_arity: bool;
-  unbox_return: bool;
+  unbox_return: unbox_return_attribute;
 }
 
 type parameter_attribute = {
@@ -893,8 +952,6 @@ type debug_uid = Shape.Uid.t
     WARNING: Unlike the name sugggests, these identifiers are not always unique.
     Instead, in many cases, we use [debug_uid_none] below, and multiple
     variables at the level of Lambda or below can use the same [debug_uid]. *)
-(* CR sspies: This comment is currently not accurate, since we do not yet
-  emit these ids into dwarf code. *)
 
 val debug_uid_none : debug_uid
 (** [debug_uid_none] should be used for those identifiers that are not
@@ -974,7 +1031,7 @@ type lambda =
   | Lfor of lambda_for
   | Lassign of Ident.t * lambda
   | Lsend of meth_kind * lambda * lambda * lambda list
-             * region_close * locality_mode * scoped_location * layout
+             * region_close * return_mode * scoped_location * layout
              * yielding_kind
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
@@ -1041,7 +1098,7 @@ and lfunction = private
     attr: function_attribute; (* specified with [@inline] attribute *)
     loc : scoped_location;
     mode : locality_mode;     (* locality of the closure itself *)
-    ret_mode: locality_mode;
+    ret_mode: return_mode;
     (** alloc mode of the returned value. Also indicates if the function might
         allocate in the caller's region. *)
     yielding: yielding_kind;
@@ -1053,9 +1110,7 @@ and lfunction = private
 
 and lkindtemplate =
   { ktmpl_params: Slambdaident.t list;
-    ktmpl_return: layout;
-    ktmpl_body: lambda;
-    ktmpl_ret_mode: locality_mode;
+    ktmpl_body: lfunction;
     ktmpl_env: (lambda * layout) Ident.Map.t;
     ktmpl_env_mode: locality_mode;
     ktmpl_loc: scoped_location;
@@ -1065,7 +1120,7 @@ and lkindinstantiate =
   { kinst_func: lambda;
     kinst_args: layout list;
     kinst_result_layout: layout;
-    kinst_mode: locality_mode;
+    kinst_mode: return_mode;
     kinst_loc: scoped_location;
   }
 
@@ -1089,7 +1144,7 @@ and lambda_apply =
     ap_args : lambda list;
     ap_result_layout : layout;
     ap_region_close : region_close;
-    ap_mode : locality_mode;
+    ap_mode : return_mode;
     ap_yielding : yielding_kind;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
@@ -1318,7 +1373,7 @@ val lfunction :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lambda
 
 val lfunction' :
@@ -1329,7 +1384,7 @@ val lfunction' :
   attr:function_attribute -> (* specified with [@inline] attribute *)
   loc:scoped_location ->
   mode:locality_mode ->
-  ret_mode:locality_mode ->
+  ret_mode:return_mode ->
   lfunction
 
 (* Set the yielding mode of a closure (defaults to [May_yield] from the
@@ -1429,6 +1484,9 @@ val rename : Ident.t Ident.Map.t -> lambda -> lambda
 (** A version of [subst] specialized for the case where we're just renaming
     idents. *)
 
+val rename_lfun : Ident.t Ident.Map.t -> lfunction -> lfunction
+(** Identical to [rename] but operates on [lfunction] rather than [lambda]. *)
+
 val duplicate_function : lfunction -> lfunction
 (** Duplicate a term, freshening all locally-bound identifiers. *)
 
@@ -1469,6 +1527,11 @@ val eq_locality_mode : locality_mode -> locality_mode -> bool
 val is_local_mode : locality_mode -> bool
 val is_heap_mode : locality_mode -> bool
 
+val is_maybe_alloc_stack : return_mode -> bool
+val is_not_alloc_stack : return_mode -> bool
+val eq_return_mode : return_mode -> return_mode -> bool
+val locality_return_compat : locality_mode -> return_mode -> bool
+
 val primitive_may_allocate : primitive -> locality_mode option
   (** Whether and where a primitive may allocate.
       [Some Alloc_local] permits both options: that is, primitives that
@@ -1485,6 +1548,11 @@ val primitive_may_allocate : primitive -> locality_mode option
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
   (** Like [primitive_may_allocate], for [external] calls. *)
+
+val return_mode_of_primitive_description :
+  external_call_description -> return_mode option
+  (** Like [locality_mode_of_primitive_description], but computes
+      a [return_mode] *)
 
 (***********************)
 (* For static failures *)

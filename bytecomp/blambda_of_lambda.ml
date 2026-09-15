@@ -76,7 +76,6 @@ let caml_sys_const name =
     | Ostype_win32 -> "ostype_win32"
     | Ostype_cygwin -> "ostype_cygwin"
     | Backend_type -> "backend_type"
-    | Runtime5 -> "runtime5"
     | Arch_amd64 -> "arch_amd64"
     | Arch_arm64 -> "arch_arm64"
   in
@@ -994,6 +993,54 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
     | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
     | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
+    (*
+       The following operations do not call [copy_mixed_block_element], so using them with
+       an unboxed product would result in unintended aliasing. Atomic fields are
+       restricted to layout [value_or_null], so this check is purely defensive.
+    *)
+    | Patomic_load_idx { layout = Punboxed_product _ }
+    | Patomic_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_load_ptr { layout = Punboxed_product _ }
+    | Patomic_set_ptr { layout = Punboxed_product _; _ }
+    | Patomic_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_ptr { layout = Punboxed_product _; _ } ->
+      Misc.fatal_errorf
+        "Blambda_of_lambda: primitive %a may not be used with unboxed products"
+        Printlambda.primitive primitive
+    | Patomic_load_idx _ -> binary (Ccall "caml_atomic_load_idx_bytecode")
+    | Patomic_set_idx _ -> ternary (Ccall "caml_atomic_set_idx_bytecode")
+    | Patomic_exchange_idx _ ->
+      ternary (Ccall "caml_atomic_exchange_idx_bytecode")
+    | Patomic_compare_exchange_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_idx_bytecode")
+    | Patomic_compare_set_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_idx_bytecode")
+    | Patomic_fetch_add_idx ->
+      ternary (Ccall "caml_atomic_fetch_add_idx_bytecode")
+    | Patomic_add_idx -> ternary (Ccall "caml_atomic_add_idx_bytecode")
+    | Patomic_sub_idx -> ternary (Ccall "caml_atomic_sub_idx_bytecode")
+    | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
+    | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
+    | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
+    | Patomic_load_ptr _ -> unary (Ccall "caml_atomic_load_ptr_bytecode")
+    | Patomic_set_ptr _ -> binary (Ccall "caml_atomic_set_ptr_bytecode")
+    | Patomic_exchange_ptr _ ->
+      binary (Ccall "caml_atomic_exchange_ptr_bytecode")
+    | Patomic_compare_exchange_ptr _ ->
+      ternary (Ccall "caml_atomic_compare_exchange_ptr_bytecode")
+    | Patomic_compare_set_ptr _ ->
+      ternary (Ccall "caml_atomic_cas_ptr_bytecode")
+    | Patomic_fetch_add_ptr ->
+      binary (Ccall "caml_atomic_fetch_add_ptr_bytecode")
+    | Patomic_add_ptr -> binary (Ccall "caml_atomic_add_ptr_bytecode")
+    | Patomic_sub_ptr -> binary (Ccall "caml_atomic_sub_ptr_bytecode")
+    | Patomic_land_ptr -> binary (Ccall "caml_atomic_land_ptr_bytecode")
+    | Patomic_lor_ptr -> binary (Ccall "caml_atomic_lor_ptr_bytecode")
+    | Patomic_lxor_ptr -> binary (Ccall "caml_atomic_lxor_ptr_bytecode")
     | Pdls_get -> unary (Ccall "caml_domain_dls_get")
     | Ptls_get -> unary (Ccall "caml_domain_tls_get")
     | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
@@ -1001,17 +1048,19 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
     | Pisnull -> unary (Ccall "caml_is_null")
     | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pstring_load_mask _ | Pbytes_load_mask _ | Pbytes_set_mask _
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
-    | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-    | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
-    | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
-    | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
-    | Pfloatarray_set_vec _ | Pint_array_set_vec _
-    | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
-    | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
-    | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _
-    | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+    | Pbigstring_load_mask _ | Pbigstring_set_mask _ | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+    | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+    | Pbox_vector _ | Punbox_vector _ | Pbox_mask _ | Punbox_mask | Pjoin_vec256
+    | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
     | Preinterpret_tuple_as_boxed_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->

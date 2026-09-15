@@ -60,6 +60,8 @@ val has_value_and_flat : t -> bool
 
 val value_prefix_len : t -> int
 
+val size_in_words : t -> int
+
 val all_value : t -> bool
 
 (* shape_is_all_value shape = all_value (count (Product shape)) *)

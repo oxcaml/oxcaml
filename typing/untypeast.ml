@@ -424,10 +424,10 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           | _, None -> None)
     | Tpat_variant (label, pato, _) ->
         Ppat_variant (label, Option.map (sub.pat sub) pato)
-    | Tpat_record (list, _, _, closed) ->
+    | Tpat_record (list, _, closed) ->
         Ppat_record (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
-    | Tpat_record_unboxed_product (list, _, _, closed) ->
+    | Tpat_record_unboxed_product (list, _, closed) ->
         Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
@@ -1014,10 +1014,10 @@ let module_expr (sub : mapper) mexpr =
         let desc = match mexpr.mod_desc with
             Tmod_ident (_p, lid) -> Pmod_ident (map_loc sub lid)
           | Tmod_structure st -> Pmod_structure (sub.structure sub st)
-          | Tmod_functor (arg, mexpr) ->
+          | Tmod_functor (arg, mexpr, _) ->
               Pmod_functor
                 (functor_parameter sub arg, sub.module_expr sub mexpr)
-          | Tmod_apply (mexp1, mexp2, _, _) ->
+          | Tmod_apply (mexp1, mexp2, _, _, _) ->
               Pmod_apply (sub.module_expr sub mexp1,
                           sub.module_expr sub mexp2)
           | Tmod_apply_unit (mexp1, _) ->
