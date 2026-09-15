@@ -178,9 +178,6 @@ val generalize_structure_exp: Typedtree.expression -> unit
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
-val reset_allocations: unit -> unit
-val optimise_allocations: unit -> unit
-
 val has_poly_constraint : Parsetree.pattern -> bool
 
 

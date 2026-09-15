@@ -101,6 +101,9 @@ module Mode_axis_pair = struct
         Language_extension.Alpha;
       monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
+    | "noalloc_strict" -> comonadic Allocation Noalloc_strict
+    | "noalloc" -> comonadic Allocation Noalloc
+    | "alloc" -> comonadic Allocation Alloc
     | _ -> raise Not_found
 end
 

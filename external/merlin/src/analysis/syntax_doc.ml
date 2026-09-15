@@ -264,6 +264,16 @@ let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
     | Monadic Staticity, Static -> Some "The value is known at compile-time."
     | Monadic Staticity, Dynamic ->
       Some "The value is not known at compile-time."
+    | Comonadic Allocation, Alloc ->
+      Some "Functions with this mode may allocate on the heap."
+    | Comonadic Allocation, Noalloc ->
+      Some
+        "Functions with this mode do not allocate on the heap when they return \
+         normally."
+    | Comonadic Allocation, Noalloc_strict ->
+      Some
+        "Functions with this mode do not allocate on the heap, even when they \
+         raise an exception."
   in
   let doc_url =
     let subpage =
@@ -278,6 +288,7 @@ let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
       | Comonadic Statefulness -> "modes/intro/"
       | Comonadic Forkable -> "modes/intro/"
       | Monadic Staticity -> "modes/intro/"
+      | Comonadic Allocation -> "modes/intro/"
     in
     syntax_doc_url Oxcaml subpage
   in

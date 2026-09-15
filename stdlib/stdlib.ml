@@ -107,13 +107,13 @@ external ( * ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%m
 external ( / ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%divint"
 external ( mod ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%modint"
 
-let abs x = if x >= 0 then x else -x
+let (abs @ noalloc_strict) x = if x >= 0 then x else -x
 
 external ( land ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%andint"
 external ( lor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%orint"
 external ( lxor ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%xorint"
 
-let lnot x = x lxor (-1)
+let (lnot @ noalloc_strict) x = x lxor (-1)
 
 external ( lsl ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lslint"
 external ( lsr ) : (int[@local_opt]) -> (int[@local_opt]) -> int @@ portable = "%lsrint"
@@ -232,7 +232,7 @@ let ( ^ ) s1 s2 =
 
 external int_of_char : char -> int @@ portable = "%identity"
 external unsafe_char_of_int : int -> char @@ portable = "%identity"
-let char_of_int n =
+let[@zero_alloc strict] char_of_int n =
   if n < 0 || n > 255 then invalid_arg "char_of_int" else unsafe_char_of_int n
 
 (* Unit operations *)
@@ -264,14 +264,14 @@ type ('a : value_or_null, 'b : value_or_null) result = Ok of 'a | Error of 'b
 external format_int : string -> int -> string @@ portable = "caml_format_int"
 external format_float : string -> float -> string @@ portable = "caml_format_float"
 
-let string_of_bool b =
+let (string_of_bool @ noalloc_strict) b =
   if b then "true" else "false"
 let bool_of_string = function
   | "true" -> true
   | "false" -> false
   | _ -> invalid_arg "bool_of_string"
 
-let bool_of_string_opt = function
+let[@zero_alloc strict] bool_of_string_opt = function
   | "true" -> Some true
   | "false" -> Some false
   | _ -> None
@@ -553,7 +553,7 @@ type ('a, 'b, 'c, 'd) format4 = ('a, 'b, 'c, 'c, 'c, 'd) format6
 
 type ('a, 'b, 'c) format = ('a, 'b, 'c, 'c) format4
 
-let string_of_format (Format (_fmt, str)) = str
+let (string_of_format @ noalloc_strict) (Format (_fmt, str)) = str
 
 external format_of_string :
  ('a, 'b, 'c, 'd, 'e, 'f) format6 ->

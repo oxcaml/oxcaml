@@ -80,7 +80,7 @@ let[@inline available] equal (x: t) (y: t) = compare x y = 0
 let[@inline available] unsigned_compare n m =
   compare (sub n min_int) (sub m min_int)
 
-let unsigned_lt n m =
+let (unsigned_lt @ noalloc_strict) n m =
   sub n min_int < sub m min_int
 
 let[@inline available] min x y : t = if x <= y then x else y
@@ -106,4 +106,4 @@ let[@inline available] unsigned_rem n d =
 external seeded_hash_param :
   int -> int -> int -> nativeint -> int @@ portable = "caml_hash_exn" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
-let hash x = seeded_hash_param 10 100 0 x
+let (hash @ noalloc_strict) x = seeded_hash_param 10 100 0 x

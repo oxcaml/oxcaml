@@ -64,7 +64,7 @@ external succ : (int[@local_opt]) -> int = "%succint"
 external pred : (int[@local_opt]) -> int = "%predint"
 (** [pred x] is [sub x 1]. *)
 
-val abs : int -> int
+val abs : int -> int @@ noalloc_strict
 (** [abs x] is the absolute value of [x]. That is [x] if [x] is positive
     and [neg x] if [x] is negative. {b Warning.} This may be negative if
     the argument is {!min_int}. *)
@@ -86,7 +86,7 @@ external logor : (int[@local_opt]) -> (int[@local_opt]) -> int = "%orint"
 external logxor : (int[@local_opt]) -> (int[@local_opt]) -> int = "%xorint"
 (** [logxor x y] is the bitwise logical exclusive or of [x] and [y]. *)
 
-val lognot : int -> int
+val lognot : int -> int @@ noalloc_strict
 (** [lognot x] is the bitwise logical negation of [x]. *)
 
 external shift_left : (int[@local_opt]) -> (int[@local_opt]) -> int = "%lslint"
@@ -113,12 +113,15 @@ val equal : int -> int -> bool
 val compare : int -> int -> int
 (** [compare x y] is {!Stdlib.compare}[ x y] but more efficient. *)
 
-val min : int -> int -> int
+(* A [noalloc_strict] function cannot heap-allocate the closure of a partial
+   application, so the inner arrow is [local]. Full applications, which never
+   build that closure, are unaffected. *)
+val min : int -> (int -> int) @ local @@ noalloc_strict
 (** Return the smaller of the two arguments.
     @since 4.13
 *)
 
-val max : int -> int -> int
+val max : int -> (int -> int) @ local @@ noalloc_strict
 (** Return the greater of the two arguments.
     @since 4.13
  *)

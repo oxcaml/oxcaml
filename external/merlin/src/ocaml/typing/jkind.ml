@@ -636,6 +636,7 @@ module Mod_bounds = struct
     @@ Sub_result.combine (modal_less_or_equal (Comonadic Statefulness))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Visibility))
     @@ Sub_result.combine (modal_less_or_equal (Monadic Staticity))
+    @@ Sub_result.combine (modal_less_or_equal (Comonadic Allocation))
     @@ axis_less_or_equal ~le:Externality.le ~axis:(Pack (Nonmodal Externality))
          (externality t1) (externality t2)
 
@@ -668,6 +669,7 @@ module Mod_bounds = struct
     |> add_crossing_if (Comonadic Statefulness)
     |> add_crossing_if (Monadic Visibility)
     |> add_crossing_if (Monadic Staticity)
+    |> add_crossing_if (Comonadic Allocation)
     |> add_if
          (Externality.le Externality.max (externality t))
          (Nonmodal Externality)

@@ -35,7 +35,8 @@ val none : ('a : value_or_null). 'a option
 val some : ('a : value_or_null). 'a -> 'a option
 (** [some v] is [Some v]. *)
 
-val value : ('a : value_or_null). 'a option -> default:'a -> 'a
+val value : ('a : value_or_null) . 'a option -> (default:'a -> 'a) @ local @@
+  noalloc_strict
 (** [value o ~default] is [v] if [o] is [Some v] and [default] otherwise. *)
 
 val get : ('a : value_or_null). 'a option -> 'a

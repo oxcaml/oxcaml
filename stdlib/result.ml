@@ -22,7 +22,8 @@ type ('a : value_or_null, 'e : value_or_null) t = ('a, 'e) result = Ok of 'a | E
 
 let ok v = Ok v
 let error e = Error e
-let value r ~default = match r with Ok v -> v | Error _ -> default
+let (value @ noalloc_strict) r ~default =
+  match r with Ok v -> v | Error _ -> default
 let get_ok = function Ok v -> v | Error _ -> invalid_arg "result is Error _"
 let get_ok' = function Ok v -> v | Error e -> invalid_arg e
 let get_error = function Error e -> e | Ok _ -> invalid_arg "result is Ok _"

@@ -54,6 +54,7 @@ val push : ('a : value_or_null) . 'a -> 'a t @ local -> unit
 (** [push] is a synonym for [add]. *)
 
 val take : ('a : value_or_null) . 'a t @ local -> 'a
+[@@zero_alloc strict]
 (** [take q] removes and returns the first element in queue [q],
    or raises {!Empty} if the queue is empty. *)
 
@@ -66,6 +67,7 @@ val pop : ('a : value_or_null) . 'a t @ local -> 'a
 (** [pop] is a synonym for [take]. *)
 
 val peek : ('a : value_or_null) . 'a t @ local -> 'a
+[@@zero_alloc strict]
 (** [peek q] returns the first element in queue [q], without removing
    it from the queue, or raises {!Empty} if the queue is empty. *)
 
@@ -78,6 +80,7 @@ val top : ('a : value_or_null) . 'a t @ local -> 'a
 (** [top] is a synonym for [peek]. *)
 
 val drop : ('a : value_or_null) . 'a t @ local -> unit
+[@@zero_alloc strict]
 (** [drop q] removes the first element in queue [q], or raises {!Empty}
    if the queue is empty.
    @since 5.3 *)

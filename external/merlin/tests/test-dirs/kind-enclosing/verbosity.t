@@ -13,12 +13,14 @@
   > type t = int
   > EOF
   Verbosity 0: immediate
-  Verbosity 1: value non_pointer mod global many stateless immutable external_
+  Verbosity 1: value non_pointer
+    mod global many stateless immutable noalloc_strict external_
   Verbosity 2: value non_pointer non_null
     mod global
         many
         stateless
         immutable
+        noalloc_strict
         forkable
         unyielding
         aliased
@@ -31,13 +33,16 @@
   > type 'a t = 'a option
   > EOF
   Verbosity 0: immutable_data with 'a
-  Verbosity 1: value non_float mod forkable unyielding many stateless immutable with 'a
+  Verbosity 1: value non_float
+    mod forkable unyielding many stateless immutable noalloc_strict
+    with 'a
   Verbosity 2: value non_float non_null
     mod forkable
         unyielding
         many
         stateless
         immutable
+        noalloc_strict
         portable
         contended
         local
@@ -51,13 +56,16 @@
   > type t2 = Foo of int t1
   > EOF
   Verbosity 0: immutable_data with int t1
-  Verbosity 1: value non_float mod forkable unyielding many stateless immutable with int t1
+  Verbosity 1: value non_float
+    mod forkable unyielding many stateless immutable noalloc_strict
+    with int t1
   Verbosity 2: value non_float non_null
     mod forkable
         unyielding
         many
         stateless
         immutable
+        noalloc_strict
         portable
         contended
         local
@@ -81,6 +89,7 @@
         read_write
         uncontended
         static
+        alloc
         internal
   Verbosity 2: value separable non_null
     mod portable
@@ -93,6 +102,7 @@
         read_write
         uncontended
         static
+        alloc
         internal
 
   $ run 1:5 <<EOF
@@ -110,6 +120,7 @@
         read_write
         uncontended
         static
+        alloc
         internal
   Verbosity 2: value separable non_null
     mod stateless
@@ -122,4 +133,5 @@
         read_write
         uncontended
         static
+        alloc
         internal

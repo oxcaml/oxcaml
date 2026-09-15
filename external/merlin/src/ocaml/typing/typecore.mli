@@ -180,9 +180,6 @@ val delayed_checks: delayed_check list ref
 val reset_delayed_checks: unit -> unit
 val force_delayed_checks: unit -> unit
 
-val reset_allocations: unit -> unit
-val optimise_allocations: unit -> unit
-
 val has_poly_constraint : Parsetree.pattern -> bool
 
 
