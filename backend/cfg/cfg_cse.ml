@@ -417,10 +417,30 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Begin_region | End_region -> Op_other
     | Dls_get | Tls_get | Domain_index -> Op_load Mutable
 
-  let class_of_operation op =
-    match Target.class_of_operation op with
-    | Class op_class -> op_class
-    | Use_default -> class_of_operation0 op
+  let is_gc_sensitive (r : Reg.t) =
+    match r.typ with
+    | Val | Valx2 | Addr -> true
+    | Int | Float | Float32 | Vec128 | Vec256 | Vec512 | Mask -> false
+
+  let class_of_operation op ~arg ~res : op_class =
+    let op_class =
+      match Target.class_of_operation op with
+      | Class op_class -> op_class
+      | Use_default -> class_of_operation0 op
+    in
+    match op_class with
+    | Op_pure ->
+      (* A pure operation can still observe or produce a moving address.
+         Classify it when recording the equation, so that GC invalidates it even
+         if its original results are no longer held in registers. This also
+         prevents recomputed Addr results from recovering old numbers. As with
+         address casts, invalidation at stores is conservative. *)
+      if
+        Array.exists arg ~f:is_gc_sensitive
+        || Array.exists res ~f:is_gc_sensitive
+      then Op_load Mutable
+      else Op_pure
+    | Op_load _ | Op_store _ | Op_other -> op_class
 
   let is_cheap_operation : Operation.t -> bool = function
     | Const_int _ -> true
@@ -608,7 +628,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
          | Specific _ | Name_for_debugger _ | Pause ) as op) -> (
-      match class_of_operation op with
+      match class_of_operation op ~arg:i.arg ~res:i.res with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
         let rhs = op, varg, Reg.typv i.res in
