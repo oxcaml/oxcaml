@@ -21,7 +21,10 @@ val register_allocation_value_mode :
   Locality.r * With_regionality.r
 
 val register_closure_allocation :
-  env:Env.t -> With_regionality.r -> loc:Location.t -> Locality.lr * With_locality.lr * With_regionality.r
+  env:Env.t ->
+  With_regionality.r ->
+  loc:Location.t ->
+  Locality.lr * Allocation.lr * With_locality.lr * With_regionality.r
 
 val register_mod_allocation :
   env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit

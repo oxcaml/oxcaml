@@ -51,19 +51,31 @@ let register_allocation_value_mode ~env ~loc
    to one argument must be global. As a result, a function gets an
    [With_locality.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation ~env (expected_mode : With_regionality.r) ~loc
-    : Locality.lr * With_locality.lr * With_regionality.r =
+    : Locality.lr * Allocation.lr * With_locality.lr * With_regionality.r =
   let allocation : Hint.allocation = { loc; txt = Unknown } in
   let closure_mode, _ =
     With_locality.newvar_below (Ctype.get_current_level ())
       (with_regionality_to_locality_r2g ~allocation expected_mode)
   in
-  let locality = With_locality.proj_comonadic Areality closure_mode in
-  let locality_mode : Locality.lr = Locality.newvar_below 0 locality |> fst in
+  let locality_mode : Locality.lr =
+    With_locality.proj_comonadic Areality closure_mode
+    |> Locality.newvar_below 0
+    |> fst
+  in
+  let allocation_mode : Allocation.lr =
+    With_locality.proj_comonadic Allocation closure_mode
+    |> Allocation.newvar_below 0
+    |> fst
+  in
   let closed_over_mode =
-    with_locality_as_regionality ~allocation (With_locality.disallow_left closure_mode)
+    With_regionality.meet
+      [ with_locality_as_regionality ~allocation (With_locality.disallow_left closure_mode);
+        With_regionality.max_with_comonadic
+          Allocation
+          (Allocation.disallow_left allocation_mode) ]
   in
   register_allocation_mode ~env ~loc locality_mode;
-  locality_mode, closure_mode, closed_over_mode
+  locality_mode, allocation_mode, closure_mode, closed_over_mode
 
 (* Module is always allocated on the heap, so every enclosing closure
    is forced to be [alloc]. *)
