@@ -100,6 +100,12 @@ val classify_lazy_argument : Typedtree.expression ->
                              | `Identifier of [`Forward_value | `Other]
                              | `Other]
 
+(* Raises an error if the mixed block's scannable prefix would be too long.
+   The shape must not contain any splice variables. *)
+val assert_mixed_product_support_for_lambda_shape :
+  Location.t -> Typedecl.Mixed_product_kind.t
+  -> 'a Lambda.mixed_block_element array -> unit
+
 (* Translate record representations to Lambda, defaulting unfilled
    sorts and turning generalized sorts into splices. *)
 val transl_record_representation:
