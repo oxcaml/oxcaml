@@ -3905,7 +3905,8 @@ let walk_locks_for_allocation ~env pp =
               (Is_closed_by (Comonadic, {closure; closed = pp}))
               comonadic
           in
-          (closure, Mode.With_regionality.Comonadic.proj Allocation comonadic) :: acc
+          (closure,
+           Mode.With_regionality.Comonadic.proj Allocation comonadic) :: acc
       (* A [Const_closure_lock] is at a constant mode which is always [alloc]
          on the allocation axis, so there is nothing to constrain. *)
       | Region_lock | Const_closure_lock _ | Exclave_lock
@@ -3944,7 +3945,9 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
-          mode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_as_regionality
+          mode
+          |> Mode.with_regionality_to_locality_r2l
+          |> Mode.with_locality_as_regionality
       | Const_closure_lock (true, _, _) -> mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env

@@ -38,7 +38,10 @@ val register_zero_alloc_application_allocation :
   unit
 
 val relax_alloc :
-  Types.value_description -> is_applied:bool -> With_regionality.l -> With_regionality.l
+  Types.value_description ->
+  is_applied:bool ->
+  With_regionality.l ->
+  With_regionality.l
 
 (** For every allocation that has to be on heap ([global]), constrain
     the enclosing closures to be [alloc].
