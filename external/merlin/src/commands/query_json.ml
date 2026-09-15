@@ -161,6 +161,11 @@ let dump (type a) : a t -> json =
     mk "case-analysis"
       [ ("start", mk_position pos_start); ("end", mk_position pos_end) ]
   | Holes -> mk "holes" []
+  | Module_type_impls position ->
+    mk "module-type-impls"
+      (match position with
+      | None -> []
+      | Some position -> [ ("position", mk_position position) ])
   | Construct (pos, with_values, depth) ->
     let depth = Option.value ~default:1 depth in
     mk "construct"
@@ -277,9 +282,9 @@ let with_location ?(with_file = false) ?(skip_none = false) loc assoc =
   else
     `Assoc
       (with_file
-      @@ ("start", Lexing.json_of_position loc.Location.loc_start)
+         (("start", Lexing.json_of_position loc.Location.loc_start)
          :: ("end", Lexing.json_of_position loc.Location.loc_end)
-         :: assoc)
+         :: assoc))
 
 let json_of_stack_or_heap (loc, desc) =
   with_location loc
@@ -609,6 +614,106 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     `List
       (List.map locations ~f:(fun (loc, typ) ->
            with_location loc [ ("type", `String typ) ]))
+  | Module_type_impls _, response ->
+    let json_of_loc loc = with_location ~with_file:true loc [] in
+    let json_of_implementation
+        (i : Query_protocol.Module_type_impls.implementation) =
+      with_location ~with_file:true i.site.impl_loc
+        ((match i.target with
+           | Own_interface -> [ ("target", `String "(interface)") ]
+           | Modtype name -> [ ("target", `String name) ])
+        @ (match i.target_loc with
+          | Some loc -> [ ("decl", json_of_loc loc) ]
+          | None -> [])
+        @ [ ("instance", `String i.target_instance) ]
+        @ (match i.implementation_uid with
+          | Some uid ->
+            [ ( "uid",
+                `String (Format.asprintf "%a" Ocaml_typing.Shape.Uid.print uid)
+              )
+            ]
+          | None -> [])
+        @ (match i.implementation_name with
+          | Some name -> [ ("name", `String name) ]
+          | None -> [])
+        @ [ ( "kind",
+              `String
+                (match i.site.impl_kind with
+                | Whole_unit -> "unit"
+                | Annotation_sites -> "annotations") );
+            ( "check",
+              `String
+                (match i.check with
+                | Annotation -> "annotation"
+                | Argument -> "argument"
+                | Package -> "package"
+                | Interface -> "interface") )
+          ]
+        @
+        match i.check_site with
+        | Some loc -> [ ("check-site", json_of_loc loc) ]
+        | None -> [])
+    in
+    let json_of_error (error : Query_protocol.Module_type_impls.error) =
+      match error with
+      | No_index_files -> `Assoc [ ("kind", `String "no-index-files") ]
+      | Channel_absent index_file ->
+        `Assoc
+          [ ("kind", `String "facts-channel-absent");
+            ("index", `String index_file)
+          ]
+      | Index_read_error { index_file; message } ->
+        `Assoc
+          [ ("kind", `String "index-read-error");
+            ("index", `String index_file);
+            ("message", `String message)
+          ]
+      | Omission { family; reason } ->
+        `Assoc
+          ([ ("kind", `String "omission"); ("reason", `String reason) ]
+          @
+          match family with
+          | Some family -> [ ("family", `String family) ]
+          | None -> [])
+      | Unresolved_implementation
+          { target; target_instance; implementation; site } ->
+        `Assoc
+          ([ ("kind", `String "unresolved-implementation");
+             ("target", `String target);
+             ("instance", `String target_instance);
+             ("implementation", `String implementation)
+           ]
+          @
+          match site with
+          | Some site -> [ ("site", `String site) ]
+          | None -> [])
+      | Unresolved_check_site { target; target_instance; site } ->
+        `Assoc
+          [ ("kind", `String "unresolved-check-site");
+            ("target", `String target);
+            ("instance", `String target_instance);
+            ("site", `String site)
+          ]
+    in
+    let json_of_status = function
+      | Query_protocol.Module_type_impls.Complete -> "complete"
+      | Partial -> "partial"
+      | Unavailable -> "unavailable"
+    in
+    let json_of_target_result
+        (target : Query_protocol.Module_type_impls.target_result) =
+      `Assoc
+        [ ("target", `String target.target);
+          ("decl", json_of_loc target.target_loc);
+          ("status", `String (json_of_status target.status));
+          ("errors", `List (List.map target.errors ~f:json_of_error))
+        ]
+    in
+    `Assoc
+      [ ("targets", `List (List.map response.targets ~f:json_of_target_result));
+        ( "implementations",
+          `List (List.map response.implementations ~f:json_of_implementation) )
+      ]
   | Construct _, ({ Location.loc_start; loc_end; _ }, strs) ->
     let assoc =
       `Assoc

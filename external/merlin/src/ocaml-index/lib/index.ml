@@ -129,7 +129,7 @@ let rewrite_module_facts ~root ~rewrite_root
 
 let merge_module_facts left right =
   match (left, right) with
-  | None, _ | _, None -> None
+  | None, facts | facts, None -> facts
   | Some left, Some right ->
     Some
       (link_module_facts
@@ -324,7 +324,7 @@ let from_files ~store_shapes ~output_file ~root ~rewrite_root ~build_path
       stats = Stats.empty;
       root_directory = root;
       related_uids = Uid_map.empty ();
-      module_facts = Some (link_module_facts Module_implementation_facts.empty)
+      module_facts = None
     }
   in
   let final_index =
