@@ -179,7 +179,7 @@ let dwarf_for_variable state ~value_type_proto_die ~function_proto_die
       let name_attribute = [DAH.create_name name_for_var] in
       name_attribute @ type_attribute
   in
-  let location_attribute_value, location_list_in_debug_loc_table =
+  let location_attributes () =
     (* Build a location list that identifies where the value of [var] may be
        found at runtime, indexed by program counter range. The representations
        of location lists (and range lists, used below to describe lexical
@@ -233,30 +233,36 @@ let dwarf_for_variable state ~value_type_proto_die ~function_proto_die
       in
       [DAH.create_location location_list_index], None
   in
-  let tag : Dwarf_tag.t =
-    match is_parameter with
-    | Parameter _index ->
-      (* The lvalue DIE is the "normal" one for variables and parameters; it is
-         the one that is marked with a name, for example. To avoid erroneous
-         display of, or confusion around, rvalue DIEs we always mark them as
-         variables not parameters. *)
-      Formal_parameter
-    | Local -> Variable
-  in
-  let reference =
-    match proto_dies_for_variable var ~proto_dies_for_vars with
-    | None -> None
-    | Some proto_dies -> Some proto_dies.value_die_lvalue
-  in
-  let sort_priority =
-    match is_parameter with
-    | Local -> None
-    | Parameter { index } ->
-      (* Ensure that parameters appear in the correct order in the debugger. *)
-      Some index
-  in
+  (* Hidden variables produce no DIE, so their location lists (which nothing
+     would reference) are not built or registered at all. *)
   if not hidden
   then
+    let location_attribute_value, location_list_in_debug_loc_table =
+      location_attributes ()
+    in
+    let tag : Dwarf_tag.t =
+      match is_parameter with
+      | Parameter _index ->
+        (* The lvalue DIE is the "normal" one for variables and parameters; it
+           is the one that is marked with a name, for example. To avoid
+           erroneous display of, or confusion around, rvalue DIEs we always mark
+           them as variables not parameters. *)
+        Formal_parameter
+      | Local -> Variable
+    in
+    let reference =
+      match proto_dies_for_variable var ~proto_dies_for_vars with
+      | None -> None
+      | Some proto_dies -> Some proto_dies.value_die_lvalue
+    in
+    let sort_priority =
+      match is_parameter with
+      | Local -> None
+      | Parameter { index } ->
+        (* Ensure that parameters appear in the correct order in the
+           debugger. *)
+        Some index
+    in
     Proto_die.create_ignore ?reference ?sort_priority
       ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
@@ -282,8 +288,8 @@ let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
       ~create_base_address_selection_entry:
         Dwarf_4_location_list_entry.create_base_address_selection_entry
   in
-  (* Lazy so that no address table entry is created for functions without any
-     variables. *)
+  (* Lazy so that no address table entry is created for functions all of whose
+     variables are hidden. *)
   let dwarf_5_base_address_index =
     lazy
       (Address_table.add_symbol (DS.address_table state) start_of_code_symbol)
