@@ -113,3 +113,29 @@ let () =
   run "virtual constant survives poll" [||] result
     [op symbol [||] [| cached |]; op Poll [||] [||]; op symbol [||] [| result |]]
   |> expect "virtual constant survives poll" Move
+
+let test_alias_write name ~prepare ~overwrite =
+  let source = Reg.create Cmm.Float32 in
+  let out1 = Reg.create Cmm.Int and out2 = Reg.create Cmm.Int in
+  let result = Reg.create Cmm.Float in
+  let physical = (Proc.loc_results_return Cmm.typ_float).(0) in
+  let alias = Reg.create_alias physical ~typ:Cmm.Float32 in
+  let one = Operation.Const_float 0x3ff0000000000000L in
+  run name [| out1; out2; source |] result
+    (prepare source
+    @ [op one [||] [| physical |]; store Double physical out1]
+    @ [overwrite source alias; store (Single { reg = Float32 }) alias out2]
+    @ [op one [||] [| result |]])
+  |> expect name one
+
+let () =
+  let zero = Operation.Const_float32 0l in
+  test_alias_write "fresh result invalidates physical aliases"
+    ~prepare:(fun _ -> [])
+    ~overwrite:(fun _ dst -> op zero [||] [| dst |]);
+  test_alias_write "move invalidates physical aliases"
+    ~prepare:(fun _ -> [])
+    ~overwrite:move;
+  test_alias_write "CSE result invalidates physical aliases"
+    ~prepare:(fun src -> [op zero [||] [| src |]])
+    ~overwrite:(fun _ dst -> op zero [||] [| dst |])
