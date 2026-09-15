@@ -73,6 +73,121 @@ let poly_ mk2 v = { x = v; y = 1 }
 val poly_ mk2 : 'a -> 'a r2 = <lpoly>
 |}]
 
+(* test creating/projecting from each of the record/constructor
+   representations that can carry lpoly fields *)
+
+(* ordinary record *)
+type ('a : any) record = { x : 'a; y : int }
+[%%expect{|
+type ('a : any) record = { x : 'a; y : int; }
+|}]
+
+let () =
+  let poly_ mk x y = { x ; y } in
+  let poly_ mk' x y = Sys.opaque_identity { x ; y } in
+
+  let { x ; y } = mk 42 43 in
+  assert (x = 42 && y = 43);
+  let { x ; y } = mk' 42 43 in
+  assert (x = 42 && y = 43);
+
+  let { x ; y } = mk #() 43 in
+  let #() = x in
+  assert (y = 43);
+  let { x ; y } = mk' #() 43 in
+  let #() = x in
+  assert (y = 43)
+[%%expect{|
+|}]
+
+(* inline record *)
+type ('a : any) inline_record = I of { x : 'a ; y : int }
+[%%expect{|
+type ('a : any) inline_record = I of { x : 'a; y : int; }
+|}]
+
+let () =
+  let poly_ mk x y = I { x ; y } in
+  let poly_ mk' x y = Sys.opaque_identity (I { x ; y }) in
+
+  let (I { x ; y }) = mk 42 43 in
+  assert (x = 42 && y = 43);
+  let (I { x ; y }) = mk' 42 43 in
+  assert (x = 42 && y = 43);
+
+  let (I { x ; y }) = mk #() 43 in
+  let #() = x in
+  assert (y = 43);
+  let (I { x ; y }) = mk' #() 43 in
+  let #() = x in
+  assert (y = 43)
+[%%expect{|
+|}]
+
+(* ordinary variant constructor *)
+type ('a : any) variant = Ctor of 'a * int
+[%%expect{|
+type ('a : any) variant = Ctor of 'a * int
+|}]
+
+let () =
+  let poly_ mk x y = Ctor (x, y) in
+  let poly_ mk' x y = Sys.opaque_identity (Ctor (x, y)) in
+
+  let (Ctor (x, y)) = mk 42 43 in
+  assert (x = 42 && y = 43);
+  let (Ctor (x, y)) = mk' 42 43 in
+  assert (x = 42 && y = 43);
+
+  let (Ctor (x, y)) = mk #() 43 in
+  let #() = x in
+  assert (y = 43);
+  let (Ctor (x, y)) = mk' #() 43 in
+  let #() = x in
+  assert (y = 43)
+[%%expect{|
+|}]
+
+(* Extension constructors (resp. their inline records) currently restrict their
+   arguments (fields) to layout value, so they can't contain lpoly fields.
+   Add expect tests now so we don't forget to update them later. *)
+
+type ('a : any) extensible_variant = ..
+type ('a : any) extensible_variant += A of 'a
+[%%expect{|
+type ('a : any) extensible_variant = ..
+type 'a extensible_variant += A of 'a
+|}]
+
+let bad = A #42.5
+[%%expect{|
+Line 1, characters 12-17:
+1 | let bad = A #42.5
+                ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because it's the type of an argument to an extension constructor.
+|}]
+
+(* inline record in extensible variant constructor *)
+type ('a : any) extensible_variant += B of { x : 'a ; y : int }
+let bad = B { x = #42.5 ; y = 42 }
+[%%expect{|
+type 'a extensible_variant += B of { x : 'a; y : int; }
+Line 2, characters 18-23:
+2 | let bad = B { x = #42.5 ; y = 42 }
+                      ^^^^^
+Error: This constant has type "float#" but an expression was expected of type
+         "('a : value_or_null)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because it is the type of field x of an extension constructor.
+|}]
+
 external box_float : float# -> float = "%box_float"
 external box_int64 : int64_u -> int64 = "%box_int64"
 [%%expect{|
