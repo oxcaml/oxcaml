@@ -560,6 +560,14 @@ module Variable = struct
     create ?user_visible data.name data.kind
 
   let export_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring variable stamp counter would overwrite modified value %d"
+        !previous_name_stamp
 end
 
 module Symbol = struct
@@ -963,6 +971,14 @@ module Code_id = struct
     Table.add !grand_table_of_code_ids (Table.import importer t)
 
   let export_name_stamp_counter () = !previous_name_stamp
+
+  let restore_name_stamp_counter counter =
+    if !previous_name_stamp = -1
+    then previous_name_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring code ID stamp counter would overwrite modified value %d"
+        !previous_name_stamp
 end
 
 module Code_id_or_symbol = struct

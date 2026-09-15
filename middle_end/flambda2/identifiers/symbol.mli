@@ -29,3 +29,8 @@ val manufacture : Compilation_unit.t -> string -> t
 
 (** The current value of the counter used by [manufacture]. *)
 val export_manufacture_counter : unit -> int
+
+(** Set the counter used by [manufacture]. This can only be called before any
+    symbol has been manufactured in the current process, and will error
+    otherwise. *)
+val restore_manufacture_counter : int -> unit

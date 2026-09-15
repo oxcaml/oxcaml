@@ -19,6 +19,14 @@ type 'f solution
 val solve :
   'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f solution
 
+(** Combine the problems of the units of a whole program and solve them
+    together. [analysis_scope] is the set of these units. Mutates the graphs of
+    the problems. *)
+val solve_whole_program :
+  [`Without_types] Traverse.Problem.t list ->
+  analysis_scope:Analysis_scope.t ->
+  [`Without_types] solution
+
 val get_unboxed_fields :
   'f solution -> Code_id_or_name.t -> Unboxing_analysis.unboxed option
 
@@ -72,3 +80,22 @@ val rewrite_kind_with_subkind :
   Flambda_kind.With_subkind.t
 
 val final_typing_env : 'f solution -> ('f, typing_env) Traverse.With_types.t
+
+(** What the rebuild consumes from a solution, in a form that can be stored: the
+    answers to its queries, the code changes and the solved slot offsets. A
+    whole-program solution is stored in one part per compilation unit. *)
+module Rebuild_data : sig
+  type t
+
+  val of_solution : 'f solution -> t
+
+  (** The data about units that did not take part in the solve. *)
+  val empty : t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+
+  (** Partition by the compilation unit owning each identifier and slot. *)
+  val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
+end

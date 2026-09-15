@@ -29,4 +29,8 @@ val main
     keep_symbol_tables:bool ->
     Lambda.program ->
     Cmm.phrase list)
+  -> reaper_lto_solve:(
+    cmx_files:string list ->
+    ltosol_file:string ->
+    unit)
   -> int
