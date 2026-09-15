@@ -4573,12 +4573,6 @@ let open_pers_signature_cmi filename env =
   let _global_name, (sign, _mode) =
     Persistent_env.read_cmi_file !persistent_env filename
   in
-  let unsupported () =
-    Misc.fatal_errorf
-      "%s: interfaces opened with -open-cmi may only contain aliases to \
-       other compilation units"
-      filename
-  in
   List.fold_left
     (fun env (item : Subst.Lazy.signature_item) ->
        match item with
@@ -4588,9 +4582,13 @@ let open_pers_signature_cmi filename env =
            | Some target ->
                add_persistent_structure_as
                  (Ident.create_persistent (Ident.name id)) target env
-           | None -> unsupported ()
+           | None -> env
          end
-       | _ -> unsupported ())
+       | _ ->
+           (* The compiler raises a fatal error on members that are not
+              aliases to other compilation units; Merlin must not die on a
+              bad configuration, so such members are simply ignored. *)
+           env)
     env
     (Subst.Lazy.force_signature_once sign)
 

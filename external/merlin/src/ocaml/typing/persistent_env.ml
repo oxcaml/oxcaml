@@ -488,20 +488,12 @@ let find_import ~allow_hidden penv ~check modname =
   let intf = CUI.Found.intf modname in
   if CUI.equal intf CUI.predef_exn then raise Not_found;
   match CUI.Tbl.find imports intf with
-<<<<<<< Merlin:attach-cmi-path
-  | Found imp -> check_visibility ~allow_hidden ~intf imp; imp
-  | Missing { hidden_were_allowed = true } -> raise Not_found
-  | Missing { hidden_were_allowed = false }
-||||||| Compiler:last-imported
-  | Found imp -> check_visibility ~allow_hidden ~intf imp; imp
-  | Missing -> raise Not_found
-=======
   | Found imp ->
       check_visibility ~allow_hidden ~intf imp;
       if check then complete_consistency_check penv imp;
       imp
-  | Missing -> raise Not_found
->>>>>>> Compiler:HEAD
+  | Missing { hidden_were_allowed = true } -> raise Not_found
+  | Missing { hidden_were_allowed = false }
   | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
@@ -1027,74 +1019,32 @@ let describe_prefix ppf prefix =
   else
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
-<<<<<<< Merlin:attach-cmi-path
-(* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f1 f2 ~loc
-    (name : Global_module.Name.t) =
-||||||| Compiler:last-imported
-(* Emits a warning if there is no valid cmi for name *)
-let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
-=======
 (* Checks that there is a valid cmi for [name]; if so, returns [name] with the
    path of the loaded cmi attached to its head. Otherwise registers a delayed
    warning 49 (delayed so that, as with warnings about unused bindings, it is
    not emitted when compilation fails with a real error). *)
-let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
->>>>>>> Compiler:HEAD
+let check_pers_struct ~allow_hidden penv f1 f2 ~loc
+    (name : Global_module.Name.t) =
   let name_as_string = CUI.to_string (CUI.Found.intf name.head) in
-<<<<<<< Merlin:attach-cmi-path
-  try
-    ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
-              ~allow_excess_args:true)
-||||||| Compiler:last-imported
-  try
-    ignore (find_pers_struct ~allow_hidden penv f ~check:false name
-              ~allow_excess_args:true)
-=======
   let delay_warning warn =
     !add_delayed_check_forward (fun () -> Location.prerr_warning loc warn)
   in
   match
-    find_pers_struct ~allow_hidden penv f ~check:false name
+    find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
       ~allow_excess_args:true
->>>>>>> Compiler:HEAD
   with
-<<<<<<< Merlin:attach-cmi-path
-  | Not_found ->
-      let warn = Warnings.No_cmi_file(name_as_string, None) in
-        Location.prerr_warning loc warn
-  | Magic_numbers.Cmi.Error err ->
-||||||| Compiler:last-imported
-  | Not_found ->
-      let warn = Warnings.No_cmi_file(name_as_string, None) in
-        Location.prerr_warning loc warn
-  | Cmi_format.Error err ->
-=======
   | ps ->
       Global_module.Name.with_head_cmi_path name
         ps.ps_name_info.pn_import.imp_filename
   | exception Not_found ->
       delay_warning (Warnings.No_cmi_file(name_as_string, None));
       name
-  | exception Cmi_format.Error err ->
->>>>>>> Compiler:HEAD
+  | exception Magic_numbers.Cmi.Error err ->
       let msg = Format.asprintf "%a"
-<<<<<<< Merlin:attach-cmi-path
           Magic_numbers.Cmi.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
-  | Error err ->
-||||||| Compiler:last-imported
-          Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
-  | Error err ->
-=======
-          Cmi_format.report_error err in
       delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
       name
   | exception Error err ->
->>>>>>> Compiler:HEAD
       let msg =
         match err with
         | Illegal_renaming(name, ps_name, filename) ->
@@ -1197,25 +1147,13 @@ let check ~allow_hidden penv f1 f2 ~loc name =
          later *)
       approximate_global_by_name penv name
     in
-<<<<<<< Merlin:attach-cmi-path
-    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
-      !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f1 f2 ~loc name)
-  end
-||||||| Compiler:last-imported
-    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
-      !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
-  end
-=======
     ()
   end;
   (* With warning 49 disabled, the alias is neither checked nor is its cmi
      searched for, so the output does not depend on which cmis happen to
      exist. *)
   if not (Warnings.is_active (Warnings.No_cmi_file ("", None))) then name
-  else check_pers_struct ~allow_hidden penv f ~loc name
->>>>>>> Compiler:HEAD
+  else check_pers_struct ~allow_hidden penv f1 f2 ~loc name
 
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
