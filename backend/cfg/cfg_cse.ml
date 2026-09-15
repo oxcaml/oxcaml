@@ -62,6 +62,9 @@ module type S = sig
 
   val find_regs_containing : numbering -> valnum array -> Reg.t array option
 
+  val find_reg_containing_with_typ :
+    numbering -> valnum -> Cmm.machtype_component -> Reg.t option
+
   val set_known_regs : numbering -> Reg.t array -> valnum array -> numbering
 
   val set_move : numbering -> Reg.t -> Reg.t -> numbering
@@ -195,6 +198,18 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let find_reg_containing n v =
     Reg.Map.fold (fun r v' res -> if v' = v then Some r else res) n.num_reg None
 
+  (* Find a register of machtype [typ] containing the given value number.
+     (Registers of different machtypes can share a value number, see
+     [set_move].) *)
+
+  let find_reg_containing_with_typ n v typ =
+    Reg.Map.fold
+      (fun r v' res ->
+        if v' = v && Cmm.equal_machtype_component r.Reg.typ typ
+        then Some r
+        else res)
+      n.num_reg None
+
   (* Find a set of registers containing the given value numbers. *)
 
   let find_regs_containing n vs =
@@ -294,19 +309,28 @@ end = struct
     InstructionId.get_and_incr state.instruction_id
 end
 
-let insert_single_move :
-    State.t -> Reg.t -> Reg.t -> Cfg.basic Cfg.instruction DLL.cell -> unit =
- fun state src dst cell ->
+let insert_single_op :
+    State.t ->
+    Operation.t ->
+    Reg.t ->
+    Reg.t ->
+    Cfg.basic Cfg.instruction DLL.cell ->
+    unit =
+ fun state op src dst cell ->
   let instr = DLL.value cell in
-  let move : Cfg.basic Cfg.instruction =
+  let new_instr : Cfg.basic Cfg.instruction =
     { instr with
-      desc = Op Move;
+      desc = Op op;
       arg = [| src |];
       res = [| dst |];
       id = State.get_and_incr_instruction_id state
     }
   in
-  DLL.insert_after cell move
+  DLL.insert_after cell new_instr
+
+let insert_single_move :
+    State.t -> Reg.t -> Reg.t -> Cfg.basic Cfg.instruction DLL.cell -> unit =
+ fun state src dst cell -> insert_single_op state Move src dst cell
 
 let insert_move :
     State.t ->
@@ -475,6 +499,72 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     List.fold_left (store_to_load_forwarding_equations instr varg) ~init:n
       ~f:(fun n (rhs, vres) -> add_equation (Op_load Mutable) n rhs vres)
 
+  (* Cross-machtype store-to-load forwarding.
+
+     A word store of an [Int] register only records a forwarding equation for
+     [Word_int] loads, and one of a [Val] register only for [Word_val] loads
+     (see [forwardable_load_chunks]). The two chunks are however used
+     asymmetrically: an immediate record field is stored with [Word_int] but
+     loaded with [Word_val]. If a non-atomic mutable word load with a single
+     result finds no equation of its own, [sibling_word_load] returns the key of
+     the sibling load (same address, other word chunk, other machtype), the
+     machtype of the sibling's result, and the cast from that machtype to the
+     load's. If the sibling equation is found and a register of the sibling
+     machtype still holds its result, the load is replaced by that
+     [Reinterpret_cast].
+
+     The cast is deliberately not a [Move], and the result of the load keeps the
+     fresh value number it would have received had the load been kept: the
+     source and the result must never be considered interchangeable, since a
+     moving GC updates [Val] registers but not [Int] ones, and the register
+     allocator must not coalesce them (it does coalesce [Move]s between [Int]
+     and [Val] registers, but not reinterpret casts).
+
+     Unlike a load, such a cast is not considered pure by [Cfg_deadcode]: a load
+     whose result is dead thus leaves a stray move behind, which is rare enough
+     to be acceptable. *)
+  let sibling_word_load (op : Operation.t) (varg : valnum array)
+      (res : Reg.t array) :
+      (rhs * Cmm.machtype_component * Cmm.reinterpret_cast) option =
+    match op with
+    | Load { memory_chunk; addressing_mode; mutability; is_atomic } -> (
+      let sibling memory_chunk : Operation.t =
+        Load
+          { memory_chunk;
+            addressing_mode;
+            mutability = Mutable;
+            is_atomic = false
+          }
+      in
+      let result_typ : Cmm.machtype_component option =
+        match res with [| r |] -> Some r.Reg.typ | _ -> None
+      in
+      match memory_chunk, mutability, is_atomic, result_typ with
+      | Word_val, Mutable, false, Some Val ->
+        Some ((sibling Word_int, varg, [| Int |]), Int, Value_of_int)
+      | Word_int, Mutable, false, Some Int ->
+        Some ((sibling Word_val, varg, [| Val |]), Val, Int_of_value)
+      | ( ( Word_int | Word_val | Byte_unsigned | Byte_signed | Sixteen_unsigned
+          | Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask
+          | Single _ | Double | Onetwentyeight_unaligned
+          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+          | Fivetwelve_unaligned | Fivetwelve_aligned ),
+          (Mutable | Immutable),
+          (true | false),
+          ( None
+          | Some
+              ( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask
+              | Float32 | Valx2 ) ) ) ->
+        None)
+    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Const_mask _ | Stackoffset _ | Store _ | Intop _ | Int128op _
+    | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+    | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+    | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+    | Pause | Alloc _ ->
+      None
+
   let cse_instruction :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.cell -> numbering =
    fun state n cell ->
@@ -542,10 +632,25 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
                operation. *)
             let n3 = set_known_regs n2 i.res vres in
             n3)
-        | None ->
+        | None -> (
           (* This operation produces a result we haven't seen earlier. *)
           let n3 = set_fresh_regs n2 i.res rhs op_class in
-          n3)
+          match sibling_word_load op varg i.res with
+          | None -> n3
+          | Some (sibling_rhs, src_typ, cast) -> (
+            match find_equation op_class n1 sibling_rhs with
+            | Some [| vsrc |] -> (
+              match find_reg_containing_with_typ n1 vsrc src_typ with
+              | Some src ->
+                (* The stored value is still in [src]: forward it through a cast
+                   (see [sibling_word_load]); [i.res] keeps its fresh value
+                   number from [n3]. *)
+                insert_single_op state (Reinterpret_cast cast) src i.res.(0)
+                  cell;
+                DLL.delete_curr cell;
+                n3
+              | None -> n3)
+            | Some (_ : valnum array) | None -> n3)))
       | Op_store false | Op_other ->
         (* An initializing store or an "other" operation do not invalidate any
            equations, but we do not know anything about the results. *)
