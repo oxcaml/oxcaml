@@ -1193,8 +1193,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
-    | Pbox layout ->
-      ignore layout;
+    | Pbox (_layout, _mode) ->
       (* CR zeisbach: implement! also, ordering? *)
       Misc.fatal_errorf "implement this!")
 

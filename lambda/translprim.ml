@@ -1335,6 +1335,9 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       Primitive(Pset_ext_ptr (layout, get_first_arg_mode ()), 2)
     | "%peek" -> Peek None
     | "%poke" -> Poke None
+    | "%box" ->
+      let layout = List.nth (get_arg_layouts ()) 0 in
+      Primitive(Pbox (layout, mode), 1)
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode

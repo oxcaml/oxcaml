@@ -1178,6 +1178,11 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.bits64]
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.scannable]
+    | "%box" ->
+      check [
+        any;
+        is (Same_as_ocaml_repr C.scannable);
+      ]
 
     | name -> (
         match String.Map.find_opt name stringlike_indexing_primitives with

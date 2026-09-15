@@ -3662,12 +3662,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
-  | Pbox layout, [args] ->
+  | Pbox (_layout, _mode), [_args] ->
     (* CR zeisbach: implement this translation! need to look at what we know
        about the args at this point (can we get their layout? should we be
        checking for consistency? the checks have to happen somewhere.) *)
-    ignore layout;
-    ignore args;
     Misc.fatal_errorf "implement this!"
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf

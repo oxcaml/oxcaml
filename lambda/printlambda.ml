@@ -1038,8 +1038,9 @@ let primitive ppf = function
       fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
-  | Pbox l ->
-      fprintf ppf "(set_ext_ptr@ %a)"
+  | Pbox (l, mode) ->
+      fprintf ppf "(box%s@ %a)"
+        (locality_kind mode)
         layout l
 
 let name_of_primitive = function
