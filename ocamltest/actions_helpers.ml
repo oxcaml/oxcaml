@@ -255,18 +255,18 @@ let run
       else (Result.fail_with_reason reason, env)
     end
 
-(* Any extra OCAMLRUNPARAM components given by -runparam are appended
+(* Any extra OCAMLRUNPARAM components given by -run-ocamlrunparam are appended
    here, for this action only, rather than in the initial environment:
    the compilers and other tools run without them. *)
 let run_program log env =
   let env =
-    if Options.runparam = "" then env
+    if Options.run_ocamlrunparam = "" then env
     else begin
       let existing =
         Environments.safe_lookup Ocaml_variables.ocamlrunparam env in
       let value =
-        if existing = "" then Options.runparam
-        else existing ^ "," ^ Options.runparam in
+        if existing = "" then Options.run_ocamlrunparam
+        else existing ^ "," ^ Options.run_ocamlrunparam in
       Environments.add Ocaml_variables.ocamlrunparam value env
     end
   in

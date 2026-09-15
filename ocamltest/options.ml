@@ -61,7 +61,7 @@ let list_tests = ref []
 
 let show_timings = ref false
 
-let runparam = ref ""
+let run_ocamlrunparam = ref ""
 
 let translate = ref false
 let style = ref Translate.Plain
@@ -92,7 +92,7 @@ let commandline_options =
    " List tests in given directory.");
   ("-keep-test-dir-on-success", Arg.Set keep_test_dir_on_success,
    " Keep the test directory (with the generated test artefacts) on success.");
-  ("-runparam", Arg.Set_string runparam,
+  ("-run-ocamlrunparam", Arg.Set_string run_ocamlrunparam,
    "<params> Append <params> to OCAMLRUNPARAM when running test programs.");
   ("-translate", Arg.Set translate,
    " Translate the test script from old to new syntax");
@@ -136,7 +136,7 @@ let find_test_dirs = !find_test_dirs
 let list_tests = !list_tests
 let keep_test_dir_on_success = !keep_test_dir_on_success
 let show_timings = !show_timings
-let runparam = !runparam
+let run_ocamlrunparam = !run_ocamlrunparam
 let translate = !translate
 let style = !style
 let compact = !compact

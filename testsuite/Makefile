@@ -123,7 +123,7 @@ RUNPARAM ?=
 ifeq "$(RUNPARAM)" ""
   OCAMLTEST_RUNPARAM_FLAG =
 else
-  OCAMLTEST_RUNPARAM_FLAG = -runparam '$(RUNPARAM)'
+  OCAMLTEST_RUNPARAM_FLAG = -run-ocamlrunparam '$(RUNPARAM)'
 endif
 
 OCAMLTESTFLAGS = \
