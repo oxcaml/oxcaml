@@ -73,13 +73,11 @@ module Header = struct
       ~original_compilation_unit
 end
 
-
 let to_sections ~sections
     ({ imported_offsets; used_value_slots; problem; skeleton } as t) =
   let table_data = Flambda_cmx_format.Table_data.create (ids_for_export t) in
   let problem =
-    File_sections.Builder.add sections
-      (Solve.create ~imported_offsets problem)
+    File_sections.Builder.add sections (Solve.create ~imported_offsets problem)
   in
   let skeleton = File_sections.Builder.add sections skeleton in
   (* We need to store ID stamp counters so that stamp-based identifiers in the
@@ -115,9 +113,7 @@ let read_for_solve ~filename ~sections (header : Header.t) =
   Solve.import solve (Header.renaming header)
 
 let read_for_rebuild ~filename ~sections (header : Header.t) =
-  let skeleton =
-    read_section ~filename ~sections header.skeleton
-  in
+  let skeleton = read_section ~filename ~sections header.skeleton in
   Traverse.Skeleton.apply_renaming skeleton (Header.renaming header)
 
 open Format_doc

@@ -40,6 +40,8 @@ module type S = sig
   val rename : t -> t
 
   val export_stamp_counter : unit -> int
+
+  val restore_stamp_counter : int -> unit
 end
 
 module Make (P : sig
@@ -112,6 +114,14 @@ end) : S with type payload := P.payload = struct
     stamp
 
   let export_stamp_counter () = !next_stamp
+
+  let restore_stamp_counter counter =
+    if !next_stamp = 0
+    then next_stamp := counter
+    else
+      Misc.fatal_errorf
+        "Restoring slot stamp counter would overwrite modified value %d"
+        !next_stamp
 
   let create compilation_unit ~name payload =
     { compilation_unit; name; name_stamp = get_next_stamp (); payload }

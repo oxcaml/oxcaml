@@ -143,6 +143,18 @@ let merge env1 env2 =
 
 let import_offsets env = current_offsets := merge env !current_offsets
 
+let filter_by_compilation_unit env ~keep =
+  { function_slot_offsets =
+      Function_slot.Map.filter
+        (fun function_slot _ ->
+          keep (Function_slot.get_compilation_unit function_slot))
+        env.function_slot_offsets;
+    value_slot_offsets =
+      Value_slot.Map.filter
+        (fun value_slot _ -> keep (Value_slot.get_compilation_unit value_slot))
+        env.value_slot_offsets
+  }
+
 (* CR gbury: considering that the goal is to have `offsets` significantly
    smaller than the `imported_offsets`, it might be better for performance to
    check whether the function slot is already in the offsets before looking it

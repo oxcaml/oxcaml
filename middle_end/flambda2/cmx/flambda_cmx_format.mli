@@ -35,6 +35,12 @@ module Id_stamp_counters : sig
   type t
 
   val save : unit -> t
+
+  (** Restore the stamp counters in preparation for merging the data of several
+      units, setting each counter to its maximum value across all of the units.
+      This can only be called once, before any stamps have been created, and
+      will error otherwise. *)
+  val restore_for_merge : t list -> unit
 end
 
 type t

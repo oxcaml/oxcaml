@@ -54,7 +54,8 @@ end
 (** Add the three sections and return the index of the header. Also records the
     current ID stamp counters, so this must be called after the last identifier
     of the compilation has been created. *)
-val to_sections : sections:File_sections.Builder.t -> t -> Header.t File_sections.Idx.t
+val to_sections :
+  sections:File_sections.Builder.t -> t -> Header.t File_sections.Idx.t
 
 type error =
   | No_lto_info of string

@@ -217,6 +217,92 @@ let pp_changed_representation ff = function
       (Function_slot.Map.print Function_slot.print)
       function_slots Function_slot.print fs
 
+let rename_unboxed_fields_tree tree ~rename_leaf renaming =
+  let rec rename_tree tree =
+    Field.Map.fold
+      (fun field u tree ->
+        Field.Map.add
+          (Renaming.apply_field renaming field)
+          (rename_unboxed_fields u) tree)
+      tree Field.Map.empty
+  and rename_unboxed_fields (u : _ Unboxed_fields.u) : _ Unboxed_fields.u =
+    match u with
+    | Not_unboxed x -> Not_unboxed (rename_leaf x)
+    | Unboxed tree -> Unboxed (rename_tree tree)
+  in
+  rename_tree tree
+
+let unboxed_fields_tree_ids_for_export tree ~add_leaf ids =
+  let rec add_tree tree ids =
+    Field.Map.fold
+      (fun field u ids ->
+        add_unboxed_fields u (Ids_for_export.add_field ids field))
+      tree ids
+  and add_unboxed_fields (u : _ Unboxed_fields.u) ids =
+    match u with
+    | Not_unboxed leaf -> add_leaf ids leaf
+    | Unboxed tree -> add_tree tree ids
+  in
+  add_tree tree ids
+
+let unboxed_fields_ids_for_export unboxed_fields ids =
+  Code_id_or_name.Map.fold
+    (fun id tree ids ->
+      unboxed_fields_tree_ids_for_export tree
+        ~add_leaf:Ids_for_export.add_variable
+        (Ids_for_export.add_code_id_or_name ids id))
+    unboxed_fields ids
+
+let unboxed_fields_apply_renaming unboxed_fields renaming =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  Code_id_or_name.Map.fold
+    (fun id tree new_unboxed_fields ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_unboxed_fields_tree tree
+           ~rename_leaf:(Renaming.apply_variable renaming)
+           renaming)
+        new_unboxed_fields)
+    unboxed_fields Code_id_or_name.Map.empty
+
+let changed_representation_ids_for_export changed_representation ids =
+  (* The leaves of the trees do not contain hashconsed identifiers. *)
+  let add_leaf ids _leaf = ids in
+  let add_id = Ids_for_export.add_code_id_or_name in
+  Code_id_or_name.Map.fold
+    (fun id (repr, allocation_point) ids ->
+      let ids = add_id (add_id ids id) allocation_point in
+      match (repr : changed_representation) with
+      | Block_representation (tree, (_ : int)) ->
+        unboxed_fields_tree_ids_for_export tree ~add_leaf ids
+      | Closure_representation
+          ( tree,
+            (_ : Function_slot.t Function_slot.Map.t),
+            (_ : Function_slot.t) ) ->
+        unboxed_fields_tree_ids_for_export tree ~add_leaf ids)
+    changed_representation ids
+
+let changed_representation_apply_renaming changed_representation renaming =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  let rename_repr (repr : changed_representation) : changed_representation =
+    (* [size], [function_slots], [current_function_slot] and the leaves of the
+       [tree]s do not contain hashconsed identifiers so don't need renaming. *)
+    match repr with
+    | Block_representation (tree, size) ->
+      Block_representation
+        (rename_unboxed_fields_tree tree ~rename_leaf:Fun.id renaming, size)
+    | Closure_representation (tree, function_slots, current_function_slot) ->
+      Closure_representation
+        ( rename_unboxed_fields_tree tree ~rename_leaf:Fun.id renaming,
+          function_slots,
+          current_function_slot )
+  in
+  Code_id_or_name.Map.fold
+    (fun id (repr, allocation_point) new_changed_representation ->
+      Code_id_or_name.Map.add (rename_id id)
+        (rename_repr repr, rename_id allocation_point)
+        new_changed_representation)
+    changed_representation Code_id_or_name.Map.empty
+
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
@@ -1170,3 +1256,69 @@ let find_code_metadata t ~analysis_scope code_id =
         Code_id.print code_id
     else None
   | Some code_change -> Some code_change.code_metadata
+
+let code_changes_ids_for_export t ids =
+  let add_leaf = Ids_for_export.add_variable in
+  let decision_ids ids (decision : param_decision) =
+    match decision with
+    | Delete -> ids
+    | Keep (var, _kind) -> Ids_for_export.add_variable ids var
+    | Unbox tree -> unboxed_fields_tree_ids_for_export tree ~add_leaf ids
+  in
+  Code_id.Map.fold
+    (fun code_id { calling_convention_change; code_metadata } ids ->
+      let ids = Ids_for_export.add_code_id ids code_id in
+      let ids =
+        Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+      in
+      match calling_convention_change with
+      | Not_changing_calling_convention -> ids
+      | Changing_calling_convention
+          { my_closure_decision; params_decisions; return_decisions } ->
+        let ids =
+          match my_closure_decision with
+          | Keep_my_closure -> ids
+          | Unbox_my_closure tree ->
+            unboxed_fields_tree_ids_for_export tree ~add_leaf ids
+        in
+        let ids = List.fold_left decision_ids ids params_decisions in
+        List.fold_left decision_ids ids return_decisions)
+    t ids
+
+let code_changes_apply_renaming t renaming =
+  let rename_var = Renaming.apply_variable renaming in
+  let rename_decision (decision : param_decision) : param_decision =
+    match decision with
+    | Delete -> Delete
+    | Keep (var, kind) -> Keep (rename_var var, kind)
+    | Unbox tree ->
+      Unbox (rename_unboxed_fields_tree tree ~rename_leaf:rename_var renaming)
+  in
+  Code_id.Map.fold
+    (fun code_id { calling_convention_change; code_metadata } acc ->
+      let calling_convention_change =
+        match calling_convention_change with
+        | Not_changing_calling_convention -> Not_changing_calling_convention
+        | Changing_calling_convention
+            { my_closure_decision; params_decisions; return_decisions } ->
+          let my_closure_decision =
+            match my_closure_decision with
+            | Keep_my_closure -> Keep_my_closure
+            | Unbox_my_closure tree ->
+              Unbox_my_closure
+                (rename_unboxed_fields_tree tree ~rename_leaf:rename_var
+                   renaming)
+          in
+          Changing_calling_convention
+            { my_closure_decision;
+              params_decisions = List.map rename_decision params_decisions;
+              return_decisions = List.map rename_decision return_decisions
+            }
+      in
+      Code_id.Map.add
+        (Renaming.apply_code_id renaming code_id)
+        { calling_convention_change;
+          code_metadata = Code_metadata.apply_renaming code_metadata renaming
+        }
+        acc)
+    t Code_id.Map.empty
