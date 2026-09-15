@@ -100,7 +100,17 @@ let load filename =
       else raise (Error (Wrong_format filename)))
     ~always:(fun () -> close_in ic)
 
-let solution t = Contents.deserialise t.contents
+let solution_for_members t ~members =
+  let participants = participants t in
+  List.iter
+    (fun member ->
+      if not (Compilation_unit.Set.mem member participants)
+      then
+        Misc.fatal_errorf "Unit %a is not a participant in the LTO solution"
+          (Format_doc.compat Compilation_unit.print)
+          member)
+    members;
+  Contents.deserialise t.contents
 
 open Format_doc
 

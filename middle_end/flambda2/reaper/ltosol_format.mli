@@ -38,4 +38,5 @@ val id_stamp_counters : t -> Flambda_cmx_format.Id_stamp_counters.t
 
 val participants : t -> Compilation_unit.Set.t
 
-val solution : t -> [`Without_types] Analysis.Solution.t
+val solution_for_members :
+  t -> members:Compilation_unit.t list -> [`Without_types] Analysis.Solution.t

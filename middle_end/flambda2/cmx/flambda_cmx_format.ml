@@ -99,6 +99,21 @@ module Id_stamp_counters = struct
         all_counters
     in
     restore max_counters
+
+  let any_greater_than
+      { variables;
+        code_ids;
+        continuations;
+        function_slots;
+        value_slots;
+        symbols
+      } other =
+    variables > other.variables
+    || code_ids > other.code_ids
+    || continuations > other.continuations
+    || function_slots > other.function_slots
+    || value_slots > other.value_slots
+    || symbols > other.symbols
 end
 
 type t0 =

@@ -44,6 +44,10 @@ module Id_stamp_counters : sig
       units, setting each counter to its maximum value across all of the units.
       Like [restore], can only be called once. *)
   val restore_for_merge : t list -> unit
+
+  (** True if any counter in the first set is greater than its corresponding
+      counter in the second. Used to guard against monotonicity breaking. *)
+  val any_greater_than : t -> t -> bool
 end
 
 type t
