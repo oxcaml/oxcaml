@@ -1,0 +1,4 @@
+type ('a : any) t = Foo
+val poly_ print_nothing : 'a -> 'b -> unit = <lpoly>
+>> Fatal error: Jkind_types.instance_var: free genvar
+Fatal error: exception Misc.Fatal_error
