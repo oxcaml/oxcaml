@@ -104,9 +104,16 @@ type is_contained_by =
     container : pinpoint
   }
 
+type annotation_syntax =
+  [ `Mode
+  | `Modality ]
+
 type annotation =
-  { loc : Location.t;
-    written_modes : string Location.loc list
+  { syntax : annotation_syntax;
+    annotated_modes : (string * string Location.loc) list;
+        (** Each bound's mode name and the written annotation that imposed it.
+            Implied bounds point to the annotation that implies them. *)
+    contained_by : is_contained_by option
   }
 
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on

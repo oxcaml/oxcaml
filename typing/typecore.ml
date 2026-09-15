@@ -1292,20 +1292,23 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
+let mode_annotation_hint (m : Alloc.Const.Option.t Typemode.modes) =
+  let annotated_modes =
+    List.map
+      (fun { txt = Alloc.Atom (axis, mode); loc } ->
+        let name =
+          Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode
+        in
+        name, { Location.txt = name; loc })
+      m.mode_desc
+  in
+  Hint.Annotation
+    { syntax = `Mode; annotated_modes; contained_by = None }
+
 let apply_mode_annots ~loc kind (m : Alloc.Const.Option.t Typemode.modes) mode =
   let min = Alloc.Const.Option.value ~default:Alloc.Const.min m.mode_modes in
   let max = Alloc.Const.Option.value ~default:Alloc.Const.max m.mode_modes in
-  let annot_loc =
-    if List.is_empty m.mode_desc then loc else
-    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
-  in
-  let written_modes =
-    List.map
-      (Location.map (fun (Alloc.Atom (axis, mode)) ->
-         Format_doc.asprintf "%a" (Alloc.Const.print_axis axis) mode))
-      m.mode_desc
-  in
-  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let hint = mode_annotation_hint m in
   let min = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint min in
   let max = Alloc.of_const ~hint_monadic:hint ~hint_comonadic:hint max in
   let pp : Hint.pinpoint = loc, kind in
@@ -8209,7 +8212,7 @@ and type_expect_
   | Pexp_constraint (sarg, None, modes) ->
       let modes = Typemode.transl_mode_annots modes in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
       { exp with exp_loc = loc
@@ -8245,7 +8248,7 @@ and type_expect_
         type_constraint env sty alloc_mode
       in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let ty' = instance ty in
       let error_message_attr_opt =
@@ -12233,13 +12236,19 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode ~loc ~env ~(modes : Alloc.Const.Option.t) expected_mode =
-    let min = Alloc.Const.Option.value ~default:Alloc.Const.min modes |> Const.alloc_as_value in
-    let max = Alloc.Const.Option.value ~default:Alloc.Const.max modes |> Const.alloc_as_value in
-    submode ~loc ~env ~reason:Other (Value.of_const min) expected_mode;
-    let expected_mode = mode_coerce (Value.of_const max) expected_mode in
+and type_expect_mode ~loc ~env
+    ~(modes : Alloc.Const.Option.t Typemode.modes) expected_mode =
+    let hint = mode_annotation_hint modes in
+    let bound default =
+      Alloc.Const.Option.value ~default modes.mode_modes
+      |> Const.alloc_as_value
+      |> Value.of_const ~hint_monadic:hint ~hint_comonadic:hint
+    in
+    submode ~loc ~env ~reason:Other (bound Alloc.Const.min) expected_mode;
+    let max = Value.disallow_left (bound Alloc.Const.max) in
+    let expected_mode = mode_coerce max expected_mode in
     let expected_mode =
-      match modes.areality with
+      match modes.mode_modes.areality with
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
     in
