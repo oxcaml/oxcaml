@@ -833,9 +833,9 @@ let mode_lazy expected_mode =
       expected_mode
   in
   let mode_crossing =
-    Crossing.create ~linearity:true ~portability:true
-      ~regionality:false ~uniqueness:false ~contention:false ~statefulness:false
-      ~visibility:false ~forkable:false ~yielding:false ~staticity:false
+    Crossing.create ~regionality:false ~linearity:true ~uniqueness:false
+      ~portability:true ~contention:false ~externality:false ~forkable:false
+      ~yielding:false ~statefulness:false ~visibility:false ~staticity:false
   in
   let closure_mode =
     expected_mode |> as_single_mode |> Crossing.apply_right mode_crossing
@@ -1010,6 +1010,8 @@ let create_allocation_mode_r mode =
 
 let register_allocation_value_mode ~loc
     ?(desc  = (Unknown : Mode.Hint.allocation_desc)) mode =
+  Externality.submode_err (loc, Allocation) Externality.legacy
+    (Value.proj_comonadic Externality mode);
   let alloc_mode = create_allocation_mode_r (value_to_alloc_r2g mode) in
   register_allocation_mode alloc_mode;
   (* We must apply each morphism separately so that their hints correspond to
@@ -1033,6 +1035,8 @@ let register_closure_allocation (mode : Value.r) ~loc
     Alloc.newvar_below (Ctype.get_current_level ())
       (value_to_alloc_r2g ~allocation mode)
   in
+  Externality.submode_err (loc, Function) Externality.legacy
+    (Alloc.proj_comonadic Externality mode);
   let locality_mode = Alloc.proj_comonadic Areality mode in
   let alloc_mode, _ = Locality.newvar_below 0 locality_mode in
   let closed_over_mode =
@@ -5429,6 +5433,8 @@ let type_omitted_parameters_and_build_result_type expected_mode env loc ty_ret
                Alloc.newvar_above (Ctype.get_current_level ()) (Alloc.join
                 (mode_partial_fun:: mode_closed_args))
              in
+             Externality.submode_err (loc, Function) Externality.legacy
+               (Alloc.proj_comonadic Externality mode_cls);
              let mode_closure =
                create_allocation_mode_r mode_cls
              in

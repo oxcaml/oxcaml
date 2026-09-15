@@ -1569,3 +1569,125 @@ end
 [%%expect{|
 module M : sig external foo : unit -> unit = "%identity" end
 |}]
+
+(* Externality does not become a modality on inferred module fields. *)
+module Int63 : sig
+  type t : immediate64
+  val zero : t
+  val to_int : t -> int
+end = struct
+  type t = int
+  let zero = 0
+  let to_int x = x
+end
+
+module M = struct
+  let immediate = 1
+  let immediate64 = Int63.zero
+  module Nested = struct let immediate = 2 end
+end
+[%%expect{|
+module Int63 :
+  sig type t : immediate64 val zero : t val to_int : t -> int end @@
+  stateless
+module M :
+  sig
+    val immediate : int
+    val immediate64 : Int63.t
+    module Nested : sig val immediate : int end
+  end @@ stateless
+|}]
+
+module type S = module type of M
+module type S_again = module type of M
+module Copy : S = M
+module Copy_again : S_again = Copy
+module F (X : S) = struct include X end
+module Included : S = F (Copy_again)
+[%%expect{|
+module type S =
+  sig
+    val immediate : int @@ stateless
+    val immediate64 : Int63.t @@ stateless
+    module Nested : sig val immediate : int @@ stateless end
+  end
+module type S_again =
+  sig
+    val immediate : int @@ stateless
+    val immediate64 : Int63.t @@ stateless
+    module Nested : sig val immediate : int @@ stateless end
+  end
+module Copy : S @@ stateless
+module Copy_again : S_again @@ stateless
+module F :
+  functor (X : S) ->
+    sig
+      val immediate : int @@ stateless
+      val immediate64 : Int63.t @@ stateless
+      module Nested : sig val immediate : int @@ stateless end
+    end
+  @@ stateless
+module Included : S @@ stateless
+|}]
+
+let sum =
+  Int63.to_int Included.immediate64 + Included.immediate +
+    Included.Nested.immediate
+[%%expect{|
+val sum : int = 3
+|}]
+
+(* Externality is available in crossings, but not ordinary annotations. *)
+let forbidden @ external_ = 1
+[%%expect{|
+Line 1, characters 16-25:
+1 | let forbidden @ external_ = 1
+                    ^^^^^^^^^
+Error: Externality "external_" cannot currently be annotated as a mode.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
+
+let forbidden @ external64 = 1n
+[%%expect{|
+Line 1, characters 16-26:
+1 | let forbidden @ external64 = 1n
+                    ^^^^^^^^^^
+Error: Externality "external64" cannot currently be annotated as a mode.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
+
+let forbidden @ internal = 1
+[%%expect{|
+Line 1, characters 16-24:
+1 | let forbidden @ internal = 1
+                    ^^^^^^^^
+Error: Externality "internal" cannot currently be annotated as a mode.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
+
+type forbidden = { field : int @@ external_ }
+[%%expect{|
+Line 1, characters 34-43:
+1 | type forbidden = { field : int @@ external_ }
+                                      ^^^^^^^^^
+Error: Externality "external_" cannot currently be annotated as a modality.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
+
+type forbidden = C of int @@ external64
+[%%expect{|
+Line 1, characters 29-39:
+1 | type forbidden = C of int @@ external64
+                                 ^^^^^^^^^^
+Error: Externality "external64" cannot currently be annotated as a modality.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
+
+module type Forbidden = sig val field : int @@ internal end
+[%%expect{|
+Line 1, characters 47-55:
+1 | module type Forbidden = sig val field : int @@ internal end
+                                                   ^^^^^^^^
+Error: Externality "internal" cannot currently be annotated as a modality.
+       It is supported in kind modifiers and with-bound modalities.
+|}]
