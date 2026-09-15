@@ -2222,36 +2222,21 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
-    let all_void_sort_option sort =
-      match sort with
-      | Some sort -> Jkind_types.Sort.Const.all_void sort
-      | None -> false
-
-    let all_void_labels_with_updates lbls_updated =
-      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
-
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun ((lbl : label_declaration), ld_type, _sort) ->
-          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
+        (fun { ld_type; ld_modalities; _ } ->
+          add_with_bounds ~type_expr:ld_type ~modality:ld_modalities)
         lbls jkind
 
-    let for_boxed_record_with_updates lbls =
-      if all_void_labels_with_updates lbls
-      then Builtin.immediate ~why:Empty_record
-      else
-        let base =
-          lbls
-          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
-          |> List.fold_left combine_mutability Immutable
-          |> jkind_of_mutability ~why:Boxed_record
-          |> mark_best
-        in
-        add_labels_as_with_bounds lbls base
-
     let for_boxed_record lbls =
-      for_boxed_record_with_updates
-        (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
+      let base =
+        lbls
+        |> List.map (fun { ld_mutable; _ } -> ld_mutable)
+        |> List.fold_left combine_mutability Immutable
+        |> jkind_of_mutability ~why:Boxed_record
+        |> mark_best
+      in
+      add_labels_as_with_bounds lbls base
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =

@@ -50,8 +50,6 @@ type continuation_sort =
 type region =
   | Named of variable
   | Toplevel_alloc_region
-  | Toplevel_region
-  | Toplevel_ghost_region
 
 type tag_scannable = int
 

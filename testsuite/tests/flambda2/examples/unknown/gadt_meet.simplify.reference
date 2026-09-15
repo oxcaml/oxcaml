@@ -18,9 +18,7 @@ let code loopify(never) size(10) newer_version_of(with_y_0)
   let Pmakeblock = %block.[`0`].my_alloc_region (int_add) in
   cont k (Pmakeblock)
 in
-let $camlGadt_meet__with_y_4 =
-  closure with_y_0_1 @with_y &toplevel.alloc_region
-in
+let $camlGadt_meet__with_y_4 = closure with_y_0_1 @with_y &toplevel in
 let code inline(never) loopify(never) size(1) newer_version_of(f_1)
       f_1_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth
@@ -28,7 +26,7 @@ let code inline(never) loopify(never) size(1) newer_version_of(f_1)
         : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ] =
   cont k ($camlGadt_meet__const_block_1)
 in
-let $camlGadt_meet__f_5 = closure f_1_1 @f &toplevel.alloc_region in
+let $camlGadt_meet__f_5 = closure f_1_1 @f &toplevel in
 let code loopify(never) size(2) newer_version_of(get_2)
       get_2_1 (t : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ])
         my_closure &my_alloc_region my_depth
@@ -37,7 +35,7 @@ let code loopify(never) size(2) newer_version_of(get_2)
   let Pfield = %block_load.[`0`] (t) in
   cont k (Pfield)
 in
-let $camlGadt_meet__get_6 = closure get_2_1 @get &toplevel.alloc_region in
+let $camlGadt_meet__get_6 = closure get_2_1 @get &toplevel in
 let code loopify(never) size(44) newer_version_of(test_3)
       test_3_1 (x)
         my_closure &my_alloc_region my_depth
@@ -71,7 +69,7 @@ let code loopify(never) size(44) newer_version_of(test_3)
                      in
                      cont k (Pmakeblock_1))))
 in
-let $camlGadt_meet__test_7 = closure test_3_1 @test &toplevel.alloc_region in
+let $camlGadt_meet__test_7 = closure test_3_1 @test &toplevel in
 let $camlGadt_meet__Pmakeblock_9 =
   Block 0 ($`*predef*`.caml_exn_Failure, $camlGadt_meet__immstring_3)
 in
@@ -91,7 +89,7 @@ let code loopify(never) size(17) newer_version_of(foo_4)
            let Pfield = %block_load.[`0`] (`*match*`) in
            cont k (Pfield))
 in
-let $camlGadt_meet__foo_8 = closure foo_4_1 @foo &toplevel.alloc_region in
+let $camlGadt_meet__foo_8 = closure foo_4_1 @foo &toplevel in
 let $camlGadt_meet =
   Block 0 ($camlGadt_meet__with_y_4,
            $camlGadt_meet__f_5,

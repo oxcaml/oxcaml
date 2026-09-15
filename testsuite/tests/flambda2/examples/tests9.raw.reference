@@ -1650,16 +1650,16 @@
        (42, l)
        -> k1 * k2
  in
- let length_aux = closure length_aux_0 @length_aux &toplevel.alloc_region in
- let length = closure length_1 @length &toplevel.alloc_region
+ let length_aux = closure length_aux_0 @length_aux &toplevel in
+ let length = closure length_1 @length &toplevel
  with { length_aux = length_aux }
  in
- let rev_append = closure rev_append_2 @rev_append &toplevel.alloc_region in
- let chop = closure chop_3 @chop &toplevel.alloc_region in
- let sort_uniq = closure sort_uniq_4 @sort_uniq &toplevel.alloc_region
+ let rev_append = closure rev_append_2 @rev_append &toplevel in
+ let chop = closure chop_3 @chop &toplevel in
+ let sort_uniq = closure sort_uniq_4 @sort_uniq &toplevel
  with { length = length; rev_append_2 = rev_append; chop_1 = chop }
  in
- let foo = closure foo_9 @foo &toplevel.alloc_region in
+ let foo = closure foo_9 @foo &toplevel in
  let Pmakeblock =
    %block.[`0`].`toplevel`
      (length_aux, length, rev_append, chop, sort_uniq, foo)

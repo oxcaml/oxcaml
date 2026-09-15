@@ -25,15 +25,6 @@
  (section bin)
  (package ocaml))
 
-(executables
- (names   make_opcodes)
- (modules make_opcodes))
-
-(ocamllex
- (modules make_opcodes)
- (mode    fallback))
-
-
 (executable
   (name ocamldep)
   (modes byte native)
@@ -49,14 +40,18 @@
   (package ocaml))
 
 (rule
-  (target opnames.ml)
-  (deps
-     (:make_opcodes make_opcodes.exe)
-     (:input ../runtime/caml/instruct.h))
-  (action
-    (with-stdin-from %{input}
-      (with-stdout-to %{target}
-        (run %{make_opcodes} -opnames)))))
+ (targets opnames.ml)
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c opnames.ml.c)
+  (:tbl
+   ../runtime/caml/opcodes.h))
+ (action
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime %{c}"))))
 
 (library
   (name opnames)

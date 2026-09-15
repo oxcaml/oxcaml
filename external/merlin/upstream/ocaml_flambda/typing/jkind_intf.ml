@@ -107,13 +107,6 @@ module type Sort = sig
 
     val all_void : t -> bool
 
-    (** Like [all_void], but a layout variable counts as maybe-void, since it
-        can be instantiated as void.
-
-        CR layout-polymorphism: This function should be deleted once we support
-        layout-poly any-fields *)
-    val maybe_all_void : t -> bool
-
     (** True if the sort contains no univars or genvars.
 
         CR layout-polymorphism: This function should be deleted once we support
@@ -266,9 +259,7 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  (** This checks for equality, and sets any variables to make two sorts equal,
-      if possible *)
-  val equate : t -> t -> bool
+  val equate : allow_mutation:bool -> t -> t -> bool
 
   val format : Format_doc.formatter -> t -> unit
 
@@ -494,7 +485,6 @@ module History = struct
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
-    | Empty_record
     | Enumeration
     | Primitive of Ident.t
     | Immediate_polymorphic_variant

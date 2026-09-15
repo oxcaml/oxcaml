@@ -344,7 +344,7 @@ let is_pure = function
   | Const_vec512 _ -> true
   | Const_mask _ -> true
   | Stackoffset _ -> false
-  | Load _ -> true
+  | Load { is_atomic; _ } -> not is_atomic
   | Store _ -> false
   | Intop _ -> true
   | Int128op _ -> true

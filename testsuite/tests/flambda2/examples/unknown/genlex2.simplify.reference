@@ -45,7 +45,7 @@ apply ccall noalloc
              where k2 =
                cont k1 pop(regular k1) ($camlGenlex2__Pmakeblock_5))
     in
-    let $camlGenlex2__foo_3 = closure foo_0_1 @foo &toplevel.alloc_region in
+    let $camlGenlex2__foo_3 = closure foo_0_1 @foo &toplevel in
     let $camlGenlex2 = Block 0 ($camlGenlex2__Error_2, $camlGenlex2__foo_3)
     in
     cont done ($camlGenlex2)

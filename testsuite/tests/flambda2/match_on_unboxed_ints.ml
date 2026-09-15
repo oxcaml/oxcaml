@@ -47,7 +47,7 @@ let code loopify(never) size(60) newer_version_of(map_ints_to_float_constants_0)
 in
 let $camlTOP1__map_ints_to_float_constants_1 =
   closure map_ints_to_float_constants_0_1 @map_ints_to_float_constants
-    &toplevel.alloc_region
+    &toplevel
 in
 let $camlTOP1 = Block 0 ($camlTOP1__map_ints_to_float_constants_1) in
 cont done ($camlTOP1)
@@ -83,7 +83,7 @@ let code loopify(never) size(14) newer_version_of(map_tagged_ints_to_float_const
 in
 let $camlTOP2__map_tagged_ints_to_float_constants_4 =
   closure map_tagged_ints_to_float_constants_1_1
-    @map_tagged_ints_to_float_constants &toplevel.alloc_region
+    @map_tagged_ints_to_float_constants &toplevel
 in
 let $camlTOP2 = Block 0 ($camlTOP2__map_tagged_ints_to_float_constants_4) in
 cont done ($camlTOP2)
@@ -109,7 +109,7 @@ let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP7__match_on_ints_20 =
-  closure match_on_ints_6_1 @match_on_ints &toplevel.alloc_region
+  closure match_on_ints_6_1 @match_on_ints &toplevel
 and code loopify(never) size(88) newer_version_of(match_on_ints_6)
       match_on_ints_6_1 (param : nativeint)
         my_closure &my_alloc_region my_depth
@@ -189,8 +189,7 @@ let opaque_fun3 = %block_load.[`0`] ($TOP5.camlTOP5) in
 let opaque_fun2 = %block_load.[`0`] ($TOP4.camlTOP4) in
 let opaque_fun1 = %block_load.[`0`] ($TOP3.camlTOP3) in
 let $camlTOP8__match_on_tagged_ints_23 =
-  closure match_on_tagged_ints_7_1 @match_on_tagged_ints
-    &toplevel.alloc_region
+  closure match_on_tagged_ints_7_1 @match_on_tagged_ints &toplevel
 and code loopify(never) size(61) newer_version_of(match_on_tagged_ints_7)
       match_on_tagged_ints_7_1 (param : imm tagged)
         my_closure &my_alloc_region my_depth

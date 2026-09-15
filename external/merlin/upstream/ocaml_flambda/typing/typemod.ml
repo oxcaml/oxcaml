@@ -3366,6 +3366,12 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           (fun () -> Typecore.type_exp env sexp
             ~mode:(Value.disallow_left mode))
       in
+      let mode =
+        Value.join
+          [Value.disallow_right mode;
+           Value.min_with_monadic Staticity
+              (Staticity.of_const ~hint:Mod_unpack Staticity.Dynamic) ]
+      in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
           Tpackage pack ->
@@ -3387,13 +3393,15 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         (fun tj -> Not_allowed_in_functor_body tj);
       { mod_desc = Tmod_unpack(exp, mty);
         mod_type = mty;
-        mod_mode = Value.disallow_right mode, None;
+        mod_mode = mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.leaf_for_unpack
   | Pmod_extension ext ->
       raise (Error_forward (Builtin_attributes.error_of_extension ext))
+  | Pmod_hole ->
+      raise (Typecore.Error(smod.pmod_loc, env, Typecore.Unexpected_hole))
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in

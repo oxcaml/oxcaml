@@ -711,11 +711,11 @@ let find_map_local_output f a = exclave_
   loop 0
 
 let split x =
-  if x = unsafe_of_array [||]
+  let n = length x in
+  if n = 0
   then unsafe_of_array [||], unsafe_of_array [||]
   else begin
     let a0, b0 = unsafe_get x 0 in
-    let n = length x in
     let a = Array.make n a0 in
     let b = Array.make n b0 in
     for i = 1 to n - 1 do
@@ -730,11 +730,11 @@ let split x =
    elements already exist.  (This doesn't work for [combine], where we need to
    create the tuples.) *)
 let split_local x = exclave_
-  if x = unsafe_of_array [||]
+  let n = length x in
+  if n = 0
   then unsafe_of_array [||], unsafe_of_array [||]
   else begin
     let a0, b0 = unsafe_get x 0 in
-    let n = length x in
     let a = make_mutable_local n a0 in
     let b = make_mutable_local n b0 in
     for i = 1 to n - 1 do

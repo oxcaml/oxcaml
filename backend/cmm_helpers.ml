@@ -524,6 +524,7 @@ let[@inline] is_constant = function
   | _ -> false
 
 let rec add_const c n dbg =
+  let c = prefer_add c in
   if n = 0
   then c
   else
@@ -543,7 +544,7 @@ let rec add_const c n dbg =
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
           add_const c (n - x) dbg
-        | _ -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
 
 let rec add_const' arg const dbg =
   let open P.Default_variables in
@@ -593,7 +594,7 @@ let rec add_int c1 c2 dbg =
         add_const (add_int c1 c2 dbg) n1 dbg
       | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
         add_const (add_int c1 c2 dbg) n2 dbg
-      | _, _ -> Cop (Caddi, [c1; c2], dbg))
+      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
 
 let rec add_int' arg1 arg2 dbg =
   let open P.Default_variables in
@@ -614,12 +615,12 @@ let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
 let rec sub_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match prefer_add c1, prefer_add c2 with
-      | _, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
-      | _, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
+      | c1, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
+      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
         add_const (sub_int c1 c2 dbg) (-n2) dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), _ ->
+      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
         add_const (sub_int c1 c2 dbg) n1 dbg
-      | _, _ -> Cop (Csubi, [c1; c2], dbg))
+      | c1, c2 -> Cop (Csubi, [c1; c2], dbg))
 
 let rec sub_int' arg1 arg2 dbg =
   let open P.Default_variables in

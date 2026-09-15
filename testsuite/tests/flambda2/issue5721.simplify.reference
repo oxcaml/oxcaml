@@ -22,6 +22,6 @@ let code loopify(never) size(33) newer_version_of(main_0)
       let Pnot = %boolean_not (Pisint) in
       cont k (Pnot)
 in
-let $camlIssue5721__main_1 = closure main_0_1 @main &toplevel.alloc_region in
+let $camlIssue5721__main_1 = closure main_0_1 @main &toplevel in
 let $camlIssue5721 = Block 0 ($camlIssue5721__main_1) in
 cont done ($camlIssue5721)

@@ -87,22 +87,9 @@ module Sort : sig
 
   val set_change_log : (change -> unit) -> unit
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
+  val equate : allow_mutation:bool -> t -> t -> bool
 
-  val equate_tracking_mutation : t -> t -> equate_result
-
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
-
-  val constrain_addressable :
-    allow_mutation:bool -> t -> constrain_addressable_result
+  val constrain_addressable : allow_mutation:bool -> t -> bool
 
   val strip_head_addressable : t -> t
 
@@ -113,6 +100,8 @@ module Sort : sig
   (** Determines if the sort is [Scannable] or an unfilled sort variable,
       possibly under [Addressable] wrappers *)
   val is_scannable_or_var : t -> bool
+
+  val crosses_externality : t -> bool
 
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
@@ -213,6 +202,8 @@ module Layout : sig
     val get_sort : t -> Sort.Const.t option
 
     val is_scannable_or_any : t -> bool
+
+    val crosses_externality : t -> bool
 
     val is_surely_addressable : t -> bool
 

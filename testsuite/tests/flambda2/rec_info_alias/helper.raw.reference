@@ -36,7 +36,7 @@
    let g = closure g_2 @g &my_alloc_region with { f = f } in
    cont k1 (g)
  in
- let $camlHelper__s0 = closure p_0 @p &toplevel.alloc_region in
+ let $camlHelper__s0 = closure p_0 @p &toplevel in
  let $camlHelper__s1 = Block 0 ($camlHelper__s0) in
  cont k ($camlHelper__s1))
   where k define_root_symbol (module_block) =

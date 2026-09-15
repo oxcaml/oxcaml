@@ -104,9 +104,7 @@ let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
   let Pfield_1 = %block_load.mut.[`3`] (Pfield) in
   cont k (Pfield_1)
 in
-let $camlPhantom__is_false_7 =
-  closure is_false_2_1 @is_false &toplevel.alloc_region
-in
+let $camlPhantom__is_false_7 = closure is_false_2_1 @is_false &toplevel in
 let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
       is_true_1_1 (a : val)
         my_closure &my_alloc_region my_depth
@@ -115,9 +113,7 @@ let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
   let Pfield = %block_load.mut.[`3`] (a) in
   cont k (Pfield)
 in
-let $camlPhantom__is_true_6 =
-  closure is_true_1_1 @is_true &toplevel.alloc_region
-in
+let $camlPhantom__is_true_6 = closure is_true_1_1 @is_true &toplevel in
 let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       Make_0_1 (F : val) my_closure &my_alloc_region my_depth -> k * k1 : val =
   apply ccall noalloc
@@ -148,7 +144,7 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
       in
       cont k (Pmakeblock)
 in
-let $camlPhantom__Make_5 = closure Make_0_1 @Make &toplevel.alloc_region in
+let $camlPhantom__Make_5 = closure Make_0_1 @Make &toplevel in
 let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
       true_at_level0_4_2 (st, a : val)
         my_closure &my_alloc_region my_depth
@@ -266,7 +262,6 @@ let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
       in
       cont k (Pmakeblock)
 in
-let $camlPhantom__Make2_8 = closure Make2_5_1 @Make2 &toplevel.alloc_region
-in
+let $camlPhantom__Make2_8 = closure Make2_5_1 @Make2 &toplevel in
 let $camlPhantom = Block 0 ($camlPhantom__Make_5, $camlPhantom__Make2_8) in
 cont done ($camlPhantom)

@@ -96,17 +96,13 @@
    cont k1 (int_or)
  in
  let $camlTests15__immstring_4 = " \\ \n " in
- let list_to_array =
-   closure list_to_array_0 @list_to_array &toplevel.alloc_region
- in
- let is_c = closure is_c_1 @is_c &toplevel.alloc_region in
- let set_to_x = closure set_to_x_2 @set_to_x &toplevel.alloc_region in
- let classical_id =
-   closure classical_id_3 @classical_id &toplevel.alloc_region
- in
- let swapped = closure swapped_4 @swapped &toplevel.alloc_region in
- let negate = closure negate_5 @negate &toplevel.alloc_region in
- let foo = closure foo_6 @foo &toplevel.alloc_region in
+ let list_to_array = closure list_to_array_0 @list_to_array &toplevel in
+ let is_c = closure is_c_1 @is_c &toplevel in
+ let set_to_x = closure set_to_x_2 @set_to_x &toplevel in
+ let classical_id = closure classical_id_3 @classical_id &toplevel in
+ let swapped = closure swapped_4 @swapped &toplevel in
+ let negate = closure negate_5 @negate &toplevel in
+ let foo = closure foo_6 @foo &toplevel in
  let Pmakeblock =
    %block.[`0`].`toplevel`
      (list_to_array,

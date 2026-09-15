@@ -1193,6 +1193,12 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_gdwarf_version f =
+  ( "-gdwarf-version",
+    Arg.String f,
+    "<version>  Set the DWARF version for OxCaml debugging information\n\
+    \         (4 (default) or 5)" )
+
 let mk_ddebug_avail_sets f =
   ( "-ddebug-avail-sets",
     Arg.Unit f,
@@ -2306,6 +2312,7 @@ end
 module type Debugging_options = sig
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
@@ -2324,6 +2331,7 @@ module Make_debugging_options (F : Debugging_options) = struct
     [
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_gdwarf_version F.gdwarf_version;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
@@ -2343,6 +2351,17 @@ end
 module Debugging_options_impl = struct
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+
+  let gdwarf_version version =
+    match version with
+    | "4" -> Debugging.gdwarf_version := Dwarf_flags.Four
+    | "5" -> Debugging.gdwarf_version := Dwarf_flags.Five
+    | _ ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf "invalid DWARF version '%s' (must be 4 or 5)"
+                version))
+
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false

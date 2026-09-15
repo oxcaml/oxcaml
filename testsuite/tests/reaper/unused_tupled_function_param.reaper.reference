@@ -22,7 +22,7 @@ let code loopify(never) size(1) newer_version_of(tupled_0) tupled
   cont k (1)
 in
 let $camlUnused_tupled_function_param__tupled_4 =
-  closure tupled_0_1 @`tupled` &toplevel.alloc_region
+  closure tupled_0_1 @`tupled` &toplevel
 in
 (let code inline(never) loopify(never) size(1) newer_version_of(id_1)
        id_1_1 (f)
@@ -30,19 +30,16 @@ in
          -> k1 * k2 stack =
    cont k1 (f)
  in
- let $camlUnused_tupled_function_param__id_5 =
-   closure id_1_1 @`id` &toplevel.alloc_region
+ let $camlUnused_tupled_function_param__id_5 = closure id_1_1 @`id` &toplevel
  in
  let over_app_region = %begin_region () in
  let over_app_ghost_region = %begin_ghost_region () in
- apply
-        direct(id_1_1
-        &toplevel.alloc_region &over_app_region &over_app_ghost_region)
+ apply direct(id_1_1 &toplevel &over_app_region &over_app_ghost_region)
    $camlUnused_tupled_function_param__id_5
      ($camlUnused_tupled_function_param__tupled_4)
      -> k1 * error
    where k1 (func) =
-     (apply &toplevel.alloc_region
+     (apply &toplevel
         func ($camlUnused_tupled_function_param__const_block_0) -> k2 * error
         where k2 (param : [ 0 |1 ]) =
           let unboxed_field = %untag_imm (param) in

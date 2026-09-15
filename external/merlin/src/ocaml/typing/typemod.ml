@@ -3408,7 +3408,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
        (* [merlin] For better Construct error messages we need to keep holes
           in the recovered typedtree *)
         match sarg.pmod_desc with
-        | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
+        | Pmod_hole ->
             Msupport.raise_error exn;
             {
               mod_desc = Tmod_typed_hole;
@@ -3428,6 +3428,12 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           ~before_generalize:Typecore.generalize_structure_exp
           (fun () -> Typecore.type_exp env sexp
             ~mode:(Value.disallow_left mode))
+      in
+      let mode =
+        Value.join
+          [Value.disallow_right mode;
+           Value.min_with_monadic Staticity
+              (Staticity.of_const ~hint:Mod_unpack Staticity.Dynamic) ]
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
@@ -3450,12 +3456,14 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         (fun tj -> Not_allowed_in_functor_body tj);
       { mod_desc = Tmod_unpack(exp, mty);
         mod_type = mty;
-        mod_mode = Value.disallow_right mode, None;
+        mod_mode = mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.leaf_for_unpack
-  | Pmod_extension ({ txt; _ }, _) when txt = Ast_helper.hole_txt ->
+  | Pmod_extension ext ->
+      raise (Error_forward (Builtin_attributes.error_of_extension ext))
+  | Pmod_hole ->
       { mod_desc = Tmod_typed_hole;
         mod_type = Mty_for_hole;
         mod_mode = Value.(disallow_right min), None;
@@ -3463,8 +3471,6 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
       Shape.dummy_mod
-  | Pmod_extension ext ->
-      raise (Error_forward (Builtin_attributes.error_of_extension ext))
   | Pmod_instance glob ->
       Language_extension.assert_enabled ~loc:smod.pmod_loc Instances ();
       let glob = instance_name ~loc:smod.pmod_loc env glob in

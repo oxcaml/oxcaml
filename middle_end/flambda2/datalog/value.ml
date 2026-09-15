@@ -30,6 +30,10 @@
 type _ repr =
   | Int_repr : { print : Format.formatter -> int -> unit } -> int repr
 
+include Heterogenous_list.Make (struct
+  type 'a t = 'a repr
+end)
+
 let int_repr ~print = Int_repr { print }
 
 let equal_repr : type a. a repr -> a -> a -> bool =
