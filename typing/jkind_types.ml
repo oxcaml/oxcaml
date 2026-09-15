@@ -482,13 +482,14 @@ module Sort = struct
       v.level <- level)
 
   let rec update_level level = function
-    | Var v -> (
-      match v.contents with
-      | Some t -> update_level level t
-      | None -> set_var_level v level)
+    | Var v -> update_level_var level v
     | Base _ | Univar _ -> ()
     | Product ts -> List.iter (update_level level) ts
     | Addressable t -> update_level level t
+
+  and update_level_var level = function
+    | { contents = Some t; _ } -> update_level level t
+    | { contents = None } as v -> set_var_level v level
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
