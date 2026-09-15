@@ -111,7 +111,7 @@ let[@tail_mod_cons] rec rec_map f = function
         (if param
           (let
             (*match* =a? (field_imm 0 param)
-             block1_arg0 =? (apply f (field_imm 0 *match*))
+             block1_arg0 = (apply f (field_imm 0 *match*))
              block =
                (makemutable 0 (*,value<
                                   (consts (0))
@@ -204,9 +204,15 @@ let[@tail_mod_cons] rec trip = function
         (if param
           (let
             (x =a? (field_imm 0 param)
-             block0_arg0 =? (makeblock 0 (?,value<int>) x 0)
-             block1_arg0 =? (makeblock 0 (?,value<int>) x 1)
-             block2_arg0 =? (makeblock 0 (?,value<int>) x 2)
+             block0_arg0 =[value<
+                            (consts ()) (non_consts ([0: ?, value<int>]))>]
+               (makeblock 0 (?,value<int>) x 0)
+             block1_arg0 =[value<
+                            (consts ()) (non_consts ([0: ?, value<int>]))>]
+               (makeblock 0 (?,value<int>) x 1)
+             block2_arg0 =[value<
+                            (consts ()) (non_consts ([0: ?, value<int>]))>]
+               (makeblock 0 (?,value<int>) x 2)
              block =
                (makemutable 0 (value<
                                 (consts ()) (non_consts ([0: ?, value<int>]))>,

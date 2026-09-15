@@ -140,7 +140,20 @@ end = struct
   let with_placeholder constr (body : offset destination -> lambda) =
     let k_with_placeholder =
       apply { constr with flag = Mutable } tmc_placeholder in
-    let placeholder_pos = List.length constr.before in
+    let placeholder_pos =
+      let field = List.length constr.before in
+      (* Bytecode boxes products and preserves the source field order. *)
+      match constr.shape with
+      | _ when not !Clflags.native_code -> field
+      | All_value -> field
+      | Shape shape ->
+        let shape = Mixed_block_shape.of_mixed_block_elements shape
+            ~print_locality:(fun ppf () -> Format.pp_print_string ppf "()") in
+        match Mixed_block_shape.lookup_path_producing_new_indexes shape [field]
+        with
+        | [offset] -> offset
+        | _ -> Misc.fatal_error "Tmc: destination must be a single value field"
+    in
     let placeholder_pos_lam = Lconst (Const_base (Const_int placeholder_pos)) in
     let block_var = Ident.create_local "block" in
     let block_var_duid = Lambda.debug_uid_none in
@@ -153,7 +166,7 @@ end = struct
           })
 
   let delay_impure : block_id:int -> t -> (t -> lambda) -> lambda =
-    let bind_list ~block_id ~arg_offset lambdas k =
+    let bind_list ~shape ~block_id ~arg_offset lambdas k =
       let can_be_delayed =
         (* Note that the delayed subterms will be used
            exactly once in the linear-static subterm. So
@@ -170,20 +183,27 @@ end = struct
               let v = Ident.create_local
                   (Printf.sprintf "block%d_arg%d" block_id (arg_offset + i)) in
               let v_duid = Lambda.debug_uid_none in
-              (Some (v, v_duid, lam), Lvar v)
+              let layout = match shape with
+                | All_value -> Lambda.layout_tmc_field
+                | Shape shape ->
+                  Lambda.layout_of_mixed_block_element shape.(arg_offset + i)
+              in
+              (Some (v, v_duid, layout, lam), Lvar v)
             end)
         |> List.split in
       let body = k args in
       List.fold_right (fun binding body ->
           match binding with
           | None -> body
-          | Some (v, v_duid, lam) ->
-            Llet(Strict, Lambda.layout_tmc_field, v, v_duid, lam, body)
+          | Some (v, v_duid, layout, lam) ->
+            Llet(Strict, layout, v, v_duid, lam, body)
         ) bindings body in
     fun ~block_id constr body ->
-    bind_list ~block_id ~arg_offset:0 constr.before @@ fun vbefore ->
+    bind_list ~shape:constr.shape ~block_id ~arg_offset:0 constr.before
+      @@ fun vbefore ->
     let arg_offset = List.length constr.before + 1 in
-    bind_list ~block_id ~arg_offset constr.after @@ fun vafter ->
+    bind_list ~shape:constr.shape ~block_id ~arg_offset constr.after
+      @@ fun vafter ->
     body { constr with before = vbefore; after = vafter }
 end
 
@@ -775,7 +795,14 @@ let rec choice ctx t =
       }
 
   and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
-    let choices = List.map (choice ctx ~tail:false) blockargs in
+    let choices = List.mapi (fun index arg ->
+        match shape with
+        | All_value -> choice ctx ~tail:false arg
+        | Shape shape ->
+          match shape.(index) with
+          | Value _ -> choice ctx ~tail:false arg
+          | _ -> Choice.lambda (traverse ctx arg)
+      ) blockargs in
     match Choice.find_nonambiguous_tmc_call choices with
     | Choice.No_tmc_call args ->
         Choice.lambda @@ Lprim (Pmakeblock (tag, flag, shape, mode), args, loc)

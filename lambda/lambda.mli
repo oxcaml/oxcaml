@@ -1648,6 +1648,8 @@ val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
 
+val layout_of_mixed_block_element : _ mixed_block_element -> layout
+
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)
 val project_from_mixed_block_shape
