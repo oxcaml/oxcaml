@@ -187,18 +187,6 @@ let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
   t.alias_if_any_source
     <- NNN.add_or_replace [if_any_source; to_; from] () t.alias_if_any_source
 
-let add_opaque_let_dependency t ~to_ ~from =
-  let bound_to = Bound_pattern.free_names to_ in
-  let f () bound_to =
-    Name_occurrences.fold_names from
-      ~f:(fun () var ->
-        add_use_dep t
-          ~to_:(Code_id_or_name.name bound_to)
-          ~from:(Code_id_or_name.name var))
-      ~init:()
-  in
-  Name_occurrences.fold_names bound_to ~f ~init:()
-
 let add_any_usage t (var : Code_id_or_name.t) =
   t.any_usage <- N.add_or_replace [var] () t.any_usage
 
