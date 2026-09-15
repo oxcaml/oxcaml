@@ -24,9 +24,10 @@ module Style = Misc.Style
 
 module Compunit = struct
   type t = compunit
-  let name (Compunit cu_name) = cu_name
-  let is_packed (Compunit name) = String.contains name '.'
-  let to_ident (Compunit cu_name) = Ident.create_persistent cu_name
+  let name cu = Compilation_unit.full_path_as_string cu
+  let is_packed = Compilation_unit.is_packed
+  let to_ident cu =
+    Ident.create_persistent (Compilation_unit.full_path_as_string cu)
   module Set = Set.Make(struct type nonrec t = t let compare = compare end)
   module Map = Map.Make(struct type nonrec t = t let compare = compare end)
 end
@@ -374,7 +375,7 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-    crcs: Import_info.t array;
+    crcs: Cmo_format.crcs;
     prim: string list;
     dlpt: string list }
 

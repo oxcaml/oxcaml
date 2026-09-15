@@ -74,6 +74,13 @@ jobs:
             echo "Could not parse PR number from '$HEAD_REF'; not skipping 80ch."
           fi
 
+      # These would be set-up by configure, but we don't have a compiler
+      - name: Configure tree
+        run: |
+          touch otherlibs/dynlink/dynlink_config.ml
+          touch otherlibs/dynlink/dynlink_cmo_format.mli
+          touch otherlibs/dynlink/dynlink_cmxs_format.mli
+
       - name: Check OCaml Formatting
         run: opam exec -- bash tools/ci/actions/check-fmt.sh
 

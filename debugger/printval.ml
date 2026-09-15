@@ -62,7 +62,8 @@ module EvalPath =
 
     let rec eval_address = function
     | Env.Aunit (cu, _) ->
-      eval_id (cu |> Compilation_unit.to_global_ident_for_bytecode)
+        Ident.create_persistent (Compilation_unit.full_path_as_string cu)
+        |> eval_id
     | Env.Alocal id -> eval_id id
     | Env.Adot(root, _field_sorts, pos) ->
         (* We can ignore [_field_sorts] since the debugger runs only bytecode *)
