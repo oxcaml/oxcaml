@@ -162,6 +162,12 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type layout_poly_restriction =
+  | Class
+
+type layout_poly_inst_restriction =
+  | Binding_op
+
 type mode_mismatch_kind = Parameter | Return
 
 type error =
@@ -336,14 +342,10 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Let_poly_not_yet_implemented
+  | Layout_poly_not_yet_supported of layout_poly_restriction
+  | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
   | Let_poly_not_function
-  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
   | Useless_lpoly
-
-and invalid_layout_poly_inst_context =
-  | Binding_op
-
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -11946,12 +11948,12 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           Lpoly.generalize
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
-              let _, univars =
+              let (), genvars =
                 Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
-              if List.is_empty univars then
+              if List.is_empty genvars then
                 raise (Error (loc, env, Useless_lpoly));
-              univars)
+              genvars)
             pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
@@ -14028,15 +14030,18 @@ let report_error ~loc env =
   | Unexpected_hole ->
       Location.errorf ~loc
         "wildcard \"_\" not expected."
-  | Let_poly_not_yet_implemented ->
-      Location.errorf ~loc
-        "The %a annotation is not yet implemented."
-        Style.inline_code "let poly_"
   | Let_poly_not_function ->
       Location.errorf ~loc
         "This expression is not allowed in a %a definition;@ \
          it must be a function."
         Style.inline_code "let poly_"
+  | Layout_poly_not_yet_supported ctx ->
+      let ctx_str = match ctx with
+        | Class -> "classes"
+      in
+      Location.errorf ~loc
+        "Defining layout-polymorphic values is not yet supported in %s."
+        ctx_str
   | Layout_poly_inst_not_yet_supported ctx ->
       let ctx_str = match ctx with
         | Binding_op -> "binding operators"
