@@ -118,6 +118,10 @@ type import = {
   mutable imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  (* Whether [check_consistency] has run for this import. An import first
+     loaded without checking (e.g. by [check_pers_struct] for warning 49) must
+     still record and check its crcs on its first checked access. *)
+  mutable imp_checked : bool;
 }
 
 (* If a .cmi file is missing (or invalid), we
@@ -290,6 +294,12 @@ let check_consistency penv imp =
     } ->
     error (Inconsistent_import(name, auth, source))
 
+let complete_consistency_check penv imp =
+  if not imp.imp_checked then begin
+    check_consistency penv imp;
+    imp.imp_checked <- true
+  end
+
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
@@ -392,6 +402,7 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
+      imp_checked = check;
     }
   in
   if check then check_consistency penv import;
@@ -429,7 +440,10 @@ let find_import ~allow_hidden penv ~check modname =
   let intf = CUI.Found.intf modname in
   if CUI.equal intf CUI.predef_exn then raise Not_found;
   match CUI.Tbl.find imports intf with
-  | Found imp -> check_visibility ~allow_hidden ~intf imp; imp
+  | Found imp ->
+      check_visibility ~allow_hidden ~intf imp;
+      if check then complete_consistency_check penv imp;
+      imp
   | Missing -> raise Not_found
   | exception Not_found ->
       match can_load_cmis penv with
@@ -750,7 +764,11 @@ and acknowledge_new_pers_name penv check global_name global import =
 and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   let {persistent_names; _} = penv in
   match Global_module.Name.Tbl.find persistent_names name with
-  | pn -> pn
+  | pn ->
+      check_visibility ~allow_hidden
+        ~intf:(CUI.Found.intf name.Global_module.Name.head) pn.pn_import;
+      if check then complete_consistency_check penv pn.pn_import;
+      pn
   | exception Not_found ->
       let unit_name = name.Global_module.Name.head in
       let import = find_import ~allow_hidden penv ~check unit_name in
@@ -936,6 +954,7 @@ let find_pers_struct
       check_visibility ~allow_hidden
         ~intf:(CUI.Found.intf name.Global_module.Name.head)
         ps.ps_name_info.pn_import;
+      if check then complete_consistency_check penv ps.ps_name_info.pn_import;
       ps
   | exception Not_found ->
       let pers_name =
@@ -949,22 +968,31 @@ let describe_prefix ppf prefix =
   else
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
-(* Emits a warning if there is no valid cmi for name *)
+(* Checks that there is a valid cmi for [name]; if so, returns [name] with the
+   path of the loaded cmi attached to its head. Otherwise registers a delayed
+   warning 49 (delayed so that, as with warnings about unused bindings, it is
+   not emitted when compilation fails with a real error). *)
 let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
   let name_as_string = CUI.to_string (CUI.Found.intf name.head) in
-  try
-    ignore (find_pers_struct ~allow_hidden penv f ~check:false name
-              ~allow_excess_args:true)
+  let delay_warning warn =
+    !add_delayed_check_forward (fun () -> Location.prerr_warning loc warn)
+  in
+  match
+    find_pers_struct ~allow_hidden penv f ~check:false name
+      ~allow_excess_args:true
   with
-  | Not_found ->
-      let warn = Warnings.No_cmi_file(name_as_string, None) in
-        Location.prerr_warning loc warn
-  | Cmi_format.Error err ->
+  | ps ->
+      Global_module.Name.with_head_cmi_path name
+        ps.ps_name_info.pn_import.imp_filename
+  | exception Not_found ->
+      delay_warning (Warnings.No_cmi_file(name_as_string, None));
+      name
+  | exception Cmi_format.Error err ->
       let msg = Format.asprintf "%a"
           Cmi_format.report_error err in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
-  | Error err ->
+      delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
+      name
+  | exception Error err ->
       let msg =
         match err with
         | Illegal_renaming(name, ps_name, filename) ->
@@ -1014,8 +1042,8 @@ let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
               (Style.as_inline_code Global_module.Name.print) value
       in
       let msg = Format_doc.(asprintf "%a" pp_doc) msg in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
+      delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
+      name
 
 let read penv modname a =
   read_pers_struct penv true modname a
@@ -1067,10 +1095,13 @@ let check ~allow_hidden penv f ~loc name =
          later *)
       approximate_global_by_name penv name
     in
-    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
-      !add_delayed_check_forward
-        (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
-  end
+    ()
+  end;
+  (* With warning 49 disabled, the alias is neither checked nor is its cmi
+     searched for, so the output does not depend on which cmis happen to
+     exist. *)
+  if not (Warnings.is_active (Warnings.No_cmi_file ("", None))) then name
+  else check_pers_struct ~allow_hidden penv f ~loc name
 
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with

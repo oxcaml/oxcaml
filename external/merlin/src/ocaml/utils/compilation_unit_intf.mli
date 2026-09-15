@@ -52,7 +52,8 @@ val print_as_inline_code : Format_doc.formatter -> t -> unit
     users should traffic in plain [t]; a [Found.t] additionally remembers
     where the .cmi was (or will be) located, so that later lookups can try
     that path before searching the load path. The path is advisory only: it is
-    ignored by [compare], [equal] and [hash]. *)
+    ignored by [compare], [equal] and [hash]. Attached paths are made absolute
+    (against the current working directory) at attachment time. *)
 module Found : sig
   type cui := t
 
