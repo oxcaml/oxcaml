@@ -73,3 +73,4 @@ let canonical_ids = ref false
 let print_variance = ref false
 let error_style = ref (Some Misc.Error_style.Merlin)
 let structured_diagnostics = ref false
+let json = ref false

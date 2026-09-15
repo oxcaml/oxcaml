@@ -946,40 +946,15 @@ let batch_mode_printer : report_printer =
   { pp; pp_report_kind; pp_main_loc; pp_main_txt;
     pp_submsgs; pp_submsg; pp_submsg_loc; pp_submsg_txt }
 
-<<<<<<< Merlin:ggray/msd/dev
-(*
-||||||| Compiler:last-imported
-=======
 let rendering_report_to_string = ref false
 
->>>>>>> Compiler:HEAD
+(*
 let terminfo_toplevel_printer (lb: lexbuf): report_printer =
   let pp self ppf err =
-<<<<<<< Merlin:ggray/msd/dev
-    (* setup_tags (); *)
-    (* Highlight all toplevel locations of the report, instead of displaying
-       the main location. Do it now instead of in [pp_main_loc], to avoid
-       messing with Format boxes. *)
-    let sub_locs = List.map (fun { loc; _ } -> loc) err.sub in
-    let all_locs = err.main.loc :: sub_locs in
-    let locs_highlighted = List.filter is_quotable_loc all_locs in
-    highlight_terminfo lb ppf locs_highlighted;
-    batch_mode_printer.pp self ppf err
-||||||| Compiler:last-imported
-    setup_tags ();
-    (* Highlight all toplevel locations of the report, instead of displaying
-       the main location. Do it now instead of in [pp_main_loc], to avoid
-       messing with Format boxes. *)
-    let sub_locs = List.map (fun { loc; _ } -> loc) err.sub in
-    let all_locs = err.main.loc :: sub_locs in
-    let locs_highlighted = List.filter is_quotable_loc all_locs in
-    highlight_terminfo lb ppf locs_highlighted;
-    batch_mode_printer.pp self ppf err
-=======
     if !rendering_report_to_string then
       batch_mode_printer.pp batch_mode_printer ppf err
     else begin
-      setup_tags ();
+      (* setup_tags (); *)
       (* Highlight all toplevel locations of the report, instead of displaying
          the main location. Do it now instead of in [pp_main_loc], to avoid
          messing with Format boxes. *)
@@ -989,7 +964,6 @@ let terminfo_toplevel_printer (lb: lexbuf): report_printer =
       highlight_terminfo lb ppf locs_highlighted;
       batch_mode_printer.pp self ppf err
     end
->>>>>>> Compiler:HEAD
   in
   let pp_main_loc _ _ _ _ = () in
   let pp_submsg_loc _ _ ppf loc =

@@ -3,15 +3,17 @@ module Diagnostic = Structured_diagnostic
 type t =
   { loc : Location.t;
     kind : Location.report_kind;
+    source : Location.error_source;
     legacy : string;
     fragments : Diagnostic_term.t Diagnostic_nlg.fragment list
   }
 
-let diagnostic_of_legacy ~loc ~kind legacy =
-  { loc; kind; legacy; fragments = [] }
+let diagnostic_of_legacy ~loc ~kind ~source legacy =
+  { loc; kind; source; legacy; fragments = [] }
 
 let diagnostic_of_report (report : Location.report) =
   diagnostic_of_legacy ~loc:report.main.loc ~kind:report.kind
+    ~source:report.source
     (Location.report_to_string report)
 
 let mode_diagnostic ~loc error = Mode_diagnostics.diagnose ~loc error
@@ -374,7 +376,7 @@ let of_exn exn =
     Some
       (`Ok
         (diagnostic_of_legacy ~loc:Location.none ~kind:Location.Report_error
-           legacy))
+           ~source:Location.Unknown legacy))
   | Some `Already_displayed -> Some `Already_displayed
   | Some (`Ok legacy) -> Some (`Ok (prepare ~legacy exn))
 
@@ -395,6 +397,7 @@ let print_text ppf diagnostic =
           main =
             Location.msg ~loc:diagnostic.loc "%a" Diagnostic.format diagnostic;
           sub = [];
+          source = diagnostic.source;
           footnote = None
         }
       in
