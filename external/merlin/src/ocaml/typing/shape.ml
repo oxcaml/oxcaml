@@ -317,6 +317,7 @@ module Predef = struct
       | Unboxed_int8
       | Unboxed_mask
       | Unboxed_simd of simd_vec_split
+      | Unboxed_unit
 
     type t =
       | Array
@@ -397,6 +398,7 @@ module Predef = struct
       | Unboxed_int8 -> "int8"
       | Unboxed_mask -> "mask"
       | Unboxed_simd s -> simd_vec_split_to_string s
+      | Unboxed_unit -> "unit"
 
     let to_string : t -> string = function
       | Array -> "array"
@@ -457,6 +459,7 @@ module Predef = struct
       | Unboxed_int8 -> Bits8
       | Unboxed_mask -> Mask
       | Unboxed_simd s -> simd_vec_split_to_layout s
+      | Unboxed_unit -> Void
 
     let to_base_layout : t -> base_layout =
       function
@@ -508,9 +511,10 @@ module Predef = struct
       | Unboxed_int8, Unboxed_int8
       | Unboxed_mask, Unboxed_mask -> true
       | Unboxed_simd s1, Unboxed_simd s2 -> equal_simd_vec_split s1 s2
+      | Unboxed_unit, Unboxed_unit -> true
       | (Unboxed_float | Unboxed_float32 | Unboxed_nativeint
         | Unboxed_int64 | Unboxed_int32 | Unboxed_int16 | Unboxed_int8
-        | Unboxed_mask | Unboxed_simd _), _ -> false
+        | Unboxed_mask | Unboxed_simd _ | Unboxed_unit), _ -> false
 
     let equal p1 p2 =
       match p1, p2 with
