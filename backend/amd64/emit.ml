@@ -46,10 +46,6 @@ module L = Asm_targets.Asm_label
 (* Name of current function *)
 let function_name = ref ""
 
-(* Keep the name of the current block section to get back to it after emitting
-   data. *)
-let current_basic_block_section = ref ""
-
 (* These callbacks are just instrumentation for expect_asm tests. *)
 let expect_asm_callbacks = ref []
 
@@ -382,7 +378,7 @@ let load_symbol_addr (s : Cmm.symbol) arg =
 (* Output .text section directive, or named .text.caml.<name> if enabled and
    supported on the target system. *)
 
-let emit_named_text_section ?(suffix = "") func_name =
+let emit_named_text_section func_name =
   (* CR-someday ksvetlitski: In the future we should consider extending this to
      also place other known-cold functions in a separate section (specifically
      [.text.unlikely.caml]). This would necessitate adding a new constructor to
@@ -412,7 +408,7 @@ let emit_named_text_section ?(suffix = "") func_name =
          specific text section. *)
       (* CR sspies: Add proper support for named text sections. *)
       D.unsafe_set_internal_section_ref Text)
-  else if !Clflags.function_sections || !Oxcaml_flags.basic_block_sections
+  else if !Clflags.function_sections
   then (
     match[@ocaml.warning "-4"] system with
     | S_macosx
@@ -424,9 +420,7 @@ let emit_named_text_section ?(suffix = "") func_name =
          does not support function sections. *) ->
       assert false
     | _ ->
-      let name =
-        Printf.sprintf ".text.caml.%s%s" (emit_symbol func_name) suffix
-      in
+      let name = Printf.sprintf ".text.caml.%s" (emit_symbol func_name) in
       D.switch_to_section_raw ~names:[name] ~flags:(Some "ax")
         ~args:["@progbits"] ~is_delayed:false;
       Emitaux.enter_code_section name;
@@ -442,26 +436,7 @@ let emit_named_text_section ?(suffix = "") func_name =
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
 
-let emit_function_or_basic_block_section_name () =
-  let suffix =
-    if String.length !current_basic_block_section = 0
-    then ""
-    else "." ^ !current_basic_block_section
-  in
-  emit_named_text_section !function_name ~suffix
-
-let emit_Llabel fallthrough lbl section_name =
-  (if !Oxcaml_flags.basic_block_sections
-   then
-     match section_name with
-     | Some name ->
-       if not (String.equal name !current_basic_block_section)
-       then (
-         current_basic_block_section := name;
-         D.cfi_endproc ();
-         emit_function_or_basic_block_section_name ();
-         D.cfi_startproc ())
-     | None -> ());
+let emit_Llabel fallthrough lbl =
   if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
   D.define_label lbl
 
@@ -2693,9 +2668,9 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lop Domain_index -> I.mov (domain_field Domainstate.Domain_id) (res i 0)
   | Lreloadretaddr -> ()
   | Lreturn -> I.ret ()
-  | Llabel { label = lbl; section_name } ->
+  | Llabel lbl ->
     let lbl = label_to_asm_label ~section:Text lbl in
-    emit_Llabel fallthrough lbl section_name
+    emit_Llabel fallthrough lbl
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
@@ -2814,7 +2789,7 @@ let emit_function_type_and_size fun_sym =
   (* Note: Symbol types and sizes are only needed on some platforms/systems.
      These functions check internally whether they are needed. *)
   D.type_symbol ~ty:Function fun_sym;
-  if not !Oxcaml_flags.basic_block_sections then D.size fun_sym
+  D.size fun_sym
 
 (* Emission of a function declaration *)
 
@@ -2838,9 +2813,7 @@ let fundecl fundecl =
   prologue_required := fundecl.fun_prologue_required;
   frame_required := fundecl.fun_frame_required;
   all_functions := fundecl :: !all_functions;
-  current_basic_block_section
-    := Option.value fundecl.fun_section_name ~default:"";
-  emit_function_or_basic_block_section_name ();
+  emit_named_text_section fundecl.fun_name;
   D.align ~fill:Nop ~bytes:16;
   add_def_symbol fundecl.fun_name;
   let fundecl_sym = S.create_global fundecl.fun_name in
