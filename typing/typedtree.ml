@@ -850,11 +850,13 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
   | Tincl_gen_functor of
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
 
 and 'a include_infos =
