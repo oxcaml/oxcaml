@@ -535,10 +535,13 @@ val open_signature_by_path: Path.t -> t -> t
 
 val open_pers_signature: string -> t -> Path.t * t
 
-(* Like [open_pers_signature], but takes a [.cmi] file path and loads it
-   directly (bypassing the include path) and ignores any in-scope module of
-   the same name. Used to implement [-open-cmi]. *)
-val open_pers_signature_cmi: string -> t -> Path.t * t
+(* [open_pers_signature_cmi file env] opens the interface in [file] (a [.cmi]
+   path, read directly, bypassing the include path) anonymously: the interface
+   must consist only of aliases to other compilation units (possibly with
+   instance arguments), and each member name resolves directly to its alias
+   target, never through the opened interface (which is not nameable and is
+   never linked). Used to implement [-open-cmi]. *)
+val open_pers_signature_cmi: string -> t -> t
 
 val remove_last_open: Path.t -> t -> t option
 
@@ -647,7 +650,7 @@ val save_signature_with_imports:
 (** See [Persistent_env.find_import]. *)
 val find_import:
   chain:Compilation_unit_intf.t list ->
-  Compilation_unit_intf.t ->
+  Compilation_unit_intf.Found.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t

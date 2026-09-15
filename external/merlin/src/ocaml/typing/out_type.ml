@@ -464,7 +464,8 @@ let instance_name global =
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
     String.concat ""
-      (Compilation_unit_intf.to_string head :: List.map string_of_arg args)
+      (Compilation_unit_intf.to_string (Compilation_unit_intf.Found.intf head)
+       :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"
@@ -508,16 +509,6 @@ let rec module_path_is_an_alias_of env path ~alias_of =
   | _ -> false
   | exception Not_found -> false
 
-let expand_longident_head name =
-  match find_double_underscore name with
-  | None -> None
-  | Some i ->
-    Some
-      (Ldot
-        (Location.mknoloc (Lident (String.sub name 0 i)),
-        (Location.mknoloc (Unit_info.modulize
-            (String.sub name (i + 2) (String.length name - i - 2))))))
-
 (* Simple heuristic to print Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 let rec rewrite_double_underscore_paths_impl env p =
@@ -531,16 +522,33 @@ let rec rewrite_double_underscore_paths_impl env p =
     Pextra_ty (rewrite_double_underscore_paths_impl env p, extra)
   | Pident id ->
     let name = Ident.name id in
-    match expand_longident_head name with
+    match find_double_underscore name with
     | None -> p
-    | Some better_lid ->
+    | Some i ->
+      let tail =
+        Unit_info.modulize
+          (String.sub name (i + 2) (String.length name - i - 2))
+      in
+      let better_lid =
+        Ldot
+          (Location.mknoloc (Lident (String.sub name 0 i)),
+           Location.mknoloc tail)
+      in
+      let tail_of_open_cmi_rebinding () =
+        (* An [-open-cmi] rebinding binds the member name directly to a global
+           such as [p]. The resulting ident is used for printing only. *)
+        match Env.find_module_by_name_lazy (Lident tail) env with
+        | exception Not_found -> p
+        | p', _ ->
+            if Path.same p' p || module_path_is_an_alias_of env p' ~alias_of:p
+            then Pident (Ident.create_persistent tail)
+            else p
+      in
       match Env.find_module_by_name_lazy better_lid env with
-      | exception Not_found -> p
+      | exception Not_found -> tail_of_open_cmi_rebinding ()
       | p', _ ->
-          if module_path_is_an_alias_of env p' ~alias_of:p then
-            p'
-          else
-          p
+          if module_path_is_an_alias_of env p' ~alias_of:p then p'
+          else tail_of_open_cmi_rebinding ()
 
 let rewrite_double_underscore_paths env p =
   if env == Env.empty then

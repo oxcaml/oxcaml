@@ -24,7 +24,10 @@ let () =
   let module Persistent_signature = Persistent_env.Persistent_signature in
   let old_loader = !Persistent_signature.load in
   Persistent_signature.load := (fun ~allow_hidden ~unit_name ->
-    match unit_name |> Compilation_unit_intf.to_string with
+    match
+      unit_name |> Compilation_unit_intf.Found.intf
+      |> Compilation_unit_intf.to_string
+    with
     | "Foo" ->
       let
         { Cmi_format.cmi_name;

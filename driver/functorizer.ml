@@ -134,7 +134,9 @@ let rec load_approx ~chain (gm : GM.t) : GM.t * Signature_with_global_bindings.t
 let rec insert_module_exact ~chain (gm : GM.t)
     (swg : Signature_with_global_bindings.t) state =
   state.module_map <- GM.Name.Map.add (GM.to_name gm) chain state.module_map;
-  let chain = (GM.to_name gm).GM.Name.head :: chain in
+  let chain =
+    Compilation_unit_intf.Found.intf (GM.to_name gm).GM.Name.head :: chain
+  in
 
   let swg =
     let args =
@@ -203,7 +205,10 @@ let analyze (src_names : CUI.Set.t) : result =
   let state = new_empty_state () in
   CUI.Set.iter
     (fun cu_name ->
-      match Env.find_import ~chain cu_name with
+      match
+        Env.find_import ~chain
+          (Compilation_unit_intf.Found.without_cmi_path cu_name)
+      with
       | None, _, _ ->
           Compenv.fatal
             (Printf.sprintf

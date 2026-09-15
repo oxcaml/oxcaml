@@ -271,7 +271,7 @@ end = struct
 
   let of_global_name (glob : Global_module.Name.t) =
     match glob with
-    | { head; args = [] } -> of_plain_name (Name.of_intf head)
+    | { head; args = [] } -> of_plain_name (Name.of_intf (CUI.Found.intf head))
     | _ -> of_full (Global glob)
 
   let convert_arguments l =
@@ -295,7 +295,7 @@ end = struct
       | With_prefix { name; for_pack_prefix } ->
         { name; for_pack_prefix; arguments = [] }
       | Global { head; args } ->
-        let name = Name.of_intf head in
+        let name = Name.of_intf (CUI.Found.intf head) in
         let arguments = convert_arguments args in
         { name; arguments; for_pack_prefix = Prefix.empty }
 
@@ -308,7 +308,7 @@ end = struct
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
       | With_prefix { name; _ } -> name
-      | Global { head; _ } -> Name.of_intf head
+      | Global { head; _ } -> Name.of_intf (CUI.Found.intf head)
 
   let for_pack_prefix t =
     let tag = Obj.tag t in
@@ -379,7 +379,8 @@ end = struct
 
   let of_global_name (name : Global_module.Name.t) =
     match name with
-    | { head; args = [] } -> of_plain_name (head |> Name.of_intf)
+    | { head; args = [] } ->
+      of_plain_name (head |> CUI.Found.intf |> Name.of_intf)
     | _ -> of_full (Global name)
 
   let create_full for_pack_prefix name arguments =

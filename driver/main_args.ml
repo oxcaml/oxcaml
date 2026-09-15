@@ -511,8 +511,9 @@ let mk_open f =
 
 let mk_open_cmi f =
   "-open-cmi", Arg.String f,
-  "<file.cmi>  Same as -open, but reads the signature from <file.cmi>\n\
-  \    rather than looking up a module on the include path"
+  "<file.cmi>  Open the interface in <file.cmi> anonymously: it must\n\
+  \    contain only module aliases, and its members resolve directly to\n\
+  \    the alias targets rather than through the opened interface"
 
 let mk_output_obj f =
   "-output-obj", Arg.Unit f, " Output an object file instead of an executable"

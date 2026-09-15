@@ -838,6 +838,9 @@ and module_alias_locks = locks
 and module_entry =
   | Mod_local of module_data * module_alias_locks
   | Mod_persistent
+  | Mod_persistent_as of Global_module.Name.t
+    (* Bound by [-open-cmi] to an alias member of an anonymous interface: the
+       bound name resolves directly to this global. *)
   | Mod_unbound of module_unbound_reason
 
 and modtype_data =
@@ -1263,6 +1266,14 @@ let add_persistent_structure id env =
     { env with modules; summary }
   end
 
+(* Bind [id]'s name such that it resolves directly to the global [target].
+   Used by [-open-cmi], whose interface is anonymous: its members must not be
+   referenced through it. *)
+let add_persistent_structure_as id target env =
+  if not (Ident.is_global id) then
+    invalid_arg "Env.add_persistent_structure_as";
+  { env with modules = IdTbl.add id (Mod_persistent_as target) env.modules }
+
 let components_of_module ~alerts ~uid env ps path addr mty mode shape =
   {
     alerts;
@@ -1435,7 +1446,11 @@ let find_ident_module id env =
   match find_same_module id env.modules with
   | Mod_local (data, _) -> data
   | Mod_unbound _ -> raise Not_found
-  | Mod_persistent ->
+  | Mod_persistent | Mod_persistent_as _ ->
+      (* [Mod_persistent_as] rebinds a name for lexical (by-name) references
+         only. [id] here is a semantic reference to the global it denotes
+         itself (e.g. an ident from a loaded cmi that merely has the same
+         name), so the rebinding's target must not be consulted. *)
       match Ident.to_global id with
       | Some global_name ->
           let allow_excess_args =
@@ -1891,7 +1906,8 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Module ->
       begin match IdTbl.find_same_without_locks id env.modules with
       | Mod_local ({ mda_shape; _ }, _) -> mda_shape
-      | Mod_persistent -> Shape.for_persistent_unit (Ident.name id)
+      | Mod_persistent | Mod_persistent_as _ ->
+          Shape.for_persistent_unit (Ident.name id)
       | Mod_unbound _ ->
           (* Only present temporarily while approximating the environment for
              recursive modules.
@@ -1948,7 +1964,7 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = global.Global_module.Name.head in
+    let name = CUI.Found.intf global.Global_module.Name.head in
     if Current_unit.is_intf name
     then begin
       (* The current compilation unit appears in quotes.
@@ -2227,7 +2243,7 @@ let iter_env wrap proj1 proj2 f env () =
        | Mod_unbound _ -> ()
        | Mod_local (data, _) ->
            iter_components (Pident id) path data.mda_components
-       | Mod_persistent -> ())
+       | Mod_persistent | Mod_persistent_as _ -> ())
     env.modules;
   Persistent_env.fold !persistent_env (fun name data () ->
     let id = Ident.create_global name in
@@ -2255,7 +2271,8 @@ let same_types env1 env2 =
 
 let used_persistent () =
   Persistent_env.fold !persistent_env
-    (fun (s : Global_module.Name.t) _m r -> CUI.Set.add s.head r)
+    (fun (s : Global_module.Name.t) _m r ->
+       CUI.Set.add (CUI.Found.intf s.head) r)
     CUI.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
@@ -2274,7 +2291,7 @@ let rec find_shadowed_comps path env =
         (fun (p, data) ->
            match data with
            | Mod_local (x, _) -> Some (p, x)
-           | Mod_unbound _ | Mod_persistent -> None)
+           | Mod_unbound _ | Mod_persistent | Mod_persistent_as _ -> None)
         (IdTbl.find_all wrap_module (Ident.name id) env.modules)
   | Pdot (p, s) ->
       let l = find_shadowed_comps p env in
@@ -3439,7 +3456,8 @@ let read_signature modname cmi =
 
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
-  with Not_found -> error (Cmi_not_found { modname; chain })
+  with Not_found ->
+    error (Cmi_not_found { modname = CUI.Found.intf modname; chain })
 
 let register_parameter modname =
   Persistent_env.register_parameter !persistent_env modname
@@ -3812,14 +3830,15 @@ type _ load =
   | Don't_load : unit load
 
 let lookup_global_name_module_no_locks
-      (type a) (load : a load) ~errors ~use ~loc name env =
-  let path = Pident(Ident.create_global name) in
+      (type a) (load : a load) ~allow_hidden ~errors ~use ~loc name env =
   match load with
   | Don't_load ->
-      check_pers_mod ~allow_hidden:false ~loc name;
+      let name = check_pers_mod ~allow_hidden ~loc name in
+      let path = Pident(Ident.create_global name) in
       path, (() : a)
   | Load -> begin
-      match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
+      let path = Pident(Ident.create_global name) in
+      match find_pers_mod ~allow_hidden name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;
           path, (mda : a)
@@ -3855,14 +3874,21 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
     end
   | Mod_unbound reason ->
       report_module_unbound ~errors ~loc env reason
-  | Mod_persistent -> begin
-      (* This is only used when processing [Longident.t]s, which never have
-         instance arguments *)
-      let name =
-        Global_module.Name.create_no_args (CUI.of_string s)
+  | (Mod_persistent | Mod_persistent_as _) as entry -> begin
+      let name, allow_hidden =
+        match entry with
+        | Mod_persistent_as name ->
+            (* References through an [-open-cmi] rebinding are transitive:
+               they may reach units on the hidden include path. *)
+            name, true
+        | _ ->
+          (* This is only used when processing [Longident.t]s, which never
+             have instance arguments *)
+          Global_module.Name.create_no_args (CUI.of_string s), false
       in
       let path, a =
-        lookup_global_name_module_no_locks load ~errors ~use ~loc name env
+        lookup_global_name_module_no_locks load ~allow_hidden ~errors ~use ~loc
+          name env
       in
       let mode =
         match load with
@@ -4544,21 +4570,27 @@ let open_pers_signature name env =
   path, env
 
 let open_pers_signature_cmi filename env =
-  let global_name, _sign =
+  let _global_name, (sign, _mode) =
     Persistent_env.read_cmi_file !persistent_env filename
   in
-  let mda =
-    find_pers_mod ~allow_hidden:true global_name ~allow_excess_args:false
-  in
-  let path = Pident (Ident.create_global global_name) in
-  use_module ~use:true ~loc:Location.none path mda;
-  let comps = find_structure_components path env in
-  let locks =
-    locks_for_pers_mod ~loc_use:Location.none
-      ~loc_def:Location.none env path
-  in
-  let env = add_components None path env comps locks in
-  path, env
+  List.fold_left
+    (fun env (item : Subst.Lazy.signature_item) ->
+       match item with
+       | Sig_module (id, _, { md_type = Mty_alias (Pident target); _ }, _, _)
+         -> begin
+           match Ident.to_global target with
+           | Some target ->
+               add_persistent_structure_as
+                 (Ident.create_persistent (Ident.name id)) target env
+           | None -> env
+         end
+       | _ ->
+           (* The compiler raises a fatal error on members that are not
+              aliases to other compilation units; Merlin must not die on a
+              bad configuration, so such members are simply ignored. *)
+           env)
+    env
+    (Subst.Lazy.force_signature_once sign)
 
 let open_signature
     ~used_slot
@@ -4639,7 +4671,8 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
   let path, loc_def, mode =
     if !Clflags.no_alias_deps && not load then
       let path, () =
-        lookup_global_name_module_no_locks Don't_load ~errors ~use ~loc name env
+        lookup_global_name_module_no_locks Don't_load ~allow_hidden:false
+          ~errors ~use ~loc name env
       in
       (* The cmi is not loaded, so [cmi_staticity] is unknown. Conservatively
          fall back to [Dynamic]. *)
@@ -4648,7 +4681,8 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
           (Persistent_env.mode_pers_mod Dynamic)
     else
       let path, (mda : module_data) =
-        lookup_global_name_module_no_locks Load ~errors ~use ~loc name env
+        lookup_global_name_module_no_locks Load ~allow_hidden:false ~errors
+          ~use ~loc name env
       in
       path, mda.mda_declaration.md_loc, mda.mda_mode
   in
@@ -5084,6 +5118,13 @@ let fold_modules f lid env acc =
            | Mod_unbound _ -> acc
            | Mod_local (mda, _) ->
                f name p mda.mda_declaration acc
+           | Mod_persistent_as modname -> begin
+               match
+                 Persistent_env.find_in_cache !persistent_env modname
+               with
+               | None -> acc
+               | Some mda -> f name p mda.mda_declaration acc
+             end
            | Mod_persistent ->
                (* CR lmaurer: Setting instance args to [] here isn't right. We
                   really should have [IdTbl.fold_name] provide the whole ident
@@ -5165,6 +5206,15 @@ let filter_non_loaded_persistent f env =
          match entry with
          | Mod_local _ -> acc
          | Mod_unbound _ -> acc
+         | Mod_persistent_as modname -> begin
+             match Persistent_env.find_in_cache !persistent_env modname with
+             | Some _ -> acc
+             | None ->
+                 if f (Ident.create_persistent name) then
+                   acc
+                 else
+                   String.Set.add name acc
+           end
          | Mod_persistent ->
              (* CR lmaurer: Again, setting args to [] here is weird but fine
                 for the moment *)

@@ -356,9 +356,7 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
     | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
-        env
+    | Open_cmi cmi -> Env.open_pers_signature_cmi cmi env
   in
   let add_units env units =
     String.Set.fold
@@ -4975,7 +4973,8 @@ let functorize_signature ~params ~modules : Types.signature =
       (fun (p_name, param_id) body ->
         let impl, param_params, (swg : Signature_with_global_bindings.t) =
           Env.find_import ~chain:[]
-            (p_name : Global_module.Parameter_name.t :> CUI.t)
+            (CUI.Found.without_cmi_path
+               (p_name : Global_module.Parameter_name.t :> CUI.t))
         in
         assert (Option.is_none impl);
         assert (List.is_empty param_params);

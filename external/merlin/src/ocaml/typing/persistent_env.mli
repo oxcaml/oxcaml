@@ -73,7 +73,7 @@ module Persistent_signature : sig
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:CUI.t -> t option) ref
+    (allow_hidden:bool -> unit_name:CUI.Found.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -129,7 +129,7 @@ val read_cmi_file :
     would impose typing constraints between it and the current
     persistent module, such as the "parameter subset rule". *)
 val find_import :
-  'a t -> CUI.t ->
+  'a t -> CUI.Found.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
@@ -139,9 +139,15 @@ val find : allow_hidden:bool -> 'a t -> 'a sig_reader
 
 val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 
+(* [check] is used for references that do not contribute a dependency on the
+   interface, such as module aliases under -no-alias-deps: it records a weak
+   dependency on [name] and, when warning 49 is active, checks that [name]'s
+   cmi is present and usable (warning otherwise) and returns the name with the
+   loaded cmi's path attached to its head. With the warning disabled, the cmi
+   is not searched for at all and [name] is returned unchanged. *)
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
-  -> loc:Location.t -> Global_module.Name.t -> unit
+  -> loc:Location.t -> Global_module.Name.t -> Global_module.Name.t
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
