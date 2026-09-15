@@ -36,7 +36,7 @@ end
 module type S = sig
   type op
 
-  type rhs = op * valnum array
+  type rhs = op * valnum array * Cmm.machtype
 
   module Equations : sig
     module Rhs_map : Map.S with type key = rhs
@@ -81,9 +81,23 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   type op = Op.t
 
   (* We maintain sets of equations of the form valnums = operation(valnums) plus
-     a mapping from registers to valnums (value numbers). *)
+     a mapping from registers to valnums (value numbers).
 
-  type rhs = op * valnum array
+     The machtypes of the results are part of the key, so that an equation can
+     only be reused by an instruction whose results have the machtypes of the
+     results the equation was established for. Registers sharing a value number
+     must remain interchangeable for as long as their bindings are kept,
+     including across allocations and polls; a moving GC updates [Val] and
+     [Valx2] registers but leaves [Int] and [Vec128] ones unchanged, so
+     registers of different machtypes holding the same bits at one point may
+     hold different bits later on. Both the store-to-load forwarding equations
+     (see [Cse_generic]) and vectorized loads of the same chunk, which can
+     produce either a [Vec128] or a [Valx2], rely on this. (Instruction
+     selection may still emit a [Move] between an [Int] and a [Val] register at
+     join points, in which case [set_move] shares a value number across the two
+     machtypes; CSE does not currently guard against that.) *)
+
+  type rhs = op * valnum array * Cmm.machtype
 
   module Equations = struct
     module Rhs_map = Map.Make (struct
@@ -344,7 +358,19 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
-    | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
+    | Floatop _ | Csel _ | Static_cast _ -> Op_pure
+    | Reinterpret_cast (Int_of_value | Value_of_int) ->
+      (* The result depends on the current address of a heap value, which a
+         moving GC may change at any allocation or poll. Equations over these
+         casts are hence kept with the ones over mutable loads, which those
+         points invalidate (so do stores, atomics and fences, which is more than
+         needed but harmless). *)
+      Op_load Mutable
+    | Reinterpret_cast
+        ( Float_of_float32 | Float32_of_float | Float_of_int64 | Int64_of_float
+        | Float32_of_int32 | Int32_of_float32 | Mask_of_int64 | Int64_of_mask
+        | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ) ->
+      Op_pure
     | Specific _ -> Op_other
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other
@@ -381,14 +407,16 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
      the register is [Float64]); [Addr]-typed values are conservatively
      excluded.
 
-     [Word_int] and [Word_val] both denote a full-word location and round-trip
-     the register bits exactly; they are used asymmetrically (e.g. an immediate
-     record field is stored with [Word_int] but loaded with [Word_val]), so a
-     word store is forwardable under both chunks. *)
+     [Word_int] and [Word_val] stores both preserve a full word, but the load
+     must preserve the register's GC representation too. Sharing a value number
+     between [Int] and [Val] is unsound across a moving GC, which updates only
+     [Val]. Thus the load chunk is chosen from [typ], not from the store
+     chunk. *)
   let forwardable_load_chunks (memory_chunk : Cmm.memory_chunk)
       (typ : Cmm.machtype_component) : Cmm.memory_chunk list =
     match memory_chunk, typ with
-    | (Word_int | Word_val), (Int | Val) -> [Word_int; Word_val]
+    | (Word_int | Word_val), Int -> [Word_int]
+    | (Word_int | Word_val), Val -> [Word_val]
     | Double, Float -> [Double]
     | (Onetwentyeight_unaligned | Onetwentyeight_aligned), Vec128
     | (Twofiftysix_unaligned | Twofiftysix_aligned), Vec256
@@ -426,7 +454,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
                 is_atomic = false
               }
           in
-          (load, vaddr), [| varg.(0) |])
+          (load, vaddr, [| instr.arg.(0).Reg.typ |]), [| varg.(0) |])
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
@@ -491,8 +519,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
+        let rhs = op, varg, Reg.typv i.res in
         let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
-        match find_equation op_class n1 (op, varg) with
+        match find_equation op_class n1 rhs with
         | Some vres -> (
           (* This operation was computed earlier. *)
           (* Are there registers that hold the results computed earlier? *)
@@ -515,7 +544,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
             n3)
         | None ->
           (* This operation produces a result we haven't seen earlier. *)
-          let n3 = set_fresh_regs n2 i.res (op, varg) op_class in
+          let n3 = set_fresh_regs n2 i.res rhs op_class in
           n3)
       | Op_store false | Op_other ->
         (* An initializing store or an "other" operation do not invalidate any
