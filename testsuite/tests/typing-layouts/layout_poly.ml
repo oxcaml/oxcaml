@@ -74,17 +74,6 @@ module M = struct
 end
 
 [%%expect{|
-Line 4, characters 58-69:
-4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
-                                                              ^^^^^^^^^^^
-Error:
-       The layout of string is value non_float
-         because it is the primitive type string.
-       But the layout of string must be a sublayout of float64
-         because of the definition of id' at line 2, characters 10-18.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
-|}, Principal{|
 Line 4, characters 63-68:
 4 |   let () = Format.printf "%f %s\n" (F.to_float (id' #1.)) (id' "abc")
                                                                    ^^^^^
