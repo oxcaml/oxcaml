@@ -1097,10 +1097,12 @@ let tag_int i dbg =
   | Cconst_int (n, _) -> int_const dbg n
   | c ->
       match i with
-      | Cop ((Clsr | Casr as op), [e; Cconst_int (right, dbg_int)], dbg_op)
+      | Cop (Casr, [e; Cconst_int (right, _)], dbg_op)
         when right > 0 ->
-          Cop (Cor, [Cop (op, [e; Cconst_int (right - 1, dbg_int)], dbg_op);
-                     Cconst_int (1, dbg)], dbg)
+          or_const (asr_const e (right - 1) dbg_op) 1n dbg
+      | Cop (Clsr, [e; Cconst_int (right, _)], dbg_op)
+        when right > 0 ->
+          or_const (lsr_const e (right - 1) dbg_op) 1n dbg
       | _ -> incr_int (lsl_const c 1 dbg) dbg
 
 let untag_int i dbg =
