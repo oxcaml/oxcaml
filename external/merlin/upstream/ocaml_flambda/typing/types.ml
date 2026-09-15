@@ -1001,11 +1001,8 @@ let equal_record_representation_up_to_scannable_axes r1 r2 = match r1, r2 with
   | Record_unboxed, Record_unboxed ->
       true
   | Record_inlined (tag1, cr1, vr1), Record_inlined (tag2, cr2, vr2) ->
-      (* Equality of tag and variant representation imply equality of
-         constructor representation. *)
-      ignore (cr1 : constructor_representation);
-      ignore (cr2 : constructor_representation);
       equal_tag tag1 tag2 &&
+        equal_constructor_representation_up_to_scannable_axes cr1 cr2 &&
         equal_variant_representation_up_to_scannable_axes vr1 vr2
   | Record_boxed, Record_boxed ->
       true

@@ -586,3 +586,33 @@ let w = { id = 1; value = "visible" }
 [%%expect{|
 val w : string r = {id = 1; value = "visible"}
 |}]
+
+(* Functional updates that change the representation *)
+
+type ('a : any) fu = { a : 'a; i : int }
+[%%expect{|
+type ('a : any) fu = { a : 'a; i : int; }
+|}]
+
+let f (r : int fu) = { r with a = #2.5 }
+[%%expect{|
+val f : int fu -> float# fu = <fun>
+|}]
+
+let f (r : 'a fu) = { r with a = "hi" }
+[%%expect{|
+val f : 'a fu -> string fu = <fun>
+|}]
+
+(* The original record isn't representable *)
+let bad (type a : any) (r : a fu) = { r with a = "hi" }
+[%%expect{|
+Line 1, characters 38-39:
+1 | let bad (type a : any) (r : a fu) = { r with a = "hi" }
+                                          ^
+Error: Record element types must have a representable layout.
+       The layout of a is any
+         because of the annotation on the abstract type declaration for a.
+       But the layout of a must be representable
+         because it's the type of a field involved in a functional update.
+|}]
