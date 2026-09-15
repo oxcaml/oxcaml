@@ -123,7 +123,8 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
     (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
-let register_allocation ~env ~loc ~desc : With_locality.lr * With_regionality.lr =
+let register_allocation ~env ~loc ~desc
+    : With_locality.lr * With_regionality.lr =
   Typeallocation.register_mod_allocation ~env ~loc ~desc;
   let upper_bound =
     With_locality.of_const
