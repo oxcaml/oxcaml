@@ -134,9 +134,9 @@ bump_twice:
   ret
 |}]
 
-(* Store-to-load forwarding: the reload of [pos] right after the store to
-   [pos] is satisfied by the stored value, so only one load of [pos] should
-   remain; the stores are all kept. *)
+(* The reload of [pos] is retained: [p + 1] has machtype [Int], whereas
+   loading [pos] produces [Val]. Forwarding would require proving that the
+   stored value is an immediate, which CSE does not currently track. *)
 let push_two c =
   let p = c.pos in
   c.last <- p;
@@ -150,9 +150,60 @@ push_two:
   movq  %rbx, 8(%rax)
   addq  $2, %rbx
   movq  %rbx, (%rax)
+  movq  (%rax), %rbx
   movq  %rbx, 8(%rax)
   addq  $2, %rbx
   movq  %rbx, (%rax)
   movl  $1, %eax
+  ret
+|}]
+
+(* The stored value and the reload both have machtype [Val], even though
+   the store uses [Word_int] and the load uses [Word_val]. *)
+let copy_pos c other =
+  let p = other.pos in
+  c.pos <- p;
+  c.last <- c.pos
+[%%expect_asm X86_64{|
+copy_pos:
+  movq  (%rbx), %rbx
+  movq  %rbx, (%rax)
+  movq  %rbx, 8(%rax)
+  movl  $1, %eax
+  ret
+|}]
+
+external store_bits : int64_u -> int64_u -> unit = "%unsafe_set_ext_ptr"
+external load_value : int64_u -> string = "%unsafe_get_ext_ptr"
+
+type snapshot = { root : string; mutable bits : int64_u }
+
+(* [p] is a writable off-heap word and [raw] is the address of a live string.
+   The load roots the string before allocating [snapshot]. A moving GC may
+   update [rooted], but [raw] must retain the original integer bits. *)
+let store_load_across_gc p raw =
+  store_bits p raw;
+  let rooted = load_value p in
+  let snapshot = { root = rooted; bits = #0L } in
+  snapshot.bits <- raw;
+  let result = snapshot.bits in
+  #(snapshot, rooted, result)
+[%%expect_asm X86_64{|
+store_load_across_gc:
+  subq  $8, %rsp
+  movq  %rbx, %rdi
+  movq  %rdi, (%rax)
+  movq  (%rax), %rbx
+  subq  $24, %r15
+  cmpq  (%r14), %r15
+  jb    <hidden GC jump pad>
+.L0:
+  leaq  8(%r15), %rax
+  movabsq $144115188075857920, %rsi
+  movq  %rsi, -8(%rax)
+  movq  %rbx, (%rax)
+  movq  $0, 8(%rax)
+  movq  %rdi, 8(%rax)
+  addq  $8, %rsp
   ret
 |}]
