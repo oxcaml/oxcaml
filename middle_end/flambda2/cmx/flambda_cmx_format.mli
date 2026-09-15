@@ -39,6 +39,11 @@ module Id_stamp_counters : sig
       in the process that serialised this value. This can only be called once,
       before any stamps have been created, and will error otherwise. *)
   val restore : t -> unit
+
+  (** Restore the stamp counters in preparation for merging the data of several
+      units, setting each counter to its maximum value across all of the units.
+      Like [restore], can only be called once. *)
+  val restore_for_merge : t list -> unit
 end
 
 type t

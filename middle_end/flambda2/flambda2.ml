@@ -411,3 +411,70 @@ let lambda_to_jsir ~ppf_dump ~prefixname ~keep_symbol_tables
     { Optcomp_intf.program; imported_compilation_units }
   in
   Profile.record_call "flambda2" run
+
+let reaper_lto_solve ~cmx_files ~ltosol_file =
+  (* ID stamp counters are process-global monotonically increasing counters that
+     give us an easy way of creating fresh identifiers. These identifiers get
+     persisted across processes, and we need to prevent collisions when this
+     happens. There are two cases:
+
+     (1) Different processes that operate on different compilation units,
+     potentially in parallel. Collisions are prevented here by the fact that
+     identifiers are scoped to compilation units, as (CU, number) pairs.
+
+     (2) Different processes that operate on the same compilation units, which
+     must always happen in sequence. Collisions are prevented here by saving
+     stamp counters in the earlier processes and restoring them in the later
+     processes.
+
+     Here we're resuming from many processes that operated on different CUs, and
+     we're operating on all of those CUs, so we need to restore stamp counters
+     from all of those processes. However stamp counters are global for the
+     process, not per-CU. To make this work, we take the maximum across all the
+     processes we've resumed from. It is okay that this makes some unused stamps
+     get jumped over, the important thing is that they increase monotonically.
+
+     After we're done, rebuild processes will be created to do more work on the
+     CUs we touched. To keep counters monotonically increasing, we need to save
+     them after our work so that the rebuild processes can restore them. *)
+  let units =
+    List.map
+      (fun filename ->
+        let (unit_infos : Cmx_format.unit_infos), (_ : Digest.t) =
+          Compilenv.read_unit_info filename
+        in
+        let lto_info =
+          match unit_infos.ui_lto_info with
+          | None ->
+            Misc.fatal_errorf "File %s was not compiled with [-support-lto]"
+              filename
+          | Some lto_info ->
+            File_sections.get unit_infos.ui_file_sections lto_info
+        in
+        unit_infos.ui_unit, unit_infos.ui_file_sections, lto_info)
+      cmx_files
+  in
+  Flambda_cmx_format.Id_stamp_counters.restore_for_merge
+    (List.map
+       (fun (_, _, lto_info) ->
+         Flambda2_reaper.Lto_info.id_stamp_counters lto_info)
+       units);
+  let participants =
+    Compilation_unit.Set.of_list
+      (List.map (fun (compilation_unit, _, _) -> compilation_unit) units)
+  in
+  let problems =
+    List.map
+      (fun (compilation_unit, sections, lto_info) ->
+        let imported_offsets, problem =
+          Flambda2_reaper.Lto_info.read_for_solve ~sections lto_info
+        in
+        Exported_offsets.import_offsets
+          (Exported_offsets.filter_by_compilation_unit imported_offsets
+             ~keep:(fun cu -> not (Compilation_unit.Set.mem cu participants)));
+        compilation_unit, problem)
+      units
+  in
+  let solution = Flambda2_reaper.Analysis.solve_whole_program problems in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
+    ~solution

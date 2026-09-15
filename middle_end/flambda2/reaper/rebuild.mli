@@ -41,5 +41,5 @@ val rebuild :
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
   skeleton:Traverse.Skeleton.t ->
-  solution:'f Analysis.solution ->
+  solution:'f Analysis.Solution.t ->
   'f result

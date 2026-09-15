@@ -77,6 +77,28 @@ module Id_stamp_counters = struct
     Function_slot.restore_stamp_counter function_slots;
     Value_slot.restore_stamp_counter value_slots;
     Symbol.restore_manufacture_counter symbols
+
+  let restore_for_merge all_counters =
+    let max_counters =
+      List.fold_left
+        (fun acc counters ->
+          { variables = max acc.variables counters.variables;
+            code_ids = max acc.code_ids counters.code_ids;
+            continuations = max acc.continuations counters.continuations;
+            function_slots = max acc.function_slots counters.function_slots;
+            value_slots = max acc.value_slots counters.value_slots;
+            symbols = max acc.symbols counters.symbols
+          })
+        { variables = 0;
+          code_ids = 0;
+          continuations = 0;
+          function_slots = 0;
+          value_slots = 0;
+          symbols = 0
+        }
+        all_counters
+    in
+    restore max_counters
 end
 
 type t0 =
