@@ -1042,6 +1042,9 @@ let primitive ppf = function
       fprintf ppf "(box%s@ %a)"
         (locality_kind mode)
         layout l
+  | Punbox l ->
+      fprintf ppf "(box@ %a)"
+        layout l
 
 let name_of_primitive = function
   | Pscalar i ->
@@ -1256,6 +1259,7 @@ let name_of_primitive = function
   | Pget_ext_ptr _ -> "Pget_ext_ptr"
   | Pset_ext_ptr _ -> "Pset_ext_ptr"
   | Pbox _ -> "Pbox"
+  | Punbox _ -> "Punbox"
 
 let zero_alloc_attribute ppf check =
   match check with

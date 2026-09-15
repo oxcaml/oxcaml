@@ -1195,6 +1195,9 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
     | Pbox (_layout, _mode) ->
       (* CR zeisbach: implement! also, ordering? *)
+      Misc.fatal_errorf "implement this!"
+    | Punbox _layout ->
+      (* CR zeisbach: implement! also, ordering? *)
       Misc.fatal_errorf "implement this!")
 
 and comp_binary_scalar_intrinsic : type a.

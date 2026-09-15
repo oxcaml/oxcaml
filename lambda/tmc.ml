@@ -1014,7 +1014,7 @@ let rec choice ctx t =
     | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _
     | Pget_ext_ptr _ | Pset_ext_ptr _
-    | Pbox _ ->
+    | Pbox _ | Punbox _ ->
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 

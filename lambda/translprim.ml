@@ -1338,6 +1338,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%box" ->
       let layout = List.nth (get_arg_layouts ()) 0 in
       Primitive(Pbox (layout, mode), 1)
+    | "%unbox" -> Primitive(Punbox layout, 1)
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode
@@ -2738,7 +2739,10 @@ let lambda_primitive_needs_event_after = function
   | Pcontinue | Pdiscontinue | Pdiscontinue_with_backtrace
   | Ppoll | Pobj_dup | Pget_header _
   | Pbox _ -> true
-  (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
+  (* In general, [Punbox] may allocate in bytecode, since unboxed structures
+     are actually represented as boxed values. *)
+  | Punbox _ -> true
+  (* [Preinterpret_tagged_int63_as_unboxed_int64] similarly has to allocate in
      bytecode, because int64_u is actually represented as a boxed value. *)
   | Preinterpret_tagged_int63_as_unboxed_int64 -> true
 

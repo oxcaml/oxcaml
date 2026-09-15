@@ -3667,6 +3667,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        about the args at this point (can we get their layout? should we be
        checking for consistency? the checks have to happen somewhere.) *)
     Misc.fatal_errorf "implement this!"
+  | Punbox _layout, [[_arg]] ->
+    (* CR zeisbach: implement this translation! *)
+    Misc.fatal_errorf "implement this!"
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3693,7 +3696,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ | Pbox _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ | Pbox _ | Punbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
