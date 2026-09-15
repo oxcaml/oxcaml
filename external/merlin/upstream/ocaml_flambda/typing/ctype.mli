@@ -373,11 +373,18 @@ val unify_var: Env.t -> type_expr -> type_expr -> unit
         (* Same as [unify], but allow free univars when first type
            is a variable. *)
 val unify_delaying_jkind_checks :
-  Env.t -> type_expr -> type_expr -> (type_expr * jkind_r) list
+  ?check_variables:bool ->
+  Env.t -> type_expr -> type_expr -> (Env.t * type_expr * jkind_r) list
         (* Same as [unify], but don't check jkind compatibility.  Instead,
-           return the checks that would have been performed.  For use in
-           typedecl before well-foundedness checks have made jkind checking
-           safe. *)
+           return the checks that would have been performed, together with
+           their environments, in reverse unification order.  For use in
+           typedecl and result-first expression typing. With [check_variables],
+           eagerly intersect variable kinds before linking them. This requires
+           well-founded types and defaults to [false] for typedecl. *)
+val unify_delaying_layout_checks :
+  Env.t -> type_expr -> type_expr -> (Env.t * type_expr * jkind_r) list
+        (* Same as [unify_delaying_jkind_checks], but eagerly checks only
+           modality bounds, retaining the full checks for later. *)
 
 type filtered_arrow =
   { ty_arg : type_expr;
