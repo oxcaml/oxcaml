@@ -1,5 +1,20 @@
+(** Core module for reading and writing granular values.
+
+    Note on file paths: when writing a value that was read from an existing
+    granular file, only a pointer to the original file is present in the new
+    one. This means the original file should not be moved or deleted.
+
+    These pointers are relative to the working directory of the tool that wrote
+    the new file. *)
+
 (** A pointer to an ['a] value, either residing in memory or on disk. *)
 type 'a link
+
+type cached
+
+(* val create_lru : int -> unit *)
+val set_lru_size : int -> unit
+val get_lru : unit -> cached Dbllist.t
 
 (** [link v] returns a new link to the in-memory value [v]. *)
 val link : 'a -> 'a link
@@ -11,6 +26,9 @@ val reuse : 'a link -> unit
 (** [cache (module Hash)] returns a function to de-duplicate links which share
     the same value, resulting in a compressed file. *)
 val cache : 'a. (module Hashtbl.HashedType with type t = 'a) -> 'a link -> unit
+
+(** [is_on_disk link] tests if [link] is stored in another index file. *)
+val is_on_disk : 'a link -> bool
 
 (** [fetch lnk] returns the value pointed by the link [lnk].
 
@@ -53,13 +71,26 @@ and iter = { yield : 'a. 'a link -> 'a link Type.Id.t -> 'a schema -> unit }
 (** A schema usable when the ['a] value does not contain any links. *)
 val schema_no_sublinks : 'a schema
 
-(** [write oc schema value] writes the [value] in the output channel [oc],
-    creating unmarshalling boundaries on every link in [value] specified
-    by the [schema]. *)
+(** Exception raised when attempting to consult an outdated store. *)
+exception
+  Outdated_store of
+    { filename : string; reason : [ `Missing_file | `Index_ids_do_not_match ] }
+
+(** [write oc ~id schema value] writes the [value] in the output channel [oc],
+    creating unmarshalling boundaries on every link in [value] specified by the
+    [schema]. [id] is used as index UID. File pointers are made relative to the
+    current working directory. *)
 val write :
-  ?flags:Marshal.extern_flags list -> out_channel -> 'a schema -> 'a -> unit
+  ?flags:Marshal.extern_flags list ->
+  out_channel ->
+  filename:string ->
+  id:int ->
+  'a schema ->
+  'a ->
+  unit
 
 (** [read ic schema] reads the value marshalled in the input channel [ic],
     stopping the unmarshalling on every link boundary indicated by the [schema].
-    It returns the root [value] read.  *)
+    It returns the root [value] read. File pointers are resolved relatively to
+    the current working directory.  *)
 val read : string -> in_channel -> 'a schema -> 'a
