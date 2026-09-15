@@ -220,17 +220,105 @@ merlin-test:
 merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
-# Intermediary library target to build ocaml-compiler-libs-build against install
+# Intermediary library targets
+
+OCAML_COMPILER_LIBS_DIR := $(CURDIR)/_build/ocaml-compiler-libs
+PPX_DERIVERS_DIR := $(CURDIR)/_build/ppx-derivers
+SEXPLIB0_DIR := $(CURDIR)/_build/sexplib0
+STDLIB_SHIMS_DIR := $(CURDIR)/_build/stdlib-shims
+PPXLIB_AST_DIR := $(CURDIR)/_build/ppxlib-ast
+PPXLIB_DIR := $(CURDIR)/_build/ppxlib
+PPXLIB_JANE_DIR := $(CURDIR)/_build/ppxlib-jane
+
+OCAML_COMPILER_LIBS_LIB := $(OCAML_COMPILER_LIBS_DIR)/install/default/lib
+PPX_DERIVERS_LIB := $(PPX_DERIVERS_DIR)/install/default/lib
+SEXPLIB0_LIB := $(SEXPLIB0_DIR)/install/default/lib
+STDLIB_SHIMS_LIB := $(STDLIB_SHIMS_DIR)/install/default/lib
+PPXLIB_AST_LIB := $(PPXLIB_AST_DIR)/install/default/lib
+PPXLIB_JANE_LIB := $(PPXLIB_JANE_DIR)/install/default/lib
+
+PPXLIB_BASE_OCAMLPATH := $(OCAML_COMPILER_LIBS_LIB):$(PPX_DERIVERS_LIB):$(SEXPLIB0_LIB):$(STDLIB_SHIMS_LIB)
+PPXLIB_JANE_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB)
+PPXLIB_OCAMLPATH := $(PPXLIB_BASE_OCAMLPATH):$(PPXLIB_AST_LIB):$(PPXLIB_JANE_LIB)
+
+OXCAML_INSTALL ?= $(CURDIR)/_install
+
+PPXLIB_DUNE_ENV = \
+  PATH="$(OXCAML_INSTALL)/bin:$(PATH)" \
+  OCAMLLIB="$(OXCAML_INSTALL)/lib/ocaml" \
+  DUNE_CACHE=disabled
+
+.PHONY: external-libs-compiler
+external-libs-compiler:
+	@mkdir -p "$(CURDIR)/_build"
+	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || $(MAKE) _install
 
 .PHONY: ocaml-compiler-libs-build
-ocaml-compiler-libs-build: _install
-	env -u OCAMLPATH \
-	  PATH="$(CURDIR)/_install/bin:$(PATH)" \
-	  OCAMLLIB="$(CURDIR)/_install/lib/ocaml" \
+ocaml-compiler-libs-build: external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
 	    --root=external/ocaml-compiler-libs \
-	    --build-dir="$(CURDIR)/_build/ocaml-compiler-libs" \
+	    --build-dir="$(OCAML_COMPILER_LIBS_DIR)" \
+	    --only-packages=ocaml-compiler-libs \
 	    @install
+
+.PHONY: ppx-derivers-build
+ppx-derivers-build: external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_PPX_DERIVERS_SRC)" \
+	    --build-dir="$(PPX_DERIVERS_DIR)" \
+	    --only-packages=ppx_derivers \
+	    @install
+
+.PHONY: sexplib0-build
+sexplib0-build: external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_SEXPLIB0_SRC)" \
+	    --build-dir="$(SEXPLIB0_DIR)" \
+	    --only-packages=sexplib0 \
+	    @install
+
+.PHONY: stdlib-shims-build
+stdlib-shims-build: external-libs-compiler
+	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_STDLIB_SHIMS_SRC)" \
+	    --build-dir="$(STDLIB_SHIMS_DIR)" \
+	    --only-packages=stdlib-shims \
+	    @install
+
+.PHONY: ppxlib-ast-build
+ppxlib-ast-build: \
+  ocaml-compiler-libs-build ppx-derivers-build sexplib0-build stdlib-shims-build
+	env OCAMLPATH="$(PPXLIB_BASE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/ppxlib \
+	    --build-dir="$(PPXLIB_AST_DIR)" \
+	    --only-packages=ppxlib_ast \
+	    @install
+
+.PHONY: ppxlib-jane-build
+ppxlib-jane-build: ppxlib-ast-build
+	env OCAMLPATH="$(PPXLIB_JANE_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root="$(PPXLIB_JANE_SRC)" \
+	    --build-dir="$(PPXLIB_JANE_DIR)" \
+	    --only-packages=ppxlib_jane \
+	    @install
+
+.PHONY: ppxlib-build
+ppxlib-build: ppxlib-jane-build
+	env OCAMLPATH="$(PPXLIB_OCAMLPATH)" $(PPXLIB_DUNE_ENV) \
+	  $(dune) build \
+	    --root=external/ppxlib \
+	    --build-dir="$(PPXLIB_DIR)" \
+	    --only-packages=ppxlib \
+	    @install
+
+.PHONY: external-libs-build
+external-libs-build: ppxlib-build
 
 .PHONY: fmt
 fmt: $(dune_config_targets)
