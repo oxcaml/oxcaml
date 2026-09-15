@@ -26,10 +26,10 @@
 
 (** [-functorize] driver: bundle parameterised modules into a single functor. *)
 
-val validate_inputs : string list -> Compilation_unit.Name.Set.t
+val validate_inputs : string list -> Compilation_unit_intf.Set.t
 
 val functorize :
-  Compilation_unit.Name.Set.t ->
+  Compilation_unit_intf.Set.t ->
   Misc.filepath ->
   with_info:
     (dump_ext:string -> Unit_info.t -> (Compile_common.info -> unit) -> unit) ->

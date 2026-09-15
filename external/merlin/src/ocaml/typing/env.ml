@@ -33,6 +33,7 @@ open Local_store
 
 module Jkind = Btype.Jkind0
 module String = Misc.Stdlib.String
+module CUI = Compilation_unit_intf
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
@@ -966,8 +967,8 @@ type error =
   | Initial_stage_splice of Location.t
   | Unsupported_inside_quotation of Location.t * no_open_quotations_context
   | Cmi_not_found of
-      { modname : Compilation_unit.Name.t;
-        chain : Compilation_unit.Name.t list;
+      { modname : CUI.t;
+        chain : CUI.t list;
       }
 
 exception Error of error
@@ -1343,11 +1344,11 @@ let check_pers_mod ~allow_hidden ~loc name =
 let crc_of_unit name =
   Persistent_env.crc_of_unit !persistent_env name
 
-let is_imported_opaque modname =
-  Persistent_env.is_imported_opaque !persistent_env modname
+let is_opaque_impl cu =
+  Persistent_env.is_opaque_impl !persistent_env cu
 
-let register_import_as_opaque modname =
-  Persistent_env.register_import_as_opaque !persistent_env modname
+let register_impl_as_opaque cu =
+  Persistent_env.register_impl_as_opaque !persistent_env cu
 
 let is_parameter_unit modname =
   Persistent_env.is_parameter_import !persistent_env modname
@@ -1947,8 +1948,8 @@ let add_required_global_for_quote path env =
   begin match Ident.to_global (Path.head path) with
   | None -> ()
   | Some global ->
-    let name = Compilation_unit.Name.of_head_of_global_name global in
-    if Current_unit.Name.is (Compilation_unit.Name.to_string name)
+    let name = global.Global_module.Name.head in
+    if Current_unit.is_intf name
     then begin
       (* The current compilation unit appears in quotes.
          [find_module_address] would [raise Not_found] in this case. *)
@@ -2254,11 +2255,8 @@ let same_types env1 env2 =
 
 let used_persistent () =
   Persistent_env.fold !persistent_env
-    (fun s _m r ->
-       Compilation_unit.Name.Set.add
-         (s |> Compilation_unit.Name.of_head_of_global_name)
-         r)
-    Compilation_unit.Name.Set.empty
+    (fun (s : Global_module.Name.t) _m r -> CUI.Set.add s.head r)
+    CUI.Set.empty
 
 let find_all_comps wrap proj s (p, mda) =
   match get_components mda.mda_components with
@@ -3860,7 +3858,9 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
   | Mod_persistent -> begin
       (* This is only used when processing [Longident.t]s, which never have
          instance arguments *)
-      let name = Global_module.Name.create_no_args s in
+      let name =
+        Global_module.Name.create_no_args (CUI.of_string s)
+      in
       let path, a =
         lookup_global_name_module_no_locks load ~errors ~use ~loc name env
       in
@@ -5003,7 +5003,8 @@ let bound_module name env =
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
-            (Global_module.Name.create_no_args name)
+            (Global_module.Name.create_no_args
+               (CUI.of_string name))
         with
         | (_ : module_data) -> true
         | exception Not_found -> false
@@ -5089,7 +5090,10 @@ let fold_modules f lid env acc =
                   rather than just the name. It looks like the only immediate
                   consequence of this is that spellcheck won't suggest
                   instance names (which is good!). *)
-               let modname = Global_module.Name.create_no_args name in
+               let modname =
+                 Global_module.Name.create_no_args
+                   (CUI.of_string name)
+               in
                match Persistent_env.find_in_cache !persistent_env modname with
                | None -> acc
                | Some mda ->
@@ -5164,7 +5168,10 @@ let filter_non_loaded_persistent f env =
          | Mod_persistent ->
              (* CR lmaurer: Again, setting args to [] here is weird but fine
                 for the moment *)
-             let modname = Global_module.Name.create_no_args name in
+             let modname =
+               Global_module.Name.create_no_args
+                 (CUI.of_string name)
+             in
              match Persistent_env.find_in_cache !persistent_env modname with
              | Some _ -> acc
              | None ->
@@ -5724,12 +5731,12 @@ let report_error_doc = function
         List.iter
           (fun loader ->
             Format_doc.fprintf ppf ",@ referenced from %a"
-              (Style.as_inline_code Compilation_unit.Name.print) loader)
+              (Style.as_inline_code CUI.print) loader)
           chain
       in
       Location.errorf ~loc:Location.none
         "@[<hov>Cannot find the compiled interface for %a%a@]"
-        (Style.as_inline_code Compilation_unit.Name.print) modname
+        (Style.as_inline_code CUI.print) modname
         pp_referenced_from chain
 
 let () =
@@ -5745,13 +5752,14 @@ let () =
 
 let check_state_consistency () =
   let missing modname =
-    let modname_as_string = Compilation_unit.Name.to_string modname in
+    let modname_as_string = Compilation_unit_intf.to_string modname in
     match Load_path.find_normalized (modname_as_string ^ ".cmi") with
     | _ -> false
     | exception Not_found -> true
   and found _modname filename ps_name =
     match Cmi_cache.get_cached_entry filename with
-    | cmi_infos -> Compilation_unit.Name.equal ps_name cmi_infos.Cmi_format.cmi_name
+    | cmi_infos ->
+      Compilation_unit_intf.equal ps_name cmi_infos.Cmi_format.cmi_name
     | exception Not_found -> false
   in
   Persistent_env.forall ~found ~missing !persistent_env

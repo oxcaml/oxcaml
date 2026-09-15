@@ -26,6 +26,7 @@
 
 open Printf
 open Cmo_format
+module CUI = Compilation_unit_intf
 
 (* Command line options to prevent printing approximation,
    function code and CRC
@@ -66,7 +67,7 @@ let print_with_crc ~print_name name crco =
   in
     printf "\t%s\t%a\n" crc print_name name
 
-let print_name_crc = print_with_crc ~print_name:Compilation_unit.Name.output
+let print_name_crc = print_with_crc ~print_name:(fun oc s -> output_string oc s)
 
 let print_cu_crc = print_with_crc ~print_name:print_cu_without_prefix
 
@@ -83,7 +84,7 @@ let print_impl_import import =
   print_cu_crc name crco
 
 let print_quoted_intf global =
-  printf "\t%a\n" Compilation_unit.Name.output global
+  printf "\t%a\n" CUI.output global
 
 let print_quoted_impl global =
   printf "\t%a\n" Compilation_unit.output global
@@ -160,7 +161,7 @@ let print_cma_infos (lib : Cmo_format.library) =
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
     let open Cmi_format in
-    printf "Unit name: %a\n" Compilation_unit.Name.output name;
+    printf "Unit name: %a\n" CUI.output name;
     let is_param =
       match kind with
       | Normal _ -> false

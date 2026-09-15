@@ -47,8 +47,8 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
-  sourcefile:string -> Compilation_unit.t -> Env.t ->
-  Parsetree.signature -> Typedtree.signature
+  sourcefile:string -> intf:Compilation_unit_intf.t -> Compilation_unit.t ->
+  Env.t -> Parsetree.signature -> Typedtree.signature
 val transl_signature:
   ?interface_toplevel:bool -> Env.t -> Parsetree.signature -> Typedtree.signature
 
