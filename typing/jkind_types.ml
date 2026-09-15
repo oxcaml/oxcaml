@@ -885,24 +885,26 @@ module Sort = struct
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_scannable_and_get ts)
     | Univar uv -> Univar uv
-    | Var v ->
-      let compress_to s =
-        set_var_contents v (Static.T_option.of_const s);
-        s
-      in
-      begin match v.contents with
-      | Some s -> compress_to (default_to_scannable_and_get s)
-      | None ->
-        if is_genvar v
-        then Const.Genvar v
-        else if equate_var v Static.T.scannable
-        then compress_to Static.Const.scannable
-        else
-          Misc.fatal_error
-            "Jkind_types.default_to_scannable_and_get: cannot default rigid \
-             variables"
-      end
+    | Var v -> default_to_scannable_and_get_var v
     | Addressable s -> Const.addressable (default_to_scannable_and_get s)
+
+  and default_to_scannable_and_get_var (v : var) : Const.t =
+    let compress_to s =
+      set_var_contents v (Static.T_option.of_const s);
+      s
+    in
+    begin match v.contents with
+    | Some s -> compress_to (default_to_scannable_and_get s)
+    | None ->
+      if is_genvar v
+      then Const.Genvar v
+      else if equate_var v Static.T.scannable
+      then compress_to Static.Const.scannable
+      else
+        Misc.fatal_error
+          "Jkind_types.default_to_scannable_and_get: cannot default rigid \
+           variables"
+    end
 
   let get_concrete_defaulting_to_scannable s =
     let const = default_to_scannable_and_get s in
