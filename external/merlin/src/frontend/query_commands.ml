@@ -185,7 +185,7 @@ let dump pipeline = function
     let tree = Mpipeline.typer_result pipeline |> Mtyper.get_typedtree in
     let ppf, to_string = Format.to_string () in
     begin match tree with
-    | `Interface s -> Printtyped.interface ppf s
+    | `Interface s -> Printtyped.signature ppf s
     | `Implementation s -> Printtyped.implementation ppf s
     end;
     Format.pp_print_newline ppf ();
