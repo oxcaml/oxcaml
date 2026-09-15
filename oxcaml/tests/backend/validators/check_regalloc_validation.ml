@@ -38,6 +38,7 @@ open Utils
          predecessors = Label.Set.empty;
          stack_offset = 0;
          cold = false;
+         is_loop_header = false;
          terminator =
            { desc = Return;
              arg = [| Proc.phys_reg 0 |];

@@ -2066,11 +2066,13 @@ let prologue_stack_offset () =
 let emit_linear_label ~fallthrough ~is_dwarf_only_label ~is_loop_header label =
   let lbl = L.create_int ~is_dwarf_only_label Text (Label.to_int label) in
   (* Aligning loop headers to 16 bytes makes it less likely that a small loop
-     body straddles a 64-byte cache line boundary, which can cost a factor of 2
-     in throughput on some microarchitectures. 16 bytes matches what GCC and
-     Clang emit for -falign-loops. Padding before a fallthrough loop header is
-     executed (as nops) only once per loop entry. *)
-  if is_loop_header && !fastcode_flag
+     body straddles a 64-byte cache line boundary. AMD Zen 4 can only fetch from
+     a single 64-byte cache line per cycle, so a short loop crossing a cache
+     line boundary has a 1-cycle frontend penalty on every iteration. 16 bytes
+     matches what GCC and Clang emit for -falign-loops. Padding before a loop
+     header that is entered by fallthrough from outside the loop is executed (as
+     nops) only once per loop entry. *)
+  if is_loop_header && !Oxcaml_flags.align_loops && !fastcode_flag
   then D.align ~fill:Nop ~bytes:16
   else if (not fallthrough) && !fastcode_flag
   then D.align ~fill:Nop ~bytes:4;

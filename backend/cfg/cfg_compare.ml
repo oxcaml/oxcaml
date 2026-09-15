@@ -442,6 +442,7 @@ let compare_block_flags ~ppf_m ~(old_block : Cfg.basic_block)
          can_raise;
          stack_offset;
          cold;
+         is_loop_header = _;
          start = _;
          body = _;
          terminator = _;
