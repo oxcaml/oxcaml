@@ -1212,6 +1212,12 @@ let value_kind env loc ty =
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
 
+let assert_mixed_product_support_for_lambda_shape loc kind shape =
+  let counts = Mixed_product_bytes.count (Product shape) in
+  if not (Mixed_product_bytes.all_value counts) then
+    Typedecl.assert_mixed_product_support loc kind
+      ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+
 let transl_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
@@ -1254,12 +1260,8 @@ let transl_instantiated_shape env loc sorts_and_types kind =
           sorts_and_types
       in
       (* Shapes containing splices are checked after static evaluation *)
-      if not (Lambda.mixed_block_shape_has_splices shape) then begin
-        let counts = Mixed_product_bytes.count (Product shape) in
-        if not (Mixed_product_bytes.all_value counts) then
-          Typedecl.assert_mixed_product_support loc kind
-            ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
-      end;
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        assert_mixed_product_support_for_lambda_shape loc kind shape;
       `Mixed shape
   in
   shape, consts
