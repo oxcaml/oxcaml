@@ -148,8 +148,8 @@ and raw_type_desc ppf ty =
   | Tsubst (t, Some t') ->
       fprintf ppf "@[<1>Tsubst@,(%a,@ Some%a)@]" raw_type t raw_type t'
   | Tunivar { name; jkind } ->
-      fprintf ppf "Tunivar (@,%a,@,%a)"
-        print_name name (Format_doc.compat (Jkind.format env)) jkind
+      fprintf ppf "@[<hov1>Tunivar (@,%a,@,%a)]"
+        print_name name Jkind.Debug_printers.t jkind
   | Tpoly (t, tl) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
