@@ -1095,6 +1095,11 @@ let get_calling_convention_change t code_id =
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
 
+let is_changing_calling_convention t code_id =
+  match get_calling_convention_change t code_id with
+  | Not_changing_calling_convention -> false
+  | Changing_calling_convention _ -> true
+
 let get_code_metadata t code_id =
   if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
   then
