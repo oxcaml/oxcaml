@@ -36,7 +36,7 @@ end
 module type S = sig
   type op
 
-  type rhs = op * valnum array
+  type rhs = op * valnum array * Cmm.machtype
 
   module Equations : sig
     module Rhs_map : Map.S with type key = rhs
@@ -62,11 +62,16 @@ module type S = sig
 
   val find_regs_containing : numbering -> valnum array -> Reg.t array option
 
+  val find_reg_containing_with_typ :
+    numbering -> valnum -> Cmm.machtype_component -> Reg.t option
+
   val set_known_regs : numbering -> Reg.t array -> valnum array -> numbering
 
   val set_move : numbering -> Reg.t -> Reg.t -> numbering
 
   val set_fresh_regs : numbering -> Reg.t array -> rhs -> op_class -> numbering
+
+  val add_equation : op_class -> numbering -> rhs -> valnum array -> numbering
 
   val set_unknown_regs : numbering -> Reg.t array -> numbering
 
@@ -79,9 +84,23 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   type op = Op.t
 
   (* We maintain sets of equations of the form valnums = operation(valnums) plus
-     a mapping from registers to valnums (value numbers). *)
+     a mapping from registers to valnums (value numbers).
 
-  type rhs = op * valnum array
+     The machtypes of the results are part of the key, so that an equation can
+     only be reused by an instruction whose results have the machtypes of the
+     results the equation was established for. Registers sharing a value number
+     must remain interchangeable for as long as their bindings are kept,
+     including across allocations and polls; a moving GC updates [Val] and
+     [Valx2] registers but leaves [Int] and [Vec128] ones unchanged, so
+     registers of different machtypes holding the same bits at one point may
+     hold different bits later on. Both the store-to-load forwarding equations
+     (see [Cse_generic]) and vectorized loads of the same chunk, which can
+     produce either a [Vec128] or a [Valx2], rely on this. (Instruction
+     selection may still emit a [Move] between an [Int] and a [Val] register at
+     join points, in which case [set_move] shares a value number across the two
+     machtypes; CSE does not currently guard against that.) *)
+
+  type rhs = op * valnum array * Cmm.machtype
 
   module Equations = struct
     module Rhs_map = Map.Make (struct
@@ -179,6 +198,18 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let find_reg_containing n v =
     Reg.Map.fold (fun r v' res -> if v' = v then Some r else res) n.num_reg None
 
+  (* Find a register of machtype [typ] containing the given value number.
+     (Registers of different machtypes can share a value number, see
+     [set_move].) *)
+
+  let find_reg_containing_with_typ n v typ =
+    Reg.Map.fold
+      (fun r v' res ->
+        if v' = v && Cmm.equal_machtype_component r.Reg.typ typ
+        then Some r
+        else res)
+      n.num_reg None
+
   (* Find a set of registers containing the given value numbers. *)
 
   let find_regs_containing n vs =
@@ -223,6 +254,14 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let set_fresh_regs n rs rhs op_class =
     let n1, vs = fresh_valnum_regs n rs in
     { n1 with num_eqs = Equations.add op_class rhs vs n.num_eqs }
+
+  (* Record the equation [vres = rhs] without modifying the register-to-valnum
+     mapping. Used for store-to-load forwarding, where the recorded equation
+     concerns a hypothetical load rather than the instruction being
+     processed. *)
+
+  let add_equation op_class n rhs vres =
+    { n with num_eqs = Equations.add op_class rhs vres n.num_eqs }
 
   (* Forget everything we know about the given result registers, which are
      receiving unpredictable values at run-time. *)
@@ -270,19 +309,28 @@ end = struct
     InstructionId.get_and_incr state.instruction_id
 end
 
-let insert_single_move :
-    State.t -> Reg.t -> Reg.t -> Cfg.basic Cfg.instruction DLL.cell -> unit =
- fun state src dst cell ->
+let insert_single_op :
+    State.t ->
+    Operation.t ->
+    Reg.t ->
+    Reg.t ->
+    Cfg.basic Cfg.instruction DLL.cell ->
+    unit =
+ fun state op src dst cell ->
   let instr = DLL.value cell in
-  let move : Cfg.basic Cfg.instruction =
+  let new_instr : Cfg.basic Cfg.instruction =
     { instr with
-      desc = Op Move;
+      desc = Op op;
       arg = [| src |];
       res = [| dst |];
       id = State.get_and_incr_instruction_id state
     }
   in
-  DLL.insert_after cell move
+  DLL.insert_after cell new_instr
+
+let insert_single_move :
+    State.t -> Reg.t -> Reg.t -> Cfg.basic Cfg.instruction DLL.cell -> unit =
+ fun state src dst cell -> insert_single_op state Move src dst cell
 
 let insert_move :
     State.t ->
@@ -334,7 +382,19 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
-    | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
+    | Floatop _ | Csel _ | Static_cast _ -> Op_pure
+    | Reinterpret_cast (Int_of_value | Value_of_int) ->
+      (* The result depends on the current address of a heap value, which a
+         moving GC may change at any allocation or poll. Equations over these
+         casts are hence kept with the ones over mutable loads, which those
+         points invalidate (so do stores, atomics and fences, which is more than
+         needed but harmless). *)
+      Op_load Mutable
+    | Reinterpret_cast
+        ( Float_of_float32 | Float32_of_float | Float_of_int64 | Int64_of_float
+        | Float32_of_int32 | Int32_of_float32 | Mask_of_int64 | Int64_of_mask
+        | V128_of_vec _ | V256_of_vec _ | V512_of_vec _ ) ->
+      Op_pure
     | Specific _ -> Op_other
     | Name_for_debugger _ -> Op_other
     | Probe_is_enabled _ -> Op_other
@@ -359,6 +419,151 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       false
 
   let kill_loads (n : numbering) : numbering = remove_mutable_load_numbering n
+
+  (* Load chunks under which a store of chunk [memory_chunk], whose stored value
+     lives in a register of machtype [typ], may be forwarded to a subsequent
+     load of the same address; empty if the store is not eligible for
+     store-to-load forwarding.
+
+     Forwarding is only correct when storing then reloading is the identity on
+     the register: chunks narrower than the register's machtype are excluded
+     (the reload sign- or zero-extends), as is [Single] (a lossy round trip when
+     the register is [Float64]); [Addr]-typed values are conservatively
+     excluded.
+
+     [Word_int] and [Word_val] stores both preserve a full word, but the load
+     must preserve the register's GC representation too. Sharing a value number
+     between [Int] and [Val] is unsound across a moving GC, which updates only
+     [Val]. Thus the load chunk is chosen from [typ], not from the store
+     chunk. *)
+  let forwardable_load_chunks (memory_chunk : Cmm.memory_chunk)
+      (typ : Cmm.machtype_component) : Cmm.memory_chunk list =
+    match memory_chunk, typ with
+    | (Word_int | Word_val), Int -> [Word_int]
+    | (Word_int | Word_val), Val -> [Word_val]
+    | Double, Float -> [Double]
+    | (Onetwentyeight_unaligned | Onetwentyeight_aligned), Vec128
+    | (Twofiftysix_unaligned | Twofiftysix_aligned), Vec256
+    | (Fivetwelve_unaligned | Fivetwelve_aligned), Vec512 ->
+      [memory_chunk]
+    | ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
+        | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_mask
+        | Word_val | Single _ | Double | Onetwentyeight_unaligned
+        | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+        | Fivetwelve_unaligned | Fivetwelve_aligned ),
+        ( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask | Float32
+        | Valx2 ) ) ->
+      []
+
+  (* If [instr] is an eligible plain store (see [forwardable_load_chunks]),
+     return equations stating that a subsequent non-atomic mutable load from the
+     same address would yield the stored value (store-to-load forwarding).
+     [varg] must be the value numbers of [instr]'s arguments, computed from the
+     numbering in force just before the store. The equations must be added to
+     the mutable-load equations after the store's own invalidation, so that
+     later stores, atomics, fences, allocations, polls and calls remove them
+     through the existing invalidation logic. *)
+  let store_to_load_forwarding_equations (instr : Cfg.basic Cfg.instruction)
+      (varg : valnum array) : (rhs * valnum array) list =
+    match instr.desc with
+    | Op (Store (memory_chunk, addressing_mode, _)) ->
+      let vaddr = Array.sub varg ~pos:1 ~len:(Array.length varg - 1) in
+      List.map (forwardable_load_chunks memory_chunk instr.arg.(0).Reg.typ)
+        ~f:(fun memory_chunk ->
+          let load : Operation.t =
+            Load
+              { memory_chunk;
+                addressing_mode;
+                mutability = Mutable;
+                is_atomic = false
+              }
+          in
+          (load, vaddr, [| instr.arg.(0).Reg.typ |]), [| varg.(0) |])
+    | Op
+        ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+        | Const_mask _ | Stackoffset _ | Load _ | Intop _ | Int128op _
+        | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+        | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Pause | Alloc _ )
+    | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+    | Stack_check _ ->
+      []
+
+  (* Add to [n] the store-to-load forwarding equations for [instr] (see
+     [store_to_load_forwarding_equations] above for the requirements on [varg]
+     and on the point at which this must be called). *)
+  let add_store_to_load_forwarding_equations (n : numbering)
+      (instr : Cfg.basic Cfg.instruction) (varg : valnum array) : numbering =
+    List.fold_left (store_to_load_forwarding_equations instr varg) ~init:n
+      ~f:(fun n (rhs, vres) -> add_equation (Op_load Mutable) n rhs vres)
+
+  (* Cross-machtype store-to-load forwarding.
+
+     A word store of an [Int] register only records a forwarding equation for
+     [Word_int] loads, and one of a [Val] register only for [Word_val] loads
+     (see [forwardable_load_chunks]). The two chunks are however used
+     asymmetrically: an immediate record field is stored with [Word_int] but
+     loaded with [Word_val]. If a non-atomic mutable word load with a single
+     result finds no equation of its own, [sibling_word_load] returns the key of
+     the sibling load (same address, other word chunk, other machtype), the
+     machtype of the sibling's result, and the cast from that machtype to the
+     load's. If the sibling equation is found and a register of the sibling
+     machtype still holds its result, the load is replaced by that
+     [Reinterpret_cast].
+
+     The cast is deliberately not a [Move], and the result of the load keeps the
+     fresh value number it would have received had the load been kept: the
+     source and the result must never be considered interchangeable, since a
+     moving GC updates [Val] registers but not [Int] ones, and the register
+     allocator must not coalesce them (it does coalesce [Move]s between [Int]
+     and [Val] registers, but not reinterpret casts).
+
+     Unlike a load, such a cast is not considered pure by [Cfg_deadcode]: a load
+     whose result is dead thus leaves a stray move behind, which is rare enough
+     to be acceptable. *)
+  let sibling_word_load (op : Operation.t) (varg : valnum array)
+      (res : Reg.t array) :
+      (rhs * Cmm.machtype_component * Cmm.reinterpret_cast) option =
+    match op with
+    | Load { memory_chunk; addressing_mode; mutability; is_atomic } -> (
+      let sibling memory_chunk : Operation.t =
+        Load
+          { memory_chunk;
+            addressing_mode;
+            mutability = Mutable;
+            is_atomic = false
+          }
+      in
+      let result_typ : Cmm.machtype_component option =
+        match res with [| r |] -> Some r.Reg.typ | _ -> None
+      in
+      match memory_chunk, mutability, is_atomic, result_typ with
+      | Word_val, Mutable, false, Some Val ->
+        Some ((sibling Word_int, varg, [| Int |]), Int, Value_of_int)
+      | Word_int, Mutable, false, Some Int ->
+        Some ((sibling Word_val, varg, [| Val |]), Val, Int_of_value)
+      | ( ( Word_int | Word_val | Byte_unsigned | Byte_signed | Sixteen_unsigned
+          | Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask
+          | Single _ | Double | Onetwentyeight_unaligned
+          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
+          | Fivetwelve_unaligned | Fivetwelve_aligned ),
+          (Mutable | Immutable),
+          (true | false),
+          ( None
+          | Some
+              ( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask
+              | Float32 | Valx2 ) ) ) ->
+        None)
+    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+    | Const_mask _ | Stackoffset _ | Store _ | Intop _ | Int128op _
+    | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+    | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+    | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
+    | Pause | Alloc _ ->
+      None
 
   let cse_instruction :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.cell -> numbering =
@@ -404,8 +609,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       match class_of_operation op with
       | (Op_pure | Op_load _) as op_class -> (
         let n1, varg = valnum_regs n i.arg in
+        let rhs = op, varg, Reg.typv i.res in
         let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
-        match find_equation op_class n1 (op, varg) with
+        match find_equation op_class n1 rhs with
         | Some vres -> (
           (* This operation was computed earlier. *)
           (* Are there registers that hold the results computed earlier? *)
@@ -426,23 +632,40 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
                operation. *)
             let n3 = set_known_regs n2 i.res vres in
             n3)
-        | None ->
+        | None -> (
           (* This operation produces a result we haven't seen earlier. *)
-          let n3 = set_fresh_regs n2 i.res (op, varg) op_class in
-          n3)
+          let n3 = set_fresh_regs n2 i.res rhs op_class in
+          match sibling_word_load op varg i.res with
+          | None -> n3
+          | Some (sibling_rhs, src_typ, cast) -> (
+            match find_equation op_class n1 sibling_rhs with
+            | Some [| vsrc |] -> (
+              match find_reg_containing_with_typ n1 vsrc src_typ with
+              | Some src ->
+                (* The stored value is still in [src]: forward it through a cast
+                   (see [sibling_word_load]); [i.res] keeps its fresh value
+                   number from [n3]. *)
+                insert_single_op state (Reinterpret_cast cast) src i.res.(0)
+                  cell;
+                DLL.delete_curr cell;
+                n3
+              | None -> n3)
+            | Some (_ : valnum array) | None -> n3)))
       | Op_store false | Op_other ->
         (* An initializing store or an "other" operation do not invalidate any
            equations, but we do not know anything about the results. *)
-        let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
-        let n2 = set_unknown_regs n1 i.res in
-        n2
+        let n1, varg = valnum_regs n i.arg in
+        let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+        let n3 = set_unknown_regs n2 i.res in
+        add_store_to_load_forwarding_equations n3 i varg
       | Op_store true ->
         (* A non-initializing store can invalidate anything we know about prior
            mutable loads. *)
-        let n1 = set_unknown_regs n (Proc.destroyed_at_basic i.desc) in
-        let n2 = set_unknown_regs n1 i.res in
-        let n3 = kill_loads n2 in
-        n3)
+        let n1, varg = valnum_regs n i.arg in
+        let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+        let n3 = set_unknown_regs n2 i.res in
+        let n4 = kill_loads n3 in
+        add_store_to_load_forwarding_equations n4 i varg)
 
   let cse_body :
       State.t -> numbering -> Cfg.basic Cfg.instruction DLL.t -> numbering =
