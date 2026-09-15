@@ -892,10 +892,10 @@ and pattern2 ctxt f p =
       { p with ppat_desc = Ppat_constraint (inner, cty, []);
                ppat_attributes = [] }
     in
-    pp f "(%a)%a%a" (pattern2 ctxt) p_without_modes
+    pp f "@[<2>(%a)%a%a@]" (pattern2 ctxt) p_without_modes
       (attributes ctxt) attrs optional_at_modes modes
   | _, (_ :: _ as attrs) ->
-    pp f "(%a)%a" (pattern2 ctxt) {p with ppat_attributes=[]}
+    pp f "@[<2>(%a)%a@]" (pattern2 ctxt) {p with ppat_attributes=[]}
       (attributes ctxt) attrs
   | Ppat_constraint(p, ct, m), [] ->
     begin match ct with
