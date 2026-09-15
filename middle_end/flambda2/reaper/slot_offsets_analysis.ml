@@ -28,7 +28,7 @@
 module PTA = Points_to_analysis
 module Unboxed_fields = Unboxing_analysis.Unboxed_fields
 
-let function_slots_to_be_built ~(uses : Unboxing_analysis.result)
+let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
     ~get_code_metadata ~closure_function_decls ~function_slot_rewrites
     ~function_slots =
   let db = uses.db in
@@ -60,8 +60,8 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result)
             || PTA.field_used db closure_name Field.unknown_arity_call_witness
           then
             let changed_calling_convention =
-              not
-                (Unboxing_analysis.cannot_change_calling_convention uses code_id)
+              Unboxing_analysis.is_changing_calling_convention code_changes
+                code_id
             in
             Code_id
               { code_id;
@@ -69,7 +69,11 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result)
                   only_full_applications || changed_calling_convention
               }
           else
-            let code_metadata = get_code_metadata code_id in
+            let code_metadata =
+              if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+              then Unboxing_analysis.get_code_metadata code_changes code_id
+              else get_code_metadata code_id
+            in
             Deleted
               { function_slot_size =
                   Code_metadata.function_slot_size code_metadata;
@@ -107,7 +111,7 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
    built at all, e.g. if it has no usages. [closure_name] should be the name of
    any one of the closures in the set. *)
 let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
-    ~get_code_metadata ~closure_function_decls ~unboxed_fields
+    ~code_changes ~get_code_metadata ~closure_function_decls ~unboxed_fields
     ~(changed_representation :
        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
@@ -139,12 +143,13 @@ let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
         Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
-      ( function_slots_to_be_built ~uses ~get_code_metadata
+      ( function_slots_to_be_built ~uses ~code_changes ~get_code_metadata
           ~closure_function_decls ~function_slot_rewrites
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
+let compute ~free_names ~code_deps ~closure_function_decls ~code_changes
+    ~get_code_metadata
     ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
@@ -169,8 +174,8 @@ let compute ~free_names ~code_deps ~closure_function_decls ~get_code_metadata
             in
             let set_slots' =
               match
-                slots_to_be_built_for_set_of_closures ~uses ~get_code_metadata
-                  ~closure_function_decls ~unboxed_fields
+                slots_to_be_built_for_set_of_closures ~uses ~code_changes
+                  ~get_code_metadata ~closure_function_decls ~unboxed_fields
                   ~changed_representation ~closure_name set
               with
               | None -> set_slots

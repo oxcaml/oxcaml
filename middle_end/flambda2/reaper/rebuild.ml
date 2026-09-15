@@ -459,14 +459,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
             if code_is_used bound_name
             then
               let changed_calling_convention =
-                Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                &&
-                match
-                  Unboxing_analysis.get_calling_convention_change
-                    env.code_changes code_id
-                with
-                | Not_changing_calling_convention -> false
-                | Changing_calling_convention _ -> true
+                Unboxing_analysis.is_changing_calling_convention
+                  env.code_changes code_id
               in
               Code_id
                 { code_id;
