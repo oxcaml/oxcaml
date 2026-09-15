@@ -23,6 +23,7 @@ val print_version_and_library : string -> 'a
 val print_version_string : unit -> 'a
 val print_standard_library : unit -> 'a
 val fatal : string -> 'a
+val report_message : ?usage:(unit -> unit) -> string -> unit
 
 val first_ccopts : string list ref
 val first_ppx : string list ref
