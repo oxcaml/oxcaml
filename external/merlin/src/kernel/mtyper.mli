@@ -10,7 +10,7 @@
 type result
 
 type typedtree =
-  [ `Interface of Typedtree.signature | `Implementation of Typedtree.structure ]
+  [ `Interface of Typedtree.interface | `Implementation of Typedtree.structure ]
 
 type typer_cache_stats = Miss | Hit of { reused : int; typed : int }
 

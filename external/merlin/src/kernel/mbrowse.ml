@@ -329,7 +329,7 @@ let of_signature sg =
 
 let of_typedtree = function
   | `Implementation str -> of_structure str
-  | `Interface sg -> of_signature sg
+  | `Interface (intf : interface) -> of_signature intf.signature
 
 let optional_label_sugar = function
   | Typedtree.Texp_construct (id, _, _, [ (_, e) ], _)
