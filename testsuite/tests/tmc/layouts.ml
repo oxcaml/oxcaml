@@ -1,0 +1,166 @@
+(* TEST
+ flags = "-extension layout_poly_alpha -warn-error +51+71";
+ { bytecode; }
+ { native; }
+*)
+
+let[@tail_mod_cons] rec copy (xs : #(int * int) list) =
+  match xs with
+  | [] -> []
+  | x :: xs -> x :: (copy [@tailcall]) xs
+
+let[@tail_mod_cons] rec repeat n (x : #(int * int)) =
+  if n = 0 then [] else x :: (repeat [@tailcall]) (n - 1) x
+
+let rec check_pairs expected = function
+  | [] -> assert (expected = [])
+  | #(a, b) :: xs ->
+    match expected with
+    | [] -> failwith "unexpected list element"
+    | (c, d) :: expected ->
+      assert (a = c && b = d);
+      check_pairs expected xs
+
+let () =
+  check_pairs [] (copy []);
+  check_pairs [1, 2; 3, 4; 5, 6]
+    (copy [#(1, 2); #(3, 4); #(5, 6)]);
+  check_pairs [11, 22] (repeat 1 #(11, 22));
+  check_pairs [11, 22; 11, 22; 11, 22] (repeat 3 #(11, 22))
+
+let poly_ map f xs =
+  let[@tail_mod_cons] rec loop = function
+    | [] -> []
+    | x :: xs -> f x :: (loop [@tailcall]) xs
+  in
+  loop xs
+
+module type Filter_map = sig
+  type ('a : any) t
+  val poly_ filter_map : 'a t -> f:('a -> 'b option) -> 'b t
+end
+
+module Filter_opt (M : Filter_map @ static) = struct
+  let poly_ filter_opt xs = M.filter_map xs ~f:(fun x -> x)
+end
+
+module List = struct
+  type ('a : any) t = 'a list
+
+  let poly_ filter_map xs ~f =
+    let[@tail_mod_cons] rec loop = function
+      | [] -> []
+      | x :: xs ->
+        match f x with
+        | None -> loop xs
+        | Some y -> y :: (loop [@tailcall]) xs
+    in
+    loop xs
+end
+
+module Filter = Filter_opt (List)
+
+let () =
+  check_pairs [1, 2; 3, 4] (map (fun x -> x) [#(1, 2); #(3, 4)]);
+  check_pairs [1, 2; 3, 4]
+    (Filter.filter_opt [None; Some #(1, 2); None; Some #(3, 4)]);
+  check_pairs [1, 2; 3, 4]
+    (map (fun #(a, #(b, #())) -> #(a, b))
+       (map (fun x -> x) [#(1, #(2, #())); #(3, #(4, #()))]));
+  check_pairs [1, 2; 1, 2]
+    (map (fun #() -> #(1, 2)) (map (fun x -> x) [#(); #()]))
+
+let () =
+  let calls = ref [] in
+  let result = map (fun n -> calls := n :: !calls; #(n, n + 1)) [1; 2; 3] in
+  assert (!calls = [3; 2; 1]);
+  check_pairs [1, 2; 2, 3; 3, 4] result
+
+type tree = Leaf | Node of #(int * int) * tree * #(int * int)
+
+let[@tail_mod_cons] rec tree n =
+  if n = 0 then Leaf
+  else Node (#(n, n + 1), tree (n - 1), #(n + 2, n + 3))
+
+let () =
+  let rec check n = function
+    | Leaf -> assert (n = 0)
+    | Node (#(a, b), t, #(c, d)) ->
+      assert (a = n && b = n + 1 && c = n + 2 && d = n + 3);
+      check (n - 1) t
+  in
+  check 100 (tree 100)
+
+let () =
+  let xs = map (fun n -> Gc.minor (); #(string_of_int n, n)) [1; 2; 3] in
+  Gc.full_major ();
+  assert (map (fun #(s, n) -> s, n) xs = ["1", 1; "2", 2; "3", 3]);
+  let calls = ref [] in
+  let exception Stop in
+  match map (fun n ->
+      calls := n :: !calls;
+      if n = 2 then raise Stop;
+      #(n, n + 1)) [1; 2; 3] with
+  | exception Stop -> assert (!calls = [2; 1])
+  | _ -> failwith "expected Stop"
+
+let () =
+  let xs = repeat 100_000 #(11, 22) in
+  let rec length n = function
+    | [] -> n
+    | #(a, b) :: xs ->
+      assert (a = 11 && b = 22);
+      length (n + 1) xs
+  in
+  assert (length 0 (copy xs) = 100_000)
+
+external box_float : float# -> float = "%box_float"
+external box_int64 : int64_u -> int64 = "%box_int64"
+
+let () =
+  assert (map box_float (map (fun x -> x) [#1.5; #2.5]) = [1.5; 2.5]);
+  assert (map box_int64 (map (fun x -> x) [#11L; #22L]) = [11L; 22L]);
+  assert (map box_float
+            (Filter.filter_opt [None; Some #1.5; None; Some #2.5])
+          = [1.5; 2.5]);
+  assert (map (fun #(f, #(), n, s) -> box_float f, box_int64 n, s)
+            (map (fun x -> x)
+               [#(#1.5, #(), #11L, "one"); #(#2.5, #(), #22L, "two")])
+          = [1.5, 11L, "one"; 2.5, 22L, "two"])
+
+type mixed_tree =
+  | End
+  | Link of #(float# * int * int) * mixed_tree * #(int * int64_u)
+
+let[@tail_mod_cons] rec mixed_tree n =
+  if n = 0 then End
+  else Link (#(#1.5, n, n + 1), (mixed_tree [@tailcall]) (n - 1),
+             #(n + 2, #22L))
+
+let () =
+  let rec check n = function
+    | End -> assert (n = 0)
+    | Link (#(f, a, b), t, #(c, d)) ->
+      assert (box_float f = 1.5 && a = n && b = n + 1);
+      assert (c = n + 2 && box_int64 d = 22L);
+      check (n - 1) t
+  in
+  check 100 (mixed_tree 100)
+
+let[@tail_mod_cons] rec repeat_float n (x : float#) =
+  if n = 0 then [] else x :: (repeat_float [@tailcall]) (n - 1) x
+
+let () =
+  let calls = ref 0 in
+  let xs = map (fun x ->
+      incr calls;
+      if !calls mod 1000 = 0 then Gc.minor ();
+      #(x, string_of_int !calls)) (repeat_float 100_000 #1.5) in
+  Gc.full_major ();
+  let rec check n = function
+    | [] -> assert (n = 100_001)
+    | #(f, s) :: xs ->
+      assert (box_float f = 1.5 && s = string_of_int n);
+      check (n + 1) xs
+  in
+  check 1 xs

@@ -30,50 +30,22 @@ type t = C : int# -> t
 *)
 type t = int# list;;
 [%%expect {|
-Line 1, characters 9-13:
-1 | type t = int# list;;
-             ^^^^
-Error: This type "int#" should be an instance of type "('a : value_or_null)"
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = int# list
 |}];;
 
 let f (_ : int# list) = ();;
 [%%expect {|
-Line 1, characters 11-15:
-1 | let f (_ : int# list) = ();;
-               ^^^^
-Error: This type "int#" should be an instance of type "('a : value_or_null)"
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because the type argument of list has layout value_or_null.
+val f : int# list -> unit = <fun>
 |}];;
 
 type t = C of int# list;;
 [%%expect {|
-Line 1, characters 14-18:
-1 | type t = C of int# list;;
-                  ^^^^
-Error: This type "int#" should be an instance of type "('a : value_or_null)"
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C of int# list
 |}];;
 
 type t = C : int# list -> t;;
 [%%expect {|
-Line 1, characters 13-17:
-1 | type t = C : int# list -> t;;
-                 ^^^^
-Error: This type "int#" should be an instance of type "('a : value_or_null)"
-       The layout of int# is untagged_immediate
-         because it is the unboxed version of the primitive type int.
-       But the layout of int# must be a value layout
-         because the type argument of list has layout value_or_null.
+type t = C : int# list -> t
 |}];;
 
 (* Syntax: int#c

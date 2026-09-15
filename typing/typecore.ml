@@ -1416,7 +1416,8 @@ let check_project_mutability ~loc ~env mut_name mutability mode =
   if Types.is_mutable mutability then
     submode ~loc ~env mode (mode_project_mutable mut_name)
 
-let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
+let check_atomic_loc_of_finalized_repr ~loc ~env label
+    (record_repres : Lambda.record_representation) lid =
   if not (Types.is_atomic label.lbl_mut) then
     raise (Error (loc, env, Label_not_atomic lid));
   if is_poly_Tpoly label.lbl_arg then
@@ -1431,17 +1432,12 @@ let check_atomic_loc_of_finalized_repr ~loc ~env label record_repres lid =
   | Record_boxed | Record_inlined (_, Constructor_uniform_value, _) -> ()
   | Record_mixed _ | Record_inlined (_, Constructor_mixed _, _) ->
       raise (Error (loc, env, Mixed_record_atomic_loc lid))
-  | Record_undetermined | Record_variable _
-  | Record_inlined
-      (_, (Constructor_undetermined | Constructor_variable _), _)
   (* Inline records are never immediate. *)
   | Record_inlined (_, Constructor_immediate_all_void, _)
   (* [@@unboxed] prohibits mutable (and therefore atomic) fields. *)
   | Record_unboxed
   (* [@atomic] fields disable float record optimization. *)
-  | Record_float | Record_ufloat
-  (* Only exists as an intermediate step of typechecking the decl itself *)
-  | Record_dummy _ ->
+  | Record_float | Record_ufloat ->
       Misc.fatal_error
         "check_atomic_loc_of_finalized_repr: unexpected record representation"
 
@@ -3232,6 +3228,15 @@ end)
 type unrepresentable_arg =
   Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
 
+let keep_scopes tys ~f =
+  let old_scopes = List.map (fun ty -> ty, get_scope ty) tys in
+  let result = f () in
+  List.iter
+    (fun (ty, old_scope) ->
+       if get_scope ty > old_scope then set_scope ty old_scope)
+    old_scopes;
+  result
+
 let instance_constructor_representation env constr ~types ~why
     : _ Result.t =
   match constr.cstr_shape with
@@ -3248,15 +3253,19 @@ let instance_constructor_representation env constr ~types ~why
       end
   | Constructor_undetermined ->
       let sorts_result =
-        Misc.Stdlib.List.mapi_result
-          (fun i (ty, loc) ->
-             match (List.nth constr.cstr_args i).ca_sort with
-             | Some sort -> Ok (Jkind.Sort.of_const sort)
-             | None ->
-                 type_sort env ty ~why ~fixed:false
-                 |> Result.map_error
-                      (fun err -> Unrepresentable_arg (loc, ty, err)))
-          types
+        (* XXX Claude suggested keeping the scopes as a fix, and it works, but
+           its explanation for the correctness was not good. Need to be
+           convinced that it's safe to poke these holes in the scopes. *)
+        keep_scopes (List.map fst types) ~f:(fun () ->
+          Misc.Stdlib.List.mapi_result
+            (fun i (ty, loc) ->
+               match (List.nth constr.cstr_args i).ca_sort with
+               | Some sort -> Ok (Jkind.Sort.of_const sort)
+               | None ->
+                   type_sort env ty ~why ~fixed:false
+                   |> Result.map_error
+                        (fun err -> Unrepresentable_arg (loc, ty, err)))
+            types)
       in
       begin match sorts_result with
       | Ok sorts ->
@@ -4220,7 +4229,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       (* CR layouts v5: value restriction here to be relaxed *)
       if is_optional l then
         unify_pat val_env pat
-          (type_option (newvar Predef.option_argument_jkind));
+          (type_option (newvar Predef.optional_argument_jkind));
       tps.tps_pattern_variables, pat
     end
   in
@@ -5661,7 +5670,7 @@ let rec approx_type env sty =
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
       (* CR layouts v5: value requirement here to be relaxed *)
-      if is_optional p then newvar Predef.option_argument_jkind
+      if is_optional p then newvar Predef.optional_argument_jkind
       else begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
         let arg_ty =
@@ -5681,7 +5690,7 @@ let rec approx_type env sty =
       let p = Typetexp.transl_label p (Some arg_sty) in
       let arg =
         if is_optional p
-        then type_option (newvar Predef.option_argument_jkind)
+        then type_option (newvar Predef.optional_argument_jkind)
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
       let ret = approx_type env sty in
@@ -8856,7 +8865,7 @@ and type_expect_
              typechecking. *)
           add_delayed_check (fun () ->
             let record_repres =
-              Typedecl.finalize_record_representation env loc record_repres
+              Typeopt.finalize_record_representation env loc record_repres
             in
             check_atomic_loc_of_finalized_repr ~loc ~env label record_repres
               lid.txt);
@@ -10684,7 +10693,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
        | Optional _ ->
            (* CR layouts v5: relax value requirement *)
            unify_exp ~sexp:sarg env arg
-             (type_option(newvar Predef.option_argument_jkind))
+             (type_option(newvar Predef.optional_argument_jkind))
        | Position _ ->
            unify_exp ~sexp:sarg env arg (instance Predef.type_lexing_position));
       (lbl, Arg (arg, mode_arg, sort_arg), None,
@@ -12496,7 +12505,11 @@ and type_comprehension_expr ~loc ~env ~ty_expected ~attributes cexpr =
         Predef.type_list,
         (fun tcomp -> Texp_list_comprehension tcomp),
         comp,
-        Predef.list_argument_jkind
+        (* Although [list] takes an [any] parameter, list comprehensions
+           require value elements (see [transl_list_comprehension.ml]). *)
+        (* CR layouts: Lift this. *)
+        Jkind.Builtin.value_or_null
+          ~why:Jkind.History.List_comprehension_element
     | Pcomp_array_comprehension (amut, comp) ->
         let container_type, mut = match amut with
         | Mutable   ->
