@@ -1369,9 +1369,11 @@ let find_ident_module id env =
   match find_same_module id env.modules with
   | Mod_local (data, _) -> data
   | Mod_unbound _ -> raise Not_found
-  | Mod_persistent_as global_name ->
-      find_pers_mod ~allow_hidden:true ~allow_excess_args:false global_name
-  | Mod_persistent ->
+  | Mod_persistent | Mod_persistent_as _ ->
+      (* [Mod_persistent_as] rebinds a name for lexical (by-name) references
+         only. [id] here is a semantic reference to the global it denotes
+         itself (e.g. an ident from a loaded cmi that merely has the same
+         name), so the rebinding's target must not be consulted. *)
       match Ident.to_global id with
       | Some global_name ->
           let allow_excess_args =
@@ -1827,9 +1829,8 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
   | Module ->
       begin match IdTbl.find_same_without_locks id env.modules with
       | Mod_local ({ mda_shape; _ }, _) -> mda_shape
-      | Mod_persistent -> Shape.for_persistent_unit (Ident.name id)
-      | Mod_persistent_as name ->
-          Shape.for_persistent_unit (Global_module.Name.to_string name)
+      | Mod_persistent | Mod_persistent_as _ ->
+          Shape.for_persistent_unit (Ident.name id)
       | Mod_unbound _ ->
           (* Only present temporarily while approximating the environment for
              recursive modules.
