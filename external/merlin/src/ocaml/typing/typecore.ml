@@ -2337,12 +2337,12 @@ let reorder_pat loc penv patl closed labeled_tl expected_ty =
 
 (* This assumes the [args] have already been reordered according to the
    [expected_ty], if needed.  *)
-let solve_Ppat_tuple ~alloc_mode loc env args expected_ty =
+let solve_Ppat_tuple ~pat_mode loc env args expected_ty =
   (* CR layouts v5: consider sharing code with [solve_Ppat_unboxed_tuple] below
      when we allow non-values in boxed tuples. *)
   let arity = List.length args in
   let arg_modes =
-    match alloc_mode.tuple_modes with
+    match pat_mode.tuple_modes with
     (* CR zqian: improve the modes of opened labeled tuple pattern. *)
     | Some l when List.compare_length_with l arity = 0 -> l
     | _ ->
@@ -2350,7 +2350,7 @@ let solve_Ppat_tuple ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by pat_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -2369,10 +2369,10 @@ let solve_Ppat_tuple ~alloc_mode loc env args expected_ty =
 
 (* This assumes the [args] have already been reordered according to the
    [expected_ty], if needed.  *)
-let solve_Ppat_unboxed_tuple ~alloc_mode loc env args expected_ty =
+let solve_Ppat_unboxed_tuple ~pat_mode loc env args expected_ty =
   let arity = List.length args in
   let arg_modes =
-    match alloc_mode.tuple_modes with
+    match pat_mode.tuple_modes with
     (* CR zqian: improve the modes of opened labeled tuple pattern. *)
     | Some l when List.compare_length_with l arity = 0 -> l
     | _ ->
@@ -2380,7 +2380,7 @@ let solve_Ppat_unboxed_tuple ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by pat_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -3604,10 +3604,10 @@ let forbid_atomic_in_record_update loc env lbl =
 let rec type_pat
   : type k . type_pat_state -> k pattern_category ->
       no_existentials: existential_restriction option ->
-      alloc_mode:expected_pat_mode -> mutable_flag:_ ->
+      pat_mode:expected_pat_mode -> mutable_flag:_ ->
       penv: Pattern_env.t -> Parsetree.pattern -> type_expr ->
       Jkind.Sort.t -> k general_pattern
-  = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
       expected_ty sort ->
   Msupport.with_saved_types
     ~warning_attribute:sp.ppat_attributes ?save_part:None
@@ -3615,7 +3615,7 @@ let rec type_pat
        let saved = save_levels () in
        try
          type_pat_aux tps category ~no_existentials
-           ~alloc_mode ~mutable_flag ~penv sp expected_ty sort
+           ~pat_mode ~mutable_flag ~penv sp expected_ty sort
        with Error _ as exn ->
          (* We only want to catch error, not internal exceptions such as
             [Need_backtrack], etc. *)
@@ -3641,13 +3641,13 @@ let rec type_pat
 
 and type_pat_aux
   : type k . type_pat_state -> k pattern_category -> no_existentials:_ ->
-         alloc_mode:expected_pat_mode -> mutable_flag:mutable_flag ->
+         pat_mode:expected_pat_mode -> mutable_flag:mutable_flag ->
          penv:Pattern_env.t -> _ -> _ -> _ -> k general_pattern
-  = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv sp
+  = fun tps category ~no_existentials ~pat_mode ~mutable_flag ~penv sp
         expected_ty sort ->
   assert (penv.in_counterexample = false);
-  let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) =
-    type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
+  let type_pat tps category ?(pat_mode=pat_mode) ?(penv=penv) =
+    type_pat tps category ~no_existentials ~pat_mode ~mutable_flag ~penv
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =
@@ -3682,12 +3682,12 @@ and type_pat_aux
         | Closed -> spl
     in
     let expected_tys =
-      solve_Ppat_tuple ~alloc_mode loc penv args expected_ty
+      solve_Ppat_tuple ~pat_mode loc penv args expected_ty
     in
     let pl =
-      List.map2 (fun (lbl, t, alloc_mode) (_, p) ->
+      List.map2 (fun (lbl, t, pat_mode) (_, p) ->
         lbl,
-        type_pat tps Value ~alloc_mode p t
+        type_pat tps Value ~pat_mode p t
           Jkind.Sort.(of_const Const.for_tuple_element))
         expected_tys args
     in
@@ -3718,11 +3718,11 @@ and type_pat_aux
         | Closed -> spl
     in
     let expected_tys =
-      solve_Ppat_unboxed_tuple ~alloc_mode loc penv args expected_ty
+      solve_Ppat_unboxed_tuple ~pat_mode loc penv args expected_ty
     in
     let pl =
-      List.map2 (fun (lbl, t, alloc_mode, sort) (_, p) ->
-        lbl, type_pat tps Value ~alloc_mode p t sort, sort)
+      List.map2 (fun (lbl, t, pat_mode, sort) (_, p) ->
+        lbl, type_pat tps Value ~pat_mode p t sort, sort)
         expected_tys args
     in
     let ty =
@@ -3764,18 +3764,18 @@ and type_pat_aux
             record_ty record_form in
         check_project_mutability ~loc ~env:!!penv
           (Record_field label.lbl_name)
-          label.lbl_mut alloc_mode.mode;
+          label.lbl_mut pat_mode.mode;
         let is_contained_by : Mode.Hint.is_contained_by =
           { containing = Record (label.lbl_name, Modality);
             container = (loc, Pattern) }
         in
         let mode =
           apply_left_is_contained_by is_contained_by
-            ~modalities:label.lbl_modalities alloc_mode.mode
+            ~modalities:label.lbl_modalities pat_mode.mode
         in
-        let alloc_mode = simple_pat_mode mode in
+        let pat_mode = simple_pat_mode mode in
         let ty_sort = label_sort record_form label rep ~record_sort in
-        (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg ty_sort)
+        (label_lid, label, type_pat tps Value ~pat_mode sarg ty_arg ty_sort)
       in
       let make_record_pat
             (rep : rep)
@@ -3830,44 +3830,44 @@ and type_pat_aux
         pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_var name ->
       let ty = instance expected_ty in
-      let alloc_mode =
-        cross_left !!penv expected_ty alloc_mode.mode
+      let mode =
+        cross_left !!penv expected_ty pat_mode.mode
       in
-      let mode, kind =
+      let var_mode, kind =
         match mutable_flag with
-        | Immutable -> alloc_mode, Val_reg sort
+        | Immutable -> mode, Val_reg sort
         | Mutable ->
             let m0 =
               With_regionality.Comonadic.newvar
                 (Ctype.get_current_level ())
             in
-            let mode =
+            let var_mode =
               mutvar_mode ~loc ~env:!!penv
-                (Ctype.get_current_level ()) m0 alloc_mode
+                (Ctype.get_current_level ()) m0 mode
             in
             let kind = Val_mut (m0, sort) in
-            mode, kind
+            var_mode, kind
       in
       let pat_desc =
         match (penv : Pattern_env.t).env_locality_mode with
         | Some env_locality_mode ->
           let lpoly = Lpoly.pending ~loc in
           let id, uid =
-            enter_variable ~lpoly tps loc name mode ~kind ty
+            enter_variable ~lpoly tps loc name var_mode ~kind ty
               sp.ppat_attributes sort
           in
           Tpat_fun_layout
             { id; name; uid; sort;
-              mode = alloc_mode; lpoly;
+              mode; lpoly;
               env_locality_mode =
                 Typedtree.create_locality_mode_r env_locality_mode }
         | None ->
           let lpoly = Lpoly.determined [] in
           let id, uid =
-            enter_variable ~lpoly tps loc name mode ~kind ty
+            enter_variable ~lpoly tps loc name var_mode ~kind ty
               sp.ppat_attributes sort
           in
-          Tpat_var { id; name; uid; sort; mode = alloc_mode }
+          Tpat_var { id; name; uid; sort; mode }
       in
       rvp {
         pat_desc;
@@ -3904,12 +3904,12 @@ and type_pat_aux
              the comment on [may_contain_modules]. *)
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
-            enter_variable tps loc v alloc_mode.mode t ~is_module:true
+            enter_variable tps loc v pat_mode.mode t ~is_module:true
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var { id; name = v; uid; sort;
-                                  mode = alloc_mode.mode };
+                                  mode = pat_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra;
             pat_type = t;
@@ -3919,7 +3919,7 @@ and type_pat_aux
       end
   | Ppat_alias(sq, name) ->
       let q = type_pat tps Value sq expected_ty sort in
-      let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
+      let ty_var, mode = solve_Ppat_alias ~mode:pat_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
         enter_variable ~is_as_variable:true
@@ -4097,14 +4097,14 @@ and type_pat_aux
       let ctor_args, jkinds_to_check =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
-             let alloc_mode =
+             let mode =
               apply_left_is_contained_by is_contained_by
-                ~modalities:arg.ca_modalities alloc_mode.mode
+                ~modalities:arg.ca_modalities pat_mode.mode
              in
-             let alloc_mode =
-              Mode.With_regionality.join [ alloc_mode; constructor_mode ]
+             let mode =
+              Mode.With_regionality.join [ mode; constructor_mode ]
              in
-             let alloc_mode = simple_pat_mode alloc_mode in
+             let pat_mode = simple_pat_mode mode in
              (* We need a sort for [type_pat], but it's not available in
                 [ca_sort] for constructors containing [any]. In that case, we
                 create a new sort var, and store it in [jkind_to_check] to make
@@ -4121,7 +4121,7 @@ and type_pat_aux
                | Some s ->
                  Jkind.Sort.of_const s, None
              in
-             type_pat ~alloc_mode tps Value p arg.ca_type sort, jkind_to_check)
+             type_pat ~pat_mode tps Value p arg.ca_type sort, jkind_to_check)
           sargs args
         |> List.split
       in
@@ -4205,17 +4205,17 @@ and type_pat_aux
       in
       let modalities = Typemode.mutable_modalities mutability in
       check_project_mutability ~loc ~env:!!penv Array_elements mutability
-        alloc_mode.mode;
+        pat_mode.mode;
       let is_contained_by : Mode.Hint.is_contained_by =
         {containing = Array Modality; container = (loc, Pattern)}
       in
-      let alloc_mode =
-        apply_left_is_contained_by is_contained_by ~modalities alloc_mode.mode
+      let mode =
+        apply_left_is_contained_by is_contained_by ~modalities pat_mode.mode
       in
-      let alloc_mode = simple_pat_mode alloc_mode in
+      let pat_mode = simple_pat_mode mode in
       let pl =
         List.map
-          (fun p -> type_pat ~alloc_mode tps Value p ty_elt arg_sort) spl
+          (fun p -> type_pat ~pat_mode tps Value p ty_elt arg_sort) spl
       in
       rvp {
         pat_desc = Tpat_array (mutability, arg_sort, pl);
@@ -4238,8 +4238,8 @@ and type_pat_aux
       let env1, p1, env2, p2 =
         with_local_level begin fun () ->
           let type_pat_rec tps penv sp =
-            let alloc_mode = dynamic_pat_mode alloc_mode in
-            type_pat ~alloc_mode tps category sp expected_ty sort ~penv
+            let pat_mode = dynamic_pat_mode pat_mode in
+            type_pat ~pat_mode tps category sp expected_ty sort ~penv
           in
           let penv1 =
             Pattern_env.copy ~equations_scope:(get_current_level ()) penv in
@@ -4287,11 +4287,11 @@ and type_pat_aux
            pat_env = !!penv;
            pat_unique_barrier = Unique_barrier.not_computed () }
   | Ppat_lazy sp1 ->
-      submode ~loc ~env:!!penv alloc_mode.mode mode_force_lazy;
+      submode ~loc ~env:!!penv pat_mode.mode mode_force_lazy;
       let nv = solve_Ppat_lazy loc penv expected_ty in
-      let alloc_mode = global_pat_mode alloc_mode in
+      let pat_mode = global_pat_mode pat_mode in
       let p1 =
-        type_pat ~alloc_mode tps Value sp1 nv
+        type_pat ~pat_mode tps Value sp1 nv
           Jkind.Sort.(of_const Const.for_lazy_body)
       in
       rvp {
@@ -4316,7 +4316,7 @@ and type_pat_aux
           None, None, expected_ty
       in
       let p =
-        type_pat ~alloc_mode tps category sp_constrained expected_ty sort
+        type_pat ~pat_mode tps category sp_constrained expected_ty sort
       in
       let pat_type = match ty with Some ty -> ty | None -> p.pat_type in
       let extra =
@@ -4343,9 +4343,9 @@ and type_pat_aux
       { p with pat_extra = (Tpat_open (path,lid,new_env),
                                 loc, sp.ppat_attributes) :: p.pat_extra }
   | Ppat_exception p ->
-      let alloc_mode = simple_pat_mode With_regionality.legacy in
+      let pat_mode = simple_pat_mode With_regionality.legacy in
       let p_exn =
-        type_pat tps Value ~alloc_mode p Predef.type_exn
+        type_pat tps Value ~pat_mode p Predef.type_exn
           Jkind.Sort.(of_const Const.for_exception)
       in
       rcp {
@@ -4366,13 +4366,13 @@ let type_pat tps category ?no_existentials ~mutable_flag penv =
   type_pat tps category ~no_existentials ~mutable_flag ~penv
 
 let type_pattern
-    category ~lev ~alloc_mode env spat expected_ty ?cont sort allow_modules
+    category ~lev ~pat_mode env spat expected_ty ?cont sort allow_modules
   =
   let tps = create_type_pat_state ?cont allow_modules in
   let new_penv = Pattern_env.make env
       ~equations_scope:lev ~in_counterexample:false in
   let pat =
-      type_pat tps category ~alloc_mode ~mutable_flag:Immutable new_penv spat
+      type_pat tps category ~pat_mode ~mutable_flag:Immutable new_penv spat
         expected_ty sort
   in
   let { tps_pattern_variables = pvs;
@@ -4395,7 +4395,7 @@ let type_pattern_list
       (fun () ->
          exp_mode,
          type_pat tps category
-           ~no_existentials ~alloc_mode:pat_mode ~mutable_flag
+           ~no_existentials ~pat_mode ~mutable_flag
            new_penv pat ty sort
       )
   in
@@ -4414,12 +4414,12 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
       begin fun () ->
       let tps = create_type_pat_state Modules_rejected in
       let nv = newvar (Jkind.Builtin.value ~why:Class_term_argument) in
-      let alloc_mode = simple_pat_mode With_regionality.legacy in
+      let pat_mode = simple_pat_mode With_regionality.legacy in
       let equations_scope = get_current_level () in
       let new_penv = Pattern_env.make val_env
           ~equations_scope ~in_counterexample:false in
       let pat =
-        type_pat tps Value ~no_existentials:In_class_args ~alloc_mode
+        type_pat tps Value ~no_existentials:In_class_args ~pat_mode
           ~mutable_flag:Immutable new_penv spat nv
           Jkind.Sort.(of_const Const.for_class_arg)
       in
@@ -4480,12 +4480,12 @@ let type_self_pattern env spat =
   let spat = Pat.mk(Ppat_alias (spat, mknoloc "selfpat-*")) in
   let tps = create_type_pat_state Modules_rejected in
   let nv = newvar (Jkind.Builtin.value ~why:Object) in
-  let alloc_mode = simple_pat_mode With_regionality.legacy in
+  let pat_mode = simple_pat_mode With_regionality.legacy in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
       ~equations_scope ~in_counterexample:false in
   let pat =
-    type_pat tps Value ~no_existentials:In_self_pattern ~alloc_mode
+    type_pat tps Value ~no_existentials:In_self_pattern ~pat_mode
       ~mutable_flag:Immutable new_penv spat nv
       Jkind.Sort.(of_const Const.for_object)
   in
@@ -4697,7 +4697,7 @@ let rec check_counter_example_pat
   let check_rec ?(info=info) ?(penv=penv) =
     check_counter_example_pat ~info ~penv type_pat_state in
   let loc = tp.pat_loc in
-  let alloc_mode = simple_pat_mode With_regionality.min in
+  let pat_mode = simple_pat_mode With_regionality.min in
   let solve_expected (x : pattern) : pattern =
     unify_pat_types_penv x.pat_loc penv x.pat_type
       (instance expected_ty);
@@ -4768,7 +4768,7 @@ let rec check_counter_example_pat
       k @@ solve_expected (mp (Tpat_constant cst) ~pat_type:(type_constant cst))
   | Tpat_tuple tpl ->
       let expected_tys =
-        solve_Ppat_tuple ~alloc_mode loc penv tpl expected_ty
+        solve_Ppat_tuple ~pat_mode loc penv tpl expected_ty
       in
       let tpl_ann = List.combine tpl expected_tys in
       map_fold_cont (fun ((l,p),(_,t,_)) k -> check_rec p t (fun p -> k (l, p)))
@@ -4780,7 +4780,7 @@ let rec check_counter_example_pat
            mkp k (Tpat_tuple pl) ~pat_type)
   | Tpat_unboxed_tuple tpl ->
       let expected_tys =
-        solve_Ppat_unboxed_tuple ~alloc_mode loc penv
+        solve_Ppat_unboxed_tuple ~pat_mode loc penv
           (List.map (fun (l,t,_) -> l, t) tpl) expected_ty
       in
       List.iter2
@@ -11993,7 +11993,7 @@ and map_half_typed_cases
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
               let (pat, ext_env, force, pvs, mvs) =
-                type_pattern ?cont category ~lev ~alloc_mode:pat_mode env
+                type_pattern ?cont category ~lev ~pat_mode env
                   pattern ty_arg sort_arg allow_modules
               in
               pattern_force := force @ !pattern_force;
@@ -13368,7 +13368,7 @@ and type_comprehension_iterator
           tps
           Value
           ~no_existentials:In_self_pattern
-          ~alloc_mode:(simple_pat_mode With_regionality.legacy)
+          ~pat_mode:(simple_pat_mode With_regionality.legacy)
           ~mutable_flag:Immutable
           penv
           pattern
