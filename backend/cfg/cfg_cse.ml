@@ -559,7 +559,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     match i.desc with
     | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
     | Stack_check _ ->
-      n
+      set_unknown_regs n (Proc.destroyed_at_basic i.desc)
     | Op (Move | Spill | Reload) ->
       (* For moves, we associate the same value number to the result reg as to
          the argument reg. *)
@@ -579,8 +579,8 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          handler, context switch), which can contain non-initializing stores.
          Hence, all equations over mutable loads must be removed. *)
       let n1 = kill_addr_regs (kill_loads n) in
-      let n2 = set_unknown_regs n1 i.res in
-      n2
+      let n2 = set_unknown_regs n1 (Proc.destroyed_at_basic i.desc) in
+      set_unknown_regs n2 i.res
     | Op
         (( Const_int _ | Begin_region | End_region | Dls_get | Tls_get
          | Domain_index | Const_float32 _ | Const_float _ | Const_symbol _
