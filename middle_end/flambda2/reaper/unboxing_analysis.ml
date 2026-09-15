@@ -248,7 +248,7 @@ let lambda_lifting =
   Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
 let datalog_rules =
-  saturate_in_order
+  fixpoint_in_order
     [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
          properly tracked: a closure will only local value slots that has

@@ -57,7 +57,7 @@ module Syntax : sig
 
   val ( !! ) : 'a -> 'a Term.t
 
-  val saturate_in_order : rule list -> Schedule.t list
+  val fixpoint_in_order : rule list -> Schedule.t list
 
   val ( ~~ ) : [< `Atom of atom] -> [> `Not_atom of atom]
 

@@ -54,7 +54,7 @@ module Syntax = struct
 
   let ( !! ) = Term.constant
 
-  let saturate_in_order = List.map (fun r -> Schedule.saturate [r])
+  let fixpoint_in_order = List.map (fun r -> Schedule.fixpoint [r])
 
   let ( ~~ ) = not
 
@@ -325,7 +325,7 @@ end = struct
 
   let fix x f g =
     let y = Table.locals x in
-    let schedule = Datalog.Schedule.saturate (f y) in
+    let schedule = Datalog.Schedule.fixpoint (f y) in
     let body = g y in
     Now (Seq (Run schedule, body), fun db -> Table.copy x y db)
 
@@ -335,14 +335,14 @@ end = struct
     let body = g y in
     let go =
       List.fold_right
-        (fun r acc -> Seq (Run (Datalog.Schedule.saturate [r]), acc))
+        (fun r acc -> Seq (Run (Datalog.Schedule.fixpoint [r]), acc))
         rules body
     in
     Now (go, fun db -> Table.copy x y db)
 
   let fix1 x f g =
     let y = local "fix" (Datalog.columns x) in
-    let schedule = Datalog.Schedule.saturate (f y) in
+    let schedule = Datalog.Schedule.fixpoint (f y) in
     let body = g y in
     Now
       ( Seq (Run schedule, body),
@@ -350,7 +350,7 @@ end = struct
 
   let fix' x f =
     let y = Table.locals x in
-    let schedule = Datalog.Schedule.saturate (f y) in
+    let schedule = Datalog.Schedule.fixpoint (f y) in
     Now
       ( Map (Run schedule, fun db () -> Table.get y db),
         fun db -> Table.copy x y db )
@@ -362,7 +362,7 @@ end = struct
       Option.get
         (List.fold_right
            (fun r acc ->
-             let r = Run (Datalog.Schedule.saturate [r]) in
+             let r = Run (Datalog.Schedule.fixpoint [r]) in
              match acc with None -> Some r | Some acc -> Some (Seq (r, acc)))
            rules None)
     in
@@ -370,7 +370,7 @@ end = struct
 
   let fix1' x f =
     let y = local "fix" (Datalog.columns x) in
-    let schedule = Datalog.Schedule.saturate (f y) in
+    let schedule = Datalog.Schedule.fixpoint (f y) in
     Now
       ( Map (Run schedule, fun db () -> Datalog.get_table y db),
         fun db -> Datalog.set_table y (Datalog.get_table x db) db )
