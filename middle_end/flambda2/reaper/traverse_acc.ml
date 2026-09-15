@@ -783,6 +783,22 @@ let deps t = t.deps
 
 let delayed_deps t = t.delayed_deps
 
+let imported_symbols (delayed_deps : Delayed_deps.t) =
+  delayed_deps.imported_symbols
+
+let code_ids_of_delayed_deps
+    Delayed_deps.{ apply_deps; set_of_closures_deps; imported_symbols = _ } =
+  let code_ids =
+    List.fold_left
+      (fun code_ids Delayed_deps.{ apply_code_id; _ } ->
+        Code_id.Set.add apply_code_id code_ids)
+      Code_id.Set.empty apply_deps
+  in
+  List.fold_left
+    (fun code_ids Delayed_deps.{ closure_code_id; _ } ->
+      Code_id.Set.add closure_code_id code_ids)
+    code_ids set_of_closures_deps
+
 let simple_to_node t ~denv s =
   simple_to_node t ~all_constants:(Env.all_constants denv) s
 

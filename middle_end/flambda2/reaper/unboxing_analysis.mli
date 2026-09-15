@@ -114,6 +114,9 @@ val find_code_metadata :
 
 val pp_result : Format.formatter -> result -> unit
 
+(** The code changes of the given code ids, for those which have some. *)
+val restrict_code_changes : Code_changes.t -> Code_id.Set.t -> Code_changes.t
+
 val perform_analysis :
   ?stats:Datalog.Schedule.stats ->
   Datalog.database ->
