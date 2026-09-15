@@ -202,6 +202,10 @@ let () =
 
 (* functional updates where we do change the block's record repr *)
 
+(*
+
+   XXX jkerrigan: uncomment after rebasing on top of PR #7155
+
 (* boxed -> variable (mixed) *)
 let () =
   let u = { x = 42; y = 7 } in
@@ -222,6 +226,7 @@ let () =
   assert (v.y = 7)
 [%%expect{|
 |}]
+*)
 
 type ('a : any) inlined = I of { mutable payload : 'a; tag : int }
 [%%expect{|
