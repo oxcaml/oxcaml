@@ -1359,6 +1359,7 @@ val equal_constructor_representation_up_to_scannable_axes :
 (** Whether the constructor is represented as a constant rather than a block:
     it is nullary, or its shape is [Constructor_immediate_all_void]. *)
 val cstr_layout_is_constant : cstr_layout -> bool
+val mixed_block_element_is_scannable : mixed_block_element -> bool
 
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element

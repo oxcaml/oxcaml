@@ -43,7 +43,7 @@ module Simple : sig
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -97,7 +97,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation

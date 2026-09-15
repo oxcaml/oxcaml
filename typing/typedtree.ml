@@ -241,7 +241,8 @@ and 'k pattern_desc =
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
   | Tpat_unboxed_bool : bool -> value pattern_desc
-  | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
+  | Tpat_tuple : (string option * value general_pattern * Jkind.sort) list ->
+      value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
@@ -336,7 +337,7 @@ and expression_desc =
   | Texp_try of expression * value case list * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_tuple of (string option * expression) list * alloc_mode_r
+  | Texp_tuple of (string option * expression * Jkind.sort) list * alloc_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
       Longident.t loc * constructor_description * constructor_representation *
@@ -1197,7 +1198,7 @@ let shallow_iter_pattern_desc
   = fun f -> function
   | Tpat_alias { pattern = p; _ } -> f.f p
   | Tpat_fun_layout _ -> ()
-  | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
+  | Tpat_tuple patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, _, patl, _) -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
@@ -1226,7 +1227,8 @@ let shallow_map_pattern_desc
       Tpat_alias { pattern = f.f p1; id; name = s; uid; sort; mode = m;
                    type_expr = ty }
   | Tpat_tuple pats ->
-      Tpat_tuple (List.map (fun (label, pat) -> label, f.f pat) pats)
+      Tpat_tuple
+        (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
@@ -1358,8 +1360,7 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
           List.iter (fun (_, _, pat) -> loop f pat)
             lbl_pat_list
       | Tpat_variant (_, pat, _) -> Option.iter (loop f) pat
-      | Tpat_tuple patl ->
-        List.iter (fun (_, pat) -> loop f pat) patl
+      | Tpat_tuple patl
       | Tpat_unboxed_tuple patl ->
         List.iter (fun (_, pat, _) -> loop f pat) patl
       | Tpat_array (_, _, patl) ->

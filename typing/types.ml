@@ -1053,6 +1053,14 @@ let cstr_layout_is_constant (layout : cstr_layout) =
     Array.length sorts = 0
   | Cstr_layout_undetermined -> false
 
+let rec mixed_block_element_is_scannable (elt : mixed_block_element) =
+  match elt with
+  | Scannable _ -> true
+  | Addressable elt -> mixed_block_element_is_scannable elt
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Product _
+  | Void -> false
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
