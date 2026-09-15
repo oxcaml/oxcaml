@@ -128,9 +128,6 @@ module Layout : sig
   (** Updates the nullability on the layout's scannable axis. *)
   val set_root_nullability : Sort.t t -> Jkind_axis.Nullability.t -> Sort.t t
 
-  (** Updates the separability on the layout's scannable axis. *)
-  val set_root_separability : Sort.t t -> Jkind_axis.Separability.t -> Sort.t t
-
   module Debug_printers : sig
     val t :
       (Format.formatter -> 'sort -> unit) -> Format.formatter -> 'sort t -> unit
@@ -337,8 +334,6 @@ module Builtin : sig
 
   (** Value of types of this jkind are not retained at all at runtime *)
   val void : why:History.void_creation_reason -> ('l * disallowed) Types.jkind
-
-  val scannable : why:History.scannable_creation_reason -> 'd Types.jkind
 
   val value_or_null :
     why:History.value_or_null_creation_reason -> 'd Types.jkind
