@@ -795,6 +795,8 @@ let rec choice ctx t =
       }
 
   and choice_makeblock ctx ~tail:_ (tag, flag, shape, mode) blockargs loc =
+    (* Sibling fields may have any layout, but the destination must be a value
+       field so that the placeholder and initialization store are valid. *)
     let choices = List.mapi (fun index arg ->
         match shape with
         | All_value -> choice ctx ~tail:false arg
@@ -893,8 +895,7 @@ let rec choice ctx t =
   and choice_prim ctx ~tail prim primargs loc =
     match prim with
     (* The important case is the construction case *)
-    | Pmakeblock (tag, flag, shape, mode)
-      when Lambda.is_uniform_block_shape shape ->
+    | Pmakeblock (tag, flag, shape, mode) ->
         choice_makeblock ctx ~tail (tag, flag, shape, mode) primargs loc
 
     (* Some primitives have arguments in tail-position *)
@@ -968,12 +969,9 @@ let rec choice ctx t =
     (* we don't handle { foo with x = ...; y = recursive-call } *)
     | Pduprecord _
 
-    (* we don't handle all-float records or mixed-blocks. If we
-       did, we'd need to remove references to Lambda.layout_tmc_field
-    *)
+    (* All-float records have no value field to use as a destination. *)
     | Pmakefloatblock _
     | Pmakeufloatblock _
-    | Pmakeblock _
 
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _

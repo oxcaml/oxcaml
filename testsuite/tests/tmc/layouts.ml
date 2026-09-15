@@ -113,3 +113,54 @@ let () =
       length (n + 1) xs
   in
   assert (length 0 (copy xs) = 100_000)
+
+external box_float : float# -> float = "%box_float"
+external box_int64 : int64_u -> int64 = "%box_int64"
+
+let () =
+  assert (map box_float (map (fun x -> x) [#1.5; #2.5]) = [1.5; 2.5]);
+  assert (map box_int64 (map (fun x -> x) [#11L; #22L]) = [11L; 22L]);
+  assert (map box_float
+            (Filter.filter_opt [None; Some #1.5; None; Some #2.5])
+          = [1.5; 2.5]);
+  assert (map (fun #(f, #(), n, s) -> box_float f, box_int64 n, s)
+            (map (fun x -> x)
+               [#(#1.5, #(), #11L, "one"); #(#2.5, #(), #22L, "two")])
+          = [1.5, 11L, "one"; 2.5, 22L, "two"])
+
+type mixed_tree =
+  | End
+  | Link of #(float# * int * int) * mixed_tree * #(int * int64_u)
+
+let[@tail_mod_cons] rec mixed_tree n =
+  if n = 0 then End
+  else Link (#(#1.5, n, n + 1), (mixed_tree [@tailcall]) (n - 1),
+             #(n + 2, #22L))
+
+let () =
+  let rec check n = function
+    | End -> assert (n = 0)
+    | Link (#(f, a, b), t, #(c, d)) ->
+      assert (box_float f = 1.5 && a = n && b = n + 1);
+      assert (c = n + 2 && box_int64 d = 22L);
+      check (n - 1) t
+  in
+  check 100 (mixed_tree 100)
+
+let[@tail_mod_cons] rec repeat_float n (x : float#) =
+  if n = 0 then [] else x :: (repeat_float [@tailcall]) (n - 1) x
+
+let () =
+  let calls = ref 0 in
+  let xs = map (fun x ->
+      incr calls;
+      if !calls mod 1000 = 0 then Gc.minor ();
+      #(x, string_of_int !calls)) (repeat_float 100_000 #1.5) in
+  Gc.full_major ();
+  let rec check n = function
+    | [] -> assert (n = 100_001)
+    | #(f, s) :: xs ->
+      assert (box_float f = 1.5 && s = string_of_int n);
+      check (n + 1) xs
+  in
+  check 1 xs
