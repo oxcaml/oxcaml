@@ -461,11 +461,12 @@ let emit_Llabel fallthrough lbl section_name ~is_loop_header =
          D.cfi_startproc ())
      | None -> ());
   (* Aligning loop headers to 16 bytes makes it less likely that a small loop
-     body straddles a 64-byte cache line boundary, which can cost a factor of 2
-     in throughput on some microarchitectures. 16 bytes matches what GCC and
-     Clang emit for -falign-loops. Padding before a fallthrough loop header is
-     executed (as nops) only once per loop entry. *)
-  if is_loop_header && !fastcode_flag
+     body straddles a 64-byte cache line boundary. AMD Zen 4 can only fetch from
+     a single 64-byte cache line per cycle, so a short loop crossing a cache
+     line boundary has a 1-cycle frontend penalty on every iteration. 16 bytes
+     matches what GCC and Clang emit for -falign-loops. Padding before a
+     fallthrough loop header is executed (as nops) only once per loop entry. *)
+  if is_loop_header && !Oxcaml_flags.align_loops && !fastcode_flag
   then D.align ~fill:Nop ~bytes:16
   else if (not fallthrough) && !fastcode_flag
   then D.align ~fill:Nop ~bytes:4;

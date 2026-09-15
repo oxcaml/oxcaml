@@ -110,7 +110,8 @@ let basic_block : Cfg.basic_block -> int =
       exn = _;
       can_raise = _;
       is_trap_handler = _;
-      cold = _
+      cold = _;
+      is_loop_header = _
     } ->
     let body_hash = basic_instruction_list body in
     let term_hash = terminator terminator_desc in

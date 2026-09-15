@@ -350,6 +350,22 @@ let reorder_blocks_random ppf_dump cl =
     pass_dump_cfg_if ppf_dump Oxcaml_flags.dump_cfg
       "After reorder_blocks_random" cl
 
+(* Records on each block whether it is the header of a natural loop, i.e. the
+   destination of a back edge, so that the emitter can align it. This must run
+   after the last pass that changes the structure of the CFG (in particular
+   [Simplify_terminator] can move a loop header, by turning a while loop into a
+   do-while loop). The CFG may be irreducible at that point, so
+   [Cfg_loop_infos.build] cannot be used, but dominators and hence back edges
+   are still well defined. *)
+let mark_loop_headers (cfg_with_layout : Cfg_with_layout.t) =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
+  let doms = Cfg_dominators.build cfg in
+  Cfg_edge.Set.iter
+    (fun { Cfg_edge.src = _; dst } ->
+      (Cfg.get_block_exn cfg dst).is_loop_header <- true)
+    (Cfg_loop_infos.compute_back_edges cfg doms);
+  cfg_with_layout
+
 let register_allocator_gi cfg_with_infos =
   cfg_with_infos_profile ~accumulate:true "cfg_gi" Regalloc_gi.run
     cfg_with_infos
@@ -470,6 +486,8 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
     (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
     cfg_with_layout_profile ~accumulate:true "cfg_simplify"
       Regalloc_utils.simplify_cfg cfg_with_layout)
+  ++ cfg_with_layout_profile ~accumulate:true "cfg_mark_loop_headers"
+       mark_loop_headers
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)

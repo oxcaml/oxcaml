@@ -43,7 +43,8 @@ type basic_block =
     mutable exn : Label.t option;
     mutable can_raise : bool;
     mutable is_trap_handler : bool;
-    mutable cold : bool
+    mutable cold : bool;
+    mutable is_loop_header : bool
   }
 
 type codegen_option =
@@ -446,7 +447,8 @@ let make_empty_block ?label terminator : basic_block =
     exn = None;
     can_raise = false;
     is_trap_handler = false;
-    cold = false
+    cold = false;
+    is_loop_header = false
   }
 
 let is_poll (instr : basic instruction) =

@@ -48,7 +48,8 @@ and instruction_desc =
       { label : label;
         section_name : string option;
         is_loop_header : bool
-            (* target of a backward branch in the linearized order *)
+            (* the block starting at this label is a natural loop header, see
+               [Cfg.basic_block.is_loop_header] *)
       }
   | Lbranch of label
   | Lcondbranch of Operation.test * label

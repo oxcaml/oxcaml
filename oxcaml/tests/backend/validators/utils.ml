@@ -74,7 +74,8 @@ module Block = struct
       exn;
       can_raise;
       is_trap_handler = false;
-      cold = false
+      cold = false;
+      is_loop_header = false
     }
 end
 

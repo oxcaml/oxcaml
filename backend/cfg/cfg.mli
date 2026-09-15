@@ -53,7 +53,7 @@ type basic_block =
     mutable is_trap_handler : bool;
         (** Is this block a trap handler (i.e. is it an exn successor of another
             block) or not? *)
-    mutable cold : bool
+    mutable cold : bool;
         (* CR-someday gyorsh: The current implementation allows multiple
            pushtraps in each block means that different trap stacks are
            associated with the block at different points. At most one
@@ -62,6 +62,12 @@ type basic_block =
            unique trap stack associated with it. [exns] will not be needed, as
            the exn-successor will be uniquely determined by can_raise + top of
            trap stack. *)
+    mutable is_loop_header : bool
+        (** Is this block the header of a natural loop, i.e. the destination of
+            a back edge (an edge whose destination dominates its source)?
+            [false] until it is computed at the end of the CFG pipeline, after
+            the last pass that changes the structure of the CFG (see
+            [Asmgen.mark_loop_headers]). Only used as a code layout hint. *)
   }
 
 (* Subset of Cmm.codegen_option. *)

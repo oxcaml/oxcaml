@@ -259,13 +259,14 @@ let block :
     Cfg_liveness.domain InstructionId.Tbl.t option ->
     unit =
  fun fmt block liveness ->
-  Format.fprintf fmt "block %t%a%t%s%s -"
+  Format.fprintf fmt "block %t%a%t%s%s%s -"
     (if block.is_trap_handler
      then Cfg_colours.block_label_exn
      else Cfg_colours.block_label)
     Label.format block.start Cfg_colours.pop
     (match block.is_trap_handler with false -> "" | true -> " [handler]")
-    (match block.cold with false -> "" | true -> " [cold]");
+    (match block.cold with false -> "" | true -> " [cold]")
+    (match block.is_loop_header with false -> "" | true -> " [loop header]");
   Format.fprintf fmt " %tpredecessors: %a%t" Cfg_colours.pred_succ label_set
     block.predecessors Cfg_colours.pop;
   Format.fprintf fmt " %tnormal successors: %a%t" Cfg_colours.pred_succ

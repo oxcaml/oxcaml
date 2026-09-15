@@ -12,7 +12,7 @@
 *)
 
 (* Check that -align-loops emits a 16-byte alignment directive before
-   labels that are targets of backward branches (see align_loops.run). *)
+   loop header labels (see align_loops.run). *)
 
 let[@inline never] sum_to n =
   let total = ref 0 in
@@ -21,4 +21,10 @@ let[@inline never] sum_to n =
   done;
   !total
 
-let () = assert (sum_to 10 = 55)
+(* A self tail call is compiled to a loop. *)
+let[@inline never] rec count_down acc n =
+  if n = 0 then acc else count_down (acc + n) (n - 1)
+
+let () =
+  assert (sum_to 10 = 55);
+  assert (count_down 0 10 = 55)

@@ -467,7 +467,8 @@ let insert_block :
           exn = None;
           can_raise = false;
           is_trap_handler = false;
-          cold = predecessor_block.cold
+          cold = predecessor_block.cold;
+          is_loop_header = false
         }
       in
       add_block cfg_with_layout block ~after:predecessor_block.start;

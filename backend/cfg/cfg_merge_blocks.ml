@@ -72,7 +72,8 @@ end = struct
           exn = left_exn;
           can_raise = _;
           is_trap_handler = left_is_trap_handler;
-          cold = _
+          cold = _;
+          is_loop_header = _
         },
         { start = _;
           body = right_body;
@@ -82,7 +83,8 @@ end = struct
           exn = right_exn;
           can_raise = _;
           is_trap_handler = right_is_trap_handler;
-          cold = _
+          cold = _;
+          is_loop_header = _
         } ) ->
       Int.equal left_stack_offset right_stack_offset
       && Bool.equal left_is_trap_handler right_is_trap_handler
