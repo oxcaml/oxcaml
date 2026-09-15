@@ -1,0 +1,32 @@
+let code used_half_code deleted in
+let code loopify(never) size(1) newer_version_of(used_half_code)
+      used_half_code_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * ke
+        : val =
+  cont k (x)
+in
+let code unused_half_code deleted in
+let code loopify(never) size(1) newer_version_of(unused_half_code)
+      unused_half_code_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * ke
+        : val =
+  cont k (x)
+in
+let code used_code deleted in
+let code loopify(never) size(1) newer_version_of(used_code)
+      used_code_1 (x : val)
+        my_closure &my_alloc_region my_depth
+        -> k * ke
+        : val =
+  cont k (x)
+in
+let $used_half =
+  closure used_half_code_1 @used_half_slot &toplevel
+and $unused_half =
+  closure unused_half_code_1 @unused_half_slot &toplevel
+in
+let $used_closure = closure used_code_1 @used_slot &toplevel in
+let $camlUnused_closures_in_group = Block 0 ($used_closure, $used_half) in
+cont done ($camlUnused_closures_in_group)

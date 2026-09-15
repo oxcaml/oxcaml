@@ -21,5 +21,6 @@ val unit :
   all_code:Exported_code.t ->
   reachable_names:Name_occurrences.t ->
   localise_unreachable_symbols:bool ->
+  define_module_symbol_if_missing:bool ->
   Flambda_unit.t ->
   Cmm.phrase list

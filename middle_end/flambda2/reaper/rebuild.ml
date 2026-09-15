@@ -1924,23 +1924,29 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
           else None)
       (List.combine (Bound_static.to_list bound_static) group)
   in
-  let bound_static, _group = List.split bound_and_group in
-  let res, group_members =
-    List.fold_left_map
-      (fun res pat_and_rev ->
-        let static_const_or_code, res =
-          rebuild_static_const_or_code env res pat_and_rev
-        in
-        res, static_const_or_code)
-      res bound_and_group
-  in
-  let group = Static_const_group.create group_members in
-  ( RE.create_let
-      (Bound_pattern.static (Bound_static.create bound_static))
-      (Named.create_static_consts group)
-      ~size_of_defining_expr:(Code_size.static_consts ())
-      ~body:hole,
-    res )
+  match bound_and_group with
+  | [] ->
+    (* Every member of the group has been deleted; don't leave behind a "let
+       symbol" binding nothing at all. *)
+    hole, res
+  | _ :: _ ->
+    let bound_static, _group = List.split bound_and_group in
+    let res, group_members =
+      List.fold_left_map
+        (fun res pat_and_rev ->
+          let static_const_or_code, res =
+            rebuild_static_const_or_code env res pat_and_rev
+          in
+          res, static_const_or_code)
+        res bound_and_group
+    in
+    let group = Static_const_group.create group_members in
+    ( RE.create_let
+        (Bound_pattern.static (Bound_static.create bound_static))
+        (Named.create_static_consts group)
+        ~size_of_defining_expr:(Code_size.static_consts ())
+        ~body:hole,
+      res )
 
 and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result

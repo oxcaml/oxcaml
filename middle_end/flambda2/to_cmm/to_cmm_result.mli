@@ -33,11 +33,20 @@ type t
     only sound if no other object file can reference them by name; the Reaper's
     staged rebuilds (see [Flambda2.reaped_flambda2_to_cmm]) must not set it,
     because other units' rebuilds contain code frozen before this unit's
-    reachable names shrank. *)
+    reachable names shrank.
+
+    [define_module_symbol_if_missing] says what to do if the translated term
+    does not define the module symbol. This normally means that the module
+    initialiser cannot return, in which case the symbol must still be defined,
+    since other units may refer to it. After the Reaper has run over a closed
+    world, however, the module block may instead have been deleted because
+    nothing in the program refers to it; there is then no reason to define the
+    symbol, and [false] should be passed. *)
 val create :
   module_symbol:Symbol.t ->
   reachable_names:Name_occurrences.t ->
   localise_unreachable_symbols:bool ->
+  define_module_symbol_if_missing:bool ->
   t
 
 (** Translate an existing [Symbol.t] to a Cmm symbol. *)
