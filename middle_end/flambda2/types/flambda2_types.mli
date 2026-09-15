@@ -154,7 +154,7 @@ module Typing_env : sig
 
     val ids_for_export : t -> Ids_for_export.t
 
-    val apply_renaming : t -> Renaming.t -> t
+    val import_names : t -> Renaming.import_map -> t
 
     val merge : t -> t -> t
 
