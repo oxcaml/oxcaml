@@ -35,11 +35,10 @@ type layout = Label.t DLL.t
 
 type t =
   { cfg : Cfg.t;
-    mutable layout : layout;
-    sections : (Label.t, string) Hashtbl.t
+    mutable layout : layout
   }
 
-let create cfg ~layout = { cfg; layout; sections = Hashtbl.create 3 }
+let create cfg ~layout = { cfg; layout }
 
 let cfg t = t.cfg
 
@@ -67,19 +66,6 @@ let set_layout t layout =
           layout, or first label is not entry");
   t.layout <- layout
 
-let assign_blocks_to_section t labels name =
-  List.iter
-    (fun label ->
-      match Hashtbl.find_opt t.sections label with
-      | Some new_name ->
-        Misc.fatal_errorf
-          "Cannot add %a->%s section mapping, already have %a->%s" Label.format
-          label name Label.format label new_name
-      | None -> Hashtbl.replace t.sections label name)
-    labels
-
-let get_section t label = Hashtbl.find_opt t.sections label
-
 exception Found_all
 
 let remove_blocks t labels_to_remove =
@@ -104,25 +90,16 @@ let remove_blocks t labels_to_remove =
       Misc.fatal_errorf
         "Cfg_with_layout.remove_blocks: %d block(s) to remove were not found \
          in the layout"
-        (num_to_remove - !num_removed);
-    (* remove from the section table, which is also keyed by label *)
-    Label.Set.iter
-      (fun label -> Hashtbl.remove t.sections label)
-      labels_to_remove)
+        (num_to_remove - !num_removed))
 
 let add_block t (block : Cfg.basic_block) ~after =
   match
     DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
   with
   | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell -> (
+  | Some cell ->
     DLL.insert_after cell block.start;
-    Cfg.add_block_exn t.cfg block;
-    (* The new block inherits the section of the [after] block, so that the
-       section table remains total on blocks when sections are in use. *)
-    match Hashtbl.find_opt t.sections after with
-    | None -> ()
-    | Some section_name -> Hashtbl.replace t.sections block.start section_name)
+    Cfg.add_block_exn t.cfg block
 
 let is_trap_handler t label =
   let block = Cfg.get_block_exn t.cfg label in
