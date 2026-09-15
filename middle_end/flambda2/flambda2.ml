@@ -399,10 +399,11 @@ let reset_symbol_tables () =
   Flambda2_identifiers.Int_ids.reset ()
 
 let flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
+    ~define_module_symbol_if_missing
     ({ flambda; all_code; offsets; reachable_names } : flambda_result) =
   let cmm =
     Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
-      ~localise_unreachable_symbols
+      ~localise_unreachable_symbols ~define_module_symbol_if_missing
   in
   if not keep_symbol_tables then reset_symbol_tables ();
   cmm
@@ -421,6 +422,7 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     in
     lambda_to_flambda ~ppf_dump ~prefixname ~machine_width program
     |> flambda_result_to_cmm ~keep_symbol_tables ~localise_unreachable_symbols
+         ~define_module_symbol_if_missing:true
   in
   Profile.record_call "flambda2" run
 
@@ -611,8 +613,17 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
         Flambda2_nominal.Name_mode.normal
     in
     Compiler_hooks.execute Reaped_flambda2 flambda;
+    let define_module_symbol_if_missing =
+      (* If the Reaper deleted the module block, then nothing in the program
+         refers to it -- the solve saw the whole closed world -- so the symbol
+         must not be defined at all. If the module block is used but was never
+         defined by the term, the symbol is still needed by other units. *)
+      Flambda2_reaper.Rebuild_solution.has_use solution
+        (Flambda2_identifiers.Code_id_or_name.symbol
+           (Flambda_unit.module_symbol flambda))
+    in
     (* CR mvellacott: in the future we'd like to always localise unreachable
        symbols, but it can cause issues with LTO if not properly handled. *)
     flambda_result_to_cmm ~keep_symbol_tables
-      ~localise_unreachable_symbols:false
+      ~localise_unreachable_symbols:false ~define_module_symbol_if_missing
       { flambda; all_code; offsets; reachable_names }

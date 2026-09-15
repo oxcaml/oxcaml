@@ -27,10 +27,12 @@ type t =
        [Symbol.t], e.g. module entry point names. *)
     module_symbol : Symbol.t;
     module_symbol_defined : bool;
+    define_module_symbol_if_missing : bool;
     invalid_message_symbols : Symbol.t String.Map.t
   }
 
-let create ~module_symbol ~reachable_names ~localise_unreachable_symbols =
+let create ~module_symbol ~reachable_names ~localise_unreachable_symbols
+    ~define_module_symbol_if_missing =
   { gc_roots = [];
     data_list = [];
     functions = [];
@@ -40,6 +42,7 @@ let create ~module_symbol ~reachable_names ~localise_unreachable_symbols =
     symbols = String.Map.empty;
     module_symbol;
     module_symbol_defined = false;
+    define_module_symbol_if_missing;
     invalid_message_symbols = String.Map.empty
   }
 
@@ -156,8 +159,9 @@ type result =
     functions : Cmm.phrase list
   }
 
+(* See the comment on [create] in the .mli. *)
 let define_module_symbol_if_missing r =
-  if r.module_symbol_defined
+  if r.module_symbol_defined || not r.define_module_symbol_if_missing
   then r
   else
     let linkage_name =
