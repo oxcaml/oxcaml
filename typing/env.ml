@@ -3847,7 +3847,7 @@ let walk_locks_with_mode_constraint ~env pp ~mode =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
   ignore (walk_locks ~errors:true ~env ~pp
-      (Mode.Value.disallow_right mode) None locks)
+      (Mode.With_regionality.disallow_right mode) None locks)
 
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
@@ -3865,8 +3865,8 @@ let walk_locks_for_zero_alloc_return ~env ~loc mode =
   let pp : Mode.Hint.pinpoint = (loc, Zero_alloc_func_appl) in
   walk_locks_with_mode_constraint ~env pp
     ~mode:
-      (Mode.Value.min_with_comonadic Allocation
-         (Mode.Value.proj_comonadic Allocation mode))
+      (Mode.With_regionality.min_with_comonadic Allocation
+         (Mode.With_regionality.proj_comonadic Allocation mode))
 
 (** Registers a use of an allocation at the given pinpoint.
 
