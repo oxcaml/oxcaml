@@ -129,7 +129,7 @@ let mark_successors_rule =
   compile ["X"; "Y"] (fun [x; y] ->
       where [edge [x; y]; marked [x]] (deduce (marked [y])))
 
-let schedule = Schedule.saturate [mark_successors_rule]
+let schedule = Schedule.fixpoint [mark_successors_rule]
 
 let db = Schedule.run schedule db
 
