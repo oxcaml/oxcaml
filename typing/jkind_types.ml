@@ -475,6 +475,14 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
+  let rec get_level = function
+    | Var { contents = Some t } -> get_level t
+    | Var { contents = None; level } -> level
+    | Base _ | Univar _ -> generic_level
+    | Product ts ->
+      List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
+    | Addressable t -> get_level t
+
   let[@inline] set_var_level (v : var) (level : int) =
     if level < v.level
     then (
