@@ -159,6 +159,8 @@ let () =
 [%%expect{|
 |}]
 
+(* functional updates where we don't change the block's record repr *)
+
 let () =
   let poly_ mk x = { x; y = 1 } in
   let poly_ mk' x = Sys.opaque_identity { x; y = 1 } in
@@ -196,6 +198,29 @@ let () =
   assert (tag = 8);
   let #(#(), tag) = unpack (update_y (mk' #()) 8) in
   assert (tag = 8)
+[%%expect{|
+|}]
+
+(* functional updates where we do change the block's record repr *)
+
+(* boxed -> variable (mixed) *)
+let () =
+  let u = { x = 42; y = 7 } in
+  let poly_ update r x = { r with x } in
+  (* this functional update changes the record's representation *)
+  let v = update u #41.9 in
+  (* if we fail to account for the change in representation, this reads the wrong field *)
+  assert (v.y = 7)
+[%%expect{|
+|}]
+
+(* mixed -> variable (mixed) *)
+let () =
+  let u = { x = #41.9; y = 7 } in
+  let poly_ update r x = { r with x } in
+  (* even though [v] contains only values, it still uses a mixed representation *)
+  let v = update u 42 in
+  assert (v.y = 7)
 [%%expect{|
 |}]
 
