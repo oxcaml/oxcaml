@@ -292,10 +292,71 @@ let
     hash = "sha256-aJO/FWu6pCVOxewupf5TkDDyOVvFzYPMuP45MM/4nLA=";
   });
 
-  mkExternalLibraries =
+  cmdlinerSrc = unpackSourceArchive "cmdliner-2.1.1-source" (pkgs.fetchurl {
+    url = "https://erratique.ch/software/cmdliner/releases/cmdliner-2.1.1.tbz";
+    hash = "sha256-Bbk40d709UxHgXjxmCgig0UQQx7ZjyrGfLTZCqEg1rY=";
+  });
+
+  menhirLibrariesSrc = pkgs.runCommand "menhir-${menhirVersion}-libraries-source" { } ''
+    cp -R ${menhirSrc} "$out"
+    chmod -R u+w "$out"
+    # Attach the deprecation to [reductions], not the surrounding signature.
+    substituteInPlace "$out/sdk/cmly_api.ml" \
+      --replace-fail '[@@@ocaml.deprecated "Please use [get_reductions]"]' \
+        '[@@ocaml.deprecated "Please use [get_reductions]"]'
+  '';
+
+  yojsonSrc = pkgs.runCommand "yojson-2.2.2-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/ocaml-community/yojson/releases/download/2.2.2/yojson-2.2.2.tbz";
+      hash = "sha256-mr+tjJp51HI60vZEjmacHmjb/IfMVKG3wGSwyQkSxZU=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    # Keep the release's opam metadata; the prepared source is read-only.
+    substituteInPlace "$out/dune-project" \
+      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+    # Eta-expand to avoid exposing Buffer.add_string's OxCaml modes.
+    substituteInPlace "$out/lib/write.ml" \
+      --replace-fail 'let write_intlit = Buffer.add_string' \
+        'let write_intlit ob s = Buffer.add_string ob s' \
+      --replace-fail 'let write_floatlit = Buffer.add_string' \
+        'let write_floatlit ob s = Buffer.add_string ob s' \
+      --replace-fail 'let write_stringlit = Buffer.add_string' \
+        'let write_stringlit ob s = Buffer.add_string ob s'
+  '';
+
+  outChannelRedirectSrc = pkgs.runCommand "out-channel-redirect-0.2-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/hhugo/out-channel-redirect/releases/download/0.2/out-channel-redirect-0.2.tbz";
+      hash = "sha256-rUJ+jdNv4YNHzEpXSvF3d+BlD1WFNF+rWCzu+xbuIZ4=";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    substituteInPlace "$out/dune-project" \
+      --replace-fail '(generate_opam_files true)' '(generate_opam_files false)'
+  '';
+
+  qcheckSrc = pkgs.runCommand "qcheck-0.25-source" {
+    src = pkgs.fetchurl {
+      url = "https://github.com/c-cube/qcheck/archive/v0.25.tar.gz";
+      hash = "sha512-oLV5HOoJ+Y8fFyIeYom4enocFq4cmvDC5b1qFw8s+HJ9ugdZp/2TLV1hfowkJWLWkYfH507v1SYrxf11oyJpng==";
+    };
+  } ''
+    mkdir "$out"
+    tar --extract --file="$src" --directory="$out" --strip-components=1
+    # Do not constrain the callback to Array.length's polymodal signature.
+    substituteInPlace "$out/src/core/QCheck.ml" \
+      --replace-fail '_opt_map_or ~d:Array.length ~f:array_sum_' \
+        '_opt_map_or ~d:(fun a -> Array.length a) ~f:array_sum_'
+  '';
+
+  mkJsoo =
     oxcaml:
     stdenv.mkDerivation {
-      pname = "oxcaml-external-libs";
+      pname = "oxcaml-jsoo";
       inherit (oxcaml) version meta;
       inherit src;
 
@@ -303,10 +364,16 @@ let
       PPXLIB_SEXPLIB0_SRC = sexplib0Src;
       PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
       SEDLEX_GEN_SRC = genSrc;
+      JSOO_CMDLINER_SRC = cmdlinerSrc;
+      JSOO_MENHIR_SRC = menhirLibrariesSrc;
+      JSOO_YOJSON_SRC = yojsonSrc;
 
       nativeBuildInputs = [
         dune
         oxcaml
+        menhir
+        pkgs.nodejs
+        pkgs.binaryen
       ];
 
       dontConfigure = true;
@@ -318,7 +385,7 @@ let
           REQUIRES_CONFIGURATION= \
           DUNE=${dune}/bin/dune \
           OXCAML_INSTALL=${oxcaml} \
-          external-libs-build
+          jsoo-build
         runHook postBuild
       '';
 
@@ -426,6 +493,11 @@ stdenv.mkDerivation {
   PPXLIB_SEXPLIB0_SRC = sexplib0Src;
   PPXLIB_STDLIB_SHIMS_SRC = stdlibShimsSrc;
   SEDLEX_GEN_SRC = genSrc;
+  JSOO_CMDLINER_SRC = cmdlinerSrc;
+  JSOO_MENHIR_SRC = menhirLibrariesSrc;
+  JSOO_YOJSON_SRC = yojsonSrc;
+  JSOO_OUT_CHANNEL_REDIRECT_SRC = outChannelRedirectSrc;
+  JSOO_QCHECK_SRC = qcheckSrc;
 
   enableParallelBuilding = true;
   separateDebugInfo = false;
@@ -443,6 +515,8 @@ stdenv.mkDerivation {
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
+    pkgs.nodejs
+    pkgs.binaryen
     pkgs.rsync
     pkgs.which
     pkgs.parallel
@@ -529,7 +603,8 @@ stdenv.mkDerivation {
         make install             - Install
         make test                - Run all tests
         make test-one TEST=...   - Run a single test
-        make external-libs-build - Builds vendored external libraries depending on oxcaml
+        make jsoo-build          - Build js_of_ocaml and wasm_of_ocaml
+        make jsoo-test           - Run core JSOO compiler and JS/Wasm regressions
       ${merlinCommands}EOF
     '';
 
@@ -542,7 +617,7 @@ stdenv.mkDerivation {
       ocaml_5_4_0
       ocamlformat
       lldb
-      mkExternalLibraries
+      mkJsoo
       mkMerlinPackages
       ;
   };
