@@ -92,7 +92,7 @@ let remove_blocks t labels_to_remove =
     let num_removed = ref 0 in
     (try
        DLL.iter_cell t.layout ~f:(fun cell ->
-           if !num_removed = num_to_remove then raise Found_all;
+           if !num_removed = num_to_remove then raise_notrace Found_all;
            let l = DLL.value cell in
            if Label.Set.mem l labels_to_remove
            then (

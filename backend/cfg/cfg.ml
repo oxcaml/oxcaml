@@ -686,8 +686,7 @@ let remove_blocks t labels_to_remove =
       if Label.Set.mem l labels_to_remove
       then (
         assert (Label.Set.is_empty b.predecessors);
-        assert (Label.Set.is_empty (successor_labels b ~normal:true ~exn:false));
-        assert (Option.is_none b.exn);
+        assert (Label.Set.is_empty (successor_labels b ~normal:true ~exn:true));
         if b.is_trap_handler
         then removed_trap_handlers := Label.Set.add l !removed_trap_handlers;
         removed_labels := Label.Set.add l !removed_labels;
