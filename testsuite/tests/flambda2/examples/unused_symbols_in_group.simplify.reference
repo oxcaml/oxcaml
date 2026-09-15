@@ -1,0 +1,4 @@
+let a = %opaque (5555555) in
+let $live_root = Block 4 ($live_leaf) and $live_leaf = Block 1 (a) in
+let $camlUnused_symbols_in_group = Block 0 ($live_root) in
+cont done ($camlUnused_symbols_in_group)

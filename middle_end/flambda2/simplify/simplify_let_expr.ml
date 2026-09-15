@@ -16,26 +16,41 @@
 
 open! Simplify_import
 
+(* Delete any lifted constant definition that does not define a symbol (or, for
+   definitions of code, a code ID) which is used.
+
+   Note that definitions are considered individually: an unused symbol is
+   deleted even when it is bound by the same "let symbol" as symbols that are
+   used. The symbols bound by a single definition are however kept or deleted
+   together, since they all come from one static allocation (this matters for
+   sets of closures, which bind one symbol per function slot).
+
+   This can only be done for constants that the flow analysis has seen, which is
+   why it happens here and not when the constants are placed. (Constants created
+   during the upwards traversal, for example the lookup tables built by
+   [Simplify_switch_expr], never appear in [UA.required_names], but they are
+   used by construction.) *)
 let keep_lifted_constant_only_if_used uacc acc lifted_constant =
-  let bound = LC.bound_static lifted_constant in
-  let code_ids_live =
-    match UA.reachable_code_ids uacc with
-    | Unknown -> Bound_static.binds_code bound
-    | Known { live_code_ids = _; ancestors_of_live_code_ids } ->
-      (* CR bclement for gbury: This is likely no longer needed now that the
-         code age relation join has been removed. *)
-      not
-        (Code_id.Set.disjoint
-           (Bound_static.code_being_defined bound)
-           ancestors_of_live_code_ids)
+  let required_names = UA.required_names uacc in
+  let symbol_is_used symbol =
+    Name.Set.mem (Name.symbol symbol) required_names
   in
-  let symbols_live =
-    not
-      (Name.Set.disjoint
-         (Name.set_of_symbol_set (Bound_static.symbols_being_defined bound))
-         (UA.required_names uacc))
+  let definition_is_used definition =
+    match LC.Definition.descr definition with
+    | Code code_id -> (
+      match UA.reachable_code_ids uacc with
+      | Unknown -> true
+      | Known { live_code_ids = _; ancestors_of_live_code_ids } ->
+        (* CR bclement for gbury: This is likely no longer needed now that the
+           code age relation join has been removed. *)
+        Code_id.Set.mem code_id ancestors_of_live_code_ids)
+    | Block_like _ | Set_of_closures _ ->
+      Symbol.Set.exists symbol_is_used
+        (LC.Definition.symbols_being_defined definition)
   in
-  if symbols_live || code_ids_live then LCS.add acc lifted_constant else acc
+  match LC.filter_definitions lifted_constant ~f:definition_is_used with
+  | None -> acc
+  | Some lifted_constant -> LCS.add acc lifted_constant
 
 let rebuild_let simplify_named_result removed_operations ~rewrite_id
     ~lifted_constants_from_defining_expr ~at_unit_toplevel

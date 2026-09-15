@@ -47,6 +47,15 @@ module Definition = struct
         closure_symbols_with_types
     | Block_like { symbol; _ } -> Symbol.equal sym symbol
 
+  let symbols_being_defined t =
+    match t.descr with
+    | Code _ -> Symbol.Set.empty
+    | Set_of_closures { closure_symbols_with_types; _ } ->
+      Function_slot.Lmap.fold
+        (fun _ (symbol, _) symbols -> Symbol.Set.add symbol symbols)
+        closure_symbols_with_types Symbol.Set.empty
+    | Block_like { symbol; _ } -> Symbol.Set.singleton symbol
+
   let free_names t =
     match t.descr with
     | Code _ -> Rebuilt_static_const.free_names t.defining_expr
@@ -215,15 +224,23 @@ let create_code code_id defining_expr =
     symbol_projections = Definition.symbol_projections definition
   }
 
-let create_definition definition =
-  let definitions = [definition] in
+let create_from_definitions definitions =
   { definitions;
     bound_static = compute_bound_static definitions;
     defining_exprs = compute_defining_exprs definitions;
     is_fully_static =
-      Rebuilt_static_const.is_fully_static (Definition.defining_expr definition);
-    symbol_projections = Definition.symbol_projections definition
+      ListLabels.for_all definitions ~f:(fun definition ->
+          Rebuilt_static_const.is_fully_static
+            (Definition.defining_expr definition));
+    symbol_projections =
+      ListLabels.fold_left definitions ~init:Variable.Map.empty
+        ~f:(fun symbol_projections definition ->
+          Variable.Map.disjoint_union ~eq:Symbol_projection.equal
+            (Definition.symbol_projections definition)
+            symbol_projections)
   }
+
+let create_definition definition = create_from_definitions [definition]
 
 let concat ts =
   let definitions =
@@ -274,6 +291,15 @@ let types_of_symbols t =
         types_of_symbols)
 
 let all_defined_symbols t = Symbol.Map.keys (types_of_symbols t)
+
+let filter_definitions t ~f =
+  let definitions = ListLabels.filter t.definitions ~f in
+  match definitions with
+  | [] -> None
+  | _ :: _ ->
+    if List.compare_lengths definitions t.definitions = 0
+    then Some t
+    else Some (create_from_definitions definitions)
 
 let apply_projection t proj =
   let symbol = Symbol_projection.symbol proj in

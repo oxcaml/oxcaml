@@ -1,0 +1,49 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+ check-fexpr-dump;
+*)
+
+(* As [unused_symbols_in_group.fl], but for the other kinds of binding that can
+   occur in a "let symbol" group. *)
+
+let code size(1) used_code (x : val)
+      my_closure &my_alloc_region my_depth
+      -> k * ke
+      : val =
+  cont k (x)
+(* This piece of code is only used by [unused_closure] below, so it must be
+   deleted along with it. *)
+and code size(1) unused_code (x : val)
+      my_closure &my_alloc_region my_depth
+      -> k * ke
+      : val =
+  cont k (x)
+and code size(1) used_half_code (x : val)
+      my_closure &my_alloc_region my_depth
+      -> k * ke
+      : val =
+  cont k (x)
+and code size(1) unused_half_code (x : val)
+      my_closure &my_alloc_region my_depth
+      -> k * ke
+      : val =
+  cont k (x)
+and set_of_closures
+      $used_closure = closure used_code @used_slot &toplevel
+    end
+and set_of_closures
+      $unused_closure = closure unused_code @unused_slot &toplevel
+    end
+(* A set of closures binds one symbol per function slot but is a single static
+   allocation, so its symbols can only be deleted all together.  This set is
+   therefore kept in full, even though [unused_half] is not used. *)
+and set_of_closures
+      $used_half = closure used_half_code @used_half_slot &toplevel
+  and $unused_half = closure unused_half_code @unused_half_slot &toplevel
+    end
+in
+let $camlUnused_closures_in_group = Block 0 ($used_closure, $used_half) in
+cont done ($camlUnused_closures_in_group)

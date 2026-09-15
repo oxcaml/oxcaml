@@ -65,6 +65,12 @@ module Definition : sig
 
   val bound_static : t -> Bound_static.t
 
+  (** All symbols bound by a single definition are defined by a single static
+      allocation (this matters for sets of closures, which bind one symbol per
+      function slot). As such they must all be kept, or all be deleted,
+      together. *)
+  val symbols_being_defined : t -> Symbol.Set.t
+
   val free_names : t -> Name_occurrences.t
 
   val symbol_projections : t -> Symbol_projection.t Variable.Map.t
@@ -106,6 +112,10 @@ val types_of_symbols : t -> (Downwards_env.t * Flambda2_types.t) Symbol.Map.t
 val symbol_projections : t -> Symbol_projection.t Variable.Map.t
 
 val concat : t list -> t
+
+(** [filter_definitions t ~f] removes from [t] any definition for which [f]
+    returns [false]. [None] is returned if no definitions remain. *)
+val filter_definitions : t -> f:(Definition.t -> bool) -> t option
 
 val is_fully_static : t -> bool
 
