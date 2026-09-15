@@ -74,6 +74,27 @@ module Inputs = struct
     in
     { free_names; closure_function_decls; code_info }
 
+  let empty =
+    { free_names = Name_occurrences.empty;
+      closure_function_decls = Code_id_or_name.Map.empty;
+      code_info = Code_id.Map.empty
+    }
+
+  let union t1 t2 =
+    { free_names = Name_occurrences.union t1.free_names t2.free_names;
+      (* Closures are defined by a single compilation unit, so the maps of
+         different units are disjoint. *)
+      closure_function_decls =
+        Code_id_or_name.Map.disjoint_union t1.closure_function_decls
+          t2.closure_function_decls;
+      (* Several units can record info for the same imported code ID; the
+         entries are equal, so keep either. *)
+      code_info =
+        Code_id.Map.union
+          (fun _code_id info _info -> Some info)
+          t1.code_info t2.code_info
+    }
+
   let ids_for_export { free_names; closure_function_decls; code_info } =
     let ids = Name_occurrences.ids_for_export free_names in
     let ids =

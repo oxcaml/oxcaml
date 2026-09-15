@@ -42,3 +42,35 @@ let save () =
     value_slots = Value_slot.export_stamp_counter ();
     symbols = Symbol.export_manufacture_counter ()
   }
+
+let restore_for_resume
+    { variables; code_ids; continuations; function_slots; value_slots; symbols }
+    =
+  Variable.restore_name_stamp_counter variables;
+  Code_id.restore_name_stamp_counter code_ids;
+  Continuation.restore_stamp_counter continuations;
+  Function_slot.restore_stamp_counter function_slots;
+  Value_slot.restore_stamp_counter value_slots;
+  Symbol.restore_manufacture_counter symbols
+
+let restore_for_merge all_counters =
+  let max_counters =
+    List.fold_left
+      (fun acc counters ->
+        { variables = max acc.variables counters.variables;
+          code_ids = max acc.code_ids counters.code_ids;
+          continuations = max acc.continuations counters.continuations;
+          function_slots = max acc.function_slots counters.function_slots;
+          value_slots = max acc.value_slots counters.value_slots;
+          symbols = max acc.symbols counters.symbols
+        })
+      { variables = 0;
+        code_ids = 0;
+        continuations = 0;
+        function_slots = 0;
+        value_slots = 0;
+        symbols = 0
+      }
+      all_counters
+  in
+  restore_for_resume max_counters

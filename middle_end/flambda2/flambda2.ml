@@ -413,3 +413,98 @@ let lambda_to_cmm ~ppf_dump ~prefixname ~machine_width ~keep_symbol_tables
     cmm
   in
   Profile.record_call "flambda2" run
+
+(* Read what the LTO entry points need from the .cmx file of a unit compiled
+   with -support-lto. Creates no identifiers, so it may be called before the
+   stamp counters are restored. *)
+let read_lto_header_and_export_info ~filename
+    (unit_infos : Cmx_format.unit_infos) =
+  let header =
+    Flambda2_reaper.Lto_sections.read_header ~filename
+      ~sections:unit_infos.ui_file_sections unit_infos.ui_lto_info
+  in
+  let export_info =
+    match Compilenv.get_export_info unit_infos with
+    | Some export_info -> export_info
+    | None ->
+      Misc.fatal_errorf "%s has LTO information but no export information"
+        filename
+  in
+  header, export_info
+
+let reaper_lto_solve ~cmx_files ~ltosol_file =
+  (* ID stamp counters are process-global monotonically increasing counters that
+     give us an easy way of creating fresh identifiers. These identifiers get
+     persisted across processes, and we need to prevent collisions when this
+     happens. There are two cases:
+
+     (1) Different processes that operate on different compilation units,
+     potentially in parallel. Collisions are prevented here by the fact that
+     identifiers are scoped to compilation units, as (CU, number) pairs.
+
+     (2) Different processes that operate on the same compilation units, which
+     must always happen in sequence. Collisions are prevented here by saving
+     stamp counters in the earlier processes and restoring them in the later
+     processes.
+
+     Here we're resuming from many processes that operated on different CUs, and
+     we're operating on all of those CUs, so we need to restore stamp counters
+     from all of those processes. However stamp counters are global for the
+     process, not per-CU. To make this work, we take the maximum across all the
+     processes we've resumed from. It is okay that this makes some unused stamps
+     get jumped over, the important thing is that they increase monotonically.
+
+     After we're done, rebuild processes will be created to do more work on the
+     CUs we touched. To keep counters monotonically increasing, we need to save
+     them after our work so that the rebuild processes can restore them. *)
+  let units =
+    List.map
+      (fun filename ->
+        let unit_infos, (_ : Digest.t) = Compilenv.read_unit_info filename in
+        let header, export_info =
+          read_lto_header_and_export_info ~filename unit_infos
+        in
+        filename, unit_infos, header, export_info)
+      cmx_files
+  in
+  Flambda2_reaper.Id_stamp_counters.restore_for_merge
+    (List.map
+       (fun (_, _, header, _) ->
+         Flambda2_reaper.Lto_sections.Header.id_stamp_counters header)
+       units);
+  let solve_data =
+    List.map
+      (fun (filename, (unit_infos : Cmx_format.unit_infos), header, export_info)
+         ->
+        ( unit_infos.ui_unit,
+          Flambda2_reaper.Lto_sections.read_for_solve ~filename
+            ~sections:unit_infos.ui_file_sections
+            ~renaming:(Flambda_cmx_format.import_renaming_of_unit export_info)
+            header ))
+      units
+  in
+  let participants = List.map fst solve_data in
+  let solve_inputs =
+    List.map (fun (_participant, (_, solve_inputs)) -> solve_inputs) solve_data
+  in
+  let participant_units = Compilation_unit.Set.of_list participants in
+  let analysis_scope =
+    Flambda2_reaper.Analysis_scope.Lto_participants participant_units
+  in
+  (* Make the offsets of slots defined by units outside the solve available to
+     [Slot_offsets.finalize_offsets]. The offsets of the participants' own slots
+     are recomputed from the solution, so the stale ones stored in the .cmx
+     files must not be imported. *)
+  List.iter
+    (fun (_participant, (imported_offsets, _)) ->
+      Exported_offsets.import_offsets
+        (Exported_offsets.filter_by_compilation_unit imported_offsets
+           ~keep:(fun cu ->
+             not
+               (Flambda2_reaper.Analysis_scope.contains_unit analysis_scope cu))))
+    solve_data;
+  let solution =
+    Flambda2_reaper.Reaper.Staged.solve ~analysis_scope solve_inputs
+  in
+  Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
+    ~solution

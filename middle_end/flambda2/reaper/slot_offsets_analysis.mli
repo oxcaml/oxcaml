@@ -55,6 +55,12 @@ module Inputs : sig
     get_code_metadata:(Code_id.t -> Code_metadata.t) ->
     t
 
+  val empty : t
+
+  (** Combine the inputs of several compilation units for a whole-program (LTO)
+      computation. *)
+  val union : t -> t -> t
+
   val ids_for_export : t -> Ids_for_export.t
 
   val apply_renaming : t -> Renaming.t -> t

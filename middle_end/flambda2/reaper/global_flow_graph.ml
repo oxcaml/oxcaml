@@ -171,6 +171,27 @@ let create () =
     code_id_my_closure = NN.empty
   }
 
+let union g1 g2 =
+  (* Relations can carry data on each edge, but for these types it is always
+     unit. *)
+  let keep () () = Some () in
+  { alias = NN.union keep g1.alias g2.alias;
+    use = NN.union keep g1.use g2.use;
+    accessor = NFN.union keep g1.accessor g2.accessor;
+    constructor = NFN.union keep g1.constructor g2.constructor;
+    argument = NCN.union keep g1.argument g2.argument;
+    parameter = NCN.union keep g1.parameter g2.parameter;
+    propagate = NNN.union keep g1.propagate g2.propagate;
+    alias_if_any_source =
+      NNN.union keep g1.alias_if_any_source g2.alias_if_any_source;
+    imported_symbol = N.union keep g1.imported_symbol g2.imported_symbol;
+    any_usage = N.union keep g1.any_usage g2.any_usage;
+    any_source = N.union keep g1.any_source g2.any_source;
+    zero_alloc_source = N.union keep g1.zero_alloc_source g2.zero_alloc_source;
+    code_id_my_closure =
+      NN.union keep g1.code_id_my_closure g2.code_id_my_closure
+  }
+
 let add_alias t ~to_ ~from = t.alias <- NN.add_or_replace [to_; from] () t.alias
 
 let add_use_dep t ~to_ ~from = t.use <- NN.add_or_replace [to_; from] () t.use

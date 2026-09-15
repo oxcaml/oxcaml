@@ -40,6 +40,11 @@ val exported_offsets : t -> Exported_offsets.t
 
 val with_exported_offsets : t -> Exported_offsets.t -> t
 
+(** The renaming that imports the unit's export information, for importing the
+    unit's LTO sections, which share its identifier table. Only for units that
+    are not packs. *)
+val import_renaming_of_unit : t -> Renaming.t
+
 (** Create the Flambda data for a pack *)
 val pack : sections:File_sections.Builder.t -> t option list -> raw option
 
@@ -51,3 +56,17 @@ val print :
   Format.formatter ->
   t ->
   unit
+
+(* [create_table_data] and [import_renaming] are exposed for the sections of
+   .ltosol files, which carry their own tables. *)
+
+(** The exported forms of hashconsed identifiers in the marshalled data. *)
+type table_data
+
+val create_table_data : Ids_for_export.t -> table_data
+
+val import_renaming :
+  table_data:table_data ->
+  used_value_slots:Value_slot.Set.t ->
+  original_compilation_unit:Compilation_unit.t ->
+  Renaming.t * Code_id.importer

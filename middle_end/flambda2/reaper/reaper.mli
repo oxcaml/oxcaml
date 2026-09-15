@@ -50,6 +50,9 @@ module Staged : sig
   (** The rewriting decisions and slot offsets computed by the solve. *)
   module Solution : sig
     type t
+
+    (** The answers of the solution in the form the rebuild consumes. *)
+    val rebuild_data : t -> Rebuild_solution.data
   end
 
   (** Traverse the compilation unit. [free_names] are the free names of the
@@ -65,9 +68,11 @@ module Staged : sig
     Flambda_unit.t ->
     Solve_inputs.t * Rebuild_inputs.t
 
-  (** Analyse the dependency graph and compute the rewriting decisions and slot
-      offsets. Mutates the graph by linking the code references. *)
-  val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
+  (** Combine the units' inputs, analyse the resulting dependency graph and
+      compute the rewriting decisions and slot offsets. Mutates the graphs by
+      combining them and linking the code references. *)
+  val solve :
+    analysis_scope:Analysis_scope.t -> Solve_inputs.t list -> Solution.t
 
   (** Rebuild the traversed unit according to the solution. Returns the rebuilt
       unit, its code, its typing environment and its free names. *)

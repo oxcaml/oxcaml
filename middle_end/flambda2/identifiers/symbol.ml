@@ -34,3 +34,11 @@ let manufacture cu name =
   create cu (Linkage_name.of_string name)
 
 let export_manufacture_counter () = !manufacture_counter
+
+let restore_manufacture_counter counter =
+  if !manufacture_counter = -1
+  then manufacture_counter := counter
+  else
+    Misc.fatal_errorf
+      "Restoring symbol manufacture counter would overwrite modified value %d"
+      !manufacture_counter

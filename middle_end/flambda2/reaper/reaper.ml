@@ -219,6 +219,10 @@ module Staged = struct
         queries : Rebuild_queries.t;
         slot_offsets : Slot_offsets.result
       }
+
+    let rebuild_data { solved_dep; code_changes; queries; slot_offsets } =
+      Rebuild_solution.create_data ~queries ~unboxing:solved_dep ~code_changes
+        ~slot_offsets:slot_offsets.exported_offsets
   end
 
   let traverse ~free_names ~cmx_loader ~all_code ~top_level_return_escapes unit
@@ -265,18 +269,39 @@ module Staged = struct
     in
     solve_inputs, rebuild_inputs
 
-  let solve ~analysis_scope
-      ({ deps;
-         slot_offsets_inputs;
-         code_deps;
-         code_references;
-         le_monde_exterieur;
-         applications;
-         all_sets_of_closures = _
-       } :
-        Solve_inputs.t) =
-    Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
-      code_references;
+  let solve ~analysis_scope (solve_inputs : Solve_inputs.t list) =
+    let deps =
+      match solve_inputs with
+      | [] -> Global_flow_graph.create ()
+      | first :: rest ->
+        List.fold_left
+          (fun deps (inputs : Solve_inputs.t) ->
+            Global_flow_graph.union deps inputs.deps)
+          first.deps rest
+    in
+    let slot_offsets_inputs =
+      List.fold_left
+        (fun combined (inputs : Solve_inputs.t) ->
+          Slot_offsets_analysis.Inputs.union combined inputs.slot_offsets_inputs)
+        Slot_offsets_analysis.Inputs.empty solve_inputs
+    in
+    let code_deps =
+      List.fold_left
+        (fun code_deps (inputs : Solve_inputs.t) ->
+          Code_id.Map.disjoint_union code_deps inputs.code_deps)
+        Code_id.Map.empty solve_inputs
+    in
+    let applications =
+      List.fold_left
+        (fun applications (inputs : Solve_inputs.t) ->
+          Rebuild_queries.Applications.union applications inputs.applications)
+        Rebuild_queries.Applications.empty solve_inputs
+    in
+    List.iter
+      (fun (inputs : Solve_inputs.t) ->
+        Cross_unit_calls.link deps ~analysis_scope ~code_deps
+          ~le_monde_exterieur:inputs.le_monde_exterieur inputs.code_references)
+      solve_inputs;
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps ~analysis_scope)
@@ -344,7 +369,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~top_level_return_escapes:true unit
   in
   let Staged.Solution.{ solved_dep; code_changes; queries; slot_offsets } =
-    Staged.solve ~analysis_scope:Current_unit solve_inputs
+    Staged.solve ~analysis_scope:Current_unit [solve_inputs]
   in
   let types_rewrite_context =
     Types_rewriter.prepare_rewrite_context solved_dep

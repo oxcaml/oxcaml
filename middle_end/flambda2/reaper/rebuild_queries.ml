@@ -27,6 +27,7 @@
 
 open! Flambda.Import
 module PTA = Points_to_analysis
+module Serialisation = Datalog_helpers.Serialisation
 
 let add_keys map ids =
   Code_id_or_name.Map.fold
@@ -222,3 +223,115 @@ let arguments_used_by_unknown_arity_call t callee args =
         Code_id_or_name.print callee
   in
   apply_groups masks args
+
+let ids_for_export t =
+  let ids = Serialisation.N.add_ids t.has_usage Ids_for_export.empty in
+  let ids = Serialisation.N.add_ids t.has_source ids in
+  let ids = Serialisation.Nf.add_ids t.field_of_constructor_is_used ids in
+  let ids = add_keys t.known_masks ids in
+  let ids = add_keys t.unknown_masks ids in
+  Code_id_or_name.Map.fold
+    (fun callee targets ids ->
+      let ids = Ids_for_export.add_code_id_or_name ids callee in
+      match targets with
+      | Or_unknown.Unknown -> ids
+      | Or_unknown.Known targets ->
+        Code_id.Set.fold
+          (fun code_id ids -> Ids_for_export.add_code_id ids code_id)
+          targets ids)
+    t.directly_called ids
+
+let fields_for_export t =
+  Serialisation.Nf.add_fields t.field_of_constructor_is_used Field.Set.empty
+
+let apply_renaming t renaming ~rename_field =
+  let rename_id = Renaming.apply_code_id_or_name renaming in
+  { has_usage = Serialisation.N.rename t.has_usage ~rename_id;
+    has_source = Serialisation.N.rename t.has_source ~rename_id;
+    field_of_constructor_is_used =
+      Serialisation.Nf.rename t.field_of_constructor_is_used ~rename_id
+        ~rename_field;
+    directly_called =
+      rename_map t.directly_called renaming ~f:(fun targets ->
+          Or_unknown.map targets ~f:(fun targets ->
+              Code_id.Set.fold
+                (fun code_id targets ->
+                  Code_id.Set.add
+                    (Renaming.apply_code_id renaming code_id)
+                    targets)
+                targets Code_id.Set.empty));
+    known_masks = rename_map t.known_masks renaming ~f:(fun mask -> mask);
+    unknown_masks = rename_map t.unknown_masks renaming ~f:(fun masks -> masks)
+  }
+
+let disjoint_union a b =
+  let union a b = Code_id_or_name.Map.disjoint_union a b in
+  { has_usage = union a.has_usage b.has_usage;
+    has_source = union a.has_source b.has_source;
+    field_of_constructor_is_used =
+      union a.field_of_constructor_is_used b.field_of_constructor_is_used;
+    directly_called = union a.directly_called b.directly_called;
+    known_masks = union a.known_masks b.known_masks;
+    unknown_masks = union a.unknown_masks b.unknown_masks
+  }
+
+let partition_by_compilation_unit t =
+  let distribute map add partitions =
+    Code_id_or_name.Map.fold
+      (fun id value partitions ->
+        Compilation_unit.Map.update
+          (Code_id_or_name.compilation_unit id)
+          (fun part ->
+            let part = Option.value part ~default:empty in
+            Some (add id value part))
+          partitions)
+      map partitions
+  in
+  let partitions =
+    distribute t.has_usage
+      (fun id value part ->
+        { part with
+          has_usage = Code_id_or_name.Map.add id value part.has_usage
+        })
+      Compilation_unit.Map.empty
+  in
+  let partitions =
+    distribute t.has_source
+      (fun id value part ->
+        { part with
+          has_source = Code_id_or_name.Map.add id value part.has_source
+        })
+      partitions
+  in
+  let partitions =
+    distribute t.field_of_constructor_is_used
+      (fun id value part ->
+        { part with
+          field_of_constructor_is_used =
+            Code_id_or_name.Map.add id value part.field_of_constructor_is_used
+        })
+      partitions
+  in
+  let partitions =
+    distribute t.directly_called
+      (fun id value part ->
+        { part with
+          directly_called =
+            Code_id_or_name.Map.add id value part.directly_called
+        })
+      partitions
+  in
+  let partitions =
+    distribute t.known_masks
+      (fun id value part ->
+        { part with
+          known_masks = Code_id_or_name.Map.add id value part.known_masks
+        })
+      partitions
+  in
+  distribute t.unknown_masks
+    (fun id value part ->
+      { part with
+        unknown_masks = Code_id_or_name.Map.add id value part.unknown_masks
+      })
+    partitions

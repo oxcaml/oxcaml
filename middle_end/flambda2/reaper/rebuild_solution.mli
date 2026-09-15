@@ -29,8 +29,29 @@ open! Flambda.Import
 
 (** Materialised answers to the queries the rebuild makes of the solved
     analysis, without a Datalog database. *)
+type data
+
+val create_data :
+  queries:Rebuild_queries.t ->
+  unboxing:Unboxing_analysis.result ->
+  code_changes:Unboxing_analysis.code_changes ->
+  slot_offsets:Exported_offsets.t ->
+  data
+
+val empty_data : data
+
+val ids_for_export : data -> Ids_for_export.t
+
+val fields_for_export : data -> Field.Set.t
+
+val apply_renaming :
+  data -> Renaming.t -> rename_field:(Field.t -> Field.t) -> data
+
+val partition_by_compilation_unit : data -> data Compilation_unit.Map.t
+
 type t
 
+(** A solution backed by a single [data]. *)
 val create :
   analysis_scope:Analysis_scope.t ->
   queries:Rebuild_queries.t ->
@@ -38,6 +59,10 @@ val create :
   code_changes:Unboxing_analysis.code_changes ->
   slot_offsets:Exported_offsets.t ->
   t
+
+(** A solution sharded by compilation unit. *)
+val create_sharded :
+  analysis_scope:Analysis_scope.t -> get_unit:(Compilation_unit.t -> data) -> t
 
 val has_use : t -> Code_id_or_name.t -> bool
 
@@ -79,6 +104,6 @@ val get_calling_convention_change :
 
 val is_changing_calling_convention : t -> Code_id.t -> bool
 
-(** Copy exactly the offsets of the slots occurring at normal mode. Missing
-    offsets are fatal errors. *)
+(** Copy exactly the offsets of the slots occurring at normal mode, loading
+    their owning sections. Missing offsets are fatal errors. *)
 val offsets_for_free_names : t -> Name_occurrences.t -> Exported_offsets.t

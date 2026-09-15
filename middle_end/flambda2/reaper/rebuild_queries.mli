@@ -55,6 +55,8 @@ end
 
 type t
 
+val empty : t
+
 val create : Datalog.database -> applications:Applications.t -> t
 
 val has_use : t -> Code_id_or_name.t -> bool
@@ -79,3 +81,15 @@ val arguments_used_by_unknown_arity_call :
   Code_id_or_name.t ->
   'a list list ->
   ('a * Points_to_analysis.keep_or_delete) list list
+
+val ids_for_export : t -> Ids_for_export.t
+
+val fields_for_export : t -> Field.Set.t
+
+val apply_renaming : t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
+
+(** Union answers whose outermost key sets are disjoint in each map. *)
+val disjoint_union : t -> t -> t
+
+(** Partition by the compilation unit of each map's outermost key. *)
+val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
