@@ -108,3 +108,22 @@ child d_worker [expect 100]: 100
 inner child d_child [expect 3]: 3
 inner child d_lex [expect 1]: 1
 inner child d_worker [expect 200]: 200
+
+# Test 18: use_scope beneath existing bindings
+child d_lex before mount [expect 9]: 9
+child d_lex via scope [expect 1]: 1
+own push shadows scope [expect 3]: 3
+own push kept [expect 4]: 4
+child d_worker [expect 100]: 100
+grandchild own push [expect 4]: 4
+grandchild shadow [expect 3]: 3
+grandchild scope [expect 1]: 1
+grandchild d_worker [expect 200]: 200
+child d_child after pop [expect null]: null
+child d_both after pops [expect 2]: 2
+child d_lex after pops [expect 1]: 1
+
+# Test 19: root mount keeps existing bindings
+task keeps binding [expect 1]: 1
+child d_lex via scope [expect 1]: 1
+child d_worker stops at base [expect 222]: 222

@@ -228,10 +228,19 @@ CAMLprim value caml_dynamic_use_scope(value scope)
 
   struct stack_info *stack = Caml_state->current_stack;
   CAMLassert(stack);
-  CAMLassert(Is_null(stack->dynamic));
 
   stack->is_task = true;
-  stack->dynamic = scope;
+
+  if(Is_null(stack->dynamic)) {
+    stack->dynamic = scope;
+  } else {
+    // Existing bindings shadow the newly installed scope.
+    value last = stack->dynamic;
+    while(Is_this(Dynamic_node_next(last))) {
+      last = Dynamic_node_next(last);
+    }
+    caml_modify(&Dynamic_node_next(last), scope);
+  }
 
   caml_dynamic_cache_flush(Caml_state->dynamic_bindings);
 
