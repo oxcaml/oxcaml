@@ -150,12 +150,37 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let empty_numbering =
     { num_next = 0; num_eqs = Equations.empty; num_reg = Reg.Map.empty }
 
+  (* [Reg.Map] orders keys by stamp, then machtype. Physical aliases share a
+     stamp, so remove every view without scanning unrelated virtual
+     registers. *)
+  let remove_reg (r : Reg.t) num_reg =
+    match r.Reg.loc with
+    | Unknown | Stack _ -> Reg.Map.remove r num_reg
+    | Reg _ ->
+      let rec remove_aliases num_reg =
+        match
+          Reg.Map.find_first_opt
+            (fun r' -> Reg.Stamp.compare r'.Reg.stamp r.stamp >= 0)
+            num_reg
+        with
+        | Some (r', _) when Reg.Stamp.equal r'.Reg.stamp r.stamp ->
+          remove_aliases (Reg.Map.remove r' num_reg)
+        | Some _ | None -> num_reg
+      in
+      remove_aliases num_reg
+
+  (* Associate a value number with a register. Keep at most one typed view of
+     each physical register, since a write invalidates its other views. *)
+  let set_known_reg n r v =
+    { n with num_reg = Reg.Map.add r v (remove_reg r n.num_reg) }
+
   (** Generate a fresh value number [v] and associate it to register [r].
       Returns a pair [(n',v)] with the updated value numbering [n']. *)
 
   let fresh_valnum_reg n r =
     let v = n.num_next in
-    { n with num_next = v + 1; num_reg = Reg.Map.add r v n.num_reg }, v
+    let n = set_known_reg n r v in
+    { n with num_next = v + 1 }, v
 
   (* Same, for a set of registers [rs]. *)
 
@@ -230,11 +255,6 @@ module Make (Op : Operation) : S with type op = Op.t = struct
         Some rs
       with Exit -> None)
 
-  (* Associate the given value number to the given result register, without
-     adding new equations. *)
-
-  let set_known_reg n r v = { n with num_reg = Reg.Map.add r v n.num_reg }
-
   (* Associate the given value numbers to the given result registers, without
      adding new equations. *)
 
@@ -246,7 +266,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   let set_move n src dst =
     let n1, v = valnum_reg n src in
-    { n1 with num_reg = Reg.Map.add dst v n1.num_reg }
+    set_known_reg n1 dst v
 
   (* Record the equation [fresh valnums = rhs] and associate the given result
      registers [rs] to [fresh valnums]. *)
@@ -267,7 +287,7 @@ module Make (Op : Operation) : S with type op = Op.t = struct
      receiving unpredictable values at run-time. *)
 
   let set_unknown_regs n rs =
-    { n with num_reg = Array.fold_right ~f:Reg.Map.remove rs ~init:n.num_reg }
+    { n with num_reg = Array.fold_right ~f:remove_reg rs ~init:n.num_reg }
 
   (* Keep only the equations satisfying the given predicate. *)
 
