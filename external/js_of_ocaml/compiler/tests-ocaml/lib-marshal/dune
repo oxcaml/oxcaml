@@ -1,0 +1,14 @@
+(tests
+ (names compressed)
+ (libraries compiler-libs.common)
+ (build_if
+  (and
+   (>= %{ocaml_version} 5.2)
+   (not %{oxcaml_supported})))
+ (modes js wasm))
+
+(tests
+ (names intern_final marshal_bigarray intext intext_par)
+ (build_if
+  (>= %{ocaml_version} 5.0))
+ (modes js wasm))
