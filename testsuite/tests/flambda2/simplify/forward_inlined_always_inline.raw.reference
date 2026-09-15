@@ -1,4 +1,4 @@
-let $camlForward_inlined_always_inline__first_const = Block 0 () in
+let $camlForward_inlined_always_inline__first_const_0 = Block 0 () in
 (let code inline(always) size(1)
        f_0 (x) my_closure &my_alloc_region my_depth -> k1 * k2 =
    let next_depth = rec_info (succ my_depth) in
@@ -38,21 +38,19 @@ let $camlForward_inlined_always_inline__first_const = Block 0 () in
    in
    apply direct(g_1 &my_alloc_region) inlined(never) g (x) -> k1 * k2
  in
- let f = closure f_0 @f &toplevel.alloc_region in
- let g = closure g_1 @g &toplevel.alloc_region with { f = f } in
+ let f = closure f_0 @f &toplevel in
+ let g = closure g_1 @g &toplevel with { f = f } in
  let call_g_with_default_inlined =
    closure call_g_with_default_inlined_2 @call_g_with_default_inlined
-     &toplevel.alloc_region
+     &toplevel
  with { g = g }
  in
  let call_g_with_always_inlined =
-   closure call_g_with_always_inlined_3 @call_g_with_always_inlined
-     &toplevel.alloc_region
+   closure call_g_with_always_inlined_3 @call_g_with_always_inlined &toplevel
  with { g_1 = g }
  in
  let call_g_with_never_inlined =
-   closure call_g_with_never_inlined_4 @call_g_with_never_inlined
-     &toplevel.alloc_region
+   closure call_g_with_never_inlined_4 @call_g_with_never_inlined &toplevel
  with { g_2 = g }
  in
  let Pmakeblock =
