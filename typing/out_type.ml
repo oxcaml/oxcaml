@@ -2536,9 +2536,11 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   (* While we need to handle the non-constant case here, we prefer the
      fallthrough to [Jkind.Const.to_out_jkind_const] otherwise, which puts the
      mod- and with-bounds outside the layout *)
-  | Layout (Box (lay, sa)) when Option.is_none (Jkind.Desc.get_const desc) ->
+  | Layout (Box (lay, applied))
+    when Option.is_none (Jkind.Desc.get_const desc) ->
     Ojkind_box (out_jkind_of_desc env { desc with base = Layout lay },
-                Jkind.Scannable_axes.to_string_list sa)
+                Jkind.Scannable_axes.to_string_list
+                  (Jkind_types.Applied_scannable_axes.upper_bound applied))
   | _ -> match Jkind.Desc.get_const desc with
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)

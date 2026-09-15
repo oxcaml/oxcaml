@@ -125,6 +125,12 @@ module Scannable_axes = struct
       Nullability.print nullability Separability.print separability
 end
 
+module Applied_scannable_axes = struct
+  include Jkind_types.Applied_scannable_axes
+
+  let debug_print ppf t = Scannable_axes.debug_print ppf (upper_bound t)
+end
+
 (* A *layout* of a type describes the way values of that type are stored at
    runtime, including details like width, register convention, calling
    convention, etc. A layout may be *representable* or *unrepresentable*.  The
@@ -139,7 +145,7 @@ module Layout = struct
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
-    | Box of 'sort t * Scannable_axes.t
+    | Box of 'sort t * Applied_scannable_axes.t
 
   module Const = struct
     include Jkind_types.Layout.Const
@@ -231,13 +237,14 @@ module Layout = struct
         | Univar { name = None } -> "_"
         | Genvar v -> Sort.to_string_genvar v
         | Addressable t -> to_string true t ^ " addressable"
-        | Box (t, sa) ->
+        | Box (t, applied) ->
           let axes =
             if include_redundant_scannable_axes
-            then Scannable_axes.to_string_list sa
+            then Scannable_axes.to_string_list (box_scannable_axes t applied)
             else
               Scannable_axes.to_string_list
-                (Scannable_axes.residual (implied_box_axes t) sa)
+                (Scannable_axes.residual (implied_box_axes t)
+                   (Applied_scannable_axes.upper_bound applied))
           in
           String.concat " " ((to_string true t ^ " box") :: axes)
       in
@@ -287,10 +294,10 @@ module Layout = struct
              (t format_sort))
           ts
       | Addressable t' -> fprintf ppf "Addressable (%a)" (t format_sort) t'
-      | Box (t', sa) ->
+      | Box (t', applied) ->
         fprintf ppf "Box (%a, %a)" (t format_sort) t'
-          (Fmt.compat Scannable_axes.debug_print)
-          sa
+          (Fmt.compat Applied_scannable_axes.debug_print)
+          applied
   end
 
   let rec get : Sort.t t -> Sort.Flat.t t =
@@ -380,8 +387,8 @@ module Layout = struct
          restrictive. *)
       Scannable_axes.max
 
-  (* The scannable axes of [Box (t, sa)] *)
-  let box_scannable_axes t sa = Scannable_axes.meet (implied_box_axes t) sa
+  let box_scannable_axes t applied =
+    Applied_scannable_axes.apply applied ~implied:(implied_box_axes t)
 
   let rec equate_or_equal ~allow_mutation t1 t2 =
     match t1, t2 with
@@ -450,7 +457,8 @@ module Layout = struct
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
     | Addressable t' -> Addressable (meet_root_scannable_axes t' sa)
-    | Box (t', sa') -> Box (t', Scannable_axes.meet sa sa')
+    | Box (t', applied) ->
+      Box (t', Applied_scannable_axes.meet_scannable_axes applied sa)
 
   let sub t1 t2 =
     let rec sub t1 t2 : Misc.Le_result.t =
@@ -559,13 +567,13 @@ module Layout = struct
       if constrain_above_addressable ~allow_mutation:true t2
       then intersection (Addressable l1) (Addressable t2)
       else None
-    | Box (l1, sa1), Box (l2, sa2) ->
+    | Box (l1, a1), Box (l2, a2) ->
       Option.map
-        (fun l -> Box (l, Scannable_axes.meet sa1 sa2))
+        (fun l -> Box (l, Applied_scannable_axes.meet a1 a2))
         (intersection l1 l2)
-    | Box (l, sa), Sort (s, sa') | Sort (s, sa'), Box (l, sa) ->
+    | Box (l, applied), Sort (s, sa) | Sort (s, sa), Box (l, applied) ->
       if Sort.equate ~allow_mutation:true s Sort.scannable
-      then Some (Box (l, Scannable_axes.meet sa sa'))
+      then Some (Box (l, Applied_scannable_axes.meet_scannable_axes applied sa))
       else None
     | Box _, Product _ | Product _, Box _ -> None
     | Sort (s1, sa1), Sort (s2, sa2) ->
@@ -617,10 +625,11 @@ module Layout = struct
         if constrain_below_addressable ~allow_mutation:false t
         then pp_element ~nested ppf t
         else Fmt.fprintf ppf "%a addressable" (pp_element ~nested:true) t
-      | Box (t, sa) ->
+      | Box (t, applied) ->
         let axes =
           Scannable_axes.to_string_list
-            (Scannable_axes.residual (implied_box_axes t) sa)
+            (Scannable_axes.residual (implied_box_axes t)
+               (Applied_scannable_axes.upper_bound applied))
         in
         Fmt.fprintf ppf "%a %a" (pp_element ~nested:true) t pp_string_list
           ("box" :: axes)
@@ -2058,7 +2067,7 @@ module Const = struct
   let apply_box ~loc (t : _ jkind_const_desc) =
     match t.base with
     | Layout layout ->
-      { base = Layout (Layout.Const.box layout Scannable_axes.max);
+      { base = Layout (Layout.Const.box layout Applied_scannable_axes.none);
         mod_bounds = box_mod_bounds t.mod_bounds;
         with_bounds = t.with_bounds
       }
@@ -2169,12 +2178,12 @@ module Const = struct
             match l with
             | Addressable inner ->
               go inner |> Option.map (fun t -> Addressable t)
-            | Box (contents, sa) ->
+            | Box (contents, applied) ->
               let box_axes =
                 Scannable_axes.to_string_list
                   (Scannable_axes.residual
                      (Layout.Const.implied_box_axes contents)
-                     sa)
+                     (Applied_scannable_axes.upper_bound applied))
               in
               go contents
               |> Option.map (fun t -> Scannable_axes (Box t, box_axes))
@@ -2708,12 +2717,14 @@ module Desc = struct
           Fmt.fprintf ppf "%a addressable"
             (fun ppf -> format_desc ~nested:true ppf)
             { desc with base = Layout lay }
-      | Layout (Box (lay, sa)) when Option.is_none (get_const desc) ->
+      | Layout (Box (lay, applied)) when Option.is_none (get_const desc) ->
         Fmt.fprintf ppf "%a %a"
           (fun ppf -> format_desc ~nested:true ppf)
           { desc with base = Layout lay }
           pp_string_list
-          ("box" :: Scannable_axes.to_string_list sa)
+          ("box"
+          :: Scannable_axes.to_string_list
+               (Applied_scannable_axes.upper_bound applied))
       | Layout _ | Kconstr _ -> (
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c
@@ -3895,8 +3906,10 @@ module Violation = struct
 
   let offending_const display (c : Layout.Const.t) =
     match display, c with
-    | Offending_box_as_scannable_bound, Box (_, sa) ->
-      Layout.Const.of_sort_const (Sort.Const.base Scannable) sa
+    | Offending_box_as_scannable_bound, Box (contents, applied) ->
+      Layout.Const.of_sort_const
+        (Sort.Const.base Scannable)
+        (Layout.Const.box_scannable_axes contents applied)
     | ( Offending_box_as_scannable_bound,
         (Any _ | Base _ | Product _ | Univar _ | Genvar _ | Addressable _) )
     | Offending_exactly, _ ->

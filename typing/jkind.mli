@@ -104,12 +104,16 @@ module Layout : sig
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t  (** See Note [Addressable kinds] *)
-    | Box of 'sort t * Scannable_axes.t  (** See [Jkind_types.Layout.t] *)
+    | Box of 'sort t * Jkind_types.Applied_scannable_axes.t
+        (** See [Jkind_types.Layout.t] *)
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
     val get_sort : t -> Sort.Const.t option
+
+    val box_scannable_axes :
+      t -> Jkind_types.Applied_scannable_axes.t -> Scannable_axes.t
 
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 

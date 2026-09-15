@@ -1073,6 +1073,24 @@ module Scannable_axes = struct
     }
 end
 
+module Applied_scannable_axes = struct
+  type t = Scannable_axes.t
+
+  let none = Scannable_axes.max
+
+  let of_scannable_axes sa = sa
+
+  let meet = Scannable_axes.meet
+
+  let equal = Scannable_axes.equal
+
+  let meet_scannable_axes = Scannable_axes.meet
+
+  let apply t ~implied = Scannable_axes.meet t implied
+
+  let upper_bound t = t
+end
+
 module Layout = struct
   open Jkind_axis
 
@@ -1081,7 +1099,7 @@ module Layout = struct
     | Product of 'sort t list
     | Any of Scannable_axes.t
     | Addressable of 'sort t
-    | Box of 'sort t * Scannable_axes.t
+    | Box of 'sort t * Applied_scannable_axes.t
 
   module Const = struct
     type t =
@@ -1091,7 +1109,7 @@ module Layout = struct
       | Univar of Sort.univar
       | Genvar of Sort.var
       | Addressable of t
-      | Box of t * Scannable_axes.t
+      | Box of t * Applied_scannable_axes.t
 
     let any sa = Any sa
 
@@ -1116,10 +1134,10 @@ module Layout = struct
         (* Relies on the invariant that consts have no redundant
            [Addressable] *)
         equal c1 c2
-      | Box (c1, sa1), Box (c2, sa2) ->
+      | Box (c1, a1), Box (c2, a2) ->
         (* Relies on the invariant that axes on const boxes incorporate the
            axes implied by the contents *)
-        equal c1 c2 && Scannable_axes.equal sa1 sa2
+        equal c1 c2 && Applied_scannable_axes.equal a1 a2
       | ( ( Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _
           | Box _ ),
           _ ) ->
@@ -1187,7 +1205,14 @@ module Layout = struct
       | Addressable (Addressable _) | Addressable (Box _) ->
         Misc.fatal_error "implied_box_axes"
 
-    let box c sa = Box (c, Scannable_axes.meet (implied_box_axes c) sa)
+    let box_scannable_axes c applied =
+      Applied_scannable_axes.apply applied ~implied:(implied_box_axes c)
+
+    let box c applied =
+      Box
+        ( c,
+          Applied_scannable_axes.of_scannable_axes
+            (box_scannable_axes c applied) )
 
     let rec get_root_scannable_axes t =
       match t with
@@ -1198,7 +1223,7 @@ module Layout = struct
       | Univar _ -> None
       | Genvar _ -> None
       | Addressable t -> get_root_scannable_axes t
-      | Box (_, sa) -> Some sa
+      | Box (c, applied) -> Some (box_scannable_axes c applied)
 
     let rec set_root_scannable_axes t sa =
       match t with
@@ -1209,7 +1234,7 @@ module Layout = struct
       | Univar _ -> t
       | Genvar _ -> t
       | Addressable t' -> Addressable (set_root_scannable_axes t' sa)
-      | Box (t', _) -> box t' sa
+      | Box (t', _) -> box t' (Applied_scannable_axes.of_scannable_axes sa)
 
     let meet_root_scannable_axes t sa =
       match get_root_scannable_axes t with

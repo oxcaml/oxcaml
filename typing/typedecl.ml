@@ -2004,7 +2004,11 @@ module Element_repr = struct
       in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t option = function
       | Any _ -> None
-      | Base (Scannable, sa) | Box (_, sa) -> Some (Value_element sa)
+      | Base (Scannable, sa) -> Some (Value_element sa)
+      | Box (contents, applied) ->
+        Some
+          (Value_element
+             (Jkind.Layout.Const.box_scannable_axes contents applied))
       | Base (Float64, _) -> Some (Unboxed_element Float64)
       | Base (Float32, _) -> Some (Unboxed_element Float32)
       | Base (Word, _) -> Some (Unboxed_element Word)

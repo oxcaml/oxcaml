@@ -306,13 +306,18 @@ let rec scannable_product_array_kind elt_ty_for_error loc layouts =
 
 and sort_to_scannable_product_element_kind elt_ty_for_error loc
       (layout : Jkind.Layout.Const.t) =
+  let of_separability separability =
+    let open Jkind_axis.Separability in
+    if le separability (upper_bound_if_is_always_gc_ignorable ())
+      then Pint_scannable else Paddr_scannable
+  in
   match layout with
   | Any _ -> Misc.fatal_error "sort_to_scannable_product_element_kind called \
                                with non-representable layout"
-  | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) ->
-      let open Jkind_axis.Separability in
-      if le separability (upper_bound_if_is_always_gc_ignorable ())
-        then Pint_scannable else Paddr_scannable
+  | Base (Scannable, { separability; _ }) -> of_separability separability
+  | Box (contents, applied) ->
+    of_separability
+      (Jkind.Layout.Const.box_scannable_axes contents applied).separability
   | Base ((Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Word |
           Untagged_immediate | Vec128 | Vec256 | Vec512 | Mask), _) as c ->
     raise (Error (loc, Mixed_product_array (c, elt_ty_for_error)))
@@ -507,15 +512,20 @@ let value_kind_of_scannable_jkind env jkind =
   let externality_upper_bound =
     Jkind.get_externality_upper_bound ~context env jkind
   in
+  let of_separability separability =
+    (* use the better of the two [immediate_or_pointer]s *)
+    match pointerness_of_separability separability,
+          pointerness_of_scannable_with_externality externality_upper_bound
+    with
+    | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate ->
+      Pintval
+    | Pointer, Pointer -> Pgenval
+  in
   let rec of_layout : Jkind.Layout.Const.t -> _ = function
-    | Base (Scannable, { separability; _ }) | Box (_, { separability; _ }) -> (
-      (* use the better of the two [immediate_or_pointer]s *)
-      match pointerness_of_separability separability,
-            pointerness_of_scannable_with_externality externality_upper_bound
-      with
-      | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate ->
-        Pintval
-      | Pointer, Pointer -> Pgenval)
+    | Base (Scannable, { separability; _ }) -> of_separability separability
+    | Box (contents, applied) ->
+      of_separability
+        (Jkind.Layout.Const.box_scannable_axes contents applied).separability
     | Addressable layout -> of_layout layout
     | Any _
     | Product _
