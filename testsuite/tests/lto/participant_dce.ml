@@ -1,3 +1,47 @@
+(* TEST
+ readonly_files = "participant_dce_dep.ml participant_external.ml";
+ flambda2;
+ setup-ocamlopt.opt-build-env;
+
+ flags = "-opaque";
+ compile_only = "true";
+ all_modules = "participant_external.ml";
+ ocamlopt.opt;
+
+ flags = "-flambda2-reaper -support-lto";
+ all_modules = "participant_dce_dep.ml";
+ ocamlopt.opt;
+ all_modules = "participant_dce.ml";
+ ocamlopt.opt;
+
+ script = "grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.o";
+ script;
+
+ compile_only = "false";
+ flags = "-reaper-solve participant_dce.cmx participant_dce_dep.cmx";
+ last_flags = "-o participant_dce.ltosol";
+ all_modules = "";
+ ocamlopt.opt;
+
+ flags = "-reaper-rebuild participant_dce.cmx participant_dce.ltosol";
+ last_flags = "";
+ ocamlopt.opt;
+ flags = "-reaper-rebuild participant_dce_dep.cmx participant_dce.ltosol";
+ ocamlopt.opt;
+
+ exit_status = "1";
+ script = "grep -a -q LTO_DEAD_PARTICIPANT_EXPORT participant_dce_dep.reaped.o";
+ script;
+ exit_status = "0";
+
+ flags = "";
+ all_modules = "participant_external.cmx participant_dce_dep.reaped.cmx participant_dce.reaped.cmx";
+ program = "${test_build_directory}/participant_dce.exe";
+ ocamlopt.opt;
+ run;
+ check-program-output;
+*)
+
 (******************************************************************************
  *                                  OxCaml                                    *
  * -------------------------------------------------------------------------- *
@@ -8,7 +52,7 @@
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
  * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
+ * to deal in the Software without restriction, including without limitation *
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
  * and/or sell copies of the Software, and to permit persons to whom the      *
  * Software is furnished to do so, subject to the following conditions:       *
@@ -25,24 +69,7 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Snapshots of the stamp counters used to create identifiers. Identifiers are
-    compared by compilation unit and stamp only, so a resuming process must not
-    mint stamps that collide with the imported ones. *)
-type t
-
-(** Capture the current values of all stamp counters for serialisation. *)
-val save : unit -> t
-
-(** Restore all stamp counters to the values they had when [save] was called in
-    the process that serialised this value. This can only be called once, before
-    any stamps have been created, and will error otherwise. *)
-val restore_for_resume : t -> unit
-
-(** Restore the stamp counters in preparation for merging the data of several
-    units, setting each counter to its maximum value across all of the units.
-    Like [restore_for_resume], can only be called once. *)
-val restore_for_merge : t list -> unit
-
-(** True if any counter in the first set is greater than its corresponding
-    counter in the second. Used to guard against monotonicity breaking. *)
-val any_greater_than : t -> t -> bool
+(* [Sys.opaque_identity] leaves the cross-unit call indirect. This checks graph
+   joining independently of the solve-time code metadata changes. *)
+let () =
+  Participant_external.run (Sys.opaque_identity Participant_dce_dep.used)

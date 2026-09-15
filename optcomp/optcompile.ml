@@ -41,6 +41,13 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
+  val reaper_rebuild :
+    ltosol_file:string ->
+    cmx_file:string ->
+    output_prefix:string ->
+    keep_symbol_tables:bool ->
+    unit
+
   val link : ppf_dump:Format.formatter -> string list -> string -> unit
 
   val link_shared :
@@ -230,6 +237,25 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
 
+  let reaper_rebuild ~ltosol_file ~cmx_file ~output_prefix ~keep_symbol_tables =
+    match Backend.compile_from_reaped_flambda with
+    | None -> Misc.fatal_error "This backend does not support -reaper-rebuild"
+    | Some compile_from_reaped_flambda ->
+      let paused_unit_infos, (_ : Digest.t) =
+        Compilenv.read_unit_info cmx_file
+      in
+      let unit_info =
+        unit_info_from_cu_or_output_prefix ~source_file:cmx_file Impl
+          ~output_prefix
+          ~compilation_unit:(Exactly paused_unit_infos.Cmx_format.ui_unit)
+      in
+      with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
+      if !Oxcaml_flags.internal_assembler
+      then Emitaux.binary_backend_available := true;
+      Compilenv.reset info.target;
+      compile_from_reaped_flambda ~ltosol_file ~keep_symbol_tables ~cmx_file
+        ~paused_unit_infos info
+
   module Link = Optlink.Make (Backend)
 
   module Link_input = struct
@@ -274,7 +300,16 @@ let native unix
         machine_width:Target_system.Machine_width.t ->
         keep_symbol_tables:bool ->
         Lambda.program ->
-        Cmm.phrase list) =
+        Cmm.phrase list)
+    ~(reaped_flambda2_to_cmm :
+       machine_width:Target_system.Machine_width.t ->
+       ltosol_filename:string ->
+       keep_symbol_tables:bool ->
+       cmx_filename:string ->
+       paused_unit_infos:Cmx_format.unit_infos ->
+       ppf_dump:Format.formatter ->
+       prefixname:string ->
+       Cmm.phrase list) =
   (module Make (struct
     let backend = Compile_common.Native
 
@@ -320,6 +355,32 @@ let native unix
         ~pipeline:
           (Direct_to_cmm (lambda_to_cmm ~machine_width ~keep_symbol_tables))
         ~sourcefile ~prefixname ~ppf_dump program
+
+    let compile_from_reaped_flambda :
+        Optcomp_intf.compile_from_reaped_flambda option =
+      Some
+        (fun ~ltosol_file
+          ~keep_symbol_tables
+          ~cmx_file
+          ~paused_unit_infos
+          (info : Compile_common.info)
+        ->
+          let machine_width = Target_system.Machine_width.Sixty_four in
+          Asmgen.compile_implementation_from_cmm unix
+            ~sourcefile:(Some cmx_file)
+            ~prefixname:(Unit_info.prefix info.target)
+            ~ppf_dump:info.ppf_dump
+            (reaped_flambda2_to_cmm ~machine_width ~ltosol_filename:ltosol_file
+               ~keep_symbol_tables ~cmx_filename:cmx_file ~paused_unit_infos);
+          (* Unlike [compile_implementation] we create the .reaped.cmx file
+             here. Everything describing generated code comes from [Compilenv]
+             as filled by this rebuild; the paused .cmx only supplies the
+             frontend fields (imports, format, ...), never its export
+             information, whose code metadata and offsets are stale. *)
+          Compilenv.save_resumed_unit_info
+            (Unit_info.Artifact.filename
+               (Unit_info.artifact info.target ~extension:ext_flambda_obj))
+            ~paused:paused_unit_infos)
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 

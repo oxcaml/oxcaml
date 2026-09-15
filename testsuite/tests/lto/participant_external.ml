@@ -8,7 +8,7 @@
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
  * copy of this software and associated documentation files (the "Software"), *
- * to deal in the Software without restriction, including without limitation  *
+ * to deal in the Software without restriction, including without limitation *
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
  * and/or sell copies of the Software, and to permit persons to whom the      *
  * Software is furnished to do so, subject to the following conditions:       *
@@ -25,24 +25,12 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Snapshots of the stamp counters used to create identifiers. Identifiers are
-    compared by compilation unit and stamp only, so a resuming process must not
-    mint stamps that collide with the imported ones. *)
-type t
+(* This unit does not participate in the solve or depend on either participant. *)
+let initialized () = print_endline "initialized"
 
-(** Capture the current values of all stamp counters for serialisation. *)
-val save : unit -> t
-
-(** Restore all stamp counters to the values they had when [save] was called in
-    the process that serialised this value. This can only be called once, before
-    any stamps have been created, and will error otherwise. *)
-val restore_for_resume : t -> unit
-
-(** Restore the stamp counters in preparation for merging the data of several
-    units, setting each counter to its maximum value across all of the units.
-    Like [restore_for_resume], can only be called once. *)
-val restore_for_merge : t list -> unit
-
-(** True if any counter in the first set is greater than its corresponding
-    counter in the second. Used to guard against monotonicity breaking. *)
-val any_greater_than : t -> t -> bool
+let run f =
+  let values = List.map f [41; 42] in
+  Gc.full_major ();
+  assert (values = [42; 43]);
+  print_int (f (Sys.opaque_identity 41));
+  print_newline ()

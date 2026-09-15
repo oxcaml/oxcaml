@@ -64,6 +64,9 @@ val create :
 val create_sharded :
   analysis_scope:Analysis_scope.t -> get_unit:(Compilation_unit.t -> data) -> t
 
+(** The analysis scope the solution was computed for. *)
+val analysis_scope : t -> Analysis_scope.t
+
 val has_use : t -> Code_id_or_name.t -> bool
 
 val has_source : t -> Code_id_or_name.t -> bool

@@ -508,3 +508,81 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
     ~solution
+
+let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~keep_symbol_tables
+    ~cmx_filename ~(paused_unit_infos : Cmx_format.unit_infos) ~ppf_dump:_
+    ~prefixname:_ =
+  let ltosol =
+    Profile.record_call ~accumulate:true "ltosol_load" (fun () ->
+        Flambda2_reaper.Ltosol_format.load ltosol_filename)
+  in
+  let id_stamp_counters =
+    Flambda2_reaper.Ltosol_format.id_stamp_counters ltosol
+  in
+  Flambda2_reaper.Id_stamp_counters.restore_for_resume id_stamp_counters;
+  let solution =
+    Profile.record_call ~accumulate:true "ltosol_deserialise" (fun () ->
+        Flambda2_reaper.Ltosol_format.solution_for_members ltosol
+          ~members:[paused_unit_infos.ui_unit])
+  in
+  let participant_units =
+    Compilation_unit.Set.of_list
+      (Flambda2_reaper.Ltosol_format.participants ltosol)
+  in
+  let get_module_info comp_unit =
+    if Compilation_unit.Set.mem comp_unit participant_units
+    then
+      Misc.fatal_errorf
+        "-reaper-rebuild: attempted to read the .cmx of %a, which participated \
+         in the solve"
+        (Format_doc.compat Compilation_unit.print)
+        comp_unit;
+    get_module_info comp_unit
+  in
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let header, export_info =
+    read_lto_header_and_export_info ~filename:cmx_filename paused_unit_infos
+  in
+  (* We expect the stamp counters in the .cmx file to be less than the counters
+     in the .ltosol file, because the -reaper-solve invocation begins by taking
+     the maximum counters across the .cmx files it reads. Therefore, we can
+     ignore these counters. *)
+  if
+    Flambda2_reaper.Id_stamp_counters.any_greater_than
+      (Flambda2_reaper.Lto_sections.Header.id_stamp_counters header)
+      id_stamp_counters
+  then
+    Misc.fatal_error
+      "The rebuild data contains ID stamp counters greater than those in the \
+       the solution file. Stamp counter monotonicity is broken.";
+  let unit_metadata, rebuild_inputs =
+    Profile.record_call ~accumulate:true "lto_sections_deserialise" (fun () ->
+        Flambda2_reaper.Lto_sections.read_for_rebuild ~filename:cmx_filename
+          ~sections:paused_unit_infos.ui_file_sections
+          ~renaming:(Flambda_cmx_format.import_renaming_of_unit export_info)
+          header)
+  in
+  (* Code metadata of the participants comes from the solution and that of other
+     units from their .cmx files, loaded on demand. *)
+  let flambda, all_code, _final_typing_env, free_names =
+    Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata ~rebuild_inputs
+      ~solution ~typing:None ~machine_width ~cmx_loader
+      ~all_code:Exported_code.empty
+  in
+  (* Reaped CMXs are only used for linking, so leave their Flambda export
+     information empty, as for opaque compilation. The backend still needs the
+     rebuilt code metadata and solved closure offsets. *)
+  let offsets =
+    Flambda2_reaper.Rebuild_solution.offsets_for_free_names solution free_names
+  in
+  let reachable_names =
+    NO.singleton_symbol
+      (Flambda_unit.module_symbol flambda)
+      Flambda2_nominal.Name_mode.normal
+  in
+  Compiler_hooks.execute Reaped_flambda2 flambda;
+  let cmm =
+    Flambda2_to_cmm.To_cmm.unit flambda ~all_code ~offsets ~reachable_names
+  in
+  if not keep_symbol_tables then reset_symbol_tables ();
+  cmm

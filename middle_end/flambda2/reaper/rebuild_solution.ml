@@ -151,6 +151,8 @@ let create ~analysis_scope ~queries ~unboxing ~code_changes ~slot_offsets =
       Single_data (create_data ~queries ~unboxing ~code_changes ~slot_offsets)
   }
 
+let analysis_scope t = t.analysis_scope
+
 let create_sharded ~analysis_scope ~get_unit =
   { analysis_scope; store = Sharded_data get_unit }
 

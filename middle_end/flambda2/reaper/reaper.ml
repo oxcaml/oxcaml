@@ -21,6 +21,39 @@ let get_code_metadata ~cmx_loader ~all_code =
       | Some code -> code
       | None -> Exported_code.find_exn (load_code ()) code_id)
 
+(* Import the .cmx file defining [code_id] if its metadata is not already
+   available. Only the LTO rebuild gets here: it does not run [Simplify], so the
+   metadata of code from units that did not take part in the solve is only
+   available from their .cmx files. The metadata of the units in the analysis
+   scope comes from the solution instead, and their .cmx files must not be
+   read. *)
+let load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader ~all_code
+    code_id =
+  let comp_unit = Code_id.get_compilation_unit code_id in
+  if Analysis_scope.contains_unit analysis_scope comp_unit
+  then
+    Misc.fatal_errorf
+      "Code ID %a belongs to the analysis scope, so its metadata must come \
+       from the solution"
+      Code_id.print code_id;
+  if
+    (not (Exported_code.mem code_id all_code))
+    && not
+         (Exported_code.mem code_id
+            (Flambda_cmx.get_imported_code cmx_loader ()))
+  then
+    ignore
+      (Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
+        : Typing_env.Serializable.t option)
+
+let get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code code_id =
+  (match Exported_code.find all_code code_id with
+  | Some _ -> ()
+  | None ->
+    load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader ~all_code
+      code_id);
+  get_code_metadata ~cmx_loader ~all_code code_id
+
 module Staged = struct
   module Solve_inputs = struct
     type t =
@@ -327,7 +360,10 @@ module Staged = struct
 
   let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)
       ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
-    let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
+    let analysis_scope = Rebuild_solution.analysis_scope solution in
+    let get_code_metadata =
+      get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code
+    in
     let Rebuild_inputs.
           { toplevel_expr;
             code;
@@ -337,17 +373,46 @@ module Staged = struct
           } =
       rebuild_inputs
     in
-    let Rebuild.{ body; all_code; code_ids_to_remember; free_names } =
+    let Rebuild.
+          { body; all_code = rebuilt_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
         ~fixed_arity_continuations ~continuation_info ~typing solution
         get_code_metadata toplevel_expr code
     in
+    let is_foreign code_id =
+      not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+    in
+    (* The metadata of foreign code comes from the solution for units that took
+       part in the solve, and from their .cmx files otherwise. *)
+    let solution_metadata =
+      Name_occurrences.fold_code_ids free_names ~init:[]
+        ~f:(fun solution_metadata code_id ->
+          if not (is_foreign code_id)
+          then solution_metadata
+          else
+            match Rebuild_solution.find_code_metadata solution code_id with
+            | Some code_metadata -> code_metadata :: solution_metadata
+            | None ->
+              load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader
+                ~all_code code_id;
+              solution_metadata)
+    in
+    (* Local entries are replaced by rebuilt code below. *)
+    let imported_code =
+      Exported_code.merge
+        (Exported_code.mark_as_imported all_code)
+        (Exported_code.mark_as_imported
+           (Flambda_cmx.get_imported_code cmx_loader ()))
+      |> Exported_code.filter ~f:is_foreign
+    in
+    let imported_code =
+      List.fold_left Exported_code.add_code_metadata imported_code
+        solution_metadata
+    in
     let all_code =
       Exported_code.add_code
         ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
-        all_code
-        (Exported_code.mark_as_imported
-           (Flambda_cmx.get_imported_code cmx_loader ()))
+        rebuilt_code imported_code
     in
     let final_typing_env =
       match typing with
