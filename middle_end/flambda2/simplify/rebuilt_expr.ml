@@ -19,6 +19,8 @@ type t = Expr.t
 
 type rebuilt_expr = t
 
+let apply_renaming = Expr.apply_renaming
+
 let to_expr t are_rebuilding =
   if ART.do_not_rebuild_terms are_rebuilding
   then
@@ -54,9 +56,30 @@ let create_let are_rebuilding bound_vars defining_expr ~body ~free_names_of_body
   if ART.do_not_rebuild_terms are_rebuilding
   then term_not_rebuilt
   else
-    Let.create bound_vars defining_expr ~body
-      ~free_names_of_body:(Known free_names_of_body)
-    |> Expr.create_let
+    let let_binding () =
+      Let.create bound_vars defining_expr ~body
+        ~free_names_of_body:(Known free_names_of_body)
+      |> Expr.create_let
+    in
+    match[@ocaml.warning "-4-18"] bound_vars, defining_expr with
+    | Singleton bv, Simple bound_to ->
+        (* We try to apply renaming instead of introducing let x = y when possible *)
+        Simple.pattern_match' bound_to
+          ~const:(fun _ -> let_binding ())
+          ~symbol:(fun _ ~coercion:_ -> let_binding ())
+          ~var:(fun bound_to ~coercion : rebuilt_expr ->
+              if not (Coercion.is_id coercion)
+              then let_binding ()
+              else
+              if Name_occurrences.mem_var free_names_of_body bound_to then
+                (* As renamings are permutations, this would also apply a renaming to [bound_to] *)
+                let_binding ()
+              else
+                apply_renaming body
+                  (Renaming.(add_variable empty (Bound_var.var bv) bound_to))
+              )
+    | _ -> let_binding ()
+
 
 let create_apply are_rebuilding apply =
   if ART.do_not_rebuild_terms are_rebuilding
