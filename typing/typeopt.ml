@@ -1213,7 +1213,7 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
       let rec element (layout : Jkind_types.Layout.Const.t)
           : unit Lambda.mixed_block_element =
         match layout with
-        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+        | Genvar (var, _) -> Splice_variable (Slambdaident.of_sort_var var)
         | Product layouts ->
             Product (Array.of_list (List.map element layouts))
         | Addressable layout -> element layout
