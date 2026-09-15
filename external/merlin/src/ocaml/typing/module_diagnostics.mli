@@ -36,4 +36,5 @@ type error =
         mismatch : Includecore.type_mismatch
       }
 
-val diagnose : loc:Location.t -> error -> Structured_diagnostic.t option
+val diagnose :
+  loc:Location.t -> error -> Diagnostic_term.diagnostic option

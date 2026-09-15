@@ -51,12 +51,18 @@ val set_documentation : (t -> documentation option) -> unit
 
 val entry : t -> Structured_diagnostic.Glossary_entry.t
 
-val realize :
-  loc:Location.t -> t Diagnostic_nlg.story list -> Structured_diagnostic.t
+type diagnostic =
+  { loc : Location.t;
+    fragments : t Diagnostic_nlg.fragment list
+  }
 
-val rendered_children : t Diagnostic_nlg.beat -> Structured_diagnostic.Block.t
+val realize :
+  t Diagnostic_nlg.fragment list -> Structured_diagnostic.Block.t list
+
+val rendered_children :
+  t Diagnostic_nlg.fragment -> Structured_diagnostic.Block.t
 
 val diagnose :
   loc:Location.t ->
-  (unit -> t Diagnostic_nlg.story list) ->
-  Structured_diagnostic.t option
+  (unit -> t Diagnostic_nlg.fragment list) ->
+  diagnostic option

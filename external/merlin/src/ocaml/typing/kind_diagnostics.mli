@@ -5,4 +5,4 @@ type error =
         error : Ikind.subjkind_error
       }
 
-val diagnose : error -> Diagnostic_term.t Diagnostic_nlg.story list option
+val diagnose : error -> Diagnostic_term.t Diagnostic_nlg.fragment list option

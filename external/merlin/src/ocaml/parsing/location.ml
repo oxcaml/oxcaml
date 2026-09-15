@@ -946,9 +946,16 @@ let batch_mode_printer : report_printer =
   { pp; pp_report_kind; pp_main_loc; pp_main_txt;
     pp_submsgs; pp_submsg; pp_submsg_loc; pp_submsg_txt }
 
+<<<<<<< Merlin:ggray/msd/dev
 (*
+||||||| Compiler:last-imported
+=======
+let rendering_report_to_string = ref false
+
+>>>>>>> Compiler:HEAD
 let terminfo_toplevel_printer (lb: lexbuf): report_printer =
   let pp self ppf err =
+<<<<<<< Merlin:ggray/msd/dev
     (* setup_tags (); *)
     (* Highlight all toplevel locations of the report, instead of displaying
        the main location. Do it now instead of in [pp_main_loc], to avoid
@@ -958,6 +965,31 @@ let terminfo_toplevel_printer (lb: lexbuf): report_printer =
     let locs_highlighted = List.filter is_quotable_loc all_locs in
     highlight_terminfo lb ppf locs_highlighted;
     batch_mode_printer.pp self ppf err
+||||||| Compiler:last-imported
+    setup_tags ();
+    (* Highlight all toplevel locations of the report, instead of displaying
+       the main location. Do it now instead of in [pp_main_loc], to avoid
+       messing with Format boxes. *)
+    let sub_locs = List.map (fun { loc; _ } -> loc) err.sub in
+    let all_locs = err.main.loc :: sub_locs in
+    let locs_highlighted = List.filter is_quotable_loc all_locs in
+    highlight_terminfo lb ppf locs_highlighted;
+    batch_mode_printer.pp self ppf err
+=======
+    if !rendering_report_to_string then
+      batch_mode_printer.pp batch_mode_printer ppf err
+    else begin
+      setup_tags ();
+      (* Highlight all toplevel locations of the report, instead of displaying
+         the main location. Do it now instead of in [pp_main_loc], to avoid
+         messing with Format boxes. *)
+      let sub_locs = List.map (fun { loc; _ } -> loc) err.sub in
+      let all_locs = err.main.loc :: sub_locs in
+      let locs_highlighted = List.filter is_quotable_loc all_locs in
+      highlight_terminfo lb ppf locs_highlighted;
+      batch_mode_printer.pp self ppf err
+    end
+>>>>>>> Compiler:HEAD
   in
   let pp_main_loc _ _ _ _ = () in
   let pp_submsg_loc _ _ ppf loc =
@@ -980,20 +1012,53 @@ let default_report_printer () : report_printer =
 
 let report_printer = ref default_report_printer
 
-type emitter = Format.formatter -> exn option -> report -> unit
+type 'a reporting = {
+  of_exn : exn -> [ `Ok of 'a | `Already_displayed ] option;
+  of_report : report -> 'a;
+  print : Format.formatter -> 'a -> unit;
+}
 
-let text_emitter ppf _exn report =
+type packed_reporting = Reporting : 'a reporting -> packed_reporting
+
+let reporting = ref None
+
+let set_reporting reporter = reporting := Some (Reporting reporter)
+
+let print_legacy_report ppf report =
   let printer = !report_printer () in
   printer.pp printer ppf report
 
-let emitter = ref text_emitter
+let report_to_string report =
+  let saved_rendering = !rendering_report_to_string in
+  let saved_num_loc_lines = !num_loc_lines in
+  Fun.protect
+    ~finally:(fun () ->
+      rendering_report_to_string := saved_rendering;
+      num_loc_lines := saved_num_loc_lines)
+    (fun () ->
+      rendering_report_to_string := true;
+      num_loc_lines := 0;
+      Format.asprintf "%a"
+        (fun ppf report ->
+          let { Format.margin; max_indent } =
+            Format.pp_get_geometry Format.err_formatter ()
+          in
+          Format.pp_set_geometry ppf ~margin ~max_indent;
+          Misc.Style.set_tag_handling ppf;
+          print_legacy_report ppf report)
+        report)
 
-let set_emitter new_emitter = emitter := new_emitter
+let print_report_string ppf text =
+  if not (String.equal text "") then begin
+    separate_new_message ppf;
+    print_updating_num_loc_lines ppf Format.pp_print_string text
+  end
 
-let print_report_with_exn ppf exn report =
-  !emitter ppf exn report
-
-let print_report ppf report = print_report_with_exn ppf None report
+let print_report ppf report =
+  match !reporting with
+  | None -> print_legacy_report ppf report
+  | Some (Reporting reporter) ->
+      reporter.print ppf (reporter.of_report report)
 
 (******************************************************************************)
 (* Reporting errors *)
@@ -1189,11 +1254,21 @@ let () =
 external reraise : exn -> 'a = "%reraise"
 
 let report_exception ppf exn =
+  let Reporting reporter =
+    match !reporting with
+    | Some reporter -> reporter
+    | None ->
+        Reporting {
+          of_exn = error_of_exn;
+          of_report = Fun.id;
+          print = print_legacy_report;
+        }
+  in
   let rec loop n exn =
-    match error_of_exn exn with
+    match reporter.of_exn exn with
     | None -> reraise exn
     | Some `Already_displayed -> ()
-    | Some (`Ok err) -> print_report_with_exn ppf (Some exn) err
+    | Some (`Ok diagnostic) -> reporter.print ppf diagnostic
     | exception exn when n > 0 -> loop (n-1) exn
   in
   loop 5 exn

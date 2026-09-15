@@ -82,16 +82,17 @@ type modality_input =
     requirement : modality_requirement
   }
 
-val modality_story :
+val modality_fragment :
   sides:Diagnostic_term.sides ->
   modality_input ->
-  Diagnostic_term.t Diagnostic_nlg.story
+  Diagnostic_term.t Diagnostic_nlg.fragment
 
-val mode_error_stories :
+val mode_error_fragments :
   error_loc:Location.t ->
   ?expected_declaration:Types.value_description ->
   Mode.Hint.pinpoint ->
   Mode.Value.error ->
-  Diagnostic_term.t Diagnostic_nlg.story list
+  Diagnostic_term.t Diagnostic_nlg.fragment list
 
-val diagnose : loc:Location.t -> error -> Structured_diagnostic.t option
+val diagnose :
+  loc:Location.t -> error -> Diagnostic_term.diagnostic option

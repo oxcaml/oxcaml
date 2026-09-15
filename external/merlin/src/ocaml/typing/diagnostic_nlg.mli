@@ -43,57 +43,57 @@ val mention : case:Phrase.case -> subject -> _ Phrase.segment
 
 val pronoun : case:Phrase.case -> subject -> _ Phrase.segment
 
-type 'term aside
+type 'term fragment
 
-type 'term beat
+type necessity =
+  | Inherit
+  | Necessary
+  | Unnecessary
 
-type 'term story = 'term beat
+type verbosity =
+  | Full
+  | Minimal
 
-val note :
-  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term aside
+val state : ?subject:subject -> 'term Phrase.t -> 'term fragment
 
-val background : 'term Phrase.t -> 'term aside
+val but : ?subject:subject -> 'term Phrase.t -> 'term fragment
 
-val suggest : 'term Phrase.t -> 'term aside
+val reason : ?subject:subject -> 'term Phrase.t -> 'term fragment
 
-val claim :
-  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term beat
+val rule : 'term Phrase.t -> 'term fragment
 
-val but :
-  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term beat
+val is_rule : 'term fragment -> bool
 
-val sub_claim :
-  ?subject:subject -> ?asides:'term aside list -> 'term Phrase.t -> 'term aside
+val suggestion : 'term Phrase.t -> 'term fragment
 
-val child : 'term beat -> 'term aside
+val with_children : 'term fragment list -> 'term fragment -> 'term fragment
 
-val story : 'term beat list -> 'term story
+val group : 'term fragment list -> 'term fragment
 
-val plain :
-  claim:'term Phrase.t ->
-  ?contrast:'term Phrase.t ->
-  ?background:'term Phrase.t list ->
-  ?suggestions:'term Phrase.t list ->
-  unit ->
-  'term story
+val block :
+  ?necessity:necessity -> 'term fragment list -> 'term fragment
 
-val beheaded : 'term beat -> 'term beat
+val explanation :
+  ?necessity:necessity -> 'term fragment list -> 'term fragment
 
-val reframe : 'term beat -> 'term story list -> 'term beat
+val focus :
+  on:'term fragment -> 'term fragment list -> 'term fragment list
 
-val pronominalize : 'term story list -> 'term story list
+val without_text : 'term fragment -> 'term fragment
 
-val pronominalize_one : 'term story -> 'term story
+val clip :
+  verbosity:verbosity -> 'term fragment list -> 'term fragment list
+
+val naturalize : 'term fragment list -> 'term fragment list
 
 val realize :
   term_entry:('term -> Structured_diagnostic.Glossary_entry.t) ->
   term_words:('term -> 'term Phrase.t) ->
-  loc:Location.t ->
-  'term story list ->
-  Structured_diagnostic.t
+  'term fragment list ->
+  Structured_diagnostic.Block.t list
 
 val rendered_children :
   term_entry:('term -> Structured_diagnostic.Glossary_entry.t) ->
   term_words:('term -> 'term Phrase.t) ->
-  'term beat ->
+  'term fragment ->
   Structured_diagnostic.Block.t

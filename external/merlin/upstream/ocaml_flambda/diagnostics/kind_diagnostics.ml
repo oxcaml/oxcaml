@@ -17,21 +17,21 @@ let crossing ~loc ~subject error =
   | axes ->
     let suffix = match axes with [_] -> " axis" | _ -> " axes" in
     Some
-      [ Nlg.plain
-          ~claim:
-               [ Nlg.ref_source loc
-                   [ Nlg.txt
-                       (subject ^ " does not cross the "
-                      ^ String.concat ", " axes ^ suffix) ] ]
-             ~contrast:
-               [Nlg.txt "but the kind it is checked against requires it to"]
-             ~background:
-               [ [ Nlg.txt "a ";
-                   Nlg.code "mod";
-                   Nlg.txt
-                     " annotation claims a type's values may be used at the \
-                      stronger mode on those axes, whatever mode they are held \
-                      at" ] ]
-             () ]
+      [ Nlg.block
+          [ Nlg.state
+              [ Nlg.ref_source loc
+                  [ Nlg.txt
+                      (subject ^ " does not cross the "
+                      ^ String.concat ", " axes ^ suffix) ] ];
+            Nlg.but
+              [Nlg.txt "the kind it is checked against requires it to"]
+            |> Nlg.with_children
+                 [ Nlg.rule
+                     [ Nlg.txt "a ";
+                       Nlg.code "mod";
+                       Nlg.txt
+                         " annotation claims a type's values may be used at \
+                          the stronger mode on those axes, whatever mode they \
+                          are held at" ] ] ] ]
 
 let diagnose (Crossing { loc; subject; error }) = crossing ~loc ~subject error

@@ -5,7 +5,7 @@ module Side = Diagnostic_term.Side
 
 type term = Diagnostic_term.t
 
-type story = term Nlg.story
+type fragment = term Nlg.fragment
 
 type sides = Diagnostic_term.sides =
   { expected_name : Diagnostic_term.t Phrase.segment list;
@@ -195,7 +195,7 @@ let crossing_bounds_difference (expected : Mode.Crossing.t)
 let located loc words =
   match loc with None -> words | Some l -> [Nlg.ref_source l words]
 
-let crossing_story ~sides (input : crossing_input) : story =
+let crossing_fragment ~sides (input : crossing_input) : fragment =
   let open Nlg in
   let attribute = "[@@unsafe_allow_any_mode_crossing]" in
   let span =
@@ -209,7 +209,7 @@ let crossing_story ~sides (input : crossing_input) : story =
       txt " disagree on ";
       Diagnostic_term.concept_word Diagnostic_term.Unsafe_mode_crossing ]
   in
-  let asides =
+  let children =
     match input.difference with
     | Attribute_on_one_side { declared_on } ->
       let declaring = Diagnostic_term.side_name sides declared_on in
@@ -219,18 +219,17 @@ let crossing_story ~sides (input : crossing_input) : story =
       in
       let declaring_loc = side_loc declared_on in
       let other_loc = side_loc (Side.other declared_on) in
-      [ note
+      [ reason
           (located declaring_loc
              (txt "only " :: declaring
              @ [txt " is marked "; code attribute]));
-        sub_claim
-          ~asides:
-            [ background
-                [ code attribute;
-                  txt
-                    " is part of a type's interface: both declarations must \
-                     carry it" ] ]
-          (located other_loc (txt "but " :: other @ [txt " is not"])) ]
+        but (located other_loc (other @ [txt " is not"]))
+        |> with_children
+             [ rule
+                 [ code attribute;
+                   txt
+                     " is part of a type's interface: both declarations must \
+                      carry it" ] ] ]
     | Bounds_differ
         { expected_only; actual_only; differing; expected_with; actual_with } ->
       let name_of_expected = sides.expected_name in
@@ -241,12 +240,12 @@ let crossing_story ~sides (input : crossing_input) : story =
         | axes ->
           let plural = match axes with [_] -> " axis" | _ -> " axes" in
           let crosses = " crosses the " ^ String.concat ", " axes ^ plural in
-          Some (note (located loc (txt "only " :: name @ [txt crosses])))
+          Some (reason (located loc (txt "only " :: name @ [txt crosses])))
       in
       let differing_lines =
         List.map
           (fun (axis, e, a) ->
-            note
+            reason
               (txt ("both cross the " ^ axis ^ " axis, but ")
                :: located input.expected_loc name_of_expected
               @ txt " to " :: code e :: txt " and "
@@ -268,13 +267,13 @@ let crossing_story ~sides (input : crossing_input) : story =
                   Diagnostic_term.concept_word Diagnostic_term.With_bounds ]
               else [txt " includes "; code with_]
             in
-            note (located loc words)
+            reason (located loc words)
           in
           [ line ~name:sides.expected_name ~loc:input.expected_loc
               expected_with;
             line ~name:sides.actual_name ~loc:input.actual_loc actual_with ]
       in
-      let claim_lines =
+      let explanation_lines =
         List.filter_map Fun.id
           [ axes_line ~name:sides.expected_name ~loc:input.expected_loc
               expected_only;
@@ -282,48 +281,48 @@ let crossing_story ~sides (input : crossing_input) : story =
               actual_only ]
         @ differing_lines @ with_lines
       in
-      let educate =
-        background
+      let matching_rule =
+        rule
           [ txt "two declarations that both use ";
             code attribute;
             txt " must claim exactly the same mode crossing" ]
       in
-      claim_lines @ [educate]
+      explanation_lines @ [matching_rule]
   in
-  Nlg.pronominalize_one (Nlg.claim ~subject ~asides header)
+  Nlg.state ~subject header |> Nlg.with_children children
 
-let declarations_do_not_match ?(background = []) ~noun ~name ~expected_loc
-    ~got_loc children : story =
+let declarations_do_not_match ?(rules = []) ~noun ~name ~expected_loc
+    ~got_loc children : fragment =
   let span =
     match expected_loc, got_loc with
     | Some loc, _ | None, Some loc -> Some loc
     | None, None -> None
   in
   let subject = Nlg.subject ?span [Phrase.Text noun; Phrase.Code name] in
-  Nlg.claim ~subject
-    ~asides:(List.map Nlg.child children @ background)
+  Nlg.state ~subject
     [ Nlg.txt "the declarations of ";
       Nlg.mention ~case:Subject subject;
       Nlg.txt " do not match" ]
+  |> Nlg.with_children (children @ rules)
 
-let parameters_do_not_match ~position children : story =
-  Nlg.claim
-    ~asides:(List.map Nlg.child children)
+let parameters_do_not_match ~position children : fragment =
+  Nlg.state
     (match position with
     | None -> [Nlg.txt "the functors' parameters do not match"]
     | Some position ->
       [ Nlg.txt
           ("the declarations of the " ^ Nlg.ordinal position
          ^ " parameter do not match") ])
+  |> Nlg.with_children children
 
-let is_not_included_in ~sides ~(not_included : Side.t) children : story =
+let is_not_included_in ~sides ~(not_included : Side.t) children : fragment =
   let name side = Diagnostic_term.side_name sides side in
-  Nlg.claim
-    ~asides:(List.map Nlg.child children)
+  Nlg.state
     (name not_included
     @ (Nlg.txt " is not included in " :: name (Side.other not_included)))
+  |> Nlg.with_children children
 
-let same_children (left : story) (right : story) =
+let same_children (left : fragment) (right : fragment) =
   Diagnostic.Block.equal
     (Diagnostic_term.rendered_children left)
     (Diagnostic_term.rendered_children right)
@@ -332,12 +331,11 @@ let frame ~subject predicate children =
   match children with
   | [] -> []
   | children ->
-    [ Nlg.reframe
-        (Nlg.claim ~subject (Nlg.mention ~case:Subject subject :: predicate))
-        children ]
+    [ Nlg.state ~subject (Nlg.mention ~case:Subject subject :: predicate)
+      |> Nlg.with_children children ]
 
-let field_stories ~sides ~orientation
-    (changes : Includecore.record_change list) : story list =
+let field_fragments ~sides ~orientation
+    (changes : Includecore.record_change list) : fragment list =
   List.filter_map
     (fun (change : Includecore.record_change) ->
       match change with
@@ -349,7 +347,7 @@ let field_stories ~sides ~orientation
                _
              }) ->
         Some
-          (Mode_diagnostics.modality_story ~sides
+          (Mode_diagnostics.modality_fragment ~sides
              (equate_modality_input ~orientation
                 ~subject:(Modality_field (Ident.name ld1.Types.ld_id))
                 ~expected_loc:(Some ld2.Types.ld_loc)
@@ -363,8 +361,8 @@ let field_stories ~sides ~orientation
         None)
     changes
 
-let constructor_stories ~sides ~orientation
-    (changes : Includecore.variant_change list) : story list =
+let constructor_fragments ~sides ~orientation
+    (changes : Includecore.variant_change list) : fragment list =
   List.concat_map
     (fun (change : Includecore.variant_change) ->
       match change with
@@ -372,7 +370,7 @@ let constructor_stories ~sides ~orientation
           (Type { got = cd1, _; expected = cd2, _; reason; _ }) -> begin
         match (reason : Includecore.constructor_mismatch) with
         | Includecore.Modality (i, equate) ->
-          [ Mode_diagnostics.modality_story ~sides
+          [ Mode_diagnostics.modality_fragment ~sides
               (equate_modality_input ~orientation
                  ~subject:
                    (Modality_constructor_arg
@@ -382,7 +380,7 @@ let constructor_stories ~sides ~orientation
                  ~expected_loc:(Some cd2.Types.cd_loc)
                  ~actual_loc:(Some cd1.Types.cd_loc) equate) ]
         | Includecore.Inline_record changes ->
-          field_stories ~sides ~orientation changes
+          field_fragments ~sides ~orientation changes
         | Includecore.(
             ( Type _ | Arity | Kind _ | Explicit_return_type _
             | Fixed_representation _ | Immediate_representation _
@@ -395,13 +393,13 @@ let constructor_stories ~sides ~orientation
         [])
     changes
 
-let type_stories ~sides ~orientation ~expected_loc ~actual_loc
-    (mismatch : Includecore.type_mismatch) : story list =
+let type_fragments ~sides ~orientation ~expected_loc ~actual_loc
+    (mismatch : Includecore.type_mismatch) : fragment list =
   match mismatch with
   | Includecore.Record_mismatch (Includecore.Label_mismatch changes) ->
-    field_stories ~sides ~orientation changes
+    field_fragments ~sides ~orientation changes
   | Includecore.Variant_mismatch changes ->
-    constructor_stories ~sides ~orientation changes
+    constructor_fragments ~sides ~orientation changes
   | Includecore.Unsafe_mode_crossing mismatch ->
     let difference =
       match (mismatch : Includecore.unsafe_mode_crossing_mismatch) with
@@ -430,7 +428,7 @@ let type_stories ~sides ~orientation ~expected_loc ~actual_loc
             actual_with = with_bounds got
           }
     in
-    [crossing_story ~sides { difference; expected_loc; actual_loc }]
+    [crossing_fragment ~sides { difference; expected_loc; actual_loc }]
   | Includecore.(
       ( Arity | Privacy _ | Kind _ | Constraint _ | Manifest _
       | Parameter_jkind _ | Private_variant _ | Private_object _ | Variance
@@ -457,45 +455,45 @@ module Inclusion = struct
   let reversed (ctx : context) =
     { ctx with orientation = Orientation.reverse ctx.orientation }
 
-  let mode_stories ?expected_declaration (ctx : context) pinpoint error =
-    Mode_diagnostics.mode_error_stories ~error_loc:ctx.reported_loc
-      ?expected_declaration pinpoint error
+  let mode_fragments ?expected_declaration (ctx : context) pinpoint error =
+    Mode_diagnostics.mode_error_fragments
+      ~error_loc:ctx.reported_loc ?expected_declaration pinpoint error
 
-  let rec stories_of_all (ctx : context) (all : all) : story list =
+  let rec fragments_of_all (ctx : context) (all : all) : fragment list =
     match all with
     | In_Compilation_unit (_, { symptom; _ }) ->
-      stories_of_signature ctx symptom
+      fragments_of_signature ctx symptom
     | In_Signature s | In_Include_functor_signature s ->
-      stories_of_signature ctx s
-    | In_Module_type d -> stories_of_module_type_diff ctx d
+      fragments_of_signature ctx s
+    | In_Module_type d -> fragments_of_module_type_diff ctx d
     | In_Module_type_substitution (_, { symptom; _ }) ->
-      stories_of_mtd_symptom ctx symptom
+      fragments_of_mtd_symptom ctx symptom
     | In_Type_declaration (id, c) | In_Jkind_declaration (id, c) ->
-      stories_of_core ctx id c
+      fragments_of_core ctx id c
     | In_Expansion _ -> []
 
-  and stories_of_module_type_diff (ctx : context)
+  and fragments_of_module_type_diff (ctx : context)
       ({ symptom; _ } : module_type_diff) =
-    stories_of_module_type_symptom ctx symptom
+    fragments_of_module_type_symptom ctx symptom
 
-  and stories_of_module_type_symptom (ctx : context)
+  and fragments_of_module_type_symptom (ctx : context)
       (symptom : module_type_symptom) =
     match symptom with
     | Mt_core _ | Invalid_module_alias _ -> []
-    | Signature s -> stories_of_signature ctx s
+    | Signature s -> fragments_of_signature ctx s
     | Functor (Params ({ got; expected; _ } as diff)) -> begin
       let outer_expected, outer_got =
         Orientation.expected_and_actual ctx.orientation ~got ~expected
       in
       match outer_got.params, outer_expected.params with
       | [], _ | _, [] -> []
-      | _ :: _, _ :: _ -> stories_of_functor_params ctx diff
+      | _ :: _, _ :: _ -> fragments_of_functor_params ctx diff
       end
-    | Functor (Result d) -> stories_of_module_type_diff ctx d
-    | After_alias_expansion d -> stories_of_module_type_diff ctx d
-    | Mode e -> mode_stories ctx (ctx.fallback, Mode.Hint.Module) e
+    | Functor (Result d) -> fragments_of_module_type_diff ctx d
+    | After_alias_expansion d -> fragments_of_module_type_diff ctx d
+    | Mode e -> mode_fragments ctx (ctx.fallback, Mode.Hint.Module) e
 
-  and stories_of_functor_params (ctx : context)
+  and fragments_of_functor_params (ctx : context)
       ({ got; expected; _ } : functor_params_diff) =
     let patch =
       Includemod.Functor_inclusion_diff.diff ctx.env (got.params, got.res)
@@ -508,7 +506,7 @@ module Inclusion = struct
            match (change : _ Diffing.change) with
            | Diffing.Keep _ -> []
            | Diffing.Change (_, _, Mismatch d) -> begin
-             match stories_of_module_type_diff (reversed ctx) d with
+             match fragments_of_module_type_diff (reversed ctx) d with
              | [] -> []
              | children ->
                [ parameters_do_not_match
@@ -520,7 +518,7 @@ module Inclusion = struct
              [])
          patch)
 
-  and stories_of_signature (ctx : context)
+  and fragments_of_signature (ctx : context)
       ({ env; subst; missings = _; incompatibles } : signature_symptom) =
     let ctx =
       { ctx with
@@ -528,14 +526,14 @@ module Inclusion = struct
       }
     in
     List.concat_map
-      (fun (id, symptom) -> stories_of_sigitem ctx id symptom)
+      (fun (id, symptom) -> fragments_of_sigitem ctx id symptom)
       incompatibles
 
-  and stories_of_sigitem (ctx : context) id (symptom : sigitem_symptom) =
+  and fragments_of_sigitem (ctx : context) id (symptom : sigitem_symptom) =
     match symptom with
-    | Core c -> stories_of_core ctx id c
+    | Core c -> fragments_of_core ctx id c
     | Module_type_declaration { got; expected; symptom } -> begin
-      match stories_of_mtd_symptom ctx symptom with
+      match fragments_of_mtd_symptom ctx symptom with
       | [] -> []
       | children ->
         let expected_loc, got_loc =
@@ -545,25 +543,25 @@ module Inclusion = struct
         in
         [ declarations_do_not_match ~noun:"module type " ~name:(Ident.name id)
             ~expected_loc ~got_loc
-            ~background:
-              [ Nlg.background
+            ~rules:
+              [ Nlg.rule
                   [ Nlg.txt
                       "module type declarations must be equal on both sides" ]
               ]
             children ]
       end
     | Module_type d -> begin
-      match stories_of_module_type_diff ctx d with
+      match fragments_of_module_type_diff ctx d with
       | [] -> []
       | children ->
         [ declarations_do_not_match ~noun:"module " ~name:(Ident.name id)
             ~expected_loc:None ~got_loc:None children ]
       end
 
-  and stories_of_mtd_symptom (ctx : context)
+  and fragments_of_mtd_symptom (ctx : context)
       (symptom : module_type_declaration_symptom) =
     let direction ctx ~not_included d =
-      match stories_of_module_type_diff ctx d with
+      match fragments_of_module_type_diff ctx d with
       | [] -> []
       | children -> [is_not_included_in ~sides:ctx.sides ~not_included children]
     in
@@ -581,28 +579,28 @@ module Inclusion = struct
             greater_than )
       with
       | [first], [second] when same_children first second ->
-        [Nlg.beheaded first]
+        [Nlg.without_text first]
       | first, second -> first @ second
       end
 
-  and stories_of_core (ctx : context) id (symptom : core_sigitem_symptom) =
+  and fragments_of_core (ctx : context) id (symptom : core_sigitem_symptom) =
     match symptom with
     | Value_descriptions { got; expected; symptom = Includecore.Mode e } ->
-      mode_stories ~expected_declaration:expected ctx
+      mode_fragments ~expected_declaration:expected ctx
         (got.Types.val_loc, Mode.Hint.Structure_item (Mode.Hint.Value, id))
         e
     | Class_declarations { symptom = Class_mode e; _ } ->
-      mode_stories ctx (ctx.fallback, Mode.Hint.Class) e
+      mode_fragments ctx (ctx.fallback, Mode.Hint.Class) e
     | Value_descriptions { got; expected; symptom = Includecore.Modality e; _ }
       ->
-      [ Mode_diagnostics.modality_story ~sides:ctx.sides
+      [ Mode_diagnostics.modality_fragment ~sides:ctx.sides
           (modality_input ~orientation:ctx.orientation
              ~subject:(Modality_item (Ident.name id))
              ~expected_loc:(Some expected.Types.val_loc)
              ~actual_loc:(Some got.Types.val_loc)
              ~requirement:At_least_as_strong e) ]
     | Modalities e ->
-      [ Mode_diagnostics.modality_story ~sides:ctx.sides
+      [ Mode_diagnostics.modality_fragment ~sides:ctx.sides
           (modality_input ~orientation:ctx.orientation
              ~subject:(Modality_item (Ident.name id))
              ~expected_loc:None ~actual_loc:None
@@ -614,7 +612,7 @@ module Inclusion = struct
           ~expected:(Some expected.Types.type_loc)
       in
       match
-        type_stories ~sides:ctx.sides ~orientation:ctx.orientation
+        type_fragments ~sides:ctx.sides ~orientation:ctx.orientation
           ~expected_loc ~actual_loc:got_loc symptom
       with
       | [] -> []
@@ -630,7 +628,7 @@ module Inclusion = struct
       let children =
         match (reason : Includecore.constructor_mismatch) with
         | Includecore.Modality (i, equate) ->
-          [ Mode_diagnostics.modality_story ~sides:ctx.sides
+          [ Mode_diagnostics.modality_fragment ~sides:ctx.sides
               (equate_modality_input ~orientation:ctx.orientation
                  ~subject:
                    (Modality_constructor_arg
@@ -638,7 +636,7 @@ module Inclusion = struct
                  ~expected_loc:(Some ext2.Types.ext_loc)
                  ~actual_loc:(Some ext1.Types.ext_loc) equate) ]
         | Includecore.Inline_record changes ->
-          field_stories ~sides:ctx.sides ~orientation:ctx.orientation changes
+          field_fragments ~sides:ctx.sides ~orientation:ctx.orientation changes
         | Includecore.(
             ( Type _ | Arity | Kind _ | Explicit_return_type _
             | Fixed_representation _ | Immediate_representation _
@@ -683,13 +681,15 @@ module Inclusion = struct
       orientation = Orientation.Got_is_actual
     }
 
-  let stories ~sides ~fallback ~reported_loc
+  let fragments ~sides ~fallback ~reported_loc
       ((i_env, all) : Includemod.explanation) =
-    stories_of_all (initial ~i_env ~fallback ~sides ~reported_loc) all
+    fragments_of_all
+      (initial ~i_env ~fallback ~sides ~reported_loc) all
 
-  let module_type_stories ~env ~sides ~reported_loc symptom =
-    stories_of_module_type_symptom
-      (initial ~i_env:env ~fallback:reported_loc ~sides ~reported_loc)
+  let module_type_fragments ~env ~sides ~reported_loc symptom =
+    fragments_of_module_type_symptom
+      (initial ~i_env:env ~fallback:reported_loc ~sides
+         ~reported_loc)
       symptom
 end
 
@@ -716,8 +716,8 @@ let diagnose ~reported_loc (error : error) =
           [Nlg.txt " does not match its signature"] )
     in
     frame ~subject predicate
-      (Inclusion.stories ~sides:declaration_sides ~fallback:loc ~reported_loc
-         explanation)
+      (Inclusion.fragments ~sides:declaration_sides ~fallback:loc
+         ~reported_loc explanation)
   | Strengthening_mismatch { loc; path = lid; explanation } ->
     let sides =
       { expected_name = [Nlg.txt "the module type"];
@@ -732,7 +732,8 @@ let diagnose ~reported_loc (error : error) =
     in
     frame ~subject
       [Nlg.txt " does not match the module type it strengthens"]
-      (Inclusion.stories ~sides ~fallback:loc ~reported_loc explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
+         explanation)
   | Applicative_functor_mismatch
       { loc; constrained = lid; type_path = path; explanation } ->
     let sides =
@@ -757,7 +758,8 @@ let diagnose ~reported_loc (error : error) =
           Nlg.txt " constraint" ]
     in
     frame ~subject predicate
-      (Inclusion.stories ~sides ~fallback:loc ~reported_loc explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
+         explanation)
   | Substitution_mismatch { loc; path = lid; explanation } ->
     let sides =
       { expected_name = [Nlg.txt "the new definition"];
@@ -772,7 +774,8 @@ let diagnose ~reported_loc (error : error) =
     in
     frame ~subject
       [Nlg.txt " does not match its original definition"]
-      (Inclusion.stories ~sides ~fallback:loc ~reported_loc explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
+         explanation)
   | Functor_application_mismatch { env; app_name; mty_f; args } -> begin
     let failing =
       List.filter_map
@@ -822,8 +825,8 @@ let diagnose ~reported_loc (error : error) =
       frame ~subject predicate
         (List.concat_map
            (fun (_, (diff : Includemod.Error.module_type_diff)) ->
-             Inclusion.module_type_stories ~env ~sides ~reported_loc
-               diff.symptom)
+             Inclusion.module_type_fragments ~env ~sides
+               ~reported_loc diff.symptom)
            failing)
     end
   | Type_definition_mismatch { loc; type_expr; env; mismatch } -> begin
@@ -848,7 +851,7 @@ let diagnose ~reported_loc (error : error) =
         :: located equated_loc [Nlg.code name]
       in
       frame ~subject predicate
-        (type_stories ~sides ~orientation:Orientation.Got_is_actual
+        (type_fragments ~sides ~orientation:Orientation.Got_is_actual
            ~expected_loc:(Some loc) ~actual_loc:equated_loc mismatch)
     | Types.Tvar _ | Types.Tarrow _ | Types.Ttuple _ | Types.Tunboxed_tuple _
     | Types.Tobject _ | Types.Tfield _ | Types.Tquote _ | Types.Tsplice _

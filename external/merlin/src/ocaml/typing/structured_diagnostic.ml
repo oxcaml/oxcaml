@@ -1,3 +1,5 @@
+module Fmt = Format_doc
+
 module Location_key = struct
   type position_key =
     { line : int;
@@ -103,7 +105,7 @@ end
 module Kind = struct
   type t =
     | Explanation
-    | Background
+    | Rule
     | Suggestion
 end
 
@@ -152,10 +154,10 @@ module Block = struct
 
   let equal_kind (left : Kind.t) (right : Kind.t) =
     match left, right with
-    | Explanation, Explanation | Background, Background
+    | Explanation, Explanation | Rule, Rule
     | Suggestion, Suggestion ->
       true
-    | (Explanation | Background | Suggestion), _ -> false
+    | (Explanation | Rule | Suggestion), _ -> false
 
   let equal_relation (left : Relation.t) (right : Relation.t) =
     match left, right with
@@ -195,7 +197,9 @@ end
 
 type t =
   { loc : Location.t;
-    body : Block.t list
+    kind : Location.report_kind;
+    body : Block.t list;
+    legacy : string
   }
 
 module Entities = Symbol_table (struct
@@ -285,7 +289,7 @@ module Json = struct
   let kind_to_string (kind : Kind.t) =
     match kind with
     | Explanation -> "explanation"
-    | Background -> "background"
+    | Rule -> "rule"
     | Suggestion -> "suggestion"
 
   let relation_to_string (relation : Relation.t) =
@@ -303,6 +307,15 @@ module Json = struct
         ["file", string loc.loc_start.pos_fname;
          "start", position_to_value loc.loc_start;
          "end", position_to_value loc.loc_end]
+    in
+    let report_kind_fields (kind : Location.report_kind) =
+      let with_id kind id = [kind_field kind; "id", string id] in
+      match kind with
+      | Report_error -> [kind_field "error"]
+      | Report_warning id -> with_id "warning" id
+      | Report_warning_as_error id -> with_id "warning_as_error" id
+      | Report_alert id -> with_id "alert" id
+      | Report_alert_as_error id -> with_id "alert_as_error" id
     in
     let annotation_to_value (annotation : Wire.Annotation.t) =
       match annotation with
@@ -355,13 +368,16 @@ module Json = struct
     in
     let tables, body = intern_body diagnostic.body in
     object_
-      ["loc", location_to_value diagnostic.loc;
-       "entities",
-       array (List.map entity_to_value (Entities.to_list tables.entities));
-       "glossary",
-       array
-         (List.map glossary_entry_to_value (Glossary.to_list tables.glossary));
-       "body", array (List.map block_to_value body)]
+      (report_kind_fields diagnostic.kind
+       @ ["loc", location_to_value diagnostic.loc;
+          "entities",
+          array (List.map entity_to_value (Entities.to_list tables.entities));
+          "glossary",
+          array
+            (List.map glossary_entry_to_value
+               (Glossary.to_list tables.glossary));
+          "body", array (List.map block_to_value body);
+          "legacy", string diagnostic.legacy])
 
   let from_value ~string ~int ~array ~field ~optional_field value =
     let position_of_value ~file json =
@@ -379,6 +395,17 @@ module Json = struct
         loc_end = position_of_value ~file (field "end" json);
         loc_ghost = false
       }
+    in
+    let report_kind_of_value json =
+      match string (field "kind" json) with
+      | "error" -> Location.Report_error
+      | "warning" -> Location.Report_warning (string (field "id" json))
+      | "warning_as_error" ->
+        Location.Report_warning_as_error (string (field "id" json))
+      | "alert" -> Location.Report_alert (string (field "id" json))
+      | "alert_as_error" ->
+        Location.Report_alert_as_error (string (field "id" json))
+      | kind -> Json.malformed "unknown report kind %S" kind
     in
     let resolve items kind json =
       let serialized = int json in
@@ -449,7 +476,7 @@ module Json = struct
     let kind_of_value json =
       match string json with
       | "explanation" -> Kind.Explanation
-      | "background" -> Kind.Background
+      | "rule" -> Kind.Rule
       | "suggestion" -> Kind.Suggestion
       | kind -> Json.malformed "unknown block kind %S" kind
     in
@@ -479,7 +506,11 @@ module Json = struct
       List.map (block_of_value ~entities ~glossary)
         (array (field "body" value))
     in
-    { loc; body }
+    { loc;
+      kind = report_kind_of_value value;
+      body;
+      legacy = string (field "legacy" value)
+    }
 
   let of_json text =
     match
@@ -504,3 +535,62 @@ end
 let to_json = Json.to_json
 
 let of_json = Json.of_json
+
+let format ppf diagnostic =
+  let source_location ppf loc =
+    if not (Location.is_none loc)
+       && not
+            (Location_key.equal
+               (Location_key.of_location loc)
+               (Location_key.of_location diagnostic.loc))
+    then
+      Fmt.fprintf ppf "@ at %a"
+        (Location.Doc.loc ~capitalize_first:false) loc
+  in
+  let rec inlines ~in_code ppf content =
+    List.iter (inline ~in_code ppf) content
+  and inline ~in_code ppf (inline : Inline.t) =
+    match inline with
+    | Text text ->
+      if in_code then Fmt.pp_print_string ppf text else Fmt.pp_print_text ppf text
+    | Annotated { annotation = Code; content } ->
+      Misc.Style.as_inline_code (inlines ~in_code:true) ppf content
+    | Annotated { annotation = Source loc; content } ->
+      Fmt.fprintf ppf "%a%a" (inlines ~in_code) content source_location loc
+    | Annotated { annotation = Mention _ | Term _; content } ->
+      inlines ~in_code ppf content
+  in
+  let rec has_text content =
+    List.exists
+      (fun (inline : Inline.t) ->
+        match inline with
+        | Text text -> not (String.equal text "")
+        | Annotated { annotation = _; content } -> has_text content)
+      content
+  in
+  let prefix ppf = function
+    | Kind.Explanation | Kind.Rule -> ()
+    | Kind.Suggestion -> Fmt.fprintf ppf "@{<hint>Hint@}: "
+  in
+  let children ppf = function
+    | [] -> ()
+    | children ->
+      Fmt.fprintf ppf "@,%a"
+        (Fmt.pp_print_list ~pp_sep:Fmt.pp_print_cut Fmt.pp_doc) children
+  in
+  let rec blocks ~indent (block : Block.t) =
+    let visible = has_text block.content in
+    let child_indent = if visible then 0 else indent in
+    let nested =
+      List.concat_map
+        (fun (_, child) -> blocks ~indent:child_indent child)
+        block.children
+    in
+    if visible then
+      [ Fmt.doc_printf "@[<v %d>@[<hov>%a%a@]%a@]" indent prefix block.kind
+          (inlines ~in_code:false) block.content children nested ]
+    else nested
+  in
+  Fmt.fprintf ppf "@[<v>%a@]"
+    (Fmt.pp_print_list ~pp_sep:Fmt.pp_print_cut Fmt.pp_doc)
+    (List.concat_map (blocks ~indent:2) diagnostic.body)

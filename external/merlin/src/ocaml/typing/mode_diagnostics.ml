@@ -1,5 +1,5 @@
 module Nlg = Diagnostic_nlg
-module Phrase = Nlg.Phrase
+open Nlg
 module Step_mode = Mode.Reported_mode
 module Side = Diagnostic_term.Side
 
@@ -13,12 +13,7 @@ type mode_description = Step_mode.described list
 
 type term = Diagnostic_term.t
 
-type subject = Nlg.subject
-
-type story = term Nlg.story
-
-let plain_story ~claim ?contrast ?background ?suggestions () : story list =
-  [Nlg.plain ~claim ?contrast ?background ?suggestions ()]
+type fragment = term Nlg.fragment
 
 let described_point (description : Step_mode.described) = description.semantic
 
@@ -27,6 +22,41 @@ let mode_word = Diagnostic_term.mode_word
 let modality_word = Diagnostic_term.modality_word
 
 let mode_const_word = Diagnostic_term.mode_const_word
+
+let local = mode_const_word (Comonadic Areality) Mode.Locality.Const.Local
+
+and once = mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Once
+
+and many = mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Many
+
+and portable =
+  mode_const_word (Comonadic Portability) Mode.Portability.Const.Portable
+
+and nonportable =
+  mode_const_word (Comonadic Portability) Mode.Portability.Const.Nonportable
+
+and unique = mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Unique
+
+and aliased = mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Aliased
+
+and uncontended =
+  mode_const_word (Monadic Contention) Mode.Contention.Const.Uncontended
+
+and shared = mode_const_word (Monadic Contention) Mode.Contention.Const.Shared
+
+and contended =
+  mode_const_word (Monadic Contention) Mode.Contention.Const.Contended
+
+and read = mode_const_word (Monadic Visibility) Mode.Visibility.Const.Read
+
+and write = mode_const_word (Monadic Visibility) Mode.Visibility.Const.Write
+
+and read_write =
+  mode_const_word (Monadic Visibility) Mode.Visibility.Const.Read_write
+
+and static = mode_const_word (Monadic Staticity) Mode.Staticity.Static
+
+and dynamic = mode_const_word (Monadic Staticity) Mode.Staticity.Dynamic
 
 type argument_requirement =
   { callee : Mode.Hint.pinpoint;
@@ -163,16 +193,6 @@ module Meaning = struct
     | Const (Spliced _) -> Fact Spliced
     | Const (Contained_by c) -> Reroute (Contained_by c)
     | Const (Cmx_not_guaranteed unit) -> Fact (Static_not_guaranteed unit)
-
-  let is_region_escape : fact -> bool = function
-    | Region_escape _ -> true
-    | Mutable_read _ | Mutable_write _ | Lazy_allocated_on_heap | Lazy_forced
-    | Module_allocated_on_heap | Unpacked_module | Legacy_construct _
-    | Toplevel_expression | Tailcall_function | Tailcall_argument
-    | Function_return_default | Stack_allocated | Always_dynamic _
-    | Has_branches | Layout_poly_instantiated | Borrowed | Quoted_computation
-    | Spliced | Static_not_guaranteed _ ->
-      false
 end
 
 module Step = struct
@@ -203,48 +223,13 @@ module Step = struct
         | _ -> false
       in
       if transparent then for_explanation rest else s :: for_explanation rest
-
-  let is_capture (s : t) =
-    match s.says with
-    | Capture _ -> true
-    | Nothing_to_say | Unexplained | User_annotation _ | Signature_argument _
-    | Fact _ | Reroute _ ->
-      false
-
-  let is_region_escape (s : t) =
-    match s.says with
-    | Fact fact -> Meaning.is_region_escape fact
-    | Nothing_to_say | Unexplained | User_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
-      false
-
-  let mutable_read (s : t) : Mode.Hint.mutable_part option =
-    match s.says with
-    | Fact (Mutable_read part) -> Some part
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
-      None
-
-  let mutable_write (s : t) : Mode.Hint.mutable_part option =
-    match s.says with
-    | Fact (Mutable_write part) -> Some part
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
-      None
-
-  let is_function_return (s : t) =
-    match s.says with
-    | Fact Function_return_default -> true
-    | Fact _ | Nothing_to_say | Unexplained | User_annotation _ | Capture _
-    | Signature_argument _ | Reroute _ ->
-      false
 end
 
 let word_segment = function
-  | Phrase.Text text -> Nlg.txt text
-  | Phrase.Code text -> Nlg.code text
+  | Phrase.Text text -> txt text
+  | Phrase.Code text -> code text
 
-let subject_words subject = List.map word_segment subject.Nlg.name
+let subject_words (subject : subject) = List.map word_segment subject.name
 
 let human_desc : Mode.Hint.pinpoint_desc -> string = function
   | Unknown -> "this value"
@@ -272,7 +257,7 @@ let human_desc : Mode.Hint.pinpoint_desc -> string = function
 
 let subject_of_loc ~fallback loc =
   let span = if Location.is_none loc then None else Some loc in
-  Nlg.subject ?span [Phrase.Text fallback]
+  subject ?span [Phrase.Text fallback]
 
 let subject_of_pinpoint ((loc, desc) : Mode.Hint.pinpoint) =
   match desc with
@@ -286,12 +271,18 @@ let subject_of_pinpoint ((loc, desc) : Mode.Hint.pinpoint) =
     in
     let name = Format_doc.asprintf "%a" Printtyp.Doc.longident lid in
     let span = if Location.is_none loc then None else Some loc in
-    Nlg.subject ?span [Phrase.Text noun; Phrase.Code name]
-  | Structure_item (_, id) -> Nlg.subject ~span:loc [Phrase.Code (Ident.name id)]
+    subject ?span [Phrase.Text noun; Phrase.Code name]
+  | Structure_item (_, id) -> subject ~span:loc [Phrase.Code (Ident.name id)]
   | Unknown | Function | Module | Functor | Functor_parameter | Parameter
   | Return | Structure | Lazy | Quote | Allocation | Expression | Effect_match
   | Effect_try | Class | Object | Loop | Letop | Cases_result | Pattern ->
     subject_of_loc ~fallback:(human_desc desc) loc
+
+let located_mention (subject : subject) =
+  let words = mention ~case:Subject subject in
+  match subject.span with
+  | None -> words
+  | Some loc -> ref_source loc [words]
 
 let short_subject (subject : subject) =
   match subject.name with
@@ -319,7 +310,6 @@ let subject_of_chain (pinpoint : Mode.Hint.pinpoint) (chain : Step.t list) =
 
 let description_words (description : mode_description) :
     term Phrase.segment list =
-  let open Nlg in
   match description with
   | [] -> []
   | first :: alternatives ->
@@ -331,7 +321,6 @@ let description_words (description : mode_description) :
 
 let mutable_part_noun (part : Mode.Hint.mutable_part) :
     term Phrase.segment list * Phrase.number =
-  let open Nlg in
   match part with
   | Record_field f -> [txt "mutable field "; code f], Singular
   | Array_elements -> [txt "array elements"], Plural
@@ -346,426 +335,387 @@ let containing_text (containing : Mode.Hint.containing) =
   | Constructor (name, Modality) -> with_modality ("via constructor " ^ name)
   | Structure (_, Modality) -> with_modality "in the structure"
 
-let modality_annotation_reason ~mode_name ~subject:owner ?(asides = [])
-    (written : string Location.loc) =
-  let open Nlg in
-  let implication =
+let annotation_fragments ~mode_name ~mode ~subject:owner
+    (source : Mode.Hint.annotation_source) =
+  match source with
+  | Written_modality written ->
+    [ reason ~subject:owner
+        [ txt "because ";
+          mention ~case:Subject owner;
+          copula;
+          txt " annotated ";
+          ref_source written.loc
+            [term (Diagnostic_term.Written_modality_term written.txt)] ] ]
+    @
     if String.equal mode_name written.txt
     then []
     else
-      [ background
+      [ rule
           [ code mode_name;
             txt " is implied by the ";
             code written.txt;
             txt " modality" ] ]
-  in
-  note ~subject:owner ~asides:(asides @ implication)
-    [ txt "because ";
-      mention ~case:Subject owner;
-      copula;
-      txt " annotated ";
-      ref_source written.loc
-        [term (Diagnostic_term.Written_modality_term written.txt)] ]
-
-let annotation_reason ~mode_name ~mode ~subject:owner ?(asides = [])
-    (source : Mode.Hint.annotation_source) =
-  let open Nlg in
-  match source with
-  | Written_modality written ->
-    [modality_annotation_reason ~mode_name ~subject:owner ~asides written]
   | Written_mode written ->
-    [ note ~subject:owner ~asides
+    [ reason ~subject:owner
         [ txt "because ";
           mention ~case:Subject owner;
           ref_source written.loc (copula :: txt " annotated as " :: mode) ] ]
   | Mutable_field field ->
-    let implication =
-      background
-        [ txt "mutable fields imply the ";
-          term (Diagnostic_term.Written_modality_term mode_name);
-          txt " modality by default" ]
-    in
-    [ note ~asides
+    [ reason
         [ txt "because field ";
           ref_source field.loc
             [code field.txt; txt " is declared "; code "mutable"] ];
-      implication ]
+      rule
+        [ txt "mutable fields imply the ";
+          term (Diagnostic_term.Written_modality_term mode_name);
+          txt " modality by default" ] ]
 
-let say_step ~side ~asides ~subject:(owner : subject) (s : Step.t) :
-    term Nlg.aside list =
-  let subj = Nlg.mention ~case:Subject owner in
-  let subject_possessive = Nlg.mention ~case:Possessive owner in
-  let subject_pronoun = Nlg.pronoun ~case:Possessive owner in
-  let say segments = Nlg.note ~asides (Nlg.txt "because " :: segments) in
-  let about segments =
-    Nlg.note ~subject:owner ~asides (Nlg.txt "because " :: segments)
-  in
-  let mode =
-    Step_mode.describe
-      (Side.select side ~expected:`Expected ~actual:`Actual)
-      s.mode
-    |> description_words
-  in
-  let open Nlg in
-  let is_ rest = [say [subj; copula; txt (" " ^ rest)]] in
-  let mutable_access part verb =
-    let noun, number = mutable_part_noun part in
-    [ say
-        ((subject_possessive :: txt " " :: noun)
-        @ [copula_agreeing number; txt (" being " ^ verb)]) ]
-  in
-  match s.says with
-  | Nothing_to_say | Unexplained -> []
-  | User_annotation source ->
-    annotation_reason ~mode_name:(Step_mode.name s.mode) ~mode ~subject:owner
-      ~asides source
-  | Capture { relation = Closes_over; details = { closed; _ }; _ } ->
-    [ about
-        [ subj;
-          txt " closes over ";
-          Nlg.mention ~case:Subject (subject_of_pinpoint closed) ] ]
-  | Capture { relation = Used_inside; details = { closure; _ }; _ } ->
-    [ about
-        [ subj;
-          copula;
-          txt " used inside ";
-          Nlg.mention ~case:Subject (subject_of_pinpoint closure) ] ]
-  | Signature_argument
-      { callee; argument; parameter = { label; index_in_callee_arrow_type } } ->
-    let callee = short_subject (subject_of_pinpoint callee) in
-    let argument = short_subject (subject_of_pinpoint argument) in
-    let position =
-      match (label : Mode.Hint.argument_label) with
-      | Labelled label | Position label -> [code ("~" ^ label); txt " argument"]
-      | Optional label -> [code ("?" ^ label); txt " argument"]
-      | Unlabelled ->
-        [txt (Nlg.ordinal (index_in_callee_arrow_type + 1) ^ " argument")]
-    in
-    [ say
-        ([Nlg.mention ~case:Subject callee; txt " requires its "]
-        @ position
-        @ [txt ", "; Nlg.mention ~case:Subject argument; txt ","]
-        @ (txt " to be " :: mode)) ]
-  | Fact (Mutable_read part) -> mutable_access part "read"
-  | Fact (Mutable_write part) -> mutable_access part "written"
-  | Fact Lazy_allocated_on_heap ->
-    [about [subj; copula; txt " a lazy expression allocated on the heap"]]
-  | Fact Module_allocated_on_heap ->
-    [about [subj; copula; txt " a module allocated on the heap"]]
-  | Fact Unpacked_module ->
-    [say [txt "unpacked first-class modules are always dynamic"]]
-  | Fact (Legacy_construct legacy) ->
-    let what =
-      match (legacy : Mode.Hint.legacy) with
-      | Toplevel -> "a top-level definition"
-      | Compilation_unit -> "a compilation unit"
-      | Class -> "a class"
-      | Quoted -> "a quoted expression's result"
-    in
-    [ about
-        [subj; copula; txt (" " ^ what ^ ", which always has the legacy modes")]
-    ]
-  | Fact Layout_poly_instantiated ->
-    [about [subj; copula; txt " layout-polymorphic and instantiated here"]]
-  | Fact Lazy_forced -> is_ "a lazy value being forced"
-  | Fact Toplevel_expression -> is_ "a top-level expression"
-  | Fact Tailcall_function -> is_ "the function of a tail call"
-  | Fact Tailcall_argument -> is_ "an argument of a tail call"
-  | Fact Function_return_default -> is_ "returned from a function"
-  | Fact Stack_allocated ->
-    [say [subj; copula; txt " allocated with "; code "stack_"]]
-  | Fact (Always_dynamic x) ->
-    let what =
-      match (x : Mode.Hint.always_dynamic) with
-      | Application -> "function applications"
-      | Try_with -> "try-with clauses"
-      | Generative_functor -> "generative functor applications"
-    in
-    [say [txt (what ^ " are always dynamic")]]
-  | Fact Has_branches -> [say [subj; txt " has branches"]]
-  | Fact Borrowed -> is_ "borrowed"
-  | Fact (Region_escape (loc, Borrow)) ->
-    let escape = txt " escapes a borrow region" in
-    [ say
-        [ subj;
-          (if Location.is_none loc then escape else ref_source loc [escape]) ]
-    ]
-  | Fact Quoted_computation -> is_ "the quote of a computation"
-  | Fact Spliced -> is_ "spliced"
-  | Fact (Static_not_guaranteed (Some unit)) ->
-    [ say
-        [ code (Compilation_unit.name_as_string unit);
-          txt
-            " is neither a core library nor the current library, and only \
-             those can be ";
-          mode_const_word (Monadic Staticity) Mode.Staticity.Static ] ]
-  | Fact (Static_not_guaranteed None) ->
-    [ say
-        [ txt "parameter modules are always ";
-          mode_const_word (Monadic Staticity) Mode.Staticity.Dynamic ] ]
-  | Reroute Mode_crossing ->
-    [say [subj; txt " crosses modes based on "; subject_pronoun; txt " type"]]
-  | Reroute Partial_application_capture ->
-    is_ "captured by a partial application"
-  | Reroute (Allocation { txt = desc; loc }) ->
-    let located words =
-      if Location.is_none loc then words else [ref_source loc words]
-    in
-    let specific =
-      match (desc : Mode.Hint.allocation_desc) with
-      | Unknown -> [copula; txt " an allocation"]
-      | Optional_argument -> [copula; txt " boxed as an optional argument"]
-      | Function_coercion -> [copula; txt " partially applied"]
-      | Float_projection -> [copula; txt " a float-record projection"]
-      | Lpoly_captured_environment ->
-        [txt " captures a layout-polymorphic environment"]
-      | Captured_by_partial_application ->
-        [copula; txt " captured by a partial application"]
-    in
-    [about (subj :: located specific)]
-  | Reroute (Contains { containing; contained }) ->
-    let contained = subject_of_pinpoint contained in
-    [ say
-        [ subj;
-          txt " contains ";
-          Nlg.mention ~case:Subject contained;
-          txt (" (" ^ containing_text containing ^ ")") ] ]
-  | Reroute (Contained_by { containing; container }) ->
-    let container = subject_of_pinpoint container in
-    [ say
-        [ subj;
-          copula;
-          txt " contained in ";
-          Nlg.mention ~case:Subject container;
-          txt (" (" ^ containing_text containing ^ ")") ] ]
-  | Reroute (Shared_staticity shared) ->
-    let related =
-      match shared with
-      | Of_functor loc -> subject_of_loc ~fallback:"the functor" loc
-      | Of_functor_parameter loc ->
-        subject_of_loc ~fallback:"the functor parameter" loc
-    in
-    [ say
-        [ subj;
-          txt " shares the staticity of ";
-          Nlg.mention ~case:Subject related ] ]
-  | Reroute (Functor_application loc) ->
-    let applied = subject_of_loc ~fallback:"the functor" loc in
-    [ say
-        [ subj;
-          copula;
-          txt " an application of ";
-          Nlg.mention ~case:Subject applied ] ]
-  | Reroute (Functor_applied_at loc) ->
-    let application = subject_of_loc ~fallback:"this application" loc in
-    [ say
-        [subj; copula; txt " applied at "; Nlg.mention ~case:Subject application]
-    ]
+let same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right) =
+  Int.equal (Mode.Alloc.Axis.compare left right) 0
 
-let rec explain_chain ~side ~subject ~extras (chain : Step.t list) :
-    term Nlg.aside list =
-  let following rest =
-    match rest with [] -> None | (next : Step.t) :: _ -> Some next
+let explain_chain ~axis ~side ~subject:initial_subject chain :
+    fragment list =
+  let show_suggestions = Side.select side ~expected:true ~actual:false in
+  let next_context ~side ~subject:owner (step : Step.t) rest =
+    match step.says with
+    | Capture { relation; details; source_side } ->
+      let pinpoint =
+        match relation with
+        | Closes_over -> details.closed
+        | Used_inside -> details.closure
+      in
+      source_side, subject_of_chain pinpoint rest
+    | Nothing_to_say | Unexplained -> side, owner
+    | User_annotation _ | Signature_argument _ | Fact _ | Reroute _ ->
+      let subject =
+        match rest with
+        | [] -> owner
+        | (next : Step.t) :: _ ->
+          let same_location =
+            Structured_diagnostic.Location_key.equal
+              (Structured_diagnostic.Location_key.of_location
+                 (fst step.pinpoint))
+              (Structured_diagnostic.Location_key.of_location
+                 (fst next.pinpoint))
+          in
+          if same_location then owner else subject_of_pinpoint next.pinpoint
+      in
+      side, subject
   in
-  match chain with
-  | [] -> []
-  | { says = Nothing_to_say | Unexplained; _ } :: rest ->
-    explain_chain ~side ~subject ~extras rest
-  | ({ says = Capture { relation; details; source_side }; _ } as step) :: rest
-    ->
-    let pinpoint =
-      match relation with
-      | Closes_over -> details.closed
-      | Used_inside -> details.closure
-    in
-    let source = subject_of_chain pinpoint rest in
-    let asides =
-      match rest with
-      | [] -> []
-      | next :: _ ->
-        let predicate =
-          match relation, source_side with
-          | _, Actual -> " "
-          | Closes_over, Expected -> " used as "
-          | Used_inside, Expected -> " expected to be "
+  let rec explain ~side ~subject:(owner : subject) (chain : Step.t list) =
+    match chain with
+    | [] -> [], None
+    | { says = Nothing_to_say | Unexplained; _ } :: rest ->
+      explain ~side ~subject:owner rest
+    | s :: rest -> (
+      let subj = mention ~case:Subject owner in
+      let subject_possessive = mention ~case:Possessive owner in
+      let subject_pronoun = pronoun ~case:Possessive owner in
+      let say segments = reason (txt "because " :: segments) in
+      let about segments = reason ~subject:owner (txt "because " :: segments) in
+      let mode =
+        Step_mode.describe
+          (Side.select side ~expected:`Expected ~actual:`Actual)
+          s.mode
+        |> description_words
+      in
+      let continuation =
+        lazy
+          (let side, subject = next_context ~side ~subject:owner s rest in
+           explain ~side ~subject rest)
+      in
+      let continue () = fst (Lazy.force continuation) in
+      let is_ rest = [say [subj; copula; txt (" " ^ rest)]] in
+      let mutable_access ~writing part =
+        let noun, number = mutable_part_noun part in
+        let verb = if writing then "written" else "read" in
+        [ say
+            ((subject_possessive :: txt " " :: noun)
+            @ [copula_agreeing number; txt (" being " ^ verb)]) ]
+        @
+        match axis with
+        | Mode.Alloc.Axis.P (Monadic (Contention | Visibility)) ->
+          let part, owner =
+            match (part : Mode.Hint.mutable_part) with
+            | Record_field _ -> "a mutable field", "the value"
+            | Array_elements -> "mutable array elements", "the array"
+          in
+          let required =
+            match axis, writing with
+            | Mode.Alloc.Axis.P (Monadic Contention), true -> [uncontended]
+            | Mode.Alloc.Axis.P (Monadic Contention), false ->
+              [shared; txt " or "; uncontended]
+            | _, true -> [write; txt " or "; read_write]
+            | _, false -> [read; txt " or "; read_write]
+          in
+          [ rule
+              (txt
+                 ((if writing then "writing " else "reading ")
+                 ^ part ^ " requires " ^ owner ^ " to be ")
+              :: required) ]
+        | _ -> []
+      in
+      let fragments =
+        match s.says with
+        | Nothing_to_say | Unexplained -> continue ()
+        | User_annotation source ->
+          annotation_fragments ~mode_name:(Step_mode.name s.mode) ~mode
+            ~subject:owner source
+        | Capture { relation; details; source_side } ->
+          let pinpoint, relation_words =
+            match relation with
+            | Closes_over -> details.closed, [txt " closes over "]
+            | Used_inside -> details.closure, [copula; txt " used inside "]
+          in
+          let source = subject_of_chain pinpoint rest in
+          [ about
+              ((subj :: relation_words)
+              @ [located_mention (subject_of_pinpoint pinpoint)])
+            |> with_children
+                 (match rest with
+                 | [] -> []
+                 | next :: _ ->
+                   let predicate =
+                     match relation, source_side with
+                     | _, Actual -> " "
+                     | Closes_over, Expected -> " used as "
+                     | Used_inside, Expected -> " expected to be "
+                   in
+                   let mode =
+                     Step_mode.describe
+                       (Side.select source_side ~expected:`Expected
+                          ~actual:`Actual)
+                       next.mode
+                     |> description_words
+                   in
+                   [ reason
+                       (txt "and "
+                       :: mention ~case:Subject source
+                       :: copula :: txt predicate :: mode)
+                     |> with_children (continue ()) ]) ]
+          @
+          let step_on wanted (step : Step.t) =
+            match Mode.reported_mode_as_alloc_atom step.mode with
+            | None -> false
+            | Some (Mode.Alloc.Atom (axis, _)) ->
+              same_alloc_axis (Mode.Alloc.Axis.P axis) wanted
+          in
+          let crosses ~source ~target =
+            step_on source s
+            && match rest with [] -> false | next :: _ -> step_on target next
+          in
+          let portability = Mode.Alloc.Axis.P (Comonadic Portability) in
+          let contention = Mode.Alloc.Axis.P (Monadic Contention) in
+          if
+            same_alloc_axis axis portability
+            && crosses ~source:portability ~target:contention
+          then
+            [ rule
+                [ txt "a function that closes over ";
+                  uncontended;
+                  txt " data";
+                  copula;
+                  txt " ";
+                  nonportable ] ]
+          else if
+            same_alloc_axis axis contention
+            && crosses ~source:contention ~target:portability
+          then
+            [ rule
+                [ txt "values used inside a ";
+                  portable;
+                  txt " function";
+                  copula_agreeing Plural;
+                  txt " ";
+                  contended ] ]
+          else []
+        | Signature_argument
+            { callee;
+              argument;
+              parameter = { label; index_in_callee_arrow_type }
+            } ->
+          let callee = short_subject (subject_of_pinpoint callee) in
+          let argument = short_subject (subject_of_pinpoint argument) in
+          let argument_mention =
+            match argument.name with
+            | [Phrase.Code _] ->
+              [txt ", "; mention ~case:Subject argument; txt ","]
+            | _ -> []
+          in
+          let position =
+            match (label : Mode.Hint.argument_label) with
+            | Labelled label | Position label ->
+              [code ("~" ^ label); txt " argument"]
+            | Optional label -> [code ("?" ^ label); txt " argument"]
+            | Unlabelled ->
+              [txt (ordinal (index_in_callee_arrow_type + 1) ^ " argument")]
+          in
+          [ say
+              ([mention ~case:Subject callee; txt " requires its "]
+              @ position @ argument_mention @ (txt " to be " :: mode))
+            |> with_children (continue ()) ]
+        | Fact (Mutable_read part) -> mutable_access ~writing:false part
+        | Fact (Mutable_write part) -> mutable_access ~writing:true part
+        | Fact Lazy_allocated_on_heap ->
+          [about [subj; copula; txt " a lazy expression allocated on the heap"]]
+        | Fact Module_allocated_on_heap ->
+          [about [subj; copula; txt " a module allocated on the heap"]]
+        | Fact Unpacked_module ->
+          [say [txt "unpacked first-class modules are always dynamic"]]
+        | Fact (Legacy_construct legacy) ->
+          let what =
+            match (legacy : Mode.Hint.legacy) with
+            | Toplevel -> "a top-level definition"
+            | Compilation_unit -> "a compilation unit"
+            | Class -> "a class"
+            | Quoted -> "a quoted expression's result"
+          in
+          [ about
+              [ subj;
+                copula;
+                txt (" " ^ what ^ ", which always has the legacy modes") ] ]
+        | Fact Layout_poly_instantiated ->
+          [about [subj; copula; txt " layout-polymorphic and instantiated here"]]
+        | Fact Lazy_forced -> is_ "a lazy value being forced"
+        | Fact Toplevel_expression -> is_ "a top-level expression"
+        | Fact Tailcall_function -> is_ "the function of a tail call"
+        | Fact Tailcall_argument -> is_ "an argument of a tail call"
+        | Fact Function_return_default ->
+          is_ "returned from a function"
+          @
+          if show_suggestions
+          then
+            [ suggestion
+                [ txt "use ";
+                  code "exclave_";
+                  txt " to return a ";
+                  local;
+                  txt " value" ] ]
+          else []
+        | Fact Stack_allocated ->
+          [say [subj; copula; txt " allocated with "; code "stack_"]]
+        | Fact (Always_dynamic x) ->
+          let what =
+            match (x : Mode.Hint.always_dynamic) with
+            | Application -> "function applications"
+            | Try_with -> "try-with clauses"
+            | Generative_functor -> "generative functor applications"
+          in
+          [say [txt (what ^ " are always dynamic")]]
+        | Fact Has_branches -> [say [subj; txt " has branches"]]
+        | Fact Borrowed -> is_ "borrowed"
+        | Fact (Region_escape (loc, Borrow)) -> (
+          let escape = txt " escapes a borrow region" in
+          [ say
+              [ subj;
+                (if Location.is_none loc then escape else ref_source loc [escape])
+              ] ]
+          @
+          match axis with
+          | Mode.Alloc.Axis.P (Comonadic Areality) ->
+            [rule [local; txt " values cannot escape their region"]]
+          | _ -> [])
+        | Fact Quoted_computation -> is_ "the quote of a computation"
+        | Fact Spliced -> is_ "spliced"
+        | Fact (Static_not_guaranteed (Some unit)) ->
+          [ say
+              [ code (Compilation_unit.name_as_string unit);
+                txt
+                  " is neither a core library nor the current library, and only \
+                   those can be ";
+                static ] ]
+        | Fact (Static_not_guaranteed None) ->
+          [say [txt "parameter modules are always "; dynamic]]
+        | Reroute Mode_crossing ->
+          [ say
+              [subj; txt " crosses modes based on "; subject_pronoun; txt " type"]
+            |> with_children (continue ()) ]
+        | Reroute Partial_application_capture ->
+          [ say [subj; copula; txt " captured by a partial application"]
+            |> with_children (continue ()) ]
+        | Reroute (Allocation { txt = desc; loc }) ->
+          let located words =
+            if Location.is_none loc then words else [ref_source loc words]
+          in
+          let specific =
+            match (desc : Mode.Hint.allocation_desc) with
+            | Unknown -> [copula; txt " an allocation"]
+            | Optional_argument -> [copula; txt " boxed as an optional argument"]
+            | Function_coercion -> [copula; txt " partially applied"]
+            | Float_projection -> [copula; txt " a float-record projection"]
+            | Lpoly_captured_environment ->
+              [txt " captures a layout-polymorphic environment"]
+            | Captured_by_partial_application ->
+              [copula; txt " captured by a partial application"]
+          in
+          [about (subj :: located specific) |> with_children (continue ())]
+        | Reroute (Contains { containing; contained }) ->
+          let contained = subject_of_pinpoint contained in
+          [ say
+              [ subj;
+                txt " contains ";
+                located_mention contained;
+                txt (" (" ^ containing_text containing ^ ")") ]
+            |> with_children (continue ()) ]
+        | Reroute (Contained_by { containing; container }) ->
+          let container = subject_of_pinpoint container in
+          [ say
+              [ subj;
+                copula;
+                txt " contained in ";
+                located_mention container;
+                txt (" (" ^ containing_text containing ^ ")") ]
+            |> with_children (continue ()) ]
+        | Reroute (Shared_staticity shared) ->
+          let related =
+            match shared with
+            | Of_functor loc -> subject_of_loc ~fallback:"the functor" loc
+            | Of_functor_parameter loc ->
+              subject_of_loc ~fallback:"the functor parameter" loc
+          in
+          [ say
+              [ subj;
+                txt " shares the staticity of ";
+                located_mention related ]
+            |> with_children (continue ()) ]
+        | Reroute (Functor_application loc) ->
+          let applied = subject_of_loc ~fallback:"the functor" loc in
+          [ say
+              [ subj;
+                copula;
+                txt " an application of ";
+                located_mention applied ]
+            |> with_children (continue ()) ]
+        | Reroute (Functor_applied_at loc) ->
+          let application = subject_of_loc ~fallback:"this application" loc in
+          [ say
+              [ subj; copula; txt " applied at ";
+                located_mention application ]
+            |> with_children (continue ()) ]
+      in
+      let is_cause =
+        match s.says with
+        | User_annotation _ -> true
+        | _ -> List.exists Nlg.is_rule fragments
+      in
+      match fragments with
+      | [] -> [], None
+      | _ :: _ ->
+        let fragment = explanation fragments in
+        let cause =
+          if is_cause then Some fragment
+          else if Lazy.is_val continuation then snd (Lazy.force continuation)
+          else None
         in
-        let mode =
-          Step_mode.describe
-            (Side.select source_side ~expected:`Expected ~actual:`Actual)
-            next.mode
-          |> description_words
-        in
-        (* Introduce the next subject by name; its reasons may use pronouns. *)
-        [ Nlg.note
-            ~asides:
-              (explain_chain ~side:source_side ~subject:source ~extras rest)
-            (Nlg.txt "and "
-            :: Nlg.mention ~case:Subject source
-            :: Nlg.copula :: Nlg.txt predicate :: mode) ]
-    in
-    say_step ~side ~asides ~subject step @ extras step (following rest)
-  | step :: rest ->
-    let next_subject =
-      match rest with
-      | [] -> subject
-      | next :: _ ->
-        let same_location =
-          Structured_diagnostic.Location_key.equal
-            (Structured_diagnostic.Location_key.of_location (fst step.pinpoint))
-            (Structured_diagnostic.Location_key.of_location (fst next.pinpoint))
-        in
-        if same_location then subject else subject_of_pinpoint next.pinpoint
-    in
-    let asides = explain_chain ~side ~subject:next_subject ~extras rest in
-    say_step ~side ~asides ~subject step @ extras step (following rest)
-
-module Rule = struct
-  type accessed =
-    | Field
-    | Array_elements
-
-  type mutable_axis =
-    | On_contention
-    | On_visibility
-
-  type t =
-    | Nonportable_closure
-    | Portable_function_contends_captures
-    | Mutable_write_requirement of accessed * mutable_axis
-    | Mutable_read_requirement of accessed * mutable_axis
-    | Local_escape
-
-  let accessed (part : Mode.Hint.mutable_part) : accessed =
-    match part with Record_field _ -> Field | Array_elements -> Array_elements
-
-  let accessed_nouns : accessed -> string * string = function
-    | Field -> "a mutable field", "the value"
-    | Array_elements -> "mutable array elements", "the array"
-
-  let sentence : t -> term Phrase.segment list =
-    let open Nlg in
-    function
-    | Nonportable_closure ->
-      [ txt "a function that closes over ";
-        mode_const_word (Monadic Contention) Mode.Contention.Const.Uncontended;
-        txt " data";
-        copula;
-        txt " ";
-        mode_const_word (Comonadic Portability)
-          Mode.Portability.Const.Nonportable ]
-    | Portable_function_contends_captures ->
-      [ txt "values used inside a ";
-        mode_const_word (Comonadic Portability) Mode.Portability.Const.Portable;
-        txt " function";
-        copula_agreeing Plural;
-        txt " ";
-        mode_const_word (Monadic Contention) Mode.Contention.Const.Contended ]
-    | Mutable_write_requirement (accessed, mutable_axis) ->
-      let part, owner = accessed_nouns accessed in
-      txt ("writing " ^ part ^ " requires " ^ owner ^ " to be ")
-      ::
-      (match mutable_axis with
-      | On_contention ->
-        [mode_const_word (Monadic Contention) Mode.Contention.Const.Uncontended]
-      | On_visibility ->
-        [ mode_const_word (Monadic Visibility) Mode.Visibility.Const.Write;
-          txt " or ";
-          mode_const_word (Monadic Visibility) Mode.Visibility.Const.Read_write
-        ])
-    | Mutable_read_requirement (accessed, mutable_axis) ->
-      let part, owner = accessed_nouns accessed in
-      txt ("reading " ^ part ^ " requires " ^ owner ^ " to be ")
-      ::
-      (match mutable_axis with
-      | On_contention ->
-        [ mode_const_word (Monadic Contention) Mode.Contention.Const.Shared;
-          txt " or ";
-          mode_const_word (Monadic Contention) Mode.Contention.Const.Uncontended
-        ]
-      | On_visibility ->
-        [ mode_const_word (Monadic Visibility) Mode.Visibility.Const.Read;
-          txt " or ";
-          mode_const_word (Monadic Visibility) Mode.Visibility.Const.Read_write
-        ])
-    | Local_escape ->
-      [ mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-        txt " values cannot escape their region" ]
-
-  let same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right) =
-    Int.equal (Mode.Alloc.Axis.compare left right) 0
-
-  let at_step ~axis (step : Step.t) (next : Step.t option) : t list =
-    let on axis' = same_alloc_axis axis (Mode.Alloc.Axis.P axis') in
-    let step_on wanted (s : Step.t) =
-      match Mode.reported_mode_as_alloc_atom s.mode with
-      | None -> false
-      | Some (Mode.Alloc.Atom (ax, _)) ->
-        same_alloc_axis (Mode.Alloc.Axis.P ax) wanted
-    in
-    let crosses ~source ~target =
-      Step.is_capture step && step_on source step
-      && match next with None -> false | Some next -> step_on target next
-    in
-    let portability = Mode.Alloc.Axis.P (Comonadic Portability) in
-    let contention = Mode.Alloc.Axis.P (Monadic Contention) in
-    let mutable_axis =
-      if on (Monadic Contention)
-      then Some On_contention
-      else if on (Monadic Visibility)
-      then Some On_visibility
-      else None
-    in
-    let mutable_requirement part_of =
-      match next with
-      | Some _ -> None
-      | None ->
-        Option.bind mutable_axis (fun mutable_axis ->
-            Option.map (fun part -> accessed part, mutable_axis) (part_of step))
-    in
-    List.filter_map Fun.id
-      [ (if
-           on (Comonadic Portability)
-           && crosses ~source:portability ~target:contention
-         then Some Nonportable_closure
-         else None);
-        (if
-           on (Monadic Contention)
-           && crosses ~source:contention ~target:portability
-         then Some Portable_function_contends_captures
-         else None);
-        Option.map
-          (fun (accessed, mutable_axis) ->
-            Mutable_write_requirement (accessed, mutable_axis))
-          (mutable_requirement Step.mutable_write);
-        Option.map
-          (fun (accessed, mutable_axis) ->
-            Mutable_read_requirement (accessed, mutable_axis))
-          (mutable_requirement Step.mutable_read);
-        (if on (Comonadic Areality) && Step.is_region_escape step
-         then Some Local_escape
-         else None) ]
-end
-
-let step_rules ~axis (step : Step.t) (next : Step.t option) :
-    term Nlg.aside list =
-  Rule.at_step ~axis step next
-  |> List.map (fun rule -> Nlg.background (Rule.sentence rule))
-
-let step_suggestions (step : Step.t) (next : Step.t option) :
-    term Nlg.aside list =
-  let open Nlg in
-  if Option.is_none next && Step.is_function_return step
-  then
-    [ Nlg.suggest
-        [ txt "use ";
-          code "exclave_";
-          txt " to return a ";
-          mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-          txt " value" ] ]
-  else []
+        [fragment], cause)
+  in
+  let fragments, cause = explain ~side ~subject:initial_subject chain in
+  match side, cause with
+  | Side.Actual, Some cause -> Nlg.focus ~on:cause fragments
+  | Side.Expected, _ | Side.Actual, None -> fragments
 
 let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
-    (result_type : Types.type_expr) : term Nlg.aside list =
+    (result_type : Types.type_expr) : fragment list =
   match axis with
   | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) -> begin
     let rec non_local_arity sure n ty =
@@ -786,9 +736,9 @@ let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
     | Some (n, sure) ->
       let arguments = if n = 1 then "argument" else "arguments" in
       let qualifier = if sure then "will" else "may" in
-      [ Nlg.background [Nlg.txt "this is a partial application"];
-        Nlg.suggest
-          [ Nlg.txt
+      [ rule [txt "this is a partial application"];
+        suggestion
+          [ txt
               ("adding " ^ string_of_int n ^ " more " ^ arguments ^ " "
              ^ qualifier ^ " make the value non-local") ] ]
     end
@@ -797,8 +747,8 @@ let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
 type actuality_note = Arguments_do_not_cross
 
 type extra_rules =
-  { for_actual : term Nlg.aside list;
-    for_expected : term Nlg.aside list
+  { for_actual : fragment list;
+    for_expected : fragment list
   }
 
 let no_extra_rules = { for_actual = []; for_expected = [] }
@@ -819,8 +769,7 @@ let loosened_comparative loosened ~(side : Side.t) =
   else ""
 
 let signature_reason ~axis ~subject:owner
-    (declaration : Types.value_description option) : term Nlg.aside list =
-  let open Nlg in
+    (declaration : Types.value_description option) : fragment list =
   match declaration with
   | None -> []
   | Some declaration ->
@@ -847,13 +796,13 @@ let signature_reason ~axis ~subject:owner
               (Mode.Modality.Per_axis.print axis)
               modality
           in
-          annotation_reason ~mode_name
-            ~mode:[Nlg.code mode_name]
+          annotation_fragments ~mode_name
+            ~mode:[code mode_name]
             ~subject:owner source
         | None ->
-          [ Nlg.note
+          [ reason
               [ txt "because ";
-                Nlg.pronoun ~case:Possessive owner;
+                pronoun ~case:Possessive owner;
                 txt " signature requires ";
                 ref_source declaration.val_loc
                   [modality_word (Mode.Modality.Atom (axis, modality))] ] ])
@@ -869,8 +818,7 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
        actual_loosened;
        expected_loosened
      } :
-      axis_input) : term Nlg.story list =
-  let open Nlg in
+      axis_input) : fragment list =
   let actual = Step.for_explanation (Step.of_chain actual) in
   let expected = Step.for_explanation (Step.of_chain expected) in
   let subject =
@@ -881,13 +829,6 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
       | (s : Step.t) :: _ -> subject_of_pinpoint s.pinpoint
       | [] -> subject_of_loc ~fallback:"this value" error_loc)
   in
-  let expected_extras step next =
-    step_rules ~axis step next @ step_suggestions step next
-  in
-  let actual_extras step next = step_rules ~axis step next in
-  let step_asides side ~extras chain =
-    explain_chain ~side ~subject ~extras chain
-  in
   let actuality_explanation =
     match actuality_note with
     | None -> []
@@ -897,9 +838,9 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
         | Mode.Alloc.Axis.P axis ->
           Format_doc.asprintf "%a" Mode.Alloc.Axis.print axis
       in
-      [ Nlg.note
+      [ reason
           [ txt "the argument types of ";
-            Nlg.mention ~case:Subject subject;
+            mention ~case:Subject subject;
             txt (" do not all cross " ^ axis_name) ] ]
   in
   let signature_reason =
@@ -913,29 +854,34 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
     then []
     else signature_reason ~axis ~subject expected_declaration
   in
-  let expected_beat =
-    Nlg.claim ~subject
-      ~asides:
-        (step_asides Expected ~extras:expected_extras expected
-        @ signature_reason @ extra_rules.for_expected)
-      (Nlg.mention ~case:Subject subject
+  let expected_fragment =
+    state ~subject
+      (mention ~case:Subject subject
       :: copula
       :: txt
            (" expected to be "
            ^ loosened_comparative expected_loosened ~side:Expected)
       :: description_words expected_description)
+    |> with_children
+         ((match
+             explain_chain ~axis ~side:Expected ~subject expected
+             @ signature_reason
+           with
+           | [] -> []
+           | fragments -> [explanation ~necessity:Unnecessary fragments])
+         @ extra_rules.for_expected)
   in
-  let actual_beat =
-    Nlg.but ~subject
-      ~asides:
-        (step_asides Actual ~extras:actual_extras actual
-        @ actuality_explanation @ extra_rules.for_actual)
-      (Nlg.mention ~case:Subject subject
+  let actual_fragment =
+    but ~subject
+      (mention ~case:Subject subject
       :: copula
       :: txt (" " ^ loosened_comparative actual_loosened ~side:Actual)
       :: description_words actual_description)
+    |> with_children
+         (explain_chain ~axis ~side:Actual ~subject actual
+         @ actuality_explanation @ extra_rules.for_actual)
   in
-  pronominalize [expected_beat; actual_beat]
+  [expected_fragment; actual_fragment]
 
 let fold_step ~mode ~pinpoint ~hint chain =
   { mode; pinpoint; kind = hint } :: chain
@@ -1037,9 +983,8 @@ type modality_input =
     requirement : modality_requirement
   }
 
-let modality_story ~(sides : Diagnostic_term.sides) (input : modality_input) :
-    term Nlg.story =
-  let open Nlg in
+let modality_fragment ~(sides : Diagnostic_term.sides) (input : modality_input)
+    : fragment =
   let axis_name =
     match input.axis with
     | Mode.Value.Axis.P ax -> Format_doc.asprintf "%a" Mode.Value.Axis.print ax
@@ -1051,12 +996,12 @@ let modality_story ~(sides : Diagnostic_term.sides) (input : modality_input) :
       | None, None -> None
     in
     match input.subject with
-    | Modality_item name -> Nlg.subject ?span [Phrase.Code name]
+    | Modality_item name -> subject ?span [Phrase.Code name]
     | Modality_field name ->
-      Nlg.subject ?span [Phrase.Text "the field "; Phrase.Code name]
+      subject ?span [Phrase.Text "the field "; Phrase.Code name]
     | Modality_constructor_arg { constructor; index } ->
-      Nlg.subject ?span
-        [ Phrase.Text ("the " ^ Nlg.ordinal index ^ " argument of ");
+      subject ?span
+        [ Phrase.Text ("the " ^ ordinal index ^ " argument of ");
           Phrase.Code constructor ]
   in
   let side ~name ({ atom; loc } : modality_side) : term Phrase.segment list =
@@ -1070,36 +1015,33 @@ let modality_story ~(sides : Diagnostic_term.sides) (input : modality_input) :
   in
   let header =
     [ txt "the declarations of ";
-      Nlg.mention ~case:Subject subject;
+      mention ~case:Subject subject;
       txt (" disagree on " ^ axis_name) ]
   in
   let expected_line =
-    Nlg.mention ~case:Subject subject
+    mention ~case:Subject subject
     :: side ~name:sides.Diagnostic_term.expected_name input.expected
   in
   let actual_line =
-    Nlg.mention ~case:Subject subject
+    mention ~case:Subject subject
     :: side ~name:sides.Diagnostic_term.actual_name input.actual
   in
-  let educate =
+  let rules =
     match input.requirement with
     | At_least_as_strong -> []
     | Exact_match ->
-      [ Nlg.background
+      [ rule
           [ txt
               "field and constructor-argument modalities must match exactly on \
                both sides" ] ]
   in
-  Nlg.pronominalize_one
-    (Nlg.claim ~subject
-       ~asides:
-         [ Nlg.note ~subject expected_line;
-           Nlg.sub_claim ~asides:educate actual_line ]
-       header)
+  state ~subject header
+  |> with_children
+       [reason ~subject expected_line; state actual_line |> with_children rules]
 
-let mode_stories ~error_loc ?extra_rules ?actuality_note ?subject_override
-    ?expected_declaration (axes : mismatch_step list Mode.folded_axis list) :
-    story list =
+let mode_fragments ~error_loc ?extra_rules ?actuality_note
+    ?subject_override ?expected_declaration
+    (axes : mismatch_step list Mode.folded_axis list) : fragment list =
   List.filter_map prepare_axis axes
   |> List.map (fun (input : axis_input) ->
       let extra_rules =
@@ -1107,12 +1049,13 @@ let mode_stories ~error_loc ?extra_rules ?actuality_note ?subject_override
         | None -> no_extra_rules
         | Some rules -> rules input.axis
       in
-      Nlg.story
+      block
         (plan_axis ~extra_rules ~actuality_note ~subject_override
            ~expected_declaration ~error_loc input))
 
-let mode_error_stories ~error_loc ?expected_declaration pinpoint error =
-  mode_stories ~error_loc ?expected_declaration
+let mode_error_fragments ~error_loc ?expected_declaration
+    pinpoint error =
+  mode_fragments ~error_loc ?expected_declaration
     (Mode.Value.fold_error ~init:[] ~step:fold_step pinpoint error)
 
 let describe_usage usage =
@@ -1136,7 +1079,6 @@ let describe_usage usage =
 
 let diagnose ~error_loc = function
   | Expression_error { loc; error = err } -> begin
-    let open Nlg in
     let fold_value error =
       Mode.Value.fold_error ~init:[] ~step:fold_step
         (loc, Mode.Hint.Expression)
@@ -1155,8 +1097,8 @@ let diagnose ~error_loc = function
           ( (fun _axis ->
               { no_extra_rules with
                 for_actual =
-                  [ Nlg.background
-                      [ Nlg.txt
+                  [ rule
+                      [ txt
                           "using a constructor across a mode boundary requires \
                            all its argument types to mode-cross" ] ]
               }),
@@ -1169,7 +1111,8 @@ let diagnose ~error_loc = function
             None )
         | Other -> (fun _axis -> no_extra_rules), None
       in
-      mode_stories ~error_loc ~extra_rules ?actuality_note (fold_value e)
+      mode_fragments ~error_loc ~extra_rules ?actuality_note
+        (fold_value e)
     | Curried_application_complete { label = lbl; error = e; part } ->
       let argument_words =
         match (lbl : Typedtree.arg_label) with
@@ -1182,36 +1125,31 @@ let diagnose ~error_loc = function
         | `Prefix -> None
         | `Single_arg ->
           Some
-            (Nlg.subject ~span:loc
+            (subject ~span:loc
                [Phrase.Text "the application up to this argument"])
         | `Entire_apply ->
           Some
-            (Nlg.subject ~span:loc
+            (subject ~span:loc
                (Phrase.Text "the application up to " :: argument_words))
       in
       let restricted_word (axis : Mode.Alloc.Axis.packed) =
         match axis with
-        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) ->
-          Some (mode_const_word (Comonadic Areality) Mode.Locality.Const.Local)
-        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Linearity) ->
-          Some (mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Once)
+        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) -> Some local
+        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Linearity) -> Some once
         | Mode.Alloc.Axis.P _ -> None
       in
       let suggestion_phrases =
         match part with
-        | `Prefix ->
-          [[Nlg.txt "try wrapping the marked application in parentheses"]]
+        | `Prefix -> [[txt "try wrapping the marked application in parentheses"]]
         | `Single_arg ->
-          [ [Nlg.txt "try splitting the application in two"];
-            [ Nlg.txt
+          [ [txt "try splitting the application in two"];
+            [ txt
                 "the arguments after this one in the function's type should be \
                  applied separately" ] ]
         | `Entire_apply ->
-          [ [Nlg.txt "try splitting the application in two"];
-            Nlg.txt "the arguments after "
-            :: List.map word_segment argument_words
-            @ [Nlg.txt " in the function's type should be applied separately"]
-          ]
+          [ [txt "try splitting the application in two"];
+            (txt "the arguments after " :: List.map word_segment argument_words)
+            @ [txt " in the function's type should be applied separately"] ]
       in
       let extra_rules axis =
         match restricted_word axis with
@@ -1219,24 +1157,24 @@ let diagnose ~error_loc = function
         | Some word ->
           { no_extra_rules with
             for_expected =
-              Nlg.background
-                [ Nlg.txt "when passing or calling ";
+              rule
+                [ txt "when passing or calling ";
                   word;
-                  Nlg.txt
+                  txt
                     " values, extra arguments are passed in a separate \
                      application" ]
-              :: List.map Nlg.suggest suggestion_phrases
+              :: List.map suggestion suggestion_phrases
           }
       in
-      mode_stories ~error_loc ~extra_rules ?subject_override (fold_alloc e)
+      mode_fragments ~error_loc ~extra_rules ?subject_override
+        (fold_alloc e)
     | Function_mode_mismatch { part; direction = step; error = e } ->
       let subject_override : subject option =
         match (part : Typecore.mode_mismatch_kind) with
         | Parameter ->
-          Some (Nlg.subject ~span:loc [Phrase.Text "this function's parameter"])
+          Some (subject ~span:loc [Phrase.Text "this function's parameter"])
         | Return ->
-          Some
-            (Nlg.subject ~span:loc [Phrase.Text "this function's return value"])
+          Some (subject ~span:loc [Phrase.Text "this function's return value"])
       in
       let axes = fold_alloc e in
       let axes =
@@ -1254,37 +1192,37 @@ let diagnose ~error_loc = function
               })
             axes
       in
-      mode_stories ~error_loc ?subject_override axes
+      mode_fragments ~error_loc ?subject_override axes
     | Uncurried_function_escapes_comonadic e ->
       let subject_override : subject option =
         Some
-          (Nlg.subject ~span:loc
+          (subject ~span:loc
              [Phrase.Text "this function when partially applied"])
       in
       let extra_rules _axis =
         { no_extra_rules with
           for_actual =
-            [ Nlg.background
-                [ Nlg.txt
+            [ rule
+                [ txt
                     "partially applying a function closes over the arguments \
                      given so far" ] ]
         }
       in
-      mode_stories ~error_loc ~extra_rules ?subject_override
+      mode_fragments ~error_loc ~extra_rules ?subject_override
         (fold_alloc (Mode.Alloc.Comonadic e))
     | Overwrite_of_invalid_term ->
-      plain_story
-        ~claim:[ref_source loc [txt "this term cannot be overwritten"]]
-        ~contrast:
-          [ txt
-              "but overwriting works only on tuples, constructors and boxed \
-               records" ]
-        ~background:
-          [ [ code "overwrite_";
-              txt
-                " reuses an existing block, so the value must be one that \
-                 occupies a block of its own" ] ]
-        ()
+      [ block
+          [ state [ref_source loc [txt "this term cannot be overwritten"]];
+            but
+              [ txt
+                  "overwriting works only on tuples, constructors and boxed \
+                   records" ]
+            |> with_children
+                 [ rule
+                     [ code "overwrite_";
+                       txt
+                         " reuses an existing block, so the value must be one \
+                          that occupies a block of its own" ] ] ] ]
     | Block_index_modality_mismatch { mutable_elements = mut; error = err } ->
       let _step, Mode.Modality.Error (ax, { left; right = _ }) = err in
       let axis_name =
@@ -1297,90 +1235,93 @@ let diagnose ~error_loc = function
         then [txt ("no modality on the " ^ axis_name ^ " axis")]
         else [txt "the modality "; modality_word (Mode.Modality.Atom (ax, left))]
       in
-      plain_story
-        ~claim:
-          (ref_source loc [txt "this block index reaches a field with "]
-          :: actual_words)
-        ~contrast:
-          [ txt
-              ("but a block index over "
-              ^ (match mut with true -> "mutable" | false -> "immutable")
-              ^ " elements requires the modalities implied by its declaration, \
-                 and no others") ]
-        ~background:
-          [ [ txt
-                "this is a current limitation: the block-index primitives are \
-                 typed with one fixed modality and cannot express others yet" ]
-          ]
-        ~suggestions:
-          [ [ txt
-                "remove the modality from the field, or read the field \
-                 directly instead of taking an index" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc
+                  (txt "this block index reaches a field with " :: actual_words)
+              ];
+            but
+              [ txt
+                  ("a block index over "
+                  ^ (match mut with true -> "mutable" | false -> "immutable")
+                  ^ " elements requires the modalities implied by its \
+                     declaration, and no others") ]
+            |> with_children
+                 [ rule
+                     [ txt
+                         "this is a current limitation: the block-index \
+                          primitives are typed with one fixed modality and \
+                          cannot express others yet" ];
+                   suggestion
+                     [ txt
+                         "remove the modality from the field, or read the \
+                          field directly instead of taking an index" ] ] ] ]
     | Exclave_in_nontail_position ->
       let subject = subject_of_loc ~fallback:"this expression" loc in
-      plain_story
-        ~claim:
-          [ ref_source loc
-              (subject_words subject @ [txt " is not in tail position"]) ]
-        ~contrast:
-          [ txt "but ";
-            code "exclave_";
-            txt " must be the last thing the enclosing region evaluates" ]
-        ~background:
-          [ [ code "exclave_";
-              txt
-                " puts a value in the caller's region, so it can only appear \
-                 where the current region is about to end" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc
+                  (subject_words subject @ [txt " is not in tail position"]) ];
+            but
+              [ code "exclave_";
+                txt " must be the last thing the enclosing region evaluates" ]
+            |> with_children
+                 [ rule
+                     [ code "exclave_";
+                       txt
+                         " puts a value in the caller's region, so it can only \
+                          appear where the current region is about to end" ] ]
+          ] ]
     | Exclave_returns_not_local ->
-      plain_story
-        ~claim:
-          [ ref_source loc [txt "this expression is "];
-            mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-            txt ", because ";
-            code "exclave_";
-            txt " makes it so" ]
-        ~contrast:
-          [ txt "but the enclosing function is not declared to return a ";
-            mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-            txt " value" ]
-        ~background:
-          [ [ txt "a function containing ";
-              code "exclave_";
-              txt " allocates into its caller's region, so it must itself be ";
-              mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-              txt "-returning" ] ]
-        ~suggestions:
-          [ [ txt "annotate the function's result as ";
-              mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-              txt ", or drop the ";
-              code "exclave_" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc [txt "this expression is "; local];
+                txt ", because ";
+                code "exclave_";
+                txt " makes it so" ];
+            but
+              [ txt "the enclosing function is not declared to return a ";
+                local;
+                txt " value" ]
+            |> with_children
+                 [ rule
+                     [ txt "a function containing ";
+                       code "exclave_";
+                       txt
+                         " allocates into its caller's region, so it must \
+                          itself be ";
+                       local;
+                       txt "-returning" ];
+                   suggestion
+                     [ txt "annotate the function's result as ";
+                       local;
+                       txt ", or drop the ";
+                       code "exclave_" ] ] ] ]
     | Tail_call_local_returning ->
       let subject = subject_of_loc ~fallback:"this call" loc in
-      plain_story
-        ~claim:
-          [ ref_source loc
-              (subject_words subject
-              @ [ txt " returns a ";
-                  mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-                  txt " value" ]) ]
-        ~contrast:
-          [ txt "but it is in the tail position of a function that is not ";
-            mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-            txt "-returning" ]
-        ~background:
-          [ [ txt "a tail call hands its result straight to the caller, so a ";
-              mode_const_word (Comonadic Areality) Mode.Locality.Const.Local;
-              txt
-                "-returning call can only sit in the tail of a local-returning \
-                 function" ] ]
-        ~suggestions:
-          [ [ txt "bind the result first, as in ";
-              code "let r = ... in r";
-              txt ", so the call is no longer in tail position" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc
+                  (subject_words subject
+                  @ [txt " returns a "; local; txt " value"]) ];
+            but
+              [ txt "it is in the tail position of a function that is not ";
+                local;
+                txt "-returning" ]
+            |> with_children
+                 [ rule
+                     [ txt
+                         "a tail call hands its result straight to the caller, \
+                          so a ";
+                       local;
+                       txt
+                         "-returning call can only sit in the tail of a \
+                          local-returning function" ];
+                   suggestion
+                     [ txt "bind the result first, as in ";
+                       code "let r = ... in r";
+                       txt ", so the call is no longer in tail position" ] ] ]
+      ]
     | Always_heap_allocation kind ->
       let what =
         match (kind : Typecore.always_heap_allocation) with
@@ -1390,17 +1331,20 @@ let diagnose ~error_loc = function
         | List_comprehension -> "a list comprehension"
         | Array_comprehension -> "an array comprehension"
       in
-      plain_story
-        ~claim:
-          [ ref_source loc
-              [txt ("the compiler cannot stack-allocate " ^ what ^ " yet")] ]
-        ~background:
-          [[txt "this is a current limitation, not a rule of the language"]]
-        ~suggestions:
-          [ [ txt "drop the ";
-              code "stack_";
-              txt " and let this allocate on the heap" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc
+                  [txt ("the compiler cannot stack-allocate " ^ what ^ " yet")]
+              ]
+            |> with_children
+                 [ rule
+                     [ txt
+                         "this is a current limitation, not a rule of the \
+                          language" ];
+                   suggestion
+                     [ txt "drop the ";
+                       code "stack_";
+                       txt " and let this allocate on the heap" ] ] ] ]
     | Always_static_allocation kind ->
       let what =
         match (kind : Typecore.always_static_allocation) with
@@ -1409,59 +1353,54 @@ let diagnose ~error_loc = function
         | Unboxed_unit -> "an unboxed unit literal"
         | Unboxed_bool -> "an unboxed boolean literal"
       in
-      plain_story
-        ~claim:[ref_source loc [txt (what ^ " is not allocated at runtime")]]
-        ~contrast:
-          [ txt "but ";
-            code "stack_";
-            txt " must be applied to something that allocates" ]
-        ~background:
-          [ [ code "stack_";
-              txt
-                " chooses where an allocation happens, and this value needs no \
-                 allocation to choose from" ] ]
-        ~suggestions:[[txt "remove the "; code "stack_"]]
-        ()
+      [ block
+          [ state [ref_source loc [txt (what ^ " is not allocated at runtime")]];
+            but
+              [code "stack_"; txt " must be applied to something that allocates"]
+            |> with_children
+                 [ rule
+                     [ code "stack_";
+                       txt
+                         " chooses where an allocation happens, and this value \
+                          needs no allocation to choose from" ];
+                   suggestion [txt "remove the "; code "stack_"] ] ] ]
     | Not_allocation ->
       let subject = subject_of_loc ~fallback:"this expression" loc in
-      plain_story
-        ~claim:
-          [ref_source loc (subject_words subject @ [txt " does not allocate"])]
-        ~contrast:
-          [ txt "but ";
-            code "stack_";
-            txt " must be applied to something that allocates" ]
-        ~background:
-          [ [ txt
-                "a record, tuple, array, variant, closure or boxed field read \
-                 allocates; a variable, constant or function result does not" ];
-            [ code "stack_";
-              txt
-                " chooses where an allocation happens; it cannot move a value \
-                 that already exists" ] ]
-        ~suggestions:[[txt "remove the "; code "stack_"]]
-        ()
+      [ block
+          [ state
+              [ ref_source loc
+                  (subject_words subject @ [txt " does not allocate"]) ];
+            but
+              [code "stack_"; txt " must be applied to something that allocates"]
+            |> with_children
+                 [ rule
+                     [ txt
+                         "a record, tuple, array, variant, closure or boxed \
+                          field read allocates; a variable, constant or \
+                          function result does not" ];
+                   rule
+                     [ code "stack_";
+                       txt
+                         " chooses where an allocation happens; it cannot move \
+                          a value that already exists" ];
+                   suggestion [txt "remove the "; code "stack_"] ] ] ]
     end
   | Constructor_submode_failed { loc; error = e } ->
     let extra_rules _axis =
       { no_extra_rules with
         for_actual =
-          [ Nlg.background
-              [ Nlg.txt
-                  "all argument types must mode-cross for rebinding to succeed"
-              ] ]
+          [ rule
+              [txt "all argument types must mode-cross for rebinding to succeed"]
+          ]
       }
     in
-    mode_stories ~error_loc ~extra_rules ~actuality_note:Arguments_do_not_cross
+    mode_fragments ~error_loc ~extra_rules
+      ~actuality_note:Arguments_do_not_cross
       (Mode.Value.fold_error ~init:[] ~step:fold_step (loc, Mode.Hint.Unknown) e)
   | Local_value_used_in_exclave { loc; description = desc } ->
-    let open Nlg in
-    let local_word =
-      mode_const_word (Comonadic Areality) Mode.Locality.Const.Local
-    in
     let (item : Mode.Hint.lock_item), name =
       match desc with
-      | Mode.Hint.Ident { category; lid } -> category, Nlg.longident_name lid
+      | Mode.Hint.Ident { category; lid } -> category, longident_name lid
       | Mode.Hint.Structure_item (category, id) ->
         category, Some (Ident.name id)
       | Mode.Hint.Module | Mode.Hint.Functor | Mode.Hint.Functor_parameter
@@ -1475,14 +1414,14 @@ let diagnose ~error_loc = function
     in
     let named noun fallback =
       match name with
-      | Some name -> Nlg.subject ~span:loc [Phrase.Text noun; Phrase.Code name]
-      | None -> Nlg.subject ~span:loc [Phrase.Text fallback]
+      | Some name -> subject ~span:loc [Phrase.Text noun; Phrase.Code name]
+      | None -> subject ~span:loc [Phrase.Text fallback]
     in
     let plainly_local noun fallback =
       let s = named noun fallback in
-      s, [Nlg.mention ~case:Subject s; copula; txt " "; local_word]
+      s, [mention ~case:Subject s; copula; txt " "; local]
     in
-    let subject, claim =
+    let subject, statement =
       match (item : Mode.Hint.lock_item) with
       | Mode.Hint.Value -> plainly_local "the value " "this value"
       | Module -> plainly_local "the module " "this module"
@@ -1490,93 +1429,69 @@ let diagnose ~error_loc = function
       | Class ->
         let s =
           match name with
-          | Some name -> Nlg.subject ~span:loc [Phrase.Code name]
-          | None -> Nlg.subject ~span:loc [Phrase.Text "this class"]
+          | Some name -> subject ~span:loc [Phrase.Code name]
+          | None -> subject ~span:loc [Phrase.Text "this class"]
         in
         ( s,
-          [ Nlg.mention ~case:Subject s;
+          [ mention ~case:Subject s;
             copula;
             txt " a class, and classes are always ";
-            local_word ] )
+            local ] )
     in
-    [ Nlg.story
-        [ Nlg.claim ~subject claim;
-          Nlg.but
-            ~asides:
-              [ Nlg.background
-                  [ code "exclave_";
-                    txt " ends the current region early, so the region's ";
-                    local_word;
-                    txt " values cannot be used inside it" ] ]
-            [ Nlg.pronoun ~case:Subject subject;
+    [ block
+        [ state ~subject statement;
+          but
+            [ pronoun ~case:Subject subject;
               copula;
               txt " used inside ";
-              code "exclave_" ] ] ]
+              code "exclave_" ]
+          |> with_children
+               [ rule
+                   [ code "exclave_";
+                     txt " ends the current region early, so the region's ";
+                     local;
+                     txt " values cannot be used inside it" ] ] ] ]
   | Mutable_value_used_in_closure
       { loc; pinpoint = boundary_loc, boundary_desc } ->
-    let open Nlg in
     let subject = subject_of_loc ~fallback:"this variable" loc in
-    [ Nlg.story
-        [ Nlg.claim ~subject
-            [ Nlg.mention ~case:Subject subject;
-              copula;
-              txt " a mutable variable" ];
-          Nlg.but
-            ~asides:
-              [ Nlg.background
-                  [ txt
-                      "mutable variables cannot be captured: the capturing \
-                       context may outlive them or run in parallel" ];
-                Nlg.suggest
-                  [ txt "use a ";
-                    code "ref";
-                    txt " for mutable state shared across functions" ] ]
-            [ Nlg.pronoun ~case:Subject subject;
+    [ block
+        [ state ~subject
+            [mention ~case:Subject subject; copula; txt " a mutable variable"];
+          but
+            [ pronoun ~case:Subject subject;
               copula;
               txt " used inside ";
-              ref_source boundary_loc [txt (human_desc boundary_desc)] ] ] ]
+              ref_source boundary_loc [txt (human_desc boundary_desc)] ]
+          |> with_children
+               [ rule
+                   [ txt
+                       "mutable variables cannot be captured: the capturing \
+                        context may outlive them or run in parallel" ];
+                 suggestion
+                   [ txt "use a ";
+                     code "ref";
+                     txt " for mutable state shared across functions" ] ] ] ]
   | Unique_use_during_borrowing
       { region_loc; borrow_occ; cannot_force = { occ; axis } } -> begin
-    let open Nlg in
-    let wanted =
-      match axis with
-      | Uniqueness ->
-        mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Unique
-      | Linearity ->
-        mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Once
-    in
+    let wanted = match axis with Uniqueness -> unique | Linearity -> once in
     let borrow_loc = borrow_occ.Uniqueness_analysis.Occurrence.loc in
-    plain_story
-      ~claim:[ref_source occ.loc [txt "this value is used as "]; wanted]
-      ~contrast:
-        [ txt "but it is ";
-          ref_source borrow_loc [txt "borrowed"];
-          txt " for the whole of ";
-          ref_source region_loc [txt "this borrow"] ]
-      ~background:
-        [ [ txt
-              "a borrow lends the value for the length of its context: until \
-               the context ends, the value is not the borrower's to use" ] ]
-      ()
+    [ block
+        [ state [ref_source occ.loc [txt "this value is used as "; wanted]];
+          but
+            [ txt "it is ";
+              ref_source borrow_loc [txt "borrowed"];
+              txt " for the whole of ";
+              ref_source region_loc [txt "this borrow"] ]
+          |> with_children
+               [ rule
+                   [ txt
+                       "a borrow lends the value for the length of its \
+                        context: until the context ends, the value is not the \
+                        borrower's to use" ] ] ] ]
     end
   | Uniqueness_error err -> begin
-    let open Nlg in
-    let unique_word =
-      mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Unique
-    in
-    let aliased_word =
-      mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Aliased
-    in
-    let once_word =
-      mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Once
-    in
-    let many_word =
-      mode_const_word (Comonadic Linearity) Mode.Linearity.Const.Many
-    in
     let used_as (axis : Uniqueness_analysis.Maybe_unique.axis) =
-      match axis with
-      | Uniqueness -> unique_word, aliased_word
-      | Linearity -> many_word, once_word
+      match axis with Uniqueness -> unique, aliased | Linearity -> many, once
     in
     match err with
     | Uniqueness_analysis.Boundary { cannot_force = { occ; axis }; reason } ->
@@ -1588,31 +1503,37 @@ let diagnose ~error_loc = function
         | Uniqueness_analysis.Out_of_mod_class ->
           "outside the current module or class"
       in
-      plain_story
-        ~claim:[ref_source occ.loc [txt "this value is used as "]; wanted]
-        ~contrast:[txt ("but it comes from " ^ boundary)]
-        ~background:
-          [ [ txt "a value that crosses a module or class boundary is ";
-              forced;
-              txt
-                ": the analysis cannot see how the other side uses it, so it \
-                 must assume the worst" ] ]
-        ()
+      [ block
+          [ state [ref_source occ.loc [txt "this value is used as "; wanted]];
+            but [txt ("it comes from " ^ boundary)]
+            |> with_children
+                 [ rule
+                     [ txt "a value that crosses a module or class boundary is ";
+                       forced;
+                       txt
+                         ": the analysis cannot see how the other side uses \
+                          it, so it must assume the worst" ] ] ] ]
     | Uniqueness_analysis.Borrowed_value_used_uniquely { occ; axis } ->
       let wanted, forced = used_as axis in
-      plain_story
-        ~claim:[ref_source occ.loc [txt "this value is used as "]; wanted]
-        ~contrast:[txt "but it is borrowed here, which makes it "; forced]
-        ()
+      [ block
+          [ state [ref_source occ.loc [txt "this value is used as "; wanted]];
+            but [txt "it is borrowed here, which makes it "; forced] ] ]
     | Uniqueness_analysis.Borrowed_out_of_context loc ->
-      plain_story
-        ~claim:
-          [ref_source loc [code "borrow_"]; txt " is not in a borrowing context"]
-        ~background:
-          [ [txt "a borrow may be an argument of a function application"];
-            [txt "a borrow may appear on the right-hand side of a let binding"];
-            [txt "a borrow may be the scrutinee of a pattern match"] ]
-        ()
+      [ block
+          [ state
+              [ ref_source loc [code "borrow_"];
+                txt " is not in a borrowing context" ]
+            |> with_children
+                 [ rule
+                     [ txt
+                         "a borrow may be an argument of a function application"
+                     ];
+                   rule
+                     [ txt
+                         "a borrow may appear on the right-hand side of a let \
+                          binding" ];
+                   rule [txt "a borrow may be the scrutinee of a pattern match"]
+                 ] ] ]
     | Uniqueness_analysis.Overwrite_changed_tag
         (Uniqueness_analysis.Overwrites.Changed_tag { old_tag; new_tag }) ->
       let tag_name (tag : Uniqueness_analysis.Tag.t) =
@@ -1621,33 +1542,33 @@ let diagnose ~error_loc = function
       let contrast =
         match old_tag with
         | Uniqueness_analysis.Overwrites.Old_tag_unknown ->
-          [txt "but the tag it overwrites is not known here"]
+          [txt "the tag it overwrites is not known here"]
         | Uniqueness_analysis.Overwrites.Old_tag_was tag ->
-          [ txt "but it overwrites ";
+          [ txt "it overwrites ";
             ref_source tag.name_for_error.loc [code (tag_name tag)] ]
         | Uniqueness_analysis.Overwrites.Old_tag_mutated order ->
           [ txt
               (match order with
               | Uniqueness_analysis.Par ->
-                "but the tag is being changed by a mutation, so it is not \
-                 known here"
+                "the tag is being changed by a mutation, so it is not known \
+                 here"
               | Uniqueness_analysis.Seq_before | Uniqueness_analysis.Seq_after
                 ->
-                "but the tag was changed by a mutation, so it is not known here")
-          ]
+                "the tag was changed by a mutation, so it is not known here") ]
       in
-      plain_story
-        ~claim:
-          [ ref_source new_tag.name_for_error.loc
-              [txt "this overwrite sets the tag to "; code (tag_name new_tag)]
-          ]
-        ~contrast
-        ~background:
-          [ [ txt
-                "an overwrite reuses the block it is given, and the garbage \
-                 collector does not support changing a block's tag: the \
-                 constructor must stay the same" ] ]
-        ()
+      [ block
+          [ state
+              [ ref_source new_tag.name_for_error.loc
+                  [ txt "this overwrite sets the tag to ";
+                    code (tag_name new_tag) ] ];
+            but contrast
+            |> with_children
+                 [ rule
+                     [ txt
+                         "an overwrite reuses the block it is given, and the \
+                          garbage collector does not support changing a \
+                          block's tag: the constructor must stay the same" ] ]
+          ] ]
     | Uniqueness_analysis.Cannot_force
         { inner = { cannot_force = { occ; axis }; there; order };
           first_is_of_second
@@ -1684,54 +1605,54 @@ let diagnose ~error_loc = function
           | Uniqueness_analysis.Descendant _ -> "part of it "
           | Uniqueness_analysis.Ancestor _ -> "it is part of a value that "
         in
-        let mode_word, rule =
+        let mode_word, rule_words =
           match axis with
           | Uniqueness ->
-            ( mode_const_word (Monadic Uniqueness) Mode.Uniqueness.Const.Unique,
+            ( unique,
               [ txt "a value used as ";
-                unique_word;
+                unique;
                 txt " must have no other use: that is what ";
-                unique_word;
+                unique;
                 txt " means" ] )
           | Linearity ->
-            ( once_word,
-              [txt "a "; once_word; txt " value may be used at most once"] )
+            once, [txt "a "; once; txt " value may be used at most once"]
         in
         let first_loc = first.Uniqueness_analysis.Occurrence.loc in
         let second_loc = second.Uniqueness_analysis.Occurrence.loc in
         let first_ref = ref_source first_loc [txt first_usage] in
-        let but_already = txt ("but " ^ subject ^ already) in
-        let claim, contrast =
+        let subject_already = txt (subject ^ already) in
+        let statement, contrast =
           if second_is_here
           then
             ( (match axis with
               | Uniqueness ->
                 [ ref_source second_loc
-                    [txt ("this value is " ^ second_usage ^ " here as ")];
-                  mode_word ]
+                    [ txt ("this value is " ^ second_usage ^ " here as ");
+                      mode_word ] ]
               | Linearity ->
                 [ txt "this value is ";
                   mode_word;
                   ref_source second_loc [txt (" and " ^ second_usage ^ " here")]
                 ]),
-              [but_already; first_ref] )
+              [subject_already; first_ref] )
           else
             ( [ ref_source second_loc
                   [txt ("this value is " ^ second_usage ^ " here")] ],
               match axis with
               | Uniqueness ->
-                [ but_already;
-                  ref_source first_loc [txt (first_usage ^ " as ")];
-                  mode_word ]
+                [ subject_already;
+                  ref_source first_loc [txt (first_usage ^ " as "); mode_word] ]
               | Linearity ->
-                [ txt ("but " ^ subject ^ "is ");
+                [ txt (subject ^ "is ");
                   mode_word;
                   txt (" and " ^ already);
                   first_ref ] )
         in
-        plain_story ~claim ~contrast ~background:[rule] ())
+        [ block
+            [state statement; but contrast |> with_children [rule rule_words]]
+        ])
     end
-  | Folded_mismatch axes -> mode_stories ~error_loc axes
+  | Folded_mismatch axes -> mode_fragments ~error_loc axes
 
 let diagnose ~loc error =
   Diagnostic_term.diagnose ~loc (fun () -> diagnose ~error_loc:loc error)

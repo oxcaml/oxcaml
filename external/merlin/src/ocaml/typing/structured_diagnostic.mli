@@ -24,7 +24,7 @@ end
 module Kind : sig
   type t =
     | Explanation
-    | Background
+    | Rule
     | Suggestion
 end
 
@@ -66,7 +66,9 @@ end
 
 type t =
   { loc : Location.t;
-    body : Block.t list
+    kind : Location.report_kind;
+    body : Block.t list;
+    legacy : string
   }
 
 module Json : sig
@@ -90,3 +92,5 @@ end
 
 val to_json : t -> string
 val of_json : string -> (t, string) result
+
+val format : Format_doc.formatter -> t -> unit
