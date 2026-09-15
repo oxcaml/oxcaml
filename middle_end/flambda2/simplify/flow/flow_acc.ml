@@ -416,19 +416,36 @@ let record_lifted_function_slot_aux ~free_names ~value_slots _ (symbol, _) elt =
         (Simple.free_names simple) elt)
     value_slots elt
 
-let record_lifted_constant_definition_aux ~being_defined elt definition =
+(* Each definition of a lifted constant is either kept or deleted as a whole, so
+   all of the symbols it binds must be mutually dependent. This only makes a
+   difference for sets of closures, which bind one symbol per function slot of a
+   single static allocation.
+
+   Note that symbols bound by *different* definitions of the same lifted
+   constant (that is to say, in the same "let symbol" group) are deliberately
+   not related in this way. Any genuine dependency between them is recorded via
+   the free names of the definitions themselves, which means that an unused
+   symbol can be deleted from a group even when other symbols of that group are
+   used.
+
+   Code IDs are likewise never registered as being mutually dependent with
+   anything, since code bindings can also be deleted individually. In
+   particular, code IDs that are only used in the [newer_version_of] field of
+   another binding will be deleted as expected. *)
+let record_lifted_constant_definition_aux elt definition =
   let module D = Lifted_constant.Definition in
   match D.descr definition with
   | Code code_id ->
-    record_code_id_binding_aux code_id
-      (Name_occurrences.union being_defined (D.free_names definition))
-      elt
+    record_code_id_binding_aux code_id (D.free_names definition) elt
   | Block_like { symbol; _ } ->
-    let free_names =
-      Name_occurrences.union being_defined (D.free_names definition)
-    in
-    record_symbol_binding_aux symbol free_names elt
+    record_symbol_binding_aux symbol (D.free_names definition) elt
   | Set_of_closures { closure_symbols_with_types; _ } -> (
+    let being_defined =
+      Function_slot.Lmap.fold
+        (fun _ (symbol, _) being_defined ->
+          Name_occurrences.add_symbol being_defined symbol Name_mode.normal)
+        closure_symbols_with_types Name_occurrences.empty
+    in
     let expr = D.defining_expr definition in
     match Rebuilt_static_const.to_const expr with
     | Some (Static_const const) ->
@@ -452,19 +469,6 @@ let record_lifted_constant_definition_aux ~being_defined elt definition =
         closure_symbols_with_types elt)
 
 let normalize_lifted_constant_aux lifted_constant (elt : cont_info) =
-  let being_defined =
-    let bound_static = Lifted_constant.bound_static lifted_constant in
-    (* Note: We're not registering code IDs in the set, because we can actually
-       delete code bindings individually. In particular, code IDs that are only
-       used in the newer_version_of field of another binding will be deleted as
-       expected. *)
-    let symbols = Bound_static.symbols_being_defined bound_static in
-    Name_occurrences.empty
-    |> Symbol.Set.fold
-         (fun symbol acc ->
-           Name_occurrences.add_symbol acc symbol Name_mode.normal)
-         symbols
-  in
   (* Record all projections as potential dependencies. *)
   let elt =
     Variable.Map.fold
@@ -476,7 +480,7 @@ let normalize_lifted_constant_aux lifted_constant (elt : cont_info) =
   let elt =
     ListLabels.fold_left ~init:elt
       (Lifted_constant.definitions lifted_constant)
-      ~f:(record_lifted_constant_definition_aux ~being_defined)
+      ~f:record_lifted_constant_definition_aux
   in
   elt
 

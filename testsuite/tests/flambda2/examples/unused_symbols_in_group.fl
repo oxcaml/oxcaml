@@ -1,0 +1,28 @@
+(* TEST
+ compile_only = "true";
+ flambda2;
+ setup-simple-build-env;
+ fexpr with dump-simplify;
+ check-fexpr-dump;
+*)
+
+(* Unused symbols must be deleted from a "let symbol" group, even when other
+   symbols bound by the same group are used. *)
+
+(let a = %opaque (5555555) in
+ cont k (a))
+  where k (a) =
+    (* Only [live_root] is reachable from the module block.  [live_leaf] is
+       kept as well, since [live_root] refers to it.  Everything else is dead:
+       [unused] is not mentioned anywhere; [unused_using_live] does mention a
+       live symbol, but being mentioned *by* a dead symbol must not keep
+       anything alive; and [dead_leaf] is only mentioned by [dead_root], which
+       is itself dead, so both of those must go too. *)
+    let $live_leaf = Block 1 (a)
+    and $unused = Block 2 (a)
+    and $dead_leaf = Block 3 (a)
+    and $live_root = Block 4 ($live_leaf)
+    and $unused_using_live = Block 5 ($live_leaf)
+    and $dead_root = Block 6 ($dead_leaf) in
+    let $camlUnused_symbols_in_group = Block 0 ($live_root) in
+    cont done ($camlUnused_symbols_in_group)
