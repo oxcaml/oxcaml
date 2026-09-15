@@ -33,8 +33,16 @@ type t
 (** Capture the current values of all stamp counters for serialisation. *)
 val save : unit -> t
 
+(** Restore all stamp counters to the values they had when [save] was called in
+    the process that serialised this value. This can only be called once, before
+    any stamps have been created, and will error otherwise. *)
+val restore_for_resume : t -> unit
+
 (** Restore the stamp counters in preparation for merging the data of several
     units, setting each counter to its maximum value across all of the units.
-    This can only be called once, before any stamps have been created, and will
-    error otherwise. *)
+    Like [restore_for_resume], can only be called once. *)
 val restore_for_merge : t list -> unit
+
+(** True if any counter in the first set is greater than its corresponding
+    counter in the second. Used to guard against monotonicity breaking. *)
+val any_greater_than : t -> t -> bool
