@@ -238,6 +238,15 @@ module M6_1 = struct
 end
 
 [%%expect{|
+Line 11, characters 65-97:
+11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
+                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of Stdlib_upstream_compatible.Int64_u.t is bits64.
+       But the layout of Stdlib_upstream_compatible.Int64_u.t must be a sublayout of
+         bits32
+         because of the definition of get_third at lines 4-7, characters 16-23.
+|}, Principal{|
 Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^
@@ -261,6 +270,16 @@ module M6_2 = struct
 end
 
 [%%expect{|
+Line 9, characters 29-32:
+9 |   let f2 idx : int32_u = get arr idx
+                                 ^^^
+Error: The value "arr" has type "'a array" but an expression was expected of type
+         "int32_u array"
+       The layout of int32_u is bits32
+         because it is the primitive type int32_u.
+       But the layout of int32_u must be a sublayout of float64
+         because of the definition of arr at line 6, characters 12-16.
+|}, Principal{|
 Line 9, characters 25-36:
 9 |   let f2 idx : int32_u = get arr idx
                              ^^^^^^^^^^^

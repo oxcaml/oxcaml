@@ -145,6 +145,12 @@ let rec example : type a . a ty -> a = function
 | Int -> 0
 | Pair (type b c) (x, y : b ty * c ty) -> (example x, example (*error*)x)
 [%%expect{|
+Line 3, characters 71-72:
+3 | | Pair (type b c) (x, y : b ty * c ty) -> (example x, example (*error*)x)
+                                                                           ^
+Error: The value "x" has type "b ty" but an expression was expected of type "$1 ty"
+       Type "b" = "$0" is not compatible with type "$1"
+|}, Principal{|
 Line 3, characters 54-72:
 3 | | Pair (type b c) (x, y : b ty * c ty) -> (example x, example (*error*)x)
                                                           ^^^^^^^^^^^^^^^^^^
