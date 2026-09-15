@@ -148,7 +148,7 @@ let build_uid_to_locs_tbl ~(local_defs : Mtyper.typedtree) () =
   in
   let iter = iter_on_defs ~uid_to_locs_tbl in
   begin match local_defs with
-  | `Interface intf -> iter.signature iter intf.signature
+  | `Interface sign -> iter.signature iter sign
   | `Implementation str -> iter.structure iter str
   end;
   uid_to_locs_tbl
@@ -157,7 +157,7 @@ let iter_on_usages ~f (local_defs : Mtyper.typedtree) =
   let occ_iter = Cmt_format.iter_on_occurrences ~f in
   let iter = iter_only_visible occ_iter in
   begin match local_defs with
-  | `Interface intf -> iter.signature iter intf.signature
+  | `Interface signature -> iter.signature iter signature
   | `Implementation structure -> iter.structure iter structure
   end
 
