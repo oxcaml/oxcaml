@@ -29,7 +29,6 @@
    let fn = closure fn_2 @fn_1 &my_alloc_region in
    apply &my_alloc_region bind (fn) -> k1 * k2
  in
- let  in
  let bind = %opaque (0) in
  let f_into_f_field_bind = bind in
  apply direct(g_1 &toplevel)  -> k2 * error
