@@ -641,26 +641,23 @@ and eval_record_representation env loc (repr : record_representation) =
 
 and eval_mixed_block_shape :
     'a.
-    Env.t
-    -> 'a mixed_block_element array
-    -> check_at:scoped_location option
-    (** If [Some loc], perform block shape check, reporting errors at [loc]. *)
-    -> 'a mixed_block_element array =
+    Env.t ->
+    'a mixed_block_element array ->
+    check_at:scoped_location option
+      (** If [Some loc], perform block shape check, reporting errors at [loc].
+      *) ->
+    'a mixed_block_element array =
  fun env shape ~check_at ->
   let shape' =
     Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
   in
   (match check_at with
-   (* Only check shapes if they changed during evaluation. Shapes that were
+  (* Only check shapes if they changed during evaluation. Shapes that were
       already concrete were validated during typechecking. *)
   | Some loc when shape' != shape ->
-    let counts = Mixed_product_bytes.count (Product shape') in
-    if not (Mixed_product_bytes.all_value counts)
-    then
-      Typedecl.assert_mixed_product_support
-        (Debuginfo.Scoped_location.to_location loc)
-        Block
-        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+    Typeopt.assert_mixed_product_support_for_lambda_shape
+      (Debuginfo.Scoped_location.to_location loc)
+      Block shape'
   | Some _ | None -> ());
   shape'
 
