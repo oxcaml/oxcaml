@@ -1,49 +1,44 @@
 module Diagnostic = Structured_diagnostic
 
-let diagnostic_of_report report : Diagnostic.t =
-  let printer = Location.batch_mode_printer in
-  let text =
-    Format.asprintf "%a"
-      (fun ppf report -> printer.pp printer ppf report)
-      report
-    |> String.trim
-  in
-  { loc = report.Location.main.loc;
-    body =
-      [ { kind = Diagnostic.Kind.Explanation;
-          content = [Diagnostic.Inline.Text text];
-          children = []
-        } ]
+type t =
+  { loc : Location.t;
+    kind : Location.report_kind;
+    legacy : string;
+    fragments : Diagnostic_term.t Diagnostic_nlg.fragment list
   }
 
-let realize report stories =
-  Diagnostic_term.realize ~loc:report.Location.main.loc stories
+let diagnostic_of_legacy ~loc ~kind legacy =
+  { loc; kind; legacy; fragments = [] }
 
-let mode_diagnostic report error =
-  let loc = report.Location.main.loc in
-  Mode_diagnostics.diagnose ~loc error
+let diagnostic_of_report (report : Location.report) =
+  diagnostic_of_legacy ~loc:report.main.loc ~kind:report.kind
+    (Location.report_to_string report)
 
-let module_diagnostic report error =
-  let loc = report.Location.main.loc in
-  Module_diagnostics.diagnose ~loc error
+let mode_diagnostic ~loc error = Mode_diagnostics.diagnose ~loc error
 
-let kind_diagnostic report error =
-  Option.map (realize report) (Kind_diagnostics.diagnose error)
+let module_diagnostic ~loc error = Module_diagnostics.diagnose ~loc error
 
-let type_diagnostic report error =
-  Some (realize report (Type_diagnostics.diagnose error))
+let kind_diagnostic ~loc error =
+  Diagnostic_term.diagnose ~loc (fun () ->
+      Option.value (Kind_diagnostics.diagnose error) ~default:[])
 
-let expression_diagnostic report loc error =
-  mode_diagnostic report (Mode_diagnostics.Expression_error { loc; error })
+let type_diagnostic ~loc error =
+  Diagnostic_term.diagnose ~loc (fun () -> Type_diagnostics.diagnose error)
 
-let direct_mode_diagnostic report exn =
+let expression_diagnostic loc error =
+  mode_diagnostic ~loc
+    (Mode_diagnostics.Expression_error { loc; error })
+
+let direct_mode_diagnostic exn =
   let add_step ~mode ~pinpoint ~hint steps =
     { Mode_diagnostics.mode; pinpoint; kind = hint } :: steps
   in
-  Option.bind (Mode.fold_error_exn ~init:[] ~step:add_step exn) (fun axes ->
-      mode_diagnostic report (Mode_diagnostics.Folded_mismatch axes))
+  Option.bind (Mode.fold_error_exn ~init:[] ~step:add_step exn)
+    (fun (loc, axes) ->
+      mode_diagnostic ~loc
+        (Mode_diagnostics.Folded_mismatch axes))
 
-let typetexp_diagnostic _report _loc (error : Typetexp.error) =
+let typetexp_diagnostic _loc (error : Typetexp.error) =
   let open Typetexp in
   match error with
   | Bad_jkind_annot _ | Unbound_type_variable _ | No_type_wildcards _
@@ -60,33 +55,34 @@ let typetexp_diagnostic _report _loc (error : Typetexp.error) =
   | Val_poly_and_layout ->
     None
 
-let typedecl_diagnostic report loc (error : Typedecl.error) =
+let typedecl_diagnostic loc (error : Typedecl.error) =
   let open Typedecl in
   match error with
   | Jkind_mismatch_of_type (_env, _type, error) ->
-    kind_diagnostic report
+    kind_diagnostic ~loc
       (Kind_diagnostics.Crossing { loc; subject = "this type"; error })
   | Jkind_mismatch_of_path (_env, path, error) ->
-    kind_diagnostic report
+    kind_diagnostic ~loc
       (Kind_diagnostics.Crossing
          { loc; subject = "type " ^ Path.name path; error })
   | Atomic_field_must_be_mutable name ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Atomic_field_must_be_mutable { loc; name })
   | Non_value_atomic_field ->
-    type_diagnostic report (Type_diagnostics.Non_value_atomic_field loc)
+    type_diagnostic ~loc
+      (Type_diagnostics.Non_value_atomic_field loc)
   | Unboxed_mutable_label ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Mutable_field_in_unboxed_record loc)
   | Unsafe_mode_crossing_on_invalid_type_kind ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Unsafe_mode_crossing_on_invalid_type_kind loc)
   | Definition_mismatch (type_expr, env, Some mismatch) ->
-    module_diagnostic report
+    module_diagnostic ~loc
       (Module_diagnostics.Type_definition_mismatch
          { loc; type_expr; env; mismatch })
   | Constructor_submode_failed error ->
-    mode_diagnostic report
+    mode_diagnostic ~loc
       (Mode_diagnostics.Constructor_submode_failed { loc; error })
   | Repeated_parameter | Duplicate_constructor _ | Too_many_constructors
   | Duplicate_label _ | Recursive_abbrev _ | Cycle_in_def _
@@ -113,52 +109,57 @@ let typedecl_diagnostic report loc (error : Typedecl.error) =
   | Recursive_jkind_definition _ | Bad_represent_as_float_array_attribute ->
     None
 
-let typecore_diagnostic report loc (error : Typecore.error) =
+let typecore_diagnostic loc (error : Typecore.error) =
   let open Typecore in
   match error with
   | Atomic_in_pattern field ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Atomic_field_in_pattern { loc; field })
   | Label_not_atomic field ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Non_atomic_field_access { loc; field })
   | Modalities_on_atomic_field field ->
-    type_diagnostic report
+    type_diagnostic ~loc
       (Type_diagnostics.Modalities_on_atomic_field { loc; field })
   | Invalid_atomic_loc_payload ->
-    type_diagnostic report (Type_diagnostics.Invalid_atomic_access loc)
+    type_diagnostic ~loc
+      (Type_diagnostics.Invalid_atomic_access loc)
   | Bad_tail_annotation kind ->
-    type_diagnostic report (Type_diagnostics.Bad_tail_annotation { loc; kind })
+    type_diagnostic ~loc
+      (Type_diagnostics.Bad_tail_annotation { loc; kind })
   | Block_index_modality_mismatch { mut; err } ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Block_index_modality_mismatch
          { mutable_elements = mut; error = err })
   | Submode_failed (error, context) ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Submode_failed { error; context })
   | Curried_application_complete (label, error, part) ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Curried_application_complete { label; error; part })
   | Uncurried_function_escapes_comonadic error ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Uncurried_function_escapes_comonadic error)
   | Overwrite_of_invalid_term ->
-    expression_diagnostic report loc Mode_diagnostics.Overwrite_of_invalid_term
+    expression_diagnostic loc
+      Mode_diagnostics.Overwrite_of_invalid_term
   | Exclave_in_nontail_position ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       Mode_diagnostics.Exclave_in_nontail_position
   | Exclave_returns_not_local ->
-    expression_diagnostic report loc Mode_diagnostics.Exclave_returns_not_local
+    expression_diagnostic loc
+      Mode_diagnostics.Exclave_returns_not_local
   | Tail_call_local_returning ->
-    expression_diagnostic report loc Mode_diagnostics.Tail_call_local_returning
+    expression_diagnostic loc
+      Mode_diagnostics.Tail_call_local_returning
   | Always_heap_allocation allocation ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Always_heap_allocation allocation)
   | Always_static_allocation allocation ->
-    expression_diagnostic report loc
+    expression_diagnostic loc
       (Mode_diagnostics.Always_static_allocation allocation)
   | Not_allocation ->
-    expression_diagnostic report loc Mode_diagnostics.Not_allocation
+    expression_diagnostic loc Mode_diagnostics.Not_allocation
   | Non_value_object _ | Non_value_let_rec _ | Existential_jkind_mismatch _
   | Function_type_not_rep _ | Record_projection_not_rep _ | Record_not_rep _
   | Mutable_var_not_rep _ | Field_value_not_rep _
@@ -206,22 +207,22 @@ let typecore_diagnostic report loc (error : Typecore.error) =
   | Uncurried_function_escapes_locality ->
     None
 
-let typemod_diagnostic report loc (error : Typemod.error) =
+let typemod_diagnostic loc (error : Typemod.error) =
   let open Typemod in
   match error with
   | Not_included explanation | Not_included_functor explanation ->
-    module_diagnostic report
+    module_diagnostic ~loc
       (Module_diagnostics.Not_included { loc; explanation })
   | Strengthening_mismatch (path, explanation) ->
-    module_diagnostic report
+    module_diagnostic ~loc
       (Module_diagnostics.Strengthening_mismatch { loc; path; explanation })
   | With_makes_applicative_functor_ill_typed
       (constrained, type_path, explanation) ->
-    module_diagnostic report
+    module_diagnostic ~loc
       (Module_diagnostics.Applicative_functor_mismatch
          { loc; constrained; type_path; explanation })
   | With_mismatch (path, explanation) ->
-    module_diagnostic report
+    module_diagnostic ~loc
       (Module_diagnostics.Substitution_mismatch { loc; path; explanation })
   | Cannot_apply _ | Cannot_eliminate_dependency _ | Signature_expected
   | Structure_expected _ | Functor_expected _ | Signature_parameter_expected _
@@ -243,14 +244,14 @@ let typemod_diagnostic report loc (error : Typemod.error) =
   | Inconsistent_argument_types _ | Duplicate_parameter_name _ ->
     None
 
-let env_lookup_diagnostic report loc (error : Env.lookup_error) =
+let env_lookup_diagnostic loc (error : Env.lookup_error) =
   let open Env in
   match error with
   | Local_value_used_in_exclave description ->
-    mode_diagnostic report
+    mode_diagnostic ~loc
       (Mode_diagnostics.Local_value_used_in_exclave { loc; description })
   | Mutable_value_used_in_closure pinpoint ->
-    mode_diagnostic report
+    mode_diagnostic ~loc
       (Mode_diagnostics.Mutable_value_used_in_closure { loc; pinpoint })
   | Unbound_value _ | Unbound_type _ | Unbound_constructor _ | Unbound_label _
   | Unbound_module _ | Unbound_class _ | Unbound_modtype _ | Unbound_cltype _
@@ -265,47 +266,150 @@ let env_lookup_diagnostic report loc (error : Env.lookup_error) =
   | Error_from_persistent_env _ | Incompatible_stage _ | Unbound_in_stage _ ->
     None
 
-let env_diagnostic report (error : Env.error) =
+let env_diagnostic (error : Env.error) =
   let open Env in
   match error with
-  | Lookup_error (loc, _env, error) -> env_lookup_diagnostic report loc error
+  | Lookup_error (loc, _env, error) ->
+    env_lookup_diagnostic loc error
   | Missing_module _ | Illegal_value_name _ | Incomplete_instantiation _
   | Initial_stage_splice _ | Unsupported_inside_quotation _ | Cmi_not_found _ ->
     None
 
-let structured_diagnostic_of_exception report = function
-  | Typetexp.Error (loc, _env, error) -> typetexp_diagnostic report loc error
-  | Typedecl.Error (loc, error) -> typedecl_diagnostic report loc error
-  | Typecore.Error (loc, _env, error) -> typecore_diagnostic report loc error
-  | Typemod.Error (loc, _env, error) -> typemod_diagnostic report loc error
-  | Env.Error error -> env_diagnostic report error
-  | Includemod.Apply_error { env; app_name; mty_f; args; _ } ->
-    module_diagnostic report
+let uniqueness_diagnostic
+    (error : Uniqueness_analysis.error) =
+  let open Uniqueness_analysis in
+  let loc =
+    match error with
+    | Cannot_force { inner = { cannot_force = { occ; _ }; there; order }; _ } ->
+      Option.map
+        (fun (there_occ : Occurrence.t) ->
+          match order with
+          | Seq_before -> there_occ.loc
+          | Seq_after -> occ.loc
+          | Par ->
+            if Location.compare occ.loc there_occ.loc < 0
+            then there_occ.loc
+            else occ.loc)
+        (Usage.extract_occurrence there)
+    | Boundary { cannot_force = { occ; _ }; _ }
+    | Borrowed_value_used_uniquely { occ; _ } ->
+      Some occ.loc
+    | Overwrite_changed_tag (Overwrites.Changed_tag { new_tag; _ }) ->
+      Some new_tag.name_for_error.loc
+    | Borrowed_out_of_context loc -> Some loc
+  in
+  Option.bind loc (fun loc ->
+      mode_diagnostic ~loc
+        (Mode_diagnostics.Uniqueness_error error))
+
+let structured_diagnostic_of_exception = function
+  | Typetexp.Error (loc, _env, error) ->
+    typetexp_diagnostic loc error
+  | Typedecl.Error (loc, error) ->
+    typedecl_diagnostic loc error
+  | Typecore.Error (loc, _env, error) ->
+    typecore_diagnostic loc error
+  | Typemod.Error (loc, _env, error) ->
+    typemod_diagnostic loc error
+  | Env.Error error -> env_diagnostic error
+  | Includemod.Apply_error { loc; env; app_name; mty_f; args } ->
+    module_diagnostic ~loc
       (Module_diagnostics.Functor_application_mismatch
          { env; app_name; mty_f; args })
-  | Uniqueness_analysis.Usage.Unique_use_during_borrowing error ->
-    mode_diagnostic report (Mode_diagnostics.Unique_use_during_borrowing error)
+  | Uniqueness_analysis.Usage.Unique_use_during_borrowing
+      ({ cannot_force = { occ; _ }; _ } as error) ->
+    mode_diagnostic ~loc:occ.loc
+      (Mode_diagnostics.Unique_use_during_borrowing error)
   | Uniqueness_analysis.Error error ->
-    mode_diagnostic report (Mode_diagnostics.Uniqueness_error error)
+    uniqueness_diagnostic error
   (* [exn] is extensible: unknown exception families use the normal report. *)
   | _ -> None
 
-let diagnostic_of_exception report exn =
-  match structured_diagnostic_of_exception report exn with
+let specialized_diagnostic_of_exception exn =
+  match structured_diagnostic_of_exception exn with
   | Some diagnostic -> Some diagnostic
-  | None -> direct_mode_diagnostic report exn
+  | None -> direct_mode_diagnostic exn
 
-let structured_emitter ppf exn report =
-  let diagnostic =
-    match exn with
-    | Some exn -> (
-      match diagnostic_of_exception report exn with
-      | Some diagnostic -> diagnostic
-      | None -> diagnostic_of_report report)
-    | None -> diagnostic_of_report report
+let prepare ~legacy exn =
+  let diagnostic = diagnostic_of_report legacy in
+  match specialized_diagnostic_of_exception exn with
+  | Some { Diagnostic_term.loc; fragments } ->
+    { diagnostic with loc; fragments }
+  | None -> diagnostic
+
+let with_body (diagnostic : t) body : Diagnostic.t =
+  { loc = diagnostic.loc;
+    kind = diagnostic.kind;
+    body;
+    legacy = diagnostic.legacy
+  }
+
+let to_structured diagnostic =
+  let body =
+    match diagnostic.fragments with
+    | [] ->
+      [ { Diagnostic.Block.kind = Explanation;
+          content = [Diagnostic.Inline.Text (String.trim diagnostic.legacy)];
+          children = []
+        } ]
+    | fragments -> Diagnostic_term.realize fragments
   in
-  Format.fprintf ppf "%s@." (Diagnostic.to_json diagnostic)
+  with_body diagnostic body
+
+let diagnostic_of_exception ~legacy exn =
+  to_structured (prepare ~legacy exn)
+
+let of_report = diagnostic_of_report
+
+let of_exn exn =
+  match Location.error_of_exn exn with
+  | None ->
+    let backtrace =
+      if Printexc.backtrace_status () then Printexc.get_backtrace () else ""
+    in
+    let legacy =
+      Printf.sprintf "Fatal error: exception %s\n%s"
+        (Printexc.to_string exn) backtrace
+    in
+    Some
+      (`Ok
+        (diagnostic_of_legacy ~loc:Location.none ~kind:Location.Report_error
+           legacy))
+  | Some `Already_displayed -> Some `Already_displayed
+  | Some (`Ok legacy) -> Some (`Ok (prepare ~legacy exn))
+
+let print_text ppf diagnostic =
+  if not !Clflags.structured_diagnostics then
+    Location.print_report_string ppf diagnostic.legacy
+  else
+    let body =
+      Diagnostic_nlg.clip ~verbosity:Minimal diagnostic.fragments
+      |> Diagnostic_term.realize
+    in
+    match body with
+    | [] -> Location.print_report_string ppf diagnostic.legacy
+    | _ :: _ ->
+      let diagnostic = with_body diagnostic body in
+      let report : Location.report =
+        { kind = diagnostic.kind;
+          main =
+            Location.msg ~loc:diagnostic.loc "%a" Diagnostic.format diagnostic;
+          sub = [];
+          footnote = None
+        }
+      in
+      let printer = !Location.report_printer () in
+      printer.pp printer ppf report
+
+let print_json ppf diagnostic =
+  Format.fprintf ppf "%s@." (Diagnostic.to_json (to_structured diagnostic))
+
+let print ppf diagnostic =
+  if !Clflags.json then print_json ppf diagnostic else print_text ppf diagnostic
+
+let () = Location.set_reporting { of_exn; of_report; print }
 
 let enable_structured_diagnostics () =
-  Clflags.structured_diagnostics := true;
-  Location.set_emitter structured_emitter
+  Clflags.structured_diagnostics := true
+
+let enable_json () = Clflags.json := true

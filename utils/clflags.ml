@@ -627,6 +627,7 @@ let error_style_reader = {
 }
 
 let structured_diagnostics = ref false
+let json = ref false
 
 let unboxed_types = ref false
 

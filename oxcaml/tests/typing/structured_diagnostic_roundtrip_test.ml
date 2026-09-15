@@ -34,6 +34,8 @@ let () =
   let second = location ~line:2 ~line_start:10 in
   let diagnostic : Diagnostic.t =
     { loc = first;
+      kind = Location.Report_error;
+      legacy = "first second";
       body =
         [ { kind = Diagnostic.Kind.Explanation;
             content = [mention first "first"; mention second "second"];
@@ -75,8 +77,10 @@ let () =
   in
   let diagnostic : Diagnostic.t =
     { loc;
+      kind = Location.Report_error;
+      legacy = "first portable";
       body =
-        [ { kind = Diagnostic.Kind.Background;
+        [ { kind = Diagnostic.Kind.Rule;
             content = [mention loc "first"; term];
             children =
               [ Diagnostic.Relation.Claim, leaf [source];

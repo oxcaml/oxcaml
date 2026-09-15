@@ -883,6 +883,7 @@ type expect_mode =
   | Normal
   | Principal
   | Structured
+  | StructuredTxt
 
 let run_expect_once input_file mode log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
@@ -891,15 +892,17 @@ let run_expect_once input_file mode log env ~backend =
       mode,
       Environments.lookup_as_bool Ocaml_variables.structured_diagnostics env
     with
-    | (Normal | Structured), Some true ->
+    | (Normal | Structured | StructuredTxt), Some true ->
       "-automatic-structured-diagnostics"
-    | (Normal | Structured), (None | Some false) | Principal, _ -> ""
+    | (Normal | Structured | StructuredTxt), (None | Some false)
+    | Principal, _ -> ""
   in
   let mode_flag =
     match mode with
     | Normal -> ""
     | Principal -> "-principal"
-    | Structured -> "-structured-diagnostics"
+    | Structured -> "-structured -json"
+    | StructuredTxt -> "-structured"
   in
   let command =
     match (backend : Ocaml_backends.t) with
@@ -968,12 +971,22 @@ let run_expect_passes input_file log env ~backend =
       in
       if not (Result.is_pass result3) then (result3, env3)
       else begin
-        let output_env = Environments.add_bindings
-        [
-          Builtin_variables.reference, input_file;
-          Builtin_variables.output, output_file
-        ] env3 in
-        (Result.pass, output_env)
+        let (result4, env4, output_file) =
+          if needs_structured then
+            let (result4, env4, ..) =
+              run_expect_once output_file StructuredTxt log env3 ~backend
+            in
+            (result4, env4, corrected output_file)
+          else (result3, env3, output_file)
+        in
+        if not (Result.is_pass result4) then (result4, env4)
+        else
+          let output_env = Environments.add_bindings
+          [
+            Builtin_variables.reference, input_file;
+            Builtin_variables.output, output_file
+          ] env4 in
+          (Result.pass, output_env)
       end
     end else (result2, env2)
   end else (result1, env1)

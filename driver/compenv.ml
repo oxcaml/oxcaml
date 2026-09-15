@@ -40,7 +40,7 @@ let print_standard_library () =
   raise (Exit_with_status 0)
 
 let report_message ?usage message =
-  if !Clflags.structured_diagnostics then
+  if !Clflags.structured_diagnostics || !Clflags.json then
     Location.print_report Format.err_formatter (Location.errorf "%s" message)
   else begin
     prerr_endline message;

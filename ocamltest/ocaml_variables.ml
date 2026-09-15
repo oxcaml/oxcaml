@@ -239,7 +239,7 @@ let sharedobjext =
 
 let structured_diagnostics =
   Variables.make ("structured_diagnostics",
-    "Whether expect tests should include structured diagnostics for errors")
+    "Whether expect tests should include Structured and StructuredTxt errors")
 
 let use_runtime =
   Variables.make ("use_runtime",

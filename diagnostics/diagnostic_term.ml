@@ -122,20 +122,27 @@ let entry (t : t) : Structured_diagnostic.Glossary_entry.t =
          written `with 'a`."
       ~url:"https://oxcaml.org/documentation/kinds/intro/" ()
 
-let realize ~loc (stories : t Nlg.story list) : Structured_diagnostic.t =
-  Nlg.realize ~term_entry:entry ~term_words:words ~loc stories
+type diagnostic =
+  { loc : Location.t;
+    fragments : t Nlg.fragment list
+  }
 
-let rendered_children (beat : t Nlg.beat) : Structured_diagnostic.Block.t =
-  Nlg.rendered_children ~term_entry:entry ~term_words:words beat
+let realize (fragments : t Nlg.fragment list) =
+  Nlg.naturalize fragments
+  |> Nlg.realize ~term_entry:entry ~term_words:words
 
-let diagnose ~loc make_stories =
+let rendered_children (fragment : t Nlg.fragment) :
+    Structured_diagnostic.Block.t =
+  Nlg.rendered_children ~term_entry:entry ~term_words:words fragment
+
+let diagnose ~loc make_fragments =
   let snapshot = Btype.snapshot () in
   Fun.protect
     ~finally:(fun () -> Btype.backtrack snapshot)
     (fun () ->
-      match make_stories () with
+      match make_fragments () with
       | [] -> None
-      | stories -> Some (realize ~loc stories)
+      | fragments -> Some { loc; fragments }
       | exception ((Out_of_memory | Stack_overflow) as unrecoverable) ->
         raise unrecoverable
       | exception _ -> None)

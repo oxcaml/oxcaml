@@ -301,6 +301,7 @@ val error_style : Misc.Error_style.setting option ref
 val error_style_reader : Misc.Error_style.setting env_reader
 
 val structured_diagnostics : bool ref
+val json : bool ref
 
 val unboxed_types : bool ref
 
