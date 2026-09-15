@@ -599,6 +599,10 @@ module Datalog : sig
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
+
+      (** Union of two relations; the values of shared keys are combined
+          according to [result_repr]. *)
+      val union : t -> t -> t
     end
 
     module Nil :

@@ -277,6 +277,12 @@ val deps : t -> Graph.graph
     recorded by [simple_to_node]. *)
 val delayed_deps : t -> Delayed_deps.t
 
+(** The symbols from other compilation units recorded by [simple_to_node]. *)
+val imported_symbols : Delayed_deps.t -> Symbol.Set.t
+
+(** The code ids recorded by [add_apply] and [add_set_of_closures_dep]. *)
+val code_ids_of_delayed_deps : Delayed_deps.t -> Code_id.Set.t
+
 (** Resolve all deferred dependencies into the graph. Imported symbols from
     compilation units outside [analysis_scope] are marked [any_source]. *)
 val resolve_delayed_deps :
