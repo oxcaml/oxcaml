@@ -2,7 +2,7 @@
    frame_pointers;
    readonly_files = "fp_backtrace.c";
    all_modules = "${readonly_files} effects.ml";
-   flags = " -flambda2-no-simplify-stubs";
+   flags = " -no-flambda2-simplify-stubs";
    native;
 *)
 
