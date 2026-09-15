@@ -24,14 +24,16 @@ Module-type implementation queries using indexed compiler facts.
   > }
 
   $ impls_of () {
-  >   local module_type="$1"
+  >   local module_type
   >   cat > main.ml
   >   $OCAMLC -bin-annot -c main.ml || return
   >   ocaml-index aggregate main.cmt -o module-types.ocaml-index || return
-  >   $MERLIN single module-type-impls \
-  >     -index-file ./module-types.ocaml-index \
-  >     -filename ./main.ml < ./main.ml \
-  >     | print_results "$module_type"
+  >   for module_type in "$@"; do
+  >     $MERLIN single module-type-impls \
+  >       -index-file ./module-types.ocaml-index \
+  >       -filename ./main.ml < ./main.ml \
+  >       | print_results "$module_type"
+  >   done
   > }
 
   $ setup_index () (
@@ -526,7 +528,7 @@ Passing [A] to a functor makes its member [A.M] an implementer of [S].
   complete
   M 12:9 12:10 argument
 
-  $ impls_of S <<'EOF'
+  $ impls_of S U <<'EOF'
   > module type S = sig val x : int end
   > module type U = sig val y : bool end
   > module A = struct module type T = S end
@@ -539,11 +541,6 @@ Passing [A] to a functor makes its member [A.M] an implementer of [S].
   > EOF
   partial
   M 6:29 6:30 argument
-
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./module-types.ocaml-index \
-  >   -filename ./main.ml < ./main.ml \
-  >   | print_results U
   partial
   M 7:29 7:30 argument
 
@@ -788,7 +785,7 @@ A [with module] constraint makes [Concrete] and [M.N] implementers of [S].
 [with module type] constraints apply per instance: [A.M] implements [S], and
 [B.M] implements [U].
 
-  $ impls_of S <<'EOF'
+  $ impls_of S U <<'EOF'
   > module type S = sig val x : int end
   > module type U = sig val y : bool end
   > module type Outer = sig
@@ -806,11 +803,6 @@ A [with module] constraint makes [Concrete] and [M.N] implementers of [S].
   > EOF
   complete
   M 9:9 9:10 annotation
-
-  $ $MERLIN single module-type-impls \
-  >   -index-file ./module-types.ocaml-index \
-  >   -filename ./main.ml < ./main.ml \
-  >   | print_results U
   complete
   M 13:9 13:10 annotation
 
