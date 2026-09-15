@@ -148,8 +148,8 @@ module Layout = struct
       | Base b -> Static.of_base b sa
       | Product consts ->
         product (List.map (fun s -> of_sort_const s sa) consts)
-      | Univar uv -> univar uv
-      | Genvar v -> genvar v
+      | Univar uv -> univar uv sa
+      | Genvar v -> genvar v sa
       | Addressable s -> addressable (of_sort_const s sa)
 
     let rec equal_up_to_scannable_axes c1 c2 =
@@ -158,12 +158,12 @@ module Layout = struct
       | Any _, Any _ -> true
       | Product cs1, Product cs2 ->
         List.equal equal_up_to_scannable_axes cs1 cs2
-      | Univar uv1, Univar uv2 ->
+      | Univar (uv1, _), Univar (uv2, _) ->
         (* [equal_up_to_scannable_axes] is only used to choose which
            abbreviation to use for printing, so physical equality suffices here.
            [Sort.equal_univar_univar] is not available from this module. *)
         uv1 == uv2
-      | Genvar v1, Genvar v2 -> v1 == v2
+      | Genvar (v1, _), Genvar (v2, _) -> v1 == v2
       | Addressable c1, Addressable c2 -> equal_up_to_scannable_axes c1 c2
       | (Base _ | Any _ | Product _ | Univar _ | Genvar _ | Addressable _), _ ->
         false
@@ -224,9 +224,11 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
-        | Univar { name = Some n } -> n
-        | Univar { name = None } -> "_"
-        | Genvar v -> Sort.to_string_genvar v
+        | Univar ({ name = Some n }, _) -> n
+        | Univar ({ name = None }, _) -> "_"
+        | Genvar (v, sa) ->
+          String.concat " "
+            (Sort.to_string_genvar v :: Scannable_axes.to_string_list sa)
         | Addressable t -> to_string true t ^ " addressable"
       in
       to_string false t
