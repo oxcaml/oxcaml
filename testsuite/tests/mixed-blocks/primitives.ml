@@ -90,9 +90,7 @@ module Polymorphic_immutable = struct
 
   let construct_by_syntax (a : field) = { a }
   let construct_by_primitive (a : field) = make a
-  (* CR-soon lmaurer: The [field t] ascription shouldn't be necessary. There's a
-     bug here. *)
-  let access_by_syntax ({ a } : field t) = print a
+  let access_by_syntax { a } = print a
   let access_by_primitive t = print (field0 t)
 
   let () =
@@ -120,11 +118,9 @@ module Polymorphic_mutable = struct
 
   let construct_by_syntax (a : field) = { a }
   let construct_by_primitive (a : field) = make a
-  (* CR-soon lmaurer: The [field t] ascription shouldn't be necessary. There's a
-     bug here. *)
-  let access_by_syntax ({ a } : field t) = print a
+  let access_by_syntax { a } = print a
   let access_by_primitive t = print (field0 t)
-  let modify_by_syntax (t : field t) =
+  let modify_by_syntax t =
     let #(a1, a2, a3) = t.a in
     t.a <- #(Int8_u.mul a1 #10s, a2, a3 ^ " times ten")
   let modify_by_primitive t =
@@ -153,11 +149,9 @@ module Ref = struct
 
   let construct_by_syntax (a : field) = { contents = a }
   let construct_by_primitive (a : field) = ref a
-  (* CR-soon lmaurer: The [field ref] ascription shouldn't be necessary. There's
-     a bug here. *)
-  let access_by_syntax ({ contents } : field ref) = print contents
+  let access_by_syntax { contents } = print contents
   let access_by_primitive t = print !t
-  let modify_by_syntax (t : field ref) =
+  let modify_by_syntax t =
     let #(a1, a2) = t.contents in
     t.contents <- #(Int16_u.mul a1 #10S, Nativeint_u.mul a2 #10n)
   let modify_by_primitive t =
