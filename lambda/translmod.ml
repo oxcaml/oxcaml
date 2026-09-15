@@ -958,12 +958,16 @@ and transl_structure ~scopes loc
             match incl.incl_kind with
             | Tincl_structure ->
                 pure_module modl, transl_module ~scopes Tcoerce_none None modl
-            | Tincl_functor { input_coercion; input_repr; yielding } ->
+            | Tincl_functor
+                { input_coercion; input_repr; yielding; staticity } ->
                 Strict, transl_include_functor ~generative:false modl
                           input_coercion scopes loc ~input_repr ~yielding
-            | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
+                          ~staticity
+            | Tincl_gen_functor
+                { input_coercion; input_repr; yielding; staticity } ->
                 Strict, transl_include_functor ~generative:true modl
                           input_coercion scopes loc ~input_repr ~yielding
+                          ~staticity
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
@@ -1017,34 +1021,47 @@ and transl_structure ~scopes loc
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
-and transl_include_functor ~generative ~input_repr ~yielding modl params scopes
-      loc =
+and transl_include_functor ~generative ~input_repr ~yielding ~staticity modl
+      params scopes loc =
   let input_repr = transl_module_representation input_repr in
   let inlined_attribute =
     Translattribute.get_inlined_attribute_on_module modl
   in
   let modl = transl_module ~scopes Tcoerce_none None modl in
-  let params = if generative then [params;[]] else [params] in
-  let params = List.map (fun coercion ->
+  let block coercion =
     Lprim(block_of_module_representation ~loc:(to_location loc) input_repr,
           List.map (fun (name, cc) ->
             apply_coercion loc Strict cc (Lvar name))
             coercion,
-          loc))
-    params
+          loc)
   in
-  Lapply {
-    ap_loc = loc;
-    ap_func = modl;
-    ap_args = params;
-    ap_result_layout = Lambda.layout_module;
-    ap_region_close=Rc_normal;
-    ap_mode = not_alloc_stack;
-    ap_yielding = Translmode.transl_yielding_mode_l yielding;
-    ap_tailcall = Default_tailcall;
-    ap_inlined = inlined_attribute;
-    ap_specialised = Default_specialise;
-    ap_probe = None;}
+  let apply ap_func ap_args =
+    { ap_loc = loc;
+      ap_func;
+      ap_args;
+      ap_result_layout = Lambda.layout_module;
+      ap_region_close=Rc_normal;
+      ap_mode = not_alloc_stack;
+      ap_yielding = Translmode.transl_yielding_mode_l yielding;
+      ap_tailcall = Default_tailcall;
+      ap_inlined = inlined_attribute;
+      ap_specialised = Default_specialise;
+      ap_probe = None;}
+  in
+  match Translmode.transl_staticity_mode_r staticity with
+  | Dynamic ->
+    let params =
+      if generative then [block params; block []] else [block params]
+    in
+    Lapply (apply modl params)
+  | Static ->
+    (* A generative functor is always dynamic (see [Typemod]), so a static
+       generative functor is a template whose instantiation is a regular unit
+       functor: instantiate first, then apply to unit. *)
+    let instantiated = Linstantiate (apply modl [block params]) in
+    if generative
+    then Lapply (apply instantiated [block []])
+    else instantiated
 
 (* Update forward declaration in Translcore *)
 let _ =
@@ -1375,12 +1392,14 @@ let transl_toplevel_item ~scopes item =
         match incl.incl_kind with
         | Tincl_structure ->
             transl_module ~scopes Tcoerce_none None modl
-        | Tincl_functor { input_coercion; input_repr; yielding } ->
+        | Tincl_functor
+            { input_coercion; input_repr; yielding; staticity } ->
             transl_include_functor ~generative:false modl input_coercion scopes
-              loc ~input_repr ~yielding
-        | Tincl_gen_functor { input_coercion; input_repr; yielding } ->
+              loc ~input_repr ~yielding ~staticity
+        | Tincl_gen_functor
+            { input_coercion; input_repr; yielding; staticity } ->
             transl_include_functor ~generative:true modl input_coercion scopes
-              loc ~input_repr ~yielding
+              loc ~input_repr ~yielding ~staticity
       in
       let mid = Ident.create_local "include" in
       let mid_duid = Lambda.debug_uid_none in

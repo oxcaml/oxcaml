@@ -243,7 +243,9 @@ let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
 
 (* Extract the signature and the mode of a functor's return, given the signature
    [sig_acc] and mode [md_mode] of the functor argument. [funct_mode] is the
-   mode of the functor expression itself. *)
+   mode of the functor expression itself; it is [None] for includes in
+   signatures, where there is no functor expression and no runtime
+   application. *)
 let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
       ~funct_mode =
   let sig_acc = List.rev sig_acc in
@@ -255,7 +257,10 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
       Yielding.disallow_right (Value.proj_comonadic Yielding m)
     in
     Ctype.create_yielding_mode_l
-      (Yielding.join [yielding funct_mode; yielding md_mode])
+      (match funct_mode with
+       | Some funct_mode ->
+         Yielding.join [yielding funct_mode; yielding md_mode]
+       | None -> Yielding.disallow_right Yielding.max)
   in
   match Mtype.scrape_alias env mty with
   | Mty_functor (Named (param, mty_param, mm_param),mty_result,mm_result)
@@ -266,6 +271,12 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
       let mm_param = mm_param |> alloc_as_value in
+      (* The parameter's staticity determines which kind of functor is applied.
+         See Note [Staticity of functors] in [typedtree.mli]. *)
+      let staticity =
+        Staticity.apply_hint (Parameter_to_functor Location.none)
+          (Value.proj_monadic Staticity mm_param)
+      in
       let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
@@ -295,14 +306,18 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
               sig..end -> () -> sig..end *)
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
-            Tincl_functor { input_coercion; input_repr; yielding }, sg_result,
-            mm_result
+            Tincl_functor
+              { input_coercion; input_repr; yielding;
+                staticity = Staticity.disallow_left staticity },
+            sg_result, mm_result
         | Mty_functor (Unit, mty_result, mm_result) -> begin
             check_for_generated_type_or_jkind ~funct_body env loc mty
               (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
-              Tincl_gen_functor { input_coercion; input_repr; yielding },
+              Tincl_gen_functor
+                { input_coercion; input_repr; yielding;
+                  staticity = Staticity.disallow_left staticity },
               sg_result, mm_result
             | sg -> raise (Error (loc,env,Signature_result_expected
                                             (Mty_functor (Unit,sg, mm_result))))
@@ -320,7 +335,22 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
             raise(Error(loc, env, Cannot_eliminate_dependency
                                     (Functor_included, mty_func)))
       in
-      let mm = mm_result |> alloc_as_value in
+      let mm = mm_result |> alloc_as_value |> Value.disallow_right in
+      let mm =
+        match funct_mode with
+        | None -> mm
+        | Some funct_mode ->
+          (* As in [type_one_application]: the functor must have the staticity
+             of its parameter, and the application inherits the functor's
+             staticity. *)
+          let funct_staticity = Value.proj_monadic Staticity funct_mode in
+          Staticity.submode_err (loc, Functor) funct_staticity staticity;
+          Value.join
+            [ mm;
+              Value.min_with_monadic Staticity
+                (Staticity.apply_hint (Functor_to_application loc)
+                   funct_staticity) ]
+      in
       (sg, mm, incl_kind)
   | Mty_functor (Unit,_,_) as mty ->
       raise(Error(loc, env, Signature_parameter_expected mty))
@@ -2239,10 +2269,9 @@ and transl_signature ?(interface_toplevel = false) env
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
-        let funct_mode = Value.disallow_right Value.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
-            ~funct_mode
+            ~funct_mode:None
         in
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
@@ -3558,13 +3587,25 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_curried_application_complete
         ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
         ~mode_arg:None;
+      let mm_res =
+        (* The application inherits the functor's staticity; since generative
+           functors are always dynamic, so is their application. *)
+        let funct_staticity =
+          Value.proj_monadic Staticity (mode_without_locks_exn funct.mod_mode)
+        in
+        Value.join
+          [ alloc_as_value (Alloc.disallow_right mm_res);
+            Value.min_with_monadic Staticity
+              (Staticity.apply_hint (Functor_to_application funct.mod_loc)
+                 funct_staticity) ]
+      in
       { mod_desc =
           Tmod_apply_unit
             (funct,
              functor_application_yielding ~funct
                ~arg_mode:(Value.disallow_right Value.legacy));
         mod_type = mty_res;
-        mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
+        mod_mode = mm_res, None;
         mod_env = env;
         mod_attributes = app_view.attributes;
         mod_loc = funct.mod_loc },
@@ -3782,9 +3823,9 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
         let funct_mode = Typedtree.mode_without_locks_exn modl.mod_mode in
         let sg, mode, incl_kind =
           extract_sig_functor_open funct_body env smodl.pmod_loc
-            modl.mod_type sig_acc md_mode ~funct_mode
+            modl.mod_type sig_acc md_mode ~funct_mode:(Some funct_mode)
         in
-        incl_kind, sg, Value.disallow_right mode
+        incl_kind, sg, mode
       | Structure ->
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
           (Typedtree.mode_without_locks_exn modl.mod_mode)
