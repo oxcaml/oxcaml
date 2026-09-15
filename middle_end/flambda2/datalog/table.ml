@@ -56,6 +56,14 @@ let result_repr_is_unit (type v) (repr : v result_repr) :
     (v, unit) Type.eq option =
   match repr with Unit_repr -> Some Equal | Lattice_repr _ -> None
 
+let rec union : type t k v.
+    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t =
+ fun columns repr t1 t2 ->
+  match columns with
+  | [] -> result_repr_union repr t1 t2
+  | column :: columns ->
+    Column.union_total column (fun t1 t2 -> union columns repr t1 t2) t1 t2
+
 let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
     =
  fun columns ~earlier ~later ->

@@ -87,6 +87,8 @@ module Datalog = struct
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
       val find_opt : keys Constant.hlist -> t -> value option
+
+      val union : t -> t -> t
     end
 
     module type Relation = S with type value = unit
@@ -130,6 +132,8 @@ module Datalog = struct
 
       let find_opt keys table =
         Or_null.to_option (Column.find_or_null_hlist columns keys table)
+
+      let union table1 table2 = Table.union columns result_repr table1 table2
     end
 
     module Relation1 (C1 : C) = Cons (C1) (Nil)

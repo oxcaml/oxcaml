@@ -55,6 +55,8 @@ module type Flambda2 = sig
     keep_symbol_tables:bool ->
     Lambda.program ->
     jsir_program
+
+  val reaper_lto_solve : cmx_files:string list -> ltosol_file:string -> unit
 end
 
 module type File_extensions = sig

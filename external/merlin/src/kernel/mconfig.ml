@@ -592,6 +592,7 @@ let ocaml_ignored_flags =
     "-flambda2-advanced-meet";
     "-lto-support";
     "-no-lto-support";
+    "-reaper-solve";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)
