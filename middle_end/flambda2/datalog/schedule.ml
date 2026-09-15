@@ -94,7 +94,7 @@ end)
 
 type provenance =
   | Input
-  | Rule of rule_id * Executor.bindings
+  | Rule of rule_id * Bytecode.bindings
 
 let add_if_not_exists sources tid args provenance =
   let fact = Fact_id (tid, args) in
@@ -166,7 +166,7 @@ let deduce (atoms : deduction) =
             then
               provenance_table_ref
                 := add_if_not_exists !provenance_table_ref tid keys
-                     (Rule (rule_id, Executor.get_bindings bindings)
+                     (Rule (rule_id, Bytecode.get_bindings bindings)
                        : provenance);
             table_ref
               := incremental
@@ -290,7 +290,7 @@ let print_provenance_group char_trie rule_id ppf provenance =
       Format.fprintf ppf "@[<hv 2>%a :-@ @[<2>%a@ @[%a@]@]@]" print_fact
         (tid, args)
         (print_string_with_unique_prefix len)
-        rule_id Executor.print_bindings bindings)
+        rule_id Bytecode.print_bindings bindings)
     provenance
 
 type table_provenance =

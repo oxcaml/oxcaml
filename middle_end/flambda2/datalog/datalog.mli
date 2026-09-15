@@ -80,7 +80,7 @@ val filter :
 type callback
 
 val create_callback_with_bindings :
-  (Executor.bindings_ref -> 'a Constant.hlist -> unit) ->
+  (Bytecode.bindings_ref -> 'a Constant.hlist -> unit) ->
   name:string ->
   'a Term.hlist ->
   callback
