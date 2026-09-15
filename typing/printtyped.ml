@@ -1540,7 +1540,9 @@ and label_x_bool_x_core_type_list i ppf x =
       line i ppf "Tinherit\n";
       core_type (i+1) ppf ct
 
-let interface ppf x = list 0 signature_item ppf x.sig_items
+let signature ppf x = list 0 signature_item ppf x.sig_items
+
+let interface ppf (x : interface) = signature ppf x.signature
 
 let implementation ppf x = list 0 structure_item ppf x.str_items
 

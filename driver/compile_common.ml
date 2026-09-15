@@ -98,11 +98,9 @@ let typecheck_intf info ast =
     Typemod.type_interface
       ~sourcefile:(Unit_info.original_source_file info.target)
       info.module_name info.env ast
+    |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
   in
-  let tsg =
-    print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
-      interface.signature
-  in
+  let tsg = interface.signature in
   let alerts = Builtin_attributes.alerts_of_sig ~mark:true ast in
   let sg = tsg.Typedtree.sig_type in
   if !Clflags.print_types then
