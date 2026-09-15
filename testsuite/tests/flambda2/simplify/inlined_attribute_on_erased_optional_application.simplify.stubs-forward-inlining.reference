@@ -36,8 +36,8 @@ let code loopify(never) size(1) newer_version_of(default_0)
       default_0_1 (x) my_closure &my_alloc_region my_depth -> k * k1 =
   cont k (x)
 in
-let $camlInlined_attribute_on_erased_optional_application__default_4 =
-  closure default_0_1 @`default` &toplevel.alloc_region
+let $camlInlined_attribute_on_erased_optional_application__default_1 =
+  closure default_0_1 @`default` &toplevel
 in
 let code loopify(never) size(5) newer_version_of(f_inner_2)
       f_inner_2_1 (x, y : imm tagged, z : imm tagged)
@@ -48,32 +48,32 @@ let code loopify(never) size(5) newer_version_of(f_inner_2)
   let int_add_1 = %int_barith.add (int_add, z) in
   cont k (int_add_1)
 in
-let $camlInlined_attribute_on_erased_optional_application__f_inner_5 =
-  closure f_inner_2_1 @f_inner &toplevel.alloc_region
+let $camlInlined_attribute_on_erased_optional_application__f_inner_2 =
+  closure f_inner_2_1 @f_inner &toplevel
 in
-let $camlInlined_attribute_on_erased_optional_application__f_6 =
-  closure f_1 @f &toplevel.alloc_region
+let $camlInlined_attribute_on_erased_optional_application__f_3 =
+  closure f_1 @f &toplevel
   with {
     `default` =
-      $camlInlined_attribute_on_erased_optional_application__default_4;
+      $camlInlined_attribute_on_erased_optional_application__default_1;
     f_inner =
-      $camlInlined_attribute_on_erased_optional_application__f_inner_5
+      $camlInlined_attribute_on_erased_optional_application__f_inner_2
   }
 in
-let $camlInlined_attribute_on_erased_optional_application__partial_f_7 =
-  closure partial_f_3 @partial_f &toplevel.alloc_region
-  with { f = $camlInlined_attribute_on_erased_optional_application__f_6 }
+let $camlInlined_attribute_on_erased_optional_application__partial_f_4 =
+  closure partial_f_3 @partial_f &toplevel
+  with { f = $camlInlined_attribute_on_erased_optional_application__f_3 }
 in
-apply direct(default_0_1 &toplevel.alloc_region)
-  ($camlInlined_attribute_on_erased_optional_application__default_4
+apply direct(default_0_1 &toplevel)
+  ($camlInlined_attribute_on_erased_optional_application__default_1
    : _ -> imm tagged)
     (0)
     -> k * error
   where k (x : imm tagged) =
     let $camlInlined_attribute_on_erased_optional_application =
-      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_4,
-               $camlInlined_attribute_on_erased_optional_application__f_6,
-               $camlInlined_attribute_on_erased_optional_application__partial_f_7,
+      Block 0 ($camlInlined_attribute_on_erased_optional_application__default_1,
+               $camlInlined_attribute_on_erased_optional_application__f_3,
+               $camlInlined_attribute_on_erased_optional_application__partial_f_4,
                x)
     in
     cont done ($camlInlined_attribute_on_erased_optional_application)
