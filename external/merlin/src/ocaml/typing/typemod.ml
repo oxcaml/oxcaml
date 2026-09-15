@@ -107,25 +107,36 @@ type error =
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
 
-let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
-  let mode = Mode.Value.newvar 0 in
-  let min = Alloc.Const.Option.value ~default:Alloc.Const.min m in
-  let max = Alloc.Const.Option.value ~default:Alloc.Const.max m in
-  Value.submode_exn (min |> Alloc.of_const |> alloc_as_value) mode;
-  Value.submode_exn mode (max |> Alloc.of_const |> alloc_as_value);
+let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
+  let mode = Mode.With_regionality.newvar 0 in
+  let min =
+    With_locality.Const.Option.value ~default:With_locality.Const.min m
+  in
+  let max =
+    With_locality.Const.Option.value ~default:With_locality.Const.max m
+  in
+  With_regionality.submode_exn
+    (min |> With_locality.of_const |> with_locality_as_regionality)
+    mode;
+  With_regionality.submode_exn
+    mode
+    (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
-let register_allocation loc : Alloc.lr * Value.lr =
+let register_allocation ~env ~loc ~desc : With_locality.lr * With_regionality.lr =
+  Typeallocation.register_mod_allocation ~env ~loc ~desc;
   let upper_bound =
-    Alloc.of_const
+    With_locality.of_const
       ~hint_comonadic:Module_allocated_on_heap
-      { Alloc.Const.max with areality = Global }
+      { With_locality.Const.max with areality = Global }
   in
-  let alloc_mode, _ = Alloc.newvar_below 0 upper_bound in
+  let mode_with_locality, _ = With_locality.newvar_below 0 upper_bound in
   let closed_over_mode =
-    alloc_as_value ~allocation:({loc; txt = Unknown}) alloc_mode
+    with_locality_as_regionality
+      ~allocation:({loc; txt = Unknown})
+      mode_with_locality
   in
-  alloc_mode, closed_over_mode
+  mode_with_locality, closed_over_mode
 
 open Typedtree
 
@@ -173,7 +184,9 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
       To achieve that, the mode of [foo] to be exposed as [M.foo] should be a
       flexible mode variable weaker than its actual mode.
     *)
-    let mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
+    let mode, _ =
+      Mode.With_regionality.newvar_above (Ctype.get_current_level ()) mode
+    in
     (* Upon construction, for comonadic (prescriptive) axes, module
     must be weaker than the values therein, for otherwise operations
     would be allowed to performed on the module (and extended to the
@@ -183,7 +196,7 @@ let infer_modalities pp ~loc_md item ~md_mode ~mode =
     construction but on the projection, which is modelled by the
     [Diff] modality in [mode.ml]. *)
     let mode' = md_mode |> apply_is_contained_by ~loc_md item in
-    Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
+    With_regionality.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
 (** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
@@ -254,7 +267,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
      structure it is applied to is yielding (the argument's mode). *)
   let yielding =
     let yielding m =
-      Yielding.disallow_right (Value.proj_comonadic Yielding m)
+      Yielding.disallow_right (With_regionality.proj_comonadic Yielding m)
     in
     Ctype.create_yielding_mode_l
       (Yielding.join [yielding funct_mode; yielding md_mode])
@@ -267,7 +280,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
         | Mty_signature sg_param -> sg_param
         | _ -> raise (Error (loc,env,Signature_parameter_expected mty_func))
       in
-      let mm_param = mm_param |> alloc_as_value in
+      let mm_param = mm_param |> with_locality_as_regionality in
       let input_coercion =
         try
           Includemod.include_functor_signatures ~mark:true env
@@ -322,7 +335,7 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode
             raise(Error(loc, env, Cannot_eliminate_dependency
                                     (Functor_included, mty_func)))
       in
-      let mm = mm_result |> alloc_as_value in
+      let mm = mm_result |> with_locality_as_regionality in
       (sg, mm, incl_kind)
   | Mty_functor (Unit,_,_) as mty ->
       raise(Error(loc, env, Signature_parameter_expected mty))
@@ -554,7 +567,11 @@ let iterator_with_env super env =
       | Unit -> ()
       | Named (param, mty_arg, mm_arg) ->
         self.Btype.it_module_type self mty_arg;
-        let mode = Mode.(alloc_as_value mm_arg |> Value.disallow_right) in
+        let mode =
+          Mode.(
+            with_locality_as_regionality mm_arg
+            |> With_regionality.disallow_right)
+        in
         match param with
         | None -> ()
         | Some id ->
@@ -1495,14 +1512,14 @@ let rec approx_modtype env smty =
         match param with
         | Unit -> Types.Unit, env
         | Named (param, sarg, marg) ->
-          let {mode_modes = marg} = Typemode.transl_alloc_mode marg in
-          let marg = Alloc.of_const marg in
+          let {mode_modes = marg} = Typemode.transl_mode_with_locality marg in
+          let marg = With_locality.of_const marg in
           let arg = approx_modtype env sarg in
           match param.txt with
           | None -> Types.Named (None, arg, marg), env
           | Some name ->
             let rarg = Mtype.scrape_for_functor_arg env arg in
-            let mode = alloc_as_value marg in
+            let mode = with_locality_as_regionality marg in
             let scope = Ctype.create_scope () in
             let (id, newenv) =
               Env.enter_module ~scope ~arg:true name Mp_present rarg ~mode env
@@ -1510,8 +1527,8 @@ let rec approx_modtype env smty =
             Types.Named (Some id, arg, marg), newenv
       in
       let res = approx_modtype newenv sres in
-      let {mode_modes = mres} = Typemode.transl_alloc_mode mres in
-      let mres = Alloc.of_const mres in
+      let {mode_modes = mres} = Typemode.transl_mode_with_locality mres in
+      let mres = With_locality.of_const mres in
       Mty_functor(param, res, mres)
   | Pmty_with(sbody, constraints) ->
       (* the module type body is approximated and resolved to a signature.*)
@@ -1586,7 +1603,7 @@ and approx_sig_items env ssg=
               compatibility *)
           let id, newenv =
             Env.enter_module_declaration ~scope (Option.get pmd.pmd_name.txt)
-              pres md ~mode:Value.legacy env
+              pres md ~mode:With_regionality.legacy env
           in
           Sig_module(id, pres, md, Trec_not, Exported) :: approx_sig_items newenv srem
       | Psig_modsubst pms ->
@@ -1604,7 +1621,7 @@ and approx_sig_items env ssg=
               compatibility *)
           let _, newenv =
             Env.enter_module_declaration ~scope pms.pms_name.txt pres md env
-              ~mode:Value.legacy
+              ~mode:With_regionality.legacy
           in
           approx_sig_items newenv srem
       | Psig_recmodule sdecls ->
@@ -1622,7 +1639,7 @@ and approx_sig_items env ssg=
           let newenv =
             List.fold_left
               (fun env (id, md) -> Env.add_module_declaration ~check:false
-                  id Mp_present md ~mode:(Value.min) env)
+                  id Mp_present md ~mode:(With_regionality.min) env)
               env decls
           in
           map_rec
@@ -2087,15 +2104,15 @@ and transl_modtype_aux env smty =
       mkmty (Tmty_signature sg) (Mty_signature sg.sig_type) env loc
         smty.pmty_attributes
   | Pmty_functor(sarg_opt, sres, mres) ->
-      let tmres = Typemode.transl_alloc_mode mres in
-      let mres = tmres.mode_modes |> Alloc.of_const in
+      let tmres = Typemode.transl_mode_with_locality mres in
+      let mres = tmres.mode_modes |> With_locality.of_const in
       let t_arg, ty_arg, newenv =
         match sarg_opt with
         | Unit -> Unit, Types.Unit, env
         | Named (param, sarg, marg) ->
-          let tmarg = Typemode.transl_alloc_mode marg in
-          let marg = Alloc.of_const tmarg.mode_modes in
-          let mode = marg |> alloc_as_value in
+          let tmarg = Typemode.transl_mode_with_locality marg in
+          let marg = With_locality.of_const tmarg.mode_modes in
+          let mode = marg |> with_locality_as_regionality in
           let arg = transl_modtype_functor_arg env sarg in
           let (id, newenv) =
             match param.txt with
@@ -2236,7 +2253,7 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
   (* We assume the structure (described by the signature) to be at legacy mode,
   for backward compatibility *)
   (* CR-soon zqian: make it a parameter instead *)
-  let md_mode = Value.legacy in
+  let md_mode = With_regionality.legacy in
 
   let sig_modalities =
     transl_modalities ~allow_redundant_staticity:interface_toplevel
@@ -2255,11 +2272,12 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
       match sincl.pincl_kind with
       | Functor ->
         Language_extension.assert_enabled ~loc Include_functor ();
-        let funct_mode = Value.disallow_right Value.max in
+        let funct_mode = With_regionality.disallow_right With_regionality.max in
         let sg, mode, incl_kind =
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
             ~funct_mode
         in
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
         in
@@ -2312,7 +2330,8 @@ and transl_signature ?(keep_warnings = false) ?(interface_toplevel = false) env 
         let (tdesc, _, newenv) =
           Typedecl.transl_value_decl env loc sdesc
             ~modal:(Sig_value
-              (Value.disallow_right md_mode, sig_modalities.moda_modalities))
+              (With_regionality.disallow_right md_mode,
+               sig_modalities.moda_modalities))
             ~why:Signature_item
         in
         Signature_names.check_value names tdesc.val_loc tdesc.val_id;
@@ -2743,9 +2762,10 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
               (* CR zqian: mode annotations on rec modules default to legacy for
               now. We can remove this workaround once [module type of] doesn't
               require zapping. *)
-              |> Alloc.Const.Option.value ~default:Alloc.Const.legacy
-              |> Alloc.of_const
-              |> alloc_as_value
+              |> With_locality.Const.Option.value
+                   ~default:With_locality.Const.legacy
+              |> With_locality.of_const
+              |> with_locality_as_regionality
             in
             { tmmode with mode_modes = mmode }) smmode
           in
@@ -2819,7 +2839,10 @@ let rec nongen_modtype env f g = function
         | Named (None, _, _) -> env
         | Named (Some id, param, mm_param) ->
             let mode =
-              Mode.(mm_param |> alloc_as_value |> Value.disallow_right)
+              Mode.(
+                mm_param
+                |> with_locality_as_regionality
+                |> With_regionality.disallow_right)
             in
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
@@ -2868,16 +2891,16 @@ let check_nongen_signature_item ~zap_scope env sig_item =
   | _ -> ()
 
 let check_nongen_signature env sg =
-  Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+  Mode.With_locality.with_zap_scope (fun ~zap_scope ->
       List.iter (check_nongen_signature_item ~zap_scope env) sg)
 
 let remove_functor_mode_variables ~zap_scope = function
   | Mty_functor (arg_opt, _, mres) ->
       let zap_mode ~arg mode =
         if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
-          Alloc.add_mode_to_zap_scope ~arg mode zap_scope
+          With_locality.add_mode_to_zap_scope ~arg mode zap_scope
          end else begin
-          Alloc.zap_to_legacy_force ~arg mode |> ignore
+          With_locality.zap_to_legacy_force ~arg mode |> ignore
          end
       in
       zap_mode ~arg:false mres;
@@ -2888,7 +2911,7 @@ let remove_functor_mode_variables ~zap_scope = function
   | _ -> ()
 
 let remove_mode_and_jkind_variables env sg =
-  Mode.Alloc.with_zap_scope(fun ~zap_scope ->
+  Mode.With_locality.with_zap_scope(fun ~zap_scope ->
     let rm_ty _env ty =
       Ctype.remove_mode_and_jkind_variables
         ty ~zap_scope;
@@ -3023,7 +3046,8 @@ let check_recmodule_inclusion env bindings =
             { mod_desc = Tmod_constraint(modl, mty_decl.mty_type,
                 Tmodtype_explicit (mty_decl, mode_decl), coercion);
               mod_type = mty_decl.mty_type;
-              mod_mode = Value.disallow_right mode_decl.mode_modes, None;
+              mod_mode =
+                With_regionality.disallow_right mode_decl.mode_modes, None;
               mod_env = env;
               mod_loc = modl.mod_loc;
               mod_attributes = [];
@@ -3171,7 +3195,7 @@ let wrap_constraint_package env mark arg mty mode explicit =
   in
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
     mod_type = mty;
-    mod_mode = Value.disallow_right mode, None;
+    mod_mode = With_regionality.disallow_right mode, None;
     mod_env = env;
     mod_attributes = [];
     mod_loc = arg.mod_loc }
@@ -3189,7 +3213,7 @@ let wrap_constraint_with_shape ~self_check env mark arg mty mode
   in
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
     mod_type = mty;
-    mod_mode = Value.disallow_right mode, None;
+    mod_mode = With_regionality.disallow_right mode, None;
     mod_env = env;
     mod_attributes = [];
     mod_loc = arg.mod_loc }, shape
@@ -3252,7 +3276,7 @@ and type_module_maybe_hold_locks ?(alias=false) ~hold_locks ~strengthen
     Msupport.raise_error exn;
     { mod_desc = Tmod_typed_hole;
       mod_type = Mty_for_hole;
-      mod_mode = Value.(disallow_right min), None;
+      mod_mode = With_regionality.(disallow_right min), None;
       mod_env = env;
       mod_attributes = Msupport.flush_saved_types () @ smod.pmod_attributes;
       mod_loc = smod.pmod_loc },
@@ -3280,7 +3304,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
-          mod_mode = Value.disallow_right mode, None;
+          mod_mode = With_regionality.disallow_right mode, None;
           mod_env = env;
           mod_attributes = smod.pmod_attributes;
           mod_loc = smod.pmod_loc }
@@ -3293,15 +3317,17 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       in
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
-      let alloc_mode, closed_over_mode =
-        register_allocation sbody.pmod_loc
+      let mode_with_locality, closed_over_mode =
+        register_allocation ~env ~loc:sbody.pmod_loc ~desc:Functor
       in
       let newenv =
         Env.add_closure_lock
           (smod.pmod_loc, Functor)
           closed_over_mode.comonadic env
       in
-      let staticity = Value.proj_monadic Staticity closed_over_mode in
+      let staticity =
+        With_regionality.proj_monadic Staticity closed_over_mode
+      in
       let t_arg, ty_arg, newenv, funct_shape_param, funct_body =
         match arg_opt with
         | Unit ->
@@ -3312,11 +3338,11 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
           Unit, Types.Unit, newenv, Shape.for_unnamed_functor_param, false
         | Named (param, smty, smode) ->
           (* unspecified mode axes defaults to legacy *)
-          let tmode = Typemode.transl_alloc_mode smode in
-          let mode = Alloc.of_const tmode.mode_modes in
+          let tmode = Typemode.transl_mode_with_locality smode in
+          let mode = With_locality.of_const tmode.mode_modes in
           let param_st =
             Staticity.apply_hint (Parameter_to_functor param.loc)
-              (Alloc.proj_monadic Staticity mode)
+              (With_locality.proj_monadic Staticity mode)
           in
           (* See Note [Staticity of functors] in [typedtree.mli] *)
           Staticity.equate_err (smod.pmod_loc, Functor) staticity param_st;
@@ -3337,7 +3363,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
               in
               let id = Ident.create_scoped ~scope name in
               let shape = Shape.var md_uid id in
-              let mode = alloc_as_value mode in
+              let mode = with_locality_as_regionality mode in
               let newenv = Env.add_module_declaration
                 ~shape ~arg:true ~check:true id Mp_present arg_md ~mode newenv
               in
@@ -3351,8 +3377,10 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         type_module ~strengthen:true ~funct_body None newenv sbody
       in
       let body_mode = mode_without_locks_exn body.mod_mode in
-      let ret_mode = Alloc.newvar 0 in
-      Value.submode_exn body_mode (ret_mode |> alloc_as_value);
+      let ret_mode = With_locality.newvar 0 in
+      With_regionality.submode_exn
+        body_mode
+        (ret_mode |> with_locality_as_regionality);
       (* Apply currying constraints if the body is a functor,
          similar to constraints for functions. *)
       (match body.mod_type with
@@ -3360,13 +3388,17 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
          (match ty_arg with
           | Unit -> ()
           | Named (_, _, param_mode) ->
-            Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
-         Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
+            With_locality.submode_exn
+              (With_locality.close_over param_mode)
+              ret_mode);
+         With_locality.submode_exn
+           (With_locality.partial_apply mode_with_locality)
+           ret_mode
        | _ -> ());
       { mod_desc =
           Tmod_functor (t_arg, body, Staticity.disallow_left staticity);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
-        mod_mode = Value.disallow_right closed_over_mode, None;
+        mod_mode = With_regionality.disallow_right closed_over_mode, None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
@@ -3389,9 +3421,13 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         match smty with
         | None ->
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
-            Value.submode_err (sarg.pmod_loc, Module) arg_mode mode.mode_modes;
+            With_regionality.submode_err
+              (sarg.pmod_loc, Module)
+              arg_mode
+              mode.mode_modes;
             { arg with
-              mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
+              mod_mode =
+                (Mode.With_regionality.disallow_right mode.mode_modes, None)},
             arg_shape
           | Some smty ->
               let mty = transl_modtype env smty in
@@ -3413,7 +3449,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
             {
               mod_desc = Tmod_typed_hole;
               mod_type = Mty_for_hole;
-              mod_mode = Value.(disallow_right min), None;
+              mod_mode = With_regionality.(disallow_right min), None;
               mod_loc = sarg.pmod_loc;
               mod_env = env;
               mod_attributes = sarg.pmod_attributes;
@@ -3422,17 +3458,17 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
         | _ -> raise exn
       end
   | Pmod_unpack sexp ->
-      let mode = Value.newvar 0 in
+      let mode = With_regionality.newvar 0 in
       let exp =
         Ctype.with_local_level_generalize_structure_if_principal
           ~before_generalize:Typecore.generalize_structure_exp
           (fun () -> Typecore.type_exp env sexp
-            ~mode:(Value.disallow_left mode))
+            ~mode:(With_regionality.disallow_left mode))
       in
       let mode =
-        Value.join
-          [Value.disallow_right mode;
-           Value.min_with_monadic Staticity
+        With_regionality.join
+          [With_regionality.disallow_right mode;
+           With_regionality.min_with_monadic Staticity
               (Staticity.of_const ~hint:Mod_unpack Staticity.Dynamic) ]
       in
       let mty =
@@ -3466,7 +3502,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
   | Pmod_hole ->
       { mod_desc = Tmod_typed_hole;
         mod_type = Mty_for_hole;
-        mod_mode = Value.(disallow_right min), None;
+        mod_mode = With_regionality.(disallow_right min), None;
         mod_env = env;
         mod_attributes = smod.pmod_attributes;
         mod_loc = smod.pmod_loc },
@@ -3581,7 +3617,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
      functor closes over a yielding value (its own mode) or is given a yielding
      argument (the argument's mode). *)
   let functor_application_yielding ~funct ~arg_mode =
-    let yielding m = Value.proj_comonadic Yielding m in
+    let yielding m = With_regionality.proj_comonadic Yielding m in
     Ctype.create_yielding_mode_l
       (Yielding.join
          [yielding (mode_without_locks_exn funct.mod_mode); yielding arg_mode])
@@ -3598,11 +3634,14 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     match Mtype.scrape_alias env mty_res with
     | Mty_functor _ ->
         let mode_fun = mode_without_locks_exn funct.mod_mode in
-        Value.submode_err (loc, Module) (Value.partial_apply mode_fun) mode_res;
+        With_regionality.submode_err
+          (loc, Module)
+          (With_regionality.partial_apply mode_fun)
+          mode_res;
         Option.iter
           (fun mode_arg ->
-            Value.submode_err (loc, Module)
-              (Value.close_over mode_arg) mode_res)
+            With_regionality.submode_err (loc, Module)
+              (With_regionality.close_over mode_arg) mode_res)
           mode_arg
     | _ -> ()
   in
@@ -3625,23 +3664,29 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       check_for_generated_type_or_jkind ~funct_body env apply_loc funct.mod_type
         (fun tj -> Not_allowed_in_functor_body tj);
       check_curried_application_complete
-        ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
+        ~loc:app_view.loc
+        ~mty_res
+        ~mode_res:(with_locality_as_regionality mm_res)
         ~mode_arg:None;
       { mod_desc =
           Tmod_apply_unit
             (funct,
              functor_application_yielding ~funct
-               ~arg_mode:(Value.disallow_right Value.legacy));
+               ~arg_mode:
+                 (With_regionality.disallow_right With_regionality.legacy));
         mod_type = mty_res;
-        mod_mode = alloc_as_value (Alloc.disallow_right mm_res), None;
+        mod_mode =
+          with_locality_as_regionality
+            (With_locality.disallow_right mm_res),
+          None;
         mod_env = env;
         mod_attributes = app_view.attributes;
         mod_loc = funct.mod_loc },
       Shape.app funct_shape ~arg:Shape.dummy_mod
   | Mty_functor (Named (param, mty_param, mm_param), mty_res, mm_res)
       as mty_functor ->
-      let mm_param = alloc_as_value mm_param in
-      let mm_res = alloc_as_value mm_res in
+      let mm_param = with_locality_as_regionality mm_param in
+      let mm_res = with_locality_as_regionality mm_res in
       let apply_error () =
         let args = List.map simplify_app_summary args in
         let mty_f = md_f.mod_type in
@@ -3656,7 +3701,7 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           Msupport.raise_error (apply_error ());
           { mod_desc = Tmod_apply_unit(funct, Mode.Yielding.newvar 0);
             mod_type = mty_res;
-            mod_mode = Value.(disallow_right min), None;
+            mod_mode = With_regionality.(disallow_right min), None;
             mod_env = env;
             mod_attributes = app_attributes;
             mod_loc = app_loc },
@@ -3736,18 +3781,20 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
         ~loc:app_loc ~mty_res:mty_appl ~mode_res:mm_res
         ~mode_arg:(Some mm_param);
       let mode_funct = mode_without_locks_exn funct.mod_mode in
-      let funct_staticity = Value.proj_monadic Staticity mode_funct in
+      let funct_staticity =
+        With_regionality.proj_monadic Staticity mode_funct
+      in
       (* The following [submode] recovers the functor's original staticity [m].
          See Note [Staticity of functors] in [typedtree.mli] *)
       let staticity =
         Staticity.apply_hint (Parameter_to_functor Location.none)
-          (Value.proj_monadic Staticity mm_param)
+          (With_regionality.proj_monadic Staticity mm_param)
       in
       Staticity.submode_err (funct.mod_loc, Functor) funct_staticity staticity;
       let mm_res =
-        Value.join
-          [ Value.disallow_right mm_res;
-            Value.min_with_monadic Staticity
+        With_regionality.join
+          [ With_regionality.disallow_right mm_res;
+            With_regionality.min_with_monadic Staticity
               (Staticity.apply_hint (Functor_to_application funct.mod_loc)
                  funct_staticity) ]
       in
@@ -3804,7 +3851,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
       open_loc = loc;
       open_attributes = od.popen_attributes
     } in
-    open_descr, Mode.Value.(max |> disallow_right), [], newenv
+    open_descr, Mode.With_regionality.(max |> disallow_right), [], newenv
   | _ ->
     let md, mod_shape =
       type_module ~strengthen:true ~funct_body None env od.popen_expr
@@ -3858,7 +3905,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
     anchor env sig_acc sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
-  let _, md_mode = register_allocation loc_md in
+  let _, md_mode = register_allocation ~env ~loc:loc_md ~desc:Structure in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -3876,7 +3923,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
           extract_sig_functor_open funct_body env smodl.pmod_loc
             modl.mod_type sig_acc md_mode ~funct_mode
         in
-        incl_kind, sg, Value.disallow_right mode
+        incl_kind, sg, With_regionality.disallow_right mode
       | Structure ->
         Tincl_structure, extract_sig_open env smodl.pmod_loc modl.mod_type,
           (Typedtree.mode_without_locks_exn modl.mod_mode)
@@ -4236,7 +4283,7 @@ and type_structure ?(toplevel = None) ?(keep_warnings = false) ~funct_body
               cls.cls_id, cls.cls_decl.cty_loc
         in
         let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
-        Value.submode_err (first_loc, Class) Types.class_mode mode;
+        With_regionality.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
             let loc = cls.cls_id_loc.Location.loc in
@@ -4358,7 +4405,7 @@ let remove_mode_and_jkind_variables_for_toplevel str =
                          vb_expr = exp}])) }] ->
      (* These types are printed by the toplevel,
         even though they do not appear in sg *)
-     Mode.Alloc.with_zap_scope
+     Mode.With_locality.with_zap_scope
        (fun ~zap_scope ->
           Ctype.remove_mode_and_jkind_variables ~zap_scope exp.exp_type)
   | _ -> ()
@@ -4366,15 +4413,21 @@ let remove_mode_and_jkind_variables_for_toplevel str =
 let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
-  Typecore.reset_allocations ();
+  Typeallocation.reset_allocations ();
   let (str, sg, mode, _to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env
-      sig_acc s
+    type_structure
+      ~toplevel:(Some sig_acc)
+      ~funct_body:false
+      None
+      env
+      sig_acc
+      s
   in
-  Value.submode_err (Location.none, Structure) mode toplevel_mode;
+  With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
+  Typeallocation.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
-  Typecore.optimise_allocations ();
+  Typeallocation.optimise_allocations ();
   (str, sg, (* to_remove_from_sg, *) shape, env)
 
 let type_module_alias env smod =
@@ -4390,6 +4443,11 @@ let merlin_type_structure env sig_acc str =
   let (str, sg, _mode, _sg_names, _shape, env) =
     type_structure ~keep_warnings:true ~funct_body:false None env sig_acc str
   in
+  begin try
+    Typeallocation.constrain_allocations ();
+    Typeallocation.constrain_closures ()
+  with exn -> Msupport.raise_error exn
+  end;
   str, sg, env
 let type_structure env = type_structure ~funct_body:false None env []
 let merlin_transl_signature ?interface_toplevel env sig_acc sg =
@@ -4439,10 +4497,12 @@ let type_module_type_of env smod =
         me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
+  Typeallocation.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   if not skip_nongen_check then
-    Mode.Alloc.with_zap_scope (fun ~zap_scope ->
-       check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
+    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
+      check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
+  Typeallocation.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4556,7 +4616,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation modl.mod_loc in
+  let _, mode = register_allocation ~env ~loc:modl.mod_loc ~desc:Module in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
@@ -4695,7 +4755,7 @@ let type_implementation target modulename initial_env ast =
   Cms_format.clear ();
   Misc.try_finally (fun () ->
       Typecore.reset_delayed_checks ();
-      Typecore.reset_allocations ();
+      Typeallocation.reset_allocations ();
       Env.reset_required_globals ();
       Env.reset_probes ();
       if !Clflags.print_types then (* #7656 *)
@@ -4705,7 +4765,7 @@ let type_implementation target modulename initial_env ast =
       let (str, sg, mode, names, shape, finalenv) =
         type_structure initial_env ast
       in
-      Value.submode_err (Location.in_file sourcefile, Structure)
+      With_regionality.submode_err (Location.in_file sourcefile, Structure)
         mode (Persistent_env.mode_pers_mod Dynamic);
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
@@ -4713,7 +4773,9 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
+        Typeallocation.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         in
@@ -4725,7 +4787,7 @@ let type_implementation target modulename initial_env ast =
         in
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
-        Typecore.optimise_allocations ();
+        Typeallocation.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
           Format.(fun () -> fprintf std_formatter "%a@."
@@ -4783,6 +4845,7 @@ let type_implementation target modulename initial_env ast =
             error (Inconsistent_argument_types
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
+          Typeallocation.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit
@@ -4807,7 +4870,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
@@ -4837,7 +4900,9 @@ let type_implementation target modulename initial_env ast =
               Includemod.compunit initial_env ~mark:true sourcefile ~modes
                 sg "(inferred signature)" simple_sg shape)
           in
+          Typeallocation.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
+          Typeallocation.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
                inclusion check, so we zap to identity if mode extension is
@@ -4855,7 +4920,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* See comment above. Here the target signature contains all
              the values being exported. We can still capture unused
              declarations like "let x = true;; let x = 1;;", because in this
@@ -4975,7 +5040,9 @@ let functorize_signature ~params ~modules : Types.signature =
         let sign, _ = swg.sign in
         let param_type = Mty_signature (Subst.Lazy.force_signature sign) in
         Mty_functor
-          (Named (Some param_id, param_type, Alloc.legacy), body, Alloc.legacy))
+          (Named (Some param_id, param_type, With_locality.legacy),
+           body,
+           With_locality.legacy))
       params body
   in
   let body =
@@ -5009,7 +5076,7 @@ let functorize_signature ~params ~modules : Types.signature =
       (Path.Pident intf_id) make_params
   in
   let make_result = Mty_ident (Path.Pdot (intf_applied_path, "S")) in
-  let make_with_unit = Mty_functor (Unit, make_result, Alloc.legacy) in
+  let make_with_unit = Mty_functor (Unit, make_result, With_locality.legacy) in
   let make_mty = wrap_in_named_functor_layers make_params make_with_unit in
   [
     Sig_module (intf_id, Mp_present, make_md intf_mty, Trec_not, Exported);

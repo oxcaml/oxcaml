@@ -449,6 +449,10 @@ module type S = sig
           a conservative result. I.e., it might return [None] for
           fully-constrained modes. *)
       val check_const_conservative : ('l * 'r) t -> Const.t option
+
+      (** Returns the upper bound of the given mode. Unlike the lower bound, it
+          is precise. See [get_ceil] in [solver_intf.mli]. *)
+      val get_ceil : ('l * allowed) t -> Const.t
     end
   end
 
@@ -616,13 +620,39 @@ module type S = sig
     include Common_axis_neg with type Const.t = const
   end
 
+  module Allocation : sig
+    module Const : sig
+      type t =
+        | Noalloc_strict
+        | Noalloc
+        | Alloc
+
+      include Const with type t := t
+    end
+
+    include Common_axis_pos with module Const := Const
+
+    val noalloc_strict : lr
+
+    val noalloc : lr
+
+    val alloc : lr
+
+    module Guts : sig
+      (** Returns the upper bound of the given mode. Unlike the lower bound, it
+          is precise. See [get_ceil] in [solver_intf.mli]. *)
+      val get_ceil : ('l * allowed) t -> Const.t
+    end
+  end
+
   type 'a comonadic_with =
     { areality : 'a;
       linearity : Linearity.Const.t;
       portability : Portability.Const.t;
       forkable : Forkable.Const.t;
       yielding : Yielding.Const.t;
-      statefulness : Statefulness.Const.t
+      statefulness : Statefulness.Const.t;
+      allocation : Allocation.Const.t
     }
 
   type monadic =
@@ -644,6 +674,7 @@ module type S = sig
       | Linearity : ('areality comonadic_with, Linearity.Const.t) t
       | Statefulness : ('areality comonadic_with, Statefulness.Const.t) t
       | Portability : ('areality comonadic_with, Portability.Const.t) t
+      | Allocation : ('areality comonadic_with, Allocation.Const.t) t
       | Uniqueness : (monadic, Uniqueness.Const.t) t
       | Visibility : (monadic, Visibility.Const.t) t
       | Contention : (monadic, Contention.Const.t) t
@@ -713,7 +744,7 @@ module type S = sig
       include Axis with type 'a t := 'a t
     end
 
-    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) modes =
+    type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k) modes =
       { areality : 'a;
         linearity : 'b;
         uniqueness : 'c;
@@ -723,7 +754,8 @@ module type S = sig
         yielding : 'g;
         statefulness : 'h;
         visibility : 'i;
-        staticity : 'j
+        staticity : 'j;
+        allocation : 'k
       }
 
     module Const : sig
@@ -739,7 +771,8 @@ module type S = sig
               Yielding.Const.t,
               Statefulness.Const.t,
               Visibility.Const.t,
-              Staticity.Const.t )
+              Staticity.Const.t,
+              Allocation.Const.t )
             modes
 
       module Option : sig
@@ -755,7 +788,8 @@ module type S = sig
             Yielding.Const.t option,
             Statefulness.Const.t option,
             Visibility.Const.t option,
-            Staticity.Const.t option )
+            Staticity.Const.t option,
+            Allocation.Const.t option )
           modes
 
         val none : t
@@ -783,10 +817,10 @@ module type S = sig
           [Some a0] for axes where [a] is [a0] and [b] isn't. *)
       val diff : t -> t -> Option.t
 
-      (** Similar to [Alloc.close_over] but for constants *)
+      (** Similar to [With_locality.close_over] but for constants *)
       val close_over : t -> Comonadic.Const.t
 
-      (** Similar to [Alloc.partial_apply] but for constants *)
+      (** Similar to [With_locality.partial_apply] but for constants *)
       val partial_apply : t -> Comonadic.Const.t
 
       (** Similar to [comonadic_to_monadic_min] but for constants *)
@@ -1070,22 +1104,24 @@ module type S = sig
 
   (** The most general mode. Used in most type checking, including in value
       bindings in [Env] *)
-  module Value : Mode with module Areality := Regionality
+  module With_regionality : Mode with module Areality := Regionality
 
-  (** The mode on arrow types. Compared to [Value], it contains the [Locality]
-      axis instead of [Regionality] axis, as arrow types are exposed to users
-      and would be hard to understand if it involves [Regionality]. *)
-  module Alloc : Mode with module Areality := Locality
+  (** The mode on arrow types. Compared to [With_regionality], it contains the
+      [Locality] axis instead of [Regionality] axis, as arrow types are exposed
+      to users and would be hard to understand if it involves [Regionality]. *)
+  module With_locality : Mode with module Areality := Locality
 
   module Const : sig
-    val alloc_as_value : Alloc.Const.t -> Value.Const.t
+    val with_locality_as_regionality :
+      With_locality.Const.t -> With_regionality.Const.t
 
     module Axis : sig
-      val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
+      val with_locality_as_regionality :
+        With_locality.Axis.packed -> With_regionality.Axis.packed
 
       val is_areality :
-        'a Alloc.Axis.t ->
-        (('a, Locality.Const.t) Misc.eq, 'a Value.Axis.t) Either.t
+        'a With_locality.Axis.t ->
+        (('a, Locality.Const.t) Misc.eq, 'a With_regionality.Axis.t) Either.t
     end
 
     val locality_as_regionality : Locality.Const.t -> Regionality.Const.t
@@ -1095,20 +1131,24 @@ module type S = sig
   val locality_as_regionality : Locality.l -> Regionality.l
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value :
-    ?allocation:Hint.allocation -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+  val with_locality_as_regionality :
+    ?allocation:Hint.allocation ->
+    ('l * 'r) With_locality.t ->
+    ('l * 'r) With_regionality.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
-  val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
+  val with_locality_to_regionality_l2r :
+    ('l * 'r) With_locality.t -> ('l * disallowed) With_regionality.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val with_regionality_to_locality_r2l :
+    ('l * 'r) With_regionality.t -> ('l * 'r) With_locality.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
-  val value_to_alloc_r2g :
+  val with_regionality_to_locality_r2g :
     ?allocation:Hint.allocation ->
-    ('l * 'r) Value.t ->
-    (disallowed * 'r) Alloc.t
+    ('l * 'r) With_regionality.t ->
+    (disallowed * 'r) With_locality.t
 
   module Modality : sig
     module Comonadic : sig
@@ -1133,14 +1173,16 @@ module type S = sig
 
     module Axis : sig
       type 'a t =
-        | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
-        | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
+        | Monadic : 'a With_regionality.Monadic.Axis.t -> 'a Monadic.Atom.t t
+        | Comonadic :
+            'a With_regionality.Comonadic.Axis.t
+            -> 'a Comonadic.Atom.t t
 
       type packed = P : 'a t -> packed
 
-      val of_value : Value.Axis.packed -> packed
+      val of_value : With_regionality.Axis.packed -> packed
 
-      val to_value : packed -> Value.Axis.packed
+      val to_value : packed -> With_regionality.Axis.packed
 
       val compare : packed -> packed -> int
     end
@@ -1178,8 +1220,8 @@ module type S = sig
        [zap_to_id], [zap_to_floor], etc.. *)
 
     module Const : sig
-      (** A modality that acts on [Value] axes. Conceptually it is a record
-          where individual fields can be [set] or [proj]. *)
+      (** A modality that acts on [With_regionality] axes. Conceptually it is a
+          record where individual fields can be [set] or [proj]. *)
       type t
 
       (** The identity modality. *)
@@ -1194,15 +1236,15 @@ module type S = sig
       val apply_left :
         ?is_contained_by:Hint.is_contained_by ->
         t ->
-        (allowed * 'r) Value.t ->
-        Value.l
+        (allowed * 'r) With_regionality.t ->
+        With_regionality.l
 
       (** Apply a modality on right mode. *)
       val apply_right :
         ?is_contained_by:Hint.is_contained_by ->
         t ->
-        ('l * allowed) Value.t ->
-        Value.r
+        ('l * allowed) With_regionality.t ->
+        With_regionality.r
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
@@ -1225,8 +1267,8 @@ module type S = sig
       val print : Fmt.formatter -> t -> unit
     end
 
-    (** A modality that acts on [Value] modes. Conceptually it is a record where
-        individual fields can be [set] or [proj]. *)
+    (** A modality that acts on [With_regionality] modes. Conceptually it is a
+        record where individual fields can be [set] or [proj]. *)
     type t
 
     (* CR-someday zqian: [undefined] is only used for [val_modalities] and
@@ -1248,8 +1290,8 @@ module type S = sig
     val apply_left :
       ?is_contained_by:Hint.is_contained_by ->
       t ->
-      (allowed * 'r) Value.t ->
-      Value.l
+      (allowed * 'r) With_regionality.t ->
+      With_regionality.l
 
     (** [sub t0 t1] checks that [t0 <= t1]. Definition: [t0 <= t1] iff
         [forall a. t0(a) <= t1(a)].
@@ -1271,7 +1313,7 @@ module type S = sig
         value description in the inferred module type.
 
         The caller should ensure that for comonadic axes, [md_mode >= mode]. *)
-    val infer : md_mode:Value.lr -> mode:Value.lr -> t
+    val infer : md_mode:With_regionality.lr -> mode:With_regionality.lr -> t
 
     (* The following zapping functions possibly mutate a potentially inferred
        modality [m] to a constant modality [c]. The constant modality is
@@ -1353,11 +1395,11 @@ module type S = sig
         staticity:Staticity.Const.t Atom.t ->
         t
 
-      (** Apply mode crossing on a right monadic [Alloc] fragment. *)
-      val apply_right_alloc :
+      (** Apply mode crossing on a right monadic [With_locality] fragment. *)
+      val apply_right_with_locality :
         t ->
-        (disallowed * 'r) Alloc.Monadic.t ->
-        (disallowed * 'r) Alloc.Monadic.t
+        (disallowed * 'r) With_locality.Monadic.t ->
+        (disallowed * 'r) With_locality.Monadic.t
     end
 
     module Comonadic : sig
@@ -1385,17 +1427,18 @@ module type S = sig
         forkable:Forkable.Const.t Atom.t ->
         yielding:Yielding.Const.t Atom.t ->
         statefulness:Statefulness.Const.t Atom.t ->
+        allocation:Allocation.Const.t Atom.t ->
         t
 
       (** Create the mode crossing for a type whose values are always
           constructed at the given mode. *)
-      val always_constructed_at : Value.Comonadic.Const.t -> t
+      val always_constructed_at : With_regionality.Comonadic.Const.t -> t
 
-      (** Apply mode crossing on a left comonadic [Alloc] fragment. *)
-      val apply_left_alloc :
+      (** Apply mode crossing on a left comonadic [With_locality] fragment. *)
+      val apply_left_with_locality :
         t ->
-        ('l * disallowed) Alloc.Comonadic.t ->
-        ('l * disallowed) Alloc.Comonadic.t
+        ('l * disallowed) With_locality.Comonadic.t ->
+        ('l * disallowed) With_locality.Comonadic.t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
@@ -1406,8 +1449,10 @@ module type S = sig
       (** ['a t] specifies an axis whose mode crossing capability is represented
           as ['a] *)
       type 'a t =
-        | Monadic : 'a Value.Monadic.Axis.t -> 'a Monadic.Atom.t t
-        | Comonadic : 'a Value.Comonadic.Axis.t -> 'a Comonadic.Atom.t t
+        | Monadic : 'a With_regionality.Monadic.Axis.t -> 'a Monadic.Atom.t t
+        | Comonadic :
+            'a With_regionality.Comonadic.Axis.t
+            -> 'a Comonadic.Atom.t t
 
       type packed = P : 'a t -> packed
 
@@ -1435,6 +1480,7 @@ module type S = sig
       statefulness:bool ->
       visibility:bool ->
       staticity:bool ->
+      allocation:bool ->
       t
 
     (** Project a mode crossing (of all axes) onto the specified axis. *)
@@ -1455,28 +1501,34 @@ module type S = sig
     val to_modality : t -> Modality.Const.t
 
     (** Apply mode crossing on a left mode, making it stronger. *)
-    val apply_left : t -> (allowed * 'r) Value.t -> Value.l
+    val apply_left :
+      t -> (allowed * 'r) With_regionality.t -> With_regionality.l
 
     (** Apply mode crossing on a right mode, making it more permissive. *)
-    val apply_right : t -> ('l * allowed) Value.t -> Value.r
+    val apply_right :
+      t -> ('l * allowed) With_regionality.t -> With_regionality.r
 
-    (* We extend mode crossing on [Value] to [Alloc] via [alloc_as_value].
-       Concretely, two [Alloc] modes are indistinguishable if their images under
-       [alloc_as_value] are indistinguishable. Currently types cross locality
-       either fully or fully not, and therefore [alloc_as_value] seems sufficient. *)
+    (* We extend mode crossing on [With_regionality] to [With_locality] via
+       [with_locality_as_regionality]. Concretely, two [With_locality] modes are
+       indistinguishable if their images under [with_locality_as_regionality]
+       are indistinguishable. Currently types cross locality either fully or
+       fully not, and therefore [with_locality_as_regionality] seems
+       sufficient. *)
 
-    (** Similar to [apply_left] but for [Alloc] via [alloc_as_value] *)
-    val apply_left_alloc : t -> Alloc.l -> Alloc.l
+    (** Similar to [apply_left] but for [With_locality] via
+        [with_locality_as_regionality] *)
+    val apply_left_with_locality : t -> With_locality.l -> With_locality.l
 
-    (** Similar to [apply_right] but for [Alloc] via [alloc_as_value] *)
-    val apply_right_alloc : t -> Alloc.r -> Alloc.r
+    (** Similar to [apply_right] but for [With_locality] via
+        [with_locality_as_regionality] *)
+    val apply_right_with_locality : t -> With_locality.r -> With_locality.r
 
     (** Apply mode crossong on the left comonadic fragment, and the right
         monadic fragment. *)
-    val apply_left_right_alloc :
+    val apply_left_right_with_locality :
       t ->
-      (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic ->
-      (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
+      (With_locality.Monadic.r, With_locality.Comonadic.l) monadic_comonadic ->
+      (With_locality.Monadic.r, With_locality.Comonadic.l) monadic_comonadic
 
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
     val print : Fmt.formatter -> t -> unit

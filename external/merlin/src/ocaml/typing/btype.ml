@@ -108,7 +108,7 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Mode.Alloc.generic_level
+let generic_level = Mode.With_locality.generic_level
 let lowest_level = Ident.lowest_scope
 
 (**** leveled type pool ****)
@@ -451,7 +451,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -650,14 +650,16 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_saving : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_saving :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
-  val mode_copy_for_restoring : copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+  val mode_copy_for_restoring :
+     copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
 
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
@@ -674,19 +676,19 @@ end = struct
 
   let mode_instantiate copy_scope ~current_level m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.instantiate ~copy_scope ~current_level m
+    Mode.With_locality.instantiate ~copy_scope ~current_level m
 
   let mode_copy_generic copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_generic ~copy_scope m
+    Mode.With_locality.copy_generic ~copy_scope m
 
   let mode_copy_for_saving copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_saving ~copy_scope m
+    Mode.With_locality.copy_for_saving ~copy_scope m
 
   let mode_copy_for_restoring copy_scope m =
     let copy_scope = copy_scope.saved_mode_changes in
-    Mode.Alloc.copy_for_restoring ~copy_scope m
+    Mode.With_locality.copy_for_restoring ~copy_scope m
 
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
@@ -986,6 +988,7 @@ module Jkind0 = struct
     let statefulness = Crossing.Axis.Comonadic Statefulness
     let visibility = Crossing.Axis.Monadic Visibility
     let staticity = Crossing.Axis.Monadic Staticity
+    let allocation = Crossing.Axis.Comonadic Allocation
     let[@inline] externality t = t.externality
 
     let[@inline] create
@@ -1018,6 +1021,7 @@ module Jkind0 = struct
       let statefulness = modal statefulness in
       let visibility = modal visibility in
       let staticity = modal staticity in
+      let allocation = modal allocation in
       let externality =
         if mem min_axes (Nonmodal Externality)
         then Externality.min
@@ -1028,7 +1032,7 @@ module Jkind0 = struct
       in
       let comonadic =
         Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-          ~forkable ~statefulness
+          ~forkable ~statefulness ~allocation
       in
       let crossing : Mode.Crossing.t = { monadic; comonadic } in
       {
@@ -1047,6 +1051,7 @@ module Jkind0 = struct
         Crossing.create ~linearity:false ~regionality:false ~uniqueness:true
           ~portability:false ~contention:true ~forkable:false ~yielding:false
           ~statefulness:false ~visibility:true ~staticity:false
+          ~allocation:false
       in
       create crossing ~externality:Externality.max
 
@@ -1410,6 +1415,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:true ~staticity:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -1444,12 +1450,16 @@ module Jkind0 = struct
                 Layout
                   (base Scannable
                       { nullability = Non_null; separability = Non_float });
+              (* CR-soon shsong: Exceptions should not cross allocation. We may
+                  need to let them cross -- for now let's keep the conservative
+                  option and check this when we start to handle exceptions *)
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
                      ~portability:true ~forkable:false ~yielding:false
                      ~uniqueness:false ~contention:true ~statefulness:true
                      ~visibility:true ~staticity:false
+                     ~allocation:false
                  in
                  create crossing ~externality:Externality.max);
               with_bounds = No_with_bounds
@@ -1463,6 +1473,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~uniqueness:false ~contention:true
             ~statefulness:true ~visibility:false ~staticity:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -1496,6 +1507,7 @@ module Jkind0 = struct
           Crossing.create ~regionality:false ~linearity:true ~portability:true
             ~forkable:true ~yielding:true ~contention:false ~uniqueness:false
             ~statefulness:true ~visibility:false ~staticity:false
+            ~allocation:true
         in
         create crossing ~externality:Externality.max
 
@@ -1588,6 +1600,9 @@ module Jkind0 = struct
          * Contention: This is fine, because contention matters only for
          types with mutable fields, and an immediate64 does not have immutable
          fields.
+
+         * Allocation: This is fine, because "crosses everything" is used for
+         plain data like immediates or unboxed numbers, which cross allocation
 
          In practice, the functor that creates immediate64s,
          [Stdlib.Sys.Immediate64.Make], will require these conditions on its
@@ -2499,6 +2514,7 @@ module Jkind0 = struct
         Mode.Crossing.create ~regionality:false ~linearity:true
           ~portability:true ~forkable:true ~yielding:true ~uniqueness:false
           ~contention:true ~statefulness:true ~visibility:true ~staticity:false
+          ~allocation:true
       in
       let mod_bounds =
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max

@@ -229,7 +229,7 @@ let function_attribute_disallowing_arity_fusion =
 (** [curried_function_kind p] checks the well-formedness of the list and returns
   the corresponding [curried_function_kind]. *)
 let curried_function_kind
-    : (function_curry * Typedtree.alloc_mode_l) list
+    : (function_curry * Typedtree.locality_mode_l) list
       -> return_mode:return_mode
       -> mode:locality_mode
       -> curried_function_kind
@@ -244,14 +244,14 @@ let curried_function_kind
           if running_count = 0
              && is_not_alloc_stack return_mode
              && is_alloc_heap mode
-             && is_alloc_heap (transl_alloc_mode_l final_arg_mode)
+             && is_alloc_heap (transl_typed_locality_mode_l final_arg_mode)
           then 0
           else running_count + 1
         in
         { nlocal }
     | (Final_arg, _) :: _ -> Misc.fatal_error "Found [Final_arg] too early"
     | (More_args { partial_mode }, _) :: params ->
-        match transl_alloc_mode_l partial_mode with
+        match transl_typed_locality_mode_l partial_mode with
         | Alloc_heap when not found_local_already ->
             loop params ~return_mode ~mode
               ~running_count:0 ~found_local_already
@@ -336,7 +336,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
         (function (Texp_poly _, _, _) -> true | _ -> false)
         exp_extra
     ->
-      begin match transl_alloc_mode_r method_.alloc_mode with
+      begin match transl_typed_locality_mode_r method_.locality_mode with
       | Alloc_heap -> ()
       | Alloc_local ->
           (* If we support locally-allocated objects, we'll also have to
@@ -348,7 +348,7 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
         { self_param
           with fp_curry = More_args
             { partial_mode =
-              create_alloc_mode_l
+              create_locality_mode_l
                 (Mode.Locality.disallow_right Mode.Locality.legacy) }
         }
       in
@@ -381,6 +381,7 @@ let rec iter_exn_names f pat =
 let transl_ident loc env ty path desc kind =
   match desc.val_kind, kind with
   | Val_prim p, Id_prim (poly_mode, poly_sort, yielding) ->
+      let poly_mode = Option.map Mode.Locality.disallow_right poly_mode in
       Translprim.transl_primitive loc p env ty ~poly_mode ~poly_sort ~yielding
         ~zero_alloc_check:None (Some path)
   | Val_anc _, Id_value ->
@@ -388,25 +389,6 @@ let transl_ident loc env ty path desc kind =
   | (Val_reg _ | Val_self _), Id_value ->
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
-
-let is_omitted = function
-  | Arg _ -> false
-  | Omitted _ -> true
-
-let can_apply_primitive p pmode pos args =
-  if List.exists (fun (_, arg) -> is_omitted arg) args then false
-  else begin
-    let nargs = List.length args in
-    if nargs = p.prim_arity then true
-    else if nargs < p.prim_arity then false
-    else if pos <> Typedtree.Tail then true
-    else begin
-      let return_mode =
-        Ctype.prim_mode pmode p.prim_native_repr_res ~level:0
-      in
-      is_heap_mode (transl_locality_mode_l return_mode)
-    end
-  end
 
 let zero_alloc_of_application
       ~num_args (annotation : Zero_alloc.assume option) funct =
@@ -484,18 +466,19 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_letmutable(pat_expr, body) ->
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
-  | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
+  | Texp_function { params; body; ret_sort; ret_mode; locality_mode;
                     yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
-        ~alloc_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~locality_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
                                         kind = Id_prim (pmode, psort, _); _ };
                  exp_type = prim_type; } as funct,
                oargs, pos, ap_mode, ap_yielding, zero_alloc)
-    when can_apply_primitive p pmode pos oargs ->
+    when Translprim.can_apply_primitive p pmode pos oargs
+          ~check_poly_mode:true ->
       let rec cut_args prim_repr oargs =
         match prim_repr, oargs with
         | [], _ -> [], oargs
@@ -533,7 +516,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         in
         Translprim.transl_primitive_application
           loc p e.exp_env prim_type
-          ~poly_mode:pmode ~poly_sort:psort ~stack ~yielding
+          ~poly_mode:(Option.map Mode.Locality.disallow_right pmode)
+          ~poly_sort:psort ~stack ~yielding
           path prim_exp args (List.map fst arg_exps) position
       in
       if extra_args = [] then lam
@@ -615,7 +599,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             of_location ~scopes e.exp_loc)
   | Texp_unboxed_bool b ->
       Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
-  | Texp_tuple (el, alloc_mode) ->
+  | Texp_tuple (el, locality_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
@@ -625,7 +609,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable,
                          Lambda.block_shape_of_value_kinds (Some shape),
-                         transl_alloc_mode_r alloc_mode),
+                         transl_typed_locality_mode_r locality_mode),
               ll,
               (of_location ~scopes e.exp_loc))
       end
@@ -641,7 +625,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       Lprim(Pmake_unboxed_product shape,
             ll,
             of_location ~scopes e.exp_loc)
-  | Texp_construct(_, cstr, shape, args, alloc_mode) ->
+  | Texp_construct(_, cstr, shape, args, locality_mode) ->
       let args_with_sorts =
         List.map
           (fun (sort, e) -> e, Jkind.Sort.default_for_transl_and_get sort)
@@ -718,7 +702,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           begin match constant with
           | Some constant -> Lconst constant
           | None ->
-              let alloc_mode = transl_alloc_mode_r (Option.get alloc_mode) in
+              let locality_mode =
+                transl_typed_locality_mode_r (Option.get locality_mode)
+              in
               let makeblock =
                 match shape with
                 | Constructor_uniform_value ->
@@ -729,13 +715,14 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                     in
                     Pmakeblock(runtime_tag, Immutable,
                                Lambda.block_shape_of_value_kinds (Some shape),
-                               alloc_mode)
+                               locality_mode)
                 | Constructor_mixed shape ->
                     (* CR layouts v5: once all-void records are allowed, handle
                        constructors with all-void inline records, which are
                        stored as immediates *)
                     let shape = Lambda.transl_mixed_product_shape shape in
-                    Pmakeblock(runtime_tag, Immutable, Shape shape, alloc_mode)
+                    Pmakeblock
+                      (runtime_tag, Immutable, Shape shape, locality_mode)
                 | Constructor_immediate_all_void ->
                     fatal_error
                       "transl_exp: non-constant immediate constructor"
@@ -757,7 +744,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                that the list is empty *)
             lam)
           else
-            let alloc_mode = transl_alloc_mode_r (Option.get alloc_mode) in
+            let locality_mode =
+              transl_typed_locality_mode_r (Option.get locality_mode)
+            in
             (* CR mshinwell: why are we using generic_value and not an immediate
                value kind for the poly variant hash? *)
             let makeblock =
@@ -771,7 +760,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                   Pmakeblock(0, Immutable,
                              Lambda.block_shape_of_value_kinds
                                (Some (Lambda.generic_value :: shape)),
-                             alloc_mode)
+                             locality_mode)
               | Constructor_mixed shape ->
                   (* CR layouts v5: once all-void records are allowed, handle
                      constructors with all-void inline records, which are stored
@@ -784,7 +773,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                        value prefix of a mixed block. *)
                     Array.append [| Lambda.Value Lambda.generic_value |] shape
                   in
-                  Pmakeblock(0, Immutable, Shape shape, alloc_mode)
+                  Pmakeblock(0, Immutable, Shape shape, locality_mode)
               | Constructor_immediate_all_void ->
                   fatal_error "Unexpected immediate representation in \
                                extensible variant"
@@ -802,31 +791,31 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let tag = Btype.hash_variant l in
       begin match arg with
         None -> (tagged_immediate tag)
-      | Some (arg, alloc_mode) ->
+      | Some (arg, locality_mode) ->
           let lam = transl_exp ~scopes Lambda.layout_variant_arg arg in
           try
             Lconst(Const_block(0, [const_int tag;
                                    extract_constant lam]))
           with Not_constant ->
             Lprim(Pmakeblock(0, Immutable, All_value,
-                             transl_alloc_mode_r alloc_mode),
+                             transl_typed_locality_mode_r locality_mode),
                   [tagged_immediate tag; lam],
                   of_location ~scopes e.exp_loc)
       end
-  | Texp_record {fields; representation; extended_expression; alloc_mode} ->
+  | Texp_record {fields; representation; extended_expression; locality_mode} ->
       let representation =
         Typedecl.finalize_record_representation e.exp_env e.exp_loc
           representation
       in
       transl_record ~scopes e.exp_loc e.exp_env
-        (Option.map transl_alloc_mode_r alloc_mode)
+        (Option.map transl_typed_locality_mode_r locality_mode)
         fields representation extended_expression
   | Texp_record_unboxed_product
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
         fields representation extended_expression
   | Texp_atomic_loc { record = arg; record_sort = arg_sort; record_repres;
-                      lid = _; label = lbl; alloc_mode; } ->
+                      lid = _; label = lbl; locality_mode; } ->
       let shape =
         (Shape
             [| Value (Typeopt.value_kind arg.exp_env arg.exp_loc arg.exp_type);
@@ -856,7 +845,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let arg_layout = layout_exp arg_sort arg in
       let (arg, lbl) = transl_atomic_loc ~scopes arg arg_layout lbl repres in
       let loc = of_location ~scopes e.exp_loc in
-      Lprim (Pmakeblock (0, Immutable, shape, transl_alloc_mode_r alloc_mode),
+      Lprim (Pmakeblock
+               (0,
+                Immutable,
+                shape,
+                transl_typed_locality_mode_r locality_mode),
              [arg; lbl], loc)
   | Texp_field { record = arg; record_sort = arg_sort;
                  record_repres; lid = _; label = lbl; boxing = float;
@@ -888,12 +881,12 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
         | Record_float ->
-          let alloc_mode =
+          let locality_mode =
             match float with
-            | Boxing (alloc_mode, _) -> alloc_mode
+            | Boxing (locality_mode, _) -> locality_mode
             | Non_boxing _ -> assert false
           in
-          let mode = transl_alloc_mode_r alloc_mode in
+          let mode = transl_typed_locality_mode_r locality_mode in
           Some (Pfloatfield (lbl.lbl_pos, sem, mode), [targ])
         | Record_ufloat ->
           Some (Pufloatfield (lbl.lbl_pos, sem), [targ])
@@ -929,7 +922,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                 if i <> lbl.lbl_pos then Lambda.alloc_heap
                 else
                   match float with
-                    | Boxing (mode, _) -> transl_alloc_mode_r mode
+                    | Boxing (mode, _) -> transl_typed_locality_mode_r mode
                     | Non_boxing _ ->
                         Misc.fatal_error
                           "expected typechecking to make [float] boxing mode\
@@ -1081,8 +1074,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             fatal_error "transl_exp0: unexpected unknown representation"
       in
       Lprim(prim, args, of_location ~scopes e.exp_loc)
-  | Texp_array (amut, element_sort, expr_list, alloc_mode) ->
-      let mode = transl_alloc_mode_r alloc_mode in
+  | Texp_array (amut, element_sort, expr_list, locality_mode) ->
+      let mode = transl_typed_locality_mode_r locality_mode in
       let element_sort = Jkind.Sort.default_for_transl_and_get element_sort in
       let kind = array_kind e in
       let ll =
@@ -1806,8 +1799,8 @@ and transl_apply ~scopes
         (* Process remaining arguments and build closure *)
         let body =
           let loc = map_scopes enter_partial_or_eta_wrapper loc in
-          let mode = transl_alloc_mode_r mode_closure in
-          let arg_mode = transl_alloc_mode_l mode_arg in
+          let mode = transl_typed_locality_mode_r mode_closure in
+          let arg_mode = transl_typed_locality_mode_l mode_arg in
           let ret_mode = transl_ret_mode mode_ret in
           let sort_arg = Jkind.Sort.default_for_transl_and_get sort_arg in
           let sort_ret = Jkind.Sort.default_for_transl_and_get sort_ret in
@@ -1919,7 +1912,7 @@ and transl_tupled_function
       (({ c_lhs = { pat_desc = Tpat_tuple pl } } as first_case),
        rest_cases, partial, arg_mode, arg_sort)
     when is_alloc_heap mode
-      && is_alloc_heap (transl_alloc_mode_l arg_mode)
+      && is_alloc_heap (transl_typed_locality_mode_l arg_mode)
       && !Clflags.native_code
       && List.length pl <= (Lambda.max_arity ()) ->
       begin try
@@ -2121,7 +2114,7 @@ and transl_curried_function ~scopes loc repr params body
                    a function that always raises Match_failure. *)
                 layout_of_fun_arg_ty fc_arg_ty fc_loc fc_arg_sort
         in
-        let arg_mode = transl_alloc_mode_l fc_arg_mode in
+        let arg_mode = transl_typed_locality_mode_l fc_arg_mode in
         add_type_shapes_of_cases fc_cases;
         (match fc_cases with
          | { c_lhs; _ } :: _ ->
@@ -2167,7 +2160,7 @@ and transl_curried_function ~scopes loc repr params body
           then layout_of_fun_arg_ty fun_arg_ty fp_loc fp_sort
           else layout arg_env fp_loc fp_sort arg_type
         in
-        let arg_mode = transl_alloc_mode_l fp_mode.mode_modes in
+        let arg_mode = transl_typed_locality_mode_l fp_mode.mode_modes in
         let param =
           { name = fp_param;
             debug_uid = fp_param_debug_uid;
@@ -2282,11 +2275,20 @@ and transl_curried_function ~scopes loc repr params body
     in
     ((Curried { nlocal }, params, return_layout, region, return_mode ), body)
 
-and transl_function ~in_new_scope ~scopes e params body
-      ~alloc_mode ~ret_mode:sreturn_mode ~ret_sort:sreturn_sort ~region:sregion
-      ~zero_alloc ~yielding =
+and transl_function
+      ~in_new_scope
+      ~scopes
+      e
+      params
+      body
+      ~locality_mode
+      ~ret_mode:sreturn_mode
+      ~ret_sort:sreturn_sort
+      ~region:sregion
+      ~zero_alloc
+      ~yielding =
   let attrs = e.exp_attributes in
-  let mode = transl_alloc_mode_r alloc_mode in
+  let mode = transl_typed_locality_mode_r locality_mode in
   let zero_alloc = Zero_alloc.get zero_alloc in
   let assume_zero_alloc =
     match zero_alloc with
@@ -2975,20 +2977,20 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
   in
   let classic =
     match arg, exn_cases with
-    | {exp_desc = Texp_tuple (argl, alloc_mode)}, [] ->
+    | {exp_desc = Texp_tuple (argl, locality_mode)}, [] ->
       (* CR layouts v7.1: This case and the one below it give special treatment
          to matching on literal tuples. This optimization is irrelevant for
          unboxed tuples in native code, but not doing it for unboxed tuples in
          bytecode means unboxed tuple are slightly worse than normal tuples
          there. Consider adding it for unboxed tuples. *)
       assert (static_handlers = []);
-      let mode = transl_alloc_mode_r alloc_mode in
+      let mode = transl_typed_locality_mode_r locality_mode in
       let argl =
         List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
       in
       Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
         (transl_list_with_layout ~scopes argl) mode val_cases partial
-    | {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
+    | {exp_desc = Texp_tuple (argl, locality_mode)}, _ :: _ ->
         let argl =
           List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
         in
@@ -3004,7 +3006,7 @@ and transl_match ~scopes ~arg_sort ~return_layout e arg pat_expr_list partial =
             argl
           |> List.split
         in
-        let mode = transl_alloc_mode_r alloc_mode in
+        let mode = transl_typed_locality_mode_r locality_mode in
         static_catch (transl_list ~scopes argl) val_ids
           (Matching.for_multiple_match ~scopes ~return_layout e.exp_loc
              lvars mode val_cases partial)
@@ -3228,7 +3230,7 @@ and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
                   fc_param_debug_uid = param_debug_uid; fc_partial = partial;
                   fc_loc = ghost_loc; fc_exp_extra = []; fc_attributes = [];
                   fc_arg_mode =
-                    create_alloc_mode_l
+                    create_locality_mode_l
                       (Mode.Locality.disallow_right Mode.Locality.legacy);
                   fc_arg_sort = param_sort; fc_env = env;
                   fc_ret_type = case.c_rhs.exp_type;

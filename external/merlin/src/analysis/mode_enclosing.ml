@@ -1,12 +1,12 @@
 open Std
 
 module Mode_info = struct
-  type t = Mode.Value.l
+  type t = Mode.With_regionality.l
 
   let to_string ~verbosity mode =
     (* Zap mode variables to floor. *)
     let snap = Btype.snapshot () in
-    let const = Mode.Value.zap_to_floor_force mode in
+    let const = Mode.With_regionality.zap_to_floor_force mode in
     Btype.backtrack snap;
     (* Convert modes into a list of modes. *)
     let verbose =
@@ -29,9 +29,10 @@ module Mode_info = struct
            linearity;
            forkable;
            yielding;
-           staticity
+           staticity;
+           allocation
          }
-          : Mode.Value.Const.t) =
+          : Mode.With_regionality.Const.t) =
       const
     in
     let modes =
@@ -45,7 +46,8 @@ module Mode_info = struct
           maybe_print (module Mode.Linearity.Const) linearity;
           maybe_print (module Mode.Forkable.Const) forkable;
           maybe_print (module Mode.Yielding.Const) yielding;
-          maybe_print (module Mode.Staticity.Const) staticity
+          maybe_print (module Mode.Staticity.Const) staticity;
+          maybe_print (module Mode.Allocation.Const) allocation
         ]
         ~f:Fun.id
     in

@@ -445,7 +445,9 @@ let name_expression ~loc ~attrs sort exp =
   let pat =
     { pat_desc =
         Tpat_var { id; name = mknoloc name; uid = vd.val_uid; sort;
-                   mode = Mode.Value.disallow_right Mode.Value.legacy };
+                   mode =
+                      Mode.With_regionality.disallow_right
+                        Mode.With_regionality.legacy };
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;
@@ -466,7 +468,9 @@ let name_expression ~loc ~attrs sort exp =
       str_loc = loc;
       str_env = exp.exp_env; }
   in
-  let final_env = Env.add_value ~mode:Mode.Value.legacy id vd exp.exp_env in
+  let final_env =
+     Env.add_value ~mode:Mode.With_regionality.legacy id vd exp.exp_env
+   in
   let str =
     { str_items = [item];
       str_type = sg;

@@ -31,15 +31,15 @@ open Mode
 
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 
-let dummy_value_mode = Value.disallow_right Value.legacy
+let dummy_value_mode = With_regionality.disallow_right With_regionality.legacy
 
 let dummy_scannable_sort = Jkind.Sort.scannable
 
-let dummy_alloc_mode_r =
-  create_alloc_mode_r (Locality.disallow_left Locality.legacy)
+let dummy_locality_mode_r =
+  create_locality_mode_r (Locality.disallow_left Locality.legacy)
 
-let dummy_alloc_mode_l =
-  create_alloc_mode_l (Locality.disallow_right Locality.legacy)
+let dummy_locality_mode_l =
+  create_locality_mode_l (Locality.disallow_right Locality.legacy)
 
 let dummy_return_mode =
   create_return_mode (Locality.disallow_right Locality.legacy)
@@ -54,13 +54,13 @@ let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
   let label = Typetexp.transl_label label None in
-  Tarrow ((label, Alloc.legacy, Alloc.legacy), t1, t2, comm)
+  Tarrow ((label, With_locality.legacy, With_locality.legacy), t1, t2, comm)
 
 type texp_ident_identifier = ident_kind * unique_use
 
 let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
     (path, lid, desc) =
-  let mode = Mode.Value.(disallow_right legacy) in
+  let mode = Mode.With_regionality.(disallow_right legacy) in
   let staticity = Mode.Staticity.(disallow_left legacy) in
   Texp_ident { path; lid; desc; kind; unique_use; staticity; mode }
 
@@ -83,40 +83,41 @@ let mkTexp_apply
   in
   Texp_apply (exp, args, pos, mode, yielding, za)
 
-type texp_tuple_identifier = string option list * alloc_mode_r
+type texp_tuple_identifier = string option list * locality_mode_r
 
 let mkTexp_tuple ?id exps =
   let labels, alloc =
     match id with
-    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode_r
+    | None -> List.map (fun _ -> None) exps, dummy_locality_mode_r
     | Some id -> id
   in
   let exps = List.combine labels exps in
   Texp_tuple (exps, alloc)
 
 type texp_construct_identifier =
-  alloc_mode_r option * constructor_representation
+  locality_mode_r option * constructor_representation
 
 type texp_construct_arg_identifier = Jkind.Sort.t
 
 let mkTexp_construct
-    ?id:(mode, repres = Some dummy_alloc_mode_r, dummy_ctor_repres)
+    ?id:(mode, repres = Some dummy_locality_mode_r, dummy_ctor_repres)
     (name, desc, args) =
   Texp_construct (name, desc, repres, args, mode)
 
-type texp_record_identifier = Types.record_representation * alloc_mode_r option
+type texp_record_identifier =
+  Types.record_representation * locality_mode_r option
 
 type texp_record_field_identifier = Jkind.Sort.t
 
 type texp_record_extended_expression_identifier = Jkind.Sort.t
 
-let mkTexp_record ~id:(representation, alloc_mode) (fields, extended_expression)
-    =
-  Texp_record { fields; representation; extended_expression; alloc_mode }
+let mkTexp_record ~id:(representation, locality_mode)
+    (fields, extended_expression) =
+  Texp_record { fields; representation; extended_expression; locality_mode }
 
 type texp_function_param_identifier =
   { param_sort : Jkind.Sort.t;
-    param_mode : alloc_mode_l;
+    param_mode : locality_mode_l;
     param_curry : function_curry;
     param_newtypes :
       (Ident.t
@@ -136,7 +137,7 @@ type texp_function_param =
   }
 
 type texp_function_cases_identifier =
-  { last_arg_mode : alloc_mode_l;
+  { last_arg_mode : locality_mode_l;
     last_arg_sort : Jkind.Sort.t;
     last_arg_exp_extra : exp_extra list;
     last_arg_attributes : attributes;
@@ -159,14 +160,14 @@ type texp_function =
   }
 
 type texp_function_identifier =
-  { alloc_mode : alloc_mode_r;
+  { locality_mode : locality_mode_r;
     ret_sort : Jkind.sort;
     ret_mode : return_mode;
     zero_alloc : Zero_alloc.t
   }
 
 let texp_function_cases_identifier_defaults =
-  { last_arg_mode = dummy_alloc_mode_l;
+  { last_arg_mode = dummy_locality_mode_l;
     last_arg_sort = Jkind.Sort.scannable;
     last_arg_exp_extra = [];
     last_arg_attributes = [];
@@ -176,13 +177,13 @@ let texp_function_cases_identifier_defaults =
 
 let texp_function_param_identifier_defaults =
   { param_sort = Jkind.Sort.scannable;
-    param_mode = dummy_alloc_mode_l;
-    param_curry = More_args { partial_mode = dummy_alloc_mode_l };
+    param_mode = dummy_locality_mode_l;
+    param_curry = More_args { partial_mode = dummy_locality_mode_l };
     param_newtypes = []
   }
 
 let texp_function_defaults =
-  { alloc_mode = dummy_alloc_mode_r;
+  { locality_mode = dummy_locality_mode_r;
     ret_sort = Jkind.Sort.scannable;
     ret_mode = dummy_return_mode;
     zero_alloc = Zero_alloc.default
@@ -235,7 +236,7 @@ let mkTexp_function ?(id = texp_function_defaults)
               fc_attributes = id.last_arg_attributes;
               fc_loc = Location.none
             });
-      alloc_mode = id.alloc_mode;
+      locality_mode = id.locality_mode;
       ret_sort = id.ret_sort;
       ret_mode = { mode_modes = id.ret_mode; mode_desc = [] };
       yielding = Yielding.disallow_right Yielding.yielding;
@@ -301,13 +302,15 @@ let view_texp (e : expression_desc) =
     Texp_apply (exp, args, (pos, mode, yielding, za))
   | Texp_construct (name, desc, repres, args, mode) ->
     Texp_construct (name, desc, args, (mode, repres))
-  | Texp_record { fields; representation; extended_expression; alloc_mode } ->
-    Texp_record { fields; extended_expression; id = representation, alloc_mode }
+  | Texp_record { fields; representation; extended_expression; locality_mode }
+    ->
+    Texp_record
+      { fields; extended_expression; id = representation, locality_mode }
   | Texp_tuple (args, mode) ->
     let labels, args = List.split args in
     Texp_tuple (args, (labels, mode))
-  | Texp_function { params; body; alloc_mode; ret_sort; ret_mode; zero_alloc }
-    ->
+  | Texp_function
+      { params; body; locality_mode; ret_sort; ret_mode; zero_alloc } ->
     let params =
       List.map
         (fun param ->
@@ -351,7 +354,8 @@ let view_texp (e : expression_desc) =
     in
     Texp_function
       ( { params; body },
-        { alloc_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc } )
+        { locality_mode; ret_sort; ret_mode = ret_mode.mode_modes; zero_alloc }
+      )
   | Texp_sequence (e1, sort, e2) -> Texp_sequence (e1, e2, sort)
   | Texp_match (e, sort, cases, _, partial) ->
     Texp_match (e, cases, partial, sort)
@@ -368,14 +372,14 @@ let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
     pat_unique_barrier = Unique_barrier.not_computed ()
   }
 
-type tpat_var_identifier = Jkind.Sort.t * Value.l
+type tpat_var_identifier = Jkind.Sort.t * With_regionality.l
 
 let mkTpat_var ?id:(sort, mode = dummy_scannable_sort, dummy_value_mode)
     (ident, name) =
   Tpat_var
     { id = ident; name; uid = Uid.internal_not_actually_unique; sort; mode }
 
-type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
+type tpat_alias_identifier = Jkind.Sort.t * With_regionality.l * Types.type_expr
 
 let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
   Tpat_alias
@@ -392,7 +396,8 @@ type tpat_array_identifier = mutability * Jkind.sort
 
 let mkTpat_array
     ?id:(mut, arg_sort =
-        ( Mutable { mode = Value.Comonadic.legacy; atomic = Nonatomic },
+        ( Mutable
+            { mode = With_regionality.Comonadic.legacy; atomic = Nonatomic },
           Jkind.Sort.scannable )) l =
   Tpat_array (mut, arg_sort, l)
 

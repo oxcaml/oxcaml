@@ -4827,13 +4827,15 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; lpoly; env_alloc_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; lpoly; env_locality_mode; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_alloc_mode = Translmode.transl_alloc_mode_r env_alloc_mode in
+    let env_locality_mode =
+      Translmode.transl_typed_locality_mode_r env_locality_mode
+    in
     let param =
       match param with
       | Lfunction lfun -> lfun
@@ -4848,7 +4850,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
         { ktmpl_params = kind_params;
           ktmpl_body;
           ktmpl_env;
-          ktmpl_env_mode = env_alloc_mode;
+          ktmpl_env_mode = env_locality_mode;
           ktmpl_loc = Scoped_location.of_location ~scopes loc;
         }
     in

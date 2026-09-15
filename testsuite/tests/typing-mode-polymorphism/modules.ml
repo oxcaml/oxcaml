@@ -43,7 +43,7 @@ let make (type a) (x : a) : (module S with type t = a) =
 [%%expect{|
 val make :
   'a @ [< global many read_write] ->
-  (module S with type t = 'a) @ [> aliased stateful dynamic] = <fun>
+  (module S with type t = 'a) @ [> aliased stateful dynamic alloc] = <fun>
 |}]
 
 let unpack_inferred_witness () =

@@ -190,8 +190,8 @@ type stage_lock =
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
-      Mode.Value.Comonadic.Const.t
-  | Closure_lock of Mode.Hint.pinpoint * Mode.Value.Comonadic.r
+      Mode.With_regionality.Comonadic.Const.t
+  | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -209,11 +209,11 @@ type locks = lock list
 
 type summary =
     Env_empty
-  | Env_value of summary * Ident.t * value_description * Mode.Value.l
+  | Env_value of summary * Ident.t * value_description * Mode.With_regionality.l
   | Env_type of summary * Ident.t * type_declaration
   | Env_extension of summary * Ident.t * extension_constructor
   | Env_module of summary * Ident.t * module_presence * module_declaration *
-      Mode.Value.l * locks
+      Mode.With_regionality.l * locks
   | Env_modtype of summary * Ident.t * modtype_declaration
   | Env_class of summary * Ident.t * class_declaration
   | Env_cltype of summary * Ident.t * class_type_declaration
@@ -245,7 +245,7 @@ let map_summary f = function
   | Env_jkind (s, id, d) -> Env_jkind (f s, id, d)
 
 type address = Persistent_env.address =
-  | Aunit of Compilation_unit.t * Mode.Value.l
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * module_representation * int
 
@@ -394,7 +394,7 @@ module TycompTbl =
 
 type empty = |
 
-type mode_with_locks = Mode.Value.l * locks
+type mode_with_locks = Mode.With_regionality.l * locks
 
 let locks_empty = []
 
@@ -753,7 +753,7 @@ and components_maker = {
   cm_path: Path.t;
   cm_addr: address_lazy;
   cm_mty: Subst.Lazy.module_type;
-  cm_mode : Mode.Value.l;
+  cm_mode : Mode.With_regionality.l;
   cm_shape: Shape.t;
 }
 
@@ -800,7 +800,7 @@ and address_lazy = (address_unforced, address) Lazy_backtrack.t
 and value_data =
   { vda_description : Subst.Lazy.value_description;
     vda_address : address_lazy;
-    vda_mode : Mode.Value.l;
+    vda_mode : Mode.With_regionality.l;
     vda_shape : Shape.t }
 
 and value_entry =
@@ -825,7 +825,7 @@ and module_data =
   { mda_declaration : Subst.Lazy.module_declaration;
     mda_components : module_components;
     mda_address : address_lazy;
-    mda_mode : Mode.Value.l;
+    mda_mode : Mode.With_regionality.l;
     mda_shape: Shape.t; }
 
 and module_alias_locks = locks
@@ -866,12 +866,12 @@ and jkind_data =
   { jkda_declaration : jkind_declaration;
     jkda_shape : Shape.t }
 
-let clda_mode = Types.class_mode |> Mode.Value.disallow_right
+let clda_mode = Types.class_mode |> Mode.With_regionality.disallow_right
 
 (** In this file, a functor's return is only used to access the types inside
 (such as F(M).t). Therefore, the return having the weakest mode is sufficient.
 *)
-let fcomp_res_mode = Mode.Value.(max |> disallow_right)
+let fcomp_res_mode = Mode.With_regionality.(max |> disallow_right)
 
 (** Accessing `F(M).t` is not closing over anything *)
 let fcomp_res_mode_with_locks = (fcomp_res_mode, locks_empty)
@@ -3073,7 +3073,7 @@ let add_functor_arg id env =
 let add_value_lazy ?check ?shape ~mode id desc env =
   let addr = value_declaration_address env id desc in
   let shape = shape_or_leaf desc.Subst.Lazy.val_uid shape in
-  let mode = Mode.Value.disallow_right mode in
+  let mode = Mode.With_regionality.disallow_right mode in
   store_value ?check ~mode id addr desc shape env
 
 let add_type_maybe_hidden ~check ~hidden ?shape id info env =
@@ -3089,7 +3089,7 @@ and add_extension ~check ?shape ~rebind id ext env =
 
 and add_module_declaration_lazy
       ~update_summary ?(arg=false) ?shape ?full_env ~check id presence md
-      ?(mode = Mode.Value.(allow_right max)) ?(locks = []) env =
+      ?(mode = Mode.With_regionality.(allow_right max)) ?(locks = []) env =
   let check =
     if not check then
       None
@@ -3103,7 +3103,7 @@ and add_module_declaration_lazy
   in
   let addr = module_declaration_address full_env id presence md in
   let shape = shape_or_leaf md.Subst.Lazy.md_uid shape in
-  let mode = Mode.Value.disallow_right mode in
+  let mode = Mode.With_regionality.disallow_right mode in
   let env =
     store_module ~update_summary ~full_env ~check id addr presence md mode shape
       locks env
@@ -3179,7 +3179,7 @@ let enter_value ?check ~mode name desc env =
   let id = Ident.create_local name in
   let desc = Subst.Lazy.of_value_description desc in
   let addr = value_declaration_address env id desc in
-  let mode = Mode.Value.disallow_right mode in
+  let mode = Mode.With_regionality.disallow_right mode in
   let env =
     store_value ?check ~mode id addr desc (Shape.leaf desc.val_uid)
       env
@@ -3259,7 +3259,7 @@ let add_const_closure_lock ?(ghost = false) closure_context comonadic env =
 let add_closure_lock closure_context comonadic env =
   let lock = Closure_lock
     (closure_context,
-     Mode.Value.Comonadic.disallow_left comonadic)
+     Mode.With_regionality.Comonadic.disallow_left comonadic)
   in
   add_lock lock env
 
@@ -3309,12 +3309,17 @@ let proj_shape map mod_shape item =
       Shape.Map.add map item shape, Some shape
 
 module Add_signature(T : Types.Wrapped)(M : sig
-  val add_value: ?shape:Shape.t -> mode:(Mode.allowed * 'r0) Mode.Value.t -> Ident.t ->
-    T.value_description  -> t -> t
+  val add_value:
+    ?shape:Shape.t ->
+    mode:(Mode.allowed * 'r0) Mode.With_regionality.t ->
+    Ident.t ->
+    T.value_description ->
+    t ->
+    t
   val add_module_declaration: ?arg:bool -> ?shape:Shape.t
     -> full_env:t ref -> check:bool
     -> Ident.t -> module_presence -> T.module_declaration
-    -> ?mode:(Mode.allowed * 'r) Mode.Value.t -> ?locks:locks ->
+    -> ?mode:(Mode.allowed * 'r) Mode.With_regionality.t -> ?locks:locks ->
     t -> t
   val add_modtype: ?shape:Shape.t -> Ident.t -> T.modtype_declaration -> t -> t
 end) = struct
@@ -3349,8 +3354,12 @@ end) = struct
         let map, shape = proj_shape map mod_shape (Shape.Item.jkind id) in
         map, add_jkind ~check:false ?shape id decl env
 
-  let add_signature map mod_shape sg ?(mode = Mode.Value.(allow_right max))
-    env =
+  let add_signature
+      map
+      mod_shape
+      sg
+      ?(mode = Mode.With_regionality.(allow_right max))
+      env =
     let full_env = ref env in
     let rec go map env = function
       | [] -> map, env
@@ -3437,7 +3446,8 @@ let enter_unbound_module name reason env =
 let read_signature modname cmi =
   let mty, mode = read_pers_mod modname cmi in
   (* [mode] read from the cmi is always a constant *)
-  Subst.Lazy.force_signature mty, (Mode.Value.zap_to_floor_exn mode).staticity
+  Subst.Lazy.force_signature mty,
+  (Mode.With_regionality.zap_to_floor_exn mode).staticity
 
 let find_import ~chain modname =
   try Persistent_env.find_import !persistent_env modname
@@ -3870,7 +3880,7 @@ let lookup_ident_module (type a) (load : a load) ~errors ~use ~loc s env =
         | Don't_load ->
           (* The cmi is not loaded, so [cmi_staticity] is unknown.
              Conservatively fall back to [Dynamic]. *)
-          Mode.Value.disallow_right
+          Mode.With_regionality.disallow_right
             (Persistent_env.mode_pers_mod Dynamic)
       in
       path, (mode, locks), a
@@ -3880,24 +3890,30 @@ let closure_mode pp {Mode.monadic; comonadic} closure_context comonadic0 =
   let hint_comonadic : _ Mode.Hint.morph =
     Is_closed_by (Comonadic, {closure = closure_context; closed = pp})
   in
-  Mode.Value.Comonadic.submode_err pp
-    comonadic (Mode.Value.Comonadic.apply_hint hint_comonadic comonadic0);
+  Mode.With_regionality.Comonadic.submode_err
+    pp
+    comonadic
+    (Mode.With_regionality.Comonadic.apply_hint
+       hint_comonadic
+       comonadic0);
   let hint_monadic : _ Mode.Hint.morph =
     Is_closed_by (Monadic, {closure = closure_context; closed = pp})
   in
   let monadic =
-    Mode.Value.Monadic.join
+    Mode.With_regionality.Monadic.join
       [ monadic;
-        Mode.Value.comonadic_to_monadic_min ~hint:hint_monadic comonadic0 ]
+        Mode.With_regionality.comonadic_to_monadic_min
+          ~hint:hint_monadic
+          comonadic0 ]
   in
   {Mode.monadic; comonadic}
 
 let const_closure_mode pp {Mode.monadic; comonadic}
   closure_context comonadic0 =
-  Mode.Value.Comonadic.(submode_err pp comonadic
+  Mode.With_regionality.Comonadic.(submode_err pp comonadic
     (of_const ~hint:(Is_used_in closure_context) comonadic0));
   let monadic =
-    Mode.Value.(Monadic.join
+    Mode.With_regionality.(Monadic.join
       [ monadic;
         Const.comonadic_to_monadic_min comonadic0
         |> Monadic.of_const ~hint:(Is_used_in closure_context) ])
@@ -3907,16 +3923,21 @@ let const_closure_mode pp {Mode.monadic; comonadic}
 let exclave_mode ~errors ~env ~pp vmode =
   match
   Mode.Regionality.submode
-    (Mode.Value.proj_comonadic Areality vmode)
+    (Mode.With_regionality.proj_comonadic Areality vmode)
     Mode.Regionality.regional
 with
-| Ok () -> vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
+| Ok () ->
+    vmode
+    |> Mode.with_regionality_to_locality_r2l
+    |> Mode.with_locality_as_regionality
 | Error _ ->
     may_lookup_error errors (fst pp) env
       (Local_value_used_in_exclave (snd pp))
 
 let region_mode vmode =
-  vmode |> Mode.value_to_alloc_r2l |> Mode.alloc_to_value_l2r
+  vmode
+  |> Mode.with_regionality_to_locality_r2l
+  |> Mode.with_locality_to_regionality_l2r
 
 let unboxed_type ~errors ~env ~loc ty_and_lid =
   match ty_and_lid with
@@ -3938,8 +3959,8 @@ let unboxed_type ~errors ~env ~loc ty_and_lid =
         (Non_value_used_in_object (lid, ty, err))
 
 (** Takes the [mode] and [ty] of a value at definition site, walks through the
-    list of locks and constrains [mode] and [ty]. Return the access mode of the
-    value allowed by the locks.
+    list of locks and constrains [mode] and [ty]. Returns the access mode of
+    the value allowed by the locks.
 
     [ty_and_lid] is the type of the value paired with its identifier; it is
     [None] when the function is used on modules and classes.
@@ -3964,18 +3985,57 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
         vmode
     ) mode locks
 
+(** Constrains every enclosing closure lock with the given minimum mode. *)
+let walk_locks_with_mode_constraint ~env pp ~mode =
+  let locks = IdTbl.get_all_locks env.values in
+  let _stage_locks, locks = partition_locks locks in
+  ignore (walk_locks ~errors:true ~env ~pp
+      (Mode.With_regionality.disallow_right mode) None locks)
+
 (** Registers a use of a construct that is at legacy comonadic modes,
     constraining every enclosing closure lock as if a legacy value defined at
     toplevel were used at the pinpoint's location. Used for constructs (e.g.
     effect handlers) that force enclosing functions to be nonportable and
     stateful. *)
 let walk_locks_for_legacy_construct ~env pp =
+  walk_locks_with_mode_constraint ~env pp ~mode:Mode.With_regionality.legacy
+
+(** Re-walks the enclosing locks with an application's return [mode] on the
+    allocation axis (forcing every closure to be [>= mode] there). Used to stop
+    an [alloc] value from being laundered out of a fully-applied zero_alloc
+    function through a [noalloc] closure. *)
+let walk_locks_for_zero_alloc_return ~env ~loc mode =
+  let pp : Mode.Hint.pinpoint = (loc, Zero_alloc_func_appl) in
+  walk_locks_with_mode_constraint ~env pp
+    ~mode:
+      (Mode.With_regionality.min_with_comonadic Allocation
+         (Mode.With_regionality.proj_comonadic Allocation mode))
+
+(** Registers a use of an allocation at the given pinpoint.
+
+    Returns the pinpoint and allocation mode of every enclosing closure.
+    The list is ordered from the innermost closure to the outermost one,
+    so that error messages blame the closure nearest to the allocation. *)
+(* CR shsong: currently it only considers noalloc_strict and alloc,
+    need to customize this to support noalloc later *)
+let walk_locks_for_allocation ~env pp =
   let locks = IdTbl.get_all_locks env.values in
   let _stage_locks, locks = partition_locks locks in
-  ignore
-    (walk_locks ~errors:true ~env ~pp
-       (Mode.Value.disallow_right Mode.Value.legacy) None locks
-      : Mode.Value.l)
+  List.fold_left
+    (fun acc lock ->
+      match lock with
+      | Closure_lock (closure, comonadic) ->
+          let comonadic =
+            Mode.With_regionality.Comonadic.apply_hint
+              (Is_closed_by (Comonadic, {closure; closed = pp}))
+              comonadic
+          in
+          (closure, Mode.With_regionality.Comonadic.proj Allocation comonadic) :: acc
+      (* A [Const_closure_lock] is at a constant mode which is always [alloc]
+         on the allocation axis, so there is nothing to constrain. *)
+      | Region_lock | Const_closure_lock _ | Exclave_lock
+      | Unboxed_lock -> acc
+    ) [] locks
 
 (** Takes [m0] which is the parameter of [let mutable x] at declaration site,
   and [locks] which is the locks between the declaration and the usage (either
@@ -3987,27 +4047,30 @@ let walk_locks_for_legacy_construct ~env pp =
 let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
   let mode =
     m0
-    |> mutable_mode |> Mode.Value.disallow_left
+    |> mutable_mode |> Mode.With_regionality.disallow_left
   in
   List.fold_left
-    (fun (mode : Mode.Value.r) lock ->
+    (fun (mode : Mode.With_regionality.r) lock ->
       match lock with
       | Region_lock ->
           (* CR zqian: once we have finer regionality, remove this branch *)
           (* First map [regional] to [global], then cap [local] to [regional] *)
-          let mode = mode |> Mode.value_to_alloc_r2g |> Mode.alloc_as_value in
-          Mode.Value.meet
+          let mode =
+            mode
+            |> Mode.with_regionality_to_locality_r2g
+            |> Mode.with_locality_as_regionality
+          in
+          Mode.With_regionality.meet
             [mode;
-             Mode.Value.max_with_comonadic Areality
+             Mode.With_regionality.max_with_comonadic Areality
                                  (Mode.Regionality.regional)]
       | Exclave_lock ->
           (* If [m0] is [global], then inside the exclave we require new values
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
-          mode |> Mode.value_to_alloc_r2l |> Mode.alloc_as_value
-      | Const_closure_lock (true, _, _) ->
-          mode
+          mode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_as_regionality
+      | Const_closure_lock (true, _, _) -> mode
       | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
@@ -4644,7 +4707,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       (* The cmi is not loaded, so [cmi_staticity] is unknown. Conservatively
          fall back to [Dynamic]. *)
       path, Location.none,
-        Mode.Value.disallow_right
+        Mode.With_regionality.disallow_right
           (Persistent_env.mode_pers_mod Dynamic)
     else
       let path, (mda : module_data) =
@@ -4952,7 +5015,11 @@ let lookup_all_labels_from_type ?(use=true) ~record_form ~loc usage ty_path env
 
 type settable_variable =
   | Instance_variable of Path.t * Asttypes.mutable_flag * string * type_expr
-  | Mutable_variable of Ident.t * Mode.Value.r * type_expr * Jkind_types.Sort.t
+  | Mutable_variable of
+      Ident.t
+      * Mode.With_regionality.r
+      * type_expr
+      * Jkind_types.Sort.t
 
 let lookup_settable_variable ?(use=true) ~loc name env =
   match IdTbl.find_name_and_locks wrap_value ~mark:use name env.values with

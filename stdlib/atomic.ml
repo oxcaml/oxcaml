@@ -99,8 +99,8 @@ external logxor
   @@ portable
   = "%atomic_lxor"
 
-let incr r = add r 1
-let decr r = sub r 1
+let (incr @ noalloc_strict) r = add r 1
+let (decr @ noalloc_strict) r = sub r 1
 
 external get_contended
   : ('a : value_or_null).

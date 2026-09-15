@@ -1,0 +1,170 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 2006 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+module ZA = Zero_alloc_utils
+
+module Scoped_location : sig
+  type scope_item = private
+    | Sc_anonymous_function
+    | Sc_value_definition
+    | Sc_module_definition
+    | Sc_class_definition
+    | Sc_method_definition
+    | Sc_partial_or_eta_wrapper
+    | Sc_lazy
+
+  val equal_scope_item : scope_item -> scope_item -> bool
+
+  type scopes = private
+    | Empty
+    | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
+               assume_zero_alloc: ZA.Assume_info.t;
+               mangling_item:
+                 Compilation_unit.t Structured_mangling.path_item option}
+
+  val string_of_scopes : include_zero_alloc:bool -> scopes -> string
+
+  val compilation_unit : scopes -> Compilation_unit.t option
+
+  val empty_scopes : scopes
+  val enter_anonymous_function :
+    scopes:scopes ->
+    assume_zero_alloc:ZA.Assume_info.t ->
+    loc:Location.t ->
+    scopes
+  val enter_anonymous_module :
+    scopes:scopes ->
+    loc:Location.t ->
+    scopes
+  val enter_value_definition :
+    scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> Ident.t -> scopes
+  val enter_compilation_unit : scopes:scopes -> Compilation_unit.t -> scopes
+  val enter_module_definition : scopes:scopes -> Ident.t -> scopes
+  val enter_class_definition : scopes:scopes -> Ident.t -> scopes
+  val enter_method_definition : scopes:scopes -> Asttypes.label -> scopes
+  val enter_lazy : scopes:scopes -> scopes
+  val enter_partial_or_eta_wrapper : scopes:scopes -> loc:Location.t -> scopes
+  val update_assume_zero_alloc :
+    scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
+  val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t
+
+  type t =
+    | Loc_unknown
+    | Loc_known of
+        { loc : Location.t;
+          scopes : scopes; }
+
+  val of_location : scopes:scopes -> Location.t -> t
+  val to_location : t -> Location.t
+  val string_of_scoped_location : include_zero_alloc:bool -> t -> string
+
+  val map_scopes : (scopes:scopes -> loc:Location.t -> scopes) -> t -> t
+end
+
+type item = private {
+  dinfo_file: string;
+  dinfo_line: int;
+  dinfo_char_start: int;
+  dinfo_char_end: int;
+  dinfo_start_bol: int;
+  dinfo_end_bol: int;
+  dinfo_end_line: int;
+  dinfo_scopes: Scoped_location.scopes;
+  (** See the [Inlined_debuginfo] module in Flambda 2 for an explanation
+      of the uid and function symbol fields.  (They are used for generation
+      of DWARF inlined frame information.)  These fields should only be
+      set to [Some] by Flambda 2. *)
+  dinfo_uid: string option;
+  dinfo_function_symbol: string option;
+  dinfo_dir: string option;
+}
+
+val item_with_uid_and_function_symbol : item -> dinfo_uid:string option
+  -> dinfo_function_symbol:string option -> item
+
+type t
+
+val none : t
+
+val is_none : t -> bool
+
+val of_items : item list -> t
+
+val mapi_items : t -> f:(int -> item -> item) -> t
+
+val to_items : t -> item list
+
+val to_string : t -> string
+
+val from_location : Scoped_location.t -> t
+
+val to_location : t -> Location.t
+
+(** The source file of the given item, qualified with the directory recorded
+    in [dinfo_dir] (see the [-directory] flag) whenever the recorded filename
+    is relative, so that the result remains meaningful outside the directory
+    in which the item's compilation unit was compiled -- in particular in the
+    debugging information of other units into which its code is inlined.
+    Relative directory values are interpreted against the current unit's build
+    root, which assumes that linked units were built from the same root.  Used
+    when emitting DWARF line tables and file attributes. *)
+val item_file_path : item -> string
+
+(** [item_file_path] applied to the item that determines [to_location]. *)
+val to_file_path : t -> string option
+
+val inline : t -> from_inlined_body:t -> t
+
+val compare : t -> t -> int
+
+val print_compact : Format.formatter -> t -> unit
+
+(** Like [print_compact] but uses [Format_doc.formatter]. *)
+val doc_print_compact : Format_doc.formatter -> t -> unit
+
+(** Like [print_compact] but also prints uid and function symbol info. *)
+val print_compact_extended : Format.formatter -> t -> unit
+
+val merge : into:t -> t -> t
+
+val assume_zero_alloc : t -> ZA.Assume_info.t
+
+(** [to_structured_mangling_path] converts the debug info into a mangling path.
+    In all cases, the [name] is used to populate the last element of the path.
+*)
+val to_structured_mangling_path :
+  name:string -> t -> Compilation_unit.t Structured_mangling.path
+
+module Dbg : sig
+  type t
+
+  (** [compare] and [hash] ignore the [dinfo_scopes] field of item;
+      [compare] additionally ignores [dinfo_function_symbol]. *)
+
+  val is_none : t -> bool
+
+  (** [compare] Inner-most inlined debug info is used first. Allocates. *)
+  val compare : t -> t -> int
+
+  (** [compare_outer_first] Outer-most inlined debug info is used first.
+      Does not allocate. *)
+  val compare_outer_first : t -> t -> int
+
+  val hash : t -> int
+  val to_list : t -> item list
+  val length : t -> int
+end
+
+val get_dbg : t -> Dbg.t
