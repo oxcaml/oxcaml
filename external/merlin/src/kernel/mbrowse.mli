@@ -77,7 +77,7 @@ val of_structure : Typedtree.structure -> t
 val of_signature : Typedtree.signature -> t
 
 val of_typedtree :
-  [ `Implementation of Typedtree.structure | `Interface of Typedtree.signature ] ->
+  [ `Implementation of Typedtree.structure | `Interface of Typedtree.interface ] ->
   t
 
 val node_of_binary_part : Env.t -> Cmt_format.binary_part -> node

@@ -31,7 +31,7 @@ type ('p, 't) item =
   }
 
 type typedtree =
-  [ `Interface of Typedtree.signature | `Implementation of Typedtree.structure ]
+  [ `Interface of Typedtree.interface | `Implementation of Typedtree.structure ]
 
 type typedtree_items =
   | Interface_items of
@@ -340,7 +340,7 @@ let get_errors t =
   Typecore.reset_delayed_checks ();
   !caught
 
-let get_typedtree t =
+let get_typedtree t : typedtree =
   let split_items l =
     let typd, typs = List.split (List.map ~f:(fun x -> x.typedtree_items) l) in
     (List.concat typd, List.concat typs)
@@ -352,13 +352,15 @@ let get_typedtree t =
   | Interface_items { items = l; psig_modalities = _; sig_modalities; sig_sloc }
     ->
     let sig_items, sig_type = split_items l in
-    `Interface
+    let signature =
       { Typedtree.sig_items;
         sig_type;
         sig_final_env = get_env t;
         sig_modalities;
         sig_sloc
       }
+    in
+    `Interface { signature; argument_interface = None }
 
 let get_index t =
   let of_items items =
