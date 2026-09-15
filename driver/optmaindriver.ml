@@ -91,7 +91,9 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
           Compenv.fatal "-pack is not supported when targeting js_of_ocaml";
         Jscomp.make ~lambda_to_jsir:Flambda2.lambda_to_jsir
       end
-      else Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
+      else
+        Optcompile.native unix ~flambda2:Flambda2.lambda_to_cmm
+          ~reaped_flambda2_to_cmm:Flambda2.reaped_flambda2_to_cmm
     in
     begin try
       Compenv.process_deferred_actions
@@ -111,7 +113,7 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      functorize; reaper_solve;
+                      functorize; reaper_rebuild; reaper_solve;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -119,7 +121,8 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate, -functorize, -reaper-solve";
+                         -output-obj, -instantiate, -functorize, \
+                         -reaper-rebuild, -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -171,6 +174,40 @@ let main unix argv ppf ~flambda2:(module Flambda2 : Optcomp_intf.Flambda2) =
         |> Functorizer.validate_inputs
       in
       Compiler.functorize input_module_names target;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_rebuild then begin
+      Compmisc.init_path ();
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let ltosol_file, (other_inputs : string list) = match
+        List.partition (fun f -> Filename.check_suffix f ".ltosol") inputs
+      with
+        | [ltosol_file], other_inputs -> ltosol_file, other_inputs
+        | ltosol_files, _ ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify exactly one .ltosol file with -reaper-rebuild \
+             (found %d: [%s])"
+            (List.length ltosol_files) (String.concat ", " ltosol_files)
+      in
+      let cmx_file = match
+        List.partition
+          (fun f -> Filename.check_suffix f Compiler.ext_flambda_obj)
+          other_inputs
+      with
+        | [cmx_file], [] -> cmx_file
+        | ([] | _ :: _ :: _), [] ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify exactly one %s file with -reaper-rebuild"
+            Compiler.ext_flambda_obj
+        | _, other_files ->
+          Printf.ksprintf Compenv.fatal
+            "Got unexpected files: [%s] (-reaper-rebuild expects one %s file \
+             and one .ltosol file)"
+            (String.concat ", " other_files) Compiler.ext_flambda_obj
+      in
+      Compiler.reaper_rebuild ~ltosol_file ~cmx_file
+        ~output_prefix:(Compenv.output_prefix cmx_file ^ ".reaped")
+        ~keep_symbol_tables:false;
       Warnings.check_fatal ();
     end
     else if !reaper_solve then begin
