@@ -1179,13 +1179,13 @@ let prim_has_valid_reprs ~loc prim =
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       exactly [Same_as_ocaml_repr C.bits64; Same_as_ocaml_repr C.scannable]
     | "%box" ->
-      (* CR zeisbach: eventually this should have [box] kind check *)
+      (* CR layouts: eventually this should have [box] kind check *)
       check [
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
     | "%unbox" ->
-      (* CR zeisbach: eventually this should have [box] kind check *)
+      (* CR layouts: eventually this should have [box] kind check *)
       check [
         is (Same_as_ocaml_repr C.scannable);
         any;
