@@ -128,6 +128,8 @@ let ids_for_export_map ~fold ~add_ids_key ~ids_for_export_value map =
       union ids (add_ids_key (ids_for_export_value value) key))
     map empty
 
+let ids_for_export_symbol_set symbols = create ~symbols ()
+
 let ids_for_export_name_set names =
   ids_for_export_set ~fold:Name.Set.fold ~add_ids_key:add_name names
 
