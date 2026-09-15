@@ -544,6 +544,60 @@ let contains_initial_stage_splice stage ty =
   in
   loop stage ty
 
+(* Returns [true] iff [t] is valid at any stage. Equivalently:
+   [<[t]> expr = t] up to beta-reductions in [try_reduce_quote_eval]. *)
+let type_is_persistent_in_quotations env t =
+  with_type_mark begin fun mark ->
+    let rec loop t =
+      if not (try_mark_node mark t) then true
+      else match get_desc t with
+      | Tvar _ | Tunivar _ ->
+        false
+      | Tarrow (_, t1, t2, _) ->
+        loop t1 && loop t2
+      | Ttuple tl ->
+        List.map (fun (_, t) -> t) tl |> loop_list
+      | Tbox t ->
+        loop t
+      | Tunboxed_tuple tl ->
+        List.map (fun (_, t) -> t) tl |> loop_list
+      | Tconstr (path, tl, _) ->
+        Env.path_is_persistent_in_quotations env path && loop_list tl
+      | Tmod (t, _) ->
+        loop t
+      | Tobject (t, ct) ->
+        loop t &&
+        Option.map
+          (fun (p, tl) ->
+            Env.path_is_persistent_in_quotations env p && loop_list tl)
+          !ct
+        |> Option.value ~default:true
+      | Tfield (_, _, t_method, t_rest) ->
+        loop t_method && loop t_rest
+      | Tnil ->
+        true
+      | Tquote _ | Tsplice _ | Tquote_eval _ ->
+        (* [eval] does not reduce on these *)
+        false
+      | Tvariant row ->
+        row_more row |> loop
+      | Tpoly (_, []) ->
+        true
+      | Tpoly (_, _::_) ->
+        false
+      | Trepr (t, _) ->
+        loop t
+      | Tpackage { pack_path; pack_cstrs } ->
+        Env.path_is_persistent_in_quotations env pack_path &&
+        loop_list (List.map (fun (_, t) -> t) pack_cstrs)
+      | Tof_kind _ ->
+        true
+      | Tlink _ | Tsubst _ -> assert false
+    and loop_list tl = List.fold_left (fun acc t -> acc && loop t) true tl in
+    loop t
+  end
+
+
 (* Update unification environment stage *)
 let unify_with_incr_stage uenv f =
   match uenv with
@@ -2506,6 +2560,9 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
+(* Raised when [f x] beta-reduces to [x]. Caught to preserve identity of [x]. *)
+exception Reduction_fixpoint
+
 (* Note [Beta normal form]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2541,8 +2598,9 @@ let try_expand_safe env ty =
    * Simplify a [Tbox] over a type with a unboxed version. *)
 let rec try_reduce_once env t =
   match get_desc t with
-  | Tquote_eval t ->
-    try_reduce_quote_eval env t |> newty2 ~level:(get_level t)
+  | Tquote_eval t -> begin
+    try try_reduce_quote_eval env t |> newty2 ~level:(get_level t)
+    with Reduction_fixpoint -> t end
   | Tbox t ->
     try_reduce_box t |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
@@ -2593,7 +2651,12 @@ and try_reduce_quote_eval env t =
   (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
   | Tconstr (p, tl, a) ->
     path_must_be_persistent env p;
-    Tconstr (p, List.map new_quote_eval_ty tl, a)
+    let tl =
+      match tl with
+      | _ :: _ -> List.map new_quote_eval_ty tl
+      | [] -> raise Reduction_fixpoint
+    in
+    Tconstr (p, tl, a)
   | Tmod (ty, mod_bounds) ->
     Tmod (new_quote_eval_ty ty, mod_bounds)
   (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
@@ -2665,9 +2728,12 @@ and try_reduce_quote_eval env t =
       ==> [module S with type typ = <[t]> eval] *)
   | Tpackage { pack_path; pack_cstrs } ->
     path_must_be_persistent env pack_path;
-    Tpackage { pack_path;
-               pack_cstrs =
-                 List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs }
+    let pack_cstrs =
+      match pack_cstrs with
+      | _::_ -> List.map (fun (n, t) -> n, new_quote_eval_ty t) pack_cstrs
+      | [] -> raise Reduction_fixpoint
+    in
+    Tpackage { pack_path; pack_cstrs }
   (* It is safe not to expand [Tof_kind], and we do not need to currently *)
   | Tof_kind _ -> raise Cannot_expand
   | Tlink _ | Tsubst _ -> assert false
@@ -5259,6 +5325,12 @@ and unify3 uenv t1 t1' t2 t2' =
       unify_with_decr_stage uenv (fun uenv -> unify uenv t1 t2)
   | (Tquote_eval t1, Tquote_eval t2) ->
       unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2)
+  | (Tquote_eval t1, _)
+    when type_is_persistent_in_quotations (get_env uenv) t2' ->
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1 t2')
+  | (_, Tquote_eval t2)
+    when type_is_persistent_in_quotations (get_env uenv) t1' ->
+      unify_with_incr_stage uenv (fun uenv -> unify uenv t1' t2)
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       unify_with_decr_stage uenv (fun uenv -> unify uenv s1 (new_quote_ty t2'))
   | (Tquote s1, _) when is_flexible_ty s1 ->
@@ -6647,6 +6719,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs
                 (incr_stage env) t1 t2
+          | (Tquote_eval t1, _) when type_is_persistent_in_quotations env t2' ->
+              moregen inst_nongen variance type_pairs
+                (incr_stage env) t1 t2'
           | (Tbox t1, Tbox t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tbox t, _) when is_unboxable_ty env t2' ->
