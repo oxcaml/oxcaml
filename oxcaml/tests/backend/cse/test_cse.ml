@@ -221,3 +221,102 @@ let () =
   | None -> failwith (name ^ ": unexpected IRC fallback"));
   if Reg.equal_location raw.loc root.loc
   then failwith (name ^ ": both values occupy the same location")
+
+let compare_op = Operation.Intop (Icomp Ceq)
+
+let compare left right dst = op compare_op [| left; right |] [| dst |]
+
+let address root dst = op (Reinterpret_cast Int_of_value) [| root |] [| dst |]
+
+let add8_op = Operation.Intop_imm (Iadd, 8)
+
+let add8 src dst = op add8_op [| src |] [| dst |]
+
+let test_gc_equations safepoint_name safepoint =
+  let name s = s ^ " across " ^ safepoint_name in
+  let root = Reg.create Cmm.Val in
+  let raw = Reg.create Cmm.Int in
+  let before = Reg.create Cmm.Int and result = Reg.create Cmm.Int in
+  run
+    (name "root/address comparison")
+    [| root |] result
+    [ address root raw;
+      compare root raw before;
+      safepoint ();
+      compare root raw result ]
+  |> expect (name "root/address comparison") compare_op;
+  let old_address = Reg.create Cmm.Int in
+  let derived1 = Reg.create Cmm.Addr and derived2 = Reg.create Cmm.Addr in
+  run
+    (name "recomputed derived address")
+    [| root |] result
+    [ address root raw;
+      add8 raw old_address;
+      add8 root derived1;
+      compare derived1 old_address before;
+      safepoint ();
+      add8 root derived2;
+      compare derived2 old_address result ]
+  |> expect (name "recomputed derived address") compare_op;
+  (* The immutable load equation survives even after its result is overwritten.
+     Reloading that value must not recover a pre-GC comparison with its bits. *)
+  let addr = Reg.create Cmm.Int and other = Reg.create Cmm.Val in
+  let reloaded = Reg.create Cmm.Val in
+  run
+    (name "lost immutable-load result")
+    [| other |] result
+    [ op symbol [||] [| addr |];
+      load ~mutability:Immutable Word_val addr root;
+      address root raw;
+      compare root raw before;
+      move other root;
+      safepoint ();
+      load ~mutability:Immutable Word_val addr reloaded;
+      compare reloaded raw result ]
+  |> expect (name "lost immutable-load result") compare_op;
+  (* Checking arguments alone is insufficient: a Val result can move even when
+     all operands are fixed integer snapshots. *)
+  let input = Reg.create Cmm.Int and value = Reg.create Cmm.Val in
+  let result_value = Reg.create Cmm.Val in
+  run
+    (name "GC-sensitive result")
+    [| input |] result_value
+    [add8 input value; safepoint (); add8 input result_value]
+  |> expect (name "GC-sensitive result") add8_op;
+  let vector = Reg.create Cmm.Valx2 in
+  let extract = Operation.Static_cast (Scalar_of_v128 Int64x2) in
+  run
+    (name "Valx2 address extraction")
+    [| root |] result
+    [ load ~mutability:Immutable Onetwentyeight_unaligned root vector;
+      op extract [| vector |] [| before |];
+      safepoint ();
+      op extract [| vector |] [| result |] ]
+  |> expect (name "Valx2 address extraction") extract;
+  (* Immutable values and computations on already-captured integer snapshots
+     still permit CSE across safepoints. *)
+  run
+    (name "immutable load retained")
+    [| addr |] result_value
+    [ load ~mutability:Immutable Word_val addr value;
+      safepoint ();
+      load ~mutability:Immutable Word_val addr result_value ]
+  |> expect_move (name "immutable load retained") value;
+  run
+    (name "integer snapshot arithmetic retained")
+    [| root |] result
+    [address root raw; add8 raw before; safepoint (); add8 raw result]
+  |> expect_move (name "integer snapshot arithmetic retained") before
+
+let () =
+  test_gc_equations "poll" (fun () -> op Poll [||] [||]);
+  test_gc_equations "allocation" (fun () ->
+      op
+        (Alloc { bytes = 40; dbginfo = []; mode = Heap })
+        [||]
+        [| Reg.create Cmm.Val |]);
+  let root = Reg.create Cmm.Val and raw = Reg.create Cmm.Int in
+  let before = Reg.create Cmm.Int and result = Reg.create Cmm.Int in
+  run "root/address comparison without safepoint" [| root |] result
+    [address root raw; compare root raw before; compare root raw result]
+  |> expect_move "root/address comparison without safepoint" before

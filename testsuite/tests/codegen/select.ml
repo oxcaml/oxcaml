@@ -260,8 +260,9 @@ min_max:
   movq  %rbx, %rdi
   cmpq  %rbx, %rax
   cmovge %rax, %rdi
-  cmovle %rax, %rbx
-  movq  %rbx, %rax
+  movq  %rbx, %rsi
+  cmovle %rax, %rsi
+  movq  %rsi, %rax
   movq  %rdi, %rbx
   ret
 |}]
