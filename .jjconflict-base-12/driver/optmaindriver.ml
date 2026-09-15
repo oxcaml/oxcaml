@@ -20,7 +20,7 @@ let usage = "Usage: ocamlopt <options> <files>\nOptions are:"
 module Options = Oxcaml_args.Make_optcomp_options
         (Oxcaml_args.Default.Optmain)
 
-let main unix argv ppf ~flambda2 =
+let main unix argv ppf ~flambda2 ~reaper_lto_solve =
   native_code := true;
   let columns =
     match Sys.getenv "COLUMNS" with
@@ -103,7 +103,7 @@ let main unix argv ppf ~flambda2 =
     if
       List.length (List.filter (fun x -> !x)
                      [make_package; make_archive; shared; instantiate;
-                      functorize;
+                      functorize; reaper_solve;
                       Compenv.stop_early; output_c_object]) > 1
     then
     begin
@@ -111,7 +111,7 @@ let main unix argv ppf ~flambda2 =
       match !stop_after with
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
-                         -output-obj, -instantiate, -functorize";
+                         -output-obj, -instantiate, -functorize, -reaper-solve";
       | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
               | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
@@ -163,6 +163,28 @@ let main unix argv ppf ~flambda2 =
         |> Functorizer.validate_inputs
       in
       Compiler.functorize input_module_names target;
+      Warnings.check_fatal ();
+    end
+    else if !reaper_solve then begin
+      Compmisc.init_path ();
+      let inputs = Compenv.get_objfiles ~with_ocamlparam:false in
+      let cmx_files = match
+        List.partition
+          (fun f -> Filename.check_suffix f Compiler.ext_flambda_obj)
+          inputs
+      with
+        | [], _ ->
+          Printf.ksprintf Compenv.fatal
+            "Must specify at least one %s file with -reaper-solve"
+            Compiler.ext_flambda_obj
+        | cmx_files, [] -> cmx_files
+        | _, other_files ->
+          Printf.ksprintf Compenv.fatal
+            "Got unexpected files: [%s] (-reaper-solve expects %s files only)"
+            (String.concat ", " other_files) Compiler.ext_flambda_obj
+      in
+      let ltosol_file = Compenv.extract_output !output_name in
+      reaper_lto_solve ~cmx_files ~ltosol_file;
       Warnings.check_fatal ();
     end
     else if !shared then begin

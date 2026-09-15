@@ -48,9 +48,34 @@ module Staged : sig
     val apply_renaming : t -> Renaming.t -> t
   end
 
+  (** What the rebuild consumes from a solution, in a form that can be stored:
+      the answers to its queries, the code changes and the solved slot offsets.
+      A whole-program solution is stored in one part per compilation unit. *)
+  module Rebuild_data : sig
+    type t
+
+    (** The data about units that did not take part in the solve. *)
+    val empty : analysis_scope:Analysis_scope.t -> t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    (** Fields are hashconsed, so for serialisation the [Field.view] of each one
+        needs serialising separately. *)
+    val fields_for_export : t -> Field.Set.t
+
+    val apply_renaming :
+      t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
+
+    (** Partition by the compilation unit owning each identifier and slot. *)
+    val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
+  end
+
   (** The rewriting decisions and slot offsets computed by the solve. *)
   module Solution : sig
     type t
+
+    (** The answers of the solution in the form the rebuild consumes. *)
+    val rebuild_data : t -> Rebuild_data.t
   end
 
   (** Traverse the compilation unit. [free_names] are the free names of the
@@ -64,12 +89,14 @@ module Staged : sig
     Flambda_unit.t ->
     Solve_inputs.t * Rebuild_inputs.t
 
-  (** Analyse the dependency graph and compute the rewriting decisions and slot
-      offsets. Mutates the graph by linking the code references.
-      [analysis_scope] is the set of compilation units analysed together. No
-      typing information is used: the result types of the code whose calling
-      convention changes are left unknown and its subkinds are erased. *)
-  val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
+  (** Combine the units' inputs, analyse the resulting dependency graph and
+      compute the rewriting decisions and slot offsets. Mutates the graphs by
+      combining them and linking the code references. [analysis_scope] is the
+      set of compilation units analysed together. No typing information is used:
+      the result types of the code whose calling convention changes are left
+      unknown and its subkinds are erased. *)
+  val solve :
+    analysis_scope:Analysis_scope.t -> Solve_inputs.t list -> Solution.t
 
   (** Rebuild the traversed unit according to the solution. No typing
       information is used, so the exported types of the rebuilt code are left

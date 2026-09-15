@@ -53,3 +53,17 @@ val arguments_used_by_unknown_arity_call :
   Code_id_or_name.t ->
   'a list list ->
   ('a * Points_to_analysis.keep_or_delete) list list
+
+val empty : result
+
+val ids_for_export : result -> Ids_for_export.t
+
+(** Fields are hashconsed, so for serialisation the [Field.view] of each one
+    needs serialising separately. *)
+val fields_for_export : result -> Field.Set.t
+
+val apply_renaming :
+  result -> Renaming.t -> rename_field:(Field.t -> Field.t) -> result
+
+(** Partition by the compilation unit of each map's outermost key. *)
+val partition_by_compilation_unit : result -> result Compilation_unit.Map.t

@@ -187,6 +187,78 @@ module Staged = struct
       }
   end
 
+  module Rebuild_data = struct
+    type t =
+      { analysis : Analysis.result;
+        code_changes : Unboxing_analysis.code_changes;
+        slot_offsets : Exported_offsets.t
+      }
+
+    let empty ~analysis_scope =
+      { analysis = Analysis.empty;
+        code_changes = Unboxing_analysis.empty_code_changes ~analysis_scope;
+        slot_offsets = Exported_offsets.empty
+      }
+
+    let ids_for_export { analysis; code_changes; slot_offsets = _ } =
+      Unboxing_analysis.code_changes_ids_for_export code_changes
+        (Analysis.ids_for_export analysis)
+
+    let fields_for_export { analysis; code_changes; slot_offsets = _ } =
+      Unboxing_analysis.code_changes_fields_for_export code_changes
+        (Analysis.fields_for_export analysis)
+
+    let apply_renaming { analysis; code_changes; slot_offsets } renaming
+        ~rename_field =
+      { analysis = Analysis.apply_renaming analysis renaming ~rename_field;
+        code_changes =
+          Unboxing_analysis.code_changes_apply_renaming code_changes renaming
+            ~rename_field;
+        slot_offsets
+      }
+
+    let partition_by_compilation_unit { analysis; code_changes; slot_offsets } =
+      let analysis_scope = Unboxing_analysis.analysis_scope code_changes in
+      let analysis = Analysis.partition_by_compilation_unit analysis in
+      let code_changes =
+        Unboxing_analysis.partition_code_changes_by_compilation_unit
+          code_changes
+      in
+      let slot_offsets =
+        Exported_offsets.partition_by_compilation_unit slot_offsets
+      in
+      let add_units map units =
+        Compilation_unit.Map.fold
+          (fun compilation_unit _ units ->
+            Compilation_unit.Set.add compilation_unit units)
+          map units
+      in
+      let units =
+        Compilation_unit.Set.empty |> add_units analysis
+        |> add_units code_changes |> add_units slot_offsets
+      in
+      let find map compilation_unit ~default =
+        Option.value
+          (Compilation_unit.Map.find_opt compilation_unit map)
+          ~default
+      in
+      Compilation_unit.Set.fold
+        (fun compilation_unit parts ->
+          let part =
+            { analysis = find analysis compilation_unit ~default:Analysis.empty;
+              code_changes =
+                find code_changes compilation_unit
+                  ~default:
+                    (Unboxing_analysis.empty_code_changes ~analysis_scope);
+              slot_offsets =
+                find slot_offsets compilation_unit
+                  ~default:Exported_offsets.empty
+            }
+          in
+          Compilation_unit.Map.add compilation_unit part parts)
+        units Compilation_unit.Map.empty
+  end
+
   module Solution = struct
     type t =
       { analysis : Analysis.result;
@@ -221,6 +293,12 @@ module Staged = struct
               Value_slot.print value_slot)
         (Name_occurrences.all_value_slots_at_normal_mode free_names)
         offsets
+
+    let rebuild_data { analysis; code_changes; slot_offsets } =
+      { Rebuild_data.analysis;
+        code_changes;
+        slot_offsets = slot_offsets.Slot_offsets.exported_offsets
+      }
   end
 
   let traverse ~free_names ~cmx_loader ~all_code unit =
@@ -265,17 +343,39 @@ module Staged = struct
     in
     solve_inputs, rebuild_inputs
 
-  let solve ~analysis_scope
-      ({ deps;
-         slot_offsets_inputs;
-         code_deps;
-         code_references;
-         le_monde_exterieur;
-         applications
-       } :
-        Solve_inputs.t) =
-    Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
-      code_references;
+  let solve ~analysis_scope (solve_inputs : Solve_inputs.t list) =
+    let deps =
+      match solve_inputs with
+      | [] -> Global_flow_graph.create ()
+      | first :: rest ->
+        List.fold_left
+          (fun deps (inputs : Solve_inputs.t) ->
+            Global_flow_graph.union deps inputs.deps)
+          first.deps rest
+    in
+    let slot_offsets_inputs =
+      List.fold_left
+        (fun combined (inputs : Solve_inputs.t) ->
+          Slot_offsets_analysis.Inputs.union combined inputs.slot_offsets_inputs)
+        Slot_offsets_analysis.Inputs.empty solve_inputs
+    in
+    let code_deps =
+      List.fold_left
+        (fun code_deps (inputs : Solve_inputs.t) ->
+          Code_id.Map.disjoint_union code_deps inputs.code_deps)
+        Code_id.Map.empty solve_inputs
+    in
+    let applications =
+      List.fold_left
+        (fun applications (inputs : Solve_inputs.t) ->
+          Traverse_acc.Applications.union applications inputs.applications)
+        Traverse_acc.Applications.empty solve_inputs
+    in
+    List.iter
+      (fun (inputs : Solve_inputs.t) ->
+        Cross_unit_calls.link deps ~analysis_scope ~code_deps
+          ~le_monde_exterieur:inputs.le_monde_exterieur inputs.code_references)
+      solve_inputs;
     let solved_dep, analysis =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps ~applications ~analysis_scope)
