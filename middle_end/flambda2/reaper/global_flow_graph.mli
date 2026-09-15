@@ -149,9 +149,6 @@ val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
 val create : unit -> graph
 
-val add_opaque_let_dependency :
-  graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit
-
 val print_iter_edges :
   print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
   graph ->

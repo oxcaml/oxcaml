@@ -197,7 +197,8 @@ let rebuild_non_inlined_direct_full_application apply ~use_id ~exn_cont_use_id
   in
   let erase_callee = false in
   (* CR ncourant: find out how we can erase the callee in simplify mode and
-     still update to newer code pointers after resimplification. *)
+     still update to newer code pointers after resimplification.
+     pchambart: this is a job for the new code simplification primitive *)
   (* let erase_callee =
    *   match Apply.callee apply with
    *   | None -> false
