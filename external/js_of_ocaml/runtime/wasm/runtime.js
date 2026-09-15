@@ -163,7 +163,7 @@
       : f;
   }
 
-  const decoder = new TextDecoder("utf-8", { ignoreBOM: 1 });
+  const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
   const encoder = new TextEncoder();
 
   // View on the scratch area used to convert between OCaml and JavaScript
@@ -312,6 +312,7 @@
     typeof: (x) => typeof x,
     // biome-ignore lint/suspicious/noDoubleEquals: ..
     equals: (x, y) => x == y,
+    eval: (x) => eval("("+x+")"),
     strict_equals: (x, y) => x === y,
     fun_call: (f, o, args) => f.apply(o, args),
     meth_call: (o, f, args) => o[f].apply(o, args),

@@ -24,6 +24,7 @@
       (func $parse_int_format
          (param (ref $bytes)) (result i32 i32 i32 i32 i32)))
    (import "fail" "caml_failwith" (func $caml_failwith (param (ref eq))))
+   (import "fail" "caml_raise_zero_divide" (func $caml_raise_zero_divide))
    (import "marshal" "caml_serialize_int_8"
       (func $caml_serialize_int_8 (param (ref eq)) (param i64)))
    (import "marshal" "caml_deserialize_int_8"
@@ -99,8 +100,18 @@
       (i32.const 8))
 
    (func $int64_dup (param $v (ref eq)) (result (ref eq))
+      ;; Under [portable-int] this is also [Nativeint]'s [dup], so the ops
+      ;; must come from the source value rather than [$int64_ops].
+      (@if $portable-int
+      (@then
+         (struct.new $int64
+            (struct.get $int64 0 (ref.cast (ref $int64) (local.get $v)))
+            (struct.get $int64 1 (ref.cast (ref $int64) (local.get $v)))))
+      (@else
       (struct.new $int64 (global.get $int64_ops)
          (struct.get $int64 1 (ref.cast (ref $int64) (local.get $v)))))
+      ))
+
 
    (func $caml_copy_int64 (export "caml_copy_int64")
       (param $i64 i64) (result (ref eq))
@@ -121,6 +132,14 @@
                       (i64.const 24))
             (i64.rotl (i64.and (local.get $i) (i64.const 0xFF000000FF000000))
                       (i64.const 8)))))
+
+   (func (export "caml_int64_unsigned_div") (param $x i64) (param $y i64) (result i64)
+      (if (i64.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+      (i64.div_u (local.get $x) (local.get $y)))
+
+   (func (export "caml_int64_unsigned_mod") (param $x i64) (param $y i64) (result i64)
+      (if (i64.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+      (i64.rem_u (local.get $x) (local.get $y)))
 
    (func (export "caml_int64_compare")
       (param $i1 i64) (param $i2 i64) (result i32)
@@ -326,4 +345,13 @@
       (param (ref eq)) (result (ref eq))
       (call $caml_failwith (global.get $unsupported))
       (ref.i31 (i32.const 0)))
+
+   (@if $portable-int
+      (@then
+         (export "caml_portability_int64_cmp" (func $int64_cmp))
+         (export "caml_portability_int64_hash" (func $int64_hash))
+         (export "caml_portability_int64_serialize" (func $int64_serialize))
+         (export "caml_portability_int64_deserialize" (func $int64_deserialize))
+         (export "caml_portability_int64_dup" (func $int64_dup))
+   ))
 )
