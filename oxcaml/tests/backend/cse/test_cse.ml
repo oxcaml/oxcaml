@@ -26,14 +26,19 @@ let block ?(handler = false) start body terminator : Cfg.basic_block =
 
 (* Check the public pass on pre-regalloc CFGs, including cases with explicit
    physical registers. All input graphs must satisfy the CFG invariants. *)
-let run name args result body =
+let make_cfg name args result body =
   let parameters = Proc.loc_parameters (Reg.typv args) in
   let prefix = Array.to_list (Array.map2 move parameters args) in
-  let ret_type = [| result.Reg.typ |] in
+  (* Valx2 is internal to vectorization, not a function-return machtype. *)
+  let ret_type, return_op =
+    match result.Reg.typ with
+    | Valx2 -> Cmm.typ_int, Operation.Static_cast (Scalar_of_v128 Int64x2)
+    | _ -> [| result.Reg.typ |], Operation.Move
+  in
   let ret_regs = Proc.loc_results_return ret_type in
   let entry =
     block Label.entry_label
-      (prefix @ body @ [op Move [| result |] ret_regs])
+      (prefix @ body @ [op return_op [| result |] ret_regs])
       (instr Return ret_regs [||])
   in
   let handlers =
@@ -63,9 +68,14 @@ let run name args result body =
   in
   if Cfg_invariants.run Format.err_formatter cfg
   then failwith (name ^ ": invalid input CFG");
-  let cfg = Cse.cfg_with_layout cfg in
+  cfg
+
+let run name args result body =
+  let cfg = Cse.cfg_with_layout (make_cfg name args result body) in
   if Cfg_invariants.run Format.err_formatter cfg
   then failwith (name ^ ": invalid output CFG");
+  let graph = Cfg_with_layout.cfg cfg in
+  let entry = Cfg.get_block_exn graph graph.entry_label in
   match
     DLL.find_opt entry.body ~f:(fun (i : Cfg.basic Cfg.instruction) ->
         Array.exists (Reg.same result) i.res)
@@ -139,3 +149,75 @@ let () =
   test_alias_write "CSE result invalidates physical aliases"
     ~prepare:(fun src -> [op zero [||] [| src |]])
     ~overwrite:(fun _ dst -> op zero [||] [| dst |])
+
+let load ?(mutability = Operation.Mutable) chunk addr dst =
+  op
+    (Load
+       { memory_chunk = chunk;
+         addressing_mode = Arch.identity_addressing;
+         mutability;
+         is_atomic = false
+       })
+    [| addr |] [| dst |]
+
+let expect_move name source i =
+  expect name Move i;
+  if not (Reg.same i.arg.(0) source)
+  then
+    Misc.fatal_errorf "%s: expected source %a, got %a" name Printreg.reg source
+      Printreg.reg i.arg.(0)
+
+let test_snapshot_copy name chunk root_typ raw_typ =
+  let owner = Reg.create Cmm.Val and out = Reg.create Cmm.Int in
+  let root = Reg.create root_typ and raw = Reg.create raw_typ in
+  if Proc.types_are_compatible root raw
+  then
+    let result = Reg.create root_typ in
+    let load dst = load ~mutability:Immutable chunk owner dst in
+    run name [| owner; out |] result
+      [ load root;
+        move root raw;
+        store chunk raw out;
+        op Poll [||] [||];
+        load result ]
+    |> expect_move name root
+
+let () =
+  test_snapshot_copy "Val/Int copies stay distinct" Word_val Val Int;
+  test_snapshot_copy "Valx2/Vec128 copies stay distinct"
+    Onetwentyeight_unaligned Valx2 Vec128;
+  let raw = Reg.create Cmm.Int and out = Reg.create Cmm.Int in
+  let root = Reg.create Cmm.Val and result = Reg.create Cmm.Int in
+  run "Int/Val copies stay distinct" [| raw; out |] result
+    [ move raw root;
+      op Poll [||] [||];
+      store Word_int raw out;
+      load Word_int out result ]
+  |> expect_move "Int/Val copies stay distinct" raw
+
+(* CSE can extend the lifetime of an integer snapshot independently of the
+   number assigned to the mixed-type copy. IRC must not coalesce the copy once
+   both representations remain live across GC. *)
+let () =
+  let name = "CSE-extended snapshot does not coalesce with root" in
+  let bits = Reg.create Cmm.Float and out = Reg.create Cmm.Int in
+  let raw = Reg.create Cmm.Int and root = Reg.create Cmm.Val in
+  let result = Reg.create Cmm.Int in
+  let snapshot dst =
+    op (Reinterpret_cast Int64_of_float) [| bits |] [| dst |]
+  in
+  let cfg =
+    make_cfg name [| bits; out |] result
+      [ snapshot raw;
+        move raw root;
+        op Poll [||] [||];
+        store Word_val root out;
+        snapshot result ]
+    |> Cse.cfg_with_layout
+  in
+  let infos = Cfg_with_infos.make cfg in
+  (match Regalloc_irc.run infos with
+  | Some _ -> ()
+  | None -> failwith (name ^ ": unexpected IRC fallback"));
+  if Reg.equal_location raw.loc root.loc
+  then failwith (name ^ ": both values occupy the same location")
