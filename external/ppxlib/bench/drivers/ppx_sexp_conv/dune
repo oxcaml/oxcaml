@@ -1,0 +1,7 @@
+; A driver with the ppx_sexp_conv plugin
+
+(executable
+ (name driver)
+ (enabled_if
+  (>= %{ocaml_version} "4.10.0"))
+ (libraries ppxlib ppx_sexp_conv))
