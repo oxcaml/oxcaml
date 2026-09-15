@@ -60,7 +60,8 @@ module type S = sig
 
   val find_equation : op_class -> numbering -> rhs -> valnum array option
 
-  val find_regs_containing : numbering -> valnum array -> Reg.t array option
+  val find_regs_containing :
+    numbering -> valnum array -> Cmm.machtype -> Reg.t array option
 
   val find_reg_containing_with_typ :
     numbering -> valnum -> Cmm.machtype_component -> Reg.t option
@@ -95,10 +96,9 @@ module Make (Op : Operation) : S with type op = Op.t = struct
      registers of different machtypes holding the same bits at one point may
      hold different bits later on. Both the store-to-load forwarding equations
      (see [Cse_generic]) and vectorized loads of the same chunk, which can
-     produce either a [Vec128] or a [Valx2], rely on this. (Instruction
-     selection may still emit a [Move] between an [Int] and a [Val] register at
-     join points, in which case [set_move] shares a value number across the two
-     machtypes; CSE does not currently guard against that.) *)
+     produce either a [Vec128] or a [Valx2], rely on this. Moves between
+     different machtypes also receive distinct value numbers (see
+     [set_move]). *)
 
   type rhs = op * valnum array * Cmm.machtype
 
@@ -218,14 +218,8 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let find_equation op_class n rhs =
     try Some (Equations.find op_class rhs n.num_eqs) with Not_found -> None
 
-  (* Find a register containing the given value number. *)
-
-  let find_reg_containing n v =
-    Reg.Map.fold (fun r v' res -> if v' = v then Some r else res) n.num_reg None
-
-  (* Find a register of machtype [typ] containing the given value number.
-     (Registers of different machtypes can share a value number, see
-     [set_move].) *)
+  (* Find a register containing the given value number with the required GC
+     representation. *)
 
   let find_reg_containing_with_typ n v typ =
     Reg.Map.fold
@@ -237,18 +231,18 @@ module Make (Op : Operation) : S with type op = Op.t = struct
 
   (* Find a set of registers containing the given value numbers. *)
 
-  let find_regs_containing n vs =
+  let find_regs_containing n vs typs =
     match Array.length vs with
     | 0 -> Some [||]
     | 1 -> (
-      match find_reg_containing n vs.(0) with
+      match find_reg_containing_with_typ n vs.(0) typs.(0) with
       | None -> None
       | Some r -> Some [| r |])
     | l -> (
       let rs = Array.make l Reg.dummy in
       try
         for i = 0 to l - 1 do
-          match find_reg_containing n vs.(i) with
+          match find_reg_containing_with_typ n vs.(i) typs.(i) with
           | None -> raise Exit
           | Some r -> rs.(i) <- r
         done;
@@ -261,12 +255,14 @@ module Make (Op : Operation) : S with type op = Op.t = struct
   let set_known_regs n rs vs =
     Misc.Stdlib.Array.fold_left2 set_known_reg n rs vs
 
-  (* Record the effect of a move: no new equations, but the result reg maps to
-     the same value number as the argument reg. *)
-
+  (* A copy may change GC representation. Only copies within a machtype keep the
+     same value number; equal bits do not imply equal behavior at GC. *)
   let set_move n src dst =
-    let n1, v = valnum_reg n src in
-    set_known_reg n1 dst v
+    if Cmm.equal_machtype_component src.Reg.typ dst.Reg.typ
+    then
+      let n1, v = valnum_reg n src in
+      set_known_reg n1 dst v
+    else fst (fresh_valnum_reg n dst)
 
   (* Record the equation [fresh valnums = rhs] and associate the given result
      registers [rs] to [fresh valnums]. *)
@@ -581,8 +577,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Stack_check _ ->
       set_unknown_regs n (Proc.destroyed_at_basic i.desc)
     | Op (Move | Spill | Reload) ->
-      (* For moves, we associate the same value number to the result reg as to
-         the argument reg. *)
+      (* Copies share value numbers only within a machtype. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
       n1
     | Op Opaque ->
@@ -622,7 +617,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
         | Some vres -> (
           (* This operation was computed earlier. *)
           (* Are there registers that hold the results computed earlier? *)
-          match find_regs_containing n1 vres with
+          match find_regs_containing n1 vres (Reg.typv i.res) with
           | Some res when not (is_cheap_operation op) ->
             (* We can replace the operation with a move, provided the registers
                are stable (non-volatile). If the operation is very cheap to
