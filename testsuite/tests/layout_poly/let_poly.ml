@@ -130,29 +130,13 @@ Error: This expression is not allowed in a "let poly_" definition;
        it must be a function.
 |}]
 
-(* layout-polymorphic id is not included in regular id,
-   even though the former can be instantiated to the latter *)
+(* layout-polymorphic id can be instatiated to value id *)
 module _ : sig
   val id : 'a -> 'a
 end = struct
   let poly_ id x = x
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   let poly_ id x = x
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig val poly_ id : 'a -> 'a end
-       is not included in
-         sig val id : 'a -> 'a end
-       Values do not match:
-         val poly_ id : 'a -> 'a
-       is not included in
-         val id : 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
 |}]
 
 (* The RHS has to be a syntactic value *)
@@ -535,4 +519,51 @@ let () = Printf.printf "%.1f\n" (to_float (f 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 >> Fatal error: Slambda does not currently support functions with over 125 arguments
 Uncaught exception: Misc.Fatal_error
 
-|}]
+|}];;
+
+(** Layout-polymorphic bindings in the top-level **)
+
+(* Static binding in expression *)
+
+let poly_ id x = x in
+(id 42, id #3.14 |> to_float)
+[%%expect {|
+- : int * float = (42, 3.14)
+|}];;
+
+(* Static module binding in expression *)
+
+let module Id = struct
+  let poly_ id x = x
+end in
+(Id.id 42, Id.id #3.14 |> to_float)
+[%%expect {|
+- : int * float = (42, 3.14)
+|}];;
+
+(* Value binding *)
+
+(* For now, we always force value bindings in the top-level to be at [legacy].
+   However, we could change this for staticity. *)
+let poly_ id x = x;;
+(id 42, id #3.14 |> to_float)
+[%%expect {|
+val poly_ id : 'a -> 'a = <lpoly>
+Line 2, characters 1-3:
+2 | (id 42, id #3.14 |> to_float)
+     ^^
+Error: The value "id" is "dynamic"
+       but is expected to be "static"
+         because it is layout-polymorphic and being instantiated here.
+|}];;
+
+(* Module binding *)
+
+module Id = struct
+  let poly_ id x = x
+end;;
+(Id.id 42, Id.id #3.14 |> to_float)
+[%%expect {|
+module Id : sig val poly_ id : 'a -> 'a end
+- : int * float = (42, 3.14)
+|}];;

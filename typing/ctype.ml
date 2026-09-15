@@ -6849,8 +6849,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen pat_sort_vars
-    subj_sort_vars pat_sch subj_sch =
+let moregeneral ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_sch subj_sch =
   let instantiate_modes = not self_check in
   (* Moregen splits the generic level into two finer levels:
      [generic_level] and [subject_level = generic_level - 1].
@@ -6873,48 +6873,50 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
         then copied with [duplicate_type].  That way, its levels won't be
         changed.
        *)
-      let (subj_sorts, subj_inst) =
-        Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
+      let (subj_inst_sorts, subj_inst) =
+        Jkind_types.Sort.instance_with ~level:!current_level subj_sch_sorts
           (fun () -> instance_aux ~instantiate_modes subj_sch)
       in
-      let subj = duplicate_type subj_inst in
+      let subj_inst' = duplicate_type subj_inst in
       (* Duplicate generic variables *)
-      let (pat_sorts, patt) =
-        Jkind_types.Sort.instance_with ~level:generic_level pat_sort_vars
+      let (pat_inst_sorts, pat_inst) =
+        Jkind_types.Sort.instance_with ~level:generic_level pat_sch_sorts
           (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
       in
       try
         with_univar_pairs [] begin fun () ->
           let type_pairs = fresh_moregen_pairs () in
-          moregen inst_nongen Covariant type_pairs env patt subj;
-          (* After [moregen], [pat_sorts] have been set to [subj_sorts].
-             [subj_sorts] are ephemeral rigid vars created by [instance_with] to
-             stand for [subj_sort_vars] during moregen.  Replace them back with
-             the originals so that the returned [pat_sort_refs] refer to
-             [subj_sort_vars], not to the short-lived rigid instances. *)
-          let subj_sort_vars =
-            List.map (fun v -> Jkind_types.Sort.Var v) subj_sort_vars
-          in
-          let subst_map = List.combine subj_sorts subj_sort_vars in
-          let sorts =
-            List.map
-              (fun v ->
-                (* We check whether the pattern variable [v] is unbound,
-                   which happens when it does not occur in the subject. *)
-                if Jkind.Sort.Var.is_root v
-                then None
-                else Some (Jkind_types.Sort.subst subst_map (Var v)))
-              pat_sorts
-          in
-          subj_inst, Ok sorts
-        end
+          moregen inst_nongen Covariant type_pairs env pat_inst subj_inst';
+        end;
+        subj_inst, Ok (subj_inst_sorts, pat_inst_sorts)
       with Moregen_trace trace -> subj_inst, Error trace
     end
       ~before_generalize:(fun (subj_inst, _) ->
         ignore
           (Jkind_types.Sort.generalize_with (fun () -> generalize subj_inst)))
     with
-    | _, Ok sorts -> sorts
+    | _, Ok (subj_inst_sorts, pat_inst_sorts) ->
+      (* After [moregen], [pat_inst_sorts] have been set to [subj_inst_sorts],
+         which are ephemeral instances of [subj_sort_vars].
+         We substitute [subj_inst_sorts] in for [subj_sch_sorts],
+         as the latter are part of the type-and-sort scheme known externally.
+         By this point, we have left [subject_level] and all variables involved
+         are generalized, so we use [Sort.Const]s to represent them. *)
+      let subj_sch_sorts =
+        List.map Jkind_types.Sort.Const.genvar subj_sch_sorts
+      in
+      let subst_map = List.combine subj_inst_sorts subj_sch_sorts in
+      List.map
+        (fun v ->
+          (* We check whether the pattern variable [v] is unbound,
+              which happens when it does not occur in the subject. *)
+          match Jkind.Sort.Var.is_root v with
+          | true -> None
+          | false ->
+            Jkind_types.Sort.unwrap_const (Var v)
+            |> Jkind_types.Sort.Const.subst subst_map
+            |> Option.some)
+        pat_inst_sorts
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 

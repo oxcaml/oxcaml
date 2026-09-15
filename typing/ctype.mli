@@ -406,7 +406,7 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
 val occur_in: Env.t -> type_expr -> type_expr -> bool
 val moregeneral: self_check:bool -> Env.t -> bool ->
   Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
-  type_expr -> type_expr -> Jkind_types.Sort.t option list
+  type_expr -> type_expr -> Jkind_types.Sort.Const.t option list
         (* Check if the first type scheme is more general than the second.
            The two [Sort.var list] arguments are the layout-polymorphic sort
            variables of the pattern and subject respectively.
