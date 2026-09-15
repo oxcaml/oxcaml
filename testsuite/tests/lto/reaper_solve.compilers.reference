@@ -1,3 +1,6 @@
 File "reaper_solve.cmx", line 1:
 Error: Unit Reaper_solve is also defined by reaper_solve.cmx:
        each unit can only take part in the solve once
+File "reaper_solve_partial.ltosol", line 1:
+Error: This file has no solution for unit Reaper_solve_dependency,
+       which did not take part in the solve

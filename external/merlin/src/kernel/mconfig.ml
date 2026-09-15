@@ -593,6 +593,7 @@ let ocaml_ignored_flags =
     "-lto-support";
     "-no-lto-support";
     "-reaper-solve";
+    "-reaper-rebuild";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)

@@ -31,6 +31,9 @@ val free_function_slots_and_value_slots : t -> Name_occurrences.t
 
 val add_code : keep_code:(Code_id.t -> bool) -> Code.t Code_id.Map.t -> t -> t
 
+(** Add or replace an entry with metadata only, discarding any existing body. *)
+val add_code_metadata : t -> Code_metadata.t -> t
+
 val mark_as_imported : t -> t
 
 val merge : t -> t -> t
