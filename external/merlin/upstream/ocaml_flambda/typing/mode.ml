@@ -5656,7 +5656,7 @@ let () =
 let fold_error_exn ~init ~step exn =
   match exn with
   | Submode_error_simple_context (pp, packed) ->
-    Some (Error.fold_packed ~step ~init pp packed)
+    Some (fst pp, Error.fold_packed ~step ~init pp packed)
   | _ -> None
 
 module type Common_axis_pos = sig

@@ -694,7 +694,7 @@ module type S = sig
       'a ->
       'a) ->
     exn ->
-    'a folded_axis list option
+    (Location.t * 'a folded_axis list) option
 
   module type Mode := sig
     module Areality : Common_axis_pos
