@@ -677,12 +677,15 @@ module Sort = struct
 
   let reset_cmi_sort_id () = last_var_cmi_id := 0
 
-  let new_var ~level =
-    assert (level >= 0 && level <= generic_level);
+  let new_var_unsafe ~level =
     incr last_var_id;
     { contents = None; level; id = !last_var_id }
 
-  let new_genvar () = new_var ~level:generic_level
+  let new_var ~level =
+    assert (level >= 0 && level <= generic_level);
+    new_var_unsafe ~level
+
+  let new_genvar () = new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
@@ -830,7 +833,7 @@ module Sort = struct
       match v.contents with
       | Some s -> constrain_addressable ~allow_mutation s
       | None when not allow_mutation -> false
-      | None -> equate_var v (Addressable (Var (new_var ~level:generic_level))))
+      | None -> equate_var v (Addressable (Var (new_genvar ()))))
 
   let is_surely_addressable = constrain_addressable ~allow_mutation:false
 
@@ -872,7 +875,7 @@ module Sort = struct
     | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
-    let ts = List.init n (fun _ -> of_var (new_var ~level:generic_level)) in
+    let ts = List.init n (fun _ -> of_var (new_genvar ())) in
     if equate ~allow_mutation:true t (Product ts) then Some ts else None
 
   (*** defaulting ***)
