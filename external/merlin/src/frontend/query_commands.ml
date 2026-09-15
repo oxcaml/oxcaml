@@ -233,7 +233,9 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
         | Some (`Ok report) ->
           let snap = Btype.snapshot () in
           let result =
-            try Diagnostics.diagnostic_of_exception report exn with
+            try
+              Some (Diagnostics.diagnostic_of_exception ~legacy:report exn)
+            with
             | (Out_of_memory | Stack_overflow) as e ->
               Btype.backtrack snap;
               raise e
