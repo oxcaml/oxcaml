@@ -19,12 +19,37 @@ type 'f solution
 val solve :
   'f Traverse.Problem.t -> analysis_scope:Analysis_scope.t -> 'f solution
 
+(** What the rebuild consumes from a solution, in a form that can be stored: the
+    answers to its queries, the code changes and the solved slot offsets. A
+    whole-program solution is stored in one part per compilation unit. *)
+module Rebuild_data : sig
+  type t
+
+  (** The data about units that did not take part in the solve. *)
+  val empty : t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
+
+  (** Partition by the compilation unit owning each identifier and slot. *)
+  val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
+end
+
 (** Combine the problems of the units of a whole program and solve them
     together. [analysis_scope] is the set of these units. Mutates the graphs of
     the problems. *)
 val solve_whole_program :
   [`Without_types] Traverse.Problem.t list ->
   analysis_scope:Analysis_scope.t ->
+  Rebuild_data.t
+
+(** A whole-program solution read back from storage: the data about the
+    identifiers and slots of a compilation unit comes from [data_for_unit],
+    called on demand. *)
+val sharded :
+  analysis_scope:Analysis_scope.t ->
+  (Compilation_unit.t -> Rebuild_data.t) ->
   [`Without_types] solution
 
 val get_unboxed_fields :
@@ -67,7 +92,11 @@ val is_changing_calling_convention : 'f solution -> Code_id.t -> bool
    solve. *)
 val find_code_metadata : 'f solution -> Code_id.t -> Code_metadata.t option
 
-val slot_offsets : 'f solution -> Slot_offsets.result
+(** The solved offsets and used value slots, provided by the solve of a unit
+    compiled with its typing information. The offsets of a whole-program
+    solution are obtained with [offsets_for_free_names]. *)
+val slot_offsets :
+  'f solution -> ('f, Slot_offsets.result) Traverse.With_types.t
 
 (** The solved offsets of the slots occurring in the given free names. *)
 val offsets_for_free_names :
@@ -80,22 +109,3 @@ val rewrite_kind_with_subkind :
   Flambda_kind.With_subkind.t
 
 val final_typing_env : 'f solution -> ('f, typing_env) Traverse.With_types.t
-
-(** What the rebuild consumes from a solution, in a form that can be stored: the
-    answers to its queries, the code changes and the solved slot offsets. A
-    whole-program solution is stored in one part per compilation unit. *)
-module Rebuild_data : sig
-  type t
-
-  val of_solution : 'f solution -> t
-
-  (** The data about units that did not take part in the solve. *)
-  val empty : t
-
-  val ids_for_export : t -> Ids_for_export.t
-
-  val apply_renaming : t -> Renaming.t -> t
-
-  (** Partition by the compilation unit owning each identifier and slot. *)
-  val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
-end

@@ -32,6 +32,18 @@ open Compilenv
 
 type emit = Compile_common.info -> unit
 
+(** Rebuild one reaped compilation unit from its reaped Flambda data and the
+    given .ltosol file. [paused_unit_infos] is the contents of the unit's paused
+    .cmx file [cmx_file], including its LTO sections. [Compilenv.reset] must
+    have been called for the unit first. *)
+type compile_from_reaped_flambda =
+  ltosol_file:string ->
+  keep_symbol_tables:bool ->
+  cmx_file:string ->
+  paused_unit_infos:Cmx_format.unit_infos ->
+  Compile_common.info ->
+  unit
+
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
       string append, and removed by Filename.strip_extension *)
@@ -88,6 +100,8 @@ module type Backend = sig
     unit
 
   val emit : emit option
+
+  val compile_from_reaped_flambda : compile_from_reaped_flambda option
 
   (** This function is side-effect free. *)
   val support_files_for_eval : unit -> string list

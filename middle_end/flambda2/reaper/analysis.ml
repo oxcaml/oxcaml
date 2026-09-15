@@ -31,11 +31,22 @@ type answers =
       (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
+type data =
+  { answers : answers;
+    code_changes : UA.code_changes;
+    slot_offsets : Exported_offsets.t
+  }
+
+(* A whole-program solution read back from a file is sharded: the data about an
+   identifier or slot comes from the data of its compilation unit. *)
+type store =
+  | Single of data
+  | Sharded of (Compilation_unit.t -> data)
+
 type 'f solution =
   { analysis_scope : Analysis_scope.t;
-    answers : answers;
-    code_changes : Unboxing_analysis.code_changes;
-    slot_offsets : Slot_offsets.result;
+    store : store;
+    slot_offsets : ('f, Slot_offsets.result) Traverse.With_types.t;
     types_rewrite_context :
       ('f, Types_rewriter.rewrite_context) Traverse.With_types.t;
     final_typing_env : ('f, typing_env) Traverse.With_types.t
@@ -108,11 +119,12 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-(* [deps] must have its delayed dependencies resolved. *)
+(* [deps] must have its delayed dependencies resolved. Returns the solution and
+   the data it stores. *)
 let solve0 (type f) deps ~analysis_scope ~code_deps ~applications ~free_names
     ~(all_sets_of_closures : (f, _) Traverse.With_types.t)
     ~(final_typing_env : (f, typing_env) Traverse.With_types.t)
-    ~(module_symbol : (f, Symbol.t) Traverse.With_types.t) : f solution =
+    ~(module_symbol : (f, Symbol.t) Traverse.With_types.t) : f solution * data =
   let unboxing = fixpoint deps ~analysis_scope in
   let db = unboxing.db in
   let ~directly_called, ~known_masks, ~unknown_masks =
@@ -149,23 +161,32 @@ let solve0 (type f) deps ~analysis_scope ~code_deps ~applications ~free_names
         (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol
            final_typing_env)
   in
-  { analysis_scope;
-    answers =
-      { has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
-        has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
-        field_of_constructor_is_used =
-          Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db;
-        directly_called;
-        known_masks;
-        unknown_masks;
-        unboxed_fields = unboxing.unboxed_fields;
-        changed_representation = unboxing.changed_representation
-      };
-    code_changes;
-    slot_offsets;
-    types_rewrite_context;
-    final_typing_env
-  }
+  let data =
+    { answers =
+        { has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
+          has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
+          field_of_constructor_is_used =
+            Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db;
+          directly_called;
+          known_masks;
+          unknown_masks;
+          unboxed_fields = unboxing.unboxed_fields;
+          changed_representation = unboxing.changed_representation
+        };
+      code_changes;
+      slot_offsets = slot_offsets.Slot_offsets.exported_offsets
+    }
+  in
+  ( { analysis_scope;
+      store = Single data;
+      slot_offsets =
+        Traverse.With_types.map
+          (fun (_ : typing_env) -> slot_offsets)
+          final_typing_env;
+      types_rewrite_context;
+      final_typing_env
+    },
+    data )
 
 let solve (problem : _ Traverse.Problem.t) ~(analysis_scope : Analysis_scope.t)
     =
@@ -185,8 +206,11 @@ let solve (problem : _ Traverse.Problem.t) ~(analysis_scope : Analysis_scope.t)
   | Current_unit -> Global_flow_graph.add_any_usage deps toplevel_return
   | Lto_participants _ -> ());
   Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
-  solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
-    ~all_sets_of_closures ~final_typing_env ~module_symbol
+  let solution, (_ : data) =
+    solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
+      ~all_sets_of_closures ~final_typing_env ~module_symbol
+  in
+  solution
 
 let solve_whole_program (problems : [`Without_types] Traverse.Problem.t list)
     ~analysis_scope =
@@ -222,22 +246,47 @@ let solve_whole_program (problems : [`Without_types] Traverse.Problem.t list)
       Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
         problem.delayed_deps)
     problems;
-  solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
-    ~all_sets_of_closures:Without_types ~final_typing_env:Without_types
-    ~module_symbol:Without_types
+  let (_ : [`Without_types] solution), data =
+    solve0 deps ~analysis_scope ~code_deps ~applications ~free_names
+      ~all_sets_of_closures:Without_types ~final_typing_env:Without_types
+      ~module_symbol:Without_types
+  in
+  data
+
+let sharded ~analysis_scope data_for_unit : [`Without_types] solution =
+  { analysis_scope;
+    store = Sharded data_for_unit;
+    slot_offsets = Without_types;
+    types_rewrite_context = Without_types;
+    final_typing_env = Without_types
+  }
+
+let data_for_unit solution compilation_unit =
+  match solution.store with
+  | Single data -> data
+  | Sharded data_for_unit -> data_for_unit compilation_unit
+
+let answers_for solution id =
+  (data_for_unit solution (Code_id_or_name.compilation_unit id)).answers
+
+let code_changes_for solution code_id =
+  (data_for_unit solution (Code_id.get_compilation_unit code_id)).code_changes
 
 let get_unboxed_fields solution cn =
-  Code_id_or_name.Map.find_opt cn solution.answers.unboxed_fields
+  Code_id_or_name.Map.find_opt cn (answers_for solution cn).unboxed_fields
 
 let get_changed_representation solution cn =
   Option.map fst
-    (Code_id_or_name.Map.find_opt cn solution.answers.changed_representation)
+    (Code_id_or_name.Map.find_opt cn
+       (answers_for solution cn).changed_representation)
 
-let has_use solution v = Code_id_or_name.Map.mem v solution.answers.has_usage
+let has_use solution v =
+  Code_id_or_name.Map.mem v (answers_for solution v).has_usage
 
 let field_used solution v f =
   match
-    Code_id_or_name.Map.find_opt v solution.answers.field_of_constructor_is_used
+    Code_id_or_name.Map.find_opt v
+      (answers_for solution v).field_of_constructor_is_used
   with
   | None -> false
   | Some fields -> Field.Map.mem f fields
@@ -250,8 +299,8 @@ let find_answer map callee query =
       Code_id_or_name.print callee
 
 let code_id_actually_directly_called solution closure =
-  find_answer solution.answers.directly_called
-    (Code_id_or_name.name closure)
+  let callee = Code_id_or_name.name closure in
+  find_answer (answers_for solution callee).directly_called callee
     "direct-call targets"
 
 let rec apply_mask callee query mask args =
@@ -264,12 +313,15 @@ let rec apply_mask callee query mask args =
       query Code_id_or_name.print callee
 
 let arguments_used_by_known_arity_call solution callee args =
-  let mask = find_answer solution.answers.known_masks callee "known-arity" in
+  let mask =
+    find_answer (answers_for solution callee).known_masks callee "known-arity"
+  in
   apply_mask callee "known-arity" mask args
 
 let arguments_used_by_unknown_arity_call solution callee args =
   let masks =
-    find_answer solution.answers.unknown_masks callee "unknown-arity"
+    find_answer (answers_for solution callee).unknown_masks callee
+      "unknown-arity"
   in
   let rec apply_groups masks args =
     match args, masks with
@@ -284,27 +336,36 @@ let arguments_used_by_unknown_arity_call solution callee args =
   apply_groups masks args
 
 let has_source solution v =
-  Code_id_or_name.Map.mem v solution.answers.has_source
+  Code_id_or_name.Map.mem v (answers_for solution v).has_source
 
 let get_calling_convention_change solution code_id =
-  Unboxing_analysis.get_calling_convention_change solution.code_changes
+  Unboxing_analysis.get_calling_convention_change
+    (code_changes_for solution code_id)
     ~analysis_scope:solution.analysis_scope code_id
 
 let is_changing_calling_convention solution code_id =
-  Unboxing_analysis.is_changing_calling_convention solution.code_changes
+  Unboxing_analysis.is_changing_calling_convention
+    (code_changes_for solution code_id)
     ~analysis_scope:solution.analysis_scope code_id
 
 let find_code_metadata solution code_id =
-  Unboxing_analysis.find_code_metadata solution.code_changes
+  Unboxing_analysis.find_code_metadata
+    (code_changes_for solution code_id)
     ~analysis_scope:solution.analysis_scope code_id
 
 let slot_offsets solution = solution.slot_offsets
 
+let solved_offsets solution compilation_unit =
+  (data_for_unit solution compilation_unit : data).slot_offsets
+
 let offsets_for_free_names solution free_names =
-  let solved = solution.slot_offsets.exported_offsets in
   let offsets =
     Function_slot.Set.fold
       (fun function_slot offsets ->
+        let solved =
+          solved_offsets solution
+            (Function_slot.get_compilation_unit function_slot)
+        in
         match Exported_offsets.function_slot_offset solved function_slot with
         | Some info ->
           Exported_offsets.add_function_slot_offset offsets function_slot info
@@ -316,6 +377,9 @@ let offsets_for_free_names solution free_names =
   in
   Value_slot.Set.fold
     (fun value_slot offsets ->
+      let solved =
+        solved_offsets solution (Value_slot.get_compilation_unit value_slot)
+      in
       match Exported_offsets.value_slot_offset solved value_slot with
       | Some info ->
         Exported_offsets.add_value_slot_offset offsets value_slot info
@@ -331,16 +395,10 @@ let rewrite_kind_with_subkind solution =
 let final_typing_env solution = solution.final_typing_env
 
 module Rebuild_data = struct
-  type t =
+  type t = data =
     { answers : answers;
       code_changes : UA.code_changes;
       slot_offsets : Exported_offsets.t
-    }
-
-  let of_solution ({ answers; code_changes; slot_offsets; _ } : _ solution) =
-    { answers;
-      code_changes;
-      slot_offsets = slot_offsets.Slot_offsets.exported_offsets
     }
 
   let empty_answers =

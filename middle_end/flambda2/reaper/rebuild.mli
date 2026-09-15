@@ -32,7 +32,7 @@
 type 'f result = private
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
-    slot_offsets : Slot_offsets.result;
+    slot_offsets : ('f, Slot_offsets.result) Traverse.With_types.t;
     final_typing_env : ('f, typing_env) Traverse.With_types.t;
     free_names : Name_occurrences.t
   }

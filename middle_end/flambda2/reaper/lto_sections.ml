@@ -61,7 +61,7 @@ module Id_stamp_counters = struct
       symbols = Symbol.export_manufacture_counter ()
     }
 
-  let restore
+  let restore_for_resume
       { variables;
         code_ids;
         continuations;
@@ -96,7 +96,22 @@ module Id_stamp_counters = struct
         }
         all_counters
     in
-    restore max_counters
+    restore_for_resume max_counters
+
+  let any_greater_than
+      { variables;
+        code_ids;
+        continuations;
+        function_slots;
+        value_slots;
+        symbols
+      } other =
+    variables > other.variables
+    || code_ids > other.code_ids
+    || continuations > other.continuations
+    || function_slots > other.function_slots
+    || value_slots > other.value_slots
+    || symbols > other.symbols
 end
 
 module Header = struct

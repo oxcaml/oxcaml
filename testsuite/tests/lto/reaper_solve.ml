@@ -23,10 +23,24 @@
  file = "reaper_solve_partial.ltosol";
  file-exists;
 
+ flags = "-reaper-rebuild reaper_solve.cmx reaper_solve_partial.ltosol";
+ last_flags = "";
+ ocamlopt.opt;
+
+ file = "reaper_solve.reaped.cmx";
+ file-exists;
+
+ flags = "";
+ all_modules = "reaper_solve_dependency.cmx reaper_solve.reaped.cmx";
+ ocamlopt.opt;
+
  check-ocamlopt.opt-output;
+ run;
+ check-program-output;
 *)
 
-(* A solve over both units and a partial solve over the caller alone each
-   produce a solution file. *)
+(* The partial solve excludes the dependency. Rebuilding the caller in a fresh
+   process must load the dependency's metadata from its .cmx file, so its
+   non-inlined call still works when linked with the original dependency. *)
 
 let () = assert (Reaper_solve_dependency.used 41 = 42)

@@ -2348,10 +2348,24 @@ and rebuild_static_const_or_code env res
 type 'f result =
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
-    slot_offsets : Slot_offsets.result;
+    slot_offsets : ('f, Slot_offsets.result) Traverse.With_types.t;
     final_typing_env : ('f, typing_env) Traverse.With_types.t;
     free_names : Name_occurrences.t
   }
+
+(* The LTO rebuild does not run [Simplify], so the .cmx files of the units that
+   did not take part in the solve are only loaded when their code is needed. The
+   code metadata of the units in the analysis scope comes from the solution
+   instead, and their .cmx files must not be read. *)
+let load_cmx_for_code_id ~cmx_loader code_id =
+  if
+    not
+      (Exported_code.mem code_id (Flambda_cmx.get_imported_code cmx_loader ()))
+  then
+    ignore
+      (Flambda_cmx.load_cmx_file_contents cmx_loader
+         (Code_id.get_compilation_unit code_id)
+        : _ option)
 
 let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
     ~(solution : f Analysis.solution) =
@@ -2401,16 +2415,18 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
   in
   (* Make sure [get_code_metadata] returns the updated code metadata in case it
      exists *)
-  let get_code_metadata =
-    let load_code = Flambda_cmx.get_imported_code cmx_loader in
-    fun code_id ->
-      match Analysis.find_code_metadata solution code_id with
-      | Some code_metadata -> code_metadata
-      | None ->
-        Code_or_metadata.code_metadata
-          (match Exported_code.find all_code code_id with
-          | Some code -> code
-          | None -> Exported_code.find_exn (load_code ()) code_id)
+  let get_code_metadata code_id =
+    match Analysis.find_code_metadata solution code_id with
+    | Some code_metadata -> code_metadata
+    | None ->
+      Code_or_metadata.code_metadata
+        (match Exported_code.find all_code code_id with
+        | Some code -> code
+        | None ->
+          load_cmx_for_code_id ~cmx_loader code_id;
+          Exported_code.find_exn
+            (Flambda_cmx.get_imported_code cmx_loader ())
+            code_id)
   in
   let env =
     { machine_width;
@@ -2436,16 +2452,35 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
         in
         rebuild_expr env res toplevel_expr)
   in
+  let free_names = rebuilt_expr.free_names in
+  (* The metadata of the code of other units comes from the solution for the
+     units in the analysis scope, and from their .cmx files otherwise. *)
+  let solution_metadata =
+    Name_occurrences.fold_code_ids free_names ~init:[]
+      ~f:(fun solution_metadata code_id ->
+        if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+        then solution_metadata
+        else
+          match Analysis.find_code_metadata solution code_id with
+          | Some code_metadata -> code_metadata :: solution_metadata
+          | None ->
+            load_cmx_for_code_id ~cmx_loader code_id;
+            solution_metadata)
+  in
+  let imported_code =
+    List.fold_left Exported_code.add_code_metadata
+      (Exported_code.mark_as_imported
+         (Flambda_cmx.get_imported_code cmx_loader ()))
+      solution_metadata
+  in
   let exported_code =
     Exported_code.add_code
       ~keep_code:(fun code_id -> Code_id.Set.mem code_id code_ids_to_remember)
-      all_code
-      (Exported_code.mark_as_imported
-         (Flambda_cmx.get_imported_code cmx_loader ()))
+      all_code imported_code
   in
   { unit = Flambda_unit.create_of_metadata_and_body metadata rebuilt_expr.expr;
     exported_code;
     slot_offsets = Analysis.slot_offsets solution;
     final_typing_env = Analysis.final_typing_env solution;
-    free_names = rebuilt_expr.free_names
+    free_names
   }

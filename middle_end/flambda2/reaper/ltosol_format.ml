@@ -69,8 +69,7 @@ type error =
 exception Error of error
 
 let save ~filename ~participants ~solution =
-  let data = Rebuild_data.of_solution solution in
-  let by_unit = Rebuild_data.partition_by_compilation_unit data in
+  let by_unit = Rebuild_data.partition_by_compilation_unit solution in
   let builder =
     File_sections.Builder.create (Compilation_unit.Map.cardinal by_unit)
   in
@@ -154,6 +153,19 @@ let data_for_unit t cu =
        batch. *)
     Compilation_unit.Tbl.add t.loaded cu data;
     data
+
+let solution_for_members t ~members =
+  let participants = Compilation_unit.Set.of_list (participants t) in
+  List.iter
+    (fun member ->
+      if not (Compilation_unit.Set.mem member participants)
+      then
+        Misc.fatal_errorf "Unit %a is not a participant in the LTO solution"
+          (Format_doc.compat Compilation_unit.print)
+          member)
+    members;
+  Analysis.sharded ~analysis_scope:(Lto_participants participants)
+    (data_for_unit t)
 
 open Format_doc
 
