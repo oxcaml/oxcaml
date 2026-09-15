@@ -857,6 +857,8 @@ let process_action
         has_linker_inputs := true;
         ccobjs := name :: !ccobjs
       end
+      else if Filename.check_suffix name ".ltosol" && !reaper_rebuild then
+        objfiles := name :: !objfiles
       else if Filename.check_suffix name Config.ext_obj
            || Filename.check_suffix name Config.ext_lib then begin
         if Clflags.target_is_jsir () then

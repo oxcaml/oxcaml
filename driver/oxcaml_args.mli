@@ -164,6 +164,7 @@ module type Oxcaml_options = sig
   val no_reaper_change_calling_conventions : unit -> unit
   val lto_support : unit -> unit
   val no_lto_support : unit -> unit
+  val reaper_rebuild : unit -> unit
   val reaper_solve : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
