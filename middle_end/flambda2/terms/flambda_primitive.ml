@@ -769,8 +769,8 @@ let reading_from_a_block mutable_or_immutable : Effects_and_coeffects.t =
   in
   effects, coeffects, Strict, Can't_move_before_any_branch
 
-let reading_from_an_array
-    (mutable_or_immutable : Mutability.t) : Effects_and_coeffects.t =
+let reading_from_an_array (mutable_or_immutable : Mutability.t) :
+    Effects_and_coeffects.t =
   let coeffects =
     match mutable_or_immutable with
     | Immutable | Immutable_unique -> Coeffects.No_coeffects
@@ -2147,8 +2147,7 @@ let result_kind_of_binary_primitive p : result_kind =
 let effects_and_coeffects_of_binary_primitive p : Effects_and_coeffects.t =
   match p with
   | Block_set _ -> writing_to_a_block
-  | Array_load (_array_kind, _load_kind, mut) ->
-    reading_from_an_array mut
+  | Array_load (_array_kind, _load_kind, mut) -> reading_from_an_array mut
   | Bigarray_load (_, kind, _) -> reading_from_a_bigarray kind
   | String_or_bigstring_load (String, _) ->
     reading_from_a_string_or_bigstring Immutable
