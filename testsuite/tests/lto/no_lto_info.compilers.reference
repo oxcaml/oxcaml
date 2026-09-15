@@ -1,2 +1,4 @@
 File "no_lto_info.cmx", line 1:
 Error: This file has no LTO information: it was not compiled with -lto-support
+File "no_lto_info.cmx", line 1:
+Error: This file has no LTO information: it was not compiled with -lto-support

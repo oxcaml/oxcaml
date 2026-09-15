@@ -26,6 +26,11 @@ type direct_to_cmm =
 (** The one true way to get from Lambda to Cmm. *)
 type pipeline = Direct_to_cmm of direct_to_cmm
 
+(** A callback to generate Cmm for a program. Note the program source is not an
+    argument, so this should be a closure capturing it. *)
+type cmm_generator =
+  ppf_dump:Format.formatter -> prefixname:string -> Cmm.phrase list
+
 (** Compile an implementation from Lambda using the given middle end. *)
 val compile_implementation :
   (module Compiler_owee.Unix_intf.S) ->
@@ -35,6 +40,21 @@ val compile_implementation :
   prefixname:string ->
   ppf_dump:Format.formatter ->
   Lambda.program ->
+  unit
+
+(** Compile an implementation from the Cmm phrases produced by the given
+    callback, e.g. when rebuilding a reaped compilation unit.
+
+    Unlike [compile_implementation], this doesn't add information about
+    dependencies to the [Compilenv] unit info, because it isn't available here.
+    Instead, [Compilenv.save_resumed_unit_info] gets this from the old .cmx. *)
+val compile_implementation_from_cmm :
+  (module Compiler_owee.Unix_intf.S) ->
+  ?toplevel:(string -> bool) ->
+  sourcefile:string option ->
+  prefixname:string ->
+  ppf_dump:Format.formatter ->
+  cmm_generator ->
   unit
 
 (** [compile_implementation_linear] reads Linear IR from [progname] file

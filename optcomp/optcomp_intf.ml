@@ -56,8 +56,30 @@ module type Flambda2 = sig
     Lambda.program ->
     jsir_program
 
+  val reaped_flambda2_to_cmm :
+    machine_width:Target_system.Machine_width.t ->
+    ltosol_filename:string ->
+    keep_symbol_tables:bool ->
+    cmx_filename:string ->
+    paused_unit_infos:Cmx_format.unit_infos ->
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    Cmm.phrase list
+
   val reaper_lto_solve : cmx_files:string list -> ltosol_file:string -> unit
 end
+
+(** Rebuild one reaped compilation unit from its reaped Flambda data and the
+    given .ltosol file. [paused_unit_infos] is the contents of the unit's paused
+    .cmx file [cmx_file], including its LTO sections. [Compilenv.reset] must
+    have been called for the unit first. *)
+type compile_from_reaped_flambda =
+  ltosol_file:string ->
+  keep_symbol_tables:bool ->
+  cmx_file:string ->
+  paused_unit_infos:Cmx_format.unit_infos ->
+  Compile_common.info ->
+  unit
 
 module type File_extensions = sig
   (** File extensions include exactly one dot, so they can be added with regular
@@ -115,6 +137,8 @@ module type Backend = sig
     unit
 
   val emit : emit option
+
+  val compile_from_reaped_flambda : compile_from_reaped_flambda option
 
   (** This function is side-effect free. *)
   val support_files_for_eval : unit -> string list

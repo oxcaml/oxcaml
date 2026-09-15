@@ -203,6 +203,8 @@ let make (target : Clflags.Jsir_target.t)
 
     let emit = None
 
+    let compile_from_reaped_flambda = None
+
     let compile_implementation ~keep_symbol_tables ~sourcefile:_ ~prefixname
         ~ppf_dump (program : Lambda.program) =
       Compilation_unit.Set.iter Compilenv.require_global
