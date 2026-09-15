@@ -148,8 +148,7 @@ let slots_to_be_built_for_set_of_closures ~(uses : Unboxing_analysis.result)
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~free_names ~code_deps ~closure_function_decls ~code_changes
-    ~get_code_metadata
+let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
     ({ db; unboxed_fields; changed_representation; _ } as uses :
       Unboxing_analysis.result) =
   (* The query gives us the name of every closure, but we want one entry per set
@@ -239,15 +238,12 @@ let compute ~free_names ~code_deps ~closure_function_decls ~code_changes
           built_value_slots
     }
   in
-  (* CR mvellacott: this uses the pre-reaper metadata, but function slots can be
-     shrunk by untupling. Once we pre-compute code metadata too, we should use
-     it here. *)
   let get_function_slot_size code_id =
-    match Code_id.Map.find_opt code_id code_deps with
-    | Some ({ function_slot_size; _ } : Traverse_acc.code_dep) ->
-      function_slot_size
-    | None ->
-      (* Imported code, which is only reached through its cmx. *)
-      Code_metadata.function_slot_size (get_code_metadata code_id)
+    let code_metadata =
+      if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+      then Unboxing_analysis.get_code_metadata code_changes code_id
+      else get_code_metadata code_id
+    in
+    Code_metadata.function_slot_size code_metadata
   in
   Slot_offsets.finalize_offsets ~get_function_slot_size ~used_slots slot_offsets

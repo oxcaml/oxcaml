@@ -30,7 +30,6 @@
     output by simplify. *)
 val compute :
   free_names:Name_occurrences.t ->
-  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   closure_function_decls:
     Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t ->
   code_changes:Unboxing_analysis.code_changes ->

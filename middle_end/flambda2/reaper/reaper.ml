@@ -62,7 +62,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~code_deps
   in
   let slot_offsets =
-    Slot_offsets_analysis.compute ~free_names ~code_deps ~closure_function_decls
+    Slot_offsets_analysis.compute ~free_names ~closure_function_decls
       ~code_changes ~get_code_metadata solved_dep
   in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
