@@ -31,15 +31,25 @@ type t =
   ; optim : string list on_off
   ; quiet : bool
   ; werror : bool
+  ; warnings : (bool * Warning.t) list
   ; custom_header : string option
   }
+
+let enums all =
+  let conv = Arg.(list (enum all)) in
+  let complete _ctx ~token =
+    let l = List.filter ~f:(String.starts_with ~prefix:token) (List.map ~f:fst all) in
+    Ok (List.map ~f:Arg.Completion.string l)
+  in
+  let completion = Arg.Completion.make complete in
+  Arg.Conv.of_conv ~completion conv
 
 let debug =
   lazy
     (let doc = "enable debug [$(docv)]." in
      let all = List.map (Debug.available ()) ~f:(fun s -> s, s) in
      let arg =
-       Arg.(value & opt_all (list (enum all)) [] & info [ "debug" ] ~docv:"SECTION" ~doc)
+       Arg.(value & opt_all (enums all) [] & info [ "debug" ] ~docv:"SECTION" ~doc)
      in
      Term.(const List.flatten $ arg))
 
@@ -48,7 +58,7 @@ let enable =
     (let doc = "Enable optimization [$(docv)]." in
      let all = List.map (Config.Flag.available ()) ~f:(fun s -> s, s) in
      let arg =
-       Arg.(value & opt_all (list (enum all)) [] & info [ "enable" ] ~docv:"OPT" ~doc)
+       Arg.(value & opt_all (enums all) [] & info [ "enable" ] ~docv:"OPT" ~doc)
      in
      Term.(const List.flatten $ arg))
 
@@ -57,9 +67,38 @@ let disable =
     (let doc = "Disable optimization [$(docv)]." in
      let all = List.map (Config.Flag.available ()) ~f:(fun s -> s, s) in
      let arg =
-       Arg.(value & opt_all (list (enum all)) [] & info [ "disable" ] ~docv:"OPT" ~doc)
+       Arg.(value & opt_all (enums all) [] & info [ "disable" ] ~docv:"OPT" ~doc)
      in
      Term.(const List.flatten $ arg))
+
+let parse_warning s =
+  let err s = `Msg (Printf.sprintf "Unknown warning %s" s) in
+  if String.is_empty s
+  then Error (err s)
+  else
+    match Warning.parse s with
+    | Some n -> Ok (true, n)
+    | None -> (
+        match String.drop_prefix ~prefix:"no-" s with
+        | Some n -> (
+            match Warning.parse n with
+            | Some n -> Ok (false, n)
+            | None -> Error (err n))
+        | None -> Error (err s))
+
+let print_warning fmt (b, w) =
+  Format.fprintf
+    fmt
+    "%s%s"
+    (match b with
+    | true -> ""
+    | false -> "")
+    (Warning.name w)
+
+let warnings : (bool * Warning.t) list Term.t =
+  let doc = "Enable or disable the warnings specified by the argument [$(docv)]." in
+  let c : 'a Arg.conv = Arg.conv ~docv:"" (parse_warning, print_warning) in
+  Arg.(value & opt_all c [] & info [ "w" ] ~docv:"WARN" ~doc)
 
 let pretty =
   let doc = "Pretty print the output." in
@@ -88,10 +127,53 @@ let custom_header =
   in
   Arg.(value & opt (some string) None & info [ "custom-header" ] ~doc)
 
+let build_config =
+  let doc = "Print build-relevant configuration as key=value pairs and exit." in
+  Arg.(value & flag & info [ "build-config" ] ~doc)
+
+let apply_build_config =
+  let doc =
+    "Override build-relevant configuration. $(docv) is a '+'-separated list of key=value \
+     pairs (e.g. effects=cps+use-js-string=true)."
+  in
+  Arg.(value & opt (some string) None & info [ "apply-build-config" ] ~docv:"CONFIG" ~doc)
+
+let set_param =
+  let doc = "Set compiler options." in
+  let all = List.map (Config.Param.all ()) ~f:(fun (x, _, _) -> x, x) in
+  let pair = Arg.(pair ~sep:'=' (enum all) string) in
+  let parser s =
+    match Arg.conv_parser pair s with
+    | Ok (k, v) -> (
+        match
+          List.find ~f:(fun (k', _, _) -> String.equal k k') (Config.Param.all ())
+        with
+        | _, _, valid -> (
+            match valid v with
+            | Ok () -> Ok (k, v)
+            | Error msg -> Error (`Msg ("Unexpected VALUE after [=], " ^ msg))))
+    | Error _ as e -> e
+  in
+  let printer = Arg.conv_printer pair in
+  let c = Arg.conv (parser, printer) in
+  Arg.(value & opt_all (list c) [] & info [ "set" ] ~docv:"PARAM=VALUE" ~doc)
+
 let t =
   lazy
     Term.(
-      const (fun debug enable disable pretty debuginfo noinline quiet werror c_header ->
+      const
+        (fun
+          debug
+          enable
+          disable
+          pretty
+          debuginfo
+          noinline
+          quiet
+          (warnings : (bool * Warning.t) list)
+          werror
+          c_header
+        ->
           let enable = if pretty then "pretty" :: enable else enable in
           let enable = if debuginfo then "debuginfo" :: enable else enable in
           let disable = if noinline then "inline" :: disable else disable in
@@ -104,6 +186,7 @@ let t =
           let disable = disable_if_pretty "share" disable in
           { debug = { enable = debug; disable = [] }
           ; optim = { enable; disable }
+          ; warnings
           ; quiet
           ; werror
           ; custom_header = c_header
@@ -115,6 +198,7 @@ let t =
       $ debuginfo
       $ noinline
       $ is_quiet
+      $ warnings
       $ is_werror
       $ custom_header)
 
@@ -125,5 +209,8 @@ let on_off on off t =
 let eval t =
   Config.Flag.(on_off enable disable t.optim);
   Debug.(on_off enable disable t.debug);
-  quiet := t.quiet;
-  werror := t.werror
+  List.iter t.warnings ~f:(function
+    | true, w -> Warning.enable w
+    | false, w -> Warning.disable w);
+  Warning.quiet := t.quiet;
+  Warning.werror := t.werror

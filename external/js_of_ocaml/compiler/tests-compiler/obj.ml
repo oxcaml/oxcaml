@@ -17,7 +17,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Util
+open! Util
+
+(* Some Obj functions stopped being primitives in OCaml 5, changing the
+   generated code; the expected output here is the >= 5 one. OxCaml differs
+   again, so it is excluded too. *)
+[@@@if ocaml_version >= (5, 0, 0) && not oxcaml]
 
 let%expect_test "static eval of string get" =
   let program =
@@ -50,11 +55,11 @@ let%expect_test "static eval of string get" =
     //end
     function my_tag(x){return runtime.caml_obj_tag([0, x, 0]);}
     //end
-    function my_size(x){return caml_call1(Stdlib_Obj[2], x);}
+    function my_size(x){return x.length - 1;}
     //end
-    function my_field(x, i){return caml_call2(Stdlib_Obj[5], x, i);}
+    function my_field(x, i){return x[i + 1];}
     //end
-    function my_set_field(x, i, o){return caml_call3(Stdlib_Obj[6], x, i, o);}
+    function my_set_field(x, i, o){x[i + 1] = o; return 0;}
     //end
     function my_new_block(x, l){return runtime.caml_obj_block(x + 1 | 0, 3);}
     //end

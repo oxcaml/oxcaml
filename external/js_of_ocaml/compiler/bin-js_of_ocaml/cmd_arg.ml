@@ -39,8 +39,8 @@ let trim_trailing_dir_sep s =
 
 let normalize_include_dirs dirs = List.map dirs ~f:trim_trailing_dir_sep
 
-let normalize_effects (effects : [ `Cps | `Double_translation ] option) common :
-    Config.effects_backend =
+let normalize_effects (effects : [ `Disabled | `Cps | `Double_translation ] option) common
+    : Config.effects_backend =
   match effects with
   | None ->
       (* For backward compatibility, consider that [--enable effects] alone means
@@ -48,7 +48,7 @@ let normalize_effects (effects : [ `Cps | `Double_translation ] option) common :
       if List.mem ~eq:String.equal "effects" common.Jsoo_cmdline.Arg.optim.enable
       then `Cps
       else `Disabled
-  | Some ((`Cps | `Double_translation) as e) -> (e :> Config.effects_backend)
+  | Some ((`Disabled | `Cps | `Double_translation) as e) -> e
 
 type t =
   { common : Jsoo_cmdline.Arg.t
@@ -59,15 +59,15 @@ type t =
   ; no_runtime : bool
   ; include_runtime : bool
   ; output_file : [ `Name of string | `Stdout ] * bool
-  ; input : [ `Bytecode_file of string | `Cmj of string | `Cmja of string | `Bytecode_stdin | `None ]
+  ; bytecode : [ `File of string | `Stdin | `None ]
   ; params : (string * string) list
   ; static_env : (string * string) list
   ; wrap_with_fun : [ `Iife | `Named of string | `Anonymous ]
   ; target_env : Target_env.t
+  ; shape_files : string list
   ; (* toplevel *)
     dynlink : bool
   ; linkall : bool
-  ; toplevel : bool
   ; export_file : string option
   ; no_cmis : bool
   ; (* filesystem *)
@@ -77,6 +77,8 @@ type t =
   ; fs_external : bool
   ; keep_unit_names : bool
   ; effects : Config.effects_backend
+  ; build_config : bool
+  ; apply_build_config : string option
   }
 
 let wrap_with_fun_conv =
@@ -108,19 +110,26 @@ let options =
       ^ "One can refer to path relative to Findlib packages with "
       ^ "the syntax '+pkg_name/file.js'"
     in
-    Arg.(value & pos_left ~rev:true 0 string [] & info [] ~docv:"JS_FILES" ~doc)
+    Arg.(value & pos_left ~rev:true 0 filepath [] & info [] ~docv:"JS_FILES" ~doc)
   in
   let output_file =
     let doc = "Set output file name to [$(docv)]." in
-    Arg.(value & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
+    Arg.(value & opt (some filepath) None & info [ "o" ] ~docv:"FILE" ~doc)
+  in
+  let shape_files =
+    let doc = "load shape file [$(docv)]." in
+    Arg.(value & opt_all filepath [] & info [ "load-shape" ] ~docv:"FILE" ~doc)
   in
   let input_file =
     let doc =
-      "Compile the bytecode program [$(docv)], IR file (.cmj), or IR archive (.cmja). "
+      "Compile the bytecode program [$(docv)]. "
       ^ "Use '-' to read from the standard input instead."
     in
-    Arg.(required & pos ~rev:true 0 (some string) None & info [] ~docv:"PROGRAM" ~doc)
+    Arg.(value & pos ~rev:true 0 (some filepath) None & info [] ~docv:"PROGRAM" ~doc)
   in
+  let build_config = Jsoo_cmdline.Arg.build_config in
+  let apply_build_config = Jsoo_cmdline.Arg.apply_build_config in
+  let set_param = Jsoo_cmdline.Arg.set_param in
   let keep_unit_names =
     let doc = "Keep unit name" in
     Arg.(value & flag & info [ "keep-unit-names" ] ~doc)
@@ -166,7 +175,7 @@ let options =
   in
   let sourcemap_root =
     let doc = "root dir for source map." in
-    Arg.(value & opt (some string) None & info [ "source-map-root" ] ~doc)
+    Arg.(value & opt (some dirpath) None & info [ "source-map-root" ] ~doc)
   in
   let wrap_with_function =
     let doc =
@@ -174,14 +183,6 @@ let options =
        with the global object."
     in
     Arg.(value & opt wrap_with_fun_conv `Iife & info [ "wrap-with-fun" ] ~doc)
-  in
-  let set_param =
-    let doc = "Set compiler options." in
-    let all = List.map (Config.Param.all ()) ~f:(fun (x, _) -> x, x) in
-    Arg.(
-      value
-      & opt_all (list (pair ~sep:'=' (enum all) string)) []
-      & info [ "set" ] ~docv:"PARAM=VALUE" ~doc)
   in
   let set_env =
     let doc = "Set environment variable statically." in
@@ -210,7 +211,7 @@ let options =
       "File containing the list of unit to export in a toplevel, with Dynlink or with \
        --linkall. If absent, all units will be exported."
     in
-    Arg.(value & opt (some string) None & info [ "export" ] ~docs:toplevel_section ~doc)
+    Arg.(value & opt (some filepath) None & info [ "export" ] ~docs:toplevel_section ~doc)
   in
   let dynlink =
     let doc =
@@ -234,13 +235,13 @@ let options =
   let include_dirs =
     let doc = "Add [$(docv)] to the list of include directories." in
     Arg.(
-      value & opt_all string [] & info [ "I" ] ~docs:filesystem_section ~docv:"DIR" ~doc)
+      value & opt_all dirpath [] & info [ "I" ] ~docs:filesystem_section ~docv:"DIR" ~doc)
   in
   let fs_files =
     let doc = "Register [$(docv)] to the pseudo filesystem." in
     Arg.(
       value
-      & opt_all string []
+      & opt_all filepath []
       & info [ "file" ] ~docs:filesystem_section ~docv:"FILE" ~doc)
   in
   let fs_external =
@@ -268,17 +269,18 @@ let options =
     let doc = "Output the filesystem to [$(docv)]." in
     Arg.(
       value
-      & opt (some string) None
+      & opt (some filepath) None
       & info [ "ofs" ] ~docs:filesystem_section ~docv:"FILE" ~doc)
   in
   let effects =
     let doc =
-      "Select an implementation of effect handlers. [$(docv)] should be one of $(b,cps) \
-       or $(b,double-translation). Effects won't be supported if unspecified."
+      "Select an implementation of effect handlers. [$(docv)] should be one of $(b,cps), \
+       $(b,double-translation) or $(b,disabled) (the default). Effects won't be \
+       supported if unspecified."
     in
     Arg.(
       value
-      & opt (some (enum [ "cps", `Cps; "double-translation", `Double_translation ])) None
+      & opt (some (enum Build_info.effects_backends_javascript)) None
       & info [ "effects" ] ~docv:"KIND" ~doc)
   in
   let build_t
@@ -309,81 +311,96 @@ let options =
       input_file
       js_files
       keep_unit_names
-      effects =
+      effects
+      shape_files
+      build_config
+      apply_build_config =
     let inline_source_content = not sourcemap_don't_inline_content in
     let chop_extension s = try Filename.chop_extension s with Invalid_argument _ -> s in
     let runtime_files = js_files in
-    let fs_external = fs_external || (toplevel && no_cmis) in
-    let input =
-      match input_file with
-      | "-" -> `Bytecode_stdin
-      | x when Filename.check_suffix x ".cmj" -> `Cmj x
-      | x when Filename.check_suffix x ".cmja" -> `Cmja x
-      | x -> `Bytecode_file x
-    in
-    let output_file =
-      match output_file with
-      | Some "-" -> `Stdout, true
-      | Some s -> `Name s, true
-      | None -> (
-          match input with
-          | `Bytecode_file s | `Cmj s | `Cmja s ->
-            `Name (chop_extension s ^ ".js"), false
-          | `Bytecode_stdin -> `Stdout, false)
-    in
-    let source_map =
-      if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)
+    let common =
+      if toplevel
       then
-        let file, sm_output_file =
+        let open Jsoo_cmdline.Arg in
+        { common with
+          optim = { common.optim with enable = "toplevel" :: common.optim.enable }
+        }
+      else common
+    in
+    let fs_external = fs_external || (toplevel && no_cmis) in
+    match build_config, input_file with
+    | false, None -> `Error (true, "required argument PROGRAM is missing")
+    | _ ->
+        let bytecode =
+          match input_file with
+          | Some "-" -> `Stdin
+          | Some x -> `File x
+          | None -> `None
+        in
+        let output_file =
           match output_file with
-          | `Name file, _ when sourcemap_inline_in_js -> Some file, None
-          | `Name file, _ -> Some file, Some (chop_extension file ^ ".map")
-          | `Stdout, _ -> None, None
+          | Some "-" -> `Stdout, true
+          | Some s -> `Name s, true
+          | None -> (
+              match bytecode with
+              | `File s -> `Name (chop_extension s ^ ".js"), false
+              | `Stdin | `None -> `Stdout, false)
         in
         let source_map =
-          { (Source_map.Standard.empty ~inline_source_content) with
-            file
-          ; sourceroot = sourcemap_root
-          }
+          if (not no_sourcemap) && (sourcemap || sourcemap_inline_in_js)
+          then
+            let file, sm_output_file =
+              match output_file with
+              | `Name file, _ when sourcemap_inline_in_js -> Some file, None
+              | `Name file, _ -> Some file, Some (chop_extension file ^ ".map")
+              | `Stdout, _ -> None, None
+            in
+            let source_map =
+              { (Source_map.Standard.empty ~inline_source_content) with
+                file
+              ; sourceroot = sourcemap_root
+              }
+            in
+            let spec =
+              { Source_map.Encoding_spec.output_file = sm_output_file
+              ; source_map
+              ; keep_empty = sourcemap_empty
+              }
+            in
+            Some spec
+          else None
         in
-        let spec =
-          { Source_map.Encoding_spec.output_file = sm_output_file
+        let params : (string * string) list = List.flatten set_param in
+        let static_env : (string * string) list = List.flatten set_env in
+        let include_dirs = normalize_include_dirs include_dirs in
+        let effects = normalize_effects effects common in
+        `Ok
+          { common
+          ; params
+          ; profile
+          ; static_env
+          ; wrap_with_fun
+          ; dynlink
+          ; linkall
+          ; target_env
+          ; export_file
+          ; include_dirs
+          ; runtime_files
+          ; no_runtime
+          ; include_runtime
+          ; fs_files
+          ; fs_output
+          ; fs_external
+          ; no_cmis
+          ; output_file
+          ; bytecode
           ; source_map
-          ; keep_empty = sourcemap_empty
+          ; keep_unit_names
+          ; effects
+          ; shape_files
+          ; build_config
+          ; apply_build_config
           }
-        in
-        Some spec
-      else None
-    in
-    let params : (string * string) list = List.flatten set_param in
-    let static_env : (string * string) list = List.flatten set_env in
-    let include_dirs = normalize_include_dirs include_dirs in
-    let effects = normalize_effects effects common in
-    `Ok
-      { common
-      ; params
-      ; profile
-      ; static_env
-      ; wrap_with_fun
-      ; dynlink
-      ; linkall
-      ; target_env
-      ; toplevel
-      ; export_file
-      ; include_dirs
-      ; runtime_files
-      ; no_runtime
-      ; include_runtime
-      ; fs_files
-      ; fs_output
-      ; fs_external
-      ; no_cmis
-      ; output_file
-      ; input
-      ; source_map
-      ; keep_unit_names
-      ; effects
-      }
   in
   let t =
     Term.(
@@ -415,7 +432,10 @@ let options =
       $ input_file
       $ js_files
       $ keep_unit_names
-      $ effects)
+      $ effects
+      $ shape_files
+      $ build_config
+      $ apply_build_config)
   in
   Term.ret t
 
@@ -427,11 +447,11 @@ let options_runtime_only =
       ^ "One can refer to path relative to Findlib packages with "
       ^ "the syntax '+pkg_name/file.js'"
     in
-    Arg.(value & pos_all string [] & info [] ~docv:"JS_FILES" ~doc)
+    Arg.(value & pos_all filepath [] & info [] ~docv:"JS_FILES" ~doc)
   in
   let output_file =
     let doc = "Set output file name to [$(docv)]." in
-    Arg.(required & opt (some string) None & info [ "o" ] ~docv:"FILE" ~doc)
+    Arg.(required & opt (some filepath) None & info [ "o" ] ~docv:"FILE" ~doc)
   in
   let noruntime =
     let doc = "Do not include the standard runtime." in
@@ -461,7 +481,7 @@ let options_runtime_only =
   in
   let sourcemap_root =
     let doc = "root dir for source map." in
-    Arg.(value & opt (some string) None & info [ "source-map-root" ] ~doc)
+    Arg.(value & opt (some dirpath) None & info [ "source-map-root" ] ~doc)
   in
   let toplevel =
     let doc =
@@ -489,14 +509,6 @@ let options_runtime_only =
     in
     Arg.(value & opt wrap_with_fun_conv `Iife & info [ "wrap-with-fun" ] ~doc)
   in
-  let set_param =
-    let doc = "Set compiler options." in
-    let all = List.map (Config.Param.all ()) ~f:(fun (x, _) -> x, x) in
-    Arg.(
-      value
-      & opt_all (list (pair ~sep:'=' (enum all) string)) []
-      & info [ "set" ] ~docv:"PARAM=VALUE" ~doc)
-  in
   let set_env =
     let doc = "Set environment variable statically." in
     Arg.(
@@ -507,13 +519,13 @@ let options_runtime_only =
   let include_dirs =
     let doc = "Add [$(docv)] to the list of include directories." in
     Arg.(
-      value & opt_all string [] & info [ "I" ] ~docs:filesystem_section ~docv:"DIR" ~doc)
+      value & opt_all dirpath [] & info [ "I" ] ~docs:filesystem_section ~docv:"DIR" ~doc)
   in
   let fs_files =
     let doc = "Register [$(docv)] to the pseudo filesystem." in
     Arg.(
       value
-      & opt_all string []
+      & opt_all filepath []
       & info [ "file" ] ~docs:filesystem_section ~docv:"FILE" ~doc)
   in
   let fs_external =
@@ -541,19 +553,23 @@ let options_runtime_only =
     let doc = "Output the filesystem to [$(docv)]." in
     Arg.(
       value
-      & opt (some string) None
+      & opt (some filepath) None
       & info [ "ofs" ] ~docs:filesystem_section ~docv:"FILE" ~doc)
   in
   let effects =
     let doc =
-      "Select an implementation of effect handlers. [$(docv)] should be one of $(b,cps) \
-       or $(b,double-translation). Effects won't be supported if unspecified."
+      "Select an implementation of effect handlers. [$(docv)] should be one of $(b,cps), \
+       $(b,double-translation), or $(b,disabled) (the default). Effects won't be \
+       supported if unspecified."
     in
     Arg.(
       value
-      & opt (some (enum [ "cps", `Cps; "double-translation", `Double_translation ])) None
+      & opt (some (enum Build_info.effects_backends_javascript)) None
       & info [ "effects" ] ~docv:"KIND" ~doc)
   in
+  let build_config = Jsoo_cmdline.Arg.build_config in
+  let apply_build_config = Jsoo_cmdline.Arg.apply_build_config in
+  let set_param = Jsoo_cmdline.Arg.set_param in
   let build_t
       common
       toplevel
@@ -575,7 +591,9 @@ let options_runtime_only =
       target_env
       output_file
       js_files
-      effects =
+      effects
+      build_config
+      apply_build_config =
     let inline_source_content = not sourcemap_don't_inline_content in
     let chop_extension s = try Filename.chop_extension s with Invalid_argument _ -> s in
     let runtime_files = js_files in
@@ -612,6 +630,15 @@ let options_runtime_only =
     let static_env : (string * string) list = List.flatten set_env in
     let include_dirs = normalize_include_dirs include_dirs in
     let effects = normalize_effects effects common in
+    let common =
+      if toplevel
+      then
+        let open Jsoo_cmdline.Arg in
+        { common with
+          optim = { common.optim with enable = "toplevel" :: common.optim.enable }
+        }
+      else common
+    in
     `Ok
       { common
       ; params
@@ -621,7 +648,6 @@ let options_runtime_only =
       ; dynlink = false
       ; linkall = false
       ; target_env
-      ; toplevel
       ; export_file = None
       ; include_dirs
       ; runtime_files
@@ -632,10 +658,13 @@ let options_runtime_only =
       ; fs_external
       ; no_cmis
       ; output_file
-      ; input = `None
+      ; bytecode = `None
       ; source_map
       ; keep_unit_names = false
       ; effects
+      ; shape_files = []
+      ; build_config
+      ; apply_build_config
       }
   in
   let t =
@@ -661,6 +690,8 @@ let options_runtime_only =
       $ target_env
       $ output_file
       $ js_files
-      $ effects)
+      $ effects
+      $ build_config
+      $ apply_build_config)
   in
   Term.ret t

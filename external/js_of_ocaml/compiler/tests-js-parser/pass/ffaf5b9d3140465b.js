@@ -1,0 +1,4 @@
+/*
+  flags: [noStrict]
+*/
+let()

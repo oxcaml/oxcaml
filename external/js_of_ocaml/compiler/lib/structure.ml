@@ -1,7 +1,7 @@
 open Stdlib
 open Code
 
-let get_edges g src = try Addr.Hashtbl.find g src with Not_found -> Addr.Set.empty
+let get_edges g src = Addr.Hashtbl.find_opt g src |> Option.value ~default:Addr.Set.empty
 
 let add_edge g src dst = Addr.Hashtbl.replace g src (Addr.Set.add dst (get_edges g src))
 
@@ -42,7 +42,7 @@ let is_forward g pc pc' =
 
 (* pc has at least two forward edges moving into it *)
 let is_merge_node' block_order preds pc =
-  let s = try Addr.Hashtbl.find preds pc with Not_found -> Addr.Set.empty in
+  let s = Addr.Hashtbl.find_opt preds pc |> Option.value ~default:Addr.Set.empty in
   let o = Addr.Hashtbl.find block_order pc in
   try
     ignore
@@ -125,7 +125,7 @@ let build_graph blocks pc =
           (Addr.Set.add enter_pc (Addr.Hashtbl.find preds leave_pc))));
   { succs; preds; reverse_post_order = !l; block_order }
 
-let dominator_tree g =
+let reversed_dominator_tree g =
   (* A Simple, Fast Dominance Algorithm
      Keith D. Cooper, Timothy J. Harvey, and Ken Kennedy *)
   let dom = Addr.Hashtbl.create 16 in
@@ -143,7 +143,11 @@ let dominator_tree g =
         (fun pc' ->
           if is_forward g pc pc'
           then
-            let d = try inter pc (Addr.Hashtbl.find dom pc') with Not_found -> pc in
+            let d =
+              match Addr.Hashtbl.find_opt dom pc' with
+              | Some d -> inter pc d
+              | None -> pc
+            in
             Addr.Hashtbl.replace dom pc' d)
         l);
   (* Check we have reached a fixed point (reducible graph) *)
@@ -156,13 +160,18 @@ let dominator_tree g =
             let d = Addr.Hashtbl.find dom pc' in
             assert (inter pc d = d))
         l);
-  reverse_tree dom
+
+  dom
+
+let dominator_tree g =
+  let idom = reversed_dominator_tree g in
+  reverse_tree idom
 
 (* pc has at least two forward edges moving into it *)
 let is_merge_node g pc = is_merge_node' g.block_order g.preds pc
 
 let is_loop_header g pc =
-  let s = try Addr.Hashtbl.find g.preds pc with Not_found -> Addr.Set.empty in
+  let s = Addr.Hashtbl.find_opt g.preds pc |> Option.value ~default:Addr.Set.empty in
   let o = Addr.Hashtbl.find g.block_order pc in
   Addr.Set.exists (fun pc' -> Addr.Hashtbl.find g.block_order pc' >= o) s
 
@@ -171,12 +180,11 @@ let sort_in_post_order t l =
 
 let blocks_in_reverse_post_order g = g.reverse_post_order
 
-(*
-
 (* pc dominates pc' *)
 let rec dominates g idom pc pc' =
   pc = pc' || (is_forward g pc pc' && dominates g idom pc (Addr.Hashtbl.find idom pc'))
 
+(*
 let dominance_frontier g idom =
   let frontiers = Addr.Hashtbl.create 16 in
   Addr.Hashtbl.iter
@@ -210,8 +218,10 @@ let mark_loops g =
     g.preds;
   in_loop
 
-let rec measure blocks g pc limit =
-  if is_loop_header g pc
+let rec measure blocks g ~idom ~root pc limit =
+  if not (dominates g idom root pc)
+  then limit
+  else if is_loop_header g pc
   then -1
   else
     let b = Addr.Map.find pc blocks in
@@ -227,11 +237,12 @@ let rec measure blocks g pc limit =
     then limit
     else
       Addr.Set.fold
-        (fun pc limit -> if limit < 0 then limit else measure blocks g pc limit)
+        (fun pc limit ->
+          if limit < 0 then limit else measure blocks g ~idom ~root pc limit)
         (get_edges g.succs pc)
         limit
 
-let is_small blocks g pc = measure blocks g pc 20 >= 0
+let is_small blocks g ~idom ~root pc = measure blocks g ~idom ~root pc 20 >= 0
 
 let shrink_loops blocks ({ succs; preds; reverse_post_order; _ } as g) =
   let add_edge pred succ =
@@ -239,7 +250,8 @@ let shrink_loops blocks ({ succs; preds; reverse_post_order; _ } as g) =
     Addr.Hashtbl.replace preds succ (Addr.Set.add pred (Addr.Hashtbl.find preds succ))
   in
   let in_loop = mark_loops g in
-  let dom = dominator_tree g in
+  let idom = reversed_dominator_tree g in
+  let dom = reverse_tree idom in
   let root = List.hd reverse_post_order in
   let rec traverse ignored pc =
     let succs = get_edges dom pc in
@@ -252,7 +264,7 @@ let shrink_loops blocks ({ succs; preds; reverse_post_order; _ } as g) =
         let ignored =
           match block.branch with
           | Pushtrap ((body_pc, _), _, _) when pc' = body_pc ->
-              Addr.Set.union ignored loops
+              Addr.Set.add body_pc (Addr.Set.union ignored loops)
           | _ -> ignored
         in
         let loops' = get_edges in_loop pc' in
@@ -260,14 +272,14 @@ let shrink_loops blocks ({ succs; preds; reverse_post_order; _ } as g) =
         (* If we leave a loop, we add an edge from predecessors of
            the loop header to the current block, so that it is
            considered outside of the loop. *)
-        if not (Addr.Set.is_empty left_loops || is_small blocks g pc')
-        then
-          Addr.Set.iter
-            (fun pc0 ->
+        Addr.Set.iter
+          (fun pc0 ->
+            if not (is_small blocks g ~idom ~root:pc0 pc')
+            then
               Addr.Set.iter
                 (fun pc -> if is_forward g pc pc0 then add_edge pc pc')
                 (get_edges g.preds pc0))
-            left_loops;
+          left_loops;
         traverse ignored pc')
       succs
   in
@@ -277,3 +289,67 @@ let build_graph blocks pc =
   let g = build_graph blocks pc in
   shrink_loops blocks g;
   g
+
+(* Ensure that all loops have a predecessor block. Function
+   shrink_loops assumes this. *)
+let norm p =
+  let free_pc = ref p.free_pc in
+  let visited = BitSet.create' p.free_pc in
+  let rec mark_used ~function_start pc =
+    if not (BitSet.mem visited pc)
+    then (
+      if not function_start then BitSet.set visited pc;
+      let block = Addr.Map.find pc p.blocks in
+      List.iter
+        ~f:(fun i ->
+          match i with
+          | Let (_, Closure (_, (pc', _), _)) -> mark_used ~function_start:true pc'
+          | _ -> ())
+        block.body;
+      fold_children p.blocks pc (fun pc' () -> mark_used ~function_start:false pc') ())
+  in
+  mark_used ~function_start:true p.start;
+  let closure_need_update = function
+    | Let (_, Closure (_, (pc, _), _)) -> BitSet.mem visited pc
+    | _ -> false
+  in
+  let rewrite_cont cont blocks =
+    let npc = !free_pc in
+    incr free_pc;
+    let body =
+      let b = Addr.Map.find (fst cont) blocks in
+      match b.body with
+      | (Event _ as e) :: _ -> [ e ]
+      | _ -> []
+    in
+    let blocks = Addr.Map.add npc { body; params = []; branch = Branch cont } blocks in
+    (npc, []), blocks
+  in
+  let blocks =
+    Addr.Map.fold
+      (fun pc block blocks ->
+        if List.exists block.body ~f:closure_need_update
+        then
+          let blocks = ref blocks in
+          let body =
+            List.map block.body ~f:(function
+              | Let (x, Closure (params, cont, loc)) as i when closure_need_update i ->
+                  let cont', blocks' = rewrite_cont cont !blocks in
+                  blocks := blocks';
+                  Let (x, Closure (params, cont', loc))
+              | i -> i)
+          in
+          Addr.Map.add pc { block with body } !blocks
+        else blocks)
+      p.blocks
+      p.blocks
+  in
+  if BitSet.mem visited p.start
+  then (
+    let npc = !free_pc in
+    incr free_pc;
+    let blocks =
+      Addr.Map.add npc { body = []; params = []; branch = Branch (p.start, []) } blocks
+    in
+    { blocks; free_pc = !free_pc; start = npc })
+  else { blocks; free_pc = !free_pc; start = p.start }

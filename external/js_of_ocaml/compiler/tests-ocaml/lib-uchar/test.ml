@@ -74,7 +74,7 @@ let test_compare () =
 let test_hash () =
   let f u =
     assert (Hashtbl.hash u = Uchar.hash u);
-    (* assert (Hashtbl.seeded_hash 42 u = Uchar.seeded_hash 42 u) *)
+    assert (Hashtbl.seeded_hash 42 u = Uchar.seeded_hash 42 u)
   in
   List.iter (Fun.compose f Uchar.of_int)
     [0x0000; 0x002D; 0x00E9; 0x062D; 0x2014; 0x1F349]
@@ -92,6 +92,15 @@ let test_utf_decode () =
   assert (not (Uchar.utf_decode_is_valid invalid));
   assert (Uchar.utf_decode_length invalid = 3);
   assert (Uchar.equal (Uchar.utf_decode_uchar invalid) Uchar.rep);
+  ()
+
+let test_utf_8_decode_length_of_byte () =
+  assert (Uchar.utf_8_decode_length_of_byte "a".[0] = 1);
+  assert (Uchar.utf_8_decode_length_of_byte "é".[0] = 2);
+  assert (Uchar.utf_8_decode_length_of_byte "‘".[0] = 3);
+  assert (Uchar.utf_8_decode_length_of_byte "🐫".[0] =
+          Uchar.max_utf_8_decode_length);
+  assert (Uchar.utf_8_decode_length_of_byte "\xFF".[0] = 0);
   ()
 
 let test_utf_x_byte_length () =
@@ -117,8 +126,9 @@ let tests () =
   test_to_char ();
   test_equal ();
   test_compare ();
-  (* test_hash (); *)
+  test_hash ();
   test_utf_decode ();
+  test_utf_8_decode_length_of_byte ();
   test_utf_x_byte_length ();
   ()
 

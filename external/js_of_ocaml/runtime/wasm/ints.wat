@@ -23,10 +23,10 @@
    (type $bytes (array (mut i8)))
 
    (func (export "caml_format_int")
-      (param (ref eq)) (param (ref eq)) (result (ref eq))
+      (param $v (ref eq)) (param $n (ref eq)) (result (ref eq))
       (return_call $format_int
-         (local.get 0)
-         (i31.get_s (ref.cast (ref i31) (local.get 1))) (i32.const 1)))
+         (local.get $v)
+         (i31.get_s (ref.cast (ref i31) (local.get $n))) (i32.const 1)))
 
    (func $parse_sign_and_base (export "parse_sign_and_base")
       (param $s (ref $bytes)) (result i32 i32 i32 i32)
@@ -77,9 +77,8 @@
                      (local.set $signedness (i32.const 0))
                      (local.set $i (i32.add (local.get $i)
                         (i32.const 2)))))))))))))))
-      (tuple.make 4
-         (local.get $i) (local.get $signedness) (local.get $sign)
-         (local.get $base)))
+      (local.get $i) (local.get $signedness) (local.get $sign)
+      (local.get $base))
 
    (func $parse_digit (export "parse_digit") (param $c i32) (result i32)
       (if (i32.and (i32.ge_u (local.get $c) (@char "0"))
@@ -100,16 +99,15 @@
       (local $i i32) (local $len i32) (local $d i32) (local $c i32)
       (local $signedness i32) (local $sign i32) (local $base i32)
       (local $res i32) (local $threshold i32)
-      (local $t (tuple i32 i32 i32 i32))
       (local.set $s (ref.cast (ref $bytes) (local.get $v)))
       (local.set $len (array.len (local.get $s)))
       (if (i32.eqz (local.get $len))
         (then (call $caml_failwith (local.get $errmsg))))
-      (local.set $t (call $parse_sign_and_base (local.get $s)))
-      (local.set $i (tuple.extract 4 0 (local.get $t)))
-      (local.set $signedness (tuple.extract 4 1 (local.get $t)))
-      (local.set $sign (tuple.extract 4 2 (local.get $t)))
-      (local.set $base (tuple.extract 4 3 (local.get $t)))
+      (call $parse_sign_and_base (local.get $s))
+      (local.set $base)
+      (local.set $sign)
+      (local.set $signedness)
+      (local.set $i)
       (local.set $threshold (i32.div_u (i32.const -1) (local.get $base)))
       (if (i32.ge_s (local.get $i) (local.get $len))
          (then (call $caml_failwith (local.get $errmsg))))
@@ -165,9 +163,27 @@
          (call $parse_int
             (local.get $v) (i32.const 31) (global.get $INT_ERRMSG))))
 
-   (func (export "caml_bswap16") (param (ref eq)) (result (ref eq))
+   (@string $INT8_ERRMSG "Int8.of_string")
+
+   (func (export "caml_int8_of_string")
+      (param $v (ref eq)) (result (ref eq))
+      (ref.i31
+         (i32.extend8_s
+            (call $parse_int
+               (local.get $v) (i32.const 8) (global.get $INT8_ERRMSG)))))
+
+   (@string $INT16_ERRMSG "Int16.of_string")
+
+   (func (export "caml_int16_of_string")
+      (param $v (ref eq)) (result (ref eq))
+      (ref.i31
+         (i32.extend16_s
+            (call $parse_int
+               (local.get $v) (i32.const 16) (global.get $INT16_ERRMSG)))))
+
+   (func (export "caml_bswap16") (param $vx (ref eq)) (result (ref eq))
       (local $x i32)
-      (local.set $x (i31.get_s (ref.cast (ref i31) (local.get 0))))
+      (local.set $x (i31.get_s (ref.cast (ref i31) (local.get $vx))))
       (ref.i31
          (i32.or
             (i32.shl (i32.and (local.get $x) (i32.const 0xFF)) (i32.const 8))
@@ -277,35 +293,33 @@
                (br $bad_format)))))))))))
             (br $return))
          (call $caml_invalid_argument (global.get $format_error)))
-      (tuple.make 5
-         (local.get $sign_style)
-         (local.get $alternate)
-         (local.get $signed)
-         (local.get $base)
-         (local.get $uppercase)))
+      (local.get $sign_style)
+      (local.get $alternate)
+      (local.get $signed)
+      (local.get $base)
+      (local.get $uppercase))
 
    (func $format_int (export "format_int")
-      (param (ref eq)) (param $d i32) (param $small i32) (result (ref eq))
+      (param $vs (ref eq)) (param $d i32) (param $small i32) (result (ref eq))
       (local $s (ref $bytes))
-      (local $format (tuple i32 i32 i32 i32 i32))
       (local $sign_style i32) (local $alternate i32) (local $signed i32)
       (local $base i32) (local $uppercase i32)
       (local $negative i32)
       (local $i i32)
       (local $n i32)
       (local $chars (ref $chars))
-      (local.set $s (ref.cast (ref $bytes) (local.get 0)))
+      (local.set $s (ref.cast (ref $bytes) (local.get $vs)))
       (if (i32.eq (array.len (local.get $s)) (i32.const 2))
          (then
             (if (i32.eq (array.get_u $bytes (local.get $s) (i32.const 1))
                         (@char "d"))
                (then (return_call $format_int_default (local.get $d))))))
-      (local.set $format (call $parse_int_format (local.get $s)))
-      (local.set $sign_style (tuple.extract 5 0 (local.get $format)))
-      (local.set $alternate (tuple.extract 5 1 (local.get $format)))
-      (local.set $signed (tuple.extract 5 2 (local.get $format)))
-      (local.set $base (tuple.extract 5 3 (local.get $format)))
-      (local.set $uppercase (tuple.extract 5 4 (local.get $format)))
+      (call $parse_int_format (local.get $s))
+      (local.set $uppercase)
+      (local.set $base)
+      (local.set $signed)
+      (local.set $alternate)
+      (local.set $sign_style)
       (if (i32.lt_s (local.get $d) (i32.const 0))
          (then
             (if (local.get $signed)
@@ -362,7 +376,12 @@
                      (else
                         (array.set $bytes (local.get $s) (i32.const 0)
                            (@char " "))))))))
-      (if (local.get $alternate)
+      ;; The "#" flag only prefixes octal/hex; for base 10 it is ignored (as
+      ;; in C). Guarding on base here also stops the "0" from overwriting the
+      ;; sign, since the digit-count phase above only reserves prefix room for
+      ;; base 8/16.
+      (if (i32.and (local.get $alternate)
+                   (i32.ne (local.get $base) (i32.const 10)))
          (then
             (if (local.get $i)
                (then

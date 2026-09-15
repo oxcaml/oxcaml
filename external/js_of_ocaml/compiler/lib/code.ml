@@ -60,15 +60,17 @@ module Var : sig
 
   val compare : t -> t -> int
 
-  val set_name : t -> string -> unit
+  val set_name : t -> ?generated:bool -> string -> unit
+
+  val generated_name : t -> bool
 
   val get_name : t -> string option
 
   val propagate_name : t -> t -> unit
 
-  val reset : unit -> unit
+  val forget_generated_name : t -> unit
 
-  val set_last : int -> unit
+  val reset : unit -> unit
 
   module Set : Set.S with type elt = t
 
@@ -127,7 +129,13 @@ end = struct
   module Name = struct
     let names = Int.Hashtbl.create 100
 
-    let reset () = Int.Hashtbl.clear names
+    let user_defined = ref (BitSet.create' 16)
+
+    let generated v = not (BitSet.mem !user_defined v)
+
+    let reset () =
+      Int.Hashtbl.clear names;
+      user_defined := BitSet.create' 16
 
     let reserved = String.Hashtbl.create 100
 
@@ -135,30 +143,35 @@ end = struct
 
     let is_reserved s = String.Hashtbl.mem reserved s
 
-    let merge n1 n2 =
-      match n1, n2 with
-      | "", n2 -> n2
-      | n1, "" -> n1
-      | n1, n2 ->
-          if generated_name n1
-          then n2
-          else if generated_name n2
-          then n1
-          else if String.length n1 > String.length n2
-          then n1
-          else n2
+    let merge v1 v2 =
+      let n1_generated = generated v1 in
+      let n2_generated = generated v2 in
+      let n1_name = Int.Hashtbl.find names v1 in
+      let n2_name = Int.Hashtbl.find names v2 in
+      (* Prefer non-generated names over generated ones *)
+      if n1_generated && not n2_generated
+      then n2_name, n2_generated
+      else if n2_generated && not n1_generated
+      then n1_name, n1_generated
+      else if String.length n1_name > String.length n2_name
+      then n1_name, n1_generated
+      else n2_name, n2_generated
 
-    let set_raw v nm = Int.Hashtbl.replace names v nm
+    let set_raw v nm gen =
+      Int.Hashtbl.replace names v nm;
+      if gen then BitSet.unset !user_defined v else BitSet.set !user_defined v
 
     let propagate v v' =
       try
         let name = Int.Hashtbl.find names v in
         match Int.Hashtbl.find names v' with
-        | exception Not_found -> set_raw v' name
-        | name' -> set_raw v' (merge name name')
+        | exception Not_found -> set_raw v' name (generated v)
+        | _ ->
+            let name, gen = merge v v' in
+            set_raw v' name gen
       with Not_found -> ()
 
-    let set v nm_orig =
+    let set v ?(generated = false) nm_orig =
       let len = String.length nm_orig in
       if len > 0
       then (
@@ -194,9 +207,11 @@ end = struct
         let str =
           if String.length str > max_len then String.sub str ~pos:0 ~len:max_len else str
         in
-        set_raw v str)
+        set_raw v str generated)
 
-    let get v = try Some (Int.Hashtbl.find names v) with Not_found -> None
+    let get v = Int.Hashtbl.find_opt names v
+
+    let forget_generated_name v = if generated v then Int.Hashtbl.remove names v
   end
 
   let last_var = ref 0
@@ -204,9 +219,6 @@ end = struct
   let reset () =
     last_var := 0;
     Name.reset ()
-
-  let set_last n =
-    last_var := n
 
   let print f x =
     Format.fprintf
@@ -217,7 +229,9 @@ end = struct
       | None -> ""
       | Some nm -> "{" ^ nm ^ "}")
 
-  let set_name i nm = Name.set i nm
+  let set_name = Name.set
+
+  let generated_name i = Name.generated i
 
   let fresh () =
     incr last_var;
@@ -225,7 +239,7 @@ end = struct
 
   let fresh_n nm =
     incr last_var;
-    set_name !last_var nm;
+    set_name !last_var ~generated:true nm;
     !last_var
 
   let count () = !last_var + 1
@@ -237,6 +251,8 @@ end = struct
   let get_name i = Name.get i
 
   let propagate_name i j = Name.propagate i j
+
+  let forget_generated_name = Name.forget_generated_name
 
   let fork o =
     let n = fresh () in
@@ -291,9 +307,9 @@ end
 type cont = Addr.t * Var.t list
 
 type prim =
-  | Vectlength
+  | Vectlength of Optimization_hint.array_kind
   | Array_get
-  | Extern of string
+  | Extern of string * Optimization_hint.ccall option
   | Not
   | IsInt
   | Eq
@@ -332,9 +348,9 @@ type constant =
   | Int of Targetint.t
   | Int32 of Int32.t
   | Int64 of Int64.t
-  | NativeInt of Int32.t (* Native int are 32bit on all known backend *)
+  | NativeInt of Int32.t (* Native ints are 32bit on all known backends *)
   | Tuple of int * constant array * array_or_not
-  | Null
+  | Null_
 
 module Constant = struct
   type t = constant
@@ -369,7 +385,7 @@ module Constant = struct
         Some (Float.ieee_equal (Int64.float_of_bits a) (Int64.float_of_bits b))
     | Float32 a, Float32 b ->
         Some (Float.ieee_equal (Int64.float_of_bits a) (Int64.float_of_bits b))
-    | Null, Null -> Some true
+    | Null_, Null_ -> Some true
     | String _, NativeString _ | NativeString _, String _ -> None
     | Int _, Float _ | Float _, Int _ -> None
     | Int _, Float32 _ | Float32 _, Int _ -> None
@@ -396,11 +412,23 @@ module Constant = struct
         | Float32 _
         | Tuple _ ) ) -> Some false
     | ( String _
-      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
-        Some false
+      , ( Int64 _
+        | Int _
+        | Int32 _
+        | NativeInt _
+        | Float _
+        | Float32 _
+        | Tuple _
+        | Float_array _ ) ) -> Some false
     | ( NativeString _
-      , (Int64 _ | Int _ | Int32 _ | NativeInt _ | Float _ | Float32 _ | Tuple _ | Float_array _) ) ->
-        Some false
+      , ( Int64 _
+        | Int _
+        | Int32 _
+        | NativeInt _
+        | Float _
+        | Float32 _
+        | Tuple _
+        | Float_array _ ) ) -> Some false
     | ( Int64 _
       , ( String _
         | NativeString _
@@ -411,14 +439,16 @@ module Constant = struct
         | Float32 _
         | Tuple _
         | Float_array _ ) ) -> Some false
-    | Float _, (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
-        Some false
-    | Float32 _, (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ->
-        Some false
+    | ( Float _
+      , (Float32 _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
+      ) -> Some false
+    | ( Float32 _
+      , (Float _ | String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _))
+      ) -> Some false
     | ( (Int _ | Int32 _ | NativeInt _)
       , (String _ | NativeString _ | Float_array _ | Int64 _ | Tuple (_, _, _)) ) ->
         Some false
-    | (Null, _) | (_, Null) -> Some false
+    | Null_, _ | _, Null_ -> Some false
     (* Note: the following cases should not occur when compiling to Javascript *)
     | Int _, (Int32 _ | NativeInt _)
     | Int32 _, (Int _ | NativeInt _)
@@ -454,7 +484,8 @@ type expr =
       }
   | Block of int * Var.t array * array_or_not * mutability
   | Field of Var.t * int * field_type
-  | Closure of Var.t list * cont * Parse_info.t option
+  | Closure of
+      Var.t list * cont * (Optimization_hint.closure_hint option * Parse_info.t option)
   | Constant of constant
   | Prim of prim * prim_arg list
   | Special of special
@@ -487,19 +518,6 @@ type program =
   { start : Addr.t
   ; blocks : block Addr.Map.t
   ; free_pc : Addr.t
-  }
-
-type cmj_body =
-  { program : program
-  ; last_var : Addr.t
-    (** Highest used variable in the translation, since it is kept track by a
-        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
-        need to have these in sync *)
-  ; imported_compilation_units : Compilation_unit.t list
-    (** Compilation units fetched from JSOO's global data table. Needed to fill in
-      [Unit_info.t] in JSOO *)
-  ; exported_compilation_unit : Compilation_unit.t
-    (** Current compilation unit. Needed to fill in [Unit_info.t] in JSOO *)
   }
 
 let noloc = No
@@ -552,7 +570,7 @@ module Print = struct
               constant f a.(i)
             done;
             Format.fprintf f ")")
-    | Null -> Format.fprintf f "null"
+    | Null_ -> Format.fprintf f "null"
 
   let arg f a =
     match a with
@@ -579,17 +597,29 @@ module Print = struct
     | "%int_neg" -> "-"
     | _ -> raise Not_found
 
+  let hint f h =
+    match h with
+    | None -> ()
+    | Some h -> Format.fprintf f " [hint:%a]" Optimization_hint.print_ccall h
+
   let prim f p l =
     match p, l with
-    | Vectlength, [ x ] -> Format.fprintf f "%a.length" arg x
+    | Vectlength k, [ x ] ->
+        Format.fprintf
+          f
+          "%a.length [hint:%a]"
+          arg
+          x
+          Optimization_hint.print
+          (Optimization_hint.Hint_arraylength k)
     | Array_get, [ x; y ] -> Format.fprintf f "%a[%a]" arg x arg y
-    | Extern s, [ x; y ] -> (
-        try Format.fprintf f "%a %s %a" arg x (binop s) arg y
-        with Not_found -> Format.fprintf f "\"%s\"(%a)" s (list arg) l)
-    | Extern s, [ x ] -> (
-        try Format.fprintf f "%s %a" (unop s) arg x
-        with Not_found -> Format.fprintf f "\"%s\"(%a)" s (list arg) l)
-    | Extern s, _ -> Format.fprintf f "\"%s\"(%a)" s (list arg) l
+    | Extern (s, h), [ x; y ] -> (
+        try Format.fprintf f "%a %s %a%a" arg x (binop s) arg y hint h
+        with Not_found -> Format.fprintf f "\"%s\"(%a)%a" s (list arg) l hint h)
+    | Extern (s, h), [ x ] -> (
+        try Format.fprintf f "%s %a%a" (unop s) arg x hint h
+        with Not_found -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h)
+    | Extern (s, h), _ -> Format.fprintf f "\"%s\"(%a) %a" s (list arg) l hint h
     | Not, [ x ] -> Format.fprintf f "!%a" arg x
     | IsInt, [ x ] -> Format.fprintf f "is_int(%a)" arg x
     | Eq, [ x; y ] -> Format.fprintf f "%a === %a" arg x arg y
@@ -623,7 +653,11 @@ module Print = struct
         Format.fprintf f "}"
     | Field (x, i, Non_float) -> Format.fprintf f "%a[%d]" Var.print x i
     | Field (x, i, Float) -> Format.fprintf f "FLOAT{%a[%d]}" Var.print x i
-    | Closure (l, c, _) -> Format.fprintf f "fun(%a){%a}" var_list l cont c
+    | Closure (l, c, (hint, _)) -> (
+        Format.fprintf f "fun(%a){%a}" var_list l cont c;
+        match hint with
+        | None -> ()
+        | Some h -> Format.fprintf f " [hint:%a]" Optimization_hint.print_closure_hint h)
     | Constant c -> Format.fprintf f "CONST{%a}" constant c
     | Prim (p, l) -> prim f p l
     | Special s -> special f s
@@ -682,7 +716,7 @@ let fold_closures p f accu =
     (fun _ block accu ->
       List.fold_left block.body ~init:accu ~f:(fun accu i ->
           match i with
-          | Let (x, Closure (params, cont, cloc)) -> f (Some x) params cont cloc accu
+          | Let (x, Closure (params, cont, (_, cloc))) -> f (Some x) params cont cloc accu
           | _ -> accu))
     p.blocks
     (f None [] (p.start, []) None accu)
@@ -721,7 +755,8 @@ let is_empty p =
       match v with
       | { body; branch = Stop; params = _ } -> (
           match body with
-          | ([] | [ Let (_, Prim (Extern "caml_get_global_data", _)) ]) when true -> true
+          | ([] | [ Let (_, Prim (Extern ("caml_get_global_data", None), _)) ]) when true
+            -> true
           | _ -> false)
       | _ -> false)
   | _ -> false
@@ -841,7 +876,7 @@ let fold_closures_innermost_first { start; blocks; _ } f accu =
         let block = Addr.Map.find pc blocks in
         List.fold_left block.body ~init:accu ~f:(fun accu i ->
             match i with
-            | Let (x, Closure (params, cont, cloc)) ->
+            | Let (x, Closure (params, cont, (_, cloc))) ->
                 let accu = visit blocks (fst cont) f accu in
                 f (Some x) params cont cloc accu
             | _ -> accu))
@@ -860,7 +895,7 @@ let fold_closures_outermost_first { start; blocks; _ } f accu =
         let block = Addr.Map.find pc blocks in
         List.fold_left block.body ~init:accu ~f:(fun accu i ->
             match i with
-            | Let (x, Closure (params, cont, cloc)) ->
+            | Let (x, Closure (params, cont, (_, cloc))) ->
                 let accu = f (Some x) params cont cloc accu in
                 visit blocks (fst cont) f accu
             | _ -> accu))
@@ -876,6 +911,30 @@ let rec last_instr l =
   | [] | [ Event _ ] -> None
   | [ i ] | [ i; Event _ ] -> Some i
   | _ :: rem -> last_instr rem
+
+(* Compute the list of variables containing the return values of each
+   function *)
+let return_values p =
+  fold_closures
+    p
+    (fun name_opt _ (pc, _) _ rets ->
+      match name_opt with
+      | None -> rets
+      | Some name ->
+          let s =
+            traverse
+              { fold = fold_children }
+              (fun pc s ->
+                let block = Addr.Map.find pc p.blocks in
+                match block.branch with
+                | Return x -> Var.Set.add x s
+                | _ -> s)
+              pc
+              p.blocks
+              Var.Set.empty
+          in
+          Var.Map.add name s rets)
+    Var.Map.empty
 
 let equal p1 p2 =
   p1.start = p2.start

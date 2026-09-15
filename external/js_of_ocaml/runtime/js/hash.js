@@ -87,14 +87,14 @@ function caml_hash_mix_jsbytes(h, s) {
   }
   w = 0;
   switch (len & 3) {
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 3:
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       w = s.charCodeAt(i + 2) << 16;
-    // fallthrough
+    // falls through
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 2:
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       w |= s.charCodeAt(i + 1) << 8;
-    // fallthrough
+    // falls through
     case 1:
       w |= s.charCodeAt(i);
       h = caml_hash_mix_int(h, w);
@@ -115,14 +115,14 @@ function caml_hash_mix_bytes_arr(h, s) {
   }
   w = 0;
   switch (len & 3) {
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 3:
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       w = s[i + 2] << 16;
-    // fallthrough
+    // falls through
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: falls through
     case 2:
-      // biome-ignore lint/suspicious/noFallthroughSwitchClause:
       w |= s[i + 1] << 8;
-    // fallthrough
+    // falls through
     case 1:
       w |= s[i];
       h = caml_hash_mix_int(h, w);
@@ -147,13 +147,41 @@ function caml_hash_mix_string(h, v) {
   return caml_hash_mix_jsbytes(h, caml_jsbytes_of_string(v));
 }
 
-//Provides: caml_hash_exn mutable
+//Provides: caml_jsstring_is_bytes
+function caml_jsstring_is_bytes(s) {
+  // Whether every code unit fits in a byte, i.e. no code point above U+00FF.
+  for (var i = 0; i < s.length; i++) if (s.charCodeAt(i) > 0xff) return false;
+  return true;
+}
+
+//Provides: caml_hash_mix_jsstring
+//Requires: caml_hash_mix_jsbytes, caml_hash_mix_int, caml_jsstring_is_bytes
+function caml_hash_mix_jsstring(h, s) {
+  // A string whose code units all fit in a byte (every ASCII string, all of
+  // Latin-1, and any raw byte string) is mixed four per word, leaving its hash
+  // unchanged and, for an OCaml string's bytes, matching the OCaml string hash.
+  if (caml_jsstring_is_bytes(s)) return caml_hash_mix_jsbytes(h, s);
+  // Genuine Unicode text: mix two 16-bit code units per word, so no information
+  // is lost. Packing the code units four per word at byte offsets (as for a
+  // byte string) would overlap their high bits.
+  var len = s.length,
+    i,
+    w;
+  for (i = 0; i + 2 <= len; i += 2) {
+    w = s.charCodeAt(i) | (s.charCodeAt(i + 1) << 16);
+    h = caml_hash_mix_int(h, w);
+  }
+  if (len & 1) h = caml_hash_mix_int(h, s.charCodeAt(i));
+  return h ^ len;
+}
+
+//Provides: caml_hash mutable
 //Requires: caml_is_ml_string, caml_is_ml_bytes
 //Requires: caml_hash_mix_int, caml_hash_mix_final
 //Requires: caml_hash_mix_float, caml_hash_mix_string, caml_hash_mix_bytes, caml_custom_ops
-//Requires: caml_hash_mix_jsbytes
+//Requires: caml_hash_mix_jsstring
 //Requires: caml_is_continuation_tag
-function caml_hash_exn(count, limit, seed, obj) {
+function caml_hash(count, limit, seed, obj) {
   var queue, rd, wr, sz, num, h, v, i, len;
   sz = limit;
   if (sz < 0 || sz > 256) sz = 256;
@@ -184,6 +212,17 @@ function caml_hash_exn(count, limit, seed, obj) {
           // Forward
           queue[--rd] = v[1];
           break;
+        case 251:
+          // Abstract: block contents unknown, do nothing
+          break;
+        case 254:
+          // Double_array_tag: mix the elements directly, no header
+          for (i = 1, len = v.length; i < len; i++) {
+            h = caml_hash_mix_float(h, v[i]);
+            num--;
+            if (num <= 0) break;
+          }
+          break;
         default:
           if (caml_is_continuation_tag(v[0])) {
             /* All continuations hash to the same value,
@@ -205,7 +244,7 @@ function caml_hash_exn(count, limit, seed, obj) {
       h = caml_hash_mix_string(h, v);
       num--;
     } else if (typeof v === "string") {
-      h = caml_hash_mix_jsbytes(h, v);
+      h = caml_hash_mix_jsstring(h, v);
       num--;
     } else if (v === (v | 0)) {
       // Integer
@@ -220,6 +259,12 @@ function caml_hash_exn(count, limit, seed, obj) {
   h = caml_hash_mix_final(h);
   return h & 0x3fffffff;
 }
+
+//Provides: caml_hash_exn
+//Requires: caml_hash
+//Version: >= 5.2, < 5.3
+//OxCaml
+var caml_hash_exn = caml_hash;
 
 //Provides: caml_string_hash
 //Requires: caml_hash_mix_final, caml_hash_mix_string

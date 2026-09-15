@@ -21,8 +21,6 @@
 open Js
 open! Import
 
-external html_escape : js_string t -> js_string t = "caml_js_html_escape"
-
 external html_entities : js_string t -> js_string t opt = "caml_js_html_entities"
 
 let decode_html_entities s =
@@ -37,6 +35,16 @@ class type cssStyleDeclaration = object
   method getPropertyPriority : js_string t -> js_string t meth
 
   method removeProperty : js_string t -> js_string t meth
+
+  method accentColor : js_string t prop
+
+  method alignContent : js_string t prop
+
+  method alignItems : js_string t prop
+
+  method alignSelf : js_string t prop
+
+  method all : js_string t prop
 
   method animation : js_string t prop
 
@@ -56,23 +64,69 @@ class type cssStyleDeclaration = object
 
   method animationTimingFunction : js_string t prop
 
+  method appearance : js_string t prop
+
+  method aspectRatio : js_string t prop
+
+  method backdropFilter : js_string t prop
+
+  method backfaceVisibility : js_string t prop
+
   method background : js_string t prop
 
   method backgroundAttachment : js_string t prop
+
+  method backgroundBlendMode : js_string t prop
+
+  method backgroundClip : js_string t prop
 
   method backgroundColor : js_string t prop
 
   method backgroundImage : js_string t prop
 
+  method backgroundOrigin : js_string t prop
+
   method backgroundPosition : js_string t prop
 
   method backgroundRepeat : js_string t prop
 
+  method backgroundSize : js_string t prop
+
+  method blockSize : js_string t prop
+
   method border : js_string t prop
+
+  method borderBlock : js_string t prop
+
+  method borderBlockColor : js_string t prop
+
+  method borderBlockEnd : js_string t prop
+
+  method borderBlockEndColor : js_string t prop
+
+  method borderBlockEndStyle : js_string t prop
+
+  method borderBlockEndWidth : js_string t prop
+
+  method borderBlockStart : js_string t prop
+
+  method borderBlockStartColor : js_string t prop
+
+  method borderBlockStartStyle : js_string t prop
+
+  method borderBlockStartWidth : js_string t prop
+
+  method borderBlockStyle : js_string t prop
+
+  method borderBlockWidth : js_string t prop
 
   method borderBottom : js_string t prop
 
   method borderBottomColor : js_string t prop
+
+  method borderBottomLeftRadius : js_string t prop
+
+  method borderBottomRightRadius : js_string t prop
 
   method borderBottomStyle : js_string t prop
 
@@ -81,6 +135,42 @@ class type cssStyleDeclaration = object
   method borderCollapse : js_string t prop
 
   method borderColor : js_string t prop
+
+  method borderImage : js_string t prop
+
+  method borderImageOutset : js_string t prop
+
+  method borderImageRepeat : js_string t prop
+
+  method borderImageSlice : js_string t prop
+
+  method borderImageSource : js_string t prop
+
+  method borderImageWidth : js_string t prop
+
+  method borderInline : js_string t prop
+
+  method borderInlineColor : js_string t prop
+
+  method borderInlineEnd : js_string t prop
+
+  method borderInlineEndColor : js_string t prop
+
+  method borderInlineEndStyle : js_string t prop
+
+  method borderInlineEndWidth : js_string t prop
+
+  method borderInlineStart : js_string t prop
+
+  method borderInlineStartColor : js_string t prop
+
+  method borderInlineStartStyle : js_string t prop
+
+  method borderInlineStartWidth : js_string t prop
+
+  method borderInlineStyle : js_string t prop
+
+  method borderInlineWidth : js_string t prop
 
   method borderLeft : js_string t prop
 
@@ -108,6 +198,10 @@ class type cssStyleDeclaration = object
 
   method borderTopColor : js_string t prop
 
+  method borderTopLeftRadius : js_string t prop
+
+  method borderTopRightRadius : js_string t prop
+
   method borderTopStyle : js_string t prop
 
   method borderTopWidth : js_string t prop
@@ -116,13 +210,27 @@ class type cssStyleDeclaration = object
 
   method bottom : js_string t prop
 
+  method boxShadow : js_string t prop
+
+  method boxSizing : js_string t prop
+
   method captionSide : js_string t prop
+
+  method caretColor : js_string t prop
 
   method clear : js_string t prop
 
   method clip : js_string t prop
 
+  method clipPath : js_string t prop
+
   method color : js_string t prop
+
+  method colorScheme : js_string t prop
+
+  method columnGap : js_string t prop
+
+  method contain : js_string t prop
 
   method content : js_string t prop
 
@@ -144,19 +252,105 @@ class type cssStyleDeclaration = object
 
   method fill : js_string t prop
 
+  method filter : js_string t prop
+
+  method flex : js_string t prop
+
+  method flexBasis : js_string t prop
+
+  method flexDirection : js_string t prop
+
+  method flexFlow : js_string t prop
+
+  method flexGrow : js_string t prop
+
+  method flexShrink : js_string t prop
+
+  method flexWrap : js_string t prop
+
   method font : js_string t prop
 
   method fontFamily : js_string t prop
 
+  method fontFeatureSettings : js_string t prop
+
+  method fontKerning : js_string t prop
+
   method fontSize : js_string t prop
+
+  method fontStretch : js_string t prop
 
   method fontStyle : js_string t prop
 
   method fontVariant : js_string t prop
 
+  method fontVariantLigatures : js_string t prop
+
+  method fontVariantNumeric : js_string t prop
+
   method fontWeight : js_string t prop
 
+  method gap : js_string t prop
+
+  method grid : js_string t prop
+
+  method gridArea : js_string t prop
+
+  method gridAutoColumns : js_string t prop
+
+  method gridAutoFlow : js_string t prop
+
+  method gridAutoRows : js_string t prop
+
+  method gridColumn : js_string t prop
+
+  method gridColumnEnd : js_string t prop
+
+  method gridColumnStart : js_string t prop
+
+  method gridRow : js_string t prop
+
+  method gridRowEnd : js_string t prop
+
+  method gridRowStart : js_string t prop
+
+  method gridTemplate : js_string t prop
+
+  method gridTemplateAreas : js_string t prop
+
+  method gridTemplateColumns : js_string t prop
+
+  method gridTemplateRows : js_string t prop
+
   method height : js_string t prop
+
+  method hyphens : js_string t prop
+
+  method imageRendering : js_string t prop
+
+  method inlineSize : js_string t prop
+
+  method inset : js_string t prop
+
+  method insetBlock : js_string t prop
+
+  method insetBlockEnd : js_string t prop
+
+  method insetBlockStart : js_string t prop
+
+  method insetInline : js_string t prop
+
+  method insetInlineEnd : js_string t prop
+
+  method insetInlineStart : js_string t prop
+
+  method isolation : js_string t prop
+
+  method justifyContent : js_string t prop
+
+  method justifyItems : js_string t prop
+
+  method justifySelf : js_string t prop
 
   method left : js_string t prop
 
@@ -174,7 +368,19 @@ class type cssStyleDeclaration = object
 
   method margin : js_string t prop
 
+  method marginBlock : js_string t prop
+
+  method marginBlockEnd : js_string t prop
+
+  method marginBlockStart : js_string t prop
+
   method marginBottom : js_string t prop
+
+  method marginInline : js_string t prop
+
+  method marginInlineEnd : js_string t prop
+
+  method marginInlineStart : js_string t prop
 
   method marginLeft : js_string t prop
 
@@ -182,15 +388,35 @@ class type cssStyleDeclaration = object
 
   method marginTop : js_string t prop
 
+  method mask : js_string t prop
+
+  method maskImage : js_string t prop
+
+  method maxBlockSize : js_string t prop
+
   method maxHeight : js_string t prop
+
+  method maxInlineSize : js_string t prop
 
   method maxWidth : js_string t prop
 
+  method minBlockSize : js_string t prop
+
   method minHeight : js_string t prop
+
+  method minInlineSize : js_string t prop
 
   method minWidth : js_string t prop
 
+  method mixBlendMode : js_string t prop
+
+  method objectFit : js_string t prop
+
+  method objectPosition : js_string t prop
+
   method opacity : js_string t prop
+
+  method order : js_string t prop
 
   method outline : js_string t prop
 
@@ -204,13 +430,29 @@ class type cssStyleDeclaration = object
 
   method overflow : js_string t prop
 
+  method overflowWrap : js_string t prop
+
   method overflowX : js_string t prop
 
   method overflowY : js_string t prop
 
+  method overscrollBehavior : js_string t prop
+
   method padding : js_string t prop
 
+  method paddingBlock : js_string t prop
+
+  method paddingBlockEnd : js_string t prop
+
+  method paddingBlockStart : js_string t prop
+
   method paddingBottom : js_string t prop
+
+  method paddingInline : js_string t prop
+
+  method paddingInlineEnd : js_string t prop
+
+  method paddingInlineStart : js_string t prop
 
   method paddingLeft : js_string t prop
 
@@ -222,11 +464,37 @@ class type cssStyleDeclaration = object
 
   method pageBreakBefore : js_string t prop
 
+  method perspective : js_string t prop
+
+  method perspectiveOrigin : js_string t prop
+
+  method placeContent : js_string t prop
+
+  method placeItems : js_string t prop
+
+  method placeSelf : js_string t prop
+
   method pointerEvents : js_string t prop
 
   method position : js_string t prop
 
+  method quotes : js_string t prop
+
+  method resize : js_string t prop
+
   method right : js_string t prop
+
+  method rowGap : js_string t prop
+
+  method scrollBehavior : js_string t prop
+
+  method scrollMargin : js_string t prop
+
+  method scrollPadding : js_string t prop
+
+  method scrollSnapAlign : js_string t prop
+
+  method scrollSnapType : js_string t prop
 
   method stroke : js_string t prop
 
@@ -234,19 +502,49 @@ class type cssStyleDeclaration = object
 
   method tableLayout : js_string t prop
 
+  method tabSize : js_string t prop
+
   method textAlign : js_string t prop
 
   method textAnchor : js_string t prop
 
   method textDecoration : js_string t prop
 
+  method textDecorationColor : js_string t prop
+
+  method textDecorationLine : js_string t prop
+
+  method textDecorationStyle : js_string t prop
+
+  method textDecorationThickness : js_string t prop
+
   method textIndent : js_string t prop
+
+  method textOverflow : js_string t prop
+
+  method textShadow : js_string t prop
 
   method textTransform : js_string t prop
 
   method top : js_string t prop
 
   method transform : js_string t prop
+
+  method transformOrigin : js_string t prop
+
+  method transformStyle : js_string t prop
+
+  method transition : js_string t prop
+
+  method transitionDelay : js_string t prop
+
+  method transitionDuration : js_string t prop
+
+  method transitionProperty : js_string t prop
+
+  method transitionTimingFunction : js_string t prop
+
+  method userSelect : js_string t prop
 
   method verticalAlign : js_string t prop
 
@@ -256,7 +554,13 @@ class type cssStyleDeclaration = object
 
   method width : js_string t prop
 
+  method willChange : js_string t prop
+
+  method wordBreak : js_string t prop
+
   method wordSpacing : js_string t prop
+
+  method writingMode : js_string t prop
 
   method zIndex : js_string t prop
 end
@@ -273,6 +577,8 @@ type delta_mode =
   | Delta_pixel
   | Delta_line
   | Delta_page
+
+type domStringMap
 
 class type event = object
   inherit [element] Dom.event
@@ -297,6 +603,10 @@ and mouseEvent = object
 
   method clientY : number_t readonly_prop
 
+  method x : number_t readonly_prop
+
+  method y : number_t readonly_prop
+
   method screenX : number_t readonly_prop
 
   method screenY : number_t readonly_prop
@@ -317,11 +627,15 @@ and mouseEvent = object
 
   method buttons : int readonly_prop
 
+  method getModifierState : js_string t -> bool t meth
+
   method which : mouse_button optdef readonly_prop
 
   method fromElement : element t opt optdef readonly_prop
+  (** @deprecated Use [relatedTarget] instead. *)
 
   method toElement : element t opt optdef readonly_prop
+  (** @deprecated Use [relatedTarget] instead. *)
 
   method pageX : number_t optdef readonly_prop
 
@@ -381,19 +695,6 @@ end
 
 and mousewheelEvent = wheelEvent
 
-and mouseScrollEvent = object
-  (* Deprecated *)
-  inherit mouseEvent
-
-  method detail : int readonly_prop
-
-  method axis : int optdef readonly_prop
-
-  method _HORIZONTAL_AXIS : int optdef readonly_prop
-
-  method _VERTICAL_AXIS : int optdef readonly_prop
-end
-
 and touchEvent = object
   inherit event
 
@@ -436,24 +737,32 @@ and touch = object
   method pageX : number_t readonly_prop
 
   method pageY : number_t readonly_prop
+
+  method radiusX : number_t readonly_prop
+
+  method radiusY : number_t readonly_prop
+
+  method rotationAngle : number_t readonly_prop
+
+  method force : number_t readonly_prop
 end
 
 and submitEvent = object
   inherit event
 
-  method submitter : element t readonly_prop
+  method submitter : element t opt readonly_prop
 end
 
 and dragEvent = object
   inherit mouseEvent
 
-  method dataTransfer : dataTransfer t readonly_prop
+  method dataTransfer : dataTransfer t opt readonly_prop
 end
 
 and clipboardEvent = object
   inherit event
 
-  method clipboardData : dataTransfer t readonly_prop
+  method clipboardData : dataTransfer t opt readonly_prop
 end
 
 and toggleEvent = object
@@ -462,6 +771,16 @@ and toggleEvent = object
   method newState : js_string t readonly_prop
 
   method oldState : js_string t readonly_prop
+
+  method source : element t opt readonly_prop
+end
+
+and mediaQueryListEvent = object
+  inherit event
+
+  method matches : bool t readonly_prop
+
+  method media : js_string t readonly_prop
 end
 
 and dataTransfer = object
@@ -561,6 +880,10 @@ and eventTarget = object ('self)
 
   method onpointerup : ('self t, pointerEvent t) event_listener writeonly_prop
 
+  method onbeforetoggle : ('self t, toggleEvent t) event_listener writeonly_prop
+
+  method ontoggle : ('self t, toggleEvent t) event_listener writeonly_prop
+
   method dispatchEvent : event t -> bool t meth
 end
 
@@ -573,25 +896,33 @@ end
 and pointerEvent = object
   inherit mouseEvent
 
-  method pointerId : int Js.readonly_prop
+  method pointerId : int readonly_prop
 
-  method width : number_t Js.readonly_prop
+  method width : number_t readonly_prop
 
-  method height : number_t Js.readonly_prop
+  method height : number_t readonly_prop
 
-  method pressure : number_t Js.readonly_prop
+  method pressure : number_t readonly_prop
 
-  method tangentialPressure : number_t Js.readonly_prop
+  method tangentialPressure : number_t readonly_prop
 
-  method tiltX : int Js.readonly_prop
+  method tiltX : int readonly_prop
 
-  method tiltY : int Js.readonly_prop
+  method tiltY : int readonly_prop
 
-  method twist : int Js.readonly_prop
+  method twist : int readonly_prop
 
-  method pointerType : Js.js_string Js.t Js.readonly_prop
+  method altitudeAngle : number_t readonly_prop
 
-  method isPrimary : bool Js.t Js.readonly_prop
+  method azimuthAngle : number_t readonly_prop
+
+  method pointerType : js_string t readonly_prop
+
+  method isPrimary : bool t readonly_prop
+
+  method getCoalescedEvents : pointerEvent t js_array t meth
+
+  method getPredictedEvents : pointerEvent t js_array t meth
 end
 
 and storageEvent = object
@@ -654,12 +985,86 @@ and mediaEvent = object
   inherit event
 end
 
-and messageEvent = object
-  inherit event
+and ['target, 'data] messageEvent = object
+  inherit ['target] Dom.event
 
-  method data : Unsafe.any opt readonly_prop
+  method data : 'data readonly_prop
+
+  method origin : js_string t readonly_prop
+
+  method lastEventId : js_string t readonly_prop
 
   method source : Unsafe.any opt readonly_prop
+
+  method ports : Unsafe.any js_array t readonly_prop
+end
+
+and staticRange = object
+  method collapsed : bool t readonly_prop
+
+  method startContainer : Dom.node t readonly_prop
+
+  method startOffset : int readonly_prop
+
+  method endContainer : Dom.node t readonly_prop
+
+  method endOffset : int readonly_prop
+end
+
+and compositionEvent = object
+  inherit event
+
+  method data : js_string t readonly_prop
+end
+
+and inputEvent = object
+  inherit event
+
+  method data : js_string t opt readonly_prop
+
+  method inputType : js_string t readonly_prop
+
+  method dataTransfer : dataTransfer t opt readonly_prop
+
+  method isComposing : bool t readonly_prop
+
+  method getTargetRanges : staticRange t js_array t meth
+end
+
+and errorEvent = object
+  inherit event
+
+  method message : js_string t readonly_prop
+
+  method filename : js_string t readonly_prop
+
+  method lineno : int readonly_prop
+
+  method colno : int readonly_prop
+
+  method error : 'a. 'a opt readonly_prop
+end
+
+and progressEvent = object
+  inherit event
+
+  method lengthComputable : bool t readonly_prop
+
+  method loaded : number_t readonly_prop
+
+  method total : number_t readonly_prop
+end
+
+and beforeUnloadEvent = object
+  inherit event
+
+  method returnValue : js_string t prop
+end
+
+and pageTransitionEvent = object
+  inherit event
+
+  method persisted : bool t readonly_prop
 end
 
 and nodeSelector = object
@@ -684,6 +1089,222 @@ and tokenList = object
   method stringifier : js_string t prop
 end
 
+and shadowRootInit = object
+  method mode : js_string t writeonly_prop
+
+  method delegatesFocus : bool t writeonly_prop
+end
+
+and shadowRoot = object
+  inherit Dom.documentFragment
+
+  method mode : js_string t readonly_prop
+
+  method host : element t readonly_prop
+
+  method innerHTML : js_string t prop
+
+  method activeElement : element t opt readonly_prop
+end
+
+and animation = object
+  method id : js_string t prop
+
+  method effect_ : animationEffect t opt prop
+
+  method timeline : animationTimeline t opt prop
+
+  method playState : js_string t readonly_prop
+
+  method replaceState : js_string t readonly_prop
+
+  method playbackRate : number_t prop
+
+  method currentTime : number_t opt prop
+
+  method startTime : number_t opt prop
+
+  method pending : bool t readonly_prop
+
+  method play : unit meth
+
+  method pause : unit meth
+
+  method finish : unit meth
+
+  method cancel : unit meth
+
+  method reverse : unit meth
+
+  method persist : unit meth
+
+  method commitStyles : unit meth
+
+  method updatePlaybackRate : number_t -> unit meth
+
+  method finished : animation t Promise.t readonly_prop
+
+  method ready : animation t Promise.t readonly_prop
+
+  method oncancel : (animation t, animationPlaybackEvent t) event_listener writeonly_prop
+
+  method onfinish : (animation t, animationPlaybackEvent t) event_listener writeonly_prop
+
+  method onremove : (animation t, event t) event_listener writeonly_prop
+end
+
+and animationTimeline = object
+  method currentTime : number_t opt readonly_prop
+end
+
+and documentTimeline = object
+  inherit animationTimeline
+end
+
+and animationEffect = object
+  method updateTiming : optionalEffectTiming t -> unit meth
+
+  method getComputedTiming : computedEffectTiming t meth
+end
+
+and keyframeEffect = object
+  inherit animationEffect
+
+  method target : element t opt prop
+
+  method pseudoElement : js_string t opt prop
+
+  method composite : js_string t prop
+
+  method getKeyframes : computedKeyframe t js_array t meth
+
+  method setKeyframes : 'a. 'a -> unit meth
+end
+
+and computedKeyframe = object
+  method offset : number_t opt readonly_prop
+
+  method computedOffset : number_t readonly_prop
+
+  method easing : js_string t readonly_prop
+
+  method composite : js_string t readonly_prop
+end
+
+and optionalEffectTiming = object
+  method delay : number_t writeonly_prop
+
+  method endDelay : number_t writeonly_prop
+
+  method fill : js_string t writeonly_prop
+
+  method iterationStart : number_t writeonly_prop
+
+  method iterations : number_t writeonly_prop
+
+  method duration : number_t writeonly_prop
+
+  method duration_auto : js_string t writeonly_prop
+
+  method direction : js_string t writeonly_prop
+
+  method easing : js_string t writeonly_prop
+end
+
+and computedEffectTiming = object
+  method delay : number_t readonly_prop
+
+  method endDelay : number_t readonly_prop
+
+  method fill : js_string t readonly_prop
+
+  method iterationStart : number_t readonly_prop
+
+  method iterations : number_t readonly_prop
+
+  method duration : number_t readonly_prop
+
+  method direction : js_string t readonly_prop
+
+  method easing : js_string t readonly_prop
+
+  method endTime : number_t readonly_prop
+
+  method activeDuration : number_t readonly_prop
+
+  method localTime : number_t opt readonly_prop
+
+  method progress : number_t opt readonly_prop
+
+  method currentIteration : number_t opt readonly_prop
+end
+
+and keyframeAnimationOptions = object
+  method delay : number_t writeonly_prop
+
+  method endDelay : number_t writeonly_prop
+
+  method fill : js_string t writeonly_prop
+
+  method iterationStart : number_t writeonly_prop
+
+  method iterations : number_t writeonly_prop
+
+  method duration : number_t writeonly_prop
+
+  method duration_auto : js_string t writeonly_prop
+
+  method direction : js_string t writeonly_prop
+
+  method easing : js_string t writeonly_prop
+
+  method id : js_string t writeonly_prop
+
+  method composite : js_string t writeonly_prop
+
+  method pseudoElement : js_string t opt writeonly_prop
+
+  method timeline : animationTimeline t opt writeonly_prop
+end
+
+and animationPlaybackEvent = object
+  inherit event
+
+  method currentTime : number_t opt readonly_prop
+
+  method timelineTime : number_t opt readonly_prop
+end
+
+and scrollToOptions = object
+  method top : number_t writeonly_prop
+
+  method left : number_t writeonly_prop
+
+  method behavior : js_string t writeonly_prop
+end
+
+and scrollIntoViewOptions = object
+  method behavior : js_string t writeonly_prop
+
+  method block : js_string t writeonly_prop
+
+  method inline : js_string t writeonly_prop
+end
+
+and focusOptions = object
+  method preventScroll : bool t writeonly_prop
+end
+
+and showPopover_options = object
+  method source : element t writeonly_prop
+end
+
+and togglePopover_options = object
+  method force : bool t writeonly_prop
+
+  method source : element t writeonly_prop
+end
+
 and element = object
   inherit Dom.element
 
@@ -703,6 +1324,14 @@ and element = object
 
   method closest : js_string t -> element t opt meth
 
+  method slot : js_string t prop
+
+  method shadowRoot : shadowRoot t opt readonly_prop
+
+  method assignedSlot : element t opt readonly_prop
+
+  method attachShadow : shadowRootInit t -> shadowRoot t meth
+
   method style : cssStyleDeclaration t prop
 
   method innerHTML : js_string t prop
@@ -712,6 +1341,32 @@ and element = object
   method textContent : js_string t opt prop
 
   method innerText : js_string t prop
+
+  method dataset : domStringMap t readonly_prop
+
+  method tabIndex : int prop
+
+  method hidden : bool t writeonly_prop
+
+  method draggable : bool t prop
+
+  method spellcheck : bool t prop
+
+  method translate : bool t prop
+
+  method contentEditable : js_string t prop
+
+  method isContentEditable : bool t readonly_prop
+
+  method accessKey : js_string t prop
+
+  method autofocus : bool t prop
+
+  method inputMode : js_string t prop
+
+  method enterKeyHint : js_string t prop
+
+  method nonce : js_string t prop
 
   method clientLeft : int readonly_prop
 
@@ -735,9 +1390,11 @@ and element = object
 
   method scrollTop : number_t prop
 
-  method scrollWidth : int prop
+  method scrollWidth : int readonly_prop
 
-  method scrollHeight : int prop
+  method scrollHeight : int readonly_prop
+
+  method popover : js_string t opt prop
 
   method getClientRects : clientRectList t meth
 
@@ -745,11 +1402,51 @@ and element = object
 
   method scrollIntoView : bool t -> unit meth
 
+  method scrollIntoView_options : scrollIntoViewOptions t -> unit meth
+
+  method scrollTo_options : scrollToOptions t -> unit meth
+
+  method scrollBy_options : scrollToOptions t -> unit meth
+
   method click : unit meth
 
   method focus : unit meth
 
+  method focus_options : focusOptions t -> unit meth
+
   method blur : unit meth
+
+  method setPointerCapture : int -> unit meth
+
+  method releasePointerCapture : int -> unit meth
+
+  method hasPointerCapture : int -> bool t meth
+
+  method requestFullscreen : unit Promise.t meth
+
+  method requestPointerLock : unit Promise.t meth
+
+  method animate : 'a 'b. 'a -> 'b -> animation t meth
+
+  method animate_keyframes : 'a. 'a -> animation t meth
+
+  method animate_duration : 'a. 'a -> number_t -> animation t meth
+
+  method animate_options : 'a. 'a -> keyframeAnimationOptions t -> animation t meth
+
+  method getAnimations : animation t js_array t meth
+
+  method hidePopover : unit meth
+
+  method showPopover : unit meth
+
+  method showPopover_options : showPopover_options t -> unit meth
+
+  method togglePopover : bool t meth
+
+  method togglePopover_force : bool t -> bool t meth
+
+  method togglePopover_options : togglePopover_options t -> bool t meth
 
   inherit eventTarget
 end
@@ -779,6 +1476,10 @@ let no_handler : ('a, 'b) event_listener = Dom.no_handler
 let handler = Dom.handler
 
 let full_handler = Dom.full_handler
+
+let listener = Dom.listener
+
+let full_listener = Dom.full_listener
 
 let invoke_handler = Dom.invoke_handler
 
@@ -818,8 +1519,6 @@ module Event = struct
   let mousewheel = Dom.Event.make "mousewheel"
 
   let wheel = Dom.Event.make "wheel"
-
-  let _DOMMouseScroll = Dom.Event.make "DOMMouseScroll"
 
   let touchstart = Dom.Event.make "touchstart"
 
@@ -971,7 +1670,21 @@ module Event = struct
 
   let waiting = Dom.Event.make "waiting"
 
+  let beforetoggle = Dom.Event.make "beforetoggle"
+
   let toggle = Dom.Event.make "toggle"
+
+  let compositionstart = Dom.Event.make "compositionstart"
+
+  let compositionupdate = Dom.Event.make "compositionupdate"
+
+  let compositionend = Dom.Event.make "compositionend"
+
+  let pageshow = Dom.Event.make "pageshow"
+
+  let pagehide = Dom.Event.make "pagehide"
+
+  let loadend = Dom.Event.make "loadend"
 
   let make = Dom.Event.make
 end
@@ -986,13 +1699,7 @@ let removeEventListener = Dom.removeEventListener
 
 let createCustomEvent = Dom.createCustomEvent
 
-class type ['node] collection = object
-  method length : int readonly_prop
-
-  method item : int -> 'node t opt meth
-
-  method namedItem : js_string t -> 'node t opt meth
-end
+class type ['node] collection = ['node] Dom.collection
 
 class type htmlElement = element
 
@@ -1011,13 +1718,27 @@ class type linkElement = object
 
   method crossorigin : js_string t prop
 
+  method crossOrigin : js_string t opt prop
+
+  method _as : js_string t prop
+
   method href : js_string t prop
 
   method hreflang : js_string t prop
 
+  method imageSrcset : js_string t prop
+
+  method imageSizes : js_string t prop
+
+  method integrity : js_string t prop
+
   method media : js_string t prop
 
+  method referrerPolicy : js_string t prop
+
   method rel : js_string t prop
+
+  method relList : tokenList t readonly_prop
 
   method rev : js_string t prop
 
@@ -1064,6 +1785,34 @@ end
 
 class type bodyElement = element
 
+class type validityState = object
+  method valueMissing : bool t readonly_prop
+
+  method typeMismatch : bool t readonly_prop
+
+  method patternMismatch : bool t readonly_prop
+
+  method tooLong : bool t readonly_prop
+
+  method tooShort : bool t readonly_prop
+
+  method rangeUnderflow : bool t readonly_prop
+
+  method rangeOverflow : bool t readonly_prop
+
+  method stepMismatch : bool t readonly_prop
+
+  method badInput : bool t readonly_prop
+
+  method customError : bool t readonly_prop
+
+  method valid : bool t readonly_prop
+end
+
+class type submitterElement = object
+  inherit element
+end
+
 class type formElement = object
   inherit element
 
@@ -1071,21 +1820,47 @@ class type formElement = object
 
   method length : int readonly_prop
 
+  method name : js_string t prop
+
   method acceptCharset : js_string t prop
 
   method action : js_string t prop
+
+  method autocomplete : js_string t prop
 
   method enctype : js_string t prop
 
   method _method : js_string t prop
 
+  method noValidate : bool t prop
+
   method target : js_string t prop
 
   method submit : unit meth
 
+  method requestSubmit : unit meth
+
+  method requestSubmit_submitter : submitterElement t -> unit meth
+
   method reset : unit meth
 
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
   method onsubmit : ('self t, submitEvent t) event_listener writeonly_prop
+end
+
+class type labelElement = object
+  inherit element
+
+  method form : formElement t opt readonly_prop
+
+  method accessKey : js_string t prop
+
+  method htmlFor : js_string t prop
+
+  method control : element t opt readonly_prop
 end
 
 class type optGroupElement = object
@@ -1112,12 +1887,20 @@ class type optionElement = object
   method value : js_string t prop
 end
 
+class type dataListElement = object
+  inherit element
+
+  method options : optionElement collection t readonly_prop
+end
+
 class type selectElement = object ('self)
   inherit element
 
   method _type : js_string t readonly_prop
 
   method selectedIndex : int prop
+
+  method selectedOptions : optionElement collection t readonly_prop
 
   method value : js_string t prop
 
@@ -1143,17 +1926,31 @@ class type selectElement = object ('self)
 
   method required : bool t writeonly_prop
 
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
+
   method onchange : ('self t, event t) event_listener prop
 
   method oninput : ('self t, event t) event_listener prop
 end
 
 class type inputElement = object ('self)
-  inherit element
+  inherit submitterElement
 
   method defaultValue : js_string t prop
 
-  method defaultChecked : js_string t prop
+  method defaultChecked : bool t prop
 
   method form : formElement t opt readonly_prop
 
@@ -1162,16 +1959,47 @@ class type inputElement = object ('self)
   method accessKey : js_string t prop
 
   method align : js_string t prop
+  (** @deprecated Use CSS instead. *)
 
   method alt : js_string t prop
 
+  method autocomplete : js_string t prop
+
+  method capture : js_string t prop
+
   method checked : bool t prop
+
+  method dirName : js_string t prop
 
   method disabled : bool t prop
 
+  method formAction : js_string t prop
+
+  method formEnctype : js_string t prop
+
+  method formMethod : js_string t prop
+
+  method formNoValidate : bool t prop
+
+  method formTarget : js_string t prop
+
+  method indeterminate : bool t prop
+
+  method list : dataListElement t opt readonly_prop
+
+  method max : js_string t prop
+
   method maxLength : int prop
 
+  method min : js_string t prop
+
+  method minLength : int prop
+
+  method multiple : bool t prop
+
   method name : js_string t readonly_prop
+
+  method pattern : js_string t prop
 
   method readOnly : bool t prop
 
@@ -1181,6 +2009,8 @@ class type inputElement = object ('self)
 
   method src : js_string t prop
 
+  method step : js_string t prop
+
   method tabIndex : int prop
 
   method _type : js_string t readonly_prop
@@ -1189,17 +2019,51 @@ class type inputElement = object ('self)
 
   method value : js_string t prop
 
+  method valueAsDate : Js.date t opt prop
+
+  method valueAsNumber : number_t prop
+
+  method stepUp : unit meth
+
+  method stepUp_n : int -> unit meth
+
+  method stepDown : unit meth
+
+  method stepDown_n : int -> unit meth
+
   method select : unit meth
 
-  method files : File.fileList t readonly_prop
+  method setSelectionRange : int -> int -> unit meth
 
-  method placeholder : js_string t writeonly_prop
+  method setSelectionRange_direction : int -> int -> js_string t -> unit meth
+
+  method files : File.fileList t opt readonly_prop
+
+  method placeholder : js_string t prop
 
   method selectionDirection : js_string t prop
 
   method selectionStart : int prop
 
   method selectionEnd : int prop
+
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
+
+  method popoverTargetElement : element t opt prop
+
+  method popoverTargetAction : js_string t prop
 
   method onselect : ('self t, event t) event_listener prop
 
@@ -1221,9 +2085,17 @@ class type textAreaElement = object ('self)
 
   method accessKey : js_string t prop
 
+  method autocomplete : js_string t prop
+
   method cols : int prop
 
+  method dirName : js_string t prop
+
   method disabled : bool t prop
+
+  method maxLength : int prop
+
+  method minLength : int prop
 
   method name : js_string t readonly_prop
 
@@ -1243,11 +2115,35 @@ class type textAreaElement = object ('self)
 
   method value : js_string t prop
 
+  method wrap : js_string t prop
+
   method select : unit meth
+
+  method setSelectionRange : int -> int -> unit meth
+
+  method setSelectionRange_direction : int -> int -> js_string t -> unit meth
+
+  method setRangeText : js_string t -> unit meth
+
+  method setRangeText_full : js_string t -> int -> int -> js_string t -> unit meth
 
   method required : bool t writeonly_prop
 
-  method placeholder : js_string t writeonly_prop
+  method placeholder : js_string t prop
+
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
 
   method onselect : ('self t, event t) event_listener prop
 
@@ -1261,13 +2157,23 @@ class type textAreaElement = object ('self)
 end
 
 class type buttonElement = object
-  inherit element
+  inherit submitterElement
 
   method form : formElement t opt readonly_prop
 
   method accessKey : js_string t prop
 
   method disabled : bool t prop
+
+  method formAction : js_string t prop
+
+  method formEnctype : js_string t prop
+
+  method formMethod : js_string t prop
+
+  method formNoValidate : bool t prop
+
+  method formTarget : js_string t prop
 
   method name : js_string t readonly_prop
 
@@ -1276,22 +2182,50 @@ class type buttonElement = object
   method _type : js_string t readonly_prop
 
   method value : js_string t prop
-end
 
-class type labelElement = object
-  inherit element
+  method popoverTargetElement : element t opt prop
 
-  method form : formElement t opt readonly_prop
+  method popoverTargetAction : js_string t prop
 
-  method accessKey : js_string t prop
+  method labels : labelElement Dom.nodeList t opt readonly_prop
 
-  method htmlFor : js_string t prop
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
 end
 
 class type fieldSetElement = object
   inherit element
 
   method form : formElement t opt readonly_prop
+
+  method name : js_string t prop
+
+  method disabled : bool t prop
+
+  method _type : js_string t readonly_prop
+
+  method elements : element collection t readonly_prop
+
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
 end
 
 class type legendElement = object
@@ -1300,6 +2234,138 @@ class type legendElement = object
   method form : formElement t opt readonly_prop
 
   method accessKey : js_string t prop
+end
+
+class type outputElement = object
+  inherit element
+
+  method form : formElement t opt readonly_prop
+
+  method name : js_string t prop
+
+  method _type : js_string t readonly_prop
+
+  method defaultValue : js_string t prop
+
+  method value : js_string t prop
+
+  method htmlFor : tokenList t readonly_prop
+
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+
+  method validity : validityState t readonly_prop
+
+  method validationMessage : js_string t readonly_prop
+
+  method willValidate : bool t readonly_prop
+
+  method checkValidity : bool t meth
+
+  method reportValidity : bool t meth
+
+  method setCustomValidity : js_string t -> unit meth
+end
+
+class type progressElement = object
+  inherit element
+
+  method value : number_t prop
+
+  method max : number_t prop
+
+  method position : number_t readonly_prop
+
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+end
+
+class type meterElement = object
+  inherit element
+
+  method value : number_t prop
+
+  method min : number_t prop
+
+  method max : number_t prop
+
+  method low : number_t prop
+
+  method high : number_t prop
+
+  method optimum : number_t prop
+
+  method labels : labelElement Dom.nodeList t opt readonly_prop
+end
+
+class type templateElement = object
+  inherit element
+
+  method content : Dom.documentFragment t readonly_prop
+end
+
+class type slotElement = object
+  inherit element
+
+  method name : js_string t prop
+
+  method assignedNodes : Dom.node t js_array t meth
+
+  method assignedElements : element t js_array t meth
+end
+
+class type pictureElement = element
+
+class type sourceElement = object
+  inherit element
+
+  method src : js_string t prop
+
+  method _type : js_string t prop
+
+  method srcset : js_string t prop
+
+  method sizes : js_string t prop
+
+  method media : js_string t prop
+
+  method width : int prop
+
+  method height : int prop
+end
+
+type trackReadyState =
+  | TRACK_NONE
+  | TRACK_LOADING
+  | TRACK_LOADED
+  | TRACK_ERROR
+
+class type trackElement = object
+  inherit element
+
+  method kind : js_string t prop
+
+  method src : js_string t prop
+
+  method srclang : js_string t prop
+
+  method label : js_string t prop
+
+  method default : bool t prop
+
+  method readyState_int : int readonly_prop
+
+  method readyState : trackReadyState readonly_prop
+end
+
+class type timeElement = object
+  inherit element
+
+  method dateTime : js_string t prop
+end
+
+class type dataElement = object
+  inherit element
+
+  method value : js_string t prop
 end
 
 class type uListElement = element
@@ -1373,7 +2439,13 @@ class type anchorElement = object
 
   method name : js_string t prop
 
+  method ping : js_string t prop
+
+  method referrerPolicy : js_string t prop
+
   method rel : js_string t prop
+
+  method relList : tokenList t readonly_prop
 
   method rev : js_string t prop
 
@@ -1382,6 +2454,8 @@ class type anchorElement = object
   method tabIndex : int prop
 
   method target : js_string t prop
+
+  method text : js_string t prop
 
   method _type : js_string t prop
 end
@@ -1392,8 +2466,6 @@ class type detailsElement = object ('self)
   method open_ : bool t prop
 
   method name : js_string t prop
-
-  method ontoggle : ('self t, toggleEvent t) event_listener prop
 end
 
 class type imageElement = object ('self)
@@ -1402,6 +2474,20 @@ class type imageElement = object ('self)
   method alt : js_string t prop
 
   method src : js_string t prop
+
+  method srcset : js_string t prop
+
+  method sizes : js_string t prop
+
+  method currentSrc : js_string t readonly_prop
+
+  method crossOrigin : js_string t opt prop
+
+  method decoding : js_string t prop
+
+  method loading : js_string t prop
+
+  method referrerPolicy : js_string t prop
 
   method useMap : js_string t prop
 
@@ -1416,6 +2502,8 @@ class type imageElement = object ('self)
   method naturalHeight : int readonly_prop
 
   method complete : bool t prop
+
+  method decode : unit Promise.t meth
 
   method onload : ('self t, event t) event_listener prop
 
@@ -1505,7 +2593,15 @@ class type scriptElement = object
 
   method charset : js_string t prop
 
+  method crossOrigin : js_string t opt prop
+
   method defer : bool t prop
+
+  method integrity : js_string t prop
+
+  method noModule : bool t prop
+
+  method referrerPolicy : js_string t prop
 
   method src : js_string t prop
 
@@ -1686,7 +2782,7 @@ class type mediaElement = object
 
   method load : unit meth
 
-  method play : unit meth
+  method play : unit Promise.t meth
 
   method pause : unit meth
 
@@ -1777,6 +2873,18 @@ end
 
 class type videoElement = object
   inherit mediaElement
+
+  method width : int prop
+
+  method height : int prop
+
+  method videoWidth : int readonly_prop
+
+  method videoHeight : int readonly_prop
+
+  method poster : js_string t prop
+
+  method playsInline : bool t prop
 end
 
 type context = js_string t
@@ -1796,7 +2904,7 @@ class type canvasElement = object
 
   method toDataURL_type : js_string t -> js_string t meth
 
-  method toDataURL_type_compression : js_string t -> number_t -> js_string t meth
+  method toDataURL_compression : js_string t -> number_t -> js_string t meth
 
   method getContext : js_string t -> canvasRenderingContext2D t meth
 end
@@ -2045,6 +3153,12 @@ external pixel_get : canvasPixelArray t -> int -> int = "caml_js_get"
 
 external pixel_set : canvasPixelArray t -> int -> int -> unit = "caml_js_set"
 
+type boundary_points_comparison =
+  | Start_to_start
+  | Start_to_end
+  | End_to_end
+  | End_to_start
+
 class type range = object
   method collapsed : bool t readonly_prop
 
@@ -2055,6 +3169,8 @@ class type range = object
   method startContainer : Dom.node t readonly_prop
 
   method endContainer : Dom.node t readonly_prop
+
+  method commonAncestorContainer : Dom.node t readonly_prop
 
   method setStart : Dom.node t -> int -> unit meth
 
@@ -2074,6 +3190,18 @@ class type range = object
 
   method collapse : bool t -> unit meth
 
+  method compareBoundaryPoints : boundary_points_comparison -> range t -> int meth
+
+  method comparePoint : Dom.node t -> int -> int meth
+
+  method isPointInRange : Dom.node t -> int -> bool t meth
+
+  method intersectsNode : Dom.node t -> bool t meth
+
+  method getBoundingClientRect : clientRect t meth
+
+  method getClientRects : clientRectList t meth
+
   method cloneContents : Dom.documentFragment t meth
 
   method extractContents : Dom.documentFragment t meth
@@ -2084,18 +3212,21 @@ class type range = object
 
   method surroundContents : Dom.node t -> unit meth
 
+  method createContextualFragment : js_string t -> Dom.documentFragment t meth
+
   method cloneRange : range t meth
+
+  method detach : unit meth
 
   method toString : js_string t meth
 end
 
-(** Information on current selection *)
 class type selection = object
-  method anchorNode : Dom.node t readonly_prop
+  method anchorNode : Dom.node t opt readonly_prop
 
   method anchorOffset : int readonly_prop
 
-  method focusNode : Dom.node t readonly_prop
+  method focusNode : Dom.node t opt readonly_prop
 
   method focusOffset : int readonly_prop
 
@@ -2103,9 +3234,19 @@ class type selection = object
 
   method rangeCount : int readonly_prop
 
+  method _type : js_string t readonly_prop
+
   method getRangeAt : int -> range t meth
 
-  method collapse : bool t -> unit meth
+  method collapse : Dom.node t opt -> unit meth
+
+  method collapse_offset : Dom.node t opt -> int -> unit meth
+
+  method setPosition : Dom.node t opt -> unit meth
+
+  method setPosition_offset : Dom.node t opt -> int -> unit meth
+
+  method setBaseAndExtent : Dom.node t -> int -> Dom.node t -> int -> unit meth
 
   method extend : Dom.node t -> int -> unit meth
 
@@ -2145,13 +3286,21 @@ class type document = object
 
   method _URL : js_string t readonly_prop
 
+  method lastModified : js_string t readonly_prop
+
   method head : headElement t prop
 
   method body : bodyElement t prop
 
   method documentElement : htmlElement t readonly_prop
 
+  method currentScript : element t opt readonly_prop
+
+  method scrollingElement : element t opt readonly_prop
+
   method images : imageElement collection t readonly_prop
+
+  method fonts : FontFace.fontFaceSet t readonly_prop
 
   method applets : element collection t readonly_prop
 
@@ -2160,6 +3309,12 @@ class type document = object
   method forms : formElement collection t readonly_prop
 
   method anchors : element collection t readonly_prop
+
+  method embeds : embedElement collection t readonly_prop
+
+  method plugins : element collection t readonly_prop
+
+  method scripts : scriptElement collection t readonly_prop
 
   method cookie : js_string t prop
 
@@ -2177,7 +3332,7 @@ class type document = object
 
   method readyState : js_string t readonly_prop
 
-  method getElementsByClassName : js_string t -> element Dom.nodeList t meth
+  method getElementsByClassName : js_string t -> element Dom.collection t meth
 
   method getElementsByName : js_string t -> element Dom.nodeList t meth
 
@@ -2185,7 +3340,41 @@ class type document = object
 
   method hidden : bool t readonly_prop
 
+  method visibilityState : js_string t readonly_prop
+
+  method fullscreenElement : element t opt readonly_prop
+
+  method fullscreenEnabled : bool t readonly_prop
+
+  method pointerLockElement : element t opt readonly_prop
+
+  method hasFocus : bool t meth
+
+  method elementFromPoint : number_t -> number_t -> element t opt meth
+
+  method elementsFromPoint : number_t -> number_t -> element t js_array t meth
+
+  method getSelection : selection t opt meth
+
+  method getAnimations : animation t js_array t meth
+
+  method timeline : documentTimeline t readonly_prop
+
+  method exitFullscreen : unit Promise.t meth
+
+  method exitPointerLock : unit meth
+
+  method onreadystatechange : (document t, event t) event_listener writeonly_prop
+
+  method onvisibilitychange : (document t, event t) event_listener writeonly_prop
+
   method onfullscreenchange : (document t, event t) event_listener writeonly_prop
+
+  method onfullscreenerror : (document t, event t) event_listener writeonly_prop
+
+  method onpointerlockchange : (document t, event t) event_listener writeonly_prop
+
+  method onpointerlockerror : (document t, event t) event_listener writeonly_prop
 
   method onwebkitfullscreenchange : (document t, event t) event_listener writeonly_prop
 
@@ -2312,6 +3501,22 @@ class type _URL = object
   method revokeObjectURL : js_string t -> unit meth
 end
 
+class type mediaQueryList = object
+  method media : js_string t prop
+
+  method matches : bool t readonly_prop
+
+  method onchange : (mediaQueryList t, mediaQueryListEvent t) event_listener prop
+
+  inherit eventTarget
+end
+
+class type windowPostMessageOptions = object
+  method targetOrigin : js_string t writeonly_prop
+
+  method transfer : Unsafe.any js_array t writeonly_prop
+end
+
 class type window = object
   inherit eventTarget
 
@@ -2345,11 +3550,21 @@ class type window = object
 
   method scrollY : number_t readonly_prop
 
+  method pageXOffset : number_t readonly_prop
+
+  method pageYOffset : number_t readonly_prop
+
   method scroll : number_t -> number_t -> unit meth
+
+  method scroll_options : scrollToOptions t -> unit meth
 
   method scrollTo : number_t -> number_t -> unit meth
 
+  method scrollTo_options : scrollToOptions t -> unit meth
+
   method scrollBy : number_t -> number_t -> unit meth
+
+  method scrollBy_options : scrollToOptions t -> unit meth
 
   method sessionStorage : storage t optdef readonly_prop
 
@@ -2359,9 +3574,19 @@ class type window = object
 
   method parent : window t readonly_prop
 
+  method opener : window t opt prop
+
   method frameElement : element t opt readonly_prop
 
   method open_ : js_string t -> js_string t -> js_string t opt -> window t opt meth
+
+  method postMessage : 'a. 'a -> unit meth
+
+  method postMessage_targetOrigin : 'a. 'a -> js_string t -> unit meth
+
+  method postMessage_transfer : 'a 'b. 'a -> js_string t -> 'b js_array t -> unit meth
+
+  method postMessage_options : 'a. 'a -> windowPostMessageOptions t -> unit meth
 
   method alert : js_string t -> unit meth
 
@@ -2407,7 +3632,7 @@ class type window = object
 
   method onunload : (window t, event t) event_listener prop
 
-  method onbeforeunload : (window t, event t) event_listener prop
+  method onbeforeunload : (window t, beforeUnloadEvent t) event_listener prop
 
   method onblur : (window t, focusEvent t) event_listener prop
 
@@ -2428,6 +3653,8 @@ class type window = object
   method _URL : _URL t readonly_prop
 
   method devicePixelRatio : number_t readonly_prop
+
+  method matchMedia : js_string t -> mediaQueryList t meth
 end
 
 let window : window t = Js.Unsafe.global
@@ -2491,11 +3718,17 @@ end
 class type iFrameElement = object
   inherit element
 
+  method allow : js_string t prop
+
+  method allowFullscreen : bool t prop
+
   method frameBorder : js_string t prop
 
   method height : js_string t prop
 
   method width : js_string t prop
+
+  method loading : js_string t prop
 
   method longDesc : js_string t prop
 
@@ -2505,13 +3738,19 @@ class type iFrameElement = object
 
   method name : js_string t prop
 
+  method referrerPolicy : js_string t prop
+
+  method sandbox : tokenList t readonly_prop
+
   method scrolling : js_string t prop
 
   method src : js_string t prop
 
+  method srcdoc : js_string t prop
+
   method contentDocument : document t opt readonly_prop
 
-  method contentWindow : window t readonly_prop
+  method contentWindow : window t opt readonly_prop
 end
 
 (****)
@@ -2527,41 +3766,11 @@ let createElement (doc : document t) name = doc##createElement (Js.string name)
 
 let unsafeCreateElement doc name = Js.Unsafe.coerce (createElement doc name)
 
-let createElementSyntax = ref `Unknown
-
-let rec unsafeCreateElementEx ?_type ?name doc elt =
-  if Poly.(_type = None) && Poly.(name = None)
-  then Js.Unsafe.coerce (createElement doc elt)
-  else
-    match !createElementSyntax with
-    | `Standard ->
-        let res = Js.Unsafe.coerce (createElement doc elt) in
-        opt_iter _type (fun t -> res##._type := t);
-        opt_iter name (fun n -> res##.name := n);
-        res
-    | `Extended ->
-        let a = new%js Js.array_empty in
-        ignore (a##push_2 (Js.string "<") (Js.string elt));
-        opt_iter _type (fun t ->
-            ignore (a##push_3 (Js.string " type=\"") (html_escape t) (Js.string "\"")));
-        opt_iter name (fun n ->
-            ignore (a##push_3 (Js.string " name=\"") (html_escape n) (Js.string "\"")));
-        ignore (a##push (Js.string ">"));
-        Js.Unsafe.coerce (doc##createElement (a##join (Js.string "")))
-    | `Unknown ->
-        createElementSyntax :=
-          if
-            try
-              let el : inputElement Js.t =
-                Js.Unsafe.coerce
-                  (document##createElement (Js.string "<input name=\"x\">"))
-              in
-              Js.equals el##.tagName##toLowerCase (Js.string "input")
-              && Js.equals el##.name (Js.string "x")
-            with _ -> false
-          then `Extended
-          else `Standard;
-        unsafeCreateElementEx ?_type ?name doc elt
+let unsafeCreateElementEx ?_type ?name doc elt =
+  let res = Js.Unsafe.coerce (createElement doc elt) in
+  opt_iter _type (fun t -> res##._type := t);
+  opt_iter name (fun n -> res##.name := n);
+  res
 
 let createHtml doc : htmlElement t = unsafeCreateElement doc "html"
 
@@ -2729,7 +3938,29 @@ let createIframe doc : iFrameElement t = unsafeCreateElement doc "iframe"
 
 let createAudio doc : audioElement t = unsafeCreateElement doc "audio"
 
-let createVideo doc : audioElement t = unsafeCreateElement doc "video"
+let createVideo doc : videoElement t = unsafeCreateElement doc "video"
+
+let createOutput doc : outputElement t = unsafeCreateElement doc "output"
+
+let createProgress doc : progressElement t = unsafeCreateElement doc "progress"
+
+let createMeter doc : meterElement t = unsafeCreateElement doc "meter"
+
+let createDatalist doc : dataListElement t = unsafeCreateElement doc "datalist"
+
+let createTemplate doc : templateElement t = unsafeCreateElement doc "template"
+
+let createSlot doc : slotElement t = unsafeCreateElement doc "slot"
+
+let createPicture doc : pictureElement t = unsafeCreateElement doc "picture"
+
+let createSource doc : sourceElement t = unsafeCreateElement doc "source"
+
+let createTrack doc : trackElement t = unsafeCreateElement doc "track"
+
+let createTime doc : timeElement t = unsafeCreateElement doc "time"
+
+let createData doc : dataElement t = unsafeCreateElement doc "data"
 
 exception Canvas_not_available
 
@@ -2884,11 +4115,22 @@ module CoerceTo = struct
 
   let wheelEvent ev = unsafeCoerceEvent Js.Unsafe.global##._WheelEvent ev
 
-  let mouseScrollEvent ev = unsafeCoerceEvent Js.Unsafe.global##._MouseScrollEvent ev
-
   let popStateEvent ev = unsafeCoerceEvent Js.Unsafe.global##._PopStateEvent ev
 
   let messageEvent ev = unsafeCoerceEvent Js.Unsafe.global##._MessageEvent ev
+
+  let inputEvent ev = unsafeCoerceEvent Js.Unsafe.global##._InputEvent ev
+
+  let compositionEvent ev = unsafeCoerceEvent Js.Unsafe.global##._CompositionEvent ev
+
+  let errorEvent ev = unsafeCoerceEvent Js.Unsafe.global##._ErrorEvent ev
+
+  let progressEvent ev = unsafeCoerceEvent Js.Unsafe.global##._ProgressEvent ev
+
+  let pageTransitionEvent ev =
+    unsafeCoerceEvent Js.Unsafe.global##._PageTransitionEvent ev
+
+  let beforeUnloadEvent ev = unsafeCoerceEvent Js.Unsafe.global##._BeforeUnloadEvent ev
 end
 
 (****)
@@ -3240,139 +4482,6 @@ module Keyboard_code = struct
     | "Pause" -> Pause
     | _ -> Unidentified
 
-  let try_key location v =
-    match Js.to_string v with
-    | "a" | "A" -> KeyA
-    | "b" | "B" -> KeyB
-    | "c" | "C" -> KeyC
-    | "d" | "D" -> KeyD
-    | "e" | "E" -> KeyE
-    | "f" | "F" -> KeyF
-    | "g" | "G" -> KeyG
-    | "h" | "H" -> KeyH
-    | "i" | "I" -> KeyI
-    | "j" | "J" -> KeyJ
-    | "k" | "K" -> KeyK
-    | "l" | "L" -> KeyL
-    | "m" | "M" -> KeyM
-    | "n" | "N" -> KeyN
-    | "o" | "O" -> KeyO
-    | "p" | "P" -> KeyP
-    | "q" | "Q" -> KeyQ
-    | "r" | "R" -> KeyR
-    | "s" | "S" -> KeyS
-    | "t" | "T" -> KeyT
-    | "u" | "U" -> KeyU
-    | "v" | "V" -> KeyV
-    | "w" | "W" -> KeyW
-    | "x" | "X" -> KeyX
-    | "y" | "Y" -> KeyY
-    | "z" | "Z" -> KeyZ
-    | "0" -> Digit0
-    | "1" -> Digit1
-    | "2" -> Digit2
-    | "3" -> Digit3
-    | "4" -> Digit4
-    | "5" -> Digit5
-    | "6" -> Digit6
-    | "7" -> Digit7
-    | "8" -> Digit8
-    | "9" -> Digit9
-    | "-" -> Minus
-    | "=" -> Equal
-    (* Whitespace *)
-    | "Tab" -> Tab
-    | "Enter" -> (
-        match location with
-        | `Numpad -> NumpadEnter
-        | _ -> Enter)
-    | " " -> Space
-    (* Editing *)
-    | "Escape" -> Escape
-    | "Backspace" -> Backspace
-    | "Insert" -> Insert
-    | "Delete" -> Delete
-    | "CapsLock" -> CapsLock
-    (* Misc Printable *)
-    | "[" -> BracketLeft
-    | "]" -> BracketRight
-    | ";" -> Semicolon
-    | "\"" -> Quote
-    | "`" -> Backquote
-    | "\\" -> Backslash
-    | "," -> Comma
-    | "." -> Period
-    | "/" -> Slash
-    (* Function keys *)
-    | "F1" -> F1
-    | "F2" -> F2
-    | "F3" -> F3
-    | "F4" -> F4
-    | "F5" -> F5
-    | "F6" -> F6
-    | "F7" -> F7
-    | "F8" -> F8
-    | "F9" -> F9
-    | "F10" -> F10
-    | "F11" -> F11
-    | "F12" -> F12
-    (* Numpad keys *)
-    | "NumLock" -> NumLock
-    (* Modifier keys *)
-    | "Control" -> (
-        match location with
-        | `Left -> ControlLeft
-        | `Right | _ -> ControlRight)
-    | "Meta" -> (
-        match location with
-        | `Left -> MetaLeft
-        | `Right | _ -> MetaRight)
-    | "Shift" -> (
-        match location with
-        | `Left -> ShiftLeft
-        | `Right | _ -> ShiftRight)
-    | "Alt" -> (
-        match location with
-        | `Left -> AltLeft
-        | `Right | _ -> AltRight)
-    (* Arrow keys *)
-    | "ArrowLeft" -> ArrowLeft
-    | "ArrowRight" -> ArrowRight
-    | "ArrowUp" -> ArrowUp
-    | "ArrowDown" -> ArrowDown
-    (* Navigation *)
-    | "PageUp" -> PageUp
-    | "PageDown" -> PageDown
-    | "Home" -> Home
-    | "End" -> End
-    (* Sound *)
-    | "AudioVolumeMute" -> VolumeMute
-    | "AudioVolumeDown" -> VolumeDown
-    | "AudioVolumeUp" -> VolumeUp
-    (* Media *)
-    | "MediaTrackPrevious" -> MediaTrackPrevious
-    | "MediaTrackNext" -> MediaTrackNext
-    | "MediaPlayPause" -> MediaPlayPause
-    | "MediaStop" -> MediaStop
-    (* Browser special *)
-    | "ContextMenu" -> ContextMenu
-    | "BrowserSearch" -> BrowserSearch
-    | "BrowserHome" -> BrowserHome
-    | "BrowserFavorites" -> BrowserFavorites
-    | "BrowserRefresh" -> BrowserRefresh
-    | "BrowserStop" -> BrowserStop
-    | "BrowserForward" -> BrowserForward
-    | "BrowserBack" -> BrowserBack
-    (* Misc *)
-    | "OSLeft" -> OSLeft
-    | "OSRight" -> OSRight
-    | "ScrollLock" -> ScrollLock
-    | "PrintScreen" -> PrintScreen
-    | "IntlBackslash" -> IntlBackslash
-    | "IntlYen" -> IntlYen
-    | "Pause" -> Pause
-    | _ -> Unidentified
-
   let try_key_code_left = function
     | 16 -> ShiftLeft
     | 17 -> ControlLeft
@@ -3511,33 +4620,19 @@ module Keyboard_code = struct
 
   let get_key_code evt = evt##.keyCode
 
-  let try_key_location location evt =
-    match location with
-    | `Left -> run_next (get_key_code evt) try_key_code_left
-    | `Right -> run_next (get_key_code evt) try_key_code_right
-    | `Numpad -> run_next (get_key_code evt) try_key_code_numpad
-    | `Other -> fun x -> x
+  let try_key_location evt =
+    match evt##.location with
+    | 1 -> run_next (get_key_code evt) try_key_code_left
+    | 2 -> run_next (get_key_code evt) try_key_code_right
+    | 3 -> run_next (get_key_code evt) try_key_code_numpad
+    | _ -> fun v -> v
 
   let ( |> ) x f = f x
 
-  (* On the event, we have access to both `key` and `code` which are strings representing
-     which key was pressed.  `key` is for the "intended" key; that is to say, it takes
-     into account keyboard locale and software defined keyboard remappings (like QWERTY ->
-     Dvorak).  `code` is for the physical key that was pressed.  We almost always want to
-     use `key` over `code`. *)
   let of_event evt =
-    (* https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/location *)
-    let location =
-      match evt##.location with
-      | 1 -> `Left
-      | 2 -> `Right
-      | 3 -> `Numpad
-      | _ -> `Other
-    in
     Unidentified
-    |> try_next evt##.key (try_key location)
     |> try_next evt##.code try_code
-    |> try_key_location location evt
+    |> try_key_location evt
     |> run_next (get_key_code evt) try_key_code_normal
 
   let of_key_code = try_key_code_normal
@@ -3757,9 +4852,8 @@ let opt_tagged e = Opt.case e (fun () -> None) (fun e -> Some (tagged e))
 type taggedEvent =
   | MouseEvent of mouseEvent t
   | KeyboardEvent of keyboardEvent t
-  | MessageEvent of messageEvent t
+  | MessageEvent of (Unsafe.top, Unsafe.any opt) messageEvent t
   | MousewheelEvent of mousewheelEvent t
-  | MouseScrollEvent of mouseScrollEvent t
   | PopStateEvent of popStateEvent t
   | OtherEvent of event t
 
@@ -3774,17 +4868,13 @@ let taggedEvent (ev : #event Js.t) =
             (CoerceTo.wheelEvent ev)
             (fun () ->
               Js.Opt.case
-                (CoerceTo.mouseScrollEvent ev)
+                (CoerceTo.popStateEvent ev)
                 (fun () ->
                   Js.Opt.case
-                    (CoerceTo.popStateEvent ev)
-                    (fun () ->
-                      Js.Opt.case
-                        (CoerceTo.messageEvent ev)
-                        (fun () -> OtherEvent (ev :> event t))
-                        (fun ev -> MessageEvent ev))
-                    (fun ev -> PopStateEvent ev))
-                (fun ev -> MouseScrollEvent ev))
+                    (CoerceTo.messageEvent ev)
+                    (fun () -> OtherEvent (ev :> event t))
+                    (fun ev -> MessageEvent ev))
+                (fun ev -> PopStateEvent ev))
             (fun ev -> MousewheelEvent ev))
         (fun ev -> KeyboardEvent ev))
     (fun ev -> MouseEvent ev)
@@ -3793,26 +4883,128 @@ let opt_taggedEvent ev = Opt.case ev (fun () -> None) (fun ev -> Some (taggedEve
 
 let stopPropagation ev =
   let e = Js.Unsafe.coerce ev in
-  Optdef.case
-    e##.stopPropagation
-    (fun () -> e##.cancelBubble := Js._true)
-    (fun _ -> e##_stopPropagation)
+  e##_stopPropagation
+
+module DomStringMap = struct
+  let get (m : domStringMap t) (k : js_string t) : js_string t optdef = Js.Unsafe.get m k
+
+  let set (m : domStringMap t) (k : js_string t) (v : js_string t) : unit =
+    Js.Unsafe.set m k v
+
+  let remove (m : domStringMap t) (k : js_string t) : unit = Js.Unsafe.delete m k
+end
+
+let attachShadow ?delegatesFocus ~mode (el : #element t) =
+  let init : shadowRootInit t = Js.Unsafe.obj [||] in
+  init##.mode := mode;
+  Option.iter (fun v -> init##.delegatesFocus := v) delegatesFocus;
+  el##attachShadow init
+
+let scrollIntoView ?behavior ?block ?inline (el : #element t) =
+  let opts : scrollIntoViewOptions t = Js.Unsafe.obj [||] in
+  Option.iter (fun v -> opts##.behavior := v) behavior;
+  Option.iter (fun v -> opts##.block := v) block;
+  Option.iter (fun v -> opts##.inline := v) inline;
+  el##scrollIntoView_options opts
+
+let focus ?preventScroll (el : #element t) =
+  match preventScroll with
+  | None -> el##focus
+  | Some v ->
+      let opts : focusOptions t = Js.Unsafe.obj [||] in
+      opts##.preventScroll := v;
+      el##focus_options opts
+
+let showPopover ?source (el : #element t) =
+  match source with
+  | None -> el##showPopover
+  | Some s ->
+      let opts : showPopover_options t = Js.Unsafe.obj [||] in
+      opts##.source := (s :> element t);
+      el##showPopover_options opts
+
+let hidePopover (el : #element t) = el##hidePopover
+
+let togglePopover ?force ?source (el : #element t) =
+  match force, source with
+  | None, None -> el##togglePopover
+  | Some f, None -> el##togglePopover_force f
+  | _, _ ->
+      let opts : togglePopover_options t = Js.Unsafe.obj [||] in
+      Option.iter (fun f -> opts##.force := f) force;
+      Option.iter (fun s -> opts##.source := (s :> element t)) source;
+      el##togglePopover_options opts
+
+let postMessage ?transfer ?targetOrigin (w : window t) message =
+  let opts : windowPostMessageOptions t = Js.Unsafe.obj [||] in
+  Option.iter (fun v -> opts##.targetOrigin := v) targetOrigin;
+  Option.iter (fun v -> opts##.transfer := v) transfer;
+  w##postMessage_options message opts
+
+let makeScrollToOptions ?top ?left ?behavior () =
+  let opts : scrollToOptions t = Js.Unsafe.obj [||] in
+  Option.iter (fun v -> opts##.top := v) top;
+  Option.iter (fun v -> opts##.left := v) left;
+  Option.iter (fun v -> opts##.behavior := v) behavior;
+  opts
+
+let makeKeyframeAnimationOptions
+    ?delay
+    ?endDelay
+    ?fill
+    ?iterationStart
+    ?iterations
+    ?duration
+    ?direction
+    ?easing
+    ?id
+    ?composite
+    ?pseudoElement
+    ?timeline
+    () =
+  let opts : keyframeAnimationOptions t = Js.Unsafe.obj [||] in
+  Option.iter (fun v -> opts##.delay := v) delay;
+  Option.iter (fun v -> opts##.endDelay := v) endDelay;
+  Option.iter (fun v -> opts##.fill := v) fill;
+  Option.iter (fun v -> opts##.iterationStart := v) iterationStart;
+  Option.iter (fun v -> opts##.iterations := v) iterations;
+  Option.iter (fun v -> opts##.duration := v) duration;
+  Option.iter (fun v -> opts##.direction := v) direction;
+  Option.iter (fun v -> opts##.easing := v) easing;
+  Option.iter (fun v -> opts##.id := v) id;
+  Option.iter (fun v -> opts##.composite := v) composite;
+  Option.iter (fun v -> opts##.pseudoElement := v) pseudoElement;
+  Option.iter (fun v -> opts##.timeline := v) timeline;
+  opts
+
+let makeOptionalEffectTiming
+    ?delay
+    ?endDelay
+    ?fill
+    ?iterationStart
+    ?iterations
+    ?duration
+    ?direction
+    ?easing
+    () =
+  let opts : optionalEffectTiming t = Js.Unsafe.obj [||] in
+  Option.iter (fun v -> opts##.delay := v) delay;
+  Option.iter (fun v -> opts##.endDelay := v) endDelay;
+  Option.iter (fun v -> opts##.fill := v) fill;
+  Option.iter (fun v -> opts##.iterationStart := v) iterationStart;
+  Option.iter (fun v -> opts##.iterations := v) iterations;
+  Option.iter (fun v -> opts##.duration := v) duration;
+  Option.iter (fun v -> opts##.direction := v) direction;
+  Option.iter (fun v -> opts##.easing := v) easing;
+  opts
 
 let _requestAnimationFrame : (unit -> unit) Js.callback -> unit =
   Js.Unsafe.pure_expr (fun _ ->
       let w = Js.Unsafe.coerce window in
-      let l =
-        [ w##.requestAnimationFrame
-        ; w##.mozRequestAnimationFrame
-        ; w##.webkitRequestAnimationFrame
-        ; w##.oRequestAnimationFrame
-        ; w##.msRequestAnimationFrame
-        ]
-      in
-      try
-        let req = List.find (fun c -> Js.Optdef.test c) l in
-        fun callback -> Js.Unsafe.fun_call req [| Js.Unsafe.inject callback |]
-      with Not_found ->
+      let req = w##.requestAnimationFrame in
+      if Js.Optdef.test req
+      then fun callback -> Js.Unsafe.fun_call req [| Js.Unsafe.inject callback |]
+      else
         let now () = Js.to_float (new%js Js.date_now)##getTime in
         let last = ref (now ()) in
         fun callback ->
@@ -3858,6 +5050,20 @@ let clearTimeout (id : timeout_id_safe) =
   | Some x ->
       id := None;
       window##clearTimeout x
+
+let onload f =
+  let complete = Js.string "complete" in
+  if document##.readyState == complete
+  then f ()
+  else
+    ignore
+      (Dom.addEventListener
+         window
+         Event.load
+         (handler (fun _ ->
+              f ();
+              Js._true))
+         Js._false)
 
 let js_array_of_collection (c : #element collection Js.t) : #element Js.t Js.js_array Js.t
     =

@@ -24,20 +24,16 @@ type kind =
   | `Exe
   | `Cmo
   | `Cma
-  | `Cmj
-  | `Cmja
   | `Unknown
   ]
 
-let all = [ `Runtime; `Exe; `Cmo; `Cma; `Cmj; `Cmja; `Unknown ]
+let all = [ `Runtime; `Exe; `Cmo; `Cma; `Unknown ]
 
 let string_of_kind = function
   | `Runtime -> "runtime"
   | `Exe -> "exe"
   | `Cmo -> "cmo"
   | `Cma -> "cma"
-  | `Cmj -> "cmj"
-  | `Cmja -> "cmja"
   | `Unknown -> "unknown"
 
 let string_of_effects_backend : Config.effects_backend -> string = function
@@ -45,13 +41,163 @@ let string_of_effects_backend : Config.effects_backend -> string = function
   | `Cps -> "cps"
   | `Double_translation -> "double-translation"
   | `Jspi -> "jspi"
+  | `Native -> "native"
 
-let effects_backend_of_string = function
-  | "disabled" -> `Disabled
-  | "cps" -> `Cps
-  | "double-translation" -> `Double_translation
-  | "jspi" -> `Jspi
-  | _ -> invalid_arg "effects_backend_of_string"
+let effects_backend_of_string_result = function
+  | "disabled" -> Ok `Disabled
+  | "cps" -> Ok `Cps
+  | "double-translation" -> Ok `Double_translation
+  | "jspi" -> Ok `Jspi
+  | "native" -> Ok `Native
+  | s -> Error (Printf.sprintf "unknown effects backend %s" s)
+
+let effects_backend_of_string s =
+  match effects_backend_of_string_result s with
+  | Ok b -> b
+  | Error _ -> invalid_arg "effects_backend_of_string"
+
+let effects_backends_javascript =
+  [ "cps", `Cps; "double-translation", `Double_translation; "disabled", `Disabled ]
+
+let effects_backends_wasm =
+  [ "jspi", `Jspi; "cps", `Cps; "native", `Native; "disabled", `Disabled ]
+
+type config_key =
+  | Bool_key of
+      { name : string
+      ; get : unit -> bool
+      ; set : bool -> unit
+      ; default : bool
+      }
+  | Enum_key of
+      { name : string
+      ; get : unit -> string
+      ; set : string -> unit
+      ; valid : string list
+      }
+
+let config_key_name = function
+  | Bool_key { name; _ } -> name
+  | Enum_key { name; _ } -> name
+
+let config_keys target =
+  let effects_valid =
+    match target with
+    | `JavaScript -> List.map ~f:fst effects_backends_javascript
+    | `Wasm -> List.map ~f:fst effects_backends_wasm
+  in
+  let effects_get () = string_of_effects_backend (Config.effects ()) in
+  [ Enum_key
+      { name = "effects"
+      ; get = effects_get
+      ; set = (fun s -> Config.set_effects_backend (effects_backend_of_string s))
+      ; valid = effects_valid
+      }
+  ; Bool_key
+      { name = "use-js-string"
+      ; get = Config.Flag.use_js_string
+      ; set = Config.Flag.set "use-js-string"
+      ; default = true
+      }
+  ; Bool_key
+      { name = "toplevel"
+      ; get = Config.Flag.toplevel
+      ; set = Config.Flag.set "toplevel"
+      ; default = false
+      }
+  ]
+  @
+  match target with
+  | `Wasm ->
+      [ Bool_key
+          { name = "wasi"
+          ; get = Config.Flag.wasi
+          ; set = Config.Flag.set "wasi"
+          ; default = false
+          }
+      ]
+  | `JavaScript -> []
+
+let config_key_values = function
+  | Bool_key _ -> [ "true"; "false" ]
+  | Enum_key { valid; _ } -> valid
+
+let get_values keys =
+  List.map
+    ~f:(fun key ->
+      match key with
+      | Bool_key { name; get; _ } -> name, string_of_bool (get ())
+      | Enum_key { name; get; _ } -> name, get ())
+    keys
+
+let set_values keys entries =
+  (* Reject unknown keys before applying anything. *)
+  List.iter entries ~f:(fun (k, _) ->
+      if not (List.exists keys ~f:(fun key -> String.equal (config_key_name key) k))
+      then failwith (Printf.sprintf "unknown config key %S" k));
+  (* Iterate over [keys] (not [entries]) so that a key omitted from
+     [entries] is reset to its default rather than silently keeping
+     whatever value the caller left it at. *)
+  List.iter keys ~f:(fun key ->
+      let name = config_key_name key in
+      let v =
+        List.find_map entries ~f:(fun (k, v) ->
+            if String.equal k name then Some v else None)
+      in
+      match key with
+      | Bool_key { set; default; _ } -> (
+          match v with
+          | None -> set default
+          | Some "true" -> set true
+          | Some "false" -> set false
+          | Some v ->
+              failwith (Printf.sprintf "key %S expects true or false, got %S" name v))
+      | Enum_key { set; valid; _ } -> (
+          match v with
+          | None -> failwith (Printf.sprintf "missing required config key %S" name)
+          | Some v ->
+              if List.mem ~eq:String.equal v valid
+              then set v
+              else
+                failwith
+                  (Printf.sprintf
+                     "key %S expects one of {%s}, got %S"
+                     name
+                     (String.concat ~sep:", " valid)
+                     v)))
+
+let parse_entries ~sep s =
+  if String.is_empty s
+  then []
+  else
+    s
+    |> String.split_on_char ~sep
+    |> List.map ~f:String.trim
+    |> List.map ~f:(fun s ->
+        match String.lsplit2 ~on:'=' s with
+        | None -> failwith (Printf.sprintf "invalid config entry %S: missing '='" s)
+        | Some (k, v) -> k, v)
+
+let entries_to_string ~sep entries =
+  let entries = List.sort ~cmp:(fun (k1, _) (k2, _) -> String.compare k1 k2) entries in
+  String.concat ~sep (List.map ~f:(fun (k, v) -> Printf.sprintf "%s=%s" k v) entries)
+
+(* Like [get_values] but omits any bool key whose current value equals its
+   default. Used to produce a compact [--build-config] output:
+   [set_values] resets an omitted bool back to its default, so the
+   omitted-at-default convention round-trips. Keeps the build-config
+   directory name dune derives from this output short on Windows. *)
+let get_non_default_values keys =
+  List.filter_map keys ~f:(fun key ->
+      match key with
+      | Bool_key { name; get; default; _ } ->
+          let v = get () in
+          if Bool.equal v default then None else Some (name, string_of_bool v)
+      | Enum_key { name; get; _ } -> Some (name, get ()))
+
+let to_config_string entries = entries_to_string ~sep:"+" entries
+
+let parse_config_string s = parse_entries ~sep:'+' s
 
 let kind_of_string s =
   match List.find_opt all ~f:(fun k -> String.equal s (string_of_kind k)) with
@@ -71,39 +217,26 @@ let create kind =
     | "" -> Compiler_version.s
     | v -> Printf.sprintf "%s+%s" Compiler_version.s v
   in
-  [ "use-js-string", string_of_bool (Config.Flag.use_js_string ())
-  ; "effects", string_of_effects_backend (Config.effects ())
-  ; "version", version
-  ; "kind", string_of_kind kind
-  ]
+  get_values (config_keys (Config.target ()))
+  @ [ "version", version; "kind", string_of_kind kind ]
   |> List.fold_left ~init:StringMap.empty ~f:(fun acc (k, v) -> StringMap.add k v acc)
 
 let with_kind t kind = StringMap.add "kind" (string_of_kind kind) t
 
 let prefix = "//# buildInfo:"
 
-let to_string info =
-  let str =
-    StringMap.bindings info
-    |> List.map ~f:(fun (k, v) -> Printf.sprintf "%s=%s" k v)
-    |> String.concat ~sep:", "
-  in
+let to_comment info =
+  let str = entries_to_string ~sep:", " (StringMap.bindings info) in
   Printf.sprintf "%s%s\n" prefix str
 
-let parse s =
+let parse_comment s =
   match String.drop_prefix ~prefix s with
   | None -> None
   | Some suffix ->
       let t =
-        suffix
-        |> String.split_on_char ~sep:','
-        |> List.map ~f:String.trim
-        |> List.map ~f:(fun s ->
-               match String.lsplit2 ~on:'=' s with
-               | None -> s, ""
-               | Some (k, v) -> k, v)
+        parse_entries ~sep:',' suffix
         |> List.fold_left ~init:StringMap.empty ~f:(fun acc (k, v) ->
-               StringMap.add k v acc)
+            StringMap.add k v acc)
       in
       Some t
 
@@ -118,7 +251,7 @@ exception
     ; second : (string * string option)
     }
 
-let merge fname1 info1 fname2 info2 =
+let merge target fname1 info1 fname2 info2 =
   if String.equal fname1 fname2
   then
     StringMap.merge
@@ -138,29 +271,33 @@ let merge fname1 info1 fname2 info2 =
       info1
       info2
   else
+    (* Also check that version match *)
+    let matching_keys = "version" :: List.map ~f:config_key_name (config_keys target) in
     StringMap.merge
       (fun k v1 v2 ->
-        match k, v1, v2 with
-        | "kind", v1, v2 ->
+        match k, List.mem ~eq:String.equal k matching_keys, v1, v2 with
+        | "kind", _, v1, v2 ->
             if Option.equal String.equal v1 v2 then v1 else Some (string_of_kind `Unknown)
-        | ("effects" | "use-js-string" | "version"), Some v1, Some v2
-          when String.equal v1 v2 -> Some v1
-        | (("effects" | "use-js-string" | "version") as key), v1, v2 ->
+        | _, true, Some v1, Some v2 when String.equal v1 v2 -> Some v1
+        | key, true, v1, v2 ->
             raise
               (Incompatible_build_info { key; first = fname1, v1; second = fname2, v2 })
-        | _, Some v1, Some v2 when String.equal v1 v2 -> Some v1
+        | _, _, Some v1, Some v2 when String.equal v1 v2 -> Some v1
         (* ignore info that are present on one side only or have a different value *)
-        | _, Some _, Some _ -> None
-        | _, None, Some _ | _, Some _, None -> None
-        | _, None, None -> assert false)
+        | _, false, Some _, Some _ -> None
+        | _, false, None, Some _ | _, false, Some _, None -> None
+        | _, false, None, None -> assert false)
       info1
       info2
 
 let configure t =
-  StringMap.iter
-    (fun k v ->
-      match k with
-      | "use-js-string" -> Config.Flag.set k (bool_of_string v)
-      | "effects" -> Config.set_effects_backend (effects_backend_of_string v)
-      | _ -> ())
-    t
+  let entries =
+    StringMap.fold
+      (fun k v acc ->
+        match k with
+        | "version" | "kind" -> acc
+        | _ -> (k, v) :: acc)
+      t
+      []
+  in
+  set_values (config_keys (Config.target ())) entries

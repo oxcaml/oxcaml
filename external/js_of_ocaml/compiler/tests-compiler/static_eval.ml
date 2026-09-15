@@ -136,25 +136,25 @@ let%expect_test "static eval of string get" =
   print_fun_decl program (Some "copy_bucketlist");
   [%expect
     {|
-    function copy_bucketlist(param){
-     if(! param) return 0;
+    function copy_bucketlist(_a_){
+     if(! _a_) return 0;
      var
-      key = param[1],
-      data = param[2],
-      next = param[3],
+      key = _a_[1],
+      data = _a_[2],
+      next = _a_[3],
       prec$1 = [0, key, data, next],
       prec = prec$1,
-      param$0 = next;
+      _a_ = next;
      for(;;){
-      if(! param$0) return prec$1;
+      if(! _a_) return prec$1;
       var
-       key$0 = param$0[1],
-       data$0 = param$0[2],
-       next$0 = param$0[3],
+       key$0 = _a_[1],
+       data$0 = _a_[2],
+       next$0 = _a_[3],
        prec$0 = [0, key$0, data$0, next$0];
       prec[3] = prec$0;
       prec = prec$0;
-      param$0 = next$0;
+      _a_ = next$0;
      }
     }
     //end
@@ -190,12 +190,10 @@ let%expect_test "static eval of tags (optimized switch)" =
                 ? f(a0)
                 : runtime.caml_call_gen(f, [a0]);
        }
-       var
-        global_data = runtime.caml_get_global_data(),
-        Stdlib_Random = global_data.Stdlib__Random;
+       var Stdlib_Random = runtime.caml_get_global("Stdlib__Random");
        caml_call1(Stdlib_Random[5], 3);
-       var foobar = 3, export$ = [0, foobar, foobar], Test = [0, foobar, export$];
-       runtime.caml_register_global(3, Test, "Test");
+       var foobar = 3;
+       runtime.caml_register_global([0, foobar, [0, foobar, foobar]], "Test");
        return;
       }
       (globalThis));
@@ -233,12 +231,10 @@ let%expect_test "static eval of tags" =
                 ? f(a0)
                 : runtime.caml_call_gen(f, [a0]);
        }
-       var
-        global_data = runtime.caml_get_global_data(),
-        Stdlib_Random = global_data.Stdlib__Random;
+       var Stdlib_Random = runtime.caml_get_global("Stdlib__Random");
        caml_call1(Stdlib_Random[5], 3);
-       var foobar = 3, export$ = [0, foobar, foobar], Test = [0, foobar, export$];
-       runtime.caml_register_global(3, Test, "Test");
+       var foobar = 3;
+       runtime.caml_register_global([0, foobar, [0, foobar, foobar]], "Test");
        return;
       }
       (globalThis));
@@ -288,23 +284,15 @@ let%expect_test "static eval int prims" =
                 ? f(a0)
                 : runtime.caml_call_gen(f, [a0]);
        }
-       var
-        global_data = runtime.caml_get_global_data(),
-        Stdlib_Random = global_data.Stdlib__Random;
+       var Stdlib_Random = runtime.caml_get_global("Stdlib__Random");
        caml_call1(Stdlib_Random[5], 3);
-       var lt = 1;
        caml_call1(Stdlib_Random[5], 3);
-       var le = 1;
        caml_call1(Stdlib_Random[5], 3);
-       var eq = 0;
        caml_call1(Stdlib_Random[5], 3);
-       var neq = 1;
        caml_call1(Stdlib_Random[5], 3);
-       var
-        ult = 1,
-        export$ = [0, lt, le, eq, neq, ult],
-        Test = [0, lt, le, eq, neq, ult, export$];
-       runtime.caml_register_global(1, Test, "Test");
+       var lt = 1, le = 1, eq = 0, neq = 1, ult = 1;
+       runtime.caml_register_global
+        ([0, lt, le, eq, neq, ult, [0, lt, le, eq, neq, ult]], "Test");
        return;
       }
       (globalThis));

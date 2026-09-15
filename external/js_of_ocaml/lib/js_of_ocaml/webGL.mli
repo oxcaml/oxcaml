@@ -135,8 +135,16 @@ class type contextAttributes = object
   method preserveDrawingBuffer : bool t prop
 
   method preferLowPowerToHighPerformance : bool t prop
+  (** Removed from the specification, superseded by {!powerPreference}. *)
 
   method failIfMajorPerformanceCaveat : bool t prop
+
+  method powerPreference : js_string t prop
+  (** ["default"], ["low-power"] or ["high-performance"]. *)
+
+  method desynchronized : bool t prop
+
+  method xrCompatible : bool t prop
 end
 
 val defaultContextAttributes : contextAttributes t
@@ -1040,7 +1048,7 @@ class type renderingContext = object
 
   method _RENDERBUFFER_BINDING_ : renderbuffer t opt parameter readonly_prop
 
-  method _MAX_RENDERBUFFER_SIZE : int parameter readonly_prop
+  method _MAX_RENDERBUFFER_SIZE_ : int parameter readonly_prop
 
   method _NEVER : depthFunction readonly_prop
 

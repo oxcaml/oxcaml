@@ -44,27 +44,27 @@ let%expect_test _ =
   Util.print_fun_decl program (Some "fun1");
   [%expect
     {|
-    function fun1(param){
+    function fun1(_b_){
      function odd$0(counter, x){
       if(0 === x) return 0;
-      var _c_ = x - 1 | 0;
-      if(counter >= 50) return caml_trampoline_return(even$0, [0, _c_]);
-      var counter$0 = counter + 1 | 0;
-      return even$0(counter$0, _c_);
+      var _b_ = x - 1 | 0;
+      return counter < 50
+              ? even$0(counter + 1 | 0, _b_)
+              : caml_trampoline_return(even$0, [0, _b_]);
      }
      function odd(x){return caml_trampoline(odd$0(0, x));}
      function even$0(counter, x){
       if(0 === x) return 1;
-      var _c_ = x - 1 | 0;
-      if(counter >= 50) return caml_trampoline_return(odd$0, [0, _c_]);
-      var counter$0 = counter + 1 | 0;
-      return odd$0(counter$0, _c_);
+      var _b_ = x - 1 | 0;
+      return counter < 50
+              ? odd$0(counter + 1 | 0, _b_)
+              : caml_trampoline_return(odd$0, [0, _b_]);
      }
      function even(x){return caml_trampoline(even$0(0, x));}
      var _b_ = even(1);
      if(odd(1) === _b_)
       throw caml_maybe_attach_backtrace([0, Assert_failure, _a_], 1);
-     try{odd(5000); var _c_ = log_success(0); return _c_;}
+     try{odd(5000); _b_ = log_success(0); return _b_;}
      catch(exn){return caml_call1(log_failure, cst_too_much_recursion);}
     }
     //end
@@ -94,7 +94,7 @@ let%expect_test _ =
   Util.print_fun_decl program (Some "fun1");
   [%expect
     {|
-    function fun1(param){
+    function fun1(_b_){
      function odd$0(x){
       return 0 === x ? 0 : caml_trampoline_return(even$0, [0, x - 1 | 0]);
      }
@@ -106,8 +106,74 @@ let%expect_test _ =
      var _b_ = even(1);
      if(odd(1) === _b_)
       throw caml_maybe_attach_backtrace([0, Assert_failure, _a_], 1);
-     try{odd(5000); var _c_ = log_success(0); return _c_;}
+     try{odd(5000); _b_ = log_success(0); return _b_;}
      catch(exn){return caml_call1(log_failure, cst_too_much_recursion);}
+    }
+    //end
+    |}]
+
+let%expect_test "global-deadcode-bug" =
+  let prog =
+    {|
+     let log_success () = print_endline "Success!"
+     type t = { a : bool; b : bool }
+     let fun1 () =
+     let g f = if f.b then true else false in
+     let f x = print_endline "here"; g { a = true; b = false} in
+     let _ = (f 5000) in
+     log_success ()
+     let () = fun1 ()
+    |}
+  in
+  Util.compile_and_run ~flags:[ "--disable"; "inline" ] prog;
+  [%expect {|
+    here
+    Success!
+    |}];
+  let program = Util.compile_and_parse ~flags:[ "--disable"; "inline" ] prog in
+  Util.print_fun_decl program (Some "fun1");
+  [%expect
+    {|
+    function fun1(param){
+     function f(x){caml_call1(Stdlib[46], cst_here);}
+     f(5000);
+     return log_success(0);
+    }
+    //end
+    |}]
+
+let%expect_test "_" =
+  let prog =
+    {|
+type t =
+  | Zero
+  | Succ of t
+
+let rules (rules : t -> t) : t -> t =
+  function
+  | Zero -> Succ Zero
+  | Succ n -> Succ (rules n)
+
+let rec step n =
+  rules step n
+
+let rec grow (iters : int) (n : t) : t =
+  if iters < 0 then n else
+    (grow [@tailcall]) (iters - 1) (step n)
+|}
+  in
+  let program = Util.compile_and_parse ~flags:[ "--debug"; "js_assign" ] prog in
+  Util.print_fun_decl program (Some "grow");
+  [%expect
+    {|
+    function grow(iters$1, n$1){
+     var iters = iters$1, n = n$1;
+     for(;;){
+      if(0 > iters) return n;
+      var n$0 = step(n), iters$0 = iters - 1 | 0;
+      iters = iters$0;
+      n = n$0;
+     }
     }
     //end
     |}]

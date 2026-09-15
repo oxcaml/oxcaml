@@ -17,7 +17,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Util
+open! Util
+
+(* In OxCaml, raise is always reraise, which changes the generated code. *)
+[@@@if not oxcaml]
 
 let%expect_test "" =
   let program =
@@ -43,8 +46,7 @@ let wrap f =
      catch(exn$1){
       var exn = caml_wrap_exception(exn$1);
       for(;;){
-       var tag = exn[1];
-       if(tag !== Nested) throw caml_maybe_attach_backtrace(exn, 0);
+       if(exn[1] !== Nested) throw caml_maybe_attach_backtrace(exn, 1);
        var exn$0 = exn[2];
        exn = exn$0;
       }
@@ -53,12 +55,11 @@ let wrap f =
     //end
     function wrap$1(f, cont){
      function _a_(exn$1){
-      var tag = exn$1[1];
-      if(tag === Nested){
+      if(exn$1[1] === Nested){
        var exn$0 = exn$1[2];
        return caml_exact_trampoline_call1(_a_, exn$0);
       }
-      var raise = caml_pop_trap(), exn = caml_maybe_attach_backtrace(exn$1, 0);
+      var raise = caml_pop_trap(), exn = caml_maybe_attach_backtrace(exn$1, 1);
       return raise(exn);
      }
      runtime.caml_push_trap(_a_);

@@ -1,0 +1,165 @@
+name: js_of_ocaml
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  schedule:
+    # Prime the caches every Monday
+    - cron: 0 1 * * MON
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    env:
+      OXCAML_OPAM_REPO_REF: d89747aa6e7b9f44d6cc844dca5b5e7c8a90716f
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 4.14 and 5.5 are tested on all three OSes; build-only compiler
+        # coverage lives in the build workflow.
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        ocaml-compiler:
+          - "4.14"
+          - "5.5"
+        ocaml-name:
+          - ""
+        include:
+          # Display names for the OSes
+          - os: ubuntu-latest
+            os-name: Ubuntu
+          - os: macos-latest
+            os-name: MacOS
+          - os: windows-latest
+            os-name: Windows
+          # Extra configurations, Ubuntu-only
+          - os: ubuntu-latest
+            os-name: Ubuntu
+            ocaml-name: "4.14.2+32bit"
+            ocaml-compiler: "ocaml-variants.4.14.2+options,ocaml-option-32bit"
+          - os: ubuntu-latest
+            os-name: Ubuntu
+            ocaml-name: "5.6+trunk"
+            ocaml-compiler: "ocaml-variants.5.6.0+trunk"
+          # Note this OCaml compiler is bytecode only
+          - os: ubuntu-latest
+            os-name: Ubuntu
+            ocaml-name: ""
+            ocaml-compiler: "5.1"
+          - os: ubuntu-latest
+            os-name: Ubuntu
+            ocaml-name: "OxCaml"
+            ocaml-compiler: "ocaml-variants.5.2.0+ox"
+
+    runs-on: ${{ matrix.os }}
+
+    name:
+       ${{ matrix.ocaml-name != '' && matrix.ocaml-name || matrix.ocaml-compiler}} / ${{ matrix.os-name }} / Tests${{ (startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.')) && ' / Effects' || ''}}${{ (matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.5') && ' / Docs' || ''}}
+
+
+    steps:
+      - name: Update apt cache
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo apt-get update
+
+      - name: Checkout tree
+        uses: actions/checkout@v7
+
+        # EJGA: Note that I tried to fix this upstream as depext is
+        # getting much better, but no luck yet, c.f:
+        # https://github.com/ocaml/opam-repository/pull/26626
+      - name: Install apt 32-bit dependencies
+        if: contains( matrix.ocaml-compiler, 'ocaml-option-32bit')
+        run: |
+          sudo apt-get install aptitude
+          sudo dpkg --add-architecture i386
+          sudo aptitude -o Acquire::Retries=30 update -q
+          # Note we also install the 64-bit versions here as opam will
+          # try to install them anyways, so we save an apt-roundtrip.
+          sudo aptitude -o Acquire::Retries=30 install gcc-multilib g++-multilib pkg-config libgmp-dev libgmp-dev:i386 libx11-dev libx11-dev:i386 libxft-dev libxft-dev:i386 -y
+
+      - name: Set-up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: latest
+
+      - name: Set-up OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+        if: ${{ ! endsWith(matrix.ocaml-compiler, '+ox') }}
+
+      - name: Set-up OxCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          opam-repositories: |
+            default: https://github.com/ocaml/opam-repository.git
+            ox: https://github.com/oxcaml/opam-repository.git#${{ env.OXCAML_OPAM_REPO_REF }}
+        if: ${{ endsWith(matrix.ocaml-compiler, '+ox') }}
+
+      - name: Pin ppxlib
+        if: matrix.ocaml-name == '5.6+trunk'
+        run: opam pin add -n ppxlib https://github.com/hhugo/ppxlib.git#support-5.6
+
+      # Work-around a race between reinstalling mingw-w64-shims
+      # (because of conf-pkg-config optional dep) and installing other
+      # packages that implicitly depend on mingw-w64-shims.
+      - run: opam install conf-pkg-config conf-mingw-w64-g++-i686 conf-mingw-w64-g++-x86_64
+        if: runner.os == 'Windows'
+
+      - name: Set-up Binaryen
+        uses: Aandreba/setup-binaryen@v1.0.0
+        with:
+          token: ${{ github.token }}
+
+      - run: opam install . --deps-only --with-test
+        # Install the test dependencies
+
+      - name: Pin js_of_ocaml
+        # OxCaml wants a precise version of Js_of_ocaml
+        run: opam pin . -n --with-version 6.0.1+ox
+
+      - run: opam install .
+        # Install the packages (without running the tests)
+
+      - run: opam exec -- make all
+
+      - run: opam exec -- make tests
+
+      - name: Run Babel downleveling test
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          npm install
+          opam exec -- make test-babel-downlevel
+
+      # Effect handlers require OCaml 5
+      - run: opam exec -- dune build @all @runtest @runtest-js --profile with-effects
+        if: ${{ startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.') }}
+
+      - run: opam exec -- dune build @all @runtest @runtest-js --profile with-effects-double-translation
+        if: ${{ startsWith(matrix.ocaml-compiler, '5.') || startsWith(matrix.ocaml-compiler, 'ocaml-variants.5.') }}
+
+      - run: opam exec -- git diff --exit-code
+
+      # Documentation is built and deployed by a dedicated workflow (doc.yml):
+      # odoc (manual + API) + the interactive examples, themed with the Ocsigen
+      # chrome and published to gh-pages (ocsigen.org/js_of_ocaml/). Here we only
+      # check that it compiles. The old `make doc` -> wikidoc -> html_of_wiki
+      # pipeline has been retired.
+      # Documentation is checked once, on the latest release (odoc is not
+      # installable against trunk)
+      - name: build doc (compile check)
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.5' }}
+        run: |
+          opam install odoc yojson ocp-indent graphics higlo
+          opam exec -- make doc
+

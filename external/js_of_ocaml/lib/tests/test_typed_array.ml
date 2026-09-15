@@ -116,11 +116,11 @@ let test : type a b c. (a, b, c) Setup.t -> b array -> unit =
   let a1 = ba_of_array setup a0 in
 
   let a2 = from_genarray (type_of_setup setup) a1 in
-  if not (array_of_ta setup a2 = a0) then print_endline "`a2` doesnt match `a0`";
+  if not (array_of_ta setup a2 = a0) then print_endline "`a2` doesn't match `a0`";
   if not (ta_type_is_correct setup a2) then print_endline "corrupted typedArray type";
 
   let a3 = to_genarray a2 in
-  if not (array_of_ba a3 = a0) then print_endline "`a3` doesnt match `a0`";
+  if not (array_of_ba a3 = a0) then print_endline "`a3` doesn't match `a0`";
   if not (kind_field_is_correct setup a3) then print_endline "corrupted `kind`";
   ()
 
@@ -145,6 +145,17 @@ let%expect_test "float32" =
 
 let%expect_test "float64" =
   test Setup.Float64 [| Float.neg_infinity; -1.; 0.; 1.; Float.infinity |];
+  [%expect {||}]
+
+let%expect_test "float arrays from JS arrays" =
+  let input = [| -1.; -1.; 3.; -1.; -1.; 3. |] in
+  let js_input = Js.array (Array.map Js.float input) in
+  let float32 = new%js float32Array_fromArray js_input in
+  let float64 = new%js float64Array_fromArray js_input in
+  if not (array_of_ta Setup.Float32 float32 = input)
+  then print_endline "float32Array_fromArray doesn't match its input";
+  if not (array_of_ta Setup.Float64 float64 = input)
+  then print_endline "float64Array_fromArray doesn't match its input";
   [%expect {||}]
 
 let%expect_test "int8" =
