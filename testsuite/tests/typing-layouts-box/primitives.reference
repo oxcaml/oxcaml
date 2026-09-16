@@ -5,3 +5,5 @@ vec128: ok
 vec256: ok
 products: ok
 unboxed records: ok
+all-void records: ok
+local allocation: ok

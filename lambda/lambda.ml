@@ -3842,7 +3842,7 @@ let primitive_result_layout (p : primitive) =
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
   | Pbox (_layout, _) ->
-    (* CR zeisbach: compute a more precise layout here! *)
+    (* CR zeisbach: compute a more precise output layout here! *)
     layout_block
   | Punbox layout -> layout
 
