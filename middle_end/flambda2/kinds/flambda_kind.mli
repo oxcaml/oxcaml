@@ -235,7 +235,8 @@ module With_subkind : sig
       | Tagged_immediate
       | Variant of
           { consts : Target_ocaml_int.Set.t;
-            non_consts : (Block_shape.t * full_kind list) Tag.Scannable.Map.t
+            non_consts :
+              (Block_shape.t * full_kind list) option Tag.Scannable.Map.t
           }
       | Float_block of { num_fields : int }
       | Float_array

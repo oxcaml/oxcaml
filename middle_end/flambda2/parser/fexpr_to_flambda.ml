@@ -59,8 +59,11 @@ let rec subkind :
       non_consts
       |> List.map (fun (tag, sk) ->
           ( tag_scannable tag,
-            ( Flambda_kind.Block_shape.Scannable Value_only,
-              List.map value_kind_with_subkind sk ) ))
+            Option.map
+              (fun sk ->
+                ( Flambda_kind.Block_shape.Scannable Value_only,
+                  List.map value_kind_with_subkind sk ))
+              sk ))
       |> Tag.Scannable.Map.of_list
     in
     Variant { consts; non_consts }
