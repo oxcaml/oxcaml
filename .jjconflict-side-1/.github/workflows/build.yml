@@ -1,0 +1,687 @@
+# CYBERSECURITY WARNING: DO NOT give workflows write permission to any source code repo.
+# If you want this functionality, ask for help from a subset of:
+# @jvanburen @glittershark @mshinwell
+name: build
+on:
+  push:
+    branches:
+      - main
+      - '*microbranch'
+    tags:
+      - '*'
+  pull_request:
+  merge_group:
+permissions: {}
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      actions: read # the "Print diff artifact URL" step reads workflow artifacts via `gh api`
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_debug: true
+            build_ast_dependent_libs: true
+            check_installed: true
+            sysdeps: gdb
+
+          - name: dissector-assembler (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            dissector_assembler: true
+            sysdeps: gdb
+
+          - name: stack-checks (x86_64-linux)
+            config: --enable-stack-checks
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          - name: poll-insertion (x86_64-linux)
+            config: --enable-poll-insertion
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          - name: multidomain (x86_64-linux)
+            config: --enable-stack-checks --enable-poll-insertion --enable-multidomain
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          - name: no-flat-float-array (x86_64-linux)
+            config: --disable-flat-float-array
+            os: warp-ubuntu-latest-x64-8x
+            sysdeps: gdb
+
+          # We use a custom install prefix for this workflow.
+          # Consider renaming it to indicate as such when convenient.
+          - name: dev (x86_64-linux)
+            config: --enable-dev --enable-keyword-edition=5.2
+            os: warp-ubuntu-latest-x64-8x
+            install_path: _custom_install
+            sysdeps: gdb
+
+          - name: debug stack-checks (x86_64-linux)
+            config: --enable-stack-checks --enable-keyword-edition=5.4
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+            sysdeps: gdb
+
+          - name: debug (x86_64-linux)
+            config: --enable-keyword-edition=5.2+effect
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+            sysdeps: gdb
+
+          - name: O3 metrics (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_'
+            ocamlparam: '_,O3=1'
+            collect_metrics: true
+            disable_testcases: 'testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml testsuite/tests/reaper/unboxed_closure_not_needed.ml'
+
+          - name: Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
+            config: --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            ocamlparam: '_,Oclassic=1'
+            # CR-someday dallsopp: various failures, descending from this
+            # previously being a runtime4-only check:
+            #   backtrace/print_location.ml
+            #   backtrace/backtrace_effects_nested.ml
+            #   effects/preemptible_fibers.ml
+            #   effects/preemption/*
+            #   frame-pointers/* (apart from exceptions.ml which was new in 5.4, but is sensitive to inlining)
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/backtrace/backtrace_effects_nested.ml testsuite/tests/backtrace/print_location.ml testsuite/tests/effects/preemptible_fibers.ml testsuite/tests/effects/preemption/basic.ml testsuite/tests/effects/preemption/basic2.ml testsuite/tests/effects/preemption/gc_in_handler.ml testsuite/tests/effects/preemption/lazy_values.ml testsuite/tests/effects/preemption/live_across_preemption1.ml testsuite/tests/effects/preemption/live_across_preemption2.ml testsuite/tests/effects/preemption/multiple_live_continuations.ml testsuite/tests/effects/preemption/resume_after_alloc.ml testsuite/tests/effects/preemption/shallow_handlers.ml testsuite/tests/effects/preemption/stored_continuation.ml testsuite/tests/effects/preemption/weak_references.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml testsuite/tests/reaper/* testsuite/tests/flambda2/n_way_join_null.ml testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/flambda2/issue5721.ml testsuite/tests/flambda2/stdlib_functor_inlining.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/gadt_simplified_switch.ml testsuite/tests/flambda2/simplify/* testsuite/tests/frame-pointers/c_call.ml testsuite/tests/frame-pointers/effects.ml testsuite/tests/frame-pointers/exceptions.ml testsuite/tests/frame-pointers/reperform.ml testsuite/tests/frame-pointers/stack_realloc.ml testsuite/tests/frame-pointers/stack_realloc2.ml testsuite/tests/quotation/eval/current_unit/eval_before_init_ok.ml testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/array_element_kind_meet.ml testsuite/tests/tool-ocamlfilt/e2e_[ios]*.ml testsuite/tests/flambda2/rec_info_alias/*.ml'
+
+          - name: regalloc (aarch64-darwin)
+            config: --disable-warn-error
+            os: warp-macos-15-arm64-6x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            run_regalloc_tool: true
+            sysdeps: gdb
+
+          - name: debug regalloc (aarch64-darwin)
+            config: --disable-warn-error
+            os: warp-macos-15-arm64-6x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+            run_regalloc_tool: true
+            sysdeps: gdb
+
+          - name: regalloc (aarch64-linux)
+            config: --disable-warn-error
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            run_regalloc_tool: true
+            sysdeps: gdb
+
+          - name: regalloc multidomain (aarch64-linux)
+            config: --enable-poll-insertion --enable-multidomain --disable-warn-error
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
+            sysdeps: gdb
+
+          - name: frame-pointers irc (x86_64-linux)
+            config: --enable-frame-pointers
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=irc'
+            ocamlparam: '_,w=-46,regalloc=irc'
+            check_arch: true
+            sysdeps: gdb
+
+          - name: cfg-invariants (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            check_arch: true
+            sysdeps: gdb
+
+          - name: cfg-invariants (aarch64-linux)
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            check_arch: true
+            sysdeps: gdb
+
+          - name: vectorizer (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
+            check_arch: true
+            sysdeps: gdb
+
+          - name: x86-peephole (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            ocamlparam: '_,w=-46,x86-peephole-optimize=1'
+            check_arch: true
+            sysdeps: gdb
+
+          - name: experimental-optimizations (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            ocamlparam: "_,w=-46,experimental-optimizations-optimize=1"
+            check_arch: true
+            sysdeps: gdb
+
+          - name: address-sanitizer (x86_64-linux)
+            config: --enable-address-sanitizer
+            os: warp-ubuntu-latest-x64-8x
+            cc: clang
+            sysdeps: clang
+
+          # CR sspies: The DWARF tests unconditionally pass -function-sections
+          # in their dune rules, which requires --enable-function-sections at
+          # configure time. The tests should be made parametric over function
+          # sections so they can run with or without it.
+          # CR sspies: We should enable --enable-oxcaml-dwarf-on-compiler in
+          # at least one CI build to test that the compiler itself can be built
+          # with DWARF enabled under function sections.
+          - name: dwarf-tests (x86_64-linux)
+            config: --enable-function-sections
+            os: warp-ubuntu-latest-x64-8x
+            dwarf_tests_only: true
+            oxcaml_llvm_tag: oxcaml-lldb-21.1.0+oxcaml1
+            oxcaml_llvm_source_branch: oxcaml-llvm-plugin
+            sysdeps: gdb
+
+          - name: frame-pointers llvmize-tests (x86_64-linux)
+            config: --enable-frame-pointers
+            os: warp-ubuntu-latest-x64-8x
+            llvmize_tests_only: true
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus4
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            sysdeps: gdb
+
+          - name: musl (x86_64-linux)
+            os: warp-ubuntu-latest-x64-8x
+            cc: musl-gcc
+            sysdeps: musl musl-tools
+
+          # Here and below, we put 'reaper=1,_' instead of '_,reaper=1', as
+          # some tests rely on explicitely controlling whether the reaper is
+          # enabled.
+          - name: reaper
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'reaper=1,_'
+            ocamlparam: 'reaper=1,_'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/cross_function_cse_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/tool-ocamlfilt/e2e_ocaml.ml testsuite/tests/flambda2/simplify/* testsuite/tests/flambda2/rec_info_alias/*.ml'
+            sysdeps: gdb
+
+          - name: reaper with local value slots
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/cross_function_cse_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml testsuite/tests/flambda2/examples/unknown/bigarrays.ml testsuite/tests/flambda2/examples/unknown/test_cmx_offsets2.ml testsuite/tests/tool-ocamlfilt/e2e_[os]*.ml testsuite/tests/flambda2/simplify/* testsuite/tests/flambda2/rec_info_alias/*.ml'
+            sysdeps: gdb
+
+          # Same as for the reaper, some tests rely on being able to enable or disable
+          # lifting and specialization, also it's pointless to test match-in-match without O3 (or more)
+          # because it requires join points.
+          - name: match-in-match
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
+            ocamlparam: 'O3=1,flambda2-match-in-match=1,_'
+            disable_testcases: 'testsuite/tests/flambda2/n_way_join_preserves_null.ml testsuite/tests/basic-modules/recursive_module_init.ml testsuite/tests/flambda2/examples/unknown/* testsuite/tests/flambda2/examples/wrong/* testsuite/tests/flambda2/examples/*.[mf]l testsuite/tests/flambda2/simplify/variant_unboxing.ml'
+            sysdeps: gdb
+
+    env:
+      J: "8"
+      run_testsuite: "true"
+
+    steps:
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Runner information
+        if: runner.os == 'Linux'
+        run: |
+          # There have been times where we have trouble with response times from
+          # azure.archive.ubuntu.com - uncomment if needed:
+          # sudo sed -i -e '/azure.archive.ubuntu.com/s/^/#/' /etc/apt/apt-mirrors.txt
+          cat /etc/apt/apt-mirrors.txt
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux' && (matrix.sysdeps != '')
+        env:
+          SYSDEPS: ${{ matrix.sysdeps }}
+          MATRIX_CC: ${{ matrix.cc }}
+        run: |
+          # $SYSDEPS is deliberately unquoted: word-splitting is intended
+          # (it is a whitespace-separated list of packages).
+          if ! sudo apt-get install -y $SYSDEPS; then
+            sudo apt-get update -y
+            sudo apt-get install -y $SYSDEPS
+          fi
+          if [ "$MATRIX_CC" = 'musl-gcc' ]; then
+            # Install musl-compatible kernel headers
+            mkdir musl-kernel
+            filename='v4.19.88-1.tar.gz'
+            wget "https://github.com/sabotage-linux/kernel-headers/archive/refs/tags/$filename"
+            shasum --check <(echo "44a07e9f18033cff7840dbb112fff2862c0fb8fc  $filename")
+            tar -xzf "$filename" -C musl-kernel --strip-components=1
+            echo "C_INCLUDE_PATH=$PWD/musl-kernel/x86/include" >> "$GITHUB_ENV"
+          fi
+
+      - name: Install autoconf and bash and parallel (macOS)
+        if: runner.os == 'macOS'
+        run: HOMEBREW_NO_INSTALL_CLEANUP=TRUE brew install autoconf bash parallel
+        # bash >=4 is needed for tools/gen_ocamlj_rules.sh
+
+      - name: Pretend we're running in a container (makes setup-ocaml go faster)
+        if: runner.os == 'Linux'
+        run: sudo touch /.dockerenv
+        # makes setup-ocaml skip apt-get, which is slow on first invocation
+
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@605a7e998e76e035b82c14d618a6e1010732c4ce # v3.7.1
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.4.0-with-ocaml.5.4.0-with-ocamlformat.0.29.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
+
+      - name: Set up Opam environment
+        # this command adds the opam environment to the PATH.
+        run: |
+          opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
+
+      - name: Disable any testcases
+        env:
+          DISABLE_TESTCASES: ${{ matrix.disable_testcases }}
+        run: |
+          disable_testcases="$DISABLE_TESTCASES"
+          if [ -n "$disable_testcases" ]; then
+            rm -rfv $disable_testcases
+          fi
+
+      - name: Install custom OxCaml LLVM
+        if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        env:
+          MATRIX_OXCAML_LLVM_TAG: ${{ matrix.oxcaml_llvm_tag }}
+          MATRIX_OXCAML_LLVM_SOURCE_BRANCH: ${{ matrix.oxcaml_llvm_source_branch }}
+        run: |
+          # Determine architecture
+          if [[ "$RUNNER_ARCH" == "X64" ]]; then
+            ARCH="x86_64"
+          elif [[ "$RUNNER_ARCH" == "ARM64" ]]; then
+            ARCH="aarch64"
+          else
+            echo "Unsupported architecture: $RUNNER_ARCH"
+            exit 1
+          fi
+
+          OXCAML_LLVM_TAG="$MATRIX_OXCAML_LLVM_TAG"
+          OXCAML_LLVM_SOURCE_BRANCH="$MATRIX_OXCAML_LLVM_SOURCE_BRANCH"
+          OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
+
+          # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
+          cd $GITHUB_WORKSPACE
+          wget -O oxcaml-llvm.tar.gz "$OXCAML_LLVM_URL"
+          mkdir -p oxcaml-llvm
+          tar -xzf oxcaml-llvm.tar.gz -C oxcaml-llvm --strip-components=1
+
+      - name: Configure OxCaml
+        env:
+          MATRIX_CC: ${{ matrix.cc }}
+          INSTALL_PATH: ${{ matrix.install_path }}
+          DISSECTOR_ASSEMBLER: ${{ matrix.dissector_assembler }}
+          MATRIX_CONFIG: ${{ matrix.config }}
+        run: |
+          if [[ -n "$MATRIX_CC" ]]; then
+            export CC="$MATRIX_CC"
+          fi
+          if [[ -n "$INSTALL_PATH" ]]; then
+            install_path="$INSTALL_PATH"
+          else
+            install_path="_install"
+          fi
+          dissector_config=""
+          if [[ "$DISSECTOR_ASSEMBLER" == "true" ]]; then
+            dissector_config="--enable-assembler-suitable-for-dissector=$GITHUB_WORKSPACE/oxcaml-llvm/bin/llvm-mc"
+          fi
+          autoconf
+          # $MATRIX_CONFIG is deliberately unquoted: word-splitting is
+          # intended (it is a whitespace-separated list of configure flags).
+          ./configure \
+            --prefix=$GITHUB_WORKSPACE/$install_path \
+            $MATRIX_CONFIG \
+            $dissector_config
+
+      - name: Setup for saving core files (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo mkdir /cores
+          sudo chmod 777 /cores
+          # Core filenames will be of the form executable.pid.timestamp:
+          sudo bash -c 'echo "/cores/%e.%p.%t" > /proc/sys/kernel/core_pattern'
+
+      - name: Setup for saving core files (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          sudo chmod 1777 /cores
+          sudo sysctl kern.coredump=1
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.get-task-allow bool true" /tmp/core.entitlements
+          # Find opam's OCaml installation
+          OCAML_BIN=$(opam var bin)
+          codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlc.opt
+          codesign -s - -f --entitlements /tmp/core.entitlements $OCAML_BIN/ocamlopt.opt
+
+      - name: Build AST-dependent libraries against bootstrap compiler
+        if: matrix.build_ast_dependent_libs == true
+        run: make ast-dependent-libs-build-boot
+
+      - name: Build OxCaml
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true
+        id: build
+        run: |
+          if [ "$COLLECT_METRICS" = "true" ]; then
+            mkdir $GITHUB_WORKSPACE/_profile_csv
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make compiler \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run OxCaml testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "$COLLECT_METRICS" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make runtest \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Run upstream testsuite
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "$COLLECT_METRICS" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make runtest-upstream \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Check installed library metadata
+        if: matrix.check_installed == true
+        run: |
+          make install
+          make check-installed
+
+      - name: Run minimizer
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && steps.build.conclusion == 'success' && always()
+        run: |
+          if [ "$COLLECT_METRICS" = "true" ]; then
+            BUILD_OCAMLPARAM="$BUILD_OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+            OCAMLPARAM="$OCAMLPARAM,dump-dir=$GITHUB_WORKSPACE/_profile_csv,dump-into-csv=1,profile=1"
+          fi
+          ulimit -c unlimited
+          make minimizer \
+            || (if [ "$expected_fail" = true ]; then exit 0; else exit 1; fi);
+        env:
+          COLLECT_METRICS: ${{ matrix.collect_metrics }}
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+        # Install the compiler for metrics_collection configuration to populate _install directory
+        # This is needed for the metrics collection step to analyze installed artifacts
+      - name: Reinstall the compiler for metrics collection
+        if: matrix.dwarf_tests_only != true && matrix.llvmize_tests_only != true && matrix.collect_metrics == true
+        run: make install
+        env:
+          BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
+          OCAMLPARAM: ${{ matrix.ocamlparam }}
+          OCAMLRUNPARAM: ${{ matrix.ocamlrunparam }}
+          USE_RUNTIME: ${{ matrix.use_runtime }}
+
+      - name: Promote failed tests and capture diffs
+        # Compute the diff for an arbitrary job, we expect all to have the same diff
+        if: failure() && matrix.name == 'default (x86_64-linux)'
+        continue-on-error: true
+        run: |
+          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+          make promote-failed
+          if ! git diff --quiet; then
+            git diff > $GITHUB_WORKSPACE/test-diffs.patch
+            echo "Test output differences detected and saved to artifact"
+            echo "DIFF_CREATED=true" >> $GITHUB_ENV
+          else
+            echo "No test output differences found"
+            echo "DIFF_CREATED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Build and test OxCaml DWARF
+        if: matrix.dwarf_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        run: |
+          ulimit -c unlimited
+          make runtest-dwarf
+        env:
+          OXCAML_LLDB: ${{ github.workspace }}/oxcaml-llvm/bin/lldb
+
+      - name: Promote failed DWARF tests and capture diffs
+        if: failure() && matrix.dwarf_tests_only == true
+        continue-on-error: true
+        run: |
+          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+          make promote
+          if ! git diff --quiet; then
+            git diff > $GITHUB_WORKSPACE/test-diffs.patch
+            echo "Test output differences detected and saved to artifact"
+            echo "DIFF_CREATED=true" >> $GITHUB_ENV
+          else
+            echo "No test output differences found"
+            echo "DIFF_CREATED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Build and test OxCaml Llvmize
+        if: matrix.llvmize_tests_only == true && matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
+        run: |
+          ulimit -c unlimited
+          make runtest-llvmize
+        env:
+          OXCAML_CLANG: ${{ github.workspace }}/oxcaml-llvm/bin/clang
+
+      - name: Promote failed llvmize tests and capture diffs
+        if: failure() && matrix.llvmize_tests_only == true
+        continue-on-error: true
+        run: |
+          export PATH=$GITHUB_WORKSPACE/ocaml-414/_install/bin:$PATH
+          make promote
+          if ! git diff --quiet; then
+            git diff > $GITHUB_WORKSPACE/test-diffs.patch
+            echo "Test output differences detected and saved to artifact"
+            echo "DIFF_CREATED=true" >> $GITHUB_ENV
+          else
+            echo "No test output differences found"
+            echo "DIFF_CREATED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload test diffs
+        if: failure() && env.DIFF_CREATED == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: test-diffs-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+          path: ${{ github.workspace }}/test-diffs.patch
+
+      - name: Print diff artifact URL
+        if: failure() && env.DIFF_CREATED == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MATRIX_NAME: ${{ matrix.name }}
+        run: |
+          ARTIFACT_NAME="test-diffs-$GITHUB_SHA-$GITHUB_RUN_ID-$MATRIX_NAME"
+          # Wait a moment for artifact to be registered
+          sleep 5
+          # Get artifact URL from GitHub API
+          ARTIFACT_URL=$(gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts \
+            --jq ".artifacts[] | select(.name == \"$ARTIFACT_NAME\") | .archive_download_url")
+          if [ -n "$ARTIFACT_URL" ]; then
+            COMMAND="./tools/apply-diff.sh $ARTIFACT_URL"
+            echo "$COMMAND"
+          else
+            echo "Artifact uploaded but URL not yet available. Check: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
+
+      - name: Check other architectures
+        if: matrix.check_arch == true
+        run: make check_all_arches
+
+      - name: Build and test ocamldebug
+        if: matrix.build_debug == true
+        env:
+          INSTALL_PATH: ${{ matrix.install_path }}
+        run: |
+          if [[ -n "$INSTALL_PATH" ]]; then
+            install_path="$INSTALL_PATH"
+          else
+            install_path="_install"
+          fi
+          make debug || exit 1
+          $install_path/bin/ocamldebug $install_path/bin/ocamlc <<< ""
+
+      - name: Run register allocation on artifacts
+        if: matrix.run_regalloc_tool == true
+        run: |
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -summary -regalloc $allocator || exit 1; \
+          done
+          ./_build/main/tools/regalloc/regalloc.exe _build \
+            -validate -summary -regalloc irc -param BIT_MATRIX_THRESHOLD:8192
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -insert-prologue -regalloc $allocator || exit 1; \
+          done
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -param SPLIT_AROUND_LOOPS:on -regalloc $allocator || exit 1; \
+          done
+          for allocator in irc ls gi; do \
+            ./_build/main/tools/regalloc/regalloc.exe _build \
+              -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
+          done
+
+      - name: Collect and push metrics
+        if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          # Ideally this secret would be scoped to a dedicated deployment
+          # environment (with `environment:` on the job); that requires
+          # repo-settings changes, so we suppress the finding for now.
+          GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }} # zizmor: ignore[secrets-outside-env]
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          # The actual commit being tested (not the merge commit, for PRs)
+          COMMIT_HASH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          # Checkout metrics repository
+          gh repo clone oxcaml/oxcaml-metrics metrics-repo
+
+          # Create raw-data directory if it doesn't exist
+          mkdir -p metrics-repo/raw-data
+
+          # Use the metrics collection script (CSV filename and PR number computed internally)
+          python3 $GITHUB_WORKSPACE/scripts/collect-metrics.py \
+            --install-dir "$GITHUB_WORKSPACE/_install" \
+            --output-dir "metrics-repo/raw-data" \
+            --commit-hash "$COMMIT_HASH" \
+            --commit-message "$COMMIT_MESSAGE" \
+            --profile-dir "$GITHUB_WORKSPACE/_profile_csv" \
+            --verbose
+
+          # Commit and push metrics
+          cd metrics-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure git to use gh for authentication
+          git config --local credential.helper ""
+          git config --local credential.https://github.com.helper "!gh auth git-credential"
+
+          git add raw-data/
+          git commit -m "Add metrics for commit ${COMMIT_HASH}"
+          git push || (git pull --rebase && git push)
+
+      - name: Kernel diagnostics (Linux)
+        # Distinguish real crashes from runner-level problems: the kernel's
+        # segfault records include the fault address and instruction pointer,
+        # and MCE/EDAC records indicate hardware memory errors.
+        if: failure() && runner.os == 'Linux'
+        run: |
+          echo '::group::rlimits'
+          ulimit -a
+          echo '::endgroup::'
+          echo '::group::Kernel segfault / trap records'
+          sudo dmesg -T | grep -iE 'segfault|traps:|general protection' \
+            | tail -n 100 || echo 'none found'
+          echo '::endgroup::'
+          echo '::group::Hardware error records (MCE / EDAC)'
+          sudo dmesg -T | grep -iE 'mce:|edac|hardware error|machine check' \
+            || echo 'none found'
+          echo '::endgroup::'
+          echo '::group::Last 100 kernel log lines'
+          sudo dmesg -T | tail -n 100
+          echo '::endgroup::'
+
+      - name: Upload core dumps
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: cores-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+          path: /cores
+
+      - name: Upload DiagnosticReports (macOS)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure() && runner.os == 'macOS'
+        with:
+          name: DiagnosticReports-${{ github.sha }}-${{ github.run_id }}-${{ matrix.name }}
+          path: /Users/runner/Library/Logs/DiagnosticReports
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true

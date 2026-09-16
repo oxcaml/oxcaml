@@ -1,0 +1,158 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*           Nathanaëlle Courant, Pierre Chambart, OCamlPro               *)
+(*                                                                        *)
+(*   Copyright 2024 OCamlPro SAS                                          *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+type graph
+
+val to_datalog : graph -> Datalog.database
+
+module Relations : sig
+  type 'a atom = [> `Atom of Datalog.atom] as 'a
+
+  type 'a term = 'a Datalog.Term.t
+
+  val alias :
+    to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
+
+  val use : to_:Code_id_or_name.t term -> from:Code_id_or_name.t term -> _ atom
+
+  (** [accessor ~to_ field ~base] represents a {b directed} flow from the field
+      [field] of variable [base] into the variable [to_].
+
+      It corresponds to a projection [to_ = base.field]. *)
+  val accessor :
+    to_:Code_id_or_name.t term ->
+    Field.t term ->
+    base:Code_id_or_name.t term ->
+    _ atom
+
+  (** [constructor ~base field ~from] represents a {b directed} flow from
+      variable [from] into the field [field] or allocation [base].
+
+      It corresponds to an allocation [base = { field = from; _ }] (there might
+      be other fields in the allocation). *)
+  val constructor :
+    base:Code_id_or_name.t term ->
+    Field.t term ->
+    from:Code_id_or_name.t term ->
+    _ atom
+
+  (** [argument ~from param ~base] represents a {b directed} flow from variable
+      [from] into the parameter [param] of function [base].
+
+      It corresponds to a call [base(param = from, _)] (there might be other
+      parameters in the call).
+
+      Note that [base] is a virtual object representing function-like calls; see
+      the comment about encoding of function calls in {!module-Dep_solver}. *)
+  val argument :
+    from:Code_id_or_name.t term ->
+    Cofield.t term ->
+    base:Code_id_or_name.t term ->
+    _ atom
+
+  (** [parameter ~base param ~to_] represents a {b directed} flow from function
+      parameter [param] into variable [to_].
+
+      There is no surface language syntax for this; we write [to_ = base@param].
+
+      Note that [base] is a virtual object representing function-like calls; see
+      the comment about encoding of function calls in {!module-Dep_solver}. *)
+  val parameter :
+    base:Code_id_or_name.t term ->
+    Cofield.t term ->
+    to_:Code_id_or_name.t term ->
+    _ atom
+
+  val propagate :
+    if_used:Code_id_or_name.t term ->
+    to_:Code_id_or_name.t term ->
+    from:Code_id_or_name.t term ->
+    _ atom
+
+  val alias_if_any_source :
+    if_any_source:Code_id_or_name.t term ->
+    to_:Code_id_or_name.t term ->
+    from:Code_id_or_name.t term ->
+    _ atom
+
+  val any_usage : Code_id_or_name.t term -> _ atom
+
+  val any_source : Code_id_or_name.t term -> _ atom
+
+  (* [zero_alloc_source x] means that [x] has any source, but furthermore, that
+     all fields read from [x] are themselves [zero_alloc_source] (and hence
+     [any_source]), even if they are local fields. This is not fully tracked,
+     and will be lost if a [zero_alloc_source] variable is stored somewhere and
+     then read from there. It is only intended as a hack to make zero_alloc
+     checking work, waiting for the redesign that does not depend on keeping
+     dead code alive. *)
+  val zero_alloc_source : Code_id_or_name.t term -> _ atom
+
+  (* An entry (code_id, v) in this relation means that [v] is the "my_closure"
+     variable of the code associated to [code_id]. *)
+  val code_id_my_closure :
+    code_id:Code_id_or_name.t term ->
+    my_closure:Code_id_or_name.t term ->
+    _ atom
+end
+
+val add_alias : graph -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+val add_use_dep :
+  graph -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+val add_accessor_dep :
+  graph -> to_:Code_id_or_name.t -> Field.t -> base:Code_id_or_name.t -> unit
+
+val add_constructor_dep :
+  graph -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
+
+val add_argument_dep :
+  graph -> from:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
+
+val add_parameter_dep :
+  graph -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
+
+val add_propagate_dep :
+  graph ->
+  if_used:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+val add_alias_if_any_source_dep :
+  graph ->
+  if_any_source:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+val add_any_usage : graph -> Code_id_or_name.t -> unit
+
+val add_any_source : graph -> Code_id_or_name.t -> unit
+
+val add_zero_alloc_source : graph -> Code_id_or_name.t -> unit
+
+val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
+
+val create : unit -> graph
+
+val add_opaque_let_dependency :
+  graph -> to_:Bound_pattern.t -> from:Name_occurrences.t -> unit
+
+val print_iter_edges :
+  print_edge:(Code_id_or_name.t * Code_id_or_name.t * string -> unit) ->
+  graph ->
+  unit
