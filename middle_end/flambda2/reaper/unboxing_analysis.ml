@@ -1178,9 +1178,8 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
               { params_decisions; return_decisions; my_closure_decision },
             code_metadata )
       in
-      (* We defer updating the result types to the rebuild stage, because it is
-         not needed for link-time optimization. To avoid stale typing
-         information, we explicitly set them to [Unknown] here. *)
+      (* The original result types may no longer match the calling convention.
+         Rebuild can rewrite them for export; other units do not need them. *)
       let code_metadata =
         Code_metadata.with_result_types Unknown code_metadata
       in

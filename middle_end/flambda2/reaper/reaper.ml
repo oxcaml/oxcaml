@@ -348,7 +348,7 @@ module Staged = struct
     let code_changes =
       Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
         ~rewrite_kind_with_subkind:
-          (Types_rewriter.For_solve.rewrite_kind_with_subkind ~db:solved_dep.db)
+          (Types_rewriter.rewrite_kind_with_subkind solved_dep.db)
         ~code_deps
     in
     let slot_offsets =

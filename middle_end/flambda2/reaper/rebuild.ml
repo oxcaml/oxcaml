@@ -1738,7 +1738,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           Non_nullable
       in
       let ks =
-        Types_rewriter.rewrite_kind_with_subkind typing.context bound_name ks
+        Types_rewriter.rewrite_kind_in_context typing.context bound_name ks
       in
       let[@local] with_subkinds subkinds =
         P.Block_kind.Values (tag, subkinds)
@@ -2142,62 +2142,56 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     params_and_body
   in
   let code_id = Code_metadata.code_id code_metadata in
-  let calling_convention_change =
+  let updating_calling_convention =
     Rebuild_solution.get_calling_convention_change env.solution code_id
   in
   let code_metadata =
-    (* The result types in [code_metadata] were set to [Unknown] when computing
-       the code changes; recompute them from the original metadata. *)
     match env.typing with
     | None -> code_metadata
-    | Some typing -> (
+    | Some typing ->
       let code_dep = Code_id.Map.find code_id typing.code_deps in
-      let forget_all_types = Flambda_features.debug_reaper "forget-types" in
-      let rewrite_result_types ~my_closure ~params ~results types =
-        match typing.env with
-        | None -> Or_unknown_or_bottom.Unknown
-        | Some old_typing_env ->
-          Or_unknown_or_bottom.Ok
-            (Types_rewriter.rewrite_result_types typing.context ~old_typing_env
-               ~my_closure ~params ~results types)
+      let result_types =
+        match Code_metadata.result_types code_dep.code_metadata with
+        | Unknown -> Or_unknown_or_bottom.Unknown
+        | Bottom -> Or_unknown_or_bottom.Bottom
+        | Ok result_types -> (
+          match typing.env with
+          | None -> Or_unknown_or_bottom.Unknown
+          | Some old_typing_env ->
+            if Flambda_features.debug_reaper "forget-types"
+            then Or_unknown_or_bottom.Unknown
+            else
+              let params_vars_and_keep, results_vars_and_keep =
+                match updating_calling_convention with
+                | Not_changing_calling_convention ->
+                  ( List.map
+                      (fun p -> p, Points_to_analysis.Keep)
+                      code_dep.params,
+                    List.map
+                      (fun p -> p, Points_to_analysis.Keep)
+                      code_dep.return )
+                | Changing_calling_convention
+                    { my_closure_decision = _;
+                      params_decisions;
+                      return_decisions
+                    } ->
+                  let with_decisions vars decisions =
+                    List.map2
+                      (fun p (decision : Unboxing_analysis.param_decision) ->
+                        match decision with
+                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                        | Delete -> p, Points_to_analysis.Delete)
+                      vars decisions
+                  in
+                  ( with_decisions code_dep.params params_decisions,
+                    with_decisions code_dep.return return_decisions )
+              in
+              Or_unknown_or_bottom.Ok
+                (Types_rewriter.rewrite_result_types typing.context
+                   ~old_typing_env ~my_closure ~params:params_vars_and_keep
+                   ~results:results_vars_and_keep result_types))
       in
-      match Code_metadata.result_types code_dep.code_metadata with
-      | (Unknown | Bottom) as result_types ->
-        Code_metadata.with_result_types result_types code_metadata
-      | Ok result_types ->
-        let result_types =
-          if forget_all_types
-          then Or_unknown_or_bottom.Unknown
-          else
-            let params_vars_and_keep, results_vars_and_keep =
-              match calling_convention_change with
-              | Not_changing_calling_convention ->
-                ( List.map (fun p -> p, Points_to_analysis.Keep) code_dep.params,
-                  List.map (fun p -> p, Points_to_analysis.Keep) code_dep.return
-                )
-              | Changing_calling_convention
-                  { my_closure_decision = _;
-                    params_decisions;
-                    return_decisions
-                  } ->
-                ( List.map2
-                    (fun p (decision : Unboxing_analysis.param_decision) ->
-                      match decision with
-                      | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                      | Delete -> p, Points_to_analysis.Delete)
-                    code_dep.params params_decisions,
-                  List.map2
-                    (fun p (decision : Unboxing_analysis.param_decision) ->
-                      match decision with
-                      | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                      | Delete -> p, Points_to_analysis.Delete)
-                    code_dep.return return_decisions )
-            in
-            rewrite_result_types ~my_closure:code_dep.my_closure
-              ~params:params_vars_and_keep ~results:results_vars_and_keep
-              result_types
-        in
-        Code_metadata.with_result_types result_types code_metadata)
+      Code_metadata.with_result_types result_types code_metadata
   in
   let rebuild_body env =
     let region_vars =
@@ -2235,7 +2229,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
          ~recursive:(Code_metadata.recursive code_metadata))
       (Code_metadata.with_cost_metrics cost_metrics code_metadata)
   in
-  match calling_convention_change with
+  match updating_calling_convention with
   | Not_changing_calling_convention ->
     let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
@@ -2422,7 +2416,7 @@ let rebuild ~machine_width ~ordered_code_ids
           match typing with
           | None -> backend_kind kind
           | Some typing ->
-            Types_rewriter.rewrite_kind_with_subkind typing.context
+            Types_rewriter.rewrite_kind_in_context typing.context
               (Name.var param) kind
         in
         Keep (param, kind)

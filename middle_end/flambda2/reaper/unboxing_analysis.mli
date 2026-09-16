@@ -92,6 +92,7 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
+(** Calling-convention changes and metadata with unknown result types. *)
 type code_changes
 
 val get_calling_convention_change :

@@ -15,30 +15,27 @@
 
 type rewrite_context
 
-(** [rewrite_kind_with_subkind context var kind_with_subkind] For
+(** [rewrite_kind_with_subkind db var kind_with_subkind] For
     [kind_with_subkind] the kind associated to variable [var], removes the
     subkinds on the parts that are not used. *)
 val rewrite_kind_with_subkind :
-  rewrite_context ->
+  Datalog.database ->
   Name.t ->
   Flambda_kind.With_subkind.t ->
   Flambda_kind.With_subkind.t
 (* CR pchambart: rename to remove_unused_part_of_subkind or something like
    that *)
 
-(** Kind rewriting for the solve stage, which has no [rewrite_context]. *)
-module For_solve : sig
-  val rewrite_kind_with_subkind :
-    db:Datalog.database ->
-    Name.t ->
-    Flambda_kind.With_subkind.t ->
-    Flambda_kind.With_subkind.t
-end
-
 val prepare_rewrite_context :
   Unboxing_analysis.result ->
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
   rewrite_context
+
+val rewrite_kind_in_context :
+  rewrite_context ->
+  Name.t ->
+  Flambda_kind.With_subkind.t ->
+  Flambda_kind.With_subkind.t
 
 val rewrite_typing_env :
   rewrite_context -> unit_symbol:Symbol.t -> typing_env -> typing_env
