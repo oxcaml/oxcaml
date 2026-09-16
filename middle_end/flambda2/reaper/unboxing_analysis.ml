@@ -976,7 +976,8 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
           let result_arity =
             Flambda_arity.create_singletons
               (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarized_components code_dep.result_arity))
+                 (Flambda_arity.unarized_components
+                    (Code_metadata.result_arity code_dep.code_metadata)))
           in
           ( Not_changing_calling_convention,
             Code_metadata.with_params_arity params_arity
@@ -1011,7 +1012,8 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                   if is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
-              (Flambda_arity.unarized_components code_dep.result_arity)
+              (Flambda_arity.unarized_components
+                 (Code_metadata.result_arity code_dep.code_metadata))
           in
           let result_arity =
             Flambda_arity.unarize_t (arity_of_decisions return_decisions)
