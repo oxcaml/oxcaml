@@ -339,6 +339,28 @@ let () =
 [%%expect{|
 |}]
 
+(* boxed -> variable (mixed), where the block shrinks: [x] becomes void *)
+let () =
+  let u = { x = 42; y = 7 } in
+  let poly_ update r x = { r with x } in
+  let v = update u #() in
+  (* if we read [y] from [u] using [v]'s layout, we read [x]'s slot instead *)
+  assert (v.y = 7)
+[%%expect{|
+|}]
+
+(* variable (mixed) -> variable (mixed), where the block grows: [x] goes from
+   void to a four-word product *)
+let () =
+  let u = { x = #(); y = 7 } in
+  let poly_ update r x = { r with x } in
+  let v = update u #(1, 2, 3, 4) in
+  (* if we read [y] from [u] using [v]'s layout, we read past the end of [u] *)
+  let #(a, b, c, d) = v.x in
+  assert (v.y = 7 && a = 1 && b = 2 && c = 3 && d = 4)
+[%%expect{|
+|}]
+
 type ('a : any) inlined = I of { mutable payload : 'a; tag : int }
 [%%expect{|
 type ('a : any) inlined = I of { mutable payload : 'a; tag : int; }
