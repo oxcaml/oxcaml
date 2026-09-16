@@ -1180,7 +1180,8 @@ end = struct
               (Mode.Modality.Per_axis.print ax)
               (Mode.Modality.Const.proj ax intf))
 
-    let alloc_atoms ~impl ~explicit =
+    let alloc_atoms ~(impl : Mode.Alloc.Const.t) ~explicit =
+      let impl = { impl with staticity = Mode.Alloc.Const.legacy.staticity } in
       List.fold_left explicit ~init:impl
         ~f:(fun (acc : Mode.Alloc.Const.t) (m : _ Location.loc) ->
           let (Mode.Alloc.Atom (ax, v)) = m.txt in
