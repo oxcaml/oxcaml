@@ -280,15 +280,19 @@ module Relations = struct
 
   let nontop_sources x y = `Only_if ([~~(any_source x)], sources x y)
 
+  let has_usage_table = Datalog.create_relation ~name:"has_usage" Cols.[n]
+
   (* [has_usage x] means that [x] must continue to exist at runtime, that is,
      either it has [any_usage], or some field of [x] is itself [has_usage]. *)
-  let has_usage = rel1 "has_usage" Cols.[n]
+  let has_usage x = has_usage_table % [x]
+
+  let has_source_table = Datalog.create_relation ~name:"has_source" Cols.[n]
 
   (* [has_source x] means that [x] can have been created at runtime.
      Unfortunately due to limitations of the datalog engine, it means that
      either [x] is [any_source], or that at least one field of [x] (instead of
      all fields of [x], which would be the exact answer) is [has_source]. *)
-  let has_source = rel1 "has_source" Cols.[n]
+  let has_source x = has_source_table % [x]
 
   let field_of_constructor_is_used_tbl =
     Datalog.create_relation ~name:"field_of_constructor_is_used" Cols.[n; f]

@@ -55,6 +55,7 @@ type t =
   { mutable code_deps : code_dep Code_id.Map.t;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
+    mutable applications : Rebuild_queries.Applications.t;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
@@ -69,10 +70,16 @@ type t =
 
 let code_deps t = t.code_deps
 
+let applications t = t.applications
+
+let record_apply_for_rebuild t apply =
+  t.applications <- Rebuild_queries.Applications.add_apply t.applications apply
+
 let create () =
   { code_deps = Code_id.Map.empty;
     code = Code_id.Map.empty;
     apply_deps = [];
+    applications = Rebuild_queries.Applications.empty;
     set_of_closures_deps = [];
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;
