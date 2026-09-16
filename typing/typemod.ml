@@ -2801,14 +2801,14 @@ let path_of_module mexp =
    do not contain non-generalized type variable *)
 
 (** See [nongen_signature_item]. *)
-let rec nongen_modtype env f g h = function
+let rec nongen_modtype env f g = function
     Mty_ident _ -> None
   | Mty_alias _ -> None
   | Mty_signature sg ->
       let env = Env.add_signature sg env in
-      List.find_map (nongen_signature_item env f g h) sg
+      List.find_map (nongen_signature_item env f g) sg
   | Mty_functor(arg_opt, body, _) as mty ->
-      h mty;
+      g env mty;
       let env =
         match arg_opt with
         | Unit
@@ -2822,8 +2822,8 @@ let rec nongen_modtype env f g h = function
             in
             Env.add_module ~arg:true id Mp_present param ~mode env
       in
-      nongen_modtype env f g h body
-  | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g h mty
+      nongen_modtype env f g body
+  | Mty_strengthen (mty,_ ,_) -> nongen_modtype env f g mty
 
 (** Recursively iterate a signature, and:
 - call [f] on all value description types, which potentailly contain
@@ -2831,13 +2831,12 @@ let rec nongen_modtype env f g h = function
 - call [g] on all module declaration types, which potentially contains loose
   mode variables.
   *)
-and nongen_signature_item env f g h = function
+and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
       f env desc.val_type
       |> Option.map (fun vars -> (vars, desc))
   | Sig_module(_id, _, md, _, _) ->
-      g env md.md_type;
-      nongen_modtype env f g h md.md_type
+      nongen_modtype env f g md.md_type
   | _ -> None
 
 let remove_functor_mode_variables ~zap_scope = function
@@ -2857,8 +2856,9 @@ let remove_functor_mode_variables ~zap_scope = function
   | _ -> ()
 
 let check_nongen_modtype ~zap_scope env loc mty =
-  nongen_modtype env (Ctype.nongen_vars_in_schema ~zap_scope) (fun _ _ -> ())
-    (remove_functor_mode_variables ~zap_scope) mty
+  let rm_mty _env mty = remove_functor_mode_variables ~zap_scope mty in
+  nongen_modtype env (Ctype.nongen_vars_in_schema ~zap_scope) rm_mty
+    mty
   |> Option.iter (fun (vars, item) ->
       let vars = Btype.TypeSet.elements vars in
       let error =
@@ -2895,7 +2895,7 @@ let remove_mode_and_jkind_variables env sg =
     in
     let rm_mty _env mty = remove_functor_mode_variables ~zap_scope mty in
     List.find_map
-      (nongen_signature_item env rm_ty rm_mty (fun _ -> ())) sg |> ignore)
+      (nongen_signature_item env rm_ty rm_mty) sg |> ignore)
 
 (* Helpers for typing recursive modules *)
 
