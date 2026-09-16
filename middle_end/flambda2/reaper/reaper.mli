@@ -74,15 +74,15 @@ module Staged : sig
   val solve :
     analysis_scope:Analysis_scope.t -> Solve_inputs.t list -> Solution.t
 
-  (** Rebuild the traversed unit according to the solution. Returns the rebuilt
-      unit, its code, its typing environment and its free names. *)
+  (** Rebuild the traversed unit according to the solution. [typing] enables the
+      rewriting of subkinds and exported types; [None] leaves the exported types
+      unknown, which needs no type database. Returns the rebuilt unit, its code,
+      its typing environment and its free names. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
     solution:Rebuild_solution.t ->
-    types_rewrite_context:Types_rewriter.rewrite_context ->
-    code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    final_typing_env:Typing_env.t option ->
+    typing:Rebuild.typing option ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->

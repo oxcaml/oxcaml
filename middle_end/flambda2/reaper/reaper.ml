@@ -326,8 +326,7 @@ module Staged = struct
     Solution.{ solved_dep; code_changes; queries; slot_offsets }
 
   let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)
-      ~types_rewrite_context ~code_deps ~final_typing_env ~machine_width
-      ~cmx_loader ~all_code =
+      ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Rebuild_inputs.
           { toplevel_expr;
@@ -339,9 +338,9 @@ module Staged = struct
       rebuild_inputs
     in
     let Rebuild.{ body; all_code; code_ids_to_remember; free_names } =
-      Rebuild.rebuild ~machine_width ~code_deps ~ordered_code_ids
-        ~fixed_arity_continuations ~continuation_info ~final_typing_env
-        ~types_rewrite_context solution get_code_metadata toplevel_expr code
+      Rebuild.rebuild ~machine_width ~ordered_code_ids
+        ~fixed_arity_continuations ~continuation_info ~typing solution
+        get_code_metadata toplevel_expr code
     in
     let all_code =
       Exported_code.add_code
@@ -351,10 +350,15 @@ module Staged = struct
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
     let final_typing_env =
-      Option.map
-        (Types_rewriter.rewrite_typing_env types_rewrite_context
-           ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata))
-        final_typing_env
+      match typing with
+      | None -> None
+      | Some typing ->
+        Option.map
+          (fun typing_env ->
+            Types_rewriter.rewrite_typing_env typing.context
+              ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata)
+              typing_env)
+          typing.env
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,
@@ -371,9 +375,14 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let Staged.Solution.{ solved_dep; code_changes; queries; slot_offsets } =
     Staged.solve ~analysis_scope:Current_unit [solve_inputs]
   in
-  let types_rewrite_context =
-    Types_rewriter.prepare_rewrite_context solved_dep
-      solve_inputs.Staged.Solve_inputs.all_sets_of_closures
+  let typing =
+    Rebuild.
+      { context =
+          Types_rewriter.prepare_rewrite_context solved_dep
+            solve_inputs.Staged.Solve_inputs.all_sets_of_closures;
+        code_deps = solve_inputs.Staged.Solve_inputs.code_deps;
+        env = final_typing_env
+      }
   in
   let solution =
     Rebuild_solution.create ~analysis_scope:Current_unit ~queries
@@ -383,9 +392,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let flambda, all_code, final_typing_env, free_names =
     Staged.rebuild
       ~unit_metadata:(Flambda_unit.metadata unit)
-      ~rebuild_inputs ~solution ~types_rewrite_context
-      ~code_deps:solve_inputs.Staged.Solve_inputs.code_deps ~final_typing_env
-      ~machine_width ~cmx_loader ~all_code
+      ~rebuild_inputs ~solution ~typing:(Some typing) ~machine_width ~cmx_loader
+      ~all_code
   in
   let exported_offsets =
     Rebuild_solution.offsets_for_free_names solution free_names
