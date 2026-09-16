@@ -1338,14 +1338,6 @@ module Jkind0 = struct
           name = "any mod everything"
         }
 
-      let scannable =
-        { jkind =
-            mk_jkind (base Scannable Scannable_axes.max)
-              ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max;
-          name = "scannable"
-        }
-
       let value_or_null =
         { jkind =
             mk_jkind
@@ -1913,7 +1905,6 @@ module Jkind0 = struct
     module Builtin = struct
       let any = max
 
-      let scannable = of_const Const.Builtin.scannable.jkind
 
       let value_or_null = of_const Const.Builtin.value_or_null.jkind
 
@@ -2109,10 +2100,6 @@ module Jkind0 = struct
         fresh_jkind Jkind_desc.Builtin.void ~annotation:(mk_annot "void")
           ~why:(Void_creation why)
         |> mark_best
-
-      let scannable ~why =
-        fresh_jkind Jkind_desc.Builtin.scannable
-          ~annotation:(mk_annot "scannable") ~why:(Scannable_creation why)
 
       let value_or_null ~why =
         match (why : Jkind_intf.History.value_or_null_creation_reason) with
