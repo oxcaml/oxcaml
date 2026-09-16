@@ -1,0 +1,7 @@
+values: ok
+whole-word numbers: ok
+sub-word numbers: ok
+vec128: ok
+vec256: ok
+products: ok
+unboxed records: ok
