@@ -21,7 +21,7 @@ let code loopify(never) size(2) newer_version_of(get0_0)
   let Pfield = %block_load.mut.[`0`] (x) in
   cont k (Pfield)
 in
-let $camlTOP2__get0_2 = closure get0_0_1 @get0 &toplevel.alloc_region in
+let $camlTOP2__get0_2 = closure get0_0_1 @get0 &toplevel in
 let $camlTOP2 = Block 0 ($camlTOP2__get0_2) in
 cont done ($camlTOP2)
 |}]
@@ -40,7 +40,7 @@ let code loopify(never) size(5) newer_version_of(set0_1)
   let Psetfield = %block_set.[`0`] (x, a) in
   cont k (0)
 in
-let $camlTOP3__set0_5 = closure set0_1_1 @set0 &toplevel.alloc_region in
+let $camlTOP3__set0_5 = closure set0_1_1 @set0 &toplevel in
 let $camlTOP3 = Block 0 ($camlTOP3__set0_5) in
 cont done ($camlTOP3)
 |}]
@@ -72,7 +72,7 @@ let code loopify(never) size(2) newer_version_of(`fn[:8,2--97]_4`)
   cont k (Pfield)
 in
 let $`camlTOP5__fn[:8,2--97]_11` =
-  closure `fn[:8,2--97]_4_1` @`fn[:8,2--97]` &toplevel.alloc_region
+  closure `fn[:8,2--97]_4_1` @`fn[:8,2--97]` &toplevel
 in
 let $camlTOP5 = Block 0 ($`camlTOP5__fn[:8,2--97]_11`) in
 cont done ($camlTOP5)
