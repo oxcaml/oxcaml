@@ -40,24 +40,6 @@ let[@tail_mod_cons] rec copy_float (xs : float# seq) =
   | Nil -> Nil
   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
 [%%expect{|
-Lines 1-4, characters 35-57:
-1 | ...................................(xs : float# seq) =
-2 |   match xs with
-3 |   | Nil -> Nil
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-Warning 71 [unused-tmc-attribute]: This function is marked "@tail_mod_cons"
-  but is never applied in TMC position.
-
-Line 4, characters 29-56:
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 51 [wrong-tailcall-expectation]: expected tailcall
-
-Line 4, characters 29-56:
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 51 [wrong-tailcall-expectation]: expected tailcall
-
 val copy_float : float# seq -> float# seq = <fun>
 |}]
 
