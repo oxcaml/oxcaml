@@ -25,11 +25,11 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Compute the slot offsets of the sets of closures that will be built after
-    rewriting. [free_names] are the free names of the whole compilation unit as
-    output by simplify. *)
-val compute :
-  free_names:Name_occurrences.t ->
-  analysis_scope:Analysis_scope.t ->
-  Unboxing_analysis.result ->
-  Slot_offsets.result
+type t =
+  | Current_unit
+  | Lto_participants of Compilation_unit.Set.t
+
+let contains_unit t unit =
+  match t with
+  | Current_unit -> Current_unit.is_current unit
+  | Lto_participants units -> Compilation_unit.Set.mem unit units

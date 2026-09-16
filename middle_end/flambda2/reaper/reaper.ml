@@ -92,7 +92,7 @@ module For_lto = struct
     in
     solve_inputs, rebuild_inputs
 
-  let solve
+  let solve ~analysis_scope
       { Solve_inputs.deps;
         free_names;
         code_deps;
@@ -100,18 +100,22 @@ module For_lto = struct
         le_monde_exterieur;
         applications
       } =
-    Traverse_acc.resolve_delayed_deps deps ~code_deps ~le_monde_exterieur
-      delayed_deps;
-    let solved_dep, analysis = Analysis.fixpoint deps ~applications in
+    Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
+      ~le_monde_exterieur delayed_deps;
+    let solved_dep, analysis =
+      Analysis.fixpoint deps ~applications ~analysis_scope
+    in
     let code_changes =
-      Unboxing_analysis.compute_code_changes solved_dep
+      Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
         ~rewrite_kind_with_subkind:(fun _name kind ->
           Types_rewriter.erase_subkind kind)
         ~rewrite_result_types:(fun ~my_closure:_ ~params:_ ~results:_ _types ->
           Or_unknown_or_bottom.Unknown)
         ~code_deps
     in
-    let slot_offsets = Slot_offsets_analysis.compute ~free_names solved_dep in
+    let slot_offsets =
+      Slot_offsets_analysis.compute ~free_names ~analysis_scope solved_dep
+    in
     { Solution.analysis; code_changes; slot_offsets }
 
   let rebuild ~unit ~rebuild_inputs ~solution ~machine_width ~cmx_loader
@@ -142,6 +146,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
+  let analysis_scope = Analysis_scope.Current_unit in
   let Traverse.
         { toplevel_expr;
           code;
@@ -157,14 +162,14 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
         } =
     Traverse.run unit ~free_names
   in
-  Traverse_acc.resolve_delayed_deps deps ~code_deps ~le_monde_exterieur
-    delayed_deps;
-  let solved_dep, uses = Analysis.fixpoint deps ~applications in
+  Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps
+    ~le_monde_exterieur delayed_deps;
+  let solved_dep, uses = Analysis.fixpoint deps ~applications ~analysis_scope in
   let types_rewrite_context =
     Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
   in
   let code_changes =
-    Unboxing_analysis.compute_code_changes solved_dep
+    Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
       ~rewrite_kind_with_subkind:
         (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
       ~rewrite_result_types:(fun ~my_closure ~params ~results types ->
@@ -176,7 +181,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
-  let slot_offsets = Slot_offsets_analysis.compute ~free_names solved_dep in
+  let slot_offsets =
+    Slot_offsets_analysis.compute ~free_names ~analysis_scope solved_dep
+  in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
       ~continuation_info ~final_typing_env

@@ -64,12 +64,12 @@ let answer_call_queries db (applications : Traverse_acc.Applications.t) result =
         })
     applications result
 
-let fixpoint0 (graph : Global_flow_graph.graph) ~applications =
+let fixpoint0 (graph : Global_flow_graph.graph) ~applications ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
-  let db = PTA.perform_analysis datalog ~stats in
-  let (unboxing : UA.result) = UA.perform_analysis db ~stats in
+  let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
+  let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
@@ -88,11 +88,11 @@ let fixpoint0 (graph : Global_flow_graph.graph) ~applications =
   in
   unboxing, answer_call_queries db applications result
 
-let fixpoint graph ~applications =
+let fixpoint graph ~applications ~analysis_scope =
   if Flambda_features.debug_reaper "print-raw" then Dot_printer.print_dep graph;
   let ((solved_dep, _) as result) =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        fixpoint0 graph ~applications)
+        fixpoint0 graph ~applications ~analysis_scope)
   in
   if Flambda_features.debug_reaper "print-solved"
   then (
