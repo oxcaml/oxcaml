@@ -1271,6 +1271,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
       (* S1 -> S2 *)
       (* Since [Types.module_representation = Jkind.sort array], this could've
@@ -1281,6 +1282,7 @@ and include_kind =
       { input_coercion : (Ident.t * module_coercion) list
       ; input_repr : Types.module_representation
       ; yielding : Mode.Yielding.l
+      ; staticity : Mode.Staticity.r
       }
       (* S1 -> () -> S2 *)
       (* In both functor cases, the [Mode.Yielding.l] is the join of the
@@ -1288,7 +1290,8 @@ and include_kind =
          applied to: if it is [Unyielding], the application can never perform a
          free effect. For includes in signatures there is no module expression
          (and no runtime application), so the field is a conservative
-         [Yielding.max]. *)
+         [Yielding.max]. The [Mode.Staticity.r] specifies which kind of functor
+         is applied, as for [Tmod_apply]; see Note [Staticity of functors]. *)
 
 and 'a include_infos =
     {
