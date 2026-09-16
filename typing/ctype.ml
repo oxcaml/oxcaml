@@ -6422,8 +6422,8 @@ let relevant_pairs pairs v =
 (* Flag for controlling submode constraints placed on intermediate
    return arrows. [Constrain_all_ret_modes] is the current default behavior.
    Merlin uses [Skip_intermediate_ret_modes] to pretend like they don't exist,
-   simulating N-ary arrows, which allows us to compute the strongest OxCaml signature
-   for a function in the interface strength analysis. *)
+   simulating N-ary arrows, which allows us to compute the strongest OxCaml
+   signature for a function in the interface strength analysis. *)
 type moregen_ret_modes =
   | Constrain_all_ret_modes
   | Skip_intermediate_ret_modes
