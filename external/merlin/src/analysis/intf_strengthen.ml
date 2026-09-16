@@ -5,6 +5,8 @@ open Std
 
 module Crossing = Mode.Crossing
 
+exception Moregen_failed of string
+
 let ok_exn ~msg res =
   match res with
   | Ok () -> ()
@@ -222,11 +224,7 @@ end = struct
     | Error () ->
       (* We assume that the code typechecked, so if module inclusion with
        *fewer* submode constraints fails then some assumption has been broken *)
-      Logger.notify ~section:"intf-strengthen"
-        "intf-weakness: selective moregen re-run failed for [%s]; skipping \
-         this value."
-        name;
-      []
+      raise (Moregen_failed name)
 end
 
 (*  Matches interface items to implementation items. The analysis
@@ -632,12 +630,19 @@ end = struct
 
   let analyze ~env ~impl_sig ~intf_sig () =
     let snap = Btype.snapshot () in
-    Fun.protect
-      ~finally:(fun () -> Btype.backtrack snap)
-      (fun () ->
-        let context = { env; variance = Covariant } in
-        analyze_sig context ~impl_prefix:None ~subst:Subst.identity ~impl_sig
-          ~intf_sig)
+    try
+      Fun.protect
+        ~finally:(fun () -> Btype.backtrack snap)
+        (fun () ->
+          let context = { env; variance = Covariant } in
+          analyze_sig context ~impl_prefix:None ~subst:Subst.identity ~impl_sig
+            ~intf_sig)
+    with Moregen_failed name ->
+      Logger.notify ~section:"intf-strengthen"
+        "intf-weakness: selective moregen re-run failed for [%s]; aborting \
+         interface analysis."
+        name;
+      []
 end
 
 module Abstract : sig
