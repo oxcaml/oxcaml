@@ -1,5 +1,10 @@
 type t
 
+type verbosity =
+  | Verbose  (** Print all test cases *)
+  | Normal  (** Print only test outcome *)
+  | SilentSuccess  (** No print on success *)
+
 val create : unit -> t
 
 (*_ CR-someday lmaurer: Fix ocamlformat's handling of code/verbatim blocks in
@@ -19,7 +24,7 @@ val create : unit -> t
 val check :
   ?n:int (** Number of runs (default is 1000) *) ->
   ?seed:int (** Seed (default is 0) *) ->
-  ?verbose:bool (** Whether to print all test cases (default is false) *) ->
+  ?verbose:verbosity (** Printing level of detail (default is SilentSuccess) *) ->
   t ->
   arbitrary_impls:('a, _, bool) Tuple.Of2(Arbitrary.T).t ->
   f:'a ->
