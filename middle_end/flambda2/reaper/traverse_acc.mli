@@ -41,14 +41,7 @@ type code_dep =
     unknown_arity_call_witnesses : Code_id_or_name.t list
   }
 
-(** A record of a direct function application, to be resolved into graph edges
-    once all code has been traversed. *)
-type apply_dep =
-  { function_containing_apply_expr : Code_id.t option;
-    apply_code_id : Code_id.t;
-    apply_closure : Simple.t option;
-    apply_call_witness : Code_id_or_name.t
-  }
+type delayed_deps
 
 (** The function applications seen during traversal: for each callee, the size
     of the largest (complex) arguments. *)
@@ -194,9 +187,15 @@ val add_cond_any_usage : t -> denv:Traverse_env.t -> Simple.t -> unit
     being used. At the top level, marks it unconditionally. *)
 val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
 
-(** Record a direct function application to be resolved later by [deps]. Only
-    used for applications to code ids in the current compilation unit. *)
-val add_apply : t -> apply_dep -> unit
+(** Record a direct function application to [apply_code_id] to be resolved later
+    by [resolve_delayed_deps]. *)
+val add_apply :
+  t ->
+  function_containing_apply_expr:Code_id.t option ->
+  apply_code_id:Code_id.t ->
+  apply_closure:Code_id_or_name.t option ->
+  apply_call_witness:Code_id_or_name.t ->
+  unit
 
 (** Create the call witness node for a known-arity function definition. The
     witness carries parameter, return, exception, and code-id edges
@@ -247,8 +246,8 @@ val make_unknown_arity_apply_widget :
   Code_id_or_name.t
 
 (** Record a dependency between a closure binding and its code id. This is
-    resolved later by [deps] to connect closures to their function code in the
-    graph. *)
+    resolved later by [resolve_delayed_deps] to connect closures to their function
+    code in the graph. *)
 val add_set_of_closures_dep :
   t ->
   Name.t ->
@@ -257,9 +256,20 @@ val add_set_of_closures_dep :
   defined_in_code_id:Code_id.t option ->
   unit
 
-(** Finalize the graph by resolving all deferred apply and set-of-closures
-    dependencies, and return the completed dependency graph. *)
-val deps : t -> all_constants:Name.t -> Graph.graph
+(** Return the dependency graph, without the [delayed_deps]. *)
+val deps : t -> Graph.graph
+
+(** Return the dependencies recorded by [add_apply] and
+    [add_set_of_closures_dep]. *)
+val delayed_deps : t -> delayed_deps
+
+(** Resolve all deferred dependencies into the graph. *)
+val resolve_delayed_deps :
+  Graph.graph ->
+  code_deps:code_dep Code_id.Map.t ->
+  le_monde_exterieur:Symbol.t ->
+  delayed_deps ->
+  unit
 
 val sort_code_ids : t -> Code_id.t array
 
