@@ -1825,60 +1825,17 @@ val foo : ('a : any). 'a id -> 'a id = <fun>
 
 let cell = ref (None : (_ : any) id option)
 
-(* When G is applied to an anonymous argument, nondep will copy the weak type
-   variable in its output, but this test confirms that the subsequent inclusion
-   check unifies it back with the original. *)
 module G (X : sig kind_ ka end) = struct
   let c = (cell : (_ : X.ka) id option ref)
 end
-
-module A = G (struct kind_ ka = value end)
-module B = G (struct kind_ ka = value end)
 [%%expect{|
 val cell : '_weak1 id option ref = {contents = None}
-module G :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
-module A : sig val c : '_weak1 id option ref end
-module B : sig val c : '_weak1 id option ref end
-|}]
-
-(* obviously unsound *)
-let () = A.c := (None : int id option)
-let () = B.c := (None : bool id option)
-[%%expect{|
-Line 2, characters 16-39:
-2 | let () = B.c := (None : bool id option)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "bool id option"
-       but an expression was expected of type "int id option"
-       Type "bool" is not compatible with type "int"
-|}]
-
-(* Analogous example, but reusing the same functor argument *)
-
-let cell = ref (None : (_ : any) id option)
-
-module G (X : sig kind_ ka end) = struct
-  let c = (cell : (_ : X.ka) id option ref)
-end
-
-module K = struct kind_ ka = value end
-
-module A = G (K)
-module B = G (K)
-[%%expect{|
-val cell : '_weak2 id option ref = {contents = None}
-module G :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak2 id option ref end
-module K : sig kind_ ka = value end
-module A : sig val c : '_weak3 id option ref end
-module B : sig val c : '_weak4 id option ref end
-|}]
-
-(* obviously unsound *)
-let () = A.c := (None : int id option)
-let () = B.c := (None : bool id option)
-[%%expect{|
+Line 4, characters 11-15:
+4 |   let c = (cell : (_ : X.ka) id option ref)
+               ^^^^
+Error: The value "cell" has type "'weak1 id option ref"
+       but an expression was expected of type "'a id option ref"
+       The abstract kind "X.ka" would escape its scope
 |}]
 
 (*****************************************************)
