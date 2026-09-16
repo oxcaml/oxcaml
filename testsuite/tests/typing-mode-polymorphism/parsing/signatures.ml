@@ -140,27 +140,28 @@ end
 module type Combined = sig val f : 'a @ [< 'n > 'm] -> 'a @ [< 'm > 'n] end
 |}]
 
-(* notice how the [dynamic] lower bound propagates to the result:
+(* notice how the [contended] lower bound propagates to the result:
    let p1/p2 denote the mode variables in the argument/result.
    [f] collects the following constraints:
    - p1 < 'm, p1 < portable
-   - 'n < p1, dynamic < p1
+   - 'n < p1, contended < p1
    - 'm < p2
-   by transitivity, we get: dynamic < p2 *)
+   by transitivity, we get: contended < p2 *)
 module type Combined_consts = sig
-  val f : 'a @ [< 'm & portable many > 'n | dynamic] -> 'a @ [> 'm | aliased]
+  val f : 'a @ [< 'm & portable many > 'n | contended] -> 'a @ [> 'm | aliased]
 end
 [%%expect{|
 module type Combined_consts =
   sig
     val f :
-      'a @ [< 'm & many portable > dynamic] -> 'a @ [> 'm | aliased dynamic]
+      'a @ [< 'm & many portable > contended] ->
+      'a @ [> 'm | aliased contended]
   end
 |}]
 
-let use_static (x @ static) = ()
+let use_uncontended (x @ uncontended) = ()
 [%%expect{|
-val use_static : 'a @ [< static] -> unit @ 'm = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
 |}]
 
 module Good_combined_consts : Combined_consts = struct
@@ -172,37 +173,39 @@ module Good_combined_consts : Combined_consts
 
 let foo x =
   let y = Good_combined_consts.f x in
-  use_static y
+  use_uncontended y
 [%%expect{|
-Line 3, characters 13-14:
-3 |   use_static y
-                 ^
-Error: This value is "dynamic" but is expected to be "static".
+Line 3, characters 18-19:
+3 |   use_uncontended y
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 module Bad_constant : Combined_consts = struct
-  let f x = use_static x; x
+  let f x = use_uncontended x; x
 end
 [%%expect{|
 Lines 1-3, characters 40-3:
 1 | ........................................struct
-2 |   let f x = use_static x; x
+2 |   let f x = use_uncontended x; x
 3 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ [< 'm & many static] -> 'a @ [> 'm | aliased] end
+         sig
+           val f : 'a @ [< 'm & many uncontended] -> 'a @ [> 'm | aliased]
+         end
        is not included in
          Combined_consts
        Values do not match:
-         val f : 'a @ [< 'm & many static] -> 'a @ [> 'm | aliased]
+         val f : 'a @ [< 'm & many uncontended] -> 'a @ [> 'm | aliased]
        is not included in
          val f :
-           'a @ [< 'm & many portable > dynamic] ->
-           'a @ [> 'm | aliased dynamic]
-       The type "'a @ [< 'm & many static] -> 'a @ [> 'm | aliased]"
+           'a @ [< 'm & many portable > contended] ->
+           'a @ [> 'm | aliased contended]
+       The type "'a @ [< 'm & many uncontended] -> 'a @ [> 'm | aliased]"
        is not compatible with the type
-         "'a @ [< 'n & many portable > dynamic] ->
-         'a @ [> 'n | aliased dynamic]"
+         "'a @ [< 'n & many portable > contended] ->
+         'a @ [> 'n | aliased contended]"
 |}]
 
 (* Constant bounds *)
