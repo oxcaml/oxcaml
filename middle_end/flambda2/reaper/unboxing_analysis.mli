@@ -14,11 +14,26 @@
 (**************************************************************************)
 
 module Unboxed_fields : sig
+  type 'a t
+
   type 'a u =
     | Not_unboxed of 'a
     | Unboxed of 'a t
 
-  and 'a t = 'a u Field.Map.t
+  (** Fixes the traversal order, which is preserved by mapping and renaming. *)
+  val of_map : 'a u Field.Map.t -> 'a t
+
+  val to_map : 'a t -> 'a u Field.Map.t
+
+  val find : Field.t -> 'a t -> 'a u
+
+  val is_empty : 'a t -> bool
+
+  val keys : 'a t -> Field.Set.t
+
+  val fold : (Field.t -> 'a u -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val mapi_fields : (Field.t -> 'a u -> 'b u) -> 'a t -> 'b t
 
   val print :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
