@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming -extension comprehensions -extension layout_poly_alpha";
+ flags = "-extension runtime_metaprogramming -extension comprehensions -extension layout_poly";
  expect;
 *)
 

@@ -20,7 +20,7 @@ type _ t =
   | Small_numbers : maturity t
   | Instances : unit t
   | Let_mutable : unit t
-  | Layout_poly : maturity t
+  | Layout_poly : unit t
   | Runtime_metaprogramming : unit t
 
 (* When you update this, update [pair_of_string] below too. *)

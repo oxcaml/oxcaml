@@ -75,7 +75,7 @@ let get_level_ops : type a. a t -> (module Extension_level with type t = a) =
   | Small_numbers -> (module Maturity)
   | Instances -> (module Unit)
   | Let_mutable -> (module Unit)
-  | Layout_poly -> (module Maturity)
+  | Layout_poly -> (module Unit)
   | Runtime_metaprogramming -> (module Unit)
 
 (* We'll do this in a more principled way later. *)
@@ -118,7 +118,7 @@ module Exist_pair = struct
     | Pair (Small_numbers, m) -> Some m
     | Pair (Instances, ()) -> Some Stable
     | Pair (Let_mutable, ()) -> Some Stable
-    | Pair (Layout_poly, m) -> Some m
+    | Pair (Layout_poly, ()) -> Some Stable
     | Pair (Runtime_metaprogramming, ()) -> Some Beta
 
   let is_erasable : t -> bool = function Pair (ext, _) -> is_erasable ext
@@ -130,15 +130,13 @@ module Exist_pair = struct
     | Pair (Small_numbers, m) ->
       to_string Small_numbers ^ "_" ^ maturity_to_string m
     | Pair (SIMD, m) -> to_string SIMD ^ "_" ^ maturity_to_string m
-    | Pair (Layout_poly, m) ->
-      to_string Layout_poly ^ "_" ^ maturity_to_string m
     | Pair (Mode_polymorphism, m) ->
       to_string Mode_polymorphism ^ "_" ^ maturity_to_string m
     | Pair
         ( (( Comprehensions | Include_functor | Polymorphic_parameters
            | Immutable_arrays | Module_strengthening | Instances | Overwriting
            | Let_mutable | Runtime_metaprogramming | Mode_polymorphism_printing
-             ) as ext),
+           | Layout_poly ) as ext),
           _ ) ->
       to_string ext
 
@@ -175,9 +173,7 @@ module Exist_pair = struct
     | "small_numbers_beta" -> Some (Pair (Small_numbers, Beta))
     | "instances" -> Some (Pair (Instances, ()))
     | "let_mutable" -> Some (Pair (Let_mutable, ()))
-    | "layout_poly" -> Some (Pair (Layout_poly, Stable))
-    | "layout_poly_alpha" -> Some (Pair (Layout_poly, Alpha))
-    | "layout_poly_beta" -> Some (Pair (Layout_poly, Beta))
+    | "layout_poly" -> Some (Pair (Layout_poly, ()))
     | "runtime_metaprogramming" -> Some (Pair (Runtime_metaprogramming, ()))
     | _ -> None
 end

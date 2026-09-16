@@ -1,5 +1,5 @@
 (* TEST
-   flags = "-extension layout_poly_alpha";
+   flags = "-extension layout_poly";
    readonly_files = "layout_sigs.mli";
    setup-ocamlc.byte-build-env;
    module = "layout_sigs.mli";

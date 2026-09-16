@@ -97,8 +97,7 @@ module Mode_axis_pair = struct
     | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
     | "static" ->
-      Language_extension.assert_enabled ~loc Layout_poly
-        Language_extension.Alpha;
+      Language_extension.assert_enabled ~loc Layout_poly ();
       monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
     | _ -> raise Not_found

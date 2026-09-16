@@ -11753,8 +11753,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | [] -> false
     | first :: rest ->
       if first.pvb_is_poly then begin
-        Language_extension.assert_enabled ~loc:first.pvb_loc
-          Layout_poly Language_extension.Alpha;
+        Language_extension.assert_enabled ~loc:first.pvb_loc Layout_poly ();
         Env.check_no_open_quotations first.pvb_loc env Layout_polymorphism_qt
       end;
       List.iter (fun binding ->

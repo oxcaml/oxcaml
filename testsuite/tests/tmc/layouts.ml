@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha -warn-error +51+71";
+ flags = "-extension layout_poly -warn-error +51+71";
  { bytecode; }
  { native; }
 *)

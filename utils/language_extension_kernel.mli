@@ -31,7 +31,7 @@ type _ t =
   | Small_numbers : maturity t
   | Instances : unit t
   | Let_mutable : unit t
-  | Layout_poly : maturity t
+  | Layout_poly : unit t
   | Runtime_metaprogramming : unit t
 
 (** Print and parse language extensions; parsing is case-insensitive *)

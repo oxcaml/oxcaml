@@ -1299,8 +1299,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
-      Language_extension.assert_enabled ~loc Layout_poly
-        Language_extension.Alpha;
+      Language_extension.assert_enabled ~loc Layout_poly ();
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       let desc, typ =
         transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
@@ -1308,8 +1307,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       in
       ctyp desc typ
   | Ptyp_newlayout _ ->
-      Language_extension.assert_enabled ~loc Layout_poly
-        Language_extension.Alpha;
+      Language_extension.assert_enabled ~loc Layout_poly ();
       Env.check_no_open_quotations loc env Layout_polymorphism_qt;
       raise (Error (loc, env, Lpoly_unsupported))
   | Ptyp_package ptyp ->
@@ -1883,12 +1881,10 @@ let transl_type_scheme_newlayout env attrs loc vars inner_type =
 let transl_type_scheme env styp valdecl_flag =
   match styp.ptyp_desc, valdecl_flag with
   | Ptyp_newlayout _, Lpoly ->
-    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
-      Language_extension.Alpha;
+    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly ();
     raise (Error (styp.ptyp_loc, env, Val_poly_and_layout));
   | Ptyp_newlayout (vars, st), Lmono ->
-    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly
-      Language_extension.Alpha;
+    Language_extension.assert_enabled ~loc:styp.ptyp_loc Layout_poly ();
     transl_type_scheme_newlayout env styp.ptyp_attributes
       styp.ptyp_loc vars st
   | _, Lpoly -> transl_type_scheme_poly_val env styp

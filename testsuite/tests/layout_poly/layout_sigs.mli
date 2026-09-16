@@ -1,4 +1,4 @@
-(* flags = "-extension layout_poly_alpha";
+(* flags = "-extension layout_poly";
 *)
 
 (** This purpose of this file is to be used as part of a round-trip test: are

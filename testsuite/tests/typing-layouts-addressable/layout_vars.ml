@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layouts_alpha -extension layout_poly_alpha";
+ flags = "-extension layouts_alpha -extension layout_poly";
  expect;
 *)
 
@@ -275,4 +275,3 @@ Error: Signature mismatch:
        the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
-

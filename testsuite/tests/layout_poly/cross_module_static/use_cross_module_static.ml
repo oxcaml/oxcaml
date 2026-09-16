@@ -3,7 +3,7 @@
                    cross_module_static_relay.mli cross_module_static_relay.ml";
  setup-ocamlopt.byte-build-env;
  (* [-nocwd] is needed because [-Ix .] doesn't override the implicit [-I .]. *)
- flags = "-extension layout_poly_alpha -nocwd -Ix .";
+ flags = "-extension layout_poly -nocwd -Ix .";
  module = "cross_module_static_lib.mli";
  ocamlopt.byte;
  module = "cross_module_static_lib.ml";

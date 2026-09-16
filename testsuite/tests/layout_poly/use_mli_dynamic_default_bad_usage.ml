@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
+ flags = "-extension layout_poly";
  readonly_files = "mli_with_dynamic_default.mli use_mli_dynamic_default_bad_usage.reference";
  setup-ocamlc.byte-build-env;
  module = "mli_with_dynamic_default.mli";
