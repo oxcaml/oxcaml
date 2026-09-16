@@ -5,35 +5,28 @@
  native;
 *)
 
-(* [%box] is currently only implemented for native code. This is a native
-   test rather than an expect test because the vector values are built with
-   compiler builtins whose fallback symbols live in [stubs.c], which the
-   native toplevel cannot link. *)
+(* [%box] is currently only implemented for native code. *)
 
 external box : ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box" [@@layout_poly]
 external unbox : ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) = "%unbox" [@@layout_poly]
 
-(* The invariant under test: boxing a value of type [t] produces a block with
-   the same layout as a record with a single field of type [t]. When [t] is an
-   unboxed record, the block has the same layout as the boxed record.
+(* TESTING INVARIANT: boxing a value of type [t] produces a block with the same
+   layout as a record with a single field of type [t]. When [t] is an unboxed
+   record, the block has the same layout as the boxed record. *)
 
-   Polymorphic equality raises on mixed blocks, so we compare the blocks
-   through [Obj]. A failing check raises [Assert_failure]. *)
-
-(* Compare tag, size and scannable prefix. Enough for fields narrower than a
-   word, whose padding bits are not initialised. *)
+(* comparison using [Obj] to avoid (busted) polymorphic compare *)
 let same_shape (a : Obj.t) (b : Obj.t) =
   Obj.tag a = Obj.tag b
   && Obj.size a = Obj.size b
   && Obj.Uniform_or_mixed.(repr (of_block a) = repr (of_block b))
 
-(* Additionally compare every word of the payload. *)
 let same_words (a : Obj.t) (b : Obj.t) =
   same_shape a b
   && List.for_all
        (fun i -> Nativeint.equal (Obj.raw_field a i) (Obj.raw_field b i))
        (List.init (Obj.size a) Fun.id)
 
+(* helpers for equality *)
 external untag_int : int -> int# = "%int#_of_int"
 external int_equal : int# -> int# -> bool = "%int#_equal"
 external int8_equal : int8# -> int8# -> bool = "%int8#_equal"
@@ -73,6 +66,12 @@ let s = String.make 3 'a'
 
 type 'a vrec = { v : 'a }
 
+type mixed = { mx : int64_u; my : string }
+type with_product = { wp : #(int64_u * string); wq : int }
+type all_flat = { af : float#; ag : int32_u }
+type float_record = { fr1 : float; fr2 : float }
+type variant = A of int64_u * string | B | C of #(float# * int)
+
 let () =
   assert (same_words (Obj.repr (box 42)) (Obj.repr { v = 42 }));
   assert (same_words (Obj.repr (box s)) (Obj.repr { v = s }));
@@ -80,6 +79,24 @@ let () =
   assert (same_words (Obj.repr (box (Some s))) (Obj.repr { v = Some s }));
   assert ((Obj.obj (Obj.repr (box 42)) : int vrec).v = 42);
   assert ((Obj.obj (Obj.repr (box s)) : string vrec).v == s);
+  let m = { mx = #1L; my = s } in
+  assert (same_words (Obj.repr (box m)) (Obj.repr { v = m }));
+  assert ((Obj.obj (Obj.repr (box m)) : mixed vrec).v == m);
+  let p = { wp = #(#2L, s); wq = 3 } in
+  assert (same_words (Obj.repr (box p)) (Obj.repr { v = p }));
+  assert ((Obj.obj (Obj.repr (box p)) : with_product vrec).v == p);
+  let f = { af = #1.5; ag = #4l } in
+  assert (same_words (Obj.repr (box f)) (Obj.repr { v = f }));
+  assert ((Obj.obj (Obj.repr (box f)) : all_flat vrec).v == f);
+  let fr = { fr1 = 1.5; fr2 = 2.5 } in
+  assert (same_words (Obj.repr (box fr)) (Obj.repr { v = fr }));
+  assert ((Obj.obj (Obj.repr (box fr)) : float_record vrec).v == fr);
+  let a = A (#5L, s) and b = B and c = C #(#6.5, 7) in
+  assert (same_words (Obj.repr (box a)) (Obj.repr { v = a }));
+  assert (same_words (Obj.repr (box b)) (Obj.repr { v = b }));
+  assert (same_words (Obj.repr (box c)) (Obj.repr { v = c }));
+  assert ((Obj.obj (Obj.repr (box a)) : variant vrec).v == a);
+  assert ((Obj.obj (Obj.repr (box c)) : variant vrec).v == c);
   print_endline "values: ok"
 
 (* Unboxed numbers stored in a whole word *)
@@ -100,7 +117,9 @@ let () =
   assert (int_equal (Obj.obj (Obj.repr (box (untag_int 42))) : irec).i (untag_int 42));
   print_endline "whole-word numbers: ok"
 
-(* Unboxed numbers narrower than a word *)
+(* Unboxed numbers narrower than a word. for now, these are treated as
+   addressable and boxed as tag-0 blocks, NOT as tagged immediates. eventually,
+   addressable kinds will allow expression of both behaviors. *)
 
 type f32rec = { f32 : float32_u }
 type i32rec = { i32 : int32_u }
@@ -143,9 +162,7 @@ let () =
   assert (Int64.equal (low h) 3L && Int64.equal (high h) 4L);
   print_endline "vec256: ok"
 
-(* Unboxed products. Boxing a product should produce the same block as a
-   record whose fields are the components, including the reordering of values
-   before flat fields, and flattening of nested products. *)
+(* Unboxed products *)
 
 type p_values = { a : int; b : string }
 type p_flat_first = { c : int64_u; d : string }
@@ -158,13 +175,9 @@ let () =
   assert (same_words (Obj.repr (box #(42, s))) (Obj.repr { a = 42; b = s }));
   print_endline "products: ok"
 
-(* CR zeisbach: [#(int64_u * string) box] expands to the tuple type
-   [int64_u * string], and [Typeopt.value_kind] recurses into the components
-   of a tuple type and rejects the non-value ones with "Non-value detected in
-   [value_kind]". Until that is fixed, boxing a product with unboxed
-   components through [box] fails to compile, so the tests below are disabled
-   and unboxed records are used instead.
+(* CR zeisbach: add tests for mixed tuples after rebasing onto them *)
 
+(*
 external box_obj : ('a : any). 'a -> Obj.t = "%box" [@@layout_poly]
 
 let () =
@@ -185,9 +198,6 @@ let () =
   assert (Int64.equal (box_int64 r.m) 4L)
 *)
 
-(* Boxing an unboxed record [t#] produces a [t] with the same layout as
-   constructing [t] directly, including the reordering of values before flat
-   fields and the flattening of nested products. *)
 
 type ur = { u1 : int64_u; u2 : string; u3 : int }
 
