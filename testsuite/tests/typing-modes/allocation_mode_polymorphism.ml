@@ -15,40 +15,97 @@ val state : t list ref @@ stateless noalloc_strict = {contents = []}
 |}]
 
 module ModePolymorphic = struct
-  let rec iter (f : 'a -> unit) : 'a list -> unit = function
+  let rec (iter @ noalloc_strict) (f : 'a -> unit) : 'a list -> unit = function
     | [] -> ()
     | head :: tail -> f head; iter f tail
+
+  let rec (fold @ noalloc_strict) f (acc : 'acc) : 'a list -> 'acc =
+    function
+    | [] -> acc
+    | head :: tail -> fold f (f acc head) tail
 end
 [%%expect{|
 module ModePolymorphic :
   sig
     val iter :
-      ('a -> unit) @ [< past('n) & past('o) & global many] ->
-      ('a list ->
-      unit @ [< past('m) & global many read_write > aliased stateful dynamic alloc]) @ [> past('m) | past('n) | past('o) | stateful]
-  end
+      ('a -> unit) @ [< many] ->
+      'a list @ [< global many read_write > aliased stateful dynamic alloc] ->
+      unit @ [< global many read_write > aliased stateful dynamic alloc]
+    val fold :
+      ('acc @ [> 'o | 'n | dynamic] ->
+       'a @ [> aliased stateful dynamic alloc] ->
+       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm1) & past('q) & past('mm0) & many > aliased] ->
+      ('acc @ [< 'o & global many read_write > 'm | dynamic] ->
+       ('a list @ [< global many read_write > aliased stateful dynamic alloc] ->
+        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm1) | local stateful]) @ [< past('p) > past('q) | past('mm0) | local]
+  end @@ stateless noalloc_strict
+|}, Principal{|
+module ModePolymorphic :
+  sig
+    val iter :
+      ('a -> unit) @ [< many > aliased] ->
+      'a list @ [< global many read_write > aliased stateful dynamic alloc] ->
+      unit @ [< global many read_write > aliased stateful dynamic alloc]
+    val fold :
+      ('acc @ [> 'o | 'n | dynamic] ->
+       'a @ [> aliased stateful dynamic alloc] ->
+       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm1) & past('q) & past('mm0) & many > aliased] ->
+      ('acc @ [< 'o & global many read_write > 'm | dynamic] ->
+       ('a list @ [< global many read_write > aliased stateful dynamic alloc] ->
+        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm1) | local stateful]) @ [< past('p) > past('q) | past('mm0) | local]
+  end @@ stateless noalloc_strict
 |}]
 
 module ModePolymorphismWorksWithAllocation = struct
-  let (iter_alloc @ alloc) : int list -> unit =
-    ModePolymorphic.iter (fun value -> (state := { value } :: !state))
-  let (iter_noalloc @ noalloc) : 'a list -> unit =
-    ModePolymorphic.iter (fun _ -> ())
+  let has_to_be_local : unit =
+    let (_iter_alloc @ alloc) : 'a list -> unit =
+      ModePolymorphic.iter (fun value -> state := { value } :: !state)
+    in
+    let (_iter_noalloc @ noalloc_strict) : 'a list -> unit =
+      ModePolymorphic.iter (fun _ -> ())
+    in
+    let (_fold_alloc @ alloc) : 'a list -> 'a list =
+      ModePolymorphic.fold (fun tail head -> head :: tail) []
+    in
+    let (_fold_noalloc @ noalloc_strict) : 'a list -> unit =
+      ModePolymorphic.fold (fun () _ -> ()) ()
+    in
+    ()
 end
 [%%expect{|
 module ModePolymorphismWorksWithAllocation :
-  sig
-    val iter_alloc : int list -> unit
-    val iter_noalloc : 'a list -> unit @@ noalloc
-  end
+  sig val has_to_be_local : unit end @@ stateless noalloc_strict
 |}]
 
-module ModePolymorphismIsStillSound = struct
-  let (iter_bad @ noalloc) : int list -> unit =
-    ModePolymorphic.iter (fun value -> (state := { value } :: !state))
+module RejectAllocatingIter = struct
+  let has_to_be_local : unit =
+    let (_bad @ noalloc_strict) : 'a list -> unit =
+      ModePolymorphic.iter (fun value -> state := { value } :: !state)
+    in
+    ()
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: `iter_bad` needs to be rejected
+Line 4, characters 50-69:
+4 |       ModePolymorphic.iter (fun value -> state := { value } :: !state)
+                                                      ^^^^^^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 4, characters 27-70,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+module RejectAllocatingFold = struct
+  let has_to_be_local : unit =
+    let (_bad @ noalloc_strict) : 'a list -> 'a list =
+      ModePolymorphic.fold (fun tail head -> head :: tail) []
+    in
+    ()
+end
+[%%expect{|
+Line 4, characters 6-61:
+4 |       ModePolymorphic.fold (fun tail head -> head :: tail) []
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is "alloc" but is expected to be "noalloc_strict".
 |}]
 
 (* Regression test:
@@ -64,7 +121,13 @@ module CurriedNoalloc = struct
   let secretly_allocated : t @ global = make ()
 end
 [%%expect{|
-CR wsturgeon for wsturgeon: this needs to be rejected, but it's currently accepted
+Line 3, characters 24-38:
+3 |   let make_make () () = { value = 42 }
+                            ^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 3, characters 19-38,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
 |}]
 
 (* With `alloc` instead of `noalloc/_strict`, this ought to compile: *)
@@ -87,4 +150,66 @@ module CurriedAlloc :
     val make : unit -> t @ 'm
     val this_is_fine : t @@ noalloc_strict
   end @@ stateless
+|}]
+
+module OptionalDefaultNoalloc = struct
+  let f ?(x = { value = 42 }) () = x
+  let g @ noalloc_strict = f ?x:None
+  let result : t @ global = g ()
+end
+[%%expect{|
+Line 2, characters 14-28:
+2 |   let f ?(x = { value = 42 }) () = x
+                  ^^^^^^^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the expression at line 2, characters 14-28,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+module OptionalDefaultAlloc = struct
+  let f ?(x = { value = 42 }) () = x
+  let g @ alloc = f ?x:None
+  let result : t @ global = g ()
+end
+[%%expect{|
+module OptionalDefaultAlloc :
+  sig
+    val f :
+      ?x:t @ [< 'm & global] ->
+      unit @ 'n ->
+      t @ [> 'm mod many portable forkable unyielding stateless noalloc_strict]
+      @@ stateless
+    val g : unit -> t @ [> aliased]
+    val result : t @@ stateless noalloc_strict
+  end
+|}, Principal{|
+module OptionalDefaultAlloc :
+  sig
+    val f : ?x:t @ [< 'm & global] -> unit @ 'n -> t @ [> 'm] @@ stateless
+    val g : unit -> t @ [> aliased]
+    val result : t @@ stateless noalloc_strict
+  end
+|}]
+
+module OptionalDefaultWithoutAllocation = struct
+  let f ?(x = 42) () = x
+  let g @ noalloc_strict = f ?x:None
+  let result = g ()
+end
+[%%expect{|
+module OptionalDefaultWithoutAllocation :
+  sig
+    val f : ?x:int @ [< global] -> unit @ 'n -> int @ 'm
+    val g : unit -> int @ 'm @@ noalloc_strict
+    val result : int @@ noalloc_strict
+  end @@ stateless
+|}, Principal{|
+module OptionalDefaultWithoutAllocation :
+  sig
+    val f : ?x:int @ [< 'm & global] -> unit @ 'n -> int @ [> 'm] @@
+      stateless
+    val g : unit -> int @ [> aliased] @@ noalloc_strict
+    val result : int @@ stateless noalloc_strict
+  end
 |}]
