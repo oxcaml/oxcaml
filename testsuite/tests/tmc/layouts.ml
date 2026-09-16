@@ -40,24 +40,6 @@ let[@tail_mod_cons] rec copy_float (xs : float# seq) =
   | Nil -> Nil
   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
 [%%expect{|
-Lines 1-4, characters 35-57:
-1 | ...................................(xs : float# seq) =
-2 |   match xs with
-3 |   | Nil -> Nil
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-Warning 71 [unused-tmc-attribute]: This function is marked "@tail_mod_cons"
-  but is never applied in TMC position.
-
-Line 4, characters 29-56:
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 51 [wrong-tailcall-expectation]: expected tailcall
-
-Line 4, characters 29-56:
-4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
-                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 51 [wrong-tailcall-expectation]: expected tailcall
-
 val copy_float : float# seq -> float# seq = <fun>
 |}]
 
@@ -70,4 +52,33 @@ let _ =
 [%%expect{|
 external box_float : float# -> float = "%box_float"
 - : float * float = (1.5, 2.5)
+|}]
+
+(* Boxed and unboxed fields before and after the hole *)
+type t = Nil
+       | Cons of { a : string;
+                   b : float#;
+                   t : t;
+                   c : int;
+                   d : #(float * int16#) }
+
+let[@tail_mod_cons] rec repeat n a b c d =
+  if n = 0
+  then Nil
+  else Cons { a; b; t = (repeat [@tailcall]) (n - 1) a b c d; c; d }
+
+external box_int16 : int16# -> int16 = "%int16_of_int16#"
+let _ =
+  match repeat 3 "hi" #3.14 42 #(3.15, #43S) with
+  | Cons { t = Cons { t = Cons { a; b; t = Nil; c; d = #(d1, d2)} } } ->
+    a, box_float b, c, d1, box_int16 d2
+  | _ -> failwith "expected shape"
+[%%expect{|
+type t =
+    Nil
+  | Cons of { a : string; b : float#; t : t; c : int; d : #(float * int16#);
+    }
+val repeat : int -> string -> float# -> int -> #(float * int16#) -> t = <fun>
+external box_int16 : int16# -> int16 = "%int16_of_int16#"
+- : string * float * int * float * int16 = ("hi", 3.14, 42, 3.15, 43S)
 |}]
