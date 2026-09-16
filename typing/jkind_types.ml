@@ -793,20 +793,20 @@ module Sort = struct
     in
     result, List.rev !curr_generalized
 
-  let rec unwrap_const : t -> Const.t = function
+  let rec assert_const : t -> Const.t = function
     | Base b -> Static.Const.of_base b
-    | Product ts -> Const.Product (List.map unwrap_const ts)
+    | Product ts -> Const.Product (List.map assert_const ts)
     | Univar uv -> Univar uv
-    | Var v -> unwrap_const_var v
-    | Addressable s -> Addressable (unwrap_const s)
+    | Var v -> assert_const_var v
+    | Addressable s -> Addressable (assert_const s)
 
-  and unwrap_const_var (v : var) : Const.t =
+  and assert_const_var (v : var) : Const.t =
     match v.contents with
     | None when is_genvar v -> Genvar v
     | None ->
       Misc.fatal_error
-        "Jkind_types.Sort.unwrap_const: unexpected non-generic variable"
-    | Some s -> unwrap_const s
+        "Jkind_types.Sort.assert_const: unexpected non-generic variable"
+    | Some s -> assert_const s
 
   let is_scannable_or_var s =
     let rec go = function

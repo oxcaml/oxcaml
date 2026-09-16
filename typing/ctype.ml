@@ -6947,7 +6947,7 @@ let moregeneral ~self_check env inst_nongen
           match Jkind.Sort.Var.is_root v with
           | true -> None
           | false ->
-            Jkind_types.Sort.unwrap_const (Var v)
+            Jkind_types.Sort.assert_const (Var v)
             |> Jkind_types.Sort.Const.subst subst_map
             |> Option.some)
         pat_inst_sorts

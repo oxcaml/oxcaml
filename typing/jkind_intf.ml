@@ -283,7 +283,7 @@ module type Sort = sig
 
   (** Assert the given sort is constant, failing if the sort contains
       non-generic variables. *)
-  val unwrap_const : t -> Const.t
+  val assert_const : t -> Const.t
 
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
