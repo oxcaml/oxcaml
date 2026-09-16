@@ -47,15 +47,6 @@ let field_used uses v f = PTA.field_used uses.db v f
 let not_local_field_has_source uses v f =
   PTA.not_local_field_has_source uses.db v f
 
-let code_id_actually_directly_called uses closure =
-  PTA.code_id_actually_directly_called uses.db closure
-
-let arguments_used_by_known_arity_call uses callee args =
-  PTA.arguments_used_by_known_arity_call uses.db callee args
-
-let arguments_used_by_unknown_arity_call uses callee args =
-  PTA.arguments_used_by_unknown_arity_call uses.db callee args
-
 let has_source uses v = PTA.has_source_query uses.db v
 
 let any_source uses v = PTA.any_source uses.db v

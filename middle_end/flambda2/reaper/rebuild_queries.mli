@@ -1,13 +1,9 @@
 (******************************************************************************
- *                             flambda-backend                                *
- *                                                                            *
- *             Nathanaëlle Courant, Pierre Chambart, OCamlPro                 *
- *                        Mark Shinwell, Jane Street                          *
+ *                                  OxCaml                                    *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024--2025 OCamlPro SAS                                      *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -29,21 +25,53 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type result = private
-  { body : Flambda.Expr.t;
-    all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
-  }
+open! Flambda.Import
 
-val rebuild :
-  machine_width:Target_system.Machine_width.t ->
-  ordered_code_ids:Code_id.t array ->
-  continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
-  fixed_arity_continuations:Continuation.Set.t ->
-  final_typing_env:Typing_env.t option ->
-  types_rewrite_context:Types_rewriter.rewrite_context ->
-  Rebuild_solution.t ->
-  (Code_id.t -> Code_metadata.t) ->
-  Rev_expr.t ->
-  Rev_expr.rev_code Code_id.Map.t ->
-  result
+(** Precomputed results of the rebuild pass's datalog queries. The queries
+    themselves run once, against the solved database; rebuilding a unit then
+    only reads the recorded answers. *)
+
+(** The function applications seen during traversal: for each named callee, the
+    argument widths of its call sites. They determine which call queries to run,
+    and at which widths. *)
+module Applications : sig
+  type t
+
+  val empty : t
+
+  (** Record the named callee and argument widths of a function call, including
+      nullary calls. Ignore other call kinds and absent or constant callees. *)
+  val add_apply : t -> Apply.t -> t
+
+  (** Merge the applications of several units for a combined solve. Takes the
+      maximum known-arity width and pointwise maxima of unknown-arity group
+      widths, retaining the longer tail. *)
+  val union : t -> t -> t
+end
+
+type t
+
+val create : Datalog.database -> applications:Applications.t -> t
+
+val has_use : t -> Code_id_or_name.t -> bool
+
+val has_source : t -> Code_id_or_name.t -> bool
+
+val field_used : t -> Code_id_or_name.t -> Field.t -> bool
+
+(** Call queries require a corresponding recorded application; missing
+    applications and argument dimensions exceeding the recorded bounds are fatal
+    errors. *)
+val code_id_actually_directly_called : t -> Name.t -> Code_id.Set.t Or_unknown.t
+
+val arguments_used_by_known_arity_call :
+  t ->
+  Code_id_or_name.t ->
+  'a list ->
+  ('a * Points_to_analysis.keep_or_delete) list
+
+val arguments_used_by_unknown_arity_call :
+  t ->
+  Code_id_or_name.t ->
+  'a list list ->
+  ('a * Points_to_analysis.keep_or_delete) list list

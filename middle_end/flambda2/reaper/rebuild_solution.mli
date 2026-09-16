@@ -1,13 +1,9 @@
 (******************************************************************************
- *                             flambda-backend                                *
- *                                                                            *
- *             Nathanaëlle Courant, Pierre Chambart, OCamlPro                 *
- *                        Mark Shinwell, Jane Street                          *
+ *                                  OxCaml                                    *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024--2025 OCamlPro SAS                                      *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -29,21 +25,54 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type result = private
-  { body : Flambda.Expr.t;
-    all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
-  }
+open! Flambda.Import
 
-val rebuild :
-  machine_width:Target_system.Machine_width.t ->
-  ordered_code_ids:Code_id.t array ->
-  continuation_info:Traverse_acc.continuation_info Continuation.Map.t ->
-  fixed_arity_continuations:Continuation.Set.t ->
-  final_typing_env:Typing_env.t option ->
-  types_rewrite_context:Types_rewriter.rewrite_context ->
-  Rebuild_solution.t ->
-  (Code_id.t -> Code_metadata.t) ->
-  Rev_expr.t ->
-  Rev_expr.rev_code Code_id.Map.t ->
-  result
+(** Materialised answers to the queries the rebuild makes of the solved
+    analysis, without a Datalog database. *)
+type t
+
+val create :
+  queries:Rebuild_queries.t ->
+  unboxing:Unboxing_analysis.result ->
+  code_changes:Unboxing_analysis.code_changes ->
+  t
+
+val has_use : t -> Code_id_or_name.t -> bool
+
+val has_source : t -> Code_id_or_name.t -> bool
+
+val field_used : t -> Code_id_or_name.t -> Field.t -> bool
+
+val get_unboxed_fields :
+  t -> Code_id_or_name.t -> Unboxing_analysis.unboxed option
+
+val get_changed_representation :
+  t -> Code_id_or_name.t -> Unboxing_analysis.changed_representation option
+
+val code_id_actually_directly_called : t -> Name.t -> Code_id.Set.t Or_unknown.t
+
+val arguments_used_by_known_arity_call :
+  t ->
+  Code_id_or_name.t ->
+  'a list ->
+  ('a * Points_to_analysis.keep_or_delete) list
+
+val arguments_used_by_unknown_arity_call :
+  t ->
+  Code_id_or_name.t ->
+  'a list list ->
+  ('a * Points_to_analysis.keep_or_delete) list list
+
+(** Missing metadata for code in the current unit is a fatal error. Missing
+    metadata for other units' code returns [None]. *)
+val find_code_metadata : t -> Code_id.t -> Code_metadata.t option
+
+(** Require metadata, including for code from other units. *)
+val get_code_metadata : t -> Code_id.t -> Code_metadata.t
+
+(** Missing entries for other units' code have unchanged calling conventions;
+    missing entries for the current unit are fatal errors. *)
+val get_calling_convention_change :
+  t -> Code_id.t -> Unboxing_analysis.calling_convention_change
+
+val is_changing_calling_convention : t -> Code_id.t -> bool

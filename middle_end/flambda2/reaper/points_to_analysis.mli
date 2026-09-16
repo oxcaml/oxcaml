@@ -78,6 +78,18 @@ module Relations : sig
 
   val dominated_by_allocation_point :
     Code_id_or_name.t term -> Code_id_or_name.t term -> _ atom
+
+  val has_usage_table :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
+
+  val has_source_table :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
 end
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]

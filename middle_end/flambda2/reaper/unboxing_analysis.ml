@@ -1108,3 +1108,8 @@ let get_code_metadata t code_id =
        changes"
       Code_id.print code_id
   | Some code_change -> code_change.code_metadata
+
+let find_code_metadata t code_id =
+  Option.map
+    (fun code_change -> code_change.code_metadata)
+    (Code_id.Map.find_opt code_id t)
