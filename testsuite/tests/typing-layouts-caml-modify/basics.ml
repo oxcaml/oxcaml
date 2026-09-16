@@ -3,7 +3,7 @@
  {
    not-macos;
    (* Remove layout_beta here when block indices are out of beta *)
-   flags = "-extension layouts_beta \
+   flags = "-extension layouts_beta -extension layout_poly_alpha \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;
@@ -444,6 +444,31 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic set primitive. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set r (.x) x in
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  (* We don't currently track scannable axes of lpoly values, so we end up
+     calling [caml_modify] unnecessarily when instantiating with [int]. *)
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
 
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).

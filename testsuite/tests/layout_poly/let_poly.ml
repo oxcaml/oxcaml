@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension layout_poly_alpha";
+ flags = "-extension layout_poly_alpha -extension layouts_beta";
  { expect; }
  { expect.opt; }
 *)
@@ -516,4 +516,49 @@ let x =
   M.id #1s |> to_int8
 [%%expect {|
 val x : int8 = 1s
+|}]
+
+(* lpoly primitives with sort variables *)
+
+external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
+let poly_id =
+  let[@inline never] poly_ f x = id x in
+  let a = f 2 in
+  let b = f #3.0 |> to_float in
+  (a, b)
+
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+val poly_id : int * float = (2, 3.)
+|}]
+
+external[@layout_poly] set_idx : ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+external[@layout_poly] get_idx : ('a : value_or_null) ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+type ('a : any) t = { mutable x : 'a ; y : int }
+
+[%%expect{|
+external set_idx : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b -> unit
+  = "%set_idx" [@@layout_poly]
+external get_idx : 'a ('b : any). 'a -> ('a, 'b) idx_mut -> 'b = "%get_idx"
+  [@@layout_poly]
+type ('a : any) t = { mutable x : 'a; y : int; }
+|}]
+
+let poly_get_set_idx =
+  let[@inline never] poly_ get_x r = get_idx r (.x) in
+  let[@inline never] poly_ set_x r v = set_idx r (.x) v in
+  let r1 = { x = 42 ; y = 3 } in
+  let r2 = { x = #42.5 ; y = 3 } in
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 42 && b = 42.5);
+  set_x r1 43;
+  set_x r2 #43.5;
+  let a = get_x r1 in
+  let b = get_x r2 |> to_float in
+  assert (a = 43 && b = 43.5);
+  ()
+
+[%%expect{|
+val poly_get_set_idx : unit = ()
 |}]
