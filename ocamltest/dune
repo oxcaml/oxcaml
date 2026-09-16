@@ -16,18 +16,15 @@
  (modules tsl_lexer)
  (mode fallback))
 
-(ocamlyacc
- (modules tsl_parser)
- (mode fallback))
+; Force use of the ocamlyacc on PATH, instead of building our own.
+(rule
+ (targets tsl_parser.ml tsl_parser.mli)
+ (deps    tsl_parser.mly)
+ (action  (system "ocamlyacc %{deps}")))
 
 ;; FIXME: handle UNIX_OR_WIN32 or something similar
 
-(rule
- (targets empty.ml)
- (deps
-  (source_tree ../runtime/caml))
- (action
-  (write-file %{targets} "(* hack *)")))
+(copy_files# ../utils/config.ml)
 
 (executable
  (name main)
@@ -35,19 +32,15 @@
  (flags
   (:standard
    -w
-   +a-40-41-42-44-70
-   -cclib
-   "-I../runtime"))
- (libraries ocamlfrontend)
+   +a-40-41-42-44-70))
  ; This executable is built using the *system* compiler, so we can't use
  ; our own otherlibs/unix/, and neither can we depend on the "unix" library
  ; or this same one will be used.
  (ocamlopt_flags (:standard -I +unix unix.cmxa))
+ (ocamlc_flags (:standard -I +unix unix.cma))
  (foreign_stubs
   (language c)
-  (names run_unix run_stubs)
-  (flags
-   ((-DCAML_INTERNALS)))))
+  (names run_unix run_stubs)))
 
 (rule
  (copy main.exe ocamltest.native))
