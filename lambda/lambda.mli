@@ -1336,10 +1336,6 @@ val layout_unboxed_tupled_vector : unboxed_vector -> layout
 val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
-(* A layout that is Pgenval because it is the field of a block being considered
-   for the tmc transformation
-*)
-val layout_tmc_field : layout
 (* A layout that is Pgenval because it is an optional argument *)
 val layout_optional_arg : layout
 val layout_value_field : layout
@@ -1608,6 +1604,8 @@ val mod_field:
 val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+
+val layout_of_mixed_block_element : _ mixed_block_element -> layout
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)

@@ -1,6 +1,7 @@
 (* TEST
  flags = "-extension layouts_beta";
- expect.opt;
+ { expect; }
+ { expect.opt; }
 *)
 
 type ('a : any) seq = Nil | Cons of 'a * 'a seq
@@ -15,13 +16,7 @@ let[@tail_mod_cons] rec copy (xs : #(int * int) seq) =
   | Nil -> Nil
   | Cons (x, xs) -> Cons (x, (copy [@tailcall]) xs)
 [%%expect{|
->> Fatal error: CC.close_let: defining_exprs should have the same length as number of variables
-
-Context is: closure converting function
-with [our_let_rec_ident] copy_dps/0 (function slot (copy_dps/1 ∷ 𝕍))
-
-Uncaught exception: Misc.Fatal_error
-
+val copy : #(int * int) seq -> #(int * int) seq = <fun>
 |}]
 
 (* Should return (11, 22). The TMC code that writes the recursive result to the
@@ -36,5 +31,5 @@ let _ =
   | Cons (#(a, b), _) -> a, b
 [%%expect{|
 val repeat : int -> #(int * int) -> #(int * int) seq = <fun>
-- : int * int = (11, 0)
+- : int * int = (11, 22)
 |}]
