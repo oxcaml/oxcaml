@@ -19,7 +19,8 @@ module UA = Unboxing_analysis
 (* We use unit maps instead of sets, because it allows reuse of the tables
    stored in the Datalog database without copying. *)
 type 'f solution =
-  { has_usage : unit Code_id_or_name.Map.t;
+  { analysis_scope : Analysis_scope.t;
+    has_usage : unit Code_id_or_name.Map.t;
     has_source : unit Code_id_or_name.Map.t;
     field_of_constructor_is_used : unit Field.Map.t Code_id_or_name.Map.t;
     directly_called : Code_id.Set.t Or_unknown.t Code_id_or_name.Map.t;
@@ -35,22 +36,23 @@ type 'f solution =
     final_typing_env : ('f, typing_env option) Traverse.With_types.t
   }
 
-let fixpoint0 (graph : Global_flow_graph.graph) =
+let fixpoint0 (graph : Global_flow_graph.graph) ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
-  let db = PTA.perform_analysis datalog ~stats in
-  let (unboxing : UA.result) = UA.perform_analysis db ~stats in
+  let db = PTA.perform_analysis datalog ~stats ~analysis_scope in
+  let (unboxing : UA.result) = UA.perform_analysis db ~stats ~analysis_scope in
   if with_provenance || Flambda_features.debug_reaper "stats"
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
   unboxing
 
-let fixpoint graph =
+let fixpoint graph ~analysis_scope =
   if Flambda_features.debug_reaper "print-raw" then Dot_printer.print_dep graph;
   let solved_dep =
-    Profile.record_call ~accumulate:true "solver" (fun () -> fixpoint0 graph)
+    Profile.record_call ~accumulate:true "solver" (fun () ->
+        fixpoint0 graph ~analysis_scope)
   in
   if Flambda_features.debug_reaper "print-solved"
   then (
@@ -101,7 +103,7 @@ let rewrite_kind_with_subkind (type f)
     Types_rewriter.rewrite_kind_with_subkind types_rewrite_context
   | Without_types -> fun _ -> Types_rewriter.erase_subkind
 
-let solve (type f) (problem : f Traverse.Problem.t) =
+let solve (type f) (problem : f Traverse.Problem.t) ~analysis_scope =
   let { Traverse.Problem.deps;
         delayed_deps;
         code_deps;
@@ -113,8 +115,8 @@ let solve (type f) (problem : f Traverse.Problem.t) =
       } =
     problem
   in
-  Traverse_acc.resolve_delayed_deps deps ~code_deps delayed_deps;
-  let unboxing = fixpoint deps in
+  Traverse_acc.resolve_delayed_deps deps ~analysis_scope ~code_deps delayed_deps;
+  let unboxing = fixpoint deps ~analysis_scope in
   let db = unboxing.db in
   let ~directly_called, ~known_masks, ~unknown_masks =
     answer_call_queries db applications
@@ -125,7 +127,7 @@ let solve (type f) (problem : f Traverse.Problem.t) =
       all_sets_of_closures
   in
   let code_changes =
-    Unboxing_analysis.compute_code_changes unboxing
+    Unboxing_analysis.compute_code_changes unboxing ~analysis_scope
       ~rewrite_kind_with_subkind:
         (rewrite_kind_with_subkind types_rewrite_context)
       ~rewrite_result_types:(fun ~my_closure ~params ~results types ->
@@ -138,7 +140,9 @@ let solve (type f) (problem : f Traverse.Problem.t) =
                ~old_typing_env ~my_closure ~params ~results types))
       ~code_deps
   in
-  let slot_offsets = Slot_offsets_analysis.compute ~free_names unboxing in
+  let slot_offsets =
+    Slot_offsets_analysis.compute ~free_names ~analysis_scope unboxing
+  in
   let final_typing_env : (f, _) Traverse.With_types.t =
     match types_rewrite_context, final_typing_env, module_symbol with
     | Without_types, Without_types, Without_types -> Without_types
@@ -150,7 +154,8 @@ let solve (type f) (problem : f Traverse.Problem.t) =
            (Types_rewriter.rewrite_typing_env types_rewrite_context ~unit_symbol)
            final_typing_env)
   in
-  { has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
+  { analysis_scope;
+    has_usage = Datalog.get_table PTA.Relations.has_usage_tbl db;
     has_source = Datalog.get_table PTA.Relations.has_source_tbl db;
     field_of_constructor_is_used =
       Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db;
@@ -223,13 +228,16 @@ let arguments_used_by_unknown_arity_call solution callee args =
 let has_source solution v = Code_id_or_name.Map.mem v solution.has_source
 
 let get_calling_convention_change solution code_id =
-  Unboxing_analysis.get_calling_convention_change solution.code_changes code_id
+  Unboxing_analysis.get_calling_convention_change solution.code_changes
+    ~analysis_scope:solution.analysis_scope code_id
 
 let is_changing_calling_convention solution code_id =
-  Unboxing_analysis.is_changing_calling_convention solution.code_changes code_id
+  Unboxing_analysis.is_changing_calling_convention solution.code_changes
+    ~analysis_scope:solution.analysis_scope code_id
 
 let find_code_metadata solution code_id =
-  Unboxing_analysis.find_code_metadata solution.code_changes code_id
+  Unboxing_analysis.find_code_metadata solution.code_changes
+    ~analysis_scope:solution.analysis_scope code_id
 
 let slot_offsets solution = solution.slot_offsets
 

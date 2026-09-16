@@ -16,5 +16,5 @@
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let problem, skeleton = Traverse.run unit ~final_typing_env ~free_names in
-  let solution = Analysis.solve problem in
+  let solution = Analysis.solve problem ~analysis_scope:Current_unit in
   Rebuild.rebuild ~machine_width ~cmx_loader ~all_code ~unit ~skeleton ~solution
