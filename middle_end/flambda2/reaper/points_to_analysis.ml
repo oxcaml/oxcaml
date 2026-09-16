@@ -337,29 +337,15 @@ open! Relations
    the compilation unit), or a given constructor. *)
 
 module Datalog_schedule = struct
-  (* Group rules by priority. Rules with (let$) are executed first, then the
-     rules with (let$$) are executed. *)
-  let with_priority p x f = p, ( let$ ) x f
-
-  let ( let$ ) x f = with_priority 0 x f
-
-  let ( let$$ ) x f = with_priority 1 x f
-
-  let make_schedule l =
-    Schedule.fixpoint
-      (List.init 2 (fun i ->
-           Schedule.saturate
-             (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
+  (* All rules run in a single fixpoint computation. In particular the rules
+     deriving [any_source]/[any_usage] run in every iteration, in lockstep with
+     the rules copying [sources]/[usages] sets along aliases. *)
 
   let reverse_rules =
     (* Reverse relations, because datalog does not implement a more efficient
        representation yet. Datalog iterates on the first key of a relation
-       first, those reversed relations allows to select a different key. Of
-       these, only [alias] has both priorities, because it is the only of those
-       relations that is extended after graph construction. *)
+       first, those reversed relations allows to select a different key. *)
     [ (let$ [to_; from] = ["to_"; "from"] in
-       [alias ~to_ ~from] ==> rev_alias ~from ~to_);
-      (let$$ [to_; from] = ["to_"; "from"] in
        [alias ~to_ ~from] ==> rev_alias ~from ~to_);
       (let$ [to_; from] = ["to_"; "from"] in
        [use ~to_ ~from] ==> rev_use ~from ~to_);
@@ -384,14 +370,14 @@ module Datalog_schedule = struct
       (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
        [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
+      (let$ [base; base_use; relation; from; to_] =
          ["base"; "base_use"; "relation"; "from"; "to_"]
        in
        [ constructor ~base relation ~from;
          nontop_usages base base_use;
          rev_accessor ~base:base_use relation ~to_ ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; from; to_] =
+      (let$ [base; base_use; relation; from; to_] =
          ["base"; "base_use"; "relation"; "from"; "to_"]
        in
        [ when1 Field.is_local relation;
@@ -399,21 +385,21 @@ module Datalog_schedule = struct
          usages base base_use;
          rev_accessor ~base:base_use relation ~to_ ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_use; relation; to_; from] =
+      (let$ [base; base_use; relation; to_; from] =
          ["base"; "base_use"; "relation"; "to_"; "from"]
        in
        [ parameter ~base relation ~to_;
          nontop_usages base base_use;
          rev_argument ~base:base_use relation ~from ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_source; relation; to_; from] =
+      (let$ [base; base_source; relation; to_; from] =
          ["base"; "base_source"; "relation"; "to_"; "from"]
        in
        [ rev_accessor ~base relation ~to_;
          nontop_sources base base_source;
          constructor ~base:base_source relation ~from ]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_source; relation; to_; from] =
+      (let$ [base; base_source; relation; to_; from] =
          ["base"; "base_source"; "relation"; "to_"; "from"]
        in
        [ when1 Field.is_local relation;
@@ -424,7 +410,7 @@ module Datalog_schedule = struct
       (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
        [escaping_field relation from; reading_field relation to_]
        ==> alias ~to_ ~from);
-      (let$$ [base; base_source; relation; from; to_] =
+      (let$ [base; base_source; relation; from; to_] =
          ["base"; "base_source"; "relation"; "from"; "to_"]
        in
        [ rev_argument ~base relation ~from;
@@ -437,9 +423,9 @@ module Datalog_schedule = struct
        [any_usage x] ==> has_usage x);
       (let$ [to_; from] = ["to_"; "from"] in
        [has_usage to_; alias ~to_ ~from] ==> has_usage from);
-      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+      (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [has_usage to_; accessor ~to_ relation ~base] ==> has_usage base);
-      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+      (let$ [from; relation; base] = ["from"; "relation"; "base"] in
        [has_source from; argument ~from relation ~base] ==> has_usage base) ]
 
   let has_source_rules =
@@ -447,10 +433,10 @@ module Datalog_schedule = struct
        [any_source x] ==> has_source x);
       (let$ [from; to_] = ["from"; "to_"] in
        [has_source from; rev_alias ~from ~to_] ==> has_source to_);
-      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+      (let$ [from; relation; base] = ["from"; "relation"; "base"] in
        [has_source from; rev_constructor ~from relation ~base]
        ==> has_source base);
-      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+      (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [has_usage to_; rev_parameter ~to_ relation ~base] ==> has_source base)
     ]
 
@@ -484,20 +470,20 @@ module Datalog_schedule = struct
        [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
 
   let usages_rules =
-    [ (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+    [ (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [accessor ~to_ relation ~base] ==> nontop_usages base base);
-      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+      (let$ [from; relation; base] = ["from"; "relation"; "base"] in
        [argument ~from relation ~base] ==> nontop_usages base base);
-      (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
+      (let$ [to_; from; usage] = ["to_"; "from"; "usage"] in
        [nontop_usages to_ usage; alias ~to_ ~from] ==> nontop_usages from usage)
     ]
 
   let sources_rules =
-    [ (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+    [ (let$ [from; relation; base] = ["from"; "relation"; "base"] in
        [rev_constructor ~from relation ~base] ==> nontop_sources base base);
-      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+      (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
        [rev_parameter ~to_ relation ~base] ==> nontop_sources base base);
-      (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
+      (let$ [from; to_; source] = ["from"; "to_"; "source"] in
        [nontop_sources from source; rev_alias ~from ~to_]
        ==> nontop_sources to_ source) ]
 
@@ -535,7 +521,7 @@ module Datalog_schedule = struct
         sources_rules;
         local_rules;
         zero_alloc_rules ]
-    |> make_schedule
+    |> Schedule.fixpoint
 end
 
 let datalog_schedule = Datalog_schedule.schedule
@@ -890,7 +876,7 @@ let not_local_field_has_source =
   fun db x field -> any_source_query [x] db || field_source_query [x; field] db
 
 let post_processing_rules =
-  saturate_in_order
+  fixpoint_in_order
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
          any_usage base;

@@ -29,8 +29,6 @@ val deduce : deduction -> (Heterogenous_list.nil, rule) Datalog.program
 
 type t
 
-val saturate : rule list -> t
-
-val fixpoint : t list -> t
+val fixpoint : rule list -> t
 
 val run : ?stats:stats -> t -> Table.Map.t -> Table.Map.t
