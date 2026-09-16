@@ -121,18 +121,15 @@ let compile_terminator : type p a.
     a =
  fun ~parameters ~variables ~head ~body -> function
   | Yield args ->
-    let head, callback =
-      let callback_ref = ref ignore in
-      let yield =
-        create_callback_with_bindings ~name:"yield"
-          (fun _ args -> !callback_ref args)
-          args
-      in
-      yield :: head, Some callback_ref
+    let callback = ref ignore in
+    let yield =
+      create_callback_with_bindings ~name:"yield"
+        (fun _ args -> !callback args)
+        args
     in
     let variables = Lang.Variable.hlist_to_list variables in
-    Cursor.With_parameters.create_from_rule ?callback parameters variables
-      (Lang.rule ~head ~body)
+    Cursor.With_parameters.create_from_rule ~callback parameters variables
+      (Lang.rule ~head:(yield :: head) ~body)
   | Deduce deductions ->
     let [] = parameters in
     let head =
