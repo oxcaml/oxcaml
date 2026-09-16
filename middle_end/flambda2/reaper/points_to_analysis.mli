@@ -60,7 +60,19 @@ module Relations : sig
 
   val escaping_field : Field.t term -> Code_id_or_name.t term -> _ atom
 
+  val has_usage_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
+
   val has_usage : Code_id_or_name.t term -> _ atom
+
+  val has_source_tbl :
+    ( unit Code_id_or_name.Map.t,
+      Code_id_or_name.t -> Datalog.nil,
+      unit )
+    Datalog.table
 
   val has_source : Code_id_or_name.t term -> _ atom
 

@@ -30,14 +30,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           fixed_arity_continuations;
           continuation_info;
           code_deps;
+          applications;
           all_sets_of_closures;
           closure_function_decls
         } =
     Traverse.run unit
   in
-  let solved_dep =
+  let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        Analysis.fixpoint deps)
+        Analysis.fixpoint deps ~applications)
   in
   let () =
     if Flambda_features.debug_reaper "print-solved"
@@ -66,10 +67,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~code_changes ~get_code_metadata solved_dep
   in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
-    Rebuild.rebuild ~machine_width ~ordered_code_ids ~code_deps
-      ~fixed_arity_continuations ~continuation_info ~final_typing_env
-      ~types_rewrite_context ~code_changes solved_dep get_code_metadata
-      toplevel_expr code
+    Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
+      ~continuation_info ~final_typing_env ~types_rewrite_context ~code_changes
+      uses get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code
