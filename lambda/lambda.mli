@@ -683,6 +683,7 @@ and variant_representation =
 and constructor_shape =
   | Constructor_shape_uniform of value_kind list
   | Constructor_shape_mixed of mixed_block_shape
+  | Constructor_shape_undetermined
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64
