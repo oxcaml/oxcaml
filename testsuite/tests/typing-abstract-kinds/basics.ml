@@ -1842,6 +1842,7 @@ module A : sig val c : '_weak1 id option ref end
 module B : sig val c : '_weak1 id option ref end
 |}]
 
+(* obviously unsound *)
 let () = A.c := (None : int id option)
 let () = B.c := (None : bool id option)
 [%%expect{|
@@ -1851,6 +1852,33 @@ Line 2, characters 16-39:
 Error: This expression has type "bool id option"
        but an expression was expected of type "int id option"
        Type "bool" is not compatible with type "int"
+|}]
+
+(* Analogous example, but reusing the same functor argument *)
+
+let cell = ref (None : (_ : any) id option)
+
+module G (X : sig kind_ ka end) = struct
+  let c = (cell : (_ : X.ka) id option ref)
+end
+
+module K = struct kind_ ka = value end
+
+module A = G (K)
+module B = G (K)
+[%%expect{|
+val cell : '_weak2 id option ref = {contents = None}
+module G :
+  functor (X : sig kind_ ka end) -> sig val c : '_weak2 id option ref end
+module K : sig kind_ ka = value end
+module A : sig val c : '_weak3 id option ref end
+module B : sig val c : '_weak4 id option ref end
+|}]
+
+(* obviously unsound *)
+let () = A.c := (None : int id option)
+let () = B.c := (None : bool id option)
+[%%expect{|
 |}]
 
 (*****************************************************)
