@@ -33,13 +33,22 @@ module DLL = Doubly_linked_list
 
 type layout = Label.t DLL.t
 
+type layout_index = Label.t DLL.cell Label.Tbl.t
+
 type t =
   { cfg : Cfg.t;
     mutable layout : layout;
+    mutable index : layout_index;
     sections : (Label.t, string) Hashtbl.t
   }
 
-let create cfg ~layout = { cfg; layout; sections = Hashtbl.create 3 }
+let make_index layout =
+  let tbl = Label.Tbl.create 10 in
+  DLL.iter_cell layout ~f:(fun c -> Label.Tbl.add tbl (DLL.value c) c);
+  tbl
+
+let create cfg ~layout =
+  { cfg; layout; index = make_index layout; sections = Hashtbl.create 3 }
 
 let cfg t = t.cfg
 
@@ -63,7 +72,8 @@ let set_layout t layout =
        Misc.fatal_error
          "Cfg set_layout: new layout is not a permutation of the current \
           layout, or first label is not entry");
-  t.layout <- layout
+  t.layout <- layout;
+  t.index <- make_index layout
 
 let assign_blocks_to_section t labels name =
   List.iter
@@ -78,8 +88,6 @@ let assign_blocks_to_section t labels name =
 
 let get_section t label = Hashtbl.find_opt t.sections label
 
-exception Found_all
-
 let remove_blocks t labels_to_remove =
   let num_to_remove = Label.Set.cardinal labels_to_remove in
   if num_to_remove > 0
@@ -87,24 +95,19 @@ let remove_blocks t labels_to_remove =
     (* remove from cfg *)
     Cfg.remove_blocks t.cfg labels_to_remove;
     (* remove from layout *)
-    let num_removed = ref 0 in
-    try
-      DLL.iter_cell t.layout ~f:(fun cell ->
-          if !num_removed = num_to_remove then raise Found_all;
-          let l = DLL.value cell in
-          if Label.Set.mem l labels_to_remove
-          then (
-            DLL.delete_curr cell;
-            incr num_removed))
-    with Found_all -> ())
+    labels_to_remove
+    |> Label.Set.iter (fun lbl ->
+        let cell = Label.Tbl.find t.index lbl in
+        DLL.delete_curr cell;
+        Label.Tbl.remove t.index lbl))
 
 let add_block t (block : Cfg.basic_block) ~after =
-  match
-    DLL.find_cell_opt t.layout ~f:(fun label -> Label.equal label after)
-  with
-  | None -> Misc.fatal_error "Cfg set_layout: 'after' block is not present"
-  | Some cell ->
-    DLL.insert_after cell block.start;
+  match Label.Tbl.find t.index after with
+  | exception Not_found ->
+    Misc.fatal_error "Cfg set_layout: 'after' block is not present"
+  | cell ->
+    let new_cell = DLL.insert_and_return_after cell block.start in
+    Label.Tbl.add t.index block.start new_cell;
     Cfg.add_block_exn t.cfg block
 
 let is_trap_handler t label =
