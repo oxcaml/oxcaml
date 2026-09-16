@@ -1761,7 +1761,7 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
           (Variant
              { consts = Target_ocaml_int.Set.empty;
                non_consts =
-                 Tag.Scannable.Map.singleton tag (block_shape, subkinds)
+                 Tag.Scannable.Map.singleton tag (Some (block_shape, subkinds))
              })
           Non_nullable
       in
@@ -1778,8 +1778,8 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
       match[@ocaml.warning "-fragile-match"] KS.non_null_value_subkind ks with
       | Variant { consts = _; non_consts } -> (
         match Tag.Scannable.Map.get_singleton non_consts with
-        | Some (_, (_, subkinds)) -> with_subkinds subkinds
-        | None -> default ())
+        | Some (_, Some (_, subkinds)) -> with_subkinds subkinds
+        | Some (_, None) | None -> default ())
       | _ -> default ())
   in
   let bound_name = Code_id_or_name.name bound_name in
