@@ -1058,20 +1058,6 @@ let is_changing_calling_convention t code_id =
   | Not_changing_calling_convention -> false
   | Changing_calling_convention _ -> true
 
-let get_code_metadata t code_id =
-  if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
-  then
-    Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is not from the current unit"
-      Code_id.print code_id;
-  match Code_id.Map.find_opt code_id t with
-  | None ->
-    Misc.fatal_errorf
-      "[get_code_metadata]: code_id %a is in current unit but missing in code \
-       changes"
-      Code_id.print code_id
-  | Some code_change -> code_change.code_metadata
-
 let find_code_metadata t code_id =
   Option.map
     (fun code_change -> code_change.code_metadata)

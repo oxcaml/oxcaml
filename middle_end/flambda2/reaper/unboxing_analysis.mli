@@ -84,11 +84,9 @@ val get_calling_convention_change :
 
 val is_changing_calling_convention : code_changes -> Code_id.t -> bool
 
-(* Should only be called on code_ids from the current unit. *)
-val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
-
-(** Like [get_code_metadata], but returns [None] for code ids without an entry
-    (in particular those of units that did not participate in the solve). *)
+(** The metadata as updated by the code changes, or [None] for code ids without
+    an entry (in particular those of units that did not participate in the
+    solve). *)
 val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
 
 val pp_result : Format.formatter -> result -> unit

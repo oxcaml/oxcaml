@@ -55,9 +55,13 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
         (Types_rewriter.For_solve.rewrite_kind_with_subkind ~db:solved_dep.db)
       ~code_deps
   in
+  let slot_offsets_inputs =
+    Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
+      ~code_deps ~get_code_metadata
+  in
   let slot_offsets =
-    Slot_offsets_analysis.compute ~free_names ~closure_function_decls
-      ~code_changes ~get_code_metadata solved_dep
+    Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~code_changes
+      solved_dep
   in
   let queries = Rebuild_queries.create solved_dep.db ~applications in
   let solution =
