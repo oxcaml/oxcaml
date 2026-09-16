@@ -17,7 +17,6 @@ open! Flambda.Import
 open! Rev_expr
 module Acc = Traverse_acc
 module Env = Traverse_env
-module Dot = Dot_printer
 module K = Flambda_kind
 module KS = Flambda_kind.With_subkind
 
@@ -385,22 +384,11 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
           Some (Simple.var callee_if_any_source), widget_if_any_source)
         else callee, call_widget
       in
-      if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
-      else
-        let apply_dep =
-          { Traverse_acc.function_containing_apply_expr =
-              Env.current_code_id denv;
-            apply_code_id = code_id;
-            apply_closure = callee;
-            apply_call_witness = call_widget
-          }
-        in
-        Acc.add_apply acc apply_dep
+      Acc.add_apply acc
+        ~function_containing_apply_expr:(Env.current_code_id denv)
+        ~apply_code_id:code_id
+        ~apply_closure:(Option.map (Acc.simple_to_node acc ~denv) callee)
+        ~apply_call_witness:call_widget
     in
     match callee with
     | None -> add_apply acc ~only_if_closure_any_source:false
@@ -418,6 +406,9 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
              as we will not be able to recover the code_id from the sources of
              the closure, and the call is indeed very likely to be a call to
              that code_id. *)
+          (* CR ncourant: LTO mode will be slightly less precise when no
+             always preserving direct calls; I don't think this really matters.
+           *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -840,6 +831,8 @@ type result =
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    delayed_deps : Traverse_acc.delayed_deps;
+    le_monde_exterieur : Symbol.t;
     applications : Acc.Applications.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
@@ -851,10 +844,7 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit ~free_names acc ~all_constants () =
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
+let run0 unit acc ~free_names ~all_constants ~le_monde_exterieur () =
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
@@ -895,15 +885,17 @@ let run0 unit ~free_names acc ~all_constants () =
 let run (unit : Flambda_unit.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
+  let le_monde_exterieur =
+    create_symbol_and_add_any_source acc "le_monde_extérieur"
+  in
   let holed =
     Profile.record_call ~accumulate:false "down"
-      (run0 unit ~free_names acc ~all_constants)
+      (run0 unit acc ~free_names ~all_constants ~le_monde_exterieur)
   in
-  let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
+  let deps = Acc.deps acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
   let continuation_info = Acc.get_continuation_info acc in
   let code_deps = Acc.code_deps acc in
-  if Flambda_features.debug_reaper "print-raw" then Dot.print_dep deps;
   { toplevel_expr = holed;
     code = Acc.get_all_code acc;
     ordered_code_ids = Acc.sort_code_ids acc;
@@ -911,6 +903,8 @@ let run (unit : Flambda_unit.t) ~free_names =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
+    delayed_deps = Acc.delayed_deps acc;
+    le_monde_exterieur;
     applications = Acc.applications acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc
   }
