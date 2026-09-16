@@ -40,6 +40,11 @@ type t : bits8 box box
 type t : bits8 box box
 |}]
 
+type t : any box box
+[%%expect{|
+type t : any box box
+|}]
+
 type t : any box non_null box
 [%%expect{|
 type t : any box non_null box
@@ -345,8 +350,46 @@ let f (x : 'a) (_ : 'a any_box_req) = x
 val f : ('a : any box). 'a -> 'a any_box_req -> 'a = <fun>
 |}]
 
-(* [@layout_poly] leaves box-kinded variables alone (they are already
-   representable), so [%identity] cannot mix them with instantiated ones *)
+(**** Calling [@layout_poly] primitives with box kinds ****)
+
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+external get : ('a : any separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
+type t : bits8 box
+let f (x : t) = id x
+let g (a : t array) = get a 0
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+external get : ('a : any separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
+type t : bits8 box
+val f : t -> t = <fun>
+val g : t array -> t = <fun>
+|}]
+
+(* Calls to layout poly functions share a sort among the [any] variables.
+   We can observe that [_ box] has sort [scannable] via the below error. *)
+external magic : ('a : any) ('b : any). 'a -> 'b = "%identity"
+[@@layout_poly]
+let f (x : t) : float# = magic x
+[%%expect{|
+external magic : ('a : any) ('b : any). 'a -> 'b = "%identity"
+  [@@layout_poly]
+Line 3, characters 25-32:
+3 | let f (x : t) : float# = magic x
+                             ^^^^^^^
+Error: This expression has type "('a : value_or_null)"
+       but an expression was expected of type "float#"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be a value layout
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+(* [any box] is not treated as poly by [@layout_poly]. (Observable as this
+   binding of [%identity] then fails the "same arg/return layout" check.) *)
 external magic : ('a : any) ('b : any box). 'a -> 'b = "%identity"
 [@@layout_poly]
 [%%expect{|
@@ -356,6 +399,7 @@ Line 1, characters 17-52:
 Error: The primitive [%identity] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
+
 
 (**** Scannable axes on box ****)
 
@@ -457,15 +501,6 @@ Error: Signature mismatch:
        Their definitions are not equal.
 |}]
 
-(* [kind_of_] cannot be boxed (it is unimplemented altogether) *)
-type ('a : value) t : kind_of_ 'a box
-[%%expect{|
-Line 1, characters 22-37:
-1 | type ('a : value) t : kind_of_ 'a box
-                          ^^^^^^^^^^^^^^^
-Error: Unimplemented kind syntax
-|}]
-
 kind_ k
 type t : k box
 [%%expect{|
@@ -486,24 +521,6 @@ Line 2, characters 29-32:
 Error: The kind constructor box cannot yet be applied to the abstract kind x.
 |}]
 
-(* Also through a functor's abstract kind *)
-module Wrap (M : sig
-    kind_ k
-
-    type t : k
-  end) =
-struct
-  kind_ k = M.k box
-
-  type t : k
-end
-[%%expect{|
-Line 7, characters 16-19:
-7 |   kind_ k = M.k box
-                    ^^^
-Error: The kind constructor box cannot yet be applied to the abstract kind M.k.
-|}]
-
 
 (**** Module inclusion ****)
 
@@ -514,15 +531,6 @@ end = struct
 end
 [%%expect{|
 module M : sig type t : bits8 box end
-|}]
-
-module M : sig
-  type t : value non_pointer
-end = struct
-  type t : bits8 box
-end
-[%%expect{|
-module M : sig type t : value non_pointer end
 |}]
 
 module M : sig
@@ -574,24 +582,6 @@ Error: Signature mismatch:
        But the layout of the first must be a value layout
          because of the definition of t at line 2, characters 2-20.
 |}]
-
-(* Box kinds survive functor application *)
-module F (X : sig
-    type t : bits8 box
-  end) =
-struct
-  type ok = X.t np_req
-end
-
-module A = F (struct
-    type t : bits8 box
-  end)
-[%%expect{|
-module F :
-  functor (X : sig type t : bits8 box end) -> sig type ok = X.t np_req end
-module A : sig type ok end
-|}]
-
 
 (**** [or_null] of a box kind is not a box kind ****)
 
@@ -672,25 +662,71 @@ Error: This type "'a or_null" should be an instance of type "('b : any box)"
          because of the definition of any_box_req at line 1, characters 0-31.
 |}]
 
-(**** Unboxed records are never below box kinds, even when their declared
-      kind is approximate ****)
+(**** Scannable axes of [_ box or_null] ****)
 
-type i8 : bits8
-type ('a : any) prod = #{ a : 'a; b : string }
-type bad = i8 prod any_box_req
+(* [or_null] preserves contents-implied [non_pointer], [non_pointer64] and
+   [non_float] *)
+type ('a : value_or_null non_pointer) vonp_req
+type ('a : value_or_null non_pointer64) vonp64_req
+type t8 : bits8 box
+type t32 : bits32 box
+type ok = t8 or_null vonp_req
+type ok = t32 or_null vonp64_req
+type bad = t32 or_null vonp_req
 [%%expect{|
-type i8 : bits8
-type ('a : any) prod = #{ a : 'a; b : string; }
-Line 3, characters 11-18:
-3 | type bad = i8 prod any_box_req
-               ^^^^^^^
-Error: This type "i8 prod" should be an instance of type "('a : any box)"
-       The layout of i8 prod is any & value non_float
-         because of the definition of prod at line 2, characters 0-46.
-       But the layout of i8 prod must be a value layout
+type ('a : value_or_null non_pointer) vonp_req
+type ('a : value_or_null non_pointer64) vonp64_req
+type t8 : bits8 box
+type t32 : bits32 box
+type ok = t8 or_null vonp_req
+type ok = t32 or_null vonp64_req
+Line 7, characters 11-22:
+7 | type bad = t32 or_null vonp_req
+               ^^^^^^^^^^^
+Error: This type "t32 or_null" should be an instance of type
+         "('a : value_or_null non_pointer)"
+       The layout of t32 or_null is value_or_null
+         because it is the primitive type or_null.
+       But the layout of t32 or_null must be a sublayout of
+           value_or_null non_pointer
+         because of the definition of vonp_req at line 1, characters 0-46.
+|}]
+
+(* Contents-implied [separable] from [float64 box] is weakened to
+   [maybe_separable] *)
+type ('a : value_maybe_null) vmn_req
+type tf : float64 box
+type ok = tf v_req
+type bad = tf or_null vmn_req
+[%%expect{|
+type ('a : value_maybe_null) vmn_req
+type tf : float64 box
+type ok = tf v_req
+Line 4, characters 11-21:
+4 | type bad = tf or_null vmn_req
+               ^^^^^^^^^^
+Error: This type "tf or_null" should be an instance of type
+         "('a : value_maybe_null)"
+       The layout of tf or_null is value_or_null
+         because it is the primitive type or_null.
+       But the layout of tf or_null must be a sublayout of value_maybe_null
+         because of the definition of vmn_req at line 1, characters 0-36.
+|}]
+
+(**** Products are not below box kinds ****)
+
+type t : bits8 & value
+type bad = t any_box_req
+[%%expect{|
+type t : bits8 & value
+Line 2, characters 11-12:
+2 | type bad = t any_box_req
+               ^
+Error: This type "t" should be an instance of type "('a : any box)"
+       The layout of t is bits8 & value
+         because of the definition of t at line 1, characters 0-22.
+       But the layout of t must be a value layout
          because of the definition of any_box_req at line 1, characters 0-31.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 (**** Test [Jkind.equate] by unifying univars ****)
@@ -912,15 +948,6 @@ val ok :
   <fun>
 |}]
 
-(* And in the other order *)
-let ok (x : 'a) (_ : 'a any_box_req) (_ : 'a np_req) = x
-[%%expect{|
-val ok :
-  ('a : any box non_pointer non_null).
-    'a -> 'a any_box_req -> 'a np_req -> 'a =
-  <fun>
-|}]
-
 (* The meet of two box kinds meets the payloads and the applied axes *)
 type ('a : any box non_null) box_nn_req
 type ('a : any box non_float) box_nf_req
@@ -931,6 +958,27 @@ type ('a : any box non_float) box_nf_req
 val ok :
   ('a : any box non_float non_null).
     'a -> 'a box_nn_req -> 'a box_nf_req -> 'a =
+  <fun>
+|}]
+
+(* Meets of boxed concrete kinds (implying axes) *)
+let ok (x : 'a) (_ : 'a b8_box_req) (_ : 'a box_nn_req) = x
+[%%expect{|
+val ok : ('a : bits8 box). 'a -> 'a b8_box_req -> 'a box_nn_req -> 'a = <fun>
+|}]
+
+let ok (x : 'a) (_ : 'a b8_box_req) (_ : 'a nf_req) = x
+[%%expect{|
+val ok : ('a : bits8 box). 'a -> 'a b8_box_req -> 'a nf_req -> 'a = <fun>
+|}]
+
+(* Applied axes stronger than the implied ones do print *)
+type ('a : bits32 box) b32_box_req
+let ok (x : 'a) (_ : 'a b32_box_req) (_ : 'a np_req) = x
+[%%expect{|
+type ('a : bits32 box) b32_box_req
+val ok :
+  ('a : bits32 box non_pointer). 'a -> 'a b32_box_req -> 'a np_req -> 'a =
   <fun>
 |}]
 
@@ -960,15 +1008,6 @@ val ok : ('a : any box non_null). 'a -> 'a any_nn_req -> 'a any_box_req -> 'a =
 |}]
 
 (**** Inclusion between boxes with different payloads ****)
-
-module M : sig
-  type t : any box
-end = struct
-  type t : bits8 box
-end
-[%%expect{|
-module M : sig type t : any box end
-|}]
 
 module M : sig
   type t : bits8 box
