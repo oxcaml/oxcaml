@@ -414,7 +414,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
       in
       let existing_value_slots = value_slots in
       let value_slots =
-        Field.Map.fold
+        Unboxed_fields.fold
           (fun field (uf : _ Unboxed_fields.u) value_slots ->
             match Field.view field with
             | Is_int | Get_tag | Block _ | Boxed_number _ ->
@@ -620,7 +620,7 @@ let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access ?(mut : Mutability.t = Immutable) base field
       =
     let arg = get_simple_unboxable env base in
-    match Field.Map.find field arg with
+    match Unboxed_fields.find field arg with
     | Not_unboxed var ->
       let simple = Simple.var var in
       Named.create_simple simple, Code_size.simple simple
@@ -634,7 +634,7 @@ let rebuild_named_default_case env (named : Named.t) =
            the no_source check previously.@.Block is: %a@.Expected fields are: \
            %a@."
           Field.print field Simple.print base Field.Set.print
-          (Field.Map.keys arg)
+          (Unboxed_fields.keys arg)
       | Mutable ->
         let prim = P.Nullary (Invalid (Field.kind field)) in
         ( Named.create_prim prim Debuginfo.none,
@@ -643,7 +643,7 @@ let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
       arg field dbg =
     let[@inline] get_field ~f (arg_fields : _ Unboxed_fields.t) =
-      match Field.Map.find field arg_fields with
+      match Unboxed_fields.find field arg_fields with
       | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
       | Not_unboxed r -> f r
       | exception Not_found -> (
@@ -655,7 +655,7 @@ let rebuild_named_default_case env (named : Named.t) =
              excluded by the no_source check previously.@.Block is: \
              %a@.Expected fields are: %a@."
             Field.print field Simple.print arg Field.Set.print
-            (Field.Map.keys arg_fields)
+            (Unboxed_fields.keys arg_fields)
         | Mutable ->
           let prim = P.Nullary (Invalid (Field.kind field)) in
           ( Named.create_prim prim dbg,
@@ -1239,7 +1239,7 @@ let rebuild_apply env apply =
             (* The callee can be erased only if the function does not use its
                closure, so the set of unboxed fields is normally empty here, and
                there are no fields to bind. *)
-            if not (Field.Map.is_empty fields)
+            if not (Unboxed_fields.is_empty fields)
             then
               Misc.fatal_errorf
                 "No callee for apply %a with non-empty unboxed closure"
@@ -1351,7 +1351,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
   let arg = Code_id_or_name.name arg in
   match Rebuild_solution.get_unboxed_fields env.solution arg with
   | Some arg -> (
-    match Field.Map.find field arg with
+    match Unboxed_fields.find field arg with
     | exception Not_found ->
       Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
         Format.pp_print_text "Loading unboxed field:" Field.print field
@@ -1373,7 +1373,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
     in
     match arg with
     | Block_representation (arg_fields, _size) -> (
-      match Field.Map.find field arg_fields with
+      match Unboxed_fields.find field arg_fields with
       | exception Not_found ->
         Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
           Format.pp_print_text "Loading unboxed field:" Field.print field
@@ -1404,7 +1404,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
           (Unboxed to_bind) arg hole)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
       -> (
-      match Field.Map.find field arg_fields with
+      match Unboxed_fields.find field arg_fields with
       | exception Not_found ->
         Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
           Format.pp_print_text "Loading unboxed field:" Field.print field
@@ -1444,7 +1444,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
   | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-    Field.Map.fold
+    Unboxed_fields.fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg : _ Either.t =
           match Field.view field with
@@ -1478,7 +1478,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
         | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
       to_bind hole
   | Prim (Unary (Box_number (prim_bn, _), contents), _dbg) ->
-    Field.Map.fold
+    Unboxed_fields.fold
       (fun field (var : _ Unboxed_fields.u) hole ->
         let arg =
           match Field.view field with
@@ -1546,7 +1546,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                (Code_id_or_name.var (Bound_var.var bv)))
         in
         let value_slots = set_of_closures.value_slots in
-        Field.Map.fold
+        Unboxed_fields.fold
           (fun field (var : _ Unboxed_fields.u) hole ->
             match Field.view field with
             | Value_slot value_slot ->
@@ -1612,7 +1612,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
           Bound_var.print bv
     in
     let mp =
-      Field.Map.fold
+      Unboxed_fields.fold
         (fun f (uf : _ Unboxed_fields.u) mp ->
           match Field.view f with
           | Block (i, _kind) -> (
