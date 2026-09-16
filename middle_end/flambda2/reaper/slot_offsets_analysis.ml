@@ -70,9 +70,11 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
               }
           else
             let code_metadata =
-              if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-              then Unboxing_analysis.get_code_metadata code_changes code_id
-              else get_code_metadata code_id
+              match
+                Unboxing_analysis.find_code_metadata code_changes code_id
+              with
+              | Some code_metadata -> code_metadata
+              | None -> get_code_metadata code_id
             in
             Deleted
               { function_slot_size =
@@ -240,9 +242,9 @@ let compute ~free_names ~closure_function_decls ~code_changes ~get_code_metadata
   in
   let get_function_slot_size code_id =
     let code_metadata =
-      if Current_unit.is_current (Code_id.get_compilation_unit code_id)
-      then Unboxing_analysis.get_code_metadata code_changes code_id
-      else get_code_metadata code_id
+      match Unboxing_analysis.find_code_metadata code_changes code_id with
+      | Some code_metadata -> code_metadata
+      | None -> get_code_metadata code_id
     in
     Code_metadata.function_slot_size code_metadata
   in
