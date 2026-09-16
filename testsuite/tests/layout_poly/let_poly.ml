@@ -51,6 +51,17 @@ val poly_ const : 'a -> 'b -> 'a = <lpoly>
 val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
 |}]
 
+(* Layout variables shared by annotations in a binding group. *)
+let poly_ id1 : 'a -> 'a = fun x -> x
+and poly_ id2 : 'a -> 'a = fun x -> x
+[%%expect{|
+Line 1, characters 10-13:
+1 | let poly_ id1 : 'a -> 'a = fun x -> x
+              ^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
 (* CR-soon zqian: Tuple patterns are not yet supported by transl.
 Therefore, in the following typing test, we intentionally write the wrong
 signature such that the inferred signature can be printed and inspected, and we
