@@ -110,14 +110,6 @@ let is_var_used (env : env) var =
 let is_name_used (env : env) name =
   Name.pattern_match name ~symbol:(is_symbol_used env) ~var:(is_var_used env)
 
-(* The solution only has metadata for code covered by the solve. Other code is
-   from a unit that did not take part in it, so its imported .cmx metadata is
-   not stale. *)
-let get_solved_code_metadata (env : env) code_id =
-  match Rebuild_solution.find_code_metadata env.solution code_id with
-  | Some code_metadata -> code_metadata
-  | None -> env.get_code_metadata code_id
-
 let poison name kind = Simple.const (Reg_width_const.const_poison kind name)
 
 let simple_is_unboxable env simple =
@@ -485,8 +477,12 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
             if code_is_used bound_name
             then
               let changed_calling_convention =
-                Rebuild_solution.is_changing_calling_convention env.solution
-                  code_id
+                match
+                  Rebuild_solution.get_calling_convention_change env.solution
+                    code_id
+                with
+                | Not_changing_calling_convention -> false
+                | Changing_calling_convention _ -> true
               in
               Code_id
                 { code_id;
@@ -494,7 +490,17 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
                     only_full_applications || changed_calling_convention
                 }
             else
-              let code_metadata = get_solved_code_metadata env code_id in
+              let code_metadata =
+                match
+                  Rebuild_solution.find_code_metadata env.solution code_id
+                with
+                | Some code_metadata -> code_metadata
+                | None ->
+                  (* Not computed by the solve, so this code is from a unit that
+                     did not participate in it; its .cmx metadata is not
+                     stale. *)
+                  env.get_code_metadata code_id
+              in
               Deleted
                 { function_slot_size =
                     Code_metadata.function_slot_size code_metadata;
@@ -1798,7 +1804,12 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
                       in [all_code]"
                      Set_of_closures.print set_of_closures Code_id.print code_id
                  | code -> Code.code_metadata code
-               else get_solved_code_metadata env code_id
+               else
+                 match
+                   Rebuild_solution.find_code_metadata env.solution code_id
+                 with
+                 | Some code_metadata -> code_metadata
+                 | None -> env.get_code_metadata code_id
              in
              { cost_metrics = Code_metadata.cost_metrics code_metadata;
                function_slot_size =

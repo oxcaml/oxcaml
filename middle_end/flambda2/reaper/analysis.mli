@@ -35,3 +35,18 @@ val any_source : result -> Code_id_or_name.t -> bool
 val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
 val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
+
+val code_id_actually_directly_called :
+  result -> Name.t -> Code_id.Set.t Or_unknown.t
+
+val arguments_used_by_known_arity_call :
+  result ->
+  Code_id_or_name.t ->
+  'a list ->
+  ('a * Points_to_analysis.keep_or_delete) list
+
+val arguments_used_by_unknown_arity_call :
+  result ->
+  Code_id_or_name.t ->
+  'a list list ->
+  ('a * Points_to_analysis.keep_or_delete) list list

@@ -105,8 +105,6 @@ val get_code_metadata : t -> Code_id.t -> Code_metadata.t
 val get_calling_convention_change :
   t -> Code_id.t -> Unboxing_analysis.calling_convention_change
 
-val is_changing_calling_convention : t -> Code_id.t -> bool
-
 (** Copy exactly the offsets of the slots occurring at normal mode, loading
     their owning sections. Missing offsets are fatal errors. *)
 val offsets_for_free_names : t -> Name_occurrences.t -> Exported_offsets.t

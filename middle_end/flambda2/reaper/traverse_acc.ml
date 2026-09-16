@@ -67,7 +67,7 @@ type t =
     mutable code_references : code_reference list;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
-    mutable applications : Rebuild_queries.Applications.t;
+    mutable rebuild_queries : Rebuild_queries.Requests.t;
     mutable set_of_closures_deps : closure_dep list;
     deps : Graph.graph;
     mutable fixed_arity_conts : Continuation.Set.t;
@@ -84,10 +84,11 @@ let code_deps t = t.code_deps
 
 let code_references t = t.code_references
 
-let applications t = t.applications
+let rebuild_queries t = t.rebuild_queries
 
 let record_apply_for_rebuild t apply =
-  t.applications <- Rebuild_queries.Applications.add_apply t.applications apply
+  t.rebuild_queries
+    <- Rebuild_queries.Requests.add_apply t.rebuild_queries apply
 
 let add_code_reference t reference =
   t.code_references <- reference :: t.code_references
@@ -97,7 +98,7 @@ let create () =
     code_references = [];
     code = Code_id.Map.empty;
     apply_deps = [];
-    applications = Rebuild_queries.Applications.empty;
+    rebuild_queries = Rebuild_queries.Requests.empty;
     set_of_closures_deps = [];
     deps = Graph.create ();
     fixed_arity_conts = Continuation.Set.empty;

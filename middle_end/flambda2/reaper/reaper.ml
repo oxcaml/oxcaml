@@ -62,7 +62,7 @@ module Staged = struct
         code_deps : Traverse_acc.code_dep Code_id.Map.t;
         code_references : Traverse_acc.code_reference list;
         le_monde_exterieur : Symbol.t;
-        applications : Rebuild_queries.Applications.t;
+        rebuild_queries : Rebuild_queries.Requests.t;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
@@ -73,7 +73,7 @@ module Staged = struct
           code_deps;
           code_references;
           le_monde_exterieur;
-          applications;
+          rebuild_queries;
           all_sets_of_closures
         } =
       let ids =
@@ -101,7 +101,7 @@ module Staged = struct
           Global_flow_graph.ids_for_export deps;
           Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
           Traverse_acc.ids_for_export_code_references code_references;
-          Rebuild_queries.Applications.ids_for_export applications ]
+          Rebuild_queries.Requests.ids_for_export rebuild_queries ]
 
     let prune_for_lto t =
       { t with
@@ -127,7 +127,7 @@ module Staged = struct
           code_deps;
           code_references;
           le_monde_exterieur;
-          applications;
+          rebuild_queries;
           all_sets_of_closures
         } renaming ~rename_field =
       let code_deps =
@@ -154,8 +154,8 @@ module Staged = struct
         code_references =
           Traverse_acc.apply_renaming_code_references code_references renaming;
         le_monde_exterieur = Renaming.apply_symbol renaming le_monde_exterieur;
-        applications =
-          Rebuild_queries.Applications.apply_renaming applications renaming;
+        rebuild_queries =
+          Rebuild_queries.Requests.apply_renaming rebuild_queries renaming;
         all_sets_of_closures
       }
   end
@@ -270,7 +270,7 @@ module Staged = struct
             code_deps;
             code_references;
             le_monde_exterieur;
-            applications;
+            rebuild_queries;
             all_sets_of_closures;
             closure_function_decls
           } =
@@ -288,7 +288,7 @@ module Staged = struct
           code_deps;
           code_references;
           le_monde_exterieur;
-          applications;
+          rebuild_queries;
           all_sets_of_closures
         }
     in
@@ -324,11 +324,11 @@ module Staged = struct
           Code_id.Map.disjoint_union code_deps inputs.code_deps)
         Code_id.Map.empty solve_inputs
     in
-    let applications =
+    let requests =
       List.fold_left
-        (fun applications (inputs : Solve_inputs.t) ->
-          Rebuild_queries.Applications.union applications inputs.applications)
-        Rebuild_queries.Applications.empty solve_inputs
+        (fun requests (inputs : Solve_inputs.t) ->
+          Rebuild_queries.Requests.union requests inputs.rebuild_queries)
+        Rebuild_queries.Requests.empty solve_inputs
     in
     List.iter
       (fun (inputs : Solve_inputs.t) ->
@@ -355,7 +355,7 @@ module Staged = struct
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
         ~code_changes solved_dep
     in
-    let queries = Rebuild_queries.create solved_dep.db ~applications in
+    let queries = Rebuild_queries.create solved_dep.db ~requests in
     Solution.{ solved_dep; code_changes; queries; slot_offsets }
 
   let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)

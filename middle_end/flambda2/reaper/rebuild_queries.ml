@@ -42,7 +42,7 @@ let rename_map map renaming ~f =
         (f value) map)
     map Code_id_or_name.Map.empty
 
-module Applications = struct
+module Requests = struct
   type bounds =
     { known : int option;
       unknown : int list option
@@ -101,8 +101,6 @@ module Applications = struct
     rename_map t renaming ~f:(fun bounds -> bounds)
 end
 
-(* We use unit maps instead of sets, because it allows reuse of the tables
-   stored in the Datalog database without copying. *)
 type t =
   { has_usage : unit Code_id_or_name.Map.t;
     has_source : unit Code_id_or_name.Map.t;
@@ -121,7 +119,7 @@ let empty =
     unknown_masks = Code_id_or_name.Map.empty
   }
 
-let create db ~applications =
+let create db ~requests =
   let t =
     { empty with
       has_usage = Datalog.get_table PTA.Relations.has_usage_table db;
@@ -130,12 +128,9 @@ let create db ~applications =
         Datalog.get_table PTA.Relations.field_of_constructor_is_used_tbl db
     }
   in
-  (* The argument queries only inspect argument positions, so they are run over
-     unit placeholders at the maximal recorded width; call sites slice the
-     resulting masks down to their own arguments. *)
   let dummy_args width = List.init width (fun _ -> ()) in
   Code_id_or_name.Map.fold
-    (fun callee ({ known; unknown } : Applications.bounds) t ->
+    (fun callee ({ known; unknown } : Requests.bounds) t ->
       let t =
         match known with
         | None -> t
@@ -170,7 +165,7 @@ let create db ~applications =
         { t with
           unknown_masks = Code_id_or_name.Map.add callee masks t.unknown_masks
         })
-    applications t
+    requests t
 
 let has_use t id = Code_id_or_name.Map.mem id t.has_usage
 
@@ -193,8 +188,6 @@ let code_id_actually_directly_called t name =
     (Code_id_or_name.name name)
     "direct-call targets"
 
-(* [mask] was computed at the maximal width recorded for [callee], so a call
-   site with fewer arguments uses a prefix of it. *)
 let rec apply_mask callee query mask args =
   match args, mask with
   | [], _ -> []

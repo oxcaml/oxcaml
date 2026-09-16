@@ -88,11 +88,11 @@ type t
 (** Create a fresh, empty accumulator. *)
 val create : unit -> t
 
-(** Record an original application for the rebuild queries, before traversal
-    creates any auxiliary call witnesses. *)
+(** Record rebuild queries for an original application, before traversal creates
+    any auxiliary call witnesses. *)
 val record_apply_for_rebuild : t -> Flambda.Apply.t -> unit
 
-val applications : t -> Rebuild_queries.Applications.t
+val rebuild_queries : t -> Rebuild_queries.Requests.t
 
 (** Mark a continuation as having fixed arity (mostly function return
     continuations): the rebuild pass may not change its number of parameters. *)

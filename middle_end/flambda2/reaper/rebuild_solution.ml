@@ -220,11 +220,6 @@ let get_calling_convention_change t code_id =
   | Some _ -> UA.get_calling_convention_change data.code_changes code_id
   | None -> UA.Not_changing_calling_convention
 
-let is_changing_calling_convention t code_id =
-  match get_calling_convention_change t code_id with
-  | UA.Not_changing_calling_convention -> false
-  | UA.Changing_calling_convention _ -> true
-
 let offsets_for_free_names t free_names =
   let offsets =
     Function_slot.Set.fold

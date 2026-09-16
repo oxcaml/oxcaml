@@ -833,7 +833,7 @@ type result =
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     code_references : Traverse_acc.code_reference list;
     le_monde_exterieur : Symbol.t;
-    applications : Rebuild_queries.Applications.t;
+    rebuild_queries : Rebuild_queries.Requests.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
     closure_function_decls :
@@ -905,7 +905,7 @@ let run ~top_level_return_escapes (unit : Flambda_unit.t) =
     code_deps;
     code_references = Acc.code_references acc;
     le_monde_exterieur;
-    applications = Acc.applications acc;
+    rebuild_queries = Acc.rebuild_queries acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc;
     closure_function_decls = Acc.get_closure_function_decls acc
   }

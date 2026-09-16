@@ -27,14 +27,7 @@
 
 open! Flambda.Import
 
-(** Precomputed results of the rebuild pass's datalog queries. The queries
-    themselves run once, against the solved database; rebuilding a unit then
-    only reads the recorded answers. *)
-
-(** The function applications seen during traversal: for each named callee, the
-    argument widths of its call sites. They determine which call queries to run,
-    and at which widths. *)
-module Applications : sig
+module Requests : sig
   type t
 
   val empty : t
@@ -43,9 +36,8 @@ module Applications : sig
       nullary calls. Ignore other call kinds and absent or constant callees. *)
   val add_apply : t -> Apply.t -> t
 
-  (** Merge the applications of several units for a combined solve. Takes the
-      maximum known-arity width and pointwise maxima of unknown-arity group
-      widths, retaining the longer tail. *)
+  (** Take the maximum known-arity width and pointwise maxima of unknown-arity
+      group widths, retaining the longer tail. *)
   val union : t -> t -> t
 
   val ids_for_export : t -> Ids_for_export.t
@@ -53,11 +45,12 @@ module Applications : sig
   val apply_renaming : t -> Renaming.t -> t
 end
 
+(** Materialised rebuild answers, without a Datalog database. *)
 type t
 
 val empty : t
 
-val create : Datalog.database -> applications:Applications.t -> t
+val create : Datalog.database -> requests:Requests.t -> t
 
 val has_use : t -> Code_id_or_name.t -> bool
 
@@ -65,9 +58,8 @@ val has_source : t -> Code_id_or_name.t -> bool
 
 val field_used : t -> Code_id_or_name.t -> Field.t -> bool
 
-(** Call queries require a corresponding recorded application; missing
-    applications and argument dimensions exceeding the recorded bounds are fatal
-    errors. *)
+(** Call queries require a corresponding request; missing requests and argument
+    dimensions exceeding the recorded bounds are fatal errors. *)
 val code_id_actually_directly_called : t -> Name.t -> Code_id.Set.t Or_unknown.t
 
 val arguments_used_by_known_arity_call :
