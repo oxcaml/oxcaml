@@ -249,10 +249,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ f : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's2 separable non_null
-         because of the definition of f at line 2, characters 2-24.
-       But the kind of 'a must be representable
-         because of the definition of f at line 4, characters 8-13.
+       The type "'b" is layout-polymorphic,
+       but "'a" is not layout-polymorphic.
 |}]
 
 module M2 : sig
@@ -275,10 +273,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ f : 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's5 separable non_null
-         because of the definition of f at line 2, characters 2-30.
-       But the kind of 'a must be representable
-         because of the definition of f at line 4, characters 8-15.
+       The type "'c" is layout-polymorphic,
+       but "'a" is not layout-polymorphic.
 |}]
 
 module M2' : sig
@@ -301,10 +297,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ f : 'b. 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'd -> 'c"
-       The kind of 'a is 's6
-         because of the definition of f at line 2, characters 2-45.
-       But the kind of 'a must be representable
-         because of the definition of f at line 4, characters 8-15.
+       The type "'c" is layout-polymorphic,
+       but "'a" is not layout-polymorphic.
 |}]
 
 module M2'' : sig
@@ -327,10 +321,8 @@ Error: Signature mismatch:
        is not included in
          val poly_ f : 'a. 'a -> 'b -> 'a
        The type "'a -> 'b -> 'a" is not compatible with the type "'a -> 'c -> 'a"
-       The kind of 'a is 's7
-         because of the definition of f at line 2, characters 2-45.
-       But the kind of 'a must be representable
-         because of the definition of f at line 4, characters 8-15.
+       The type "'c" is layout-polymorphic,
+       but "'b" is not layout-polymorphic.
 |}]
 
 (* CR-soon jbachurski: This is fine, though we should check ['_weak1]'s layout
@@ -378,16 +370,17 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            external id : ('a : any). 'a -> 'a = "%opaque" [@@layout_poly]
-           val poly_ f : 'a -> 'b -> 'a
+           val poly_ f : 'a. 'a -> 'b -> 'a
          end
        is not included in
          sig val poly_ f : 'a -> 'a -> 'a end
        Values do not match:
-         val poly_ f : 'a -> 'b -> 'a
+         val poly_ f : 'a. 'a -> 'b -> 'a
        is not included in
          val poly_ f : 'a -> 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'c -> 'c"
+       The type "'c" is layout-polymorphic,
+       but "'a" is not layout-polymorphic.
 |}]
 
 (* CR-soon jbachurski: [x]'s layout is unsoundly generalised. *)
@@ -405,18 +398,16 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig
-           val g : ('a : <genvar>). 'a -> 'a
-           val poly_ f : 'a -> 'b -> 'a
-         end
+         sig val g : 'a -> 'a val poly_ f : 'a. 'a -> 'b -> 'a end
        is not included in
          sig val poly_ f : 'a -> 'a -> 'a end
        Values do not match:
-         val poly_ f : 'a -> 'b -> 'a
+         val poly_ f : 'a. 'a -> 'b -> 'a
        is not included in
          val poly_ f : 'a -> 'a -> 'a
-       the first has 1 more layout parameter that is not used,
-       which is not supported yet.
+       The type "'a -> 'b -> 'a" is not compatible with the type "'c -> 'c -> 'c"
+       The type "'c" is layout-polymorphic,
+       but "'a" is not layout-polymorphic.
 |}]
 
 (* Ordering: both use first var on both sides - same position, should succeed *)
