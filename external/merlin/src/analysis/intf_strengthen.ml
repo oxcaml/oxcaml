@@ -1181,6 +1181,9 @@ end = struct
               (Mode.Modality.Const.proj ax intf))
 
     let alloc_atoms ~(impl : Mode.Alloc.Const.t) ~explicit =
+      (* TODO: gavinleroy: Suppress inferred [@ static] for default extensions;
+         remove this reset once the strengthener supports layout polymorphism
+         and [layout_poly] is enabled. *)
       let impl = { impl with staticity = Mode.Alloc.Const.legacy.staticity } in
       List.fold_left explicit ~init:impl
         ~f:(fun (acc : Mode.Alloc.Const.t) (m : _ Location.loc) ->
