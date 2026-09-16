@@ -1142,6 +1142,11 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
 
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
+Line 1, characters 19-26:
+1 | <[ fun f x -> (f [@inlined]) x [@nontail] ]>
+                       ^^^^^^^
+Warning 53 [misplaced-attribute]: the "inlined" attribute cannot appear in this context
+
 - : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
 <[fun f x -> ((((f) [@inlined]) x) [@nontail])]>
 |}];;
@@ -1796,11 +1801,21 @@ Error: Identifier "foo" is used at line 1, characters 56-59,
 
 <[ let open [@inline] M in foo ]>
 [%%expect {|
+Line 1, characters 14-20:
+1 | <[ let open [@inline] M in foo ]>
+                  ^^^^^^
+Warning 53 [misplaced-attribute]: the "inline" attribute cannot appear in this context
+
 - : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
 |}];;
 
 <[ ((let open M in foo) [@inline]) ]>
 [%%expect {|
+Line 1, characters 26-32:
+1 | <[ ((let open M in foo) [@inline]) ]>
+                              ^^^^^^
+Warning 53 [misplaced-attribute]: the "inline" attribute cannot appear in this context
+
 - : <[int]> expr = <[((let open! M in M.foo) [@inline])]>
 |}];;
 

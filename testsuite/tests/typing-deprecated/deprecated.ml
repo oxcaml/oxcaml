@@ -65,6 +65,11 @@ let (_, foo, bar) [@deprecated] = 1, (), 3
 ;;
 foo;;
 [%%expect{|
+Line 1, characters 20-30:
+1 | let (_, foo, bar) [@deprecated] = 1, (), 3
+                        ^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "deprecated" attribute cannot appear in this context
+
 val foo : unit = ()
 val bar : int = 3
 - : unit = ()

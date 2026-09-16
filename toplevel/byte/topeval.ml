@@ -128,13 +128,15 @@ let pr_item =
 
 (* Execute a toplevel phrase *)
 
-let execute_phrase print_outcome ppf phr =
+let execute_phrase ?(check_unused_attributes = false) print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
       let oldenv = !toplevel_env in
       let oldsig = !toplevel_sig in
       let (str, sg', newenv) = typecheck_phrase ppf oldenv oldsig sstr in
       let lam = Translmod.transl_toplevel_definition str in
+      if check_unused_attributes then
+        Builtin_attributes.warn_misplaced_attributes ();
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
@@ -195,8 +197,8 @@ let execute_phrase print_outcome ppf phr =
   | Ptop_dir {pdir_name = {Location.txt = dir_name}; pdir_arg } ->
       try_run_directive ppf dir_name pdir_arg
 
-let execute_phrase print_outcome ppf phr =
-  try execute_phrase print_outcome ppf phr
+let execute_phrase ?check_unused_attributes print_outcome ppf phr =
+  try execute_phrase ?check_unused_attributes print_outcome ppf phr
   with exn ->
     Warnings.reset_fatal ();
     raise exn

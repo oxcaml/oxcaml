@@ -307,18 +307,39 @@ let capture_everything buf ppf ~f =
   collect_formatters buf [Format.std_formatter; Format.err_formatter]
                      ~f:(fun () -> Compiler_messages.capture ppf ~f)
 
+let discard_unused_attribute_warnings () =
+  Warnings.without_warnings Builtin_attributes.warn_misplaced_attributes
+
 let exec_phrase ppf phrase ~execute_phrase =
   Location.reset ();
   if !Clflags.dump_parsetree then Printast. top_phrase ppf phrase;
   if !Clflags.dump_source    then Pprintast.top_phrase ppf phrase;
-  execute_phrase true ppf phrase
+  (* Track only this phrase, using its shifted locations.  As in the parser,
+     attributes inside attribute payloads are not tracked. *)
+  let iterator =
+    { Ast_iterator.default_iterator with
+      attribute = (fun _ attr ->
+        Builtin_attributes.register_attr Invariant_check attr.attr_name)
+    }
+  in
+  Fun.protect
+    ~finally:discard_unused_attribute_warnings
+    (fun () ->
+      (match phrase with
+      | Parsetree.Ptop_def st -> iterator.structure iterator st
+      | Parsetree.Ptop_dir _ -> ());
+      execute_phrase true ppf phrase)
 
 let parse_contents ~fname contents =
   let lexbuf = Lexing.from_string contents in
   Location.init lexbuf fname;
   Location.input_name := fname;
   Location.input_lexbuf := Some lexbuf;
-  Parse.use_file lexbuf
+  (* Parsing registers attributes for the whole file, before locations are
+     shifted.  Re-register them one phrase at a time in [exec_phrase]. *)
+  Fun.protect
+    ~finally:discard_unused_attribute_warnings
+    (fun () -> Parse.use_file lexbuf)
 
 let current_arch_filter () =
   match Target_system.architecture () with

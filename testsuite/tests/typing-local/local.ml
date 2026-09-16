@@ -2898,6 +2898,11 @@ Error: This function or one of its parameters escape their region
 let f () = ((fun x -> (fun y -> "") [@extension.curry])
             : (local_ string -> (string -> string)));;
 [%%expect{|
+Line 1, characters 38-53:
+1 | let f () = ((fun x -> (fun y -> "") [@extension.curry])
+                                          ^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "extension.curry" attribute cannot appear in this context
+
 val f : unit -> string @ local -> (string -> string) = <fun>
 |}];;
 
@@ -2941,6 +2946,11 @@ val f : unit -> (int -> (int -> int)) @ local = <fun>
 (* ok if curried *)
 let f () = exclave_ ((fun x -> (fun y -> x + y) [@extension.curry]) : (_ -> _));;
 [%%expect{|
+Line 1, characters 50-65:
+1 | let f () = exclave_ ((fun x -> (fun y -> x + y) [@extension.curry]) : (_ -> _));;
+                                                      ^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "extension.curry" attribute cannot appear in this context
+
 val f : unit -> (int -> (int -> int)) @ local = <fun>
 |}];;
 

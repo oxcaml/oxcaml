@@ -345,6 +345,11 @@ Line 2, characters 2-24:
 Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
   implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
 
+Line 2, characters 6-19:
+2 |   [@@@implicit_kind: 'a]
+          ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
+
 module type S1 = sig end
 |}]
 
@@ -361,6 +366,11 @@ Line 2, characters 2-25:
       ^^^^^^^^^^^^^^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
   implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+
+Line 2, characters 6-19:
+2 |   [@@@implicit_kind: int]
+          ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
 
 module type S2 = sig end
 |}]
@@ -392,6 +402,11 @@ Line 2, characters 2-34:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute "implicit_kind".
   implicit_kind attribute expects: ('var1 : jkind1) * ('var2 : jkind2) ...
+
+Line 2, characters 6-19:
+2 |   [@@@implicit_kind: (_ : bits32)]
+          ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
 
 module type S4 = sig val a : 'a -> 'b end
 |}]
@@ -930,6 +945,11 @@ class type s33 = object
 end
 
 [%%expect{|
+Line 2, characters 6-19:
+2 |   [@@@implicit_kind: ('a : immediate)]
+          ^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "implicit_kind" attribute cannot appear in this context
+
 class type s33 = object method f : unit -> 'a end
 |}]
 

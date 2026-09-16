@@ -86,6 +86,9 @@ val mark_payload_attrs_used : Parsetree.payload -> unit
     is stopped before lambda due to command-line flags. *)
 val warn_unused : unit -> unit
 
+(** Like [warn_unused], but only reports misplaced attributes (warning 53). *)
+val warn_misplaced_attributes : unit -> unit
+
 (** {3 Warning 53 helpers for environment attributes}
 
     Some attributes, like deprecation markers, do not affect the compilation of

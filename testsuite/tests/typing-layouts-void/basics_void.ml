@@ -367,6 +367,11 @@ module type S = sig type t = A of unit_u end
 
 type t = A of int [@immediate_all_void_constructor]
 [%%expect{|
+Line 1, characters 20-50:
+1 | type t = A of int [@immediate_all_void_constructor]
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "immediate_all_void_constructor" attribute cannot appear in this context
+
 type t = A of int
 |}]
 

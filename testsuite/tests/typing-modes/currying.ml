@@ -9,6 +9,11 @@
  *)
 let g : local_ 'a -> int -> _ = fun _ _ -> (fun[@curry] (local_ _) (x : int) -> x)
 [%%expect{|
+Line 1, characters 49-54:
+1 | let g : local_ 'a -> int -> _ = fun _ _ -> (fun[@curry] (local_ _) (x : int) -> x)
+                                                     ^^^^^
+Warning 53 [misplaced-attribute]: the "curry" attribute cannot appear in this context
+
 val g : 'a @ local -> int -> ('b @ local -> int -> int) = <fun>
 |}]
 let apply1 x = g x

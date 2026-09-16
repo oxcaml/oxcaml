@@ -35,11 +35,12 @@ val setvalue : string -> Obj.t -> unit
 (* Label appended after [OCaml version XXX] when starting the toplevel. *)
 val implementation_label: string
 
-val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase -> bool
-        (* Read and execute commands from a file.
-           [use_file] prints the types and values of the results.
-           [use_silently] does not print them.
-           [mod_use_file] wrap the file contents into a module. *)
+val execute_phrase :
+  ?check_unused_attributes:bool ->
+  bool -> formatter -> Parsetree.toplevel_phrase -> bool
+        (* Execute the given toplevel phrase.
+           [check_unused_attributes] defaults to [false]; when [true],
+           report unused attributes before execution. *)
 
 val may_trace : bool ref
 

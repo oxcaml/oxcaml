@@ -476,7 +476,7 @@ let name_expression ~loc ~attrs sort exp =
 
 (* Execute a toplevel phrase *)
 
-let execute_phrase print_outcome ppf phr =
+let execute_phrase ?(check_unused_attributes = false) print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
       let oldenv = !toplevel_env in
@@ -533,6 +533,8 @@ let execute_phrase print_outcome ppf phr =
         remember compilation_unit sg' repr;
         compilation_unit, close_phrase res, required_globals, repr
       in
+      if check_unused_attributes then
+        Builtin_attributes.warn_misplaced_attributes ();
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;

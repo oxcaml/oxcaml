@@ -360,6 +360,11 @@ Error: Invalid reexport declaration.
 let[@or_null_reexport] foo = 5
 
 [%%expect{|
+Line 1, characters 5-21:
+1 | let[@or_null_reexport] foo = 5
+         ^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the "or_null_reexport" attribute cannot appear in this context
+
 val foo : int = 5
 |}]
 
