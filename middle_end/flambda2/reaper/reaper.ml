@@ -93,7 +93,7 @@ module Staged = struct
     in
     solve_inputs, rebuild_inputs
 
-  let solve
+  let solve ~analysis_scope
       ({ deps;
          slot_offsets_inputs;
          code_deps;
@@ -102,10 +102,11 @@ module Staged = struct
          applications
        } :
         Solve_inputs.t) =
-    Cross_unit_calls.link deps ~code_deps ~le_monde_exterieur code_references;
+    Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
+      code_references;
     let solved_dep, analysis =
       Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps ~applications)
+          Analysis.fixpoint deps ~applications ~analysis_scope)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
@@ -114,7 +115,7 @@ module Staged = struct
         Dot_printer.print_solved_dep solved_dep deps)
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes solved_dep
+      Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
         ~rewrite_kind_with_subkind:(fun _name kind ->
           Types_rewriter.erase_subkind kind)
         ~rewrite_result_types:(fun ~my_closure:_ ~params:_ ~results:_ _types ->
@@ -122,8 +123,8 @@ module Staged = struct
         ~code_deps
     in
     let slot_offsets =
-      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~code_changes
-        solved_dep
+      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
+        ~code_changes solved_dep
     in
     Solution.{ analysis; code_changes; slot_offsets }
 
@@ -160,6 +161,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
+  let analysis_scope = Analysis_scope.Current_unit in
   let Traverse.
         { toplevel_expr;
           code;
@@ -176,10 +178,11 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
         } =
     Traverse.run unit
   in
-  Cross_unit_calls.link deps ~code_deps ~le_monde_exterieur code_references;
+  Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
+    code_references;
   let solved_dep, uses =
     Profile.record_call ~accumulate:true "solver" (fun () ->
-        Analysis.fixpoint deps ~applications)
+        Analysis.fixpoint deps ~applications ~analysis_scope)
   in
   let () =
     if Flambda_features.debug_reaper "print-solved"
@@ -191,7 +194,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     Types_rewriter.prepare_rewrite_context solved_dep all_sets_of_closures
   in
   let code_changes =
-    Unboxing_analysis.compute_code_changes solved_dep
+    Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
       ~rewrite_kind_with_subkind:
         (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
       ~rewrite_result_types:(fun ~my_closure ~params ~results types ->
@@ -208,8 +211,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~code_deps ~get_code_metadata
   in
   let slot_offsets =
-    Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~code_changes
-      solved_dep
+    Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
+      ~code_changes solved_dep
   in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations

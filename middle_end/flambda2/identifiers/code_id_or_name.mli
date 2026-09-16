@@ -18,3 +18,5 @@ include module type of struct
 end
 
 val pattern_match' : t -> code_id:(Code_id.t -> 'a) -> name:(Name.t -> 'a) -> 'a
+
+val compilation_unit : t -> Compilation_unit.t

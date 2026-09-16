@@ -42,10 +42,11 @@ module Staged : sig
     Solve_inputs.t * Rebuild_inputs.t
 
   (** Analyse the dependency graph and compute the rewriting decisions and slot
-      offsets. Mutates the graph by linking the code references. No typing
-      information is used: the result types of the code whose calling convention
-      changes are left unknown and its subkinds are erased. *)
-  val solve : Solve_inputs.t -> Solution.t
+      offsets. Mutates the graph by linking the code references.
+      [analysis_scope] is the set of compilation units analysed together. No
+      typing information is used: the result types of the code whose calling
+      convention changes are left unknown and its subkinds are erased. *)
+  val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
 
   (** Rebuild the traversed unit according to the solution. No typing
       information is used, so the exported types of the rebuilt code are left
