@@ -224,3 +224,69 @@ let () =
   assert (same_words (Obj.repr boxed) (Obj.repr { u1 = #42L; u2 = s; u3 = 7 }));
   assert (Int64.equal (box_int64 boxed.u1) 42L && boxed.u2 == s && boxed.u3 = 7);
   print_endline "unboxed records: ok"
+
+(* All-void records. Boxing one produces an empty block with tag 0, the same
+   as constructing the boxed record directly. *)
+
+type all_void = { x : unit#; kept : unit# }
+type void_product = { y : #(unit# * unit#) }
+
+let () =
+  let boxed : all_void = box #{ x = #(); kept = #() } in
+  assert (same_words (Obj.repr boxed) (Obj.repr { x = #(); kept = #() }));
+  assert (Obj.tag (Obj.repr boxed) = 0);
+  assert (Obj.size (Obj.repr boxed) = 0);
+  let boxed : void_product = box #{ y = #(#(), #()) } in
+  assert (same_words (Obj.repr boxed) (Obj.repr { y = #(#(), #()) }));
+  assert (Obj.size (Obj.repr boxed) = 0);
+  print_endline "all-void records: ok"
+
+(* Local allocation. [box] has [@local_opt] on its argument and result, so
+   binding the result with [local_] must allocate the block on the local
+   stack. The layout is checked on a heap copy made by [globalize], since the
+   [Obj] helpers take global arguments. *)
+
+external is_stack : local_ 'a -> bool = "caml_obj_is_stack"
+external globalize : local_ 'a -> 'a = "%obj_dup"
+
+(* Inputs are hidden behind [opaque] so that the blocks cannot be lifted to
+   static constants, which would defeat the [is_stack] check. *)
+external opaque : ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
+  [@@layout_poly]
+
+let[@inline never] local_boxes () =
+  let s = opaque s in
+  let local_ value = box s in
+  assert (is_stack value);
+  assert (same_words (Obj.repr (globalize value)) (Obj.repr { v = s }));
+  let local_ f = box (opaque #3.25) in
+  assert (is_stack f);
+  assert (same_words (Obj.repr (globalize f)) (Obj.repr { f64 = #3.25 }));
+  let local_ vec = box (opaque (int64x2 43L 45L)) in
+  assert (is_stack vec);
+  assert (same_words (Obj.repr (globalize vec)) (Obj.repr { v128 = int64x2 43L 45L }));
+  let local_ record : p_many =
+    box #{ g = opaque #1L; h = opaque #2.5; k = s; l = opaque 3; m = opaque #4L }
+  in
+  assert (is_stack record);
+  assert (same_words (Obj.repr (globalize record))
+            (Obj.repr { g = #1L; h = #2.5; k = s; l = 3; m = #4L }));
+  assert (Int64.equal (box_int64 record.g) 1L && record.k == s && record.l = 3);
+  (* Boxing a local value places the pointer in a local block. *)
+  let local_ inner = Some s in
+  let local_ outer = box inner in
+  assert (is_stack outer);
+  assert ((Obj.obj (Obj.repr (globalize outer)) : string option vrec).v == inner)
+
+let escaped : p_many option ref = ref None
+
+let () =
+  local_boxes ();
+  (* A result that escapes must be on the heap. An unannotated binding that
+     does not escape would be inferred local, so store it in a global ref. *)
+  let heap : p_many =
+    box #{ g = opaque #1L; h = opaque #2.5; k = s; l = opaque 3; m = opaque #4L }
+  in
+  escaped := Some heap;
+  assert (not (is_stack heap));
+  print_endline "local allocation: ok"
