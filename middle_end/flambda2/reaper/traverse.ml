@@ -73,14 +73,11 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
       ~params ~returns:return ~exn
   in
   let code_dep =
-    { Traverse_acc.arity;
-      result_arity;
-      code_metadata = Code.code_metadata code;
+    { Traverse_acc.code_metadata = Code.code_metadata code;
       return;
       my_closure;
       exn;
       params;
-      is_tupled;
       known_arity_call_witness;
       unknown_arity_call_witnesses
     }
