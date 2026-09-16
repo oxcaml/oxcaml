@@ -959,6 +959,10 @@ module type S = sig
 
     val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
 
+    val imply_const : Comonadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
+
+    val subtract_const : Monadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
+
     val meet_const_with :
       'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
@@ -1062,6 +1066,10 @@ module type S = sig
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
 
+      (** Returns the precise floor of a mode. see notes on [get_floor] in
+          [solver_intf.mli] for cautions. *)
+      val get_floor : (allowed * 'r) t -> Const.t
+
       (** Checks that a constant is within the precise bounds of a mode. see
           notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val in_bounds : Const.t -> (allowed * allowed) t -> bool
@@ -1079,6 +1087,8 @@ module type S = sig
 
   module Const : sig
     val alloc_as_value : Alloc.Const.t -> Value.Const.t
+
+    val value_to_alloc_r2l : Value.Const.t -> Alloc.Const.t
 
     module Axis : sig
       val alloc_as_value : Alloc.Axis.packed -> Value.Axis.packed
@@ -1206,6 +1216,9 @@ module type S = sig
 
       (** [concat ~then t] returns the modality that is [then_] after [t]. *)
       val concat : then_:t -> t -> t
+
+      (** Apply a modality on a constant *)
+      val apply_const : t -> Value.Const.t -> Value.Const.t
 
       (** [set a t] overwrites an axis of [t] to be [a]. *)
       val set : 'a Axis.t -> 'a -> t -> t

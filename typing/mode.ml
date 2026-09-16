@@ -7269,6 +7269,16 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.disallow_left comonadic in
     { monadic; comonadic }
 
+  let imply_const c { comonadic; monadic } =
+    let monadic = Monadic.disallow_left monadic in
+    let comonadic = Comonadic.imply_const c comonadic in
+    { monadic; comonadic }
+
+  let subtract_const c { comonadic; monadic } =
+    let monadic = Monadic.subtract_const c monadic in
+    let comonadic = Comonadic.disallow_right comonadic in
+    { monadic; comonadic }
+
   let zap_to_ceil_force { comonadic; monadic } =
     let monadic = Monadic.zap_to_ceil_force monadic in
     let comonadic = Comonadic.zap_to_ceil_force comonadic in
@@ -7577,6 +7587,11 @@ module Value_with (Areality : Areality) = struct
       let comonadic = Comonadic.Guts.get_ceil comonadic in
       merge { monadic; comonadic }
 
+    let get_floor { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_floor monadic in
+      let comonadic = Comonadic.Guts.get_floor comonadic in
+      merge { monadic; comonadic }
+
     let in_bounds c { monadic; comonadic } =
       let c = split c in
       let monadic = Monadic.Guts.in_bounds c.monadic monadic in
@@ -7606,6 +7621,32 @@ module Const = struct
        } :
         Alloc.Const.t) : Value.Const.t =
     let areality = locality_as_regionality areality in
+    { areality;
+      linearity;
+      portability;
+      uniqueness;
+      contention;
+      forkable;
+      yielding;
+      statefulness;
+      visibility;
+      staticity
+    }
+
+  let value_to_alloc_r2l
+      ({ areality;
+         linearity;
+         portability;
+         uniqueness;
+         contention;
+         forkable;
+         yielding;
+         statefulness;
+         visibility;
+         staticity
+       } :
+        Value.Const.t) : Alloc.Const.t =
+    let areality = C.Locality_morph.apply Regional_to_local areality in
     { areality;
       linearity;
       portability;
@@ -7771,6 +7812,8 @@ module Modality = struct
       let concat ~then_ t =
         match then_, t with
         | Join_const c1, Join_const c2 -> Join_const (Mode.Const.join c1 c2)
+
+      let apply_const (Join_const c) x = Mode.Const.join c x
 
       let apply_right : type l.
           ?is_contained_by:Hint.is_contained_by ->
@@ -7949,6 +7992,8 @@ module Modality = struct
       let concat ~then_ t =
         match then_, t with
         | Meet_const c1, Meet_const c2 -> Meet_const (Mode.Const.meet c1 c2)
+
+      let apply_const (Meet_const c) x = Mode.Const.meet c x
 
       let apply_left : type r.
           ?is_contained_by:Hint.is_contained_by ->
@@ -8208,6 +8253,12 @@ module Modality = struct
       let monadic = Monadic.concat ~then_:then_.monadic t.monadic in
       let comonadic = Comonadic.concat ~then_:then_.comonadic t.comonadic in
       { monadic; comonadic }
+
+    let apply_const t c =
+      let { monadic; comonadic } = Value.Const.split c in
+      let monadic = Monadic.apply_const t.monadic monadic in
+      let comonadic = Comonadic.apply_const t.comonadic comonadic in
+      Value.Const.merge { monadic; comonadic }
 
     let proj (type a) (ax : a Axis.t) { monadic; comonadic } : a =
       match ax with

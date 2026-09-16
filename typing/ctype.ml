@@ -1501,8 +1501,8 @@ let abbreviations = ref (ref Mnil)
 
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
-let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
-  let copy = copy ?partial ?keep_names ~instantiate_modes copy_scope in
+let rec copy ?partial ?keep_names copy_scope ty =
+  let copy = copy ?partial ?keep_names copy_scope in
   match get_desc ty with
     Tsubst (ty, _) -> ty
   | desc ->
@@ -1618,11 +1618,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
           Tobject (copy ty1, ref None)
       | _ ->
         let copy_mode =
-          if instantiate_modes
-          then
-            For_copy.mode_instantiate copy_scope
-              ~current_level:!current_level
-          else Fun.id
+          For_copy.mode_instantiate copy_scope ~current_level:!current_level
         in
         copy_type_desc ?keep_names copy copy_mode desc
     in
@@ -1631,24 +1627,17 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
 
 (**** Variants of instantiations ****)
 
-let instance_aux ?partial ~instantiate_modes sch =
+let instance ?partial sch =
   let partial =
     match partial with
       None -> None
     | Some keep -> Some (compute_univars sch, keep)
   in
   For_copy.with_scope (fun copy_scope ->
-    copy ?partial ~instantiate_modes copy_scope sch)
-
-let instance ?partial sch =
-  instance_aux ?partial ~instantiate_modes:true sch
-
-let generic_instance_aux ~instantiate_modes sch =
-  with_level ~level:generic_level (fun () ->
-    instance_aux ~instantiate_modes sch)
+    copy ?partial copy_scope sch)
 
 let generic_instance sch =
-  generic_instance_aux ~instantiate_modes:true sch
+  with_level ~level:generic_level (fun () -> instance sch)
 
 let instance_list schl =
   For_copy.with_scope (fun copy_scope ->
@@ -2117,6 +2106,38 @@ let curry_mode_const alloc arg : Alloc.Const.t =
       (Alloc.Const.partial_apply alloc)
   in
   Alloc.Const.merge {comonadic = acc; monadic = Alloc.Monadic.Const.legacy}
+
+module Curry_mode = struct
+  type t =
+    | Const of Alloc.Const.t
+    | Variable of
+        { comonadic : Alloc.Comonadic.l;
+          areality : Locality.Const.t }
+
+  let comonadic = function
+    | Const c -> Alloc.Comonadic.of_const (Alloc.Const.partial_apply c)
+    | Variable { comonadic; _ } -> comonadic
+
+  let areality = function
+    | Const c -> c.areality
+    | Variable { areality; _ } -> areality
+
+  let add_arg t marg ~upper_areality =
+    let areality = Locality.Const.join (areality t) upper_areality in
+    let pinned =
+      Alloc.Comonadic.of_const { Alloc.Comonadic.Const.min with areality }
+    in
+    Variable
+      { comonadic =
+          Alloc.Comonadic.join [curry_mode (comonadic t) marg; pinned];
+        areality }
+
+  let add_const_arg t (arg : Alloc.Const.t) =
+    match t with
+    | Const c -> Const (curry_mode_const c arg)
+    | Variable _ ->
+      add_arg t (Alloc.of_const arg) ~upper_areality:arg.areality
+end
 
 let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
   match locals, get_desc ty with
@@ -6849,9 +6870,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen pat_sort_vars
-    subj_sort_vars pat_sch subj_sch =
-  let instantiate_modes = not self_check in
+let moregeneral env inst_nongen pat_sort_vars subj_sort_vars pat_sch subj_sch =
   (* Moregen splits the generic level into two finer levels:
      [generic_level] and [subject_level = generic_level - 1].
      In order to properly detect and print weak variables when
@@ -6875,13 +6894,13 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
        *)
       let (subj_sorts, subj_inst) =
         Jkind_types.Sort.instance_with ~level:!current_level subj_sort_vars
-          (fun () -> instance_aux ~instantiate_modes subj_sch)
+          (fun () -> instance subj_sch)
       in
       let subj = duplicate_type subj_inst in
       (* Duplicate generic variables *)
       let (pat_sorts, patt) =
         Jkind_types.Sort.instance_with ~level:generic_level pat_sort_vars
-          (fun () -> generic_instance_aux ~instantiate_modes pat_sch)
+          (fun () -> generic_instance pat_sch)
       in
       try
         with_univar_pairs [] begin fun () ->
@@ -6920,7 +6939,7 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
-    moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch
+    moregeneral env inst_nongen [] [] pat_sch subj_sch
   with
   | _ -> true
   | exception Moregen _ -> false
