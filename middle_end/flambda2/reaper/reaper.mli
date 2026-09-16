@@ -17,7 +17,7 @@ val run :
   machine_width:Target_system.Machine_width.t ->
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
-  final_typing_env:Typing_env.t option ->
+  final_typing_env:('f, Typing_env.t option) Traverse.With_types.t ->
   free_names:Name_occurrences.t ->
   Flambda_unit.t ->
-  Flambda_unit.t * Exported_code.t * Slot_offsets.result * Typing_env.t option
+  'f Rebuild.result
