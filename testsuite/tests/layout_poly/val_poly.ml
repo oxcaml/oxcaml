@@ -113,15 +113,152 @@ module F1 :
 |}]
 
 (* layout-poly is not included in non-poly functions, even tho the former can be instantiate to the latter. *)
-module F3 (M : sig
+module F_value_or_null_inst (M : sig
   val f : layout_ x. ('a : x). 'a -> 'a
 end @ static) : sig
   val f : 'a -> 'a
 end = M
 [%%expect{|
-module F3 :
+module F_value_or_null_inst :
   functor (M : sig val poly_ f : 'a -> 'a end @ static) ->
     sig val f : 'a -> 'a end
+|}]
+
+module F_value_or_null_gen (M : sig
+  val f : 'a -> 'a
+end @ static) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is value_or_null
+         because of the definition of f at line 4, characters 2-39.
+       But the layout of 'a must be a sublayout of value
+         because of the definition of f at line 2, characters 2-18.
+|}]
+
+module F_value_inst (M : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end @ static) : sig
+  val f : 'a -> 'a
+end = M
+[%%expect{|
+module F_value_inst :
+  functor (M : sig val poly_ f : 'a -> 'a end @ static) ->
+    sig val f : 'a -> 'a end
+|}]
+
+module F_value_gen (M : sig
+  val f : 'a -> 'a
+end @ static) : sig
+  val f : layout_ x. ('a : x separable non_null). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is value
+         because of the definition of f at line 4, characters 2-58.
+       But the kind of 'a must be a subkind of value
+         because of the definition of f at line 2, characters 2-18.
+|}]
+
+module F_bits64_inst (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end @ static) : sig
+  val f : ('a : bits64). 'a -> 'a
+end = M
+[%%expect{|
+module F_bits64_inst :
+  functor (M : sig val poly_ f : 'a -> 'a end @ static) ->
+    sig val f : ('a : bits64). 'a -> 'a end
+|}]
+
+module F_bits64_gen (M : sig
+  val f : ('a : bits64). 'a -> 'a
+end @ static) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : ('a : bits64). 'a -> 'a end
+       is not included in
+         sig val poly_ f : 'a -> 'a end
+       Values do not match:
+         val f : ('a : bits64). 'a -> 'a
+       is not included in
+         val poly_ f : 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The kind of 'a is bits64
+         because of the definition of f at line 4, characters 2-39.
+       But the kind of 'a must be a subkind of bits64
+         because of the definition of f at line 2, characters 2-33.
+|}]
+
+(* sort variables cannot instantiate to [any] *)
+module F_any_inst (M : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end @ static) : sig
+  val f : ('a : any). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val poly_ f : 'a -> 'a end
+       is not included in
+         sig val f : ('a : any). 'a -> 'a end
+       Values do not match:
+         val poly_ f : 'a -> 'a
+       is not included in
+         val f : ('a : any). 'a -> 'a
+       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
+       The layout of 'a is any
+         because of the definition of f at line 4, characters 2-30.
+       But the layout of 'a must be a value layout
+         because of the definition of f at line 2, characters 2-39.
+|}]
+
+(* [any]-bounded variables can be used to generalize over all layouts *)
+module F_any_gen (M : sig
+  val f : ('a : any). 'a -> 'a
+end @ static) : sig
+  val f : layout_ x. ('a : x). 'a -> 'a
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Coercing this module constructs a new layout-polymorphic value,
+       which is not supported yet.
 |}]
 
 (* Ordering: both use first var on both sides - same position, should succeed *)
