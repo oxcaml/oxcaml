@@ -522,7 +522,7 @@ let x =
   let poly_ (f @ global) = fun ((g, x) @ global) -> g x in
   f ((fun y -> y + 1), 41)
 [%%expect{|
->> Fatal error: Slambda does not currently support poly tupled functions
+>> Fatal error: Tupled static functions are not currently supported
 Uncaught exception: Misc.Fatal_error
 
 |}]
