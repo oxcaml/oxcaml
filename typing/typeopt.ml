@@ -792,24 +792,12 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     if cannot_proceed () then
       num_nodes_visited, non_nullable Pgenval
     else
+      let visited = Numbers.Int.Set.add (get_id ty) visited in
+      let depth = depth + 1 in
       fallback_if_missing_cmi
-        ~default:(num_nodes_visited, non_nullable Pgenval) (fun () ->
-        let visited = Numbers.Int.Set.add (get_id ty) visited in
-        let depth = depth + 1 in
-        let num_nodes_visited, fields =
-          List.fold_left_map (fun num_nodes_visited (_, field) ->
-            let num_nodes_visited = num_nodes_visited + 1 in
-            (* CR layouts v5 - this is fine because voids are not allowed in
-               tuples.  When they are, we'll need to make sure that elements
-               are values before recurring.
-            *)
-            value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
-            num_nodes_visited labeled_fields
-        in
-        num_nodes_visited,
-        non_nullable
-          (Pvariant { consts = [];
-                      non_consts = [0, Constructor_uniform fields] }))
+        ~default:(num_nodes_visited, non_nullable Pgenval)
+        (fun () -> value_kind_tuple env ~loc ~visited ~depth
+                     ~num_nodes_visited labeled_fields)
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -1210,6 +1198,36 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       (num_nodes_visited,
        non_nullable (Pvariant { consts = []; non_consts }))
     end
+
+and value_kind_tuple env ~loc ~visited ~depth ~num_nodes_visited elements =
+  let compute_mbe_if_repr (_, ty) =
+    Typedecl.mixed_block_element env ty (Ctype.type_jkind env ty)
+  in
+  match Misc.Stdlib.List.map_option compute_mbe_if_repr elements with
+  | None ->
+    (* Some element's layout is unknown or not representable, so computing
+       a more precise value kind is useless. This arises from [any] in tuples *)
+    num_nodes_visited, non_nullable Pgenval
+  | Some mixed_block_elements ->
+    let num_nodes_visited, constructor_shape =
+      (* if we are not in a mixed tuple, match existing value kind exactly *)
+      if List.for_all Types.mixed_block_element_is_scannable
+           mixed_block_elements
+      then
+        let num_nodes_visited, fields =
+          List.fold_left_map (fun num_nodes_visited (_, field) ->
+            let num_nodes_visited = num_nodes_visited + 1 in
+            value_kind env ~loc ~visited ~depth ~num_nodes_visited field)
+            num_nodes_visited elements
+        in
+        num_nodes_visited, Constructor_uniform fields
+      else
+        value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+          ~shape:(Array.of_list mixed_block_elements)
+          (List.map (fun (_, field) -> Some field) elements)
+    in
+    num_nodes_visited,
+    non_nullable (Pvariant { consts = []; non_consts = [0, constructor_shape] })
 
 let value_kind env loc ty =
   try

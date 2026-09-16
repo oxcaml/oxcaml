@@ -1332,8 +1332,6 @@ val layout_tupled_vector : boxed_vector -> layout
 val layout_unboxed_mask : layout
 val layout_unboxed_vector : unboxed_vector -> layout
 val layout_unboxed_tupled_vector : unboxed_vector -> layout
-(* A layout that is Pgenval because it is the field of a tuple *)
-val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
 val layout_variant_arg : layout
 (* A layout that is Pgenval because it is the field of a block being considered
@@ -1457,6 +1455,8 @@ val block_shape_of_value_kinds : value_kind list option -> block_shape
 (* Returns whether the block shape represents a block containing only values.
    Errors if there's a splice variable *)
 val is_uniform_block_shape : block_shape -> bool
+
+val mixed_block_shape_has_splices : _ mixed_block_element array -> bool
 
 (* Returns [None] if contains all values (including products of values
    and void), returns the [mixed_block_shape] if it has at least one

@@ -923,6 +923,16 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
 let is_uniform_block_shape (shape : block_shape) : bool =
   Option.is_none (mixed_block_of_block_shape shape)
 
+let mixed_block_shape_has_splices shape =
+  let rec has_splices : 'a mixed_block_element -> bool = function
+    | Splice_variable _ -> true
+    | Product shape -> Array.exists has_splices shape
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
+    | Untagged_immediate -> false
+  in
+  Array.exists has_splices shape
+
 let equal_layout x y =
   match x, y with
   | Pvalue x, Pvalue y -> equal_value_kind x y
@@ -1614,7 +1624,6 @@ let layout_list =
             Constructor_uniform
               [generic_value;
                { generic_value with nullable = Non_nullable}]] })
-let layout_tuple_element = nullable_value Pgenval
 let layout_value_field = nullable_value Pgenval
 let layout_tmc_field = nullable_value Pgenval
 let layout_optional_arg = nullable_value Pgenval
@@ -2172,15 +2181,7 @@ let transl_module_representation repr =
          |> Types.mixed_block_element_of_const_sort)
       repr
   in
-  let rec is_value (elt : Types.mixed_block_element) =
-    match elt with
-    | Scannable _ -> true
-    | Addressable elt -> is_value elt
-    | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
-    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word
-    | Product _ | Void -> false
-  in
-  if Array.for_all is_value shape
+  if Array.for_all Types.mixed_block_element_is_scannable shape
   then Module_value_only { field_count = Array.length shape }
   else
     Module_mixed
@@ -2788,6 +2789,8 @@ let find_exact_application kind ~arity args =
           if arity <> List.length const_args
           then None
           else Some (List.map (fun cst -> Lconst cst) const_args)
+      (* CR layouts: this should support [Const_mixed_block] once there is
+         proper support for mixed tupled applications *)
       | _ -> None
       end
 
@@ -3497,7 +3500,8 @@ let rec mixed_block_element_of_layout (layout : layout) :
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
-  | Ptop | Pbottom -> Misc.fatal_error "Pidxdeepen"
+  | Ptop | Pbottom ->
+    Misc.fatal_error "cannot convert top/bottom layout to mixed block element"
   | Pvalue value_kind -> Value value_kind
   | Punboxed_float Unboxed_float64 -> Float64
   | Punboxed_float Unboxed_float32 -> Float32

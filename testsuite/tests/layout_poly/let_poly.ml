@@ -21,9 +21,36 @@ val poly_ id : 'a -> 'a = <lpoly>
 |}]
 
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple "a" #1L in
-  let #(c, d) = tuple #42.0 "d" in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple "a" #1L in
+  let (c, d) = tuple #42.0 "d" in
+  (a, to_int64 b, to_float c, d)
+[%%expect{|
+val a : string = "a"
+val b : int64 = 1L
+val c : float = 42.
+val d : string = "d"
+|}]
+
+let (a, b, c, d, e, f) =
+  let poly_ tuple x y = Sys.opaque_identity (x + 1, y) in
+  let (a, b) = tuple 1 #1L in
+  let (c, d) = tuple 2 #42.0 in
+  let (e, f) = tuple 3 "hi" in
+  (a, to_int64 b, c, to_float d, e, f)
+[%%expect{|
+val a : int = 2
+val b : int64 = 1L
+val c : int = 3
+val d : float = 42.
+val e : int = 4
+val f : string = "hi"
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u "a" #1L in
+  let #(c, d) = tuple_u #42.0 "d" in
   (a, to_int64 b, to_float c, d)
 [%%expect{|
 val a : string = "a"
@@ -293,9 +320,9 @@ Error: This expression is not allowed in a "let poly_" definition;
 |}]
 
 (* RHS might constrain a layout and makes it not polymorphic *)
-let poly_ f x y = #(x, (y, y))
+let poly_ f x y = #(x, Some y)
 [%%expect{|
-val poly_ f : 'b. 'a -> 'b -> #('a * ('b * 'b)) = <lpoly>
+val poly_ f : 'b. 'a -> 'b -> #('a * 'b option) = <lpoly>
 |}]
 
 (* [any] doesn't really constrain the layout *)
@@ -437,9 +464,21 @@ val b : float = 43.
 
 (* let poly_ instantiation with multiple variables *)
 let (a, b, c, d) =
-  let poly_ tuple x y = #(x, y) in
-  let #(a, b) = tuple #42s #43.0 in
-  let #(c, d) = tuple #44L #45n in
+  let poly_ tuple x y = (x, y) in
+  let (a, b) = tuple #42s #43.0 in
+  let (c, d) = tuple #44L #45n in
+  (to_int8 a, to_float b, to_int64 c, to_nativeint d)
+[%%expect{|
+val a : int8 = 42s
+val b : float = 43.
+val c : int64 = 44L
+val d : nativeint = 45n
+|}]
+
+let (a, b, c, d) =
+  let poly_ tuple_u x y = #(x, y) in
+  let #(a, b) = tuple_u #42s #43.0 in
+  let #(c, d) = tuple_u #44L #45n in
   (to_int8 a, to_float b, to_int64 c, to_nativeint d)
 [%%expect{|
 val a : int8 = 42s
@@ -518,13 +557,23 @@ val x : int8 = 1s
 |}]
 
 (* Tupled functions *)
-let poly_ f = fun (g, x) -> g x
-let x = f ((fun y -> y + 1), 41)
-
+(* arguments here are [value], so the function still gets tupled *)
+let poly_ f = fun (g, ()) -> g ()
 [%%expect{|
 >> Fatal error: Slambda does not currently support poly tupled functions
 Uncaught exception: Misc.Fatal_error
 
+|}]
+
+let x =
+  (* CR layouts: we eagerly bail out of the tupled function optimization when
+     encountering non-[scannable] sorts, so we don't hit a fatal error here.
+     Eventually, we should properly support layout poly tupled functions. *)
+  let poly_ f = fun (g, x) -> g x in
+  f ((fun y -> y + 1), 41)
+
+[%%expect{|
+val x : int = 42
 |}]
 
 (* Environment arg shouldn't push things over the maximum arity *)

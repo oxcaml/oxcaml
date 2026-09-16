@@ -2457,7 +2457,8 @@ let rec with_new_idents_pat pat =
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
-  | Tpat_tuple args -> List.iter (fun (_, pat) -> with_new_idents_pat pat) args
+  | Tpat_tuple args ->
+    List.iter (fun (_, pat, _) -> with_new_idents_pat pat) args
   | Tpat_construct (_, _, _, args, _) ->
     List.iter (fun (_, pat) -> with_new_idents_pat pat) args
   | Tpat_variant (_, argo, _) -> (
@@ -2489,7 +2490,8 @@ let rec without_idents_pat pat =
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
-  | Tpat_tuple args -> List.iter (fun (_, pat) -> without_idents_pat pat) args
+  | Tpat_tuple args ->
+    List.iter (fun (_, pat, _) -> without_idents_pat pat) args
   | Tpat_construct (_, _, _, args, _) ->
     List.iter (fun pat -> without_idents_pat pat) (List.map snd args)
   | Tpat_variant (_, argo, _) -> (
@@ -2782,7 +2784,8 @@ and quote_value_pattern ~scopes p =
     | Tpat_tuple pats ->
       let pats =
         List.map
-          (fun (lbl, p) -> quote_nonopt loc lbl, quote_value_pattern ~scopes p)
+          (fun (lbl, p, _) ->
+            quote_nonopt loc lbl, quote_value_pattern ~scopes p)
           pats
       in
       Pat.tuple loc pats
@@ -3607,7 +3610,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
     | Texp_tuple (exps, _) ->
       let exps =
         List.map
-          (fun (lab, exp) ->
+          (fun (lab, exp, _) ->
             quote_nonopt loc lab, quote_expression ~scopes ~transl stage exp)
           exps
       in
