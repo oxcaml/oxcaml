@@ -1099,6 +1099,20 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) rep =
+  let of_shape num_nodes_visited fields =
+    let tag =
+      match rep with
+      | Record_inlined (Ordinary {runtime_tag}, _, _) -> runtime_tag
+      | Record_float | Record_ufloat -> Obj.double_array_tag
+      | Record_boxed | Record_mixed _ | Record_undetermined
+      | Record_inlined (Extension _, _, _) -> 0
+      | Record_unboxed | Record_dummy _ | Record_variable _
+      | Record_inlined (Null, _, _) ->
+          Misc.fatal_error "Typeopt: unexpected record representation"
+    in
+    num_nodes_visited,
+    non_nullable (Pvariant { consts = []; non_consts = [tag, fields] })
+  in
   let recompute make_rep =
     match
       List.map (fun (label : Types.label_declaration) ->
@@ -1190,25 +1204,7 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
           value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
             ~shape (List.map (fun t -> Some t) types)
       in
-      let non_consts =
-        match rep with
-        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-          [runtime_tag, fields]
-        | Record_float | Record_ufloat ->
-          [ Obj.double_array_tag, fields ]
-        | Record_boxed ->
-          [0, fields]
-        | Record_inlined (Extension _, _, _) ->
-          [0, fields]
-        | Record_mixed _ ->
-          [0, fields]
-        | Record_unboxed -> assert false
-        | Record_inlined (Null, _, _) -> assert false
-        | Record_dummy _ -> assert false
-        | Record_undetermined | Record_variable _ -> assert false
-      in
-      (num_nodes_visited,
-       non_nullable (Pvariant { consts = []; non_consts }))
+      of_shape num_nodes_visited fields
     end
 
 let value_kind env loc ty =
