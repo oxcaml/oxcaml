@@ -770,14 +770,8 @@ let rec typexp copy_scope s ty =
               For_copy.mode_copy_for_restoring copy_scope marg,
               For_copy.mode_copy_for_restoring copy_scope mret
             else
-            match s.additional_action with
-            | Prepare_for_saving { prepare_mode; _ } ->
-              prepare_mode copy_scope marg,
-              prepare_mode copy_scope mret
-            | Duplicate_variables ->
-              For_copy.mode_copy_generic copy_scope marg,
-              For_copy.mode_copy_generic copy_scope mret
-            | _ -> marg, mret
+              subst_mode_duplicate_generic copy_scope s marg,
+              subst_mode_duplicate_generic copy_scope s mret
           in
           let arg = typexp copy_scope s arg in
           let ret = typexp copy_scope s ret in
@@ -791,6 +785,24 @@ let rec typexp copy_scope s ty =
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
+
+(* Similar to [subst_mode], but copies generic mode variable if the action is
+  [Duplicate_variables] *)
+and subst_mode_duplicate_generic copy_scope s mode =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_mode; _ } ->
+    prepare_mode copy_scope mode
+  | Duplicate_variables ->
+    For_copy.mode_copy_generic copy_scope mode
+  | _ -> mode
+
+(* Prepares modes for saving: generic mode variables are copied with negative
+   id's, while weak mode variables and made into constants *)
+and subst_mode copy_scope s mode =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_mode; _ } ->
+      prepare_mode copy_scope mode
+  | No_action | Duplicate_variables -> mode
 
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
@@ -1279,12 +1291,6 @@ and subst_lazy_module_decl copy_scope scoping s md =
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }
 
-and subst_functor_mode copy_scope s mode =
-  match s.additional_action with
-  | Prepare_for_saving { prepare_mode; _ } ->
-      prepare_mode copy_scope mode
-  | No_action | Duplicate_variables -> mode
-
 and subst_lazy_modtype copy_scope scoping s = function
   | Mty_ident p ->
       begin match Path.Map.find p s.modtypes with
@@ -1302,20 +1308,20 @@ and subst_lazy_modtype copy_scope scoping s = function
       Mty_signature(subst_lazy_signature scoping s sg)
   | Mty_functor(Unit, res, mres) ->
       Mty_functor(Unit, subst_lazy_modtype copy_scope scoping s res,
-                  subst_functor_mode copy_scope s mres)
+                  subst_mode copy_scope s mres)
   | Mty_functor(Named (None, arg, marg), res, mres) ->
       Mty_functor(Named (None, subst_lazy_modtype copy_scope scoping s arg,
-                        subst_functor_mode copy_scope s marg),
+                        subst_mode copy_scope s marg),
                   subst_lazy_modtype copy_scope scoping s res,
-                  subst_functor_mode copy_scope s mres)
+                  subst_mode copy_scope s mres)
   | Mty_functor(Named (Some id, arg, marg), res, mres) ->
       let id' = rename_ident s id in
       Mty_functor(Named (Some id',
                         subst_lazy_modtype copy_scope scoping s arg,
-                        subst_functor_mode copy_scope s marg),
+                        subst_mode copy_scope s marg),
                   subst_lazy_modtype copy_scope scoping
                     (add_module id (Pident id') s) res,
-                  subst_functor_mode copy_scope s mres)
+                  subst_mode copy_scope s mres)
   | Mty_alias p ->
       Mty_alias (module_path s p)
   | Mty_strengthen (mty, p, a) ->

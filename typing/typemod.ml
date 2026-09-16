@@ -2829,7 +2829,7 @@ let rec nongen_modtype env f g = function
 - call [f] on all value description types, which potentailly contain
   non-generalized type variables.
 - call [g] on all module declaration types, which potentially contains loose
-  mode variables.
+  mode variables. [g] is called on all module types, included nested ones.
   *)
 and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
@@ -2894,8 +2894,7 @@ let remove_mode_and_jkind_variables env sg =
       None
     in
     let rm_mty _env mty = remove_functor_mode_variables ~zap_scope mty in
-    List.find_map
-      (nongen_signature_item env rm_ty rm_mty) sg |> ignore)
+    List.find_map (nongen_signature_item env rm_ty rm_mty) sg |> ignore)
 
 (* Helpers for typing recursive modules *)
 
