@@ -235,10 +235,16 @@ let explain_escape pre = function
           pp_doc pre
           (Style.as_inline_code type_expr_with_reserved_names) u
       )
-  | Errortrace.Constructor p -> Some(
+  | Errortrace.Constructor (k, p) ->
+    let what =
+      match k with
+      | Type -> "type constructor"
+      | Kind -> "abstract kind"
+    in
+    Some(
       doc_printf
-        "%a@,@[The type constructor@;<1 2>%a@ would escape its scope@]"
-        pp_doc pre pp_path p
+        "%a@,@[The %s@;<1 2>%a@ would escape its scope@]"
+        pp_doc pre what pp_path p
     )
   | Errortrace.Module_type p -> Some(
       doc_printf
