@@ -282,10 +282,11 @@ let variant ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
     let shape_and_field_tys_by_tag =
       Tag.Scannable.Map.fold
         (fun tag ty non_const_ctors ->
-          Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
+          Tag.Map.add (Tag.Scannable.to_tag tag) (Or_unknown.Known ty)
+            non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
+    TG.Row_like_for_blocks.create_multiple ~machine_width
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.create_variant ~is_unique:false ~immediates:(Known const_ctors)
@@ -299,7 +300,7 @@ let variant_non_null ~machine_width ~const_ctors ~non_const_ctors alloc_mode =
           Tag.Map.add (Tag.Scannable.to_tag tag) ty non_const_ctors)
         non_const_ctors Tag.Map.empty
     in
-    TG.Row_like_for_blocks.create_exactly_multiple ~machine_width
+    TG.Row_like_for_blocks.create_multiple ~machine_width
       ~shape_and_field_tys_by_tag alloc_mode
   in
   TG.Head_of_kind_value_non_null.create_variant ~is_unique:false
@@ -522,11 +523,15 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
         let const_ctors = these_naked_immediates consts in
         let non_const_ctors =
           Tag.Scannable.Map.map
-            (fun (shape, fields) ->
-              ( shape,
-                List.map
-                  (fun subkind -> unknown_with_subkind ~machine_width subkind)
-                  fields ))
+            (function
+              | None -> Or_unknown.Unknown
+              | Some (shape, fields) ->
+                Or_unknown.Known
+                  ( shape,
+                    List.map
+                      (fun subkind ->
+                        unknown_with_subkind ~machine_width subkind)
+                      fields ))
             non_consts
         in
         Ok

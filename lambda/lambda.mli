@@ -674,6 +674,7 @@ and mixed_block_shape_with_locality_mode
 and constructor_shape =
   | Constructor_uniform of value_kind list
   | Constructor_mixed of mixed_block_shape
+  | Constructor_undetermined
 
 and unboxed_float = Primitive.unboxed_float =
   | Unboxed_float64

@@ -751,6 +751,7 @@ and eval_raw_value_kind env value_kind =
 
 and eval_constructor_shape env constructor_shape =
   match constructor_shape with
+  | Constructor_undetermined -> constructor_shape
   | Constructor_uniform old_value_kinds ->
     let new_value_kinds =
       Misc.Stdlib.List.map_sharing (eval_value_kind env) old_value_kinds
@@ -994,6 +995,7 @@ and assert_raw_value_kind_contains_no_splices = function
     ()
 
 and assert_constructor_shape_contains_no_splices = function
+  | Constructor_undetermined -> ()
   | Constructor_uniform value_kinds ->
     List.iter assert_value_kind_contains_no_splices value_kinds
   | Constructor_mixed mixed_block_shape ->

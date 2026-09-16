@@ -997,10 +997,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -1021,10 +1023,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -1057,7 +1061,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                        Typedecl.update_constructor_representation
                          env loc cd_args ~is_extension_constructor:false
                      in
-                     Result.to_option repr, { constructor with cd_args })
+                     let shape =
+                       match repr with
+                       | Ok shape -> shape
+                       | Error _ -> Types.Constructor_undetermined
+                     in
+                     Some shape, { constructor with cd_args })
               in
               match cstr_shape_opt with
               | None -> None
@@ -1125,7 +1134,8 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
     | labels ->
         let types = List.map (fun label -> label.Types.ld_type) labels in
         match Typedecl.compute_block_shape env types with
-        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | `Undetermined ->
+            of_shape num_nodes_visited Lambda.Constructor_undetermined
         | (`Not_mixed | `Mixed _) as shape ->
             value_kind_immutable_record env ~loc ~visited ~depth
               ~num_nodes_visited ~params ~args labels (make_rep shape)
