@@ -186,7 +186,7 @@ let slots_to_be_built_for_set_of_closures ~db ~code_changes ~get_code_info
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~(inputs : Inputs.t) ~code_changes
+let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
     ({ db; unboxed_fields; changed_representation } : Unboxing_analysis.result)
     =
   let { Inputs.free_names; closure_function_decls; code_info } = inputs in
@@ -300,4 +300,6 @@ let compute ~(inputs : Inputs.t) ~code_changes
     in
     function_slot_size
   in
-  Slot_offsets.finalize_offsets ~get_function_slot_size ~used_slots slot_offsets
+  Slot_offsets.finalize_offsets
+    ~is_local_compilation_unit:(Analysis_scope.contains_unit analysis_scope)
+    ~get_function_slot_size ~used_slots slot_offsets

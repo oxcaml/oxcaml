@@ -42,7 +42,7 @@ module Staged : sig
 
   (** Analyse the dependency graph and compute the rewriting decisions and slot
       offsets. Mutates the graph by linking the code references. *)
-  val solve : Solve_inputs.t -> Solution.t
+  val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
 
   (** Rebuild the traversed unit according to the solution. Returns the rebuilt
       unit, its code and its typing environment. *)

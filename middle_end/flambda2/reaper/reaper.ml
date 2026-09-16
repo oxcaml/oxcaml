@@ -97,7 +97,7 @@ module Staged = struct
     in
     solve_inputs, rebuild_inputs
 
-  let solve
+  let solve ~analysis_scope
       ({ deps;
          slot_offsets_inputs;
          code_deps;
@@ -107,10 +107,11 @@ module Staged = struct
          all_sets_of_closures = _
        } :
         Solve_inputs.t) =
-    Cross_unit_calls.link deps ~code_deps ~le_monde_exterieur code_references;
+    Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
+      code_references;
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps)
+          Analysis.fixpoint deps ~analysis_scope)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
@@ -119,14 +120,14 @@ module Staged = struct
         Dot_printer.print_solved_dep solved_dep deps)
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes solved_dep
+      Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
         ~rewrite_kind_with_subkind:
           (Types_rewriter.For_solve.rewrite_kind_with_subkind ~db:solved_dep.db)
         ~code_deps
     in
     let slot_offsets =
-      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~code_changes
-        solved_dep
+      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
+        ~code_changes solved_dep
     in
     let queries = Rebuild_queries.create solved_dep.db ~applications in
     Solution.{ solved_dep; code_changes; queries; slot_offsets }
@@ -171,14 +172,15 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     Staged.traverse ~free_names ~cmx_loader ~all_code unit
   in
   let Staged.Solution.{ solved_dep; code_changes; queries; slot_offsets } =
-    Staged.solve solve_inputs
+    Staged.solve ~analysis_scope:Current_unit solve_inputs
   in
   let types_rewrite_context =
     Types_rewriter.prepare_rewrite_context solved_dep
       solve_inputs.Staged.Solve_inputs.all_sets_of_closures
   in
   let solution =
-    Rebuild_solution.create ~queries ~unboxing:solved_dep ~code_changes
+    Rebuild_solution.create ~analysis_scope:Current_unit ~queries
+      ~unboxing:solved_dep ~code_changes
   in
   let flambda, all_code, final_typing_env =
     Staged.rebuild ~unit ~rebuild_inputs ~solution ~types_rewrite_context
