@@ -26,6 +26,15 @@ val rewrite_kind_with_subkind :
 (* CR pchambart: rename to remove_unused_part_of_subkind or something like
    that *)
 
+(** Kind rewriting for the solve stage, which has no [rewrite_context]. *)
+module For_solve : sig
+  val rewrite_kind_with_subkind :
+    db:Datalog.database ->
+    Name.t ->
+    Flambda_kind.With_subkind.t ->
+    Flambda_kind.With_subkind.t
+end
+
 val prepare_rewrite_context :
   Unboxing_analysis.result ->
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->

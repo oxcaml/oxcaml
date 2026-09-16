@@ -914,8 +914,7 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
-    ~code_deps =
+let compute_code_changes uses ~rewrite_kind_with_subkind ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
@@ -924,7 +923,6 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
     | Region | Rec_info -> true
     | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
   in
-  let forget_all_types = Flambda_features.debug_reaper "forget-types" in
   Code_id.Map.mapi
     (fun code_id (code_dep : Traverse_acc.code_dep) ->
       let code_metadata = code_dep.code_metadata in
@@ -1034,46 +1032,11 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
               { params_decisions; return_decisions; my_closure_decision },
             code_metadata )
       in
+      (* We defer updating the result types to the rebuild stage, because it is
+         not needed for link-time optimization. To avoid stale typing
+         information, we explicitly set them to [Unknown] here. *)
       let code_metadata =
-        match Code_metadata.result_types code_metadata with
-        | Unknown | Bottom -> code_metadata
-        | Ok result_types ->
-          let result_types =
-            if forget_all_types
-            then Or_unknown_or_bottom.Unknown
-            else
-              let params_vars_and_keep, results_vars_and_keep =
-                match calling_convention_change with
-                | Not_changing_calling_convention ->
-                  ( List.map
-                      (fun p -> p, Points_to_analysis.Keep)
-                      code_dep.params,
-                    List.map
-                      (fun p -> p, Points_to_analysis.Keep)
-                      code_dep.return )
-                | Changing_calling_convention
-                    { my_closure_decision = _;
-                      params_decisions;
-                      return_decisions
-                    } ->
-                  ( List.map2
-                      (fun p decision ->
-                        match decision with
-                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                        | Delete -> p, Points_to_analysis.Delete)
-                      code_dep.params params_decisions,
-                    List.map2
-                      (fun p decision ->
-                        match decision with
-                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
-                        | Delete -> p, Points_to_analysis.Delete)
-                      code_dep.return return_decisions )
-              in
-              rewrite_result_types ~my_closure:code_dep.my_closure
-                ~params:params_vars_and_keep ~results:results_vars_and_keep
-                result_types
-          in
-          Code_metadata.with_result_types result_types code_metadata
+        Code_metadata.with_result_types Unknown code_metadata
       in
       { calling_convention_change; code_metadata })
     code_deps

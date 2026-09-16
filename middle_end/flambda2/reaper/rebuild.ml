@@ -52,6 +52,7 @@ type should_preserve_direct_calls =
 type env =
   { machine_width : Target_system.Machine_width.t;
     solution : Rebuild_solution.t;
+    code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
     cont_params_to_keep :
@@ -2118,8 +2119,56 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     params_and_body
   in
   let code_id = Code_metadata.code_id code_metadata in
-  let updating_calling_convention =
+  let calling_convention_change =
     Rebuild_solution.get_calling_convention_change env.solution code_id
+  in
+  let code_metadata =
+    (* The result types in [code_metadata] were set to [Unknown] when computing
+       the code changes; recompute them from the original metadata. *)
+    let code_dep = Code_id.Map.find code_id env.code_deps in
+    let forget_all_types = Flambda_features.debug_reaper "forget-types" in
+    let rewrite_result_types ~my_closure ~params ~results types =
+      match env.old_typing_env with
+      | None -> Or_unknown_or_bottom.Unknown
+      | Some old_typing_env ->
+        Or_unknown_or_bottom.Ok
+          (Types_rewriter.rewrite_result_types env.types_rewrite_context
+             ~old_typing_env ~my_closure ~params ~results types)
+    in
+    match Code_metadata.result_types code_dep.code_metadata with
+    | (Unknown | Bottom) as result_types ->
+      Code_metadata.with_result_types result_types code_metadata
+    | Ok result_types ->
+      let result_types =
+        if forget_all_types
+        then Or_unknown_or_bottom.Unknown
+        else
+          let params_vars_and_keep, results_vars_and_keep =
+            match calling_convention_change with
+            | Not_changing_calling_convention ->
+              ( List.map (fun p -> p, Points_to_analysis.Keep) code_dep.params,
+                List.map (fun p -> p, Points_to_analysis.Keep) code_dep.return )
+            | Changing_calling_convention
+                { my_closure_decision = _; params_decisions; return_decisions }
+              ->
+              ( List.map2
+                  (fun p (decision : Unboxing_analysis.param_decision) ->
+                    match decision with
+                    | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                    | Delete -> p, Points_to_analysis.Delete)
+                  code_dep.params params_decisions,
+                List.map2
+                  (fun p (decision : Unboxing_analysis.param_decision) ->
+                    match decision with
+                    | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                    | Delete -> p, Points_to_analysis.Delete)
+                  code_dep.return return_decisions )
+          in
+          rewrite_result_types ~my_closure:code_dep.my_closure
+            ~params:params_vars_and_keep ~results:results_vars_and_keep
+            result_types
+      in
+      Code_metadata.with_result_types result_types code_metadata
   in
   let rebuild_body env =
     let region_vars =
@@ -2157,7 +2206,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
          ~recursive:(Code_metadata.recursive code_metadata))
       (Code_metadata.with_cost_metrics cost_metrics code_metadata)
   in
-  match updating_calling_convention with
+  match calling_convention_change with
   | Not_changing_calling_convention ->
     let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
@@ -2316,7 +2365,8 @@ type result =
     code_ids_to_remember : Code_id.Set.t
   }
 
-let rebuild ~machine_width ~ordered_code_ids
+let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
+    ~ordered_code_ids
     ~(continuation_info : Traverse_acc.continuation_info Continuation.Map.t)
     ~fixed_arity_continuations ~final_typing_env ~types_rewrite_context
     (solution : Rebuild_solution.t) get_code_metadata toplevel_expr code =
@@ -2361,6 +2411,7 @@ let rebuild ~machine_width ~ordered_code_ids
   let env =
     { machine_width;
       solution;
+      code_deps;
       get_code_metadata;
       cont_params_to_keep;
       should_keep_param;

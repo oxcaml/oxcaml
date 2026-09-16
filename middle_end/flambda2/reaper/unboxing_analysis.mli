@@ -100,11 +100,5 @@ val compute_code_changes :
   result ->
   rewrite_kind_with_subkind:
     (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
-  rewrite_result_types:
-    (my_closure:Variable.t ->
-    params:(Variable.t * Points_to_analysis.keep_or_delete) list ->
-    results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
-    Result_types.t ->
-    Result_types.t Or_unknown_or_bottom.t) ->
   code_deps:Traverse_acc.code_dep Code_id.Map.t ->
   code_changes
