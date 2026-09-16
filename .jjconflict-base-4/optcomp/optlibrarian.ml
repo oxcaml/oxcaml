@@ -1,0 +1,159 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* Build libraries of .cmx files *)
+open Format
+
+module type S = sig
+  val create_archive : string list -> string -> unit
+end
+
+module Make (Backend : sig
+  include Optcomp_intf.Backend
+
+  include Optlink.S
+end) : S = struct
+  open Cmx_format
+
+  type error =
+    | File_not_found of string
+    | Archiver_error of string
+
+  exception Error of error
+
+  let read_info name =
+    let filename =
+      try Load_path.find name
+      with Not_found -> raise (Error (File_not_found name))
+    in
+    ( Filename.chop_suffix filename Backend.ext_flambda_obj ^ Backend.ext_obj,
+      Compilenv.read_unit_info filename )
+
+  let create_archive file_list lib_name =
+    let archive_name = Filename.remove_extension lib_name ^ Backend.ext_lib in
+    let outchan = open_out_bin lib_name in
+    Misc.try_finally
+      ~always:(fun () -> close_out outchan)
+      ~exceptionally:(fun () ->
+        Misc.remove_file lib_name;
+        Misc.remove_file archive_name)
+      (fun () ->
+        output_string outchan Config.cmxa_magic_number;
+        let objfile_list, descr_list =
+          List.split (List.map read_info file_list)
+        in
+        let linkenv = Linkenv.create () in
+        List.iter2
+          (fun file_name (unit, crc) ->
+            Backend.check_consistency linkenv file_name unit crc)
+          file_list descr_list;
+        let cmis = Linkenv.extract_crc_interfaces linkenv in
+        let cmxs = Linkenv.extract_crc_implementations linkenv in
+        (* CR mshinwell: see comment in compilenv.ml let cmxs =
+           Compilenv.ensure_sharing_between_cmi_and_cmx_imports cmis cmxs in *)
+        let cmis = Array.of_list cmis in
+        let cmxs = Array.of_list cmxs in
+        let cmi_index = Compilation_unit.Name.Tbl.create 42 in
+        Array.iteri
+          (fun i import ->
+            Compilation_unit.Name.Tbl.add cmi_index (Import_info.name import) i)
+          cmis;
+        let cmx_index = Compilation_unit.Tbl.create 42 in
+        Array.iteri
+          (fun i import ->
+            Compilation_unit.Tbl.add cmx_index (Import_info.cu import) i)
+          cmxs;
+        let quoted_cmi =
+          List.fold_left
+            (fun quoted_cmi (unit, _crc) ->
+              Compilation_unit.Name.Set.add_seq
+                (List.to_seq unit.ui_quoted_cmi)
+                quoted_cmi)
+            Compilation_unit.Name.Set.empty descr_list
+          |> Compilation_unit.Name.Set.elements |> Array.of_list
+        in
+        let quoted_cmx =
+          List.fold_left
+            (fun quoted_cmx (unit, _crc) ->
+              Compilation_unit.Set.add_seq
+                (List.to_seq unit.ui_quoted_cmx)
+                quoted_cmx)
+            Compilation_unit.Set.empty descr_list
+          |> Compilation_unit.Set.elements |> Array.of_list
+        in
+        let quoted_cmi_index =
+          Compilation_unit.Name.Tbl.create (Array.length quoted_cmi)
+        in
+        Array.iteri
+          (fun i cu -> Compilation_unit.Name.Tbl.add quoted_cmi_index cu i)
+          quoted_cmi;
+        let quoted_cmx_index =
+          Compilation_unit.Tbl.create (Array.length quoted_cmx)
+        in
+        Array.iteri
+          (fun i cu -> Compilation_unit.Tbl.add quoted_cmx_index cu i)
+          quoted_cmx;
+        let genfns = Generic_fns.Tbl.make () in
+        let mk_bitmap arr ix entries ~find ~get_name =
+          let module B = Misc.Bitmap in
+          let b = B.make (Array.length arr) in
+          List.iter (fun import -> B.set b (find ix (get_name import))) entries;
+          b
+        in
+        let units =
+          List.map
+            (fun (unit, crc) ->
+              ignore
+                (Generic_fns.Tbl.add ~imports:Generic_fns.Partition.Set.empty
+                   genfns unit.ui_generic_fns);
+              { li_name = unit.ui_unit;
+                li_crc = crc;
+                li_defines = unit.ui_defines;
+                li_force_link = unit.ui_force_link || !Clflags.link_everything;
+                li_imports_cmi =
+                  mk_bitmap cmis cmi_index unit.ui_imports_cmi
+                    ~find:Compilation_unit.Name.Tbl.find
+                    ~get_name:Import_info.name;
+                li_imports_cmx =
+                  mk_bitmap cmxs cmx_index unit.ui_imports_cmx
+                    ~find:Compilation_unit.Tbl.find ~get_name:Import_info.cu;
+                li_quoted_cmi =
+                  mk_bitmap quoted_cmi quoted_cmi_index unit.ui_quoted_cmi
+                    ~find:Compilation_unit.Name.Tbl.find ~get_name:Fun.id;
+                li_quoted_cmx =
+                  mk_bitmap quoted_cmx quoted_cmx_index unit.ui_quoted_cmx
+                    ~find:Compilation_unit.Tbl.find ~get_name:Fun.id;
+                li_external_symbols = Array.of_list unit.ui_external_symbols
+              })
+            descr_list
+        in
+        let infos =
+          { lib_units = units;
+            lib_imports_cmi = cmis;
+            lib_imports_cmx = cmxs;
+            lib_quoted_cmi = quoted_cmi;
+            lib_quoted_cmx = quoted_cmx;
+            lib_generic_fns = Generic_fns.Tbl.entries genfns;
+            lib_requires_metaprogramming =
+              List.exists
+                (fun (unit, _crc) -> unit.ui_requires_metaprogramming)
+                descr_list;
+            lib_ccobjs = !Clflags.ccobjs;
+            lib_ccopts = !Clflags.all_ccopts
+          }
+        in
+        output_value outchan infos;
+        Backend.create_archive archive_name objfile_list)
+end

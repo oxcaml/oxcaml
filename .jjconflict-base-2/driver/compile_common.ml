@@ -1,0 +1,204 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Misc
+
+type opt_backend = Native | Js_of_ocaml
+
+type backend = Byte | Opt of opt_backend
+
+(* CR lmaurer: No longer need both [target] and [module_name] here (true in lots
+   of places) *)
+type info = {
+  target: Unit_info.t;
+  module_name : Compilation_unit.t;
+  env : Env.t;
+  ppf_dump : Format.formatter;
+  tool_name : string;
+  backend : backend;
+}
+
+type compilation_unit_or_inferred =
+  | Exactly of Compilation_unit.t
+  | Inferred_from_output_prefix
+
+let unit_info_from_cu_or_output_prefix ~source_file kind ~output_prefix
+    ~compilation_unit =
+  match compilation_unit with
+  | Exactly compilation_unit ->
+      Unit_info.make_with_known_compilation_unit ~source_file kind
+        output_prefix compilation_unit
+  | Inferred_from_output_prefix ->
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
+
+let with_info ~backend ~tool_name ~dump_ext unit_info k =
+  Compmisc.init_path ();
+  Compmisc.init_parameters ();
+  let compilation_unit = Unit_info.modname unit_info in
+  Env.set_current_unit unit_info;
+  let env = Compmisc.initial_env() in
+  let dump_file = String.concat "." [Unit_info.prefix unit_info; dump_ext] in
+  Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
+  k {
+    target = unit_info;
+    module_name = compilation_unit;
+    env;
+    ppf_dump;
+    tool_name;
+    backend;
+  }
+
+module Parse_result = struct
+  type 'a t = { ast : 'a; info : info }
+
+  let of_pparse_ast_result ~info ({ ast; source_file } : _ Pparse.ast_result) =
+    let new_target =
+      Unit_info.set_original_source_file_name info.target source_file
+    in
+    { ast; info = { info with target = new_target } }
+
+  let map_ast { ast; info } ~f = { ast = f ast; info }
+end
+
+(** Compile a .mli file *)
+
+let parse_intf i =
+  Pparse.parse_interface
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.interface)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.signature)
+
+let typecheck_intf info ast =
+  Profile.(
+    record_call_with_counters
+      ~counter_f:(fun (_alerts, signature) ->
+        Profile_counters_functions.(
+          count_language_extensions (Typedtree_signature_output signature)))
+      typing)
+  @@ fun () ->
+  let tsg =
+    ast
+    |> Typemod.type_interface
+         ~sourcefile:(Unit_info.original_source_file info.target)
+         info.module_name info.env
+    |> print_if info.ppf_dump Clflags.dump_typedtree Printtyped.interface
+  in
+  let alerts = Builtin_attributes.alerts_of_sig ~mark:true ast in
+  let sg = tsg.Typedtree.sig_type in
+  if !Clflags.print_types then
+    Printtyp.wrap_printing_env ~error:false info.env (fun () ->
+        Format.(fprintf std_formatter) "%a@."
+          (Printtyp.printed_signature
+             (Unit_info.original_source_file info.target))
+          sg);
+  let modes =
+    let modalities = tsg.Typedtree.sig_modalities in
+    let staticity = Typemod.staticity_of_modalities modalities in
+    let mode = Persistent_env.mode_pers_mod staticity in
+    Includecore.Specific ((mode, None), mode)
+  in
+  ignore (Includemod.signatures info.env ~mark:true ~modes sg sg);
+  Typecore.force_delayed_checks ();
+  Builtin_attributes.warn_unused ();
+  Warnings.check_fatal ();
+  alerts, tsg
+
+let emit_signature info alerts tsg =
+  let sg =
+    let kind : Cmi_format.kind =
+      if !Clflags.as_parameter then
+        Parameter
+      else begin
+        let cmi_arg_for =
+          !Clflags.as_argument_for
+          |> Option.map Global_module.Parameter_name.of_string
+        in
+        Normal { cmi_impl = info.module_name; cmi_arg_for }
+      end
+    in
+    let staticity =
+      Typemod.staticity_of_modalities tsg.Typedtree.sig_modalities
+    in
+    Env.save_signature ~alerts (tsg.Typedtree.sig_type, staticity)
+      (Compilation_unit.name info.module_name) kind
+      (Unit_info.cmi info.target)
+  in
+  Typemod.save_signature info.target info.module_name tsg info.env sg
+
+let interface ~hook_parse_tree ~hook_typed_tree info =
+  Profile.(record_call (annotate_file_name (
+    Unit_info.raw_source_file info.target))) @@ fun () ->
+  let { ast; info } : _ Parse_result.t = parse_intf info in
+  let ast = hook_parse_tree ast in
+  if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
+    let alerts, tsg = typecheck_intf info ast in
+    hook_typed_tree tsg;
+    if not !Clflags.print_types then begin
+      emit_signature info alerts tsg
+    end
+  end
+
+
+(** Frontend for a .ml file *)
+
+let parse_impl i =
+  Pparse.parse_implementation
+    ~tool_name:i.tool_name
+    (Unit_info.original_source_file i.target)
+  |> Parse_result.of_pparse_ast_result ~info:i
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_parsetree Printast.implementation)
+  |> Parse_result.map_ast
+       ~f:(print_if i.ppf_dump Clflags.dump_source Pprintast.structure)
+
+let typecheck_impl i parsetree =
+  parsetree
+  |> Profile.(
+    record_with_counters
+      ~counter_f:(fun (typed_tree : Typedtree.implementation) ->
+        Profile_counters_functions.(
+          count_language_extensions
+            (Typedtree_implementation_output typed_tree)))
+      typing)
+    (Typemod.type_implementation i.target i.module_name i.env)
+  |> print_if i.ppf_dump Clflags.dump_typedtree
+    Printtyped.implementation_with_coercion
+  |> print_if i.ppf_dump Clflags.dump_shape
+    (fun fmt {Typedtree.shape; _} -> Shape.print fmt shape)
+
+let implementation ~hook_parse_tree ~hook_typed_tree info ~backend =
+  Profile.(record_call (annotate_file_name (
+    Unit_info.raw_source_file info.target))) @@ fun () ->
+  let exceptionally = Misc.remove_successful_output_files in
+  Misc.try_finally ?always:None ~exceptionally (fun () ->
+    let { ast = parsed; info } : _ Parse_result.t = parse_impl info in
+    let parsed = hook_parse_tree parsed in
+    if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
+      let typed = typecheck_impl info parsed in
+      hook_typed_tree typed;
+      if Clflags.(should_stop_after Compiler_pass.Typing) then () else begin
+        backend info typed;
+      end;
+    end;
+    Builtin_attributes.warn_unused ();
+    if not (Clflags.(should_stop_after Compiler_pass.Selection)) then
+      Builtin_attributes.warn_unchecked_zero_alloc_attribute ();
+    Warnings.check_fatal ();
+  )

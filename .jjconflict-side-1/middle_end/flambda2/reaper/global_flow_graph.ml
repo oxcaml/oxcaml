@@ -31,6 +31,7 @@ type graph =
     mutable parameter : NCN.t;
     mutable propagate : NNN.t;
     mutable alias_if_any_source : NNN.t;
+    mutable imported_symbol : N.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
     mutable zero_alloc_source : N.t;
@@ -84,6 +85,8 @@ let propagate = NNN.create ~name:"propagate"
 
 let alias_if_any_source = NNN.create ~name:"alias_if_any_source"
 
+let imported_symbol = N.create ~name:"imported_symbol"
+
 let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
@@ -101,6 +104,7 @@ let to_datalog graph =
   @@ Datalog.set_table parameter graph.parameter
   @@ Datalog.set_table propagate graph.propagate
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
+  @@ Datalog.set_table imported_symbol graph.imported_symbol
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
   @@ Datalog.set_table zero_alloc_source graph.zero_alloc_source
@@ -139,6 +143,8 @@ module Relations = struct
   let alias_if_any_source ~if_any_source ~to_ ~from =
     Datalog.atom alias_if_any_source [if_any_source; to_; from]
 
+  let imported_symbol symbol = Datalog.atom imported_symbol [symbol]
+
   let any_usage var = Datalog.atom any_usage [var]
 
   let any_source var = Datalog.atom any_source [var]
@@ -158,6 +164,7 @@ let create () =
     parameter = NCN.empty;
     propagate = NNN.empty;
     alias_if_any_source = NNN.empty;
+    imported_symbol = N.empty;
     any_usage = N.empty;
     any_source = N.empty;
     zero_alloc_source = N.empty;
@@ -198,6 +205,10 @@ let add_opaque_let_dependency t ~to_ ~from =
       ~init:()
   in
   Name_occurrences.fold_names bound_to ~f ~init:()
+
+let add_imported_symbol t symbol =
+  t.imported_symbol
+    <- N.add_or_replace [Code_id_or_name.symbol symbol] () t.imported_symbol
 
 let add_any_usage t (var : Code_id_or_name.t) =
   t.any_usage <- N.add_or_replace [var] () t.any_usage

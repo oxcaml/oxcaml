@@ -1,0 +1,6 @@
+(library
+  (name ocaml_utils)
+  (public_name merlin-lib.ocaml_utils)
+  (libraries merlin_utils str unix)
+  (modules :standard \ linkdeps)
+  (flags :standard -open Merlin_utils))

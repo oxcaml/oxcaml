@@ -1,0 +1,304 @@
+(* CR-someday: see whether the `-4` can be dropped. *)
+[@@@ocaml.warning "+a-29-40-41-42-4"]
+
+open! Int_replace_polymorphic_compare
+module DLL = Doubly_linked_list
+module U = Peephole_utils
+
+let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
+    ~(snd_val : Cfg.basic Cfg.instruction) =
+  let fst_dst = fst_val.res.(0) in
+  let snd_dst = snd_val.res.(0) in
+  if U.are_equal_regs fst_dst snd_dst
+  then (
+    DLL.delete_curr fst;
+    Some (U.prev_at_most U.go_back_const snd))
+  else None
+
+(** Logical condition for simplifying the following case:
+    {v
+    mov ..., x
+    mov ..., x
+    v}
+
+    In this case, the first instruction should be removed *)
+
+let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    match fst_val.desc, snd_val.desc with
+    | ( Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ),
+        Op
+          ( Const_int _ | Const_float _ | Const_float32 _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Const_mask _ ) ) ->
+      (* Removing the first instruction is okay here since it doesn't change the
+         set of addresses we touch. *)
+      delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
+    | Op (Spill | Reload), Op (Move | Spill | Reload) ->
+      (* We only consider the removal of spill and reload instructions because a
+         move from/to an arbitrary memory location could fail because of memory
+         protection. *)
+      (* If [snd] reads the location it overwrites (i.e. is an identity move),
+         deleting [fst] would change the value [snd] reads. Such moves are
+         currently removed by [Regalloc_utils.simplify_cfg] before this pass
+         runs, but do not rely on that here. *)
+      if U.are_equal_regs snd_val.arg.(0) snd_val.res.(0)
+      then None
+      else delete_fst_if_redundant ~fst ~snd ~fst_val ~snd_val
+    | _, _ -> None)
+  | _ -> None
+
+(** Logical condition for simplifying the following case:
+    {v
+    mov x, y
+    mov y, x
+    v}
+
+    In this case, the second instruction should be removed *)
+
+let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    match fst_val.desc with
+    | Op (Move | Spill | Reload) -> (
+      let fst_src, fst_dst = fst_val.arg.(0), fst_val.res.(0) in
+      match snd_val.desc with
+      | Op (Move | Spill | Reload) ->
+        let snd_src, snd_dst = snd_val.arg.(0), snd_val.res.(0) in
+        if U.are_equal_regs fst_src snd_dst && U.are_equal_regs fst_dst snd_src
+        then (
+          DLL.delete_curr snd;
+          Some (U.prev_at_most U.go_back_const fst))
+        else None
+      | _ -> None)
+    | _ -> None)
+  | _ -> None
+
+(** Logical condition for simplifying the following case:
+    {v
+    <op1> const1, r
+    <op2> const2, r
+    v}
+
+    to:
+    {v <op1> (const1 <op2> const2), r v}
+
+    where const1 and const2 are immediate values, and <op1> and <op2> are
+    associative binary operators such that either <op1> is the same as <op2>, or
+    <op1> is the inverse of <op2>, or there exists const3 such that <op1 const1>
+    can be expressed as <op2 const3> or <op2 const2> can be expressed as <op1
+    const3> *)
+
+let are_compatible op1 op2 imm1 imm2 :
+    (Operation.integer_operation * int) option =
+  match
+    (op1 : Operation.integer_operation), (op2 : Operation.integer_operation)
+  with
+  (* CR-someday xclerc: `U.bitwise_immediates` will return `None` if the
+     resulting immediate cannot be represented, but in some case a peephole rule
+     should nevertheless apply. For instance, on arm64 `(x xor 2) xor 2` will
+     fail, but there should arguably be a rule so that the expression is
+     simplified to `x`. *)
+  | Iand, Iand -> U.bitwise_immediates op1 imm1 imm2 ( land )
+  | Ior, Ior -> U.bitwise_immediates op1 imm1 imm2 ( lor )
+  | Ixor, Ixor -> U.bitwise_immediates op1 imm1 imm2 ( lxor )
+  (* For the following three cases we have the issue that in some situations,
+     one or both immediate values could be out of bounds, but the result might
+     be within bounds (e.g. imm1 = -4 and imm2 = 65, their sum being 61). This
+     should not happen at all since the immediate values should always be within
+     the bounds [0, Sys.int_size]. *)
+  | Ilsl, Ilsl | Ilsr, Ilsr | Iasr, Iasr | Iadd, Iadd ->
+    U.add_immediates op1 imm1 imm2
+  | Iadd, Isub ->
+    (* The following transformation changes the order of operations on [r] and
+       therefore might change the overflow behavior: if [r+c1] overflows, but
+       r-[c2-c1] does not overflow. This is fine, other compiler transformations
+       may also do it. The code below only ensures that immediates that the
+       compiler emits do not overflow. *)
+    if imm1 >= imm2
+    then U.sub_immediates Iadd imm1 imm2
+    else U.sub_immediates Isub imm2 imm1
+  | Isub, Isub (* r - (imm1 + imm2 *) -> U.add_immediates Isub imm1 imm2
+  | Isub, Iadd ->
+    if imm1 >= imm2
+    then U.sub_immediates Isub imm1 imm2
+    else U.sub_immediates Iadd imm2 imm1
+  | Ilsl, Imul ->
+    (* [(x lsl imm1) * imm2] is [x * (imm2 lsl imm1)]. *)
+    U.lsl_immediates Imul imm2 imm1
+  | Imul, Ilsl ->
+    (* [(x * imm1) lsl imm2] is [x * (imm1 lsl imm2)]. *)
+    U.lsl_immediates Imul imm1 imm2
+  | Imul, Imul -> U.mul_immediates op1 imm1 imm2
+  (* CR-soon gtulba-lecu: check this last case | Imod, Imod -> if imm1 mod imm2
+     = 0 then Some (Imod, imm2) else None
+
+     The integer modulo imm2 group is a subgroup of the integer modulo imm1 iff
+     imm2 divides imm1
+
+     This is because the operations in the groups are addition modulo n and m
+     respectively. If n divides m, then every result of the operation (addition)
+     in the n group will also be a legal result in the m group, which is
+     essentially the definition of a subgroup. If n does not divide m, there
+     will be some results in the n group that are not acceptable in the m
+     group. *)
+  | _ -> None
+
+let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] ->
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    (* The following check does the following: 1. Ensures that both instructions
+       use the same source register; 2. Ensures that both instructions output
+       the result to the source register. This is currently redundant for amd64
+       since there are no instructions that invalidate this condition. *)
+    if
+      Array.length fst_val.arg = 1
+      && Array.length snd_val.arg = 1
+      && Array.length fst_val.res = 1
+      && Array.length snd_val.res = 1
+      && U.are_equal_regs
+           (Array.unsafe_get fst_val.arg 0)
+           (Array.unsafe_get snd_val.arg 0)
+      && U.are_equal_regs
+           (Array.unsafe_get fst_val.arg 0)
+           (Array.unsafe_get fst_val.res 0)
+      && U.are_equal_regs
+           (Array.unsafe_get snd_val.arg 0)
+           (Array.unsafe_get snd_val.res 0)
+    then
+      match fst_val.desc, snd_val.desc with
+      | Op (Intop_imm (op1, imm1)), Op (Intop_imm (op2, imm2)) -> (
+        match are_compatible op1 op2 imm1 imm2 with
+        | Some (op, imm) ->
+          let new_cell =
+            DLL.insert_and_return_before fst
+              { fst_val with desc = Cfg.Op (Intop_imm (op, imm)) }
+          in
+          DLL.delete_curr fst;
+          DLL.delete_curr snd;
+          Some ((U.prev_at_most U.go_back_const) new_cell)
+        | _ -> None)
+      | _ -> None
+    else None
+  | _ -> None
+
+(** Logical condition for simplifying the following case:
+    {v
+    <add/sub> imm, r
+    <specific> ...r..., r
+    v}
+
+    to:
+    {v <specific'> ...r..., r v}
+
+    where <specific> is an arch-specific operation that reads and overwrites
+    [r], and <specific'> is <specific> with the constant folded into its
+    addressing expression (e.g. the displacement of an amd64 [lea], as in
+    [popcnt r; dec r; lea 1(r,r), r] where the [dec] can be folded into the
+    [lea] as [-1(r,r)]). The arch-specific rewriting is delegated to
+    [Arch.fold_delta_into_specific_operation]. Deleting the first instruction is
+    sound because the second one overwrites [r], and it does not affect liveness
+    because <specific'> still reads [r]. *)
+let fold_intop_imm_into_specific (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  match U.get_cells cell 2 with
+  | [fst; snd] -> (
+    let fst_val = DLL.value fst in
+    let snd_val = DLL.value snd in
+    let delta =
+      match fst_val.desc with
+      | Op (Intop_imm (Iadd, imm)) -> Some imm
+      | Op (Intop_imm (Isub, imm)) when imm <> min_int -> Some (-imm)
+      | _ -> None
+    in
+    match delta, snd_val.desc with
+    | Some delta, Op (Specific specific)
+      when Array.length fst_val.arg = 1
+           && Array.length fst_val.res = 1
+           && Array.length snd_val.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.arg 0)
+                (Array.unsafe_get fst_val.res 0)
+           && U.are_equal_regs
+                (Array.unsafe_get fst_val.res 0)
+                (Array.unsafe_get snd_val.res 0) -> (
+      let reg = Array.unsafe_get fst_val.res 0 in
+      let arg_is_folded_reg =
+        Array.map (fun arg -> U.are_equal_regs reg arg) snd_val.arg
+      in
+      match
+        Arch.fold_delta_into_specific_operation specific ~arg_is_folded_reg
+          ~delta
+      with
+      | None -> None
+      | Some specific ->
+        let new_cell =
+          DLL.insert_and_return_before snd
+            { snd_val with desc = Cfg.Op (Specific specific) }
+        in
+        DLL.delete_curr fst;
+        DLL.delete_curr snd;
+        Some (U.prev_at_most U.go_back_const new_cell))
+    | _, _ -> None)
+  | _ -> None
+
+let remove_intop_neutral_element (cell : Cfg.basic Cfg.instruction DLL.cell) =
+  (* CR-someday xclerc for xclerc: it is not clear we want these rewrites to
+     happen here. Indeed, it is probably better to avoid these useless
+     operations when generating CMM, but this is currently blocked on an
+     upcoming refactoring there and it is simple enough to do here. *)
+  match U.get_cells cell 1 with
+  | [cell] -> (
+    let instr = DLL.value cell in
+    match instr.desc with
+    | Op (Intop_imm (op, imm))
+      when Array.length instr.arg = 1
+           && Array.length instr.res = 1
+           && U.are_equal_regs
+                (Array.unsafe_get instr.arg 0)
+                (Array.unsafe_get instr.res 0) ->
+      (* CR-soon xclerc for xclerc: when the source and the destination are not
+         the same, we should downgrade the operation to a mere move. *)
+      let to_remove =
+        (* CR-soon xclerc for xclerc: we should add other cases, such as `Imul,
+           1` or `Idiv, 1`, but we need to be careful because these can clobber
+           registers on amd64. *)
+        match op, imm with
+        | Iadd, 0 | Isub, 0 | Ior, 0 | Ixor, 0 | Ilsl, 0 | Ilsr, 0 | Iasr, 0 ->
+          true
+        | _ -> false
+      in
+      if to_remove
+      then (
+        (* Compute the continuation from cells that survive the deletion: if
+           [cell] were the first element of the block, [prev_at_most] would
+           return [cell] itself, and the traversal would then operate on a
+           deleted cell. *)
+        let continue =
+          match DLL.prev cell with
+          | Some _ as prev -> prev
+          | None -> DLL.next cell
+        in
+        DLL.delete_curr cell;
+        continue)
+      else None
+    | _ -> None)
+  | _ -> None
+
+let apply cell =
+  let[@inline always] if_none_do f o =
+    match o with Some _ -> o | None -> f cell
+  in
+  None
+  |> if_none_do remove_overwritten_mov
+  |> if_none_do remove_useless_mov
+  |> if_none_do fold_intop_imm
+  |> if_none_do fold_intop_imm_into_specific
+  |> if_none_do remove_intop_neutral_element

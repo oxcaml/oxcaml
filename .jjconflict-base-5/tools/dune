@@ -1,0 +1,170 @@
+;**************************************************************************
+;*                                                                        *
+;*                                 OCaml                                  *
+;*                                                                        *
+;*                     Thomas Refis, Jane Street Europe                   *
+;*                                                                        *
+;*   Copyright 2018 Jane Street Group LLC                                 *
+;*                                                                        *
+;*   All rights reserved.  This file is distributed under the terms of    *
+;*   the GNU Lesser General Public License version 2.1, with the          *
+;*   special exception on linking described in the file LICENSE.          *
+;*                                                                        *
+;**************************************************************************
+
+(executable
+  (name objinfo)
+  (modes byte native)
+  (modules objinfo)
+  (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
+
+(install
+ (files
+  (objinfo.bc as ocamlobjinfo.byte)
+  (objinfo.exe as ocamlobjinfo.opt))
+ (section bin)
+ (package ocaml))
+
+(executable
+  (name ocamldep)
+  (modes byte native)
+  (modules ocamldep)
+  (libraries ocamlcommon))
+
+(install
+  (files
+    (ocamldep.bc as ocamldep.byte)
+    (ocamldep.exe as ocamldep.opt)
+  )
+  (section bin)
+  (package ocaml))
+
+(rule
+ (targets opnames.ml)
+ (mode fallback)
+ (deps
+  (:conf ../Makefile.config)
+  (:c opnames.ml.c)
+  (:tbl
+   ../runtime/caml/opcodes.h))
+ (action
+  (with-stdout-to
+   %{targets}
+   (bash
+    "`grep '^CPP=' %{conf} | cut -d'=' -f2-` -I ../runtime %{c}"))))
+
+(library
+  (name opnames)
+  (modes byte)
+  (modules opnames))
+
+(executable
+  (name dumpobj)
+  (modes byte)
+  (modules dumpobj)
+  (libraries ocamlfrontend ocamlbytecomp opnames))
+
+(install
+  (files
+    (dumpobj.bc as dumpobj.byte)
+    (dumpobj.exe as dumpobj.opt)
+  )
+  (section bin)
+  (package ocaml))
+
+(executable
+  (name cmpbyt)
+  (modes byte)
+  (modules cmpbyt)
+  (libraries ocamlfrontend ocamlbytecomp))
+
+(executable
+  (name ocamlmklib)
+  (modes byte native)
+  (modules ocamlmklib)
+  ; FIXME Fix warning 32
+  (flags (:standard -w -32))
+  (libraries ocamlfrontend ocamlbytecomp))
+
+(install
+  (files
+    (ocamlmklib.bc as ocamlmklib.byte)
+    (ocamlmklib.exe as ocamlmklib.opt)
+  )
+  (section bin)
+  (package ocaml))
+
+(executable
+  (name ocamlmktop)
+  (modes byte native)
+  (modules ocamlmktop)
+  (libraries ocamlfrontend ocamlbytecomp))
+
+(install
+  (files
+    (ocamlmktop.bc as ocamlmktop.byte)
+    (ocamlmktop.exe as ocamlmktop.opt)
+  )
+  (section bin)
+  (package ocaml))
+
+(library
+  (name debug_printers)
+  (modes byte)
+  (libraries ocamlfrontend)
+  (modules debug_printers))
+
+(rule
+  (target debug_printers)
+  (deps debug_printers.ml %{cmo:debug_printers})
+  (action
+    (with-stdout-to %{target}
+      (progn
+        ; Resorting to Bash instead of the built-in [echo] action because I
+        ; couldn't find a better way to get an absolute path out of Dune
+        (bash "echo load_printer \\\"$(realpath %{cmo:debug_printers})\\\"")
+        (with-stdin-from debug_printers.ml
+          (run awk "{ print \"install_printer Debug_printers.\" $2 }"))))))
+
+; ocamlcp, ocamloptp and ocamlprof are not currently supported.
+
+(executable
+ (name generate_cached_generic_functions)
+ (modes byte native)
+ (modules generate_cached_generic_functions)
+ ; FIXME Fix warnings 27 and 33 and 60
+ (flags
+  (:standard -w -27-33-60-69-70))
+ (libraries ocamlfrontend ocamloptcomp unix memtrace))
+
+(install
+ (files generate_cached_generic_functions.exe)
+ (section bin)
+ (package ocaml))
+
+(executable
+ (name merge_archives)
+ (modes native byte)
+ (modules merge_archives)
+ ; FIXME Fix warning 27
+ (flags
+  (:standard -w -27))
+ (libraries ocamlfrontend ocamlbytecomp ocamloptcomp))
+
+(executable
+ (name gen_compiler_libs_installation)
+ (modes native)
+ (modules gen_compiler_libs_installation))
+
+(executable
+ (name ocamlfilt)
+ (modes byte native)
+ (modules ocamlfilt)
+ (libraries ocamlfrontend))
+
+(install
+ (files
+  (ocamlfilt.bc as ocamlfilt.byte)
+  (ocamlfilt.exe as ocamlfilt))
+ (section bin)
+ (package ocaml))

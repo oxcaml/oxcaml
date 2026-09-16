@@ -1,0 +1,4 @@
+/*
+  flags: [noStrict]
+*/
+for(let;;);

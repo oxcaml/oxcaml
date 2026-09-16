@@ -1,0 +1,220 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Format
+
+(* type of toplevel inputs *)
+type input =
+  | Stdin
+  | File of string
+  | String of string
+
+val filename_of_input: input -> string
+
+(* Set the load paths, before running anything *)
+
+val set_paths : unit -> unit
+
+(* The interactive toplevel loop *)
+
+val reset_location : bool ref
+val loop : formatter -> unit
+
+(* Read and execute a script from the given file *)
+
+val run_script : formatter -> string -> string array -> bool
+        (* true if successful, false if error *)
+
+(* Interface with toplevel directives *)
+
+type directive_fun =
+   | Directive_none of (unit -> unit)
+   | Directive_string of (string -> unit)
+   | Directive_int of (int -> unit)
+   | Directive_ident of (Longident.t -> unit)
+   | Directive_bool of (bool -> unit)
+
+type directive_info = {
+  section: string;
+  doc: string;
+}
+
+val add_directive : string -> directive_fun -> directive_info -> unit
+
+val directive_table : (string, directive_fun) Hashtbl.t
+        (* Table of known directives, with their execution function *)
+
+val directive_info_table : (string, directive_info) Hashtbl.t
+
+val toplevel_env : Env.t ref
+        (* Typing environment for the toplevel *)
+val initialize_toplevel_env : unit -> unit
+        (* Initialize the typing environment for the toplevel *)
+val print_exception_outcome : formatter -> exn -> unit
+        (* Print an exception resulting from the evaluation of user code. *)
+val execute_phrase : bool -> formatter -> Parsetree.toplevel_phrase -> bool
+        (* Execute the given toplevel phrase. Return [true] if the
+           phrase executed with no errors and [false] otherwise. First
+           bool says whether the values and types of the results
+           should be printed. Uncaught exceptions are always
+           printed. *)
+val preprocess_phrase :
+      formatter -> Parsetree.toplevel_phrase ->  Parsetree.toplevel_phrase
+        (* Preprocess the given toplevel phrase using regular and ppx
+           preprocessors. Return the updated phrase. *)
+val use_file : formatter -> string -> bool
+val use_output : formatter -> string -> bool
+val use_silently : formatter -> string -> bool
+val mod_use_file : formatter -> string -> bool
+        (* Read and execute commands from a file.
+           [use_file] prints the types and values of the results.
+           [use_silently] does not print them.
+           [mod_use_file] wrap the file contents into a module. *)
+val eval_module_path: Env.t -> Path.t -> Obj.t
+val eval_value_path: Env.t -> Path.t -> Obj.t
+val eval_extension_path: Env.t -> Path.t -> Obj.t
+val eval_class_path: Env.t -> Path.t -> Obj.t
+        (* Return the toplevel object referred to by the given path *)
+
+(* Printing of values *)
+
+(** The type_expr must not be layout-polymorphic. *)
+val print_value:
+  Env.t -> Obj.t -> formatter -> Types.type_expr -> unit
+val print_untyped_exception: formatter -> Obj.t -> unit
+
+type ('a, 'b) gen_printer =
+  | Zero of 'b
+  | Succ of ('a -> ('a, 'b) gen_printer)
+
+val install_printer :
+  Path.t -> Types.type_expr -> (formatter -> Obj.t -> unit) -> unit
+val install_generic_printer :
+  Path.t -> Path.t ->
+  (int -> (int -> Obj.t -> Outcometree.out_value,
+           Obj.t -> Outcometree.out_value) gen_printer) -> unit
+val install_generic_printer' :
+  Path.t -> Path.t -> (formatter -> Obj.t -> unit,
+                       formatter -> Obj.t -> unit) gen_printer -> unit
+val remove_printer : Path.t -> unit
+
+val max_printer_depth: int ref
+val max_printer_steps: int ref
+
+(* Hooks for external parsers and printers *)
+
+val parse_toplevel_phrase : (Lexing.lexbuf -> Parsetree.toplevel_phrase) ref
+val parse_use_file : (Lexing.lexbuf -> Parsetree.toplevel_phrase list) ref
+val print_location : formatter -> Location.t -> unit
+val print_error : formatter -> Location.error -> unit
+val print_warning : Location.t -> formatter -> Warnings.t -> unit
+val input_name : string ref
+
+val print_out_value :
+  Outcometree.out_value Oprint.toplevel_printer
+val print_out_type :
+  Outcometree.out_type Oprint.printer
+val print_out_class_type :
+  Outcometree.out_class_type Oprint.printer
+val print_out_module_type :
+  Outcometree.out_module_type Oprint.printer
+val print_out_type_extension :
+  Outcometree.out_type_extension Oprint.printer
+val print_out_sig_item :
+  Outcometree.out_sig_item Oprint.printer
+val print_out_signature :
+  Outcometree.out_sig_item list Oprint.printer
+val print_out_phrase :
+  Outcometree.out_phrase Oprint.toplevel_printer
+
+(* Hooks for external line editor *)
+
+val read_interactive_input : (string -> bytes -> int -> int * bool) ref
+
+(* Hooks *)
+
+val toplevel_startup_hook : (unit -> unit) ref
+
+type event = ..
+type event +=
+  | Startup
+  | After_setup
+  (* Just after the setup, when the toplevel is ready to evaluate user
+     input. This happens before the toplevel has evaluated any kind of
+     user input, in particular this happens before loading the
+     [.ocamlinit] file. *)
+
+val add_hook : (event -> unit) -> unit
+(* Add a function that will be called at key points of the toplevel
+   initialization process. *)
+
+val run_hooks : event -> unit
+(* Run all the registered hooks. *)
+
+
+(* Misc *)
+
+val override_sys_argv : string array -> unit
+(* [override_sys_argv args] replaces the contents of [Sys.argv] by [args]
+   and reset [Arg.current] to [0].
+
+   This is called by [run_script] so that [Sys.argv] represents
+   "script.ml args..." instead of the full command line:
+   "ocamlrun unix.cma ... script.ml args...". *)
+
+(* JIT hook *)
+
+type evaluation_outcome = Result of Obj.t | Exception of exn
+
+module Jit : sig
+  type t =
+    {
+      load : phrase_name:string -> Format.formatter -> Lambda.program
+        -> evaluation_outcome;
+      lookup_symbol : string -> Obj.t option;
+    }
+end
+
+val register_jit : Jit.t -> unit
+
+val default_lookup : string -> Obj.t option
+
+(* Internals required by the JIT *)
+
+val need_symbol : string -> bool
+
+val phrase_name : string ref
+
+(** Disallow the reading of bundles from the current executable. Instead, fetch
+    them via the normal mechanisms used by compilerlibs. This should only be
+    used if the compilerlibs state in the process is already set up with the
+    correct [Load_path] information for .cmi and .cmx resolution (as is the case
+    in mdx, for example). *)
+val use_existing_compilerlibs_state_for_artifacts : unit -> unit
+
+(** Returns [true] iff [use_existing_compilerlibs_state_for_artifacts] has been
+    called. *)
+val using_existing_compilerlibs_state_for_artifacts : unit -> bool
+
+val load_file : formatter -> string -> bool
+(** Load a .cmxs, .cmx, or .cmxa file in-core and execute it. *)
+
+val preload_objects : string list ref
+(** List of compilation units to be loaded before entering the interactive
+    loop. *)
+
+val prepare : Format.formatter -> ?input:input -> unit -> bool
+(** Setup the load paths and initial toplevel environment and load compilation
+    units in {!preload_objects}. *)

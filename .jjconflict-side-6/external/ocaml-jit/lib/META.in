@@ -1,0 +1,7 @@
+# @configure_input@
+
+version = "@VERSION@"
+description = "Just-in-time compilation"
+requires = "compiler-libs.native-toplevel"
+archive(native) = "jit.cmxa"
+plugin(native) = "jit.cmxs"

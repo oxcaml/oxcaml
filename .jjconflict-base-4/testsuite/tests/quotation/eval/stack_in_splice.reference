@@ -1,0 +1,9 @@
+
+Test stack_ tuple in splice
+Output: 42
+
+Test stack_ ref in splice
+Output: 55
+
+Test stack_ option in splice
+Output: 99

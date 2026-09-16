@@ -1,0 +1,3 @@
+file foo/foo.cmi 00/foo
+manifest name/does\ not/matter.png(why\ png?) 01/01-manifest.txt
+manifest 02-manifest.txt 02/02-manifest.txt

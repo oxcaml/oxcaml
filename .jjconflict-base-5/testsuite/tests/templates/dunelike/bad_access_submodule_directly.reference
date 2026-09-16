@@ -1,0 +1,4 @@
+File "fancy/bad_access_submodule_directly.ml", line 7, characters 9-24:
+7 | type t = Fancy__Flourish.t
+             ^^^^^^^^^^^^^^^
+Error: Unbound module Fancy__Flourish

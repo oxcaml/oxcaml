@@ -1,0 +1,305 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2013--2021 OCamlPro SAS                                    *)
+(*   Copyright 2014--2021 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+(** This module follows the structure of driver/main_args.ml and
+    driver/main_args.mli. It provides a way to (a) share argument
+    implementations between different installable tools and (b) override default
+    implementations of arguments. *)
+
+(** Command line arguments required for flambda backend. *)
+module type Oxcaml_options = sig
+  val ocamlcfg : unit -> unit
+  val no_ocamlcfg : unit -> unit
+  val dump_inlining_paths : unit -> unit
+  val davail : unit -> unit
+  val dranges : unit -> unit
+  val ddebug_invariants : unit -> unit
+  val ddebug_available_regs : unit -> unit
+  val ddwarf_types : unit -> unit
+  val ddwarf_metrics : unit -> unit
+  val ddwarf_metrics_output_file : string -> unit
+  val dcfg : unit -> unit
+  val dssa : unit -> unit
+  val dcfg_invariants : unit -> unit
+  val regalloc : Clflags.Register_allocator.t -> unit
+  val regalloc_linscan_threshold : int -> unit
+  val regalloc_param : string -> unit
+  val regalloc_validate : unit -> unit
+  val no_regalloc_validate : unit -> unit
+  val vectorize : unit -> unit
+  val no_vectorize : unit -> unit
+  val vectorize_max_block_size : int -> unit
+  val dvectorize : unit -> unit
+  val cfg_peephole_optimize : unit -> unit
+  val no_cfg_peephole_optimize : unit -> unit
+  val x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_optimize : unit -> unit
+  val no_x86_peephole_remove_mov_to_dead_register : unit -> unit
+  val no_x86_peephole_remove_redundant_cmp : unit -> unit
+  val no_x86_peephole_remove_redundant_extension : unit -> unit
+  val no_x86_peephole_combine_add_rsp : unit -> unit
+  val no_x86_peephole_remove_redundant_test : unit -> unit
+  val cfg_stack_checks : unit -> unit
+  val no_cfg_stack_checks : unit -> unit
+  val cfg_stack_checks_threshold : int -> unit
+  val cfg_eliminate_dead_trap_handlers : unit -> unit
+  val no_cfg_eliminate_dead_trap_handlers : unit -> unit
+  val cfg_eliminate_dead_code_validate : unit -> unit
+  val no_cfg_eliminate_dead_code_validate : unit -> unit
+  val cfg_dominators_validate : unit -> unit
+  val no_cfg_dominators_validate : unit -> unit
+  val cfg_liveness_validate : unit -> unit
+  val no_cfg_liveness_validate : unit -> unit
+  val cfg_prologue_validate : unit -> unit
+  val no_cfg_prologue_validate : unit -> unit
+  val cfg_prologue_shrink_wrap : unit -> unit
+  val no_cfg_prologue_shrink_wrap : unit -> unit
+  val cfg_prologue_shrink_wrap_threshold : int -> unit
+  val omit_leaf_frame_pointers : unit -> unit
+  val no_omit_leaf_frame_pointers : unit -> unit
+  val cfg_merge_blocks : unit -> unit
+  val no_cfg_merge_blocks : unit -> unit
+  val cfg_block_layout : unit -> unit
+  val no_cfg_block_layout : unit -> unit
+  val cfg_value_propagation : unit -> unit
+  val no_cfg_value_propagation : unit -> unit
+  val cfg_value_propagation_float : unit -> unit
+  val no_cfg_value_propagation_float : unit -> unit
+  val cfg_value_propagation_flow : unit -> unit
+  val no_cfg_value_propagation_flow : unit -> unit
+  val experimental_optimizations : unit -> unit
+  val reorder_blocks_random : int -> unit
+  val module_entry_functions_section : unit -> unit
+  val dasm_comments : unit -> unit
+  val dno_asm_comments : unit -> unit
+  val heap_reduction_threshold : int -> unit
+  val zero_alloc_check : string -> unit
+  val zero_alloc_assert : string -> unit
+  val dzero_alloc : unit -> unit
+  val disable_zero_alloc_checker : unit -> unit
+  val disable_precise_zero_alloc_checker : unit -> unit
+  val zero_alloc_checker_details_cutoff : int -> unit
+  val zero_alloc_checker_details_extra : unit -> unit
+  val no_zero_alloc_checker_details_extra : unit -> unit
+  val zero_alloc_checker_join : int -> unit
+  val function_layout : string -> unit
+  val name_mangling_scheme : string -> unit
+  val disable_builtin_check : unit -> unit
+  val disable_poll_insertion : unit -> unit
+  val enable_poll_insertion : unit -> unit
+  val symbol_visibility_protected : unit -> unit
+  val no_symbol_visibility_protected : unit -> unit
+  val long_frames : unit -> unit
+  val no_long_frames : unit -> unit
+  val long_frames_threshold : int -> unit
+  val dbranch_relaxation_max_displacement : int -> unit
+  val caml_apply_inline_fast_path : unit -> unit
+  val use_ssa : unit -> unit
+  val no_use_ssa : unit -> unit
+  val ssa_simplify : unit -> unit
+  val no_ssa_simplify : unit -> unit
+  val ssa_validate : unit -> unit
+  val no_ssa_validate : unit -> unit
+  val internal_assembler : unit -> unit
+  val verify_binary_emitter : unit -> unit
+  val dissector : unit -> unit
+  val dissector_partition_size : float -> unit
+  val dissector_max_linker_parallelism : int -> unit
+  val ddissector : unit -> unit
+  val ddissector_sizes : unit -> unit
+  val ddissector_verbose : unit -> unit
+  val ddissector_partitions : unit -> unit
+  val ddissector_inputs : string -> unit
+  val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
+  val gc_timings : unit -> unit
+  val no_mach_ir : unit -> unit
+  val dllvmir : unit -> unit
+  val keep_llvmir : unit -> unit
+  val llvm_path : string -> unit
+  val llvm_flags : string -> unit
+  val flambda2_debug : unit -> unit
+  val no_flambda2_debug : unit -> unit
+  val reaper_debug_flags : string -> unit
+  val flambda2_join_points : unit -> unit
+  val no_flambda2_join_points : unit -> unit
+  val flambda2_result_types_functors_only : unit -> unit
+  val flambda2_result_types_all_functions : unit -> unit
+  val no_flambda2_result_types : unit -> unit
+  val flambda2_basic_meet : unit -> unit
+  val flambda2_advanced_meet : unit -> unit
+  val flambda2_join_algorithm : string -> unit
+  val flambda2_unbox_along_intra_function_control_flow : unit -> unit
+  val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
+  val flambda2_backend_cse_at_toplevel : unit -> unit
+  val no_flambda2_backend_cse_at_toplevel : unit -> unit
+  val flambda2_cse_depth : int -> unit
+  val flambda2_join_depth : int -> unit
+  val flambda2_reaper : unit -> unit
+  val no_flambda2_reaper : unit -> unit
+  val reaper_preserve_direct_calls : string -> unit
+  val reaper_local_fields : unit -> unit
+  val no_reaper_local_fields : unit -> unit
+  val reaper_unbox : unit -> unit
+  val no_reaper_unbox : unit -> unit
+  val reaper_max_unbox_size : int -> unit
+  val reaper_change_calling_conventions : unit -> unit
+  val no_reaper_change_calling_conventions : unit -> unit
+  val flambda2_match_in_match : unit -> unit
+  val no_flambda2_match_in_match : unit -> unit
+  val simplify_stubs : unit -> unit
+  val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
+  val flambda2_expert_fallback_inlining_heuristic : unit -> unit
+  val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
+  val flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
+  val flambda2_expert_phantom_lets : unit -> unit
+  val no_flambda2_expert_phantom_lets : unit -> unit
+  val flambda2_expert_max_block_size_for_projections : int -> unit
+  val flambda2_expert_max_unboxing_depth : int -> unit
+  val flambda2_expert_can_inline_recursive_functions : unit -> unit
+  val no_flambda2_expert_can_inline_recursive_functions : unit -> unit
+  val flambda2_expert_max_function_simplify_run : int -> unit
+  val flambda2_expert_shorten_symbol_names : unit -> unit
+  val no_flambda2_expert_shorten_symbol_names : unit -> unit
+  val flambda2_expert_cont_lifting_budget : int -> unit
+  val flambda2_expert_cont_spec_threshold : float -> unit
+  val flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
+  val no_flambda2_debug_concrete_types_only_on_canonicals : unit -> unit
+  val flambda2_debug_keep_invalid_handlers : unit -> unit
+  val no_flambda2_debug_keep_invalid_handlers : unit -> unit
+  val flambda2_inline_max_depth : string -> unit
+  val flambda2_inline_max_rec_depth : string -> unit
+  val flambda2_inline_call_cost : string -> unit
+  val flambda2_inline_alloc_cost : string -> unit
+  val flambda2_inline_prim_cost : string -> unit
+  val flambda2_inline_branch_cost : string -> unit
+  val flambda2_inline_indirect_call_cost : string -> unit
+  val flambda2_inline_poly_compare_cost : string -> unit
+  val flambda2_inline_small_function_size : string -> unit
+  val flambda2_inline_large_function_size : string -> unit
+  val flambda2_inline_small_functor_size : string -> unit
+  val flambda2_inline_large_functor_size : string -> unit
+  val flambda2_inline_threshold : string -> unit
+  val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
+  val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
+  val flambda2_speculative_inlining_track_lifted_constants : unit -> unit
+  val no_flambda2_speculative_inlining_track_lifted_constants : unit -> unit
+  val flambda2_inlining_report_bin : unit -> unit
+  val flambda2_unicode : unit -> unit
+  val flambda2_kind_checks : unit -> unit
+  val drawfexpr : unit -> unit
+  val drawfexpr_to : string -> unit
+  val dfexpr : unit -> unit
+  val dfexpr_to : string -> unit
+  val dfexpr_after : string -> unit
+  val dfexpr_annot : unit -> unit
+  val dfexpr_annot_after : string -> unit
+  val dslot_offsets : unit -> unit
+  val dfreshen : unit -> unit
+  val dflow : unit -> unit
+  val dsimplify : unit -> unit
+  val dreaper : unit -> unit
+  val use_cached_generic_functions : unit -> unit
+  val cached_generic_functions_path : string -> unit
+  val x : string -> unit
+end
+
+(** Command line arguments required for ocamlopt.*)
+module type Debugging_options = sig
+  val dwarf_inlined_frames : unit -> unit
+  val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
+  val ddebug_avail_sets : unit -> unit
+  val dwarf_for_startup_file : unit -> unit
+  val no_dwarf_for_startup_file : unit -> unit
+  val gdwarf_may_alter_codegen : unit -> unit
+  val no_gdwarf_may_alter_codegen : unit -> unit
+  val gdwarf_may_alter_codegen_experimental : unit -> unit
+  val no_gdwarf_may_alter_codegen_experimental : unit -> unit
+  val gdwarf_max_function_complexity : int -> unit
+  val gdwarf_compression : string -> unit
+  val gdwarf_fission : string -> unit
+  val gdwarf_pedantic : unit -> unit
+end
+
+(** Command line arguments required for ocamlopt. *)
+module type Optcomp_options = sig
+  include Main_args.Optcomp_options
+  include Oxcaml_options
+  include Debugging_options
+end
+
+(** Command line arguments required for ocamlnat. *)
+module type Opttop_options = sig
+  include Main_args.Opttop_options
+  include Oxcaml_options
+  include Debugging_options
+end
+
+(** Transform required command-line arguments into actual arguments. Each tool
+    can define its own argument implementations and call the right functor to
+    actualize them into [Arg.t] list. *)
+module Make_optcomp_options (_ : Optcomp_options) : Main_args.Arg_list
+
+module Make_opttop_options (_ : Opttop_options) : Main_args.Arg_list
+
+(** Default implementations of required arguments for each tool. *)
+module Default : sig
+  module Optmain : Optcomp_options
+  module Opttopmain : Opttop_options
+end
+
+(** Extra_params module provides a way to read oxcaml flags from OCAMLPARAM. All
+    command line flags should support it, with the exception of debug printing,
+    such as -dcfg. *)
+module Extra_params : sig
+  val read_param :
+    Format.formatter -> Compenv.readenv_position -> string -> string -> bool
+  (** [read_param ppf pos name value] returns whether the param was handled. *)
+end
+
+module Extra_options : sig
+  (** This module allows to define new [-X] options.
+
+      [-X] options can be passed on the command line as [-X name=value], and
+      from the [OCAMLPARAM] environment variable as [Xname=value].
+
+      {b Note}: [-X] options are intended for internal use only. They are not
+      documented in the output of [--help] and may be removed without notice. *)
+
+  val string : string -> string -> string -> unit -> string
+  (** [string __LOC__ name default] defines a new extra option which accepts
+      arbitrary strings. *)
+
+  val int : string -> string -> int -> unit -> int
+  (** [int __LOC__ name default] defines a new extra option which accepts only
+      integers. *)
+
+  val bool : string -> string -> unit -> bool
+  (** [bool __LOC__ name] defines a new extra option which accepts booleans
+      written as the integers '0' and '1'. *)
+
+  val symbol : string -> string -> 'a -> (string * 'a) list -> unit -> 'a
+  (** [symbol __LOC__ name default spec] defines a new extra option which
+      accepts only the strings in [spec] and associates them with the
+      corresponding value. *)
+end

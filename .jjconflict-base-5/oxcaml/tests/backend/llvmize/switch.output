@@ -1,0 +1,8 @@
+next 1 = 2
+next 3 = 4
+next 5 = 6
+next 7 = 8
+next 9 = 10
+next 2 = not found
+next 0 = not found
+next 100 = not found

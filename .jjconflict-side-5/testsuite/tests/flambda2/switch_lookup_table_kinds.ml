@@ -1,0 +1,431 @@
+(* TEST
+ flambda2;
+ flags += " -flambda2-inline-small-function-size 0";
+ flags += " -flambda2-inline-large-function-size 0";
+ flags += " -O3";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -x86-peephole-optimize";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
+ flags += " -cfg-merge-blocks";
+ only-default-codegen;
+ expect.opt with dump-simplify;
+*)
+
+(* Exercise the [simplify_switch_expr] single-arg-to-same-destination
+   optimisation for each supported value kind. The expected assembly must
+   load the per-arm constant from a static lookup table (of the appropriate
+   element kind), so a regression in [simplify_switch_expr.ml] that drops the
+   optimisation for a kind will be caught when the [%%expect_asm] blocks are
+   regenerated. Empty blocks below are to be filled on an x86_64 machine. *)
+
+type t = A | B | C | D
+
+let match_tagged_immediate (t : t) : int =
+  match t with
+  | A -> 5
+  | B -> 10
+  | C -> 2
+  | D -> 7
+[%%expect_asm X86_64{|
+match_tagged_immediate:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_tagged_immediate_0 deleted in
+let $camlTOP2__switch_block_3 = Value_array [|5; 10; 2; 7|] in
+let code loopify(never) size(2) newer_version_of(match_tagged_immediate_0)
+      match_tagged_immediate_0_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let arg = %array_load.`imm` ($camlTOP2__switch_block_3, t) in
+  cont k (arg)
+in
+let $camlTOP2__match_tagged_immediate_2 =
+  closure match_tagged_immediate_0_1 @match_tagged_immediate &toplevel
+in
+let $camlTOP2 = Block 0 ($camlTOP2__match_tagged_immediate_2) in
+cont done ($camlTOP2)
+|}]
+
+external untag_int : int -> int# = "%untag_int"
+
+let match_naked_immediate (t : t) : int# =
+  match t with
+  | A -> untag_int 5
+  | B -> untag_int 10
+  | C -> untag_int 2
+  | D -> untag_int 7
+[%%expect_asm X86_64{|
+match_naked_immediate:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_immediate_1 deleted in
+let $camlTOP4__switch_block_8 = Int_array [|5; 10; 2; 7|] in
+let code loopify(never) size(2) newer_version_of(match_naked_immediate_1)
+      match_naked_immediate_1_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm =
+  let arg = %array_load.`int` ($camlTOP4__switch_block_8, t) in
+  cont k (arg)
+in
+let $camlTOP4__match_naked_immediate_7 =
+  closure match_naked_immediate_1_1 @match_naked_immediate &toplevel
+in
+let $camlTOP4 = Block 0 ($camlTOP4__match_naked_immediate_7) in
+cont done ($camlTOP4)
+|}]
+
+let match_naked_float (t : t) : float# =
+  match t with
+  | A -> #5.0
+  | B -> #10.0
+  | C -> #2.0
+  | D -> #7.0
+[%%expect_asm X86_64{|
+match_naked_float:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  vmovsd -4(%rbx,%rax,4), %xmm0
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_float_2 deleted in
+let $camlTOP5__switch_block_12 =
+  Float_array [|0x1.4p+2;
+  0x1.4p+3;
+  0x1p+1;
+  0x1.cp+2|]
+in
+let code loopify(never) size(2) newer_version_of(match_naked_float_2)
+      match_naked_float_2_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float =
+  let arg = %array_load.`float` ($camlTOP5__switch_block_12, t) in
+  cont k (arg)
+in
+let $camlTOP5__match_naked_float_11 =
+  closure match_naked_float_2_1 @match_naked_float &toplevel
+in
+let $camlTOP5 = Block 0 ($camlTOP5__match_naked_float_11) in
+cont done ($camlTOP5)
+|}]
+
+let match_naked_float32 (t : t) : float32_u =
+  match t with
+  | A -> #5.0s
+  | B -> #10.0s
+  | C -> #2.0s
+  | D -> #7.0s
+[%%expect_asm X86_64{|
+match_naked_float32:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  vmovss -2(%rbx,%rax,2), %xmm0
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_float32_3 deleted in
+let $camlTOP6__switch_block_16 =
+  Float32_array [|0x1.4p+2s;
+  0x1.4p+3s;
+  0x1p+1s;
+  0x1.cp+2s|]
+in
+let code loopify(never) size(3) newer_version_of(match_naked_float32_3)
+      match_naked_float32_3_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : float32 =
+  let arg = %array_load.`float32` ($camlTOP6__switch_block_16, t) in
+  cont k (arg)
+in
+let $camlTOP6__match_naked_float32_15 =
+  closure match_naked_float32_3_1 @match_naked_float32 &toplevel
+in
+let $camlTOP6 = Block 0 ($camlTOP6__match_naked_float32_15) in
+cont done ($camlTOP6)
+|}]
+
+let match_naked_int32 (t : t) : int32_u =
+  match t with
+  | A -> #5l
+  | B -> #10l
+  | C -> #2l
+  | D -> #7l
+[%%expect_asm X86_64{|
+match_naked_int32:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movslq -2(%rbx,%rax,2), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_int32_4 deleted in
+let $camlTOP7__switch_block_20 = Int32_array [|5l; 10l; 2l; 7l|] in
+let code loopify(never) size(3) newer_version_of(match_naked_int32_4)
+      match_naked_int32_4_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : int32 =
+  let arg = %array_load.`int32` ($camlTOP7__switch_block_20, t) in
+  cont k (arg)
+in
+let $camlTOP7__match_naked_int32_19 =
+  closure match_naked_int32_4_1 @match_naked_int32 &toplevel
+in
+let $camlTOP7 = Block 0 ($camlTOP7__match_naked_int32_19) in
+cont done ($camlTOP7)
+|}]
+
+let match_naked_int64 (t : t) : int64_u =
+  match t with
+  | A -> #5L
+  | B -> #10L
+  | C -> #2L
+  | D -> #7L
+[%%expect_asm X86_64{|
+match_naked_int64:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_int64_5 deleted in
+let $camlTOP8__switch_block_24 = Int64_array [|5L; 10L; 2L; 7L|] in
+let code loopify(never) size(2) newer_version_of(match_naked_int64_5)
+      match_naked_int64_5_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : int64 =
+  let arg = %array_load.`int64` ($camlTOP8__switch_block_24, t) in
+  cont k (arg)
+in
+let $camlTOP8__match_naked_int64_23 =
+  closure match_naked_int64_5_1 @match_naked_int64 &toplevel
+in
+let $camlTOP8 = Block 0 ($camlTOP8__match_naked_int64_23) in
+cont done ($camlTOP8)
+|}]
+
+let match_naked_nativeint (t : t) : nativeint_u =
+  match t with
+  | A -> #5n
+  | B -> #10n
+  | C -> #2n
+  | D -> #7n
+[%%expect_asm X86_64{|
+match_naked_nativeint:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_nativeint_6 deleted in
+let $camlTOP9__switch_block_28 = Nativeint_array [|5n; 10n; 2n; 7n|] in
+let code loopify(never) size(2) newer_version_of(match_naked_nativeint_6)
+      match_naked_nativeint_6_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : nativeint =
+  let arg = %array_load.`nativeint` ($camlTOP9__switch_block_28, t) in
+  cont k (arg)
+in
+let $camlTOP9__match_naked_nativeint_27 =
+  closure match_naked_nativeint_6_1 @match_naked_nativeint &toplevel
+in
+let $camlTOP9 = Block 0 ($camlTOP9__match_naked_nativeint_27) in
+cont done ($camlTOP9)
+|}]
+
+let match_naked_int8 (t : t) : int8# =
+  match t with
+  | A -> #5s
+  | B -> #10s
+  | C -> #2s
+  | D -> #7s
+[%%expect_asm X86_64{|
+match_naked_int8:
+  sarq  $1, %rax
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movsbq (%rbx,%rax), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_int8_7 deleted in
+let $camlTOP10__switch_block_32 = Int8_array [|5s; 10s; 2s; 7s|] in
+let code loopify(never) size(3) newer_version_of(match_naked_int8_7)
+      match_naked_int8_7_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : int8 =
+  let arg = %array_load.`int8` ($camlTOP10__switch_block_32, t) in
+  cont k (arg)
+in
+let $camlTOP10__match_naked_int8_31 =
+  closure match_naked_int8_7_1 @match_naked_int8 &toplevel
+in
+let $camlTOP10 = Block 0 ($camlTOP10__match_naked_int8_31) in
+cont done ($camlTOP10)
+|}]
+
+let match_naked_int16 (t : t) : int16# =
+  match t with
+  | A -> #5S
+  | B -> #10S
+  | C -> #2S
+  | D -> #7S
+[%%expect_asm X86_64{|
+match_naked_int16:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movswq -1(%rbx,%rax), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let code match_naked_int16_8 deleted in
+let $camlTOP11__switch_block_36 = Int16_array [|5S; 10S; 2S; 7S|] in
+let code loopify(never) size(3) newer_version_of(match_naked_int16_8)
+      match_naked_int16_8_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : int16 =
+  let arg = %array_load.`int16` ($camlTOP11__switch_block_36, t) in
+  cont k (arg)
+in
+let $camlTOP11__match_naked_int16_35 =
+  closure match_naked_int16_8_1 @match_naked_int16 &toplevel
+in
+let $camlTOP11 = Block 0 ($camlTOP11__match_naked_int16_35) in
+cont done ($camlTOP11)
+|}]
+
+let match_symbol (t : t) : string =
+  match t with
+  | A -> "alpha"
+  | B -> "beta"
+  | C -> "gamma"
+  | D -> "delta"
+[%%expect_asm X86_64{|
+match_symbol:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let $camlTOP12__immstring_38 = "alpha" in
+let $camlTOP12__immstring_39 = "beta" in
+let $camlTOP12__immstring_40 = "gamma" in
+let $camlTOP12__immstring_41 = "delta" in
+let code match_symbol_9 deleted in
+let $camlTOP12__switch_block_43 =
+  Value_array [|$camlTOP12__immstring_38;
+  $camlTOP12__immstring_39;
+  $camlTOP12__immstring_40;
+  $camlTOP12__immstring_41|]
+in
+let code loopify(never) size(2) newer_version_of(match_symbol_9)
+      match_symbol_9_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : val =
+  let arg = %array_load ($camlTOP12__switch_block_43, t) in
+  cont k (arg)
+in
+let $camlTOP12__match_symbol_42 =
+  closure match_symbol_9_1 @match_symbol &toplevel
+in
+let $camlTOP12 = Block 0 ($camlTOP12__match_symbol_42) in
+cont done ($camlTOP12)
+|}]
+
+(* Mixed symbol and tagged-immediate arms. Both are of kind [value], so the
+   simplifier can put them in a single value-kind lookup table (see
+   [Symbols_or_tagged_immediates] in [simplify_switch_expr.ml]). *)
+
+type foo = P | Q | R1 of int | R2 of string
+
+let match_symbol_or_tagged_immediate (t : t) : foo =
+  match t with
+  | A -> R2 "foo"
+  | B -> Q
+  | C -> R1 42
+  | D -> P
+[%%expect_asm X86_64{|
+match_symbol_or_tagged_immediate:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let $camlTOP14__immstring_46 = "foo" in
+let $camlTOP14__const_block_47 = Block 1 ($camlTOP14__immstring_46) in
+let $camlTOP14__const_block_48 = Block 0 (42) in
+let code match_symbol_or_tagged_immediate_10 deleted in
+let $camlTOP14__switch_block_50 =
+  Value_array [|$camlTOP14__const_block_47;
+  1;
+  $camlTOP14__const_block_48;
+  0|]
+in
+let code loopify(never) size(2) newer_version_of(match_symbol_or_tagged_immediate_10)
+      match_symbol_or_tagged_immediate_10_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 |1 | 0 of imm tagged |1 of val ] =
+  let arg = %array_load ($camlTOP14__switch_block_50, t) in
+  cont k (arg)
+in
+let $camlTOP14__match_symbol_or_tagged_immediate_49 =
+  closure match_symbol_or_tagged_immediate_10_1
+    @match_symbol_or_tagged_immediate &toplevel
+in
+let $camlTOP14 = Block 0 ($camlTOP14__match_symbol_or_tagged_immediate_49) in
+cont done ($camlTOP14)
+|}]
+
+(* As above, but additionally including a [Null] arm. The [Null] constant is
+   of kind [value], so it can sit in the same value-kind lookup table as the
+   symbol and tagged-immediate arms. *)
+
+let match_symbol_tagged_or_null (t : t) : foo or_null =
+  match t with
+  | A -> This (R2 "foo")
+  | B -> Null
+  | C -> This (R1 42)
+  | D -> This P
+[%%expect_asm X86_64{|
+match_symbol_tagged_or_null:
+  leaq  <hidden PC-relative offset>(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+[%%expect_fexpr Simplify{|
+let $camlTOP15__immstring_52 = "foo" in
+let $camlTOP15__const_block_53 = Block 1 ($camlTOP15__immstring_52) in
+let $camlTOP15__const_block_54 = Block 0 (42) in
+let code match_symbol_tagged_or_null_11 deleted in
+let $camlTOP15__switch_block_56 =
+  Value_array [|$camlTOP15__const_block_53;
+  null;
+  $camlTOP15__const_block_54;
+  0|]
+in
+let code loopify(never) size(2) newer_version_of(match_symbol_tagged_or_null_11)
+      match_symbol_tagged_or_null_11_1 (t : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1 =
+  let arg = %array_load ($camlTOP15__switch_block_56, t) in
+  cont k (arg)
+in
+let $camlTOP15__match_symbol_tagged_or_null_55 =
+  closure match_symbol_tagged_or_null_11_1 @match_symbol_tagged_or_null
+    &toplevel
+in
+let $camlTOP15 = Block 0 ($camlTOP15__match_symbol_tagged_or_null_55) in
+cont done ($camlTOP15)
+|}]

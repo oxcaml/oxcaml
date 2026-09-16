@@ -1,0 +1,12 @@
+(* TEST
+ modules = "out_of_fibers_.c";
+ exit_status = "2";
+ { bytecode; }
+ { native; }
+*)
+
+external out_of_fibers : unit -> 'a = "test_out_of_fibers"
+
+let () =
+  Printexc.record_backtrace false;
+  out_of_fibers ()

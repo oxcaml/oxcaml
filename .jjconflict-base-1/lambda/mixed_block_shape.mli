@@ -1,0 +1,97 @@
+(******************************************************************************
+ *                                  OxCaml                                    *
+ *                        Xavier Clerc, Jane Street                           *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+(** A mixed block shape is essentially the runtime representation of a block
+    ({i i.e.}) value prefix and flat suffix), and the permutation from the type
+    definition in the surface language to that representation. *)
+type 'a t
+
+type path
+
+module Singleton_mixed_block_element : sig
+  type 'a t = private
+    | Value of Lambda.value_kind
+    | Float_boxed of 'a
+    | Float64
+    | Float32
+    | Bits8
+    | Bits16
+    | Bits32
+    | Bits64
+    | Vec128
+    | Vec256
+    | Vec512
+    | Mask
+    | Word
+    | Untagged_immediate
+
+  val print :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+end
+
+val print : Format.formatter -> _ t -> unit
+
+val of_mixed_block_elements :
+  print_locality:(Format.formatter -> 'a -> unit) ->
+  'a Lambda.mixed_block_element array ->
+  'a t
+
+val value_prefix : 'a t -> 'a Singleton_mixed_block_element.t array
+
+val flat_suffix : 'a t -> 'a Singleton_mixed_block_element.t array
+
+val value_prefix_len : 'a t -> int
+
+(** Access to the shape, as flattened and following the runtime restriction. *)
+val flattened_reordered_shape : 'a t -> 'a Singleton_mixed_block_element.t array
+
+val lookup_path_producing_new_indexes : 'a t -> int list -> int list
+
+(** Translate a top-level source field index to its flattened, reordered index.
+    Fails loudly if the field does not flatten to exactly one element. *)
+val lookup_singleton_field : 'a t -> int -> int
+
+val new_indexes_to_old_indexes : 'a t -> int array
+
+val new_block_length : 'a t -> int
+
+val new_index_to_old_path : 'a t -> int -> int list
+
+module Field_for_printing : sig
+  type 'a shape := 'a t
+
+  type 'a t =
+    | Void
+    | Unboxed_product
+    | Singleton of
+        { element : 'a Singleton_mixed_block_element.t;
+          offset_in_words : int
+        }
+
+  val of_shape : 'a shape -> index:int -> 'a t
+end

@@ -1,0 +1,2 @@
+If anything except 42 is printed, top-level eval that runs before a value is initialized may cause undefined behaviour.
+0

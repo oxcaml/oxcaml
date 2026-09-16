@@ -22,6 +22,7 @@ type result
 val fixpoint :
   Global_flow_graph.graph ->
   applications:Traverse_acc.Applications.t ->
+  analysis_scope:Analysis_scope.t ->
   Unboxing_analysis.result * result
 
 val get_unboxed_fields :

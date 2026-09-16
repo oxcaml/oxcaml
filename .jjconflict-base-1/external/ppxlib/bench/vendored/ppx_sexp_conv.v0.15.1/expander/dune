@@ -1,0 +1,8 @@
+(library
+ (name ppx_sexp_conv_expander)
+ (enabled_if
+  (>= %{ocaml_version} "4.10.0"))
+ (libraries base ppxlib ppxlib.astlib ppxlib.metaquot_lifters)
+ (ppx_runtime_libraries ppx_sexp_conv.runtime-lib sexplib0)
+ (preprocess
+  (pps ppxlib.metaquot ppxlib.traverse)))

@@ -1,0 +1,1609 @@
+(* TEST
+    flags = "-no-ikinds";
+    expect;
+*)
+
+let use_global : 'a @ global -> unit = fun _ -> ()
+let use_unique : 'a @ unique -> unit = fun _ -> ()
+let use_uncontended : 'a @ uncontended -> unit = fun _ -> ()
+let use_portable : 'a @ portable -> unit = fun _ -> ()
+let use_many : 'a @ many -> unit = fun _ -> ()
+type ('a : value mod contended) require_contended
+type ('a : value mod portable) require_portable
+[%%expect{|
+val use_global : 'a -> unit = <fun>
+val use_unique : 'a @ unique -> unit = <fun>
+val use_uncontended : 'a -> unit = <fun>
+val use_portable : 'a @ portable -> unit = <fun>
+val use_many : 'a -> unit = <fun>
+type ('a : value mod contended) require_contended
+type ('a : value mod portable) require_portable
+|}]
+
+(**********************************************)
+(* TEST: Mode crossing looks through [option] *)
+
+let foo (t : int option @ contended nonportable once) =
+    use_uncontended t;
+    use_portable t;
+    use_many t
+[%%expect{|
+val foo : int option @ once contended -> unit = <fun>
+|}]
+
+let foo (t : int option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : int option @ aliased) =
+  use_unique t;
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t;
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* crosses contention but not portability or linearity *)
+let foo (t : ('a -> 'a) option @ contended) =
+  use_uncontended t
+[%%expect{|
+val foo : ('a : any). ('a -> 'a) option @ contended -> unit = <fun>
+|}]
+
+let foo (t : ('a -> 'a) option @ nonportable) =
+  use_portable t
+[%%expect{|
+Line 2, characters 15-16:
+2 |   use_portable t
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : ('a -> 'a) option @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : ('a -> 'a) option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : ('a -> 'a) option @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* references crosses portability but not contention *)
+let foo (t : int ref option @ contended) =
+    use_uncontended t
+[%%expect{|
+Line 2, characters 20-21:
+2 |     use_uncontended t
+                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : int ref option @ nonportable once) =
+    use_portable t;
+    use_many t
+[%%expect{|
+val foo : int ref option @ once -> unit = <fun>
+|}]
+
+let foo (t : int ref option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : int ref option @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* shouldn't cross anything *)
+let foo (t : ('a -> 'a) ref option @ contended) =
+  use_uncontended t
+
+[%%expect{|
+Line 2, characters 18-19:
+2 |   use_uncontended t
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : ('a -> 'a) ref option @ nonportable) =
+  use_portable t
+
+[%%expect{|
+Line 2, characters 15-16:
+2 |   use_portable t
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : ('a -> 'a ref) option @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : ('a -> 'a) ref option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : ('a -> 'a) ref option @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* crosses nothing *)
+let foo (t : 'a option @ contended) =
+    use_uncontended t
+[%%expect{|
+Line 2, characters 20-21:
+2 |     use_uncontended t
+                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : 'a option @ nonportable) =
+    use_portable t
+[%%expect{|
+Line 2, characters 17-18:
+2 |     use_portable t
+                     ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : 'a option @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : 'a option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : 'a option @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* looks at kinds *)
+let foo (type a : value mod contended portable)
+      (t : a option @ contended nonportable) =
+  use_uncontended t;
+  use_portable t
+
+[%%expect{|
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
+  <fun>
+|}]
+
+let foo (t : ('a : value mod contended portable) option @ contended nonportable) =
+  use_uncontended t;
+  use_portable t
+
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
+[%%expect{|
+val foo : ('a : value mod portable contended). 'a option @ contended -> unit =
+  <fun>
+|}, Principal{|
+Line 2, characters 18-19:
+2 |   use_uncontended t;
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (type a : value mod contended portable) (t : a option @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : ('a : value mod contended portable) option @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (type a : value mod aliased) (t : a option @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(********************************************)
+(* TEST: Mode crossing looks through [list] *)
+
+let foo (t : int list @ contended nonportable once) =
+    use_uncontended t;
+    use_portable t;
+    use_many t
+[%%expect{|
+val foo : int list @ once contended -> unit = <fun>
+|}]
+
+let foo (t : int list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : int list @ aliased) =
+  use_unique t;
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t;
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* crosses contention but not portability or linearity *)
+let foo (t : ('a -> 'a) list @ contended) =
+  use_uncontended t
+[%%expect{|
+val foo : ('a : any). ('a -> 'a) list @ contended -> unit = <fun>
+|}]
+
+let foo (t : ('a -> 'a) list @ nonportable) =
+  use_portable t
+[%%expect{|
+Line 2, characters 15-16:
+2 |   use_portable t
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : ('a -> 'a) list @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : ('a -> 'a) list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : ('a -> 'a) list @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* references crosses portability but not contention *)
+let foo (t : int ref list @ contended) =
+    use_uncontended t
+[%%expect{|
+Line 2, characters 20-21:
+2 |     use_uncontended t
+                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : int ref list @ nonportable once) =
+    use_portable t;
+    use_many t
+[%%expect{|
+val foo : int ref list @ once -> unit = <fun>
+|}]
+
+let foo (t : int ref list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : int ref list @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* shouldn't cross anything *)
+let foo (t : ('a -> 'a) ref list @ contended) =
+  use_uncontended t
+
+[%%expect{|
+Line 2, characters 18-19:
+2 |   use_uncontended t
+                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : ('a -> 'a) ref list @ nonportable) =
+  use_portable t
+
+[%%expect{|
+Line 2, characters 15-16:
+2 |   use_portable t
+                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : ('a -> 'a ref) list @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : ('a -> 'a) ref list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : ('a -> 'a) ref list @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* crosses nothing *)
+let foo (t : 'a list @ contended) =
+    use_uncontended t
+[%%expect{|
+Line 2, characters 20-21:
+2 |     use_uncontended t
+                        ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : 'a list @ nonportable) =
+    use_portable t
+[%%expect{|
+Line 2, characters 17-18:
+2 |     use_portable t
+                     ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : 'a list @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (t : 'a list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : 'a list @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(* looks at kinds *)
+let foo (type a : value mod contended portable)
+      (t : a list @ contended nonportable) =
+  use_uncontended t;
+  use_portable t
+
+[%%expect{|
+val foo : ('a : value mod portable contended). 'a list @ contended -> unit =
+  <fun>
+|}]
+
+let foo (type a : value mod contended portable) (t : a list @ once) =
+  use_many t
+
+[%%expect{|
+Line 2, characters 11-12:
+2 |   use_many t
+               ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let foo (type a : value mod contended portable) (t : a list @ local) =
+  use_global t [@nontail]
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_global t [@nontail]
+                 ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (type a : value mod contended portable) (t : a list @ aliased) =
+  use_unique t
+
+[%%expect{|
+Line 2, characters 13-14:
+2 |   use_unique t
+                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(****************************)
+(* TEST: User-written types *)
+
+(* user syntax *)
+type 'a t : immutable_data with 'a = { x : 'a }
+[%%expect{|
+type 'a t = { x : 'a; }
+|}]
+
+type 'a t : immutable_data with 'a = Foo of 'a
+[%%expect{|
+type 'a t = Foo of 'a
+|}]
+
+type t : immutable_data = { x : int }
+type ('a : immutable_data) t : immutable_data = { x : 'a }
+type ('a : immutable_data, 'b : immutable_data) t : immutable_data = { x : 'a; y : 'b }
+type t : mutable_data = { mutable x : int }
+[%%expect {|
+type t = { x : int; }
+type ('a : immutable_data) t = { x : 'a; }
+type ('a : immutable_data, 'b : immutable_data) t = { x : 'a; y : 'b; }
+type t = { mutable x : int; }
+|}]
+
+type t : immutable_data = { mutable x : int}
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : immutable_data = { mutable x : int}
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+type ('a : mutable_data) t : immutable_data = { x : 'a }
+[%%expect {|
+Line 1, characters 0-56:
+1 | type ('a : mutable_data) t : immutable_data = { x : 'a }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* The offending type is behind an alias. *)
+type u = int ref
+type t : value mod contended = {
+  a : u;
+}
+[%%expect {|
+type u = int ref
+Lines 2-4, characters 0-1:
+2 | type t : value mod contended = {
+3 |   a : u;
+4 | }
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* The same offending type occurs twice. *)
+type t : value mod contended = {
+  a : int ref;
+  b : int ref;
+}
+[%%expect {|
+Lines 1-4, characters 0-1:
+1 | type t : value mod contended = {
+2 |   a : int ref;
+3 |   b : int ref;
+4 | }
+Error: The kind of type "t" is mutable_data
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* The offending type is an alias whose kind depends on its parameter. *)
+type 'a u : immutable_data with 'a
+type 'a t : immutable_data = Foo of 'a u
+[%%expect {|
+type 'a u : immutable_data with 'a
+Line 2, characters 0-40:
+2 | type 'a t : immutable_data = Foo of 'a u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a u
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A residual for a type-constructor occurrence covers only the
+   constructor's own contribution: [w] is blamed for the axes it fails on
+   any instantiation, while the parameter's flow is blamed on ['a]. *)
+type 'a w = { mutable x : int; y : 'a }
+type 'a c : value mod portable contended = { f : 'a w }
+[%%expect {|
+type 'a w = { mutable x : int; y : 'a; }
+Line 2, characters 0-55:
+2 | type 'a c : value mod portable contended = { f : 'a w }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is mutable_data with 'a
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-73:
+3 | type 'a c : value mod portable contended = { direct : 'a; nested : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type 'a c : value mod portable contended = { b : 'a b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-55:
+3 | type 'a c : value mod portable contended = { b : 'a b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with 'a with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+(* Same as above with ['a := int]: even with a fully-crossing parameter,
+   [c] still fails portability via [t] inside [b], so [b] must be blamed. *)
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+type c : value mod portable contended = { b : int b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of (t * 'a) | Next of 'a b
+Line 3, characters 0-53:
+3 | type c : value mod portable contended = { b : int b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is immutable_data with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+|}]
+
+type bad : value
+type t : value mod contended = { x : (bad * int) ref }
+[%%expect {|
+type bad
+Line 2, characters 0-54:
+2 | type t : value mod contended = { x : (bad * int) ref }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is
+           mutable_data with bad @@ forkable unyielding many
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+type t : value mod contended
+type 'a b = Foo of t * 'a
+type 'a c : value mod portable contended = { x : ('a ref * int) b }
+[%%expect {|
+type t : value mod contended
+type 'a b = Foo of t * 'a
+Line 3, characters 0-67:
+3 | type 'a c : value mod portable contended = { x : ('a ref * int) b }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "c" is
+           mutable_data with 'a @@ forkable unyielding many with t
+         because it's a boxed record type.
+       But the kind of type "c" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type c.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+         portability: mod portable with 'a with t ≰ mod portable
+|}]
+
+(* Ancestor and descendant requirements can differ in VALUE on the same
+   axis: [outer]'s own portability requirement is only [corruptible],
+   while the nested [bad] must be fully [portable]. On the portability
+   diamond (portable < {shareable, corruptible} < nonportable) the
+   enclosing, weaker requirement does not entail the nested, stronger
+   one, so both must be reported. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Same on the contention diamond. *)
+type 'a outer : value mod shared with 'a
+type bad : value
+type t : value mod contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shared with 'a
+type bad
+Line 3, characters 0-48:
+3 | type t : value mod contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Two enclosing subjects on one path with incomparable requirements
+   (corruptible and shareable) do not jointly cover a nested subject that
+   must be fully portable: entailment is tested against each enclosing
+   requirement separately, never against their combination. *)
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad : value
+type t : value mod portable = { x : bad o2 o1 }
+[%%expect {|
+type 'a o1 : value mod shareable with 'a
+type 'a o2 : value mod corruptible with 'a
+type bad
+Line 4, characters 0-47:
+4 | type t : value mod portable = { x : bad o2 o1 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad o2 o1
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A strictly stronger enclosing requirement suppresses a weaker nested
+   one (not only an equal one). *)
+type 'a outer : value with 'a
+type bad : value mod shareable
+type t : value mod portable = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad : value mod shareable
+Line 3, characters 0-47:
+3 | type t : value mod portable = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Partial per-axis coverage: the enclosing subject covers the nested
+   contention requirement but not the stronger nested portability one,
+   so the nested subject keeps exactly the uncovered axis. *)
+type 'a outer : value mod shareable with 'a
+type bad : value
+type t : value mod portable contended = { x : bad outer }
+[%%expect {|
+type 'a outer : value mod shareable with 'a
+type bad
+Line 3, characters 0-57:
+3 | type t : value mod portable contended = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of
+           value mod portable contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* A self-recursive declaration does not list itself as a cause; only
+   the genuine carrier is reported. *)
+type t : value mod portable = Leaf of (int -> int) | Node of t
+[%%expect {|
+Line 1, characters 0-62:
+1 | type t : value mod portable = Leaf of (int -> int) | Node of t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Mutually-recursive pair where the sibling (not self) is the carrier:
+   [t]'s self-occurrence is not reported, but the group-mate [u] is. *)
+type t : value mod portable = A of t | B of u
+and u = C of (int -> int)
+[%%expect {|
+Line 1, characters 0-45:
+1 | type t : value mod portable = A of t | B of u
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Sibling-only carrier (no self-occurrence in [t2]): a group-mate
+   subject is not self. *)
+type t2 : value mod portable = K of u2
+and u2 = L of (int -> int)
+[%%expect {|
+Line 1, characters 0-38:
+1 | type t2 : value mod portable = K of u2
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t2.
+|}]
+
+(* Chain-3 axis (externality), equal-value suppression: both subjects
+   require exactly [external64], so the enclosing subject entails the
+   nested one. *)
+type ('a : value) outer : value with 'a
+type bad : value
+type t : value mod external64 = { x : bad outer }
+[%%expect {|
+type 'a outer
+type bad
+Line 3, characters 0-49:
+3 | type t : value mod external64 = { x : bad outer }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with bad outer
+         because it's a boxed record type.
+       But the kind of type "t" must be a subkind of value mod external64
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* Chain-3 entailment where the enclosing subject does not report the
+   axis at all: the nested [external64] requirement must survive. *)
+type ('a : value) outer2 : value mod external64 with 'a
+type bad2 : value
+type t2 : value mod portable external64 = { x : bad2 outer2 }
+[%%expect {|
+type 'a outer2 : value mod external64 with 'a
+type bad2
+Line 3, characters 0-61:
+3 | type t2 : value mod portable external64 = { x : bad2 outer2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data with bad2 outer2
+         because it's a boxed record type.
+       But the kind of type "t2" must be a subkind of
+           value mod portable external64
+         because of the annotation on the declaration of the type t2.
+|}]
+
+(* GADTs: only the offending constructor's payload is reported. *)
+type _ t : value mod contended =
+  | I : int -> int t
+  | R : int ref -> string t
+[%%expect {|
+Lines 1-3, characters 0-27:
+1 | type _ t : value mod contended =
+2 |   | I : int -> int t
+3 |   | R : int ref -> string t
+Error: The kind of type "t" is mutable_data
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* GADTs: existential payloads. *)
+type t : value mod portable = Pack : ('a -> 'a) -> t
+[%%expect {|
+Line 1, characters 0-52:
+1 | type t : value mod portable = Pack : ('a -> 'a) -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float mod immutable
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(* GADTs: a payload that mentions the index parameter. *)
+type 'a t : value mod contended =
+  | A : 'b ref -> 'b t
+[%%expect {|
+Lines 1-2, characters 0-22:
+1 | type 'a t : value mod contended =
+2 |   | A : 'b ref -> 'b t
+Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod contended
+         because of the annotation on the declaration of the type t.
+
+       The first mode-crosses less than the second along:
+         contention: mod uncontended ≰ mod contended
+|}]
+
+type t : value mod portable = Pack : 'a -> t
+[%%expect {|
+Line 1, characters 0-44:
+1 | type t : value mod portable = Pack : 'a -> t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is value non_float
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+type 'a t : value mod portable = A : 'b -> 'b t
+[%%expect {|
+Line 1, characters 0-47:
+1 | type 'a t : value mod portable = A : 'b -> 'b t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the annotation on the declaration of the type t.
+|}]
+
+(***************)
+(* TEST: Loops *)
+
+(* This requires fuel-per-type-head in [Jkind.Bound.reduce_baggage] to cut off
+   *)
+type 'a t = Leaf of 'a | Node of ('a * 'a) t
+
+let rec depth : 'a. 'a t -> _ = function
+  | Leaf _ -> 1
+  | Node x -> 1 + depth x
+
+[%%expect{|
+type 'a t = Leaf of 'a | Node of ('a * 'a) t
+val depth : 'a t -> int = <fun>
+|}]
+
+(*************************)
+(* TEST: gadt refinement *)
+
+type 'a contended_with : value mod contended with 'a
+type _ t =
+  | Foo : ('a : value mod contended) t
+[%%expect {|
+type 'a contended_with : value mod contended with 'a
+type _ t = Foo : ('a : value mod contended). 'a t
+|}]
+
+let f (type a) (t : a t) (x : a contended_with @ contended) : _ @ uncontended =
+  match t with
+  | _ -> x
+[%%expect {|
+Line 3, characters 9-10:
+3 |   | _ -> x
+             ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+
+let f (type a) (t : a t) (x : a contended_with @ contended) : _ @ uncontended =
+  match t with
+  | Foo -> x
+[%%expect {|
+val f : 'a t -> 'a contended_with @ contended -> 'a contended_with = <fun>
+|}]
+
+(**************************************)
+(* TEST: cross with functor parameter *)
+
+module F (T : sig type t end) : sig
+  type t : immutable_data with T.t
+end = struct
+  type t : immutable_data with T.t
+end
+[%%expect {|
+module F :
+  functor (T : sig type t end) -> sig type t : immutable_data with T.t end
+|}]
+
+module Immutable = F(struct type t : immutable_data end)
+type t : immutable_data = Immutable.t
+[%%expect {|
+module Immutable : sig type t : immutable_data end
+type t = Immutable.t
+|}]
+
+module Value = F(struct type t end)
+type t : immutable_data = Value.t
+[%%expect {|
+module Value : sig type t : value non_float end
+Line 2, characters 0-33:
+2 | type t : immutable_data = Value.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "Value.t" is value non_float
+         because of the definition of t at line 2, characters 2-34.
+       But the kind of type "Value.t" must be a subkind of immutable_data
+         because of the definition of t at line 2, characters 0-33.
+|}]
+
+(************************)
+(* TEST: abstract types *)
+
+(*********************)
+type t : value mod contended with int
+[%%expect {|
+type t : value mod contended
+|}]
+
+type t_test = t require_contended
+[%%expect {|
+type t_test = t require_contended
+|}]
+
+type t_test = t require_portable
+[%%expect {|
+Line 1, characters 14-15:
+1 | type t_test = t require_portable
+                  ^
+Error: This type "t" should be an instance of type "('a : value mod portable)"
+       The kind of t is value mod contended
+         because of the definition of t at line 1, characters 0-37.
+       But the kind of t must be a subkind of value mod portable
+         because of the definition of require_portable at line 7, characters 0-47.
+|}]
+
+let foo (t : t @ contended) = use_uncontended t
+[%%expect {|
+val foo : t @ contended -> unit = <fun>
+|}]
+
+let foo (t : t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 45-46:
+1 | let foo (t : t @ nonportable) = use_portable t
+                                                 ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************)
+type 'a t : value mod contended with int
+[%%expect {|
+type 'a t : value mod contended
+|}]
+
+let foo (t : _ t @ contended) = use_uncontended t
+[%%expect {|
+val foo : 'a t @ contended -> unit = <fun>
+|}]
+
+let foo (t : int t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 49-50:
+1 | let foo (t : int t @ nonportable) = use_portable t
+                                                     ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************)
+type 'a t : value mod contended with 'a
+[%%expect {|
+type 'a t : value mod contended with 'a
+|}]
+
+let foo (t : int t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int t @ contended -> unit = <fun>
+|}]
+
+let foo (t : _ t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : int t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 49-50:
+1 | let foo (t : int t @ nonportable) = use_portable t
+                                                     ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************)
+type ('a : immutable_data) t : value mod contended with 'a
+[%%expect {|
+type ('a : immutable_data) t : value mod contended with 'a
+|}]
+
+type 'a t_test = 'a t require_contended
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
+[%%expect {|
+type ('a : immutable_data) t_test = 'a t require_contended
+|}, Principal{|
+Line 1, characters 17-21:
+1 | type 'a t_test = 'a t require_contended
+                     ^^^^
+Error: This type "'a t" should be an instance of type
+         "('b : value mod contended)"
+       The kind of 'a t is value mod contended with 'a
+         because of the definition of t at line 1, characters 0-58.
+       But the kind of 'a t must be a subkind of value mod contended
+         because of the definition of require_contended at line 6, characters 0-49.
+|}]
+
+let foo (t : int t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int t @ contended -> unit = <fun>
+|}]
+
+let foo (t : _ t @ contended) = use_uncontended t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
+[%%expect {|
+val foo : ('a : immutable_data). 'a t @ contended -> unit = <fun>
+|}, Principal{|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : int t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 49-50:
+1 | let foo (t : int t @ nonportable) = use_portable t
+                                                     ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************)
+type ('a, 'b) t : value mod contended with 'a with 'b
+[%%expect {|
+type ('a, 'b) t : value mod contended with 'a with 'b
+|}]
+
+type t_test = (int, int) t require_contended
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
+[%%expect {|
+type t_test = (int, int) t require_contended
+|}, Principal{|
+Line 1, characters 14-26:
+1 | type t_test = (int, int) t require_contended
+                  ^^^^^^^^^^^^
+Error: This type "(int, int) t" should be an instance of type
+         "('a : value mod contended)"
+       The kind of (int, int) t is value mod contended with int
+         because of the definition of t at line 1, characters 0-53.
+       But the kind of (int, int) t must be a subkind of value mod contended
+         because of the definition of require_contended at line 6, characters 0-49.
+|}]
+
+type ('a, 'b) t_test = ('a, 'b) t require_contended
+[%%expect {|
+Line 1, characters 23-33:
+1 | type ('a, 'b) t_test = ('a, 'b) t require_contended
+                           ^^^^^^^^^^
+Error: This type "('a, 'b) t" should be an instance of type
+         "('c : value mod contended)"
+       The kind of ('a, 'b) t is value mod contended with 'a with 'b
+         because of the definition of t at line 1, characters 0-53.
+       But the kind of ('a, 'b) t must be a subkind of value mod contended
+         because of the definition of require_contended at line 6, characters 0-49.
+|}]
+
+let foo (t : (int, int) t @ contended) = use_uncontended t
+[%%expect {|
+val foo : (int, int) t @ contended -> unit = <fun>
+|}]
+
+let foo (t : (_, _) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 53-54:
+1 | let foo (t : (_, _) t @ contended) = use_uncontended t
+                                                         ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : (_, int) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 55-56:
+1 | let foo (t : (_, int) t @ contended) = use_uncontended t
+                                                           ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(********************************************************)
+(* TEST: abstract types can hide mode crossing behavior *)
+
+module T : sig
+  type t : value mod contended
+end = struct
+  type t = { x : int }
+end
+[%%expect {|
+module T : sig type t : value mod contended end
+|}]
+
+let foo (t : T.t @ contended) = use_uncontended t
+[%%expect {|
+val foo : T.t @ contended -> unit = <fun>
+|}]
+
+let foo (t : T.t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 47-48:
+1 | let foo (t : T.t @ nonportable) = use_portable t
+                                                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************)
+module T : sig
+  type 'a t : value mod contended with 'a
+end = struct
+  type 'a t = { x : 'a }
+end
+[%%expect {|
+module T : sig type 'a t : value mod contended with 'a end
+|}]
+
+let foo (t : int T.t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int T.t @ contended -> unit = <fun>
+|}]
+
+let foo (t : _ T.t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 50-51:
+1 | let foo (t : _ T.t @ contended) = use_uncontended t
+                                                      ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : int T.t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 51-52:
+1 | let foo (t : int T.t @ nonportable) = use_portable t
+                                                       ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*************************)
+(* TEST: type equalities *)
+
+type 'a u = { x : 'a }
+type 'a t = 'a u
+[%%expect {|
+type 'a u = { x : 'a; }
+type 'a t = 'a u
+|}]
+
+let foo (t : int t @ nonportable) = use_portable t
+[%%expect {|
+val foo : int t -> unit = <fun>
+|}]
+
+let foo (t : _ t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 47-48:
+1 | let foo (t : _ t @ nonportable) = use_portable t
+                                                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : int t @ aliased) = use_unique t
+[%%expect {|
+Line 1, characters 43-44:
+1 | let foo (t : int t @ aliased) = use_unique t
+                                               ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(*********************)
+
+type ('a : immutable_data) u = Foo of 'a | Bar
+type 'a t = 'a u
+[%%expect {|
+type ('a : immutable_data) u = Foo of 'a | Bar
+type ('a : immutable_data) t = 'a u
+|}]
+
+let foo (t : int t @ nonportable) = use_portable t
+[%%expect {|
+val foo : int t -> unit = <fun>
+|}]
+
+let foo (t : _ t @ nonportable) = use_portable t
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
+[%%expect {|
+val foo : ('a : immutable_data). 'a t -> unit = <fun>
+|}, Principal{|
+Line 1, characters 47-48:
+1 | let foo (t : _ t @ nonportable) = use_portable t
+                                                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : int t @ aliased) = use_unique t
+[%%expect {|
+Line 1, characters 43-44:
+1 | let foo (t : int t @ aliased) = use_unique t
+                                               ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+(***********************)
+(* TEST: redefine type *)
+
+type u = { x : int }
+type t : immutable_data = u = { x : int }
+let foo (t : t @ nonportable) = use_portable t
+[%%expect {|
+type u = { x : int; }
+type t = u = { x : int; }
+val foo : t -> unit = <fun>
+|}]
+
+(*********************)
+
+type 'a u = Foo of 'a
+type 'a t = 'a u = Foo of 'a
+let foo (t : int t @ once) = use_many t
+[%%expect {|
+type 'a u = Foo of 'a
+type 'a t = 'a u = Foo of 'a
+val foo : int t @ once -> unit = <fun>
+|}]
+
+(*********************)
+
+type ('a, 'b) u = Foo of 'a | Bar of 'b
+type ('b, 'a) t = ('b, 'a) u = Foo of 'b | Bar of 'a
+let foo (t : (int, string) t @ contended) = use_uncontended t
+[%%expect {|
+type ('a, 'b) u = Foo of 'a | Bar of 'b
+type ('b, 'a) t = ('b, 'a) u = Foo of 'b | Bar of 'a
+val foo : (int, string) t @ contended -> unit = <fun>
+|}]
+
+(*********************)
+
+type 'a u = Foo of { x : 'a }
+type 'a t : immutable_data = 'a u = Foo of { x : 'a }
+[%%expect {|
+type 'a u = Foo of { x : 'a; }
+Line 2, characters 0-53:
+2 | type 'a t : immutable_data = 'a u = Foo of { x : 'a }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data
+         because of the annotation on the declaration of the type t.
+|}]
+
+(**********************************)
+(* TEST: signature substitution *)
+
+module type S = sig
+  type 'a t
+  val get_contended : unit -> int t @ contended
+end
+type 'a t = { x : 'a }
+[%%expect {|
+module type S =
+  sig type 'a t val get_contended : unit -> int t @ contended end
+type 'a t = { x : 'a; }
+|}]
+
+(************)
+module type S' = S with type 'a t := 'a t
+
+module M : S' = struct
+  let get_contended () = { x = 10 }
+end
+
+let () = use_uncontended (M.get_contended ())
+[%%expect {|
+module type S' = sig val get_contended : unit -> int t @ contended end
+module M : S'
+|}]
+
+(************)
+module type S' = S with type 'a t = 'a t
+
+module M : S' = struct
+  type nonrec 'a t = 'a t
+  let get_contended () = { x = 10 }
+end
+
+let () = use_uncontended (M.get_contended ())
+[%%expect {|
+module type S' =
+  sig type 'a t = 'a t val get_contended : unit -> int t @ contended end
+module M : S'
+|}]
+
+(**********************)
+(* TEST: private type *)
+
+(* a private type does not hide the kind *)
+(* CR layouts v2.8: but it should be able to. Internal ticket 5119 *)
+
+type 'a u = { x : 'a }
+type 'a t : value = private 'a u
+[%%expect {|
+type 'a u = { x : 'a; }
+type 'a t = private 'a u
+|}]
+
+let foo (t : int t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int t @ contended -> unit = <fun>
+|}]
+
+type 'a t : value = private Foo of 'a
+[%%expect {|
+type 'a t = private Foo of 'a
+|}]
+
+let foo (t : int t @ contended) = use_uncontended t
+[%%expect {|
+val foo : int t @ contended -> unit = <fun>
+|}]
+
+(****************)
+(* TEST: tuples *)
+
+type t : immutable_data = int * string
+[%%expect {|
+type t = int * string
+|}]
+
+(************)
+
+type ('a : immutable_data, 'b : immutable_data) t : immutable_data = 'a * 'b
+[%%expect {|
+type ('a : immutable_data, 'b : immutable_data) t = 'a * 'b
+|}]
+
+(************)
+
+type 'a t = int * 'a
+[%%expect {|
+type 'a t = int * 'a
+|}]
+
+let foo (t : int t @ contended nonportable once) =
+  use_uncontended t;
+  use_portable t;
+  use_many t
+[%%expect {|
+val foo : int t @ once contended -> unit = <fun>
+|}]
+
+let foo (t : int t @ local) = use_global t [@nontail]
+[%%expect {|
+Line 1, characters 41-42:
+1 | let foo (t : int t @ local) = use_global t [@nontail]
+                                             ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let foo (t : int t @ aliased) = use_unique t
+[%%expect {|
+Line 1, characters 43-44:
+1 | let foo (t : int t @ aliased) = use_unique t
+                                               ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+let foo (t : _ t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 48-49:
+1 | let foo (t : _ t @ contended) = use_uncontended t
+                                                    ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : _ t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 47-48:
+1 | let foo (t : _ t @ nonportable) = use_portable t
+                                                   ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (t : _ t @ once) = use_many t
+[%%expect {|
+Line 1, characters 36-37:
+1 | let foo (t : _ t @ once) = use_many t
+                                        ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+(************)
+type ('a, 'b, 'c, 'd) t = 'a * ('b * 'c) * 'd
+[%%expect {|
+type ('a, 'b, 'c, 'd) t = 'a * ('b * 'c) * 'd
+|}]
+
+let foo (t : (int, int, int, int) t @ nonportable) = use_portable t
+[%%expect {|
+val foo : (int, int, int, int) t -> unit = <fun>
+|}]
+
+let foo (t : (int, int, _, int) t @ nonportable) = use_portable t
+[%%expect {|
+Line 1, characters 64-65:
+1 | let foo (t : (int, int, _, int) t @ nonportable) = use_portable t
+                                                                    ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+(*********************************************)
+(* Reduction of error seen in the tree *)
+
+type 'k t1 = T of Obj.t [@@unboxed]
+
+type 'k t2 = { x : 'k t1 }
+
+type packed = T : _ t2 -> packed [@@unboxed]
+
+type q = { x : packed }
+
+module type S = sig
+  type t = private q
+end with type t = q
+
+[%%expect{|
+type 'k t1 = T of Obj.t [@@unboxed]
+type 'k t2 = { x : 'k t1; }
+type packed = T : 'a t2 -> packed [@@unboxed]
+type q = { x : packed; }
+module type S = sig type t = q end
+|}]
+
+type 'a middle_bound_gadt =
+  | Middle : ('b : value mod shareable). 'b -> 'b middle_bound_gadt
+
+type middle_bound_gadt_int : value mod portable = int middle_bound_gadt
+
+[%%expect{|
+type 'a middle_bound_gadt =
+    Middle : ('b : value mod shareable). 'b -> 'b middle_bound_gadt
+type middle_bound_gadt_int = int middle_bound_gadt
+|}]

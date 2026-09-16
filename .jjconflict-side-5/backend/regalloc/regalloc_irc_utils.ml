@@ -1,0 +1,216 @@
+[@@@ocaml.warning "+a-30-40-41-42"]
+
+open! Int_replace_polymorphic_compare
+open! Regalloc_utils
+
+let log_function = Param.make (fun () -> make_log_function ~label:"irc")
+
+let indent () = (Param.get log_function).indent ()
+
+let dedent () = (Param.get log_function).dedent ()
+
+let reset_indentation () = (Param.get log_function).reset_indentation ()
+
+let log : type a. ?no_eol:unit -> (a, Format.formatter, unit) format -> a =
+ fun ?no_eol fmt -> (Param.get log_function).log ?no_eol fmt
+
+let instr_prefix (instr : Cfg.basic Cfg.instruction) =
+  InstructionId.to_string_padded instr.id
+
+let term_prefix (term : Cfg.terminator Cfg.instruction) =
+  InstructionId.to_string_padded term.id
+
+let log_body_and_terminator :
+    Cfg.basic_instruction_list ->
+    Cfg.terminator Cfg.instruction ->
+    liveness ->
+    unit =
+ fun body terminator liveness ->
+  make_log_body_and_terminator (Param.get log_function) ~instr_prefix
+    ~term_prefix body terminator liveness
+
+let log_cfg_with_infos : Cfg_with_infos.t -> unit =
+ fun cfg_with_infos ->
+  make_log_cfg_with_infos (Param.get log_function) ~instr_prefix ~term_prefix
+    cfg_with_infos
+
+module RegWorkList = struct
+  type t =
+    | Unknown_list
+    | Precolored
+    | Initial
+    | Simplify
+    | Freeze
+    | Spill
+    | Spilled
+    | Coalesced
+    | Colored
+    | Select_stack
+
+  let rank = function
+    | Unknown_list -> 0
+    | Precolored -> 1
+    | Initial -> 2
+    | Simplify -> 3
+    | Freeze -> 4
+    | Spill -> 5
+    | Spilled -> 6
+    | Coalesced -> 7
+    | Colored -> 8
+    | Select_stack -> 9
+
+  let equal
+      (( Unknown_list | Precolored | Initial | Simplify | Freeze | Spill
+       | Spilled | Coalesced | Colored | Select_stack ) as left) right =
+    rank left = rank right
+
+  let to_string = function
+    | Unknown_list -> "unknown_list"
+    | Precolored -> "precolored"
+    | Initial -> "initial"
+    | Simplify -> "simplify"
+    | Freeze -> "freeze"
+    | Spill -> "spill"
+    | Spilled -> "spilled"
+    | Coalesced -> "coalesced"
+    | Colored -> "colored"
+    | Select_stack -> "select_stack"
+end
+
+module InstrWorkList = struct
+  type t =
+    | Unknown_list
+    | Coalesced
+    | Constrained
+    | Frozen
+    | Work_list
+    | Active
+
+  let rank = function
+    | Unknown_list -> 0
+    | Coalesced -> 1
+    | Constrained -> 2
+    | Frozen -> 3
+    | Work_list -> 4
+    | Active -> 5
+
+  let equal
+      ((Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active) as
+       left) right =
+    rank left = rank right
+
+  let to_string = function
+    | Unknown_list -> "unknown_list"
+    | Coalesced -> "coalesced"
+    | Constrained -> "constrained"
+    | Frozen -> "frozen"
+    | Work_list -> "work_list"
+    | Active -> "active"
+end
+
+module Color = struct
+  type t = Regs.Phys_reg.t
+end
+
+module Edge = Regalloc_interf_graph.Edge
+module EdgeSet = Regalloc_interf_graph.EdgeSet
+module Degree = Regalloc_interf_graph.Degree
+
+let is_move_basic : Cfg.basic -> bool =
+ fun desc ->
+  match desc with
+  | Op op -> (
+    match op with
+    | Move -> true
+    (* CR mslater: reinterpret_cast, other than value<->int, can be true *)
+    | Reinterpret_cast _ -> false
+    | Static_cast _ -> false
+    | Spill -> false
+    | Reload -> false
+    | Const_int _ -> false
+    | Const_float32 _ -> false
+    | Const_float _ -> false
+    | Const_symbol _ -> false
+    | Const_vec128 _ -> false
+    | Const_vec256 _ -> false
+    | Const_vec512 _ -> false
+    | Const_mask _ -> false
+    | Stackoffset _ -> false
+    | Load _ -> false
+    | Store _ -> false
+    | Intop _ -> false
+    | Int128op _ -> false
+    | Intop_imm _ -> false
+    | Intop_atomic _ -> false
+    | Floatop _ -> false
+    | Csel _ -> false
+    | Probe_is_enabled _ -> false
+    | Opaque -> false
+    | Begin_region -> false
+    | End_region -> false
+    | Specific _ -> false
+    | Name_for_debugger _ -> false
+    | Dls_get -> false
+    | Tls_get -> false
+    | Domain_index -> false
+    | Poll -> false
+    | Pause -> false
+    | Alloc _ -> false)
+  | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
+    ->
+    false
+
+let is_move_instruction : Cfg.basic Cfg.instruction -> bool =
+ fun instr -> is_move_basic instr.desc
+
+let all_precolored_regs = Proc.precolored_regs
+
+let k reg =
+  Regs.num_available_registers (Regs.Reg_class.of_machtype reg.Reg.typ)
+
+module Spilling_heuristics = struct
+  type t =
+    | Flat_uses
+    | Hierarchical_uses
+
+  let default = Flat_uses
+
+  let all = [Flat_uses; Hierarchical_uses]
+
+  let to_string = function
+    | Flat_uses -> "flat_uses"
+    | Hierarchical_uses -> "hierarchical_uses"
+
+  let value =
+    let available_heuristics () =
+      String.concat ", "
+        (all |> List.map ~f:to_string |> List.map ~f:(Printf.sprintf "%S"))
+    in
+    Param.make (fun () ->
+        match find_param_value "IRC_SPILLING_HEURISTICS" with
+        | None -> default
+        | Some id -> (
+          match String.lowercase_ascii id with
+          | "flat_uses" | "flat-uses" -> Flat_uses
+          | "hierarchical_uses" | "hierarchical-uses" -> Hierarchical_uses
+          | _ ->
+            fatal "unknown heuristics %S (possible values: %s)" id
+              (available_heuristics ())))
+end
+
+module Interf_threshold = struct
+  type t = int option
+
+  let default = None
+
+  let value =
+    Param.make (fun () ->
+        match find_param_value "IRC_INTERF_THRESHOLD" with
+        | None -> default
+        | Some threshold -> (
+          match int_of_string_opt threshold with
+          | None ->
+            fatal "invalid interference threshold %S (should be an integer)"
+              threshold
+          | Some value as threshold -> if value < 0 then None else threshold))
+end
