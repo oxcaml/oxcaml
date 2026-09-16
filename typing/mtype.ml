@@ -928,10 +928,12 @@ let lower_nongen nglev mty =
           let level = get_level ty in
           if level < generic_level && level > nglev then (
             set_level ty nglev;
-            match Jkind.update_level nglev jkind with
+            match Jkind.update_level Env.empty nglev jkind with
             | Ok () -> ()
             | Error Rigid ->
-              Misc.fatal_error "Ctype.lower_nongen: unexpected rigid variable")
+              Misc.fatal_error "Ctype.lower_nongen: rigid sort variable"
+            | Error (Escape _) ->
+              Misc.fatal_error "Ctype.lower_nongen: kind escape")
       | _ ->
           super.it_do_type_expr it ty
     in
