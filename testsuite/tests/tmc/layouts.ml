@@ -33,3 +33,41 @@ let _ =
 val repeat : int -> #(int * int) -> #(int * int) seq = <fun>
 - : int * int = (11, 22)
 |}]
+
+(* The value tail precedes the unboxed float in native code. *)
+let[@tail_mod_cons] rec copy_float (xs : float# seq) =
+  match xs with
+  | Nil -> Nil
+  | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
+[%%expect{|
+Lines 1-4, characters 35-57:
+1 | ...................................(xs : float# seq) =
+2 |   match xs with
+3 |   | Nil -> Nil
+4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
+Warning 71 [unused-tmc-attribute]: This function is marked "@tail_mod_cons"
+  but is never applied in TMC position.
+
+Line 4, characters 29-56:
+4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 51 [wrong-tailcall-expectation]: expected tailcall
+
+Line 4, characters 29-56:
+4 |   | Cons (x, xs) -> Cons (x, (copy_float [@tailcall]) xs)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 51 [wrong-tailcall-expectation]: expected tailcall
+
+val copy_float : float# seq -> float# seq = <fun>
+|}]
+
+external box_float : float# -> float = "%box_float"
+let _ =
+  match copy_float (Sys.opaque_identity (Cons (#1.5, Cons (#2.5, Nil)))) with
+  | Cons (a, Cons (b, Nil)) ->
+    box_float a, box_float b
+  | _ -> failwith "unexpected sequence"
+[%%expect{|
+external box_float : float# -> float = "%box_float"
+- : float * float = (1.5, 2.5)
+|}]
