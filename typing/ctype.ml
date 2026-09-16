@@ -276,6 +276,8 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
       | Ok () -> ()
       | Error Rigid ->
         Misc.fatal_error "Ctype.with_local_level_gen: rigid sort variable"
+      | Error (Escape _) ->
+        Misc.fatal_error "Ctype.with_local_level_gen: kind escape"
       end;
       add_to_sort_pool ~level:(get_level t) t)
   end sort_pool;
@@ -1009,12 +1011,13 @@ let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
     begin match get_desc ty with
-    | Tvar { jkind } ->
-      begin match Jkind.update_level !current_level jkind with
+    | Tvar { jkind } -> (
+      match Jkind.update_level Env.empty !current_level jkind with
       | Ok () -> ()
       | Error Rigid ->
         Misc.fatal_error "Ctype.lower_all: rigid sort variable in generalize"
-      end
+      | Error (Escape _) ->
+        Misc.fatal_error "Ctype.lower_all: kind escape in generalize")
     | _ -> ()
     end;
     iter_type_expr lower_all (Mode.With_locality.update_level !current_level) ty
@@ -1078,14 +1081,14 @@ let rec generalize_structure ty =
   let current_level = !current_level in
   if level <> generic_level && level > current_level then
     match get_desc ty with
-    | Tvar { jkind } ->
+    | Tvar { jkind } -> (
       set_level ty current_level;
-      begin match Jkind.update_level current_level jkind with
+      match Jkind.update_level Env.empty current_level jkind with
       | Ok () -> ()
       | Error Rigid ->
-        Misc.fatal_error "Ctype.generalize_structure: \
-          rigid sort variable in generalize_structure"
-      end
+        Misc.fatal_error "Ctype.generalize_structure: rigid sort variable"
+      | Error (Escape _) ->
+        Misc.fatal_error "Ctype.generalize_structure: kind escape")
     | _ ->
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
@@ -1201,7 +1204,7 @@ let rec check_scope_escape mark env level ty =
         | ty' ->
             check_scope_escape mark env level ty'
         | exception Cannot_expand ->
-            raise_escape_exn (Constructor p)
+            raise_escape_exn (Constructor (Type, p))
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
         let p' = normalize_package_path env p in
@@ -1261,7 +1264,7 @@ let rec update_level env level expand ty =
           link_type ty ty';
           update_level env level expand ty'
         with Cannot_expand ->
-          raise_escape_exn (Constructor p)
+          raise_escape_exn (Constructor (Type, p))
         end
     | Tconstr(p, (_ :: _ as tl), _) ->
         let variance =
@@ -1305,12 +1308,14 @@ let rec update_level env level expand ty =
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
     | Tvar { jkind } ->
-      set_level ();
-      begin match Jkind.update_level level jkind with
+      begin match Jkind.update_level env level jkind with
       | Ok () -> ()
       | Error Rigid ->
         Misc.fatal_error "Ctype.update_level: rigid sort variable"
-      end
+      | Error (Escape path) ->
+        raise_escape_exn (Constructor (Kind, path))
+      end;
+      set_level ()
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1352,11 +1357,13 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          match Jkind.update_level var_level jkind with
+          match Jkind.update_level env var_level jkind with
           | Ok () -> ()
           | Error Rigid ->
             Misc.fatal_error
               "Ctype.lower_contravariant: rigid sort variable"
+          | Error (Escape path) ->
+            raise_escape_exn (Constructor (Kind, path))
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -3518,7 +3525,7 @@ let constrain_type_jkind ~allow_mutation env ty jkind =
             ty's_jkind jkind
         in
         let+ () =
-          Jkind.update_level (get_level ty) ty's_new_jkind
+          Jkind.update_level env (get_level ty) ty's_new_jkind
           |> Result.map_error (fun error ->
             Jkind.Violation.of_ ~context env (
               Not_a_subjkind (ty's_jkind, jkind,
@@ -4460,7 +4467,7 @@ let reify uenv t =
           let path, t = create_fresh_constr level name jkind in
           link_type ty t;
           if level < fresh_constr_scope then
-            raise_for Unify (Escape (escape (Constructor path)))
+            raise_for Unify (Escape (escape (Constructor (Type, path))))
       | Tvariant r ->
           if not (static_row r) then begin
             if is_fixed r then iterator (row_more r) else
@@ -4475,7 +4482,7 @@ let reify uenv t =
                     ~name:(row_name r) ~closed:(row_closed r) in
                 link_type m (newty2 ~level (Tvariant row));
                 if level < fresh_constr_scope then
-                  raise_for Unify (Escape (escape (Constructor path)))
+                  raise_for Unify (Escape (escape (Constructor (Type, path))))
             | _ -> assert false
           end;
           iter_row iterator r

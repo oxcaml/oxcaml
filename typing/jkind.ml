@@ -151,7 +151,9 @@ module Layout = struct
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
 
-  type level_error = Sort.level_error = Rigid
+  type level_error = Sort.level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error = Sort.error =
     | Incompatible
@@ -1038,6 +1040,8 @@ module Base = struct
     | Layout l -> Layout (f l)
     | Kconstr (p, sa, op) -> Kconstr (p, sa, op)
 
+  let of_const = map_layout ~f:Layout.of_const
+
   let format format_layout ppf base =
     match base with
     | Layout l -> format_layout ppf l
@@ -1056,7 +1060,6 @@ module Base = struct
         Some (Jkind0.Base_and_axes.meet_scannable_axes base sa))
 
   let expand_pair env t1 t2 =
-    let of_const = map_layout ~f:Layout.of_const in
     match expand_once env t1, expand_once env t2 with
     | None, None -> None
     | Some t1, None -> Some (of_const t1, t2)
@@ -1105,8 +1108,7 @@ end
 module Base_and_axes = struct
   include Jkind0.Base_and_axes
 
-  let jkind_desc_of_const const =
-    { const with base = Base.map_layout ~f:Layout.of_const const.base }
+  let jkind_desc_of_const const = { const with base = Base.of_const const.base }
 
   let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
     Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
@@ -3129,21 +3131,26 @@ let get_layout env jk : Layout.Const.t option =
   Option.bind (extract_layout_opt env jk) Layout.get_const
 
 let default_to_scannable t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
+  (* [Kconstr] cannot contain non-generic variables which could be defaulted. *)
   match t.jkind.base with
   | Kconstr _ -> ()
   | Layout l -> ignore (Layout.default_to_scannable_and_get l)
 
 let generalize ~current_level t =
-  (* Expanding unnecessary in the case of a Kconstr, which is constant. *)
   match t.jkind.base with
+  (* [Kconstr] cannot contain non-generic variables to generalize. *)
   | Kconstr _ -> ()
   | Layout l -> Layout.generalize ~current_level l
 
-let update_level level t : (unit, Sort.level_error) result =
-  match t.jkind.base with
+let rec update_level_base env level = function
+  | Kconstr (path, _, _) as base when level < Path.scope path -> (
+    match Base.expand_once env base with
+    | Some base' -> Base.of_const base' |> update_level_base env level
+    | None -> Error (Layout.Escape path))
   | Kconstr _ -> Ok ()
   | Layout l -> Layout.update_level level l
+
+let update_level env level t = update_level_base env level t.jkind.base
 
 let get t = Jkind_desc.get t.jkind
 

@@ -68,7 +68,9 @@ module Sort = struct
       id : int
     }
 
-  type level_error = Rigid
+  type level_error =
+    | Rigid
+    | Escape of Path.t
 
   type error =
     | Incompatible

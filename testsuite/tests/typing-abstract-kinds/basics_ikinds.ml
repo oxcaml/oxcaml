@@ -1877,26 +1877,14 @@ let cell = ref (None : (_ : any) id option)
 module G (X : sig kind_ ka end) = struct
   let c = (cell : (_ : X.ka) id option ref)
 end
-
-module A = G (struct kind_ ka = value end)
-module B = G (struct kind_ ka = value end)
 [%%expect{|
 val cell : '_weak1 id option ref = {contents = None}
-module G :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
-module A : sig val c : '_weak1 id option ref end
-module B : sig val c : '_weak1 id option ref end
-|}]
-
-let () = A.c := (None : int id option)
-let () = B.c := (None : bool id option)
-[%%expect{|
-Line 2, characters 16-39:
-2 | let () = B.c := (None : bool id option)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "bool id option"
-       but an expression was expected of type "int id option"
-       Type "bool" is not compatible with type "int"
+Line 7, characters 11-15:
+7 |   let c = (cell : (_ : X.ka) id option ref)
+               ^^^^
+Error: The value "cell" has type "'weak1 id option ref"
+       but an expression was expected of type "'a id option ref"
+       The kind constructor "X.ka" would escape its scope
 |}]
 
 (*******************************************************************)
@@ -1972,18 +1960,26 @@ let () = A_refine.c := (None : int id option)
 let () = B_refine.c := (None : bool id option)
 [%%expect{|
 val cell_refine : '_weak5 id option ref = {contents = None}
-module G_refine :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak5 id option ref end
-module K_refine : sig kind_ ka = value end
-module A_refine : sig val c : '_weak6 id option ref end
-module B_refine : sig val c : '_weak7 id option ref end
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'weak5 id option"
+       The kind of 'weak5 is any
+         because of the annotation on the wildcard _ at line 1, characters 30-39.
+       But the kind of 'weak5 must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 6, characters 34-44.
 |}, Principal{|
 val cell_refine : '_weak3 id option ref = {contents = None}
-module G_refine :
-  functor (X : sig kind_ ka end) -> sig val c : '_weak3 id option ref end
-module K_refine : sig kind_ ka = value end
-module A_refine : sig val c : '_weak4 id option ref end
-module B_refine : sig val c : '_weak5 id option ref end
+Line 6, characters 26-55:
+6 |   let () = cell_refine := (None : (_ : X.ka) id option)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'weak3 id option"
+       The kind of 'weak3 is any
+         because of the annotation on the wildcard _ at line 1, characters 30-39.
+       But the kind of 'weak3 must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 6, characters 34-44.
 |}]
 
 let f_refine (x : (_ : any) id option ref) =
@@ -1992,7 +1988,15 @@ let f_refine (x : (_ : any) id option ref) =
   end in
   ()
 [%%expect{|
-val f_refine : ('a : X.ka). 'a id option ref -> unit = <fun>
+Line 3, characters 18-47:
+3 |     let () = x := (None : (_ : X.ka) id option)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a id option"
+       but an expression was expected of type "'b id option"
+       The kind of 'a is any
+         because of the annotation on the wildcard _ at line 1, characters 18-27.
+       But the kind of 'a must be a subkind of X.ka
+         because of the annotation on the wildcard _ at line 3, characters 26-36.
 |}]
 
 (*************************************************************************)
@@ -2006,9 +2010,9 @@ let x_letmodule =
   end in
   M.r
 [%%expect{|
-val x_letmodule : '_weak8 id option ref = {contents = None}
-|}, Principal{|
-val x_letmodule : '_weak6 id option ref = {contents = None}
+>> Fatal error: Ctype.lower_nongen: kind escape
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* [k] has a manifest, so the variable can be given its expansion, and [r] and
@@ -2021,21 +2025,9 @@ end
 let () = M_manifest_local.r := (None : int id option)
 let (_ : bool id option) = M_manifest_local.get ()
 [%%expect{|
-module M_manifest_local :
-  sig
-    kind_ k = value
-    val r : '_weak9 id option ref
-    val get : unit -> '_weak9 id option
-  end
-- : bool id option = None
-|}, Principal{|
-module M_manifest_local :
-  sig
-    kind_ k = value
-    val r : '_weak7 id option ref
-    val get : unit -> '_weak7 id option
-  end
-- : bool id option = None
+>> Fatal error: Ctype.lower_nongen: kind escape
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module M_abstract_local = struct
@@ -2045,23 +2037,9 @@ module M_abstract_local = struct
 end
 let () = M_abstract_local.r := (None : M_abstract_local.t id option)
 [%%expect{|
-module M_abstract_local :
-  sig kind_ k type t : k val r : '_weak10 id option ref end
-Line 6, characters 31-68:
-6 | let () = M_abstract_local.r := (None : M_abstract_local.t id option)
-                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "M_abstract_local.t id option"
-       but an expression was expected of type "'a id option"
-       The type constructor "M_abstract_local.t" would escape its scope
-|}, Principal{|
-module M_abstract_local :
-  sig kind_ k type t : k val r : '_weak8 id option ref end
-Line 6, characters 31-68:
-6 | let () = M_abstract_local.r := (None : M_abstract_local.t id option)
-                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "M_abstract_local.t id option"
-       but an expression was expected of type "'a id option"
-       The type constructor "M_abstract_local.t" would escape its scope
+>> Fatal error: Ctype.lower_nongen: kind escape
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module G_local (X : sig kind_ ka end) = struct
@@ -2079,38 +2057,9 @@ end
 let () = M_include_functor.c := (None : int id option)
 let (_ : bool id option) = M_include_functor.get ()
 [%%expect{|
-module G_local :
-  functor (X : sig kind_ ka end) ->
-    sig
-      val c : '_weak11 id option ref
-      val get : unit -> '_weak11 id option
-    end
-module K_local : sig kind_ ka = value end
-module A_local :
-  sig val c : '_weak12 id option ref val get : unit -> '_weak13 id option end
-- : bool id option = None
-module M_include_functor :
-  sig
-    kind_ ka = value
-    val c : '_weak14 id option ref
-    val get : unit -> '_weak15 id option
-  end
-- : bool id option = None
-|}, Principal{|
-module G_local :
-  functor (X : sig kind_ ka end) ->
-    sig val c : '_weak9 id option ref val get : unit -> '_weak9 id option end
-module K_local : sig kind_ ka = value end
-module A_local :
-  sig val c : '_weak10 id option ref val get : unit -> '_weak11 id option end
-- : bool id option = None
-module M_include_functor :
-  sig
-    kind_ ka = value
-    val c : '_weak12 id option ref
-    val get : unit -> '_weak13 id option
-  end
-- : bool id option = None
+>> Fatal error: Ctype.lower_nongen: kind escape
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 module type Empty = sig end
@@ -2121,7 +2070,9 @@ let p_package =
   end : Empty)
 [%%expect{|
 module type Empty = sig end
-val p_package : (module Empty) = <module>
+>> Fatal error: Ctype.lower_nongen: kind escape
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (*********************************************************************)
@@ -2142,12 +2093,12 @@ let (_ : bool id option) = A_anon.get ()
 [%%expect{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak16 id option ref val get : unit -> '_weak17 id option end
+  sig val c : '_weak6 id option ref val get : unit -> '_weak7 id option end
 - : bool id option = None
 |}, Principal{|
 module K_anon : sig kind_ ka = value end
 module A_anon :
-  sig val c : '_weak14 id option ref val get : unit -> '_weak15 id option end
+  sig val c : '_weak4 id option ref val get : unit -> '_weak5 id option end
 - : bool id option = None
 |}]
 
