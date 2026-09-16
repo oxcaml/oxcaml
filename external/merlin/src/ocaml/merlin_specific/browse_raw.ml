@@ -86,7 +86,7 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Mode.Alloc.atom Location.loc
+  | Mode of Mode.With_locality.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
   | Jkind_declaration of Typedtree.jkind_declaration
@@ -566,7 +566,7 @@ let rec of_expression_desc loc = function
         record_repres = _;
         lid = _;
         label = _;
-        alloc_mode = _
+        locality_mode = _
       } -> of_expression record
   | Texp_hole _ -> id_fold
   | Texp_quote exp -> of_expression exp
@@ -795,7 +795,9 @@ let of_node node =
                 name = { txt = name; loc = vd.val_loc };
                 uid = vd.val_uid;
                 sort;
-                mode = Mode.Value.disallow_right Mode.Value.legacy
+                mode =
+                  Mode.With_regionality.disallow_right
+                    Mode.With_regionality.legacy
               };
           pat_loc = vd.val_loc;
           pat_extra = [];

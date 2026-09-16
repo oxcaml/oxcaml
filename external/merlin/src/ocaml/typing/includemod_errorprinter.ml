@@ -280,8 +280,10 @@ module Is_modal = struct
   open Err
   let rec module_type_symptom = function
     | Mode e ->
-       let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
-        Some (Mode.Value.Axis.P ax)
+       let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
+        Some (Mode.With_regionality.Axis.P ax)
     | Signature s -> signature_symptom s
     | Functor _ | Invalid_module_alias _ | After_alias_expansion _ | Mt_core _
       -> None
@@ -303,14 +305,18 @@ module Is_modal = struct
 
   and class_declaration_symptom = function
     | Class_mode e ->
-        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
-        Some (Mode.Value.Axis.P ax)
+        let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
+        Some (Mode.With_regionality.Axis.P ax)
     | Class_type _ -> None
 
   and value_mismatch : Includecore.value_mismatch -> _ = function
     | Mode e ->
-        let Mode.Value.Error (ax, _) = Mode.Value.to_simple_error e in
-        Some (Mode.Value.Axis.P ax)
+        let Mode.With_regionality.Error (ax, _) =
+         Mode.With_regionality.to_simple_error e
+       in
+        Some (Mode.With_regionality.Axis.P ax)
     | _ -> None
 
   and functor_param_symptom = function
@@ -323,42 +329,42 @@ module Is_modal = struct
 end
 
 let zap_axis_to_floor
-  : type a. a Mode.Value.Axis.t -> Mode.Value.l -> a
+  : type a. a Mode.With_regionality.Axis.t -> Mode.With_regionality.l -> a
   = fun ax m ->
   match ax with
   | Comonadic ax ->
-      Mode.Value.Comonadic.Per_axis.zap_to_floor ax
-        (Mode.Value.proj_comonadic ax m)
+      Mode.With_regionality.Comonadic.Per_axis.zap_to_floor ax
+        (Mode.With_regionality.proj_comonadic ax m)
   | Monadic ax ->
-      Mode.Value.Monadic.Per_axis.zap_to_floor ax
-        (Mode.Value.proj_monadic ax m)
+      Mode.With_regionality.Monadic.Per_axis.zap_to_floor ax
+        (Mode.With_regionality.proj_monadic ax m)
 
 let zap_axis_to_ceil
-  : type a. a Mode.Value.Axis.t -> Mode.Value.r -> a
+  : type a. a Mode.With_regionality.Axis.t -> Mode.With_regionality.r -> a
   = fun ax m ->
   match ax with
   | Comonadic ax ->
-      Mode.Value.Comonadic.Per_axis.zap_to_ceil ax
-        (Mode.Value.proj_comonadic ax m)
+      Mode.With_regionality.Comonadic.Per_axis.zap_to_ceil ax
+        (Mode.With_regionality.proj_comonadic ax m)
   | Monadic ax ->
-      Mode.Value.Monadic.Per_axis.zap_to_ceil ax
-        (Mode.Value.proj_monadic ax m)
+      Mode.With_regionality.Monadic.Per_axis.zap_to_ceil ax
+        (Mode.With_regionality.proj_monadic ax m)
 
 let print_out_mode
-: type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _ -> _
+: type a. ?in_structure:_ -> a Mode.With_regionality.Axis.t -> a -> _ -> _
 = fun ?(in_structure=false) ax mode ->
-  let print = Mode.Value.Const.print_axis ax in
+  let print = Mode.With_regionality.Const.print_axis ax in
   if in_structure then
     fun ppf -> Fmt.fprintf ppf " (* in a structure at %a *)" print mode
   else
     fun ppf -> Fmt.fprintf ppf " @@ %a" print mode
 
 let maybe_print_mode_l ~is_modal mode =
-  let mode = Mode.Value.disallow_right mode in
+  let mode = Mode.With_regionality.disallow_right mode in
   match is_modal with
   | None -> fun _ppf -> ()
   | Some ax ->
-      let (P ax) : Mode.Value.Axis.packed = ax in
+      let (P ax) : Mode.With_regionality.Axis.packed = ax in
       let mode =
         mode
         (* error printing, so mutation doesn't need to be backtracked *)
@@ -367,21 +373,22 @@ let maybe_print_mode_l ~is_modal mode =
       print_out_mode ax mode
 
 let maybe_print_mode_r ~is_modal mode =
-  let mode = Mode.Value.disallow_left mode in
+  let mode = Mode.With_regionality.disallow_left mode in
   match is_modal with
   | None -> fun _ppf -> ()
   | Some ax ->
-      let (P ax) : Mode.Value.Axis.packed = ax in
+      let (P ax) : Mode.With_regionality.Axis.packed = ax in
       let mode = mode |> zap_axis_to_ceil ax in
       print_out_mode ax mode
 
 let print_modes ?in_structure ax (modes : Includemod.modes) =
-  let (P ax) : Mode.Value.Axis.packed = ax in
+  let (P ax) : Mode.With_regionality.Axis.packed = ax in
   let mode1, mode2 =
     match modes with
     | All -> assert false
     | Specific ((mode1, _), mode2) ->
-        Mode.Value.disallow_right mode1, Mode.Value.disallow_left mode2
+        Mode.With_regionality.disallow_right mode1,
+        Mode.With_regionality.disallow_left mode2
   in
   let mode1 =
     mode1
@@ -402,12 +409,12 @@ let maybe_print_modes ?in_structure ~is_modal (modes : Includemod.modes) =
 let dthen_mode_l ~is_modal mm t =
   Fmt.dprintf "%t%t" t (maybe_print_mode_l ~is_modal mm)
 
-let maybe_print_alloc_mode_r ~is_modal mm =
-  let mm = Mode.alloc_as_value mm in
+let maybe_print_mode_with_locality_r ~is_modal mm =
+  let mm = Mode.with_locality_as_regionality mm in
   maybe_print_mode_r ~is_modal mm
 
-let dthen_alloc_mode_r ~is_modal mm t =
-  Fmt.dprintf "%t%t" t (maybe_print_alloc_mode_r ~is_modal mm)
+let dthen_mode_with_locality_r ~is_modal mm t =
+  Fmt.dprintf "%t%t" t (maybe_print_mode_with_locality_r ~is_modal mm)
 
 (**
    In order to display a list of functor arguments in a compact format,
@@ -438,7 +445,7 @@ module With_shorthand = struct
 
   type functor_param =
     | Unit
-    | Named of (Ident.t option * Types.module_type t * Mode.Alloc.lr)
+    | Named of (Ident.t option * Types.module_type t * Mode.With_locality.lr)
 
   (** Shorthand generation *)
   type kind =
@@ -513,30 +520,31 @@ module With_shorthand = struct
     | Unit -> Fmt.dprintf "()"
     | Named(_,short_mty, mm) ->
         match short_mty with
-        | Original mty -> dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
+        | Original mty ->
+            dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
         | Synthetic {name; item = mty} ->
             Fmt.dprintf
               "%s@ =@ %t" name (dmodtype mty)
-            |> dthen_alloc_mode_r ~is_modal mm
+            |> dthen_mode_with_locality_r ~is_modal mm
 
   let param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (_, short_mty, mm) ->
         pp dmodtype short_mty
-        |> dthen_alloc_mode_r ~is_modal mm
+        |> dthen_mode_with_locality_r ~is_modal mm
 
   let qualified_param ~is_modal x = match functor_param x with
     | Unit -> Fmt.dprintf "()"
     | Named (None, Original (Mty_signature []), mm) ->
         Fmt.dprintf "(sig end%t)"
-          (maybe_print_alloc_mode_r ~is_modal mm)
+          (maybe_print_mode_with_locality_r ~is_modal mm)
     | Named (None, short_mty, mm) ->
         pp dmodtype short_mty
-        |> dthen_alloc_mode_r ~is_modal mm
+        |> dthen_mode_with_locality_r ~is_modal mm
     | Named (Some p, short_mty, mm) ->
         Fmt.dprintf "(%s : %t)"
           (Ident.name p) (pp dmodtype short_mty
-          |> dthen_alloc_mode_r ~is_modal mm)
+          |> dthen_mode_with_locality_r ~is_modal mm)
 
   let definition_of_argument ~is_modal ua =
     let arg, mty, (mode, _locks) = ua.item in
@@ -754,7 +762,7 @@ module Functor_suberror = struct
         match e.With_shorthand.item with
         | Types.Unit -> Fmt.dprintf "()"
         | Types.Named(_, mty, mm) ->
-            dmodtype mty |> dthen_alloc_mode_r ~is_modal mm
+            dmodtype mty |> dthen_mode_with_locality_r ~is_modal mm
       in
       Fmt.dprintf
         "Modules do not match:@ @[%t@]@;<1 -2>\

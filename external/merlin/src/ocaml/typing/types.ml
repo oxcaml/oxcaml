@@ -110,7 +110,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
       ; atomic : atomic
       }
 
@@ -125,9 +125,9 @@ let is_atomic = function
 
 (** Takes [m0] which is the parameter of [let mutable], returns the
     mode of new values in future writes. *)
-let mutable_mode m0 : _ Mode.Value.t =
+let mutable_mode m0 : _ Mode.With_regionality.t =
   { comonadic = m0
-  ; monadic = Mode.Value.Monadic.(min |> allow_left |> allow_right)
+  ; monadic = Mode.With_regionality.Monadic.(min |> allow_left |> allow_right)
   }
 
 (* Type expressions for the core language *)
@@ -186,7 +186,7 @@ and arg_label =
   | Position of string
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 and package =
     { pack_path : Path.t;
@@ -330,7 +330,7 @@ module Vars = Misc.Stdlib.String.Map
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable value *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -724,7 +724,7 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
@@ -732,11 +732,11 @@ module type Wrapped = sig
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -1862,11 +1862,17 @@ let undo_compress (changes, _old) =
 
 let class_mode =
   let hint : _ Mode.Hint.const = Legacy Class in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
-  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+  Mode.With_regionality.(of_const
+    ~hint_monadic:hint
+    ~hint_comonadic:hint
+    Const.legacy)
 
 (* Merlin specific *)
 let linked_variables () = !linked_variables
