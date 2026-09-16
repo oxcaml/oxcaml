@@ -380,11 +380,14 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
         else callee, call_widget
       in
       if is_external
-      then (
-        Acc.add_cond_any_source acc ~denv call_widget;
-        match callee with
-        | None -> ()
-        | Some callee -> Acc.add_cond_any_usage acc ~denv callee)
+      then
+        Acc.add_code_reference acc
+          (Traverse_acc.Direct_call
+             { call = call_widget;
+               code_id;
+               closure = Option.map (Acc.simple_to_node acc ~denv) callee;
+               caller = Env.current_code_id denv
+             })
       else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr =
@@ -828,6 +831,8 @@ type result =
     fixed_arity_continuations : Continuation.Set.t;
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
+    code_references : Traverse_acc.code_reference list;
+    le_monde_exterieur : Symbol.t;
     applications : Rebuild_queries.Applications.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
@@ -842,10 +847,7 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants () =
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
+let run0 unit acc ~all_constants ~le_monde_exterieur () =
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
   Acc.add_any_usage acc (Code_id_or_name.var dummy_toplevel_return);
@@ -879,8 +881,12 @@ let run0 unit acc ~all_constants () =
 let run (unit : Flambda_unit.t) =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
+  let le_monde_exterieur =
+    create_symbol_and_add_any_source acc "le_monde_extérieur"
+  in
   let holed =
-    Profile.record_call ~accumulate:false "down" (run0 unit acc ~all_constants)
+    Profile.record_call ~accumulate:false "down"
+      (run0 unit acc ~all_constants ~le_monde_exterieur)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
@@ -894,6 +900,8 @@ let run (unit : Flambda_unit.t) =
     fixed_arity_continuations;
     continuation_info;
     code_deps;
+    code_references = Acc.code_references acc;
+    le_monde_exterieur;
     applications = Acc.applications acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc;
     closure_function_decls = Acc.get_closure_function_decls acc

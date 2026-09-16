@@ -43,6 +43,28 @@ type code_dep =
     unknown_arity_call_witnesses : Code_id_or_name.t list
   }
 
+(** A reference to code outside the current compilation unit: a closure whose
+    code is external, or a direct call to external code. The traversal records
+    these instead of adding graph edges; [Cross_unit_calls.link] resolves them
+    once all code has been traversed, either connecting the reference to the
+    code's call witnesses or making it escape. *)
+type code_reference =
+  | Closure of
+      { closure : Code_id_or_name.t;
+        code_id : Code_id.t
+      }
+  | Direct_call of
+      { call : Code_id_or_name.t;
+            (** The call witness of the application, guarded as in [apply_dep]
+                for the [Auto] mode of
+                [Traverse_env.should_preserve_direct_calls]. *)
+        code_id : Code_id.t;
+        closure : Code_id_or_name.t option;
+            (** The callee closure, if any, guarded likewise. *)
+        caller : Code_id.t option
+            (** The code containing the application, if any. *)
+      }
+
 (** A record of a direct function application, to be resolved into graph edges
     once all code has been traversed. *)
 type apply_dep =
@@ -94,6 +116,18 @@ val find_code_dep : t -> Code_id.t -> code_dep option
 
 (** Return the map of all registered code deps. *)
 val code_deps : t -> code_dep Code_id.Map.t
+
+(** Return all recorded code references. *)
+val code_references : t -> code_reference list
+
+(** Connect a closure to the call witnesses of its code, whose [code_dep] is
+    given. *)
+val connect_closure :
+  Graph.graph ->
+  closure:Code_id_or_name.t ->
+  code_id:Code_id.t ->
+  code_dep ->
+  unit
 
 val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
 
@@ -176,6 +210,10 @@ val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
 (** Record a direct function application to be resolved later by [deps]. Only
     used for applications to code ids in the current compilation unit. *)
 val add_apply : t -> apply_dep -> unit
+
+(** Record a reference to external code, to be resolved later by
+    [Cross_unit_calls.link]. *)
+val add_code_reference : t -> code_reference -> unit
 
 (** Create the call witness node for a known-arity function definition. The
     witness carries parameter, return, exception, and code-id edges
