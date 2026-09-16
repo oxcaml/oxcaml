@@ -379,9 +379,13 @@ let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
         in
         Label.Set.fold
           (fun successor_label critical_edges ->
-            Cfg_edge.Set.add
-              { Cfg_edge.src = label; dst = successor_label }
-              critical_edges)
+            let successor_block = Cfg.get_block_exn cfg successor_label in
+            if Label.Set.cardinal successor_block.predecessors = 1
+            then critical_edges
+            else
+              Cfg_edge.Set.add
+                { Cfg_edge.src = label; dst = successor_label }
+                critical_edges)
           successor_labels critical_edges)
 
 let prelude :
