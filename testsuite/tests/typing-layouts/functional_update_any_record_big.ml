@@ -138,3 +138,11 @@ let () =
   let r = { (mk ()) with y = 1000 } in
   Printf.printf "same x=%d " r.x;
   check "same" r.f0 r.f100 r.f253 r.y
+
+(* Same layout, different scannable axes. *)
+let () =
+  let update_x (r : int big) (x : string) : string big = { r with x } in
+  (* use Sys.opaque_identity to work around internal ticket 7878 *)
+  let r = update_x (Sys.opaque_identity (mk ())) (String.make 3 'a') in
+  Printf.printf "scannable axes x=%s " r.x;
+  check "scannable axes" r.f0 r.f100 r.f253 r.y
