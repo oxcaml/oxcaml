@@ -963,10 +963,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -987,10 +989,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_undetermined ->
+              num_nodes_visited, Lambda.Constructor_undetermined
           | Constructor_immediate_all_void ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected immediate constructor"
-          | Constructor_undetermined | Constructor_variable _ ->
+          | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
@@ -1023,7 +1027,12 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                        Typedecl.update_constructor_representation
                          env loc cd_args ~is_extension_constructor:false
                      in
-                     Result.to_option repr, { constructor with cd_args })
+                     let shape =
+                       match repr with
+                       | Ok shape -> shape
+                       | Error _ -> Types.Constructor_undetermined
+                     in
+                     Some shape, { constructor with cd_args })
               in
               match cstr_shape_opt with
               | None -> None
@@ -1065,6 +1074,20 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
       ~params ~args (labels : Types.label_declaration list) rep =
+  let of_shape num_nodes_visited fields =
+    let tag =
+      match rep with
+      | Record_inlined (Ordinary {runtime_tag}, _, _) -> runtime_tag
+      | Record_float | Record_ufloat -> Obj.double_array_tag
+      | Record_boxed | Record_mixed _ | Record_undetermined
+      | Record_inlined (Extension _, _, _) -> 0
+      | Record_unboxed | Record_dummy _ | Record_variable _
+      | Record_inlined (Null, _, _) ->
+          Misc.fatal_error "Typeopt: unexpected record representation"
+    in
+    num_nodes_visited,
+    non_nullable (Pvariant { consts = []; non_consts = [tag, fields] })
+  in
   let recompute make_rep =
     match
       List.map (fun (label : Types.label_declaration) ->
@@ -1077,7 +1100,8 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
     | labels ->
         let types = List.map (fun label -> label.Types.ld_type) labels in
         match Typedecl.compute_block_shape env types with
-        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | `Undetermined ->
+            of_shape num_nodes_visited Lambda.Constructor_undetermined
         | (`Not_mixed | `Mixed _) as shape ->
             value_kind_immutable_record env ~loc ~visited ~depth
               ~num_nodes_visited ~params ~args labels (make_rep shape)
@@ -1156,25 +1180,7 @@ and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
           value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
             ~shape (List.map (fun t -> Some t) types)
       in
-      let non_consts =
-        match rep with
-        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-          [runtime_tag, fields]
-        | Record_float | Record_ufloat ->
-          [ Obj.double_array_tag, fields ]
-        | Record_boxed ->
-          [0, fields]
-        | Record_inlined (Extension _, _, _) ->
-          [0, fields]
-        | Record_mixed _ ->
-          [0, fields]
-        | Record_unboxed -> assert false
-        | Record_inlined (Null, _, _) -> assert false
-        | Record_dummy _ -> assert false
-        | Record_undetermined | Record_variable _ -> assert false
-      in
-      (num_nodes_visited,
-       non_nullable (Pvariant { consts = []; non_consts }))
+      of_shape num_nodes_visited fields
     end
 
 let value_kind env loc ty =
