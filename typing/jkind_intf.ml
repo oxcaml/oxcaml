@@ -105,7 +105,9 @@ module type Sort = sig
     val all_void : t -> bool
 
     (** [subst s t] applies the variable substitution [s] to [t], replacing each
-        [Genvar v], where [(v, t')] is in [s], with [t']. *)
+        [Genvar v], where [(v, t')] is in [s], with [t'].
+
+        Raises [Not_found] if no pairing for [v] occurs in [s]. *)
     val subst : (var * t) list -> t -> t
 
     (** True if the sort contains no univars or genvars.
