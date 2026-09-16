@@ -13,8 +13,7 @@ external is_int : 'a -> bool = "%obj_is_int"
 let record_is_int (x : _ t) = is_int x
 [%%expect_asm X86_64{|
 record_is_int:
-  andl  $1, %eax
-  leaq  1(%rax,%rax), %rax
+  movl  $1, %eax
   ret
 |}]
 
@@ -23,8 +22,7 @@ type ('a : any) variant = A of 'a | B of int
 let variant_is_int (x : _ variant) = is_int x
 [%%expect_asm X86_64{|
 variant_is_int:
-  andl  $1, %eax
-  leaq  1(%rax,%rax), %rax
+  movl  $1, %eax
   ret
 |}]
 
