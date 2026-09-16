@@ -168,8 +168,7 @@ let extra_atoms_for_provenance ~stats ~rule_id atom =
     in
     let name = Table.Id.name tid ^ ".provenance" in
     [Lang.callback_with_bindings ~name provenance_fn args]
-  | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
-    Misc.fatal_error "Relation is not supported in rules"
+  | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> []
 
 let compile_rule ?with_provenance ~rule_id vars rule =
   let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
