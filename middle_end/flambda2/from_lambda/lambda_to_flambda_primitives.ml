@@ -65,6 +65,12 @@ let boxable_number_of_boxed_integer (bint : L.boxed_integer) :
   | Boxed_int32 -> Naked_int32
   | Boxed_int64 -> Naked_int64
 
+let boxable_number_of_unboxed_vector : L.unboxed_vector -> K.Boxable_number.t =
+  function
+  | Unboxed_vec128 -> Naked_vec128
+  | Unboxed_vec256 -> Naked_vec256
+  | Unboxed_vec512 -> Naked_vec512
+
 let standard_int_of_unboxed_integer :
     L.unboxed_or_untagged_integer -> K.Standard_int.t = function
   | Untagged_int8 -> Naked_int8
@@ -83,6 +89,20 @@ let standard_int_or_float_of_unboxed_integer
   | Untagged_int16 -> Naked_int16
   | Unboxed_int32 -> Naked_int32
   | Unboxed_int64 -> Naked_int64
+
+let flat_suffix_element_of_unboxed_integer :
+    L.unboxed_or_untagged_integer -> K.flat_suffix_element = function
+  | Untagged_int -> Naked_immediate
+  | Unboxed_nativeint -> Naked_nativeint
+  | Untagged_int8 -> Naked_int8
+  | Untagged_int16 -> Naked_int16
+  | Unboxed_int32 -> Naked_int32
+  | Unboxed_int64 -> Naked_int64
+
+let flat_suffix_element_of_unboxed_float :
+    L.unboxed_float -> K.flat_suffix_element = function
+  | Unboxed_float64 -> Naked_float
+  | Unboxed_float32 -> Naked_float32
 
 let standard_int_or_float_of_peek_or_poke (layout : L.peek_or_poke) :
     K.Standard_int_or_float.t =
@@ -3662,11 +3682,57 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
-  | Pbox (_layout, _mode), [_args] ->
-    (* CR zeisbach: implement this translation! need to look at what we know
-       about the args at this point (can we get their layout? should we be
-       checking for consistency? the checks have to happen somewhere.) *)
+  | Pbox (Punboxed_product _layouts, _mode), [_args] ->
+    (* CR zeisbach: implement this translation! *)
     Misc.fatal_errorf "implement this!"
+  | ( Pbox
+        ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+             ) as layout),
+          mode ),
+      [[arg]] ) -> (
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    let box_number (kind : K.Boxable_number.t) : H.expr_primitive list =
+      [Unary (Box_number (kind, mode), arg)]
+    in
+    let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
+      let shape =
+        K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
+      in
+      [ Variadic
+          ( Make_block
+              (Mixed (Tag.Scannable.zero, shape), Mutability.Immutable, mode),
+            [arg] ) ]
+    in
+    (* CR zeisbach: this assumes that everything is addressable! Meaning small
+       numbers are boxed as singleton tag-0 mixed blocks and not as tagged
+       immediates. Once we have addressable layouts, we will need to handle both
+       ways of boxing. *)
+    match layout with
+    | Pvalue value_kind ->
+      let shape =
+        [K.With_subkind.from_lambda_value_kind ~machine_width value_kind]
+      in
+      [ Variadic
+          ( Make_block
+              (Values (Tag.Scannable.zero, shape), Mutability.Immutable, mode),
+            [arg] ) ]
+    | Punboxed_float f ->
+      mixed_singleton (flat_suffix_element_of_unboxed_float f)
+    | Punboxed_or_untagged_integer i ->
+      mixed_singleton (flat_suffix_element_of_unboxed_integer i)
+    (* These will eventually be lowered into singleton mixed blocks, as above,
+       but using [box_number] instead of [mixed_singleton] enables some peephole
+       optimizations. *)
+    | Punboxed_vector v -> box_number (boxable_number_of_unboxed_vector v)
+    | Punboxed_mask -> box_number Naked_mask
+    | Ptop -> Misc.fatal_error "convert_lprim: Pbox: Ptop layout"
+    | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+    | Punboxed_product _ -> assert false (* contradicts outer match *))
   | Punbox _layout, [[_arg]] ->
     (* CR zeisbach: implement this translation! *)
     Misc.fatal_errorf "implement this!"
