@@ -348,8 +348,8 @@ let int64_length (a : int64_u array) = Array.length a
 int64_length:
   movq  -8(%rax), %rax
   salq  $8, %rax
-  shrq  $18, %rax
-  leaq  1(%rax,%rax), %rax
+  shrq  $17, %rax
+  orq   $1, %rax
   ret
 |}]
 
@@ -500,8 +500,7 @@ let int64_safe_get (a : int64_u array) (i : int) =
 int64_safe_get:
   movq  -8(%rax), %rdi
   salq  $8, %rdi
-  shrq  $18, %rdi
-  salq  $1, %rdi
+  shrq  $17, %rdi
   cmpq  %rdi, %rbx
   jae   .L0
   movq  -4(%rax,%rbx,4), %rax
