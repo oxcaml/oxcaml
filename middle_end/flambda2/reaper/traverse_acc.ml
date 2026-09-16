@@ -37,6 +37,18 @@ type code_dep =
       Code_id_or_name.t list (* One element for each (complex) parameter *)
   }
 
+type code_reference =
+  | Closure of
+      { closure : Code_id_or_name.t;
+        code_id : Code_id.t
+      }
+  | Direct_call of
+      { call : Code_id_or_name.t;
+        code_id : Code_id.t;
+        closure : Code_id_or_name.t option;
+        caller : Code_id.t option
+      }
+
 type apply_dep =
   { function_containing_apply_expr : Code_id.t option;
     apply_code_id : Code_id.t;
@@ -109,6 +121,7 @@ end
 
 type t =
   { mutable code_deps : code_dep Code_id.Map.t;
+    mutable code_references : code_reference list;
     mutable code : Rev_expr.rev_code Code_id.Map.t;
     mutable apply_deps : apply_dep list;
     mutable applications : Applications.t;
@@ -126,13 +139,19 @@ type t =
 
 let code_deps t = t.code_deps
 
+let code_references t = t.code_references
+
 let applications t = t.applications
 
 let record_apply_for_rebuild t apply =
   t.applications <- Applications.add_apply t.applications apply
 
+let add_code_reference t reference =
+  t.code_references <- reference :: t.code_references
+
 let create () =
   { code_deps = Code_id.Map.empty;
+    code_references = [];
     code = Code_id.Map.empty;
     apply_deps = [];
     applications = Applications.empty;
@@ -511,6 +530,17 @@ let make_unknown_arity_apply_widget t ~(denv : Env.t) apply ~returns ~exn =
   cond_alias t ~denv ~from:apply ~to_:(List.hd witnesses);
   apply
 
+let connect_closure graph ~closure ~code_id (code_dep : code_dep) =
+  Graph.add_propagate_dep graph
+    ~to_:(Code_id_or_name.var code_dep.my_closure)
+    ~from:closure
+    ~if_used:(Code_id_or_name.code_id code_id);
+  Graph.add_constructor_dep graph ~from:code_dep.known_arity_call_witness
+    Field.known_arity_call_witness ~base:closure;
+  Graph.add_constructor_dep graph
+    ~from:(List.hd code_dep.unknown_arity_call_witnesses)
+    Field.unknown_arity_call_witness ~base:closure
+
 let record_set_of_closures_deps_one_closure t
     { let_bound_name_of_the_closure = name;
       closure_code_id = code_id;
@@ -522,31 +552,10 @@ let record_set_of_closures_deps_one_closure t
   match find_code_dep t code_id with
   | None ->
     assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit, so we don't know what
-       happens once it is applied. As such, it must cause the whole block to
-       escape. *)
-    let witness =
-      Code_id_or_name.var
-        (Variable.create
-           (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
-           K.value)
-    in
-    add_any_source t witness;
-    add_constructor_dep t ~from:witness Field.known_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~from:witness Field.unknown_arity_call_witness
-      ~base:name;
-    add_constructor_dep t ~base:witness Field.code_id_of_call_witness ~from:name
-  | Some code_dep ->
-    add_propagate_dep t
-      ~to_:(Code_id_or_name.var code_dep.my_closure)
-      ~from:name
-      ~if_used:(Code_id_or_name.code_id code_id);
-    add_constructor_dep t ~from:code_dep.known_arity_call_witness
-      Field.known_arity_call_witness ~base:name;
-    add_constructor_dep t
-      ~from:(List.hd code_dep.unknown_arity_call_witnesses)
-      Field.unknown_arity_call_witness ~base:name
+    (* The code comes from another compilation unit; the reference is resolved
+       once the traversal is complete. *)
+    add_code_reference t (Closure { closure = name; code_id })
+  | Some code_dep -> connect_closure t.deps ~closure:name ~code_id code_dep
 
 let record_set_of_closures_deps t =
   List.iter (record_set_of_closures_deps_one_closure t) t.set_of_closures_deps
