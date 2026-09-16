@@ -1889,12 +1889,7 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
     Mixed_block_shape.of_mixed_block_elements shape
       ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
   in
-  let field_index =
-    match Mixed_block_shape.lookup_path_producing_new_indexes shape [index] with
-    | [index] -> index
-    | _ ->
-      Misc.fatal_errorf "%s: expected exactly one flattened index" prim_name
-  in
+  let field_index = Mixed_block_shape.lookup_singleton_field shape index in
   let field_kind =
     match (Mixed_block_shape.flattened_reordered_shape shape).(field_index) with
     | Value vk -> H.block_access_field_kind_of_value_kind vk
