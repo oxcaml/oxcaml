@@ -3,7 +3,7 @@
  {
    not-macos;
    (* Remove layout_beta here when block indices are out of beta *)
-   flags = "-extension layouts_beta \
+   flags = "-extension layouts_beta -extension layout_poly_alpha \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
             -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
    native;
@@ -445,6 +445,34 @@ let () =
     (fun () -> unsafe_set t idx #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
 
+(* A layout-polymorphic function calling a layout-polymorphic set primitive. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set r (.x) x in
+  (* both [string] and [int] share the same specialization of [set_x],
+     and so we have to do the conservative thing and emit [caml_modify]
+     in either case. *)
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  (* [float#] has a distinct layout and gets its own specialization where
+     [caml_modify] is skipped. *)
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
+
 (* Second, specialized versions *)
 external unsafe_set_imm : ('a : value) ('b : immediate).
   'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
@@ -634,6 +662,31 @@ let () =
   test ~expect_caml_modifies:1
     (fun () -> unsafe_set_ptr #(t, idx) #(#1L, "b", false);
                ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic ptr set
+   primitive. As above, [string] and [int] share a specialization of [set_x]
+   that must call [caml_modify], while [float#] gets its own. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set_ptr #(r, (.x)) x in
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
 
 (* Second, specialized versions *)
 external unsafe_set_ptr_imm :
