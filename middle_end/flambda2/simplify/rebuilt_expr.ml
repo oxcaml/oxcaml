@@ -395,6 +395,24 @@ module Matching_for_unique_handler = struct
   (** Maps each variable that is a parameter to the corresponding matching
       between two [Bound_parameters.t].
 
+      It might be surprising to see two nested mappings from variables here,
+      since [Match_permutable_parameters] is itself a mapping from variables.
+      The two nested mappings have fundamentally distinct meanings: the outer
+      mapping ([matching_env]) maps variables to the permutation (if any) that
+      they participate in, while the inner mapping
+      ([Match_permutable_parameters]) records, for each variable participating
+      in that specific permutation, its matching parameter in the other list.
+
+      This is helpful in two situations:
+
+      - For exception handlers, the exception parameter is matched directly and
+        then there is a permutation for the remaining params.
+
+      - If we want to support deduplication of continuations containing
+        [let_cont]s, we must make sure not to match variables from different
+        continuations together, which is taken care of by creating a distinct
+        [Match_permutable_parameters] instance for each continuation.
+
       {b Note}: Matching information is recorded by mutably modifying the
       [Match_permutable_parameters.t] instance(s), so environments should only
       be passed down the call stack, not returned. *)
@@ -471,6 +489,13 @@ module Matching_for_unique_handler = struct
     match_simples env (P.args prim1) (P.args prim2)
 
   let match_named env (named1 : Named.t) (named2 : Named.t) =
+    (* We only try to match simples and prims; other types of [named]s prevent
+       deduplication.
+
+       It is unlikely we find the same set of closure twice since we resimplify
+       them; static consts are already deduplicated separately, and rec infos
+       are unlikely to appear in the continuations we want to deduplicate (arms
+       of switches). *)
     match named1, named2 with
     | Simple simple1, Simple simple2 -> match_simple env simple1 simple2
     | Prim (prim1, _dbg1), Prim (prim2, _dbg2) ->
@@ -481,7 +506,7 @@ module Matching_for_unique_handler = struct
 
   let rec match_expr env t1 t2 =
     (* CR-someday bclement: consider sharing more expressions, e.g. apply
-       switches, and maybe let conts -- [bind_permutable_parameters] should
+       switches, and maybe let conts -- [Match_permutable_parameters] should
        allow to do this up to permutation of their parameters, but make sure
        it's not too expensive. *)
     match Expr.descr t1, Expr.descr t2 with
@@ -584,11 +609,16 @@ let match_continuation_handler ~is_exn_handler params1 handler1 params2 handler2
   | args -> Some args
 
 module Unique_continuation_handlers = struct
-  type 'a t =
-    (Bound_parameters.t * Expr.t * is_exn_handler:bool * 'a) list
-    Numeric_types.Int.Map.t
+  type 'a entry =
+    { params : Bound_parameters.t;
+      handler : Expr.t;
+      is_exn_handler : bool;
+      payload : 'a
+    }
 
-  let empty = Numeric_types.Int.Map.empty
+  type 'a t = { hash_map : 'a entry list Numeric_types.Int.Map.t } [@@unboxed]
+
+  let empty = { hash_map = Numeric_types.Int.Map.empty }
 
   let contents_hash are_rebuilding handler ~is_exn_handler
       ~free_names_without_params =
@@ -622,13 +652,15 @@ module Unique_continuation_handlers = struct
     | Null -> t
     | This hash ->
       let entries =
-        match Numeric_types.Int.Map.find_or_null hash t with
+        match Numeric_types.Int.Map.find_or_null hash t.hash_map with
         | Null -> []
         | This entries -> entries
       in
-      Numeric_types.Int.Map.add hash
-        ((params, handler.expr, ~is_exn_handler, value) :: entries)
-        t
+      let entry =
+        { params; handler = handler.expr; is_exn_handler; payload = value }
+      in
+      { hash_map = Numeric_types.Int.Map.add hash (entry :: entries) t.hash_map
+      }
 
   let find_opt are_rebuilding params handler ~is_exn_handler
       ~free_names_without_params t =
@@ -640,10 +672,11 @@ module Unique_continuation_handlers = struct
     | This hash ->
       List.find_map
         (fun
-          ( other_params,
-            other_handler,
-            ~is_exn_handler:other_is_exn_handler,
-            value )
+          { params = other_params;
+            handler = other_handler;
+            is_exn_handler = other_is_exn_handler;
+            payload = value
+          }
         ->
           if Bool.equal is_exn_handler other_is_exn_handler
           then
@@ -652,5 +685,5 @@ module Unique_continuation_handlers = struct
               (match_continuation_handler ~is_exn_handler params handler.expr
                  other_params other_handler)
           else None)
-      |> Option.bind (Numeric_types.Int.Map.find_opt hash t)
+      |> Option.bind (Numeric_types.Int.Map.find_opt hash t.hash_map)
 end
