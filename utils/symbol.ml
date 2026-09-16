@@ -45,7 +45,7 @@ include Identifiable.Make (struct
   let print ppf t = Linkage_name.print ppf t.linkage_name
 end)
 
-let caml_symbol_prefix = "caml"
+let caml_symbol_prefix = Config.caml_symbol_prefix
 
 (* NB OCaml 5.4 uses [.] as a separator only on Linux and uses $ on other
       systems. The mangling convention in OxCaml has not yet been changed

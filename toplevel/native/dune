@@ -29,7 +29,7 @@
   oxcaml_common
   flambda2_ui
   flambda2
-  dynlink_internal
+  dynlink
   unix)
  (modules genprintval_native opttoploop opttopdirs topmain))
 

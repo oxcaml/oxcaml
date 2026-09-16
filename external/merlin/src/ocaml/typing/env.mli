@@ -661,7 +661,10 @@ val crc_of_unit: Compilation_unit.Name.t -> Digest.t
 val imports: unit -> Import_info.t list
 
 (* may raise Persistent_env.Consistbl.Inconsistency *)
-val import_crcs: source:string -> Import_info.t array -> unit
+val import_crcs:
+  source:string
+  -> (Compilation_unit.Name.t * Import_info.Intf.Nonalias.t option) array
+  -> unit
 
 (* Return the set of imports represented as runtime parameters (see
    [Persistent_env.runtime_parameter_bindings] for details) *)
