@@ -1052,7 +1052,8 @@ module With_subkind = struct
           let num_fields =
             match shape with
             | Constructor_shape_uniform fields -> List.length fields
-            | Constructor_shape_mixed _ -> assert false
+            | Constructor_shape_mixed _ | Constructor_shape_undetermined ->
+              Misc.fatal_error "Invalid constructor shape for a float record"
           in
           Float_block { num_fields }
         | [], _ :: _ | _ :: _, [] | _ :: _, _ :: _ ->
@@ -1071,6 +1072,7 @@ module With_subkind = struct
                     (* CR mshinwell/vlaviron: In both of these cases it would be
                        nice to propagate immediacy information. *)
                     match (shape : Lambda.constructor_shape) with
+                    | Constructor_shape_undetermined -> None
                     | Constructor_shape_uniform fields ->
                       Some
                         ( Scannable Value_only,
