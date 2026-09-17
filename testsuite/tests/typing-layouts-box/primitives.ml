@@ -294,7 +294,8 @@ let () =
 (* Aliasing. This test would fail on bytecode if [box] did not deeply copy. *)
 
 type inner = #{ ix : int; iy : int }
-(* CR zeisbach: avoiding singleton unboxed record because it can be weird. *)
+(* CR zeisbach: avoiding singleton unboxed record because it can be weird. \
+   check what the correct/intended behavior is. *)
 type outer = { mutable u : inner; tag : int }
 
 let () =
@@ -316,7 +317,8 @@ type outer = { mutable u : inner; tag : int; }
 (* Mutability. If we said that the boxed version was [Immutable], optimizations
    could cause a stale value to be read. Simiarly, two different allocations
    could be CSE-ed away. *)
-
+(* CR zeisbach: consider adding more of these tests, or adding a some tests that
+   inspect the lambda directly? think about what to really test. *)
 let () =
   let un = #{ u = #{ ix = Sys.opaque_identity 1; iy = 2 }; tag = 7 } in
   let r1 = (box un : outer @ global) in
