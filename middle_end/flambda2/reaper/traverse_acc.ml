@@ -41,13 +41,17 @@ type code_dep =
 type code_reference =
   | Closure of
       { closure : Code_id_or_name.t;
-        code_id : Code_id.t
+        code_id : Code_id.t;
+        external_witness : Code_id_or_name.t
       }
   | Direct_call of
       { call : Code_id_or_name.t;
         code_id : Code_id.t;
         closure : Code_id_or_name.t option;
-        caller : Code_id.t option
+        caller : Code_id.t option;
+        external_call : Code_id_or_name.t;
+        external_closure : Code_id_or_name.t option;
+        external_world : Code_id_or_name.t
       }
 
 type apply_dep =
@@ -204,6 +208,21 @@ let continuation_info t k ~params ~arity ~is_exn_handler =
   t.continuation_info <- Continuation.Map.add k info t.continuation_info
 
 let get_continuation_info t = t.continuation_info
+
+let add_external_apply t ~participant_call ~(denv : Env.t) ~code_id ~witness
+    ~closure =
+  let participant_witness, participant_closure = participant_call in
+  let to_node = simple_to_node t ~all_constants:(Env.all_constants denv) in
+  add_code_reference t
+    (Direct_call
+       { call = participant_witness;
+         code_id;
+         closure = Option.map to_node participant_closure;
+         caller = Env.current_code_id denv;
+         external_call = witness;
+         external_closure = Option.map to_node closure;
+         external_world = Code_id_or_name.name (Env.le_monde_exterieur denv)
+       })
 
 let add_apply t apply = t.apply_deps <- apply :: t.apply_deps
 
@@ -497,9 +516,14 @@ let record_set_of_closures_deps_one_closure t
   match find_code_dep t code_id with
   | None ->
     assert (not (Current_unit.is_current (Code_id.get_compilation_unit code_id)));
-    (* The code comes from another compilation unit; the reference is resolved
-       once the traversal is complete. *)
-    add_code_reference t (Closure { closure = name; code_id })
+    let witness =
+      Code_id_or_name.var
+        (Variable.create
+           (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
+           K.value)
+    in
+    add_code_reference t
+      (Closure { closure = name; code_id; external_witness = witness })
   | Some code_dep -> connect_closure t.deps ~closure:name ~code_id code_dep
 
 let record_set_of_closures_deps t =
@@ -574,27 +598,55 @@ let get_closure_function_decls t = t.closure_function_decls
 
 let fold_code_reference_ids reference ~init ~f =
   match reference with
-  | Closure { closure; code_id } ->
-    f (f init closure) (Code_id_or_name.code_id code_id)
-  | Direct_call { call; code_id; closure; caller } ->
-    let acc = f (f init call) (Code_id_or_name.code_id code_id) in
+  | Closure { closure; code_id; external_witness } ->
+    let acc = f init closure in
+    let acc = f acc (Code_id_or_name.code_id code_id) in
+    f acc external_witness
+  | Direct_call
+      { call;
+        code_id;
+        closure;
+        caller;
+        external_call;
+        external_closure;
+        external_world
+      } ->
+    let acc =
+      List.fold_left f init
+        [call; Code_id_or_name.code_id code_id; external_call; external_world]
+    in
     let acc = Option.fold ~none:acc ~some:(f acc) closure in
+    let acc = Option.fold ~none:acc ~some:(f acc) external_closure in
     Option.fold ~none:acc
       ~some:(fun code_id -> f acc (Code_id_or_name.code_id code_id))
       caller
 
 let rename_code_reference renaming = function
-  | Closure { closure; code_id } ->
+  | Closure { closure; code_id; external_witness } ->
     Closure
       { closure = Renaming.apply_code_id_or_name renaming closure;
-        code_id = Renaming.apply_code_id renaming code_id
+        code_id = Renaming.apply_code_id renaming code_id;
+        external_witness =
+          Renaming.apply_code_id_or_name renaming external_witness
       }
-  | Direct_call { call; code_id; closure; caller } ->
+  | Direct_call
+      { call;
+        code_id;
+        closure;
+        caller;
+        external_call;
+        external_closure;
+        external_world
+      } ->
     Direct_call
       { call = Renaming.apply_code_id_or_name renaming call;
         code_id = Renaming.apply_code_id renaming code_id;
         closure = Option.map (Renaming.apply_code_id_or_name renaming) closure;
-        caller = Option.map (Renaming.apply_code_id renaming) caller
+        caller = Option.map (Renaming.apply_code_id renaming) caller;
+        external_call = Renaming.apply_code_id_or_name renaming external_call;
+        external_closure =
+          Option.map (Renaming.apply_code_id_or_name renaming) external_closure;
+        external_world = Renaming.apply_code_id_or_name renaming external_world
       }
 
 let ids_for_export_code_references references =

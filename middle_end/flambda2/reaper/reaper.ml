@@ -61,7 +61,6 @@ module Staged = struct
         slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
         code_deps : Traverse_acc.code_dep Code_id.Map.t;
         code_references : Traverse_acc.code_reference list;
-        le_monde_exterieur : Symbol.t;
         rebuild_queries : Rebuild_queries.Requests.t;
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
@@ -72,7 +71,6 @@ module Staged = struct
           slot_offsets_inputs;
           code_deps;
           code_references;
-          le_monde_exterieur;
           rebuild_queries;
           all_sets_of_closures
         } =
@@ -97,7 +95,7 @@ module Staged = struct
           ids all_sets_of_closures
       in
       Ids_for_export.union_list
-        [ Ids_for_export.add_symbol ids le_monde_exterieur;
+        [ ids;
           Global_flow_graph.ids_for_export deps;
           Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
           Traverse_acc.ids_for_export_code_references code_references;
@@ -126,7 +124,6 @@ module Staged = struct
           slot_offsets_inputs;
           code_deps;
           code_references;
-          le_monde_exterieur;
           rebuild_queries;
           all_sets_of_closures
         } renaming ~rename_field =
@@ -153,7 +150,6 @@ module Staged = struct
         code_deps;
         code_references =
           Traverse_acc.apply_renaming_code_references code_references renaming;
-        le_monde_exterieur = Renaming.apply_symbol renaming le_monde_exterieur;
         rebuild_queries =
           Rebuild_queries.Requests.apply_renaming rebuild_queries renaming;
         all_sets_of_closures
@@ -269,7 +265,6 @@ module Staged = struct
             continuation_info;
             code_deps;
             code_references;
-            le_monde_exterieur;
             rebuild_queries;
             all_sets_of_closures;
             closure_function_decls
@@ -287,7 +282,6 @@ module Staged = struct
           slot_offsets_inputs;
           code_deps;
           code_references;
-          le_monde_exterieur;
           rebuild_queries;
           all_sets_of_closures
         }
@@ -301,6 +295,83 @@ module Staged = struct
       }
     in
     solve_inputs, rebuild_inputs
+
+  let link_code_references ~analysis_scope
+      ~(code_deps : Traverse_acc.code_dep Code_id.Map.t) ~solve_inputs deps =
+    let module Graph = Global_flow_graph in
+    let add_alias_for_caller graph ~caller ~from ~to_ =
+      match caller with
+      | None -> Graph.add_alias graph ~from ~to_
+      | Some code_id ->
+        Graph.add_propagate_dep graph
+          ~if_used:(Code_id_or_name.code_id code_id)
+          ~from ~to_
+    in
+    let find_in_scope code_id =
+      if
+        not
+          (Analysis_scope.contains_unit analysis_scope
+             (Code_id.get_compilation_unit code_id))
+      then None
+      else
+        match Code_id.Map.find_opt code_id code_deps with
+        | Some code_dep -> Some code_dep
+        | None ->
+          Misc.fatal_errorf "Missing participant code interface %a"
+            Code_id.print code_id
+    in
+    let link_reference = function
+      | Traverse_acc.Closure { closure; code_id; external_witness } -> (
+        match find_in_scope code_id with
+        | Some code_dep ->
+          Traverse_acc.connect_closure deps ~closure ~code_id code_dep
+        | None ->
+          Graph.add_any_source deps external_witness;
+          Graph.add_constructor_dep deps ~base:closure
+            Field.known_arity_call_witness ~from:external_witness;
+          Graph.add_constructor_dep deps ~base:closure
+            Field.unknown_arity_call_witness ~from:external_witness;
+          Graph.add_constructor_dep deps ~base:external_witness
+            Field.code_id_of_call_witness ~from:closure)
+      | Traverse_acc.Direct_call
+          { call;
+            code_id;
+            closure;
+            caller;
+            external_call;
+            external_closure;
+            external_world
+          } -> (
+        match find_in_scope code_id with
+        | Some code_dep ->
+          add_alias_for_caller deps ~caller ~to_:call
+            ~from:code_dep.known_arity_call_witness;
+          Option.iter
+            (fun closure ->
+              add_alias_for_caller deps ~caller ~from:closure
+                ~to_:(Code_id_or_name.var code_dep.my_closure))
+            closure
+        | None ->
+          (match caller with
+          | None -> Graph.add_any_source deps external_call
+          | Some caller ->
+            Graph.add_propagate_dep deps
+              ~if_used:(Code_id_or_name.code_id caller)
+              ~to_:external_call ~from:external_world);
+          Option.iter
+            (fun closure ->
+              match caller with
+              | None -> Graph.add_any_usage deps closure
+              | Some caller ->
+                Graph.add_use_dep deps
+                  ~to_:(Code_id_or_name.code_id caller)
+                  ~from:closure)
+            external_closure)
+    in
+    List.iter
+      (fun (inputs : Solve_inputs.t) ->
+        List.iter link_reference inputs.code_references)
+      solve_inputs
 
   let solve ~analysis_scope (solve_inputs : Solve_inputs.t list) =
     let deps =
@@ -330,11 +401,7 @@ module Staged = struct
           Rebuild_queries.Requests.union requests inputs.rebuild_queries)
         Rebuild_queries.Requests.empty solve_inputs
     in
-    List.iter
-      (fun (inputs : Solve_inputs.t) ->
-        Cross_unit_calls.link deps ~analysis_scope ~code_deps
-          ~le_monde_exterieur:inputs.le_monde_exterieur inputs.code_references)
-      solve_inputs;
+    link_code_references ~analysis_scope ~code_deps ~solve_inputs deps;
     let solved_dep =
       Profile.record_call ~accumulate:true "solver" (fun () ->
           Analysis.fixpoint deps ~analysis_scope)

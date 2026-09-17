@@ -363,6 +363,7 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
     in
     let[@local] add_apply acc ~only_if_closure_any_source =
+      let participant_call = call_widget, callee in
       let callee, call_widget =
         if only_if_closure_any_source
         then (
@@ -383,13 +384,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       in
       if is_external
       then
-        Acc.add_code_reference acc
-          (Traverse_acc.Direct_call
-             { call = call_widget;
-               code_id;
-               closure = Option.map (Acc.simple_to_node acc ~denv) callee;
-               caller = Env.current_code_id denv
-             })
+        Acc.add_external_apply acc ~participant_call ~denv ~code_id
+          ~witness:call_widget ~closure:callee
       else
         let apply_dep =
           { Traverse_acc.function_containing_apply_expr =
@@ -413,10 +409,8 @@ let traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
       | No ->
         if is_external
         then
-          (* External call. We always want to mark everything as escaping here,
-             as we will not be able to recover the code_id from the sources of
-             the closure, and the call is indeed very likely to be a call to
-             that code_id. *)
+          (* Rebuild can retain this foreign direct target even when the
+             closure's target is unknown, so record the explicit reference. *)
           add_apply acc ~only_if_closure_any_source:false))
   | Function { function_call = Indirect_known_arity _; _ } ->
     let call_widget =
@@ -834,7 +828,6 @@ type result =
     continuation_info : Acc.continuation_info Continuation.Map.t;
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     code_references : Traverse_acc.code_reference list;
-    le_monde_exterieur : Symbol.t;
     rebuild_queries : Rebuild_queries.Requests.t;
     all_sets_of_closures :
       (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
@@ -849,8 +842,10 @@ let create_symbol_and_add_any_source acc name =
   Acc.add_any_source acc (Code_id_or_name.symbol sym);
   sym
 
-let run0 unit acc ~all_constants ~le_monde_exterieur ~top_level_return_escapes
-    () =
+let run0 unit acc ~all_constants ~top_level_return_escapes () =
+  let le_monde_exterieur =
+    create_symbol_and_add_any_source acc "le_monde_extérieur"
+  in
   let dummy_toplevel_return = Variable.create "dummy_toplevel_return" K.value in
   let dummy_toplevel_exn = Variable.create "dummy_toplevel_exn" K.value in
   if top_level_return_escapes
@@ -885,13 +880,9 @@ let run0 unit acc ~all_constants ~le_monde_exterieur ~top_level_return_escapes
 let run ~top_level_return_escapes (unit : Flambda_unit.t) =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
-  let le_monde_exterieur =
-    create_symbol_and_add_any_source acc "le_monde_extérieur"
-  in
   let holed =
     Profile.record_call ~accumulate:false "down"
-      (run0 unit acc ~all_constants ~le_monde_exterieur
-         ~top_level_return_escapes)
+      (run0 unit acc ~all_constants ~top_level_return_escapes)
   in
   let deps = Acc.deps ~all_constants:(Name.symbol all_constants) acc in
   let fixed_arity_continuations = Acc.fixed_arity_continuations acc in
@@ -906,7 +897,6 @@ let run ~top_level_return_escapes (unit : Flambda_unit.t) =
     continuation_info;
     code_deps;
     code_references = Acc.code_references acc;
-    le_monde_exterieur;
     rebuild_queries = Acc.rebuild_queries acc;
     all_sets_of_closures = Acc.get_all_sets_of_closures acc;
     closure_function_decls = Acc.get_closure_function_decls acc
