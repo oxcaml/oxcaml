@@ -11949,20 +11949,38 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (fun (_, pat, _) (exp, _) ->
           if maybe_expansive exp then lower_contravariant env pat.pat_type)
         mode_pat_typ_list exp_list;
+      (* Generalize non-layout-polymorphic bindings first, including aliases
+         in [poly_] patterns, without generalizing their layout variables. *)
       iter_pattern_variables_type_mut
-        ~f_immut:(fun pv_lpoly ty ->
-          Lpoly.generalize
-            ~on_determined:(fun () -> generalize ty)
-            ~on_to_generalize:(fun loc ->
-              let _, univars =
-                Jkind_types.Sort.generalize_with (fun () -> generalize ty)
-              in
-              if List.is_empty univars then
-                raise (Error (loc, env, Useless_lpoly));
-              univars)
-            pv_lpoly)
+        ~f_immut:(fun lpoly ty ->
+          if not (Lpoly.is_pending lpoly) then generalize ty)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
+      if is_lpoly && not is_recursive then begin
+        (* Generalize the remaining bindings, recording candidates for the
+           whole group so that shared layout variables are included once. *)
+        let (), generalized_sorts =
+          Jkind_types.Sort.generalize_with (fun () ->
+            iter_pattern_variables_type_mut
+              ~f_immut:(fun lpoly ty ->
+                if Lpoly.is_pending lpoly then generalize ty)
+              ~f_mut:(fun _ -> ()) pvs)
+        in
+        (* Finalize each binding's layout parameters without generalizing. *)
+        iter_pattern_variables_type_mut
+          ~f_immut:(fun pv_lpoly ty ->
+            Lpoly.generalize
+              ~on_determined:(fun () -> ())
+              ~on_to_generalize:(fun loc ->
+                let univars =
+                  collect_layout_variables ty ~candidates:generalized_sorts
+                in
+                if List.is_empty univars then
+                  raise (Error (loc, env, Useless_lpoly));
+                univars)
+              pv_lpoly)
+          ~f_mut:(fun _ -> ()) pvs
+      end;
       List.iter2
         (fun (_, _, expected_ty) (exp, vars) ->
           match vars with

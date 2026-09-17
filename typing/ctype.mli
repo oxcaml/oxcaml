@@ -158,6 +158,11 @@ val iter_type_expr_with_stages:
 
 val generalize: type_expr -> unit
 (* Generalize in-place the given type *)
+val collect_layout_variables:
+        type_expr -> candidates:Jkind_types.Sort.var list ->
+        Jkind_types.Sort.var list
+(* Collect the candidate layout variables occurring in a type, including its
+   generic nodes, without duplicates and in order of first occurrence. *)
 val lower_contravariant: Env.t -> type_expr -> unit
         (* Lower level of type variables inside contravariant branches;
            to be used before generalize for expansive expressions *)

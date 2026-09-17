@@ -1201,6 +1201,9 @@ module Lpoly : sig
       where [loc] is the source location that requested polymorphism. *)
   val pending : loc:Location.t -> t
 
+  (** Returns [true] if layout generalization is still pending. *)
+  val is_pending : t -> bool
+
   (** Assert that layout poly is determined and return the generalized vars. *)
   val get_exn : t -> Jkind_types.Sort.var list
 
