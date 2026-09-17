@@ -3688,11 +3688,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
-  (* CR zeisbach: blocks are made with [Mutable] here, since the boxed version
-     of the unboxed type could have mutable fields, so boxing it needs to assume
-     the worst. We should track mutability and update it during
-     [specialize_primitive], otherwise we regress performance vs ppx_box *)
-  | Pbox (Punboxed_product layouts, mode), [args] ->
+  | Pbox (Punboxed_product layouts, mut, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
@@ -3701,8 +3697,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Shape (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
     in
     (* A boxed all-void product must be [Immutable] for the middle-end *)
+    (* CR zeisbach: could we check this during specialization if we wanted to?
+       or would that be bad bc of splice variables? *)
     let mutability =
-      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+      if List.is_empty args
+      then Mutability.Immutable
+      else Mutability.from_lambda mut
     in
     convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
       shape mutability mode args
@@ -3710,19 +3710,20 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
            | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
              ) as layout),
+          mut,
           mode ),
       [[arg]] ) -> (
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
     in
+    let mutability = Mutability.from_lambda mut in
     let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
       let shape =
         K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
       in
       [ Variadic
-          ( Make_block
-              (Mixed (Tag.Scannable.zero, shape), Mutability.Mutable, mode),
+          ( Make_block (Mixed (Tag.Scannable.zero, shape), mutability, mode),
             [arg] ) ]
     in
     (* CR zeisbach: this assumes that everything is addressable! Meaning small
@@ -3735,8 +3736,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         [K.With_subkind.from_lambda_value_kind ~machine_width value_kind]
       in
       [ Variadic
-          ( Make_block
-              (Values (Tag.Scannable.zero, shape), Mutability.Mutable, mode),
+          ( Make_block (Values (Tag.Scannable.zero, shape), mutability, mode),
             [arg] ) ]
     | Punboxed_float f ->
       mixed_singleton (flat_suffix_element_of_unboxed_float f)

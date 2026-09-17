@@ -1038,8 +1038,15 @@ let primitive ppf = function
       fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
-  | Pbox (l, mode) ->
-      fprintf ppf "(box%s@ %a)"
+  | Pbox (l, mut, mode) ->
+      let mut =
+        match mut with
+        | Immutable -> ""
+        | Immutable_unique -> "_unique"
+        | Mutable -> "_mutable"
+      in
+      fprintf ppf "(box%s%s@ %a)"
+        mut
         (locality_kind mode)
         layout l
   | Punbox l ->

@@ -905,9 +905,9 @@ and eval_prim env prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_ptr { layout = new_layout; mode }
-  | Pbox (old_layout, mode) ->
+  | Pbox (old_layout, mut, mode) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pbox (new_layout, mode)
+    if new_layout == old_layout then prim else Pbox (new_layout, mut, mode)
   | Punbox old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Punbox new_layout

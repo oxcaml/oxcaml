@@ -1197,7 +1197,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
-    | Pbox (layout, _mode) -> (
+    | Pbox (layout, _mut, _mode) -> (
       match layout with
       | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
       | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
