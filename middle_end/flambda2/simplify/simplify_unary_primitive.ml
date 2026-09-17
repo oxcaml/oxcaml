@@ -756,12 +756,22 @@ let simplify_duplicate_array ~kind:_ ~(source_mutability : Mutability.t)
       Named.print original_term
 
 let simplify_duplicate_and_update_block ~kind:_ ~alloc_region:_ dacc
-    ~original_term ~arg:_ ~arg_ty ~result_var =
-  (* Any alias in the type to the whole block will be dropped, but aliases
-     inside the type (e.g. in fields) can remain. *)
-  let ty = T.remove_outermost_alias (DA.typing_env dacc) arg_ty in
-  let dacc = DA.add_variable dacc result_var ty in
-  SPR.create original_term ~try_reify:false dacc
+    ~original_term ~arg:_ ~arg_ty:_ ~result_var =
+  (* The result must be given an unknown type, not the type of the argument.
+     This primitive is only used to compile the functional update of a record
+     with at least [Config.max_young_wosize] fields, where [Lambda] copies the
+     original record and then writes the updated fields into the copy. Records
+     are immutable, so the argument's type records the values of its fields;
+     propagating that type to the copy claims those values also hold of the
+     copy, which is wrong for precisely the fields that the update is about to
+     overwrite. Nothing subsequently corrects this: [Block_set] does not alter
+     the typing environment, so a later load from an updated field would be
+     folded to the value it had in the original record.
+
+     Retaining the field types is only sound once the update is part of this
+     primitive rather than a sequence of writes that follow it, which is what
+     the name anticipates. *)
+  SPR.create_unknown dacc ~result_var K.value ~original_term
 
 let simplify_obj_dup ~alloc_region dbg dacc ~original_term ~arg ~arg_ty
     ~result_var =
