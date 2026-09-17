@@ -31,6 +31,7 @@ type code_dep =
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
     exn : Variable.t; (* Dummy variable representing exn return value *)
+    function_slot_size : int;
     is_tupled : bool;
     known_arity_call_witness : Code_id_or_name.t;
     unknown_arity_call_witnesses :
@@ -621,6 +622,7 @@ let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
 let ids_for_export_code_dep
     { arity = _;
       code_metadata;
+      function_slot_size = _;
       params;
       my_closure;
       return;
@@ -650,6 +652,7 @@ let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
 let apply_renaming_code_dep
     { arity;
       code_metadata;
+      function_slot_size;
       params;
       my_closure;
       return;
@@ -660,6 +663,7 @@ let apply_renaming_code_dep
     } renaming =
   { arity;
     code_metadata = Code_metadata.apply_renaming code_metadata renaming;
+    function_slot_size;
     params = List.map (Renaming.apply_variable renaming) params;
     my_closure = Renaming.apply_variable renaming my_closure;
     return = List.map (Renaming.apply_variable renaming) return;

@@ -57,18 +57,15 @@ module Inputs = struct
             if Code_id.Map.mem code_id code_info
             then code_info
             else
-              let code_metadata =
+              let function_slot_size =
                 match Code_id.Map.find_opt code_id code_deps with
-                | Some ({ code_metadata; _ } : Traverse_acc.code_dep) ->
-                  code_metadata
+                | Some ({ function_slot_size; _ } : Traverse_acc.code_dep) ->
+                  function_slot_size
                 | None ->
                   (* Imported code, which is only reached through its cmx. *)
-                  get_code_metadata code_id
+                  Code_metadata.function_slot_size (get_code_metadata code_id)
               in
-              let function_slot_size =
-                Code_metadata.function_slot_size code_metadata
-              in
-              let dbg = Code_metadata.dbg code_metadata in
+              let dbg = Code_metadata.dbg (get_code_metadata code_id) in
               Code_id.Map.add code_id { function_slot_size; dbg } code_info)
         closure_function_decls Code_id.Map.empty
     in
@@ -262,10 +259,6 @@ let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
     =
   let { Inputs.free_names; closure_function_decls; code_info } = inputs in
   let get_code_info code_id : Inputs.code_info =
-    (* The solve can change code metadata (e.g. when a calling convention
-       changes), so solved metadata takes precedence. Code ids without an entry
-       in [code_changes] — here, only imported code — are unchanged by the
-       solve, so the info recorded at traverse time is still accurate. *)
     match Unboxing_analysis.find_code_metadata code_changes code_id with
     | Some code_metadata ->
       { function_slot_size = Code_metadata.function_slot_size code_metadata;
