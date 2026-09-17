@@ -5101,7 +5101,12 @@ module Report = struct
     | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
       Some (print_is_contained_by ~fixpoint is_contained_by)
-    | Parameter_to_argument _ | Argument_to_parameter _ -> None
+    | Parameter_to_argument _ | Argument_to_parameter _ ->
+      Some
+        ( print_bug
+            ~explanation:"parameter to argument morphisms should not be printed"
+            (),
+          pp )
 
   let print_mode : type a.
       [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
