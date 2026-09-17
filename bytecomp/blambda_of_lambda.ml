@@ -216,20 +216,24 @@ let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
     (expr : Blambda.blambda) : Blambda.blambda =
   match elt with
   | Product elements ->
-    (* Bind expr to a variable so it's only evaluated once *)
-    let id = Ident.create_local "copy_src" in
-    let copied_fields =
-      Array.to_list
-        (Array.mapi
-           (fun i field_elt ->
-             copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
-           elements)
-    in
-    Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+    copy_product_fields elements expr ~make_block:(fun fields ->
+        Prim (Makeblock { tag = 0 }, fields))
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     expr
   | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
+
+and copy_product_fields elements expr ~make_block =
+  (* Bind expr to a variable so it's only evaluated once *)
+  let id = Ident.create_local "copy_src" in
+  let copied_fields =
+    Array.to_list
+      (Array.mapi
+         (fun i field_elt ->
+           copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
+         elements)
+  in
+  Let { id; arg = expr; body = make_block copied_fields }
 
 (** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
     a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
@@ -1200,10 +1204,29 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         (* CR zeisbach: will we want to compile non-addressable to tagged
            immediates once we have addressability information? *)
         pseudo_event (unary (Make_faux_mixedblock { total_len = 1; tag = 0 }))
+      | Punboxed_product layouts ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        (* The unboxed product is already a block with one field per
+           component, but it must not be shared with the record, or a later
+           mutation of the record would be visible through the unboxed value. *)
+        let shape =
+          Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+        in
+        let make_block fields =
+          let prim : Blambda.primitive =
+            match Lambda.mixed_block_of_block_shape (Shape shape) with
+            | None -> Makeblock { tag = 0 }
+            | Some shape ->
+              Make_faux_mixedblock { total_len = Array.length shape; tag = 0 }
+          in
+          pseudo_event (Prim (prim, fields))
+        in
+        copy_product_fields shape arg ~make_block
       | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
-      | Punboxed_product _ ->
-        Misc.fatal_errorf "Blambda_of_lambda: %a is not yet implemented"
-          Printlambda.primitive primitive
       | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
       | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
