@@ -906,7 +906,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
-  let shape = Lambda.mixed_block_shape_of_types shape in
+  let shape = Lambda.transl_mixed_product_shape shape in
   let (_, num_nodes_visited), shape =
     List.fold_left_map
       (fun (i, num_nodes_visited) typ ->
@@ -1381,7 +1381,7 @@ let refine_mixed_block_element env loc ty mbe =
 
 let transl_mixed_block_element env loc ty mbe =
   refine_mixed_block_element env loc ty
-    (Lambda.mixed_block_element_of_types mbe)
+    (Lambda.transl_mixed_product_element mbe)
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
