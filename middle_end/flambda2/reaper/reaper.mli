@@ -13,12 +13,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** The Reaper as three phases: [traverse] a unit, [solve] the resulting graph
-    and [rebuild] the unit from the solution. [run] composes them. *)
 module Staged : sig
-  (** A unit's inputs to the solve. *)
+  (** Per-unit code information and references collected for the solve. *)
   module Solve_inputs : sig
-    type t
+    type t =
+      { code_deps : Traverse_acc.code_dep Code_id.Map.t;
+        code_references : Traverse_acc.code_reference list;
+        rebuild_queries : Rebuild_queries.Requests.t;
+        all_sets_of_closures :
+          (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      }
 
     (** Throw away the information the whole-program solve does not need: the
         result types of the code metadata and the sets of closures, which only
@@ -27,19 +31,13 @@ module Staged : sig
 
     val ids_for_export : t -> Ids_for_export.t
 
-    (** Fields are hashconsed, so for serialisation the [Field.view] of each one
-        needs serialising separately. *)
-    val fields_for_export : t -> Field.Set.t
-
-    (** The units mentioned by the code references. *)
+    (** Units mentioned by pending code references. *)
     val referenced_compilation_units : t -> Compilation_unit.Set.t
 
-    val apply_renaming :
-      t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
+    val apply_renaming : t -> Renaming.t -> t
   end
 
-  (** The data needed to rebuild a traversed unit. *)
-  module Rebuild_inputs : sig
+  module Traverse_rebuild : sig
     type t
 
     val ids_for_export : t -> Ids_for_export.t
@@ -47,40 +45,50 @@ module Staged : sig
     val apply_renaming : t -> Renaming.t -> t
   end
 
-  (** The rewriting decisions and slot offsets computed by the solve. *)
-  module Solution : sig
-    type t
+  type solution =
+    { uses : Analysis.result;
+      code_changes : Unboxing_analysis.code_changes;
+      queries : Rebuild_queries.t
+    }
 
-    (** The answers of the solution in the form the rebuild consumes. *)
-    val rebuild_data : t -> Rebuild_solution.data
-  end
-
-  (** Traverse the compilation unit. [free_names] are the free names of the
-      whole unit as output by simplify. With [top_level_return_escapes], the
-      value passed to the unit's return continuation is marked as used by
-      unknown code; a whole-program analysis passes [false], since those uses
-      come from the other units analysed. *)
+  (** Traverse the compilation unit in preparation for Reaper analysis.
+      [free_names] are the free names of the whole compilation unit as output by
+      simplify. Returns the dependency graph, the unit's inputs to the
+      solve-time slot offsets and code changes computations, and the data needed
+      to rebuild the unit. With [top_level_return_escapes], the value passed to
+      the unit's return continuation is marked as used by unknown code; a
+      whole-program analysis passes [false], since those uses come from the
+      other units analysed. *)
   val traverse :
     free_names:Name_occurrences.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
     top_level_return_escapes:bool ->
     Flambda_unit.t ->
-    Solve_inputs.t * Rebuild_inputs.t
+    Global_flow_graph.graph
+    * Slot_offsets_analysis.Inputs.t
+    * Solve_inputs.t
+    * Traverse_rebuild.t
 
-  (** Combine the units' inputs, analyse the resulting dependency graph and
-      compute the rewriting decisions and slot offsets. Mutates the graphs by
-      combining them and linking the code references. *)
+  (** Analyse the combined dependency graph and compute rewriting decisions and
+      slot offsets. Mutates the graph by linking code references. *)
   val solve :
-    analysis_scope:Analysis_scope.t -> Solve_inputs.t list -> Solution.t
+    slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
+    analysis_scope:Analysis_scope.t ->
+    solve_inputs:Solve_inputs.t list ->
+    Global_flow_graph.graph ->
+    solution * Slot_offsets.result
 
-  (** Rebuild the traversed unit according to the solution. [typing] enables the
-      rewriting of subkinds and exported types; [None] leaves the exported types
-      unknown, which needs no type database. Returns the rebuilt unit, its code,
-      its typing environment and its free names. *)
+  (** Use a Reaper solution and traversed compilation unit to rebuild the unit
+      with dead code removed. The solution must cover the current unit and the
+      other participating units whose identifiers occur in it. [typing] enables
+      precise subkind and export-type rewriting for normal Reaper. LTO passes
+      [None] for backend-only rebuilding, which needs no type database and
+      leaves export types unknown. Returns the rebuilt unit, code, typing
+      environment, and free names. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
-    rebuild_inputs:Rebuild_inputs.t ->
+    traverse_rebuild:Traverse_rebuild.t ->
     solution:Rebuild_solution.t ->
     typing:Rebuild.typing option ->
     machine_width:Target_system.Machine_width.t ->

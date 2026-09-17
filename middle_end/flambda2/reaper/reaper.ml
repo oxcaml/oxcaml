@@ -57,9 +57,7 @@ let get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code code_id =
 module Staged = struct
   module Solve_inputs = struct
     type t =
-      { deps : Global_flow_graph.graph;
-        slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
-        code_deps : Traverse_acc.code_dep Code_id.Map.t;
+      { code_deps : Traverse_acc.code_dep Code_id.Map.t;
         code_references : Traverse_acc.code_reference list;
         rebuild_queries : Rebuild_queries.Requests.t;
         all_sets_of_closures :
@@ -67,13 +65,7 @@ module Staged = struct
       }
 
     let ids_for_export
-        { deps;
-          slot_offsets_inputs;
-          code_deps;
-          code_references;
-          rebuild_queries;
-          all_sets_of_closures
-        } =
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures } =
       let ids =
         Code_id.Map.fold
           (fun code_id code_dep ids ->
@@ -96,8 +88,6 @@ module Staged = struct
       in
       Ids_for_export.union_list
         [ ids;
-          Global_flow_graph.ids_for_export deps;
-          Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
           Traverse_acc.ids_for_export_code_references code_references;
           Rebuild_queries.Requests.ids_for_export rebuild_queries ]
 
@@ -114,19 +104,12 @@ module Staged = struct
         all_sets_of_closures = []
       }
 
-    let fields_for_export t = Global_flow_graph.fields_for_export t.deps
-
     let referenced_compilation_units t =
       Traverse_acc.code_references_compilation_units t.code_references
 
     let apply_renaming
-        { deps;
-          slot_offsets_inputs;
-          code_deps;
-          code_references;
-          rebuild_queries;
-          all_sets_of_closures
-        } renaming ~rename_field =
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
+        renaming =
       let code_deps =
         Code_id.Map.fold
           (fun code_id code_dep map ->
@@ -143,20 +126,16 @@ module Staged = struct
                  Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
           all_sets_of_closures
       in
-      { deps = Global_flow_graph.apply_renaming deps renaming ~rename_field;
-        slot_offsets_inputs =
-          Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs
-            renaming;
-        code_deps;
-        code_references =
-          Traverse_acc.apply_renaming_code_references code_references renaming;
-        rebuild_queries =
-          Rebuild_queries.Requests.apply_renaming rebuild_queries renaming;
-        all_sets_of_closures
-      }
+      let code_references =
+        Traverse_acc.apply_renaming_code_references code_references renaming
+      in
+      let rebuild_queries =
+        Rebuild_queries.Requests.apply_renaming rebuild_queries renaming
+      in
+      { code_deps; code_references; rebuild_queries; all_sets_of_closures }
   end
 
-  module Rebuild_inputs = struct
+  module Traverse_rebuild = struct
     type t =
       { toplevel_expr : Rev_expr.t;
         code : Rev_expr.rev_code Code_id.Map.t;
@@ -241,18 +220,11 @@ module Staged = struct
       }
   end
 
-  module Solution = struct
-    type t =
-      { solved_dep : Analysis.result;
-        code_changes : Unboxing_analysis.code_changes;
-        queries : Rebuild_queries.t;
-        slot_offsets : Slot_offsets.result
-      }
-
-    let rebuild_data { solved_dep; code_changes; queries; slot_offsets } =
-      Rebuild_solution.create_data ~queries ~unboxing:solved_dep ~code_changes
-        ~slot_offsets:slot_offsets.exported_offsets
-  end
+  type solution =
+    { uses : Analysis.result;
+      code_changes : Unboxing_analysis.code_changes;
+      queries : Rebuild_queries.t
+    }
 
   let traverse ~free_names ~cmx_loader ~all_code ~top_level_return_escapes unit
       =
@@ -278,23 +250,17 @@ module Staged = struct
     in
     let solve_inputs =
       Solve_inputs.
-        { deps;
-          slot_offsets_inputs;
-          code_deps;
-          code_references;
-          rebuild_queries;
-          all_sets_of_closures
-        }
+        { code_deps; code_references; rebuild_queries; all_sets_of_closures }
     in
-    let rebuild_inputs =
-      { Rebuild_inputs.toplevel_expr;
+    let rebuild_data =
+      { Traverse_rebuild.toplevel_expr;
         code;
         ordered_code_ids;
         fixed_arity_continuations;
         continuation_info
       }
     in
-    solve_inputs, rebuild_inputs
+    deps, slot_offsets_inputs, solve_inputs, rebuild_data
 
   let link_code_references ~analysis_scope
       ~(code_deps : Traverse_acc.code_dep Code_id.Map.t) ~solve_inputs deps =
@@ -373,27 +339,33 @@ module Staged = struct
         List.iter link_reference inputs.code_references)
       solve_inputs
 
-  let solve ~analysis_scope (solve_inputs : Solve_inputs.t list) =
-    let deps =
-      match solve_inputs with
-      | [] -> Global_flow_graph.create ()
-      | first :: rest ->
-        List.fold_left
-          (fun deps (inputs : Solve_inputs.t) ->
-            Global_flow_graph.union deps inputs.deps)
-          first.deps rest
-    in
-    let slot_offsets_inputs =
-      List.fold_left
-        (fun combined (inputs : Solve_inputs.t) ->
-          Slot_offsets_analysis.Inputs.union combined inputs.slot_offsets_inputs)
-        Slot_offsets_analysis.Inputs.empty solve_inputs
-    in
+  let solve ~slot_offsets_inputs ~analysis_scope ~solve_inputs deps =
     let code_deps =
       List.fold_left
         (fun code_deps (inputs : Solve_inputs.t) ->
           Code_id.Map.disjoint_union code_deps inputs.code_deps)
         Code_id.Map.empty solve_inputs
+    in
+    link_code_references ~analysis_scope ~code_deps ~solve_inputs deps;
+    let uses =
+      Profile.record_call ~accumulate:true "solver" (fun () ->
+          Analysis.fixpoint deps ~analysis_scope)
+    in
+    let () =
+      if Flambda_features.debug_reaper "print-solved"
+      then (
+        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
+        Dot_printer.print_solved_dep uses deps)
+    in
+    let code_changes =
+      Unboxing_analysis.compute_code_changes uses ~analysis_scope
+        ~rewrite_kind_with_subkind:
+          (Types_rewriter.rewrite_kind_with_subkind uses.db)
+        ~code_deps
+    in
+    let slot_offsets =
+      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
+        ~code_changes uses
     in
     let requests =
       List.fold_left
@@ -401,44 +373,23 @@ module Staged = struct
           Rebuild_queries.Requests.union requests inputs.rebuild_queries)
         Rebuild_queries.Requests.empty solve_inputs
     in
-    link_code_references ~analysis_scope ~code_deps ~solve_inputs deps;
-    let solved_dep =
-      Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps ~analysis_scope)
-    in
-    let () =
-      if Flambda_features.debug_reaper "print-solved"
-      then (
-        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
-        Dot_printer.print_solved_dep solved_dep deps)
-    in
-    let code_changes =
-      Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
-        ~rewrite_kind_with_subkind:
-          (Types_rewriter.rewrite_kind_with_subkind solved_dep.db)
-        ~code_deps
-    in
-    let slot_offsets =
-      Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
-        ~code_changes solved_dep
-    in
-    let queries = Rebuild_queries.create solved_dep.db ~requests in
-    Solution.{ solved_dep; code_changes; queries; slot_offsets }
+    let queries = Rebuild_queries.create uses.db ~requests in
+    { uses; code_changes; queries }, slot_offsets
 
-  let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)
+  let rebuild ~unit_metadata ~traverse_rebuild ~(solution : Rebuild_solution.t)
       ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
     let analysis_scope = Rebuild_solution.analysis_scope solution in
     let get_code_metadata =
       get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code
     in
-    let Rebuild_inputs.
+    let Traverse_rebuild.
           { toplevel_expr;
             code;
             ordered_code_ids;
             fixed_arity_continuations;
             continuation_info
           } =
-      rebuild_inputs
+      traverse_rebuild
     in
     let Rebuild.
           { body; all_code = rebuilt_code; code_ids_to_remember; free_names } =
@@ -500,32 +451,33 @@ end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
-  let solve_inputs, rebuild_inputs =
+  let deps, slot_offsets_inputs, solve_inputs, traverse_rebuild =
     Staged.traverse ~free_names ~cmx_loader ~all_code
       ~top_level_return_escapes:true unit
   in
-  let Staged.Solution.{ solved_dep; code_changes; queries; slot_offsets } =
-    Staged.solve ~analysis_scope:Current_unit [solve_inputs]
+  let solution, slot_offsets =
+    Staged.solve ~slot_offsets_inputs ~analysis_scope:Current_unit
+      ~solve_inputs:[solve_inputs] deps
   in
+  let unit_metadata = Flambda_unit.metadata unit in
   let typing =
     Rebuild.
       { context =
-          Types_rewriter.prepare_rewrite_context solved_dep
+          Types_rewriter.prepare_rewrite_context solution.uses
             solve_inputs.Staged.Solve_inputs.all_sets_of_closures;
         code_deps = solve_inputs.Staged.Solve_inputs.code_deps;
         env = final_typing_env
       }
   in
   let solution =
-    Rebuild_solution.create ~analysis_scope:Current_unit ~queries
-      ~unboxing:solved_dep ~code_changes
+    Rebuild_solution.create ~analysis_scope:Current_unit
+      ~queries:solution.queries ~unboxing:solution.uses
+      ~code_changes:solution.code_changes
       ~slot_offsets:slot_offsets.exported_offsets
   in
   let flambda, all_code, final_typing_env, free_names =
-    Staged.rebuild
-      ~unit_metadata:(Flambda_unit.metadata unit)
-      ~rebuild_inputs ~solution ~typing:(Some typing) ~machine_width ~cmx_loader
-      ~all_code
+    Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution
+      ~typing:(Some typing) ~machine_width ~cmx_loader ~all_code
   in
   let exported_offsets =
     Rebuild_solution.offsets_for_free_names solution free_names

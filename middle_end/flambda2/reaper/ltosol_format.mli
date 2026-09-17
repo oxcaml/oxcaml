@@ -32,7 +32,8 @@ exception Error of error
 val save :
   filename:string ->
   participants:Compilation_unit.t list ->
-  solution:Reaper.Staged.Solution.t ->
+  solution:Reaper.Staged.solution ->
+  slot_offsets:Slot_offsets.result ->
   unit
 
 (** Read only the header. *)

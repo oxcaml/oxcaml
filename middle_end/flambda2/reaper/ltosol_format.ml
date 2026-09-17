@@ -71,8 +71,13 @@ type error =
 
 exception Error of error
 
-let save ~filename ~participants ~solution =
-  let data = Reaper.Staged.Solution.rebuild_data solution in
+let save ~filename ~participants
+    ~solution:({ uses; code_changes; queries } : Reaper.Staged.solution)
+    ~(slot_offsets : Slot_offsets.result) =
+  let data =
+    Rebuild_solution.create_data ~queries ~unboxing:uses ~code_changes
+      ~slot_offsets:slot_offsets.exported_offsets
+  in
   let by_unit = Rebuild_solution.partition_by_compilation_unit data in
   let builder =
     File_sections.Builder.create (Compilation_unit.Map.cardinal by_unit)

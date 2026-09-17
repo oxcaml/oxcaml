@@ -28,24 +28,56 @@
 type t =
   { unit_metadata : Flambda_unit.Metadata.t;
     imported_offsets : Exported_offsets.t;
+    deps : Global_flow_graph.graph;
+    slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
     solve_inputs : Reaper.Staged.Solve_inputs.t;
-    rebuild_inputs : Reaper.Staged.Rebuild_inputs.t
+    rebuild_data : Reaper.Staged.Traverse_rebuild.t
   }
 
-let create ~unit_metadata ~imported_offsets ~solve_inputs ~rebuild_inputs =
+let create ~unit_metadata ~imported_offsets ~deps ~slot_offsets_inputs
+    ~solve_inputs ~rebuild_data =
   { unit_metadata;
     imported_offsets;
+    deps;
+    slot_offsets_inputs;
     solve_inputs = Reaper.Staged.Solve_inputs.prune_for_lto solve_inputs;
-    rebuild_inputs
+    rebuild_data
   }
 
 let ids_for_export
-    { unit_metadata; imported_offsets = _; solve_inputs; rebuild_inputs } =
+    { unit_metadata;
+      imported_offsets = _;
+      deps;
+      slot_offsets_inputs;
+      solve_inputs;
+      rebuild_data
+    } =
   (* Slots are not hashconsed, so the offsets need no renaming. *)
   Ids_for_export.union_list
     [ Flambda_unit.Metadata.ids_for_export unit_metadata;
+      Global_flow_graph.ids_for_export deps;
+      Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
       Reaper.Staged.Solve_inputs.ids_for_export solve_inputs;
-      Reaper.Staged.Rebuild_inputs.ids_for_export rebuild_inputs ]
+      Reaper.Staged.Traverse_rebuild.ids_for_export rebuild_data ]
+
+module Deps_with_fields = struct
+  (** Fields are hashconsed per-process, so the graph is stored with views of
+      them in the style of the export information's table. *)
+  type t =
+    { deps : Global_flow_graph.graph;
+      fields : Fields_for_export.t
+    }
+
+  let create deps =
+    { deps;
+      fields =
+        Fields_for_export.export (Global_flow_graph.fields_for_export deps)
+    }
+
+  let import { deps; fields } renaming =
+    Global_flow_graph.apply_renaming deps renaming
+      ~rename_field:(Fields_for_export.import fields)
+end
 
 module Header = struct
   type t =
@@ -58,32 +90,18 @@ module Header = struct
 end
 
 module Solve = struct
-  (** Fields are hashconsed per-process, so the solve inputs are stored with
-      views of their fields in the style of the export information's table. *)
   type t =
-    { solve_inputs : Reaper.Staged.Solve_inputs.t;
-      fields : Fields_for_export.t;
-      imported_offsets : Exported_offsets.t
+    { deps : Deps_with_fields.t;
+      slot_offsets_inputs : Slot_offsets_analysis.Inputs.t;
+      imported_offsets : Exported_offsets.t;
+      solve_inputs : Reaper.Staged.Solve_inputs.t
     }
-
-  let create ~imported_offsets solve_inputs =
-    { solve_inputs;
-      fields =
-        Fields_for_export.export
-          (Reaper.Staged.Solve_inputs.fields_for_export solve_inputs);
-      imported_offsets
-    }
-
-  let import { solve_inputs; fields; imported_offsets } renaming =
-    ( imported_offsets,
-      Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming
-        ~rename_field:(Fields_for_export.import fields) )
 end
 
 module Rebuild = struct
   type t =
     { unit_metadata : Flambda_unit.Metadata.t;
-      rebuild_inputs : Reaper.Staged.Rebuild_inputs.t
+      rebuild_data : Reaper.Staged.Traverse_rebuild.t
     }
 end
 
@@ -92,9 +110,21 @@ end
    be collected earlier, if [File_sections] learnt to store pre-marshalled
    sections. *)
 let to_sections ~sections
-    { unit_metadata; imported_offsets; solve_inputs; rebuild_inputs } =
-  let solve = Solve.create ~imported_offsets solve_inputs in
-  let rebuild : Rebuild.t = { unit_metadata; rebuild_inputs } in
+    { unit_metadata;
+      imported_offsets;
+      deps;
+      slot_offsets_inputs;
+      solve_inputs;
+      rebuild_data
+    } =
+  let solve : Solve.t =
+    { deps = Deps_with_fields.create deps;
+      slot_offsets_inputs;
+      imported_offsets;
+      solve_inputs
+    }
+  in
+  let rebuild : Rebuild.t = { unit_metadata; rebuild_data } in
   let solve = File_sections.Builder.add sections (Obj.repr solve) in
   let rebuild = File_sections.Builder.add sections (Obj.repr rebuild) in
   (* We need to store ID stamp counters so that stamp-based identifiers in the
@@ -120,15 +150,21 @@ let read_header ~filename ~sections idx =
   | Some idx -> (read_section ~filename ~sections idx : Header.t)
 
 let read_for_solve ~filename ~sections ~renaming ({ solve; _ } : Header.t) =
-  let (solve : Solve.t) = read_section ~filename ~sections solve in
-  Solve.import solve renaming
+  let ({ deps; slot_offsets_inputs; imported_offsets; solve_inputs } : Solve.t)
+      =
+    read_section ~filename ~sections solve
+  in
+  ( Deps_with_fields.import deps renaming,
+    Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming,
+    imported_offsets,
+    Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming )
 
 let read_for_rebuild ~filename ~sections ~renaming ({ rebuild; _ } : Header.t) =
-  let ({ unit_metadata; rebuild_inputs } : Rebuild.t) =
+  let ({ unit_metadata; rebuild_data } : Rebuild.t) =
     read_section ~filename ~sections rebuild
   in
   ( Flambda_unit.Metadata.apply_renaming unit_metadata renaming,
-    Reaper.Staged.Rebuild_inputs.apply_renaming rebuild_inputs renaming )
+    Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming )
 
 open Format_doc
 

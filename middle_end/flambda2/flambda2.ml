@@ -269,7 +269,7 @@ let flambda_to_flambda0 : type m.
           in
           flambda, all_code, slot_offsets, final_typing_env, "reaper", None
         | Lto_support ->
-          let solve_inputs, rebuild_inputs =
+          let deps, slot_offsets_inputs, solve_inputs, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
               ~all_code ~top_level_return_escapes:false flambda
           in
@@ -277,7 +277,7 @@ let flambda_to_flambda0 : type m.
             Flambda2_reaper.Lto_sections.create
               ~unit_metadata:(Flambda_unit.metadata flambda)
               ~imported_offsets:(Exported_offsets.imported_offsets ())
-              ~solve_inputs ~rebuild_inputs
+              ~deps ~slot_offsets_inputs ~solve_inputs ~rebuild_data
           in
           let slot_offsets =
             finalize_offsets ~free_names ~all_code slot_offsets
@@ -496,8 +496,23 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
       units
   in
   let participants = List.map fst solve_data in
+  let combined_graph =
+    List.fold_left
+      (fun combined (_participant, (graph, _, _, _)) ->
+        Flambda2_reaper.Global_flow_graph.union combined graph)
+      (Flambda2_reaper.Global_flow_graph.create ())
+      solve_data
+  in
+  let slot_offsets_inputs =
+    List.fold_left
+      (fun combined (_participant, (_, inputs, _, _)) ->
+        Flambda2_reaper.Slot_offsets_analysis.Inputs.union combined inputs)
+      Flambda2_reaper.Slot_offsets_analysis.Inputs.empty solve_data
+  in
   let solve_inputs =
-    List.map (fun (_participant, (_, solve_inputs)) -> solve_inputs) solve_data
+    List.map
+      (fun (_participant, (_, _, _, solve_inputs)) -> solve_inputs)
+      solve_data
   in
   let participant_units = Compilation_unit.Set.of_list participants in
   let analysis_scope =
@@ -508,18 +523,19 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
      are recomputed from the solution, so the stale ones stored in the .cmx
      files must not be imported. *)
   List.iter
-    (fun (_participant, (imported_offsets, _)) ->
+    (fun (_participant, (_, _, imported_offsets, _)) ->
       Exported_offsets.import_offsets
         (Exported_offsets.filter_by_compilation_unit imported_offsets
            ~keep:(fun cu ->
              not
                (Flambda2_reaper.Analysis_scope.contains_unit analysis_scope cu))))
     solve_data;
-  let solution =
-    Flambda2_reaper.Reaper.Staged.solve ~analysis_scope solve_inputs
+  let solution, slot_offsets =
+    Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs ~analysis_scope
+      ~solve_inputs combined_graph
   in
   Flambda2_reaper.Ltosol_format.save ~filename:ltosol_file ~participants
-    ~solution
+    ~solution ~slot_offsets
 
 let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
   (* Everything up to the function returned below is computed once and shared by
@@ -573,7 +589,7 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
       Misc.fatal_error
         "The rebuild data contains ID stamp counters greater than those in the \
          the solution file. Stamp counter monotonicity is broken.";
-    let unit_metadata, rebuild_inputs =
+    let unit_metadata, rebuild_data =
       Profile.record_call ~accumulate:true "lto_sections_deserialise" (fun () ->
           Flambda2_reaper.Lto_sections.read_for_rebuild ~filename:cmx_filename
             ~sections:paused_unit_infos.ui_file_sections
@@ -583,9 +599,9 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     (* Code metadata of the participants comes from the solution and that of
        other units from their .cmx files, loaded on demand. *)
     let flambda, all_code, _final_typing_env, free_names =
-      Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata ~rebuild_inputs
-        ~solution ~typing:None ~machine_width ~cmx_loader
-        ~all_code:Exported_code.empty
+      Flambda2_reaper.Reaper.Staged.rebuild ~unit_metadata
+        ~traverse_rebuild:rebuild_data ~solution ~typing:None ~machine_width
+        ~cmx_loader ~all_code:Exported_code.empty
     in
     (* Reaped CMXs are only used for linking, so leave their Flambda export
        information empty, as for opaque compilation. The backend still needs the

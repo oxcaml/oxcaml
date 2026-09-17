@@ -42,8 +42,10 @@ type t
 val create :
   unit_metadata:Flambda_unit.Metadata.t ->
   imported_offsets:Exported_offsets.t ->
+  deps:Global_flow_graph.graph ->
+  slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
   solve_inputs:Reaper.Staged.Solve_inputs.t ->
-  rebuild_inputs:Reaper.Staged.Rebuild_inputs.t ->
+  rebuild_data:Reaper.Staged.Traverse_rebuild.t ->
   t
 
 val ids_for_export : t -> Ids_for_export.t
@@ -73,15 +75,19 @@ val read_header :
   File_sections.Idx.t option ->
   Header.t
 
-(** Import the offsets imported when the unit was compiled and the unit's inputs
-    to the solve. [renaming] imports the identifiers of the unit's export
-    information, whose table the sections share. *)
+(** Import the dependency graph, the slot offsets inputs, the offsets imported
+    when the unit was compiled and the per-unit solve inputs. [renaming] imports
+    the identifiers of the unit's export information, whose table the sections
+    share. *)
 val read_for_solve :
   filename:string ->
   sections:File_sections.t ->
   renaming:Renaming.t ->
   Header.t ->
-  Exported_offsets.t * Reaper.Staged.Solve_inputs.t
+  Global_flow_graph.graph
+  * Slot_offsets_analysis.Inputs.t
+  * Exported_offsets.t
+  * Reaper.Staged.Solve_inputs.t
 
 (** Import the unit metadata and the data needed to rebuild the unit, with
     [renaming] as for [read_for_solve]. *)
@@ -90,4 +96,4 @@ val read_for_rebuild :
   sections:File_sections.t ->
   renaming:Renaming.t ->
   Header.t ->
-  Flambda_unit.Metadata.t * Reaper.Staged.Rebuild_inputs.t
+  Flambda_unit.Metadata.t * Reaper.Staged.Traverse_rebuild.t
