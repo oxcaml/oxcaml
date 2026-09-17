@@ -33,6 +33,7 @@ module Unboxed_fields : sig
 
   val fold : (Field.t -> 'a u -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
+  (** Map the immediate fields without changing their order. *)
   val mapi_fields : (Field.t -> 'a u -> 'b u) -> 'a t -> 'b t
 
   val print :
@@ -43,6 +44,8 @@ module Unboxed_fields : sig
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val map_u : ('a -> 'b) -> 'a u -> 'b u
+
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
   val fold2_subset : ('a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
 

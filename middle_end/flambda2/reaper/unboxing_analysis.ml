@@ -72,7 +72,7 @@ open Datalog_helpers
 module Unboxed_fields = struct
   type 'a t =
     { fields : 'a u Field.Map.t;
-      in_order : Field.t list (* the keys of [fields], in a fixed order *)
+      in_order : (Field.t * 'a u) list
     }
 
   and 'a u =
@@ -81,11 +81,9 @@ module Unboxed_fields = struct
 
   (* Field IDs can change order on import. Keep the solve-time traversal order
      so that rebuilt parameters and arguments agree with the code metadata. *)
-  let of_map fields =
-    { fields; in_order = List.map fst (Field.Map.bindings fields) }
+  let of_map fields = { fields; in_order = Field.Map.bindings fields }
 
-  let of_bindings bindings =
-    { fields = Field.Map.of_list bindings; in_order = List.map fst bindings }
+  let of_bindings in_order = { fields = Field.Map.of_list in_order; in_order }
 
   let to_map t = t.fields
 
@@ -96,17 +94,19 @@ module Unboxed_fields = struct
   let keys t = Field.Map.keys t.fields
 
   let fold f t acc =
-    List.fold_left
-      (fun acc field -> f field (Field.Map.find field t.fields) acc)
-      acc t.in_order
+    List.fold_left (fun acc (field, value) -> f field value acc) acc t.in_order
 
-  let mapi_fields f t = { t with fields = Field.Map.mapi f t.fields }
+  let mapi_fields f t =
+    let fields = Field.Map.mapi f t.fields in
+    { fields;
+      in_order =
+        List.map
+          (fun (field, _) -> field, Field.Map.find field fields)
+          t.in_order
+    }
 
   let map_keys_and_values f t =
-    of_bindings
-      (List.map
-         (fun field -> f field (Field.Map.find field t.fields))
-         t.in_order)
+    of_bindings (List.map (fun (field, value) -> f field value) t.in_order)
 
   let rec print_u pp_elem ppf = function
     | Not_unboxed x -> pp_elem ppf x
@@ -150,6 +150,22 @@ module Unboxed_fields = struct
     match uf with
     | Not_unboxed x -> Not_unboxed (f x)
     | Unboxed fields -> Unboxed (map f fields)
+
+  (* CR mvellacott: These structural equality functions are only used because
+     after deserialisation we can't rely on pointer equality. They may be
+     deleted in the future, see the CR in
+     [get_set_of_closures_changed_representation] in [types_rewriter.ml]. *)
+  let rec equal_u eq u1 u2 =
+    match u1, u2 with
+    | Not_unboxed x1, Not_unboxed x2 -> eq x1 x2
+    | Unboxed fields1, Unboxed fields2 -> equal eq fields1 fields2
+    | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ -> false
+
+  and equal eq fields1 fields2 =
+    List.equal
+      (fun (field1, value1) (field2, value2) ->
+        Field.equal field1 field2 && equal_u eq value1 value2)
+      fields1.in_order fields2.in_order
 
   (* This is not symmetrical!! [fields1] must define a subset of [fields2], but
      does not have to define all of them. *)
@@ -199,14 +215,13 @@ module Unboxed_fields = struct
   and equal_shape fields1 fields2 =
     (* CR ncourant: we can't use [Field.Map.equal] here because it doesn't have
        a type that is general enough :( *)
-    List.compare_lengths fields1.in_order fields2.in_order = 0
+    let bindings1 = fields1.in_order in
+    let bindings2 = fields2.in_order in
+    List.compare_lengths bindings1 bindings2 = 0
     && List.for_all2
-         (fun f1 f2 ->
-           Field.equal f1 f2
-           && equal_shape_u
-                (Field.Map.find f1 fields1.fields)
-                (Field.Map.find f2 fields2.fields))
-         fields1.in_order fields2.in_order
+         (fun (f1, fields1) (f2, fields2) ->
+           Field.equal f1 f2 && equal_shape_u fields1 fields2)
+         bindings1 bindings2
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
