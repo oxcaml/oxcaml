@@ -1340,11 +1340,8 @@ let layout_of_ident env ident =
         match Env.find_class path env with
         | _ -> Some Lambda.layout_class
         | exception Not_found ->
-            (match Translobj.layout_of_ident ident with
-            | Some _ as layout -> layout
-            | None ->
-              Misc.fatal_errorf "Failed to find value_desc for %a"
-                Ident.print ident)
+            Misc.fatal_errorf "Failed to find value_desc for %a"
+              Ident.print ident
 
 
 let layout_of_sort loc sort =

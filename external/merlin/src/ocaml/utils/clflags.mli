@@ -53,6 +53,7 @@ val shape_format         : shape_format ref
 val store_occurrences    : bool ref
 val print_types          : bool ref
 val native_code          : bool ref
+val stubs_forward_inlining : bool ref
 val is_flambda2 : unit -> bool
 val dump_debug_uids : bool ref
 val directory : string option ref

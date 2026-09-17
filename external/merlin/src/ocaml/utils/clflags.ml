@@ -44,6 +44,7 @@ let shape_format        = ref Old_merlin
 let store_occurrences   = ref true
 let print_types         = ref false
 let native_code         = ref false
+let stubs_forward_inlining = ref false
 let is_flambda2 () = false
 let dump_debug_uids = ref false
 let directory = ref None
