@@ -57,13 +57,21 @@ module Found = struct
       cmi_path : Misc.filepath
     }
 
-  let create intf ~cmi_path = { intf; cmi_path }
+  (* Attached paths are made absolute so that they remain valid for consumers
+     of the artifact running from a different working directory. Note that ""
+     is the unknown-path sentinel and must be left alone. *)
+  let absolute cmi_path =
+    if String.equal cmi_path "" || not (Filename.is_relative cmi_path)
+    then cmi_path
+    else Filename.concat (Sys.getcwd ()) cmi_path
+
+  let create intf ~cmi_path = { intf; cmi_path = absolute cmi_path }
 
   let without_cmi_path intf = { intf; cmi_path = "" }
 
   let intf t = t.intf
 
-  let with_cmi_path t cmi_path = { t with cmi_path }
+  let with_cmi_path t cmi_path = { t with cmi_path = absolute cmi_path }
 
   let cmi_path t = match t.cmi_path with "" -> None | path -> Some path
 

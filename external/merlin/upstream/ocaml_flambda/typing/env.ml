@@ -3333,17 +3333,152 @@ let persistent_structures_of_dir dir =
   Load_path.Dir.basenames dir
   |> persistent_structures_of_basenames
 
+(* Normalization of the global mentions of a signature about to be saved.
+
+   A mention is any path in the signature rooted at a global unit. If that
+   unit's cmi carries [Cmi_format.Closed], the mention may stay as written:
+   its head ident gets the cmi's path attached, and consumers resolve the
+   remaining components inside that cmi without consulting the load path.
+   Otherwise the mention is chased down the interface's members. While the
+   head's cmi is not closed and the next component is one of its top-level
+   module aliases, the prefix is rewritten to the alias target (for example,
+   [Stdlib.Buffer.t] becomes [Stdlib__Buffer.t] when stdlib.cmi is not
+   closed, having been compiled with warning 49 disabled): such aliases are
+   recorded without attached cmi paths, so consumers could not follow them.
+   Only module paths are ever rewritten; a final component naming a type is
+   instead verified in place (see [Persistent_env.Member_verified]). The
+   chase stops at the first closed cmi. The signature is marked closed iff
+   every mention resolves one of these ways; when a chase gets stuck, the
+   mention keeps the progress made, with the cmi path attached to its head,
+   and the produced cmi is simply not marked [Cmi_format.Closed].
+
+   The rewriting is returned as a substitution, to be carried out by the
+   [Prepare_for_saving] pass. Loading a cmi that typing did not load is only
+   permitted while warning 49 is active, as in [Persistent_env.check]: with
+   the warning disabled, the saved cmi must not depend on which cmis exist. *)
+let normalize_mentions_for_save sg =
+  let penv = !persistent_env in
+  let may_load = Warnings.is_active (Warnings.No_cmi_file ("", None)) in
+  let closed = ref true in
+  let subst = ref (Subst.identity : Subst.t) in
+  let processed = ref Path.Set.empty in
+  let rebuild head labels =
+    List.fold_left (fun p l -> Pdot (p, l)) head labels
+  in
+  (* The target of a hop must be rooted at a global unit. *)
+  let rec decompose acc : Path.t -> _ = function
+    | Pident id -> Option.map (fun name -> name, acc) (Ident.to_global id)
+    | Pdot (p, l) -> decompose (l :: acc) p
+    | Papply _ | Pextra_ty _ -> None
+  in
+  let stamped_head (name : Global_module.Name.t) filename =
+    Pident
+      (Ident.create_global
+         (Global_module.Name.with_head_cmi_path name filename))
+  in
+  (* [root]/[consumed_rev]: the prefix of the mention as written, which the
+     registered substitution rewrites; [head]/[pending]: its normalization so
+     far, [pending] being components introduced by hop targets; [remaining]:
+     the components of the mention not consumed by hops, which stay in place
+     around the rewritten prefix. *)
+  let rec chase ~root ~consumed_rev (head : Global_module.Name.t) ~pending
+        ~remaining ~depth =
+    let register filename =
+      Persistent_env.add_weak_import penv
+        (CUI.Found.intf head.Global_module.Name.head);
+      let key = rebuild (Pident root) (List.rev consumed_rev) in
+      let value = rebuild (stamped_head head filename) pending in
+      subst := Subst.add_same_module_path key value !subst
+    in
+    let intf = CUI.Found.intf head.Global_module.Name.head in
+    if CUI.equal intf CUI.predef_exn then ()
+    else
+      match Persistent_env.mention_head penv ~may_load intf with
+      | Persistent_env.Head_unavailable -> closed := false
+      | Persistent_env.Head_closed filename ->
+          register filename;
+          (match head.Global_module.Name.args with
+           | [] -> ()
+           | _ :: _ ->
+               (* Instance arguments carry no cmi paths of their own. *)
+               closed := false)
+      | Persistent_env.Head_open (filename, member) ->
+          let stuck () = register filename; closed := false in
+          if depth > 20 then stuck ()
+          else begin
+            let hop label ~pending ~consumed_rev ~remaining =
+              let last =
+                match pending, remaining with [], [] -> true | _ -> false
+              in
+              match member label with
+              | None -> stuck ()
+              | Some (Persistent_env.Member_module_alias target) -> begin
+                  match decompose [] target with
+                  | None -> stuck ()
+                  | Some (head, target_labels) ->
+                      chase ~root ~consumed_rev head
+                        ~pending:(target_labels @ pending) ~remaining
+                        ~depth:(depth + 1)
+                end
+              | Some Persistent_env.Member_verified ->
+                  (* A type member that terminates within this interface or
+                     reaches only attached cmi paths: [register] leaves the
+                     component in place, after the stamped prefix. *)
+                  if last then register filename else stuck ()
+            in
+            match pending, remaining with
+            | label :: pending, _ ->
+                hop label ~pending ~consumed_rev ~remaining
+            | [], label :: remaining ->
+                hop label ~pending:[] ~consumed_rev:(label :: consumed_rev)
+                  ~remaining
+            | [], [] ->
+                (* The mention is the unit itself. *)
+                stuck ()
+          end
+  in
+  let mention root labels =
+    match Ident.to_global root with
+    | None -> ()
+    | Some name ->
+        chase ~root ~consumed_rev:[] name ~pending:[] ~remaining:labels
+          ~depth:0
+  in
+  with_type_mark (fun mark ->
+    let super = Btype.type_iterators mark in
+    let rec it_path p =
+      if not (Path.Set.mem p !processed) then begin
+        processed := Path.Set.add p !processed;
+        match (p : Path.t) with
+        | Pident id -> mention id []
+        | Pdot _ ->
+            let rec split acc : Path.t -> unit = function
+              | Pident id -> mention id acc
+              | Pdot (p, l) -> split (l :: acc) p
+              | (Papply _ | Pextra_ty _) as p -> it_path p
+            in
+            split [] p
+        | Papply (f, x) -> it_path f; it_path x
+        | Pextra_ty (p, _) -> it_path p
+      end
+    in
+    let it = { super with Btype.it_path } in
+    it.Btype.it_signature it sg);
+  !subst, !closed
+
 (* Save a signature to a file *)
 let save_signature_with_transform cmi_transform ~alerts (sg, staticity) modname
       kind cmi_info =
   Btype.cleanup_abbrev ();
   Subst.reset_additional_action_id ();
+  let mention_subst, closed = normalize_mentions_for_save sg in
   let sg = Subst.Lazy.of_signature sg
     |> Subst.Lazy.signature Make_local
-        (Subst.with_additional_action Prepare_for_saving Subst.identity)
+        (Subst.with_additional_action Prepare_for_saving mention_subst)
   in
   let cmi =
     Persistent_env.make_cmi !persistent_env modname kind (sg, staticity) alerts
+      ~closed
     |> cmi_transform in
   let filename = Unit_info.Artifact.filename cmi_info in
   let pers_sig =
@@ -3675,12 +3810,13 @@ type _ load =
 
 let lookup_global_name_module_no_locks
       (type a) (load : a load) ~errors ~use ~loc name env =
-  let path = Pident(Ident.create_global name) in
   match load with
   | Don't_load ->
-      check_pers_mod ~allow_hidden:false ~loc name;
+      let name = check_pers_mod ~allow_hidden:false ~loc name in
+      let path = Pident(Ident.create_global name) in
       path, (() : a)
   | Load -> begin
+      let path = Pident(Ident.create_global name) in
       match find_pers_mod ~allow_hidden:false name ~allow_excess_args:false with
       | mda ->
           use_module ~use ~loc path mda;

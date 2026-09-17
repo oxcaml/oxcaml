@@ -120,6 +120,10 @@ type import = {
   mutable imp_visibility: Load_path.visibility;
   imp_crcs : Import_info.Intf.t array;
   imp_flags : Cmi_format.pers_flags list;
+  (* Whether [check_consistency] has run for this import. An import first
+     loaded without checking (e.g. by [check_pers_struct] for warning 49) must
+     still record and check its crcs on its first checked access. *)
+  mutable imp_checked : bool;
 }
 
 (* If a .cmi file is missing (or invalid), we
@@ -298,6 +302,12 @@ let check_consistency penv imp =
     } ->
     error (Inconsistent_import(name, auth, source))
 
+let complete_consistency_check penv imp =
+  if not imp.imp_checked then begin
+    check_consistency penv imp;
+    imp.imp_checked <- true
+  end
+
 let is_registered_parameter_import {param_imports; _} name =
   Global_module.Name.mem_parameter_set name !param_imports
 
@@ -395,7 +405,8 @@ let acknowledge_import penv ~check modname pers_sig =
         | Opaque ->
             (match kind with
              | Normal { cmi_impl; _ } -> register_impl_as_opaque penv cmi_impl
-             | Parameter -> ()))
+             | Parameter -> ())
+        | Closed -> ())
     flags;
   begin match kind, Current_unit.get_cu () with
   | Normal { cmi_impl = imported_unit }, Some current_unit ->
@@ -440,6 +451,7 @@ let acknowledge_import penv ~check modname pers_sig =
       imp_visibility = visibility;
       imp_crcs = crcs;
       imp_flags = flags;
+      imp_checked = check;
     }
   in
   if check then check_consistency penv import;
@@ -477,9 +489,20 @@ let find_import ~allow_hidden penv ~check modname =
   let intf = CUI.Found.intf modname in
   if CUI.equal intf CUI.predef_exn then raise Not_found;
   match CUI.Tbl.find imports intf with
+<<<<<<< Merlin:attach-cmi-path
   | Found imp -> check_visibility ~allow_hidden ~intf imp; imp
   | Missing { hidden_were_allowed = true } -> raise Not_found
   | Missing { hidden_were_allowed = false }
+||||||| Compiler:last-imported
+  | Found imp -> check_visibility ~allow_hidden ~intf imp; imp
+  | Missing -> raise Not_found
+=======
+  | Found imp ->
+      check_visibility ~allow_hidden ~intf imp;
+      if check then complete_consistency_check penv imp;
+      imp
+  | Missing -> raise Not_found
+>>>>>>> Compiler:HEAD
   | exception Not_found ->
       match can_load_cmis penv with
       | Cannot_load_cmis _ -> raise Not_found
@@ -494,6 +517,156 @@ let find_import ~allow_hidden penv ~check modname =
           in
           add_import penv intf;
           acknowledge_import penv ~check intf psig
+
+(* Load the cmi for [intf] in order to classify a mention rooted at it. Unlike
+   [find_import], this neither registers the unit as an import of the current
+   compilation nor records its crcs: the cmi is read purely to inspect it. *)
+let load_import_unrecorded penv intf =
+  match CUI.Tbl.find penv.imports intf with
+  | Found imp -> Some imp
+  | Missing -> None
+  | exception Not_found ->
+      match can_load_cmis penv with
+      | Cannot_load_cmis _ -> None
+      | Can_load_cmis ->
+          match
+            !Persistent_signature.load ~allow_hidden:true
+              ~unit_name:(CUI.Found.without_cmi_path intf)
+          with
+          | None -> None
+          | Some psig -> Some (acknowledge_import penv ~check:false intf psig)
+          | exception (Error _ | Cmi_format.Error _ | Sys_error _) ->
+              (* [Sys_error]: the cmi is not a declared dependency of this
+                 compilation, so a concurrent build tool may remove it between
+                 the load-path lookup and the read. *)
+              None
+
+type member =
+  | Member_module_alias of Path.t
+  | Member_verified
+
+type mention_head =
+  | Head_closed of filepath
+  | Head_open of filepath * (string -> member option)
+  | Head_unavailable
+
+let import_status penv ~may_load intf =
+  let import =
+    if may_load then load_import_unrecorded penv intf
+    else find_import_info_in_cache penv intf
+  in
+  match import with
+  | None -> None
+  | Some imp ->
+      let is_closed =
+        List.exists
+          (function Cmi_format.Closed -> true | _ -> false)
+          imp.imp_flags
+      in
+      Some (imp, is_closed)
+
+let items_of_import imp =
+  match imp.imp_params with
+  | _ :: _ ->
+      (* The signature of a parameterised unit is not meaningful without its
+         arguments substituted. *)
+      []
+  | [] ->
+      let sign, _ = imp.imp_raw_sign.Signature_with_global_bindings.sign in
+      Subst.Lazy.force_signature_once sign
+
+(* Verification that everything reachable from a top-level type member of a
+   non-closed interface can be resolved by a consumer of that interface
+   without the load path: every path in the member's declaration (manifest -
+   private or not: it is not rewritten, only followed - constructor arguments,
+   record fields, ...) may reference the interface's own top-level types, and
+   global units through idents that carry an attached cmi path - which they do
+   when the interface's compilation loaded the unit, even under [-w -49] -
+   provided their cmis are closed or, recursively, the reference is to such a
+   verifiable member. *)
+let rec verify_member penv ~may_load ~depth items name =
+  depth > 0
+  && List.exists
+       (fun (item : Subst.Lazy.signature_item) ->
+          match item with
+          | Sig_type (id, decl, _, _) when String.equal (Ident.name id) name ->
+              verify_type_decl penv ~may_load ~depth ~items decl
+          | _ -> false)
+       items
+
+and verify_type_decl penv ~may_load ~depth ~items
+      (decl : Types.type_declaration) =
+  let ok = ref true in
+  Types.with_type_mark (fun mark ->
+    let super = Btype.type_iterators mark in
+    let it_path p =
+      if not (verify_path penv ~may_load ~depth ~items p) then ok := false
+    in
+    let it = { super with Btype.it_path } in
+    it.Btype.it_type_declaration it decl);
+  !ok
+
+and verify_path penv ~may_load ~depth ~items p =
+  let rec split acc : Path.t -> _ = function
+    | Path.Pident id -> Some (id, acc)
+    | Path.Pdot (p, l) -> split (l :: acc) p
+    | Path.Papply _ | Path.Pextra_ty _ -> None
+  in
+  match split [] p with
+  | None -> false
+  | Some (id, labels) ->
+      match Ident.to_global id with
+      | None -> begin
+          (* A reference to another top-level member of the same interface,
+             which the consumer resolves without leaving it. *)
+          match labels with
+          | [] -> verify_member penv ~may_load ~depth:(depth - 1) items
+                    (Ident.name id)
+          | _ :: _ -> false
+        end
+      | Some gname ->
+          match gname.Global_module.Name.args with
+          | _ :: _ -> false
+          | [] ->
+              let intf = CUI.Found.intf gname.head in
+              CUI.equal intf CUI.predef_exn
+              || (* The consumer follows the attached path. *)
+                 (match CUI.Found.cmi_path gname.head with
+                  | None -> false
+                  | Some _ ->
+                      match import_status penv ~may_load intf with
+                      | None -> false
+                      | Some (_, true) -> true
+                      | Some (imp, false) ->
+                          match labels with
+                          | [label] ->
+                              verify_member penv ~may_load ~depth:(depth - 1)
+                                (items_of_import imp) label
+                          | _ -> false)
+
+let member_module_alias name (item : Subst.Lazy.signature_item) =
+  match item with
+  | Sig_module (id, _, { md_type = Mty_alias p; _ }, _, _)
+    when String.equal (Ident.name id) name -> Some p
+  | _ -> None
+
+let mention_head penv ~may_load intf =
+  match import_status penv ~may_load intf with
+  | None -> Head_unavailable
+  | Some (imp, true) -> Head_closed imp.imp_filename
+  | Some (imp, false) ->
+      let items = items_of_import imp in
+      let member name =
+        match List.find_map (member_module_alias name) items with
+        | Some p -> Some (Member_module_alias p)
+        | None ->
+            if verify_member penv ~may_load ~depth:20 items name
+            then Some Member_verified
+            else None
+      in
+      Head_open (imp.imp_filename, member)
+
+let add_weak_import penv intf = add_import penv intf
 
 let remember_global { globals; _ } global ~precision ~mentioned_by =
   let global_name = Global_module.to_name global in
@@ -800,7 +973,11 @@ and acknowledge_new_pers_name penv check global_name global import =
 and find_pers_name ~allow_hidden penv ~check name ~allow_excess_args =
   let {persistent_names; _} = penv in
   match Global_module.Name.Tbl.find persistent_names name with
-  | pn -> pn
+  | pn ->
+      check_visibility ~allow_hidden
+        ~intf:(CUI.Found.intf name.Global_module.Name.head) pn.pn_import;
+      if check then complete_consistency_check penv pn.pn_import;
+      pn
   | exception Not_found ->
       let unit_name = name.Global_module.Name.head in
       let import = find_import ~allow_hidden penv ~check unit_name in
@@ -987,6 +1164,7 @@ let find_pers_struct
       check_visibility ~allow_hidden
         ~intf:(CUI.Found.intf name.Global_module.Name.head)
         ps.ps_name_info.pn_import;
+      if check then complete_consistency_check penv ps.ps_name_info.pn_import;
       ps
   | exception Not_found ->
       let pers_name =
@@ -1000,23 +1178,74 @@ let describe_prefix ppf prefix =
   else
     Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
+<<<<<<< Merlin:attach-cmi-path
 (* Emits a warning if there is no valid cmi for name *)
 let check_pers_struct ~allow_hidden penv f1 f2 ~loc
     (name : Global_module.Name.t) =
+||||||| Compiler:last-imported
+(* Emits a warning if there is no valid cmi for name *)
+let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
+=======
+(* Checks that there is a valid cmi for [name]; if so, returns [name] with the
+   path of the loaded cmi attached to its head. Otherwise registers a delayed
+   warning 49 (delayed so that, as with warnings about unused bindings, it is
+   not emitted when compilation fails with a real error). *)
+let check_pers_struct ~allow_hidden penv f ~loc (name : Global_module.Name.t) =
+>>>>>>> Compiler:HEAD
   let name_as_string = CUI.to_string (CUI.Found.intf name.head) in
+<<<<<<< Merlin:attach-cmi-path
   try
     ignore (find_pers_struct ~allow_hidden penv f1 f2 ~check:false name
               ~allow_excess_args:true)
+||||||| Compiler:last-imported
+  try
+    ignore (find_pers_struct ~allow_hidden penv f ~check:false name
+              ~allow_excess_args:true)
+=======
+  let delay_warning warn =
+    !add_delayed_check_forward (fun () -> Location.prerr_warning loc warn)
+  in
+  match
+    find_pers_struct ~allow_hidden penv f ~check:false name
+      ~allow_excess_args:true
+>>>>>>> Compiler:HEAD
   with
+<<<<<<< Merlin:attach-cmi-path
   | Not_found ->
       let warn = Warnings.No_cmi_file(name_as_string, None) in
         Location.prerr_warning loc warn
   | Magic_numbers.Cmi.Error err ->
+||||||| Compiler:last-imported
+  | Not_found ->
+      let warn = Warnings.No_cmi_file(name_as_string, None) in
+        Location.prerr_warning loc warn
+  | Cmi_format.Error err ->
+=======
+  | ps ->
+      Global_module.Name.with_head_cmi_path name
+        ps.ps_name_info.pn_import.imp_filename
+  | exception Not_found ->
+      delay_warning (Warnings.No_cmi_file(name_as_string, None));
+      name
+  | exception Cmi_format.Error err ->
+>>>>>>> Compiler:HEAD
       let msg = Format.asprintf "%a"
+<<<<<<< Merlin:attach-cmi-path
           Magic_numbers.Cmi.report_error err in
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
   | Error err ->
+||||||| Compiler:last-imported
+          Cmi_format.report_error err in
+      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
+        Location.prerr_warning loc warn
+  | Error err ->
+=======
+          Cmi_format.report_error err in
+      delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
+      name
+  | exception Error err ->
+>>>>>>> Compiler:HEAD
       let msg =
         match err with
         | Illegal_renaming(name, ps_name, filename) ->
@@ -1066,8 +1295,8 @@ let check_pers_struct ~allow_hidden penv f1 f2 ~loc
               (Style.as_inline_code Global_module.Name.print) value
       in
       let msg = Format_doc.(asprintf "%a" pp_doc) msg in
-      let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-        Location.prerr_warning loc warn
+      delay_warning (Warnings.No_cmi_file(name_as_string, Some msg));
+      name
 
 let read penv modname a =
   read_pers_struct penv true modname a
@@ -1119,10 +1348,25 @@ let check ~allow_hidden penv f1 f2 ~loc name =
          later *)
       approximate_global_by_name penv name
     in
+<<<<<<< Merlin:attach-cmi-path
     if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
       !add_delayed_check_forward
         (fun () -> check_pers_struct ~allow_hidden penv f1 f2 ~loc name)
   end
+||||||| Compiler:last-imported
+    if (Warnings.is_active (Warnings.No_cmi_file("", None))) then
+      !add_delayed_check_forward
+        (fun () -> check_pers_struct ~allow_hidden penv f ~loc name)
+  end
+=======
+    ()
+  end;
+  (* With warning 49 disabled, the alias is neither checked nor is its cmi
+     searched for, so the output does not depend on which cmis happen to
+     exist. *)
+  if not (Warnings.is_active (Warnings.No_cmi_file ("", None))) then name
+  else check_pers_struct ~allow_hidden penv f ~loc name
+>>>>>>> Compiler:HEAD
 
 let crc_of_unit penv name =
   match Consistbl.find penv.crc_units name with
@@ -1227,14 +1471,7 @@ let implemented_parameter penv modname =
   | Some { pn_import = { imp_arg_for; _ }; _ } -> imp_arg_for
   | None -> None
 
-let make_cmi penv modname kind sign alerts =
-  let flags =
-    List.concat [
-      if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
-      if !Clflags.opaque then [Cmi_format.Opaque] else [];
-      [Alerts alerts];
-    ]
-  in
+let make_cmi penv modname kind sign alerts ~closed =
   let params =
     (* Needs to be consistent with [Translmod] *)
     parameters penv
@@ -1254,6 +1491,21 @@ let make_cmi penv modname kind sign alerts =
               None
             else Some gn_global)
     |> Array.of_seq
+  in
+  let closed =
+    (* Parameters and incomplete globals are mentions of the parameterised
+       world, whose argument heads do not carry cmi paths; be conservative. *)
+    closed
+    && (match params with [] -> true | _ :: _ -> false)
+    && Array.length globals = 0
+  in
+  let flags =
+    List.concat [
+      if !Clflags.recursive_types then [Cmi_format.Rectypes] else [];
+      if !Clflags.opaque then [Cmi_format.Opaque] else [];
+      [Alerts alerts];
+      if closed then [Cmi_format.Closed] else [];
+    ]
   in
   {
     cmi_name = modname;
