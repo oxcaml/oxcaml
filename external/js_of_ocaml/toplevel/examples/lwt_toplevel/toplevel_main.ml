@@ -1,0 +1,295 @@
+(* Js_of_ocaml toplevel
+ * http://www.ocsigen.org/js_of_ocaml/
+ * Copyright (C) 2011 Jérôme Vouillon
+ * Laboratoire PPS - CNRS Université Paris Diderot
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, with linking exception;
+ * either version 2.1 of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *)
+
+open Js_of_ocaml
+open Js_of_ocaml_lwt
+open Js_of_ocaml_tyxml
+open Js_of_ocaml_toplevel_common
+open Toplevel_util
+open Lwt
+
+let compiler_name = "OCaml"
+
+(* load file using a synchronous XMLHttpRequest *)
+let load_resource_aux filename url =
+  Js_of_ocaml_lwt.XmlHttpRequest.perform_raw ~response_type:XmlHttpRequest.ArrayBuffer url
+  >|= fun frame ->
+  if frame.Js_of_ocaml_lwt.XmlHttpRequest.code = 200
+  then
+    Js.Opt.case
+      frame.Js_of_ocaml_lwt.XmlHttpRequest.content
+      (fun () -> Printf.eprintf "Could not load %s\n" filename)
+      (fun b ->
+        Sys_js.update_file ~name:filename ~content:(Typed_array.String.of_arrayBuffer b))
+  else ()
+
+let load_resource scheme ~prefix ~path:suffix =
+  let url = scheme ^ suffix in
+  let filename = Filename.concat prefix suffix in
+  Lwt.async (fun () -> load_resource_aux filename url);
+  Some ""
+
+let setup_pseudo_fs ~load_cmis_from_server =
+  Sys_js.mount ~path:"/dev/" (fun ~prefix:_ ~path:_ -> None);
+  Sys_js.mount ~path:"/http/" (load_resource "http://");
+  Sys_js.mount ~path:"/https/" (load_resource "https://");
+  Sys_js.mount ~path:"/ftp/" (load_resource "ftp://");
+  if load_cmis_from_server then Sys_js.mount ~path:"/home/" (load_resource "filesys/")
+
+let exec' s =
+  match Wrapped.use () ~ppf_answer:Format.std_formatter s with
+  | Wrapped.Success (true, _) -> ()
+  | _ -> Format.eprintf "error while evaluating %s@." s
+
+let setup_toplevel () =
+  Clflags.debug := true;
+  Direct.initialize ();
+  Sys.interactive := false;
+  if Version.compare Version.current [ 4; 07 ] >= 0 then exec' "open Stdlib";
+  exec'
+    "module Lwt_main = struct\n\
+    \  let run t = match Lwt.state t with\n\
+    \    | Lwt.Return x -> x\n\
+    \    | Lwt.Fail e -> raise e\n\
+    \    | Lwt.Sleep -> failwith \"Lwt_main.run: thread didn't return\"\n\
+    \ end";
+  let header1 = Printf.sprintf "        %s version %%s" compiler_name in
+  let header2 =
+    Printf.sprintf "     Compiled with Js_of_ocaml version %s" Sys_js.js_of_ocaml_version
+  in
+  exec' (Printf.sprintf "Format.printf \"%s@.\" Sys.ocaml_version;;" header1);
+  exec' (Printf.sprintf "Format.printf \"%s@.@.\";;" header2);
+  exec' "#enable \"pretty\";;";
+  exec' "#disable \"shortvar\";;";
+  Ppx_support.init ();
+  Toploop.add_directive
+    "load_js"
+    (Toploop.Directive_string (fun name -> Js.Unsafe.global##load_script_ name))
+    { section = "js_of_ocaml-toplevel-example"; doc = "Load the given javascript file" };
+  Sys.interactive := true;
+  ()
+
+let setup_printers () =
+  exec'
+    "let _print_error fmt e = Format.pp_print_string fmt (Js_of_ocaml.Js_error.to_string \
+     e)";
+  Topdirs.dir_install_printer Format.std_formatter Longident.(Lident "_print_error");
+  exec' "let _print_unit fmt (_ : 'a) : 'a = Format.pp_print_string fmt \"()\"";
+  Topdirs.dir_install_printer Format.std_formatter Longident.(Lident "_print_unit")
+
+let setup_examples ~container ~textbox =
+  (* The examples source is mounted in the pseudo-filesystem. *)
+  let content =
+    let lines = ref [] in
+    (try
+       let ic = open_in "/static/examples.ml" in
+       (try
+          while true do
+            lines := input_line ic :: !lines
+          done
+        with End_of_file -> ());
+       close_in ic
+     with _ -> ());
+    String.concat "\n" (List.rev !lines)
+  in
+  Toplevel_util.setup_examples
+    ~container_id:"toplevel-examples"
+    ~on_pick:(fun acc ->
+      textbox##.value := (Js.string acc)##trim;
+      Lwt.async (fun () ->
+          resize ~container ~textbox ()
+          >>= fun () ->
+          textbox##focus;
+          Lwt.return_unit))
+    content
+
+(* we need to compute the hash form href to avoid different encoding behavior
+     across browser. see Url.get_fragment *)
+let parse_hash () =
+  let frag = Url.Current.get_fragment () in
+  Url.decode_arguments frag
+
+let setup_share_button ~output =
+  do_by_id "btn-share" (fun e ->
+      e##.style##.display := Js.string "block";
+      e##.onclick :=
+        Dom_html.handler (fun _ ->
+            (* get all ocaml code *)
+            let code = ref [] in
+            Js.Opt.iter
+              output##.firstChild
+              (iter_on_sharp ~f:(fun e ->
+                   code :=
+                     Js.Opt.case e##.textContent (fun () -> "") Js.to_string :: !code));
+            let code_encoded =
+              Js_of_ocaml_compiler.Base64.encode_string
+                (String.concat "" (List.rev !code))
+            in
+            let url, is_file =
+              match Url.Current.get () with
+              | Some (Url.Http url) -> Url.Http { url with Url.hu_fragment = "" }, false
+              | Some (Url.Https url) -> Url.Https { url with Url.hu_fragment = "" }, false
+              | Some (Url.File url) -> Url.File { url with Url.fu_fragment = "" }, true
+              | _ -> assert false
+            in
+            let frag =
+              let frags = parse_hash () in
+              let frags = List.remove_assoc "code" frags @ [ "code", code_encoded ] in
+              Url.encode_arguments frags
+            in
+            let uri = Url.string_of_url url ^ "#" ^ frag in
+            let append_url str =
+              let dom =
+                Tyxml_js.Html.(
+                  p
+                    ~a:[ a_class [ "share-url" ] ]
+                    [ txt "Share: "; a ~a:[ a_href str ] [ txt str ] ])
+              in
+              Dom.appendChild output (Tyxml_js.To_dom.of_element dom)
+            in
+            Lwt.async (fun () ->
+                Lwt.catch
+                  (fun () ->
+                    if is_file
+                    then failwith "Cannot shorten url with file scheme"
+                    else
+                      let uri =
+                        Printf.sprintf
+                          "http://is.gd/create.php?format=json&url=%s"
+                          (Url.urlencode uri)
+                      in
+                      Lwt.bind (Js_of_ocaml_lwt.Jsonp.call uri) (fun o ->
+                          (match
+                             ( Js.Optdef.to_option o##.errorcode
+                             , Js.Optdef.to_option o##.errormessage )
+                           with
+                          | _, Some err -> failwith (Js.to_string err)
+                          | Some err_code, _ ->
+                              failwith (Printf.sprintf "Unknown error %d" err_code)
+                          | None, None -> (
+                              match Js.Optdef.to_option o##.shorturl with
+                              | None -> failwith "Unknown error"
+                              | Some url -> append_url (Js.to_string url)));
+                          Lwt.return_unit))
+                  (fun exn ->
+                    Format.eprintf
+                      "Could not generate short url. reason: %s@."
+                      (Printexc.to_string exn);
+                    append_url uri;
+                    Lwt.return_unit));
+            Js._false))
+
+let current_position = ref 0
+
+let make_ppf flusher =
+  let buf = Buffer.create 256 in
+  Format.make_formatter
+    (fun s pos len -> Buffer.add_substring buf s pos len)
+    (fun () ->
+      let s = Buffer.contents buf in
+      Buffer.clear buf;
+      if s <> "" then flusher s)
+
+let run ~setup_preview () =
+  let container = by_id "toplevel-container" in
+  let output = by_id "output" in
+  let textbox : 'a Js.t = by_id_coerce "userinput" Dom_html.CoerceTo.textarea in
+  let sharp_ppf = make_ppf (append Colorize.ocaml output "sharp") in
+  let caml_ppf = make_ppf (append Colorize.ocaml output "caml") in
+  let execute () =
+    let content = Js.to_string textbox##.value##trim in
+    current_position := output##.childNodes##.length;
+    textbox##.value := Js.string "";
+    History.push content;
+    (* [Wrapped] returns errors and warnings as values (and normalizes the
+       source, so no trailing [;;] is needed). Render them to stderr — which
+       this page styles into the output — and highlight their source locations
+       in the echoed input. *)
+    let report (e : Wrapped.error) =
+      Format.fprintf Format.err_formatter "%s@." e.Wrapped.msg;
+      let output = by_id "output" in
+      let first =
+        Js.Opt.get (output##.childNodes##item !current_position) (fun _ -> assert false)
+      in
+      List.iter (fun loc -> highlight_location ~first loc) e.Wrapped.locs
+    in
+    let warnings, error =
+      match
+        Wrapped.execute
+          ()
+          ~ppf_code:sharp_ppf
+          ~print_outcome:true
+          ~ppf_answer:caml_ppf
+          content
+      with
+      | Wrapped.Success (_, warnings) -> warnings, None
+      | Wrapped.Error (err, warnings) -> warnings, Some err
+    in
+    List.iter report warnings;
+    Option.iter report error;
+    resize ~container ~textbox ()
+    >>= fun () ->
+    container##.scrollTop := Js.float (float container##.scrollHeight);
+    textbox##focus;
+    Lwt.return_unit
+  in
+  setup_input_handlers ~container ~textbox ~output ~execute ~reset:setup_toplevel;
+  (Lwt.async_exception_hook :=
+     fun exc ->
+       Format.eprintf "exc during Lwt.async: %s@." (Printexc.to_string exc);
+       match exc with
+       | Js_error.Exn e ->
+           let e = Js_error.to_error e in
+           Console.console##log e##.stack
+       | _ -> ());
+  Lwt.async (fun () ->
+      resize ~container ~textbox ()
+      >>= fun () ->
+      textbox##focus;
+      Lwt.return_unit);
+  Sys_js.set_channel_flusher stdout (append Colorize.text output "stdout");
+  Sys_js.set_channel_flusher stderr (append Colorize.text output "stderr");
+  let readline () =
+    Js.Opt.case
+      (Dom_html.window##prompt (Js.string "The toplevel expects inputs:") (Js.string ""))
+      (fun () -> "")
+      (fun s -> Js.to_string s ^ "\n")
+  in
+  Sys_js.set_channel_filler stdin readline;
+  setup_share_button ~output;
+  setup_examples ~container ~textbox;
+  setup_pseudo_fs ~load_cmis_from_server:false;
+  setup_toplevel ();
+  setup_preview ();
+  setup_printers ();
+  History.setup ();
+  textbox##.value := Js.string "";
+  (* Run initial code if any *)
+  try
+    let code = List.assoc "code" (parse_hash ()) in
+    textbox##.value := Js.string (Js_of_ocaml_compiler.Base64.decode_exn code);
+    Lwt.async execute
+  with
+  | Not_found -> ()
+  | exc ->
+      Console.console##log_3
+        (Js.string "exception")
+        (Js.string (Printexc.to_string exc))
+        exc
