@@ -436,10 +436,6 @@ let emit_named_text_section func_name =
        function boundaries need not break delta chains. *)
     Emitaux.enter_code_section ".text")
 
-let emit_Llabel fallthrough lbl =
-  if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
-  D.define_label lbl
-
 (* Output a pseudo-register *)
 
 let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
@@ -2670,7 +2666,8 @@ let emit_instr ~first ~last ~fallthrough i =
   | Lreturn -> I.ret ()
   | Llabel lbl ->
     let lbl = label_to_asm_label ~section:Text lbl in
-    emit_Llabel fallthrough lbl
+    if (not fallthrough) && !fastcode_flag then D.align ~fill:Nop ~bytes:4;
+    D.define_label lbl
   | Lbranch lbl -> I.jmp (emit_label_arg ~section:Text lbl)
   | Lcondbranch (tst, lbl) ->
     emit_test i tst ~taken:(fun c -> I.j c (emit_label_arg ~section:Text lbl))
