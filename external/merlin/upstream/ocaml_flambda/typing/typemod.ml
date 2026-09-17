@@ -2807,7 +2807,8 @@ let rec nongen_modtype env f g = function
   | Mty_signature sg ->
       let env = Env.add_signature sg env in
       List.find_map (nongen_signature_item env f g) sg
-  | Mty_functor(arg_opt, body, _) ->
+  | Mty_functor(arg_opt, body, _) as mty ->
+      g env mty;
       let env =
         match arg_opt with
         | Unit
@@ -2828,19 +2829,35 @@ let rec nongen_modtype env f g = function
 - call [f] on all value description types, which potentailly contain
   non-generalized type variables.
 - call [g] on all module declaration types, which potentially contains loose
-  mode variables.
+  mode variables. [g] is called on all module types, included nested ones.
   *)
 and nongen_signature_item env f g = function
   | Sig_value(_id, desc, _) ->
       f env desc.val_type
       |> Option.map (fun vars -> (vars, desc))
   | Sig_module(_id, _, md, _, _) ->
-      g env md.md_type;
       nongen_modtype env f g md.md_type
   | _ -> None
 
+let remove_functor_mode_variables ~zap_scope = function
+  | Mty_functor (arg_opt, _, mres) ->
+      let zap_mode ~arg mode =
+        if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+          With_locality.add_mode_to_zap_scope ~arg mode zap_scope
+         end else begin
+          With_locality.zap_to_legacy_force ~arg mode |> ignore
+         end
+      in
+      zap_mode ~arg:false mres;
+      begin match arg_opt with
+      | Unit -> ()
+      | Named (_, _, marg) -> zap_mode ~arg:true marg
+      end
+  | _ -> ()
+
 let check_nongen_modtype ~zap_scope env loc mty =
-  nongen_modtype env (Ctype.nongen_vars_in_schema ~zap_scope) (fun _ _ -> ())
+  let rm_mty _env mty = remove_functor_mode_variables ~zap_scope mty in
+  nongen_modtype env (Ctype.nongen_vars_in_schema ~zap_scope) rm_mty
     mty
   |> Option.iter (fun (vars, item) ->
       let vars = Btype.TypeSet.elements vars in
@@ -2868,22 +2885,6 @@ let check_nongen_signature_item ~zap_scope env sig_item =
 let check_nongen_signature env sg =
   Mode.With_locality.with_zap_scope (fun ~zap_scope ->
       List.iter (check_nongen_signature_item ~zap_scope env) sg)
-
-let remove_functor_mode_variables ~zap_scope = function
-  | Mty_functor (arg_opt, _, mres) ->
-      let zap_mode ~arg mode =
-        if Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
-          With_locality.add_mode_to_zap_scope ~arg mode zap_scope
-         end else begin
-          With_locality.zap_to_legacy_force ~arg mode |> ignore
-         end
-      in
-      zap_mode ~arg:false mres;
-      begin match arg_opt with
-      | Unit -> ()
-      | Named (_, _, marg) -> zap_mode ~arg:true marg
-      end
-  | _ -> ()
 
 let remove_mode_and_jkind_variables env sg =
   Mode.With_locality.with_zap_scope(fun ~zap_scope ->
