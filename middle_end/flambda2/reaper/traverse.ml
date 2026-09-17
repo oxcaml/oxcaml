@@ -214,7 +214,7 @@ let traverse_prim denv acc ~bound_pattern (prim : Flambda_primitive.t) ~default
       ( Invalid _ | Optimised_out _ | Probe_is_enabled _ | Enter_inlined_apply _
       | Dls_get | Tls_get | Domain_index | Poll | Cpu_relax )
   | Unary
-      ( ( Duplicate_block _ | Duplicate_array _
+      ( ( Duplicate_and_update_block _ | Duplicate_array _
         | Is_int { variant_only = false }
         | Is_null | Array_length _ | Bigarray_length _ | String_length _
         | Int_as_pointer _ | Opaque_identity _ | Int_arith _ | Float_arith _

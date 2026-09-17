@@ -1245,7 +1245,7 @@ type unary_primitive =
         mut : Mutability.t;
         field : Target_ocaml_int.t
       }
-  | Duplicate_block of
+  | Duplicate_and_update_block of
       { kind : Duplicate_block_kind.t;
         alloc_region : Variable.t
       }
@@ -1305,7 +1305,7 @@ let unary_primitive_eligible_for_cse p ~arg =
   match p with
   | Block_load _ -> false
   | Duplicate_array _ -> false
-  | Duplicate_block { kind = _; alloc_region = _ } -> false
+  | Duplicate_and_update_block { kind = _; alloc_region = _ } -> false
   | Is_int _ | Is_null | Get_tag | Get_header -> true
   | Array_length _ -> true
   | Bigarray_length _ -> false
@@ -1338,7 +1338,7 @@ let compare_unary_primitive p1 p2 =
     match p with
     | Block_load _ -> 0
     | Duplicate_array _ -> 1
-    | Duplicate_block _ -> 2
+    | Duplicate_and_update_block _ -> 2
     | Is_int _ -> 3
     | Get_tag -> 4
     | Array_length _ -> 5
@@ -1401,8 +1401,9 @@ let compare_unary_primitive p1 p2 =
           Stdlib.compare destination_mutability1 destination_mutability2
         in
         if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
-  | ( Duplicate_block { kind = kind1; alloc_region = alloc_region1 },
-      Duplicate_block { kind = kind2; alloc_region = alloc_region2 } ) ->
+  | ( Duplicate_and_update_block { kind = kind1; alloc_region = alloc_region1 },
+      Duplicate_and_update_block { kind = kind2; alloc_region = alloc_region2 }
+    ) ->
     let c = Duplicate_block_kind.compare kind1 kind2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
   | ( Is_int { variant_only = variant_only1 },
@@ -1465,8 +1466,8 @@ let compare_unary_primitive p1 p2 =
       Make_lazy { lazy_tag = lazy_tag2; alloc_region = alloc_region2 } ) ->
     let c = Lazy_block_tag.compare lazy_tag1 lazy_tag2 in
     if c <> 0 then c else Variable.compare alloc_region1 alloc_region2
-  | ( ( Block_load _ | Duplicate_array _ | Duplicate_block _ | Is_int _
-      | Is_null | Get_tag | String_length _ | Int_as_pointer _
+  | ( ( Block_load _ | Duplicate_array _ | Duplicate_and_update_block _
+      | Is_int _ | Is_null | Get_tag | String_length _ | Int_as_pointer _
       | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
       | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector | Float_arith _
       | Array_length _ | Bigarray_length _ | Unbox_number _ | Box_number _
@@ -1485,8 +1486,9 @@ let print_unary_primitive ppf p =
   | Block_load { kind; mut; field } ->
     fprintf ppf "@[(Block_load@ %a@ %a@ %a)@]" Block_access_kind.print kind
       Mutability.print mut Target_ocaml_int.print field
-  | Duplicate_block { kind; alloc_region } ->
-    fprintf ppf "@[<hov 1>(Duplicate_block (kind %a) (alloc_region %a))@]"
+  | Duplicate_and_update_block { kind; alloc_region } ->
+    fprintf ppf
+      "@[<hov 1>(Duplicate_and_update_block (kind %a) (alloc_region %a))@]"
       Duplicate_block_kind.print kind Variable.print alloc_region
   | Duplicate_array
       { kind; source_mutability; destination_mutability; alloc_region } ->
@@ -1551,7 +1553,7 @@ let print_unary_primitive ppf p =
 let arg_kind_of_unary_primitive p =
   match p with
   | Block_load _ -> block_kind
-  | Duplicate_array _ | Duplicate_block _ -> K.value
+  | Duplicate_array _ | Duplicate_and_update_block _ -> K.value
   | Is_int _ -> K.value
   | Is_null -> K.value
   | Get_tag -> K.value
@@ -1588,7 +1590,7 @@ let result_kind_of_unary_primitive p : result_kind =
   match p with
   | Block_load { kind; _ } ->
     Singleton (Block_access_kind.element_kind_for_load kind)
-  | Duplicate_array _ | Duplicate_block _ -> Singleton K.value
+  | Duplicate_array _ | Duplicate_and_update_block _ -> Singleton K.value
   | Is_int _ | Is_null | Get_tag -> Singleton K.naked_immediate
   | String_length _ -> Singleton K.naked_immediate
   | Int_as_pointer _ ->
@@ -1651,7 +1653,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
         Has_coeffects,
         Strict,
         Can't_move_before_any_branch ))
-  | Duplicate_block { kind = _; alloc_region = _ } ->
+  | Duplicate_and_update_block { kind = _; alloc_region = _ } ->
     (* We have to assume that the fields might be mutable. (This information
        isn't currently propagated from [Lambda].) *)
     ( Only_generative_effects Mutable,
@@ -1749,7 +1751,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
 
 let unary_classify_for_printing p =
   match p with
-  | Duplicate_array _ | Duplicate_block _ | Obj_dup _ -> Constructive
+  | Duplicate_array _ | Duplicate_and_update_block _ | Obj_dup _ -> Constructive
   | String_length _ | Get_tag -> Destructive
   | Is_int _ | Is_null | Opaque_identity _ | Int_arith _ | Num_conv _
   | Boolean_not | Reinterpret_64_bit_word _ | Reinterpret_boxed_vector
@@ -1780,7 +1782,7 @@ let free_names_unary_primitive p =
          value_slot Name_mode.normal)
       project_from Name_mode.normal
   | Duplicate_array { alloc_region; _ }
-  | Duplicate_block { alloc_region; _ }
+  | Duplicate_and_update_block { alloc_region; _ }
   | Obj_dup { alloc_region }
   | Make_lazy { alloc_region; _ } ->
     Name_occurrences.singleton_variable alloc_region Name_mode.normal
@@ -1817,11 +1819,11 @@ let apply_renaming_unary_primitive p renaming =
           source_mutability;
           destination_mutability
         }
-  | Duplicate_block { alloc_region; kind } ->
+  | Duplicate_and_update_block { alloc_region; kind } ->
     let alloc_region' = Renaming.apply_variable renaming alloc_region in
     if alloc_region == alloc_region'
     then p
-    else Duplicate_block { alloc_region = alloc_region'; kind }
+    else Duplicate_and_update_block { alloc_region = alloc_region'; kind }
   | Obj_dup { alloc_region } ->
     let alloc_region' = Renaming.apply_variable renaming alloc_region in
     if alloc_region == alloc_region'
@@ -1847,7 +1849,7 @@ let ids_for_export_unary_primitive p =
   | Box_number (_, alloc_mode) | Int_as_pointer alloc_mode ->
     Alloc_mode.For_allocations.ids_for_export alloc_mode
   | Duplicate_array { alloc_region; _ }
-  | Duplicate_block { alloc_region; _ }
+  | Duplicate_and_update_block { alloc_region; _ }
   | Obj_dup { alloc_region }
   | Make_lazy { alloc_region; _ } ->
     Ids_for_export.singleton_variable alloc_region

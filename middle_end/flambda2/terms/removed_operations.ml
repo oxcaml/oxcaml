@@ -47,7 +47,8 @@ let prim (prim : Flambda_primitive.t) =
   match prim with
   | Unary (prim, _) -> (
     match prim with
-    | Duplicate_block _ | Duplicate_array _ | Box_number _ | Unbox_number _ ->
+    | Duplicate_and_update_block _ | Duplicate_array _ | Box_number _
+    | Unbox_number _ ->
       alloc
     | _ ->
       (* Some allocating primitives ([Num_conv] to naked_int64 on arch32 for

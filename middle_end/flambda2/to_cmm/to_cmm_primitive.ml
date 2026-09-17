@@ -1179,7 +1179,7 @@ let unary_primitive env res dbg f (_arg_simple : Simple.t option)
   | Block_load { kind; mut; field } ->
     None, res, block_load ~dbg kind mut ~field ~block:arg
   | Duplicate_array { alloc_region; _ }
-  | Duplicate_block { alloc_region; _ }
+  | Duplicate_and_update_block { alloc_region; _ }
   | Obj_dup { alloc_region } ->
     (* CR alloc_regions: propagate alloc_regions to CMM. *)
     let () = ignore alloc_region in
