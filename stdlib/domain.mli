@@ -208,7 +208,7 @@ module Tick : sig @@ portable
 
       In between calling [acquire] and calling [release], the tick thread will
       tick {i at least as frequently} as the provided [interval_usec]. *)
-  type t : mutable_data mod external_ global non_float
+  type t : value non_pointer mod external_ global many stateless
 
   (** Request that the tick thread tick at least as frequently as
       [interval_usec] until [release] is called on the returned handle. *)
