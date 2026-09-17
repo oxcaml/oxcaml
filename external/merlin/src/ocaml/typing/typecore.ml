@@ -6653,6 +6653,7 @@ let split_function_ty
         in
         Env.add_region_lock env
   in
+  (* This [alloc_as_value] cuts the hint chain *)
   let ret_value_mode = alloc_as_value ret_mode in
   let expected_inner_mode =
     if not is_final_val_param then begin
@@ -6682,6 +6683,7 @@ let split_function_ty
     else fst (Alloc.Monadic.newvar_above (get_current_level ())
       arg_mode.monadic)
   in
+  (* This [with_locality_to_regionality_l2r] cuts the hint chain *)
   let arg_value_mode =
     alloc_to_value_l2r { arg_mode with monadic = env_monadic }
   in

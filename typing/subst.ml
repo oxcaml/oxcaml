@@ -300,12 +300,13 @@ let with_additional_action =
             end
           | None -> raise(Error (loc, Unconstrained_jkind_variable))
         in
-        (* CR-someday zqian: preserve the hints *)
         (* modes and modalities should have been zapped already *)
         (* if a mode is generic we copy it persistently for saving *)
         let prepare_mode copy_scope mode =
           if Mode.Alloc.check_generic mode
           then For_copy.mode_copy_for_saving copy_scope mode
+          else if !Clflags.keep_locs
+          then Mode.Alloc.to_of_const_exn mode
           else Mode.Alloc.(mode |> to_const_exn |> of_const)
         in
         let prepare_modality modality =
