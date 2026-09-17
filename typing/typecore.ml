@@ -9795,8 +9795,19 @@ and type_function
             in
             (* Defaults are always global. They can be moved out of the
                function's region by Simplf.split_default_wrapper. *)
+            let default_allocation_mode, _ =
+              let closure_allocation_mode =
+                With_locality.Comonadic.proj Allocation closure_mode
+              in
+              Allocation.newvar_below 0 closure_allocation_mode
+            in
+            let default_env =
+              Env.add_curry_lock (default.pexp_loc, Expression)
+                default_allocation_mode env
+            in
             let default_arg =
-              type_expect env mode_legacy default (mk_expected ty_default_arg)
+              type_expect default_env mode_legacy default
+                (mk_expected ty_default_arg)
             in
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
