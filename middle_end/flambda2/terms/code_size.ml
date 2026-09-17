@@ -74,6 +74,41 @@ let unary_int_prim_size ~machine_width:_ kind op =
       Swap_byte_endianness ) ->
     does_not_need_caml_c_call_extcall_size + 1
 
+let bit_counting_prim_size ~machine_width kind op =
+  (* Note: assumes that the bit-counting primitives (clz, ctz, popcnt) are
+     available as single ops on the target system. *)
+  let module MW = Target_system.Machine_width in
+  match
+    ( (op : Flambda_primitive.unary_int_bit_counting_op),
+      (kind : Flambda_kind.Standard_int.t) )
+  with
+  (* clz *)
+  | Leading_zeros, (Tagged_immediate | Naked_nativeint) -> 1
+  | Leading_zeros, Naked_int32 when MW.is_32_bit machine_width -> 1
+  | Leading_zeros, Naked_int64 when MW.is_64_bit machine_width -> 1
+  | ( Leading_zeros,
+      (Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64) )
+    ->
+    1 (* convert to unsigned *) + 1 (* clz *) + 1 (* subtract extra bits *)
+  (* ctz *)
+  | Trailing_zeros, Naked_nativeint -> 1
+  | Trailing_zeros, Naked_int32 when MW.is_32_bit machine_width -> 1
+  | Trailing_zeros, Naked_int64 when MW.is_64_bit machine_width -> 1
+  | ( Trailing_zeros,
+      (Naked_immediate | Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64) )
+    ->
+    1 (* set top bit(s) *) + 1 (* ctz *)
+  | Trailing_zeros, Tagged_immediate ->
+    2 (* clear tag bit *) + 1 (* ctz *) + 1 (* subtract extra bit *)
+  (* popcnt *)
+  | Popcount, Naked_nativeint -> 1
+  | Popcount, Naked_int32 when MW.is_32_bit machine_width -> 1
+  | Popcount, Naked_int64 when MW.is_64_bit machine_width -> 1
+  | Popcount, Tagged_immediate -> 1 (* popcnt *) + 1 (* subtract tag bit *)
+  | Popcount, Naked_immediate -> 1 (* clear sign bit *) + 1 (* popcnt *)
+  | Popcount, (Naked_int8 | Naked_int16 | Naked_int32 | Naked_int64) ->
+    1 (* convert to unsigned *) + 1 (* popcnt *)
+
 let arith_conversion_size ~machine_width src dst =
   match
     ( (src : Flambda_kind.Standard_int_or_float.t),
@@ -426,6 +461,7 @@ let unary_prim_size ~machine_width prim =
   | Int_as_pointer _ -> 1
   | Opaque_identity _ -> 0
   | Int_arith (kind, op) -> unary_int_prim_size ~machine_width kind op
+  | Int_bit_counting (kind, op) -> bit_counting_prim_size ~machine_width kind op
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
   | Boolean_not -> 1
