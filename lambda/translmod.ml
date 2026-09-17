@@ -806,17 +806,12 @@ and transl_structure ~scopes loc
                       ~loc:(to_location loc) output_repr,
                   List.map
                     (fun (pos, cc) ->
-                      match cc with
-                      | Tcoerce_primitive p ->
-                          Translprim.transl_primitive
-                            (of_location ~scopes p.pc_loc)
-                            p.pc_desc p.pc_env p.pc_type
-                            ~poly_mode:p.pc_poly_mode
-                            ~poly_sort:p.pc_poly_sort
-                            ~yielding:p.pc_yielding
-                            ~zero_alloc_check:p.pc_zero_alloc_check
-                            None
-                      | _ -> apply_coercion loc Strict cc (get_field pos))
+                      let loc =
+                        match cc with
+                        | Tcoerce_primitive p -> of_location ~scopes p.pc_loc
+                        | _ -> loc
+                      in
+                      apply_coercion loc Strict cc (get_field pos))
                     pos_cc_list, loc)
             and id_pos_list =
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
