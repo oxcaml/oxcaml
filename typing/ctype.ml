@@ -1040,6 +1040,46 @@ let generalize ty =
   simple_abbrevs := Mnil;
   generalize 0 ty
 
+let collect_layout_variables ty ~candidates =
+  let variables = ref [] in
+  let rec collect_sort sort =
+    let open Jkind_types.Sort in
+    match get sort with
+    | Var v ->
+        if List.memq v candidates && not (List.memq v !variables) then
+          variables := v :: !variables
+    | Product sorts -> List.iter collect_sort sorts
+    | Addressable sort -> collect_sort sort
+    | Base _ | Univar _ -> ()
+  in
+  let rec collect_layout
+      (layout : Jkind_types.Sort.t Jkind_types.Layout.t) =
+    match layout with
+    | Jkind_types.Layout.Sort (sort, _) -> collect_sort sort
+    | Product layouts -> List.iter collect_layout layouts
+    | Addressable layout -> collect_layout layout
+    | Any _ -> ()
+  in
+  (* Abbreviation memos can refer back to enclosing types containing layout
+     variables that do not occur in [ty], so do not traverse them. *)
+  let visited = ref TypeSet.empty in
+  let rec collect ty =
+    if not (TypeSet.mem ty !visited) then begin
+      visited := TypeSet.add ty !visited;
+      begin match get_desc ty with
+      | Tvar { jkind; _ } | Tunivar { jkind; _ } | Tof_kind jkind ->
+          begin match jkind.jkind.base with
+          | Layout layout -> collect_layout layout
+          | Kconstr _ -> ()
+          end
+      | _ -> ()
+      end;
+      iter_type_expr collect (Fun.const ()) ty
+    end
+  in
+  collect ty;
+  List.rev !variables
+
 (* Generalize the structure and lower the variables *)
 
 let rec generalize_structure ty =

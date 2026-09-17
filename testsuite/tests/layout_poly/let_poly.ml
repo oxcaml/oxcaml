@@ -55,9 +55,109 @@ val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
 let poly_ id1 : 'a -> 'a = fun x -> x
 and poly_ id2 : 'a -> 'a = fun x -> x
 [%%expect{|
-Line 1, characters 10-13:
-1 | let poly_ id1 : 'a -> 'a = fun x -> x
-              ^^^
+val poly_ id1 : 'a -> 'a = <lpoly>
+val poly_ id2 : 'a -> 'a = <lpoly>
+|}]
+
+let _ =
+  let module M = struct
+    let poly_ id1 : 'a -> 'a = fun x -> x
+    and poly_ id2 : 'a -> 'a = fun x -> x
+  end in
+  (to_float (M.id1 #1.5), to_int64 (M.id1 #2L),
+   to_float (M.id2 #3.5), to_int64 (M.id2 #4L))
+[%%expect{|
+- : float * int64 * float * int64 = (1.5, 2L, 3.5, 4L)
+|}]
+
+(* Each binding needs exactly its own layout parameters, even when some
+   parameters are shared. Check both binding orders. *)
+let _ =
+  let module Shared_layouts : sig
+    val poly_ const : 'a -> 'b -> 'a
+    val poly_ id : 'a -> 'a
+  end = struct
+    let poly_ const : 'a -> 'b -> 'a = fun x y -> x
+    and poly_ id : 'a -> 'a = fun x -> x
+  end in
+  let module Reversed_shared_layouts : sig
+    val poly_ id : 'a -> 'a
+    val poly_ const : 'a -> 'b -> 'a
+  end = struct
+    let poly_ id : 'a -> 'a = fun x -> x
+    and poly_ const : 'a -> 'b -> 'a = fun x y -> x
+  end in
+  (to_float (Shared_layouts.const #1.5 #2L),
+   to_int64 (Shared_layouts.const #3L #4.5),
+   to_float (Reversed_shared_layouts.const #5.5 #6L),
+   to_int64 (Reversed_shared_layouts.const #7L #8.5),
+   to_float (Shared_layouts.id #9.5),
+   to_int64 (Reversed_shared_layouts.id #10L))
+[%%expect{|
+- : float * int64 * float * int64 * float * int64 =
+(1.5, 3L, 5.5, 7L, 9.5, 10L)
+|}]
+
+(* Sharing annotations must still propagate constraints between bindings. *)
+let poly_ ignore_first : 'a -> 'b -> 'b = fun x y -> y
+and poly_ require_int : 'a -> 'c -> 'c = fun x y ->
+  let _ = x + 1 in y
+[%%expect{|
+val poly_ ignore_first : int -> 'b -> 'b = <lpoly>
+val poly_ require_int : int -> 'c -> 'c = <lpoly>
+|}]
+
+(* Traverse the components of product layouts. *)
+let poly_ pair_id1 : ('a : any & any) -> 'a = fun x -> x
+and poly_ pair_id2 : 'a -> 'a = fun x -> x
+[%%expect{|
+val pair_id1 : layout_ l l0. ('a : l & l0). 'a -> 'a = <lpoly>
+val pair_id2 : layout_ l l0. ('a : l & l0). 'a -> 'a = <lpoly>
+|}]
+
+let _ =
+  let module M = struct
+    let poly_ id1 : ('a : any & any) -> 'a = fun x -> x
+    and poly_ id2 : 'a -> 'a = fun x -> x
+  end in
+  let #(x, y) = M.id1 #(#1.5, #2L) in
+  let #(z, w) = M.id2 #(#3L, #4.5) in
+  (to_float x, to_int64 y, to_int64 z, to_float w)
+[%%expect{|
+- : float * int64 * int64 * float = (1.5, 2L, 3L, 4.5)
+|}]
+
+(* These annotations are scoped outside the local binding group, so their
+   layout cannot be generalized by that group. *)
+let _ =
+  let poly_ id1 : 'a -> 'a = fun x -> x
+  and poly_ id2 : 'a -> 'a = fun x -> x in
+  (id1 1, id2 2)
+[%%expect{|
+Line 3, characters 12-15:
+3 |   and poly_ id2 : 'a -> 'a = fun x -> x in
+                ^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+(* A sibling's layout parameters cannot make a monomorphic binding poly_. *)
+let poly_ polymorphic x = x
+and poly_ monomorphic (x : int) = x
+[%%expect{|
+Line 2, characters 10-21:
+2 | and poly_ monomorphic (x : int) = x
+              ^^^^^^^^^^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
+(* Alias binders are not yet layout-polymorphic. *)
+let poly_ (f as g) = fun x -> x
+[%%expect{|
+Line 1, characters 11-12:
+1 | let poly_ (f as g) = fun x -> x
+               ^
 Error: This binding has no layout variables, so "poly_" has no effect.
        Consider using a regular "let" instead.
 |}]

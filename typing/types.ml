@@ -702,6 +702,10 @@ module Lpoly = struct
   let determined l = ref (Determined l)
   let pending ~loc = ref (Pending loc)
 
+  let is_pending t = match !t with
+    | Pending _ -> true
+    | Determined _ -> false
+
   let generalize ~on_determined ~on_to_generalize t =
     match !t with
     | Pending loc -> t := Determined (on_to_generalize loc)
