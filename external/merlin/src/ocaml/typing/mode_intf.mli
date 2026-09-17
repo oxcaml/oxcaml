@@ -975,9 +975,15 @@ module type S = sig
     val min_with_comonadic :
       'a Comonadic.Axis.t -> ('a, 'l * 'r) mode -> ('l * disallowed) t
 
-    (* [min_with_monadic ax elt] returns [min] but with the monadic axis [ax] set to [elt]. *)
+    (** [min_with_monadic ax elt] returns [min] but with the monadic axis [ax]
+        set to [elt]. *)
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
+
+    (** [max_with_monadic ax elt] returns [max] but with the monadic axis [ax]
+        set to [elt]. *)
+    val max_with_monadic :
+      'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> (disallowed * 'l) t
 
     (** Registers a mode in the scope, to be zapped to legacy when the scope is
         resolved. See [zap_to_legacy] for an explanation of [arg]. *)

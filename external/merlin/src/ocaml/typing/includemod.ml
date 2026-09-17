@@ -445,6 +445,10 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         (Format_doc.compat Printtyp.Doc.path) p
         print_coercion c
+  | Tcoerce_kindtemplate { tc_params; tc_args } ->
+      pr "@[<2>kindtemplate (%a => _ %a)@]"
+        (print_list Jkind.Sort.Debug_printers.var) tc_params
+        (print_list Jkind.Sort.Const.Debug_printers.t) tc_args
   | Tcoerce_invalid ->
       pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
@@ -476,7 +480,6 @@ let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
   else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
-
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)

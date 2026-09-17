@@ -171,7 +171,9 @@ module Sort = struct
 
     let univar uv = Univar uv
 
-    let genvar v = Genvar v
+    let genvar (v : var) =
+      assert (v.contents = None && v.level = generic_level);
+      Genvar v
 
     let rec equal c1 c2 =
       match c1, c2 with
@@ -386,6 +388,15 @@ module Sort = struct
     let[@inline] some : t -> t option = function
       | Base b -> some_of_base b
       | (Product _ | Univar _ | Genvar _ | Addressable _) as t -> Some t
+
+    let rec subst s t =
+      match t with
+      | Genvar v ->
+        assert (v.contents = None);
+        List.assq v s
+      | Base _ | Univar _ -> t
+      | Product ts -> Product (List.map (subst s) ts)
+      | Addressable t -> Addressable (subst s t)
   end
 
   module Var = struct
@@ -746,19 +757,6 @@ module Sort = struct
         if result != s then set_var_contents r (Some result);
         result)
 
-  let rec subst s t =
-    match t with
-    | Var v ->
-      begin match v.contents with
-      | None ->
-        begin match List.assq_opt v s with Some t -> t | None -> t
-        end
-      | Some t -> subst s t
-      end
-    | Base _ | Univar _ -> t
-    | Product ts -> Product (List.map (subst s) ts)
-    | Addressable t -> Addressable (subst s t)
-
   (** During a call to [generalize_with], [!generalized] is [Some] list of
       generalized variables. Outside of a call, [!generalized] is [None]. *)
   let generalized : var list ref option ref = ref None
@@ -795,15 +793,20 @@ module Sort = struct
     in
     result, List.rev !curr_generalized
 
-  let rec to_const_opt : t -> Const.t option = function
-    | Base b -> Some (Static.Const.of_base b)
-    | Product ts ->
-      Misc.Stdlib.List.map_option to_const_opt ts
-      |> Option.map (fun cs : Const.t -> Const.Product cs)
-    | Univar uv -> Some (Univar uv)
-    | Var r -> (
-      match r.contents with None -> None | Some s -> to_const_opt s)
-    | Addressable s -> Option.map Const.addressable (to_const_opt s)
+  let rec assert_const : t -> Const.t = function
+    | Base b -> Static.Const.of_base b
+    | Product ts -> Const.Product (List.map assert_const ts)
+    | Univar uv -> Univar uv
+    | Var v -> assert_const_var v
+    | Addressable s -> Addressable (assert_const s)
+
+  and assert_const_var (v : var) : Const.t =
+    match v.contents with
+    | None when is_genvar v -> Genvar v
+    | None ->
+      Misc.fatal_error
+        "Jkind_types.Sort.assert_const: unexpected non-generic variable"
+    | Some s -> assert_const s
 
   let is_scannable_or_var s =
     let rec go = function
@@ -1013,7 +1016,9 @@ module Layout = struct
 
     let univar uv = Univar uv
 
-    let genvar v = Genvar v
+    let genvar (v : Sort.var) =
+      assert (v.contents = None && v.level = Sort.generic_level);
+      Genvar v
 
     let max = Any Scannable_axes.max
 
