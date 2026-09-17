@@ -146,14 +146,8 @@ val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
    loaded cmi's path attached to its head. With the warning disabled, the cmi
    is not searched for at all and [name] is returned unchanged. *)
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-<<<<<<< Merlin:attach-cmi-path
   -> (Global_module.Name.t -> 'a -> Short_paths.Desc.Module.components Lazy.t)
-  -> loc:Location.t -> Global_module.Name.t -> unit
-||||||| Compiler:last-imported
-  -> loc:Location.t -> Global_module.Name.t -> unit
-=======
   -> loc:Location.t -> Global_module.Name.t -> Global_module.Name.t
->>>>>>> Compiler:HEAD
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
