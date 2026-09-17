@@ -1,0 +1,4 @@
+File "use_open_cmi.ml", line 6, characters 20-21:
+6 | let () = use_static x
+                        ^
+Error: This value is dynamic but is expected to be static.

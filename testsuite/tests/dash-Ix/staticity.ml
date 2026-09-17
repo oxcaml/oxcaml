@@ -12,10 +12,12 @@
    Each scenario below is compiled twice: via -Ix (a cmx is guaranteed, so the
    static use succeeds) and via plain -I (S is forced dynamic, so the static use
    fails with an error naming S).
+
+   -open-cmi-x is to -open-cmi as -Ix is to -I, and is tested the same way.
 *)
 
 subdirectories = "slib";
-readonly_files = "use_module.ml use_field.ml use_open.ml";
+readonly_files = "use_module.ml use_field.ml use_open.ml use_open_cmi.ml";
 setup-ocamlc.byte-build-env;
 
 (* Compile the static library module S. *)
@@ -76,6 +78,25 @@ ocamlc.byte;
   ocamlc_byte_exit_status = "2";
   ocamlc.byte;
   compiler_reference = "${test_source_directory}/use_open.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
+(* Scenario 4: S is opened from the command line via -open-cmi(-x). *)
+{
+  flags = "-extension layout_poly -nocwd -open-cmi-x slib/s.cmi";
+  module = "use_open_cmi.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "0";
+  ocamlc.byte;
+}
+{
+  flags = "-extension layout_poly -nocwd -open-cmi slib/s.cmi";
+  module = "use_open_cmi.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc_byte_exit_status = "2";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/use_open_cmi.ocamlc.reference";
   check-ocamlc.byte-output;
 }
 

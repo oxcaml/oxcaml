@@ -20,7 +20,8 @@ let () =
       *)
       let quote_open_arg : Clflags.open_arg -> string = function
         | Open s -> Printf.sprintf "Open(%S)" s
-        | Open_cmi s -> Printf.sprintf "Open_cmi(%S)" s
+        | Open_cmi { path; cmx_guaranteed } ->
+          Printf.sprintf "Open_cmi(%S, %B)" path cmx_guaranteed
       in
       Printf.eprintf "open_args: [%s]\n"
         (List.map quote_open_arg !Clflags.open_args |> String.concat " ");

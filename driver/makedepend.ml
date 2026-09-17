@@ -347,8 +347,8 @@ let read_parse_and_extract parse_function extract_function def ast_kind
                    Parse.simple_module_path lexbuf in
                  Depend.open_module bv lid
              | Open_cmi _ ->
-                 (* ocamldep does not accept the [-open-cmi] flag and does
-                    not load cmis, so there is nothing to do.  An
+                 (* ocamldep does not accept the [-open-cmi(-x)] flags and
+                    does not load cmis, so there is nothing to do.  An
                     [Open_cmi] could still reach this list via [OCAMLPARAM],
                     in which case we just skip it. *)
                  bv)

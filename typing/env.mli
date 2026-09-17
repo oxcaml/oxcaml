@@ -537,8 +537,9 @@ val open_pers_signature: string -> t -> Path.t * t
 
 (* Like [open_pers_signature], but takes a [.cmi] file path and loads it
    directly (bypassing the include path) and ignores any in-scope module of
-   the same name. Used to implement [-open-cmi]. *)
-val open_pers_signature_cmi: string -> t -> Path.t * t
+   the same name. Used to implement [-open-cmi] and [-open-cmi-x];
+   [cmx_guaranteed] is [true] for the latter. *)
+val open_pers_signature_cmi: cmx_guaranteed:bool -> string -> t -> Path.t * t
 
 val remove_last_open: Path.t -> t -> t option
 

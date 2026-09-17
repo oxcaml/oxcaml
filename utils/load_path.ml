@@ -236,7 +236,9 @@ module For_testing = struct
     Dune_manifests_reader.Path.For_testing.root_override := path
 end
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
+type visibility =
+  | Visible of { cmx_guaranteed : bool }
+  | Hidden of { cmx_guaranteed : bool }
 
 module Dir : sig
   type entry = {
@@ -376,7 +378,7 @@ end = struct
   let prepend_add dir =
     let hidden, cmx_guaranteed =
       match Dir.visibility dir with
-      | Hidden -> true, false
+      | Hidden { cmx_guaranteed } -> true, cmx_guaranteed
       | Visible { cmx_guaranteed } -> false, cmx_guaranteed
     in
     List.iter
@@ -387,7 +389,7 @@ end = struct
   let add dir =
     let update base fn visible_files hidden_files =
       match Dir.visibility dir with
-      | Hidden ->
+      | Hidden _ ->
         if not (STbl.mem !hidden_files base) then
           STbl.replace !hidden_files base fn
       | Visible { cmx_guaranteed } ->
@@ -407,7 +409,8 @@ end = struct
       let { Clflags.path; cmx_guaranteed } = STbl.find !visible_files fn in
       (path, Visible { cmx_guaranteed })
     with
-    | Not_found -> (STbl.find !hidden_files fn, Hidden)
+    | Not_found ->
+      (STbl.find !hidden_files fn, Hidden { cmx_guaranteed = false })
 
   let find fn =
     find_in fn visible_files hidden_files
@@ -461,7 +464,7 @@ let get_paths () =
   let visible_dir_to_include dir : Clflags.visible_include =
     let cmx_guaranteed =
       match Dir.visibility dir with
-      | Hidden -> Misc.fatal_error "Load_path.get_paths"
+      | Hidden _ -> Misc.fatal_error "Load_path.get_paths"
       | Visible { cmx_guaranteed } -> cmx_guaranteed
     in
     { path = Dir.path dir; cmx_guaranteed }
@@ -526,7 +529,7 @@ let load_one_pending_manifest ~uncap fn =
         let location =
           Dune_manifests_reader.Path.Cwd_relative.to_string location in
         if Option.is_none !found && basename_matches ~uncap fn basename
-        then found := Some (location, Hidden);
+        then found := Some (location, Hidden { cmx_guaranteed = false });
         Path_cache.add_hidden_single basename location);
     !found
 
@@ -557,7 +560,8 @@ let init ~auto_include ~visible ~hidden =
       (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
         Dir.create (Visible { cmx_guaranteed }) path)
       visible;
-  hidden_dirs := List.rev_map (Dir.create Hidden) hidden;
+  hidden_dirs :=
+    List.rev_map (Dir.create (Hidden { cmx_guaranteed = false })) hidden;
   Profile.record_call ~accumulate:true "load_hidden_dirs" (fun () ->
     List.iter Path_cache.prepend_add !hidden_dirs);
   Profile.record_call ~accumulate:true "load_visible_dirs" (fun () ->
@@ -585,7 +589,7 @@ let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.add dir;
   match Dir.visibility dir with
-  | Hidden -> hidden_dirs := dir :: !hidden_dirs
+  | Hidden _ -> hidden_dirs := dir :: !hidden_dirs
   | Visible _ -> visible_dirs := dir :: !visible_dirs
 
 let append_dir = add
@@ -598,7 +602,7 @@ let prepend_dir (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
   Path_cache.prepend_add dir;
   match Dir.visibility dir with
-  | Hidden -> hidden_dirs := !hidden_dirs @ [dir]
+  | Hidden _ -> hidden_dirs := !hidden_dirs @ [dir]
   | Visible _ -> visible_dirs := !visible_dirs @ [dir]
 
 let is_basename fn = Filename.basename fn = fn

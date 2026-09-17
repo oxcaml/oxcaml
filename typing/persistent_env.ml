@@ -78,7 +78,7 @@ module Persistent_signature = struct
       Some { filename; cmi = read_cmi_lazy filename; visibility}
     | filename, (Visible _ as visibility) ->
       Some { filename; cmi = read_cmi_lazy filename; visibility}
-    | _, Hidden
+    | _, Hidden _
     | exception Not_found -> None)
 end
 
@@ -412,8 +412,8 @@ let read_import penv ~check modname cmi =
 
 let check_visibility ~allow_hidden imp =
   match imp.imp_visibility with
-  | Hidden when not allow_hidden -> raise Not_found
-  | Hidden | Visible _ -> ()
+  | Hidden _ when not allow_hidden -> raise Not_found
+  | Hidden _ | Visible _ -> ()
 
 let find_import ~allow_hidden penv ~check modname =
   let {imports; _} = penv in
@@ -705,11 +705,13 @@ and acknowledge_new_pers_name penv check global_name global import =
   let pn_sign =
     let signature, staticity = sign.sign in
     let mode = Mode.Value.disallow_right (mode_pers_mod staticity) in
-    let mode =
+    let cmx_guaranteed =
       match import.imp_visibility with
-      | Visible { cmx_guaranteed = true } ->
-        mode
-      | Visible { cmx_guaranteed = false } | Hidden ->
+      | Visible { cmx_guaranteed } | Hidden { cmx_guaranteed } -> cmx_guaranteed
+    in
+    let mode =
+      if cmx_guaranteed then mode
+      else
         (* Without a guaranteed [.cmx], the unit is not available for
            compile-time evaluation, so its staticity is forced to [Dynamic]
            regardless of what the [.cmi] claims. *)
@@ -995,7 +997,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
 let read penv modname a =
   read_pers_struct penv true modname a
 
-let read_cmi_file penv filename =
+let read_cmi_file ~cmx_guaranteed penv filename =
   let cmi = read_cmi_lazy filename in
   let unit_name = cmi.cmi_name in
   let modname = CU.Name.to_global_name unit_name in
@@ -1003,7 +1005,8 @@ let read_cmi_file penv filename =
   (* Register as hidden so that direct user-code references to the module
      are still reported as unbound; only transitive lookups can reach it. *)
   let pers_sig =
-    { Persistent_signature.filename; cmi; visibility = Load_path.Hidden }
+    { Persistent_signature.filename; cmi;
+      visibility = Load_path.Hidden { cmx_guaranteed } }
   in
   let import = acknowledge_import penv ~check:true unit_name pers_sig in
   let pers_name =

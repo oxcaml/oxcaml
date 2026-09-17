@@ -30,7 +30,8 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
         | Load_path.Visible { cmx_guaranteed = true } ->
           "visible, cmx_guaranteed"
         | Load_path.Visible { cmx_guaranteed = false } -> "visible"
-        | Hidden -> "hidden"
+        | Hidden { cmx_guaranteed = true } -> "hidden, cmx_guaranteed"
+        | Hidden { cmx_guaranteed = false } -> "hidden"
       in
       Format.sprintf "%s (%s)" path visibility
     with Not_found -> "Not_found"

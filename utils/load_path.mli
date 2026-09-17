@@ -25,7 +25,11 @@
 (* CR aodintsov/mshinwell: merge the remaining oxcaml changes
    upstream *)
 
-type visibility = Visible of { cmx_guaranteed : bool } | Hidden
+type visibility =
+  | Visible of { cmx_guaranteed : bool }
+  | Hidden of { cmx_guaranteed : bool }
+(** Whether user code may refer to a module directly, and whether its cmx
+    file is guaranteed to be available (see [-Ix] and [-open-cmi-x]). *)
 
 val add_dir : visibility -> string -> unit
 (** Add a directory to the end of the load path (i.e. at lowest priority.) *)
@@ -93,7 +97,7 @@ val find_normalized : string -> string
 
 val find_normalized_with_visibility : string -> string * visibility
 (** Same as [find_normalized], but also reports whether the cmi was found in a
-    -I directory (Visible) or a -H directory (Hidden) *)
+    -I/-Ix directory (Visible) or a -H directory (Hidden) *)
 
 val[@deprecated] add : Dir.t -> unit
 (** Old name for {!append_dir} *)

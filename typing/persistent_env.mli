@@ -116,10 +116,12 @@ val read : 'a t -> Global_module.Name.t -> Unit_info.Artifact.t
 (** [read_cmi_file] is a variant of [read] that takes the path of a cmi
     file directly: it reads the cmi and registers it as a hidden import
     under the module name stored inside the cmi (rather than one inferred
-    from the filename or supplied by the caller). Returns the resulting
-    global name and signature. *)
+    from the filename or supplied by the caller). [cmx_guaranteed] says
+    whether the unit's cmx file is guaranteed to be available (as with
+    [-Ix]); if not, the unit is forced to be dynamic. Returns the
+    resulting global name and signature. *)
 val read_cmi_file :
-     'a t -> string
+     cmx_guaranteed:bool -> 'a t -> string
   -> Global_module.Name.t * Subst.Lazy.persistent_signature
 
 (** Read a CU and register it as an "import" of the current compilation

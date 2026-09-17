@@ -125,7 +125,8 @@ val match_context_rows : int ref
 val safer_matching : bool ref
 type open_arg =
   | Open of string
-  | Open_cmi of string
+  | Open_cmi of { path : string; cmx_guaranteed : bool }
+    (* -open-cmi / -open-cmi-x *)
 
 val open_args : open_arg list ref
 val preprocessor : string option ref

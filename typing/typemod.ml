@@ -377,8 +377,8 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let process_open_arg env (arg : Clflags.open_arg) =
     match arg with
     | Open m -> open_module env m
-    | Open_cmi cmi ->
-        let _, env = Env.open_pers_signature_cmi cmi env in
+    | Open_cmi { path; cmx_guaranteed } ->
+        let _, env = Env.open_pers_signature_cmi ~cmx_guaranteed path env in
         env
   in
   let add_units env units =
@@ -424,7 +424,7 @@ let initial_env ~loc ~initially_opened_module ~open_implicit_args =
   let units_from_filenames =
     Env.persistent_structures_of_basenames basenames in
   let env = add_units env units_from_filenames in
-  (* Process [-open] and [-open-cmi] in command-line order, so an [-open]
+  (* Process [-open] and [-open-cmi(-x)] in command-line order, so an [-open]
      can refer to a module brought into scope by an earlier [-open-cmi]
      (and vice-versa: a later [-open-cmi] shadows an earlier [-open]). *)
   List.fold_left process_open_arg env open_implicit_args

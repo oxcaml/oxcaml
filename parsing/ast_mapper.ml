@@ -1131,7 +1131,9 @@ module PpxContext = struct
   let make_open_arg (arg : Clflags.open_arg) =
     match arg with
     | Open s -> Exp.construct (lid "Open") (Some (make_string s))
-    | Open_cmi s -> Exp.construct (lid "Open_cmi") (Some (make_string s))
+    | Open_cmi { path; cmx_guaranteed } ->
+      Exp.construct (lid "Open_cmi")
+        (Some (make_pair make_string make_bool (path, cmx_guaranteed)))
 
   let get_cookies () =
     lid "cookies",
@@ -1234,14 +1236,18 @@ module PpxContext = struct
             None
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] option syntax" name
-      and get_open_arg = function
+      in
+      (* Defined outside the recursive group above so that [get_pair] is
+         used polymorphically. *)
+      let get_open_arg = function
         | { pexp_desc =
               Pexp_construct ({ txt = Longident.Lident "Open" }, Some exp) } ->
             Clflags.Open (get_string exp)
         | { pexp_desc =
               Pexp_construct
                 ({ txt = Longident.Lident "Open_cmi" }, Some exp) } ->
-            Clflags.Open_cmi (get_string exp)
+            let path, cmx_guaranteed = get_pair get_string get_bool exp in
+            Clflags.Open_cmi { path; cmx_guaranteed }
         | _ -> raise_errorf "Internal error: invalid [@@@ocaml.ppx.context \
                              { %s }] open_arg syntax" name
       in

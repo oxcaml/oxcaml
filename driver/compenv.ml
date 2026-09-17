@@ -338,10 +338,13 @@ let read_one_param ppf position name v =
       let names = String.split_on_char ',' v in
       open_args :=
         List.rev_append (List.map (fun n -> Open n) names) !open_args
-  | "open-cmi" ->
-      let names = String.split_on_char ',' v in
+  | "open-cmi" | "open-cmi-x" ->
+      let cmx_guaranteed = String.equal name "open-cmi-x" in
+      let paths = String.split_on_char ',' v in
       open_args :=
-        List.rev_append (List.map (fun n -> Open_cmi n) names) !open_args
+        List.rev_append
+          (List.map (fun path -> Open_cmi { path; cmx_guaranteed }) paths)
+          !open_args
   | "cc" -> c_compiler := Some v
 
   | "clambda-checks" -> set "clambda-checks" [ clambda_checks ] v
