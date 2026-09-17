@@ -1,23 +1,20 @@
 (* TEST
-(* This tests the -H flag.
+(* This tests the -H flag and attached cmi paths.
 
    The basic structure is that libc depends on libb, which depends on liba.  We
    want to test a few things:
 
-   - Compiling libc with -I liba allows the compiler to see the type definitions
-     in liba and allows c.ml to reference it directly.
+   - b.cmi records the path of the a.cmi it was compiled against, so compiling
+     libc resolves transitive references to A through that path, whether or not
+     any version of liba is on the include path and regardless of -I/-H order.
 
-   - Compiling libc with -H liba allows the compiler to see the type definitions
-     in liba, but doesn't allow c.ml to reference it directly.
+   - Compiling libc with -I liba allows c.ml to reference A directly.
 
-   - If -H and -I are are passed for two different versions of liba, the -I one
-     takes priority.
+   - Compiling libc with -H liba (or with A reachable only through b.cmi's
+     attached path) does not allow c.ml to reference A directly.
 
-   - If -H is passed twice with two different versions of liba, the first takes
-     priority.
-
-   The liba_alt directory has an alternate versions of liba used for testing the
-   precedence order of the includes.
+   The liba_alt directory has an alternate version of liba used for testing
+   that the attached path prevails for transitive references.
 *)
 
 subdirectories = "liba liba_alt libb libc";
@@ -39,26 +36,18 @@ flags = "-nocwd";
 module = "libb/with_sub.ml";
 ocamlc.byte;
 {
-  (* Test hiding A completely. You can't do much with types from it because
-     their layouts are unknown. *)
+  (* Test using values whose types come from A with no liba on the include
+     path at all: a.cmi is found through the path attached in b.cmi. *)
   flags = "-I libb -nocwd";
   module = "libc/c2.ml";
   setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
   ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/missing_cmi_layout.ocamlc.reference";
-  check-ocamlc.byte-output;
 }
 {
-  (* Test hiding A completely, but using it *)
   flags = "-I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
   ocamlc.byte;
-  compiler_reference = "${test_source_directory}/not_included.ocamlc.reference";
-  check-ocamlc.byte-output;
 }
 (* Test transitive use of A's cmi, both with -I and with -H. *)
 {
@@ -82,47 +71,20 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 
-(* The next four tests check that -I takes priority over -H regardless of the
-   order on the command line.
-*)
+(* The next tests check that transitive references to A resolve through the
+   path attached in b.cmi - the one b was compiled against - regardless of
+   which alternate versions of liba appear on the include path, in any -I/-H
+   combination and order. (Direct references still go through the include
+   path: see the c3 and c4 tests.) *)
 {
   split [
   | flags = "-H liba_alt -I liba -I libb -nocwd";
   | flags = "-I liba -H liba_alt -I libb -nocwd";
-  ]
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc.byte;
-}
-{
-  not-target-windows;
-  split [
   | flags = "-H liba -I liba_alt -I libb -nocwd";
   | flags = "-I liba_alt -H liba -I libb -nocwd";
+  | flags = "-H liba_alt -H liba -I libb -nocwd";
+  | flags = "-H liba -H liba_alt -I libb -nocwd";
   ]
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-
-(* The next two tests show that earlier -Hs take priority over later -Hs *)
-{
-  not-target-windows;
-  flags = "-H liba_alt -H liba -I libb -nocwd";
-  module = "libc/c1.ml";
-  setup-ocamlc.byte-build-env;
-  ocamlc_byte_exit_status = "2";
-  ocamlc.byte;
-  compiler_reference =
-    "${test_source_directory}/wrong_include_order.ocamlc.reference";
-  check-ocamlc.byte-output;
-}
-{
-  flags = "-H liba -H liba_alt -I libb -nocwd";
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;

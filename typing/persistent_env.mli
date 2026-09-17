@@ -184,11 +184,48 @@ val global_of_global_name : 'a t
    loading any .cmi files necessary to do so. *)
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 
+(* A top-level member of a non-closed interface through which a mention rooted
+   at it can still be resolved. *)
+type member =
+  | Member_module_alias of Path.t
+    (* The member is a module alias: since the interface records it without an
+       attached cmi path, the mention must be rewritten to the target. *)
+  | Member_verified
+    (* The member is a type from which nothing escapes the interface except
+       through attached cmi paths reaching closed cmis: the mention may keep
+       resolving through it. *)
+
+(* Classification of the interface at the head of a path mentioned by the
+   signature being saved, used to decide [Cmi_format.Closed] and to normalize
+   the mention (see [Env.save_signature]). *)
+type mention_head =
+  | Head_closed of filepath
+    (* The cmi carries [Cmi_format.Closed] and was found at this path: a
+       mention may stay rooted at it. *)
+  | Head_open of filepath * (string -> member option)
+    (* The cmi does not carry [Cmi_format.Closed]: a mention rooted at it must
+       be resolved through its top-level members, which the function looks up
+       by name. *)
+  | Head_unavailable
+    (* The cmi is not loaded, and [may_load] was false or loading failed. *)
+
+val mention_head : 'a t -> may_load:bool -> CUI.t -> mention_head
+
+(* Record [intf] as an import of the current unit without loading it or
+   recording a crc, like an alias reference does: used for the target of a
+   normalized mention. *)
+val add_weak_import : 'a t -> CUI.t -> unit
+
+(* [closed] asserts that every global module name mentioned by the signature
+   resolves, through its attached cmi path, to a cmi that itself carries
+   [Cmi_format.Closed]; it is further restricted here for parameterised
+   interfaces, and recorded as [Cmi_format.Closed]. *)
 val make_cmi : 'a t
   -> CUI.t
   -> Cmi_format.kind
   -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
+  -> closed:bool
   -> Cmi_format.cmi_infos_lazy
 
 val save_cmi : 'a t -> Persistent_signature.t -> unit
