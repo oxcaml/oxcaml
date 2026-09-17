@@ -42,6 +42,8 @@ let create cfg ~layout = { cfg; layout }
 
 let cfg t = t.cfg
 
+let with_cfg t cfg = { t with cfg }
+
 let layout t = t.layout
 
 let label_set_of_layout : layout -> Label.Set.t =
