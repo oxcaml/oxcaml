@@ -211,13 +211,26 @@ let fields_to_simples dbg simples =
   List.map (fun simple -> Simple.With_debuginfo.create simple dbg) simples
 
 let create_lookup_table_array_const dbg (array_kind : P.Array_kind.t) rebuilding
-    simples =
+    simples ~machine_width =
   let fields_to_or_variables prover simples =
     ListLabels.map simples ~f:(fun simple ->
         Simple.pattern_match simple
           ~name:(fun _ ~coercion:_ ->
             (* Only constants reach this point. *) assert false)
           ~const:(fun cst ->
+            let cst =
+              (* Poison values can't be represented in static const arrays, so
+                 we materialize them as an arbitrary value here.
+
+                 We lose the information that the value is a poison for later
+                 simplifications, which is unfortunate, but the benefit in code
+                 size is likely worth it compared to not using lookup tables for
+                 values that could be poisoned. *)
+              match RWC.is_poison cst with
+              | None -> cst
+              | Some (kind, name) ->
+                RWC.of_int_of_kind machine_width kind (String.hash name)
+            in
             let cst =
               match prover cst with
               | Some v -> v
@@ -291,10 +304,11 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
   match expr with
   | Simple simple -> already_bound simple
   | Lookup_table { name; array_kind; element_kind; simples; dbg } -> (
+    let machine_width = DE.machine_width (DA.denv dacc_before_switch) in
     let array_const =
       create_lookup_table_array_const dbg array_kind
         (UA.are_rebuilding_terms uacc)
-        simples
+        simples ~machine_width
     in
     let[@local] create_lookup_table static_const =
       let symbol = Symbol.manufacture (Current_unit.get_cu_exn ()) name in
@@ -310,8 +324,7 @@ let ( let$ ) expr k uacc ~dacc_before_switch ~local_cse =
       let fields = List.map (T.alias_type_of (KS.kind element_kind)) simples in
       let block_type =
         T.immutable_array ~element_kind:(Ok element_kind) ~fields
-          Alloc_mode.For_types.heap
-          ~machine_width:(DE.machine_width (DA.denv dacc_before_switch))
+          Alloc_mode.For_types.heap ~machine_width
       in
       let uacc =
         UA.add_lifted_constant uacc
