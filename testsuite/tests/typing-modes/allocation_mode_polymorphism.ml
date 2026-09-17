@@ -34,10 +34,10 @@ module ModePolymorphic :
     val fold :
       ('acc @ [> 'o | 'n | dynamic] ->
        'a @ [> aliased stateful dynamic alloc] ->
-       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm1) & past('q) & past('mm0) & many > aliased] ->
+       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm0) & past('q) & many > aliased] ->
       ('acc @ [< 'o & global many read_write > 'm | dynamic] ->
        ('a list @ [< global many read_write > aliased stateful dynamic alloc] ->
-        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm1) | local stateful]) @ [< past('p) > past('q) | past('mm0) | local]
+        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm0) | local stateful]) @ [< past('p) > past('q) | local]
   end @@ stateless noalloc_strict
 |}, Principal{|
 module ModePolymorphic :
@@ -49,10 +49,10 @@ module ModePolymorphic :
     val fold :
       ('acc @ [> 'o | 'n | dynamic] ->
        'a @ [> aliased stateful dynamic alloc] ->
-       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm1) & past('q) & past('mm0) & many > aliased] ->
+       'acc @ [< 'm & 'n & global many read_write]) @ [< past('mm0) & past('q) & many > aliased] ->
       ('acc @ [< 'o & global many read_write > 'm | dynamic] ->
        ('a list @ [< global many read_write > aliased stateful dynamic alloc] ->
-        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm1) | local stateful]) @ [< past('p) > past('q) | past('mm0) | local]
+        'acc @ [< global many read_write > aliased stateful dynamic alloc]) @ [> close('o) | past('p) | past('mm0) | local stateful]) @ [< past('p) > past('q) | local]
   end @@ stateless noalloc_strict
 |}]
 
