@@ -3690,9 +3690,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       mode ~ptr:null_base ~idx ~new_values
   (* CR zeisbach: blocks are made with [Mutable] here, since the boxed version
      of the unboxed type could have mutable fields, so boxing it needs to assume
-     the worst. maybe once we have mutable kinds we could do better here? or
-     maybe we could already do better by tracking more frontend information in
-     [translprim]? *)
+     the worst. We should track mutability and update it during
+     [specialize_primitive], otherwise we regress performance vs ppx_box *)
   | Pbox (Punboxed_product layouts, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
