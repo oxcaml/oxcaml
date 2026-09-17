@@ -1947,11 +1947,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : ?x:'a -> unit end
+         sig val f : ('a : any). ?x:'a -> unit end
        is not included in
          sig val f : int -> unit end
        Values do not match:
-         val f : ?x:'a -> unit
+         val f : ('a : any). ?x:'a -> unit
        is not included in
          val f : int -> unit
        The type "?x:'a -> unit" is not compatible with the type "int -> unit"
@@ -1977,11 +1977,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : ?x:'a -> unit end
+         sig val f : ('a : any). ?x:'a -> unit end
        is not included in
          sig val f : x:int -> unit end
        Values do not match:
-         val f : ?x:'a -> unit
+         val f : ('a : any). ?x:'a -> unit
        is not included in
          val f : x:int -> unit
        The type "?x:'a -> unit" is not compatible with the type "x:int -> unit"
@@ -2006,11 +2006,11 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : ?y:'a -> unit end
+         sig val f : ('a : any). ?y:'a -> unit end
        is not included in
          sig val f : ?x:int -> unit end
        Values do not match:
-         val f : ?y:'a -> unit
+         val f : ('a : any). ?y:'a -> unit
        is not included in
          val f : ?x:int -> unit
        The type "?y:'a -> unit" is not compatible with the type "?x:int -> unit"

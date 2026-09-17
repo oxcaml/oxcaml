@@ -327,6 +327,7 @@ type error =
   | Field_value_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_projection_not_rep of type_expr * Jkind.Violation.t
   | Constructor_arg_value_not_rep of type_expr * Jkind.Violation.t
+  | Optional_arg_default_not_rep of type_expr * Jkind.Violation.t
   | Invalid_label_for_src_pos of arg_label
   | Nonoptional_call_pos_label of string
   | Always_heap_allocation of always_heap_allocation
@@ -4217,7 +4218,6 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
         finalize_variants pat;
       end;
       List.iter (fun f -> f()) tps.tps_pattern_force;
-      (* CR layouts v5: value restriction here to be relaxed *)
       if is_optional l then
         unify_pat val_env pat
           (type_option (newvar Predef.optional_argument_jkind));
@@ -5660,7 +5660,6 @@ let rec approx_type env sty =
   match sty.ptyp_desc with
   | Ptyp_arrow (p, ({ ptyp_desc = Ptyp_poly _ } as arg_sty), sty, arg_mode, _) ->
       let p = Typetexp.transl_label p (Some arg_sty) in
-      (* CR layouts v5: value requirement here to be relaxed *)
       if is_optional p then newvar Predef.optional_argument_jkind
       else begin
         let arg_mode = Typemode.transl_alloc_mode arg_mode in
@@ -9645,14 +9644,22 @@ and type_function
               | Nolabel | Labelled _ ->
                 Misc.fatal_error "[default] allowed only with optional argument"
             in
+            (* The default is projected out of the [option], so its type must
+               be representable even though optional argument types in general
+               needn't be. *)
+            let ty_default_arg = extract_option_type env ty_arg_mono in
             let default_arg_jkind, default_arg_sort =
               Jkind.of_new_sort_var ~why:Optional_arg_default
                 ~level:(Ctype.get_current_level ())
             in
-            let ty_default_arg = newvar default_arg_jkind in
-            begin
-              try unify env (type_option ty_default_arg) ty_arg_mono
-              with Unify _ -> assert false;
+            begin match
+              Ctype.constrain_type_jkind env ty_default_arg default_arg_jkind
+            with
+            | Ok () -> ()
+            | Error err ->
+              raise
+                (Error (pat.ppat_loc, env,
+                        Optional_arg_default_not_rep (ty_default_arg, err)))
             end;
             (* Issue#12668: Retain type-directed disambiguation of
                ?x:(y : Variant.t = Constr)
@@ -10341,9 +10348,16 @@ and type_option_some env expected_mode sarg ty ty0 =
   let arg = type_argument ~overwrite:No_overwrite env argument_mode sarg ty' ty0' in
   let lid = Longident.Lident "Some" in
   let csome = Env.find_ident_constructor Predef.ident_some env in
-  let sort = Jkind.Sort.scannable in
-  let repres = Types.Constructor_uniform_value in
-  mkexp (Texp_construct(mknoloc lid , csome, repres, [sort, arg],
+  let repres, sorts =
+    match
+      instance_constructor_representation env csome
+        ~types:[arg.exp_type, arg.exp_loc] ~why:Function_argument
+    with
+    | Ok (repres, sorts) -> repres, sorts
+    | Error (Unrepresentable_arg (loc, ty, err)) ->
+      raise (Error (loc, env, Function_type_not_rep (ty, err)))
+  in
+  mkexp (Texp_construct(mknoloc lid , csome, repres, List.combine sorts [arg],
                         Some (Typedtree.create_alloc_mode_r alloc_mode)))
     (type_option arg.exp_type) arg.exp_loc arg.exp_env
 
@@ -10673,7 +10687,6 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
       (match lbl with
        | Labelled _ | Nolabel -> ()
        | Optional _ ->
-           (* CR layouts v5: relax value requirement *)
            unify_exp ~sexp:sarg env arg
              (type_option(newvar Predef.optional_argument_jkind))
        | Position _ ->
@@ -13969,6 +13982,12 @@ let report_error ~loc env =
   | Constructor_arg_value_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Constructor arguments must be representable.@]@ %a"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
+           env) violation
+  | Optional_arg_default_not_rep (ty,violation) ->
+      Location.errorf ~loc
+        "@[Optional arguments with defaults must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
            env) violation
