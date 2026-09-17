@@ -1,3 +1,5 @@
+# For the OxCaml LLDB (the Linux tests): its OCaml plugin demangles
+# symbol names. Keep in step with lldb-script.
 settings set target.disable-aslr false
 settings set stop-disassembly-display never
 command script import ./lldb_test.py
