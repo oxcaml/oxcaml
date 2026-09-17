@@ -130,6 +130,51 @@ int64_t int16_su8(int64_t i) {
 #else /* __ARM_NEON */
 #if defined(__SSE4_2__)
 #include <smmintrin.h>
+#include <wmmintrin.h>
+
+__attribute__((target("aes")))
+__m128i aes_dec_reference(__m128i a, __m128i key)
+{
+  return _mm_aesdec_si128(a, key);
+}
+
+__attribute__((target("aes")))
+__m128i aes_declast_reference(__m128i a, __m128i key)
+{
+  return _mm_aesdeclast_si128(a, key);
+}
+
+__attribute__((target("aes")))
+__m128i aes_enc_reference(__m128i a, __m128i key)
+{
+  return _mm_aesenc_si128(a, key);
+}
+
+__attribute__((target("aes")))
+__m128i aes_enclast_reference(__m128i a, __m128i key)
+{
+  return _mm_aesenclast_si128(a, key);
+}
+
+__attribute__((target("aes")))
+__m128i aes_imc_reference(__m128i a)
+{
+  return _mm_aesimc_si128(a);
+}
+
+__attribute__((target("aes")))
+__m128i aes_keygenassist_reference(intnat imm, __m128i a)
+{
+  switch (imm) {
+    case 0x00: return _mm_aeskeygenassist_si128(a, 0x00);
+    case 0x01: return _mm_aeskeygenassist_si128(a, 0x01);
+    case 0x1b: return _mm_aeskeygenassist_si128(a, 0x1b);
+    case 0x36: return _mm_aeskeygenassist_si128(a, 0x36);
+    case 0x80: return _mm_aeskeygenassist_si128(a, 0x80);
+    case 0xff: return _mm_aeskeygenassist_si128(a, 0xff);
+    default: abort();
+  }
+}
 
 typedef __m128 simd_poly128_t;
 typedef __m128 simd_float32x4_t;

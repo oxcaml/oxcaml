@@ -21,11 +21,15 @@ let rule ~subst template =
   Buffer.output_buffer Out_channel.stdout buf;
   Buffer.clear buf
 
-let compile ~enabled_if ~extra_flags name =
+let compile ?(extra_link_flags = "") ~enabled_if ~extra_flags name =
   let subst = function
     | "name" -> name
     | "enabled_if" -> enabled_if
     | "extra_flags" -> extra_flags
+    | "extra_link_flags" ->
+      if String.equal extra_link_flags ""
+      then ""
+      else "\n (link_flags (:standard " ^ extra_link_flags ^ "))"
     | _ -> assert false
   in
   rule ~subst
@@ -37,7 +41,7 @@ let compile ~enabled_if ~extra_flags name =
  (ocamlopt_flags
   (:standard -extension simd_beta ${extra_flags}))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
+ (foreign_archives stubs)${extra_link_flags})
 |}
 
 let run ~enabled_if name =
@@ -113,7 +117,7 @@ let mangle flag =
   let dash_to_underscore c = match c with '-' -> '_' | c -> c in
   String.map dash_to_underscore flag
 
-let print_test ?extra_flag (name, enabled_if) =
+let print_test ?extra_flag ?extra_link_flags (name, enabled_if) =
   let name, extra_flags =
     match extra_flag with
     | None -> name, ""
@@ -122,7 +126,7 @@ let print_test ?extra_flag (name, enabled_if) =
       copy_file ~enabled_if name new_name;
       new_name, flag
   in
-  compile ~enabled_if ~extra_flags name;
+  compile ?extra_link_flags ~enabled_if ~extra_flags name;
   run ~enabled_if name;
   diff_output ~enabled_if name;
   ()
@@ -149,7 +153,8 @@ let () =
       "sse41_test_ops";
       "sse42_string_ops";
       "f16c_ops";
-      "fma_ops" ]
+      "fma_ops";
+      "aes_ops" ]
   in
   List.iter make_ops_u ops;
   let tests =
@@ -193,6 +198,8 @@ let () =
       "f16c_ops_u", enabled_if_main_amd64_not_macos;
       "fma_ops", enabled_if_main_amd64_not_macos;
       "fma_ops_u", enabled_if_main_amd64_not_macos;
+      "aes_ops", enabled_if_main_amd64_not_macos;
+      "aes_ops_u", enabled_if_main_amd64_not_macos;
       "arrays", enabled_if_main;
       "arrays_u", enabled_if_main;
       "scalar_ops", enabled_if_main;
@@ -227,4 +234,22 @@ let () =
     (* disable on macos and arm64 *)
     List.map (fun (name, _) -> name, enabled_if_main_amd64_not_macos) tests
   in
-  List.iter (print_test ~extra_flag:"-internal-assembler") tests
+  List.iter (print_test ~extra_flag:"-internal-assembler") tests;
+  let aes_tests =
+    [ "aes_ops", enabled_if_main_amd64_not_macos;
+      "aes_ops_u", enabled_if_main_amd64_not_macos ]
+  in
+  (* Compile AES with legacy encodings, but keep AVX at link time for generic
+     functions required by the shared SIMD test library. *)
+  List.iter
+    (print_test ~extra_flag:"-fno-avx" ~extra_link_flags:"-favx")
+    aes_tests;
+  List.iter
+    (fun (name, enabled_if) ->
+      let new_name = name ^ "_no_avx_internal_assembler" in
+      copy_file ~enabled_if name new_name;
+      compile ~enabled_if ~extra_flags:"-fno-avx -internal-assembler"
+        ~extra_link_flags:"-favx" new_name;
+      run ~enabled_if new_name;
+      diff_output ~enabled_if new_name)
+    aes_tests
