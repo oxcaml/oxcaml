@@ -6600,7 +6600,7 @@ let split_function_ty
     else fst (With_locality.Monadic.newvar_above (get_current_level ())
       arg_mode.monadic)
   in
-  (* This [alloc_to_value_l2r] cuts the hint chain *)
+  (* This [with_locality_to_regionality_l2r] cuts the hint chain *)
   let arg_value_mode =
     with_locality_to_regionality_l2r { arg_mode with monadic = env_monadic }
   in
