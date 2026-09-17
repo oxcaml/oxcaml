@@ -66,7 +66,6 @@ val config_var : string -> string option
 
 val merlin : bool
 
-<<<<<<< Merlin:aes-intrins
 module Magic_numbers : sig
   type t =
     { cmi_magic_number : string;
@@ -76,56 +75,6 @@ module Magic_numbers : sig
       cms_magic_number : string;
       index_magic_number : string
     }
-||||||| Compiler:last-imported
-(**/**)
-
-val has_pclmul : bool
-(* Whether the compiler was configured on a machine with PCLMUL *)
-
-val has_popcnt : bool
-(* Whether the compiler was configured on a machine with POPCNT *)
-
-val has_lzcnt : bool
-(* Whether the compiler was configured on a machine with LZCNT *)
-
-val has_sse3 : bool
-(* Whether the compiler was configured on a machine with SSE3 *)
-
-val has_ssse3 : bool
-(* Whether the compiler was configured on a machine with SSSE3 *)
-
-val has_sse4_1 : bool
-(* Whether the compiler was configured on a machine with SSE4.1 *)
-
-val has_sse4_2 : bool
-(* Whether the compiler was configured on a machine with SSE4.2 *)
-=======
-(**/**)
-
-val has_pclmul : bool
-(* Whether the compiler was configured on a machine with PCLMUL *)
-
-val has_aes : bool
-(* Whether the compiler was configured on a machine with AES *)
-
-val has_popcnt : bool
-(* Whether the compiler was configured on a machine with POPCNT *)
-
-val has_lzcnt : bool
-(* Whether the compiler was configured on a machine with LZCNT *)
-
-val has_sse3 : bool
-(* Whether the compiler was configured on a machine with SSE3 *)
-
-val has_ssse3 : bool
-(* Whether the compiler was configured on a machine with SSSE3 *)
-
-val has_sse4_1 : bool
-(* Whether the compiler was configured on a machine with SSE4.1 *)
-
-val has_sse4_2 : bool
-(* Whether the compiler was configured on a machine with SSE4.2 *)
->>>>>>> Compiler:HEAD
 
   val current : t
 
