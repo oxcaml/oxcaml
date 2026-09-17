@@ -1828,7 +1828,7 @@ module Lattices_mono = struct
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
-	       further, but we never need the missing operation). *)
+       further, but we never need the missing operation). *)
     (* New morphisms must be added to [left_to] and [right_to]. *)
     type ('a, 'b, 'd) t =
       | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
@@ -7617,11 +7617,8 @@ module Mode_with (Areality : Areality) = struct
     | Forkable -> Forkable.zap_to_legacy_force ~global:true mode |> ignore
     | Yielding -> Yielding.zap_to_legacy_force ~global:true mode |> ignore
 
-  let zap_areality_to_legacy_obj
-      (type a)
-      (obj : a C.obj)
-      (mode : (a, allowed * allowed) S.mode) :
-      unit =
+  let zap_areality_to_legacy_obj (type a) (obj : a C.obj)
+      (mode : (a, allowed * allowed) S.mode) : unit =
     match obj with
     | Locality -> Locality.zap_to_legacy_force mode |> ignore
     | Regionality -> Regionality.zap_to_legacy_force mode |> ignore
@@ -7829,12 +7826,10 @@ module Mode_with (Areality : Areality) = struct
       (fun (arg, m) ->
         if areality_only
         then
-          begin
-            if not (check_generic m)
-            then
-              Comonadic.proj Areality m.comonadic
-              |> Areality.zap_to_legacy_force
-              |> ignore
+          begin if not (check_generic m)
+          then
+            Comonadic.proj Areality m.comonadic
+            |> Areality.zap_to_legacy_force |> ignore
           end
         else zap_to_legacy ~arg m |> ignore)
       !visible;
