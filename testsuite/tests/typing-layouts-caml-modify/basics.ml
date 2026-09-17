@@ -532,11 +532,45 @@ let () =
   let unsafe_set_imm64_imm64 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
     unsafe_set box idx v
   in
+  (* Only the product's mod bound says its components are GC-ignorable. *)
+  let[@inline never] unsafe_set_external
+      (type a : (value & value) mod external_)
+      box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
   let t = { a = #(1, 2) } in
   let idx = (.a) in
   test ~expect_caml_modifies:0
     (fun () -> unsafe_set_imm64_imm64 t idx #(0, 0);
+               ignore (Sys.opaque_identity t));
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_external t idx #(3, 4);
                ignore (Sys.opaque_identity t))
+
+(* An internal component must not hide another component's externality. *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #('a * string) }
+  end in
+  let[@inline never] unsafe_set_external
+      (type a : value mod external_) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let[@inline never] unsafe_set_external64
+      (type a : value mod external64) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let t = { x = #(1, "before") } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external t #(2, "after");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 2 && s = "after"));
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external64 t #(3, "after64");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 3 && s = "after64"))
 
 let () =
   let open struct

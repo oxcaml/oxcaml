@@ -1759,24 +1759,17 @@ let should_specialize_primitive p =
     true
 
 let layout_of_ty_for_idx_set env loc ty =
-  (* CR layouts: This is gross - particularly the call to [type_jkind] and the
-    conversion to and from [mixed_block_element]! The slightly less gross
-    thing would be to change [layout_of_const_sort_generic] in the same way
-    that we have changed [transl_mixed_block_element] to desecend into
-    products. But that's a big change that (a) will have substantial
-    performance impacts for lots of cases that don't matter, and (b) will
-    become obsolete when we do complex values. So for now, the gross
-    thing. *)
   let jkind = Ctype.type_jkind env ty in
-  let mbe = Typedecl.mixed_block_element env ty jkind in
-  let mbe =
-    match mbe with
-    | Some mbe -> mbe
-    | None ->
-      Misc.fatal_errorf "layout_of_ty_for_idx_set %a"
-        Printtyp.type_expr ty
+  let layout =
+    match Jkind.get_layout_defaulting_to_scannable env jkind with
+    | Some layout -> layout
+    | None -> Misc.fatal_error "layout_of_ty_for_idx_set: expected layout"
   in
-  let mbe = transl_mixed_block_element env (to_location loc) ty mbe in
+  (* Layouts omit per-component externality bounds. *)
+  let mbe =
+    transl_const_layout layout
+    |> refine_mixed_block_element env (to_location loc) ty
+  in
   let context = Ctype.mk_jkind_context_check_principal env in
   let ext = Jkind.get_externality_upper_bound ~context env jkind in
   layout_of_mixed_block_element_for_idx_set ext mbe
