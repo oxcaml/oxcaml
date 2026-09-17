@@ -123,7 +123,8 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
     (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
-let register_allocation ~env ~loc ~desc : With_locality.lr * With_regionality.lr =
+let register_allocation ~env ~loc ~desc
+    : With_locality.lr * With_regionality.lr =
   Typeallocation.register_mod_allocation ~env ~loc ~desc;
   let upper_bound =
     With_locality.of_const
@@ -2885,11 +2886,11 @@ let check_nongen_signature_item ~zap_scope env sig_item =
   | _ -> ()
 
 let check_nongen_signature env sg =
-  Mode.With_locality.with_zap_scope (fun ~zap_scope ->
+  Typeallocation.with_zap_scope (fun ~zap_scope ->
       List.iter (check_nongen_signature_item ~zap_scope env) sg)
 
 let remove_mode_and_jkind_variables env sg =
-  Mode.With_locality.with_zap_scope(fun ~zap_scope ->
+  Typeallocation.with_zap_scope(fun ~zap_scope ->
     let rm_ty _env ty =
       Ctype.remove_mode_and_jkind_variables
         ty ~zap_scope;
@@ -4303,7 +4304,7 @@ let remove_mode_and_jkind_variables_for_toplevel str =
                          vb_expr = exp}])) }] ->
      (* These types are printed by the toplevel,
         even though they do not appear in sg *)
-     Mode.With_locality.with_zap_scope
+     Typeallocation.with_zap_scope
        (fun ~zap_scope ->
           Ctype.remove_mode_and_jkind_variables ~zap_scope exp.exp_type)
   | _ -> ()
@@ -4376,7 +4377,7 @@ let type_module_type_of env smod =
   Typeallocation.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   if not skip_nongen_check then
-    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
+    Typeallocation.with_zap_scope (fun ~zap_scope ->
       check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
   Typeallocation.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
@@ -4723,7 +4724,7 @@ let type_implementation target modulename initial_env ast =
           Typeallocation.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit
+              Includemod.compunit ~self_check:false
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
                   ((mode, None),
@@ -4773,8 +4774,8 @@ let type_implementation target modulename initial_env ast =
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true sourcefile ~modes
-                sg "(inferred signature)" simple_sg shape)
+              Includemod.compunit ~self_check:true initial_env ~mark:true
+                sourcefile ~modes sg "(inferred signature)" simple_sg shape)
           in
           Typeallocation.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
@@ -5029,7 +5030,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
               ((Persistent_env.mode_pers_mod Staticity.Dynamic, None),
                Persistent_env.mode_pers_mod staticity)
           in
-          Includemod.compunit initial_env ~mark:true
+          Includemod.compunit ~self_check:false initial_env ~mark:true
             "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
         in
         save_cmt_cms None;
@@ -5133,7 +5134,7 @@ let package_units initial_env objfiles target_cmi modulename =
         let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
-      Includemod.compunit initial_env ~mark:true
+      Includemod.compunit ~self_check:false initial_env ~mark:true
         "(obtained by packing)" ~modes sg mli dclsig shape
     in
     let decl_deps =

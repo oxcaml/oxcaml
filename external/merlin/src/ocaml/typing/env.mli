@@ -642,8 +642,15 @@ val enter_unbound_module : string -> module_unbound_reason -> t -> t
 
 (* Lock the environment *)
 
-val add_closure_lock : Mode.Hint.pinpoint
-  -> ('l * Mode.allowed) Mode.With_regionality.Comonadic.t -> t -> t
+val add_closure_lock :
+  Mode.Hint.pinpoint ->
+  ('l * Mode.allowed) Mode.With_regionality.Comonadic.t ->
+  ?body_allocation_mode:Mode.Allocation.r ->
+  t ->
+  t
+
+val add_curry_lock : Mode.Hint.pinpoint ->
+  ('l * Mode.allowed) Mode.Allocation.t -> t -> t
 
 (** A variant of [add_closure_lock] where the mode of the closure is a constant
 due to the nature of the pinpoint. As a result, the mode is not printed in error

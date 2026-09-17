@@ -26,7 +26,10 @@ val register_allocation_value_mode :
   Locality.r * With_regionality.r
 
 val register_closure_allocation :
-  env:Env.t -> With_regionality.r -> loc:Location.t -> Locality.lr * With_locality.lr * With_regionality.r
+  env:Env.t ->
+  With_regionality.r ->
+  loc:Location.t ->
+  Locality.lr * Allocation.lr * With_locality.lr * With_regionality.r
 
 val register_mod_allocation :
   env:Env.t -> loc:Location.t -> desc:Hint.pinpoint_desc -> unit
@@ -40,7 +43,10 @@ val register_zero_alloc_application_allocation :
   unit
 
 val relax_alloc :
-  Types.value_description -> is_applied:bool -> With_regionality.l -> With_regionality.l
+  Types.value_description ->
+  is_applied:bool ->
+  With_regionality.l ->
+  With_regionality.l
 
 (** For every allocation that has to be on heap ([global]), constrain
     the enclosing closures to be [alloc].
@@ -53,5 +59,7 @@ val constrain_closures : unit -> unit
     Must only be called before zapping the locality axis of allocation
     modes. *)
 val constrain_allocations : unit -> unit
+
+val with_zap_scope : (zap_scope:With_locality.zap_scope -> 'a) -> 'a
 
 val optimise_allocations : unit -> unit

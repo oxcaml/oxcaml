@@ -176,7 +176,9 @@ type stage_lock =
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
       Mode.With_regionality.Comonadic.Const.t
-  | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r
+  | Closure_lock of Mode.Hint.pinpoint * Mode.With_regionality.Comonadic.r *
+      Mode.Allocation.r
+  | Curry_lock of Mode.Hint.pinpoint * Mode.Allocation.r
   | Region_lock
   | Exclave_lock
   | Unboxed_lock (* to prevent capture of terms with non-value types *)
@@ -3142,12 +3144,27 @@ let add_const_closure_lock ?(ghost = false) closure_context comonadic env =
   let lock = Const_closure_lock (ghost, closure_context, comonadic) in
   add_lock lock env
 
-let add_closure_lock closure_context comonadic env =
+let add_closure_lock
+    closure_context
+    comonadic
+    ?(body_allocation_mode =
+      let closure_allocation_mode =
+        Mode.With_regionality.Comonadic.proj Allocation comonadic
+      in
+      Mode.Allocation.newvar_below 0 closure_allocation_mode |> fst)
+    env =
   let lock = Closure_lock
     (closure_context,
-     Mode.With_regionality.Comonadic.disallow_left comonadic)
+     Mode.With_regionality.Comonadic.disallow_left comonadic,
+     body_allocation_mode)
   in
   add_lock lock env
+
+let add_curry_lock closure_context body_allocation_mode env =
+  add_lock
+    (Curry_lock
+       (closure_context, Mode.Allocation.disallow_left body_allocation_mode))
+    env
 
 let add_region_lock env = add_lock Region_lock env
 
@@ -3851,8 +3868,9 @@ let walk_locks ~errors ~env ~pp mode ty_and_lid locks =
       | Region_lock -> region_mode vmode
       | Const_closure_lock (_, closure_context, comonadic) ->
           const_closure_mode pp vmode closure_context comonadic
-      | Closure_lock (closure_context, comonadic) ->
+      | Closure_lock (closure_context, comonadic, _) ->
           closure_mode pp vmode closure_context comonadic
+      | Curry_lock _ -> vmode
       | Exclave_lock ->
           exclave_mode ~errors ~env ~pp vmode
       | Unboxed_lock ->
@@ -3899,13 +3917,14 @@ let walk_locks_for_allocation ~env pp =
   List.fold_left
     (fun acc lock ->
       match lock with
-      | Closure_lock (closure, comonadic) ->
-          let comonadic =
-            Mode.With_regionality.Comonadic.apply_hint
+      | Closure_lock (closure, _, allocation)
+      | Curry_lock (closure, allocation) ->
+          let allocation =
+            Mode.Allocation.apply_hint
               (Is_closed_by (Comonadic, {closure; closed = pp}))
-              comonadic
+              allocation
           in
-          (closure, Mode.With_regionality.Comonadic.proj Allocation comonadic) :: acc
+          (closure, allocation) :: acc
       (* A [Const_closure_lock] is at a constant mode which is always [alloc]
          on the allocation axis, so there is nothing to constrain. *)
       | Region_lock | Const_closure_lock _ | Exclave_lock
@@ -3944,12 +3963,14 @@ let walk_locks_for_mutable_mode ~errors ~loc ~env locks m0 =
           to be [global]. If [m0] is [regional], then we require the new values
           to be [local]. If [m0] is [local], that would trigger type error
           elsewhere, so what we return here doesn't matter. *)
-          mode |> Mode.with_regionality_to_locality_r2l |> Mode.with_locality_as_regionality
+          mode
+          |> Mode.with_regionality_to_locality_r2l
+          |> Mode.with_locality_as_regionality
       | Const_closure_lock (true, _, _) -> mode
-      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _) ->
+      | Const_closure_lock (false, pp, _) | Closure_lock (pp, _, _) ->
           may_lookup_error errors loc env
             (Mutable_value_used_in_closure pp)
-      | Unboxed_lock -> mode
+      | Unboxed_lock | Curry_lock _ -> mode
     ) mode locks
 
 let lookup_ident_value ~errors ~use ~loc name env =

@@ -1828,7 +1828,7 @@ module Lattices_mono = struct
 
   module Locality_morph = struct
     (* Following is a chain of adjunctions (this can be extended one
-	       further, but we never need the missing operation). *)
+       further, but we never need the missing operation). *)
     (* New morphisms must be added to [left_to] and [right_to]. *)
     type ('a, 'b, 'd) t =
       | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) t
@@ -7617,6 +7617,22 @@ module Mode_with (Areality : Areality) = struct
     | Forkable -> Forkable.zap_to_legacy_force ~global:true mode |> ignore
     | Yielding -> Yielding.zap_to_legacy_force ~global:true mode |> ignore
 
+  let zap_areality_to_legacy_obj (type a) (obj : a C.obj)
+      (mode : (a, allowed * allowed) S.mode) : unit =
+    match obj with
+    | Locality -> Locality.zap_to_legacy_force mode |> ignore
+    | Regionality -> Regionality.zap_to_legacy_force mode |> ignore
+    | Comonadic_with_locality ->
+      S.apply Locality.Obj.obj (Simple_proj (Id, Areality, obj)) mode
+      |> Locality.zap_to_legacy_force |> ignore
+    | Comonadic_with_regionality ->
+      S.apply Regionality.Obj.obj (Simple_proj (Id, Areality, obj)) mode
+      |> Regionality.zap_to_legacy_force |> ignore
+    | Uniqueness_op | Visibility_op | Linearity | Statefulness | Staticity_op
+    | Allocation | Monadic_op | Portability | Contention_op | Forkable
+    | Yielding ->
+      ()
+
   let zap_to_legacy_src_var_monadic m =
     S.mode_iter Monadic.Obj.obj m
       { iter = (fun obj msrc -> zap_to_legacy_obj obj msrc) }
@@ -7707,21 +7723,38 @@ module Mode_with (Areality : Areality) = struct
         else add_to_morph_map zs.zap_to_ceil_map i k p
         end
 
-    let resolve_zap_scope
+    let resolve_zap_scope ?(areality_only = false)
         { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map } =
       ModeIdMap.iter
         (fun _ p ->
           match p with
-          | Pmon m -> zap_to_legacy_src_var_monadic m
-          | Pco m -> zap_to_legacy_src_var_comonadic m)
+          | Pmon m ->
+            if areality_only
+            then
+              S.mode_iter Monadic.Obj.obj m
+                { iter = zap_areality_to_legacy_obj }
+            else zap_to_legacy_src_var_monadic m
+          | Pco m ->
+            if areality_only
+            then
+              S.mode_iter Comonadic.Obj.obj m
+                { iter = zap_areality_to_legacy_obj }
+            else zap_to_legacy_src_var_comonadic m)
         zap_to_legacy_map;
       ModeIdMap.iter
         (fun _ mm ->
           MorphMap.iter
             (fun _ p ->
               match p with
-              | Pmon m -> Monadic.zap_to_floor_force m |> ignore
-              | Pco m -> Comonadic.zap_to_floor_force m |> ignore)
+              | Pmon m ->
+                if not areality_only then Monadic.zap_to_floor_force m |> ignore
+              | Pco m ->
+                if areality_only
+                then
+                  Comonadic.proj Areality m
+                  |> Comonadic.Per_axis.zap_to_floor Areality
+                  |> ignore
+                else Comonadic.zap_to_floor_force m |> ignore)
             mm)
         zap_to_floor_map;
       ModeIdMap.iter
@@ -7729,8 +7762,15 @@ module Mode_with (Areality : Areality) = struct
           MorphMap.iter
             (fun _ p ->
               match p with
-              | Pmon m -> Monadic.zap_to_ceil_force m |> ignore
-              | Pco m -> Comonadic.zap_to_ceil_force m |> ignore)
+              | Pmon m ->
+                if not areality_only then Monadic.zap_to_ceil_force m |> ignore
+              | Pco m ->
+                if areality_only
+                then
+                  Comonadic.proj Areality m
+                  |> Comonadic.Per_axis.zap_to_ceil Areality
+                  |> ignore
+                else Comonadic.zap_to_ceil_force m |> ignore)
             mm)
         zap_to_ceil_map
   end
@@ -7780,9 +7820,19 @@ module Mode_with (Areality : Areality) = struct
 
   let add_mode_to_zap_scope ~arg m { visible } = visible := (arg, m) :: !visible
 
-  let resolve_zap_scope { variables; visible } =
+  let resolve_zap_scope_with ~areality_only { variables; visible } =
     (* we first zap all visible non generic modes to legacy *)
-    List.iter (fun (arg, m) -> zap_to_legacy ~arg m |> ignore) !visible;
+    List.iter
+      (fun (arg, m) ->
+        if areality_only
+        then
+          begin if not (check_generic m)
+          then
+            Comonadic.proj Areality m.comonadic
+            |> Areality.zap_to_legacy_force |> ignore
+          end
+        else zap_to_legacy ~arg m |> ignore)
+      !visible;
     (* we then iterate over the children of visible generic modes and zap level 0
     according to the following rules:
     1) if a mode appears only as an upper bound to generic modes, it is zapped to
@@ -7798,7 +7848,14 @@ module Mode_with (Areality : Areality) = struct
           add_contravariant_to_zap_scope m variables
         end)
       !visible;
-    Z.resolve_zap_scope variables
+    Z.resolve_zap_scope ~areality_only variables
+
+  let resolve_zap_scope_areality scope =
+    resolve_zap_scope_with ~areality_only:true
+      { scope with variables = Z.create () }
+
+  let resolve_zap_scope scope =
+    resolve_zap_scope_with ~areality_only:false scope
 
   let create_zap_scope () = { variables = Z.create (); visible = ref [] }
 

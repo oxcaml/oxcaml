@@ -853,6 +853,8 @@ module type S = sig
 
     val create_zap_scope : unit -> zap_scope
 
+    val resolve_zap_scope_areality : zap_scope -> unit
+
     val resolve_zap_scope : zap_scope -> unit
 
     (** Exposed subset of the monotone Lattices interface *)

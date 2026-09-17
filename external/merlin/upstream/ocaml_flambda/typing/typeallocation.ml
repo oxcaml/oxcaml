@@ -42,7 +42,9 @@ let register_allocation_value_mode ~env ~loc
     with_regionality_to_locality_r2g ~allocation:({loc; txt = desc})
       (Mode.With_regionality.disallow_left mode)
   in
-  let mode = with_locality_as_regionality ~allocation:({loc; txt = desc}) mode in
+  let mode =
+    with_locality_as_regionality ~allocation:({loc; txt = desc}) mode
+  in
   locality_mode, mode
 
 (* Unlike most allocations, which can be the highest mode allowed by
@@ -51,19 +53,30 @@ let register_allocation_value_mode ~env ~loc
    to one argument must be global. As a result, a function gets an
    [With_locality.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation ~env (expected_mode : With_regionality.r) ~loc
-    : Locality.lr * With_locality.lr * With_regionality.r =
+    : Locality.lr * Allocation.lr * With_locality.lr * With_regionality.r =
   let allocation : Hint.allocation = { loc; txt = Unknown } in
-  let closure_mode, _ =
-    With_locality.newvar_below (Ctype.get_current_level ())
-      (with_regionality_to_locality_r2g ~allocation expected_mode)
+  let expected_mode =
+    with_regionality_to_locality_r2g ~allocation expected_mode
   in
-  let locality = With_locality.proj_comonadic Areality closure_mode in
-  let locality_mode : Locality.lr = Locality.newvar_below 0 locality |> fst in
+  let closure_mode, _ =
+    With_locality.newvar_below (Ctype.get_current_level ()) expected_mode
+  in
+  let locality_mode : Locality.lr =
+    With_locality.proj_comonadic Areality closure_mode
+    |> Locality.newvar_below 0
+    |> fst
+  in
+  let body_allocation_mode : Allocation.lr =
+    With_locality.proj_comonadic Allocation expected_mode
+    |> Allocation.newvar_below 0
+    |> fst
+  in
   let closed_over_mode =
-    with_locality_as_regionality ~allocation (With_locality.disallow_left closure_mode)
+    with_locality_as_regionality ~allocation
+      (With_locality.disallow_left closure_mode)
   in
   register_allocation_mode ~env ~loc locality_mode;
-  locality_mode, closure_mode, closed_over_mode
+  locality_mode, body_allocation_mode, closure_mode, closed_over_mode
 
 (* Module is always allocated on the heap, so every enclosing closure
    is forced to be [alloc]. *)
@@ -106,13 +119,22 @@ let relax_alloc (desc : Types.value_description) ~is_applied mode =
   else
     match desc.val_kind with
     | Types.Val_prim _ ->
-      With_regionality.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+      With_regionality.meet_const_with
+        Allocation
+        Allocation.Const.Noalloc_strict
+        mode
     | _ ->
       begin match Type_zero_alloc.val_zero_alloc desc.val_zero_alloc with
       | Type_zero_alloc.Zero_alloc { strict = true; _ } ->
-        With_regionality.meet_const_with Allocation Allocation.Const.Noalloc_strict mode
+        With_regionality.meet_const_with
+          Allocation
+          Allocation.Const.Noalloc_strict
+          mode
       | Type_zero_alloc.Zero_alloc { strict = false; _ } ->
-        With_regionality.meet_const_with Allocation Allocation.Const.Noalloc mode
+        With_regionality.meet_const_with
+          Allocation
+          Allocation.Const.Noalloc
+          mode
       | Type_zero_alloc.Default -> mode
       end
 
@@ -169,6 +191,15 @@ let constrain_allocations () =
       in
       Locality.submode_err pp stack_allocated locality_mode)
     (List.rev local)
+
+let with_zap_scope f =
+  let zap_scope = With_locality.create_zap_scope () in
+  let result = f ~zap_scope in
+  constrain_allocations ();
+  With_locality.resolve_zap_scope_areality zap_scope;
+  constrain_closures ();
+  With_locality.resolve_zap_scope zap_scope;
+  result
 
 let optimise_allocations () =
   (* CR zqian: Ideally we want to optimise all axes relavant to allocation. For

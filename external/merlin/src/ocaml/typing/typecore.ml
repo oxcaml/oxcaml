@@ -6625,7 +6625,7 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~param_loc ~ret_loc ~in_function
     ~is_first_val_param ~is_final_val_param
   =
-  let locality_mode, closure_mode, closed_over_mode =
+  let locality_mode, body_allocation_mode, closure_mode, closed_over_mode =
     Typeallocation.register_closure_allocation ~env ~loc
       (as_single_mode expected_mode)
   in
@@ -6674,10 +6674,12 @@ let split_function_ty
       (not_principal "this higher-rank function");
   let env =
     match is_first_val_param with
-    | false -> env
+    | false -> Env.add_curry_lock (loc, Function) body_allocation_mode env
     | true ->
         let env =
           Env.add_closure_lock
+            ~body_allocation_mode:
+              (Allocation.disallow_left body_allocation_mode)
             (loc, Function)
             closed_over_mode.comonadic
             env
@@ -6728,7 +6730,9 @@ let split_function_ty
   let ret_sort = type_sort ~why:Function_result ty_ret in
   env,
   { filtered_arrow; arg_sort; ret_sort;
-    locality_mode; closure_mode=closure_mode.comonadic; ty_arg_mono;
+    locality_mode;
+    closure_mode=closure_mode.comonadic;
+    ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
     really_poly; env_mode=(With_locality.Monadic.disallow_left env_monadic)
   }
@@ -7835,7 +7839,9 @@ and type_expect_
       in
       let mode_ret = With_locality.disallow_right mode_ret in
       let ap_mode = create_allocation_mode_l mode_ret in
-      let mode_ret = cross_left env ty_ret (with_locality_as_regionality mode_ret) in
+      let mode_ret =
+        cross_left env ty_ret (with_locality_as_regionality mode_ret)
+      in
       Typeallocation.register_zero_alloc_application_allocation ~env
         ~pos:pm.apply_position funct args mode_ret;
       let zero_alloc =
@@ -8673,8 +8679,10 @@ and type_expect_
          but we register it anyway so every allocation site is covered. *)
       Typeallocation.register_allocation_mode ~env ~loc
         (Locality.disallow_left Locality.legacy);
-      With_regionality.submode_exn ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
-        cl_mode With_regionality.legacy;
+      With_regionality.submode_exn
+        ~pp:(cl.loc, Ident {category = Class; lid = cl.txt})
+        cl_mode
+        With_regionality.legacy;
       let pm = position_and_mode env expected_mode sexp in
       begin match cl_decl.cty_new with
           None ->
@@ -10112,7 +10120,10 @@ and type_function_
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
-            locality_mode; closure_mode; really_poly; env_mode
+            locality_mode;
+            closure_mode;
+            really_poly;
+            env_mode
           } =
         split_function_ty env expected_mode ty_expected loc
           ~is_first_val_param:first ~is_final_val_param
@@ -10157,8 +10168,19 @@ and type_function_
             in
             (* Defaults are always global. They can be moved out of the
                function's region by Simplf.split_default_wrapper. *)
+            let default_allocation_mode, _ =
+              let closure_allocation_mode =
+                With_locality.Comonadic.proj Allocation closure_mode
+              in
+              Allocation.newvar_below 0 closure_allocation_mode
+            in
+            let default_env =
+              Env.add_curry_lock (default.pexp_loc, Expression)
+                default_allocation_mode env
+            in
             let default_arg =
-              type_expect env mode_legacy default (mk_expected ty_default_arg)
+              type_expect default_env mode_legacy default
+                (mk_expected ty_default_arg)
             in
             ty_default_arg, Some (default_arg, arg_label, default_arg_sort),
               default_arg_sort
@@ -10199,7 +10221,8 @@ and type_function_
                 | None ->
                   assert(is_final_val_param);
                   Final_arg
-                | Some { fun_closure_mode; locality_mode } ->
+                | Some
+                    { fun_closure_mode; locality_mode } ->
                   assert(not is_final_val_param);
                   (* Handle mode crossing of [arg_mode]. Note that [close_over]
                      uses the [arg_mode.comonadic] as a left mode, and
@@ -12231,7 +12254,8 @@ and type_function_cases_expect
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
           arg_sort; ret_sort; closure_mode;
-          ty_arg_mono; expected_pat_mode; expected_inner_mode; locality_mode;
+          ty_arg_mono; expected_pat_mode; expected_inner_mode;
+          locality_mode
         } =
       split_function_ty
         env
@@ -12881,11 +12905,32 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode ~loc ~env ~(modes : With_locality.Const.Option.t) expected_mode =
-    let min = With_locality.Const.Option.value ~default:With_locality.Const.min modes |> Const.with_locality_as_regionality in
-    let max = With_locality.Const.Option.value ~default:With_locality.Const.max modes |> Const.with_locality_as_regionality in
-    submode ~loc ~env ~reason:Other (With_regionality.of_const min) expected_mode;
-    let expected_mode = mode_coerce (With_regionality.of_const max) expected_mode in
+and type_expect_mode
+    ~loc
+    ~env
+    ~(modes : With_locality.Const.Option.t)
+    expected_mode =
+    let min =
+      With_locality.Const.Option.value
+        ~default:With_locality.Const.min
+        modes
+      |> Const.with_locality_as_regionality
+    in
+    let max =
+      With_locality.Const.Option.value
+        ~default:With_locality.Const.max
+        modes
+      |> Const.with_locality_as_regionality
+    in
+    submode
+      ~loc
+      ~env
+      ~reason:Other
+      (With_regionality.of_const min)
+      expected_mode;
+    let expected_mode =
+      mode_coerce (With_regionality.of_const max) expected_mode
+    in
     match modes.areality with
     | Some Local -> mode_strictly_local expected_mode
     | _ -> expected_mode
