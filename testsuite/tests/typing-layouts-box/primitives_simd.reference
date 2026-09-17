@@ -1,0 +1,4 @@
+vec128: ok
+vec256: ok
+local vec128: ok
+aliasing: ok
