@@ -461,7 +461,7 @@ We try several places in the identifier to check the result stability
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode id(modevar#20<0>[global .. local])
+            return_mode id(modevar#22<0>[global .. local])
             []
             [
               Nolabel
@@ -469,8 +469,8 @@ We try several places in the identifier to check the result stability
                 pattern (under.ml[2,13+6]..under.ml[2,13+9])
                   Tpat_var \"x\"
                   sort '_representable_layout_1
-                  value_mode local_to_regional_full(modevar#e<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#12<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#e<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc])
+                  value_mode local_to_regional_full(modevar#f<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#13<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#f<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc])
                 []
             ]
             Tfunction_body

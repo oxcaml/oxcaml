@@ -40,9 +40,9 @@
                     None
                   expression (test.ml[3,104+11]..test.ml[3,104+28])
                     Texp_function
-                    alloc_mode id(modevar#1a<0>[global .. local])
+                    alloc_mode id(modevar#1b<0>[global .. local])
                     yielding_mode unyielding
-                    return_mode id(modevar#18<0>[global .. local])
+                    return_mode id(modevar#19<0>[global .. local])
                     []
                     []
                     Tfunction_body
@@ -87,7 +87,7 @@
             Texp_function
             alloc_mode global
             yielding_mode unyielding
-            return_mode proj_Locality(modevar#9<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,yielding,stateful,alloc])
+            return_mode proj_Locality(modevar#a<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,yielding,stateful,alloc])
             []
             [
               Nolabel
@@ -107,8 +107,8 @@
                     []
                   Tpat_var \"foo\"
                   sort value
-                  value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#8<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
-                proj_Locality(modevar#7<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc])
+                  value_mode local_to_regional_full(modevar#8<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#9<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+                proj_Locality(modevar#8<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,unyielding,stateful,alloc])
                 []
             ]
             Tfunction_body
@@ -256,7 +256,7 @@
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
     Tpat_var \"x\"
     sort '_representable_layout_1
-    value_mode local_to_regional_full(modevar#7<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,yielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#b<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+    value_mode local_to_regional_full(modevar#8<0>[global,many,portable,forkable,unyielding,stateless,noalloc_strict .. local,once,nonportable,unforkable,yielding,stateful,alloc]);meet(unique,uncontended,read_write,static,id(modevar#c<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
   ",
                         "children": []
                       },
