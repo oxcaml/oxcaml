@@ -1749,8 +1749,19 @@ type atomic_offset =
 val atomic_load :
   dbg:Debuginfo.t ->
   Lambda.immediate_or_pointer ->
+  memory_order:atomic_load_memory_order ->
   expression ->
   atomic_offset ->
+  expression
+
+(** A store with release semantics. Returns unit. *)
+val atomic_release_store :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  new_value:expression ->
   expression
 
 val atomic_exchange :
