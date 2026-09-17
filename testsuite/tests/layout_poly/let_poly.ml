@@ -165,6 +165,7 @@ val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
 
 let _ =
   let poly_ id (type a) (x : a) = x in
+  let poly_ swap (type a b) (#(x, y) : #(a * b)) = #(y, x) in
   let #(a, b) = swap #(#1L, #2.5) in
   (to_float (id #1.5), to_int64 (id #2L), id "s", to_float a, to_int64 b)
 [%%expect{|
