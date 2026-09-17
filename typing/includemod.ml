@@ -1369,12 +1369,13 @@ let () =
    interface. *)
 
 let compunit0
-    ~comparison env ~mark impl_name ~modes impl_sig intf_name intf_sig
-    unit_shape =
+    ~self_check ~comparison env ~mark impl_name ~modes impl_sig intf_name
+    intf_sig unit_shape =
   let loc = Location.in_file impl_name in
   let direction = Directionality.strictly_positive ~mark ~both:false in
+  let core = if self_check then core_inclusion_self_check else core_inclusion in
   match
-    signatures ~core:core_inclusion ~direction ~loc env Subst.identity
+    signatures ~core ~direction ~loc env Subst.identity
       ~modes impl_sig intf_sig unit_shape
   with Result.Error reasons ->
     let diff = Error.diff impl_name intf_name reasons in
@@ -1390,8 +1391,8 @@ let compunit = compunit0 ~comparison:Implementation_vs_interface
 
 let compunit_as_argument env arg_name ~modes arg_sig param_name param_sig =
   let cc, _shape =
-    compunit0 env arg_name ~modes arg_sig param_name param_sig Shape.dummy_mod
-      ~comparison:Argument_vs_parameter ~mark:true
+    compunit0 ~self_check:false env arg_name ~modes arg_sig param_name param_sig
+      Shape.dummy_mod ~comparison:Argument_vs_parameter ~mark:true
   in
   cc
 

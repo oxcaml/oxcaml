@@ -6443,7 +6443,6 @@ type split_function_ty =
     closure_mode: Mode.With_locality.Comonadic.lr;
     env_mode: Mode.With_locality.Monadic.r;
     locality_mode: Locality.lr;
-    closure_allocation: Allocation.lr;
     really_poly: bool
   }
 
@@ -6466,7 +6465,7 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~param_loc ~ret_loc ~in_function
     ~is_first_val_param ~is_final_val_param
   =
-  let locality_mode, closure_allocation, closure_mode, closed_over_mode =
+  let locality_mode, body_allocation_mode, closure_mode, closed_over_mode =
     Typeallocation.register_closure_allocation ~env ~loc
       (as_single_mode expected_mode)
   in
@@ -6506,10 +6505,12 @@ let split_function_ty
       (not_principal "this higher-rank function");
   let env =
     match is_first_val_param with
-    | false -> env
+    | false -> Env.add_curry_lock (loc, Function) body_allocation_mode env
     | true ->
         let env =
           Env.add_closure_lock
+            ~body_allocation_mode:
+              (Allocation.disallow_left body_allocation_mode)
             (loc, Function)
             closed_over_mode.comonadic
             env
@@ -6561,7 +6562,6 @@ let split_function_ty
   env,
   { filtered_arrow; arg_sort; ret_sort;
     locality_mode;
-    closure_allocation;
     closure_mode=closure_mode.comonadic;
     ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
@@ -6576,7 +6576,6 @@ type type_function_result_param =
 
 type fun_alloc_mode =
   { locality_mode: Locality.lr;
-    closure_allocation: Allocation.lr;
     fun_closure_mode: Mode.With_locality.Comonadic.lr
   }
 
@@ -9749,7 +9748,6 @@ and type_function
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             locality_mode;
-            closure_allocation;
             closure_mode;
             really_poly;
             env_mode
@@ -9840,7 +9838,7 @@ and type_function
                   assert(is_final_val_param);
                   Final_arg
                 | Some
-                    { fun_closure_mode; locality_mode; closure_allocation } ->
+                    { fun_closure_mode; locality_mode } ->
                   assert(not is_final_val_param);
                   (* Handle mode crossing of [arg_mode]. Note that [close_over]
                      uses the [arg_mode.comonadic] as a left mode, and
@@ -9869,12 +9867,6 @@ and type_function
                        ~hint
                        fun_closure_mode)
                     env_mode;
-                  Allocation.submode_err (pparam_loc, Pattern)
-                    (With_locality.Comonadic.proj Allocation arg_mode)
-                    closure_allocation;
-                  Allocation.submode_err (loc, Function)
-                    (With_locality.Comonadic.proj Allocation closure_mode)
-                    closure_allocation;
                   begin match
                     With_locality.Comonadic.submode arg_mode fun_closure_mode
                   with
@@ -10037,7 +10029,7 @@ and type_function
       in
       let fun_alloc_mode =
         { fun_closure_mode = closure_mode;
-          locality_mode; closure_allocation }
+          locality_mode }
       in
       { function_ = exp_type, param :: params, body;
         newtypes = []; params_contain_gadt = contains_gadt;
@@ -11796,7 +11788,7 @@ and type_function_cases_expect
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
           arg_sort; ret_sort; closure_mode;
           ty_arg_mono; expected_pat_mode; expected_inner_mode;
-          locality_mode; closure_allocation
+          locality_mode
         } =
       split_function_ty
         env
@@ -11856,7 +11848,7 @@ and type_function_cases_expect
     in
     let fun_alloc_mode =
       { fun_closure_mode = closure_mode;
-        locality_mode; closure_allocation }
+        locality_mode }
     in
     let calling_convention_sorts =
       [ { Calling_convention_sort.ccs_ty = ty_arg; ccs_sort = arg_sort;

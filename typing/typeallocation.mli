@@ -55,4 +55,6 @@ val constrain_closures : unit -> unit
     modes. *)
 val constrain_allocations : unit -> unit
 
+val with_zap_scope : (zap_scope:With_locality.zap_scope -> 'a) -> 'a
+
 val optimise_allocations : unit -> unit
