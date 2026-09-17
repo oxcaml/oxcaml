@@ -16,7 +16,7 @@ let code loopify(never) size(30) newer_version_of(f_0)
          | 0 -> k (0)
          | 1 -> k2
          where k2 =
-           let prim = %phys_ne (bit, 0) in
+           let prim = %int_comp.ne (bit, 0) in
            let noteq = %tag_imm (prim) in
            cont k (noteq))
 in

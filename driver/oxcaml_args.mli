@@ -50,6 +50,7 @@ module type Oxcaml_options = sig
   val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
   val no_x86_peephole_remove_redundant_test : unit -> unit
+  val no_x86_peephole_fuse_and_test : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit

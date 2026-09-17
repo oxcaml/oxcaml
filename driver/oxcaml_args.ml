@@ -138,6 +138,11 @@ let mk_no_x86_peephole_remove_redundant_test f =
     Arg.Unit f,
     " Disable x86 peephole: remove redundant test" )
 
+let mk_no_x86_peephole_fuse_and_test f =
+  ( "-no-x86-peephole-fuse-and-test",
+    Arg.Unit f,
+    " Disable x86 peephole: fuse and with immediate into the following test" )
+
 let mk_cfg_cse_optimize f =
   ("-cfg-cse-optimize", Arg.Unit f, " Apply CSE optimizations to CFG")
 
@@ -1347,6 +1352,7 @@ module type Oxcaml_options = sig
   val no_x86_peephole_remove_redundant_extension : unit -> unit
   val no_x86_peephole_combine_add_rsp : unit -> unit
   val no_x86_peephole_remove_redundant_test : unit -> unit
+  val no_x86_peephole_fuse_and_test : unit -> unit
   val cfg_stack_checks : unit -> unit
   val no_cfg_stack_checks : unit -> unit
   val cfg_stack_checks_threshold : int -> unit
@@ -1545,6 +1551,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_x86_peephole_combine_add_rsp F.no_x86_peephole_combine_add_rsp;
       mk_no_x86_peephole_remove_redundant_test
         F.no_x86_peephole_remove_redundant_test;
+      mk_no_x86_peephole_fuse_and_test F.no_x86_peephole_fuse_and_test;
       mk_cfg_stack_checks F.cfg_stack_checks;
       mk_no_cfg_stack_checks F.no_cfg_stack_checks;
       mk_cfg_stack_checks_threshold F.cfg_stack_checks_threshold;
@@ -1897,6 +1904,9 @@ module Oxcaml_options_impl = struct
 
   let no_x86_peephole_remove_redundant_test =
     clear' Oxcaml_flags.x86_peephole_remove_redundant_test
+
+  let no_x86_peephole_fuse_and_test =
+    clear' Oxcaml_flags.x86_peephole_fuse_and_test
 
   let cfg_stack_checks = set' Oxcaml_flags.cfg_stack_checks
   let no_cfg_stack_checks = clear' Oxcaml_flags.cfg_stack_checks

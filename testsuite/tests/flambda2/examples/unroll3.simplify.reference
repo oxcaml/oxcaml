@@ -8,7 +8,7 @@ and code rec loopify(never) size(18) newer_version_of(odd_1)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %phys_eq (n, 0) in
+  let prim = %int_comp.eq (n, 0) in
   switch prim
     | 0 -> k2
     | 1 -> k (0)
@@ -24,7 +24,7 @@ and code rec loopify(never) size(18) newer_version_of(even_0)
         my_closure &my_alloc_region my_depth
         -> k * k1
         : imm tagged =
-  let prim = %phys_eq (n, 0) in
+  let prim = %int_comp.eq (n, 0) in
   switch prim
     | 0 -> k2
     | 1 -> k (1)

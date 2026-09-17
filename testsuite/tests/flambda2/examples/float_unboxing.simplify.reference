@@ -10,7 +10,7 @@ let code loopify(never) size(44) newer_version_of(f_0)
       let i = %tag_imm (prim) in
       let prim_1 = %num_conv.[`imm`].[`float`] (prim) in
       ((let int_mod = %int_barith.mod (i, 2) in
-        let prim_2 = %phys_eq (int_mod, 0) in
+        let prim_2 = %int_comp.eq (int_mod, 0) in
         switch prim_2
           | 0 -> k5
           | 1 -> k4 (prim_1)

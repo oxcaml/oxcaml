@@ -2155,19 +2155,23 @@ let zero_extend ~bits ~dbg e =
   then e
   else
     map_tail
-      (function
-        | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
-          -> (
-          let load memory_chunk =
-            Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
-          in
-          match memory_chunk, bits with
-          | (Byte_signed | Byte_unsigned), 8 -> load Byte_unsigned
-          | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_unsigned
-          | (Thirtytwo_signed | Thirtytwo_unsigned), 32 ->
-            load Thirtytwo_unsigned
-          | _ -> zero_extend_via_mask e)
-        | e -> zero_extend_via_mask e)
+      (fun e ->
+        match get_const e with
+        | Some n -> natint_const_untagged dbg (Nativeint.logand n mask)
+        | None -> (
+          match e with
+          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
+            -> (
+            let load memory_chunk =
+              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            in
+            match memory_chunk, bits with
+            | (Byte_signed | Byte_unsigned), 8 -> load Byte_unsigned
+            | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_unsigned
+            | (Thirtytwo_signed | Thirtytwo_unsigned), 32 ->
+              load Thirtytwo_unsigned
+            | _ -> zero_extend_via_mask e)
+          | e -> zero_extend_via_mask e))
       (low_bits ~bits e ~dbg)
 
 let rec sign_extend ~bits ~dbg e =
@@ -2181,40 +2185,52 @@ let rec sign_extend ~bits ~dbg e =
   else
     map_tail
       (fun e ->
-        match prefer_or e with
-        | Cop (Cand, [x; y], _) when is_constant y ->
-          and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
-        | Cop (Cor, [x; y], _) when is_constant y ->
-          or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
-        | Cop (Cxor, [x; y], _) when is_constant y ->
-          xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
-        | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
-          when is_defined_shift n ->
-          (* see middle_end/flambda2/z3/sign_extension.py for proof *)
-          if n = unused_bits
-          then
-            match op with
-            | Casr -> e
-            | Clsr -> asr_const inner unused_bits dbg
-            | _ -> assert false
-          else if n > unused_bits
-          then
-            (* sign-extension is a no-op since the top n bits already match *)
-            e
-          else
-            let e = lsl_const0 inner (unused_bits - n) dbg in
-            asr_const e unused_bits dbg
-        | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
-          -> (
-          let load memory_chunk =
-            Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
-          in
-          match memory_chunk, bits with
-          | (Byte_signed | Byte_unsigned), 8 -> load Byte_signed
-          | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_signed
-          | (Thirtytwo_signed | Thirtytwo_unsigned), 32 -> load Thirtytwo_signed
-          | _ -> sign_extend_via_shift e)
-        | e -> sign_extend_via_shift e)
+        match get_const e with
+        | Some n ->
+          natint_const_untagged dbg
+            (Nativeint.shift_right
+               (Nativeint.shift_left n unused_bits)
+               unused_bits)
+        | None when max_signed_bit_length e < bits ->
+          (* [e] already fits in [bits] bits as a signed integer (e.g. [x land
+             1], or a comparison), so it is its own sign extension. *)
+          e
+        | None -> (
+          match prefer_or e with
+          | Cop (Cand, [x; y], _) when is_constant y ->
+            and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          | Cop (Cor, [x; y], _) when is_constant y ->
+            or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          | Cop (Cxor, [x; y], _) when is_constant y ->
+            xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
+            when is_defined_shift n ->
+            (* see middle_end/flambda2/z3/sign_extension.py for proof *)
+            if n = unused_bits
+            then
+              match op with
+              | Casr -> e
+              | Clsr -> asr_const inner unused_bits dbg
+              | _ -> assert false
+            else if n > unused_bits
+            then
+              (* sign-extension is a no-op since the top n bits already match *)
+              e
+            else
+              let e = lsl_const0 inner (unused_bits - n) dbg in
+              asr_const e unused_bits dbg
+          | Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg) as e
+            -> (
+            let load memory_chunk =
+              Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
+            in
+            match memory_chunk, bits with
+            | (Byte_signed | Byte_unsigned), 8 -> load Byte_signed
+            | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_signed
+            | (Thirtytwo_signed | Thirtytwo_unsigned), 32 ->
+              load Thirtytwo_signed
+            | _ -> sign_extend_via_shift e)
+          | e -> sign_extend_via_shift e))
       (low_bits ~bits e ~dbg)
 
 let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
@@ -5099,12 +5115,35 @@ let lsr_int_caml_raw ~dbg arg1 arg2 = or_const (lsr_int arg1 arg2 dbg) 1n dbg
 
 let asr_int_caml_raw ~dbg arg1 arg2 = or_const (asr_int arg1 arg2 dbg) 1n dbg
 
-let eq ~dbg x y =
-  match x, y with
-  | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
-  | Cop (Csubi, [Cconst_int (m, _); c], _), Cconst_int (n, _)
-    when Misc.no_overflow_sub m n ->
-    (* [n = m - c] <=> [c = m - n]
+(* [single_bit_mask_test x y] returns [Some masked] when one of [x] and [y] is
+   [masked = z land m] and the other is the constant [m] itself, with [m] a
+   single bit. Then [(z land m) = m] iff [(z land m) <> 0], and the latter can
+   be implemented by the backend as a single [test] instruction. *)
+let single_bit_mask_test x y =
+  let is_single_bit m =
+    (not (Nativeint.equal m 0n))
+    && Nativeint.equal (Nativeint.logand m (Nativeint.pred m)) 0n
+  in
+  let masked_against_its_own_mask masked c =
+    match get_const_bitmask masked, get_const c with
+    | Some ((_ : expression), m), Some c
+      when Nativeint.equal m c && is_single_bit m ->
+      Some masked
+    | (Some _ | None), (Some _ | None) -> None
+  in
+  match masked_against_its_own_mask x y with
+  | Some _ as result -> result
+  | None -> masked_against_its_own_mask y x
+
+let rec eq ~dbg x y =
+  match single_bit_mask_test x y with
+  | Some masked -> neq ~dbg masked (Cconst_int (0, dbg))
+  | None -> (
+    match x, y with
+    | Cconst_int (n, _), Cop (Csubi, [Cconst_int (m, _); c], _)
+    | Cop (Csubi, [Cconst_int (m, _); c], _), Cconst_int (n, _)
+      when Misc.no_overflow_sub m n ->
+      (* [n = m - c] <=> [c = m - n]
 
        This is typically generated by expressions of the form [if not expr then
        ...], with [not expr] being compiled to [4 - c] and the condition for the
@@ -5131,7 +5170,7 @@ let eq ~dbg x y =
        another way of saying that [m - n] doesn't overflow.
 
        The following z3 script confirms that this check is sufficient: *)
-    (*
+      (*
      *   (define-sort int63 () (_ BitVec 63))
      *   (define-sort int64 () (_ BitVec 64))
      *   (define-const z63 int63 ((_ int2bv 63) 0))
@@ -5153,10 +5192,49 @@ let eq ~dbg x y =
      *
      *   (check-sat)
      *)
-    binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
-  | _, _ -> binary (Ccmpi Ceq) ~dbg x y
+      binary (Ccmpi Ceq) ~dbg c (Cconst_int (m - n, dbg))
+    | _, _ -> binary (Ccmpi Ceq) ~dbg x y)
 
-let neq = binary (Ccmpi Cne)
+and neq ~dbg x y =
+  match single_bit_mask_test x y with
+  | Some masked -> eq ~dbg masked (Cconst_int (0, dbg))
+  | None -> binary (Ccmpi Cne) ~dbg x y
+
+(* [x] and [y] are well-formed tagged immediates, i.e. their least significant
+   bit is 1. When one of them is [z land m] and the other is a constant [c],
+   then [m] and [c] are odd (otherwise the expressions could not be tagged) and
+   so is [z]. The least significant bits of both sides are therefore always
+   equal, and can be dropped from [m] and [c]:
+
+   [(z land m) = c] iff [(z land (m lxor 1)) = (c lxor 1)]
+
+   This turns e.g. [t land 3 <> 1] (that is, [t land 1 <> 0] on OCaml ints) into
+   [t land 2 <> 0], which the backend can implement as a single [test]
+   instruction.
+
+   See middle_end/flambda2/z3/comparisons.smt2 for a Z3 script to prove this. *)
+let drop_tag_bit_from_masked_comparison ~dbg x y =
+  let rewrite masked c =
+    match get_const_bitmask masked, get_const c with
+    | Some (z, m), Some c
+      when Nativeint.equal (Nativeint.logand m 1n) 1n
+           && Nativeint.equal (Nativeint.logand c 1n) 1n ->
+      Some
+        ( and_const z (Nativeint.logxor m 1n) dbg,
+          natint_const_untagged dbg (Nativeint.logxor c 1n) )
+    | (Some _ | None), (Some _ | None) -> None
+  in
+  match rewrite x y with
+  | Some (x, y) -> x, y
+  | None -> ( match rewrite y x with Some (y, x) -> x, y | None -> x, y)
+
+let eq_tagged ~dbg x y =
+  let x, y = drop_tag_bit_from_masked_comparison ~dbg x y in
+  eq ~dbg x y
+
+let neq_tagged ~dbg x y =
+  let x, y = drop_tag_bit_from_masked_comparison ~dbg x y in
+  neq ~dbg x y
 
 let lt = binary (Ccmpi Clt)
 

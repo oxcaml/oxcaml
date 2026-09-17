@@ -30,3 +30,9 @@ unsat
 
 Unsigned, Ge -> C.uge ~dbg x (C.ignore_low_bit_int y))
 unsat
+
+Tagged, Eq -> C.eq_tagged: (x & m) = c  iff  (x & (m ^ 1)) = (c ^ 1)
+unsat
+
+(z & p) = p  iff  (z & p) != 0, for p a single bit
+unsat
