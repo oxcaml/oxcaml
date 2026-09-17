@@ -36,7 +36,11 @@ let copy_compunit ic oc compunit =
     seek_in ic compunit.cu_debug;
     compunit.cu_debug <- pos_out oc;
     copy_file_chunk ic oc compunit.cu_debugsize
-  end
+  end;
+  (* Static data is only read from .cmo files, so is not kept in the archive
+     (just as .cmxa files do not keep the static data of .cmx files). *)
+  compunit.cu_static_data <- 0;
+  compunit.cu_static_datasize <- 0
 
 (* Add C objects and options and "custom" info from a library descriptor *)
 

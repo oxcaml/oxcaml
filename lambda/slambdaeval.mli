@@ -59,6 +59,10 @@ module CU_data : sig
 
   val read : raw -> sections:File_sections.t -> t
 
+  (** Bottom-up rewriting of every [lambda] node in [t], including those nested
+      inside [slambda] (via [SLhalves]) and back again (via [Lsplice]). *)
+  val map_lambda : t -> f:(lambda -> lambda) -> t
+
   val print : Format_doc.formatter -> t -> unit
 end
 

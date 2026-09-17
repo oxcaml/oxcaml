@@ -13,3 +13,4 @@ Required globals:
 	Stdlib
 Uses unsafe features: no
 Force link: no
+Static data: Aliases//0[ ]

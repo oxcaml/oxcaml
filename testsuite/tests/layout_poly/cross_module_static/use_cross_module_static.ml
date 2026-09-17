@@ -1,44 +1,84 @@
 (* TEST
  readonly_files = "cross_module_static_lib.mli cross_module_static_lib.ml \
                    cross_module_static_relay.mli cross_module_static_relay.ml";
- setup-ocamlopt.byte-build-env;
  (* [-nocwd] is needed because [-Ix .] doesn't override the implicit [-I .]. *)
  flags = "-extension layout_poly -nocwd -Ix .";
- module = "cross_module_static_lib.mli";
- ocamlopt.byte;
- module = "cross_module_static_lib.ml";
- ocamlopt.byte;
- module = "cross_module_static_relay.mli";
- ocamlopt.byte;
- module = "cross_module_static_relay.ml";
- ocamlopt.byte;
- module = "use_cross_module_static.ml";
- ocamlopt.byte;
- unset module;
  {
-  program = "${test_build_directory}/use_cross_module_static.exe";
-  all_modules = "cross_module_static_lib.cmx cross_module_static_relay.cmx \
-                 use_cross_module_static.cmx";
+  setup-ocamlopt.byte-build-env;
+  module = "cross_module_static_lib.mli";
   ocamlopt.byte;
-  run;
-  check-program-output;
+  module = "cross_module_static_lib.ml";
+  ocamlopt.byte;
+  module = "cross_module_static_relay.mli";
+  ocamlopt.byte;
+  module = "cross_module_static_relay.ml";
+  ocamlopt.byte;
+  module = "use_cross_module_static.ml";
+  ocamlopt.byte;
+  unset module;
+  {
+   program = "${test_build_directory}/use_cross_module_static.exe";
+   all_modules = "cross_module_static_lib.cmx cross_module_static_relay.cmx \
+                  use_cross_module_static.cmx";
+   ocamlopt.byte;
+   run;
+   check-program-output;
+  }{
+   program = "-no-code -no-approx cross_module_static_lib.cmx";
+   output = "cross_module_static_lib.cmx.objinfo.output";
+   reference =
+     "${test_source_directory}/cross_module_static_lib.cmx.objinfo.reference";
+   ocamlobjinfo;
+   check-program-output;
+  }{
+   program = "-no-code -no-approx cross_module_static_relay.cmx";
+   output = "cross_module_static_relay.cmx.objinfo.output";
+   reference =
+     "${test_source_directory}/cross_module_static_relay.cmx.objinfo.reference";
+   ocamlobjinfo;
+   check-program-output;
+  }
  }{
-  program = "-no-code -no-approx cross_module_static_lib.cmx";
-  output = "cross_module_static_lib.objinfo.output";
-  reference = "${test_source_directory}/cross_module_static_lib.objinfo.reference";
-  ocamlobjinfo;
-  check-program-output;
- }{
-  program = "-no-code -no-approx cross_module_static_relay.cmx";
-  output = "cross_module_static_relay.objinfo.output";
-  reference = "${test_source_directory}/cross_module_static_relay.objinfo.reference";
-  ocamlobjinfo;
-  check-program-output;
+  (* The same, in bytecode: the static data is read out of the cmo files. *)
+  setup-ocamlc.byte-build-env;
+  module = "cross_module_static_lib.mli";
+  ocamlc.byte;
+  module = "cross_module_static_lib.ml";
+  ocamlc.byte;
+  module = "cross_module_static_relay.mli";
+  ocamlc.byte;
+  module = "cross_module_static_relay.ml";
+  ocamlc.byte;
+  module = "use_cross_module_static.ml";
+  ocamlc.byte;
+  unset module;
+  {
+   program = "${test_build_directory}/use_cross_module_static.byte";
+   all_modules = "cross_module_static_lib.cmo cross_module_static_relay.cmo \
+                  use_cross_module_static.cmo";
+   ocamlc.byte;
+   run;
+   check-program-output;
+  }{
+   program = "cross_module_static_lib.cmo";
+   output = "cross_module_static_lib.cmo.objinfo.output";
+   reference =
+     "${test_source_directory}/cross_module_static_lib.cmo.objinfo.reference";
+   ocamlobjinfo;
+   check-program-output;
+  }{
+   program = "cross_module_static_relay.cmo";
+   output = "cross_module_static_relay.cmo.objinfo.output";
+   reference =
+     "${test_source_directory}/cross_module_static_relay.cmo.objinfo.reference";
+   ocamlobjinfo;
+   check-program-output;
+  }
  }
 *)
 
 (* Instantiating a layout-polymorphic value defined in another compilation unit
-   requires reading that unit's static data out of its cmx. *)
+   requires reading that unit's static data out of its cmx or cmo. *)
 
 external to_float : float# -> float = "%box_float"
 external to_int64 : int64_u -> int64 = "%box_int64"

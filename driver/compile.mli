@@ -36,16 +36,19 @@ val to_bytecode :
   as_arg_for:Global_module.Parameter_name.t option ->
   Instruct.instruction list * Compilation_unit.Set.t *
     Lambda.main_module_block_format *
-    Lambda.arg_descr option
+    Lambda.arg_descr option *
+    Slambdaeval.CU_data.t
 (** [to_bytecode info typed] takes a typechecked implementation
-    and returns its bytecode.
+    and returns its bytecode, together with the compile-time value of its
+    main module block.
 *)
 
 val emit_bytecode :
   Compile_common.info ->
   Instruct.instruction list * Compilation_unit.Set.t *
     Lambda.main_module_block_format *
-    Lambda.arg_descr option ->
+    Lambda.arg_descr option *
+    Slambdaeval.CU_data.t ->
     unit
 (** [emit_bytecode bytecode] output the bytecode executable. *)
 

@@ -31,7 +31,17 @@
    inline the same cmo-reading logic. *)
 val read_cmo : Misc.filepath -> Cmo_format.compilation_unit_descr
 
-type error = Not_an_object_file of Misc.filepath
+(* Read the static data of a compilation unit from its [.cmo] in the load path.
+   Returns [None] if the [.cmo] has no static data, or (after warning) if no
+   such [.cmo] can be found. *)
+val read_static_data : Compilation_unit.t -> Slambdaeval.CU_data.t option
+
+type error =
+  | Not_an_object_file of Misc.filepath
+  | Illegal_renaming of
+      { expected : Compilation_unit.t;
+        found : Compilation_unit.t;
+        file : Misc.filepath }
 
 exception Error of error
 

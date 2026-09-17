@@ -24,11 +24,16 @@
  *                                                                                *
  **********************************************************************************)
 
-type error = Not_an_object_file of Misc.filepath
+type error =
+  | Not_an_object_file of Misc.filepath
+  | Illegal_renaming of
+      { expected : Compilation_unit.t;
+        found : Compilation_unit.t;
+        file : Misc.filepath }
 
 exception Error of error
 
-let read_cmo file =
+let with_cmo file f =
   let ic = open_in_bin file in
   Fun.protect ~finally:(fun () -> close_in ic) @@ fun () ->
   let buffer = really_input_string ic (String.length Config.cmo_magic_number) in
@@ -36,13 +41,42 @@ let read_cmo file =
   then raise (Error (Not_an_object_file file));
   let compunit_pos = input_binary_int ic in
   seek_in ic compunit_pos;
-  (input_value ic : Cmo_format.compilation_unit_descr)
+  let compunit = (input_value ic : Cmo_format.compilation_unit_descr) in
+  f ic compunit
+
+let read_cmo file = with_cmo file (fun _ic compunit -> compunit)
+
+let read_static_data cu =
+  let cmo = Compilation_unit.base_filename cu ^ ".cmo" in
+  match Load_path.find_normalized cmo with
+  | exception Not_found ->
+    Location.prerr_warning Location.none
+      (Warnings.No_cmx_file
+         { missing_extension = "cmo";
+           module_name = Compilation_unit.full_path_as_string cu });
+    None
+  | file ->
+    with_cmo file (fun ic compunit ->
+      if not (Compilation_unit.equal compunit.cu_name cu) then
+        raise (Error (Illegal_renaming
+                        { expected = cu; found = compunit.cu_name; file }));
+      if compunit.cu_static_data = 0 then None
+      else begin
+        seek_in ic compunit.cu_static_data;
+        Some (input_value ic : Slambdaeval.CU_data.t)
+      end)
 
 open Format_doc
 
 let report_error ppf = function
   | Not_an_object_file file ->
     fprintf ppf "%a is not a bytecode object file" Location.Doc.filename file
+  | Illegal_renaming { expected; found; file } ->
+    fprintf ppf "Wrong file naming: %a@ contains the compiled code for@ \
+                 %a when %a was expected"
+      Location.Doc.filename file
+      Compilation_unit.print found
+      Compilation_unit.print expected
 
 let () =
   Location.register_error_of_exn (function

@@ -21,13 +21,15 @@ open Instruct
 val to_file: out_channel -> Compilation_unit.t -> Unit_info.Artifact.t ->
   required_globals:Compilation_unit.Set.t ->
   main_module_block_format:Lambda.main_module_block_format ->
-  arg_descr:Lambda.arg_descr option -> instruction list -> unit
+  arg_descr:Lambda.arg_descr option ->
+  static_data:Slambdaeval.CU_data.t -> instruction list -> unit
         (* Arguments:
              channel on output file
              name of compilation unit implemented
              path of cmo file being written
              required_globals: list of compilation units that must be
                evaluated before this one
+             static_data: compile-time value of the unit's main module block
              list of instructions to emit *)
 val to_memory:
   instruction list ->

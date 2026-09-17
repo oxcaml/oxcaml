@@ -424,7 +424,7 @@ let rec emit = function
 (* Emission to a file *)
 
 let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
-          ~arg_descr code =
+          ~arg_descr ~static_data code =
   init();
   Fun.protect ~finally:clear (fun () ->
   output_string outchan cmo_magic_number;
@@ -453,6 +453,18 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       (p, pos_out outchan - p)
     end else
       (0, 0) in
+  let pos_static_data = pos_out outchan in
+  let static_data =
+    (* With [-g], the lambda code in [static_data] carries [Levent] nodes whose
+       [Env.t] cannot be marshalled. Keep only their summaries, which is all
+       the debugger needs (and what [Cmt_format] does for typed trees). *)
+    Slambdaeval.CU_data.map_lambda static_data ~f:(function
+      | Levent (lam, ev) ->
+        Levent (lam, { ev with lev_env = Env.keep_only_summary ev.lev_env })
+      | lam -> lam)
+  in
+  output_value outchan (static_data : Slambdaeval.CU_data.t);
+  let size_static_data = pos_out outchan - pos_static_data in
   let compunit =
     { cu_name = cu;
       cu_pos = pos_code;
@@ -466,7 +478,9 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       cu_required_compunits = Compilation_unit.Set.elements required_globals;
       cu_force_link = !Clflags.link_everything;
       cu_debug = pos_debug;
-      cu_debugsize = size_debug } in
+      cu_debugsize = size_debug;
+      cu_static_data = pos_static_data;
+      cu_static_datasize = size_static_data } in
   let pos_compunit = pos_out outchan in
   let () =
     (* Remove any cached abbreviation expansion before marshaling.

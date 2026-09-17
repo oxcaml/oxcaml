@@ -12,6 +12,7 @@ Runtime parameters:
 Required globals:
 Uses unsafe features: no
 Force link: no
+Static data: Ref_indirect//0[ (missing); ]
 File ref_indirect.cmi
 Unit name: Ref_indirect
 Is parameter: no

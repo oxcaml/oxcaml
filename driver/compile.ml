@@ -50,15 +50,10 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
        Builtin_attributes.warn_unused ();
        tlambda
        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
-       |> Slambda.eval
-            ~cu_static_data:(fun _ ->
-              Misc.fatal_errorf
-                "Cross-module static evaluation not implemented in bytecode")
+       |> Slambda.eval ~cu_static_data:Cmo_io.read_static_data
             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
-       |> fun (_static_data, lambda) ->
-          (* CR layout poly: Drop the comptime part until top-level modules can
-             be static. *)
-          lambda
+       |> fun (static_data, lambda) ->
+       lambda
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
@@ -75,7 +70,8 @@ let tlambda_to_bytecode i tlambda ~as_arg_for =
               ~main_repr:(
                 Lambda.main_module_representation main_module_block_format)
           in
-          bytecode, required_globals, main_module_block_format, arg_descr
+          bytecode, required_globals, main_module_block_format, arg_descr,
+          static_data
     )
 
 let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
@@ -92,13 +88,14 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   |> tlambda_to_bytecode i
 
 let emit_bytecode i
-      (bytecode, required_globals, main_module_block_format, arg_descr) =
+      (bytecode, required_globals, main_module_block_format, arg_descr,
+       static_data) =
   let cmo = Unit_info.cmo i.target in
   Misc.protect_output_to_file (Unit_info.Artifact.filename cmo) (fun oc ->
        bytecode
        |> Profile.(record ~accumulate:true generate)
          (Emitcode.to_file oc i.module_name cmo ~required_globals
-            ~main_module_block_format ~arg_descr);
+            ~main_module_block_format ~arg_descr ~static_data);
     )
 
 let emit_lambda_program info program =

@@ -38,6 +38,7 @@ Required globals:
 	Stdlib__List
 Uses unsafe features: no
 Force link: no
+Static data: Main//0[ (missing); ]
 File main.cmi
 Unit name: Main
 Is parameter: no

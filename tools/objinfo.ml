@@ -124,7 +124,19 @@ let print_arg_descr arg_descr =
   printf "Parameter implemented: %a\n"
     Global_module.Parameter_name.output arg_param
 
-let print_cmo_infos cu =
+let print_static_data static_data =
+  Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
+    (Format_doc.compat Slambdaeval.CU_data.print) static_data
+
+(* [ic] is the channel of the .cmo or .cma file containing [cu]. *)
+let read_static_data ic cu =
+  if cu.cu_static_data = 0 then None
+  else begin
+    seek_in ic cu.cu_static_data;
+    Some (input_value ic : Slambdaeval.CU_data.t)
+  end
+
+let print_cmo_infos ic cu =
   printf "Unit name: %a\n" Compilation_unit.output cu.cu_name;
   Option.iter print_arg_descr cu.cu_arg_descr;
   print_string "Interfaces imported:\n";
@@ -139,12 +151,13 @@ let print_cmo_infos cu =
         printf "YES\n";
         printf "Primitives declared in this module:\n";
         List.iter print_line l);
-  printf "Force link: %s\n" (if cu.cu_force_link then "YES" else "no")
+  printf "Force link: %s\n" (if cu.cu_force_link then "YES" else "no");
+  Option.iter print_static_data (read_static_data ic cu)
 
 let print_spaced_string s =
   printf " %s" s
 
-let print_cma_infos (lib : Cmo_format.library) =
+let print_cma_infos ic (lib : Cmo_format.library) =
   printf "Force custom: %s\n" (if lib.lib_custom then "YES" else "no");
   printf "Extra C object files:";
   (* PR#4949: print in linking order *)
@@ -155,7 +168,7 @@ let print_cma_infos (lib : Cmo_format.library) =
   print_string "Extra dynamically-loaded libraries:";
   List.iter print_spaced_string (List.rev lib.lib_dllibs);
   printf "\n";
-  List.iter print_cmo_infos lib.lib_units
+  List.iter (print_cmo_infos ic) lib.lib_units
 
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
@@ -385,8 +398,7 @@ let print_cmx_infos (uir, sections, crc) =
   end;
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
-  Format.printf "@[<hv 2>Static data:@ %a@]@\n%!"
-    (Format_doc.compat Slambdaeval.CU_data.print)
+  print_static_data
     (Slambdaeval.CU_data.read uir.uir_static_data ~sections);
   if not (!no_code || !no_approx) then begin
     Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
@@ -503,15 +515,15 @@ let dump_obj_by_kind filename ic obj_kind =
     | Cmo ->
        let cu_pos = input_binary_int ic in
        seek_in ic cu_pos;
-       let cu = input_value ic in
-       close_in ic;
-       print_cmo_infos cu
+       let cu = (input_value ic : compilation_unit_descr) in
+       print_cmo_infos ic cu;
+       close_in ic
     | Cma ->
        let toc_pos = input_binary_int ic in
        seek_in ic toc_pos;
        let toc = (input_value ic : library) in
-       close_in ic;
-       print_cma_infos toc
+       print_cma_infos ic toc;
+       close_in ic
     | Cmi | Cmt ->
        close_in ic;
        let cmi, cmt = Cmt_format.read filename in

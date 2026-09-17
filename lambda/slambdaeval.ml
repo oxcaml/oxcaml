@@ -185,12 +185,16 @@ and Env : sig
   val add_present : t -> Slambdaident.t -> Types.value -> t
 
   val find : t -> Slambdaident.t -> Types.value Or_missing.t
+
+  val map : t -> f:(Types.value -> Types.value) -> t
 end = struct
   module Map = Slambdaident.Map
 
   type t = Types.value Map.t
 
   let empty = Map.empty
+
+  let map t ~f = Map.map f t
 
   let add t id v =
     match (v : Types.value Or_missing.t) with
@@ -213,6 +217,13 @@ module Template_store = struct
     id
 
   let find_template t id = Template_id.Tbl.find_opt t id
+
+  let map t ~f =
+    let t' = Template_id.Tbl.create (Template_id.Tbl.length t) in
+    Template_id.Tbl.iter
+      (fun id closure -> Template_id.Tbl.add t' id (f closure))
+      t;
+    t'
 
   let print ppf t =
     if Template_id.Tbl.length t = 0
@@ -296,6 +307,60 @@ module CU_data = struct
   let read raw ~sections = Obj.obj (File_sections.get sections raw)
 
   let write t ~sections = File_sections.Builder.add sections (Obj.repr t)
+
+  let map_lambda { templates; cu } ~f =
+    let rec lambda lam =
+      let lam =
+        match lam with
+        | Lsplice (loc, sl) -> Lsplice (loc, slambda sl)
+        | lam -> Lambda.shallow_map ~tail:lambda ~non_tail:lambda lam
+      in
+      f lam
+    and slambda (sl : slambda) =
+      match sl with
+      | SLlayout _ | SLglobal _ | SLvar _ | SLmissing -> sl
+      | SLrecord sls -> SLrecord (List.map slambda sls)
+      | SLfield (sl, i) -> SLfield (slambda sl, i)
+      | SLhalves { sval_comptime; sval_runtime } ->
+        SLhalves
+          { sval_comptime = slambda sval_comptime;
+            sval_runtime = lambda sval_runtime
+          }
+      | SLproj_comptime sl -> SLproj_comptime (slambda sl)
+      | SLtemplate { sfun_params; sfun_body } ->
+        SLtemplate { sfun_params; sfun_body = slambda sfun_body }
+      | SLinstantiate { sapp_func; sapp_args } ->
+        SLinstantiate
+          { sapp_func = slambda sapp_func;
+            sapp_args = Array.map slambda sapp_args
+          }
+      | SLlet { slet_name; slet_value; slet_body } ->
+        SLlet
+          { slet_name;
+            slet_value = slambda slet_value;
+            slet_body = slambda slet_body
+          }
+    in
+    let rec value (v : Types.value) : Types.value =
+      match v with
+      | SLVhalves { slv_comptime; slv_runtime } ->
+        SLVhalves
+          { slv_comptime = Or_missing.map slv_comptime ~f:value;
+            slv_runtime = lambda slv_runtime
+          }
+      | SLVrecord { id; values } ->
+        SLVrecord { id; values = Array.map (Or_missing.map ~f:value) values }
+      | SLVlayout _ | SLVclosure _ -> v
+    in
+    let closure { Types.clo_params; clo_body; clo_env } =
+      { Types.clo_params;
+        clo_body = slambda clo_body;
+        clo_env = Env.map clo_env ~f:value
+      }
+    in
+    { templates = Template_store.map templates ~f:closure;
+      cu = Or_missing.map cu ~f:value
+    }
 
   let print ppf { templates; cu } =
     Fmt.fprintf ppf "@[<v 0>%a%a@]" Types.print_value_or_missing cu

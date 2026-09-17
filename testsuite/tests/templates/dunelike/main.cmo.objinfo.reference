@@ -66,3 +66,4 @@ Required globals:
 	Util[P:P_int]
 Uses unsafe features: no
 Force link: no
+Static data: Main//0[ (missing); ]

@@ -324,7 +324,10 @@ let package_object_files ~ppf_dump files target coercion =
         cu_required_compunits = CU.Set.elements required_compunits;
         cu_force_link = force_link;
         cu_debug = if pos_final > pos_debug then pos_debug else 0;
-        cu_debugsize = pos_final - pos_debug } in
+        cu_debugsize = pos_final - pos_debug;
+        (* No static data as we don't support packs with layout poly. *)
+        cu_static_data = 0;
+        cu_static_datasize = 0 } in
     Emitcode.marshal_to_channel_with_possibly_32bit_compat
       ~filename:targetfile ~kind:"bytecode unit"
       oc compunit;

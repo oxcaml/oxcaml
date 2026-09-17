@@ -51,13 +51,19 @@ type compilation_unit_descr =
     cu_primitives: string list;         (* Primitives declared inside *)
     mutable cu_force_link: bool;        (* Must be linked even if unref'ed *)
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
-    cu_debugsize: int }                 (* Length of debugging info *)
+    cu_debugsize: int;                  (* Length of debugging info *)
+    mutable cu_static_data: int;        (* Position of static data, or 0 *)
+    mutable cu_static_datasize: int }   (* Length of static data *)
 
 (* Format of a .cmo file:
      magic number (Config.cmo_magic_number)
      absolute offset of compilation unit descriptor
      block of relocatable bytecode
      debugging information if any
+     static data (a marshalled [Slambdaeval.CU_data.t]: the compile-time
+       value of the unit's main module block, as produced by [Slambda.eval];
+       absent from packed units and dropped from .cma files, like the static
+       data of .cmx files is dropped from .cmxa files)
      compilation unit descriptor *)
 
 (* Descriptor for libraries *)
