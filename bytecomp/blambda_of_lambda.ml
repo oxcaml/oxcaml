@@ -1193,9 +1193,20 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
-    | Pbox (_layout, _mode) ->
-      (* CR zeisbach: implement! also, ordering? *)
-      Misc.fatal_errorf "implement this!"
+    | Pbox (layout, _mode) -> (
+      match layout with
+      | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
+      | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+        (* CR zeisbach: will we want to compile non-addressable to tagged
+           immediates once we have addressability information? *)
+        pseudo_event (unary (Make_faux_mixedblock { total_len = 1; tag = 0 }))
+      | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+      | Punboxed_product _ ->
+        Misc.fatal_errorf "Blambda_of_lambda: %a is not yet implemented"
+          Printlambda.primitive primitive
+      | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
+      | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
+      | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
     | Punbox _layout ->
       (* CR zeisbach: implement! also, ordering? *)
       Misc.fatal_errorf "implement this!")
