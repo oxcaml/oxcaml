@@ -1503,11 +1503,6 @@ val mixed_product_shape_for_read :
   -> mixed_block_shape
   -> 'a mixed_block_element array
 
-val transl_mixed_product_shape_for_read :
-  get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
-  -> Types.mixed_product_shape
-  -> 'a mixed_block_element array
-
 val transl_module_representation :
   Types.module_representation -> module_representation
 

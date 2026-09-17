@@ -2219,10 +2219,6 @@ let rec mixed_block_element_for_read ~get_value_kind ~get_mode i
 and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   Array.mapi (mixed_block_element_for_read ~get_value_kind ~get_mode) shape
 
-let transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
-  mixed_product_shape_for_read ~get_value_kind ~get_mode
-    (transl_mixed_product_shape shape)
-
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->
     Pfield(pos, Pointer, read_semantics)
@@ -2252,9 +2248,10 @@ let transl_module_representation repr =
   if Array.for_all is_value shape
   then Module_value_only { field_count = Array.length shape }
   else
+    let shape = transl_mixed_product_shape shape in
     Module_mixed
-      ( transl_mixed_product_shape shape,
-        transl_mixed_product_shape_for_read
+      ( shape,
+        mixed_product_shape_for_read
         ~get_value_kind:(fun _ -> generic_value)
         ~get_mode:(fun _ ->
            fatal_error "Lambda.transl_module_representation: \
