@@ -1,3 +1,5 @@
+# For stock LLDB without the OCaml plugin (the macOS tests): breakpoints
+# use mangled OCaml symbol names. Keep in step with lldb-script-oxcaml.
 settings set target.disable-aslr false
 settings set stop-disassembly-display never
 command script import ./lldb_test.py
