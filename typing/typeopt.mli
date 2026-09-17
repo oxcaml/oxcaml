@@ -106,6 +106,11 @@ val assert_mixed_product_support_for_lambda_shape :
   Location.t -> Typedecl.Mixed_product_kind.t
   -> 'a Lambda.mixed_block_element array -> unit
 
+(* Translate a representable layout, turning generalized sorts into splices.
+   Rejects [Any] and [Univar]. *)
+val transl_const_layout :
+  Jkind_types.Layout.Const.t -> unit Lambda.mixed_block_element
+
 (* Translate record representations to Lambda, defaulting unfilled
    sorts and turning generalized sorts into splices. *)
 val transl_record_representation:
