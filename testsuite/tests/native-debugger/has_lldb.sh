@@ -23,8 +23,17 @@ else
             exit ${TEST_SKIP}
         fi
     elif [ "$OCAML_OS" = "linux" ]; then
-        # Linux version
-        LLDB_VERSION=$(lldb --version |awk -F' ' '{print $3}')
+        # The Linux references expect the demangled OCaml frames that only
+        # the OxCaml LLDB plugin produces; OXCAML_LLDB set (and executable)
+        # asserts that the lldb on PATH is the OxCaml one (see
+        # .github/workflows/build.yml).
+        if [ ! -x "$OXCAML_LLDB" ]; then
+            echo "OXCAML_LLDB not set" > "${ocamltest_response}"
+            exit ${TEST_SKIP}
+        fi
+        # head -n 1: from LLVM 21, lldb --version prints extra clang/llvm
+        # revision lines.
+        LLDB_VERSION=$(lldb --version | head -n 1 | awk -F' ' '{print $3}')
         if [ $(version "$LLDB_VERSION") -ge $(version "14.0.0") ]; then
             exit ${TEST_PASS}
         else
