@@ -423,12 +423,12 @@ type unary_primitive =
         mut : Mutability.t;
         field : Target_ocaml_int.t
       }
-  | Duplicate_block of
+  | Duplicate_and_update_block of
       { kind : Duplicate_block_kind.t;
         alloc_region : Variable.t
       }
-      (** [Duplicate_block] may not be used to change the tag or the mutability
-          of a block. *)
+      (** [Duplicate_and_update_block] may not be used to change the tag or the
+          mutability of a block. *)
   | Duplicate_array of
       { kind : Duplicate_array_kind.t;
         source_mutability : Mutability.t;

@@ -755,8 +755,8 @@ let simplify_duplicate_array ~kind:_ ~(source_mutability : Mutability.t)
       "Combination of mutabilities not supported for [Duplicate_array]:@ %a"
       Named.print original_term
 
-let simplify_duplicate_block ~kind:_ ~alloc_region:_ dacc ~original_term ~arg:_
-    ~arg_ty ~result_var =
+let simplify_duplicate_and_update_block ~kind:_ ~alloc_region:_ dacc
+    ~original_term ~arg:_ ~arg_ty ~result_var =
   (* Any alias in the type to the whole block will be dropped, but aliases
      inside the type (e.g. in fields) can remain. *)
   let ty = T.remove_outermost_alias (DA.typing_env dacc) arg_ty in
@@ -1064,8 +1064,8 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
         { kind; source_mutability; destination_mutability; alloc_region } ->
       simplify_duplicate_array ~kind ~source_mutability ~destination_mutability
         ~alloc_region
-    | Duplicate_block { kind; alloc_region } ->
-      simplify_duplicate_block ~kind ~alloc_region
+    | Duplicate_and_update_block { kind; alloc_region } ->
+      simplify_duplicate_and_update_block ~kind ~alloc_region
     | Opaque_identity { middle_end_only = _; kind } ->
       simplify_opaque_identity ~kind
     | End_region { ghost = _ } -> simplify_end_region

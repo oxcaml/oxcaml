@@ -2311,7 +2311,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           (_, (Constructor_undetermined | Constructor_variable _), _) ->
         Misc.fatal_error "convert_lprim: Pduprecord: variable representation"
     in
-    [Unary (Duplicate_block { kind; alloc_region = current_alloc_region }, arg)]
+    [ Unary
+        ( Duplicate_and_update_block
+            { kind; alloc_region = current_alloc_region },
+          arg ) ]
   | Pnot, [[arg]] -> [Unary (Boolean_not, arg)]
   | Pscalar (Unary unary), [[arg]] -> (
     match unary with

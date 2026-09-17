@@ -930,7 +930,7 @@ let bytes_length =
 let boolean_not =
   D.(unary "%boolean_not" ~params:param0 (fun _ () -> P.Boolean_not))
 
-let duplicate_block =
+let duplicate_and_update_block =
   let open D in
   let|= kind =
     let open P.Duplicate_block_kind in
@@ -947,8 +947,9 @@ let duplicate_block =
       | Naked_floats { length } -> floats length
       | Mixed -> mixed ())
   in
-  unary "%duplicate_block" ~params:(param2 kind alloc_region)
-    (fun _ (kind, alloc_region) -> P.Duplicate_block { kind; alloc_region })
+  unary "%duplicate_and_update_block" ~params:(param2 kind alloc_region)
+    (fun _ (kind, alloc_region) ->
+      P.Duplicate_and_update_block { kind; alloc_region })
 
 (* Binaries *)
 let atomic_load =
@@ -1390,8 +1391,8 @@ module OfFlambda = struct
     | Get_header -> get_header env ()
     | Reinterpret_boxed_vector -> reinterpret_boxed_vector env ()
     | Peek standard_int_or_float -> peek env standard_int_or_float
-    | Duplicate_block { kind; alloc_region } ->
-      duplicate_block env (kind, alloc_region)
+    | Duplicate_and_update_block { kind; alloc_region } ->
+      duplicate_and_update_block env (kind, alloc_region)
 
   let binop env (op : P.binary_primitive) =
     match op with
