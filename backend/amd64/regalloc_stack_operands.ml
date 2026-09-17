@@ -161,7 +161,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
           { id =
               ( Sqrtss | Sqrtsd | Roundss | Roundsd | Pcompare_string _
               | Vpcompare_string _ | Ptestz | Ptestc | Ptestnzc | Vptestz_X
-              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y );
+              | Vptestc_X | Vptestnzc_X | Vptestz_Y | Vptestc_Y | Vptestnzc_Y
+              | Kflag _ );
             instr
           } ->
         instr

@@ -1,2 +1,5 @@
 simdgen.ml
+simdgen_types.ml
+simdgen_xml.ml
+simdgen_intrins.ml
 amd64_simd_defs.ml
