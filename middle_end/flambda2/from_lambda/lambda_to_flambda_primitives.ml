@@ -65,8 +65,8 @@ let boxable_number_of_boxed_integer (bint : L.boxed_integer) :
   | Boxed_int32 -> Naked_int32
   | Boxed_int64 -> Naked_int64
 
-let boxable_number_of_unboxed_vector : L.unboxed_vector -> K.Boxable_number.t =
-  function
+let flat_suffix_element_of_unboxed_vector :
+    L.unboxed_vector -> K.flat_suffix_element = function
   | Unboxed_vec128 -> Naked_vec128
   | Unboxed_vec256 -> Naked_vec256
   | Unboxed_vec512 -> Naked_vec512
@@ -3688,6 +3688,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  (* CR zeisbach: blocks are made with [Mutable] here, since the boxed version
+     of the unboxed type could have mutable fields, so boxing it needs to assume
+     the worst. maybe once we have mutable kinds we could do better here? or
+     maybe we could already do better by tracking more frontend information in
+     [translprim]? *)
   | Pbox (Punboxed_product layouts, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
@@ -3696,8 +3701,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let shape : L.block_shape =
       Shape (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
     in
+    (* A boxed all-void product must be [Immutable] for the middle-end *)
+    let mutability =
+      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+    in
     convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
-      shape Mutability.Immutable mode args
+      shape mutability mode args
   | ( Pbox
         ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
            | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
@@ -3708,16 +3717,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
     in
-    let box_number (kind : K.Boxable_number.t) : H.expr_primitive list =
-      [Unary (Box_number (kind, mode), arg)]
-    in
     let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
       let shape =
         K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
       in
       [ Variadic
           ( Make_block
-              (Mixed (Tag.Scannable.zero, shape), Mutability.Immutable, mode),
+              (Mixed (Tag.Scannable.zero, shape), Mutability.Mutable, mode),
             [arg] ) ]
     in
     (* CR zeisbach: this assumes that everything is addressable! Meaning small
@@ -3731,17 +3737,18 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       in
       [ Variadic
           ( Make_block
-              (Values (Tag.Scannable.zero, shape), Mutability.Immutable, mode),
+              (Values (Tag.Scannable.zero, shape), Mutability.Mutable, mode),
             [arg] ) ]
     | Punboxed_float f ->
       mixed_singleton (flat_suffix_element_of_unboxed_float f)
     | Punboxed_or_untagged_integer i ->
       mixed_singleton (flat_suffix_element_of_unboxed_integer i)
-    (* These will eventually be lowered into singleton mixed blocks, as above,
-       but using [box_number] instead of [mixed_singleton] enables some peephole
-       optimizations. *)
-    | Punboxed_vector v -> box_number (boxable_number_of_unboxed_vector v)
-    | Punboxed_mask -> box_number Naked_mask
+    (* CR zeisbach: originally I thought we could use [Box_number], but that is
+       immutable (and can be CSE-d) which is broken for singleton unboxed
+       mutable records. I am not sure how this interacts with [inherit]... *)
+    | Punboxed_vector v ->
+      mixed_singleton (flat_suffix_element_of_unboxed_vector v)
+    | Punboxed_mask -> mixed_singleton Naked_mask
     | Ptop -> Misc.fatal_error "convert_lprim: Pbox: Ptop layout"
     | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
