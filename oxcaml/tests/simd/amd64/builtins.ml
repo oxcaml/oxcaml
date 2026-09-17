@@ -19,31 +19,6 @@ module AES = struct
   external keygenassist : (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
     = "caml_vec128_unreachable" "caml_aes_keygenassist"
   [@@noalloc] [@@builtin]
-
-  external dec_reference : t -> t -> t
-    = "caml_vec128_unreachable" "aes_dec_reference"
-  [@@noalloc] [@@unboxed]
-
-  external declast_reference : t -> t -> t
-    = "caml_vec128_unreachable" "aes_declast_reference"
-  [@@noalloc] [@@unboxed]
-
-  external enc_reference : t -> t -> t
-    = "caml_vec128_unreachable" "aes_enc_reference"
-  [@@noalloc] [@@unboxed]
-
-  external enclast_reference : t -> t -> t
-    = "caml_vec128_unreachable" "aes_enclast_reference"
-  [@@noalloc] [@@unboxed]
-
-  external imc_reference : t -> t
-    = "caml_vec128_unreachable" "aes_imc_reference"
-  [@@noalloc] [@@unboxed]
-
-  external keygenassist_reference :
-    (int[@untagged]) -> (t[@unboxed]) -> (t[@unboxed])
-    = "caml_vec128_unreachable" "aes_keygenassist_reference"
-  [@@noalloc]
 end
 
 module Float64 = struct
