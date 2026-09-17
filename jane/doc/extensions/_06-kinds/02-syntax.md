@@ -448,9 +448,10 @@ We allow a kind annotation to be put on a local abstract type, as in
 let f (type a : immediate) (x : a) = ...
 ```
 
-If you declare a local abstract type without a kind annotation, its kind
-is always `value`. Inference of kinds is never performed for local abstract
-types.
+If you declare a local abstract type without a kind annotation, its kind is
+inferred in the same way as for an unannotated type variable like `'a`: its
+layout is determined by how it is used, and defaults to `value` if nothing
+constrains it.
 
 As a syntactic convenience, you may declare multiple local abstract types
 with one `type` herald; any kind annotations with these will require extra

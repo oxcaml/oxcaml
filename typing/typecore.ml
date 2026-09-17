@@ -9367,7 +9367,9 @@ and type_newtype
   fun env { txt = name; loc = name_loc } jkind_annot_opt type_body  ->
   let jkind =
     Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
+      ~default:(Jkind.of_new_legacy_sort ~why:(Unannotated_newtype name)
+                  ~level:(get_current_level ()))
+      jkind_annot_opt
   in
   let ty =
     if Typetexp.valid_tyvar_name name then

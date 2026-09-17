@@ -393,6 +393,7 @@ module History = struct
      on the jkind lattice, defaulting exactly to [value]. *)
   type concrete_legacy_creation_reason =
     | Unannotated_type_parameter of Path.t
+    | Unannotated_newtype of string
     | Wildcard
     | Unification_var
 

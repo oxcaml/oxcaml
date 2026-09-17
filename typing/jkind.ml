@@ -3255,6 +3255,8 @@ module Format_history = struct
     | Unannotated_type_parameter path ->
       fprintf ppf "it instantiates an unannotated type parameter of %a"
         !printtyp_path path
+    | Unannotated_newtype name ->
+      fprintf ppf "it's the unannotated locally abstract type %s" name
     | Wildcard -> fprintf ppf "it's a _ in the type"
     | Unification_var -> fprintf ppf "it's a fresh unification variable"
 
@@ -4402,6 +4404,7 @@ module Debug_printers = struct
       fprintf ppf "Unannotated_type_parameter %a"
         (Fmt.compat !printtyp_path)
         path
+    | Unannotated_newtype name -> fprintf ppf "Unannotated_newtype %s" name
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
 

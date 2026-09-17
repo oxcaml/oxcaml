@@ -152,6 +152,35 @@ Error: This binding has no layout variables, so "poly_" has no effect.
        Consider using a regular "let" instead.
 |}]
 
+(* Unannotated locally abstract types are layout polymorphic, like type
+   variables. *)
+let poly_ id (type a) (x : a) = x
+let poly_ swap (type a b) (#(x, y) : #(a * b)) = #(y, x)
+let poly_ apply (type a) (type b) (f : a -> b) (x : a) = f x
+[%%expect{|
+val poly_ id : 'a -> 'a = <lpoly>
+val poly_ swap : #('a * 'b) -> #('b * 'a) = <lpoly>
+val poly_ apply : ('a -> 'b) -> 'a -> 'b = <lpoly>
+|}]
+
+let _ =
+  let poly_ id (type a) (x : a) = x in
+  let #(a, b) = swap #(#1L, #2.5) in
+  (to_float (id #1.5), to_int64 (id #2L), id "s", to_float a, to_int64 b)
+[%%expect{|
+- : float * int64 * string * float * int64 = (1.5, 2L, "s", 2.5, 1L)
+|}]
+
+(* A jkind annotation on the locally abstract type fixes its layout. *)
+let poly_ id (type a : value) (x : a) = x
+[%%expect{|
+Line 1, characters 10-12:
+1 | let poly_ id (type a : value) (x : a) = x
+              ^^
+Error: This binding has no layout variables, so "poly_" has no effect.
+       Consider using a regular "let" instead.
+|}]
+
 (* Alias binders are not yet layout-polymorphic. *)
 let poly_ (f as g) = fun x -> x
 [%%expect{|
