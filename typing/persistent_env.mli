@@ -137,13 +137,14 @@ val find : allow_hidden:bool -> 'a t -> 'a sig_reader
 
 val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 
+(* [check] is used for references that do not contribute a dependency on the
+   interface, such as module aliases under -no-alias-deps: it records a weak
+   dependency on [name] and, when warning 49 is active, checks that [name]'s
+   cmi is present and usable (warning otherwise) and returns the name with the
+   loaded cmi's path attached to its head. With the warning disabled, the cmi
+   is not searched for at all and [name] is returned unchanged. *)
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> loc:Location.t -> Global_module.Name.t -> unit
-
-(* Locate the .cmi for [name], without reading it, and attach the path found
-   to [name]'s head. For references that never load the interface, such as
-   module aliases under -no-alias-deps. *)
-val with_located_cmi_path : 'a t -> Global_module.Name.t -> Global_module.Name.t
+  -> loc:Location.t -> Global_module.Name.t -> Global_module.Name.t
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
