@@ -383,16 +383,18 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b -> unit end
+         sig val f : 'a -> 'b @ local unyielding -> unit end
        is not included in
          sig val f : 'a @ local -> 'b @ local -> unit end
        Values do not match:
-         val f : 'a -> 'b -> unit
+         val f : 'a -> 'b @ local unyielding -> unit
        is not included in
          val f : 'a @ local -> 'b @ local -> unit
-       The type "'a -> 'b -> unit" is not compatible with the type
-         "'a @ local -> 'b @ local -> unit"
-       Type "'b -> unit" is not compatible with type "'b @ local -> unit"
+       The type "'a -> 'b @ local unyielding -> unit"
+       is not compatible with the type "'a @ local -> 'b @ local -> unit"
+       Type "'b @ local unyielding -> unit" is not compatible with type
+         "'b @ local -> unit"
+       The argument mode was expected to be "unyielding" but is "yielding"
 |}]
 
 module Zap_before = struct
