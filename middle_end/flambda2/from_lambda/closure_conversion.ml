@@ -1511,7 +1511,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
                but is bound to the result of %a which has kind %a@."
               Variable.print var Flambda_kind.print kind Flambda_primitive.print
               prim Flambda_kind.print result_kind
-        | Simple _ | Static_consts _ | Set_of_closures _ | Rec_info _ -> ());
+        | Simple _ | Static_consts _ | Set_of_closures _ | Unboxed_closure _ | Rec_info _ -> ());
         let bound_pattern =
           Bound_pattern.singleton (VB.create var uid Name_mode.normal)
         in

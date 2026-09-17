@@ -536,6 +536,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
   (match defining_expr with
   | Set_of_closures (set_of_closures, _alloc_mode) ->
     traverse_set_of_closures denv acc ~bound_pattern set_of_closures
+  | Unboxed_closure _ ->
+    Misc.fatal_error "TODO: reaper unboxed closure"
   | Static_consts group -> traverse_static_consts denv acc ~bound_pattern group
   | Prim (prim, _dbg) ->
     traverse_prim denv acc ~bound_pattern prim ~default ~default_bp
@@ -552,6 +554,8 @@ let rec traverse_let denv acc let_expr : rev_expr =
     match defining_expr with
     | Set_of_closures (set_of_closures, alloc_mode) ->
       Set_of_closures (make_set_of_closures set_of_closures, alloc_mode)
+    | Unboxed_closure _ ->
+      Misc.fatal_error "TODO: reaper unboxed closure"
     | Static_consts group ->
       let bound_static =
         match bound_pattern with

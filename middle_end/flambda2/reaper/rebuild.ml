@@ -762,6 +762,8 @@ let rebuild_named_default_case env (named : Named.t) =
     let prim = P.map_args (rewrite_simple env) prim in
     ( Named.create_prim prim dbg,
       Code_size.prim ~machine_width:env.machine_width prim )
+  | Unboxed_closure _ ->
+    Misc.fatal_error "TODO: reaper unboxed closure"
   | Set_of_closures (s, _alloc_mode) ->
     Misc.fatal_errorf
       "[rebuild_named_default_case] called on set of closures:@ %a@."
@@ -1861,7 +1863,7 @@ let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
   let is_begin_region =
     match defining_expr with
     | Prim (prim, _) -> P.is_begin_region prim
-    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
+    | Simple _ | Set_of_closures _ | Unboxed_closure _ | Static_consts _ | Rec_info _ -> false
   in
   if not (is_begin_region || is_var_used env (Bound_var.var bv))
   then hole, res
