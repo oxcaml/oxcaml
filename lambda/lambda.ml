@@ -2100,37 +2100,6 @@ let pointerness_of_separability sep =
   if Jkind_axis.Separability.(le sep (upper_bound_if_is_always_gc_ignorable ()))
   then Immediate else Pointer
 
-let rec mixed_block_element_of_types (elt : Types.mixed_block_element) =
-  match elt with
-  | Scannable { separability; _ } ->
-    let raw_kind =
-      value_kind_of_pointerness (pointerness_of_separability separability)
-    in
-    Value { generic_value with raw_kind }
-  | Float_boxed -> Float_boxed ()
-  | Float64 -> Float64
-  | Float32 -> Float32
-  | Bits8 -> Bits8
-  | Bits16 -> Bits16
-  | Bits32 -> Bits32
-  | Bits64 -> Bits64
-  | Vec128 -> Vec128
-  | Vec256 -> Vec256
-  | Vec512 -> Vec512
-  | Mask -> Mask
-  | Word -> Word
-  | Untagged_immediate -> Untagged_immediate
-  | Product shapes ->
-    Product (mixed_block_shape_of_types shapes)
-  | Void -> Product [||]
-  | Addressable elt ->
-    (* CR box: Addressability should be preserved here once it affects boxed
-       representations *)
-    mixed_block_element_of_types elt
-
-and mixed_block_shape_of_types shape =
-  Array.map mixed_block_element_of_types shape
-
 let rec transl_mixed_product_element (element : Types.mixed_block_element)
   : unit mixed_block_element
   = match element with
@@ -2203,7 +2172,7 @@ and mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
 
 let transl_mixed_product_shape_for_read ~get_value_kind ~get_mode shape =
   mixed_product_shape_for_read ~get_value_kind ~get_mode
-    (mixed_block_shape_of_types shape)
+    (transl_mixed_product_shape shape)
 
 let mod_field ?(read_semantics=Reads_agree) pos = function
   | Module_value_only _ ->

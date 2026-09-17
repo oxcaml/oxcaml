@@ -1455,12 +1455,6 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
-val mixed_block_element_of_types :
-  Types.mixed_block_element -> unit mixed_block_element
-
-val mixed_block_shape_of_types :
-  Types.mixed_product_shape -> mixed_block_shape
-
 val transl_mixed_product_element :
   Types.mixed_block_element -> unit mixed_block_element
 
