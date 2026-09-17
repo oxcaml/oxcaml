@@ -2,6 +2,8 @@
 Current executable set to 'XXXX' ($ARCH).
 (lldb) command source -s 0 'XXXX'
 Executing commands in 'XXXX'.
+(lldb) # For the OxCaml LLDB (the Linux tests): its OCaml plugin demangles
+(lldb) # symbol names. Keep in step with lldb-script.
 (lldb) settings set target.disable-aslr false
 (lldb) settings set stop-disassembly-display never
 (lldb) command script import ./lldb_test.py

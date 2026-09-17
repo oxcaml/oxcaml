@@ -2,6 +2,8 @@
 Current executable set to 'XXXX' ($ARCH).
 (lldb) command source -s 0 'XXXX'
 Executing commands in 'XXXX'.
+(lldb) # For stock LLDB without the OCaml plugin (the macOS tests): breakpoints
+(lldb) # use mangled OCaml symbol names. Keep in step with lldb-script-oxcaml.
 (lldb) settings set target.disable-aslr false
 (lldb) settings set stop-disassembly-display never
 (lldb) command script import ./lldb_test.py
