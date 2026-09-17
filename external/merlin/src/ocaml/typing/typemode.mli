@@ -102,5 +102,5 @@ val idx_expected_modalities : mut:bool -> Mode.Modality.Const.t
 module Modifier_axis_pair : sig
   type t = P : 'a Jkind_axis.Axis.t * 'a -> t
 
-  val of_string : string -> t
+  val of_string : loc:Location.t -> string -> t
 end
