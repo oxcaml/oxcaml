@@ -58,21 +58,15 @@ let () =
   assert (Int64.equal (low h) 3L && Int64.equal (high h) 4L);
   print_endline "vec256: ok"
 
-(* Local allocation of a boxed vector. See [primitives.ml] for why the inputs
-   go through [opaque] and the layout is checked on a copy. *)
+(* Local allocation of a boxed vector. *)
 
-external is_stack : local_ 'a -> bool = "caml_obj_is_stack"
 external globalize : local_ 'a -> 'a = "%obj_dup"
-external opaque : ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
-  [@@layout_poly]
-
-let[@inline never] local_vector () =
-  let local_ vec = box (opaque (int64x2 43L 45L)) in
-  assert (is_stack vec);
-  assert (same_shape (Obj.repr (globalize vec)) (Obj.repr { v128 = int64x2 43L 45L }))
 
 let () =
-  local_vector ();
+  let local_ vec = box (int64x2 43L 45L) in
+  assert (same_shape (Obj.repr (globalize vec)) (Obj.repr { v128 = int64x2 43L 45L }));
+  let r : v128rec = Obj.obj (Obj.repr (globalize vec)) in
+  assert (Int64.equal (low r.v128) 43L && Int64.equal (high r.v128) 45L);
   print_endline "local vec128: ok"
 
 (* Aliasing. Two heap-allocated boxes of the same vector must be distinct

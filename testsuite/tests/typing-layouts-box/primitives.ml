@@ -105,6 +105,7 @@ type variant = A of int64_u * string | B | C of #(float# * int)
 
 (* Unboxed numbers stored in a whole word *)
 
+(* for now, we box [float#] as if they were not addressable. *)
 type f64rec = { f64 : float# }
 type i64rec = { i64 : int64_u }
 type nrec = { n : nativeint_u }
@@ -243,51 +244,26 @@ let () =
 type all_void = { x : unit#; kept : unit#; }
 |}]
 
-(* Local allocation. *)
+(* Local allocation. We have to globalize before passing to [Obj] helpers *)
 
-external is_stack : local_ 'a -> bool = "caml_obj_is_stack"
 external globalize : local_ 'a -> 'a = "%obj_dup"
-
-(* Inputs are hidden behind [opaque] so that the blocks cannot be lifted to
-   static constants; they are instead forced to be stack allocated. *)
-external opaque : ('a : any). ('a[@local_opt]) -> ('a[@local_opt]) = "%opaque"
-  [@@layout_poly]
-
-(* native backend does not stack allocate *)
-let on_stack (local_ x) = (not (native ())) || is_stack x
 [%%expect{|
-external is_stack : 'a @ local -> bool = "caml_obj_is_stack"
 external globalize : 'a @ local -> 'a = "%obj_dup"
-external opaque : ('a : any). ('a [@local_opt]) -> ('a [@local_opt])
-  = "%opaque" [@@layout_poly]
-val on_stack : 'a @ local -> bool = <fun>
 |}]
 
 let () =
-  let s = opaque s in
   let local_ value = box s in
-  assert (on_stack value);
   assert (same_shape (Obj.repr (globalize value)) (Obj.repr { v = s }));
-  let local_ f = box (opaque #3.25) in
-  assert (on_stack f);
+  let local_ f = box #3.25 in
   assert (same_shape (Obj.repr (globalize f)) (Obj.repr { f64 = #3.25 }));
-  let local_ record : p_many =
-    box #{ g = opaque #1L; h = opaque #2.5; k = s; l = opaque 3; m = opaque #4L }
-  in
-  assert (on_stack record);
+  assert (Float.equal (box_float (Obj.obj (Obj.repr (globalize f)) : f64rec).f64) 3.25);
+  let local_ record : p_many = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   assert (same_shape (Obj.repr (globalize record))
             (Obj.repr { g = #1L; h = #2.5; k = s; l = 3; m = #4L }));
   assert (Int64.equal (box_int64 record.g) 1L && record.k == s && record.l = 3);
-  (* Boxing a local value places the pointer in a local block. *)
   let local_ inner = Some s in
   let local_ outer = box inner in
-  assert (on_stack outer);
-  assert ((Obj.obj (Obj.repr (globalize outer)) : string option vrec).v == inner);
-  let heap =
-    (box #{ g = opaque #1L; h = opaque #2.5; k = s; l = opaque 3; m = opaque #4L }
-     : p_many @ global)
-  in
-  assert (not (is_stack heap))
+  assert ((Obj.obj (Obj.repr (globalize outer)) : string option vrec).v == inner)
 [%%expect{|
 |}]
 

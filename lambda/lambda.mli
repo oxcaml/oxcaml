@@ -510,7 +510,7 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
-  | Pbox of layout * locality_mode
+  | Pbox of layout * mutable_flag * locality_mode
   | Punbox of layout
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
