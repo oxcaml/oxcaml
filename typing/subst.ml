@@ -770,14 +770,8 @@ let rec typexp copy_scope s ty =
               For_copy.mode_copy_for_restoring copy_scope marg,
               For_copy.mode_copy_for_restoring copy_scope mret
             else
-            match s.additional_action with
-            | Prepare_for_saving { prepare_mode; _ } ->
-              prepare_mode copy_scope marg,
-              prepare_mode copy_scope mret
-            | Duplicate_variables ->
-              For_copy.mode_copy_generic copy_scope marg,
-              For_copy.mode_copy_generic copy_scope mret
-            | _ -> marg, mret
+              subst_mode_duplicate_generic copy_scope s marg,
+              subst_mode_duplicate_generic copy_scope s mret
           in
           let arg = typexp copy_scope s arg in
           let ret = typexp copy_scope s ret in
@@ -791,6 +785,24 @@ let rec typexp copy_scope s ty =
     in
     Transient_expr.set_stub_desc ty' desc;
     ty'
+
+(* Similar to [subst_mode], but copies generic mode variable if the action is
+  [Duplicate_variables] *)
+and subst_mode_duplicate_generic copy_scope s mode =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_mode; _ } ->
+    prepare_mode copy_scope mode
+  | Duplicate_variables ->
+    For_copy.mode_copy_generic copy_scope mode
+  | _ -> mode
+
+(* Prepares modes for saving: generic mode variables are copied with negative
+   id's, while weak mode variables and made into constants *)
+and subst_mode copy_scope s mode =
+  match s.additional_action with
+  | Prepare_for_saving { prepare_mode; _ } ->
+      prepare_mode copy_scope mode
+  | No_action | Duplicate_variables -> mode
 
 and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
   fun copy_scope s jkind ->
@@ -1265,8 +1277,8 @@ let rec subst_lazy_value_description s descr =
     val_uid = descr.val_uid;
   }
 
-and subst_lazy_module_decl scoping s md =
-  let md_type = subst_lazy_modtype scoping s md.md_type in
+and subst_lazy_module_decl copy_scope scoping s md =
+  let md_type = subst_lazy_modtype copy_scope scoping s md.md_type in
   let md_modalities =
     match s.additional_action with
     | Prepare_for_saving { prepare_modality; _ } ->
@@ -1279,7 +1291,7 @@ and subst_lazy_module_decl scoping s md =
     md_loc = loc s md.md_loc;
     md_uid = md.md_uid }
 
-and subst_lazy_modtype scoping s = function
+and subst_lazy_modtype copy_scope scoping s = function
   | Mty_ident p ->
       begin match Path.Map.find p s.modtypes with
        | mty -> lazy_modtype mty
@@ -1295,23 +1307,30 @@ and subst_lazy_modtype scoping s = function
   | Mty_signature sg ->
       Mty_signature(subst_lazy_signature scoping s sg)
   | Mty_functor(Unit, res, mres) ->
-      Mty_functor(Unit, subst_lazy_modtype scoping s res, mres)
+      Mty_functor(Unit, subst_lazy_modtype copy_scope scoping s res,
+                  subst_mode copy_scope s mres)
   | Mty_functor(Named (None, arg, marg), res, mres) ->
-      Mty_functor(Named (None, (subst_lazy_modtype scoping s) arg, marg),
-                   subst_lazy_modtype scoping s res, mres)
+      Mty_functor(Named (None, subst_lazy_modtype copy_scope scoping s arg,
+                        subst_mode copy_scope s marg),
+                  subst_lazy_modtype copy_scope scoping s res,
+                  subst_mode copy_scope s mres)
   | Mty_functor(Named (Some id, arg, marg), res, mres) ->
       let id' = rename_ident s id in
-      Mty_functor(Named (Some id', (subst_lazy_modtype scoping s) arg, marg),
-                  subst_lazy_modtype scoping (add_module id (Pident id') s)
-                    res,
-                  mres)
+      Mty_functor(Named (Some id',
+                        subst_lazy_modtype copy_scope scoping s arg,
+                        subst_mode copy_scope s marg),
+                  subst_lazy_modtype copy_scope scoping
+                    (add_module id (Pident id') s) res,
+                  subst_mode copy_scope s mres)
   | Mty_alias p ->
       Mty_alias (module_path s p)
   | Mty_strengthen (mty, p, a) ->
-      Mty_strengthen (subst_lazy_modtype scoping s mty, module_path s p, a)
+      Mty_strengthen (subst_lazy_modtype copy_scope scoping s mty,
+                      module_path s p, a)
 
-and subst_lazy_modtype_decl scoping s mtd =
-  { mtd_type = Option.map (subst_lazy_modtype scoping s) mtd.mtd_type;
+and subst_lazy_modtype_decl copy_scope scoping s mtd =
+  { mtd_type =
+      Option.map (subst_lazy_modtype copy_scope scoping s) mtd.mtd_type;
     mtd_attributes = attrs s mtd.mtd_attributes;
     mtd_loc = loc s mtd.mtd_loc;
     mtd_uid = mtd.mtd_uid }
@@ -1341,9 +1360,10 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
   | Sig_typext(id, ext, es, vis) ->
       Sig_typext(id, extension_constructor' copy_scope s ext, es, vis)
   | Sig_module(id, pres, d, rs, vis) ->
-      Sig_module(id, pres, subst_lazy_module_decl scoping s d, rs, vis)
+      Sig_module(id, pres,
+                 subst_lazy_module_decl copy_scope scoping s d, rs, vis)
   | Sig_modtype(id, d, vis) ->
-      Sig_modtype(id, subst_lazy_modtype_decl scoping s d, vis)
+      Sig_modtype(id, subst_lazy_modtype_decl copy_scope scoping s d, vis)
   | Sig_class(id, d, rs, vis) ->
       Sig_class(id, class_declaration' copy_scope s d, rs, vis)
   | Sig_class_type(id, d, rs, vis) ->
@@ -1352,7 +1372,9 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
       Sig_jkind(id, jkind_declaration s d, vis)
 
 and modtype scoping s t =
-  t |> lazy_modtype |> subst_lazy_modtype scoping s |> force_modtype
+  For_copy.with_scope (fun copy_scope ->
+    t |> lazy_modtype |> subst_lazy_modtype copy_scope scoping s)
+  |> force_modtype
 
 (* Composition of substitutions:
      apply (compose s1 s2) x = apply s2 (apply s1 x) *)
@@ -1448,9 +1470,15 @@ module Lazy = struct
   let of_functor_parameter = lazy_functor_parameter
   let of_value_description = lazy_value_description
 
-  let module_decl = subst_lazy_module_decl
-  let modtype = subst_lazy_modtype
-  let modtype_decl = subst_lazy_modtype_decl
+  let module_decl scoping s md =
+    For_copy.with_scope (fun copy_scope ->
+      subst_lazy_module_decl copy_scope scoping s md)
+  let modtype scoping s mty =
+    For_copy.with_scope (fun copy_scope ->
+      subst_lazy_modtype copy_scope scoping s mty)
+  let modtype_decl scoping s mtd =
+    For_copy.with_scope (fun copy_scope ->
+      subst_lazy_modtype_decl copy_scope scoping s mtd)
   let signature = subst_lazy_signature
   let signature_item = subst_lazy_signature_item
   let value_description = subst_lazy_value_description
