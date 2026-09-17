@@ -716,7 +716,7 @@ and eval_mixed_block_shape :
     Env.t ->
     'a mixed_block_element array ->
     check_at:scoped_location option
-      (** If [Some loc], perform block shape check, reporting errors at [loc].
+      (* If [Some loc], perform block shape check, reporting errors at [loc].
       *) ->
     'a mixed_block_element array =
  fun env shape ~check_at ->
