@@ -2,7 +2,7 @@
  include stdlib_stable;
  flags = "-extension layouts_alpha";
  flambda2;
- { expect.opt; }
+ { expect; expect.opt; }
 *)
 
 external box : ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box" [@@layout_poly]
@@ -401,4 +401,30 @@ module M :
     val c : u -> int
     val set_c : u box -> int -> unit
   end
+|}]
+
+(* Aliasing. In bytecode unboxed products are blocks, so [unbox] must copy
+   deeply: *)
+
+type inner = #{ ix : int; iy : int }
+(* CR zeisbach: avoiding singleton unboxed record because it can be weird. *)
+type outer = { mutable u : inner; tag : int }
+
+let () =
+  let r : outer = { u = #{ ix = 1; iy = 2 }; tag = 7 } in
+  (* A round trip through [unbox] and [box] must not share the nested product
+     with [r]. *)
+  let copy : outer = box (unbox r) in
+  Stdlib_stable.Idx_mut.set copy (.u.#ix) 10;
+  assert (copy.u.#ix = 10 && r.u.#ix = 1);
+  (* The unboxed value must not observe later writes to the record, whether
+     into the nested product or replacing it wholesale. *)
+  let un = unbox r in
+  Stdlib_stable.Idx_mut.set r (.u.#iy) 20;
+  assert (r.u.#iy = 20 && un.#u.#iy = 2);
+  r.u <- #{ ix = 30; iy = 40 };
+  assert (r.u.#ix = 30 && un.#u.#ix = 1 && un.#tag = 7)
+[%%expect{|
+type inner = #{ ix : int; iy : int; }
+type outer = { mutable u : inner; tag : int; }
 |}]
