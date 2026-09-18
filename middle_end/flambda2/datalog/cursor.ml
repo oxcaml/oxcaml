@@ -297,7 +297,6 @@ module With_parameters = struct
   let without_parameters { parameters = []; cursor } = cursor
 
   let create_from_rule ?callback params vars rule =
-    let vars = Lang.Variable.hlist_to_list vars in
     let plan = Planner.plan_rule ?callback params vars rule in
     From_plan.create_from_plan_with_parameters ~original_rule:rule plan
 
