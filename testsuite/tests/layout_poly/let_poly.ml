@@ -293,6 +293,40 @@ Error: Signature mismatch:
        which is not supported yet.
 |}]
 
+(* A [zero_alloc] attribute on a poly_ binding is exported in its signature,
+   like for a regular binding. *)
+module _ : sig
+  val poly_ id : 'a -> 'a [@@zero_alloc]
+end = struct
+  let poly_ id x = x [@@zero_alloc]
+end
+[%%expect{|
+|}]
+
+let poly_ id x = x [@@zero_alloc]
+[%%expect{|
+val poly_ id : 'a -> 'a [@@zero_alloc] = <lpoly>
+|}]
+
+(* The name of a poly_ binding is recorded in the history of its generalized
+   layout variables, like for a regular binding. *)
+type t : any
+let _ =
+  let poly_ id x = x in
+  id (assert false : t)
+[%%expect{|
+type t : any
+Line 4, characters 5-23:
+4 |   id (assert false : t)
+         ^^^^^^^^^^^^^^^^^^
+Error: This expression has type "t" but an expression was expected of type
+         "('a : '_representable_layout_8)"
+       The layout of t is any
+         because of the definition of t at line 1, characters 0-12.
+       But the layout of t must be representable
+         because of the definition of id at line 3, characters 15-20.
+|}]
+
 (* The RHS has to be a syntactic value *)
 let poly_ pair = let y = 42 in fun x -> #(x, y)
 [%%expect{|

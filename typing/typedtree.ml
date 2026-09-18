@@ -1408,7 +1408,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
         ~both_sides_of_or:true
         f vb.vb_pat;
        match vb.vb_pat.pat_desc, vb.vb_expr.exp_desc with
-       | Tpat_var { id; _ }, Texp_function fn ->
+       | (Tpat_var { id; _ } | Tpat_fun_layout { id; _ }), Texp_function fn ->
          let zero_alloc =
            match Zero_alloc.get fn.zero_alloc with
            | Default_zero_alloc ->

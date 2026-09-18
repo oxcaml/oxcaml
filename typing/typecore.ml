@@ -11990,8 +11990,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let update_exp_jkind (_, p, _) (exp, _) =
     let pat_name =
       match p.pat_desc with
-        Tpat_var { id; _ } -> Some id
-      | Tpat_alias { id; _ } -> Some id
+      | Tpat_var { id; _ } | Tpat_fun_layout { id; _ } | Tpat_alias { id; _ } ->
+        Some id
       | _ -> None in
     Ctype.check_and_update_generalized_ty_jkind
       ?name:pat_name ~loc:exp.exp_loc exp.exp_type
