@@ -1759,13 +1759,20 @@ let should_specialize_primitive p =
     true
 
 let layout_of_ty_for_idx_set env loc ty =
+  (* CR layouts: This function is a bit sad. We call [type_jkind] (which is
+     already not ideal) and then immediately consult the type and jkind to
+     refine the [Lambda.mixed_block_element] and apply externality bounds,
+     respectively.
+
+     We should consider tracking primitives' sort variables in the typedtree
+     itself, similar to what the comment above [type_representable_layout]
+     in [Typeopt] suggests. *)
   let jkind = Ctype.type_jkind env ty in
   let layout =
     match Jkind.get_layout_defaulting_to_scannable env jkind with
     | Some layout -> layout
     | None -> Misc.fatal_error "layout_of_ty_for_idx_set: expected layout"
   in
-  (* Layouts omit per-component externality bounds. *)
   let mbe =
     transl_const_layout layout
     |> refine_mixed_block_element env (to_location loc) ty
