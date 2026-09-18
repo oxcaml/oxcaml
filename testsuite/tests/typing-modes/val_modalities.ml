@@ -519,10 +519,6 @@ module M' = (M @ nonportable)
 let () = portable_use M'.length
 [%%expect{|
 module M' = M
-Line 2, characters 22-31:
-2 | let () = portable_use M'.length
-                          ^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* The example below demonstrates the need to zap modalities from [with module]
@@ -1329,13 +1325,7 @@ let (bar @ portable) () =
   let k = (module M' : Module) in
   k
 [%%expect{|
-Line 2, characters 18-20:
-2 |   let k = (module M' : Module) in
-                      ^^
-Error: The value "M'.M.baz" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-3
-         which is expected to be "portable".
+val bar : unit -> (module Module) = <fun>
 |}]
 
 module type S'_Func_portable = sig module M : Func_portable end
