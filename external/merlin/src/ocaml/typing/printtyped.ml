@@ -858,7 +858,7 @@ and expression i ppf x =
   | Texp_override (_, l) ->
       line i ppf "Texp_override\n";
       list i string_x_expression ppf l;
-  | Texp_letmodule (s, _, _, me, e) ->
+  | Texp_letmodule { id = s; module_expr = me; body = e; _ } ->
       line i ppf "Texp_letmodule \"%a\"\n" fmt_modname s;
       module_expr i ppf me;
       expression i ppf e;
@@ -1344,7 +1344,8 @@ and module_expr i ppf x =
       module_expr i ppf me;
       module_type i ppf mt;
       value_modes_var i ppf modes;
-  | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
+  | Tmod_constraint (me, _, (Tmodtype_implicit | Tmodtype_package _), _) ->
+      module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
       expression i ppf e;
@@ -1552,8 +1553,9 @@ and label_x_bool_x_core_type_list i ppf x =
       line i ppf "Tinherit\n";
       core_type (i+1) ppf ct
 
+let signature ppf x = list 0 signature_item ppf x.sig_items
 
-let interface ppf x = list 0 signature_item ppf x.sig_items
+let interface ppf (x : interface) = signature ppf x.signature
 
 let implementation ppf x = list 0 structure_item ppf x.str_items
 
