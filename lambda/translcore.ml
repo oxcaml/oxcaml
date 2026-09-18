@@ -469,10 +469,11 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       transl_letmutable ~scopes ~return_layout:layout pat_expr
         (event_before ~scopes body (transl_exp ~scopes layout body))
   | Texp_function { params; body; ret_sort; ret_mode; locality_mode;
-                    yielding; zero_alloc } ->
+                    allocation_mode; yielding; zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
       transl_function ~in_new_scope ~scopes e params body
-        ~locality_mode ~ret_mode ~ret_sort ~region:true ~zero_alloc
+        ~locality_mode ~allocation_mode ~ret_mode ~ret_sort ~region:true
+        ~zero_alloc
         ~yielding:(transl_yielding_mode_l yielding)
   | Texp_apply({ exp_desc = Texp_ident { path;
                                         desc = {val_kind = Val_prim p};
@@ -2355,6 +2356,7 @@ and transl_function
       params
       body
       ~locality_mode
+      ~allocation_mode
       ~ret_mode:sreturn_mode
       ~ret_sort:sreturn_sort
       ~region:sregion
@@ -2362,7 +2364,29 @@ and transl_function
       ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_typed_locality_mode_r locality_mode in
-  let zero_alloc = Zero_alloc.get zero_alloc in
+  let zero_alloc =
+    let zero_alloc = Zero_alloc.get zero_alloc in
+    match Mode.Allocation.Guts.get_ceil allocation_mode with
+    | Alloc -> zero_alloc
+    | (Noalloc | Noalloc_strict) as allocation ->
+      let strict = allocation = Mode.Allocation.Const.Noalloc_strict in
+      begin match zero_alloc with
+      | Check check when check.strict || not strict ->
+        Builtin_attributes.Check { check with opt = false }
+      | Default_zero_alloc | Ignore_assert_all | Assume _ | Check _ ->
+        let mode_name = if strict then "noalloc_strict" else "noalloc" in
+        Builtin_attributes.Check
+          { strict;
+            opt = false;
+            arity = Typedtree.function_arity params body;
+            loc = e.exp_loc;
+            custom_error_msg =
+              Some
+                ("Backend verification of inferred " ^ mode_name
+                 ^ " mode failed.");
+          }
+      end
+  in
   let assume_zero_alloc =
     match zero_alloc with
     | Default_zero_alloc | Check _ | Ignore_assert_all ->

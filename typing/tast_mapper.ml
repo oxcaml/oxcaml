@@ -550,13 +550,13 @@ let expr sub x =
         Texp_let (rec_flag, list, sub.expr sub exp)
     | Texp_letmutable (vb, exp) ->
         Texp_letmutable (sub.value_binding sub vb, sub.expr sub exp)
-    | Texp_function { params; body; locality_mode; ret_mode; ret_sort;
-                      yielding; zero_alloc } ->
+    | Texp_function { params; body; locality_mode; allocation_mode;
+                      ret_mode; ret_sort; yielding; zero_alloc } ->
         let params = List.map (function_param sub) params in
         let body = function_body sub body in
         let ret_mode = sub.modes sub ret_mode in
-        Texp_function { params; body; locality_mode; ret_mode; ret_sort;
-                        yielding; zero_alloc }
+        Texp_function { params; body; locality_mode; allocation_mode;
+                        ret_mode; ret_sort; yielding; zero_alloc }
     | Texp_apply (exp, list, pos, am, ym, za) ->
         Texp_apply (
           sub.expr sub exp,

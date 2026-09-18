@@ -10789,6 +10789,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                   mode_desc = [] };
               ret_sort;
               locality_mode = Typedtree.create_locality_mode_r locality_mode;
+              allocation_mode = Allocation.disallow_left Allocation.alloc;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
@@ -12594,6 +12595,9 @@ and type_n_ary_function
               locality_mode =
                 Typedtree.create_locality_mode_r
                   (Locality.disallow_left fun_alloc_mode.locality_mode);
+              allocation_mode =
+                With_regionality.proj_comonadic Allocation
+                  (as_single_mode expected_mode);
               ret_mode; yielding;
               zero_alloc
             };
