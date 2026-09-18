@@ -129,10 +129,9 @@ let compile_file ?output ?(opt="") ?stable_name name =
          (String.concat " " (List.rev !Clflags.all_ccopts))
          (quote_prefixed ~response_files:true "-I"
             (List.map (Misc.expand_directory Config.standard_library)
-               (List.rev (  !Clflags.hidden_include_dirs
-                          @ List.map
-                              (fun (e : Clflags.include_dir) -> e.path)
-                              !Clflags.include_dirs))))
+               (List.rev_map
+                  (fun (e : Clflags.include_dir) -> e.path)
+                  (!Clflags.hidden_include_dirs @ !Clflags.include_dirs))))
          (Clflags.std_include_flag "-I")
          (Filename.quote name)
          (* cl tediously includes the name of the C file as the first thing it

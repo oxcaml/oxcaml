@@ -5,7 +5,7 @@
 *)
 
 
-let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_to_check = []) () =
+let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(hidden = []) ?(files_to_check = []) () =
   let disable_interactive f =
     let old_interactive = !Sys.interactive in
     Fun.protect ~finally:(fun () -> Sys.interactive := old_interactive)
@@ -18,7 +18,8 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
   Clflags.hidden_include_manifests := hidden_include_manifests;
   let manifest_files_root = Filename.concat (Sys.getcwd ()) "manifests" in
   Load_path.For_testing.set_manifest_files_root (Some manifest_files_root);
-  Load_path.init ~auto_include:Load_path.no_auto_include ~visible:[] ~hidden:[];
+  let hidden = List.map (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed }) hidden in
+  Load_path.init ~auto_include:Load_path.no_auto_include ~visible:[] ~hidden;
   List.iter (fun basename ->
     let path_with_visibility = try
       let path, visibility = disable_interactive (fun () -> Load_path.find_normalized_with_visibility basename) in
@@ -43,7 +44,8 @@ let run_test ?(include_manifests = []) ?(hidden_include_manifests = []) ?(files_
 val run_test :
   ?include_manifests:string list ->
   ?hidden_include_manifests:string list ->
-  ?files_to_check:string list -> unit -> unit = <fun>
+  ?hidden:(string * bool) list -> ?files_to_check:string list -> unit -> unit =
+  <fun>
 |}]
 
 let () =
@@ -112,14 +114,27 @@ qux.cmi -> $PWD/manifests/04/qux (visible, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (visible)
 |}]
 
-(* You can write `file_x` in a hidden includes manifest, but it's just the same
-   as writing `file`. *)
+(* `file_x` entries in a hidden includes manifest are cmx_guaranteed too (as
+   with -Hx). *)
 let () =
   run_test ~hidden_include_manifests:[
     "04/04-manifest.txt";
   ] ~files_to_check:["qux.cmi"; "quux.cmi"] ()
 
 [%%expect{|
-qux.cmi -> $PWD/manifests/04/qux (hidden)
+qux.cmi -> $PWD/manifests/04/qux (hidden, cmx_guaranteed)
 quux.cmi -> $PWD/manifests/04/quux (hidden)
+|}]
+
+(* Hidden directories (-H and -Hx) record whether cmx files are guaranteed,
+   just like manifests do. *)
+let () =
+  run_test ~hidden:[
+    "manifests/04", true;
+    "manifests/03", false;
+  ] ~files_to_check:["04-manifest.txt"; "03-manifest.txt"] ()
+
+[%%expect{|
+04-manifest.txt -> manifests/04/04-manifest.txt (hidden, cmx_guaranteed)
+03-manifest.txt -> manifests/03/03-manifest.txt (hidden)
 |}]

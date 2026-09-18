@@ -28,6 +28,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _labels : unit -> unit

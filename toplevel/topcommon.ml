@@ -336,15 +336,13 @@ let set_paths ?(auto_include=Compmisc.auto_include) ?(dir="") () =
     ]
   in
   let hidden = List.concat [
-      List.map expand (List.rev !Clflags.hidden_include_dirs);
+      List.map expand_entry (List.rev !Clflags.hidden_include_dirs);
       hidden
     ]
   in
   Load_path.init ~auto_include ~visible ~hidden;
-  let visible_dirs =
-    List.map (fun (e : Clflags.include_dir) -> e.path) visible
-  in
-  Dll.add_path (visible_dirs @ hidden)
+  Dll.add_path
+    (List.map (fun (e : Clflags.include_dir) -> e.path) (visible @ hidden))
 
 let update_search_path_from_env () =
   let extra_paths =

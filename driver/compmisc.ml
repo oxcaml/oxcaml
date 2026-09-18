@@ -63,7 +63,9 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
            (Clflags.std_include_dir ()))
   in
   let hidden =
-    List.rev_map (Misc.expand_directory Config.standard_library)
+    List.rev_map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
+      { path = Misc.expand_directory Config.standard_library e.path;
+        cmx_guaranteed = e.cmx_guaranteed })
       !Clflags.hidden_include_dirs
   in
   Load_path.init ~auto_include ~visible ~hidden;

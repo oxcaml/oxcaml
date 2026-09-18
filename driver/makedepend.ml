@@ -438,10 +438,10 @@ let process_file_as process_fun def source_file =
   Compenv.readenv stderr (Before_compile source_file);
   load_path := [];
   let cwd = if !nocwd then [] else [Filename.current_dir_name] in
-  List.iter add_to_load_path !Clflags.hidden_include_dirs;
   List.iter
     (fun (dir : Clflags.include_dir) -> add_to_load_path dir.path)
-    (!Compenv.last_include_dirs @
+    (!Clflags.hidden_include_dirs @
+     !Compenv.last_include_dirs @
      !Clflags.include_dirs @
      !Compenv.first_include_dirs);
   List.iter add_to_load_path cwd;
@@ -640,8 +640,15 @@ let run_main argv =
           { Clflags.path; cmx_guaranteed = true }),
         "<dir>  Add <dir> to the list of include directories \
          (cmx guaranteed)";
-      "-H", Arg.String (prepend_to_list Clflags.hidden_include_dirs),
+      "-H", Arg.String (fun path ->
+        prepend_to_list Clflags.hidden_include_dirs
+          { Clflags.path; cmx_guaranteed = false }),
         "<dir>  Add <dir> to the list of hidden include directories";
+      "-Hx", Arg.String (fun path ->
+        prepend_to_list Clflags.hidden_include_dirs
+          { Clflags.path; cmx_guaranteed = true }),
+        "<dir>  Add <dir> to the list of hidden include directories \
+         (cmx guaranteed)";
       "-nocwd", Arg.Set nocwd,
         " Do not add current working directory to \
           the list of include directories";

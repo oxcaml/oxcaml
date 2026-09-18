@@ -1,5 +1,6 @@
 (* TEST
-(* This tests the -H flag.
+(* This tests the -H flag (and -Hx, which differs only in guaranteeing that
+   cmx files are available, like -Ix does for -I).
 
    The basic structure is that libc depends on libb, which depends on liba.  We
    want to test a few things:
@@ -60,19 +61,24 @@ ocamlc.byte;
   compiler_reference = "${test_source_directory}/not_included.ocamlc.reference";
   check-ocamlc.byte-output;
 }
-(* Test transitive use of A's cmi, both with -I and with -H. *)
+(* Test transitive use of A's cmi, with -I, -H and -Hx (which is -H plus a
+   guarantee that cmx files are available; it hides A just the same). *)
 {
   split [
   | flags = "-I liba -I libb -nocwd";
   | flags = "-H liba -I libb -nocwd";
+  | flags = "-Hx liba -I libb -nocwd";
   ]
   module = "libc/c1.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
 }
 {
-  (* Test direct use of A cmi with -H. *)
-  flags = "-H liba -I libb -nocwd";
+  (* Test direct use of A cmi with -H and -Hx. *)
+  split [
+  | flags = "-H liba -I libb -nocwd";
+  | flags = "-Hx liba -I libb -nocwd";
+  ]
   module = "libc/c3.ml";
   setup-ocamlc.byte-build-env;
   ocamlc_byte_exit_status = "2";

@@ -25,7 +25,7 @@ type source_file =
 val include_dirs : Clflags.include_dir list ref
 
 (** The hidden_include_dirs in the OCaml compiler. *)
-val hidden_include_dirs : string list ref
+val hidden_include_dirs : Clflags.include_dir list ref
 
 (** The merge options to be used. *)
 val merge_options : Odoc_types.merge_option list ref

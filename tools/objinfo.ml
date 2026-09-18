@@ -206,16 +206,16 @@ let print_cmt_infos cmt =
           (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
     printf "Compilation flags:";
     Array.iter print_spaced_string cmt.cmt_args;
+    let print_include_dir (dir : Clflags.include_dir) =
+      if dir.cmx_guaranteed then
+        printf " %s(cmx guaranteed)" dir.path
+      else
+        print_spaced_string dir.path
+    in
     printf "\nLoad path:\n  Visible:";
-    List.iter
-      (fun (dir : Clflags.include_dir) ->
-        if dir.cmx_guaranteed then
-          printf " %s(cmx guaranteed)" dir.path
-        else
-          print_spaced_string dir.path)
-      cmt.cmt_loadpath.visible;
+    List.iter print_include_dir cmt.cmt_loadpath.visible;
     printf "\n  Hidden:";
-    List.iter print_spaced_string cmt.cmt_loadpath.hidden;
+    List.iter print_include_dir cmt.cmt_loadpath.hidden;
     printf "\n";
     printf "cmt interface digest: %s\n"
       (match cmt.cmt_interface_digest with

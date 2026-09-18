@@ -83,9 +83,11 @@ let print_info cmt =
     Printf.fprintf oc "sourcefile: %s\n" name;
   end;
   Printf.fprintf oc "build directory: %s\n" cmt.cmt_builddir;
-  List.iter (Printf.fprintf oc "load path (visible): %s\n%!")
+  List.iter (fun (dir : Clflags.include_dir) ->
+      Printf.fprintf oc "load path (visible): %s\n%!" dir.path)
     cmt.cmt_loadpath.visible;
-  List.iter (Printf.fprintf oc "load path (hidden): %s\n%!")
+  List.iter (fun (dir : Clflags.include_dir) ->
+      Printf.fprintf oc "load path (hidden): %s\n%!" dir.path)
     cmt.cmt_loadpath.hidden;
   begin
     match cmt.cmt_source_digest with
@@ -178,8 +180,10 @@ let record_cmt_info cmt =
                                     Annot.Idef (location_file value)))
   in
   let open Cmt_format in
-  List.iter (fun dir -> record_info "include" dir) cmt.cmt_loadpath.visible;
-  List.iter (fun dir -> record_info "include" dir) cmt.cmt_loadpath.hidden;
+  List.iter (fun (dir : Clflags.include_dir) -> record_info "include" dir.path)
+    cmt.cmt_loadpath.visible;
+  List.iter (fun (dir : Clflags.include_dir) -> record_info "include" dir.path)
+    cmt.cmt_loadpath.hidden;
   record_info "chdir" cmt.cmt_builddir;
   (match cmt.cmt_sourcefile with
     None -> () | Some file -> record_info "source" file)

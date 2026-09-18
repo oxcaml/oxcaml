@@ -195,7 +195,13 @@ module Options = Main_args.Make_ocamldoc_options(struct
         { Clflags.path = s; cmx_guaranteed = true }
         :: !Odoc_global.include_dirs
     let _H s =
-      Odoc_global.hidden_include_dirs := s :: !Odoc_global.hidden_include_dirs
+      Odoc_global.hidden_include_dirs :=
+        { Clflags.path = s; cmx_guaranteed = false }
+        :: !Odoc_global.hidden_include_dirs
+    let _Hx s =
+      Odoc_global.hidden_include_dirs :=
+        { Clflags.path = s; cmx_guaranteed = true }
+        :: !Odoc_global.hidden_include_dirs
     let _impl s =
       Odoc_global.files := !Odoc_global.files @ [Odoc_global.Impl_file s]
     let _intf s =

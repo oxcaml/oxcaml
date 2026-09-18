@@ -819,7 +819,7 @@ let set_paths () =
     ]
   in
   let hidden = List.concat [
-      List.map expand (List.rev !Clflags.hidden_include_dirs);
+      List.map expand_entry (List.rev !Clflags.hidden_include_dirs);
       hidden
     ]
   in

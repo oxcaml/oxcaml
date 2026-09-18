@@ -77,8 +77,8 @@ type include_dir =
 
 let compile_only = ref false            (* -c *)
 and output_name = ref (None : string option) (* -o *)
-and include_dirs = ref ([] : include_dir list)  (* -I, -Ix *)
-and hidden_include_dirs = ref ([] : string list) (* -H *)
+and include_dirs = ref ([] : include_dir list) (* -I, -Ix *)
+and hidden_include_dirs = ref ([] : include_dir list) (* -H, -Hx *)
 and include_manifests = ref ([] : string list) (* -I-manifest *)
 and hidden_include_manifests = ref ([] : string list) (* -H-manifest *)
 and no_std_include = ref false          (* -nostdlib *)

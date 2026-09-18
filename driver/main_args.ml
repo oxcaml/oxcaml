@@ -201,6 +201,12 @@ let mk_H f =
   "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
  \     (Like -I, but the program can not directly reference these dependencies)"
 
+let mk_Hx f =
+  "-Hx", Arg.String f,
+  "<dir>  Add <dir> to the list of \"hidden\" include directories\n\
+ \     (Like -H, but indicates that cmx files for modules in <dir> are\n\
+ \     always available)"
+
 let mk_I_manifest f =
   "-I-manifest", Arg.String f, "<file>  Get paths that the compiler can\n\
   \    reference from a given manifest file. This option is an alternative\n\
@@ -1174,6 +1180,7 @@ module type Common_options = sig
   val _I : string -> unit
   val _Ix : string -> unit
   val _H : string -> unit
+  val _Hx : string -> unit
   val _I_manifest : string -> unit
   val _H_manifest : string -> unit
   val _labels : unit -> unit
@@ -1550,6 +1557,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
@@ -1686,6 +1694,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_init F._init;
@@ -1829,6 +1838,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
@@ -2014,6 +2024,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_init F._init;
@@ -2178,6 +2189,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
@@ -2320,6 +2332,7 @@ struct
     mk_I F._I;
     mk_Ix F._Ix;
     mk_H F._H;
+    mk_Hx F._Hx;
     mk_I_manifest F._I_manifest;
     mk_H_manifest F._H_manifest;
     mk_impl F._impl;
@@ -2494,7 +2507,12 @@ module Default = struct
       include_dirs := { Clflags.path; cmx_guaranteed = false } :: !include_dirs
     let _Ix path =
       include_dirs := { Clflags.path; cmx_guaranteed = true } :: !include_dirs
-    let _H dir = hidden_include_dirs := dir :: (!hidden_include_dirs)
+    let _H path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = false } :: !hidden_include_dirs
+    let _Hx path =
+      hidden_include_dirs :=
+        { Clflags.path; cmx_guaranteed = true } :: !hidden_include_dirs
     let _I_manifest file = include_manifests := file :: !include_manifests
     let _H_manifest file =
       hidden_include_manifests := file :: !hidden_include_manifests
@@ -2824,6 +2842,8 @@ module Default = struct
          Odoc_global.hidden_include_dirs :=
            (s :: (!Odoc_global.hidden_include_dirs))
       *) ()
+    let _Hx(_:string) =
+      (* placeholder: same as _H for now *) ()
     let _I_manifest(_:string) = ()
     let _H_manifest(_:string) = ()
     let _impl (_:string) =

@@ -1150,7 +1150,7 @@ module PpxContext = struct
 
   let make ~tool_name () =
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
-    let visible_load_dir_pairs dirs =
+    let include_dir_pairs dirs =
       List.map
         (fun (e : Clflags.include_dir) -> (e.path, e.cmx_guaranteed))
         dirs
@@ -1161,14 +1161,16 @@ module PpxContext = struct
         lid "include_dirs",
           make_list
             (make_pair make_string make_bool)
-            (visible_load_dir_pairs !Clflags.include_dirs);
+            (include_dir_pairs !Clflags.include_dirs);
         lid "hidden_include_dirs",
-          make_list make_string (!Clflags.hidden_include_dirs);
+          make_list
+            (make_pair make_string make_bool)
+            (include_dir_pairs !Clflags.hidden_include_dirs);
         lid "load_path",
           make_pair
             (make_list (make_pair make_string make_bool))
-            (make_list make_string)
-            (visible_load_dir_pairs visible, hidden);
+            (make_list (make_pair make_string make_bool))
+            (include_dir_pairs visible, include_dir_pairs hidden);
         lid "open_args",
           make_list make_open_arg !Clflags.open_args;
         lid "for_package",  make_option make_string !Clflags.for_package;
@@ -1239,6 +1241,12 @@ module PpxContext = struct
       in
       (* Defined outside the recursive group above so that [get_pair] is
          used polymorphically. *)
+      let get_include_dirs payload =
+        List.map
+          (fun (path, cmx_guaranteed) : Clflags.include_dir ->
+             { path; cmx_guaranteed })
+          (get_list (get_pair get_string get_bool) payload)
+      in
       let get_open_arg = function
         | { pexp_desc =
               Pexp_construct ({ txt = Longident.Lident "Open" }, Some exp) } ->
@@ -1255,12 +1263,9 @@ module PpxContext = struct
       | "tool_name" ->
           tool_name_ref := get_string payload
       | "include_dirs" ->
-          Clflags.include_dirs :=
-            List.map
-              (fun (path, cmx_guaranteed) -> { Clflags.path; cmx_guaranteed })
-              (get_list (get_pair get_string get_bool) payload)
+          Clflags.include_dirs := get_include_dirs payload
       | "hidden_include_dirs" ->
-          Clflags.hidden_include_dirs := get_list get_string payload
+          Clflags.hidden_include_dirs := get_include_dirs payload
       | "load_path" ->
           (* Duplicates Compmisc.auto_include, since we can't reference Compmisc
              from this module. *)
@@ -1272,16 +1277,7 @@ module PpxContext = struct
               Load_path.auto_include_otherlibs alert find_in_dir fn
           in
           let visible, hidden =
-            get_pair
-              (get_list (get_pair get_string get_bool))
-              (get_list get_string)
-              payload
-          in
-          let visible =
-            List.map
-              (fun (path, cmx_guaranteed) : Clflags.include_dir ->
-                 { path; cmx_guaranteed })
-              visible
+            get_pair get_include_dirs get_include_dirs payload
           in
           Load_path.init ~auto_include ~visible ~hidden
       | "open_args" ->
