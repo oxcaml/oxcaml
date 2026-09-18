@@ -18,14 +18,14 @@ type record = { x : string; y : string @@ many aliased; }
 
 let aliased_use (x @ aliased global) = x
 [%%expect{|
-(let (aliased_use/0 = (function {nlocal = 0} x/0? x/0))
+(let (aliased_use/0 = (function {nlocal = 0} x/0? audit_noalloc_strict x/0))
   (apply (field_imm 1 (global Toploop!)) "aliased_use" aliased_use/0))
 val aliased_use : 'a -> 'a = <fun>
 |}]
 
 let unique_use (x @ unique global) = x
 [%%expect{|
-(let (unique_use/0 = (function {nlocal = 0} x/1? x/1))
+(let (unique_use/0 = (function {nlocal = 0} x/1? audit_noalloc_strict x/1))
   (apply (field_imm 1 (global Toploop!)) "unique_use" unique_use/0))
 val unique_use : 'a @ unique -> 'a = <fun>
 |}]

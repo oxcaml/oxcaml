@@ -42,7 +42,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/0 =
-     (function {nlocal = 0} x/0 : int
+     (function {nlocal = 0} x/0 audit_noalloc_strict : int
        (if (field_int 0 x/0)
          (let (*match*/0 =o? (field_mut 1 x/0))
            (if *match*/0
@@ -75,7 +75,7 @@ let simple x =
 type t = { a : bool; mutable b : int option; }
 (let
   (simple/0 =
-     (function {nlocal = 0} x/1 : int
+     (function {nlocal = 0} x/1 audit_noalloc_strict : int
        (let (*match*/2 =o? (field_mut 1 x/1))
          (if *match*/2 (field_imm 0 *match*/2) 1))))
   (apply (field_imm 1 (global Toploop!)) "simple" simple/0))
@@ -106,7 +106,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/1 =
-     (function {nlocal = 0} x/2 : int
+     (function {nlocal = 0} x/2 audit_noalloc_strict : int
        (if (field_int 0 x/2)
          (let (*match*/3 =o? (field_mut 1 x/2))
            (if *match*/3 (field_imm 0 *match*/3)
@@ -149,7 +149,7 @@ Warning 74 [degraded-to-partial-match]: This pattern-matching is compiled as
   (see manual section 13.5.5)
 (let
   (f/2 =
-     (function {nlocal = 0} r/0 : int
+     (function {nlocal = 0} r/0 audit_noalloc_strict : int
        (region
          (let
            (*match*/5 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -191,7 +191,8 @@ type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/0 =
      (function {nlocal = 0}
-       param/0[value<(consts (0)) (non_consts ([0: ?]))>] : int
+       param/0[value<(consts (0)) (non_consts ([0: ?]))>]
+       audit_noalloc_strict : int
        (if param/0 (field_imm 0 (field_imm 0 param/0)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/0))
 val test : int t option -> int = <fun>
@@ -212,7 +213,7 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/1 =
-     (function {nlocal = 0} param/1 : int
+     (function {nlocal = 0} param/1 audit_noalloc_strict : int
        (let (*match*/8 =o? (field_mut 0 param/1))
          (if *match*/8 (field_imm 0 (field_imm 0 *match*/8)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/1))
@@ -237,7 +238,7 @@ let test n =
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/2 =
-     (function {nlocal = 0} n/0? : int
+     (function {nlocal = 0} n/0? audit_noalloc_strict : int
        (region
          (let
            (*match*/9 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -349,7 +350,7 @@ type _ t = Bool : bool t | Int : int t | Char : char t
   (test/3 =
      (function {nlocal = 0}
        param/2[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-       : int
+       audit_noalloc_strict : int
        (catch
          (if (%int_greaterequal (field_imm 0 param/2) 2) (exit 24)
            (if (%int_greaterequal (field_imm 1 param/2) 2) (exit 24) 0))
@@ -383,7 +384,7 @@ type t = A | B | C of nothing
                  (non_consts ([0: value<int>,
                                value<
                                 (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
-       : int
+       audit_noalloc_strict : int
        (catch
          (if (field_imm 0 param/3)
            (switch* (field_imm 1 param/3)

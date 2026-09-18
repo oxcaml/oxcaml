@@ -23,10 +23,7 @@
           (x =[value<(consts ()) (non_consts ([0: *, *]))>] [0: "foo" "bar"])
           (makeblock 0)))
       (let
-        (f =
-           (function {nlocal = 0} param
-             assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
-             : int 0)
+        (f = (function {nlocal = 0} param audit_noalloc_strict : int 0)
          s = (makemutable 0 (*) ""))
         (seq
           (ignore
@@ -34,8 +31,6 @@
               (makeblock 0)))
           (let
             (drop =
-               (function {nlocal = 0} param?
-                 assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
-                 : int 0)
+               (function {nlocal = 0} param? audit_noalloc_strict : int 0)
              *match* =[value<int>] (apply drop (field_mut 0 s)))
             (makeblock 0 A B f s drop)))))))

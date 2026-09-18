@@ -15,6 +15,7 @@ let ints (r : int t) = r
   (ints =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       audit_noalloc_strict
        : (consts ()) (non_consts ([0: value<int>, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "ints" ints))
 val ints : int t -> int t = <fun>
@@ -26,6 +27,7 @@ let floats (r : float t) = r
   (floats =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<float>, value<int>]))>]
+       audit_noalloc_strict
        : (consts ()) (non_consts ([0: value<float>, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "floats" floats))
 val floats : float t -> float t = <fun>
@@ -37,6 +39,7 @@ let unboxed_floats (r : float# t) = r
   (unboxed_floats =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: float64, value<int>]))>]
+       audit_noalloc_strict
        : (consts ()) (non_consts ([0: float64, value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "unboxed_floats" unboxed_floats))
 val unboxed_floats : float# t -> float# t = <fun>
@@ -50,6 +53,7 @@ let products (r : #(int * float#) t) = r
        r[value<
           (consts ())
            (non_consts ([0: product value<int>, float64, value<int>]))>]
+       audit_noalloc_strict
        : (consts ())
           (non_consts ([0: product value<int>, float64, value<int>]))
        r))
@@ -63,6 +67,7 @@ let voids (r : unit# t) = r
   (voids =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: product , value<int>]))>]
+       audit_noalloc_strict
        : (consts ()) (non_consts ([0: product , value<int>])) r))
   (apply (field_imm 1 (global Toploop!)) "voids" voids))
 val voids : unit# t -> unit# t = <fun>
@@ -70,7 +75,7 @@ val voids : unit# t -> unit# t = <fun>
 
 let opaque (type a : any) (r : a t) = r
 [%%expect{|
-(let (opaque = (function {nlocal = 0} r r))
+(let (opaque = (function {nlocal = 0} r audit_noalloc_strict r))
   (apply (field_imm 1 (global Toploop!)) "opaque" opaque))
 val opaque : ('a : any). 'a t -> 'a t = <fun>
 |}]
@@ -88,7 +93,7 @@ let boxed_floats (r : float single) = r
   (boxed_floats =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: value<float>]))>]
-       : (consts ()) (non_consts ([0: value<float>])) r))
+       audit_noalloc_strict : (consts ()) (non_consts ([0: value<float>])) r))
   (apply (field_imm 1 (global Toploop!)) "boxed_floats" boxed_floats))
 val boxed_floats : float single -> float single = <fun>
 |}]
@@ -99,7 +104,7 @@ let all_void (r : unit# single) = r
   (all_void =
      (function {nlocal = 0}
        r[value<(consts ()) (non_consts ([0: product ]))>]
-       : (consts ()) (non_consts ([0: product ])) r))
+       audit_noalloc_strict : (consts ()) (non_consts ([0: product ])) r))
   (apply (field_imm 1 (global Toploop!)) "all_void" all_void))
 val all_void : unit# single -> unit# single = <fun>
 |}]
@@ -112,7 +117,7 @@ type ('a : any) mutable_record = { mutable field : 'a; }
 
 let mutable_record (r : float# mutable_record) = r
 [%%expect{|
-(let (mutable_record = (function {nlocal = 0} r r))
+(let (mutable_record = (function {nlocal = 0} r audit_noalloc_strict r))
   (apply (field_imm 1 (global Toploop!)) "mutable_record" mutable_record))
 val mutable_record : float# mutable_record -> float# mutable_record = <fun>
 |}]

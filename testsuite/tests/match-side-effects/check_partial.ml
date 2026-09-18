@@ -33,7 +33,7 @@ type _ t = Int : int -> int t | True : bool t | False : bool t
                  (non_consts ([0: *,
                                value<
                                 (consts (1 0)) (non_consts ([0: value<int>]))>]))>]
-       : int
+       audit_noalloc_strict : int
        (let (*match*/0 =o? (field_mut 0 (field_imm 0 param/0)))
          (switch* (field_imm 1 param/0)
           case int 0: 0
@@ -60,7 +60,8 @@ let lazy_needs_partial : _ * bool t ref -> int = function
 (let
   (lazy_needs_partial/0 =
      (function {nlocal = 0}
-       param/1[value<(consts ()) (non_consts ([0: *, *]))>] : int
+       param/1[value<(consts ()) (non_consts ([0: *, *]))>]
+       audit_noalloc_strict : int
        (catch
          (let
            (*match*/2 =a? (field_imm 0 param/1)
@@ -94,7 +95,7 @@ let guard_total : bool t ref -> int = function
 [%%expect {|
 (let
   (guard_total/0 =
-     (function {nlocal = 0} param/2 : int
+     (function {nlocal = 0} param/2 audit_noalloc_strict : int
        (if (opaque 0) 1
          (let (*match*/6 =o? (field_mut 0 param/2))
            (if (isint *match*/6) (if *match*/6 12 0)
@@ -112,7 +113,7 @@ let guard_needs_partial : bool t ref -> int = function
 [%%expect {|
 (let
   (guard_needs_partial/0 =
-     (function {nlocal = 0} param/3 : int
+     (function {nlocal = 0} param/3 audit_noalloc_strict : int
        (let (*match*/7 =o? (field_mut 0 param/3))
          (catch (if (isint *match*/7) (if *match*/7 (exit 9) 0) (exit 9))
           with (9)

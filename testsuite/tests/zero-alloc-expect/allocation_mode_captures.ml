@@ -8,8 +8,7 @@ let make f = fun () -> f ()
 (let
   (make/0 =
      (function {nlocal = 0} f/0
-       (function {nlocal = 1} param/0[L][value<int>]
-         assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
+       (function {nlocal = 1} param/0[L][value<int>] audit_noalloc_strict
          (apply[yielding] f/0 0))))
   (makeblock 0 make/0))
 val make : (unit -> 'a) -> unit -> 'a = <fun>
@@ -20,8 +19,7 @@ let make_relaxed (f @ noalloc) = fun () -> f ()
 (let
   (make_relaxed/0 =
      (function {nlocal = 0} f/1
-       (function {nlocal = 1} param/1[L][value<int>]
-         assert_zero_alloc customer_error_message "Backend verification of inferred noalloc mode failed."
+       (function {nlocal = 1} param/1[L][value<int>] audit_noalloc
          (apply[yielding] f/1 0))))
   (makeblock 0 make_relaxed/0))
 val make_relaxed : (unit -> 'a) @ noalloc -> unit -> 'a = <fun>

@@ -26,15 +26,16 @@ Static data:
     (closure ⟨env⟩ layout_16 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/335 x/326[$layout_16] : $layout_16
+        ⟪(function {nlocal = 0} closure/335 x/326[$layout_16]
+           audit_noalloc_strict : $layout_16
            (let (calls/332 =a (mixedfield 0  (*) closure/335))
              (seq (+:=1 calls/332) x/326)))⟫ }))
   (Cross_module_static_lib/id/0
     (closure ⟨env⟩ layout_2 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/333 x/318[$layout_2] : $layout_2
-           x/318)⟫ }))
+        ⟪(function {nlocal = 0} closure/333 x/318[$layout_2]
+           audit_noalloc_strict : $layout_2 x/318)⟫ }))
   (Cross_module_static_lib/pair/1
     (closure ⟨env⟩ layout_5 layout_7 ->
       { c = (missing)

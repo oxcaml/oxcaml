@@ -18,7 +18,7 @@ let last_is_anys = function
   (last_is_anys/0 =
      (function {nlocal = 0}
        param/0[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-       : int
+       audit_noalloc_strict : int
        (catch
          (if (field_imm 0 param/0) (if (field_imm 1 param/0) (exit 2) 1)
            (if (field_imm 1 param/0) (exit 2) 2))
@@ -37,7 +37,7 @@ let last_is_vars = function
   (last_is_vars/0 =
      (function {nlocal = 0}
        param/1[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-       : int
+       audit_noalloc_strict : int
        (catch
          (if (field_imm 0 param/1) (if (field_imm 1 param/1) (exit 5) 1)
            (if (field_imm 1 param/1) (exit 5) 2))
@@ -82,7 +82,7 @@ let f = function
      (function {nlocal = 0}
        param/2[value<
                 (consts ()) (non_consts ([0: *, value<int>, value<int>]))>]
-       : int
+       audit_noalloc_strict : int
        (let (*match*/0 =a? (field_imm 0 param/2))
          (catch
            (if (%eq *match*/0 A/0) (if (field_imm 1 param/2) 1 (exit 11))

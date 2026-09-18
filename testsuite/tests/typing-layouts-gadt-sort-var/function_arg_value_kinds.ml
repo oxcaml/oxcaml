@@ -61,8 +61,8 @@ let fst2 (p : int * int) = match p with a, _b -> a
 (let
   (fst2 =
      (function {nlocal = 0}
-       p[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>] : int
-       (field_imm 0 p)))
+       p[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
+       audit_noalloc_strict : int (field_imm 0 p)))
   (apply (field_imm 1 (global Toploop!)) "fst2" fst2))
 val fst2 : int * int -> int = <fun>
 |}]
@@ -74,7 +74,7 @@ let get (o : int option) = match o with Some x -> x | None -> 0
 (let
   (get =
      (function {nlocal = 0} o[value<(consts (0)) (non_consts ([0: ?]))>]
-       : int (if o (field_imm 0 o) 0)))
+       audit_noalloc_strict : int (if o (field_imm 0 o) 0)))
   (apply (field_imm 1 (global Toploop!)) "get" get))
 val get : int option -> int = <fun>
 |}]
@@ -103,11 +103,12 @@ let j (type a) (r : a rep) : a -> int =
 (let
   (j =
      (function {nlocal = 0} r[value<int>]
-       (if r (function {nlocal = 0} x[value<int>] : int x)
+       (if r
+         (function {nlocal = 0} x[value<int>] audit_noalloc_strict : int x)
          (function {nlocal = 0}
            param[value<
                   (consts ()) (non_consts ([0: value<int>, value<int>]))>]
-           : int (field_imm 0 param)))))
+           audit_noalloc_strict : int (field_imm 0 param)))))
   (apply (field_imm 1 (global Toploop!)) "j" j))
 val j : 'a rep -> 'a -> int = <fun>
 |}]
@@ -143,7 +144,7 @@ type _ ab = A : int ab | B : bool ab
   (m =
      (function {nlocal = 0}
        param[value<(consts ()) (non_consts ([0: value<int>, value<int>]))>]
-       : int
+       audit_noalloc_strict : int
        (if (field_imm 0 param) (if (field_imm 1 param) 1 0)
          (field_imm 1 param))))
   (apply (field_imm 1 (global Toploop!)) "m" m))
@@ -159,7 +160,8 @@ let n : type a. a rep * a -> int = function
 (let
   (n =
      (function {nlocal = 0}
-       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       param[value<(consts ()) (non_consts ([0: value<int>, *]))>]
+       audit_noalloc_strict : int
        (if (field_imm 0 param) (field_imm 1 param)
          (field_imm 0 (field_imm 1 param)))))
   (apply (field_imm 1 (global Toploop!)) "n" n))
@@ -192,7 +194,7 @@ type _ rep2 = RI : im rep2 | RS : sm rep2
                (non_consts ([0: value<int>,
                              value<
                               (consts ()) (non_consts ([0: *, float64]))>]))>]
-       : int
+       audit_noalloc_strict : int
        (if (field_imm 0 param)
          (string.length (mixedfield 0  (*,float64) (field_imm 1 param)))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))
@@ -221,7 +223,8 @@ type _ rep3 = RF : fa rep3 | RG : fb rep3
 (let
   (mixed_flat =
      (function {nlocal = 0}
-       param[value<(consts ()) (non_consts ([0: value<int>, *]))>] : int
+       param[value<(consts ()) (non_consts ([0: value<int>, *]))>]
+       audit_noalloc_strict : int
        (if (field_imm 0 param)
          (mixedfield 0  (value<int>,float32) (field_imm 1 param))
          (mixedfield 0  (value<int>,float64) (field_imm 1 param)))))

@@ -14,10 +14,15 @@ let[@inline never] yield (_ : Yielding.t @ yielding) = ()
 let[@inline never] add x y = x + y
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Yielding/332"
-  (let (with_ = (function {nlocal = 0} f never_inline (apply[yielding] f 0)))
+  (let
+    (with_ =
+       (function {nlocal = 0} f never_inline audit_noalloc_strict
+         (apply[yielding] f 0)))
     (makeblock 0 with_)))
 module Yielding : sig type t val with_ : (t @ yielding -> 'r) -> 'r end
-(let (yield = (function {nlocal = 0} param never_inline : int 0))
+(let
+  (yield =
+     (function {nlocal = 0} param never_inline audit_noalloc_strict : int 0))
   (apply (field_imm 1 (global Toploop!)) "yield" yield))
 val yield : Yielding.t @ yielding -> unit = <fun>
 (let
@@ -200,8 +205,8 @@ let f (l : int list) =
            (region
              (seq
                (apply[yielding] (field_imm 0 List)
-                 (function[L] {nlocal = 1} x[value<int>] : int
-                   (%int_add x 7))
+                 (function[L] {nlocal = 1} x[value<int>] audit_noalloc_strict
+                   : int (%int_add x 7))
                  l)
                (applytail[yielding] (field_imm 0 List)
                  (function {nlocal = 0} x[value<int>] : int
@@ -239,7 +244,7 @@ let () =
                   (applynontail[yielding] yield y))
               don't_yield =
                 (function[L] {nlocal = 1} param[value<int>] never_inline
-                  : int (opaque 0)))
+                  audit_noalloc_strict : int (opaque 0)))
              (seq (apply[yielding] do_yield 0) (apply don't_yield 0)
                (apply[yielding] do_yield 0)
                (ignore
@@ -249,8 +254,8 @@ let () =
                    10))
                (ignore
                  (apply[yielding] (field_imm 1 List)
-                   (function[L] {nlocal = 1} param[value<int>] : int
-                     (apply don't_yield 0))
+                   (function[L] {nlocal = 1} param[value<int>]
+                     audit_noalloc_strict : int (apply don't_yield 0))
                    10))))))))
   0)
 |}]
@@ -453,13 +458,14 @@ let (_ : int) =
       (caml_update_dummy letrec_function_context
         (let
           (g =
-             (function {nlocal = 0} x[value<int>] : int
+             (function {nlocal = 0} x[value<int>] audit_noalloc_strict : int
                (if (%int_lessequal x 0) 0
                  (apply (field_imm 1 h) (%int_sub x 1)))))
           (makeblock 0 g)))
       (caml_update_dummy h
         (makeblock 0 3505894
-          (function {nlocal = 0} x[value<int>] : int (apply f x))))
+          (function {nlocal = 0} x[value<int>] audit_noalloc_strict : int
+            (apply f x))))
       (apply f 5))))
 - : int = 0
 |}]
@@ -497,14 +503,15 @@ let (_ : int) =
             (caml_update_dummy letrec_function_context
               (let
                 (g =
-                   (function {nlocal = 2} y? x[value<int>] : int
+                   (function {nlocal = 2} y? x[value<int>]
+                     audit_noalloc_strict : int
                      (if (%int_lessequal x 0) 0
                        (apply[yielding] (field_imm 1 h) y (%int_sub x 1)))))
                 (makeblock 0 g)))
             (caml_update_dummy h
               (makeblock 0 3505894
-                (function {nlocal = 2} y? x[value<int>] : int
-                  (apply[yielding] f y x))))
+                (function {nlocal = 2} y? x[value<int>] audit_noalloc_strict
+                  : int (apply[yielding] f y x))))
             (apply[yielding] f y 5)))))))
 - : int = 0
 |}]
@@ -675,7 +682,9 @@ let h () =
   R.g ()
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "M/883"
-  (let (f = (function {nlocal = 0} param[value<int>] : int 0))
+  (let
+    (f =
+       (function {nlocal = 0} param[value<int>] audit_noalloc_strict : int 0))
     (makeblock 0 f)))
 module M : sig val f : unit -> unit end
 (let

@@ -57,8 +57,12 @@ end
 [%%expect{|
 (apply (field_imm 1 (global Toploop!)) "Basic/367"
   (let
-    (get = (function {nlocal = 0} r (atomic_load_field_ptr r 1))
-     get_imm = (function {nlocal = 0} r : int (atomic_load_field_imm r 1))
+    (get =
+       (function {nlocal = 0} r audit_noalloc_strict
+         (atomic_load_field_ptr r 1))
+     get_imm =
+       (function {nlocal = 0} r audit_noalloc_strict : int
+         (atomic_load_field_imm r 1))
      set = (function {nlocal = 0} r v : int (atomic_set_field_ptr r 1 v))
      set_imm =
        (function {nlocal = 0} r v[value<int>] : int
@@ -203,7 +207,10 @@ type ('a : any) t = { a : 'a; mutable f : int [@atomic]; }
 
 let project (t: int t) = t.f
 [%%expect{|
-(let (project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+(let
+  (project =
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "project" project))
 val project : int t -> int = <fun>
 |}];;
@@ -212,7 +219,7 @@ let mixed_project (t: int64_u t) = t.f
 [%%expect{|
 (let
   (mixed_project =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
   (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
 val mixed_project : int64_u t -> int = <fun>
@@ -220,7 +227,10 @@ val mixed_project : int64_u t -> int = <fun>
 
 let set (t: int t) = t.f <- 42
 [%%expect{|
-(let (set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+(let
+  (set =
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_set_field_imm t 1 42)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
 val set : int t -> unit = <fun>
 |}];;
@@ -229,7 +239,7 @@ let mixed_set (t: int64_u t) = t.f <- 42
 [%%expect{|
 (let
   (mixed_set =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
   (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
 val mixed_set : int64_u t -> unit = <fun>
@@ -261,7 +271,8 @@ end
 (apply (field_imm 1 (global Toploop!)) "Inline_record/457"
   (let
     (test =
-       (function {nlocal = 0} param : int (atomic_load_field_imm param 0)))
+       (function {nlocal = 0} param audit_noalloc_strict : int
+         (atomic_load_field_imm param 0)))
     (makeblock 0 test)))
 module Inline_record :
   sig type t = A of { mutable x : int [@atomic]; } val test : t -> int end
@@ -286,7 +297,7 @@ end
        (makeblock_unique 248 "Extension_with_inline_record.A"
          (caml_fresh_oo_id 0))
      test =
-       (function {nlocal = 0} param : int
+       (function {nlocal = 0} param audit_noalloc_strict : int
          (if (%eq (field_imm 0 param) A) (atomic_load_field_imm param 1) 0))
      *match* =[value<int>]
        (if (%eq (apply test (makemutable 0 (?,value<int>) A 42)) 42) 0
@@ -310,7 +321,10 @@ type ('a : any) t = A of { a : 'a; mutable f : int [@atomic]; }
 
 let project (t: int t) = match t with A r -> r.f
 [%%expect{|
-(let (project = (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+(let
+  (project =
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "project" project))
 val project : int t -> int = <fun>
 |}];;
@@ -319,7 +333,7 @@ let mixed_project (t: int64_u t) = match t with A r -> r.f
 [%%expect{|
 (let
   (mixed_project =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_load_mixed_field 1  (bits64,value<int>) t)))
   (apply (field_imm 1 (global Toploop!)) "mixed_project" mixed_project))
 val mixed_project : int64_u t -> int = <fun>
@@ -327,7 +341,10 @@ val mixed_project : int64_u t -> int = <fun>
 
 let set (t: int t) = match t with A r -> r.f <- 42
 [%%expect{|
-(let (set = (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+(let
+  (set =
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_set_field_imm t 1 42)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
 val set : int t -> unit = <fun>
 |}];;
@@ -336,7 +353,7 @@ let mixed_set (t: int64_u t) = match t with A r -> r.f <- 42
 [%%expect{|
 (let
   (mixed_set =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_set_mixed_field 1  (bits64,value<int>) t 42)))
   (apply (field_imm 1 (global Toploop!)) "mixed_set" mixed_set))
 val mixed_set : int64_u t -> unit = <fun>
@@ -371,7 +388,8 @@ let undetermined_project t = t.f
 [%%expect{|
 (let
   (undetermined_project =
-     (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "undetermined_project"
     undetermined_project))
 val undetermined_project : 'a t -> int = <fun>
@@ -381,7 +399,8 @@ let undetermined_set t = t.f <- 42
 [%%expect{|
 (let
   (undetermined_set =
-     (function {nlocal = 0} t : int (atomic_set_field_imm t 1 42)))
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_set_field_imm t 1 42)))
   (apply (field_imm 1 (global Toploop!)) "undetermined_set" undetermined_set))
 val undetermined_set : 'a t -> unit = <fun>
 |}];;
@@ -434,7 +453,8 @@ let undetermined_project_inline t = match t with A r -> r.f
 [%%expect{|
 (let
   (undetermined_project_inline =
-     (function {nlocal = 0} t : int (atomic_load_field_imm t 1)))
+     (function {nlocal = 0} t audit_noalloc_strict : int
+       (atomic_load_field_imm t 1)))
   (apply (field_imm 1 (global Toploop!)) "undetermined_project_inline"
     undetermined_project_inline))
 val undetermined_project_inline : 'a w -> int = <fun>
@@ -465,7 +485,9 @@ Warning 214 [atomic-float-record-boxed]: This record contains atomic float field
      mk_t =
        (function {nlocal = 0} x[value<float>] y[value<float>]
          (makemutable 0 (value<float>,value<float>) x y))
-     get = (function {nlocal = 0} v : float (atomic_load_field_ptr v 1)))
+     get =
+       (function {nlocal = 0} v audit_noalloc_strict : float
+         (atomic_load_field_ptr v 1)))
     (makeblock 0 mk_flat mk_t get)))
 
 module Float_records :
@@ -679,9 +701,15 @@ Warning 9 [missing-record-field-pattern]: the following labels are not bound
   Either bind these labels explicitly or add "; _" to the pattern.
 (apply (field_imm 1 (global Toploop!)) "Pattern_matching_wildcard/672"
   (let
-    (warning = (function {nlocal = 0} param : int (field_int 0 param))
-     allowed = (function {nlocal = 0} param : int (field_int 0 param))
-     also_allowed = (function {nlocal = 0} param : int (field_int 0 param)))
+    (warning =
+       (function {nlocal = 0} param audit_noalloc_strict : int
+         (field_int 0 param))
+     allowed =
+       (function {nlocal = 0} param audit_noalloc_strict : int
+         (field_int 0 param))
+     also_allowed =
+       (function {nlocal = 0} param audit_noalloc_strict : int
+         (field_int 0 param)))
     (makeblock 0 warning allowed also_allowed)))
 
 module Pattern_matching_wildcard :
@@ -832,7 +860,7 @@ module Mixed_blocks :
   end
 (let
   (project =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_load_mixed_field 1  (product  (value_or_null<int>,value_or_null<
                                                                   int>,
          value_or_null<int>),value<int>) t)))
@@ -844,7 +872,7 @@ let set (t: Mixed_blocks.t) = t.field <- 42
 [%%expect{|
 (let
   (set =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_set_mixed_field 1  (product  (value_or_null<int>,value_or_null<
                                                                  int>,
          value_or_null<int>),value<int>) t 42)))
@@ -876,7 +904,7 @@ module Mixed_blocks_2 :
   end
 (let
   (project =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_load_mixed_field 0  (value<int>,product  (value_or_null<int>,
          value_or_null<int>,value_or_null<int>)) t)))
   (apply (field_imm 1 (global Toploop!)) "project" project))
@@ -887,7 +915,7 @@ let set (t: Mixed_blocks_2.t) = t.field <- 42
 [%%expect{|
 (let
   (set =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_set_mixed_field 0  (value<int>,product  (value_or_null<int>,
          value_or_null<int>,value_or_null<int>)) t 42)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
@@ -927,7 +955,7 @@ let project (t : Mixed_blocks_rec.t) = t.field
 [%%expect{|
 (let
   (project =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_load_mixed_field 1  (product  (untagged_immediate,float64),
          value<int>) t)))
   (apply (field_imm 1 (global Toploop!)) "project" project))
@@ -937,7 +965,7 @@ let set (t: Mixed_blocks_rec.t) = t.field <- 42
 [%%expect{|
 (let
   (set =
-     (function {nlocal = 0} t : int
+     (function {nlocal = 0} t audit_noalloc_strict : int
        (atomic_set_mixed_field 1  (product  (untagged_immediate,float64),
          value<int>) t 42)))
   (apply (field_imm 1 (global Toploop!)) "set" set))
@@ -1026,7 +1054,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Atomic_float_with_float_hash/815"
   (let
     (disallowed =
-       (function {nlocal = 0} t : float
+       (function {nlocal = 0} t audit_noalloc_strict : float
          (atomic_load_mixed_field 0  (*,float64) t)))
     (makeblock 0 disallowed)))
 module Atomic_float_with_float_hash :
@@ -1047,7 +1075,7 @@ end
 (apply (field_imm 1 (global Toploop!)) "Inline_record_atomic_in_mixed/828"
   (let
     (disallowed =
-       (function {nlocal = 0} t : int
+       (function {nlocal = 0} t audit_noalloc_strict : int
          (atomic_load_mixed_field 0  (value<int>,untagged_immediate) t)))
     (makeblock 0 disallowed)))
 module Inline_record_atomic_in_mixed :

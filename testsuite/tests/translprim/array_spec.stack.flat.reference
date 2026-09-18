@@ -4,7 +4,8 @@
    addr_a =[value<addrarray>] (makearray[addr] "a" "b" "c"))
   (seq (array.length[int] int_a) (array.length[float] float_a)
     (array.length[addr] addr_a)
-    (function {nlocal = 0} a[value<genarray>] : int (array.length[gen] a))
+    (function {nlocal = 0} a[value<genarray>] audit_noalloc_strict : int
+      (array.length[gen] a))
     (array.get[int indexed by int] int_a 0)
     (array.get[float indexed by int] float_a 0)
     (array.get[addr indexed by int] addr_a 0)
@@ -18,12 +19,12 @@
     (array.set[int indexed by int] int_a 0 1)
     (array.set[float indexed by int] float_a 0 1.)
     (array.set[addr indexed by int] addr_a 0 "a")
-    (function {nlocal = 2} a[value<genarray>] x : int
+    (function {nlocal = 2} a[value<genarray>] x audit_noalloc_strict : int
       (array.set[gen indexed by int] a 0 x))
     (array.unsafe_set[int indexed by int] int_a 0 1)
     (array.unsafe_set[float indexed by int] float_a 0 1.)
     (array.unsafe_set[addr indexed by int] addr_a 0 "a")
-    (function {nlocal = 2} a[value<genarray>] x : int
+    (function {nlocal = 2} a[value<genarray>] x audit_noalloc_strict : int
       (array.unsafe_set[gen indexed by int] a 0 x))
     (let
       (eta_gen_len =

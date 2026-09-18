@@ -87,14 +87,14 @@
 (function camlCmm__standard_atomic_get_1_14_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 1 v ->val) 1 )
 
-(function assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
- camlCmm__get_2_15_code (r: val) : val (load_mut_atomic val (+a r 8)) )
+(function camlCmm__get_2_15_code (r: val) : val
+ (load_mut_atomic val (+a r 8)) )
 
 (function camlCmm__set_3_16_code (r: val v: val) : int
  (extcall "caml_atomic_exchange_field" r 3 v ->val) 1 )
 
-(function assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
- camlCmm__get_imm_4_17_code (r: val) : int (load_mut_atomic int (+a r 8)) )
+(function camlCmm__get_imm_4_17_code (r: val) : int
+ (load_mut_atomic int (+a r 8)) )
 
 (function camlCmm__set_imm_5_18_code (r: val v: int) : int
  (atomic exchange v (+a r 8)) 1 )

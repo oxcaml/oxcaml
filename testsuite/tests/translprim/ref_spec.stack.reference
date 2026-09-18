@@ -26,22 +26,26 @@
         (setfloatfield 1 flt_rec' 1.)
         (let
           (set_open_poly =
-             (function {nlocal = 2} r y : int (setfield_ptr 0 r y))
+             (function {nlocal = 2} r y audit_noalloc_strict : int
+               (setfield_ptr 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y[value<int>] : int
-               (setfield_imm 0 r y))
+             (function {nlocal = 2} r y[value<int>] audit_noalloc_strict
+               : int (setfield_imm 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y[value<int>] : int
-               (setfield_imm 0 r y))
+             (function {nlocal = 2} r y[value<int>] audit_noalloc_strict
+               : int (setfield_imm 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y[value<int>] : int
-               (setfield_imm 0 r y))
+             (function {nlocal = 2} r y[value<int>] audit_noalloc_strict
+               : int (setfield_imm 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y : int (setfield_ptr 0 r y))
+             (function {nlocal = 2} r y audit_noalloc_strict : int
+               (setfield_ptr 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y : int (setfield_ptr 0 r y))
+             (function {nlocal = 2} r y audit_noalloc_strict : int
+               (setfield_ptr 0 r y))
            set_open_poly =
-             (function {nlocal = 2} r y : int (setfield_ptr 0 r y))
+             (function {nlocal = 2} r y audit_noalloc_strict : int
+               (setfield_ptr 0 r y))
            set_open_poly =
              (function {nlocal = 0} r y : int (setfield_ptr 0 r y)))
           (makeblock 0 int_ref var_ref vargen_ref cst_ref gen_ref flt_ref

@@ -32,7 +32,7 @@ let foo (r @ local) x = r.i <- x
 [%%expect{|
 (let
   (foo/1 =
-     (function {nlocal = 2} r/1[L] x/1 : int
+     (function {nlocal = 2} r/1[L] x/1 audit_noalloc_strict : int
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
@@ -61,9 +61,10 @@ let foo () =
        (let
          (r/3 = (makemutable 0 (*) "bar")
           store/0 =
-            (function {nlocal = 0} r/4 : int (setfield_ptr 0 r/4 "foobar")))
-         (function {nlocal = 1} param/1[L][value<int>] : int
-           (apply store/0 r/3)))))
+            (function {nlocal = 0} r/4 audit_noalloc_strict : int
+              (setfield_ptr 0 r/4 "foobar")))
+         (function {nlocal = 1} param/1[L][value<int>] audit_noalloc_strict
+           : int (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
 val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
 |}]
@@ -82,7 +83,7 @@ Warning 26 [unused-var]: unused variable "r".
      (function {nlocal = 1} param/2[L][value<int>]
        (region
          (let (r/5 =mut "bar")
-           (function {nlocal = 1} r/6[L] : int
+           (function {nlocal = 1} r/6[L] audit_noalloc_strict : int
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
@@ -100,9 +101,10 @@ let foo () =
        (let
          (r/7 = (makemutable 0 (*) "bar")
           store/1 =
-            (function {nlocal = 0} r/8 : int (setfield_ptr 0 r/8 "foobar")))
-         (function {nlocal = 1} param/4[L][value<int>] : int
-           (apply store/1 r/7)))))
+            (function {nlocal = 0} r/8 audit_noalloc_strict : int
+              (setfield_ptr 0 r/8 "foobar")))
+         (function {nlocal = 1} param/4[L][value<int>] audit_noalloc_strict
+           : int (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
 val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
 |}]
@@ -119,7 +121,9 @@ val foo : unit @ 'n -> unit @ 'm -> unit @ [> dynamic] = <fun>
 let fst x = fun y -> x
 [%%expect{|
 (let
-  (fst/0 = (function {nlocal = 0} x/3? (function {nlocal = 1} y/0[L]? x/3)))
+  (fst/0 =
+     (function {nlocal = 0} x/3?
+       (function {nlocal = 1} y/0[L]? audit_noalloc_strict x/3)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/0))
 val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
 |}]
@@ -137,8 +141,8 @@ let fst_local (x @ local) = exclave_ fun y -> x
 [%%expect{|
 (let
   (fst_local/0 =
-     (function {nlocal = 1} x/5[L]? : stack
-       (function[L] {nlocal = 1} y/2[L]? x/5)))
+     (function {nlocal = 1} x/5[L]? audit_noalloc_strict : stack
+       (function[L] {nlocal = 1} y/2[L]? audit_noalloc_strict x/5)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/0))
 val fst_local : 'a @ [< 'm > local] -> 'b @ 'n -> 'a @ [> 'm | local] = <fun>
 |}]
@@ -175,13 +179,17 @@ let use_yield (_ @ yielding) = ()
 let use_unyielding (_ @ unyielding) = ()
 let id x = x
 [%%expect{|
-(let (use_yield/0 = (function {nlocal = 1} param/6[L]? : int 0))
+(let
+  (use_yield/0 =
+     (function {nlocal = 1} param/6[L]? audit_noalloc_strict : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_yield" use_yield/0))
 val use_yield : 'a @ [> yielding] -> unit @ 'm = <fun>
-(let (use_unyielding/0 = (function {nlocal = 1} param/7[L]? : int 0))
+(let
+  (use_unyielding/0 =
+     (function {nlocal = 1} param/7[L]? audit_noalloc_strict : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_unyielding" use_unyielding/0))
 val use_unyielding : 'a @ [< unyielding] -> unit @ 'm = <fun>
-(let (id/0 = (function {nlocal = 1} x/6[L]? x/6))
+(let (id/0 = (function {nlocal = 1} x/6[L]? audit_noalloc_strict x/6))
   (apply (field_imm 1 (global Toploop!)) "id" id/0))
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
