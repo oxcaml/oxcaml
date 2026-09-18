@@ -230,4 +230,18 @@ ocamlc.byte;
   check-ocamlc.byte-output;
 }
 
+(* Regression test: mentioning a type of a non-closed unit whose members are
+   large mutually recursive declarations must verify each member once, not
+   once per reference (which is exponential). *)
+{
+  flags = "-I libd -nocwd -no-alias-deps -w -49";
+  module = "libd/rec_types.mli";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  flags = "-I libd -nocwd";
+  module = "libc/c8.mli";
+  ocamlc.byte;
+}
+
 *)
