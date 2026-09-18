@@ -174,7 +174,9 @@ and strengthen_lazy_decl ~aliasable md p =
   let open Subst.Lazy in
   match md.md_type with
   | Mty_alias _ -> md
-  | _ when aliasable -> {md with md_type = Mty_alias p}
+  | _ when aliasable ->
+      (* A module alias carries no modality. *)
+      {md with md_type = Mty_alias p; md_modalities = Mode.Modality.undefined}
   | mty -> {md with md_type = strengthen_lazy ~aliasable mty p}
 
 let strengthen ~aliasable mty p =
@@ -369,7 +371,10 @@ let rec sig_make_manifest sg =
     let md =
       match md.md_type with
       | Mty_alias _ -> md
-      | _ -> {md with md_type = Mty_alias (Pident id)}
+      | _ ->
+          (* A module alias carries no modality. *)
+          {md with md_type = Mty_alias (Pident id);
+                   md_modalities = Mode.Modality.undefined}
     in
     Sig_module(Ident.rename id, pres, md, rs, vis) :: sig_make_manifest rem
   | Sig_modtype(id, decl, vis) :: rem ->
@@ -470,6 +475,16 @@ let find_type_of_module ~strengthen ~aliasable env path =
   else
     (Env.find_module path env).md_type
 
+(* When a module alias (which carries no modality) is expanded into a real
+   module declaration, recover the modality from the mode of the alias's
+   target, relative to a fresh mode variable standing for the enclosing
+   module. *)
+let modality_of_alias_target env path =
+  let mode = Env.find_module_mode path env in
+  let mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
+  let md_mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
+  Mode.Modality.infer ~md_mode ~mode
+
 (* In nondep_supertype, env is only used for the type it assigns to id.
    Hence there is no need to keep env up-to-date by adding the bindings
    traversed. *)
@@ -546,7 +561,13 @@ and nondep_sig_item env va ids = function
       Sig_typext(id, Ctype.nondep_extension_constructor env ids ext, es, vis)
   | Sig_module(id, pres, md, rs, vis) ->
       let pres, mty = nondep_mty_with_presence env va ids pres md.md_type in
-      Sig_module(id, pres, {md with md_type = mty}, rs, vis)
+      let md_modalities =
+        match md.md_type, mty with
+        | Mty_alias _, Mty_alias _ -> md.md_modalities
+        | Mty_alias p, _ -> modality_of_alias_target env p
+        | _, _ -> md.md_modalities
+      in
+      Sig_module(id, pres, {md with md_type = mty; md_modalities}, rs, vis)
   | Sig_modtype(id, d, vis) ->
       Sig_modtype(id, nondep_modtype_decl env ids d, vis)
   | Sig_class(id, d, rs, vis) ->
@@ -852,15 +873,19 @@ let rec remove_aliases_mty env args pres mty =
   let res =
     match args.scrape env mty with
       Mty_signature sg ->
-        Mp_present, Mty_signature (remove_aliases_sig env args' sg)
-    | Mty_alias _ ->
-        let mty' = scrape_alias env mty in
-        if mty' = mty then begin
-          pres, mty
-        end else begin
-          args'.modified <- true;
-          remove_aliases_mty env args' Mp_present mty'
-        end
+        Mp_present, Mty_signature (remove_aliases_sig env args' Ident.empty sg)
+    | Mty_alias path -> begin
+        (* Expand the alias with non-aliasable strengthening (like
+           [scrape_for_type_of]) so members stay real declarations carrying
+           their modalities, rather than becoming aliases that would
+           immediately be expanded again. *)
+        match Env.find_module path env with
+        | exception Not_found -> pres, mty
+        | md ->
+            args'.modified <- true;
+            let mty' = strengthen ~aliasable:false md.md_type path in
+            remove_aliases_mty env args' Mp_present mty'
+      end
     | Mty_strengthen (mty,p,Aliasable) when not (args.exclude Strengthening p) ->
         let mty = strengthen ~aliasable:false mty p in
         args'.modified <- true;
@@ -875,7 +900,7 @@ let rec remove_aliases_mty env args pres mty =
     pres, mty
   end
 
-and remove_aliases_sig env args sg =
+and remove_aliases_sig env args siblings sg =
   match sg with
     [] -> []
   | Sig_module(id, pres, md, rs, priv) :: rem  ->
@@ -886,13 +911,33 @@ and remove_aliases_sig env args sg =
         | mty ->
             remove_aliases_mty env args pres mty
       in
-      Sig_module(id, pres, {md with md_type = mty} , rs, priv) ::
-      remove_aliases_sig (Env.add_module id pres mty env) args rem
+      let md_modalities =
+        match md.md_type, mty with
+        | Mty_alias _, Mty_alias _ -> md.md_modalities
+        | Mty_alias (Pident tid), _
+          when (match Ident.find_same tid siblings with
+                | modalities -> not (Mode.Modality.is_undefined modalities)
+                | exception Not_found -> false) ->
+            (* The alias's target is a sibling of this very signature: it is
+               not a real module and has no mode; the expanded alias has the
+               sibling's modality. *)
+            Ident.find_same tid siblings
+        | Mty_alias p, _ ->
+            (* The target is a real module: recover the modality from its
+               mode. The modality is zapped, as module types cannot contain
+               inferred modalities. *)
+            Mode.Modality.(
+              modality_of_alias_target env p |> zap_to_floor |> of_const)
+        | _, _ -> md.md_modalities
+      in
+      let siblings = Ident.add id md_modalities siblings in
+      Sig_module(id, pres, {md with md_type = mty; md_modalities}, rs, priv) ::
+      remove_aliases_sig (Env.add_module id pres mty env) args siblings rem
   | Sig_modtype(id, mtd, priv) :: rem ->
       Sig_modtype(id, mtd, priv) ::
-      remove_aliases_sig (Env.add_modtype id mtd env) args rem
+      remove_aliases_sig (Env.add_modtype id mtd env) args siblings rem
   | it :: rem ->
-      it :: remove_aliases_sig env args rem
+      it :: remove_aliases_sig env args siblings rem
 
 let scrape_for_functor_arg env mty =
   let exclude _id p =
