@@ -7888,26 +7888,27 @@ end
 module With_regionality = Mode_with (Regionality)
 module With_locality = Mode_with (Locality)
 
-let reported_mode_as_alloc_atom (Reported_mode.P (obj, m)) : Alloc.atom option =
+let reported_mode_as_alloc_atom (Reported_mode.P (obj, m)) :
+    With_locality.atom option =
   match obj with
-  | C.Locality -> Some (Alloc.Atom (Comonadic Areality, m))
+  | C.Locality -> Some (With_locality.Atom (Comonadic Areality, m))
   | C.Regionality ->
     begin match m with
     | C.Regionality.Global ->
-      Some (Alloc.Atom (Comonadic Areality, C.Locality.Global))
+      Some (With_locality.Atom (Comonadic Areality, C.Locality.Global))
     | C.Regionality.Local ->
-      Some (Alloc.Atom (Comonadic Areality, C.Locality.Local))
+      Some (With_locality.Atom (Comonadic Areality, C.Locality.Local))
     | C.Regionality.Regional -> None
     end
-  | C.Linearity -> Some (Alloc.Atom (Comonadic Linearity, m))
-  | C.Portability -> Some (Alloc.Atom (Comonadic Portability, m))
-  | C.Forkable -> Some (Alloc.Atom (Comonadic Forkable, m))
-  | C.Yielding -> Some (Alloc.Atom (Comonadic Yielding, m))
-  | C.Statefulness -> Some (Alloc.Atom (Comonadic Statefulness, m))
-  | C.Uniqueness_op -> Some (Alloc.Atom (Monadic Uniqueness, m))
-  | C.Contention_op -> Some (Alloc.Atom (Monadic Contention, m))
-  | C.Visibility_op -> Some (Alloc.Atom (Monadic Visibility, m))
-  | C.Staticity_op -> Some (Alloc.Atom (Monadic Staticity, m))
+  | C.Linearity -> Some (With_locality.Atom (Comonadic Linearity, m))
+  | C.Portability -> Some (With_locality.Atom (Comonadic Portability, m))
+  | C.Forkable -> Some (With_locality.Atom (Comonadic Forkable, m))
+  | C.Yielding -> Some (With_locality.Atom (Comonadic Yielding, m))
+  | C.Statefulness -> Some (With_locality.Atom (Comonadic Statefulness, m))
+  | C.Uniqueness_op -> Some (With_locality.Atom (Monadic Uniqueness, m))
+  | C.Contention_op -> Some (With_locality.Atom (Monadic Contention, m))
+  | C.Visibility_op -> Some (With_locality.Atom (Monadic Visibility, m))
+  | C.Staticity_op -> Some (With_locality.Atom (Monadic Staticity, m))
   | C.Monadic_op | C.Comonadic_with_locality | C.Comonadic_with_regionality ->
     None
 

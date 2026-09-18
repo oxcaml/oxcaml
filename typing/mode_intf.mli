@@ -1150,7 +1150,7 @@ module type S = sig
       to users and would be hard to understand if it involves [Regionality]. *)
   module With_locality : Mode with module Areality := Locality
 
-  val reported_mode_as_alloc_atom : Reported_mode.t -> Alloc.atom option
+  val reported_mode_as_alloc_atom : Reported_mode.t -> With_locality.atom option
 
   module Const : sig
     val with_locality_as_regionality :
