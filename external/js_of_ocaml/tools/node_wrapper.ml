@@ -11,7 +11,14 @@ let wasmedge_args =
   ; "--dir=/tmp"
   ]
 
-let extra_args_for_wasoo = [ "--experimental-wasm-wasmfx"; "--stack-size=10000" ]
+let extra_args_for_wasoo =
+  let effects_flags =
+    match Node_wrapper_per_engine.profile with
+    | "with-native-effects" | "wasi-with-native-effects" ->
+        [ "--experimental-wasm-wasmfx" ]
+    | _ -> []
+  in
+  effects_flags @ [ "--stack-size=10000" ]
 
 let extra_args_for_jsoo = []
 
