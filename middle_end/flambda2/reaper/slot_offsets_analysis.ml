@@ -143,7 +143,7 @@ module Inputs = struct
     { free_names; closure_function_decls; code_info }
 end
 
-let function_slots_to_be_built ~db ~code_changes ~get_code_info
+let function_slots_to_be_built ~db ~code_changes ~analysis_scope ~get_code_info
     ~closure_function_decls ~function_slot_rewrites ~function_slots =
   List.fold_left
     (fun new_slots (slot, closure_name) ->
@@ -172,9 +172,18 @@ let function_slots_to_be_built ~db ~code_changes ~get_code_info
             PTA.field_used db closure_name Field.known_arity_call_witness
             || PTA.field_used db closure_name Field.unknown_arity_call_witness
           then
+            (* Only participating units can change calling convention. Use the
+               solved decision, not eligibility, to detect a change. *)
             let changed_calling_convention =
-              Unboxing_analysis.is_changing_calling_convention code_changes
-                code_id
+              Analysis_scope.contains_unit analysis_scope
+                (Code_id.get_compilation_unit code_id)
+              &&
+              match
+                Unboxing_analysis.get_calling_convention_change code_changes
+                  code_id
+              with
+              | Not_changing_calling_convention -> false
+              | Changing_calling_convention _ -> true
             in
             Code_id
               { code_id;
@@ -217,8 +226,8 @@ let value_slots_to_be_built ~db ~unboxed_value_slots
    closures after rewriting. Returns [None] if the set of closures will not get
    built at all, e.g. if it has no usages. [closure_name] should be the name of
    any one of the closures in the set. *)
-let slots_to_be_built_for_set_of_closures ~db ~code_changes ~get_code_info
-    ~closure_function_decls ~unboxed_fields
+let slots_to_be_built_for_set_of_closures ~db ~code_changes ~analysis_scope
+    ~get_code_info ~closure_function_decls ~unboxed_fields
     ~(changed_representation :
        (Unboxing_analysis.changed_representation * Code_id_or_name.t)
        Code_id_or_name.Map.t) ~closure_name (set : PTA.function_and_value_slots)
@@ -249,14 +258,13 @@ let slots_to_be_built_for_set_of_closures ~db ~code_changes ~get_code_info
         Some unboxed_value_slots, Some function_slot_rewrites
     in
     Some
-      ( function_slots_to_be_built ~db ~code_changes ~get_code_info
-          ~closure_function_decls ~function_slot_rewrites
+      ( function_slots_to_be_built ~db ~code_changes ~analysis_scope
+          ~get_code_info ~closure_function_decls ~function_slot_rewrites
           ~function_slots:set.function_slots,
         value_slots_to_be_built ~db ~unboxed_value_slots set )
 
-let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
-    ({ db; unboxed_fields; changed_representation } : Unboxing_analysis.result)
-    =
+let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes ~db
+    ({ unboxed_fields; changed_representation; _ } : Unboxing_analysis.result) =
   let { Inputs.free_names; closure_function_decls; code_info } = inputs in
   let get_code_info code_id : Inputs.code_info =
     match Unboxing_analysis.find_code_metadata code_changes code_id with
@@ -294,8 +302,8 @@ let compute ~(inputs : Inputs.t) ~analysis_scope ~code_changes
             let set_slots' =
               match
                 slots_to_be_built_for_set_of_closures ~db ~code_changes
-                  ~get_code_info ~closure_function_decls ~unboxed_fields
-                  ~changed_representation ~closure_name set
+                  ~analysis_scope ~get_code_info ~closure_function_decls
+                  ~unboxed_fields ~changed_representation ~closure_name set
               with
               | None -> set_slots
               | Some slots -> slots :: set_slots

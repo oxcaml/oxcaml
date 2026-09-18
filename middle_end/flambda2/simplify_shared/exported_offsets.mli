@@ -90,11 +90,13 @@ val filter_by_compilation_unit : t -> keep:(Compilation_unit.t -> bool) -> t
 val partition_by_compilation_unit : t -> t Compilation_unit.Map.t
 
 (** Ensure the offsets for the given function slots are in the given exported
-    offsets. Only applies to function slots whose compilation units do not
-    satisfy [is_local]. *)
+    offsets. [is_local] says whether slots of the given compilation unit have
+    their offsets computed by the current process (rather than imported); such
+    slots are skipped. *)
 val reexport_function_slots :
   is_local:(Compilation_unit.t -> bool) -> Function_slot.Set.t -> t -> t
 
-(** Same as [reexport_function_slots], for value slots. *)
+(** Ensure the offsets for the given value slots are in the given exported
+    offsets. See [reexport_function_slots] regarding [is_local]. *)
 val reexport_value_slots :
   is_local:(Compilation_unit.t -> bool) -> Value_slot.Set.t -> t -> t

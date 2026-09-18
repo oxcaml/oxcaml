@@ -138,10 +138,10 @@
    Fields that are value slots or function slots originating from the current
    analysis scope are said to be *local*. Local fields are special, because we
    know all the places they are used: any constructor or accessor to a local
-   field in a compilation unit outside the scope comes necessarily from inlining
-   such a use from a unit of the scope, or type-based changed from the types
-   exported by a unit of the scope. As such, we can perform a much more precise
-   analysis on them.
+   field in a different compilation unit comes necessarily from inlining such a
+   use from the current compilation unit, or type-based changed from the types
+   exported by the current compilation unit. As such, we can perform a much more
+   precise analysis on them.
 
    Thus, let us assume we have a block $a$, with a local field $f$ containing a
    value $u$, and a block $b$, from which we read a value $v$ from the field

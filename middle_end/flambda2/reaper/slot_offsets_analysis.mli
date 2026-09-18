@@ -67,7 +67,9 @@ module Inputs : sig
 end
 
 (** Compute the slot offsets of the sets of closures that will be built after
-    rewriting. This runs at solve time. [code_changes] supplies solved calling
+    rewriting. This runs at solve time: for LTO, [inputs] is the union of the
+    participating units' inputs so that one consistent assignment of offsets is
+    computed for the whole program. [code_changes] supplies solved calling
     convention changes and metadata, determining whether a function slot may be
     partially applied and its size. Solved metadata is preferred over the
     traversal-time info in [inputs]. *)
@@ -75,5 +77,6 @@ val compute :
   inputs:Inputs.t ->
   analysis_scope:Analysis_scope.t ->
   code_changes:Unboxing_analysis.code_changes ->
+  db:Datalog.database ->
   Unboxing_analysis.result ->
   Slot_offsets.result

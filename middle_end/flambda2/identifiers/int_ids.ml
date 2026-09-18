@@ -527,6 +527,9 @@ module Variable = struct
 
     let print ppf t =
       let cu = compilation_unit t in
+      (* CR mvellacott: We've had to change the implementation here to prevent
+         an exception when no CU is set. This change is independent of LTO, so
+         could be a separate PR. *)
       if Current_unit.is_current cu
       then
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)

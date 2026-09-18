@@ -27,6 +27,7 @@ val rewrite_kind_with_subkind :
    that *)
 
 val prepare_rewrite_context :
+  db:Datalog.database ->
   Unboxing_analysis.result ->
   (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list ->
   rewrite_context

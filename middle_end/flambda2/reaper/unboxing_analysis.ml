@@ -369,8 +369,11 @@ let changed_representation_apply_renaming changed_representation renaming
 let cannot_change_witness_calling_convention =
   rel1 "cannot_change_witness_calling_convention" Cols.[n]
 
-let cannot_change_calling_convention =
-  rel1 "cannot_change_calling_convention" Cols.[n]
+let cannot_change_calling_convention_table =
+  Datalog.create_relation ~name:"cannot_change_calling_convention" Cols.[n]
+
+let cannot_change_calling_convention x =
+  cannot_change_calling_convention_table % [x]
 
 let cannot_change_representation0 = rel1 "cannot_change_representation0" Cols.[n]
 
@@ -699,10 +702,10 @@ let datalog_rules ~analysis_scope =
        ==> to_change_representation x) ]
 
 type result =
-  { db : Datalog.database;
-    unboxed_fields : unboxed Code_id_or_name.Map.t;
+  { unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    cannot_change_calling_convention : unit Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -712,8 +715,6 @@ type calling_convention_change =
         params_decisions : param_decision list;
         return_decisions : param_decision list
       }
-
-let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
     name_prefix =
@@ -798,17 +799,6 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let cannot_change_calling_convention_query =
-  let^? [x], [] = ["x"], [] in
-  [cannot_change_calling_convention x]
-
-let cannot_change_calling_convention ~analysis_scope uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not
-        (Analysis_scope.contains_unit analysis_scope
-           (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
-
 let perform_analysis0 db ~stats ~analysis_scope =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
@@ -892,6 +882,8 @@ let perform_analysis0 db ~stats ~analysis_scope =
                 PTA.get_direct_usages db
                   (Code_id_or_name.Map.singleton to_patch ())
               in
+              (* The new variables are binders in the rebuilt code where
+                 [to_patch] occurs, so they belong to its unit. *)
               let compilation_unit =
                 Code_id_or_name.compilation_unit to_patch
               in
@@ -958,6 +950,9 @@ let perform_analysis0 db ~stats ~analysis_scope =
                 in
                 add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
               | Set_of_closures l ->
+                (* The new slots describe the changed layout of the set of
+                   closures containing [code_id_or_name], so they belong to its
+                   unit. *)
                 let compilation_unit =
                   Code_id_or_name.compilation_unit code_id_or_name
                 in
@@ -998,18 +993,34 @@ let perform_analysis0 db ~stats ~analysis_scope =
             !changed_representation;
         unboxed, !changed_representation)
   in
-  { db; unboxed_fields = unboxed; changed_representation }
+  db, unboxed, changed_representation
 
 let perform_analysis db ~stats ~analysis_scope =
-  if
-    Flambda_features.reaper_unbox ()
-    && Flambda_features.reaper_change_calling_conventions ()
-  then perform_analysis0 db ~stats ~analysis_scope
-  else
-    { db;
-      unboxed_fields = Code_id_or_name.Map.empty;
-      changed_representation = Code_id_or_name.Map.empty
-    }
+  let db, unboxed_fields, changed_representation =
+    if
+      Flambda_features.reaper_unbox ()
+      && Flambda_features.reaper_change_calling_conventions ()
+    then perform_analysis0 db ~stats ~analysis_scope
+    else db, Code_id_or_name.Map.empty, Code_id_or_name.Map.empty
+  in
+  if Flambda_features.debug_reaper "db"
+  then Format.eprintf "%a@." Datalog.print db;
+  if Flambda_features.debug_reaper "print-solved"
+  then Format.printf "RESULT@ %a@." Datalog.print db;
+  { unboxed_fields;
+    changed_representation;
+    cannot_change_calling_convention =
+      Datalog.get_table cannot_change_calling_convention_table db
+  }
+
+let cannot_change_calling_convention ~analysis_scope uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not
+        (Analysis_scope.contains_unit analysis_scope
+           (Code_id.get_compilation_unit v)))
+  || Code_id_or_name.Map.mem
+       (Code_id_or_name.code_id v)
+       uses.cannot_change_calling_convention
 
 type code_change =
   { calling_convention_change : calling_convention_change;
@@ -1073,15 +1084,18 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
+let compute_code_changes ~db uses ~analysis_scope ~rewrite_kind_with_subkind
     ~code_deps =
+  let cannot_change_calling_convention =
+    cannot_change_calling_convention ~analysis_scope
+  in
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
   in
   let is_var_used var =
     match Variable.kind var with
     | Region | Rec_info -> true
-    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
+    | Value | Naked_number _ -> PTA.has_use db (Code_id_or_name.var var)
   in
   Code_id.Map.mapi
     (fun code_id (code_dep : Traverse_acc.code_dep) ->
@@ -1111,7 +1125,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
         else Code_metadata.with_is_my_closure_used false code_metadata
       in
       let calling_convention_change, code_metadata =
-        if cannot_change_calling_convention ~analysis_scope uses code_id
+        if cannot_change_calling_convention uses code_id
         then Not_changing_calling_convention, code_metadata
         else
           let params_decisions =
@@ -1212,11 +1226,6 @@ let get_calling_convention_change t code_id =
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
-
-let is_changing_calling_convention t code_id =
-  match get_calling_convention_change t code_id with
-  | Not_changing_calling_convention -> false
-  | Changing_calling_convention _ -> true
 
 let get_code_metadata t code_id =
   if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))

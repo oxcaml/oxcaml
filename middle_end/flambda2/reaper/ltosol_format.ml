@@ -75,7 +75,7 @@ let save ~filename ~participants
     ~solution:({ uses; code_changes; queries } : Reaper.Staged.solution)
     ~(slot_offsets : Slot_offsets.result) =
   let data =
-    Rebuild_solution.create_data ~queries ~unboxing:uses ~code_changes
+    Rebuild_solution.create_data ~queries ~unboxing:uses.unboxing ~code_changes
       ~slot_offsets:slot_offsets.exported_offsets
   in
   let by_unit = Rebuild_solution.partition_by_compilation_unit data in
@@ -173,8 +173,8 @@ let solution_for_members t ~members =
           (Format_doc.compat Compilation_unit.print)
           member)
     members;
-  Rebuild_solution.create_sharded
-    ~analysis_scope:(Lto_participants participants) ~get_unit:(get_unit t)
+  Rebuild_solution.create ~analysis_scope:(Lto_participants participants)
+    ~get_unit:(get_unit t)
 
 open Format_doc
 

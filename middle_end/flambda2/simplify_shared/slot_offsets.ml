@@ -38,6 +38,12 @@ type set_of_closures_slots =
     value_slots : Value_slot.Set.t
   }
 
+(* [is_local] says whether slots of the given compilation unit are laid out by
+   this offsets computation (as opposed to imported slots, whose offsets are
+   fixed by their own compilation unit). This is [Current_unit.is_current] for
+   ordinary compilations, but the LTO solve invocation lays out the slots of all
+   participating units at once. *)
+
 let[@inline] function_slot_is_used ~is_local ~used_function_slots v =
   if is_local (Function_slot.get_compilation_unit v)
   then Function_slot.Set.mem v used_function_slots

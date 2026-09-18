@@ -27,8 +27,7 @@
 
 open! Flambda.Import
 
-(** Materialised answers to the queries the rebuild makes of the solved
-    analysis, without a Datalog database. *)
+(** Materialised answers and offsets, without a Datalog database. *)
 type data
 
 val create_data :
@@ -49,23 +48,18 @@ val apply_renaming :
 
 val partition_by_compilation_unit : data -> data Compilation_unit.Map.t
 
+(** Rebuild queries load only the section owning their key. *)
 type t
 
-(** A solution backed by a single [data]. *)
+(** Any caching of loaded sections is the responsibility of [get_unit]. *)
 val create :
-  analysis_scope:Analysis_scope.t ->
-  queries:Rebuild_queries.t ->
-  unboxing:Unboxing_analysis.result ->
-  code_changes:Unboxing_analysis.code_changes ->
-  slot_offsets:Exported_offsets.t ->
-  t
-
-(** A solution sharded by compilation unit. *)
-val create_sharded :
   analysis_scope:Analysis_scope.t -> get_unit:(Compilation_unit.t -> data) -> t
 
 (** The analysis scope the solution was computed for. *)
 val analysis_scope : t -> Analysis_scope.t
+
+(** Use one in-memory data record for every compilation unit. *)
+val of_data : data -> analysis_scope:Analysis_scope.t -> t
 
 val has_use : t -> Code_id_or_name.t -> bool
 
@@ -93,14 +87,14 @@ val arguments_used_by_unknown_arity_call :
   'a list list ->
   ('a * Points_to_analysis.keep_or_delete) list list
 
-(** Missing metadata for code in the analysis scope is a fatal error. Missing
-    metadata for code outside the scope returns [None]. *)
+(** Missing metadata for a unit in the analysis scope is a fatal error. Missing
+    metadata outside the scope returns [None]. *)
 val find_code_metadata : t -> Code_id.t -> Code_metadata.t option
 
 (** Require metadata, including for code outside the analysis scope. *)
 val get_code_metadata : t -> Code_id.t -> Code_metadata.t
 
-(** Missing entries for code outside the analysis scope have unchanged calling
+(** Missing entries outside the analysis scope have unchanged calling
     conventions; missing entries inside the scope are fatal errors. *)
 val get_calling_convention_change :
   t -> Code_id.t -> Unboxing_analysis.calling_convention_change

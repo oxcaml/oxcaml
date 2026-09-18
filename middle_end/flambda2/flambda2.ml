@@ -516,7 +516,7 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
   in
   let participant_units = Compilation_unit.Set.of_list participants in
   let analysis_scope =
-    Flambda2_reaper.Analysis_scope.Lto_participants participant_units
+    Flambda2_reaper.Analysis.Scope.Lto_participants participant_units
   in
   (* Make the offsets of slots defined by units outside the solve available to
      [Slot_offsets.finalize_offsets]. The offsets of the participants' own slots
@@ -528,7 +528,7 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
         (Exported_offsets.filter_by_compilation_unit imported_offsets
            ~keep:(fun cu ->
              not
-               (Flambda2_reaper.Analysis_scope.contains_unit analysis_scope cu))))
+               (Flambda2_reaper.Analysis.Scope.contains_unit analysis_scope cu))))
     solve_data;
   let solution, slot_offsets =
     Flambda2_reaper.Reaper.Staged.solve ~slot_offsets_inputs ~analysis_scope

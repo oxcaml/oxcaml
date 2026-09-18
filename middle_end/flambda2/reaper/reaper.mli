@@ -74,7 +74,7 @@ module Staged : sig
       slot offsets. Mutates the graph by linking code references. *)
   val solve :
     slot_offsets_inputs:Slot_offsets_analysis.Inputs.t ->
-    analysis_scope:Analysis_scope.t ->
+    analysis_scope:Analysis.Scope.t ->
     solve_inputs:Solve_inputs.t list ->
     Global_flow_graph.graph ->
     solution * Slot_offsets.result

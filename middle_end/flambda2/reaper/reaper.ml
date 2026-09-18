@@ -353,19 +353,18 @@ module Staged = struct
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
-      then (
-        Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result uses;
-        Dot_printer.print_solved_dep uses deps)
+      then Dot_printer.print_solved_dep uses deps
     in
     let code_changes =
-      Unboxing_analysis.compute_code_changes uses ~analysis_scope
+      Unboxing_analysis.compute_code_changes ~db:uses.db uses.unboxing
+        ~analysis_scope
         ~rewrite_kind_with_subkind:
           (Types_rewriter.rewrite_kind_with_subkind uses.db)
         ~code_deps
     in
     let slot_offsets =
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
-        ~code_changes uses
+        ~code_changes ~db:uses.db uses.unboxing
     in
     let requests =
       List.fold_left
@@ -463,17 +462,20 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let typing =
     Rebuild.
       { context =
-          Types_rewriter.prepare_rewrite_context solution.uses
+          Types_rewriter.prepare_rewrite_context ~db:solution.uses.db
+            solution.uses.unboxing
             solve_inputs.Staged.Solve_inputs.all_sets_of_closures;
         code_deps = solve_inputs.Staged.Solve_inputs.code_deps;
         env = final_typing_env
       }
   in
-  let solution =
-    Rebuild_solution.create ~analysis_scope:Current_unit
-      ~queries:solution.queries ~unboxing:solution.uses
-      ~code_changes:solution.code_changes
+  let rebuild_data =
+    Rebuild_solution.create_data ~queries:solution.queries
+      ~unboxing:solution.uses.unboxing ~code_changes:solution.code_changes
       ~slot_offsets:slot_offsets.exported_offsets
+  in
+  let solution =
+    Rebuild_solution.of_data rebuild_data ~analysis_scope:Current_unit
   in
   let flambda, all_code, final_typing_env, free_names =
     Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution

@@ -133,35 +133,19 @@ let partition_by_compilation_unit data =
     ~f:(fun part slot_offsets -> { part with slot_offsets })
     partitions
 
-(* A single-unit solution is one record. A whole-program solution is sharded by
-   compilation unit, each shard holding the answers about the identifiers owned
-   by that unit. *)
-type store =
-  | Single_data of data
-  | Sharded_data of (Compilation_unit.t -> data)
-
 type t =
   { analysis_scope : Analysis_scope.t;
-    store : store
+    get_unit : Compilation_unit.t -> data
   }
 
-let create ~analysis_scope ~queries ~unboxing ~code_changes ~slot_offsets =
-  { analysis_scope;
-    store =
-      Single_data (create_data ~queries ~unboxing ~code_changes ~slot_offsets)
-  }
+let create ~analysis_scope ~get_unit = { analysis_scope; get_unit }
 
 let analysis_scope t = t.analysis_scope
 
-let create_sharded ~analysis_scope ~get_unit =
-  { analysis_scope; store = Sharded_data get_unit }
+let of_data data ~analysis_scope =
+  create ~analysis_scope ~get_unit:(fun _ -> data)
 
-let data_for_unit t compilation_unit =
-  match t.store with
-  | Single_data data -> data
-  | Sharded_data get_unit -> get_unit compilation_unit
-
-let data_for_id t id = data_for_unit t (Code_id_or_name.compilation_unit id)
+let data_for_id t id = t.get_unit (Code_id_or_name.compilation_unit id)
 
 let has_use t id = Rebuild_queries.has_use (data_for_id t id).queries id
 
@@ -178,7 +162,7 @@ let get_changed_representation t id =
     (Code_id_or_name.Map.find_opt id (data_for_id t id).changed_representation)
 
 let code_id_actually_directly_called t name =
-  let data = data_for_unit t (Name.compilation_unit name) in
+  let data = t.get_unit (Name.compilation_unit name) in
   Rebuild_queries.code_id_actually_directly_called data.queries name
 
 let arguments_used_by_known_arity_call t callee args =
@@ -204,7 +188,7 @@ let find_code_metadata_in_data t data code_id =
     None
 
 let find_code_metadata t code_id =
-  let data = data_for_unit t (Code_id.get_compilation_unit code_id) in
+  let data = t.get_unit (Code_id.get_compilation_unit code_id) in
   find_code_metadata_in_data t data code_id
 
 let get_code_metadata t code_id =
@@ -215,7 +199,7 @@ let get_code_metadata t code_id =
       Code_id.print code_id
 
 let get_calling_convention_change t code_id =
-  let data = data_for_unit t (Code_id.get_compilation_unit code_id) in
+  let data = t.get_unit (Code_id.get_compilation_unit code_id) in
   match find_code_metadata_in_data t data code_id with
   | Some _ -> UA.get_calling_convention_change data.code_changes code_id
   | None -> UA.Not_changing_calling_convention
@@ -225,7 +209,7 @@ let offsets_for_free_names t free_names =
     Function_slot.Set.fold
       (fun function_slot offsets ->
         let data =
-          data_for_unit t (Function_slot.get_compilation_unit function_slot)
+          t.get_unit (Function_slot.get_compilation_unit function_slot)
         in
         match
           Exported_offsets.function_slot_offset data.slot_offsets function_slot
@@ -240,7 +224,7 @@ let offsets_for_free_names t free_names =
   in
   Value_slot.Set.fold
     (fun value_slot offsets ->
-      let data = data_for_unit t (Value_slot.get_compilation_unit value_slot) in
+      let data = t.get_unit (Value_slot.get_compilation_unit value_slot) in
       match Exported_offsets.value_slot_offset data.slot_offsets value_slot with
       | Some info ->
         Exported_offsets.add_value_slot_offset offsets value_slot info

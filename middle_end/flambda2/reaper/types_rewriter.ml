@@ -119,7 +119,7 @@ type rewrite_context =
            have a given function slot *)
   }
 
-let prepare_rewrite_context result all_sets_of_closures =
+let prepare_rewrite_context ~db unboxing all_sets_of_closures =
   let sets_of_closures_by_function_slot =
     List.fold_left
       (fun acc set_of_closures ->
@@ -138,7 +138,7 @@ let prepare_rewrite_context result all_sets_of_closures =
           acc set_of_closures)
       Function_slot.Map.empty all_sets_of_closures
   in
-  { db = result.UA.db; unboxing = result; sets_of_closures_by_function_slot }
+  { db; unboxing; sets_of_closures_by_function_slot }
 
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the

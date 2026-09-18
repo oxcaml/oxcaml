@@ -81,10 +81,10 @@ type my_closure_param_decision =
 val print_param_decision : Format.formatter -> param_decision -> unit
 
 type result =
-  { db : Datalog.database;
-    unboxed_fields : unboxed Code_id_or_name.Map.t;
+  { unboxed_fields : unboxed Code_id_or_name.Map.t;
     changed_representation :
-      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
+      (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
+    cannot_change_calling_convention : unit Code_id_or_name.Map.t
   }
 
 type calling_convention_change =
@@ -101,12 +101,6 @@ type code_changes
 val get_calling_convention_change :
   code_changes -> Code_id.t -> calling_convention_change
 
-val is_changing_calling_convention : code_changes -> Code_id.t -> bool
-
-(** The metadata as updated by the code changes, or [None] for code ids without
-    an entry (in particular those of units that did not participate in the
-    solve). *)
-
 (* Should only be called on code_ids from the current unit. *)
 val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
 
@@ -114,7 +108,6 @@ val get_code_metadata : code_changes -> Code_id.t -> Code_metadata.t
     (in particular those of units that did not participate in the solve). *)
 val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
 
-val pp_result : Format.formatter -> result -> unit
 
 val empty_code_changes : code_changes
 
@@ -167,6 +160,7 @@ val perform_analysis :
   result
 
 val compute_code_changes :
+  db:Datalog.database ->
   result ->
   analysis_scope:Analysis_scope.t ->
   rewrite_kind_with_subkind:
