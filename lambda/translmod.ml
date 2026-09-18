@@ -1563,8 +1563,8 @@ let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
 (* [gm] must have been compiled with [-as-argument-for].
 
    CR-someday zqian: the fatal error below is reachable with stale
-   [.cmo]/[.cmx] artifacts, which are read without consistency checks;
-   it should be a user error. *)
+   [.cmo]/[.cmx] artifacts, because they are read without consistency
+   checks; such checks should be added. *)
 let project_arg_block ~find_impl_by_name ~chain ~(gm : Global_module.t)
       main_block =
   let fmt, arg_descr = find_impl_by_name ~chain (cu_of_impl gm) in
