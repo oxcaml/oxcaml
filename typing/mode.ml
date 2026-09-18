@@ -7554,6 +7554,11 @@ module Value_with (Areality : Areality) = struct
       let comonadic = Comonadic.Guts.get_ceil comonadic in
       merge { monadic; comonadic }
 
+    let get_floor { monadic; comonadic } =
+      let monadic = Monadic.Guts.get_floor monadic in
+      let comonadic = Comonadic.Guts.get_floor comonadic in
+      merge { monadic; comonadic }
+
     let in_bounds c { monadic; comonadic } =
       let c = split c in
       let monadic = Monadic.Guts.in_bounds c.monadic monadic in

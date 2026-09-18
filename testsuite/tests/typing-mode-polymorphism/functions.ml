@@ -66,8 +66,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -100,9 +100,10 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('c @ [> 'o] -> 'a @ [< 'n & global]) @ [< global] ->
-  'c @ [< 'o] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('mm0) & past('o) & global] ->
+  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< past('q) & global] ->
+   ('c @ [< 'p] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0)]) @ [> past('o)] =
+  <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
@@ -147,8 +148,8 @@ let rec recursive x n =
 [%%expect{|
 val recursive :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ portable) =
@@ -162,8 +163,8 @@ let recursive' = recursive
 [%%expect{|
 val recursive' :
   'a @ [< 'm & global] ->
-  int @ [< many read_write > dynamic] -> 'a @ [< global > 'm | dynamic] =
-  <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  'a @ [< global > 'm | dynamic] = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -237,7 +238,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let use_and_return x = ignore x; x
 [%%expect{|
 val use_and_return :
-  'a @ [< 'm & global many read_write] -> 'a @ [> 'm | aliased] = <fun>
+  'a @ [< 'm & global many uncontended forkable unyielding read_write] ->
+  'a @ [> 'm | aliased] = <fun>
 |}]
 
 (* contended values cannot be use_and_returned due to uncontended bound *)

@@ -26,8 +26,8 @@ val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 let foo f x = f x
 [%%expect{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let foo =
@@ -39,9 +39,11 @@ val foo : 'a @ [< 'm & global] -> 'a @ [> 'm | dynamic] = <fun>
 
 let foo a b = a + b
 [%%expect{|
-val foo : int @ 'n -> int @ 'm -> int @ [> dynamic] = <fun>
+val foo : int @ 'n -> (int @ 'm -> int @ [> dynamic]) @ [> stateful] = <fun>
 |}, Principal{|
-val foo : int @ [< global] -> int @ 'm -> int @ [> dynamic] = <fun>
+val foo :
+  int @ [< past('m) & global] ->
+  (int @ 'n -> int @ [> dynamic]) @ [> past('m) | stateful] = <fun>
 |}]
 
 
@@ -63,8 +65,8 @@ val foo : ('a, 'b) mytypemod @ [< 'm] -> 'b @ [> 'm mod portable] = <fun>
 let foo x z = x.y
 [%%expect{|
 val foo :
-  ('a, 'b) mytypemod @ [< 'm & global] -> 'c @ 'n -> 'b @ [> 'm mod portable] =
-  <fun>
+  ('a, 'b) mytypemod @ [< 'm & global] ->
+  ('c @ 'n -> 'b @ [> 'm mod portable]) @ [> close('m)] = <fun>
 |}]
 
 
@@ -74,7 +76,7 @@ let x =
   let _ @ uncontended = foo  (ref 41 : _ @ uncontended) in
   foo
 [%%expect{|
-val x : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val x : '_weak1 -> '_weak1 @ [> aliased nonportable stateful dynamic] = <fun>
 |}]
 
 type ('a,'b) mytype = { x : 'a; y : 'b }
@@ -85,15 +87,17 @@ type ('a, 'b) mytype = { x : 'a; y : 'b; }
 let foo x y = { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  'b @ [< 'm & global] -> ('a, 'b) mytype @ [> 'm | 'n] = <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> ('a, 'b) mytype @ [> 'n | 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let foo x = fun y -> { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  'b @ [< 'm & global] -> ('a, 'b) mytype @ [> 'm | 'n] = <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> ('a, 'b) mytype @ [> 'n | 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let foo x = { x; y = 42 }
@@ -115,21 +119,23 @@ type 'a myref = { mutable x : 'a; }
 let create a = { x = a }
 [%%expect{|
 val create :
-  'a @ [< 'm mod aliased dynamic & global many] ->
-  'a myref @ [> 'm | stateful] = <fun>
+  'a @ [< 'm mod aliased dynamic & global many forkable unyielding] ->
+  'a myref @ [> 'm | nonportable stateful] = <fun>
 |}]
 
 let read r = r.x
 [%%expect{|
 val read :
-  'a myref @ [< 'm & read] ->
+  'a myref @ [< 'm & shared read] ->
   'a @ [> 'm mod global many forkable unyielding | aliased dynamic] = <fun>
 |}]
 
 let store r = fun a -> r.x <- a
 [%%expect{|
 val store :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
+  'a myref @ [< past('m) & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) | corruptible writing] =
   <fun>
 |}]
 
@@ -143,15 +149,15 @@ val dupl : 'a @ [< 'm & global many] -> 'a * 'a @ [> 'm | aliased] = <fun>
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 let prod_eta x = fun y -> (x, y)
 [%%expect{|
 val prod_eta :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 let fst (a, _) = a
@@ -176,12 +182,15 @@ val foo :
 
 let foo x y = x
 [%%expect{|
-val foo : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
+val foo : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let foo x y = y
 [%%expect{|
-val foo : 'a @ [< global] -> 'b @ [< 'm] -> 'b @ [> 'm] = <fun>
+val foo :
+  'a @ [< past('m) & global] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> past('m)] =
+  <fun>
 |}]
 
 let id x = x
@@ -194,57 +203,66 @@ val foo : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm | dynamic] = <fun>
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'a @ [< 'o & global] -> 'b @ [< 'n] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('a @ [< 'q & global] ->
+   ('b @ [< 'p] -> 'c @ [> 'o | dynamic]) @ [> close('q) | past('mm1)]) @ [> past('mm0)] =
+  <fun>
 |}]
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> 'b @ 'n -> 'a @ [> 'm] = <fun>
+val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 let snd x = fun y -> y
 [%%expect{|
-val snd : 'a @ 'n -> 'b @ [< 'm] -> 'b @ [> 'm] = <fun>
+val snd : 'a @ 'o -> ('b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
 |}]
 
 let foo x y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many read_write] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'b @ 'm -> 'a ref @ [> aliased nonportable stateful dynamic] = <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many read_write > aliased] ->
-  'b @ 'm -> 'a ref @ [> aliased stateful dynamic] = <fun>
+  'a @ [< global many uncontended forkable unyielding read_write > aliased] ->
+  'b @ 'm -> 'a ref @ [> aliased nonportable stateful dynamic] = <fun>
 |}]
 
 let foo (x @ contended) y = x
 [%%expect{|
 val foo :
-  'a @ [< 'm & global > contended] -> 'b @ 'n -> 'a @ [> 'm | contended] =
-  <fun>
+  'a @ [< 'm & global > contended] ->
+  ('b @ 'n -> 'a @ [> 'm | contended]) @ [> close('m)] = <fun>
 |}]
 
 let foo x y z = 42
 [%%expect{|
-val foo : 'a @ [< global] -> 'b @ [< global] -> 'c @ 'n -> int @ 'm = <fun>
+val foo :
+  'a @ [< past('o) & past('m) & global] ->
+  ('b @ [< past('n) & global] ->
+   ('c @ 'q -> int @ 'p) @ [> past('n) | past('o)]) @ [> past('m)] =
+  <fun>
 |}]
 
 let foo x y = (x, y)
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 let foo x y z = (y,z)
 [%%expect{|
 val foo :
-  'a @ [< global] ->
-  'b @ [< 'n & global] -> 'c @ [< 'm & global] -> 'b * 'c @ [> 'm | 'n] =
+  'a @ [< past('o) & past('m) & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'p & global] -> 'b * 'c @ [> 'p | 'n]) @ [> close('n) | past('o)]) @ [> past('m)] =
   <fun>
 |}]
 
@@ -278,16 +296,18 @@ val foo : unit -> unit = <fun>
 
 let foo (y @ unique) (z @ portable) = z
 [%%expect{|
-val foo : 'a @ [< global unique] -> 'b @ [< 'm & portable] -> 'b @ [> 'm] =
-  <fun>
+val foo :
+  'a @ [< past('m) & global unique] ->
+  ('b @ [< 'n & portable] -> 'b @ [> 'n]) @ [> past('m)] = <fun>
 |}]
 
 let foo (x @ local) (y @ unique) (z @ portable) = exclave_ (x, y, z)
 [%%expect{|
 val foo :
-  'a @ [< 'o > local] ->
-  'b @ [< 'n & unique] ->
-  'c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local] = <fun>
+  'a @ [< 'm > local] ->
+  ('b @ [< 'n & unique] ->
+   ('c @ [< 'o & portable] -> 'a * 'b * 'c @ [> 'o | 'n | 'm | local]) @ [> close('n) | close('m) | local]) @ [> close('m) | local] =
+  <fun>
 |}]
 
 (* if a type is annotated, mode crossing has an effect on the bounds of mode variable *)
@@ -298,22 +318,38 @@ let foo (x : intref) (f : intref @ local -> int) = f x
 [%%expect{|
 type intref = { mutable v : int; }
 val foo :
-  intref @ [< global read_write] ->
+  intref @ [< global uncontended read_write] ->
   (intref @ local -> int) @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
+  (int -> int) @ [< 'p mod aliased contended immutable & past('o) & past('m) & global] ->
+  ('a @ [< past('n) & global] ->
+   ('b @ 'q -> (int -> int) @ [> 'p]) @ [> past('n) | past('o)]) @ [> past('m)] =
+  <fun>
+|}, Principal{|
+val foo :
   (int -> int) @ [< 'm mod aliased contended immutable & global] ->
-  'a @ [< global] -> 'b @ 'n -> (int -> int) @ [> 'm] = <fun>
+  ('a @ [< past('n) & global] ->
+   ('b @ 'o -> (int -> int) @ [> 'm]) @ [> close('m) mod many portable stateless | past('n)]) @ [> close('m) mod many portable stateless] =
+  <fun>
 |}]
 
 let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
 [%%expect{|
 val foo :
-  (intref @ local -> int) @ [< global] ->
-  intref @ [< global read_write] -> intref @ 'm -> int @ [> dynamic] = <fun>
+  (intref @ local -> int) @ [< past('o) & past('m) & global] ->
+  (intref @ [< past('n) & global uncontended read_write] ->
+   (intref @ 'p -> int @ [> dynamic]) @ [> past('n) mod many portable forkable unyielding stateless | past('o) | nonportable stateful]) @ [> past('m)] =
+  <fun>
+|}, Principal{|
+val foo :
+  (intref @ local -> int) @ [< past('o) & past('m) & global] ->
+  (intref @ [< past('n) & global uncontended read_write] ->
+   (intref @ 'p -> int @ [> dynamic]) @ [> past('n) | past('o) | nonportable stateful]) @ [> past('m)] =
+  <fun>
 |}]
 
 (* aliases of non-polymorphic functions *)
@@ -326,19 +362,21 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
-  'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  ('a @ [> past('m) | aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('o) & past('m) & past('n) & global many forkable unyielding] ->
+  ('a list @ [< global many uncontended forkable unyielding read_write] ->
+   'b list @ [> past('o) | aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
+  <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> past('m) | aliased stateful dynamic] ->
-   'b @ [< global many read_write]) @ [< past('n) & past('m) & global many] ->
-  'a list @ [< global many read_write] ->
-  'b list @ [> past('n) | aliased stateful dynamic] = <fun>
+  ('a @ [> past('m) | aliased nonportable stateful dynamic] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< past('o) & past('m) & past('n) & global many forkable unyielding] ->
+  ('a list @ [< global many uncontended forkable unyielding read_write] ->
+   'b list @ [> past('o) | aliased nonportable stateful dynamic]) @ [> past('n) | stateful] =
+  <fun>
 |}]
 
 (* modules *)
@@ -363,8 +401,8 @@ module Counter : sig type t val incr : t -> t val to_int : t -> int end
 let incr n = Counter.incr n
 [%%expect{|
 val incr :
-  Counter.t @ [< global many read_write] ->
-  Counter.t @ [> aliased stateful dynamic] = <fun>
+  Counter.t @ [< global many uncontended forkable unyielding read_write] ->
+  Counter.t @ [> aliased nonportable stateful dynamic] = <fun>
 |}]
 
 let incr = Counter.incr
@@ -438,7 +476,8 @@ Error: Signature mismatch:
        is not included in
          val illegal : t -> t @ portable
        The type
-         "t @ [< 'm > stateful dynamic] -> t @ [> 'm | stateful dynamic]"
+         "t @ [< 'm > nonportable stateful dynamic] ->
+         t @ [> 'm | nonportable stateful dynamic]"
        is not compatible with the type "t -> t @ portable"
 |}]
 
@@ -457,8 +496,8 @@ let unwrap_or default = function
   | Some' x -> x
 [%%expect{|
 val unwrap_or :
-  'a @ [< 'n & global] -> 'a option' @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('a option' @ [< 'n] -> 'a @ [> 'n | 'm | dynamic]) @ [> close('m)] = <fun>
 |}]
 
 type ('a, 'b) either = Left of 'a | Right of 'b
@@ -469,9 +508,10 @@ let map_left f = function
 [%%expect{|
 type ('a, 'b) either = Left of 'a | Right of 'b
 val map_left :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('a, 'c) either @ [< 'o & 'n & global] ->
-  ('b, 'c) either @ [> 'o | 'm | dynamic] = <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  (('a, 'c) either @ [< 'p & 'n & global] ->
+   ('b, 'c) either @ [> 'p | 'm | dynamic]) @ [> past('o)] =
+  <fun>
 |}]
 
 (* recursive functions *)
@@ -501,12 +541,16 @@ val map :
 let choose b x y = if b then x else y
 [%%expect{|
 val choose :
-  bool @ 'o ->
-  'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>
+  bool @ 'p ->
+  ('a @ [< 'n & global] ->
+   ('a @ [< 'o] -> 'a @ [> 'o | 'n | dynamic]) @ [> close('n)]) @ 'm =
+  <fun>
 |}, Principal{|
 val choose :
-  bool @ [< global] ->
-  'a @ [< 'n & global] -> 'a @ [< 'm] -> 'a @ [> 'm | 'n | dynamic] = <fun>
+  bool @ [< past('o) & past('m) & global] ->
+  ('a @ [< 'n & global] ->
+   ('a @ [< 'p] -> 'a @ [> 'p | 'n | dynamic]) @ [> close('n) | past('o)]) @ [> past('m)] =
+  <fun>
 |}]
 
 (* nested closures *)
@@ -514,7 +558,9 @@ val choose :
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'm & global] -> unit @ 'p -> unit @ 'o -> unit @ 'n -> 'a @ [> 'm] =
+  'a @ [< 'm & global] ->
+  (unit @ 'p ->
+   (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)]) @ [> close('m)] =
   <fun>
 |}]
 
@@ -523,7 +569,8 @@ val nest :
 let use_and_return x = ignore x; x
 [%%expect{|
 val use_and_return :
-  'a @ [< 'm & global many read_write] -> 'a @ [> 'm | aliased] = <fun>
+  'a @ [< 'm & global many uncontended forkable unyielding read_write] ->
+  'a @ [> 'm | aliased] = <fun>
 |}]
 
 (* multiple distinct mode variables *)
@@ -536,8 +583,8 @@ val swap : 'a * 'b @ [< 'm & global] -> 'b * 'a @ [> 'm] = <fun>
 let both_id x y = (x, y)
 [%%expect{|
 val both_id :
-  'a @ [< 'n & global] -> 'b @ [< 'm & global] -> 'a * 'b @ [> 'm | 'n] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 (* let bindings preserving modes *)
@@ -558,8 +605,8 @@ let map_option f = function
   | Some x -> Some (f x)
 [%%expect{|
 val map_option :
-  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< global] ->
-  'a option @ [< 'n] -> 'b option @ [> 'm | dynamic] = <fun>
+  ('a @ [> 'n | dynamic] -> 'b @ [< 'm & global]) @ [< past('o) & global] ->
+  ('a option @ [< 'n] -> 'b option @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 (* Currying over three arguments *)
@@ -567,29 +614,150 @@ val map_option :
 let triple x y z = (x, y, z)
 [%%expect{|
 val triple :
-  'a @ [< 'o & global] ->
-  'b @ [< 'n & global] ->
-  'c @ [< 'm & global] -> 'a * 'b * 'c @ [> 'm | 'n | 'o] = <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'o & global] -> 'a * 'b * 'c @ [> 'o | 'n | 'm]) @ [> close('n) | close('m)]) @ [> close('m)] =
+  <fun>
 |}]
 
 let flip f (x, y) = f (y, x)
 [%%expect{|
 val flip :
-  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b * 'a @ [< 'n & global] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< past('o) & global] ->
+  ('b * 'a @ [< 'n & global] -> 'c @ [> 'm | dynamic]) @ [> past('o)] = <fun>
 |}]
 
 let flip f x y = f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
+  <fun>
 |}]
 
 
 let flip f = fun x -> fun y -> f y x
 [%%expect{|
 val flip :
-  ('a @ [> 'o] -> 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< global] ->
-  'b @ [< 'n & global] -> 'a @ [< 'o] -> 'c @ [> 'm | dynamic] = <fun>
+  ('a @ [< past('m) > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> past('m) | past('n)]) @ [< past('mm1) & past('n) & past('mm0) & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [> 'o | dynamic]) @ [> close('p) | past('mm1)]) @ [> past('mm0)] =
+  <fun>
+|}]
+
+(* CR dkalinichenko: the second definition should print [stateful nonportable]. *)
+
+let stateful x : _ @ stateful = x
+let stateful_nonportable x : _ @ stateful nonportable = x
+[%%expect{|
+val stateful : 'a @ [< 'm] -> 'a @ [> 'm | stateful] = <fun>
+val stateful_nonportable : 'a @ [< 'm] -> 'a @ [> 'm | nonportable stateful] =
+  <fun>
+|}]
+
+(* CR dkalinichenko: the printing loses information that the argument [f] and the returned
+   [f] must have equal modes (in addition to having the same constraints). *)
+
+let call_and_return f x = f x, f
+[%%expect{|
+val call_and_return :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('p) & past('o) & global many] ->
+  ('a @ [< 'n] ->
+   'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | past('p) | aliased dynamic]) @ [> past('o)] =
+  <fun>
+|}, Principal{|
+val call_and_return :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many] ->
+  ('a @ [< 'n] ->
+   'b * ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> 'm | 'o | aliased dynamic]) @ [> close('o)] =
+  <fun>
+|}]
+
+(* CR dkalinichenko: the second definition should retain the [global] upper
+   bound on its intermediate closure. *)
+
+let opaque_return x y = Sys.opaque_identity x
+let global_opaque_return x : _ @ global = fun y -> Sys.opaque_identity x
+[%%expect{|
+val opaque_return :
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
+val global_opaque_return :
+  'a @ [< global many uncontended forkable unyielding read_write] ->
+  'b @ 'm -> 'a @ [> aliased nonportable stateful dynamic] = <fun>
+|}]
+
+let _ : (string -> (unit -> string) @ local) ref = ref opaque_return
+[%%expect{|
+- : (string -> (unit -> string) @ local) ref = {contents = <fun>}
+|}]
+
+let _ : (string -> (unit -> string) @ local) ref = ref global_opaque_return
+[%%expect{|
+Line 1, characters 51-75:
+1 | let _ : (string -> (unit -> string) @ local) ref = ref global_opaque_return
+                                                       ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a -> 'b -> 'a) ref"
+       but an expression was expected of type
+         "(string -> (unit -> string) @ local) ref"
+       Type "'a -> 'b -> 'a" is not compatible with type
+         "string -> (unit -> string) @ local"
+Hint: This function application is partial, maybe some arguments are missing.
+|}]
+
+(* CR dkalinichenko: with [-principal], [past('p)] on the final closure
+   should also appear as an upper bound on [c]. *)
+
+type 'a cell = { mutable v : 'a }
+
+let store_and_read c x () =
+  c.v <- x;
+  let _ = c.v in
+  ()
+[%%expect{|
+type 'a cell = { mutable v : 'a; }
+val store_and_read :
+  'a cell @ [< past('n) & global uncontended read_write] ->
+  ('a @ [< past('m) & global many uncontended forkable unyielding read_write] ->
+   (unit @ 'mm0 -> unit @ 'q) @ [> past('o) | past('p) mod many forkable unyielding | nonportable stateful]) @ [> past('m) | past('n) mod many forkable unyielding | nonportable stateful] =
+  <fun>
+|}, Principal{|
+type 'a cell = { mutable v : 'a; }
+val store_and_read :
+  'a cell @ [< past('n) & global uncontended read_write] ->
+  ('a @ [< past('m) & global many uncontended forkable unyielding read_write] ->
+   (unit @ 'mm0 -> unit @ 'q) @ [> past('o) | past('p) | nonportable stateful]) @ [> past('m) | past('n) | nonportable stateful] =
+  <fun>
+|}]
+
+let _ :
+    (string cell @ once ->
+     (string -> (unit -> unit) @ once) @ once) ref =
+  ref store_and_read
+[%%expect{|
+- : (string cell @ once -> string -> unit -> unit) ref = {contents = <fun>}
+|}]
+
+(* With [-principal], the underlying constraint prevents a [many] final closure
+   when [c] is [once]. The surrounding [ref] prevents subsumption. *)
+let _ :
+    (string cell @ once ->
+     (string -> (unit -> unit) @ many) @ once) ref =
+  ref store_and_read
+[%%expect{|
+- : (string cell @ once -> string -> (unit -> unit)) ref = {contents = <fun>}
+|}, Principal{|
+Line 4, characters 2-20:
+4 |   ref store_and_read
+      ^^^^^^^^^^^^^^^^^^
+Error: This expression has type
+         "(string cell @ once -> string -> unit -> unit) ref"
+       but an expression was expected of type
+         "(string cell @ once -> string -> (unit -> unit)) ref"
+       Type "string -> (unit -> unit) @ once" is not compatible with type
+         "string -> unit -> unit"
+Hint: This function application is partial, maybe some arguments are missing.
 |}]
