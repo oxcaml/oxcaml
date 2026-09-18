@@ -131,6 +131,14 @@ let toplevel_value id =
   try Ident.find_same id !remembered
   with _ -> failwith ("Unknown ident: " ^ Ident.unique_name id)
 
+let phrase_static_data : Slambdaeval.CU_data.t Compilation_unit.Tbl.t =
+  Compilation_unit.Tbl.create 16
+
+let cu_static_data cu =
+  match Compilation_unit.Tbl.find_opt phrase_static_data cu with
+  | Some _ as data -> data
+  | None -> Compilenv.get_static_data cu
+
 let close_phrase lam =
   let open Lambda in
   Ident.Set.fold (fun id l ->
@@ -138,7 +146,7 @@ let close_phrase lam =
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
-             [Lprim (Pgetglobal (glb, Dynamic), [], Loc_unknown)],
+             [Lprim (Pgetglobal (glb, Static), [], Loc_unknown)],
              Loc_unknown)
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
@@ -352,13 +360,11 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let (_static_data, rawlam) =
-    (* CR layout poly: If this toplevel value is static we should keep the
-       comptime part in a separate table so we can use it in later expressions.
-    *)
-    Slambda.eval ~cu_static_data:Compilenv.get_static_data
+  let (static_data, rawlam) =
+    Slambda.eval ~cu_static_data
       (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
+  Compilation_unit.Tbl.replace phrase_static_data compilation_unit static_data;
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam =
     Simplif.simplify_lambda rawlam

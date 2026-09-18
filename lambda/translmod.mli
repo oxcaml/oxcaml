@@ -96,6 +96,7 @@ type error =
   Circular_dependency of (Ident.t * unsafe_info) list
 | Conflicting_inline_attributes
 | Instantiating_packed of Compilation_unit.t
+| Coercion_returns_template
 
 exception Error of Location.t * error
 

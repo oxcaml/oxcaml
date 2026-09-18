@@ -6486,6 +6486,9 @@ module Monadic = struct
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (Max_with_simple (ax, Id)) (S.disallow_left m)
 
+  let max_with ax m =
+    S.apply ~hint:Skip Obj.obj (Min_with_simple (ax, Id)) (S.disallow_right m)
+
   let zap_to_legacy_force ?commit ~arg m : Const.t =
     let uniqueness =
       proj Uniqueness m |> Uniqueness.zap_to_legacy_force ?commit
@@ -7267,6 +7270,13 @@ module Mode_with (Areality : Areality) = struct
     let monadic = Monadic.min_with ax m in
     let comonadic =
       Comonadic.min |> Comonadic.disallow_right |> Comonadic.allow_left
+    in
+    { comonadic; monadic }
+
+  let max_with_monadic ax m =
+    let monadic = Monadic.max_with ax m in
+    let comonadic =
+      Comonadic.max |> Comonadic.disallow_left |> Comonadic.allow_right
     in
     { comonadic; monadic }
 
