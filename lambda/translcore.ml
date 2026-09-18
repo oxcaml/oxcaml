@@ -1508,7 +1508,10 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
       let funcid_duid = Lambda.debug_uid_none in
-      let return_layout = layout_unit (* Probe bodies have type unit. *) in
+      (* Probe bodies have type unit, but the handler returns [#()] so that the
+         probe call has no return value. *)
+      let return_layout = layout_unboxed_unit in
+      let body = Lprim (Punbox_unit, [body], of_location ~scopes exp.exp_loc) in
       let handler =
         let assume_zero_alloc = get_assume_zero_alloc ~scopes in
         let scopes = enter_value_definition ~scopes ~assume_zero_alloc funcid in
@@ -1547,7 +1550,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
       let lam =
         if !Clflags.emit_optimized_probes then
           let ap_probe = Some {name; enabled_at_init} in
-          Lapply (app ~ap_probe)
+          Lsequence (Lapply (app ~ap_probe), lambda_unit)
         else
           (* Slower implementation of probes where there isn't clever
              architecture-specific codegen. Read the semaphore each time. *)
@@ -1556,8 +1559,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
                  (Pprobe_is_enabled
                     { name; enabled_at_init = Some enabled_at_init },
                       [], ap_loc),
-               (* probe handler has type [unit] *)
-               Lapply (app ~ap_probe:None),
+               Lsequence (Lapply (app ~ap_probe:None), lambda_unit),
                lambda_unit,
                layout_unit ))
       in
