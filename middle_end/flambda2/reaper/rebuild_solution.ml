@@ -28,7 +28,7 @@
 open! Flambda.Import
 module UA = Unboxing_analysis
 
-type t =
+type data =
   { queries : Rebuild_queries.t;
     unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
     changed_representation :
@@ -36,41 +36,53 @@ type t =
     code_changes : UA.code_changes
   }
 
-let create ~queries ~(unboxing : UA.result) ~code_changes =
-  { queries;
-    unboxed_fields = unboxing.unboxed_fields;
-    changed_representation = unboxing.changed_representation;
-    code_changes
+type t =
+  { analysis_scope : Analysis_scope.t;
+    data : data
   }
 
-let has_use t id = Rebuild_queries.has_use t.queries id
+let create ~analysis_scope ~queries ~(unboxing : UA.result) ~code_changes =
+  { analysis_scope;
+    data =
+      { queries;
+        unboxed_fields = unboxing.unboxed_fields;
+        changed_representation = unboxing.changed_representation;
+        code_changes
+      }
+  }
 
-let has_source t id = Rebuild_queries.has_source t.queries id
+let has_use t id = Rebuild_queries.has_use t.data.queries id
 
-let field_used t id field = Rebuild_queries.field_used t.queries id field
+let has_source t id = Rebuild_queries.has_source t.data.queries id
 
-let get_unboxed_fields t id = Code_id_or_name.Map.find_opt id t.unboxed_fields
+let field_used t id field = Rebuild_queries.field_used t.data.queries id field
+
+let get_unboxed_fields t id =
+  Code_id_or_name.Map.find_opt id t.data.unboxed_fields
 
 let get_changed_representation t id =
-  Option.map fst (Code_id_or_name.Map.find_opt id t.changed_representation)
+  Option.map fst (Code_id_or_name.Map.find_opt id t.data.changed_representation)
 
 let code_id_actually_directly_called t name =
-  Rebuild_queries.code_id_actually_directly_called t.queries name
+  Rebuild_queries.code_id_actually_directly_called t.data.queries name
 
 let arguments_used_by_known_arity_call t callee args =
-  Rebuild_queries.arguments_used_by_known_arity_call t.queries callee args
+  Rebuild_queries.arguments_used_by_known_arity_call t.data.queries callee args
 
 let arguments_used_by_unknown_arity_call t callee args =
-  Rebuild_queries.arguments_used_by_unknown_arity_call t.queries callee args
+  Rebuild_queries.arguments_used_by_unknown_arity_call t.data.queries callee
+    args
 
 let find_code_metadata t code_id =
-  match UA.find_code_metadata t.code_changes code_id with
+  match UA.find_code_metadata t.data.code_changes code_id with
   | Some _ as metadata -> metadata
   | None ->
-    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    if
+      Analysis_scope.contains_unit t.analysis_scope
+        (Code_id.get_compilation_unit code_id)
     then
       Misc.fatal_errorf
-        "Rebuild_solution: code_id %a is in the current unit but missing in \
+        "Rebuild_solution: code_id %a is in the analysis scope but missing in \
          code changes"
         Code_id.print code_id;
     None
@@ -84,7 +96,7 @@ let get_code_metadata t code_id =
 
 let get_calling_convention_change t code_id =
   match find_code_metadata t code_id with
-  | Some _ -> UA.get_calling_convention_change t.code_changes code_id
+  | Some _ -> UA.get_calling_convention_change t.data.code_changes code_id
   | None -> UA.Not_changing_calling_convention
 
 let is_changing_calling_convention t code_id =

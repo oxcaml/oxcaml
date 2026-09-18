@@ -27,18 +27,18 @@
 
 module Graph = Global_flow_graph
 
-(* Look up the referenced code among the code of the current unit. Since we use
-   this module for cross unit calls, it currently always returns [None]. This
-   will change once we add support for link-time optimization.  *)
-let find_code_dep ~code_deps code_id =
-  if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+let find_code_dep ~analysis_scope ~code_deps code_id =
+  if
+    not
+      (Analysis_scope.contains_unit analysis_scope
+         (Code_id.get_compilation_unit code_id))
   then None
   else
     match Code_id.Map.find_opt code_id code_deps with
     | Some code_dep -> Some code_dep
     | None ->
-      Misc.fatal_errorf "Missing code dep for local code ID %a" Code_id.print
-        code_id
+      Misc.fatal_errorf "Missing code dep for code ID %a in the analysis scope"
+        Code_id.print code_id
 
 let add_alias_for_caller graph ~caller ~from ~to_ =
   match caller with
@@ -48,15 +48,16 @@ let add_alias_for_caller graph ~caller ~from ~to_ =
       ~if_used:(Code_id_or_name.code_id code_id)
       ~from ~to_
 
-let link_closure graph ~code_deps ~closure ~code_id =
-  match find_code_dep ~code_deps code_id with
+let link_closure graph ~analysis_scope ~code_deps ~closure ~code_id =
+  match find_code_dep ~analysis_scope ~code_deps code_id with
   | Some code_dep ->
     Traverse_acc.connect_closure graph ~closure ~code_id code_dep
   | None ->
     (* A fresh node standing for the unknown code. *)
     let external_witness =
       Code_id_or_name.var
-        (Variable.create
+        (Variable.create_in_compilation_unit
+           ~compilation_unit:(Code_id.get_compilation_unit code_id)
            (Format.asprintf "external_code_id_witness_%s" (Code_id.name code_id))
            Flambda_kind.value)
     in
@@ -68,9 +69,9 @@ let link_closure graph ~code_deps ~closure ~code_id =
     Graph.add_constructor_dep graph ~base:external_witness
       Field.code_id_of_call_witness ~from:closure
 
-let link_direct_call graph ~code_deps ~le_monde_exterieur ~call ~code_id
-    ~closure ~caller =
-  match find_code_dep ~code_deps code_id with
+let link_direct_call graph ~analysis_scope ~code_deps ~le_monde_exterieur ~call
+    ~code_id ~closure ~caller =
+  match find_code_dep ~analysis_scope ~code_deps code_id with
   | Some (code_dep : Traverse_acc.code_dep) ->
     add_alias_for_caller graph ~caller ~to_:call
       ~from:code_dep.known_arity_call_witness;
@@ -97,13 +98,13 @@ let link_direct_call graph ~code_deps ~le_monde_exterieur ~call ~code_id
             ~from:closure)
       closure
 
-let link graph ~code_deps ~le_monde_exterieur references =
+let link graph ~analysis_scope ~code_deps ~le_monde_exterieur references =
   List.iter
     (fun (reference : Traverse_acc.code_reference) ->
       match reference with
       | Closure { closure; code_id } ->
-        link_closure graph ~code_deps ~closure ~code_id
+        link_closure graph ~analysis_scope ~code_deps ~closure ~code_id
       | Direct_call { call; code_id; closure; caller } ->
-        link_direct_call graph ~code_deps ~le_monde_exterieur ~call ~code_id
-          ~closure ~caller)
+        link_direct_call graph ~analysis_scope ~code_deps ~le_monde_exterieur
+          ~call ~code_id ~closure ~caller)
     references

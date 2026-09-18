@@ -19,3 +19,7 @@ let[@inline always] pattern_match' t ~code_id ~name =
   pattern_match t ~code_id
     ~var:(fun var -> (name [@inlined hint]) (Name.var var))
     ~symbol:(fun symbol -> (name [@inlined hint]) (Name.symbol symbol))
+
+let compilation_unit t =
+  pattern_match t ~code_id:Code_id.get_compilation_unit
+    ~var:Variable.compilation_unit ~symbol:Symbol.compilation_unit

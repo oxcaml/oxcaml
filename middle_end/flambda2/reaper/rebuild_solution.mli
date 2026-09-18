@@ -32,6 +32,7 @@ open! Flambda.Import
 type t
 
 val create :
+  analysis_scope:Analysis_scope.t ->
   queries:Rebuild_queries.t ->
   unboxing:Unboxing_analysis.result ->
   code_changes:Unboxing_analysis.code_changes ->
@@ -63,15 +64,15 @@ val arguments_used_by_unknown_arity_call :
   'a list list ->
   ('a * Points_to_analysis.keep_or_delete) list list
 
-(** Missing metadata for code in the current unit is a fatal error. Missing
-    metadata for other units' code returns [None]. *)
+(** Missing metadata for code in the analysis scope is a fatal error. Missing
+    metadata for code outside the scope returns [None]. *)
 val find_code_metadata : t -> Code_id.t -> Code_metadata.t option
 
-(** Require metadata, including for code from other units. *)
+(** Require metadata, including for code outside the analysis scope. *)
 val get_code_metadata : t -> Code_id.t -> Code_metadata.t
 
-(** Missing entries for other units' code have unchanged calling conventions;
-    missing entries for the current unit are fatal errors. *)
+(** Missing entries for code outside the analysis scope have unchanged calling
+    conventions; missing entries inside the scope are fatal errors. *)
 val get_calling_convention_change :
   t -> Code_id.t -> Unboxing_analysis.calling_convention_change
 
