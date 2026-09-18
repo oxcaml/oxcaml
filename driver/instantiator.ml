@@ -54,6 +54,10 @@ type error =
       arg1 : CU.t;
       arg2 : CU.t;
     }
+  | Argument_not_fully_instantiated of {
+      compilation_unit : CU.t;
+      filename : Misc.filepath;
+    }
 
 
 exception Error of error
@@ -83,10 +87,9 @@ let instantiate
         match unit_info.ui_format with
         | Mb_struct { mb_repr } -> mb_repr
         | Mb_instantiating_functor _ ->
-          (* CR-someday zqian: should be a user error, like
-             [Not_compiled_as_argument]. *)
-          Misc.fatal_errorf_doc "Argument unit %a is parameterised"
-            CU.print unit_info.ui_unit
+          error (Argument_not_fully_instantiated
+                   { compilation_unit = unit_info.ui_unit;
+                     filename = cm_path; })
       in
       arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
@@ -271,6 +274,14 @@ let report_error ppf = function
       CU.print_as_inline_code arg2
       (Style.as_clflag
          "-as-argument-for" Global_module.Parameter_name.print) param
+  | Argument_not_fully_instantiated { compilation_unit; filename } ->
+    fprintf ppf
+      "@[<hov>Module %a@ should be fully instantiated to be used as an \
+         argument.@]@.\
+       @[<hov>@{<hint>Hint@}: \
+         @[<hov>Instantiate %a@ with @{<inline_code>-instantiate@}.@]@]"
+      CU.print_as_inline_code compilation_unit
+      (Style.as_inline_code Location.Doc.filename) filename
 let () =
   Location.register_error_of_exn
     (function
