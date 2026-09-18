@@ -22,8 +22,10 @@ type raw
 
 val from_raw : sections:File_sections.t -> raw -> t
 
+(** [final_typing_env] is absent when the unit's initialiser does not return
+    normally; the code and offsets are still exported. *)
 val create_raw :
-  final_typing_env:Flambda2_types.Typing_env.Serializable.t ->
+  final_typing_env:Flambda2_types.Typing_env.Serializable.t option ->
   all_code:Exported_code.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
@@ -31,7 +33,7 @@ val create_raw :
   raw
 
 val import_typing_env_and_code :
-  t -> Flambda2_types.Typing_env.Serializable.t * Exported_code.t
+  t -> Flambda2_types.Typing_env.Serializable.t option * Exported_code.t
 
 val exported_offsets : t -> Exported_offsets.t
 
