@@ -26,3 +26,6 @@ val is_predefined_exception : t -> bool
 (** Same as [create] but follows [Flambda_features.Expert.shorten_symbol_names]
     and uses a specific global counter. *)
 val manufacture : Compilation_unit.t -> string -> t
+
+(** The current value of the counter used by [manufacture]. *)
+val export_manufacture_counter : unit -> int
