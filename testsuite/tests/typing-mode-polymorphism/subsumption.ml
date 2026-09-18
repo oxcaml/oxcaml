@@ -287,7 +287,8 @@ Error: Signature mismatch:
          val f : 'a @ [< 'm] -> 'a @ [> 'm] @@ stateless
        The type "'a @ [< 'm > past('n) | local] -> 'a @ [> 'm | local]"
        is not compatible with the type "'a @ [< 'o & past('n)] -> 'a @ [> 'o]"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module Fail_less_polymorphic_unique : module type of Base = struct
@@ -402,7 +403,8 @@ Error: Signature mismatch:
          "'a @ [> past('o) | local] -> 'b @ [< 'm > past('n)] -> 'b @ [> 'm]"
        is not compatible with the type
          "'a @ [< past('o) & global] -> 'b @ [< 'p & past('n)] -> 'b @ [> 'p]"
-       The return mode was expected to be "global" but is "local"
+       The return mode was expected to be "global"
+       because it crosses with something but is "local"
 |}]
 
 module Fail_local_escapes : sig
