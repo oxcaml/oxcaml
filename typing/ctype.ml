@@ -6380,22 +6380,28 @@ let subject_level = generic_level - 1
    Update the level of [ty]. First check that the levels of generic
    variables from the subject are not lowered.
 *)
-let moregen_occur env level ty =
+let moregen_occur env pat pat_lv pat_jkind_lv subj =
   with_type_mark begin fun mark ->
-    let rec occur ty =
-      let lv = get_level ty in
-      if lv <= level then () else
-      if is_Tvar ty && lv >= subject_level then raise Occur else
-      if try_mark_node mark ty then iter_type_expr occur (Fun.const ()) ty
+    let rec occur subj =
+      let subj_lv = get_level subj in
+      begin match get_desc subj with
+      | Tvar { jkind = subj_jkind } ->
+        let subj_jkind_lv = Jkind.get_level subj_jkind in
+        if pat_lv < subj_lv && subj_lv >= subject_level then
+          raise_unexplained_for Moregen
+        else if pat_jkind_lv < subj_jkind_lv &&
+                subj_jkind_lv = subject_level then
+          raise_for Moregen (Weaken_sort { pat; subj })
+      | _ -> ()
+      end;
+      if pat_lv < subj_lv && try_mark_node mark subj then
+        iter_type_expr occur (Fun.const ()) subj
     in
-    try
-      occur ty
-    with Occur ->
-      raise_unexplained_for Moregen
+    occur subj
   end;
   (* also check for free univars *)
-  occur_univar_for Moregen env ty;
-  update_level_for Moregen env level ty
+  occur_univar_for Moregen env subj;
+  update_level_for Moregen env pat_lv subj
 
 type moregen_pairs =
   { invariant_pairs : TypePairs.t;
@@ -6605,7 +6611,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
     match (get_desc t1, get_desc t2) with
       (Tvar { jkind }, _) when may_instantiate inst_nongen t1
                             && not (deep_occur t1 t2) ->
-        moregen_occur env (get_level t1) t2;
+        moregen_occur env t1 (get_level t1) (Jkind.get_level jkind) t2;
         update_scope_for Moregen (get_scope t1) t2;
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
@@ -6624,7 +6630,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
               let t2 = reduce_head ~expand_reducible_abbrevs:false env t2 in
-              moregen_occur env (get_level t1') t2;
+              moregen_occur env t1 (get_level t1') (Jkind.get_level jkind) t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
@@ -6814,7 +6820,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
                     (create_row ~fields:r2 ~more:rm2 ~name:None
                        ~fixed:row2_fixed ~closed:row2_closed))
       in
-      moregen_occur env (get_level rm1) ext;
+      moregen_occur env rm1 (get_level rm1) generic_level ext;
       update_scope_for Moregen (get_scope rm1) ext;
       (* This [link_type] has to be undone if the rest of the function fails *)
       link_type rm1 ext

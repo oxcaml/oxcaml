@@ -496,7 +496,12 @@ module Sort = struct
     | Product ts -> List.iter (iter_var ~f) ts
     | Addressable t -> iter_var ~f t
 
-  let update_level level = iter_var ~f:(fun v -> set_var_level v level)
+  let update_level level =
+    iter_var ~f:(fun v ->
+        (* This should be subsumed by the [moregen_occur] jkind level check *)
+        if level < v.level && v.level = subject_level
+        then Misc.fatal_error "Jkind_types.update_level_var: rigid var lowered";
+        set_var_level v level)
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents

@@ -416,6 +416,13 @@ let explanation (type variety) intro prev env
                       @ @[<v>%t@;%t@]"
             (fmt_history "the first" k1) (fmt_history "the second" k2))
   | Errortrace.Mode_mismatch _ -> None
+  | Errortrace.Weaken_sort { pat; subj } ->
+    add_type_to_preparation pat;
+    add_type_to_preparation subj;
+    Some (doc_printf "@ The type %a is layout-polymorphic, \
+                      @ but %a is not layout-polymorphic."
+            (Style.as_inline_code prepared_type_expr) subj
+            (Style.as_inline_code prepared_type_expr) pat)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
