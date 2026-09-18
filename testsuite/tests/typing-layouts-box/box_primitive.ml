@@ -1,6 +1,6 @@
 (* TEST
  include stdlib_stable;
- flags = "-extension layouts_beta";
+ flags = "-extension layouts_alpha";
  flambda2;
  { expect; expect.opt; }
 *)

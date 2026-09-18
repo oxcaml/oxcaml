@@ -4904,6 +4904,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
           ~is_layout_poly
       in
       error_if_containing_unexpected_jkind env prim cty ty;
+      (match prim.prim_name with
+       | "%box" | "%unbox" ->
+         Language_extension.assert_enabled ~loc Layouts Language_extension.Alpha
+       | _ -> ());
       if prim.prim_arity = 0 &&
          (prim.prim_name = "" || prim.prim_name.[0] <> '%') then
         raise(Error(valdecl.pval_type.ptyp_loc, Null_arity_external));

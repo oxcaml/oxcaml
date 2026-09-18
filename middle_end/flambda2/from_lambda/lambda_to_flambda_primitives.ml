@@ -3738,13 +3738,20 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [ Variadic
           ( Make_block (Values (Tag.Scannable.zero, shape), mutability, mode),
             [arg] ) ]
+    (* CR zeisbach: the current state of the world is a little sad. We either
+       box small numbers as tagged immediates and break representation
+       invariants for singleton unboxed records, or box them as tag-0 blocks and
+       break numeric layout invariants / optimizations. We pick the former, but
+       we need addressability to properly handle these cases. *)
     | Punboxed_float f ->
       mixed_singleton (flat_suffix_element_of_unboxed_float f)
     | Punboxed_or_untagged_integer i ->
       mixed_singleton (flat_suffix_element_of_unboxed_integer i)
     (* CR zeisbach: originally I thought we could use [Box_number], but that is
-       immutable (and can be CSE-d) which is broken for singleton unboxed
-       mutable records. I am not sure how this interacts with [inherit]... *)
+       immutable (and can be CSE-d). the [Punboxed_vector] here really could
+       correspond to a singleton unboxed record with a mutable field, so the
+       boxed version could actually be a mutable block. double-check this and
+       turn this into a proper comment. *)
     | Punboxed_vector v ->
       mixed_singleton (flat_suffix_element_of_unboxed_vector v)
     | Punboxed_mask -> mixed_singleton Naked_mask
