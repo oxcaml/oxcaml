@@ -19,13 +19,16 @@
 
 (* https://github.com/ocsigen/js_of_ocaml/issues/1051 *)
 
+(* The nativeint truncation warning depends on the native integer width. *)
+[@@@if arch_sixtyfour]
+
 let prog = {|let () = Printf.printf "%nx" 0xffffffffn;;|}
 
 let%expect_test _ =
   Util.compile_and_run ~werror:false prog;
   [%expect
     {|
-    Warning: integer overflow: native integer 0xffffffff (4294967295) truncated to 0xffffffff (-1); the generated code might be incorrect.
+    Warning [integer-overflow]: native integer 0xffffffff (4294967295) truncated to 0xffffffff (-1); the generated code might be incorrect.
     ffffffff
     |}];
   ()
@@ -34,7 +37,7 @@ let%expect_test _ =
   Util.print_fun_decl (Util.compile_and_parse ~werror:false prog) None;
   [%expect
     {|
-    Warning: integer overflow: native integer 0xffffffff (4294967295) truncated to 0xffffffff (-1); the generated code might be incorrect.
+    Warning [integer-overflow]: native integer 0xffffffff (4294967295) truncated to 0xffffffff (-1); the generated code might be incorrect.
     function caml_call2(f, a0, a1){
      return (f.l >= 0 ? f.l : f.l = f.length) === 2
              ? f(a0, a1)

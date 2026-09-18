@@ -80,3 +80,67 @@ let%expect_test _ =
   [%expect {| overflow |}];
   check_fail "-9223372036854775809";
   [%expect {| overflow |}]
+
+(* Arithmetic shifts must sign-extend into the low 24-bit limb for
+   shift counts 41..47. *)
+let%expect_test "Int64.shift_right, shifts 40..48" =
+  List.iter
+    (fun s ->
+      Printf.printf
+        "%d: %Lx %Lx %Lx\n"
+        s
+        (Int64.shift_right (-1L) s)
+        (Int64.shift_right Int64.min_int s)
+        (Int64.shift_right 0x123456789abcdef0L s))
+    [ 40; 41; 44; 47; 48 ];
+  [%expect
+    {|
+    40: ffffffffffffffff ffffffffff800000 123456
+    41: ffffffffffffffff ffffffffffc00000 91a2b
+    44: ffffffffffffffff fffffffffff80000 12345
+    47: ffffffffffffffff ffffffffffff0000 2468
+    48: ffffffffffffffff ffffffffffff8000 1234
+    |}]
+
+(* The '#' (alternate) flag must not add a base prefix to zero: native
+   prints "0" for %#x / %#X / %#o of 0, like C printf. *)
+let%expect_test "alternate flag with zero" =
+  Printf.printf "[%#x]\n" 0;
+  [%expect {| [0] |}];
+  Printf.printf "[%#X]\n" 0;
+  [%expect {| [0] |}];
+  Printf.printf "[%#o]\n" 0;
+  [%expect {| [0] |}];
+  Printf.printf "[%#6x]\n" 0;
+  [%expect {| [     0] |}];
+  Printf.printf "[%#lx]\n" 0l;
+  [%expect {| [0] |}];
+  Printf.printf "[%#Lx]\n" 0L;
+  [%expect {| [0] |}];
+  (* non-zero values keep the prefix *)
+  Printf.printf "[%#x]\n" 255;
+  [%expect {| [0xff] |}];
+  Printf.printf "[%#o]\n" 8;
+  [%expect {| [010] |}]
+
+(* Comparing an immediate against a custom block (e.g. an int64) must
+   not call the custom's compare op with a raw number: native treats
+   the immediate as strictly less than the block. *)
+let%expect_test "compare immediate vs custom" =
+  let a : Obj.t = Obj.repr 1 in
+  let b : Obj.t = Obj.repr 1L in
+  let p label f =
+    match f () with
+    | v -> Printf.printf "%s = %d\n" label v
+    | exception e -> Printf.printf "%s raised %s\n" label (Printexc.to_string e)
+  in
+  p "cmp 1 1L" (fun () -> compare a b);
+  p "cmp 1L 1" (fun () -> compare b a);
+  p "cmp 2 1L" (fun () -> compare (Obj.repr 2) b);
+  p "eq 1 1L" (fun () -> if a = b then 1 else 0);
+  [%expect {|
+    cmp 1 1L = -1
+    cmp 1L 1 = 1
+    cmp 2 1L = -1
+    eq 1 1L = 0
+    |}]

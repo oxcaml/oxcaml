@@ -17,74 +17,31 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-//Provides: jsoo_floor_log2
-var log2_ok = Math.log2 && Math.log2(1.1235582092889474e307) === 1020;
-function jsoo_floor_log2(x) {
-  if (log2_ok) return Math.floor(Math.log2(x));
-  var i = 0;
-  if (x === 0) return Number.NEGATIVE_INFINITY;
-  if (x >= 1) {
-    while (x >= 2) {
-      x /= 2;
-      i++;
-    }
-  } else {
-    while (x < 1) {
-      x *= 2;
-      i--;
-    }
-  }
-  return i;
-}
+//Provides: jsoo_dataview
+var jsoo_dataview = new DataView(new ArrayBuffer(8));
 
 //Provides: caml_int64_bits_of_float const
-//Requires: jsoo_floor_log2, caml_int64_create_lo_mi_hi
+//Requires: caml_int64_create_lo_mi_hi
+//Requires: jsoo_dataview
 function caml_int64_bits_of_float(x) {
-  if (!Number.isFinite(x)) {
-    if (Number.isNaN(x)) return caml_int64_create_lo_mi_hi(1, 0, 0x7ff0);
-    if (x > 0) return caml_int64_create_lo_mi_hi(0, 0, 0x7ff0);
-    else return caml_int64_create_lo_mi_hi(0, 0, 0xfff0);
-  }
-  var sign =
-    x === 0 && 1 / x === Number.NEGATIVE_INFINITY
-      ? 0x8000
-      : x >= 0
-        ? 0
-        : 0x8000;
-  if (sign) x = -x;
-  // Int64.bits_of_float 1.1235582092889474E+307 = 0x7fb0000000000000L
-  // using Math.LOG2E*Math.log(x) in place of Math.log2 result in precision lost
-  var exp = jsoo_floor_log2(x) + 1023;
-  if (exp <= 0) {
-    exp = 0;
-    x /= Math.pow(2, -1026);
-  } else {
-    x /= Math.pow(2, exp - 1027);
-    if (x < 16) {
-      x *= 2;
-      exp -= 1;
-    }
-    if (exp === 0) {
-      x /= 2;
-    }
-  }
-  var k = Math.pow(2, 24);
-  var r3 = x | 0;
-  x = (x - r3) * k;
-  var r2 = x | 0;
-  x = (x - r2) * k;
-  var r1 = x | 0;
-  r3 = (r3 & 0xf) | sign | (exp << 4);
-  return caml_int64_create_lo_mi_hi(r1, r2, r3);
+  jsoo_dataview.setFloat64(0, x, true);
+  var lo32 = jsoo_dataview.getUint32(0, true);
+  var hi32 = jsoo_dataview.getUint32(4, true);
+  var lo = lo32 & 0xffffff;
+  var mi = (lo32 >>> 24) | ((hi32 << 8) & 0xffffff);
+  var hi = (hi32 >>> 16) & 0xffff;
+  // V8 uses signaling NaNs as sentinel. So, NaNs are made quiet when
+  // they are stored in an array. Make them quiet here so that we get
+  // consistent results.
+  if ((hi & 0x7ff8) === 0x7ff0 && (mi | lo | (hi & 0xf)) !== 0) hi |= 8;
+  return caml_int64_create_lo_mi_hi(lo, mi, hi);
 }
 
 //Provides: caml_int32_bits_of_float const
-//Requires: jsoo_floor_log2
+//Requires: jsoo_dataview
 function caml_int32_bits_of_float(x) {
-  var float32a = new Float32Array(1);
-  float32a[0] = x;
-  var int32a = new Int32Array(float32a.buffer);
-  return int32a[0] | 0;
+  jsoo_dataview.setFloat32(0, x, true);
+  return jsoo_dataview.getUint32(0, true) | 0;
 }
 
 //FP literals can be written using the hexadecimal
@@ -150,24 +107,18 @@ function caml_hexstring_of_float(x, prec, style) {
 }
 
 //Provides: caml_int64_float_of_bits const
+//Requires: jsoo_dataview
 function caml_int64_float_of_bits(x) {
   var lo = x.lo;
   var mi = x.mi;
   var hi = x.hi;
-  var exp = (hi & 0x7fff) >> 4;
-  if (exp === 2047) {
-    if ((lo | mi | (hi & 0xf)) === 0)
-      return hi & 0x8000 ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
-    else return Number.NaN;
-  }
-  var k = Math.pow(2, -24);
-  var res = (lo * k + mi) * k + (hi & 0xf);
-  if (exp > 0) {
-    res += 16;
-    res *= Math.pow(2, exp - 1027);
-  } else res *= Math.pow(2, -1026);
-  if (hi & 0x8000) res = -res;
-  return res;
+  // V8 uses signaling NaNs as sentinel. So, NaNs are made quiet when
+  // they are stored in an array. Make them quiet here so that we get
+  // consistent results.
+  if ((hi & 0x7ff8) === 0x7ff0 && (mi | lo | (hi & 0xf)) !== 0) hi |= 8;
+  jsoo_dataview.setUint32(0, lo | (mi << 24), true);
+  jsoo_dataview.setUint32(4, (mi >>> 8) | (hi << 16), true);
+  return jsoo_dataview.getFloat64(0, true);
 }
 
 //Provides: caml_nextafter_float const
@@ -192,11 +143,10 @@ function caml_trunc_float(x) {
 }
 
 //Provides: caml_int32_float_of_bits const
+//Requires: jsoo_dataview
 function caml_int32_float_of_bits(x) {
-  var int32a = new Int32Array(1);
-  int32a[0] = x;
-  var float32a = new Float32Array(int32a.buffer);
-  return float32a[0];
+  jsoo_dataview.setUint32(0, x, true);
+  return jsoo_dataview.getFloat32(0, true);
 }
 
 //Provides: caml_classify_float const
@@ -226,6 +176,9 @@ function caml_modf_float(x) {
 }
 //Provides: caml_ldexp_float const
 function caml_ldexp_float(x, exp) {
+  // musl's scalbn: scaling down goes through 2^-1022 * 2^53 so that
+  // the intermediate values stay normal; the only rounding happens in
+  // the final multiplication
   exp |= 0;
   if (exp > 1023) {
     exp -= 1023;
@@ -234,22 +187,26 @@ function caml_ldexp_float(x, exp) {
       // in case x is subnormal
       exp -= 1023;
       x *= Math.pow(2, 1023);
+      if (exp > 1023) exp = 1023;
     }
-  }
-  if (exp < -1023) {
-    exp += 1023;
-    x *= Math.pow(2, -1023);
+  } else if (exp < -1022) {
+    exp += 1022 - 53;
+    x *= Math.pow(2, -1022) * Math.pow(2, 53);
+    if (exp < -1022) {
+      exp += 1022 - 53;
+      x *= Math.pow(2, -1022) * Math.pow(2, 53);
+      if (exp < -1022) exp = -1022;
+    }
   }
   x *= Math.pow(2, exp);
   return x;
 }
 //Provides: caml_frexp_float const
-//Requires: jsoo_floor_log2
 function caml_frexp_float(x) {
   if (x === 0 || !Number.isFinite(x)) return [0, x, 0];
   var neg = x < 0;
   if (neg) x = -x;
-  var exp = Math.max(-1023, jsoo_floor_log2(x) + 1);
+  var exp = Math.max(-1023, Math.floor(Math.log2(x)) + 1);
   x *= Math.pow(2, -exp);
   while (x < 0.5) {
     x *= 2;
@@ -484,21 +441,63 @@ function caml_fma_float(x, y, z) {
 //Provides: caml_format_float const
 //Requires: caml_str_repeat, caml_parse_format, caml_finish_formatting
 function caml_format_float(fmt, x) {
-  function toFixed(x, dp) {
-    if (Math.abs(x) < 1.0) {
-      return x.toFixed(dp);
-    } else {
-      var e = Number.parseInt(x.toString().split("+")[1]);
-      if (e > 20) {
-        e -= 20;
-        x /= Math.pow(10, e);
-        x += caml_str_repeat(e, "0");
-        if (dp > 0) {
-          x = x + "." + caml_str_repeat(dp, "0");
-        }
-        return x;
-      } else return x.toFixed(dp);
+  // Exact decimal expansion through BigInt, for precisions beyond
+  // toFixed/toExponential's limit of 100 and for %f of values >= 1e21
+  function decompose(x) {
+    // x (finite, >= 0) is m * 2^e
+    var dv = new DataView(new ArrayBuffer(8));
+    dv.setFloat64(0, x);
+    var hi = dv.getUint32(0),
+      lo = dv.getUint32(4);
+    var eb = (hi >>> 20) & 0x7ff;
+    var m = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+    if (eb === 0) return [m, -1074];
+    return [m | (1n << 52n), eb - 1075];
+  }
+  function exact_scaled(x, k) {
+    // round_half_even(x * 10^k) as a BigInt
+    var d = decompose(x);
+    var num = d[0],
+      den = 1n;
+    if (k >= 0) num *= 10n ** BigInt(k);
+    else den = 10n ** BigInt(-k);
+    if (d[1] >= 0) num <<= BigInt(d[1]);
+    else den <<= BigInt(-d[1]);
+    var q = num / den,
+      r2 = (num % den) * 2n;
+    if (r2 > den || (r2 === den && q & 1n)) q += 1n;
+    return q;
+  }
+  function exact_fixed(x, prec) {
+    // toFixed, exactly
+    var q = exact_scaled(x, prec).toString();
+    if (prec === 0) return q;
+    if (q.length <= prec) q = caml_str_repeat(prec + 1 - q.length, "0") + q;
+    return q.slice(0, q.length - prec) + "." + q.slice(q.length - prec);
+  }
+  function exact_exponential(x, prec) {
+    // toExponential, exactly
+    if (x === 0)
+      return (prec > 0 ? "0." + caml_str_repeat(prec, "0") : "0") + "e+0";
+    var e10 = Math.floor(Math.log10(x));
+    for (;;) {
+      // we want round(x * 10^(prec - e10)) to have exactly prec + 1
+      // digits; the estimate of e10 is off by at most one (and
+      // rounding can add a digit), so adjust and retry
+      var s = exact_scaled(x, prec - e10).toString();
+      if (s.length === prec + 1) {
+        var m = prec > 0 ? s.charAt(0) + "." + s.slice(1) : s;
+        return m + "e" + (e10 < 0 ? "-" : "+") + Math.abs(e10);
+      }
+      e10 += s.length - (prec + 1);
     }
+  }
+  function toExponential(x, prec) {
+    return prec > 100 ? exact_exponential(x, prec) : x.toExponential(prec);
+  }
+  function toFixed(x, dp) {
+    if (dp > 100 || x >= 1e21) return exact_fixed(x, dp);
+    return x.toFixed(dp);
   }
   var s,
     f = caml_parse_format(fmt);
@@ -516,7 +515,7 @@ function caml_format_float(fmt, x) {
   } else
     switch (f.conv) {
       case "e":
-        var s = x.toExponential(prec);
+        var s = toExponential(x, prec);
         // exponent should be at least two digits
         var i = s.length;
         if (s.charAt(i - 3) === "e")
@@ -527,7 +526,7 @@ function caml_format_float(fmt, x) {
         break;
       case "g":
         prec = prec ? prec : 1;
-        s = x.toExponential(prec - 1);
+        s = toExponential(x, prec - 1);
         var j = s.indexOf("e");
         var exp = +s.slice(j + 1);
         if (exp < -4 || x >= 1e21 || x.toFixed(0).length > prec) {
@@ -544,8 +543,8 @@ function caml_format_float(fmt, x) {
           var p = prec;
           if (exp < 0) {
             p -= exp + 1;
-            s = x.toFixed(p);
-          } else while (((s = x.toFixed(p)), s.length > prec + 1)) p--;
+            s = toFixed(x, p);
+          } else while (((s = toFixed(x, p)), s.length > prec + 1)) p--;
           if (p) {
             // remove trailing zeroes
             var i = s.length - 1;
@@ -559,29 +558,64 @@ function caml_format_float(fmt, x) {
   return caml_finish_formatting(f, s);
 }
 
-//Provides: caml_float_of_string (const)
+//Provides: caml_parse_float
 //Requires: caml_failwith, caml_jsbytes_of_string
-function caml_float_of_string(s) {
+function caml_parse_float(s, err_msg) {
   var res;
-  var r_float = /^ *[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
+  var r_float = /^[ \t\n\v\f\r]*[-+]?(?:\d*\.?\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?$/;
   s = caml_jsbytes_of_string(s);
   res = +s;
   //Fast path
   if (!Number.isNaN(res) && r_float.test(s)) return res;
   s = s.replace(/_/g, "");
   res = +s;
-  if ((!Number.isNaN(res) && r_float.test(s)) || /^[+-]?nan$/i.test(s))
+  if (
+    (!Number.isNaN(res) && r_float.test(s)) ||
+    /^[ \t\n\v\f\r]*[+-]?nan$/i.test(s)
+  )
     return res;
-  var m = /^ *([+-]?)0x([0-9a-f]+)\.?([0-9a-f]*)(p([+-]?[0-9]+))?$/i.exec(s);
-  //          1        2             3           5
-  if (m) {
-    var m3 = m[3].replace(/0+$/, "");
-    var mantissa = Number.parseInt(m[1] + m[2] + m3, 16);
-    var exponent = (+m[5] || 0) - 4 * m3.length;
-    res = mantissa * Math.pow(2, exponent);
-    return res;
+  var m =
+    /^[ \t\n\v\f\r]*([+-]?)0x([0-9a-f]*)\.?([0-9a-f]*)(?:p([+-]?[0-9]+))?$/i.exec(
+      s,
+    );
+  //          1        2             3               4
+  if (m && m[2].length + m[3].length > 0) {
+    var sign = m[1] === "-" ? -1 : 1;
+    var mant = BigInt("0x0" + m[2] + m[3]);
+    var e = (+m[4] || 0) - 4 * m[3].length;
+    if (mant === 0n) return sign * 0;
+    // Round [mant * 2^e] to the nearest representable double
+    // (round-to-nearest, ties-to-even), exactly
+    for (;;) {
+      var bl = mant.toString(2).length; // bit length
+      var be = bl - 1 + e; // exponent of the leading bit
+      if (be > 1023) return sign * Number.POSITIVE_INFINITY;
+      if (be < -1075) return sign * 0;
+      // number of mantissa bits a double can hold at this magnitude
+      var p = be >= -1022 ? 53 : 53 + 1022 + be;
+      var shift = bl - p;
+      if (shift <= 0)
+        // [mant * 2^e] is representable: both operations are exact
+        return sign * Number(mant) * Math.pow(2, e);
+      var keep = mant >> BigInt(shift);
+      var rem = mant & ((1n << BigInt(shift)) - 1n);
+      var half = 1n << BigInt(shift - 1);
+      if (rem > half || (rem === half && keep & 1n)) keep += 1n;
+      if (keep < (p > 0 ? 1n << BigInt(p) : 1n))
+        return sign * Number(keep) * Math.pow(2, e + shift);
+      // the carry needs one more bit: renormalize and round again
+      mant = keep;
+      e += shift;
+    }
   }
-  if (/^\+?inf(inity)?$/i.test(s)) return Number.POSITIVE_INFINITY;
-  if (/^-inf(inity)?$/i.test(s)) return Number.NEGATIVE_INFINITY;
-  caml_failwith("float_of_string");
+  if (/^[ \t\n\v\f\r]*\+?inf(inity)?$/i.test(s))
+    return Number.POSITIVE_INFINITY;
+  if (/^[ \t\n\v\f\r]*-inf(inity)?$/i.test(s)) return Number.NEGATIVE_INFINITY;
+  caml_failwith(err_msg);
+}
+
+//Provides: caml_float_of_string (const)
+//Requires: caml_parse_float
+function caml_float_of_string(s) {
+  return caml_parse_float(s, "float_of_string");
 }

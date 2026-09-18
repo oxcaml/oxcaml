@@ -99,13 +99,13 @@ function caml_ephe_get_key(x, i) {
 }
 //Provides: caml_ephe_get_key_copy
 //Requires: caml_ephe_get_key,caml_ephe_key_offset
-//Requires: caml_obj_dup
+//Requires: caml_obj_dup, caml_is_ml_bytes
 //Alias: caml_weak_get_copy
 function caml_ephe_get_key_copy(x, i) {
   var y = caml_ephe_get_key(x, i);
   if (y === 0) return y;
   var z = y[1];
-  if (Array.isArray(z)) return [0, caml_obj_dup(z)];
+  if (Array.isArray(z) || caml_is_ml_bytes(z)) return [0, caml_obj_dup(z)];
   return y;
 }
 
@@ -134,7 +134,10 @@ function caml_ephe_check_key(x, i) {
 //Requires: caml_ephe_set_data_opt
 //Alias: caml_weak_blit
 function caml_ephe_blit_key(a1, i1, a2, i2, len) {
-  var old = caml_ephe_get_data(a1);
+  // The data is stored wrapped in WeakMaps keyed on the (live) keys, so
+  // fetch the destination's data before changing its keys and store it
+  // back afterwards.
+  var old = caml_ephe_get_data(a2);
   // minus one because caml_array_blit works on ocaml array
   caml_array_blit(
     a1,
@@ -171,7 +174,7 @@ function caml_ephe_get_data(x) {
         return 0;
       }
       if (globalThis.WeakMap) {
-        data = data.get(k);
+        data = data.get(d);
         if (data === undefined) {
           x[caml_ephe_data_offset] = caml_ephe_none;
           return 0;
@@ -184,12 +187,12 @@ function caml_ephe_get_data(x) {
 
 //Provides: caml_ephe_get_data_copy
 //Requires: caml_ephe_get_data
-//Requires: caml_obj_dup
+//Requires: caml_obj_dup, caml_is_ml_bytes
 function caml_ephe_get_data_copy(x) {
   var r = caml_ephe_get_data(x);
   if (r === 0) return 0;
   var z = r[1];
-  if (Array.isArray(z)) return [0, caml_obj_dup(z)];
+  if (Array.isArray(z) || caml_is_ml_bytes(z)) return [0, caml_obj_dup(z)];
   return r;
 }
 
@@ -206,7 +209,11 @@ function caml_ephe_set_data(x, data) {
         continue;
       }
       if (globalThis.WeakMap) {
-        data = new globalThis.WeakMap().set(k, data);
+        // Key the map on the key object itself (not the WeakRef
+        // wrapper, which the ephemeron strongly holds): the data must
+        // be reachable only while the key is, so that key <-> data
+        // cycles can be collected.
+        data = new globalThis.WeakMap().set(d, data);
       }
     }
   }

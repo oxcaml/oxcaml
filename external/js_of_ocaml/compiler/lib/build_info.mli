@@ -20,6 +20,43 @@ open! Stdlib
 
 val string_of_effects_backend : Config.effects_backend -> string
 
+val effects_backend_of_string : string -> Config.effects_backend
+
+val effects_backend_of_string_result : string -> (Config.effects_backend, string) result
+
+val effects_backends_javascript :
+  (string * [ `Cps | `Double_translation | `Disabled ]) list
+
+val effects_backends_wasm : (string * [ `Jspi | `Cps | `Native | `Disabled ]) list
+
+type config_key =
+  | Bool_key of
+      { name : string
+      ; get : unit -> bool
+      ; set : bool -> unit
+      ; default : bool
+      }
+  | Enum_key of
+      { name : string
+      ; get : unit -> string
+      ; set : string -> unit
+      ; valid : string list
+      }
+
+val config_key_name : config_key -> string
+
+val config_keys : [ `JavaScript | `Wasm ] -> config_key list
+
+val config_key_values : config_key -> string list
+
+val get_non_default_values : config_key list -> (string * string) list
+
+val set_values : config_key list -> (string * string) list -> unit
+
+val to_config_string : (string * string) list -> string
+
+val parse_config_string : string -> (string * string) list
+
 type t
 
 type kind =
@@ -27,16 +64,14 @@ type kind =
   | `Exe
   | `Cmo
   | `Cma
-  | `Cmj
-  | `Cmja
   | `Unknown
   ]
 
 val create : kind -> t
 
-val to_string : t -> string
+val to_comment : t -> string
 
-val parse : string -> t option
+val parse_comment : string -> t option
 
 val to_map : t -> string StringMap.t
 
@@ -51,7 +86,7 @@ exception
     ; second : (string * string option)
     }
 
-val merge : string -> t -> string -> t -> t
+val merge : [ `JavaScript | `Wasm ] -> string -> t -> string -> t -> t
 
 val kind : t -> kind
 

@@ -8,20 +8,21 @@ authors: ["Ocsigen team <dev@ocsigen.org>"]
 license: [
   "GPL-2.0-or-later" "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
 ]
-homepage: "https://ocsigen.org/js_of_ocaml/latest/manual/overview"
-doc: "https://ocsigen.org/js_of_ocaml/latest/manual/overview"
+homepage: "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html"
+doc: "https://ocsigen.org/js_of_ocaml/latest/js_of_ocaml/overview.html"
 bug-reports: "https://github.com/ocsigen/js_of_ocaml/issues"
 depends: [
-  "dune" {>= "3.17"}
-  "ocaml" {>= "4.13" & < "5.4"}
+  "dune" {>= "3.20"}
+  "ocaml" {>= "4.13" & < "5.7"}
   "num" {with-test}
-  "ppx_expect" {>= "v0.16.1" & with-test}
-  "ppxlib" {>= "0.15"}
+  "out-channel-redirect" {with-test}
+  "ppxlib" {>= "0.33"}
+  "ocaml-compiler-libs" {>= "v0.12.4"}
   "re" {with-test}
-  "cmdliner" {>= "1.1.0"}
+  "cmdliner" {>= "2.0"}
   "sedlex" {>= "3.3"}
   "qcheck" {with-test}
-  "menhir"
+  "menhir" {>= "20180523"}
   "menhirLib"
   "menhirSdk"
   "yojson" {>= "2.1"}
@@ -32,6 +33,8 @@ conflicts: [
   "ocamlfind" {< "1.5.1"}
   "js_of_ocaml" {< "3.0"}
 ]
+dev-repo: "git+https://github.com/ocsigen/js_of_ocaml.git"
+x-maintenance-intent: ["(latest)"]
 build: [
   [
     "dune"
@@ -41,8 +44,16 @@ build: [
     "-j"
     jobs
     "@install"
-    "@runtest" {with-test}
     "@doc" {with-doc}
   ]
+  ["cmdliner" "install" "tool-support"
+              "--update-opam-install=%{_:name}%.install"
+              "_build/install/default/bin/js_of_ocaml" {os-family != "windows"}
+              "_build/install/default/bin/js_of_ocaml.exe:js_of_ocaml" {os-family = "windows"}
+              "_build/cmdliner-install"]
+  ["cmdliner" "install" "tool-support"
+              "--update-opam-install=%{_:name}%.install"
+              "_build/install/default/bin/jsoo_minify" {os-family != "windows"}
+              "_build/install/default/bin/jsoo_minify.exe:jsoo_minify" {os-family = "windows"}
+              "_build/cmdliner-install"]
 ]
-dev-repo: "git+https://github.com/ocsigen/js_of_ocaml.git"
