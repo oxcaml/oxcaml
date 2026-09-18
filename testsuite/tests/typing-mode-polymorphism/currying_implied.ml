@@ -93,14 +93,16 @@ val local_closure :
 let use_and_return g x = ignore (g x); g
 [%%expect{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n mod aliased contended immutable & global many] ->
+  ('a @ [> 'm] -> 'b @ [< global many read_write borrowable]) @ [< 'n mod aliased contended immutable borrowed & global many] ->
   'a @ [< 'm] ->
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
+  ('a @ [> 'm] -> 'b @ [< global many read_write borrowable]) @ [> 'n | aliased] =
+  <fun>
 |}, Principal{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n & global many] ->
+  ('a @ [> 'm] -> 'b @ [< global many read_write borrowable]) @ [< 'n & global many] ->
   'a @ [< 'm] ->
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased] = <fun>
+  ('a @ [> 'm] -> 'b @ [< global many read_write borrowable]) @ [> 'n | aliased] =
+  <fun>
 |}]
 
 let both_branches g x = if x then g else (fun y -> y)
@@ -119,13 +121,13 @@ let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
-  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
-   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) mod many forkable unyielding | stateful]) @ [> past('o) | past('p) mod many forkable unyielding | stateful] =
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write borrowable] ->
+   ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) mod many forkable unyielding borrowable | stateful]) @ [> past('o) | past('p) mod many forkable unyielding borrowable | stateful] =
   <fun>
 |}, Principal{|
 val store_and_call :
   ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< past('mm0) & past('p) & global read_write] ->
-  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write] ->
+  (('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< past('q) & past('o) & global many read_write borrowable] ->
    ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> past('q) | past('mm0) | stateful]) @ [> past('o) | past('p) | stateful] =
   <fun>
 |}]
@@ -146,12 +148,12 @@ let unique_cell (c @ unique) x = c.v <- x; c
 [%%expect{|
 val unique_cell :
   'a cell @ [< 'm & global unique write] ->
-  'a @ [< global many read_write] ->
-  'a cell @ [> 'm mod many forkable unyielding] = <fun>
+  'a @ [< global many read_write borrowable] ->
+  'a cell @ [> 'm mod many forkable unyielding borrowable] = <fun>
 |}, Principal{|
 val unique_cell :
   'a cell @ [< 'm & global unique write] ->
-  'a @ [< global many read_write] -> 'a cell @ [> 'm] = <fun>
+  'a @ [< global many read_write borrowable] -> 'a cell @ [> 'm] = <fun>
 |}]
 
 let stack_args g = g (stack_ (1, 2)) (stack_ (3, 4)); ()

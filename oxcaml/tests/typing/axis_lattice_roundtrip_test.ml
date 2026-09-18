@@ -30,6 +30,8 @@ type sample =
     statefulness : Mode.Statefulness.Const.t;
     visibility : Mode.Visibility.Const.t;
     staticity : Mode.Staticity.const;
+    borrowability : Mode.Borrowability.Const.t;
+    borrowedness : Mode.Borrowedness.Const.t;
     externality : Jkind_axis.Externality.t
   }
 
@@ -44,6 +46,8 @@ let sample_of_lattice x =
     statefulness = statefulness x;
     visibility = visibility x;
     staticity = staticity x;
+    borrowability = borrowability x;
+    borrowedness = borrowedness x;
     externality = externality x
   }
 
@@ -53,6 +57,7 @@ let lattice_of_sample sample =
     ~contention:sample.contention ~forkable:sample.forkable
     ~yielding:sample.yielding ~statefulness:sample.statefulness
     ~visibility:sample.visibility ~staticity:sample.staticity
+    ~borrowability:sample.borrowability ~borrowedness:sample.borrowedness
     ~externality:sample.externality
 
 let base_samples = [sample_of_lattice bot; sample_of_lattice top]
@@ -77,6 +82,9 @@ let mod_bounds_of_sample sample =
       ~staticity:
         (Mode.Crossing.Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const sample.staticity))
+      ~borrowedness:
+        (Mode.Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const sample.borrowedness))
   in
   let comonadic =
     Mode.Crossing.Comonadic.create
@@ -98,6 +106,9 @@ let mod_bounds_of_sample sample =
       ~statefulness:
         (Mode.Crossing.Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const sample.statefulness))
+      ~borrowability:
+        (Mode.Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const sample.borrowability))
   in
   Btype.Jkind0.Mod_bounds.create { monadic; comonadic }
     ~externality:sample.externality
@@ -222,6 +233,12 @@ let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
       { sample with visibility = Mode.Visibility.Const.Read_write }
   | Modal (Monadic Staticity) ->
     lattice_of_sample { sample with staticity = Mode.Staticity.Static }
+  | Modal (Comonadic Borrowability) ->
+    lattice_of_sample
+      { sample with borrowability = Mode.Borrowability.Const.Unborrowable }
+  | Modal (Monadic Borrowedness) ->
+    lattice_of_sample
+      { sample with borrowedness = Mode.Borrowedness.Const.Owned }
   | Nonmodal Externality ->
     lattice_of_sample
       { sample with externality = Jkind_axis.Externality.Internal }
@@ -358,6 +375,18 @@ let () =
     (fun sample staticity -> { sample with staticity })
     staticity
     [Mode.Staticity.Static; Mode.Staticity.Dynamic];
+  check_axis
+    (module Mode.Borrowability.Const)
+    "borrowability"
+    (fun sample borrowability -> { sample with borrowability })
+    borrowability
+    [Mode.Borrowability.Const.Borrowable; Mode.Borrowability.Const.Unborrowable];
+  check_axis
+    (module Opposite (Mode.Borrowedness.Const))
+    "borrowedness"
+    (fun sample borrowedness -> { sample with borrowedness })
+    borrowedness
+    [Mode.Borrowedness.Const.Owned; Mode.Borrowedness.Const.Borrowed];
   check_axis
     (module Jkind_axis.Externality)
     "externality"
