@@ -391,13 +391,14 @@ let print_text ppf diagnostic =
     match body with
     | [] -> Location.print_report_string ppf diagnostic.legacy
     | _ :: _ ->
+      let source = diagnostic.source in
       let diagnostic = with_body diagnostic body in
       let report : Location.report =
         { kind = diagnostic.kind;
           main =
             Location.msg ~loc:diagnostic.loc "%a" Diagnostic.format diagnostic;
           sub = [];
-          source = diagnostic.source;
+          source;
           footnote = None
         }
       in
