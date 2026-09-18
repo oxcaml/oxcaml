@@ -41,10 +41,10 @@ module type S = sig
     keep_symbol_tables:bool ->
     unit
 
+  (** [units] are (.cmx file, output prefix) pairs, in any order. *)
   val reaper_rebuild :
     ltosol_file:string ->
-    cmx_file:string ->
-    output_prefix:string ->
+    units:(string * string) list ->
     keep_symbol_tables:bool ->
     unit
 
@@ -237,24 +237,65 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
 
-  let reaper_rebuild ~ltosol_file ~cmx_file ~output_prefix ~keep_symbol_tables =
+  let reaper_rebuild ~ltosol_file ~units ~keep_symbol_tables =
     match Backend.compile_from_reaped_flambda with
     | None -> Misc.fatal_error "This backend does not support -reaper-rebuild"
     | Some compile_from_reaped_flambda ->
-      let paused_unit_infos, (_ : Digest.t) =
-        Compilenv.read_unit_info cmx_file
+      (* Read the paused unit infos upfront: they provide the compilation unit
+         names of the batch members and are needed to resume compilation. *)
+      let units =
+        List.map
+          (fun (cmx_file, output_prefix) ->
+            let paused_unit_infos, (_ : Digest.t) =
+              Compilenv.read_unit_info cmx_file
+            in
+            cmx_file, output_prefix, paused_unit_infos)
+          units
       in
-      let unit_info =
-        unit_info_from_cu_or_output_prefix ~source_file:cmx_file Impl
-          ~output_prefix
-          ~compilation_unit:(Exactly paused_unit_infos.Cmx_format.ui_unit)
+      let batch_members =
+        List.map
+          (fun (_, _, (paused : Cmx_format.unit_infos)) -> paused.ui_unit)
+          units
       in
-      with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
-      if !Oxcaml_flags.internal_assembler
-      then Emitaux.binary_backend_available := true;
-      Compilenv.reset info.target;
-      compile_from_reaped_flambda ~ltosol_file ~keep_symbol_tables ~cmx_file
-        ~paused_unit_infos info
+      let member_set = Compilation_unit.Set.of_list batch_members in
+      if Compilation_unit.Set.cardinal member_set <> List.length batch_members
+      then
+        Misc.fatal_error
+          "-reaper-rebuild: the same compilation unit was given more than once";
+      let rebuild_unit =
+        compile_from_reaped_flambda ~ltosol_file ~batch_members
+      in
+      let rec loop ~is_first = function
+        | [] -> ()
+        | (cmx_file, output_prefix, paused_unit_infos) :: rest ->
+          let is_last = match rest with [] -> true | _ :: _ -> false in
+          let unit_info =
+            unit_info_from_cu_or_output_prefix ~source_file:cmx_file Impl
+              ~output_prefix
+              ~compilation_unit:(Exactly paused_unit_infos.Cmx_format.ui_unit)
+          in
+          ( with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
+            if !Oxcaml_flags.internal_assembler
+            then Emitaux.binary_backend_available := true;
+            (* The .cmx read caches must survive across the members of a batch:
+               the batch's shared cmx loader only consults [Compilenv] the first
+               time a dependency is imported, so clearing these caches between
+               members would leave later members without e.g. the zero_alloc
+               info of dependencies loaded by earlier members (causing spurious
+               zero_alloc check failures). The caches mirror on-disk data that
+               does not change during the batch: members' own .reaped.cmx files
+               are written during the batch but never read. *)
+            Compilenv.reset ~keep_cmx_caches:(not is_first) info.target;
+            (* The identifier tables are shared by the whole batch, so they may
+               only be reset after the last unit. Similarly, compacting the heap
+               before running the assembler is only worthwhile once the batch's
+               shared state is no longer needed. *)
+            rebuild_unit
+              ~keep_symbol_tables:(keep_symbol_tables || not is_last)
+              ~may_reduce_heap:is_last ~cmx_file ~paused_unit_infos info );
+          loop ~is_first:false rest
+      in
+      loop ~is_first:true units
 
   module Link = Optlink.Make (Backend)
 
@@ -304,6 +345,7 @@ let native unix
     ~(reaped_flambda2_to_cmm :
        machine_width:Target_system.Machine_width.t ->
        ltosol_filename:string ->
+       batch_members:Compilation_unit.t list ->
        keep_symbol_tables:bool ->
        cmx_filename:string ->
        paused_unit_infos:Cmx_format.unit_infos ->
@@ -359,28 +401,35 @@ let native unix
     let compile_from_reaped_flambda :
         Optcomp_intf.compile_from_reaped_flambda option =
       Some
-        (fun ~ltosol_file
-          ~keep_symbol_tables
-          ~cmx_file
-          ~paused_unit_infos
-          (info : Compile_common.info)
-        ->
+        (fun ~ltosol_file ~batch_members ->
           let machine_width = Target_system.Machine_width.Sixty_four in
-          Asmgen.compile_implementation_from_cmm unix
-            ~sourcefile:(Some cmx_file)
-            ~prefixname:(Unit_info.prefix info.target)
-            ~ppf_dump:info.ppf_dump
-            (reaped_flambda2_to_cmm ~machine_width ~ltosol_filename:ltosol_file
-               ~keep_symbol_tables ~cmx_filename:cmx_file ~paused_unit_infos);
-          (* Unlike [compile_implementation] we create the .reaped.cmx file
-             here. Everything describing generated code comes from [Compilenv]
-             as filled by this rebuild; the paused .cmx only supplies the
-             frontend fields (imports, format, ...), never its export
-             information, whose code metadata and offsets are stale. *)
-          Compilenv.save_resumed_unit_info
-            (Unit_info.Artifact.filename
-               (Unit_info.artifact info.target ~extension:ext_flambda_obj))
-            ~paused:paused_unit_infos)
+          (* This application loads and deserialises the .ltosol file and
+             creates the state shared by the whole batch. *)
+          let rebuild_unit_to_cmm =
+            reaped_flambda2_to_cmm ~machine_width ~ltosol_filename:ltosol_file
+              ~batch_members
+          in
+          fun ~keep_symbol_tables
+            ~may_reduce_heap
+            ~cmx_file
+            ~paused_unit_infos
+            (info : Compile_common.info)
+          ->
+            Asmgen.compile_implementation_from_cmm unix ~may_reduce_heap
+              ~sourcefile:(Some cmx_file)
+              ~prefixname:(Unit_info.prefix info.target)
+              ~ppf_dump:info.ppf_dump
+              (rebuild_unit_to_cmm ~keep_symbol_tables ~cmx_filename:cmx_file
+                 ~paused_unit_infos);
+            (* Unlike [compile_implementation] we create the .reaped.cmx file
+               here. Everything describing generated code comes from [Compilenv]
+               as filled by this rebuild; the paused .cmx only supplies the
+               frontend fields (imports, format, ...), never its export
+               information, whose code metadata and offsets are stale. *)
+            Compilenv.save_resumed_unit_info
+              (Unit_info.Artifact.filename
+                 (Unit_info.artifact info.target ~extension:ext_flambda_obj))
+              ~paused:paused_unit_infos)
 
     let extra_load_paths_for_eval = ["unix"; "compiler-libs"; "ocaml-jit"]
 
