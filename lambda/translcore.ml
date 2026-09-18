@@ -2435,7 +2435,9 @@ and transl_function
          then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
          else Default_zero_alloc)
     | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
-      if Builtin_attributes.is_zero_alloc_check_enabled ~opt
+      if Mode.Allocation.Guts.get_ceil allocation_mode
+           <> Mode.Allocation.Const.Alloc
+         || Builtin_attributes.is_zero_alloc_check_enabled ~opt
       then Check { strict; loc; custom_error_msg }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
