@@ -73,3 +73,14 @@ end
 [%%expect{|
 module Layout_inference : sig val unboxed : unit -> int64_u end @@ stateless
 |}]
+
+module Unboxable = struct
+  let[@unboxable] (constant @ noalloc_strict) () = 2.0
+  let (identity @ noalloc_strict) : float @ global -> float @ global =
+    fun (x[@unboxable]) -> x
+end
+[%%expect{|
+module Unboxable :
+  sig val constant : unit -> float val identity : float -> float end @@
+  stateless noalloc_strict
+|}]
