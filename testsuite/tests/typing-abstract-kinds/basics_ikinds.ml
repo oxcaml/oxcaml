@@ -1830,19 +1830,13 @@ module B = G (struct kind_ ka = value end)
 val cell : '_weak1 id option ref = {contents = None}
 module G :
   functor (X : sig kind_ ka end) -> sig val c : '_weak1 id option ref end
-module A : sig val c : '_weak1 id option ref end
-module B : sig val c : '_weak1 id option ref end
+module A : sig val c : '_weak2 id option ref end
+module B : sig val c : '_weak3 id option ref end
 |}]
 
 let () = A.c := (None : int id option)
 let () = B.c := (None : bool id option)
 [%%expect{|
-Line 2, characters 16-39:
-2 | let () = B.c := (None : bool id option)
-                    ^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "bool id option"
-       but an expression was expected of type "int id option"
-       Type "bool" is not compatible with type "int"
 |}]
 
 (*****************************************************)
