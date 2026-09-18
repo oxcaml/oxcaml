@@ -6,12 +6,14 @@
 *)
 
 external box : ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box" [@@layout_poly]
+external unbox : ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) = "%unbox" [@@layout_poly]
 
 (* TESTING INVARIANT: boxing a value of type [t] produces a block with the same
-   layout as a record with a single field of type [t]. See [primitives.ml]. *)
+   layout as a record with a single field of type [t], and unboxing gives back
+   the original value. See [box_primitive.ml] and [unbox_primitive.ml]. *)
 
 (* Only the header is compared; contents are read back through the record
-   type, as in [primitives.ml]. *)
+   type, as in [box_primitive.ml]. *)
 let same_shape (a : Obj.t) (b : Obj.t) =
   Obj.tag a = Obj.tag b
   && Obj.size a = Obj.size b
@@ -47,6 +49,10 @@ let () =
   let r : v128rec = Obj.obj (Obj.repr (box v)) in
   assert (Int64.equal (low r.v128) 43L);
   assert (Int64.equal (high r.v128) 45L);
+  let u = unbox (box v) in
+  assert (Int64.equal (low u) 43L && Int64.equal (high u) 45L);
+  let u = unbox (Sys.opaque_identity (box v)) in
+  assert (Int64.equal (low u) 43L && Int64.equal (high u) 45L);
   print_endline "vec128: ok"
 
 let () =
@@ -54,6 +60,9 @@ let () =
   assert (same_shape (Obj.repr (box v)) (Obj.repr { v256 = v }));
   let r : v256rec = Obj.obj (Obj.repr (box v)) in
   let #(l, h) = split_vec256 r.v256 in
+  assert (Int64.equal (low l) 1L && Int64.equal (high l) 2L);
+  assert (Int64.equal (low h) 3L && Int64.equal (high h) 4L);
+  let #(l, h) = split_vec256 (unbox (Sys.opaque_identity (box v))) in
   assert (Int64.equal (low l) 1L && Int64.equal (high l) 2L);
   assert (Int64.equal (low h) 3L && Int64.equal (high h) 4L);
   print_endline "vec256: ok"
@@ -82,4 +91,7 @@ let () =
   r1.v <- int64x2 20L 30L;
   assert (Int64.equal (low r2.v) 1L);
   assert (Int64.equal (low r1.v) 20L);
+  (* Unboxing reads the mutated vector. *)
+  let #{ v; tag } = unbox r1 in
+  assert (Int64.equal (low v) 20L && Int64.equal (high v) 30L && tag = 7);
   print_endline "aliasing: ok"
