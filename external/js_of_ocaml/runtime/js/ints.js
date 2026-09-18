@@ -135,8 +135,8 @@ function caml_int_of_string(s) {
 //Provides: caml_parse_small_int
 //Requires: caml_ml_string_length, caml_string_unsafe_get
 //Requires: caml_parse_sign_and_base, caml_parse_digit, caml_failwith
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_parse_small_int(err_msg, width, s) {
   var r = caml_parse_sign_and_base(s);
   var i = r[0],
@@ -175,16 +175,16 @@ function caml_parse_small_int(err_msg, width, s) {
 
 //Provides: caml_int8_of_string (const)
 //Requires: caml_parse_small_int
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_int8_of_string(s) {
   return caml_parse_small_int("Int8.of_string", 8, s);
 }
 
 //Provides: caml_int16_of_string (const)
 //Requires: caml_parse_small_int
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_int16_of_string(s) {
   return caml_parse_small_int("Int16.of_string", 16, s);
 }
@@ -215,6 +215,26 @@ function caml_div(x, y) {
 function caml_mod(x, y) {
   if (y === 0) caml_raise_zero_divide();
   return x % y;
+}
+
+//Provides: caml_int_unsigned_div
+//Requires: caml_raise_zero_divide
+//Alias: caml_int32_unsigned_div
+//Alias: caml_nativeint_unsigned_div
+//Alias: %int_unsigned_div
+function caml_int_unsigned_div(x, y) {
+  if (y === 0) caml_raise_zero_divide();
+  return ((x >>> 0) / (y >>> 0)) | 0;
+}
+
+//Provides: caml_int_unsigned_mod
+//Requires: caml_raise_zero_divide
+//Alias: caml_int32_unsigned_mod
+//Alias: caml_nativeint_unsigned_mod
+//Alias: %int_unsigned_mod
+function caml_int_unsigned_mod(x, y) {
+  if (y === 0) caml_raise_zero_divide();
+  return ((x >>> 0) % (y >>> 0)) | 0;
 }
 
 //Provides: caml_bswap16 const

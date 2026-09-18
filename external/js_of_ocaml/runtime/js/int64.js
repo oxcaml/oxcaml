@@ -339,6 +339,20 @@ function caml_int64_mod(x, y) {
   return x.mod(y);
 }
 
+//Provides: caml_int64_unsigned_div
+//Requires: caml_raise_zero_divide
+function caml_int64_unsigned_div(x, y) {
+  if (y.isZero()) caml_raise_zero_divide();
+  return x.udivmod(y).quotient;
+}
+
+//Provides: caml_int64_unsigned_mod
+//Requires: caml_raise_zero_divide
+function caml_int64_unsigned_mod(x, y) {
+  if (y.isZero()) caml_raise_zero_divide();
+  return x.udivmod(y).modulus;
+}
+
 //Provides: caml_int64_of_int32 const
 //Requires: MlInt64
 //Alias: caml_int64_of_int
@@ -356,8 +370,8 @@ function caml_int64_to_int32(x) {
 
 //Provides: caml_checked_int64_to_int
 //Requires: caml_int64_of_int32, caml_array_bound_error
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_checked_int64_to_int(x) {
   var y = x.toInt();
   if (x.compare(caml_int64_of_int32(y)) !== 0) caml_array_bound_error();
@@ -365,15 +379,15 @@ function caml_checked_int64_to_int(x) {
 }
 
 //Provides: caml_array_unsafe_get_indexed_by_int64 mutable (mutable, const)
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_array_unsafe_get_indexed_by_int64(array, index) {
   return array[index.toInt() + 1];
 }
 
 //Provides: caml_array_unsafe_set_indexed_by_int64 (mutable, const, mutable)
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_array_unsafe_set_indexed_by_int64(array, index, newval) {
   array[index.toInt() + 1] = newval;
   return 0;
@@ -507,8 +521,8 @@ function caml_int64_hash(v) {
 
 //Provides: caml_reinterpret_unboxed_int64_as_tagged_int63
 //Requires: caml_failwith
-//Version: >= 5.2, < 5.3
-//OxCaml
+//Version: >= 5.2
+//If: oxcaml
 function caml_reinterpret_unboxed_int64_as_tagged_int63(_v) {
   caml_failwith(
     "caml_reinterpret_unboxed_int64_as_tagged_int63 is not supported in javascript.",

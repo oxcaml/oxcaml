@@ -23,6 +23,7 @@ let runtime =
     ; backtrace
     ; bigarray
     ; bigstring
+    ; block_index
     ; compare
     ; fail
     ; format
@@ -53,6 +54,7 @@ let runtime =
     ; unix
     ; weak
     ; domain
+    ; dynamic
     ; prng
     ; sync
     ; effect_

@@ -75,6 +75,9 @@ module Flag = struct
 
   let effects = o ~name:"effects" ~default:false
 
+  let oxcaml_use_unyielding_debuginfo_for_effect_cps =
+    o ~name:"oxcaml-use-unyielding-debuginfo-for-effect-cps" ~default:true
+
   let staticeval = o ~name:"staticeval" ~default:true
 
   let share_constant = o ~name:"share" ~default:true
@@ -93,7 +96,7 @@ module Flag = struct
 
   let safe_string = o ~name:"safestring" ~default:true
 
-  let use_js_string = o ~name:"use-js-string" ~default:true
+  let use_js_string = o ~name:"use-js-string" ~default:false
 
   let check_magic = o ~name:"check-magic-number" ~default:true
 
@@ -114,6 +117,8 @@ module Flag = struct
   let toplevel = o ~name:"toplevel" ~default:false
 
   let wasi = o ~name:"wasi" ~default:false
+
+  let portable_int = o ~name:"portable-int" ~default:false
 end
 
 module Param = struct
@@ -239,10 +244,15 @@ let target () =
   | `None -> failwith "target was not set"
   | (`JavaScript | `Wasm) as t -> t
 
-let set_target (t : [ `JavaScript | `Wasm ]) =
-  (match t with
-  | `JavaScript -> Targetint.set_num_bits 32
-  | `Wasm -> Targetint.set_num_bits 31);
+let set_target (t : [ `JavaScript | `Wasm ])  =
+  (match t, Flag.portable_int () with
+  | `JavaScript, false -> Targetint.set_num_bits 32; Targetnativeint.set_num_bits 32
+  | `JavaScript, true-> failwith "Portable int representation is incompatible with JavaScript"
+  | `Wasm, false -> Targetint.set_num_bits 31; Targetnativeint.set_num_bits 32
+  | `Wasm, true when Flag.wasi () ->
+      failwith "Portable int representation is currently incompatible with wasi";
+  | `Wasm, true ->
+      Targetint.set_num_bits 63; Targetnativeint.set_num_bits 64);
   target_ := (t :> [ `JavaScript | `Wasm | `None ])
 
 type effects_backend =
