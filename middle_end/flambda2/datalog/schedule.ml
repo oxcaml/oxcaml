@@ -114,19 +114,29 @@ let add_if_not_exists sources tid args provenance =
     - An unique identifier for logging/tracing purposes.
 
     The cursor embeds callbacks to update the [binder]s. *)
+
+type rule_executor =
+  | Rule_executor :
+      { cursor : 'a Cursor.t;
+        binders : binder list
+      }
+      -> rule_executor
+
 type rule =
   | Rule :
-      { cursor : 'a Cursor.t;
-        binders : binder list;
-        enable_provenance : bool ref;
-        provenance_table_ref : provenance FactMap.t ref;
-        rule_id : rule_id
+      { executor : rule_executor;
+        rule_id : rule_id;
+        variables : Lang.Variable.t_ list;
+        rule : Lang.rule
       }
       -> rule
 
-type deduction =
-  [ `Atom of Datalog.atom
-  | `And of deduction list ]
+type stats =
+  { timings : (rule_id, float) Hashtbl.t;
+    rules : (rule_id, rule) Hashtbl.t;
+    with_provenance : bool;
+    mutable provenance : provenance FactMap.t
+  }
 
 let find_or_create_ref (type t k v) binders (table_id : (t, k, v) Table.Id.t) :
     t incremental ref =
@@ -142,89 +152,106 @@ let find_or_create_ref (type t k v) binders (table_id : (t, k, v) Table.Id.t) :
     let Equal = Table.Id.provably_equal_exn other_table_id table_id in
     current
 
-let deduce (atoms : deduction) =
-  let rec fold f atoms acc =
-    match atoms with
-    | `Atom atom -> f atom acc
-    | `And atoms -> List.fold_left (fun acc atoms -> fold f atoms acc) acc atoms
-  in
-  let rule_id = fresh_rule_id () in
+let extra_atoms_for_provenance ~stats ~rule_id atom =
+  let (Lang.Atom (relation, args)) = atom in
+  match relation with
+  | Table tid when Table.Id.has_provenance tid ->
+    let provenance_fn bindings keys =
+      let fact = Fact_id (tid, keys) in
+      match FactMap.find_opt fact stats.provenance with
+      | None ->
+        let provenance : provenance =
+          Rule (rule_id, Bytecode.get_bindings bindings)
+        in
+        stats.provenance <- FactMap.add fact provenance stats.provenance
+      | Some _ -> ()
+    in
+    let name = Table.Id.name tid ^ ".provenance" in
+    [Lang.callback_with_bindings ~name provenance_fn args]
+  | Table _ | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ -> []
+
+let compile_rule ?with_provenance ~rule_id vars rule =
   let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
-  let provenance_table_ref = ref FactMap.empty in
-  let enable_provenance = ref false in
   let callbacks =
-    fold
-      (fun (Datalog.Atom (tid, args)) callbacks ->
-        let is_trie = Table.Id.is_trie tid in
-        let table_ref = find_or_create_ref binders tid in
-        let callback_fn bindings keys =
-          let incremental_table = !table_ref in
-          match Trie.find_or_null is_trie keys incremental_table.current with
-          | This _ -> ()
-          | Null ->
-            if !enable_provenance
-            then
-              provenance_table_ref
-                := add_if_not_exists !provenance_table_ref tid keys
-                     (Rule (rule_id, Bytecode.get_bindings bindings)
-                       : provenance);
-            table_ref
-              := incremental
-                   ~current:
-                     (Trie.add_or_replace is_trie keys ()
-                        incremental_table.current)
-                   ~difference:
-                     (Trie.add_or_replace is_trie keys ()
-                        incremental_table.difference)
-        in
-        let name = Table.Id.name tid ^ ".insert" in
-        let callback =
-          Datalog.create_callback_with_bindings ~name callback_fn args
-        in
-        callback :: callbacks)
-      atoms []
+    Dynarray.unsafe_to_iarray ~capacity:(Iarray.length rule.Lang.head)
+      (fun new_head ->
+        Iarray.iter
+          (fun (Lang.Atom (relation, args)) ->
+            match relation with
+            | Unless _ | Distinct _ | Filter _ | Callback_with_bindings _ ->
+              Misc.fatal_error "Relation is not supported in rules"
+            | Table tid ->
+              let is_trie = Table.Id.is_trie tid in
+              let value = Table.Id.default_value tid in
+              let table_ref = find_or_create_ref binders tid in
+              let callback_fn _ keys =
+                let incremental_table = !table_ref in
+                match
+                  Trie.find_or_null is_trie keys incremental_table.current
+                with
+                | This _ -> ()
+                | Null ->
+                  table_ref
+                    := incremental
+                         ~current:
+                           (Trie.add_or_replace is_trie keys value
+                              incremental_table.current)
+                         ~difference:
+                           (Trie.add_or_replace is_trie keys value
+                              incremental_table.difference)
+              in
+              let name = Table.Id.name tid ^ ".insert" in
+              Dynarray.add_last new_head
+                (Lang.callback_with_bindings ~name callback_fn args))
+          rule.Lang.head;
+        match with_provenance with
+        | None -> ()
+        | Some stats ->
+          Iarray.iter
+            (fun atom ->
+              Dynarray.append_list new_head
+                (extra_atoms_for_provenance ~stats ~rule_id atom))
+            rule.Lang.head)
   in
   let binders =
     Hashtbl.fold (fun _ binder binders -> binder :: binders) binders []
   in
-  Datalog.map_program (Datalog.execute callbacks) (fun cursor ->
-      let cursor = Cursor.With_parameters.without_parameters cursor in
-      Rule { cursor; binders; enable_provenance; provenance_table_ref; rule_id })
+  let rule = { rule with Lang.head = callbacks } in
+  let cursor =
+    Cursor.With_parameters.create_from_rule [] vars rule
+    |> Cursor.With_parameters.without_parameters
+  in
+  Rule_executor { cursor; binders }
 
-type stats =
-  { timings : (rule_id, rule * float) Hashtbl.t;
-    with_provenance : bool;
-    mutable provenance : provenance FactMap.t
-  }
-
-let rec vars : type a b c. (a, b, c) Column.hlist -> b Datalog.String.hlist =
-  function
-  | [] -> []
-  | _column :: columns -> "_" :: vars columns
+let create_rule variables rule =
+  let rule_id = fresh_rule_id () in
+  let executor = compile_rule ~rule_id variables rule in
+  Rule { rule_id; variables; rule; executor }
 
 let provenance_from_db db =
   Table.Map.fold db ~init:FactMap.empty ~f:(fun (Binding (tid, _)) provenance ->
-      let cursor =
-        Datalog.compile
-          (vars (Table.Id.columns tid))
-          (fun args -> Datalog.where_atom tid args (Datalog.yield args))
-      in
-      let cursor = Cursor.With_parameters.without_parameters cursor in
-      Cursor.naive_fold cursor db
-        (fun args provenance -> add_if_not_exists provenance tid args Input)
-        provenance)
+      Trie.fold (Table.Id.is_trie tid)
+        (fun keys _ provenance -> add_if_not_exists provenance tid keys Input)
+        (Table.Map.get tid db) provenance)
 
 let create_stats ?(with_provenance = false) db =
   let provenance =
     if with_provenance then provenance_from_db db else FactMap.empty
   in
-  { timings = Hashtbl.create 17; provenance; with_provenance }
+  { timings = Hashtbl.create 17;
+    rules = Hashtbl.create 17;
+    provenance;
+    with_provenance
+  }
 
-let add_timing ~stats (Rule { rule_id; _ } as rule) time =
+let record_rule ~stats rule =
+  let (Rule { rule_id; _ }) = rule in
+  Hashtbl.replace stats.rules rule_id rule
+
+let add_timing ~stats rule time =
+  let (Rule { rule_id; _ }) = rule in
   Hashtbl.replace stats.timings rule_id
-    ( rule,
-      time
-      +. try snd (Hashtbl.find stats.timings rule_id) with Not_found -> -0. )
+    (time +. try Hashtbl.find stats.timings rule_id with Not_found -> -0.)
 
 module CharMap = Map.Make (Char)
 
@@ -263,7 +290,8 @@ let print_string_with_unique_prefix len ppf s =
     (String.sub s 0 len) Flambda_colours.pop
     (String.sub s len (String.length s - len))
 
-let print_rule char_trie ppf (Rule { cursor; binders; rule_id; _ }) =
+let print_rule char_trie ppf
+    (Rule { executor = Rule_executor { cursor; binders }; rule_id; _ }) =
   let rule_id = rule_id_to_string rule_id in
   let len = unique_prefix_len char_trie rule_id ~pos:0 in
   Format.fprintf ppf "%a:@ @[@[%a@]@ :- %a@]"
@@ -367,22 +395,21 @@ let print_stats ppf stats =
     if stats.with_provenance
     then
       Hashtbl.fold
-        (fun _ (Rule { rule_id; _ }, _time) char_trie ->
+        (fun rule_id _time char_trie ->
           add_to_trie char_trie (rule_id_to_string rule_id) ~pos:0)
         stats.timings char_trie
     else char_trie
   in
   Format.fprintf ppf "@[<v>";
-  let rule_defs = Hashtbl.create 17 in
   Hashtbl.iter
-    (fun _ ((Rule { rule_id; _ } as rule), time) ->
-      Hashtbl.replace rule_defs rule_id rule;
+    (fun rule_id time ->
+      let rule = Hashtbl.find stats.rules rule_id in
       Format.fprintf ppf "@[<v 2>%a@,: %f@]@ " (print_rule char_trie) rule time)
     stats.timings;
   if stats.with_provenance
   then (
     Format.fprintf ppf "Provenance@ ==========@ ";
-    print_provenance char_trie rule_defs ppf stats.provenance);
+    print_provenance char_trie stats.rules ppf stats.provenance);
   Format.fprintf ppf "@]"
 
 (** Evaluate a single rule using semi-naive evaluation.
@@ -398,10 +425,8 @@ let print_stats ppf stats =
     represented by the [(previous, diff, current)] triple and the output
     database [incremental_db]. *)
 let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
-    (Rule { binders; cursor; provenance_table_ref; _ } as rule) =
-  (match stats with
-  | None -> ()
-  | Some stats -> provenance_table_ref := stats.provenance);
+    (Rule { executor = Rule_executor { binders; cursor }; _ } as rule) =
+  Option.iter (fun stats -> record_rule ~stats rule) stats;
   List.iter
     (fun (Binder { table_id; previous; current }) ->
       let incremental_table =
@@ -415,10 +440,6 @@ let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
   let time1 = Sys.time () in
   let seminaive_time = time1 -. time0 in
   Option.iter (fun stats -> add_timing ~stats rule seminaive_time) stats;
-  (match stats with
-  | None -> ()
-  | Some stats -> stats.provenance <- !provenance_table_ref);
-  provenance_table_ref := FactMap.empty;
   let incremental_db =
     List.fold_left
       (fun incremental_db (Binder { table_id; previous; current }) ->
@@ -436,14 +457,26 @@ type t =
   | Saturate of rule list
   | Fixpoint of t list
 
-let rec enable_provenance_for_debug schedule b =
+let recompile_rule_with_provenance ~stats rule =
+  let (Rule { rule_id; variables; rule; _ }) = rule in
+  let executor = compile_rule ~with_provenance:stats ~rule_id variables rule in
+  Rule { rule_id; variables; rule; executor }
+
+let rec recompile_schedule_with_provenance ~stats schedule =
   match schedule with
   | Fixpoint schedules ->
-    List.iter (fun schedule -> enable_provenance_for_debug schedule b) schedules
+    Fixpoint
+      (List.map
+         (fun schedule -> recompile_schedule_with_provenance ~stats schedule)
+         schedules)
   | Saturate rules ->
-    List.iter
-      (fun (Rule { enable_provenance; _ }) -> enable_provenance := b)
-      rules
+    Saturate (List.map (recompile_rule_with_provenance ~stats) rules)
+
+let maybe_recompile_with_provenance ?stats schedule =
+  match stats with
+  | None | Some { with_provenance = false; _ } -> schedule
+  | Some ({ with_provenance = true; _ } as stats) ->
+    recompile_schedule_with_provenance ~stats schedule
 
 let fixpoint schedule = Fixpoint schedule
 
@@ -533,18 +566,8 @@ let rec run_incremental ?stats schedule ~previous ~diff ~current =
       (List.map (run_incremental ?stats) schedules)
       ~previous ~diff ~current
 
-let maybe_with_provenance stats schedule f =
-  match stats with
-  | None | Some { with_provenance = false; _ } -> f schedule
-  | Some { with_provenance = true; _ } ->
-    Fun.protect
-      ~finally:(fun () -> enable_provenance_for_debug schedule false)
-      (fun () ->
-        enable_provenance_for_debug schedule true;
-        f schedule)
-
 let run ?stats schedule db =
-  maybe_with_provenance stats schedule (fun schedule ->
-      (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
-         ~current:db)
-        .current)
+  let schedule = maybe_recompile_with_provenance ?stats schedule in
+  (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
+     ~current:db)
+    .current
