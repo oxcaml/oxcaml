@@ -16,7 +16,6 @@
 open Format
 open Asttypes
 open Primitive
-open Types
 open Lambda
 
 let unboxed_integer_suffix = function
@@ -194,10 +193,10 @@ let rec mixed_block_element print_value_kind ppf el =
 
 let constructor_shape print_value_kind ppf shape =
   match shape with
-  | Constructor_uniform fields ->
+  | Constructor_shape_uniform fields ->
      Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
        print_value_kind ppf fields
-  | Constructor_mixed shape->
+  | Constructor_shape_mixed shape->
     fprintf ppf "%a"
       (Format.pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ")
          (mixed_block_element print_value_kind)) (Array.to_list shape)
@@ -337,16 +336,13 @@ let print_bigarray name unsafe kind ppf layout =
      | Pbigarray_c_layout -> "C"
      | Pbigarray_fortran_layout -> "Fortran")
 
-let record_rep ppf r = match r with
+let record_rep ppf (r : record_representation) = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
   | Record_boxed -> fprintf ppf "boxed"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
-  | Record_dummy _ -> fprintf ppf "dummy"
-  | Record_undetermined -> fprintf ppf "undetermined"
-  | Record_variable _ -> fprintf ppf "variable"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
