@@ -369,3 +369,36 @@ let () = read_write_read (Sys.opaque_identity { c = #1L; d = s })
 type mut = { mutable c : int64_u; d : string; }
 val read_write_read : mut -> unit = <fun>
 |}]
+
+(* Abstraction. The client only sees [M.u], an abstract type of layout
+   [value & value], so it cannot tell that [u box] is a record with a mutable
+   field. *)
+module M : sig
+  type u : value & value
+  val make : int -> int -> u
+  val c : u -> int
+  val set_c : u box -> int -> unit
+end = struct
+  type t = { mutable c : int; d : int }
+  type u = t#
+  let make c d = #{ c; d }
+  let c (#{ c; d = _ } : u) = c
+  (* [u box] does not reduce to [t] through the alias, so annotate with [t] *)
+  let set_c (r : t) v = r.c <- v
+end
+
+let () =
+  let r = box (M.make 1 0) in
+  let before = M.c (unbox r) in
+  M.set_c r 2;
+  let after = M.c (unbox r) in
+  assert (before = 1 && after = 2)
+[%%expect{|
+module M :
+  sig
+    type u : value & value
+    val make : int -> int -> u
+    val c : u -> int
+    val set_c : u box -> int -> unit
+  end
+|}]
