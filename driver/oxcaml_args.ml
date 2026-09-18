@@ -1975,20 +1975,6 @@ module Oxcaml_options_impl = struct
   let no_cfg_value_propagation_flow =
     clear' Oxcaml_flags.cfg_value_propagation_flow
 
-  (* Bundle of experimental codegen optimizations enabled by
-     [-experimental-optimizations]. *)
-  let experimental_optimizations () =
-    cfg_prologue_shrink_wrap ();
-    cfg_prologue_validate ();
-    x86_peephole_optimize ();
-    regalloc_param "SPLIT_AROUND_LOOPS:on";
-    regalloc_param "AFFINITY:on";
-    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
-    regalloc_param "IRC_INTERF_THRESHOLD:4096";
-    cfg_merge_blocks ();
-    cfg_eliminate_dead_trap_handlers ();
-    cfg_value_propagation_flow ()
-
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
 
@@ -2367,6 +2353,21 @@ module Oxcaml_options_impl = struct
     Oxcaml_flags.cached_generic_functions_path := file
 
   let x = Extra_options.parse_one_arg
+
+  (* Bundle of experimental codegen optimizations enabled by
+     [-experimental-optimizations]. *)
+  let experimental_optimizations () =
+    cfg_prologue_shrink_wrap ();
+    cfg_prologue_validate ();
+    x86_peephole_optimize ();
+    regalloc_param "SPLIT_AROUND_LOOPS:on";
+    regalloc_param "AFFINITY:on";
+    regalloc_param "BIT_MATRIX_THRESHOLD:8192";
+    regalloc_param "IRC_INTERF_THRESHOLD:4096";
+    cfg_merge_blocks ();
+    cfg_eliminate_dead_trap_handlers ();
+    cfg_value_propagation_flow ();
+    use_ssa ()
 end
 
 module type Debugging_options = sig
