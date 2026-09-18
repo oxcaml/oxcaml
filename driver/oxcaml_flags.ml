@@ -140,7 +140,7 @@ let branch_relaxation_max_displacement =
 
 let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 
-let use_ssa = ref true                       (* -use-ssa *)
+let use_ssa = ref false                      (* -use-ssa *)
 
 let ssa_simplify = ref true                 (* -ssa-simplify *)
 
