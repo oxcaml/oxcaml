@@ -1173,9 +1173,9 @@ let x13 v =
   | [| v |] -> VV v
   | _ -> assert false
 [%%expect{|
-Line 2, characters 8-9:
-2 |   match v with
-            ^
+Line 3, characters 4-11:
+3 |   | [| v |] -> VV v
+        ^^^^^^^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}];;
 

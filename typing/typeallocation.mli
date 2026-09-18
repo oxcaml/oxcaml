@@ -13,6 +13,9 @@ val register_mode_for_optimisation :
 val register_allocation_mode :
   env:Env.t -> loc:Location.t -> ('l * allowed) Locality.t -> unit
 
+val register_pattern_allocation :
+  env:Env.t -> 'k Typedtree.general_pattern -> unit
+
 val register_allocation_value_mode :
   env:Env.t ->
   loc:Location.t ->

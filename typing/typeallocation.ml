@@ -24,6 +24,61 @@ let register_allocation_mode ~env ~loc locality_mode =
   let closures = Env.walk_locks_for_allocation ~env pp in
   register_mode_for_optimisation pp ~closures locality_mode
 
+let register_pattern_allocation ~env pattern =
+  let reads_value (pattern : Typedtree.pattern) =
+    match pattern.pat_desc with
+    | Tpat_any -> false
+    | _ -> true
+  in
+  let may_allocate primitive =
+    Option.is_some (Lambda.primitive_may_allocate primitive)
+  in
+  let inspect : type k. k Typedtree.general_pattern -> unit = fun pattern ->
+    let snapshot = Btype.snapshot () in
+    let allocates =
+      Fun.protect ~finally:(fun () -> Btype.backtrack snapshot) (fun () ->
+        match pattern.pat_desc with
+        | Tpat_array (mutability, _, elements)
+          when List.exists reads_value elements ->
+            let kind = Typeopt.array_pattern_kind pattern in
+            let ref_kind = Lambda.array_ref_kind Lambda.alloc_heap kind in
+            let mutability =
+              if Types.is_mutable mutability then Lambda.Mutable
+              else Lambda.Immutable
+            in
+            may_allocate (Parrayrefu (ref_kind, Ptagged_int_index, mutability))
+        | Tpat_record (fields, representation, _) ->
+            let representation, ~variable_sorts:_ =
+              Typedecl.finalize_record_representation_and_sorts
+                pattern.pat_env pattern.pat_loc representation
+            in
+            List.exists
+              (fun (_, (label : _ Data_types.gen_label_description), field) ->
+                reads_value field
+                && match representation with
+                | Record_float ->
+                    may_allocate
+                      (Pfloatfield
+                         (label.lbl_pos, Reads_agree, Lambda.alloc_heap))
+                | Record_mixed shape
+                | Record_inlined
+                    (_, Constructor_mixed shape, Variant_boxed _) ->
+                    let shape =
+                      Lambda.transl_mixed_product_shape_for_read
+                        ~get_value_kind:(fun _ -> Lambda.generic_value)
+                        ~get_mode:(fun _ -> Lambda.alloc_heap) shape
+                    in
+                    may_allocate
+                      (Pmixedfield ([label.lbl_pos], shape, Reads_agree))
+                | _ -> false)
+              fields
+        | _ -> false)
+    in
+    if allocates then
+      register_allocation_mode ~env ~loc:pattern.pat_loc Locality.global
+  in
+  Typedtree.iter_general_pattern { f = inspect } pattern
+
 let register_allocation_value_mode ~env ~loc
     ?(desc  = (Unknown : Hint.allocation_desc)) mode =
   let locality =

@@ -11747,43 +11747,50 @@ and type_cases
      is to typecheck the guards and the cases, and then to check for some
      warnings that can fire in the presence of guards.
   *)
-  map_half_typed_cases ?conts category env pat_mode ty_arg sort_arg ty_res loc
-    caselist ~check_if_total
-    ~type_body:begin
-      fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
-        ~ty_infer ~contains_gadt:_ ->
-        let cont = Option.map (fun (id,_) -> id) cont in
-        let guard =
-          match pc_guard with
-          | None -> None
-          | Some scond ->
-            (* It is crucial that the continuation is not used in the
-               `when' expression as the extent of the continuation is
-               yet to be determined. We make the continuation
-               inaccessible by typing the `when' expression using the
-               environment `ext_env' which does not bind the
-               continuation variable. *)
-            Some
-              (type_expect when_env mode_max scond
-                (mk_expected ~explanation:When_guard Predef.type_bool))
+  let cases, partial =
+    map_half_typed_cases ?conts category env pat_mode ty_arg sort_arg ty_res loc
+      caselist ~check_if_total
+      ~type_body:begin
+        fun { pc_guard; pc_rhs } pat ~when_env ~ext_env ~cont ~ty_expected
+          ~ty_infer ~contains_gadt:_ ->
+          let cont = Option.map (fun (id,_) -> id) cont in
+          let guard =
+            match pc_guard with
+            | None -> None
+            | Some scond ->
+              (* It is crucial that the continuation is not used in the
+                 `when' expression as the extent of the continuation is
+                 yet to be determined. We make the continuation
+                 inaccessible by typing the `when' expression using the
+                 environment `ext_env' which does not bind the
+                 continuation variable. *)
+              Some
+                (type_expect when_env mode_max scond
+                  (mk_expected ~explanation:When_guard Predef.type_bool))
+          in
+          let exp =
+            type_expect ext_env expr_mode pc_rhs
+              (mk_expected ?explanation ty_expected)
+          in
+          {
+            c_lhs = pat;
+            c_cont = cont;
+            c_guard = guard;
+            c_rhs = {exp with exp_type = ty_infer}
+          }
+      end
+      ~additional_checks_for_split_cases:(fun cases ->
+        let cases =
+          List.map
+            (fun (case_with_pat, case) ->
+               { case with c_lhs = case_with_pat.Parmatch.pattern }) cases
         in
-        let exp =
-          type_expect ext_env expr_mode pc_rhs (mk_expected ?explanation ty_expected)
-        in
-        {
-          c_lhs = pat;
-          c_cont = cont;
-          c_guard = guard;
-          c_rhs = {exp with exp_type = ty_infer}
-        }
-    end
-    ~additional_checks_for_split_cases:(fun cases ->
-      let cases =
-        List.map
-          (fun (case_with_pat, case) ->
-             { case with c_lhs = case_with_pat.Parmatch.pattern }) cases
-      in
-      Parmatch.check_ambiguous_bindings cases)
+        Parmatch.check_ambiguous_bindings cases)
+  in
+  List.iter
+    (fun case -> Typeallocation.register_pattern_allocation ~env case.c_lhs)
+    cases;
+  cases, partial
 
 
 (** A version of [type_expect], but that operates over function cases instead
@@ -12190,6 +12197,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
         let e = add_zero_alloc_attribute e pvb.pvb_attributes in
+        Typeallocation.register_pattern_allocation ~env p;
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -12477,6 +12485,20 @@ and type_n_ary_function
              no parameters."
     in
     let params = List.map (fun { param } -> param) result_params in
+    let body_env =
+      match body with
+      | Tfunction_body expression -> expression.exp_env
+      | Tfunction_cases cases -> cases.fc_env
+    in
+    List.iter
+      (fun param ->
+        let pattern =
+          match param.fp_kind with
+          | Tparam_pat pattern | Tparam_optional_default (pattern, _, _) ->
+              pattern
+        in
+        Typeallocation.register_pattern_allocation ~env:body_env pattern)
+      params;
     let syntactic_arity = function_arity params body in
     (* Require that the n-ary function is known to have at least n arrows
         in the type. This prevents GADT equations introduced by the parameters
