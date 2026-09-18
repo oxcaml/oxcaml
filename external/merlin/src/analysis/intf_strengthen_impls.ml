@@ -304,28 +304,32 @@ module Merge = struct
       }
   end
 
-  let agreed_on_axis (type a) (axis : a Mode.Alloc.Axis.t) ~claimed ~others =
-    match Mode.Alloc.Const.Option.proj axis claimed with
+  let agreed_on_axis (type a) (axis : a Mode.With_locality.Axis.t) ~claimed
+      ~others =
+    match Mode.With_locality.Const.Option.proj axis claimed with
     | None -> None
     | Some value ->
       let shared =
         List.for_all others ~f:(fun claims ->
-            Mode.Alloc.Const.Option.proj axis claims = Some value)
+            Mode.With_locality.Const.Option.proj axis claims = Some value)
       in
       if shared then Some value else None
 
   let alloc_claims ~intf impls =
-    match List.map impls ~f:(fun impl -> Mode.Alloc.Const.diff impl intf) with
+    match
+      List.map impls ~f:(fun impl -> Mode.With_locality.Const.diff impl intf)
+    with
     | [] -> intf
     | claimed :: others ->
       let agreed =
-        List.fold_left Mode.Alloc.Axis.all ~init:Mode.Alloc.Const.Option.none
-          ~f:(fun agreed (Mode.Alloc.Axis.P axis) ->
-            Mode.Alloc.Const.Option.set axis
+        List.fold_left Mode.With_locality.Axis.all
+          ~init:Mode.With_locality.Const.Option.none
+          ~f:(fun agreed (Mode.With_locality.Axis.P axis) ->
+            Mode.With_locality.Const.Option.set axis
               (agreed_on_axis axis ~claimed ~others)
               agreed)
       in
-      Mode.Alloc.Const.Option.value agreed ~default:intf
+      Mode.With_locality.Const.Option.value agreed ~default:intf
 
   let modality_claims ~intf impls =
     match impls with
