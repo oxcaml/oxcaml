@@ -370,31 +370,28 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Mode.Locality.r option; }
+      is_lpoly : bool; }
   val make:
-    ?env_alloc_mode:Mode.Locality.r
-    -> Env.t -> equations_scope:int
+    ?is_lpoly:bool -> Env.t -> equations_scope:int
     -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Mode.Locality.r option -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
       in_counterexample : bool;
-      mutable env_alloc_mode : Mode.Locality.r option; }
-  let make ?env_alloc_mode env ~equations_scope ~in_counterexample =
+      is_lpoly : bool; }
+  let make ?(is_lpoly=false) env ~equations_scope ~in_counterexample =
     { env;
       equations_scope;
       in_counterexample;
-      env_alloc_mode; }
+      is_lpoly; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
     { penv with equations_scope }
   let set_env penv env = penv.env <- env
-  let set_env_alloc_mode penv m = penv.env_alloc_mode <- m
 end
 
 (**** unification mode ****)

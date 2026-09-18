@@ -4803,10 +4803,6 @@ module Report = struct
         "is projected (at %a) from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
-    | Lpoly_captured_environment ->
-      Fmt.dprintf "is defined by a layout-polymorphic expression (at %a)"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
     | Captured_by_partial_application ->
       Fmt.dprintf "has a partial application capturing a value"
 
@@ -4823,9 +4819,6 @@ module Report = struct
          allocation)"
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
-    | Lpoly_captured_environment ->
-      (* currently not testable *)
-      Fmt.dprintf "is a layout-polymorphic expression"
     | Captured_by_partial_application ->
       Fmt.dprintf "is captured by a partial application"
 

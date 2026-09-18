@@ -331,8 +331,7 @@ let rec fracture_lam lambda : slambda =
     (* [Lsplice] can't exist because we're matching on tlambda (and producing
        slambda) and Lsplice only exists in slambda. *)
     fatal_error_invalid_constructor lambda
-  | Lkindtemplate
-      { ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode; ktmpl_loc } ->
+  | Lkindtemplate { ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_loc } ->
     (* A kind template fractures into a compile-time template over its kind
        parameters, paired with a runtime block capturing its free variables.
 
@@ -373,7 +372,7 @@ let rec fracture_lam lambda : slambda =
         (fun (_, (_, layout)) -> Lambda.mixed_block_element_of_layout layout)
         env
     in
-    let { kind; params; return; body; attr; loc; mode = _; ret_mode; yielding }
+    let { kind; params; return; body; attr; loc; mode; ret_mode; yielding }
         =
       ktmpl_body
     in
@@ -384,7 +383,7 @@ let rec fracture_lam lambda : slambda =
           debug_uid = debug_uid_none;
           layout = layout_template_env;
           attributes = default_param_attribute;
-          mode = ktmpl_env_mode
+          mode
         }
       in
       let _, body =
@@ -413,7 +412,7 @@ let rec fracture_lam lambda : slambda =
         | Curried { nlocal } ->
           Curried
             { nlocal =
-                begin match ktmpl_env_mode with
+                begin match mode with
                 | Alloc_heap -> nlocal
                 | Alloc_local -> List.length params + 1
                 end
@@ -452,7 +451,7 @@ let rec fracture_lam lambda : slambda =
           sval_runtime =
             Lprim
               ( Pmakeblock
-                  (0, Immutable, Shape free_vars_shape_unit, ktmpl_env_mode),
+                  (0, Immutable, Shape free_vars_shape_unit, mode),
                 free_var_capture,
                 ktmpl_loc )
         }

@@ -1594,13 +1594,11 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice (_, slambda) ->
       fprintf ppf "$%a" slam slambda
-  | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_env_mode;
-                   ktmpl_loc = _} ->
+  | Lkindtemplate {ktmpl_params; ktmpl_body; ktmpl_env; ktmpl_loc = _} ->
       let pr_params ppf params =
         List.iter (fun l -> fprintf ppf "%a@ " Slambdaident.print l) params
       in
-      fprintf ppf "@[<2>(ktemplate@ %a%a@ %a%a)@]"
-        locality_mode ktmpl_env_mode
+      fprintf ppf "@[<2>(ktemplate@ %a@ %a%a)@]"
         template_env ktmpl_env
         pr_params ktmpl_params
         lfunction ktmpl_body

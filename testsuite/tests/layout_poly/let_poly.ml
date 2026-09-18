@@ -600,6 +600,29 @@ val a : string = "first"
 val b : string = "second"
 |}]
 
+(* Regression test for an issue where a locally allocated environment could be
+   leaked by partial allocation. *)
+let (y, z, z2) =
+  let[@inline never] make (seed : int ref) =
+    let[@inline never] poly_ f =
+      (fun x y -> #(x, y, !seed) : _ -> _ -> _)
+    in
+    (* Keep this non-tail: a tail call would force [f] global and hide the bug. *)
+    let g = f #42.0 in
+    g
+  in
+  let seed = ref 91 in
+  let g = make seed in
+  let h = make (ref 92) in
+  let #(_, y, z) = g 7 in
+  let #(_, _, z2) = h 8 in
+  (y, z, z2)
+[%%expect{|
+val y : int = 7
+val z : int = 91
+val z2 : int = 92
+|}]
+
 (* closure conversion - mixed block *)
 let a, b, c, d =
   let x = true in

@@ -277,32 +277,10 @@ and 'k pattern_desc =
       the allocation mode of the captured environment. [pending] during
       type-checking; guaranteed [determined] of a non-empty list of generic sort
       variables after [type_let] returns. *)
-      env_alloc_mode: alloc_mode_r;
-      (** The allocation mode of the environment captured by the layout
-      function.
-
-      Imagine we defined [let poly_ f = .. x ..] in a structure [M], where [.. x
-      ..] is some expression (not necessarily a function) that refers to [x]. It
-      translates to runtime:
-
-      [let f__float = fun env -> let {x; ..} = env in .. x ..
-       let f_env = {x = x; ..}]
-
-      where [f__float] is the instantiated function and [f_env] is the captured
-      environment (containing the example variable [x]) and is passed to
-      [f__float]. Only [f_env] is stored within the structure [M]; [f__float]
-      is a top-level symbol.
-
-      Observe the following constraint:
-      - For comonadic axes, [f_env <= M] and [x <= f_env].
-      - The monadic axes of [f_env] don't matter. In particular, note that
-        nothing closes over [f_env]. Also note that we don't perform on [f_env]
-        operations warranted by monadic modes such as [unique] or [uncontended].
-        *)
     } -> value pattern_desc
         (** [let poly_ f = exp] creates a compile-time function [f] abstracted
-        over the layouts in [lpoly], and returns [exp] at [ret_sort] and
-        [ret_mode]. Note that [exp] is not necessarily a function. *)
+        over the layouts in [lpoly], and returns [exp] at [sort] and [mode].
+        Note that [exp] is necessarily a function. *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
