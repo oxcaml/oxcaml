@@ -428,7 +428,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
       iter_fields fields;
-      Option.iter (fun (exp, _, _) -> sub.expr sub exp) extended_expression;
+      Option.iter (fun (exp, _, _, _) -> sub.expr sub exp) extended_expression;
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
@@ -639,6 +639,7 @@ let module_coercion sub = function
   | Tcoerce_primitive {pc_loc; pc_env; _} ->
       sub.location sub pc_loc;
       sub.env sub pc_env
+  | Tcoerce_kindtemplate _ -> ()
   | Tcoerce_invalid -> ()
 
 let module_expr sub {mod_loc; mod_desc; mod_mode; mod_env; mod_attributes; _} =

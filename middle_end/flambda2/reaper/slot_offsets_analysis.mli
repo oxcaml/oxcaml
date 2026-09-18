@@ -1,11 +1,9 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Basile Clément, OCamlPro                             *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2025 OCamlPro                                                *
- * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * Copyright (c) 2026 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -27,20 +25,14 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-type _ repr =
-  | Int_repr : { print : Format.formatter -> int -> unit } -> int repr
-
-include Heterogenous_list.Make (struct
-  type 'a t = 'a repr
-end)
-
-let int_repr ~print = Int_repr { print }
-
-let equal_repr : type a. a repr -> a -> a -> bool =
- fun (Int_repr _) x1 x2 -> Int.equal x1 x2
-
-let compare_repr : type a. a repr -> a -> a -> int =
- fun (Int_repr _) x1 x2 -> Int.compare x1 x2
-
-let print_repr : type a. a repr -> Format.formatter -> a -> unit =
- fun (Int_repr { print }) ppf x -> print ppf x
+(** Compute the slot offsets of the sets of closures that will be built after
+    rewriting. [free_names] are the free names of the whole compilation unit as
+    output by simplify. *)
+val compute :
+  free_names:Name_occurrences.t ->
+  closure_function_decls:
+    Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t ->
+  code_changes:Unboxing_analysis.code_changes ->
+  get_code_metadata:(Code_id.t -> Code_metadata.t) ->
+  Unboxing_analysis.result ->
+  Slot_offsets.result

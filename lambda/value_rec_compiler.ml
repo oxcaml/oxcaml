@@ -388,9 +388,7 @@ let compute_static_size lam =
               Block (Regular_block
                 (all_value_mixed_block_size shape))
             else
-              let size =
-                compute_mixed_block_size
-                  (Lambda.split_mixed_block_shape_vectors shape)
+              let size = compute_mixed_block_size shape
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
@@ -705,7 +703,7 @@ let rec split_static_function lfun block_var local_idents lam :
         ap_args = List.map (fun p -> Lvar (p.name)) params;
         ap_loc = no_loc;
         ap_tailcall = Default_tailcall;
-        ap_inlined = Default_inlined;
+        ap_inlined = forward_inlined_attribute ();
         ap_specialised = Default_specialise;
         ap_result_layout = lfun.return;
         ap_region_close = Rc_normal;

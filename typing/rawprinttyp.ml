@@ -110,8 +110,8 @@ and raw_type_desc ppf ty =
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
-        (Format_doc.compat (Alloc.print ~verbose:true ())) arg
-        (Format_doc.compat (Alloc.print ~verbose:true ())) ret
+        (Format_doc.compat (With_locality.print ~verbose:true ())) arg
+        (Format_doc.compat (With_locality.print ~verbose:true ())) ret
         raw_type t1 raw_type t2
         (if is_commu_ok c then "Cok" else "Cunknown")
   | Ttuple tl ->

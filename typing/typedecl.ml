@@ -152,7 +152,7 @@ type error =
   | Illegal_baggage of Env.t * jkind_l
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
-  | Constructor_submode_failed of Mode.Value.error
+  | Constructor_submode_failed of Mode.With_regionality.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats
@@ -581,7 +581,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
           | Mutable, is_atomic ->
               match record_form with
               | Legacy -> Mutable {
-                mode = Mode.Value.Comonadic.legacy;
+                mode = Mode.With_regionality.Comonadic.legacy;
                 atomic = if is_atomic then Atomic else Nonatomic
               }
               | Unboxed_product -> raise(Error(loc, Unboxed_mutable_label))
@@ -591,7 +591,15 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          in
          check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in
-         let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
+         let cty =
+           transl_simple_type
+             ~new_var_jkind
+             env
+             ?univars
+             ~closed
+             Mode.With_locality.Const.legacy
+             arg
+         in
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
@@ -629,7 +637,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
   let mk arg =
     let cty =
       transl_simple_type ~new_var_jkind env ?univars ~closed
-        Mode.Alloc.Const.legacy arg.pca_type
+        Mode.With_locality.Const.legacy arg.pca_type
     in
     let gf =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
@@ -705,7 +713,12 @@ let make_constructor
               env loc univars closed sargs
           in
           let tret_type =
-            transl_simple_type ~new_var_jkind:Sort env ?univars ~closed Mode.Alloc.Const.legacy
+            transl_simple_type
+              ~new_var_jkind:Sort
+              env
+              ?univars
+              ~closed
+              Mode.With_locality.Const.legacy
               sret_type
           in
           let ret_type = tret_type.ctyp_type in
@@ -959,8 +972,18 @@ let transl_declaration env sdecl (id, uid) =
   let params = List.map (fun (cty, _) -> cty.ctyp_type) tparams in
   let cstrs = List.map
     (fun (sty, sty', loc) ->
-      transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy sty,
-      transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy sty', loc)
+      transl_simple_type
+        ~new_var_jkind:Any
+        env
+        ~closed:false
+        Mode.With_locality.Const.legacy
+        sty,
+      transl_simple_type
+        ~new_var_jkind:Sort
+        env
+        ~closed:false
+        Mode.With_locality.Const.legacy
+        sty', loc)
     sdecl.ptype_cstrs
   in
   let unboxed_attr = get_unboxed_from_attributes sdecl in
@@ -1009,7 +1032,7 @@ let transl_declaration env sdecl (id, uid) =
           Ctype.generalize_structure cty.ctyp_type)
         begin fun () ->
         Typetexp.transl_simple_type env ~new_var_jkind:Any
-          ~closed:true Mode.Alloc.Const.legacy sty
+          ~closed:true Mode.With_locality.Const.legacy sty
       end
     in
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
@@ -1027,7 +1050,14 @@ let transl_declaration env sdecl (id, uid) =
       None -> None, None
     | Some sty ->
       let no_row = not (is_fixed_type sdecl) in
-      let cty = transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty in
+      let cty =
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:no_row
+          Mode.With_locality.Const.legacy
+          sty
+      in
       Some cty, Some cty.ctyp_type
   in
   (* jkind_default is the jkind to use for now as the type_jkind when there
@@ -2029,7 +2059,7 @@ module Element_repr = struct
       in
       Option.bind layout layout_to_t
 
-  let mixed_product_shape_known loc ts kind =
+  let mixed_product_shape_known ts =
     let mixed =
       let rec is_mixed_element : t -> bool = function
         | Unboxed_element _ | Void -> true
@@ -2038,18 +2068,21 @@ module Element_repr = struct
       in
       List.exists is_mixed_element ts
     in
-    if not mixed then `Not_mixed else begin
+    if not mixed then `Not_mixed else
       let shape = List.map to_shape_element ts |> Array.of_list in
+      `Mixed shape
+
+  let check_mixed_product_shape loc shape kind =
+    match shape with
+    | `Not_mixed -> ()
+    | `Mixed shape ->
       (* All-value/void shapes will compile to uniform blocks, so the
          scannable prefix length limit doesn't apply. *)
       let mpb = Mixed_product_bytes.count_types_shape shape in
       if not (Mixed_product_bytes.all_value mpb)
       then
         assert_mixed_product_support loc kind
-          ~value_prefix_len:
-            (Mixed_product_bytes.value_prefix_len mpb);
-      `Mixed shape
-    end
+          ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
 
   type unrepresentable_element =
     Unrepresentable_element of int
@@ -2063,8 +2096,23 @@ module Element_repr = struct
            | None -> Error (Unrepresentable_element i))
         ts
     in
-    Result.map (fun ts -> mixed_product_shape_known loc ts kind) ts
+    Result.map (fun ts ->
+      let shape = mixed_product_shape_known ts in
+      check_mixed_product_shape loc shape kind;
+      shape) ts
 end
+
+let compute_block_shape env types =
+  let ts =
+    Misc.Stdlib.List.map_option
+      (fun ty ->
+        let jkind = Ctype.type_jkind env ty in
+        Element_repr.classify env ty jkind ~default_to_scannable:false)
+      types
+  in
+  match ts with
+  | None -> `Undetermined
+  | Some ts -> Element_repr.mixed_product_shape_known ts
 
 type unrepresentable_constructor =
   | Unrepresentable_argument of int
@@ -3837,7 +3885,7 @@ let transl_type_decl env rec_flag sdecl_list =
   List.iter2
     (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
-       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+       match Mode.With_locality.with_zap_scope (fun ~zap_scope ->
           Ctype.closed_type_decl ~zap_scope decl) with
          Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
        | None   -> ())
@@ -4124,7 +4172,7 @@ let transl_type_extension extend env loc styext =
   (* Check that all type variables are closed *)
   List.iter
     (fun (ext, _shape) ->
-       match Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+       match Mode.With_locality.with_zap_scope (fun ~zap_scope ->
                Ctype.closed_extension_constructor ~zap_scope
                ext.ext_type)
        with
@@ -4184,7 +4232,7 @@ let transl_exception env sext =
   in
   (* Check that all type variables are closed *)
   begin match
-    Mode.Alloc.with_zap_scope (fun ~zap_scope ->
+    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
         Ctype.closed_extension_constructor ~zap_scope ext.ext_type)
   with
     Some ty ->
@@ -4509,11 +4557,11 @@ let rec parse_native_repr_attributes env core_type ty rmode
     let mode =
       if Builtin_attributes.has_local_opt ct1.ptyp_attributes
       then Prim_poly
-      else prim_const_mode (Mode.Alloc.proj_comonadic Areality marg)
+      else prim_const_mode (Mode.With_locality.proj_comonadic Areality marg)
     in
     let repr_args, repr_res =
       parse_native_repr_attributes env ct2 t2
-        (prim_const_mode (Mode.Alloc.proj_comonadic Areality mret))
+        (prim_const_mode (Mode.With_locality.proj_comonadic Areality mret))
         ~global_repr ~is_layout_poly
     in
     ((mode, repr_arg) :: repr_args, repr_res)
@@ -4663,7 +4711,7 @@ let check_for_hidden_arrow env loc ty =
 
 type transl_value_decl_modal =
   | Str_primitive
-  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
@@ -4677,10 +4725,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
         let mode =
           modes.mode_modes
           |> Typemode.apply_mode_implications
-          |> Mode.Alloc.Const.(
+          |> Mode.With_locality.Const.(
               Option.value ~default:{legacy with staticity = Static})
-          |> Mode.Alloc.of_const
-          |> Mode.alloc_as_value
+          |> Mode.With_locality.of_const
+          |> Mode.with_locality_as_regionality
         in
         mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
@@ -4862,10 +4910,20 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   let constraints =
     List.map (fun (ty, ty', loc) ->
       let cty =
-        transl_simple_type ~new_var_jkind:Any env ~closed:false Mode.Alloc.Const.legacy ty
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          ty
       in
       let cty' =
-        transl_simple_type ~new_var_jkind:Sort env ~closed:false Mode.Alloc.Const.legacy ty'
+        transl_simple_type
+          ~new_var_jkind:Sort
+          env
+          ~closed:false
+          Mode.With_locality.Const.legacy
+          ty'
       in
       (* Note: We delay the unification of those constraints
          after the unification of parameters, so that clashing
@@ -4879,7 +4937,12 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       None -> Misc.fatal_error "Typedecl.transl_with_constraint: no manifest"
     | Some sty ->
       let cty =
-        transl_simple_type ~new_var_jkind:Any env ~closed:no_row Mode.Alloc.Const.legacy sty
+        transl_simple_type
+          ~new_var_jkind:Any
+          env
+          ~closed:no_row
+          Mode.With_locality.Const.legacy
+          sty
       in
       cty, cty.ctyp_type
   in
@@ -4993,7 +5056,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
     fixed_row_path;
   begin match
-    Mode.Alloc.with_zap_scope
+    Mode.With_locality.with_zap_scope
       (fun ~zap_scope -> Ctype.closed_type_decl ~zap_scope new_sig_decl)
   with None -> ()
   | Some ty -> raise(Error(loc, Unbound_type_var(ty, new_sig_decl)))
@@ -5574,7 +5637,8 @@ let report_error ~loc = function
         quoted_type ty
         err
   | Constraint_failed (env, err) ->
-      let get_jkind_error : _ Errortrace.elt -> _ = function
+      let get_jkind_error
+          : (_, Errortrace.unification) Errortrace.elt -> _ = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
@@ -5970,11 +6034,13 @@ let report_error ~loc = function
         "The label %a must be mutable to be declared atomic."
         Style.inline_code name
   | Constructor_submode_failed e ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
+      let Mode.With_regionality.Error (ax, {left; right}) =
+        Mode.With_regionality.to_simple_error e
+      in
       Location.errorf ~loc "This constructor is at mode %a, \
         but expected to be at mode %a.@]"
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
+        (Style.as_inline_code (Mode.With_regionality.Const.print_axis ax)) left
+        (Style.as_inline_code (Mode.With_regionality.Const.print_axis ax)) right
         ~sub:[Location.msg "@[<hv>@[@{<hint>Hint@}: all argument types must \
                             mode-cross for rebinding to succeed."]
   | Non_value_atomic_field ->

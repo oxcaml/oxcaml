@@ -63,8 +63,7 @@ let print_stage ppf stage =
     let print_lit =
       match join_columns with
       | [] -> fun ppf _ -> Format.fprintf ppf "<cst>"
-      | Column_iterator (col, _, _) :: _ ->
-        Value.print_repr (Column.value_repr col)
+      | Column_iterator (col, _, _) :: _ -> Column.print_key col
     in
     Format.fprintf ppf "@[<2>@[if %a not in %a:@]@ continue@]"
       (print_term print_lit) term
@@ -147,7 +146,7 @@ let layout_table_atom : type t k v.
         let inner_var =
           Variable.create
             (Format.asprintf "%a[%a]" Variable.print outer_var
-               (print_term (Value.print_repr (Column.value_repr column)))
+               (print_term (Column.print_key column))
                arg)
         in
         loop

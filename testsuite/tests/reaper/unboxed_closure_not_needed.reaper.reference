@@ -19,15 +19,17 @@
      where k3 (func) =
        apply &my_alloc_region func (0) -> k1 * k2
  in
- let code inline(never) size(23)
+ let code inline(never) size(24)
        f_0 (f_into_my_closure_field_bind)
          my_closure &my_alloc_region my_depth
          -> k1 * k2
-         : val =
+         : unit =
    let next_depth = rec_info (succ my_depth) in
    let bind = f_into_my_closure_field_bind in
    let fn = closure fn_2 @fn_1 &my_alloc_region in
-   apply &my_alloc_region bind (fn) -> k1 * k2
+   apply &my_alloc_region bind (fn) -> k3 * k2
+     where k3 (function_return : imm tagged) =
+       cont k1
  in
  let  in
  let bind = %opaque (0) in
@@ -36,9 +38,7 @@
    where k2 (function_return_0_g_1 : val) =
      cont k1
    where k1 =
-     (apply direct(f_0 &toplevel)  (f_into_f_field_bind) -> k2 * error
-        where k2 (function_return_0_f_0 : val) =
-          cont k1
+     (apply direct(f_0 &toplevel)  (f_into_f_field_bind) -> k1 * error
         where k1 =
           cont k))
   where k define_root_symbol =

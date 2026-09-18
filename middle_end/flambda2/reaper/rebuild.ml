@@ -67,8 +67,7 @@ type env =
   }
 
 type rebuild_result =
-  { all_slot_offsets : Slot_offsets.t;
-    all_code : Code.t Code_id.Map.t;
+  { all_code : Code.t Code_id.Map.t;
     code_ids_to_remember : Code_id.Set.t
   }
 
@@ -350,7 +349,7 @@ let rewrite_simple_with_debuginfo env (simple : Simple.With_debuginfo.t) =
 let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
-let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
+let rewrite_set_of_closures env res ~(bound : Name.t list)
     ({ Rev_expr.function_decls; value_slots } : Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
     List.exists
@@ -460,14 +459,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
             if code_is_used bound_name
             then
               let changed_calling_convention =
-                Current_unit.is_current (Code_id.get_compilation_unit code_id)
-                &&
-                match
-                  Unboxing_analysis.get_calling_convention_change
-                    env.code_changes code_id
-                with
-                | Not_changing_calling_convention -> false
-                | Changing_calling_convention _ -> true
+                Unboxing_analysis.is_changing_calling_convention
+                  env.code_changes code_id
               in
               Code_id
                 { code_id;
@@ -531,15 +524,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
   let set_of_closures = Set_of_closures.create ~value_slots function_decls in
-  let res =
-    { res with
-      all_slot_offsets =
-        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-          set_of_closures;
-      code_ids_to_remember
-    }
-  in
-  set_of_closures, res
+  set_of_closures, { res with code_ids_to_remember }
 
 let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   match sc with
@@ -793,7 +778,13 @@ let make_apply_wrapper env
     let apply_decisions =
       Continuation.Map.find return_cont env.cont_params_to_keep
     in
-    let return_cont_wrapper = Continuation.rename return_cont in
+    (* The wrapper is bound by a [Let_cont], so it must not inherit the [Return]
+       sort of the function's return continuation. *)
+    let return_cont_wrapper =
+      Continuation.create ~sort:Continuation.Sort.Normal_or_exn
+        ~name:(Continuation.name return_cont)
+        ()
+    in
     let apply = make_apply ~continuation:(Return return_cont_wrapper) in
     let rev_args_or_invalid =
       List.fold_left2
@@ -1127,8 +1118,6 @@ let rebuild_apply env apply =
       in
       Exn_continuation.create ~exn_handler ~extra_args
     in
-    (* TODO rewrite arities *)
-    (* XXX mshinwell: does this "rewrite arities" need to be done now? *)
     match updating_calling_convention with
     | Not_changing_calling_convention -> (
       match Apply.callee apply with
@@ -1166,37 +1155,83 @@ let rebuild_apply env apply =
                 Some (Code_id_or_name.name name, false))
           | C_call _ | Method _ | Effect _ -> None
         in
-        let args =
+        let args_and_keep =
           match callee_and_known_arity with
-          | None -> List.map (rewrite_simple env) (Apply.args apply)
+          | None ->
+            List.map
+              (fun arg -> rewrite_simple env arg, Points_to_analysis.Keep)
+              (Apply.args apply)
           | Some (callee, known_arity) ->
-            let keep_or_poison (arg, to_keep) =
-              match (to_keep : Points_to_analysis.keep_or_delete) with
-              | Keep -> arg
-              | Delete ->
-                Simple.pattern_match arg
-                  ~const:(fun _ -> arg)
-                  ~name:(fun name ~coercion:_ ->
-                    name_poison ~category:"reaper_unused_argument" name)
-            in
-            let args_and_keep =
-              if known_arity
-              then
-                Analysis.arguments_used_by_known_arity_call env.uses callee
+            if known_arity
+            then
+              Analysis.arguments_used_by_known_arity_call env.uses callee
+                (Apply.args apply)
+            else
+              let grouped_args =
+                Flambda_arity.group_by_parameter (Apply.args_arity apply)
                   (Apply.args apply)
-              else
-                let grouped_args =
-                  Flambda_arity.group_by_parameter (Apply.args_arity apply)
-                    (Apply.args apply)
-                in
-                List.flatten
-                  (Analysis.arguments_used_by_unknown_arity_call env.uses callee
-                     grouped_args)
-            in
-            List.map keep_or_poison args_and_keep
+              in
+              List.flatten
+                (Analysis.arguments_used_by_unknown_arity_call env.uses callee
+                   grouped_args)
         in
-        let args_arity = Apply.args_arity apply in
-        let return_arity = Apply.return_arity apply in
+        let args, args_arity =
+          List.split
+            (List.map2
+               (fun (arg, to_keep) kind ->
+                 match (to_keep : Points_to_analysis.keep_or_delete) with
+                 | Keep ->
+                   ( arg,
+                     Simple.pattern_match arg
+                       ~const:(fun _ -> kind)
+                       ~name:(fun name ~coercion:_ ->
+                         Types_rewriter.rewrite_kind_with_subkind
+                           env.types_rewrite_context name kind) )
+                 | Delete ->
+                   ( Simple.pattern_match arg
+                       ~const:(fun _ -> arg)
+                       ~name:(fun name ~coercion:_ ->
+                         name_poison ~category:"reaper_unused_argument" name),
+                     Types_rewriter.erase_subkind kind ))
+               args_and_keep
+               (Flambda_arity.unarize (Apply.args_arity apply)))
+        in
+        (* The calling convention is not changing, but the arguments might have
+           been replaced by poison, so we need to rewrite the arities. *)
+        let args_arity =
+          Flambda_arity.create
+            (List.map
+               (fun kinds ->
+                 Flambda_arity.Component_for_creation.(
+                   Unboxed_product (List.map (fun kind -> Singleton kind) kinds)))
+               (Flambda_arity.group_by_parameter (Apply.args_arity apply)
+                  args_arity))
+        in
+        let return_arity =
+          match Apply.continuation apply with
+          | Never_returns -> Apply.return_arity apply
+          | Return cont ->
+            let cont_decisions =
+              Continuation.Map.find cont env.cont_params_to_keep
+            in
+            Flambda_arity.create_singletons
+              (List.map2
+                 (fun (decision : Unboxing_analysis.param_decision) kind ->
+                   match decision with
+                   | Keep (_, kind) ->
+                     (* The subkind has already been rewritten when computing
+                        [cont_params_to_keep] *)
+                     kind
+                   | Unbox _ ->
+                     Misc.fatal_errorf
+                       "[rebuild_apply]: unexpected [Unbox] decision for \
+                        argument of return continuation of non-changing \
+                        calling convention apply %a"
+                       Apply.print apply
+                   | Delete -> Types_rewriter.erase_subkind kind)
+                 cont_decisions
+                 (Flambda_arity.unarized_components (Apply.return_arity apply)))
+        in
         let make_apply =
           Apply.create
           (* Note here that callee is rewritten with [rewrite_simple_opt], which
@@ -1763,11 +1798,8 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures
        of the set of closures has changed *)
     let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
     let bound_pattern = Bound_pattern.set_of_closures bvs in
-    let is_phantom =
-      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
-    in
     let set_of_closures, res =
-      rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
+      rewrite_set_of_closures env res ~bound set_of_closures
     in
     let size_of_defining_expr =
       Cost_metrics.size
@@ -2118,7 +2150,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let updating_calling_convention =
     Unboxing_analysis.get_calling_convention_change env.code_changes code_id
   in
-  let rebuild_body () =
+  let rebuild_body env =
     let region_vars =
       match (my_alloc_mode : Alloc_mode.For_applications.t) with
       | Not_alloc_stack { alloc_region } -> [alloc_region]
@@ -2156,7 +2188,15 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   in
   match updating_calling_convention with
   | Not_changing_calling_convention ->
-    let body, res = rebuild_body () in
+    (* The value_kind of the parameters might have been rewritten and stored in
+       the metadata; update the parameters to match *)
+    let params =
+      Bound_parameters.create
+        (List.map2 Bound_parameter.with_kind
+           (Bound_parameters.to_list params)
+           (Flambda_arity.unarize (Code_metadata.params_arity code_metadata)))
+    in
+    let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
     (* Format.eprintf "REBUILD %a FREE %a@." Code_id.print code_id
        Name_occurrences.print body.free_names; *)
@@ -2166,7 +2206,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       code_metadata,
       res )
   | Changing_calling_convention
-      { my_closure_decision; params_decisions; return_decisions = _ } ->
+      { my_closure_decision; params_decisions; return_decisions } ->
     let params_decisions =
       List.map2
         (fun decision param : Unboxing_analysis.param_decision ->
@@ -2215,7 +2255,23 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     in
     let params_decisions = my_closure_decision :: params_decisions in
     let params = get_parameters params_decisions in
-    let body, res = rebuild_body () in
+    (* Update the decisions for the return continuation: this was not done at
+       toplevel because we didn't have the mapping between return continuations
+       and the corresponding code_id.
+
+       CR-someday ncourant: it's a bit hackish to do that here while all other
+       decisions for continuations are made at toplevel... Maybe we could take
+       the decisions for each continuation only when we rebuild the code they
+       are contained in? That would avoid having to store a global continuation
+       map, as well. *)
+    let env =
+      { env with
+        cont_params_to_keep =
+          Continuation.Map.add return_continuation return_decisions
+            env.cont_params_to_keep
+      }
+    in
+    let body, res = rebuild_body env in
     let code_metadata = update_size code_metadata body in
     ( Function_params_and_body.create ~return_continuation ~exn_continuation
         (Bound_parameters.create params)
@@ -2280,7 +2336,6 @@ and rebuild_static_const_or_code env res
     let bound_to = List.map Name.symbol bound_to in
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound:bound_to set_of_closures
-        ~is_phantom:false
     in
     let static_const_or_code =
       SC.set_of_closures set_of_closures
@@ -2299,10 +2354,8 @@ and rebuild_static_const_or_code env res
 
 type result =
   { body : Expr.t;
-    free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t;
-    slot_offsets : Slot_offsets.t
+    code_ids_to_remember : Code_id.Set.t
   }
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
@@ -2364,12 +2417,9 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
     }
   in
   let res =
-    { all_slot_offsets = Slot_offsets.empty;
-      all_code = Code_id.Map.empty;
-      code_ids_to_remember = Code_id.Set.empty
-    }
+    { all_code = Code_id.Map.empty; code_ids_to_remember = Code_id.Set.empty }
   in
-  let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
+  let rebuilt_expr, ({ all_code; code_ids_to_remember } : rebuild_result) =
     Profile.record_call ~accumulate:true "up" (fun () ->
         let res =
           Array.fold_left
@@ -2380,9 +2430,4 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         in
         rebuild_expr env res toplevel_expr)
   in
-  { body = rebuilt_expr.expr;
-    free_names = rebuilt_expr.free_names;
-    all_code;
-    code_ids_to_remember;
-    slot_offsets = all_slot_offsets
-  }
+  { body = rebuilt_expr.expr; all_code; code_ids_to_remember }

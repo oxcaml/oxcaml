@@ -31,8 +31,8 @@ type pos =
 type modes = Includecore.mmodes =
   | All
   | Specific:
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       modes
 
 module Error = struct
@@ -62,7 +62,7 @@ module Error = struct
 
   type class_declaration_symptom =
     | Class_type of Ctype.class_match_failure list
-    | Class_mode of Mode.Value.error
+    | Class_mode of Mode.With_regionality.error
 
   type core_sigitem_symptom =
     | Value_descriptions of
@@ -91,7 +91,7 @@ module Error = struct
     | Functor of functor_symptom
     | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
-    | Mode of Mode.Value.error
+    | Mode of Mode.With_regionality.error
 
 
   and module_type_diff = (module_type, module_type_symptom) mdiff
@@ -445,6 +445,10 @@ let rec print_coercion ppf c =
       pr "@[<2>alias %a@ (%a)@]"
         (Format_doc.compat Printtyp.Doc.path) p
         print_coercion c
+  | Tcoerce_kindtemplate { tc_params; tc_args } ->
+      pr "@[<2>kindtemplate (%a => _ %a)@]"
+        (print_list Jkind.Sort.Debug_printers.var) tc_params
+        (print_list Jkind.Sort.Const.Debug_printers.t) tc_args
   | Tcoerce_invalid ->
       pr "invalid_coercion"
 and print_coercion2 ppf (n, c) =
@@ -476,7 +480,6 @@ let simplify_structure_coercion input_repr output_repr pos_cc_list id_pos_list =
   if is_identity_coercion 0 pos_cc_list
   then Tcoerce_none
   else Tcoerce_structure { input_repr; output_repr; pos_cc_list; id_pos_list }
-
 
 (* Build a table of the components of sig1, along with their positions.
    The table is indexed by kind and name of component *)
@@ -761,8 +764,8 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             var, Shape.app orig_shape ~arg:shape_var
       in
       let cc_res : (_, _ Error.mdiff) result =
-        let mres1 = Mode.alloc_as_value mres1 in
-        let mres2 = Mode.alloc_as_value mres2 in
+        let mres1 = Mode.with_locality_as_regionality mres1 in
+        let mres2 = Mode.with_locality_as_regionality mres2 in
         modtypes ~core ~direction ~loc env subst res1 res2 res_shape
           ~modes:(Specific ((mres1, None), mres2))
       in
@@ -785,14 +788,16 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             let param_yielding =
               match (param2 : Subst.Lazy.functor_parameter) with
               | Named (_, _, mm) ->
-                [Yielding.disallow_right (Alloc.proj_comonadic Yielding mm)]
+                [Yielding.disallow_right
+                   (With_locality.proj_comonadic Yielding mm)]
               | Unit -> []
             in
             let funct_yielding =
               match modes with
               | All -> Yielding.disallow_right Yielding.max
               | Specific ((m, _locks), _) ->
-                Yielding.disallow_right (Value.proj_comonadic Yielding m)
+                Yielding.disallow_right
+                  (With_regionality.proj_comonadic Yielding m)
             in
             Ctype.create_yielding_mode_l
               (Yielding.join (funct_yielding :: param_yielding))
@@ -870,8 +875,8 @@ and functor_param ~core ~direction ~loc env subst param1 param2 =
       Ok Tcoerce_none, env, subst
   | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
-      let marg1 = Mode.alloc_as_value marg1 in
-      let marg2 = Mode.alloc_as_value marg2 in
+      let marg1 = Mode.with_locality_as_regionality marg1 in
+      let marg2 = Mode.with_locality_as_regionality marg2 in
       let cc_arg =
         match
           modtypes ~core ~direction ~loc env Subst.identity arg2' arg1
@@ -1594,7 +1599,7 @@ module Functor_app_diff = struct
                 Result.Error (Error.Incompatible_params(arg,param))
             | ( Anonymous | Named _ | Empty_struct ),
               Named (_, param, param_m) ->
-               let param_m = Mode.alloc_as_value param_m in
+               let param_m = Mode.with_locality_as_regionality param_m in
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~core:core_inclusion ~direction ~loc state.env

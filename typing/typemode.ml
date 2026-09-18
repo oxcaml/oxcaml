@@ -5,7 +5,7 @@ module Jkind = Btype.Jkind0
 
 type 'a modes =
   { mode_modes : 'a;
-    mode_desc : Mode.Alloc.atom Location.loc list
+    mode_desc : Mode.With_locality.atom Location.loc list
   }
 
 type modalities =
@@ -15,7 +15,7 @@ type modalities =
 
 type 'ax annot_type =
   | Modifier : 'a Axis.t annot_type
-  | Mode : 'a Alloc.Axis.t annot_type
+  | Mode : 'a With_locality.Axis.t annot_type
   | Modality : 'a Modality.Axis.t annot_type
 
 let print_annot_type (type a) ppf (annot_type : a annot_type) =
@@ -27,10 +27,10 @@ let print_annot_type (type a) ppf (annot_type : a annot_type) =
 let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
   match annot_type with
   | Modifier -> Format_doc.fprintf ppf "%s" (Axis.name ax)
-  | Mode -> Alloc.Axis.print ppf ax
+  | Mode -> With_locality.Axis.print ppf ax
   | Modality ->
     let (P ax) = Modality.Axis.to_value (P ax) in
-    Value.Axis.print ppf ax
+    With_regionality.Axis.print ppf ax
 
 type forbidden_modality_kind =
   | Global_and_unique
@@ -52,9 +52,9 @@ type error =
 exception Error of Location.t * error
 
 module Mode_axis_pair = struct
-  type t = Mode.Alloc.atom
+  type t = Mode.With_locality.atom
 
-  type t_value = Mode.Value.atom
+  type t_value = Mode.With_regionality.atom
 
   let to_value (Atom (ax, a) : t) : t_value =
     match Const.Axis.is_areality ax with
@@ -62,10 +62,10 @@ module Mode_axis_pair = struct
     | Right ax -> Atom (ax, a)
 
   let of_string ~loc s : t =
-    let comonadic (type a) (ax : a Alloc.Comonadic.Axis.t) (a : a) : t =
+    let comonadic (type a) (ax : a With_locality.Comonadic.Axis.t) (a : a) : t =
       Atom (Comonadic ax, a)
     in
-    let monadic (type a) (ax : a Alloc.Monadic.Axis.t) (a : a) : t =
+    let monadic (type a) (ax : a With_locality.Monadic.Axis.t) (a : a) : t =
       Atom (Monadic ax, a)
     in
     match[@warning "-18"] s with
@@ -204,7 +204,7 @@ let enforce_forbidden_modalities ~loc annot_type m =
     raise (Error (loc, Forbidden_modality (annot_type, Global_and_unique)))
   | _ -> ()
 
-let apply_mode_implications (annots : Alloc.Const.Option.t) =
+let apply_mode_implications (annots : With_locality.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
      is [global] or [local]. *)
   let forkable =
@@ -254,17 +254,21 @@ let transl_mode_annots annots =
       annots
   in
   let step modes_so_far { txt = (Atom (ax, mode) : Mode_axis_pair.t); loc } =
-    if Option.is_some (Alloc.Const.Option.proj ax modes_so_far)
+    if Option.is_some (With_locality.Const.Option.proj ax modes_so_far)
     then raise (Error (loc, Duplicated_axis (Mode, ax)))
-    else Alloc.Const.Option.set ax (Some mode) modes_so_far
+    else With_locality.Const.Option.set ax (Some mode) modes_so_far
   in
-  let modes = List.fold_left step Alloc.Const.Option.none annots in
+  let modes = List.fold_left step With_locality.Const.Option.none annots in
   { mode_modes = modes; mode_desc = annots }
 
 let untransl_mode modes =
   let untransl_annot =
-    Location.map (fun (Atom (ax, mode) : Mode.Alloc.atom) : Parsetree.mode ->
-        Mode (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
+    Location.map
+      (fun (Atom (ax, mode) : Mode.With_locality.atom) : Parsetree.mode ->
+        Mode
+          (Format_doc.asprintf "%a"
+             (Mode.With_locality.Const.print_axis ax)
+             mode))
   in
   List.map untransl_annot modes.mode_desc
 
@@ -543,25 +547,28 @@ let transl_with_bound_modifiers annots =
   in
   modality, externality
 
-let transl_alloc_mode annots =
+let transl_mode_with_locality annots =
   let { mode_modes = opt_modes; mode_desc = annots } =
     transl_mode_annots annots
   in
   let opt_modes = apply_mode_implications opt_modes in
-  let modes = Alloc.Const.Option.value opt_modes ~default:Alloc.Const.legacy in
+  let modes =
+    With_locality.Const.Option.value opt_modes
+      ~default:With_locality.Const.legacy
+  in
   { mode_modes = modes; mode_desc = annots }
 
 let everything_modality =
   List.fold_left
     (fun acc -> function
-      | Value.Axis.P (Monadic Staticity) -> acc
-      | Value.Axis.P (Comonadic axis) -> (
+      | With_regionality.Axis.P (Monadic Staticity) -> acc
+      | With_regionality.Axis.P (Comonadic axis) -> (
         match Per_axis.min (Modal (Comonadic axis)) with
         | Modality value -> Modality.Const.set (Comonadic axis) value acc)
-      | Value.Axis.P (Monadic axis) -> (
+      | With_regionality.Axis.P (Monadic axis) -> (
         match Per_axis.min (Modal (Monadic axis)) with
         | Modality value -> Modality.Const.set (Monadic axis) value acc))
-    Modality.Const.id Value.Axis.all
+    Modality.Const.id With_regionality.Axis.all
 
 let transl_mod_bounds ?(warn = true) annots =
   let bounds_loc =
@@ -750,7 +757,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
               (Modality.Const.proj ax modality)
           in
           Some { Location.txt = Parsetree.Mode s; loc = Location.none })
-      Value.Axis.all
+      With_regionality.Axis.all
   in
   let nonmodal_annots, top_nonmodal_annots =
     let open Jkind.Mod_bounds in

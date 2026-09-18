@@ -188,7 +188,13 @@ module Datalog = struct
 
   let and_ atoms = `And atoms
 
-  let deduce = Schedule.deduce
+  let rec flatten atoms acc =
+    match atoms with
+    | `Atom atom -> atom :: acc
+    | `And atoms ->
+      List.fold_left (fun acc atoms -> flatten atoms acc) acc atoms
+
+  let deduce deduction = Datalog.deduce (flatten deduction [])
 
   type equality =
     | Equality : (_, 'k, _) Column.id * 'k Term.t * 'k Term.t -> equality
@@ -215,8 +221,7 @@ module Datalog = struct
         match predicate with
         | `Atom (Atom (id, args)) -> where_atom id args f
         | `Not_atom (Atom (id, args)) -> unless_atom id args f
-        | `Distinct (Equality (column, t1, t2)) ->
-          unless_eq (Column.value_repr column) t1 t2 f
+        | `Distinct (Equality (column, t1, t2)) -> unless_eq column t1 t2 f
         | `Filter (Filter (p, args)) -> Datalog.filter p args f)
       f predicates
 

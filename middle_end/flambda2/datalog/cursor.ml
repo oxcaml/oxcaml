@@ -14,6 +14,7 @@
 (**************************************************************************)
 
 open Datalog_imports
+module Executor = Bytecode.Make (Trie.Iterator)
 
 type binder =
   | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.or_null_sender -> binder
@@ -22,16 +23,15 @@ type 'v t =
   { cursor_binders : binder list;
     cursor_naive_binders : binder list;
     executor : Executor.t;
+    original_rule : Lang.rule;
     callback : ('v Constant.hlist -> unit) ref
   }
 
 type 'a cursor = 'a t
 
-let print ppf { cursor_binders; executor; _ } =
-  Format.fprintf ppf "@[<hov 1>(%a)@]@ %a"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_space
-       (fun ppf (Bind_table (table_id, _)) -> Table.Id.print ppf table_id))
-    cursor_binders Executor.print executor
+let print ppf { executor; original_rule; _ } =
+  Format.fprintf ppf "@[<v>Rule:@;<1 2>@[%a@]@ Code:@;<1 2>@[<v>%a@]@]"
+    Lang.print_rule original_rule Executor.print executor
 
 let bind_table (Bind_table (id, handler)) database =
   let table = Table.Map.get id database in
@@ -143,15 +143,15 @@ module From_plan = struct
         let Equal = Variable.must_be_equal var var' in
         { value = receiver; name = Variable.name var' }
 
-    let lit_to_string ?repr lit =
-      match repr with
-      | Some repr -> Format.asprintf "%a" (Value.print_repr repr) lit
+    let lit_to_string ?column lit =
+      match column with
+      | Some column -> Format.asprintf "%a" (Column.print_key column) lit
       | None -> "<cst>"
 
-    let must_be_bound_term ?repr env = function
+    let must_be_bound_term ?column env = function
       | Literal lit ->
         { value = Channel.create_or_null (Or_null.this lit) |> snd;
-          name = lit_to_string ?repr lit
+          name = lit_to_string ?column lit
         }
       | Variable var -> must_be_bound env var
 
@@ -178,9 +178,11 @@ module From_plan = struct
         { value = receiver; name = Table.Id.name tid }
   end
 
-  let value_repr_for_join = function
+  type _ column = Column : (_, 'k, _) Column.id -> 'k column
+
+  let column_for_join = function
     | [] -> Misc.fatal_error "Empty join"
-    | Column_iterator (column, _, _) :: _ -> Column.value_repr column
+    | Column_iterator (column, _, _) :: _ -> Column column
 
   let rec join_iterators : type k.
       _ -> k column_iterator list -> _ * k Trie.Iterator.t list with_names =
@@ -198,9 +200,7 @@ module From_plan = struct
       ( inner_env,
         { values = iterator :: values; names = outer_receiver.name :: names } )
 
-  let rec build_stages : type s.
-      Env.t -> (_, _) Planner.plan -> int -> s Executor.builder =
-   fun env plan index ->
+  let rec build_stages env plan index =
     if index >= Iarray.length plan.input_stages
     then
       Iarray.fold_right
@@ -210,41 +210,43 @@ module From_plan = struct
             Misc.fatal_error "not supported in the head"
           | Callback_with_bindings (fn, name) ->
             let args = Env.must_be_bound_term_hlist env terms in
-            Executor.call { value = fn; name } args body)
+            Executor.list
+              [Executor.call_with_bindings { value = fn; name } args; body])
         plan.output_atoms
         (Executor.break plan.num_existentials)
     else
       match Iarray.get plan.input_stages index with
       | Join_stage (var, columns) ->
         let env, iterators = join_iterators env columns in
-        let repr = value_repr_for_join columns in
-        Executor.for_in { value = repr; name = Variable.name var } iterators
+        let (Column column) = column_for_join columns in
+        Executor.for_in { value = column; name = Variable.name var } iterators
         @@ fun receiver ->
         build_stages (Env.bind_var env var receiver) plan (index + 1)
       | Seek_stage (term, columns) ->
         let env, iterators = join_iterators env columns in
-        let repr = value_repr_for_join columns in
-        let receiver = Env.must_be_bound_term ~repr env term in
+        let (Column column) = column_for_join columns in
+        let receiver = Env.must_be_bound_term ~column env term in
         Executor.if_in receiver iterators @@ build_stages env plan (index + 1)
       | Check_stage (Atom (relation, terms)) ->
         (match relation with
           | Table _ ->
             Misc.fatal_error "*BUG*: Should have been planned as a trie"
           | Unless tid ->
-            Executor.unless (Table.Id.is_trie tid) (Env.get_table env tid)
+            Executor.if_not_in (Table.Id.is_trie tid) (Env.get_table env tid)
               (Env.must_be_bound_term_hlist env terms)
-          | Distinct repr ->
+          | Distinct column ->
             let [term1; term2] = terms in
-            Executor.unless_eq repr
-              (Env.must_be_bound_term ~repr env term1)
-              (Env.must_be_bound_term ~repr env term2)
-          | Filter (fn, _name) ->
-            Executor.filter fn (Env.must_be_bound_term_hlist env terms)
+            Executor.if_not_equal column
+              (Env.must_be_bound_term ~column env term1)
+              (Env.must_be_bound_term ~column env term2)
+          | Filter (fn, name) ->
+            Executor.if_ { value = fn; name }
+              (Env.must_be_bound_term_hlist env terms)
           | Callback_with_bindings _ ->
             Misc.fatal_error "Callback with bindings cannot be used in the body")
         @@ build_stages env plan (index + 1)
 
-  let create_from_plan_with_parameters
+  let create_from_plan_with_parameters ~original_rule
       ({ tables;
          parameters;
          input_stages = _;
@@ -274,10 +276,16 @@ module From_plan = struct
           Env.bind_var env var receiver, binders)
         (env, []) tables
     in
-    let executor = Executor.build (build_stages env plan 0) in
+    let executor = Executor.assemble (build_stages env plan 0) in
     let cursor_naive_binders = Env.get_naive_tables env in
     { parameters;
-      cursor = { cursor_binders; cursor_naive_binders; executor; callback }
+      cursor =
+        { cursor_binders;
+          cursor_naive_binders;
+          executor;
+          callback;
+          original_rule
+        }
     }
 end
 
@@ -289,9 +297,8 @@ module With_parameters = struct
   let without_parameters { parameters = []; cursor } = cursor
 
   let create_from_rule ?callback params vars rule =
-    let vars = Lang.Variable.hlist_to_list vars in
     let plan = Planner.plan_rule ?callback params vars rule in
-    From_plan.create_from_plan_with_parameters plan
+    From_plan.create_from_plan_with_parameters ~original_rule:rule plan
 
   let naive_fold { parameters; cursor } ps db f acc =
     Or_null_sender.send_hlist parameters ps;

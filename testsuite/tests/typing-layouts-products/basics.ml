@@ -2184,7 +2184,7 @@ Line 3, characters 30-31:
                                   ^
 Error: The value "x" has type "a" but an expression was expected of type
          "('a : '_representable_layout_21 separable & value)"
-       The layout of a is '_representable_layout_22 & value
+       The layout of a is '_representable_layout_21 & value
          because it's the unannotated locally abstract type a.
        But the layout of a must be representable
          because we must know concretely how to pass a function argument.

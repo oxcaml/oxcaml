@@ -488,10 +488,7 @@ Lines 8-13, characters 6-3:
 13 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig
-           val wrap : unit -> exn
-           val unwrap : exn -> int ref @ contended @@ portable
-         end @ nonportable
+         sig val wrap : unit -> exn val unwrap : exn -> int ref end @ nonportable
        is not included in
          sig
            val wrap : unit -> exn @@ portable

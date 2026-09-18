@@ -765,6 +765,10 @@ val equal_raise_kind : raise_kind -> raise_kind -> bool
 
 val equal_value_kind : value_kind -> value_kind -> bool
 
+(** Compares record layouts, ignoring the [value_kind] of [Value] fields. *)
+val equal_record_representation_up_to_value_kinds :
+  record_representation -> record_representation -> bool
+
 val join_value_kind : value_kind -> value_kind -> value_kind
 
 (** Join of two layouts, must be of the same kind. *)
@@ -824,11 +828,14 @@ type inlined_attribute =
   | Always_inlined (* [@inlined] or [@inlined always] *)
   | Never_inlined (* [@inlined never] *)
   | Hint_inlined (* [@inlined hint] *)
+  | Forward_inlined (* [@inlined forward] *)
   | Unroll of int (* [@unroll x] *)
   | Default_inlined (* no [@inlined] attribute *)
 
 val equal_inline_attribute : inline_attribute -> inline_attribute -> bool
 val equal_inlined_attribute : inlined_attribute -> inlined_attribute -> bool
+
+val forward_inlined_attribute : unit -> inlined_attribute
 
 type probe_desc = { name: string; enabled_at_init: bool; }
 type probe = probe_desc option
@@ -1472,14 +1479,8 @@ val value_kind_of_pointerness : immediate_or_pointer -> value_kind_non_null
 val pointerness_of_separability
   : Jkind_axis.Separability.t -> immediate_or_pointer
 
-val mixed_block_element_of_types :
+val transl_mixed_product_element :
   Types.mixed_block_element -> unit mixed_block_element
-
-val mixed_block_shape_of_types :
-  Types.mixed_product_shape -> mixed_block_shape
-
-val split_mixed_block_shape_vectors :
-  'a mixed_block_element array -> 'a mixed_block_element array
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
@@ -1501,20 +1502,20 @@ val mixed_product_shape_for_read :
   -> mixed_block_shape
   -> 'a mixed_block_element array
 
-val transl_mixed_product_shape_for_read :
-  get_value_kind:(int -> value_kind) -> get_mode:(int -> 'a)
-  -> Types.mixed_product_shape
-  -> 'a mixed_block_element array
-
 val transl_module_representation :
   Types.module_representation -> module_representation
 
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
 val subst:
-  (Ident.t -> Subst.Lazy.value_description * Mode.Value.l -> Env.t -> Env.t) ->
+  (Ident.t ->
+   Subst.Lazy.value_description * Mode.With_regionality.l ->
+   Env.t ->
+   Env.t) ->
   ?freshen_bound_variables:bool ->
-  lambda Ident.Map.t -> lambda -> lambda
+  lambda Ident.Map.t ->
+  lambda ->
+  lambda
 (** [subst update_env ?freshen_bound_variables s lt]
     applies a substitution [s] to the lambda-term [lt].
 

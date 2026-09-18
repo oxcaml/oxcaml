@@ -158,11 +158,11 @@ val set_static_row_name: type_declaration -> Path.t -> unit
 (**** Utilities for type traversal ****)
 
 val iter_type_expr:
-  (type_expr -> unit) -> (Mode.Alloc.lr -> unit) ->
+  (type_expr -> unit) -> (Mode.With_locality.lr -> unit) ->
   type_expr -> unit
         (* Iteration on types *)
 val fold_type_expr:
-  ('a -> type_expr -> 'a) -> ('a -> Mode.Alloc.lr -> 'a) ->
+  ('a -> type_expr -> 'a) -> ('a -> Mode.With_locality.lr -> 'a) ->
   'a -> type_expr -> 'a
 val iter_row: (type_expr -> unit) -> row_desc -> unit
         (* Iteration on types in a row *)
@@ -205,7 +205,7 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
-    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_mode_expr: Mode.With_locality.lr -> unit;
     it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
@@ -224,7 +224,7 @@ val type_iterators_without_type_expr: type_iterators_without_type_expr
 
 val copy_type_desc:
     ?keep_names:bool -> (type_expr -> type_expr) ->
-    (Mode.Alloc.lr -> Mode.Alloc.lr) -> type_desc -> type_desc
+    (Mode.With_locality.lr -> Mode.With_locality.lr) -> type_desc -> type_desc
         (* Copy on types *)
 val copy_row:
     (type_expr -> type_expr) ->
@@ -246,21 +246,21 @@ module For_copy : sig
 
   val mode_instantiate :
     copy_scope -> current_level:int ->
-    Mode.Alloc.lr -> Mode.Alloc.lr
+    Mode.With_locality.lr -> Mode.With_locality.lr
         (* Instantiates a generic mode variable to level [current_level] *)
 
   val mode_copy_generic :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Copies the generic parts of a mode variable
            without changing its level *)
 
   val mode_copy_for_saving :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Deeply copies a mode variable without changing its level, giving
            the copies negative (persistent) ids, for storing in a cmi file. *)
 
   val mode_copy_for_restoring :
-    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+    copy_scope -> Mode.With_locality.lr -> Mode.With_locality.lr
         (* Deeply copies a mode variable without changing its level.
            Asserts that the original has negative ids. *)
 
@@ -702,8 +702,6 @@ module Jkind0 : sig
 
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
-
-    val instance : jkind_lr -> jkind_lr
 
     val has_with_bounds : jkind_l -> bool
 

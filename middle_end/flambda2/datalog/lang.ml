@@ -108,10 +108,10 @@ end
 type ('k, 'v) relation =
   | Table : (_, 'k, 'v) Table.Id.t -> ('k, 'v) relation
   | Unless : (_, 'k, 'v) Table.Id.t -> ('k, unit) relation
-  | Distinct : 'k Value.repr -> ('k -> 'k -> nil, unit) relation
+  | Distinct : (_, 'k, _) Column.id -> ('k -> 'k -> nil, unit) relation
   | Filter : ('k Constant.hlist -> bool) * string -> ('k, unit) relation
   | Callback_with_bindings :
-      (Executor.bindings_ref -> 'k Constant.hlist -> unit) * string
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
       -> ('k, unit) relation
 
 module Relation = struct

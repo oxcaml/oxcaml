@@ -39,8 +39,6 @@ end
     allows writing combinators that work in both cases. *)
 type ('p, 'a) program
 
-val map_program : ('p, 'a) program -> ('a -> 'b) -> ('p, 'b) program
-
 val compile : 'v String.hlist -> ('v Term.hlist -> (nil, 'a) program) -> 'a
 
 val compile_with_parameters :
@@ -65,7 +63,7 @@ val unless_atom :
   ('p, 'a) program
 
 val unless_eq :
-  'k Value.repr ->
+  (_, 'k, _) Column.id ->
   'k Term.t ->
   'k Term.t ->
   ('p, 'a) program ->
@@ -80,11 +78,11 @@ val filter :
 type callback
 
 val create_callback_with_bindings :
-  (Executor.bindings_ref -> 'a Constant.hlist -> unit) ->
+  (Bytecode.bindings_ref -> 'a Constant.hlist -> unit) ->
   name:string ->
   'a Term.hlist ->
   callback
 
 val yield : 'v Term.hlist -> ('p, ('p, 'v) Cursor.With_parameters.t) program
 
-val execute : callback list -> ('p, ('p, 'v) Cursor.With_parameters.t) program
+val deduce : atom list -> (nil, Schedule.rule) program

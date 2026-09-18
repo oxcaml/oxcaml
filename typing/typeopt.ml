@@ -756,18 +756,13 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited ~params:decl.type_params ~args
                          cstrs rep)
-        | Type_record
-            (_,
-             (Record_undetermined
-             | Record_inlined (_, Constructor_undetermined, _)),
-             _) ->
-          num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
-                         ~num_nodes_visited labels rep)
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         labels rep)
         | Type_record_unboxed_product
             (_, Record_unboxed_product_undetermined, _) ->
           num_nodes_visited, nullable Pgenval
@@ -856,20 +851,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
-  | Float_boxed () -> num_nodes_visited, Float_boxed ()
-  | Float64 -> num_nodes_visited, Float64
-  | Float32 -> num_nodes_visited, Float32
-  | Bits8 -> num_nodes_visited, Bits8
-  | Bits16 -> num_nodes_visited, Bits16
-  | Bits32 -> num_nodes_visited, Bits32
-  | Bits64 -> num_nodes_visited, Bits64
-  | Vec128 -> num_nodes_visited, Vec128
-  | Vec256 -> num_nodes_visited, Vec256
-  | Vec512 -> num_nodes_visited, Vec512
-  | Mask -> num_nodes_visited, Mask
-  | Word -> num_nodes_visited, Word
-  | Untagged_immediate -> num_nodes_visited, Untagged_immediate
-  | Product [||] -> num_nodes_visited, Product [||]
+  | Product [||] -> num_nodes_visited, field
   | Product fs ->
     let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
@@ -917,11 +899,14 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | Splice_variable id -> num_nodes_visited, Splice_variable id
+  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+    | Splice_variable _ ) as field ->
+    num_nodes_visited, field
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
-  let shape = Lambda.mixed_block_shape_of_types shape in
+  let shape = Lambda.transl_mixed_product_shape shape in
   let (_, num_nodes_visited), shape =
     List.fold_left_map
       (fun (i, num_nodes_visited) typ ->
@@ -1089,9 +1074,51 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     num_nodes_visited, non_nullable raw_kind
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
-      (labels : Types.label_declaration list)
+      ~params ~args (labels : Types.label_declaration list)
       (rep : Types.record_representation) =
+  let is_mutable =
+    List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
+      labels
+  in
+  if is_mutable then
+    num_nodes_visited, non_nullable Pgenval
+  else
+    value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args labels rep
+
+and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args (labels : Types.label_declaration list)
+      (rep : Types.record_representation) =
+  let recompute make_rep =
+    match
+      List.map (fun (label : Types.label_declaration) ->
+        { label with ld_type = Ctype.apply env params label.ld_type args })
+        labels
+    with
+    | exception Ctype.Cannot_apply ->
+        (* Reachable if a cmi is missing *)
+        num_nodes_visited, non_nullable Pgenval
+    | labels ->
+        let types = List.map (fun label -> label.Types.ld_type) labels in
+        match Typedecl.compute_block_shape env types with
+        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | (`Not_mixed | `Mixed _) as shape ->
+            value_kind_immutable_record env ~loc ~visited ~depth
+              ~num_nodes_visited ~params ~args labels (make_rep shape)
+  in
   match rep with
+  | Record_undetermined ->
+      recompute (function
+        | `Not_mixed -> Types.Record_boxed
+        | `Mixed shape -> Types.Record_mixed shape)
+  | Record_inlined (tag, Constructor_undetermined, vrep) ->
+      recompute (fun shape ->
+        let shape =
+          match shape with
+          | `Not_mixed -> Types.Constructor_uniform_value
+          | `Mixed shape -> Types.Constructor_mixed shape
+        in
+        Types.Record_inlined (tag, shape, vrep))
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
          cmi, according to the comment on scrape_ty.  Reevaluate whether it's
@@ -1104,82 +1131,74 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_undetermined | Record_variable _
-  | Record_inlined (_, (Constructor_undetermined
-                       | Constructor_variable _), _) ->
+  | Record_variable _
+  | Record_inlined (_, Constructor_variable _, _) ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
-      let is_mutable =
-        List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
-          labels
+      let num_nodes_visited, fields =
+        match rep with
+        | Record_unboxed | Record_dummy _ | Record_undetermined
+        | Record_variable _
+        | Record_inlined (_, (Constructor_undetermined
+                             | Constructor_variable _
+                             | Constructor_immediate_all_void), _) ->
+            (* The outer match guards against this *)
+            assert false
+        | Record_inlined (_, Constructor_uniform_value, _)
+        | Record_boxed | Record_float | Record_ufloat ->
+            let num_nodes_visited, fields =
+              List.fold_left_map
+                (fun num_nodes_visited (label:Types.label_declaration) ->
+                  let num_nodes_visited = num_nodes_visited + 1 in
+                  let num_nodes_visited, field =
+                    (* We're using the `Pboxedfloatval` value kind for unboxed
+                      floats inside of records. This is kind of a lie, but
+                       that was already happening here due to the float record
+                      optimization. *)
+                    match rep with
+                    | Record_float | Record_ufloat ->
+                      num_nodes_visited,
+                      non_nullable (Pboxedfloatval Boxed_float64)
+                    | Record_inlined _ | Record_boxed ->
+                        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+                          label.ld_type
+                    | Record_mixed _ | Record_unboxed | Record_dummy _
+                    | Record_undetermined | Record_variable _ ->
+                        (* The outer match guards against this *)
+                        assert false
+                  in
+                  num_nodes_visited, field)
+                num_nodes_visited labels
+            in
+            num_nodes_visited, Constructor_shape_uniform fields
+        | Record_inlined (_, Constructor_mixed shape, _)
+        | Record_mixed shape ->
+          let types = List.map (fun label -> label.Types.ld_type) labels in
+          value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+            ~shape (List.map (fun t -> Some t) types)
       in
-      if is_mutable then
-        num_nodes_visited, non_nullable Pgenval
-      else
-        let num_nodes_visited, fields =
-          match rep with
-          | Record_unboxed | Record_dummy _ | Record_undetermined
-          | Record_variable _
-          | Record_inlined (_, (Constructor_undetermined
-                               | Constructor_variable _
-                               | Constructor_immediate_all_void), _) ->
-              (* The outer match guards against this *)
-              assert false
-          | Record_inlined (_, Constructor_uniform_value, _)
-          | Record_boxed | Record_float | Record_ufloat ->
-              let num_nodes_visited, fields =
-                List.fold_left_map
-                  (fun num_nodes_visited (label:Types.label_declaration) ->
-                    let num_nodes_visited = num_nodes_visited + 1 in
-                    let num_nodes_visited, field =
-                      (* We're using the `Pboxedfloatval` value kind for unboxed
-                        floats inside of records. This is kind of a lie, but
-                         that was already happening here due to the float record
-                        optimization. *)
-                      match rep with
-                      | Record_float | Record_ufloat ->
-                        num_nodes_visited,
-                        non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed ->
-                          value_kind env ~loc ~visited ~depth ~num_nodes_visited
-                            label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_undetermined | Record_variable _ ->
-                          (* The outer match guards against this *)
-                          assert false
-                    in
-                    num_nodes_visited, field)
-                  num_nodes_visited labels
-              in
-              num_nodes_visited, Constructor_shape_uniform fields
-          | Record_inlined (_, Constructor_mixed shape, _)
-          | Record_mixed shape ->
-            let types = List.map (fun label -> label.Types.ld_type) labels in
-            value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape (List.map (fun t -> Some t) types)
-        in
-        let non_consts =
-          match rep with
-          | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-            [runtime_tag, fields]
-          | Record_float | Record_ufloat ->
-            [ Obj.double_array_tag, fields ]
-          | Record_boxed ->
-            [0, fields]
-          | Record_inlined (Extension _, _, _) ->
-            [0, fields]
-          | Record_mixed _ ->
-            [0, fields]
-          | Record_unboxed -> assert false
-          | Record_inlined (Null, _, _) -> assert false
-          | Record_dummy _ -> assert false
-          | Record_undetermined | Record_variable _ -> assert false
-        in
-        (num_nodes_visited,
-         non_nullable (Pvariant { consts = []; non_consts }))
+      let non_consts =
+        match rep with
+        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
+          [runtime_tag, fields]
+        | Record_float | Record_ufloat ->
+          [ Obj.double_array_tag, fields ]
+        | Record_boxed ->
+          [0, fields]
+        | Record_inlined (Extension _, _, _) ->
+          [0, fields]
+        | Record_mixed _ ->
+          [0, fields]
+        | Record_unboxed -> assert false
+        | Record_inlined (Null, _, _) -> assert false
+        | Record_dummy _ -> assert false
+        | Record_undetermined | Record_variable _ -> assert false
+      in
+      (num_nodes_visited,
+       non_nullable (Pvariant { consts = []; non_consts }))
     end
 
 let value_kind env loc ty =
@@ -1193,7 +1212,13 @@ let value_kind env loc ty =
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
 
-let finalize_instantiated_shape env loc sorts_and_types kind =
+let assert_mixed_product_support_for_lambda_shape loc kind shape =
+  let counts = Mixed_product_bytes.count (Product shape) in
+  if not (Mixed_product_bytes.all_value counts) then
+    Typedecl.assert_mixed_product_support loc kind
+      ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+
+let transl_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
       (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
@@ -1213,17 +1238,17 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
       let rec element (layout : Jkind_types.Layout.Const.t)
           : unit Lambda.mixed_block_element =
         match layout with
-        | Genvar (var, _) -> Splice_variable (Slambdaident.of_sort_var var)
+        | Genvar (var, _axes) -> Splice_variable (Slambdaident.of_sort_var var)
         | Product layouts ->
             Product (Array.of_list (List.map element layouts))
         | Addressable layout -> element layout
         | Base (base, axes) ->
             Typedecl.Element_repr.classify_base base axes
             |> Typedecl.Element_repr.to_shape_element
-            |> Lambda.mixed_block_element_of_types
+            |> Lambda.transl_mixed_product_element
         | Any _ | Univar _ ->
             Misc.fatal_error
-              "Typeopt.finalize_instantiated_shape: unrepresentable layout"
+              "Typeopt.transl_instantiated_shape: unrepresentable layout"
       in
       let shape =
         Array.map (fun (_sort, ty) ->
@@ -1231,56 +1256,52 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
           | Some layout -> element layout
           | None ->
               Misc.fatal_error
-                "Typeopt.finalize_instantiated_shape: missing layout")
+                "Typeopt.transl_instantiated_shape: missing layout")
           sorts_and_types
       in
       (* Shapes containing splices are checked after static evaluation *)
-      if not (Lambda.mixed_block_shape_has_splices shape) then begin
-        let counts = Mixed_product_bytes.count (Product shape) in
-        if not (Mixed_product_bytes.all_value counts) then
-          Typedecl.assert_mixed_product_support loc kind
-            ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
-      end;
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        assert_mixed_product_support_for_lambda_shape loc kind shape;
       `Mixed shape
   in
   shape, consts
 
-let finalize_instantiated_constructor env loc sorts_and_types kind
+let transl_instantiated_constructor env loc sorts_and_types kind
     : Lambda.constructor_representation =
-  match finalize_instantiated_shape env loc sorts_and_types kind with
+  match transl_instantiated_shape env loc sorts_and_types kind with
   | `Not_mixed, _ -> Constructor_uniform_value
   | `Mixed shape, _ -> Constructor_mixed shape
 
-let finalize_constructor_representation env loc
+let transl_constructor_representation env loc
     (shape : Types.constructor_representation)
     : Lambda.constructor_representation =
   match shape with
   | Constructor_uniform_value -> Constructor_uniform_value
   | Constructor_mixed shape ->
-      Constructor_mixed (Lambda.mixed_block_shape_of_types shape)
+      Constructor_mixed (Lambda.transl_mixed_product_shape shape)
   | Constructor_immediate_all_void -> Constructor_immediate_all_void
   | Constructor_variable sorts_and_types ->
-      finalize_instantiated_constructor env loc sorts_and_types Cstr_tuple
+      transl_instantiated_constructor env loc sorts_and_types Cstr_tuple
   | Constructor_undetermined ->
       Misc.fatal_error
-        "Typeopt.finalize_constructor_representation: representation was \
+        "Typeopt.transl_constructor_representation: representation was \
          not instantiated"
 
-let finalize_variant_representation : Types.variant_representation
+let transl_variant_representation : Types.variant_representation
     -> Lambda.variant_representation = function
   | Variant_unboxed -> Variant_unboxed
   | Variant_boxed _ -> Variant_boxed
   | Variant_extensible -> Variant_extensible
   | Variant_with_null -> Variant_with_null
 
-let finalize_record_representation_and_sorts env loc
+let transl_record_representation_and_sorts env loc
     (repres : Types.record_representation)
     : Lambda.record_representation
       * variable_sorts:Jkind.Sort.Const.t array option =
   match repres with
   | Record_variable sorts_and_types ->
       let shape, consts =
-        finalize_instantiated_shape env loc sorts_and_types Record
+        transl_instantiated_shape env loc sorts_and_types Record
       in
       let repres : Lambda.record_representation =
        match shape with
@@ -1291,41 +1312,41 @@ let finalize_record_representation_and_sorts env loc
   | Record_inlined (tag, Constructor_variable sorts_and_types,
                     vrep) ->
       let shape, consts =
-        finalize_instantiated_shape env loc sorts_and_types Cstr_record
+        transl_instantiated_shape env loc sorts_and_types Cstr_record
       in
       let shape : Lambda.constructor_representation =
         match shape with
         | `Not_mixed -> Constructor_uniform_value
         | `Mixed shape -> Constructor_mixed shape
       in
-      Record_inlined (tag, shape, finalize_variant_representation vrep),
+      Record_inlined (tag, shape, transl_variant_representation vrep),
       ~variable_sorts:(Some consts)
   | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
-        "Typeopt.finalize_record_representation: representation was not \
+        "Typeopt.transl_record_representation: representation was not \
          instantiated"
   | Record_dummy _ ->
       Misc.fatal_error
-        "Typeopt.finalize_record_representation: dummy representation"
+        "Typeopt.transl_record_representation: dummy representation"
   | Record_inlined (tag, shape, vrep) ->
       Record_inlined
-        (tag, finalize_constructor_representation env loc shape,
-         finalize_variant_representation vrep), ~variable_sorts:None
+        (tag, transl_constructor_representation env loc shape,
+         transl_variant_representation vrep), ~variable_sorts:None
   | Record_unboxed -> Record_unboxed, ~variable_sorts:None
   | Record_boxed -> Record_boxed, ~variable_sorts:None
   | Record_float -> Record_float, ~variable_sorts:None
   | Record_ufloat -> Record_ufloat, ~variable_sorts:None
   | Record_mixed shape ->
-      Record_mixed (Lambda.mixed_block_shape_of_types shape),
+      Record_mixed (Lambda.transl_mixed_product_shape shape),
       ~variable_sorts:None
 
-let finalize_record_representation env loc repres =
+let transl_record_representation env loc repres =
   let repres, ~variable_sorts:_ =
-    finalize_record_representation_and_sorts env loc repres
+    transl_record_representation_and_sorts env loc repres
   in
   repres
 
-let finalized_label_sort (label : Data_types.label_description)
+let label_sort_for_representation (label : Data_types.label_description)
       (repres : Lambda.record_representation) ~record_sort ~variable_sorts =
   match repres with
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
@@ -1345,7 +1366,7 @@ let finalized_label_sort (label : Data_types.label_description)
     end
   | Record_inlined (_, Constructor_immediate_all_void, _) ->
     Misc.fatal_error
-      "finalized_label_sort: unexpected immediate representation"
+      "label_sort_for_representation: unexpected immediate representation"
 
 let refine_mixed_block_element env loc ty mbe =
   try
@@ -1360,7 +1381,7 @@ let refine_mixed_block_element env loc ty mbe =
 
 let transl_mixed_block_element env loc ty mbe =
   refine_mixed_block_element env loc ty
-    (Lambda.mixed_block_element_of_types mbe)
+    (Lambda.transl_mixed_product_element mbe)
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function

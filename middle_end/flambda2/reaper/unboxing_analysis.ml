@@ -954,13 +954,40 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
       in
       let calling_convention_change, code_metadata =
         if cannot_change_calling_convention uses code_id
-        then Not_changing_calling_convention, code_metadata
+        then
+          (* We still need to rewrite the kinds and subkinds of parameters and
+             returns, as they could be poisoned. *)
+          let rewrite_kinds vars kinds =
+            List.map2
+              (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
+              vars kinds
+          in
+          let params_arity =
+            Flambda_arity.create
+              (List.map
+                 (fun kinds ->
+                   Flambda_arity.Component_for_creation.(
+                     Unboxed_product
+                       (List.map (fun kind -> Singleton kind) kinds)))
+                 (Flambda_arity.group_by_parameter code_dep.arity
+                    (rewrite_kinds code_dep.params
+                       (Flambda_arity.unarize code_dep.arity))))
+          in
+          let result_arity =
+            Flambda_arity.create_singletons
+              (rewrite_kinds code_dep.return
+                 (Flambda_arity.unarized_components code_dep.result_arity))
+          in
+          ( Not_changing_calling_convention,
+            Code_metadata.with_params_arity params_arity
+              (Code_metadata.with_result_arity result_arity code_metadata) )
         else
           let params_decisions =
             List.map2
               (fun param kind ->
                 match get_unboxed_fields (Code_id_or_name.var param) with
                 | None ->
+                  let kind = rewrite_kind_with_subkind (Name.var param) kind in
                   if is_var_used param then Keep (param, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.params
@@ -981,12 +1008,7 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                 match get_unboxed_fields (Code_id_or_name.var v) with
                 | None ->
                   let kind = rewrite_kind_with_subkind (Name.var v) kind in
-                  (* CR-someday ncourant: make it possible to delete function
-                     returns. Why is this not done now? The comment previously
-                     said that we "need the mapping between code ids of
-                     functions and their return continuations", but I don't see
-                     why unboxing would work and not deletion. *)
-                  if true || is_var_used v then Keep (v, kind) else Delete
+                  if is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
               (Flambda_arity.unarized_components code_dep.result_arity)
@@ -1094,6 +1116,11 @@ let get_calling_convention_change t code_id =
         Code_id.print code_id
     else Not_changing_calling_convention
   | Some code_change -> code_change.calling_convention_change
+
+let is_changing_calling_convention t code_id =
+  match get_calling_convention_change t code_id with
+  | Not_changing_calling_convention -> false
+  | Changing_calling_convention _ -> true
 
 let get_code_metadata t code_id =
   if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))

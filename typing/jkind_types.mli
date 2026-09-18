@@ -172,11 +172,6 @@ module Layout : sig
       | Product of t list
       | Univar of Sort.univar * Scannable_axes.t
       | Genvar of Sort.var * Scannable_axes.t
-          (** A layout variable bound by a surrounding [val_lpoly]. It's a
-              "fake" constant that will be instantiated to real layout constant
-              by slambda. The [var] is used only for physical identity; its
-              contents are not consumed and its level must be
-              [Ident.highest_scope]. *)
       | Addressable of t
           (** See Note [Addressable kinds].
 

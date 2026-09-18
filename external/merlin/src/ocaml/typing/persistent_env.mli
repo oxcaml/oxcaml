@@ -92,7 +92,7 @@ val clear_missing : 'a t -> unit
 val fold : 'a t -> (Global_module.Name.t -> 'a -> 'b -> 'b) -> 'b -> 'b
 
 type address =
-  | Aunit of Compilation_unit.t * Mode.Value.l
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 
@@ -100,7 +100,7 @@ type address =
    staticity. *)
 (* CR-soon zqian: all persistent modules should always be [Static], at which
    point the [staticity] parameter can be removed. *)
-val mode_pers_mod : Mode.Staticity.Const.t -> Mode.Value.lr
+val mode_pers_mod : Mode.Staticity.Const.t -> Mode.With_regionality.lr
 
 type 'a sig_reader =
   Subst.Lazy.persistent_signature

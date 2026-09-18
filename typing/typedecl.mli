@@ -37,7 +37,7 @@ type transl_value_decl_modal =
   (** A primitive in structure, in which case the modality syntax is treated as
     modes, and the returned value description will have empty modalities. *)
   (* CR zqian: avoid the above hack *)
-  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  | Sig_value of Mode.With_regionality.l * Mode.Modality.Const.t
   (** A value description in a signature, in which case we require the mode of
       the structure that the value lives in, as well as the default modalities
       of the signature. *)
@@ -48,7 +48,7 @@ val transl_value_decl:
     Env.t -> modal:transl_value_decl_modal ->
     why:Jkind.History.concrete_creation_reason -> Location.t ->
     Parsetree.value_description ->
-    Typedtree.value_description * Mode.Value.l * Env.t
+    Typedtree.value_description * Mode.With_regionality.l * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)
@@ -126,6 +126,11 @@ end
 
 val mixed_block_element :
     Env.t -> type_expr -> _ jkind -> mixed_block_element option
+
+(* Does not default sorts or check whether the block can be constructed. *)
+val compute_block_shape :
+    Env.t -> type_expr list ->
+    [ `Not_mixed | `Mixed of mixed_product_shape | `Undetermined ]
 
 type native_repr_kind = Unboxed | Untagged | Unpacked
 
@@ -248,7 +253,7 @@ type error =
   | Illegal_baggage of Env.t * jkind_l
   | No_unboxed_version of Path.t
   | Atomic_field_must_be_mutable of string
-  | Constructor_submode_failed of Mode.Value.error
+  | Constructor_submode_failed of Mode.With_regionality.error
   | Non_value_atomic_field
   | Layout_poly_unsupported
   | Misplaced_flatten_floats
