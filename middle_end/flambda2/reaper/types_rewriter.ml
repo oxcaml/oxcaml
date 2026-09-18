@@ -143,25 +143,11 @@ let prepare_rewrite_context result all_sets_of_closures =
 (* Note that this depends crucially on the fact that the poison value is not
    nullable. If it was, we could instead keep the subkind but erase the
    nullability part instead. *)
-let[@inline] erase_subkind kind =
-  match Flambda_kind.With_subkind.non_null_value_subkind kind with
-  | Anything | Tagged_immediate ->
-    (* The poison value is an immediate, allowing us to keep tagged_immediate
-       subkinds. This is important, because there is a range of optimizations
-       that apply to tagged_immediates which we may want to preserve. *)
-    kind
-  | Boxed_float32 | Boxed_float | Boxed_int32 | Boxed_int64 | Boxed_nativeint
-  | Boxed_vec128 | Boxed_vec256 | Boxed_vec512 | Boxed_mask | Float_block _
-  | Float_array | Immediate_array | Value_array | Generic_array
-  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
-  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
-  | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
-  | Unboxed_vec512_array | Unboxed_mask_array | Unboxed_product_array
-  | Variant _ ->
-    Flambda_kind.With_subkind.create
-      (Flambda_kind.With_subkind.kind kind)
-      Flambda_kind.With_subkind.Non_null_value_subkind.Anything
-      (Flambda_kind.With_subkind.nullable kind)
+let[@inline] erase kind =
+  Flambda_kind.With_subkind.create
+    (Flambda_kind.With_subkind.kind kind)
+    Flambda_kind.With_subkind.Non_null_value_subkind.Anything
+    (Flambda_kind.With_subkind.nullable kind)
 
 let rewrite_boxed_number_kind context usages kind bn =
   (* The contents of boxed numbers are tracked via [Boxed_number] fields. If the
@@ -178,7 +164,7 @@ let rewrite_boxed_number_kind context usages kind bn =
      value here can still have been replaced by a poison value and the subkind
      must be erased. *)
   match PTA.get_one_field_usage context.db (Field.boxed_number bn) usages with
-  | Bottom -> erase_subkind kind
+  | Bottom -> erase kind
   | Unknown | Ok _ -> kind
 
 let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
@@ -208,7 +194,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
        particular value, but that it syntactically looks like it could be used.
        We could keep the subkind info, but as this value should not be used, it
        is best to delete it. *)
-    erase_subkind kind
+    erase kind
   | Variant { consts; non_consts } ->
     let fields = PTA.get_fields context.db usages in
     let non_consts =
@@ -221,7 +207,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
                   Field.block i (Flambda_kind.With_subkind.kind kind)
                 in
                 match Field.Map.find_opt field fields with
-                | None -> (* maybe poison *) erase_subkind kind
+                | None -> (* maybe poison *) erase kind
                 | Some Unknown -> (* top *) kind
                 | Some (Known flow_to) ->
                   let usages = PTA.get_direct_usages context.db flow_to in
@@ -240,7 +226,7 @@ let rec rewrite_kind_with_subkind_not_top_not_bottom context usages kind =
 let rewrite_kind_with_subkind context var kind =
   let var = Code_id_or_name.name var in
   match PTA.get_usages context.db var with
-  | Bottom -> erase_subkind kind
+  | Bottom -> erase kind
   | Unknown -> kind
   | Ok usages ->
     (* We don't need to add usages through function slots, since functions never

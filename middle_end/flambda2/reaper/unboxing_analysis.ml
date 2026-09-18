@@ -954,40 +954,13 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
       in
       let calling_convention_change, code_metadata =
         if cannot_change_calling_convention uses code_id
-        then
-          (* We still need to rewrite the kinds and subkinds of parameters and
-             returns, as they could be poisoned. *)
-          let rewrite_kinds vars kinds =
-            List.map2
-              (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
-              vars kinds
-          in
-          let params_arity =
-            Flambda_arity.create
-              (List.map
-                 (fun kinds ->
-                   Flambda_arity.Component_for_creation.(
-                     Unboxed_product
-                       (List.map (fun kind -> Singleton kind) kinds)))
-                 (Flambda_arity.group_by_parameter code_dep.arity
-                    (rewrite_kinds code_dep.params
-                       (Flambda_arity.unarize code_dep.arity))))
-          in
-          let result_arity =
-            Flambda_arity.create_singletons
-              (rewrite_kinds code_dep.return
-                 (Flambda_arity.unarized_components code_dep.result_arity))
-          in
-          ( Not_changing_calling_convention,
-            Code_metadata.with_params_arity params_arity
-              (Code_metadata.with_result_arity result_arity code_metadata) )
+        then Not_changing_calling_convention, code_metadata
         else
           let params_decisions =
             List.map2
               (fun param kind ->
                 match get_unboxed_fields (Code_id_or_name.var param) with
                 | None ->
-                  let kind = rewrite_kind_with_subkind (Name.var param) kind in
                   if is_var_used param then Keep (param, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.params
