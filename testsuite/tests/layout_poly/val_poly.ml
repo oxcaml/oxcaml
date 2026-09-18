@@ -325,8 +325,6 @@ Error: Signature mismatch:
        but "'b" is not layout-polymorphic.
 |}]
 
-(* CR-soon jbachurski: This is fine, though we should check ['_weak1]'s layout
-   does not end up generalised with the level fixes. *)
 module Weak_type : sig
   val f : 'a list -> 'a list
 end = struct
@@ -353,7 +351,6 @@ Error: Signature mismatch:
        Type "'_weak1" is not compatible with type "'a"
 |}]
 
-(* CR-soon jbachurski: [x]'s layout is unsoundly generalised. *)
 module Weak_prim : sig
   val f : layout_ x. ('a : x). 'a -> 'a -> 'a
 end = struct
@@ -383,7 +380,6 @@ Error: Signature mismatch:
        but "'a" is not layout-polymorphic.
 |}]
 
-(* CR-soon jbachurski: [x]'s layout is unsoundly generalised. *)
 module Weak_sort : sig
   val f : layout_ x. ('a : x). 'a -> 'a -> 'a
 end = struct
