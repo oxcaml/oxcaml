@@ -16,15 +16,22 @@ let crossing ~loc ~subject error =
   | [] -> None
   | axes ->
     let suffix = match axes with [_] -> " axis" | _ -> " axes" in
+    let subject = Nlg.subject ~span:loc [Nlg.Phrase.Text subject] in
     Some
       [ Nlg.block
           [ Nlg.state
               [ Nlg.ref_source loc
-                  [ Nlg.txt
-                      (subject ^ " does not cross the "
-                      ^ String.concat ", " axes ^ suffix) ] ];
+                  [ Nlg.mention ~case:Subject subject;
+                    Nlg.txt
+                      (" does not cross the " ^ String.concat ", " axes ^ suffix)
+                  ] ];
             Nlg.but
-              [Nlg.txt "the kind it is checked against requires it to"]
+              [ Nlg.txt "the kind ";
+                Nlg.mention ~case:Subject subject;
+                Nlg.copula;
+                Nlg.txt " checked against requires ";
+                Nlg.mention ~case:Subject subject;
+                Nlg.txt " to" ]
             |> Nlg.with_children
                  [ Nlg.rule
                      [ Nlg.txt "a ";

@@ -105,7 +105,7 @@ let typedecl_diagnostic loc (error : Typedecl.error) =
   | Zero_alloc_attr_non_function | Zero_alloc_attr_bad_user_arity
   | Invalid_reexport _ | Non_abstract_reexport _ | Illegal_baggage _
   | No_unboxed_version _ | Layout_poly_unsupported
-  | Layout_poly_variable_representation | Misplaced_flatten_floats
+  | Misplaced_flatten_floats
   | Recursive_jkind_definition _ | Bad_represent_as_float_array_attribute ->
     None
 
@@ -167,7 +167,7 @@ let typecore_diagnostic loc (error : Typecore.error) =
   | Impossible_function_jkind _ | Label_not_mutable _
   | Instance_variable_not_mutable _ | Unexpected_mutable _ | Illegal_mutable_pat
   | Function_returns_local | Atomic_in_functional_update _
-  | Mixed_record_atomic_loc _ | Polymorphic_atomic_loc _
+  | Polymorphic_atomic_loc _
   | Mutable_block_index_polymorphic_field _ | Useless_lpoly
   | Constructor_arity_mismatch _ | Label_mismatch _ | Pattern_type_clash _
   | Or_pattern_type_clash _ | Multiply_bound_variable _ | Orpat_vars _
@@ -202,7 +202,7 @@ let typecore_diagnostic loc (error : Typecore.error) =
   | Invalid_unboxed_access _ | Block_access_bad_record _ | Optional_poly_param
   | Unboxed_int_literals_not_supported | Invalid_label_for_src_pos _
   | Nonoptional_call_pos_label _ | Unexpected_hole
-  | Let_poly_not_yet_implemented | Let_poly_not_function
+  | Let_poly_not_function | Layout_poly_not_yet_supported _
   | Layout_poly_inst_not_yet_supported _ | Function_type_escapes_partial_match _
   | Uncurried_function_escapes_locality ->
     None

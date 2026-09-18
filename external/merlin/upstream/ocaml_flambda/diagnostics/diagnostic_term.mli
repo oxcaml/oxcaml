@@ -1,6 +1,6 @@
 type mode_term =
   | Reported_mode of Mode.Reported_mode.t
-  | Alloc_mode of Mode.Alloc.atom
+  | Alloc_mode of Mode.With_locality.atom
 
 type concept =
   | Unsafe_mode_crossing
@@ -25,11 +25,16 @@ module Side : sig
 end
 
 type sides =
-  { expected_name : t Diagnostic_nlg.Phrase.segment list;
-    actual_name : t Diagnostic_nlg.Phrase.segment list
+  { expected_name : t Diagnostic_nlg.Phrase.t;
+    actual_name : t Diagnostic_nlg.Phrase.t
   }
 
-val side_name : sides -> Side.t -> t Diagnostic_nlg.Phrase.segment list
+val side_name : sides -> Side.t -> t Diagnostic_nlg.Phrase.t
+
+val mode_property : Mode.Reported_mode.t -> t Diagnostic_nlg.Property.t
+
+val mode_const_property :
+  'a Mode.With_locality.Axis.t -> 'a -> t Diagnostic_nlg.Property.t
 
 val mode_word : Mode.Reported_mode.t -> t Diagnostic_nlg.Phrase.segment
 
@@ -38,7 +43,7 @@ val modality_word : Mode.Modality.atom -> t Diagnostic_nlg.Phrase.segment
 val concept_word : concept -> t Diagnostic_nlg.Phrase.segment
 
 val mode_const_word :
-  'a Mode.Alloc.Axis.t -> 'a -> t Diagnostic_nlg.Phrase.segment
+  'a Mode.With_locality.Axis.t -> 'a -> t Diagnostic_nlg.Phrase.segment
 
 val words : t -> t Diagnostic_nlg.Phrase.t
 

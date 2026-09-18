@@ -22,7 +22,7 @@ type error =
   | Invalid_atomic_access of Location.t
   | Bad_tail_annotation of
       { loc : Location.t;
-        kind : [ `Conflict | `Not_a_tailcall ]
+        kind : [`Conflict | `Not_a_tailcall]
       }
   | Unsafe_mode_crossing_on_invalid_type_kind of Location.t
 
@@ -48,12 +48,18 @@ let diagnose = function
                      Nlg.txt ", or drop the ";
                      Nlg.code "[@atomic]" ] ] ] ]
   | Non_value_atomic_field loc ->
+    let subject = Nlg.subject ~span:loc [Nlg.Phrase.Text "this field"] in
     [ Nlg.block
         [ Nlg.state
             [ Nlg.ref_source loc
-                [Nlg.txt "this field is declared "; Nlg.code "[@atomic]"] ];
+                [ Nlg.mention ~case:Subject subject;
+                  Nlg.copula;
+                  Nlg.txt " declared ";
+                  Nlg.code "[@atomic]" ] ];
           Nlg.but
-            [Nlg.txt "its type does not have layout "; Nlg.code "value"]
+            [ Nlg.mention ~case:Possessive subject;
+              Nlg.txt " type does not have layout ";
+              Nlg.code "value" ]
           |> Nlg.with_children
                [ Nlg.rule
                    [ Nlg.txt
@@ -64,11 +70,17 @@ let diagnose = function
                    [ Nlg.txt "use the boxed type, or drop the ";
                      Nlg.code "[@atomic]" ] ] ] ]
   | Mutable_field_in_unboxed_record loc ->
+    let subject = Nlg.subject ~span:loc [Nlg.Phrase.Text "this label"] in
     [ Nlg.block
         [ Nlg.state
             [ Nlg.ref_source loc
-                [Nlg.txt "this label is declared "; Nlg.code "mutable"];
-              Nlg.txt ", but it belongs to an unboxed record" ]
+                [ Nlg.mention ~case:Subject subject;
+                  Nlg.copula;
+                  Nlg.txt " declared ";
+                  Nlg.code "mutable" ];
+              Nlg.txt ", but ";
+              Nlg.mention ~case:Subject subject;
+              Nlg.txt " belongs to an unboxed record" ]
           |> Nlg.with_children
                [ Nlg.rule
                    [ Nlg.txt
@@ -88,10 +100,10 @@ let diagnose = function
           |> Nlg.with_children
                [ Nlg.rule
                    [ Nlg.txt
-                       "atomic fields are forbidden in patterns: the field \
-                        may be read zero, one or several times depending on \
-                        the patterns around it, so it is hard to reason about \
-                        when the atomic read happens" ];
+                       "atomic fields are forbidden in patterns: the field may \
+                        be read zero, one or several times depending on the \
+                        patterns around it, so it is hard to reason about when \
+                        the atomic read happens" ];
                  Nlg.suggestion
                    [ Nlg.txt "match the field with ";
                      Nlg.code "_";
@@ -104,8 +116,7 @@ let diagnose = function
             [ Nlg.ref_source loc [Nlg.code "[%atomic.loc]"];
               Nlg.txt " needs an atomic field" ];
           Nlg.but
-            [ Nlg.code (field_name field);
-              Nlg.txt " is not declared atomic" ]
+            [Nlg.code (field_name field); Nlg.txt " is not declared atomic"]
           |> Nlg.with_children
                [ Nlg.suggestion
                    [ Nlg.txt "declare the field as ";
@@ -132,28 +143,36 @@ let diagnose = function
               Nlg.code "r.x";
               Nlg.txt ", but this payload is not one" ] ] ]
   | Bad_tail_annotation { loc; kind } ->
-    let statement =
+    let subject = Nlg.subject ~span:loc [Nlg.Phrase.Text "this call"] in
+    let statement : _ Nlg.Phrase.t =
       [ Nlg.ref_source loc
-          [Nlg.txt "this call is annotated "; Nlg.code "[@tail]"] ]
+          [ Nlg.mention ~case:Subject subject;
+            Nlg.copula;
+            Nlg.txt " annotated ";
+            Nlg.code "[@tail]" ] ]
     in
     begin match kind with
     | `Conflict ->
       [ Nlg.block
           [ Nlg.state statement;
-            Nlg.but [Nlg.txt "its tail-call annotations contradict each other"]
+            Nlg.but
+              [ Nlg.mention ~case:Possessive subject;
+                Nlg.txt " tail-call annotations contradict each other" ]
             |> Nlg.with_children
                  [ Nlg.rule
-                     [ Nlg.txt
-                         "a call cannot be required to be a tail call by ";
+                     [ Nlg.txt "a call cannot be required to be a tail call by ";
                        Nlg.code "[@tail]";
                        Nlg.txt " and required not to be by ";
                        Nlg.code "[@nontail]" ];
-                   Nlg.suggestion
-                     [Nlg.txt "keep only one tail-call annotation"] ] ] ]
+                   Nlg.suggestion [Nlg.txt "keep only one tail-call annotation"]
+                 ] ] ]
     | `Not_a_tailcall ->
       [ Nlg.block
           [ Nlg.state statement;
-            Nlg.but [Nlg.txt "it is not in tail position"]
+            Nlg.but
+              [ Nlg.mention ~case:Subject subject;
+                Nlg.copula;
+                Nlg.txt " not in tail position" ]
             |> Nlg.with_children
                  [ Nlg.rule
                      [ Nlg.txt
@@ -163,8 +182,8 @@ let diagnose = function
                      [ Nlg.txt "use ";
                        Nlg.code "[@tail hint]";
                        Nlg.txt
-                         " to ask for the optimisation only where it applies"
-                     ] ] ] ]
+                         " to ask for the optimisation only where it applies" ]
+                 ] ] ]
     end
   | Unsafe_mode_crossing_on_invalid_type_kind loc ->
     [ Nlg.block
@@ -179,6 +198,6 @@ let diagnose = function
           |> Nlg.with_children
                [ Nlg.rule
                    [ Nlg.txt
-                       "the attribute overrides the mode bounds computed \
-                        from a type's fields or constructors; a type with \
-                        neither has nothing to override" ] ] ] ]
+                       "the attribute overrides the mode bounds computed from \
+                        a type's fields or constructors; a type with neither \
+                        has nothing to override" ] ] ] ]
