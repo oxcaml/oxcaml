@@ -2358,16 +2358,14 @@ type 'f result =
     final_typing_env : ('f, typing_env) Traverse.With_types.t
   }
 
-let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
+let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
     ~(solution : f Analysis.solution) =
-  (* CR-soon ncourant: we shouldn't need the whole unit at this point, only the
-     metadata part. Once this is done, we can store it in the skeleton
-     instead. *)
   let { Traverse.Skeleton.toplevel_expr;
         code;
         ordered_code_ids;
         fixed_arity_continuations;
-        continuation_info
+        continuation_info;
+        metadata
       } =
     skeleton
   in
@@ -2450,7 +2448,7 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~unit ~skeleton
       (Exported_code.mark_as_imported
          (Flambda_cmx.get_imported_code cmx_loader ()))
   in
-  { unit = Flambda_unit.with_body unit rebuilt_expr.expr;
+  { unit = Flambda_unit.create_of_metadata_and_body metadata rebuilt_expr.expr;
     exported_code;
     slot_offsets = Analysis.slot_offsets solution;
     final_typing_env = Analysis.final_typing_env solution
