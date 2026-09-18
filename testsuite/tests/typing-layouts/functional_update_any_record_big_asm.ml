@@ -35,8 +35,8 @@ let update_scannable_axes (r : int big) (x : string) : string big =
 [%%expect_asm X86_64{|
 update_scannable_axes:
   subq  $8, %rsp
-  movq  %rax, %rdi
   movq  %rbx, (%rsp)
+  movq  %rax, %rdi
   movq  caml_obj_dup@GOTPCREL(%rip), %rax
   call  caml_c_call@PLT
 .L0:
