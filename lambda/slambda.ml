@@ -567,6 +567,8 @@ and eval_constructor_shape env old_constructor_shape =
 
 let dynamic slv_runtime = { slv_comptime = Missing; slv_runtime }
 
+(* An all-Missing record carries no static information. Use Missing so its fresh
+   identity doesn't cause needless template specializations. *)
 let make_record ?name ctx fields : value Or_missing.t =
   if
     List.for_all
@@ -596,18 +598,18 @@ let eval_lparam env
   then old_param
   else { name; debug_uid; layout = new_layout; attributes; mode }
 
+(* Evaluate static half and expand tlambda into lambda. Preserve physical
+   equality of unchanged lambda: [eval] relies on this to check that evaluation
+   is trivial when layout polymorphism is disabled. *)
 let rec eval_lam ?name ctx env old_lambda : halves =
   match old_lambda with
   | Lvar id ->
-    (* id ~> { c = env[id]; r = << id >> } *)
     { slv_comptime = Env.find env (Slambdaident.of_ident id);
       slv_runtime = old_lambda
     }
   | Lmutvar _ ->
-    (* id ~> { c = Missing; r = << id >> } *)
     dynamic old_lambda
   | Lconst old_const ->
-    (* const ~> { c = Missing; r = eval_const env const } *)
     let new_const = eval_structured_const env old_const in
     dynamic (if new_const == old_const then old_lambda else Lconst new_const)
   | Lapply
@@ -616,10 +618,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          ap_result_layout = old_layout;
          _
        } as old_apply) ->
-    (* f arg ~>
-         let { c = _; r = f_r } = eval_lam env f in
-         let { c = _; r = arg_r } = eval_lam env arg in
-         { c = Missing; r = << f_r arg_r >> } *)
     let new_func = eval_dynamic ctx env old_func in
     let new_args = eval_dynamic_list ctx env old_args in
     let new_layout = eval_layout env old_layout in
@@ -636,7 +634,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
              ap_result_layout = new_layout
            })
   | Lfunction old_func ->
-    (* func ~> { c = Missing; r = eval_lfunction env func } *)
     let new_func = eval_lfunction ctx env old_func in
     dynamic (if new_func == old_func then old_lambda else Lfunction new_func)
   | Llet (kind, old_layout, id, uid, old_def, old_body) ->
@@ -667,10 +664,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
                new_body.slv_runtime ))
     }
   | Lmutlet (old_layout, id, uid, old_def, old_body) ->
-    (* let mutable id = def in body ~>
-         let { c = _; r = def_r } = eval_lam env def in
-         let { c = body_c; r = body_r } = eval_lam env body in
-         { c = body_c; r = << let mutable id = def_r in body_r >> } *)
+    (* Mutable variables have no static part. *)
     let new_def = eval_dynamic ctx env old_def in
     let new_body = eval_lam ?name ctx env old_body in
     let new_layout = eval_layout env old_layout in
@@ -684,13 +678,8 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lmutlet (new_layout, id, uid, new_def, new_body.slv_runtime))
     }
   | Lletrec (old_bindings, old_body) ->
-    (* let rec id1 = b1 and id2 = b2 in body ~>
-        let b1_r = eval_lfunction env b1 in
-        let b2_r = eval_lfunction env b2 in
-        (* We don't worry about binding id1, id2, etc because we know the
-           compile-time part of the functions is missing. *)
-        let { c = body_c; r = body_r } = eval_lam env body in
-        { c = body_c; r = << let rec id1 = b1_r and id2 = b2_r in body_r >> } *)
+    (* Functions have no static part, so their identifiers need no binding in
+       the static environment. *)
     let new_bindings =
       Misc.Stdlib.List.map_sharing
         (fun ({ def = old_def; _ } as old_binding) ->
@@ -710,20 +699,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Lprim (old_prim, old_args, loc) ->
     eval_prim ?name ctx env old_lambda old_prim old_args loc
   | Lswitch (old_arg, old_switch, loc, old_layout) ->
-    (* switch arg with
-       | int 0: e1
-       | tag 0: e2
-       | default: e3
-       ~>
-       let { c = _; r = arg_r } = eval_lam env arg in
-       let { c = _; r = e1_r } = eval_lam env e1 in
-       let { c = _; r = e2_r } = eval_lam env e2 in
-       let { c = _; r = e3_r } = eval_lam env e3 in
-       { c = Missing;
-         r = << switch arg_r with
-                | int 0: e1_r
-                | tag 0: e2_r
-                | default: e3_r >> }*)
+    (* switch is a runtime operation. *)
     let new_arg = eval_dynamic ctx env old_arg in
     let new_consts = eval_alist ctx env old_switch.sw_consts in
     let new_blocks = eval_alist ctx env old_switch.sw_blocks in
@@ -752,17 +728,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        then old_lambda
        else Lswitch (new_arg, new_switch, loc, new_layout))
   | Lstringswitch (old_arg, old_cases, old_default, loc, old_layout) ->
-    (* stringswitch arg with
-       | case "a": e1
-       | default: e2
-       ~>
-       let { c = _; r = arg_r } = eval_lam env arg in
-       let { c = _; r = e1_r } = eval_lam env e1 in
-       let { c = _; r = e2_r } = eval_lam env e2 in
-       { c = Missing;
-         r = << stringswitch arg_r with
-                | "a": e1_r
-                | default: e2_r >> } *)
     let new_arg = eval_dynamic ctx env old_arg in
     let new_cases = eval_alist ctx env old_cases in
     let new_default =
@@ -776,11 +741,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        then old_lambda
        else Lstringswitch (new_arg, new_cases, new_default, loc, new_layout))
   | Lstaticraise (label, old_args) ->
-    (* exit label arg1 ... argn ~>
-         let { c = _; r = arg1_r } = eval_lam env arg1 in
-         ...
-         let { c = _; r = argn_r } = eval_lam env argn in
-         { c = Missing; r = << exit label arg1_r ... argn_r >> } *)
     let new_args = eval_dynamic_list ctx env old_args in
     dynamic
       (if new_args == old_args
@@ -788,12 +748,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        else Lstaticraise (label, new_args))
   | Lstaticcatch
       (old_body, (label, old_params), old_handler, pop_region, old_layout) ->
-    (* catch body with (label id1 ... idn) handler ~>
-         let { c = _; r = body_r } = eval_lam env body in
-         let { c = _; r = handler_r } = eval_lam env handler in
-         { c = Missing;
-           r = << catch body_r with (label id1 ... idn) handler_r >> }
-    *)
     let new_body = eval_dynamic ctx env old_body in
     let new_handler = eval_dynamic ctx env old_handler in
     let new_params =
@@ -813,11 +767,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          Lstaticcatch
            (new_body, (label, new_params), new_handler, pop_region, new_layout))
   | Ltrywith (old_body, id, uid, old_handler, old_layout) ->
-    (* try body with id -> handler ~>
-         let { c = _; r = body_r } = eval_lam env body in
-         let { c = _; r = handler_r } = eval_lam env handler in
-         (* Exceptions are currently runtime only. *)
-         { c = Missing; r = << try body_r with id -> handler_r >> } *)
+    (* Exceptions are runtime-only. *)
     let new_body = eval_dynamic ctx env old_body in
     let new_handler = eval_dynamic ctx env old_handler in
     let new_layout = eval_layout env old_layout in
@@ -828,11 +778,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
        then old_lambda
        else Ltrywith (new_body, id, uid, new_handler, new_layout))
   | Lifthenelse (old_cond, old_ifso, old_ifnot, old_layout) ->
-    (* if cond then ifso else ifnot ~>
-         let { c = _; r = cond_r } = eval_lam env cond in
-         let { c = _; r = ifso_r } = eval_lam env ifso in
-         let { c = _; r = ifnot_r } = eval_lam env ifnot in
-         { c = Missing; r = << if cond_r then ifso_r else ifnot_r >> } *)
     let new_cond = eval_dynamic ctx env old_cond in
     let new_ifso = eval_dynamic ctx env old_ifso in
     let new_ifnot = eval_dynamic ctx env old_ifnot in
@@ -857,11 +802,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lsequence (new_left, new_right.slv_runtime))
     }
   | Lwhile { wh_cond = old_cond; wh_body = old_body } ->
-    (* while cond do body ~>
-         let { c = _; r = cond_r } = eval_lam env cond in
-         let { c = _; r = body_r } = eval_lam env body in
-         { c = Missing; r = << while cond_r do body_r >> }
-       Expansion visits the condition and body once, not once per iteration. *)
+    (* Expansion visits the condition and body once, not once per iteration. *)
     let new_cond = eval_dynamic ctx env old_cond in
     let new_body = eval_dynamic ctx env old_body in
     dynamic
@@ -871,13 +812,7 @@ let rec eval_lam ?name ctx env old_lambda : halves =
   | Lfor
       ({ for_from = old_from; for_to = old_to; for_body = old_body; _ } as
        old_loop) ->
-    (* for id = start to stop do body ~>
-         let { c = _; r = start_r } = eval_lam env start in
-         let { c = _; r = stop_r } = eval_lam env stop in
-         let { c = _; r = body_r } = eval_lam env body in
-         { c = Missing; r = << for id = start_r to stop_r do body_r >> }
-       For loops are dynamic so only expanded once and the loop variable is
-       runtime-only. *)
+    (* Expand the body once; the loop variable is runtime-only. *)
     let new_from = eval_dynamic ctx env old_from in
     let new_to = eval_dynamic ctx env old_to in
     let new_body = eval_dynamic ctx env old_body in
@@ -892,9 +827,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
              for_body = new_body
            })
   | Lassign (id, old_value) ->
-    (* id <- value ~>
-         let { c = _; r = value_r } = eval_lam env value in
-         { c = Missing; r = << id <- value_r >> } *)
     let new_value = eval_dynamic ctx env old_value in
     dynamic
       (if new_value == old_value then old_lambda else Lassign (id, new_value))
@@ -908,13 +840,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
         loc,
         old_layout,
         yielding ) ->
-    (* send meth obj arg1 ... argn ~>
-         let { c = _; r = meth_r } = eval_lam env meth in
-         let { c = _; r = obj_r } = eval_lam env obj in
-         let { c = _; r = arg1_r } = eval_lam env arg1 in
-         ...
-         let { c = _; r = argn_r } = eval_lam env argn in
-         { c = Missing; r = << send meth_r obj_r arg1_r ... argn_r >> } *)
     let new_met = eval_dynamic ctx env old_met in
     let new_obj = eval_dynamic ctx env old_obj in
     let new_args = eval_dynamic_list ctx env old_args in
@@ -936,9 +861,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
              new_layout,
              yielding ))
   | Levent (old_body, event) ->
-    (* event body ~>
-         let { c = body_c; r = body_r } = eval_lam env body in
-         { c = body_c; r = << event body_r >> } *)
     let new_body = eval_lam ?name ctx env old_body in
     { new_body with
       slv_runtime =
@@ -947,9 +869,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Levent (new_body.slv_runtime, event))
     }
   | Lifused (id, old_body) ->
-    (* ifused id body ~>
-         let { c = body_c; r = body_r } = eval_lam env body in
-         { c = body_c; r = << ifused id body_r >> } *)
     let new_body = eval_lam ?name ctx env old_body in
     { new_body with
       slv_runtime =
@@ -958,9 +877,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lifused (id, new_body.slv_runtime))
     }
   | Lregion (old_body, old_layout) ->
-    (* region body ~>
-         let { c = body_c; r = body_r } = eval_lam env body in
-         { c = body_c; r = << region body_r >> } *)
     let new_body = eval_lam ?name ctx env old_body in
     let new_layout = eval_layout env old_layout in
     { new_body with
@@ -970,9 +886,6 @@ let rec eval_lam ?name ctx env old_lambda : halves =
          else Lregion (new_body.slv_runtime, new_layout))
     }
   | Lexclave old_body ->
-    (* exclave body ~>
-         let { c = body_c; r = body_r } = eval_lam env body in
-         { c = body_c; r = << exclave body_r >> } *)
     let new_body = eval_lam ?name ctx env old_body in
     { new_body with
       slv_runtime =
@@ -1083,6 +996,8 @@ and eval_lfunction ctx env
       ~loc ~mode ~ret_mode
     |> lfunction_with_yielding yielding
 
+(* Still evaluates static content and records template instantiations; only the
+   returned static value is discarded. *)
 and eval_dynamic ctx env old_lambda = (eval_lam ctx env old_lambda).slv_runtime
 
 and eval_dynamic_list ctx env old_args =
@@ -1164,7 +1079,7 @@ and eval_prim ?name ctx env old_lambda old_prim old_args loc =
   | Pmixedfield (path, old_shape, sem) ->
     (* e.(pos1).(pos2) ~>
        let { c = e_c; r = e_r } = eval_lam env e in
-       { c = e_c.(pos); r = << e_r.(pos1).(pos2) >> }
+       { c = e_c.(pos1).(pos2); r = << e_r.(pos1).(pos2) >> }
        If it's a read of a mutable field the compile-time part gets set to
        missing so we don't accidentally read the wrong value. *)
     let new_shape = eval_mixed_block_shape env old_shape in

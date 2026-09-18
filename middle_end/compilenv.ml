@@ -394,7 +394,9 @@ let report_error_doc ppf = function
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
   | No_cmx_file name ->
-      fprintf ppf "No compilation unit found for unit %a"
+      fprintf ppf
+        "No compilation unit found in path for %a,@ \
+         but it is required for static evaluation."
         CU.print_as_inline_code name
 
 let () =

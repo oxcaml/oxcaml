@@ -41,7 +41,9 @@ end
 
 (** Expand tlambda into lambda by evaluating its static content. The returned
     static data contains the unit's value and templates.
-    [cu_static_data] supplies the static data of other compilation units. *)
+
+    [cu_static_data] supplies other units' static data. Calls are memoized
+    during evaluation. If static data is unavailable, it should raise. *)
 val eval :
   cu_static_data:(Compilation_unit.t -> CU_data.t) ->
   Lambda.lambda ->
