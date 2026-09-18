@@ -9,6 +9,7 @@
     -open Merlin_kernel)
   (libraries
     merlin-lib.ocaml_parsing
+    merlin-lib.ocaml_typing
     merlin-lib.utils
     merlin-lib.kernel
     merlin-lib.query_protocol
