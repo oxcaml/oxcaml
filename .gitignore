@@ -59,7 +59,9 @@ perf.data.old
 # local to root directory
 
 _build/
+_build_afl/
 _build_upstream/
+/tools/afl_cfg_fuzzer/findings/
 .rsync-output
 .rsync-output-compare
 _compare/
