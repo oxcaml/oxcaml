@@ -1509,5 +1509,915 @@ let analyze ~env ~impl_sig ~intf_sig () =
 
 let render = Render.actions_of_weaknesses
 
-let code_actions ~env ~impl_sig ~intf_sig ~intf_file ~intf () =
-  analyze ~env ~impl_sig ~intf_sig () |> render ~intf_file ~intf
+let { Logger.log } = Logger.for_section "intf-strengthen"
+
+module Impls = Query_protocol.Module_type_impls
+module Intf_weakness = Query_protocol.Intf_weakness
+
+let all_or_none options =
+  let rec aux acc = function
+    | [] -> Some (List.rev acc)
+    | None :: _ -> None
+    | Some x :: rest -> aux (x :: acc) rest
+  in
+  aux [] options
+
+let span_start (loc : Location.t) = loc.loc_start.Lexing.pos_cnum
+let span_end (loc : Location.t) = loc.loc_end.Lexing.pos_cnum
+let same_file a b = String.equal (Filename.basename a) (Filename.basename b)
+
+let own_file (config : Mconfig.t) =
+  Misc.canonicalize_filename
+    (Filename.concat config.query.directory config.query.filename)
+
+type site = Unit_signature | Annotation of Location.t
+
+type subject = { file : string; site : site }
+
+type target =
+  | Unit_interface
+  | Module_type of { name : string; decl_span_start : int }
+
+type work = { target : target; subjects : subject list }
+
+type discovery = Unusable of string | Works of work list
+
+module Target_key = struct
+  type t =
+    | Own_interface
+    | Modtype of { name : string; span_start : int; span_end : int }
+
+  let of_row (row : Impls.implementation) =
+    match row.target with
+    | Own_interface -> Some Own_interface
+    | Modtype name ->
+      Option.map row.target_loc ~f:(fun loc ->
+          Modtype { name; span_start = span_start loc; span_end = span_end loc })
+end
+
+let subject_of_row (row : Impls.implementation) =
+  let loc = row.site.impl_loc in
+  let file = loc.loc_start.Lexing.pos_fname in
+  if not (Filename.check_suffix file ".ml") then None
+  else
+    match row.site.impl_kind with
+    | Whole_unit -> Some { file; site = Unit_signature }
+    | Annotation_sites ->
+      if span_start loc < span_end loc then Some { file; site = Annotation loc }
+      else None
+
+let works_of_response (response : Impls.response) =
+  let partial =
+    List.find_opt response.targets ~f:(fun (target : Impls.target_result) ->
+        match target.status with
+        | Partial -> true
+        | Complete | Unavailable -> false)
+  in
+  let unavailable =
+    List.exists response.targets ~f:(fun (target : Impls.target_result) ->
+        match target.status with
+        | Unavailable -> true
+        | Complete | Partial -> false)
+  in
+  match partial with
+  | Some target ->
+    Unusable
+      (Printf.sprintf "discovery of %s is partial (%d errors)" target.target
+         (List.length target.errors))
+  | None when unavailable -> Works []
+  | None -> (
+    let rows =
+      List.map response.implementations ~f:(fun row ->
+          match (Target_key.of_row row, subject_of_row row) with
+          | Some key, Some subject -> Some (key, subject)
+          | (None | Some _), (None | Some _) -> None)
+    in
+    match all_or_none rows with
+    | None ->
+      Unusable "an implementation could not be resolved to a source subject"
+    | Some rows ->
+      let keys = List.sort_uniq ~cmp:compare (List.map rows ~f:fst) in
+      Works
+        (List.map keys ~f:(fun key ->
+             let subjects =
+               List.sort_uniq ~cmp:compare
+                 (List.filter_map rows ~f:(fun (key', subject) ->
+                      if key' = key then Some subject else None))
+             in
+             let target =
+               match key with
+               | Target_key.Own_interface -> Unit_interface
+               | Target_key.Modtype { name; span_start; span_end = _ } ->
+                 Module_type { name; decl_span_start = span_start }
+             in
+             { target; subjects })))
+
+let with_own_unit config ~is_implementation works =
+  if not is_implementation then works
+  else
+    let own = { file = own_file config; site = Unit_signature } in
+    let updated =
+      List.map works ~f:(fun work ->
+          match work.target with
+          | Module_type _ -> work
+          | Unit_interface ->
+            { work with
+              subjects = List.sort_uniq ~cmp:compare (own :: work.subjects)
+            })
+    in
+    let own_is_covered =
+      List.exists updated ~f:(fun work ->
+          match work.target with
+          | Unit_interface -> true
+          | Module_type _ -> false)
+    in
+    if own_is_covered then updated
+    else { target = Unit_interface; subjects = [ own ] } :: updated
+
+let module_type_body (parsetree : Mreader.parsetree) ~decl_span_start =
+  let found = ref None in
+  let declared_here (loc : Location.t) = span_start loc = decl_span_start in
+  let iterator =
+    { Ast_iterator.default_iterator with
+      module_type_declaration =
+        (fun iterator (mtd : Parsetree.module_type_declaration) ->
+          (match mtd.pmtd_type with
+          | Some { pmty_desc = Pmty_signature signature; _ }
+            when declared_here mtd.pmtd_loc -> found := Some signature
+          | Some _ | None -> ());
+          Ast_iterator.default_iterator.module_type_declaration iterator mtd)
+    }
+  in
+  (match parsetree with
+  | `Implementation structure -> iterator.structure iterator structure
+  | `Interface signature -> iterator.signature iterator signature);
+  !found
+
+let longident_of_unit_path ~unit_name name =
+  let parts = String.split_on_char name ~sep:'.' in
+  List.fold_left parts ~init:(Longident.Lident unit_name) ~f:(fun prefix part ->
+      Longident.Ldot (Location.mknoloc prefix, Location.mknoloc part))
+
+let module_type_signature ~env ~unit_name name =
+  match
+    Env.lookup_modtype ~use:false ~loc:Location.none
+      (longident_of_unit_path ~unit_name name)
+      env
+  with
+  | exception _ ->
+    log ~title:"module_type_signature" "cannot resolve %s.%s" unit_name name;
+    None
+  | _path, mtd -> (
+    match Option.map mtd.mtd_type ~f:(Mtype.scrape env) with
+    | Some (Types.Mty_signature signature) -> Some signature
+    | Some _ | None -> None)
+
+let read_file file =
+  match open_in_bin file with
+  | exception Sys_error message ->
+    log ~title:"read_file" "cannot read %s: %s" file message;
+    None
+  | ic ->
+    Fun.protect
+      ~finally:(fun () -> close_in_noerr ic)
+      (fun () -> Some (Misc.string_of_file ic))
+
+let interface_source (config : Mconfig.t) impl_file =
+  let candidate = Filename.remove_extension impl_file ^ ".mli" in
+  let file =
+    if Sys.file_exists candidate then
+      Some (Misc.canonicalize_filename candidate)
+    else
+      match
+        Misc.find_in_path_normalized
+          (Mconfig.source_path config)
+          (Filename.basename candidate)
+      with
+      | file -> Some (Misc.canonicalize_filename file)
+      | exception Not_found -> None
+  in
+  Option.bind file ~f:(fun file ->
+      Option.bind (read_file file) ~f:(fun text ->
+          let reader_config =
+            { config with
+              query =
+                { config.query with
+                  filename = file;
+                  directory = Filename.dirname file
+                }
+            }
+          in
+          match
+            (Mreader.parse reader_config (Msource.make text, None))
+              .Mreader.parsetree
+          with
+          | `Interface intf -> Some (file, intf)
+          | `Implementation _ ->
+            log ~title:"interface_source" "%s is not an interface" file;
+            None))
+
+let unit_signature unit_name =
+  match Load_path.find_normalized (unit_name ^ ".cmi") with
+  | exception Not_found -> None
+  | path -> (
+    match Cmi_cache.read path with
+    | exception _ -> None
+    | cmi -> Some (Subst.Lazy.force_signature (fst cmi.cmi_sign)))
+
+let unit_interface config impl_file =
+  Option.bind
+    (unit_signature (Mconfig.unitname config))
+    ~f:(fun signature ->
+      Option.map (interface_source config impl_file)
+        ~f:(fun (intf_file, intf) -> (intf_file, intf, signature)))
+
+let config_for_file (config : Mconfig.t) file =
+  Mconfig.get_external_config file
+    { config with
+      query =
+        { config.query with
+          filename = Filename.basename file;
+          directory = Filename.dirname file
+        }
+    }
+
+let annotated_module_type ~loc (structure : Typedtree.structure) =
+  let covering = ref [] in
+  let covers (binding : Location.t) =
+    same_file binding.loc_start.Lexing.pos_fname
+      loc.Location.loc_start.Lexing.pos_fname
+    && span_start binding <= span_start loc
+    && span_end loc <= span_end binding
+  in
+  let iterator =
+    { Tast_iterator.default_iterator with
+      module_binding =
+        (fun iterator (mb : Typedtree.module_binding) ->
+          if covers mb.mb_loc then
+            covering := (mb.mb_loc, mb.mb_expr.mod_type) :: !covering;
+          Tast_iterator.default_iterator.module_binding iterator mb)
+    }
+  in
+  iterator.structure iterator structure;
+  let innermost =
+    List.sort !covering ~cmp:(fun (a, _) (b, _) ->
+        compare (span_end a - span_start a) (span_end b - span_start b))
+  in
+  match innermost with
+  | (_, module_type) :: _ -> Some module_type
+  | [] -> None
+
+let subject_signature ~env ~site (structure : Typedtree.structure) =
+  match site with
+  | Unit_signature -> Some structure.str_type
+  | Annotation loc -> (
+    match
+      Option.map (annotated_module_type ~loc structure) ~f:(Mtype.scrape env)
+    with
+    | Some (Types.Mty_signature signature) -> Some signature
+    | Some _ | None ->
+      log ~title:"subject_signature" "no module signature annotated at %d-%d"
+        (span_start loc) (span_end loc);
+      None)
+
+module Source = struct
+  type t =
+    { file : string;
+      config : Mconfig.t;
+      text : Msource.t;
+      parsetree : Mreader.parsetree;
+      typed_parsetree : Mreader.parsetree
+    }
+
+  let of_pipeline pipeline =
+    let config = Mpipeline.final_config pipeline in
+    { file = own_file config;
+      config;
+      text = Mpipeline.input_source pipeline;
+      parsetree = Mpipeline.reader_parsetree pipeline;
+      typed_parsetree = Mpipeline.ppx_parsetree pipeline
+    }
+
+  let read config file =
+    Option.map (read_file file) ~f:(fun text ->
+        let text = Msource.make text in
+        let config = config_for_file config file in
+        let parsetree = (Mreader.parse config (text, None)).Mreader.parsetree in
+        { file; config; text; parsetree; typed_parsetree = parsetree })
+
+  let declaration_location source loc =
+    match
+      Locate.find_source ~config:source.config loc "signature declaration"
+    with
+    | `File_not_found _ -> loc
+    | `Found (file, loc) ->
+      let file = Misc.canonicalize_filename file in
+      { loc with
+        loc_start = { loc.loc_start with pos_fname = file };
+        loc_end = { loc.loc_end with pos_fname = file }
+      }
+
+  let with_pipeline ~state source f =
+    Mocaml.setup_typer_config source.config;
+    f
+      (Mpipeline.make_with_parsetree ~state source.config source.text
+         source.typed_parsetree)
+end
+
+module Merge = struct
+  module Decl_key = struct
+    type t = { file : string; span_start : int; span_end : int }
+
+    let of_loc (loc : Location.t) =
+      { file = loc.Location.loc_start.Lexing.pos_fname;
+        span_start = span_start loc;
+        span_end = span_end loc
+      }
+
+    let compare = compare
+  end
+
+  module Decl_map = Map.Make (Decl_key)
+
+  let agreed_on_axis (type a) (axis : a Mode.With_locality.Axis.t) ~claimed
+      ~others =
+    match Mode.With_locality.Const.Option.proj axis claimed with
+    | None -> None
+    | Some value ->
+      let shared =
+        List.for_all others ~f:(fun claims ->
+            Mode.With_locality.Const.Option.proj axis claims = Some value)
+      in
+      if shared then Some value else None
+
+  let alloc_claims ~intf impls =
+    match
+      List.map impls ~f:(fun impl -> Mode.With_locality.Const.diff impl intf)
+    with
+    | [] -> intf
+    | claimed :: others ->
+      let agreed =
+        List.fold_left Mode.With_locality.Axis.all
+          ~init:Mode.With_locality.Const.Option.none
+          ~f:(fun agreed (Mode.With_locality.Axis.P axis) ->
+            Mode.With_locality.Const.Option.set axis
+              (agreed_on_axis axis ~claimed ~others)
+              agreed)
+      in
+      Mode.With_locality.Const.Option.value agreed ~default:intf
+
+  let modality_claims ~intf impls =
+    match impls with
+    | [] -> intf
+    | claimed :: others ->
+      List.fold_left (Mode.Modality.Const.diff intf claimed) ~init:intf
+        ~f:(fun agreed (Mode.Modality.Atom (axis, value)) ->
+          let shared =
+            List.for_all others ~f:(fun impl ->
+                let value' = Mode.Modality.Const.proj axis impl in
+                Mode.Modality.Per_axis.le axis value value'
+                && Mode.Modality.Per_axis.le axis value' value)
+          in
+          if shared then Mode.Modality.Const.set axis value agreed else agreed)
+
+  let merge_modality_diff diffs =
+    Option.bind (all_or_none diffs) ~f:(fun diffs ->
+        match diffs with
+        | [] -> None
+        | (~impl:_, ~intf) :: _ ->
+          let impls = List.map diffs ~f:(fun (~impl, ~intf:_) -> impl) in
+          Some (~impl:(modality_claims ~intf impls), ~intf))
+
+  let merge_arrow_diffs per_subject =
+    match per_subject with
+    | [] -> []
+    | claimed :: others ->
+      List.filter_map claimed ~f:(fun (diff : arrow_diff) ->
+          let at_same_position (other : arrow_diff) =
+            other.path.dir = diff.path.dir
+          in
+          let matching =
+            List.map others ~f:(fun diffs ->
+                List.find_some diffs ~f:at_same_position)
+          in
+          Option.map (all_or_none matching) ~f:(fun matching ->
+              let impls =
+                diff.impl
+                :: List.map matching ~f:(fun (d : arrow_diff) -> d.impl)
+              in
+              { diff with impl = alloc_claims ~intf:diff.intf impls }))
+
+  let merge_diffs (diffs : Abstract.diff list) =
+    match diffs with
+    | [] -> None
+    | Kind_annotation annotation :: others ->
+      let shared =
+        List.for_all others ~f:(fun (diff : Abstract.diff) ->
+            match diff with
+            | Kind_annotation annotation' -> String.equal annotation annotation'
+            | Mode_diffs _ -> false)
+      in
+      if shared then Some (Abstract.Kind_annotation annotation) else None
+    | Mode_diffs { modality_diff; arrow_diffs } :: others ->
+      let others =
+        all_or_none
+          (List.map others ~f:(fun (diff : Abstract.diff) ->
+               match diff with
+               | Mode_diffs { modality_diff; arrow_diffs } ->
+                 Some (modality_diff, arrow_diffs)
+               | Kind_annotation _ -> None))
+      in
+      Option.map others ~f:(fun others ->
+          Abstract.Mode_diffs
+            { modality_diff =
+                merge_modality_diff (modality_diff :: List.map others ~f:fst);
+              arrow_diffs =
+                merge_arrow_diffs (arrow_diffs :: List.map others ~f:snd)
+            })
+
+  let agreed per_subject =
+    let claims_by_declaration =
+      List.fold_left per_subject ~init:Decl_map.empty
+        ~f:(fun merged (declarations, claims) ->
+          let claims =
+            List.fold_left (Option.value claims ~default:[])
+              ~init:Decl_map.empty ~f:(fun claims (claim : Abstract.t) ->
+                let key = Decl_key.of_loc claim.decl_loc in
+                let diff =
+                  if Decl_map.mem key claims then None else Some claim.diff
+                in
+                Decl_map.add key diff claims)
+          in
+          let declarations =
+            List.sort_uniq declarations ~cmp:(fun left right ->
+                Decl_key.compare (Decl_key.of_loc left) (Decl_key.of_loc right))
+          in
+          List.fold_left declarations ~init:merged ~f:(fun merged loc ->
+              let key = Decl_key.of_loc loc in
+              let claim =
+                match Decl_map.find_opt key claims with
+                | Some diff -> diff
+                | None -> None
+              in
+              let _, previous =
+                Option.value (Decl_map.find_opt key merged) ~default:(loc, [])
+              in
+              Decl_map.add key (loc, claim :: previous) merged))
+    in
+    Decl_map.bindings claims_by_declaration
+    |> List.filter_map ~f:(fun (_, (decl_loc, diffs)) ->
+        Option.bind (all_or_none diffs) ~f:(fun diffs ->
+            Option.map (merge_diffs diffs) ~f:(fun diff ->
+                { Abstract.decl_loc; diff })))
+end
+
+module Actions = struct
+  let edit_key (edit : Intf_weakness.text_edit) =
+    ( Filename.basename edit.edit_loc.Location.loc_start.Lexing.pos_fname,
+      span_start edit.edit_loc,
+      span_end edit.edit_loc,
+      edit.edit_text )
+
+  let dedup edits =
+    List.rev
+      (List.fold_left edits ~init:[] ~f:(fun kept edit ->
+           if List.exists kept ~f:(fun kept -> edit_key kept = edit_key edit)
+           then kept
+           else edit :: kept))
+
+  let by_interface (actions : Intf_weakness.code_action list) =
+    let files =
+      List.sort_uniq ~cmp:compare
+        (List.map actions ~f:(fun (action : Intf_weakness.code_action) ->
+             action.intf_file))
+    in
+    List.map files ~f:(fun intf_file ->
+        let edits =
+          List.concat_map actions
+            ~f:(fun (action : Intf_weakness.code_action) ->
+              if String.equal action.intf_file intf_file then action.edits
+              else [])
+        in
+        let edits =
+          List.map edits ~f:(fun (edit : Intf_weakness.text_edit) ->
+              let loc = edit.edit_loc in
+              { edit with
+                edit_loc =
+                  { loc with
+                    loc_start = { loc.loc_start with pos_fname = intf_file };
+                    loc_end = { loc.loc_end with pos_fname = intf_file }
+                  }
+              })
+        in
+        { Intf_weakness.intf_file; edits = dedup edits })
+end
+
+type interface = { intf_file : string; intf : Parsetree.signature }
+
+let enclosing_module_type parsetree loc =
+  let found = ref None in
+  let iterator =
+    { Ast_iterator.default_iterator with
+      module_type_declaration =
+        (fun iterator (mtd : Parsetree.module_type_declaration) ->
+          if
+            span_start mtd.pmtd_loc <= span_start loc
+            && span_end loc <= span_end mtd.pmtd_loc
+          then found := Some mtd.pmtd_loc;
+          Ast_iterator.default_iterator.module_type_declaration iterator mtd)
+    }
+  in
+  (match parsetree with
+  | `Implementation structure -> iterator.structure iterator structure
+  | `Interface signature -> iterator.signature iterator signature);
+  !found
+
+let declared_in_interface interface (loc : Location.t) =
+  String.equal interface.intf_file loc.loc_start.Lexing.pos_fname
+  && span_start interface.intf.psg_loc <= span_start loc
+  && span_end loc <= span_end interface.intf.psg_loc
+  && not
+       (Option.is_some (enclosing_module_type (`Interface interface.intf) loc))
+
+type selection = All | Unit | Declaration of Lexing.position
+
+type description =
+  { target : target;
+    interface : interface option;
+    declarations : Location.t list
+  }
+
+type resolved_work =
+  { source : Source.t;
+    work : work;
+    interface : interface;
+    declarations : Location.t list
+  }
+
+type inspected_source =
+  { source : Source.t;
+    response : Impls.response;
+    descriptions : description list;
+    is_implementation : bool
+  }
+
+module Work_key = struct
+  type t = string * int option
+
+  let compare = compare
+end
+
+module Visited_work = Set.Make (Work_key)
+
+type collection_state =
+  { sources : inspected_source option String.Map.t;
+    indexes : (string list * Module_type_impls.Index.t) list;
+    visited : Visited_work.t;
+    works : resolved_work list
+  }
+
+type inputs =
+  { sources : Source.t option String.Map.t; works : resolved_work list }
+
+let rec declarations ~env signature =
+  let env = Env.add_signature signature (Env.in_signature true env) in
+  List.concat_map signature ~f:(function
+    | Types.Sig_value (_, value, _) -> [ value.val_loc ]
+    | Sig_type (_, declaration, _, _) -> [ declaration.type_loc ]
+    | Sig_module (_, _, declaration, _, _) ->
+      module_declarations ~env declaration.md_type
+    | _ -> [])
+
+and module_declarations ~env = function
+  | Types.Mty_signature signature -> declarations ~env signature
+  | Mty_functor (parameter, body, _) ->
+    let parameter_declarations, env =
+      match parameter with
+      | Types.Unit -> ([], env)
+      | Named (id, signature, _, _) ->
+        let locations = module_declarations ~env signature in
+        let env =
+          match id with
+          | None -> env
+          | Some id -> Env.add_module id Types.Mp_present signature env
+        in
+        (locations, env)
+    in
+    parameter_declarations @ module_declarations ~env body
+  | Mty_strengthen (inner, _, _) -> module_declarations ~env inner
+  | (Mty_ident _ | Mty_alias _) as signature -> (
+    match Mtype.scrape_alias env signature with
+    | Mty_ident _ | Mty_alias _ | Mty_for_hole -> []
+    | signature -> module_declarations ~env signature)
+  | Mty_for_hole -> []
+
+let module_type_at typedtree ~decl_span_start =
+  let found = ref None in
+  let iterator =
+    { Tast_iterator.default_iterator with
+      module_type_declaration =
+        (fun iterator (declaration : Typedtree.module_type_declaration) ->
+          if span_start declaration.mtd_loc = decl_span_start then
+            found := declaration.mtd_type;
+          Tast_iterator.default_iterator.module_type_declaration iterator
+            declaration)
+    }
+  in
+  (match typedtree with
+  | `Implementation structure -> iterator.structure iterator structure
+  | `Interface signature -> iterator.signature iterator signature);
+  !found
+
+let inspect_inputs (state : collection_state) pipeline
+    (typedtree : Mtyper.typedtree) =
+  let typer = Mpipeline.typer_result pipeline in
+  let source = Source.of_pipeline pipeline in
+  let is_implementation, unit =
+    match (typedtree, source.parsetree) with
+    | `Interface typed, `Interface parsed ->
+      ( false,
+        Some
+          { target = Unit_interface;
+            interface = Some { intf_file = source.file; intf = parsed };
+            declarations = declarations ~env:typed.sig_final_env typed.sig_type
+          } )
+    | `Implementation _, _ ->
+      let unit =
+        Option.map (unit_interface source.config source.file)
+          ~f:(fun (intf_file, intf, signature) ->
+            { target = Unit_interface;
+              interface = Some { intf_file; intf };
+              declarations = declarations ~env:(Mtyper.get_env typer) signature
+            })
+      in
+      (true, unit)
+    | `Interface _, `Implementation _ -> (false, None)
+  in
+  let files = source.config.merlin.index_files in
+  let index, indexes =
+    match List.assoc_opt files state.indexes with
+    | Some index -> (index, state.indexes)
+    | None ->
+      let index = Module_type_impls.Index.create source.config in
+      (index, (files, index) :: state.indexes)
+  in
+  let response = Module_type_impls.query ~index pipeline in
+  let descriptions =
+    List.filter_map response.targets ~f:(fun (result : Impls.target_result) ->
+        let decl_span_start = span_start result.target_loc in
+        Option.map (module_type_at typedtree ~decl_span_start)
+          ~f:(fun (signature : Typedtree.module_type) ->
+            { target = Module_type { name = result.target; decl_span_start };
+              interface =
+                Option.map (module_type_body source.parsetree ~decl_span_start)
+                  ~f:(fun intf -> { intf_file = source.file; intf });
+              declarations =
+                module_declarations ~env:signature.mty_env signature.mty_type
+            }))
+  in
+  let descriptions =
+    List.map
+      (Option.to_list unit @ descriptions)
+      ~f:(fun (description : description) ->
+        { description with
+          declarations =
+            List.map description.declarations
+              ~f:(Source.declaration_location source)
+        })
+  in
+  let inspected = { source; response; descriptions; is_implementation } in
+  ( inspected,
+    { state with
+      indexes;
+      sources =
+        String.Map.add ~key:source.file ~data:(Some inspected) state.sources
+    } )
+
+let load_inputs ~typer_state (state : collection_state) config file =
+  match String.Map.find_opt file state.sources with
+  | Some source -> (source, state)
+  | None -> (
+    match Source.read config file with
+    | None ->
+      ( None,
+        { state with
+          sources = String.Map.add ~key:file ~data:None state.sources
+        } )
+    | Some source ->
+      let inspected, state =
+        Source.with_pipeline ~state:typer_state source (fun pipeline ->
+            let typedtree =
+              Mtyper.get_typedtree (Mpipeline.typer_result pipeline)
+            in
+            inspect_inputs state pipeline typedtree)
+      in
+      (Some inspected, state))
+
+let selected selection = function
+  | Unit_interface -> (
+    match selection with
+    | All | Unit -> true
+    | _ -> false)
+  | Module_type { decl_span_start; _ } -> (
+    match selection with
+    | All -> true
+    | Unit -> false
+    | Declaration position -> position.Lexing.pos_cnum = decl_span_start)
+
+let select_response selection (response : Impls.response) =
+  let module_type name loc =
+    Module_type { name; decl_span_start = span_start loc }
+  in
+  { Impls.targets =
+      List.filter response.targets ~f:(fun (result : Impls.target_result) ->
+          selected selection (module_type result.target result.target_loc));
+    implementations =
+      List.filter response.implementations
+        ~f:(fun (row : Impls.implementation) ->
+          match row.target with
+          | Own_interface -> selected selection Unit_interface
+          | Modtype name -> (
+            match row.target_loc with
+            | None -> false
+            | Some loc -> selected selection (module_type name loc)))
+  }
+
+let key source target =
+  ( source.Source.file,
+    match target with
+    | Unit_interface -> None
+    | Module_type { decl_span_start; _ } -> Some decl_span_start )
+
+let rec visit_inputs ~typer_state (state : collection_state) inspected selection
+    =
+  let response = select_response selection inspected.response in
+  match works_of_response response with
+  | Unusable reason ->
+    log ~title:"discovery" "%s: %s" inspected.source.file reason;
+    state
+  | Works works ->
+    let works =
+      with_own_unit inspected.source.config
+        ~is_implementation:inspected.is_implementation works
+    in
+    List.fold_left inspected.descriptions ~init:state
+      ~f:(fun state (description : description) ->
+        let key = key inspected.source description.target in
+        if
+          (not (selected selection description.target))
+          || Visited_work.mem key state.visited
+        then state
+        else
+          let work =
+            List.find_opt works ~f:(fun (work : work) ->
+                work.target = description.target)
+          in
+          let works =
+            match (work, description.interface) with
+            | Some work, Some interface ->
+              { source = inspected.source;
+                work;
+                interface;
+                declarations = description.declarations
+              }
+              :: state.works
+            | _ -> state.works
+          in
+          let state =
+            { state with works; visited = Visited_work.add key state.visited }
+          in
+          List.fold_left description.declarations ~init:state
+            ~f:(fun state loc ->
+              match description.interface with
+              | Some interface when declared_in_interface interface loc -> state
+              | _ -> follow_declaration ~typer_state state inspected.source loc))
+
+and follow_declaration ~typer_state (state : collection_state) source loc =
+  match
+    Locate.find_source ~config:source.Source.config loc "included declaration"
+  with
+  | `File_not_found reason ->
+    log ~title:"discovery" "%s" reason;
+    state
+  | `Found (file, loc) -> (
+    let file = Misc.canonicalize_filename file in
+    let inspected, state = load_inputs ~typer_state state source.config file in
+    match inspected with
+    | None -> state
+    | Some inspected ->
+      let selection =
+        match enclosing_module_type inspected.source.parsetree loc with
+        | None -> Unit
+        | Some declaration -> Declaration declaration.loc_start
+      in
+      visit_inputs ~typer_state state inspected selection)
+
+let collect_inputs pipeline typedtree =
+  let typer_state = Mpipeline.typer_state pipeline in
+  let state =
+    { sources = String.Map.empty;
+      indexes = [];
+      visited = Visited_work.empty;
+      works = []
+    }
+  in
+  let inspected, state = inspect_inputs state pipeline typedtree in
+  let state = visit_inputs ~typer_state state inspected All in
+  let sources =
+    String.Map.map state.sources
+      ~f:(Option.map ~f:(fun inspected -> inspected.source))
+  in
+  let sources =
+    List.fold_left state.works ~init:sources
+      ~f:(fun sources (work : resolved_work) ->
+        List.fold_left work.work.subjects ~init:sources
+          ~f:(fun sources subject ->
+            if String.Map.mem subject.file sources then sources
+            else
+              String.Map.add ~key:subject.file
+                ~data:(Source.read work.source.config subject.file)
+                sources))
+  in
+  let works = List.rev state.works in
+  log ~title:"discovery" "%d targets, %d sources" (List.length works)
+    (String.Map.cardinal sources);
+  { sources; works }
+
+type analysis_result =
+  { target : resolved_work; claims : Abstract.t list option }
+
+let analyze_subject ~env ~impl_sig (target : resolved_work) =
+  let signature =
+    match target.work.target with
+    | Unit_interface -> unit_signature (Mconfig.unitname target.source.config)
+    | Module_type { name; _ } ->
+      module_type_signature ~env
+        ~unit_name:(Mconfig.unitname target.source.config)
+        name
+  in
+  Option.map signature ~f:(fun intf_sig ->
+      analyze ~env ~impl_sig ~intf_sig ()
+      |> List.map ~f:(fun (claim : Abstract.t) ->
+          { claim with
+            decl_loc = Source.declaration_location target.source claim.decl_loc
+          }))
+
+let analyze_implementations ~typer_state (inputs : inputs) =
+  let subjects =
+    List.concat_map inputs.works ~f:(fun (target : resolved_work) ->
+        List.map target.work.subjects ~f:(fun subject -> (subject, target)))
+  in
+  let files =
+    List.map subjects ~f:(fun (subject, _) -> subject.file)
+    |> List.sort_uniq ~cmp:String.compare
+  in
+  List.concat_map files ~f:(fun file ->
+      let targets =
+        List.filter subjects ~f:(fun (subject, _) ->
+            String.equal file subject.file)
+      in
+      let unavailable () =
+        List.map targets ~f:(fun (_, target) -> { target; claims = None })
+      in
+      match String.Map.find_opt file inputs.sources with
+      | None | Some None -> unavailable ()
+      | Some (Some source) ->
+        Source.with_pipeline ~state:typer_state source (fun pipeline ->
+            let typer = Mpipeline.typer_result pipeline in
+            match Mtyper.get_typedtree typer with
+            | `Interface _ -> unavailable ()
+            | `Implementation structure ->
+              let env = Mtyper.get_env typer in
+              List.map targets ~f:(fun (subject, target) ->
+                  let claims =
+                    Option.bind
+                      (subject_signature ~env ~site:subject.site structure)
+                      ~f:(fun impl_sig -> analyze_subject ~env ~impl_sig target)
+                  in
+                  { target; claims })))
+
+let merge_implementations results =
+  Merge.agreed
+    (List.map results ~f:(fun result ->
+         (result.target.declarations, result.claims)))
+
+let code_actions ~pipeline typedtree =
+  let original_config = Mpipeline.final_config pipeline in
+  Fun.protect
+    ~finally:(fun () -> Mocaml.setup_typer_config original_config)
+    (fun () ->
+      let inputs = collect_inputs pipeline typedtree in
+      let claims =
+        analyze_implementations
+          ~typer_state:(Mpipeline.typer_state pipeline)
+          inputs
+        |> merge_implementations
+      in
+      List.concat_map inputs.works ~f:(fun (target : resolved_work) ->
+          let interface = target.interface in
+          let claims =
+            List.filter claims ~f:(fun (claim : Abstract.t) ->
+                declared_in_interface interface claim.decl_loc)
+          in
+          render ~intf_file:interface.intf_file ~intf:interface.intf claims)
+      |> Actions.by_interface)

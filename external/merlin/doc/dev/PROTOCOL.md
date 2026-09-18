@@ -344,9 +344,14 @@ unit's own signature and an annotation is evidence only about the module bound
 at that site; a check whose signature cannot be read, or that the analysis says
 nothing about, leaves its interface unstrengthened. So does a `partial`
 discovery: an incomplete view of who was checked cannot certify anything.
+Declarations inherited through `include S` are traced to their original
+signature. If that signature is shared, the query merges all of its indexed
+implementations before editing the original definition, including definitions
+in `_intf.ml` files.
+
 Implementations other than the buffer are read from disk, so unsaved edits to
-them are not seen. With no index configured only the queried unit's own
-interface is answered for.
+them are not seen. With no index configured only declarations written directly
+in the queried unit's own interface are answered for.
 
 ### `jump -target <string> -position <position>`
 

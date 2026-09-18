@@ -841,7 +841,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
   | Intf_weaknesses ->
     let typer = Mpipeline.typer_result pipeline in
     let typedtree = Mtyper.get_typedtree typer in
-    Intf_strengthen_impls.code_actions ~pipeline typedtree
+    Intf_strengthen.code_actions ~pipeline typedtree
   | Construct (pos, with_values, depth) ->
     let values_scope =
       match with_values with
