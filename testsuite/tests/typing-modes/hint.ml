@@ -37,7 +37,7 @@ Error: The value "bar" is "nonportable"
     ~- And {:the function `foo`} is `nonportable`#.
       ~- Because {*:it} closes over [{:the value `x`}].
         ~- And {:the value `x`} is used as `uncontended`#.
-          ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+          ~- Because {:`(:=)`} requires {*:its} 1st argument, {:`x`}, to be `uncontended`#.
       ~- [rule] A function that closes over `uncontended`# data is `nonportable`#.
 |}, StructuredTxt{|
 Line 10, characters 16-19:
@@ -47,7 +47,7 @@ Error: The value "bar" is expected to be "portable".
        But it's "nonportable".
          Because the function "foo" closes over the value "x"
          at line 4, characters 8-9.
-         And the value "x" is used as "uncontended".
+         And it's used as "uncontended".
          A function that closes over "uncontended" data is "nonportable".
 |}]
 
@@ -81,7 +81,7 @@ Error: The value "bar" is "nonportable"
     ~- And {:the function `foo`} is `nonportable`#.
       ~- Because {*:it} closes over [{:the value `x`}].
         ~- And {:the value `x`} is used as `uncontended`#.
-          ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+          ~- Because {:`(:=)`} requires {*:its} 1st argument, {:`x`}, to be `uncontended`#.
       ~- [rule] A function that closes over `uncontended`# data is `nonportable`#.
 |}, StructuredTxt{|
 Line 6, characters 38-41:
@@ -91,7 +91,7 @@ Error: The value "bar" is expected to be "portable".
        But it's "nonportable".
          Because the function "foo" closes over the value "x"
          at line 4, characters 17-18.
-         And the value "x" is used as "uncontended".
+         And it's used as "uncontended".
          A function that closes over "uncontended" data is "nonportable".
 |}]
 
@@ -146,7 +146,7 @@ Error: Signature mismatch:
           ~- And {:the function `foo`} is `nonportable`#.
             ~- Because {*:it} closes over [{:the value `x`}].
               ~- And {:the value `x`} is used as `uncontended`#.
-                ~- Because {:`(:=)`} requires its 1st argument, {:`x`}, to be `uncontended`#.
+                ~- Because {:`(:=)`} requires {*:its} 1st argument, {:`x`}, to be `uncontended`#.
             ~- [rule] A function that closes over `uncontended`# data is `nonportable`#.
 |}, StructuredTxt{|
 Lines 3-9, characters 6-3:
@@ -162,7 +162,7 @@ Error: The module does not match its signature.
          But it's "nonportable".
          Because the function "foo" closes over the value "x"
          at line 6, characters 17-18.
-         And the value "x" is used as "uncontended".
+         And it's used as "uncontended".
          A function that closes over "uncontended" data is "nonportable".
 |}]
 
@@ -186,10 +186,10 @@ Error: This value is "aliased"
        However, the highlighted expression is expected to be "unique".
 |}, Structured{|
 - {:The expression} is expected to be `unique`#.
-  ~- Because {:`takes_unique`} requires its 1st argument to be `unique`#.
+  ~- Because {:`takes_unique`} requires {*:its} 1st argument to be `unique`#.
     ~- Because {*:it}['s annotated as `unique`#].
 - But {*:it}'s `aliased`#.
-  ~- Because field [`x` is declared `mutable`].
+  ~- Because {:the field `x`} is declared [`mutable`].
   ~- [rule] Mutable fields imply the `@@ aliased`# modality by default.
 |}, StructuredTxt{|
 type t = { mutable x : string; }
@@ -199,6 +199,6 @@ Line 9, characters 15-18:
                    ^^^
 Error: The expression is expected to be "unique".
        But it's "aliased".
-         Because field "x" is declared "mutable" at line 1, characters 11-29.
+         Because the field "x" is declared "mutable" at line 1, characters 11-29.
          Mutable fields imply the "@@ aliased" modality by default.
 |}]
