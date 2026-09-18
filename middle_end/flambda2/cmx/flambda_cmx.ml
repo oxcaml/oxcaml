@@ -52,9 +52,8 @@ let load_cmx_file_contents loader comp_unit =
           let offsets = Flambda_cmx_format.exported_offsets cmx in
           Exported_offsets.import_offsets offsets;
           loader.imported_units
-            <- Imported_unit_map.add cmx_file (Some typing_env)
-                 loader.imported_units;
-          Some typing_env)
+            <- Imported_unit_map.add cmx_file typing_env loader.imported_units;
+          typing_env)
 
 let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
@@ -204,7 +203,8 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
     EC.free_function_slots_and_value_slots all_code
   in
   let slots_used_in_typing_env =
-    TE.Serializable.free_function_slots_and_value_slots final_typing_env
+    Option.fold ~none:Name_occurrences.empty
+      ~some:TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
   let is_local = Current_unit.is_current in
   let exported_offsets =
@@ -229,20 +229,23 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
 
 let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
     ~exported_offsets ~sections all_code =
-  match final_typing_env with
-  | None ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some _ when Flambda_features.opaque () ->
-    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  | Some final_typing_env ->
-    let typing_env, canonicalise =
-      TE.Pre_serializable.create final_typing_env ~used_value_slots
-    in
-    let create_typing_env reachable_names =
-      TE.Serializable.create typing_env ~reachable_names
-    in
-    let free_names_of_name name =
-      Some (T.free_names (TE.Pre_serializable.find typing_env name))
+  if Flambda_features.opaque ()
+  then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+  else
+    let create_typing_env, free_names_of_name, canonicalise =
+      match final_typing_env with
+      | None -> (fun _reachable_names -> None), (fun _name -> None), Fun.id
+      | Some final_typing_env ->
+        let typing_env, canonicalise =
+          TE.Pre_serializable.create final_typing_env ~used_value_slots
+        in
+        let create_typing_env reachable_names =
+          Some (TE.Serializable.create typing_env ~reachable_names)
+        in
+        let free_names_of_name name =
+          Some (T.free_names (TE.Pre_serializable.find typing_env name))
+        in
+        create_typing_env, free_names_of_name, canonicalise
     in
     prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
       ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
@@ -258,8 +261,9 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (fun sym _ -> Name_occurrences.mem_symbol reachable_names sym)
           approxs
       in
-      TE.Serializable.create_from_closure_conversion_approx ~machine_width
-        approxs
+      Some
+        (TE.Serializable.create_from_closure_conversion_approx ~machine_width
+           approxs)
     in
     let free_names_of_name name =
       let symbol = Name.must_be_symbol name in
