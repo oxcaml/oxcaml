@@ -844,7 +844,8 @@ module Skeleton = struct
       code : Rev_expr.rev_code Code_id.Map.t;
       ordered_code_ids : Code_id.t array;
       fixed_arity_continuations : Continuation.Set.t;
-      continuation_info : Acc.continuation_info Continuation.Map.t
+      continuation_info : Acc.continuation_info Continuation.Map.t;
+      metadata : Flambda_unit.Metadata.t
     }
 end
 
@@ -921,7 +922,8 @@ let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
       code = Acc.get_all_code acc;
       ordered_code_ids = Acc.sort_code_ids acc;
       fixed_arity_continuations = Acc.fixed_arity_continuations acc;
-      continuation_info = Acc.get_continuation_info acc
+      continuation_info = Acc.get_continuation_info acc;
+      metadata = Flambda_unit.metadata unit
     }
   in
   problem, skeleton

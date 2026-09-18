@@ -40,7 +40,6 @@ val rebuild :
   machine_width:Target_system.Machine_width.t ->
   cmx_loader:Flambda_cmx.loader ->
   all_code:Exported_code.t ->
-  unit:Flambda_unit.t ->
   skeleton:Traverse.Skeleton.t ->
   solution:'f Analysis.solution ->
   'f result
