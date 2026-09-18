@@ -539,6 +539,18 @@ external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
 Line 2, characters 29-33:
 2 | let f (x: float#): int64_u = id x
                                  ^^^^
+Error:
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a sublayout of float64
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
+external id : ('a : any) ('b : any). 'a -> 'b = "%identity" [@@layout_poly]
+Line 2, characters 29-33:
+2 | let f (x: float#): int64_u = id x
+                                 ^^^^
 Error: This expression has type "('a : float64)"
        but an expression was expected of type "int64_u"
        The layout of int64_u is bits64
