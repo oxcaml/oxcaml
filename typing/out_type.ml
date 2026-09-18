@@ -464,7 +464,8 @@ let instance_name global =
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
     String.concat ""
-      (Compilation_unit_intf.to_string head :: List.map string_of_arg args)
+      (Compilation_unit_intf.to_string (Compilation_unit_intf.Found.intf head)
+       :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"
@@ -508,22 +509,48 @@ let rec module_path_is_an_alias_of env path ~alias_of =
   | _ -> false
   | exception Not_found -> false
 
-let expand_longident_head name =
-  match find_double_underscore name with
-  | None -> None
-  | Some i ->
-    Some
-      (Ldot
-        (Location.mknoloc (Lident (String.sub name 0 i)),
-        (Location.mknoloc (Unit_info.modulize
-            (String.sub name (i + 2) (String.length name - i - 2))))))
+(* Whether the bare [name] resolves to the module denoted by [alias_of]: if
+   so, the path [Pident name] is a re-parseable way to print it. Used for
+   members of a library module that is itself not nameable, as a dune-style
+   facade hidden under [-open-cmi], whose member names are in scope through
+   the open. This keeps compiler-printed types consumable by tools that
+   re-parse them in a context with the same names in scope, such as menhir's
+   --infer pipeline; the created ident is used for printing only. *)
+let bare_member_path env name ~alias_of =
+  match Env.find_module_by_name_lazy (Lident name) env with
+  | p', _
+    when Path.same p' alias_of
+         || module_path_is_an_alias_of env p' ~alias_of ->
+      Some (Pident (Ident.create_persistent name))
+  | _, _ | exception Not_found -> None
+
+let module_unnameable env id =
+  match Env.find_module_by_name_lazy (Lident (Ident.name id)) env with
+  | _ -> false
+  | exception Not_found -> true
 
 (* Simple heuristic to print Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 let rec rewrite_double_underscore_paths_impl env p =
   match p with
-  | Pdot (p, s) ->
-    Pdot (rewrite_double_underscore_paths_impl env p, s)
+  | Pdot (prefix, s) as p0 -> begin
+      (* A member of an unnameable library module, mentioned through it:
+         print the bare member name. Note that this must produce the same
+         ident as the [Pident] case below, which handles the same member
+         mentioned through its mangled unit name: under [-short-paths], both
+         forms feed the printing map's candidate lists, and same-named but
+         distinct idents get suffixed with fake stamps by the printing
+         disambiguator. *)
+      let collapsed =
+        match prefix with
+        | Pident prefix_id when module_unnameable env prefix_id ->
+            bare_member_path env s ~alias_of:p0
+        | _ -> None
+      in
+      match collapsed with
+      | Some p -> p
+      | None -> Pdot (rewrite_double_underscore_paths_impl env prefix, s)
+    end
   | Papply (a, b) ->
     Papply (rewrite_double_underscore_paths_impl env a,
             rewrite_double_underscore_paths_impl env b)
@@ -531,16 +558,29 @@ let rec rewrite_double_underscore_paths_impl env p =
     Pextra_ty (rewrite_double_underscore_paths_impl env p, extra)
   | Pident id ->
     let name = Ident.name id in
-    match expand_longident_head name with
+    match find_double_underscore name with
     | None -> p
-    | Some better_lid ->
+    | Some i ->
+      let tail =
+        Unit_info.modulize
+          (String.sub name (i + 2) (String.length name - i - 2))
+      in
+      let better_lid =
+        Ldot
+          (Location.mknoloc (Lident (String.sub name 0 i)),
+           Location.mknoloc tail)
+      in
       match Env.find_module_by_name_lazy better_lid env with
-      | exception Not_found -> p
       | p', _ ->
           if module_path_is_an_alias_of env p' ~alias_of:p then
             p'
           else
           p
+      | exception Not_found ->
+          (* The library module is not nameable: try the member name alone. *)
+          match bare_member_path env tail ~alias_of:p with
+          | Some p -> p
+          | None -> p
 
 let rewrite_double_underscore_paths env p =
   if env == Env.empty then

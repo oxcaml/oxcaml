@@ -645,7 +645,7 @@ val save_signature_with_imports:
 (** See [Persistent_env.find_import]. *)
 val find_import:
   chain:Compilation_unit_intf.t list ->
-  Compilation_unit_intf.t ->
+  Compilation_unit_intf.Found.t ->
   Compilation_unit.t option
   * Global_module.Parameter_name.t list
   * Signature_with_global_bindings.t
