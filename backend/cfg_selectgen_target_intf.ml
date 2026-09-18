@@ -74,6 +74,10 @@ type insert_op_debug_result =
   | Regs of Reg.t array
   | Use_default
 
+type pseudoregs_for_operation_result =
+  | Constrained of Reg.t array * Reg.t array
+  | Use_default_regs
+
 module type S = sig
   val is_immediate : Operation.integer_operation -> int -> is_immediate_result
 
@@ -120,4 +124,7 @@ module type S = sig
     Reg.t array ->
     Reg.t array ->
     insert_op_debug_result
+
+  val pseudoregs_for_operation :
+    Operation.t -> Reg.t array -> Reg.t array -> pseudoregs_for_operation_result
 end
