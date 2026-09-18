@@ -35,8 +35,8 @@
     [ids_for_export] must be added to that table (see
     [Flambda_cmx.prepare_cmx_file_contents]). *)
 
-(** A unit's LTO data, with the solve inputs pruned for the whole-program solve
-    (see [Reaper.Staged.Solve_inputs.prune_for_lto]). *)
+(** Data prepared for serialisation, without modifying the live compilation's
+    solve inputs. *)
 type t
 
 val create :
@@ -76,24 +76,21 @@ val read_header :
   Header.t
 
 (** Import the dependency graph, the slot offsets inputs, the offsets imported
-    when the unit was compiled and the per-unit solve inputs. [renaming] imports
-    the identifiers of the unit's export information, whose table the sections
-    share. *)
+    when the unit was compiled and the per-unit solve inputs. *)
 val read_for_solve :
   filename:string ->
   sections:File_sections.t ->
-  renaming:Renaming.t ->
+  export_info:Flambda_cmx_format.t ->
   Header.t ->
   Global_flow_graph.graph
   * Slot_offsets_analysis.Inputs.t
   * Exported_offsets.t
   * Reaper.Staged.Solve_inputs.t
 
-(** Import the unit metadata and the data needed to rebuild the unit, with
-    [renaming] as for [read_for_solve]. *)
+(** Import the unit metadata and the data needed to rebuild the unit. *)
 val read_for_rebuild :
   filename:string ->
   sections:File_sections.t ->
-  renaming:Renaming.t ->
+  export_info:Flambda_cmx_format.t ->
   Header.t ->
   Flambda_unit.Metadata.t * Reaper.Staged.Traverse_rebuild.t

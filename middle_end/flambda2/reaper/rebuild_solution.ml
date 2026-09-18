@@ -140,8 +140,6 @@ type t =
 
 let create ~analysis_scope ~get_unit = { analysis_scope; get_unit }
 
-let analysis_scope t = t.analysis_scope
-
 let of_data data ~analysis_scope =
   create ~analysis_scope ~get_unit:(fun _ -> data)
 

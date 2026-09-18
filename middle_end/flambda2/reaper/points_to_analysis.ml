@@ -368,20 +368,15 @@ module Datalog_schedule = struct
 
   let ( let$$ ) x f = with_priority 1 x f
 
-  (* A whole-program solve runs all rules in a single saturation instead of
-     alternating the two priority rounds to a fixpoint, so that the rules
-     deriving [any_source] and [any_usage] run in lockstep with the rules
-     copying [sources] and [usages] along aliases. *)
-  let make_schedule l =
-    if !Clflags.reaper_solve
-    then Schedule.saturate (List.map snd l)
-    else
-      Schedule.fixpoint
-        (List.init 2 (fun i ->
-             Schedule.saturate
-               (List.filter_map
-                  (fun (p, r) -> if i = p then Some r else None)
-                  l)))
+  (* All rules run in a single saturation. In particular the rules deriving
+     [any_source]/[any_usage] run in every iteration, in lockstep with the rules
+     copying [sources]/[usages] sets along aliases. *)
+  let make_schedule l = Schedule.saturate (List.map snd l)
+
+  (* CR sspies: We have changed the schedule compared to main to be flat (i.e.,
+     not sequenced according to priorities). This means [fixpoint] is now
+     dead-code, and so is the priority handling. Both should be removed or
+     revisited when merging into main. *)
 
   let reverse_rules =
     (* Reverse relations, because datalog does not implement a more efficient

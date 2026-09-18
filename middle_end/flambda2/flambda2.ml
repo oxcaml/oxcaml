@@ -271,7 +271,7 @@ let flambda_to_flambda0 : type m.
         | Lto_support ->
           let deps, slot_offsets_inputs, solve_inputs, rebuild_data =
             Flambda2_reaper.Reaper.Staged.traverse ~free_names ~cmx_loader
-              ~all_code ~top_level_return_escapes:false flambda
+              ~all_code ~closed_world:true flambda
           in
           let lto_sections =
             Flambda2_reaper.Lto_sections.create
@@ -291,14 +291,16 @@ let flambda_to_flambda0 : type m.
       in
       (* The LTO sections are renamed on import with the table of the export
          information, so their identifiers must be exported too. *)
-      let extra_ids_for_lto =
-        Option.map Flambda2_reaper.Lto_sections.ids_for_export lto_sections
+      let lto_ids =
+        match lto_sections with
+        | None -> Flambda2_nominal.Ids_for_export.empty
+        | Some lto_sections ->
+          Flambda2_reaper.Lto_sections.ids_for_export lto_sections
       in
       let prepare_cmx ~module_symbol ~used_value_slots ~exported_offsets
           all_code =
-        Flambda_cmx.prepare_cmx_file_contents ?extra_ids_for_lto
-          ~final_typing_env ~module_symbol ~used_value_slots ~exported_offsets
-          ~sections all_code
+        Flambda_cmx.prepare_cmx_file_contents ~lto_ids ~final_typing_env
+          ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code
       in
       flambda, all_code, slot_offsets, prepare_cmx, last_pass_name, lto_sections
   in
@@ -309,13 +311,18 @@ let flambda_to_flambda0 : type m.
   in
   (match cmx with
   | None -> () (* Opaque compilation *)
-  | Some cmx ->
-    Compilenv.set_export_info cmx;
-    Option.iter
-      (fun lto_sections ->
-        Compilenv.set_lto_info
-          (Flambda2_reaper.Lto_sections.to_sections ~sections lto_sections))
-      lto_sections);
+  | Some cmx -> Compilenv.set_export_info cmx);
+  (match lto_sections, cmx with
+  | None, _ -> ()
+  | Some lto_sections, Some _ ->
+    Compilenv.set_lto_info
+      (Flambda2_reaper.Lto_sections.to_sections ~sections lto_sections)
+  | Some _, None ->
+    (* The export record is only omitted for -opaque, which [lambda_to_flambda]
+       rejects together with -support-lto. *)
+    Misc.fatal_error
+      "-support-lto with -opaque should have been rejected before reaching \
+       Flambda 2");
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 
 let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width ~code_slot_offsets
@@ -490,9 +497,7 @@ let reaper_lto_solve ~cmx_files ~ltosol_file =
          ->
         ( unit_infos.ui_unit,
           Flambda2_reaper.Lto_sections.read_for_solve ~filename
-            ~sections:unit_infos.ui_file_sections
-            ~renaming:(Flambda_cmx_format.import_renaming_of_unit export_info)
-            header ))
+            ~sections:unit_infos.ui_file_sections ~export_info header ))
       units
   in
   let participants = List.map fst solve_data in
@@ -592,10 +597,9 @@ let reaped_flambda2_to_cmm ~machine_width ~ltosol_filename ~batch_members =
     let unit_metadata, rebuild_data =
       Profile.record_call ~accumulate:true "lto_sections_deserialise" (fun () ->
           Flambda2_reaper.Lto_sections.read_for_rebuild ~filename:cmx_filename
-            ~sections:paused_unit_infos.ui_file_sections
-            ~renaming:(Flambda_cmx_format.import_renaming_of_unit export_info)
-            header)
+            ~sections:paused_unit_infos.ui_file_sections ~export_info header)
     in
+    (* CR mvellacott: add debug printing code. *)
     (* Code metadata of the participants comes from the solution and that of
        other units from their .cmx files, loaded on demand. *)
     let flambda, all_code, _final_typing_env, free_names =

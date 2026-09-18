@@ -31,3 +31,5 @@ type t =
       (** Units outside this set must not depend on units inside it. *)
 
 val contains_unit : t -> Compilation_unit.t -> bool
+
+val is_closed : t -> bool

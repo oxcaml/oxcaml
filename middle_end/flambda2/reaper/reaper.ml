@@ -13,31 +13,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let get_code_metadata ~cmx_loader ~all_code =
-  let load_code = Flambda_cmx.get_imported_code cmx_loader in
-  fun code_id ->
-    Code_or_metadata.code_metadata
-      (match Exported_code.find all_code code_id with
-      | Some code -> code
-      | None -> Exported_code.find_exn (load_code ()) code_id)
-
 (* Import the .cmx file defining [code_id] if its metadata is not already
    available. Only the LTO rebuild gets here: it does not run [Simplify], so the
    metadata of code from units that did not take part in the solve is only
-   available from their .cmx files. The metadata of the units in the analysis
-   scope comes from the solution instead, and their .cmx files must not be
-   read. *)
-let load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader ~all_code
-    code_id =
+   available from their .cmx files. *)
+let load_cmx_for_code_id ~cmx_loader ~all_code code_id =
   let comp_unit = Code_id.get_compilation_unit code_id in
-  if Analysis_scope.contains_unit analysis_scope comp_unit
-  then
-    Misc.fatal_errorf
-      "Code ID %a belongs to the analysis scope, so its metadata must come \
-       from the solution"
-      Code_id.print code_id;
   if
-    (not (Exported_code.mem code_id all_code))
+    (not (Current_unit.is_current comp_unit))
+    && (not (Exported_code.mem code_id all_code))
     && not
          (Exported_code.mem code_id
             (Flambda_cmx.get_imported_code cmx_loader ()))
@@ -46,13 +30,15 @@ let load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader ~all_code
       (Flambda_cmx.load_cmx_file_contents cmx_loader comp_unit
         : Typing_env.Serializable.t option)
 
-let get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code code_id =
-  (match Exported_code.find all_code code_id with
-  | Some _ -> ()
-  | None ->
-    load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader ~all_code
-      code_id);
-  get_code_metadata ~cmx_loader ~all_code code_id
+let get_code_metadata ~cmx_loader ~all_code =
+  let load_code = Flambda_cmx.get_imported_code cmx_loader in
+  fun code_id ->
+    Code_or_metadata.code_metadata
+      (match Exported_code.find all_code code_id with
+      | Some code -> code
+      | None ->
+        load_cmx_for_code_id ~cmx_loader ~all_code code_id;
+        Exported_code.find_exn (load_code ()) code_id)
 
 module Staged = struct
   module Solve_inputs = struct
@@ -90,19 +76,6 @@ module Staged = struct
         [ ids;
           Traverse_acc.ids_for_export_code_references code_references;
           Rebuild_queries.Requests.ids_for_export rebuild_queries ]
-
-    let prune_for_lto t =
-      { t with
-        code_deps =
-          Code_id.Map.map
-            (fun (code_dep : Traverse_acc.code_dep) ->
-              { code_dep with
-                code_metadata =
-                  Code_metadata.with_result_types Unknown code_dep.code_metadata
-              })
-            t.code_deps;
-        all_sets_of_closures = []
-      }
 
     let referenced_compilation_units t =
       Traverse_acc.code_references_compilation_units t.code_references
@@ -226,8 +199,7 @@ module Staged = struct
       queries : Rebuild_queries.t
     }
 
-  let traverse ~free_names ~cmx_loader ~all_code ~top_level_return_escapes unit
-      =
+  let traverse ~free_names ~cmx_loader ~all_code ~closed_world unit =
     let Traverse.
           { toplevel_expr;
             code;
@@ -241,7 +213,7 @@ module Staged = struct
             all_sets_of_closures;
             closure_function_decls
           } =
-      Traverse.run ~top_level_return_escapes unit
+      Traverse.run ~closed_world unit
     in
     let slot_offsets_inputs =
       Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
@@ -377,10 +349,7 @@ module Staged = struct
 
   let rebuild ~unit_metadata ~traverse_rebuild ~(solution : Rebuild_solution.t)
       ~(typing : Rebuild.typing option) ~machine_width ~cmx_loader ~all_code =
-    let analysis_scope = Rebuild_solution.analysis_scope solution in
-    let get_code_metadata =
-      get_code_metadata_or_load ~analysis_scope ~cmx_loader ~all_code
-    in
+    let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Traverse_rebuild.
           { toplevel_expr;
             code;
@@ -410,8 +379,7 @@ module Staged = struct
             match Rebuild_solution.find_code_metadata solution code_id with
             | Some code_metadata -> code_metadata :: solution_metadata
             | None ->
-              load_cmx_for_non_participant_code_id ~analysis_scope ~cmx_loader
-                ~all_code code_id;
+              load_cmx_for_code_id ~cmx_loader ~all_code code_id;
               solution_metadata)
     in
     (* Local entries are replaced by rebuilt code below. *)
@@ -451,8 +419,7 @@ end
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
     (unit : Flambda_unit.t) =
   let deps, slot_offsets_inputs, solve_inputs, traverse_rebuild =
-    Staged.traverse ~free_names ~cmx_loader ~all_code
-      ~top_level_return_escapes:true unit
+    Staged.traverse ~free_names ~cmx_loader ~all_code ~closed_world:false unit
   in
   let solution, slot_offsets =
     Staged.solve ~slot_offsets_inputs ~analysis_scope:Current_unit
@@ -477,14 +444,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let solution =
     Rebuild_solution.of_data rebuild_data ~analysis_scope:Current_unit
   in
-  let flambda, all_code, final_typing_env, free_names =
+  let flambda, all_code, final_typing_env, _free_names =
     Staged.rebuild ~unit_metadata ~traverse_rebuild ~solution
       ~typing:(Some typing) ~machine_width ~cmx_loader ~all_code
   in
-  let exported_offsets =
-    Rebuild_solution.offsets_for_free_names solution free_names
-  in
-  ( flambda,
-    all_code,
-    { slot_offsets with Slot_offsets.exported_offsets },
-    final_typing_env )
+  flambda, all_code, slot_offsets, final_typing_env

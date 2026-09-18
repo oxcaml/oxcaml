@@ -53,6 +53,8 @@ let restore_for_resume
   Value_slot.restore_stamp_counter value_slots;
   Symbol.restore_manufacture_counter symbols
 
+(* CR mvellacott: instead of taking the maximum, consider keeping separate
+   per-unit stamp counters. *)
 let restore_for_merge all_counters =
   let max_counters =
     List.fold_left

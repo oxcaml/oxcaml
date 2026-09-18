@@ -22,14 +22,16 @@ type raw
 
 val from_raw : sections:File_sections.t -> raw -> t
 
-(** [extra_ids_for_lto] are the identifiers of the unit's LTO sections (see
-    [Flambda2_reaper.Lto_sections]), which share this unit's table. *)
+(** [lto_ids] are the identifiers of the unit's LTO sections (see
+    [Flambda2_reaper.Lto_sections]), which share this unit's table.
+    [final_typing_env] is absent when the unit's initialiser does not return
+    normally; the code, offsets and shared table are still exported. *)
 val create_raw :
   final_typing_env:Flambda2_types.Typing_env.Serializable.t option ->
   all_code:Exported_code.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
-  extra_ids_for_lto:Ids_for_export.t ->
+  lto_ids:Ids_for_export.t ->
   sections:File_sections.Builder.t ->
   raw
 
@@ -40,10 +42,10 @@ val exported_offsets : t -> Exported_offsets.t
 
 val with_exported_offsets : t -> Exported_offsets.t -> t
 
-(** The renaming that imports the unit's export information, for importing the
-    unit's LTO sections, which share its identifier table. Only for units that
-    are not packs. *)
-val import_renaming_of_unit : t -> Renaming.t
+(** The renaming to apply when importing the unit's LTO sections. Unlike the
+    import of the typing environment and code, no value slots are pruned. Only
+    for units that are not packs. *)
+val lto_renaming : t -> Renaming.t
 
 (** Create the Flambda data for a pack *)
 val pack : sections:File_sections.Builder.t -> t option list -> raw option

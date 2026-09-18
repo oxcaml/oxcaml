@@ -420,6 +420,8 @@ module Serialisation = struct
   module N = struct
     type t = unit Code_id_or_name.Map.t
 
+    type table = (t, Code_id_or_name.t -> Datalog.nil, unit) Datalog.table
+
     let fold_ids t ~init ~f =
       Code_id_or_name.Map.fold (fun id () acc -> f acc id) t init
 
@@ -433,6 +435,12 @@ module Serialisation = struct
 
   module Nn = struct
     type t = N.t Code_id_or_name.Map.t
+
+    type table =
+      ( t,
+        Code_id_or_name.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
 
     let fold_ids t ~init ~f =
       Code_id_or_name.Map.fold
@@ -472,6 +480,9 @@ module Serialisation = struct
   module Nf = struct
     type t = unit Field.Map.t Code_id_or_name.Map.t
 
+    type table =
+      (t, Code_id_or_name.t -> Field.t -> Datalog.nil, unit) Datalog.table
+
     let add_ids t ids =
       Code_id_or_name.Map.fold
         (fun id (_ : unit Field.Map.t) ids -> add_id ids id)
@@ -500,6 +511,12 @@ module Serialisation = struct
 
   module Nfn = struct
     type t = N.t Field.Map.t Code_id_or_name.Map.t
+
+    type table =
+      ( t,
+        Code_id_or_name.t -> Field.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
 
     let fold_ids t ~init ~f =
       Code_id_or_name.Map.fold
@@ -536,6 +553,12 @@ module Serialisation = struct
 
   module Ncn = struct
     type t = N.t Cofield.Map.t Code_id_or_name.Map.t
+
+    type table =
+      ( t,
+        Code_id_or_name.t -> Cofield.t -> Code_id_or_name.t -> Datalog.nil,
+        unit )
+      Datalog.table
 
     let fold_ids t ~init ~f =
       Code_id_or_name.Map.fold

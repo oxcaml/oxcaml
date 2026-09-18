@@ -30,6 +30,7 @@ module Metadata = struct
         toplevel_my_alloc_region;
         module_symbol
       } =
+    (* CR mvellacott: Minimise what's stored when we merge .cmr and .cmx. *)
     let ids = Ids_for_export.empty in
     let ids = Ids_for_export.add_continuation ids return_continuation in
     let ids = Ids_for_export.add_continuation ids exn_continuation in

@@ -24,11 +24,6 @@ module Staged : sig
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
 
-    (** Throw away the information the whole-program solve does not need: the
-        result types of the code metadata and the sets of closures, which only
-        the single-unit Reaper's type rewriting uses. *)
-    val prune_for_lto : t -> t
-
     val ids_for_export : t -> Ids_for_export.t
 
     (** Units mentioned by pending code references. *)
@@ -55,15 +50,12 @@ module Staged : sig
       [free_names] are the free names of the whole compilation unit as output by
       simplify. Returns the dependency graph, the unit's inputs to the
       solve-time slot offsets and code changes computations, and the data needed
-      to rebuild the unit. With [top_level_return_escapes], the value passed to
-      the unit's return continuation is marked as used by unknown code; a
-      whole-program analysis passes [false], since those uses come from the
-      other units analysed. *)
+      to rebuild the unit. *)
   val traverse :
     free_names:Name_occurrences.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    top_level_return_escapes:bool ->
+    closed_world:bool ->
     Flambda_unit.t ->
     Global_flow_graph.graph
     * Slot_offsets_analysis.Inputs.t

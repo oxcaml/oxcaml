@@ -179,9 +179,9 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
   in
   fixpoint init_names Name_occurrences.empty
 
-let prepare_cmx ?(extra_ids_for_lto = Ids_for_export.empty) ~module_symbol
+let prepare_cmx ~is_local_compilation_unit:is_local ~module_symbol
     create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
-    ~exported_offsets ~sections all_code =
+    ~exported_offsets ~lto_ids ~sections all_code =
   let reachable_names =
     compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
   in
@@ -207,7 +207,6 @@ let prepare_cmx ?(extra_ids_for_lto = Ids_for_export.empty) ~module_symbol
     Option.fold ~none:Name_occurrences.empty
       ~some:TE.Serializable.free_function_slots_and_value_slots final_typing_env
   in
-  let is_local = Current_unit.is_current in
   let exported_offsets =
     exported_offsets
     |> Exported_offsets.reexport_function_slots ~is_local
@@ -224,33 +223,37 @@ let prepare_cmx ?(extra_ids_for_lto = Ids_for_export.empty) ~module_symbol
   in
   let cmx =
     Flambda_cmx_format.create_raw ~final_typing_env ~all_code ~exported_offsets
-      ~used_value_slots ~extra_ids_for_lto ~sections
+      ~used_value_slots ~lto_ids ~sections
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ?extra_ids_for_lto ~final_typing_env
-    ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code =
-  if Flambda_features.opaque ()
-  then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
-  else
-    let create_typing_env, free_names_of_name, canonicalise =
-      match final_typing_env with
-      | None -> (fun _reachable_names -> None), (fun _name -> None), Fun.id
-      | Some final_typing_env ->
-        let typing_env, canonicalise =
-          TE.Pre_serializable.create final_typing_env ~used_value_slots
-        in
-        let create_typing_env reachable_names =
-          Some (TE.Serializable.create typing_env ~reachable_names)
-        in
-        let free_names_of_name name =
-          Some (T.free_names (TE.Pre_serializable.find typing_env name))
-        in
-        create_typing_env, free_names_of_name, canonicalise
+let prepare_cmx_file_contents
+    ?(is_local_compilation_unit = Current_unit.is_current)
+    ?(lto_ids = Ids_for_export.empty) ~final_typing_env ~module_symbol
+    ~used_value_slots ~exported_offsets ~sections all_code =
+  match final_typing_env with
+  | _ when Flambda_features.opaque () ->
+    Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
+  | None ->
+    prepare_cmx ~is_local_compilation_unit ~module_symbol
+      (fun _reachable_names -> None)
+      ~free_names_of_name:(fun _name -> None)
+      ~used_value_slots
+      ~canonicalise:(fun simple -> simple)
+      ~exported_offsets ~lto_ids ~sections all_code
+  | Some final_typing_env ->
+    let typing_env, canonicalise =
+      TE.Pre_serializable.create final_typing_env ~used_value_slots
     in
-    prepare_cmx ?extra_ids_for_lto ~module_symbol create_typing_env
+    let create_typing_env reachable_names =
+      Some (TE.Serializable.create typing_env ~reachable_names)
+    in
+    let free_names_of_name name =
+      Some (T.free_names (TE.Pre_serializable.find typing_env name))
+    in
+    prepare_cmx ~is_local_compilation_unit ~module_symbol create_typing_env
       ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
-      ~sections all_code
+      ~lto_ids ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     ~exported_offsets ~used_value_slots ~sections all_code =
@@ -276,7 +279,7 @@ let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
           (Value_approximation.free_names
              ~code_free_names:Code_or_metadata.free_names approx)
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots
+    prepare_cmx ~is_local_compilation_unit:Current_unit.is_current
+      ~module_symbol create_typing_env ~free_names_of_name ~used_value_slots
       ~canonicalise:(fun id -> id)
-      ~exported_offsets ~sections all_code
+      ~exported_offsets ~lto_ids:Ids_for_export.empty ~sections all_code

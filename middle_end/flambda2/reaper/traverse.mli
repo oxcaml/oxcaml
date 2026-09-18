@@ -30,7 +30,4 @@ type result =
       Code_id_or_name.Map.t
   }
 
-(** [top_level_return_escapes] says whether the value passed to the unit's
-    return continuation may be used by code outside the analysis, in which case
-    it is marked as used by unknown code (see [Reaper.Staged.traverse]). *)
-val run : top_level_return_escapes:bool -> Flambda_unit.t -> result
+val run : closed_world:bool -> Flambda_unit.t -> result

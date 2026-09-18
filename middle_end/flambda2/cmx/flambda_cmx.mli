@@ -32,11 +32,18 @@ val load_cmx_file_contents :
 val load_symbol_approx :
   loader -> Symbol.t -> Code_or_metadata.t Value_approximation.t
 
-(** [extra_ids_for_lto] are the identifiers of the unit's LTO sections, which
-    are renamed on import using the table created here (see
-    [Flambda2_reaper.Lto_sections]). *)
+(** [is_local_compilation_unit] says whether slots of the given compilation unit
+    have their offsets computed by the current process (rather than imported);
+    it defaults to [Current_unit.is_current], but the LTO rebuild of a
+    compilation unit passes membership of the set of units participating in the
+    solve, whose offsets all come from the solution file.
+
+    [lto_ids] are the identifiers of the unit's LTO sections, which are renamed
+    on import using the table created here (see [Flambda2_reaper.Lto_sections]).
+*)
 val prepare_cmx_file_contents :
-  ?extra_ids_for_lto:Ids_for_export.t ->
+  ?is_local_compilation_unit:(Compilation_unit.t -> bool) ->
+  ?lto_ids:Ids_for_export.t ->
   final_typing_env:Flambda2_types.Typing_env.t option ->
   module_symbol:Symbol.t ->
   used_value_slots:Value_slot.Set.t ->

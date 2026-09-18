@@ -771,6 +771,8 @@ let mk_no_support_lto f =
 
 let mk_reaper_rebuild f =
   ( "-reaper-rebuild",
+    (* CR mvellacott: instead of a boolean flag, this should ultimately take an
+       .ltosol file. *)
     Arg.Unit f,
     " Rebuild and compile the given -support-lto .cmx files according to the \
      given .ltosol Reaper solution, producing .reaped.cmx and object files \

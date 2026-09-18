@@ -43,6 +43,6 @@ val restore_for_resume : t -> unit
     Like [restore_for_resume], can only be called once. *)
 val restore_for_merge : t list -> unit
 
-(** True if any counter in the first set is greater than its corresponding
-    counter in the second. Used to guard against monotonicity breaking. *)
+(** True if any counter in the first set is greater than it's corresponding
+    counter in the second. Used to check for monotonicity breaking. *)
 val any_greater_than : t -> t -> bool

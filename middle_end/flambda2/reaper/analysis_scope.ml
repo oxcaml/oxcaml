@@ -33,3 +33,5 @@ let contains_unit t unit =
   match t with
   | Current_unit -> Current_unit.is_current unit
   | Lto_participants units -> Compilation_unit.Set.mem unit units
+
+let is_closed = function Current_unit -> false | Lto_participants _ -> true

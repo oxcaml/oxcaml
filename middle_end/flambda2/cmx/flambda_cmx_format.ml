@@ -55,7 +55,7 @@ let create_table_data (exported_ids : Ids_for_export.t) =
   { symbols; variables; simples; consts; code_ids; continuations }
 
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
-    ~extra_ids_for_lto ~sections =
+    ~lto_ids ~sections =
   let typing_env_exported_ids =
     Option.fold ~none:Ids_for_export.empty
       ~some:Flambda2_types.Typing_env.Serializable.ids_for_export
@@ -64,7 +64,7 @@ let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
   let all_code_exported_ids = Exported_code.ids_for_export all_code in
   let exported_ids =
     Ids_for_export.union_list
-      [typing_env_exported_ids; all_code_exported_ids; extra_ids_for_lto]
+      [typing_env_exported_ids; all_code_exported_ids; lto_ids]
   in
   let table_data = create_table_data exported_ids in
   let all_code =
@@ -97,13 +97,12 @@ let import_renaming ~table_data ~used_value_slots ~original_compilation_unit =
   in
   renaming, code_ids
 
-let import_renaming0 t0 =
-  import_renaming ~table_data:t0.table_data
-    ~used_value_slots:t0.used_value_slots
-    ~original_compilation_unit:t0.original_compilation_unit
-
 let import_typing_env_and_code0 ~sections t =
-  let renaming, code_ids = import_renaming0 t in
+  let renaming, code_ids =
+    import_renaming ~table_data:t.table_data
+      ~used_value_slots:t.used_value_slots
+      ~original_compilation_unit:t.original_compilation_unit
+  in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
         Option.map
@@ -160,10 +159,16 @@ let with_exported_offsets (t, sections) exported_offsets =
   | [] | _ :: _ :: _ ->
     Misc.fatal_error "Cannot set exported offsets on multiple units"
 
-let import_renaming_of_unit (t, _sections) =
+let lto_renaming (t, _sections) =
   match t with
   | [t0] ->
-    let renaming, (_ : Code_id.importer) = import_renaming0 t0 in
+    (* [used_value_slots] only drives the pruning of exported types, which do
+       not occur in the LTO sections. *)
+    let renaming, (_ : Code_id.importer) =
+      import_renaming ~table_data:t0.table_data
+        ~used_value_slots:Value_slot.Set.empty
+        ~original_compilation_unit:t0.original_compilation_unit
+    in
     renaming
   | [] | _ :: _ :: _ -> Misc.fatal_error "Packed units do not have LTO sections"
 

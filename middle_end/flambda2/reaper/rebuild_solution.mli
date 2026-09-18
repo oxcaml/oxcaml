@@ -46,6 +46,7 @@ val fields_for_export : data -> Field.Set.t
 val apply_renaming :
   data -> Renaming.t -> rename_field:(Field.t -> Field.t) -> data
 
+(** Partition by the compilation unit of each outermost key or slot. *)
 val partition_by_compilation_unit : data -> data Compilation_unit.Map.t
 
 (** Rebuild queries load only the section owning their key. *)
@@ -54,9 +55,6 @@ type t
 (** Any caching of loaded sections is the responsibility of [get_unit]. *)
 val create :
   analysis_scope:Analysis_scope.t -> get_unit:(Compilation_unit.t -> data) -> t
-
-(** The analysis scope the solution was computed for. *)
-val analysis_scope : t -> Analysis_scope.t
 
 (** Use one in-memory data record for every compilation unit. *)
 val of_data : data -> analysis_scope:Analysis_scope.t -> t
@@ -99,6 +97,6 @@ val get_code_metadata : t -> Code_id.t -> Code_metadata.t
 val get_calling_convention_change :
   t -> Code_id.t -> Unboxing_analysis.calling_convention_change
 
-(** Copy exactly the offsets of the slots occurring at normal mode, loading
-    their owning sections. Missing offsets are fatal errors. *)
+(** Copy exactly the offsets of slots occurring at normal mode, loading their
+    owning sections. Missing offsets are fatal errors. *)
 val offsets_for_free_names : t -> Name_occurrences.t -> Exported_offsets.t

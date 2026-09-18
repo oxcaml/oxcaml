@@ -35,12 +35,28 @@ type t =
   }
 
 let create ~unit_metadata ~imported_offsets ~deps ~slot_offsets_inputs
-    ~solve_inputs ~rebuild_data =
+    ~(solve_inputs : Reaper.Staged.Solve_inputs.t) ~rebuild_data =
+  (* The solve does not need result types, and only normal Reaper's type
+     rewriting needs the sets of closures. This local copy leaves the live
+     compilation's solve inputs unchanged. *)
+  let solve_inputs =
+    { solve_inputs with
+      code_deps =
+        Code_id.Map.map
+          (fun (code_dep : Traverse_acc.code_dep) ->
+            { code_dep with
+              code_metadata =
+                Code_metadata.with_result_types Unknown code_dep.code_metadata
+            })
+          solve_inputs.code_deps;
+      all_sets_of_closures = []
+    }
+  in
   { unit_metadata;
     imported_offsets;
     deps;
     slot_offsets_inputs;
-    solve_inputs = Reaper.Staged.Solve_inputs.prune_for_lto solve_inputs;
+    solve_inputs;
     rebuild_data
   }
 
@@ -149,20 +165,23 @@ let read_header ~filename ~sections idx =
   | None -> raise (Error (No_lto_info filename))
   | Some idx -> (read_section ~filename ~sections idx : Header.t)
 
-let read_for_solve ~filename ~sections ~renaming ({ solve; _ } : Header.t) =
+let read_for_solve ~filename ~sections ~export_info ({ solve; _ } : Header.t) =
   let ({ deps; slot_offsets_inputs; imported_offsets; solve_inputs } : Solve.t)
       =
     read_section ~filename ~sections solve
   in
+  let renaming = Flambda_cmx_format.lto_renaming export_info in
   ( Deps_with_fields.import deps renaming,
     Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs renaming,
     imported_offsets,
     Reaper.Staged.Solve_inputs.apply_renaming solve_inputs renaming )
 
-let read_for_rebuild ~filename ~sections ~renaming ({ rebuild; _ } : Header.t) =
+let read_for_rebuild ~filename ~sections ~export_info
+    ({ rebuild; _ } : Header.t) =
   let ({ unit_metadata; rebuild_data } : Rebuild.t) =
     read_section ~filename ~sections rebuild
   in
+  let renaming = Flambda_cmx_format.lto_renaming export_info in
   ( Flambda_unit.Metadata.apply_renaming unit_metadata renaming,
     Reaper.Staged.Traverse_rebuild.apply_renaming rebuild_data renaming )
 
