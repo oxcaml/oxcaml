@@ -6,12 +6,9 @@
 *)
 
 external box : ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box" [@@layout_poly]
-external unbox : ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) = "%unbox" [@@layout_poly]
 [%%expect{|
 external box : ('a : any). ('a [@local_opt]) -> ('a box [@local_opt])
   = "%box" [@@layout_poly]
-external unbox : ('a : any). ('a box [@local_opt]) -> ('a [@local_opt])
-  = "%unbox" [@@layout_poly]
 |}]
 
 (* TESTING INVARIANT: boxing a value of type [t] produces a block with the same
