@@ -213,6 +213,21 @@ CAMLexport const struct custom_operations caml_ba_ops = {
   custom_fixed_length_default
 };
 
+static const struct custom_operations caml_bigstring_local_ops = {
+  /* Same identifier as [caml_ba_ops] --- stack-allocated bigstrings demarshal
+   * into heap-allocated bigstrings that own and free their backing memory */
+  "_bigarr02",
+  /* [caml_alloc_custom_local] does not support finalizers */
+  custom_finalize_default,
+  /* Remaining fields are the same as [caml_ba_ops] */
+  caml_ba_compare,
+  caml_ba_hash,
+  caml_ba_serialize,
+  caml_ba_deserialize,
+  custom_compare_ext_default,
+  custom_fixed_length_default
+};
+
 /* Allocation of a big array */
 
 /* [caml_ba_alloc] will allocate a new bigarray object in the heap.
@@ -233,6 +248,7 @@ caml_ba_alloc(int flags, int num_dims, void * data, intnat * dim)
   CAMLassert(0 <= num_dims);
   CAMLassert(num_dims <= CAML_BA_MAX_NUM_DIMS);
   CAMLassert((flags & CAML_BA_KIND_MASK) < CAML_BA_FIRST_UNIMPLEMENTED_KIND);
+  flags &= ~CAML_BA_STACK;
   for (int i = 0; i < num_dims; i++) dimcopy[i] = dim[i];
   num_elts = 1;
   for (int i = 0; i < num_dims; i++) {
@@ -276,6 +292,34 @@ CAMLexport value caml_ba_alloc_dims(int flags, int num_dims, void * data, ...)
   for (int i = 0; i < num_dims; i++) dim[i] = va_arg(ap, intnat);
   va_end(ap);
   res = caml_ba_alloc(flags, num_dims, data, dim);
+  return res;
+}
+
+/* Like [caml_ba_alloc]. The allocated block always has the flags corresponding
+ * to a plain bigstring. When stack allocation is enabled, the block is
+ * allocated on the stack, and the [CAML_BA_STACK] flag is set.
+ *
+ * When [data = NULL], [caml_bigstring_alloc_local] does _not_ malloc new
+ * backing memory owned by the allocated block. Instead, the block's data
+ * pointer simply remains [NULL]. */
+
+CAMLexport value caml_bigstring_alloc_local(void * data, intnat len)
+{
+  struct caml_ba_array * b;
+  value res;
+
+  CAMLassert(len >= 0);
+  res = caml_alloc_custom_local(&caml_bigstring_local_ops,
+                               SIZEOF_BA_ARRAY + sizeof(intnat), 0, 1);
+  b = Caml_ba_array_val(res);
+  b->data = data;
+  b->num_dims = 1;
+  b->flags = CAML_BA_CHAR | CAML_BA_C_LAYOUT | CAML_BA_EXTERNAL;
+#if defined(NATIVE_CODE) && defined(STACK_ALLOCATION)
+  b->flags |= CAML_BA_STACK;
+#endif
+  b->proxy = NULL;
+  b->dim[0] = len;
   return res;
 }
 
@@ -594,7 +638,7 @@ CAMLexport uintnat caml_ba_deserialize(void * dst)
   b->num_dims = caml_deserialize_uint_4();
   if (b->num_dims < 0 || b->num_dims > CAML_BA_MAX_NUM_DIMS)
     caml_deserialize_error("input_value: wrong number of bigarray dimensions");
-  b->flags = caml_deserialize_uint_4() | CAML_BA_MANAGED;
+  b->flags = (caml_deserialize_uint_4() & ~CAML_BA_STACK) | CAML_BA_MANAGED;
   b->proxy = NULL;
   for (int i = 0; i < b->num_dims; i++) {
     intnat len = caml_deserialize_uint_2();
@@ -1203,6 +1247,13 @@ CAMLprim value caml_ba_layout(value vb)
   return Val_caml_ba_layout(layout);
 }
 
+/* Whether the bigarray block is allocated on the stack */
+
+CAMLprim value caml_ba_is_stack(value vb)
+{
+  return Val_bool((Caml_ba_array_val(vb)->flags & CAML_BA_STACK) != 0);
+}
+
 /* Create / update proxy to indicate that b2 is a sub-array of b1 */
 
 static void caml_ba_update_proxy(struct caml_ba_array * b1,
@@ -1373,6 +1424,30 @@ CAMLprim value caml_ba_sub(value vb, value vofs, value vlen)
   CAMLreturn (res);
 
   #undef b
+}
+
+/* Stack-allocate a bigstring view into a subrange. It is the caller's
+ * responsibility to ensure [vb] remains alive for the duration of the lifetime
+ * of the returned bigstring. */
+
+CAMLprim value caml_bigstring_sub_local(value vb, value vofs, value vlen)
+{
+  CAMLparam1(vb);
+  struct caml_ba_array * b = Caml_ba_array_val(vb);
+  intnat ofs = Long_val(vofs);
+  intnat len = Long_val(vlen);
+  void * data;
+
+  if (b->num_dims != 1 ||
+      (b->flags & (CAML_BA_KIND_MASK | CAML_BA_LAYOUT_MASK)) !=
+        (CAML_BA_CHAR | CAML_BA_C_LAYOUT))
+    caml_invalid_argument("Bigarray.Array1.with_sub_local: not a bigstring");
+  if (ofs < 0 || len < 0 || ofs > b->dim[0] || len > b->dim[0] - ofs)
+    caml_invalid_argument("Bigarray.Array1.with_sub_local: bad subrange");
+  data = b->data;
+  /* Avoid pointer arithmetic on NULL data pointer. */
+  data = data ? (char *) data + ofs : data;
+  CAMLreturn(caml_bigstring_alloc_local(data, len));
 }
 
 /* Copying a big array into another one */

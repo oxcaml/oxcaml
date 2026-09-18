@@ -756,6 +756,14 @@ module Array1 : sig
   (** Extract a sub-array of the given one-dimensional Bigarray.
      See {!Genarray.sub_left} for more details. *)
 
+  val with_sub_local
+    : (char, int8_unsigned_elt, c_layout) t @ local -> int -> int
+      -> ((char, int8_unsigned_elt, c_layout) t @ local -> 'a) @ local once
+      -> 'a
+  (** [with_sub_local a ofs len f] calls [f] on a sub-array of the one-dimensional
+      Bigstring [a]. The sub-array cannot escape [f] and is allocated on the stack if
+      stack-allocation is enabled. *)
+
   val slice
     : ('a : any) ('b : any) ('c : any).
       ('a, 'b, 'c) t -> int -> ('a, 'b, 'c) Array0.t

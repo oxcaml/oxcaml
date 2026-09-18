@@ -297,6 +297,27 @@ module Array1 = struct
     @@ portable
     = "caml_ba_sub"
 
+  external sub_local
+    : (char, int8_unsigned_elt, c_layout) t @ local -> int -> int
+      -> (char, int8_unsigned_elt, c_layout) t @ local
+    @@ portable
+    = "caml_bigstring_sub_local"
+
+  let with_sub_local
+      (a : (char, int8_unsigned_elt, c_layout) t @ local) ofs len
+      (f : ((char, int8_unsigned_elt, c_layout) t @ local -> 'a)
+           @ local once) =
+    let view = sub_local a ofs len in
+    (* Keep [a] alive manually --- the stack-allocated [view] can't use e.g. the
+       usual refcount mechanism to keep [a] alive. *)
+    match f view with
+    | result ->
+        let _ = Sys.opaque_identity a in
+        result
+    | exception exn ->
+        let _ = Sys.opaque_identity a in
+        raise_notrace exn
+
   let slice (type (a : any) (b : any) (c : any)) (a : (a, b, c) Genarray.t) n =
     match layout a with
     | C_layout -> (Genarray.slice_left a [|n|] : (a, b, c) Genarray.t)
