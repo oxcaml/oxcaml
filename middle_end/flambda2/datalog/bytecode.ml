@@ -28,9 +28,13 @@
 
 open Datalog_imports
 
+type _ columns =
+  | Nil : nil columns
+  | Cons : (_, 'h, _) Column.id * 'k columns -> ('h -> 'k) columns
+
 type bindings_ref =
   | Bindings_ref_innermost_first :
-      ('a Value.hlist * 'a Or_null_receiver.hlist with_names)
+      ('k columns * 'k Or_null_receiver.hlist with_names)
       -> bindings_ref
 [@@unboxed]
 
@@ -79,7 +83,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
         * label
         -> code
     | Distinct :
-        'k Value.repr
+        (_, 'k, _) Column.id
         * 'k Or_null_receiver.t
         * string
         * 'k Or_null_receiver.t
@@ -263,7 +267,7 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       { st with
         bindings =
           Bindings_ref_innermost_first
-            ( repr.value :: reprs,
+            ( Cons (repr.value, reprs),
               { values = receiver :: receivers.values;
                 names = repr.name :: receivers.names
               } )
@@ -283,9 +287,9 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     emit_with_label label (fun label ->
         Absent (is_trie, trie, name, args, names, label))
 
-  let distinct repr key1 key2 label =
+  let distinct column key1 key2 label =
     emit_with_label label (fun label ->
-        Distinct (repr, key1.value, key1.name, key2.value, key2.name, label))
+        Distinct (column, key1.value, key1.name, key2.value, key2.name, label))
 
   let seek iterator { value = receiver; name } label =
     emit_with_label label (fun label ->
@@ -331,8 +335,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
   let if_not_in is_trie table args body =
     if_template (absent is_trie table args) body
 
-  let if_not_equal repr arg1 arg2 body =
-    if_template (distinct repr arg1 arg2) body
+  let if_not_equal column arg1 arg2 body =
+    if_template (distinct column arg1 arg2) body
 
   let if_ fn args body = if_template (filter fn args) body
 
@@ -375,7 +379,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
     let st =
       { code = delayed;
         after_loops = [];
-        bindings = Bindings_ref_innermost_first ([], { values = []; names = [] });
+        bindings =
+          Bindings_ref_innermost_first (Nil, { values = []; names = [] });
         labels
       }
     in
@@ -449,8 +454,8 @@ module Make (Iterator : Leapfrog.Iterator) = struct
       match Trie.find_or_null is_trie (read_hlist args) (read table) with
       | This _ -> goto if_mem
       | Null -> next ())
-    | Distinct (repr, key1, _name1, key2, _name2, if_equal) ->
-      if Value.equal_repr repr (read key1) (read key2)
+    | Distinct (column, key1, _name1, key2, _name2, if_equal) ->
+      if Column.equal_key column (read key1) (read key2)
       then goto if_equal
       else next ()
     | Filter (func, _name, args, _names, if_false) ->
@@ -469,7 +474,7 @@ end
 
 type bindings =
   | Bindings_innermost_first :
-      'a Value.hlist * 'a Constant.hlist with_names
+      'a columns * 'a Constant.hlist with_names
       -> bindings
 
 let get_bindings (Bindings_ref_innermost_first (reprs, receivers)) =
@@ -478,20 +483,16 @@ let get_bindings (Bindings_ref_innermost_first (reprs, receivers)) =
 
 let print_bindings ppf (Bindings_innermost_first (reprs, { values; names })) =
   let rec loop : type a.
-      Format.formatter ->
-      a Value.hlist ->
-      a Constant.hlist ->
-      string list ->
-      bool =
+      Format.formatter -> a columns -> a Constant.hlist -> string list -> bool =
    fun ppf reprs values names ->
     match reprs, values, names with
-    | [], [], _ :: _ | _ :: _, _ :: _, [] ->
+    | Nil, [], _ :: _ | Cons (_, _), _ :: _, [] ->
       Misc.fatal_error "Wrong number of names"
-    | [], [], [] -> true
-    | repr :: reprs, value :: values, name :: names ->
+    | Nil, [], [] -> true
+    | Cons (column, reprs), value :: values, name :: names ->
       let first = loop ppf reprs values names in
       if not first then Format.fprintf ppf ";@,";
-      Format.fprintf ppf "@[<1>%s =@ %a@]" name (Value.print_repr repr) value;
+      Format.fprintf ppf "@[<1>%s =@ %a@]" name (Column.print_key column) value;
       false
   in
   Format.fprintf ppf "@[<2>{ @[<v>";
