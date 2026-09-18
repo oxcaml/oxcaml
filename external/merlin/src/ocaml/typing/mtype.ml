@@ -478,12 +478,13 @@ let find_type_of_module ~strengthen ~aliasable env path =
 (* When a module alias (which carries no modality) is expanded into a real
    module declaration, recover the modality from the mode of the alias's
    target, relative to a fresh mode variable standing for the enclosing
-   module. *)
+   module. The result is zapped to a constant modality, as the expansion
+   appears in module types, which cannot contain inferred modalities. *)
 let modality_of_alias_target env path =
   let mode = Env.find_module_mode path env in
   let mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
   let md_mode, _ = Mode.Value.newvar_above (Ctype.get_current_level ()) mode in
-  Mode.Modality.infer ~md_mode ~mode
+  Mode.Modality.(infer ~md_mode ~mode |> zap_to_floor |> of_const)
 
 (* In nondep_supertype, env is only used for the type it assigns to id.
    Hence there is no need to keep env up-to-date by adding the bindings
@@ -924,10 +925,8 @@ and remove_aliases_sig env args siblings sg =
             Ident.find_same tid siblings
         | Mty_alias p, _ ->
             (* The target is a real module: recover the modality from its
-               mode. The modality is zapped, as module types cannot contain
-               inferred modalities. *)
-            Mode.Modality.(
-              modality_of_alias_target env p |> zap_to_floor |> of_const)
+               mode. *)
+            modality_of_alias_target env p
         | _, _ -> md.md_modalities
       in
       let siblings = Ident.add id md_modalities siblings in

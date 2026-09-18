@@ -2602,17 +2602,22 @@ let rec components_of_module_maker
             in
             c.comp_constrs <- add_to_tbl (Ident.name id) cda c.comp_constrs
         | Sig_module(id, pres, md, _, _) ->
-            (* A module alias carries no modality ([undefined]); the mode
-               computed here is then a placeholder, and its components are
-               built at the target's mode (see [alias_components_mode]). Any
-               other module declaration carries a modality. *)
-            let normalize : Normalize_mode.t =
+            (* A module alias carries no modality ([undefined]); its real mode
+               is its target's, resolved when the alias is consumed: its
+               components are built at the target's mode (see
+               [find_module_mode]), and module-level lookups that may load the
+               target chase it (see [lookup_module_path]). The mode recorded
+               here is the max mode, which is always sound. Any other module
+               declaration carries a modality. *)
+            let md, mode =
               match md.md_type with
-              | Mty_alias _ -> Assert_normalized
+              | Mty_alias _ ->
+                  Normalize_mode.md Assert_normalized md
+                    Mode.Value.(max |> disallow_right)
               | Mty_ident _ | Mty_signature _ | Mty_functor _
-              | Mty_strengthen _ -> Normalize_exn
+              | Mty_strengthen _ ->
+                  Normalize_mode.md Normalize_exn md cm_mode
             in
-            let md, mode = Normalize_mode.md normalize md cm_mode in
             let md' =
               (* The prefixed items get the same scope as [cm_path], which is
                  the prefix. *)
