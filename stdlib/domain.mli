@@ -204,31 +204,13 @@ module TLS : sig
 end
 
 module Tick : sig @@ portable
-  (** A handle to a request that the tick thread tick at a given interval
-
-      In between calling [acquire] and calling [release], the tick thread will
-      tick {i at least as frequently} as the provided [interval_usec]. *)
-  type t : mutable_data mod external_ global non_float
-
-  (** Request that the tick thread tick at least as frequently as
-      [interval_usec] until [release] is called on the returned handle. *)
-  val acquire : interval_usec:int -> t @ unique
-
-  (** Release a handle to a tick request.
-
-     It is unsound to call this on a domain other than the one that called
-     [acquire] (though it is fine to call it on a different thread on the same
-     domain).
-  *)
-  val release : t @ unique -> unit
-
   (** [with_ ~interval_usec f] runs [f] with the tick thread ticking at least as
       frequently as [interval_usec] *)
   val with_
     : ('r : value_or_null).
        interval_usec:int
-    -> (t @ local -> 'r) @ local once
-    -> 'r
+    -> (unit -> 'r @ local unique once) @ local once unyielding
+    -> 'r @ local unique once
 
   (** Returns the interval at which the tick thread will tick, or [Null]
       if no domain has any active tick requests. This is the global minimum
