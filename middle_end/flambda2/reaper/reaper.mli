@@ -32,11 +32,15 @@ module Staged : sig
   end
 
   (** Traverse the compilation unit. [free_names] are the free names of the
-      whole unit as output by simplify. *)
+      whole unit as output by simplify. With [top_level_return_escapes], the
+      value passed to the unit's return continuation is marked as used by
+      unknown code; a whole-program analysis passes [false], since those uses
+      come from the other units analysed. *)
   val traverse :
     free_names:Name_occurrences.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
+    top_level_return_escapes:bool ->
     Flambda_unit.t ->
     Solve_inputs.t * Rebuild_inputs.t
 
