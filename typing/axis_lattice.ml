@@ -31,9 +31,6 @@
    9. Staticity (monadic): Dynamic -> Static
    10. Externality: External -> External64 -> Internal
 
-   Axes 0-9 are modal axes (affect mode-crossing).
-   Axis 10 is the only non-modal axis (externality).
-
    Each 2-valued axis uses 1 bit. The 3-valued chain axes and 4-valued diamond
    axes use 2 bits.
 
@@ -62,17 +59,17 @@ let axis_shapes =
   Array.map
     (fun (Pack axis) ->
       match axis with
-      | Modal (Comonadic Areality) -> Chain3
-      | Modal (Monadic Uniqueness) -> Chain2
-      | Modal (Comonadic Linearity) -> Chain2
-      | Modal (Monadic Contention) -> Diamond4
-      | Modal (Comonadic Portability) -> Diamond4
-      | Modal (Comonadic Forkable) -> Chain2
-      | Modal (Comonadic Yielding) -> Chain2
-      | Modal (Comonadic Statefulness) -> Diamond4
-      | Modal (Monadic Visibility) -> Diamond4
-      | Modal (Monadic Staticity) -> Chain2
-      | Nonmodal Externality -> Chain3)
+      | Comonadic Areality -> Chain3
+      | Monadic Uniqueness -> Chain2
+      | Comonadic Linearity -> Chain2
+      | Monadic Contention -> Diamond4
+      | Comonadic Portability -> Diamond4
+      | Comonadic Forkable -> Chain2
+      | Comonadic Yielding -> Chain2
+      | Comonadic Statefulness -> Diamond4
+      | Monadic Visibility -> Diamond4
+      | Monadic Staticity -> Chain2
+      | Comonadic Externality -> Chain3)
     axis_by_number
 
 let num_axes = Array.length axis_shapes
@@ -428,6 +425,9 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
       ~portability:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (portability x)))
+      ~externality:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const (externality x)))
       ~forkable:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const (forkable x)))
@@ -450,7 +450,7 @@ let create ~areality ~linearity ~uniqueness ~portability ~contention ~forkable
   |> set_visibility visibility |> set_staticity staticity
   |> set_externality externality
 
-let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
+let of_mode_crossing (crossing : Mode.Crossing.t) =
   let create_lattice = create in
   let open Mode.Crossing in
   let monadic axis =
@@ -470,7 +470,8 @@ let of_mode_crossing (crossing : Mode.Crossing.t) ~externality =
     ~uniqueness:(monadic Uniqueness) ~portability:(comonadic Portability)
     ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
     ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
-    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity) ~externality
+    ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
+    ~externality:(comonadic Externality)
 
 let mask_of_modality (modality : Mode.Modality.Const.t) : t =
   if Mode.Modality.Const.is_id modality
@@ -495,7 +496,7 @@ let mask_of_modality (modality : Mode.Modality.Const.t) : t =
       ~contention:(monadic Contention) ~forkable:(comonadic Forkable)
       ~yielding:(comonadic Yielding) ~statefulness:(comonadic Statefulness)
       ~visibility:(monadic Visibility) ~staticity:(monadic Staticity)
-      ~externality:Jkind_axis.Externality.max
+      ~externality:(comonadic Externality)
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
