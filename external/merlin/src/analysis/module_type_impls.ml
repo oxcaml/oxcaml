@@ -1057,7 +1057,24 @@ let status_and_errors ~index_files ~facts_present ~index_errors ~omissions
   | _ :: _, true, [] -> (Complete, [])
   | _ :: _, true, _ :: _ -> (Partial, errors)
 
-let query ?position pipeline =
+module Index = struct
+  type t =
+    { files : string list;
+      indexes : Index_format.index list;
+      errors : Query_protocol.Module_type_impls.error list;
+      search : Implementation_search.t option
+    }
+
+  let create (config : Mconfig.t) =
+    let facts, indexes, errors = Helpers.module_facts config in
+    { files = config.merlin.index_files;
+      indexes;
+      errors;
+      search = Option.map facts ~f:Implementation_search.create
+    }
+end
+
+let query ?index ?position pipeline =
   let typedtree = Mtyper.get_typedtree (Mpipeline.typer_result pipeline) in
   let mconfig = Mpipeline.final_config pipeline in
   let own_file = Helpers.own_file mconfig in
@@ -1075,12 +1092,17 @@ let query ?position pipeline =
       | target :: _ -> [ target ])
   in
   let open Query_protocol.Module_type_impls in
-  let index_files = mconfig.merlin.index_files in
-  let facts, indexes, index_errors = Helpers.module_facts mconfig in
+  let index =
+    match index with
+    | Some index when index.Index.files = mconfig.merlin.index_files -> index
+    | Some _ | None -> Index.create mconfig
+  in
+  let { Index.files = index_files; indexes; errors = index_errors; search } =
+    index
+  in
   let resolve_implementation =
     implementation_resolver mconfig ~local_defs:typedtree ~indexes
   in
-  let search = Option.map facts ~f:Implementation_search.create in
   let targets, implementations =
     List.split
       (List.map targets ~f:(fun target ->
@@ -1101,8 +1123,8 @@ let query ?position pipeline =
            in
            let status, errors =
              status_and_errors ~index_files ~index_errors
-               ~facts_present:(Option.is_some facts) ~omissions:result.omissions
-               ~resolution_errors
+               ~facts_present:(Option.is_some search)
+               ~omissions:result.omissions ~resolution_errors
            in
            ( { target = target.target_name; target_loc; status; errors },
              implementations )))

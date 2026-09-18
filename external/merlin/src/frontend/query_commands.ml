@@ -838,6 +838,10 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
   | Module_type_impls position ->
     let position = Option.map ~f:(Mpipeline.get_lexing_pos pipeline) position in
     Merlin_analysis.Module_type_impls.query ?position pipeline
+  | Intf_weaknesses ->
+    let typer = Mpipeline.typer_result pipeline in
+    let typedtree = Mtyper.get_typedtree typer in
+    Intf_strengthen.code_actions ~pipeline typedtree
   | Construct (pos, with_values, depth) ->
     let values_scope =
       match with_values with
