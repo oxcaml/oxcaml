@@ -73,6 +73,56 @@ module Inputs = struct
         closure_function_decls Code_id.Map.empty
     in
     { free_names; closure_function_decls; code_info }
+
+  let ids_for_export { free_names; closure_function_decls; code_info } =
+    let ids = Name_occurrences.ids_for_export free_names in
+    let ids =
+      Code_id_or_name.Map.fold
+        (fun closure_name decl ids ->
+          let ids = Ids_for_export.add_code_id_or_name ids closure_name in
+          match
+            (decl : Function_declarations.code_id_in_function_declaration)
+          with
+          | Deleted _ -> ids
+          | Code_id { code_id; only_full_applications = _ } ->
+            Ids_for_export.add_code_id ids code_id)
+        closure_function_decls ids
+    in
+    Code_id.Map.fold
+      (fun code_id _info ids -> Ids_for_export.add_code_id ids code_id)
+      code_info ids
+
+  let apply_renaming { free_names; closure_function_decls; code_info } renaming
+      =
+    let free_names = Name_occurrences.apply_renaming free_names renaming in
+    let closure_function_decls =
+      Code_id_or_name.Map.fold
+        (fun closure_name
+             (decl : Function_declarations.code_id_in_function_declaration)
+             decls ->
+          let decl : Function_declarations.code_id_in_function_declaration =
+            match decl with
+            | Deleted _ -> decl
+            | Code_id { code_id; only_full_applications } ->
+              Code_id
+                { code_id = Renaming.apply_code_id renaming code_id;
+                  only_full_applications
+                }
+          in
+          Code_id_or_name.Map.add
+            (Renaming.apply_code_id_or_name renaming closure_name)
+            decl decls)
+        closure_function_decls Code_id_or_name.Map.empty
+    in
+    let code_info =
+      Code_id.Map.fold
+        (fun code_id info code_info ->
+          Code_id.Map.add
+            (Renaming.apply_code_id renaming code_id)
+            info code_info)
+        code_info Code_id.Map.empty
+    in
+    { free_names; closure_function_decls; code_info }
 end
 
 let function_slots_to_be_built ~db ~code_changes ~get_code_info

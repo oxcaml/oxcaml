@@ -19,11 +19,32 @@ module Staged : sig
   (** A unit's inputs to the solve. *)
   module Solve_inputs : sig
     type t
+
+    (** Throw away the information the whole-program solve does not need: the
+        result types of the code metadata and the sets of closures, which only
+        the single-unit Reaper's type rewriting uses. *)
+    val prune_for_lto : t -> t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    (** Fields are hashconsed, so for serialisation the [Field.view] of each one
+        needs serialising separately. *)
+    val fields_for_export : t -> Field.Set.t
+
+    (** The units mentioned by the code references. *)
+    val referenced_compilation_units : t -> Compilation_unit.Set.t
+
+    val apply_renaming :
+      t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
   end
 
   (** The data needed to rebuild a traversed unit. *)
   module Rebuild_inputs : sig
     type t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    val apply_renaming : t -> Renaming.t -> t
   end
 
   (** The rewriting decisions and slot offsets computed by the solve. *)
@@ -51,7 +72,7 @@ module Staged : sig
   (** Rebuild the traversed unit according to the solution. Returns the rebuilt
       unit, its code and its typing environment. *)
   val rebuild :
-    unit:Flambda_unit.t ->
+    unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
     solution:Rebuild_solution.t ->
     types_rewrite_context:Types_rewriter.rewrite_context ->

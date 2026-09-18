@@ -25,49 +25,10 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The per-compilation-unit inputs to [compute]. They are computed from the
-    traversal results so that the solve-time computation does not need to load
-    .cmx files for external code. *)
-module Inputs : sig
-  (** The code metadata needed when laying out function slots. *)
-  type code_info =
-    { function_slot_size : int;
-      dbg : Debuginfo.t
-    }
+(** Snapshots of the stamp counters used to create identifiers. Identifiers are
+    compared by compilation unit and stamp only, so a resuming process must not
+    mint stamps that collide with the imported ones. *)
+type t
 
-  type t =
-    { free_names : Name_occurrences.t;
-          (** The free names of the whole compilation unit as output by
-              simplify. *)
-      closure_function_decls :
-        Function_declarations.code_id_in_function_declaration
-        Code_id_or_name.Map.t;
-      code_info : code_info Code_id.Map.t
-          (** Info for every code ID appearing in [closure_function_decls]. *)
-    }
-
-  val create :
-    free_names:Name_occurrences.t ->
-    closure_function_decls:
-      Function_declarations.code_id_in_function_declaration
-      Code_id_or_name.Map.t ->
-    code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-    t
-
-  val ids_for_export : t -> Ids_for_export.t
-
-  val apply_renaming : t -> Renaming.t -> t
-end
-
-(** Compute the slot offsets of the sets of closures that will be built after
-    rewriting. This runs at solve time. [code_changes] supplies solved calling
-    convention changes and metadata, determining whether a function slot may be
-    partially applied and its size. Solved metadata is preferred over the
-    traversal-time info in [inputs]. *)
-val compute :
-  inputs:Inputs.t ->
-  analysis_scope:Analysis_scope.t ->
-  code_changes:Unboxing_analysis.code_changes ->
-  Unboxing_analysis.result ->
-  Slot_offsets.result
+(** Capture the current values of all stamp counters for serialisation. *)
+val save : unit -> t

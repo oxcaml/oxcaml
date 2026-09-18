@@ -43,6 +43,8 @@ val view : t -> view
 
 (** {1 Constructing fields} *)
 
+val create : view -> t
+
 (** {2 Real fields}
 
     These are fields that "exist at runtime" in the sense that they can be

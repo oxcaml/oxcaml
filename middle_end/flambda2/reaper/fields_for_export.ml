@@ -25,49 +25,23 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The per-compilation-unit inputs to [compute]. They are computed from the
-    traversal results so that the solve-time computation does not need to load
-    .cmx files for external code. *)
-module Inputs : sig
-  (** The code metadata needed when laying out function slots. *)
-  type code_info =
-    { function_slot_size : int;
-      dbg : Debuginfo.t
-    }
+(* CR mvellacott: In the future, would be nice to include fields in
+   [Ids_for_export] machinery rather than handling them separately. *)
 
-  type t =
-    { free_names : Name_occurrences.t;
-          (** The free names of the whole compilation unit as output by
-              simplify. *)
-      closure_function_decls :
-        Function_declarations.code_id_in_function_declaration
-        Code_id_or_name.Map.t;
-      code_info : code_info Code_id.Map.t
-          (** Info for every code ID appearing in [closure_function_decls]. *)
-    }
+type t = (Field.t * Field.view) list
 
-  val create :
-    free_names:Name_occurrences.t ->
-    closure_function_decls:
-      Function_declarations.code_id_in_function_declaration
-      Code_id_or_name.Map.t ->
-    code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-    t
+let export set =
+  Field.Set.fold (fun field views -> (field, Field.view field) :: views) set []
 
-  val ids_for_export : t -> Ids_for_export.t
-
-  val apply_renaming : t -> Renaming.t -> t
-end
-
-(** Compute the slot offsets of the sets of closures that will be built after
-    rewriting. This runs at solve time. [code_changes] supplies solved calling
-    convention changes and metadata, determining whether a function slot may be
-    partially applied and its size. Solved metadata is preferred over the
-    traversal-time info in [inputs]. *)
-val compute :
-  inputs:Inputs.t ->
-  analysis_scope:Analysis_scope.t ->
-  code_changes:Unboxing_analysis.code_changes ->
-  Unboxing_analysis.result ->
-  Slot_offsets.result
+let import t =
+  let map =
+    List.fold_left
+      (fun map (field, view) -> Field.Map.add field (Field.create view) map)
+      Field.Map.empty t
+  in
+  fun field ->
+    match Field.Map.find_opt field map with
+    | Some field -> field
+    | None ->
+      Misc.fatal_errorf "Field %a has no view stored in the serialised data"
+        Field.print field

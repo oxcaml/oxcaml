@@ -33,6 +33,98 @@ module Staged = struct
         all_sets_of_closures :
           (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
       }
+
+    let ids_for_export
+        { deps;
+          slot_offsets_inputs;
+          code_deps;
+          code_references;
+          le_monde_exterieur;
+          applications;
+          all_sets_of_closures
+        } =
+      let ids =
+        Code_id.Map.fold
+          (fun code_id code_dep ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Traverse_acc.ids_for_export_code_dep code_dep))
+          code_deps Ids_for_export.empty
+      in
+      let ids =
+        List.fold_left
+          (fun ids set_of_closures ->
+            Function_slot.Lmap.fold
+              (fun _function_slot (name, code_id) ids ->
+                let ids = Ids_for_export.add_name ids name in
+                match (code_id : _ Or_unknown.t) with
+                | Unknown -> ids
+                | Known code_id -> Ids_for_export.add_code_id ids code_id)
+              set_of_closures ids)
+          ids all_sets_of_closures
+      in
+      Ids_for_export.union_list
+        [ Ids_for_export.add_symbol ids le_monde_exterieur;
+          Global_flow_graph.ids_for_export deps;
+          Slot_offsets_analysis.Inputs.ids_for_export slot_offsets_inputs;
+          Traverse_acc.ids_for_export_code_references code_references;
+          Rebuild_queries.Applications.ids_for_export applications ]
+
+    let prune_for_lto t =
+      { t with
+        code_deps =
+          Code_id.Map.map
+            (fun (code_dep : Traverse_acc.code_dep) ->
+              { code_dep with
+                code_metadata =
+                  Code_metadata.with_result_types Unknown code_dep.code_metadata
+              })
+            t.code_deps;
+        all_sets_of_closures = []
+      }
+
+    let fields_for_export t = Global_flow_graph.fields_for_export t.deps
+
+    let referenced_compilation_units t =
+      Traverse_acc.code_references_compilation_units t.code_references
+
+    let apply_renaming
+        { deps;
+          slot_offsets_inputs;
+          code_deps;
+          code_references;
+          le_monde_exterieur;
+          applications;
+          all_sets_of_closures
+        } renaming ~rename_field =
+      let code_deps =
+        Code_id.Map.fold
+          (fun code_id code_dep map ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Traverse_acc.apply_renaming_code_dep code_dep renaming)
+              map)
+          code_deps Code_id.Map.empty
+      in
+      let all_sets_of_closures =
+        List.map
+          (Function_slot.Lmap.map (fun (name, code_id) ->
+               ( Renaming.apply_name renaming name,
+                 Or_unknown.map code_id ~f:(Renaming.apply_code_id renaming) )))
+          all_sets_of_closures
+      in
+      { deps = Global_flow_graph.apply_renaming deps renaming ~rename_field;
+        slot_offsets_inputs =
+          Slot_offsets_analysis.Inputs.apply_renaming slot_offsets_inputs
+            renaming;
+        code_deps;
+        code_references =
+          Traverse_acc.apply_renaming_code_references code_references renaming;
+        le_monde_exterieur = Renaming.apply_symbol renaming le_monde_exterieur;
+        applications =
+          Rebuild_queries.Applications.apply_renaming applications renaming;
+        all_sets_of_closures
+      }
   end
 
   module Rebuild_inputs = struct
@@ -42,6 +134,81 @@ module Staged = struct
         ordered_code_ids : Code_id.t array;
         fixed_arity_continuations : Continuation.Set.t;
         continuation_info : Traverse_acc.continuation_info Continuation.Map.t
+      }
+
+    let ids_for_export
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          fixed_arity_continuations;
+          continuation_info
+        } =
+      let ids = Rev_expr.ids_for_export toplevel_expr in
+      let ids =
+        Code_id.Map.fold
+          (fun code_id rev_code ids ->
+            Ids_for_export.union
+              (Ids_for_export.add_code_id ids code_id)
+              (Rev_expr.ids_for_export_code rev_code))
+          code ids
+      in
+      let ids =
+        Array.fold_left Ids_for_export.add_code_id ids ordered_code_ids
+      in
+      let ids =
+        Continuation.Set.fold
+          (fun cont ids -> Ids_for_export.add_continuation ids cont)
+          fixed_arity_continuations ids
+      in
+      Continuation.Map.fold
+        (fun cont info ids ->
+          Ids_for_export.union
+            (Ids_for_export.add_continuation ids cont)
+            (Traverse_acc.ids_for_export_continuation_info info))
+        continuation_info ids
+
+    let apply_renaming
+        { toplevel_expr;
+          code;
+          ordered_code_ids;
+          fixed_arity_continuations;
+          continuation_info
+        } renaming =
+      let toplevel_expr' = Rev_expr.apply_renaming toplevel_expr renaming in
+      let code' =
+        Code_id.Map.fold
+          (fun code_id rev_code code ->
+            Code_id.Map.add
+              (Renaming.apply_code_id renaming code_id)
+              (Rev_expr.apply_renaming_code rev_code renaming)
+              code)
+          code Code_id.Map.empty
+      in
+      let ordered_code_ids' =
+        Array.map (Renaming.apply_code_id renaming) ordered_code_ids
+      in
+      let fixed_arity_continuations' =
+        Continuation.Set.fold
+          (fun cont conts ->
+            Continuation.Set.add
+              (Renaming.apply_continuation renaming cont)
+              conts)
+          fixed_arity_continuations Continuation.Set.empty
+      in
+      let continuation_info' =
+        Continuation.Map.fold
+          (fun cont info map ->
+            Continuation.Map.add
+              (Renaming.apply_continuation renaming cont)
+              (Traverse_acc.apply_renaming_continuation_info info renaming)
+              map)
+          continuation_info Continuation.Map.empty
+      in
+      { toplevel_expr = toplevel_expr';
+        code = code';
+        ordered_code_ids = ordered_code_ids';
+        fixed_arity_continuations = fixed_arity_continuations';
+        continuation_info = continuation_info'
       }
   end
 
@@ -133,7 +300,7 @@ module Staged = struct
     let queries = Rebuild_queries.create solved_dep.db ~applications in
     Solution.{ solved_dep; code_changes; queries; slot_offsets }
 
-  let rebuild ~unit ~rebuild_inputs ~(solution : Rebuild_solution.t)
+  let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)
       ~types_rewrite_context ~code_deps ~final_typing_env ~machine_width
       ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
@@ -161,10 +328,12 @@ module Staged = struct
     let final_typing_env =
       Option.map
         (Types_rewriter.rewrite_typing_env types_rewrite_context
-           ~unit_symbol:(Flambda_unit.module_symbol unit))
+           ~unit_symbol:(Flambda_unit.Metadata.module_symbol unit_metadata))
         final_typing_env
     in
-    Flambda_unit.with_body unit body, all_code, final_typing_env
+    ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
+      all_code,
+      final_typing_env )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
@@ -185,7 +354,9 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
       ~unboxing:solved_dep ~code_changes
   in
   let flambda, all_code, final_typing_env =
-    Staged.rebuild ~unit ~rebuild_inputs ~solution ~types_rewrite_context
+    Staged.rebuild
+      ~unit_metadata:(Flambda_unit.metadata unit)
+      ~rebuild_inputs ~solution ~types_rewrite_context
       ~code_deps:solve_inputs.Staged.Solve_inputs.code_deps ~final_typing_env
       ~machine_width ~cmx_loader ~all_code
   in

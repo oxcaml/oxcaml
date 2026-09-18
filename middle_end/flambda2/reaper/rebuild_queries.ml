@@ -28,6 +28,19 @@
 open! Flambda.Import
 module PTA = Points_to_analysis
 
+let add_keys map ids =
+  Code_id_or_name.Map.fold
+    (fun id _ ids -> Ids_for_export.add_code_id_or_name ids id)
+    map ids
+
+let rename_map map renaming ~f =
+  Code_id_or_name.Map.fold
+    (fun id value map ->
+      Code_id_or_name.Map.add
+        (Renaming.apply_code_id_or_name renaming id)
+        (f value) map)
+    map Code_id_or_name.Map.empty
+
 module Applications = struct
   type bounds =
     { known : int option;
@@ -80,6 +93,11 @@ module Applications = struct
 
   let union a b =
     Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
+
+  let ids_for_export t = add_keys t Ids_for_export.empty
+
+  let apply_renaming t renaming =
+    rename_map t renaming ~f:(fun bounds -> bounds)
 end
 
 (* We use unit maps instead of sets, because it allows reuse of the tables

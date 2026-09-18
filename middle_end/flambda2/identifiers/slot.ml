@@ -43,6 +43,8 @@ module type S = sig
   val is_always_immediate : t -> bool
 
   val rename : t -> t
+
+  val export_stamp_counter : unit -> int
 end
 
 module Make (P : sig
@@ -113,6 +115,8 @@ end) : S = struct
     let stamp = !next_stamp in
     incr next_stamp;
     stamp
+
+  let export_stamp_counter () = !next_stamp
 
   let create compilation_unit ~name ~is_always_immediate kind =
     { compilation_unit;

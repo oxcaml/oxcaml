@@ -47,6 +47,10 @@ module Applications : sig
       maximum known-arity width and pointwise maxima of unknown-arity group
       widths, retaining the longer tail. *)
   val union : t -> t -> t
+
+  val ids_for_export : t -> Ids_for_export.t
+
+  val apply_renaming : t -> Renaming.t -> t
 end
 
 type t

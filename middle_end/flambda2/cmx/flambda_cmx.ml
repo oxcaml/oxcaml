@@ -179,8 +179,9 @@ let compute_reachable_names_and_code ~module_symbol ~free_names_of_name code =
   in
   fixpoint init_names Name_occurrences.empty
 
-let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-    ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code =
+let prepare_cmx ?(extra_ids_for_lto = Ids_for_export.empty) ~module_symbol
+    create_typing_env ~free_names_of_name ~used_value_slots ~canonicalise
+    ~exported_offsets ~sections all_code =
   let reachable_names =
     compute_reachable_names_and_code ~module_symbol ~free_names_of_name all_code
   in
@@ -223,12 +224,12 @@ let prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
   in
   let cmx =
     Flambda_cmx_format.create_raw ~final_typing_env ~all_code ~exported_offsets
-      ~used_value_slots ~sections
+      ~used_value_slots ~extra_ids_for_lto ~sections
   in
   reachable_names, Some cmx
 
-let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
-    ~exported_offsets ~sections all_code =
+let prepare_cmx_file_contents ?extra_ids_for_lto ~final_typing_env
+    ~module_symbol ~used_value_slots ~exported_offsets ~sections all_code =
   if Flambda_features.opaque ()
   then Name_occurrences.singleton_symbol module_symbol Name_mode.normal, None
   else
@@ -247,8 +248,9 @@ let prepare_cmx_file_contents ~final_typing_env ~module_symbol ~used_value_slots
         in
         create_typing_env, free_names_of_name, canonicalise
     in
-    prepare_cmx ~module_symbol create_typing_env ~free_names_of_name
-      ~used_value_slots ~canonicalise ~exported_offsets ~sections all_code
+    prepare_cmx ?extra_ids_for_lto ~module_symbol create_typing_env
+      ~free_names_of_name ~used_value_slots ~canonicalise ~exported_offsets
+      ~sections all_code
 
 let prepare_cmx_from_approx ~machine_width ~approxs ~module_symbol
     ~exported_offsets ~used_value_slots ~sections all_code =

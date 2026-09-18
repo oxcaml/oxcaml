@@ -25,49 +25,20 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** The per-compilation-unit inputs to [compute]. They are computed from the
-    traversal results so that the solve-time computation does not need to load
-    .cmx files for external code. *)
-module Inputs : sig
-  (** The code metadata needed when laying out function slots. *)
-  type code_info =
-    { function_slot_size : int;
-      dbg : Debuginfo.t
-    }
+type t =
+  { variables : int;
+    code_ids : int;
+    continuations : int;
+    function_slots : int;
+    value_slots : int;
+    symbols : int
+  }
 
-  type t =
-    { free_names : Name_occurrences.t;
-          (** The free names of the whole compilation unit as output by
-              simplify. *)
-      closure_function_decls :
-        Function_declarations.code_id_in_function_declaration
-        Code_id_or_name.Map.t;
-      code_info : code_info Code_id.Map.t
-          (** Info for every code ID appearing in [closure_function_decls]. *)
-    }
-
-  val create :
-    free_names:Name_occurrences.t ->
-    closure_function_decls:
-      Function_declarations.code_id_in_function_declaration
-      Code_id_or_name.Map.t ->
-    code_deps:Traverse_acc.code_dep Code_id.Map.t ->
-    get_code_metadata:(Code_id.t -> Code_metadata.t) ->
-    t
-
-  val ids_for_export : t -> Ids_for_export.t
-
-  val apply_renaming : t -> Renaming.t -> t
-end
-
-(** Compute the slot offsets of the sets of closures that will be built after
-    rewriting. This runs at solve time. [code_changes] supplies solved calling
-    convention changes and metadata, determining whether a function slot may be
-    partially applied and its size. Solved metadata is preferred over the
-    traversal-time info in [inputs]. *)
-val compute :
-  inputs:Inputs.t ->
-  analysis_scope:Analysis_scope.t ->
-  code_changes:Unboxing_analysis.code_changes ->
-  Unboxing_analysis.result ->
-  Slot_offsets.result
+let save () =
+  { variables = Variable.export_name_stamp_counter ();
+    code_ids = Code_id.export_name_stamp_counter ();
+    continuations = Continuation.export_stamp_counter ();
+    function_slots = Function_slot.export_stamp_counter ();
+    value_slots = Value_slot.export_stamp_counter ();
+    symbols = Symbol.export_manufacture_counter ()
+  }

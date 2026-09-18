@@ -569,3 +569,105 @@ let sort_code_ids t =
 let get_all_sets_of_closures t = t.all_sets_of_closures
 
 let get_closure_function_decls t = t.closure_function_decls
+
+let fold_code_reference_ids reference ~init ~f =
+  match reference with
+  | Closure { closure; code_id } ->
+    f (f init closure) (Code_id_or_name.code_id code_id)
+  | Direct_call { call; code_id; closure; caller } ->
+    let acc = f (f init call) (Code_id_or_name.code_id code_id) in
+    let acc = Option.fold ~none:acc ~some:(f acc) closure in
+    Option.fold ~none:acc
+      ~some:(fun code_id -> f acc (Code_id_or_name.code_id code_id))
+      caller
+
+let rename_code_reference renaming = function
+  | Closure { closure; code_id } ->
+    Closure
+      { closure = Renaming.apply_code_id_or_name renaming closure;
+        code_id = Renaming.apply_code_id renaming code_id
+      }
+  | Direct_call { call; code_id; closure; caller } ->
+    Direct_call
+      { call = Renaming.apply_code_id_or_name renaming call;
+        code_id = Renaming.apply_code_id renaming code_id;
+        closure = Option.map (Renaming.apply_code_id_or_name renaming) closure;
+        caller = Option.map (Renaming.apply_code_id renaming) caller
+      }
+
+let ids_for_export_code_references references =
+  List.fold_left
+    (fun ids reference ->
+      fold_code_reference_ids reference ~init:ids ~f:(fun ids id ->
+          Code_id_or_name.pattern_match' id
+            ~code_id:(Ids_for_export.add_code_id ids)
+            ~name:(Ids_for_export.add_name ids)))
+    Ids_for_export.empty references
+
+let code_references_compilation_units references =
+  List.fold_left
+    (fun units reference ->
+      fold_code_reference_ids reference ~init:units ~f:(fun units id ->
+          Compilation_unit.Set.add (Code_id_or_name.compilation_unit id) units))
+    Compilation_unit.Set.empty references
+
+let apply_renaming_code_references references renaming =
+  List.map (rename_code_reference renaming) references
+
+let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
+  Ids_for_export.create ~variables:(Variable.Set.of_list params) ()
+
+let ids_for_export_code_dep
+    { arity = _;
+      code_metadata;
+      params;
+      my_closure;
+      return;
+      exn;
+      is_tupled = _;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } =
+  let variables =
+    Variable.Set.of_list (List.concat [params; return; [my_closure; exn]])
+  in
+  let ids = Ids_for_export.create ~variables () in
+  let ids =
+    Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+  in
+  let ids = Ids_for_export.add_code_id_or_name ids known_arity_call_witness in
+  List.fold_left Ids_for_export.add_code_id_or_name ids
+    unknown_arity_call_witnesses
+
+let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
+    =
+  { is_exn_handler;
+    params = List.map (Renaming.apply_variable renaming) params;
+    arity
+  }
+
+let apply_renaming_code_dep
+    { arity;
+      code_metadata;
+      params;
+      my_closure;
+      return;
+      exn;
+      is_tupled;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } renaming =
+  { arity;
+    code_metadata = Code_metadata.apply_renaming code_metadata renaming;
+    params = List.map (Renaming.apply_variable renaming) params;
+    my_closure = Renaming.apply_variable renaming my_closure;
+    return = List.map (Renaming.apply_variable renaming) return;
+    exn = Renaming.apply_variable renaming exn;
+    is_tupled;
+    known_arity_call_witness =
+      Renaming.apply_code_id_or_name renaming known_arity_call_witness;
+    unknown_arity_call_witnesses =
+      List.map
+        (Renaming.apply_code_id_or_name renaming)
+        unknown_arity_call_witnesses
+  }

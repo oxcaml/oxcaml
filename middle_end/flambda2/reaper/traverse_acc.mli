@@ -65,6 +65,14 @@ type code_reference =
             (** The code containing the application, if any. *)
       }
 
+val ids_for_export_code_references : code_reference list -> Ids_for_export.t
+
+val code_references_compilation_units :
+  code_reference list -> Compilation_unit.Set.t
+
+val apply_renaming_code_references :
+  code_reference list -> Renaming.t -> code_reference list
+
 (** A record of a direct function application, to be resolved into graph edges
     once all code has been traversed. *)
 type apply_dep =
@@ -293,3 +301,12 @@ val add_closure_function_decl :
 val get_closure_function_decls :
   t ->
   Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t
+
+val ids_for_export_continuation_info : continuation_info -> Ids_for_export.t
+
+val ids_for_export_code_dep : code_dep -> Ids_for_export.t
+
+val apply_renaming_continuation_info :
+  continuation_info -> Renaming.t -> continuation_info
+
+val apply_renaming_code_dep : code_dep -> Renaming.t -> code_dep
