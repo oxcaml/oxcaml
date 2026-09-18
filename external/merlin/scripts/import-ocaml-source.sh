@@ -53,10 +53,11 @@ function merlin-target () {
     # Merlin moves the modules it depends on from this directory into `typing/`
     # (as of the time of writing, that's `Cmi_format` and `Cmt_format`)
     file_formats/*) echo "${base/#file_formats/typing}";;
+    lambda/*) echo "${base/#lambda/typing}";;
 
     # We can't have these modules in `utils/`, it breaks Merlin's dependency
     # structure
-    utils/compilation_unit.ml*|utils/import_info.ml*)
+    utils/compilation_unit.ml*|utils/import_info.ml*|utils/structured_mangling.ml*)
       echo "${base/#utils/typing}";;
 
     # We can't have this module in `parsing/`, it breaks Merlin's dependency
@@ -110,8 +111,7 @@ else
 fi
 new_files=()
 cd upstream/ocaml_flambda
-dirs=(*/)
-dirs=("${dirs[@]%/}")
+dirs=(file_formats lambda parsing typing utils)
 if [[ "$subdirectory" = "." ]]; then
   fetch_prefix=""
 else
@@ -135,6 +135,7 @@ for file in $upstream_files; do
     case "$answer" in
       y|Y|"")
         echo "Importing $file"
+        mkdir -p "$(dirname "$file")"
         git show "$rev:$fetch_prefix$file" > "$file"
         new_files+=("$file")
         ;;

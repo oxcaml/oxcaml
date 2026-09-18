@@ -26,7 +26,7 @@ type ('a : value_or_null) node =
 
 and ('a : value_or_null) t = unit -> 'a node
 
-let empty () = Nil
+let (empty @ noalloc_strict) () = Nil
 
 let return x () = Cons (x, empty)
 

@@ -123,7 +123,9 @@ let new_mode_var_from_annots (m : With_locality.Const.Option.t) =
     (max |> With_locality.of_const |> with_locality_as_regionality);
   mode
 
-let register_allocation loc : With_locality.lr * With_regionality.lr =
+let register_allocation ~env ~loc ~desc
+    : With_locality.lr * With_regionality.lr =
+  Typeallocation.register_mod_allocation ~env ~loc ~desc;
   let upper_bound =
     With_locality.of_const
       ~hint_comonadic:Module_allocated_on_heap
@@ -2260,6 +2262,7 @@ and transl_signature ?(interface_toplevel = false) env
           extract_sig_functor_open false env smty.pmty_loc mty sig_acc md_mode
             ~funct_mode
         in
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable
         in
@@ -2883,11 +2886,11 @@ let check_nongen_signature_item ~zap_scope env sig_item =
   | _ -> ()
 
 let check_nongen_signature env sg =
-  Mode.With_locality.with_zap_scope (fun ~zap_scope ->
+  Typeallocation.with_zap_scope (fun ~zap_scope ->
       List.iter (check_nongen_signature_item ~zap_scope env) sg)
 
 let remove_mode_and_jkind_variables env sg =
-  Mode.With_locality.with_zap_scope(fun ~zap_scope ->
+  Typeallocation.with_zap_scope(fun ~zap_scope ->
     let rm_ty _env ty =
       Ctype.remove_mode_and_jkind_variables
         ty ~zap_scope;
@@ -3272,7 +3275,7 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let mode_with_locality, closed_over_mode =
-        register_allocation sbody.pmod_loc
+        register_allocation ~env ~loc:sbody.pmod_loc ~desc:Functor
       in
       let newenv =
         Env.add_closure_lock
@@ -3812,7 +3815,7 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
 and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
   let names = Signature_names.create () in
   let loc_md = location_of_structure sstr in
-  let _, md_mode = register_allocation loc_md in
+  let _, md_mode = register_allocation ~env ~loc:loc_md ~desc:Structure in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -4301,7 +4304,7 @@ let remove_mode_and_jkind_variables_for_toplevel str =
                          vb_expr = exp}])) }] ->
      (* These types are printed by the toplevel,
         even though they do not appear in sg *)
-     Mode.With_locality.with_zap_scope
+     Typeallocation.with_zap_scope
        (fun ~zap_scope ->
           Ctype.remove_mode_and_jkind_variables ~zap_scope exp.exp_type)
   | _ -> ()
@@ -4309,13 +4312,14 @@ let remove_mode_and_jkind_variables_for_toplevel str =
 let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
-  Typecore.reset_allocations ();
+  Typeallocation.reset_allocations ();
   let (str, sg, mode, to_remove_from_sg, shape, env) =
     type_structure ~toplevel:(Some sig_acc) ~funct_body:false None env s in
   With_regionality.submode_err (Location.none, Structure) mode toplevel_mode;
+  Typeallocation.constrain_allocations ();
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
-  Typecore.optimise_allocations ();
+  Typeallocation.optimise_allocations ();
   (str, sg, to_remove_from_sg, shape, env)
 
 let type_module_alias env smod =
@@ -4370,10 +4374,12 @@ let type_module_type_of env smod =
         me, false
   in
   let mty = Mtype.scrape_for_type_of ~remove_aliases env tmty.mod_type in
+  Typeallocation.constrain_allocations ();
   (* PR#5036: must not contain non-generalized type variables *)
   if not skip_nongen_check then
-    Mode.With_locality.with_zap_scope (fun ~zap_scope ->
-       check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
+    Typeallocation.with_zap_scope (fun ~zap_scope ->
+      check_nongen_modtype ~zap_scope env smod.pmod_loc mty);
+  Typeallocation.constrain_closures ();
   let zap_modality = Ctype.zap_modalities_to_floor_if_modes_enabled_at Stable in
   let mty =
     remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty
@@ -4487,7 +4493,7 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-  let _, mode = register_allocation modl.mod_loc in
+  let _, mode = register_allocation ~env ~loc:modl.mod_loc ~desc:Module in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
@@ -4625,7 +4631,7 @@ let type_implementation target modulename initial_env ast =
   Cmt_format.clear ();
   Misc.try_finally (fun () ->
       Typecore.reset_delayed_checks ();
-      Typecore.reset_allocations ();
+      Typeallocation.reset_allocations ();
       Env.reset_required_globals ();
       Env.reset_probes ();
       if !Clflags.print_types then (* #7656 *)
@@ -4643,7 +4649,9 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
+        Typeallocation.constrain_allocations ();
         remove_mode_and_jkind_variables finalenv sg;
+        Typeallocation.constrain_closures ();
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
         in
@@ -4655,7 +4663,7 @@ let type_implementation target modulename initial_env ast =
         in
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
-        Typecore.optimise_allocations ();
+        Typeallocation.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
           Format.(fun () -> fprintf std_formatter "%a@."
@@ -4713,9 +4721,10 @@ let type_implementation target modulename initial_env ast =
             error (Inconsistent_argument_types
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
+          Typeallocation.constrain_allocations ();
           let coercion, shape =
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit
+              Includemod.compunit ~self_check:false
                 initial_env ~mark:true sourcefile
                 ~modes:(Includecore.Specific
                   ((mode, None),
@@ -4737,7 +4746,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
@@ -4765,10 +4774,12 @@ let type_implementation target modulename initial_env ast =
               Includecore.Specific ((mode, None), mode)
             in
             Profile.record_call "check_sig" (fun () ->
-              Includemod.compunit initial_env ~mark:true sourcefile ~modes
-                sg "(inferred signature)" simple_sg shape)
+              Includemod.compunit ~self_check:true initial_env ~mark:true
+                sourcefile ~modes sg "(inferred signature)" simple_sg shape)
           in
+          Typeallocation.constrain_allocations ();
           check_nongen_signature finalenv simple_sg;
+          Typeallocation.constrain_closures ();
           let zap_modality =
             (* Generating [cmi] without [mli]. This [cmi] could be on the RHS of
                inclusion check, so we zap to identity if mode extension is
@@ -4786,7 +4797,7 @@ let type_implementation target modulename initial_env ast =
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
-          Typecore.optimise_allocations ();
+          Typeallocation.optimise_allocations ();
           (* See comment above. Here the target signature contains all
              the values being exported. We can still capture unused
              declarations like "let x = true;; let x = 1;;", because in this
@@ -5019,7 +5030,7 @@ let functorize_implementation initial_env ~params ~modules ~module_sigs
               ((Persistent_env.mode_pers_mod Staticity.Dynamic, None),
                Persistent_env.mode_pers_mod staticity)
           in
-          Includemod.compunit initial_env ~mark:true
+          Includemod.compunit ~self_check:false initial_env ~mark:true
             "(obtained by functorizing)" ~modes sg cmi_file dclsig shape
         in
         save_cmt_cms None;
@@ -5123,7 +5134,7 @@ let package_units initial_env objfiles target_cmi modulename =
         let mode = Persistent_env.mode_pers_mod Dynamic in
         Includecore.Specific ((mode, None), mode)
       in
-      Includemod.compunit initial_env ~mark:true
+      Includemod.compunit ~self_check:false initial_env ~mark:true
         "(obtained by packing)" ~modes sg mli dclsig shape
     in
     let decl_deps =
