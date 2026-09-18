@@ -11,8 +11,6 @@ open Bigarray
 
 type bigstring = (char, int8_unsigned_elt, c_layout) Array1.t
 
-external is_stack : ('a, 'b, 'c) Array1.t @ local -> bool
-  = "caml_ba_is_stack" [@@noalloc]
 external has_finalizer : ('a, 'b, 'c) Array1.t @ local -> bool
   = "local_bigstring_has_finalizer" [@@noalloc]
 external owns_data : bigstring @ local -> bool
@@ -25,7 +23,7 @@ external marshal : 'a @ local -> Marshal.extern_flags list -> string
 let round_trip (v : 'a @ local) : 'a = Marshal.from_string (marshal v []) 0
 
 let check_owned a =
-  assert (not (is_stack a) && owns_data a && has_finalizer a)
+  assert (not (Array1.is_stack a) && owns_data a && has_finalizer a)
 
 let raises_invalid (f : (unit -> unit) @ local once) =
   match f () with

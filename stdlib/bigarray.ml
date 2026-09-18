@@ -282,6 +282,11 @@ module Array1 = struct
       (('a, 'b, 'c) t[@local_opt]) @ immutable -> 'c layout @@ stateless
     = "caml_ba_layout"
 
+  external is_stack
+    : ('a : any) ('b : any) ('c : any).
+      (('a, 'b, 'c) t[@local_opt]) @ immutable -> bool @@ stateless
+    = "caml_ba_is_stack" [@@noalloc]
+
   external change_layout
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])
