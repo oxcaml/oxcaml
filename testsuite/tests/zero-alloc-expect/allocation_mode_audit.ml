@@ -92,6 +92,26 @@ module Nonallocating_patterns :
   end @@ portable noalloc_strict
 |}]
 
+module Primitive_representations = struct
+  external exp_local : float @ local -> float @ local =
+    "caml_exp_float" "exp" [@@unboxed] [@@noalloc]
+  let (local_result @ noalloc_strict) x = exclave_ exp_local x
+  external exp_unboxed : float# -> float# =
+    "caml_exp_float" "exp" [@@noalloc]
+  let (unboxed_result @ noalloc_strict) x = exp_unboxed x
+end
+[%%expect{|
+module Primitive_representations :
+  sig
+    external exp_local : float @ local -> float @ local = "caml_exp_float"
+      "exp" [@@unboxed] [@@noalloc]
+    val local_result : float -> float @ local @@ noalloc_strict
+    external exp_unboxed : float# -> float# = "caml_exp_float" "exp"
+      [@@noalloc]
+    val unboxed_result : float# -> float# @@ noalloc_strict
+  end
+|}]
+
 module Layout_inference = struct
   let unboxed () =
     let get = function [| x |] -> x | _ -> assert false in
