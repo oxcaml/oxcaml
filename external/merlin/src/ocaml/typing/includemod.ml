@@ -31,8 +31,8 @@ type pos =
 type modes = Includecore.mmodes =
   | All
   | Specific:
-      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
-      ('l * Mode.allowed) Mode.Value.t ->
+      Mode.((allowed * 'r) With_regionality.t * Typedtree.held_locks option) *
+      Mode.(('l * allowed) With_regionality.t) ->
       modes
 
 module Error = struct
@@ -62,7 +62,7 @@ module Error = struct
 
   type class_declaration_symptom =
     | Class_type of Ctype.class_match_failure list
-    | Class_mode of Mode.Value.error
+    | Class_mode of Mode.With_regionality.error
 
   type core_sigitem_symptom =
     | Value_descriptions of
@@ -91,7 +91,7 @@ module Error = struct
     | Functor of functor_symptom
     | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
-    | Mode of Mode.Value.error
+    | Mode of Mode.With_regionality.error
 
 
   and module_type_diff = (module_type, module_type_symptom) mdiff
@@ -257,13 +257,14 @@ module Core_inclusion = struct
 
   (* Inclusion between value descriptions *)
 
-  let value_descriptions ~loc env ~direction subst id ~mmodes vd1 vd2 =
+  let value_descriptions ~self_check ~loc env ~direction subst id ~mmodes vd1
+      vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
     let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            vd1 vd2)
+            ~self_check vd1 vd2)
     with Includecore.Dont_match err ->
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
@@ -760,8 +761,8 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             var, Shape.app orig_shape ~arg:shape_var
       in
       let cc_res : (_, _ Error.mdiff) result =
-        let mres1 = Mode.alloc_as_value mres1 in
-        let mres2 = Mode.alloc_as_value mres2 in
+        let mres1 = Mode.with_locality_as_regionality mres1 in
+        let mres2 = Mode.with_locality_as_regionality mres2 in
         modtypes ~core ~direction ~loc env subst res1 res2 res_shape
           ~modes:(Specific ((mres1, None), mres2))
       in
@@ -784,14 +785,16 @@ and try_modtypes ~core ~direction ~loc env subst ~modes
             let param_yielding =
               match (param2 : Subst.Lazy.functor_parameter) with
               | Named (_, _, mm) ->
-                [Yielding.disallow_right (Alloc.proj_comonadic Yielding mm)]
+                [Yielding.disallow_right
+                   (With_locality.proj_comonadic Yielding mm)]
               | Unit -> []
             in
             let funct_yielding =
               match modes with
               | All -> Yielding.disallow_right Yielding.max
               | Specific ((m, _locks), _) ->
-                Yielding.disallow_right (Value.proj_comonadic Yielding m)
+                Yielding.disallow_right
+                  (With_regionality.proj_comonadic Yielding m)
             in
             Ctype.create_yielding_mode_l
               (Yielding.join (funct_yielding :: param_yielding))
@@ -869,8 +872,8 @@ and functor_param ~core ~direction ~loc env subst param1 param2 =
       Ok Tcoerce_none, env, subst
   | Named (name1, arg1, marg1), Named (name2, arg2, marg2) ->
       let arg2' = Subst.Lazy.modtype Keep subst arg2 in
-      let marg1 = Mode.alloc_as_value marg1 in
-      let marg2 = Mode.alloc_as_value marg2 in
+      let marg1 = Mode.with_locality_as_regionality marg1 in
+      let marg2 = Mode.with_locality_as_regionality marg2 in
       let cc_arg =
         match
           modtypes ~core ~direction ~loc env Subst.identity arg2' arg1
@@ -1256,14 +1259,18 @@ let can_alias env path =
   in
   no_apply path && not (Env.is_functor_arg path env)
 
-let core_inclusion = Core_inclusion.{
+let make_core_inclusion ~self_check = Core_inclusion.{
   type_declarations;
-  value_descriptions;
+  value_descriptions = value_descriptions ~self_check;
   extension_constructors;
   class_type_declarations;
   class_declarations;
   jkind_declarations;
 }
+
+let core_inclusion = make_core_inclusion ~self_check:false
+
+let core_inclusion_self_check = make_core_inclusion ~self_check:true
 
 let core_consistency =
   let type_declarations ~loc:_ env ~direction:_ _ _ ~mmodes:_ d1 d2 =
@@ -1589,7 +1596,7 @@ module Functor_app_diff = struct
                 Result.Error (Error.Incompatible_params(arg,param))
             | ( Anonymous | Named _ | Empty_struct ),
               Named (_, param, param_m) ->
-               let param_m = Mode.alloc_as_value param_m in
+               let param_m = Mode.with_locality_as_regionality param_m in
                let direction = Directionality.unknown ~mark:false in
                 match
                   modtypes ~core:core_inclusion ~direction ~loc state.env
@@ -1614,11 +1621,13 @@ end
 
 (* Hide the context and substitution parameters to the outside world *)
 
-let modtypes_constraint ~shape ~loc env ~mark ~modes mty1 mty2 =
+let modtypes_constraint ~self_check ~shape ~loc env ~mark ~modes
+    mty1 mty2 =
   (* modtypes with shape is used when typing module expressions in [Typemod] *)
   let direction = Directionality.strictly_positive ~mark ~both:true in
+  let core = if self_check then core_inclusion_self_check else core_inclusion in
   match
-    modtypes ~core:core_inclusion ~direction ~loc env
+    modtypes ~core ~direction ~loc env
       Subst.identity ~modes mty1 mty2 shape
   with
   | Ok (cc, shape) -> cc, shape

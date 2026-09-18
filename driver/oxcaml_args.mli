@@ -158,6 +158,8 @@ module type Oxcaml_options = sig
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
   val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -220,6 +222,7 @@ end
 module type Debugging_options = sig
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit

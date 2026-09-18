@@ -27,13 +27,13 @@ module type Check = module type of struct
   module F (M : S @ static) = struct
     (* Check that [x addressable = x] when [x] is addressable, for different
        instantiations of the layout variable [x] *)
-    let g1 (a : int64#) (b : int64#) = M.f a b
+    let g1 (a : int64_u) (b : int64_u) = M.f a b
 
     let g2 (a : string) (b : string) = M.f a b
 
     let g3 (a : b8a) (b : b8a) = M.f a b
 
-    let g4 (a : int64#) = M.f a a
+    let g4 (a : int64_u) = M.f a a
   end
 end
 [%%expect{|
@@ -42,17 +42,17 @@ module type Check =
     module F :
       functor (M : S @ static) ->
         sig
-          val g1 : int64# -> int64# -> unit
+          val g1 : int64_u -> int64_u -> unit
           val g2 : string -> string -> unit
           val g3 : b8a -> b8a -> unit
-          val g4 : int64# -> unit
+          val g4 : int64_u -> unit
         end
       @@ stateless
   end
 |}]
 
 (* CR layouts: Inference for addressable is incomplete! These tests show that.
-   See [Jkind.Sort.equate_sort_addressable].
+   See the [Addressable] cases in [Sort.equate].
 
    We should make these complete through "fixing the kind system." *)
 
@@ -160,11 +160,15 @@ Error: Signature mismatch:
        is not included in
          val g : layout_ l. ('a : l addressable). 'a -> 'a
        The layout parameter at position 1 in the first
-       is instantiated with an unconstrained layout variable,
+       is instantiated with layout "'_representable_layout_1 addressable",
        which is not supported yet.
 |}]
 
 (* fails *)
+(* CR-someday jbachurski: The error message mentions <genvar> because the ['a]
+   comes from a type scheme with a [poly_], which does not introduce named
+   sort variables using [print_with_genvars].
+   That logic should be fixed anyhow so names appear like written by the user. *)
 module type Inclusion_widening = module type of struct
   module F (M : sig
     val g : layout_ x. ('a : x addressable). 'a -> 'a
@@ -186,9 +190,9 @@ Error: Signature mismatch:
        is not included in
          val poly_ g : 'a -> 'a
        The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The kind of 'a is 's1 addressable
+       The kind of 'a is <genvar> addressable
          because of the definition of g at line 5, characters 4-41.
-       But the kind of 'a must be addressable
+       But the kind of 'a must be a subkind of <genvar> addressable
          because of the definition of g at line 3, characters 4-53.
 |}]
 
@@ -275,4 +279,3 @@ Error: Signature mismatch:
        the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
-

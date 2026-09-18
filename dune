@@ -714,6 +714,7 @@
   regalloc_utils
   regalloc_validate
   ;; file_formats/
+  ir_config_fingerprint
   linear_format
   cfg_format
   ;; backend/ssa/
@@ -737,6 +738,7 @@
   ;; build it as part of that library.
   dwarf
   dwarf_abstract_instances
+  dwarf_base_address_selection
   dwarf_compilation_unit
   dwarf_concrete_instances
   dwarf_inlined_frames

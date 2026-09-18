@@ -37,24 +37,22 @@ module Value : sig
   val uleb128 :
     ?comment:string -> Numbers.Uint64.t -> Dwarf_attributes.Form.udata t
 
+  val sleb128 : ?comment:string -> Int64.t -> Dwarf_attributes.Form.sdata t
+
   val string : ?comment:string -> string -> Dwarf_attributes.Form.string t
 
   val indirect_string :
     ?comment:string -> string -> Dwarf_attributes.Form.strp t
 
+  (** Like the [_32_bit_with_offset(s)] functions below, this emits a
+      32-bit-wide value regardless of the target address size; the assembler
+      checks that the value does not overflow. *)
   val distance_between_symbols_32_bit :
     ?comment:string ->
     upper:Asm_symbol.t ->
     lower:Asm_symbol.t ->
     unit ->
     Dwarf_attributes.Form.data4 t
-
-  val distance_between_symbols_64_bit :
-    ?comment:string ->
-    upper:Asm_symbol.t ->
-    lower:Asm_symbol.t ->
-    unit ->
-    Dwarf_attributes.Form.data8 t
 
   val distance_between_labels_32_bit :
     ?comment:string ->
@@ -70,28 +68,25 @@ module Value : sig
     unit ->
     Dwarf_attributes.Form.data8 t
 
-  val distance_between_labels_64_bit_with_offsets :
+  (** Unlike [distance_between_labels_32_bit] and its relatives above, the
+      following two functions emit 32-bit-wide values regardless of the target
+      address size; the assembler checks that the values do not overflow. *)
+  val distance_between_labels_32_bit_with_offsets :
     ?comment:string ->
     upper:Asm_label.t ->
     upper_offset:Targetint.t ->
     lower:Asm_label.t ->
     lower_offset:Targetint.t ->
     unit ->
-    Dwarf_attributes.Form.data8 t
+    Dwarf_attributes.Form.data4 t
 
-  val distance_between_label_and_symbol_32_bit :
+  val distance_between_label_and_symbol_32_bit_with_offset :
     ?comment:string ->
     upper:Asm_label.t ->
+    offset_upper:Targetint.t ->
     lower:Asm_symbol.t ->
     unit ->
     Dwarf_attributes.Form.data4 t
-
-  val distance_between_label_and_symbol_64_bit :
-    ?comment:string ->
-    upper:Asm_label.t ->
-    lower:Asm_symbol.t ->
-    unit ->
-    Dwarf_attributes.Form.data8 t
 
   val code_address_from_label :
     ?comment:string -> Asm_label.t -> Dwarf_attributes.Form.addr t

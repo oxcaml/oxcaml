@@ -44,7 +44,7 @@ module Error: sig
 
   type class_declaration_symptom =
     | Class_type of Ctype.class_match_failure list
-    | Class_mode of Mode.Value.error
+    | Class_mode of Mode.With_regionality.error
 
   type core_sigitem_symptom =
     | Value_descriptions of
@@ -74,7 +74,7 @@ module Error: sig
     | Functor of functor_symptom
     | Invalid_module_alias of Path.t
     | After_alias_expansion of module_type_diff
-    | Mode of Mode.Value.error
+    | Mode of Mode.With_regionality.error
 
 
   and module_type_diff = (Types.module_type, module_type_symptom) mdiff
@@ -196,6 +196,7 @@ val modtypes_consistency:
     implementation file.
 *)
 val modtypes_constraint:
+  self_check:bool ->
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
   module_type -> module_type -> module_coercion * Shape.t
 

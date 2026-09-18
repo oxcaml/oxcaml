@@ -31,10 +31,8 @@
 
 type result = private
   { body : Flambda.Expr.t;
-    free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t;
-    slot_offsets : Slot_offsets.t
+    code_ids_to_remember : Code_id.Set.t
   }
 
 val rebuild :
@@ -45,6 +43,7 @@ val rebuild :
   fixed_arity_continuations:Continuation.Set.t ->
   final_typing_env:Typing_env.t option ->
   types_rewrite_context:Types_rewriter.rewrite_context ->
+  code_changes:Unboxing_analysis.code_changes ->
   Unboxing_analysis.result ->
   (Code_id.t -> Code_metadata.t) ->
   Rev_expr.t ->

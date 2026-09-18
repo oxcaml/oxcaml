@@ -84,9 +84,8 @@ let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
   let attribute_values =
     [ DAH.create_low_pc_from_symbol start_sym;
       DAH.create_high_pc ~low_pc:start_sym fun_end_label;
-      (* CR mshinwell: Probably no need to set this at the moment since the low
-         PC value should be assumed, which is correct. *)
-      DAH.create_entry_pc_from_symbol start_sym;
+      (* No [DW_AT_entry_pc]: in its absence the low PC value is assumed, which
+         is correct. *)
       DAH.create_stmt_list
         ~debug_line_label:(Asm_label.for_dwarf_section Asm_section.Debug_line);
       DAH.create_abstract_origin ~die_symbol:_abstract_instance_root_symbol ]

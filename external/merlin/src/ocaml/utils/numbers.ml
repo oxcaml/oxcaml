@@ -185,6 +185,15 @@ module Uint64 = struct
 
   let to_int64 t = t
 
+  let to_int64_exn t =
+    if Int64.compare t 0L < 0
+    then
+      Misc.fatal_errorf
+        "Uint64.to_int64_exn: 0x%Lx does not fit in the non-negative range \
+         of a signed 64-bit integer"
+        t;
+    t
+
   include Identifiable.Make (struct
     type nonrec t = t
 
@@ -224,5 +233,17 @@ module Int64 = struct
        || Int64.compare n (Int64.of_int32 Int32.max_int)  > 0
     then Misc.fatal_errorf "Integer %Ld is out of the 32-bit range." n;
     Int64.to_int32 n
+
+  let add_exn n1 n2 =
+    if not (Misc.no_overflow_add_int64 n1 n2)
+    then Misc.fatal_errorf "Addition %Ld + %Ld overflows a signed 64-bit \
+                            integer" n1 n2;
+    Int64.add n1 n2
+
+  let sub_exn n1 n2 =
+    if not (Misc.no_overflow_sub_int64 n1 n2)
+    then Misc.fatal_errorf "Subtraction %Ld - %Ld overflows a signed 64-bit \
+                            integer" n1 n2;
+    Int64.sub n1 n2
 
 end

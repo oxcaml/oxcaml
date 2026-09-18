@@ -47,22 +47,13 @@ module Sort = struct
     univar_pairs := pairs @ old_univars;
     Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
 
-  (* Special sentinel levels stored in [var.level] when [contents = None]:
-     - [level_generic]: a generalized sort variable (genvar), used for layout
-       polymorphism and must be quantified. That is, they can only appear under
-       [instance_map], etc.)
-     - [level_rigid]: a rigid sort variable that cannot be unified.
-     - [level_fresh]: a freshly-created unifiable sort variable whose level has
-       not yet been set; it will be lowered via [update_level] as soon as it is
-       unified with another variable.
-     When [contents = Some t], [level] is meaningless. *)
-  (* CR-soon zqian: Add the invariant that, when [contents = Some v], we have
-    [level >= v.level]. This can improve performance. *)
-  let level_generic = Ident.highest_scope
+  (* Same as [Btype.generic_level]. Like for types, generic variables are
+     treated as flexible, but have special treatment in e.g. [instance]. *)
+  let generic_level = Ident.highest_scope
 
-  let level_rigid = Ident.highest_scope - 1
-
-  let level_fresh = Ident.highest_scope - 2
+  (* Same as [Ctype.subject_level]. Rigid, so if [v.level = subject_level],
+     then [v.contents] is always [None]. *)
+  let subject_level = generic_level - 1
 
   type t =
     | Var of var
@@ -73,17 +64,13 @@ module Sort = struct
 
   and var =
     { mutable contents : t option;
-      mutable level : int;  (** See comments on [level_generic] *)
+      mutable level : int;
       id : int
     }
 
-  let is_rigidvar var =
-    assert (Option.is_none var.contents);
-    var.level = level_rigid
-
   let is_genvar var =
     assert (Option.is_none var.contents);
-    var.level = level_generic
+    var.level = generic_level
 
   let equal_base b1 b2 =
     match b1, b2 with
@@ -127,6 +114,12 @@ module Sort = struct
     | Scannable | Word | Bits64 | Vec128 | Vec256 | Vec512 | Mask -> true
     | Void | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16 | Bits32 ->
       false
+
+  let base_crosses_externality = function
+    | Scannable -> false
+    | Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
+    | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask ->
+      true
 
   (* Global association list mapping poly vars to names for printing *)
   let sort_poly_var_names : (var * string) list ref = ref []
@@ -229,16 +222,6 @@ module Sort = struct
     (* Maintains invariant of no redundant [Addressable] constructors in
        constants *)
     let addressable c = if is_surely_addressable c then c else Addressable c
-
-    let rec maybe_all_void = function
-      | Base Void -> true
-      | Base
-          ( Scannable | Untagged_immediate | Float64 | Float32 | Bits8 | Bits16
-          | Bits32 | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask ) ->
-        false
-      | Univar _ | Genvar _ -> true
-      | Product ts -> List.for_all maybe_all_void ts
-      | Addressable t -> maybe_all_void t
 
     let rec is_concrete = function
       | Base _ -> true
@@ -470,7 +453,8 @@ module Sort = struct
       | None -> fprintf ppf "None"
 
     and var ppf v =
-      fprintf ppf "{@[@ contents = %a;@ id = %d@ @]}" opt_t v.contents v.id
+      fprintf ppf "{@[@ contents = %a;@ level = %d;@ id = %d@ @]}" opt_t
+        v.contents v.level v.id
   end
 
   (* To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
@@ -491,43 +475,37 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
+  let[@inline] set_var_level (v : var) (level : int) =
+    if level < v.level
+    then (
+      log_change (v, Clevel v.level);
+      v.level <- level)
+
   let rec update_level level = function
     | Var v -> update_level_var level v
     | Base _ | Univar _ -> ()
     | Product ts -> List.iter (update_level level) ts
     | Addressable t -> update_level level t
 
-  and update_level_var level u =
-    match u.contents with
-    | Some t -> update_level level t
-    | None ->
-      let new_level = min level u.level in
-      if u.level <> new_level
-      then (
-        log_change (u, Clevel u.level);
-        u.level <- new_level)
+  and update_level_var level = function
+    | { contents = Some t; _ } -> update_level level t
+    | { contents = None } as v -> set_var_level v level
 
-  let[@inline] set_without_level : var -> t option -> unit =
-   fun v t_op ->
-    log_change (v, Ccontents v.contents);
-    v.contents <- t_op
+  let[@inline] set_var_contents (v : var) (contents : t option) =
+    if v.contents != contents
+    then (
+      log_change (v, Ccontents v.contents);
+      v.contents <- contents)
 
-  let[@inline] set : var -> t option -> unit =
-   fun v t_op ->
+  let[@inline] equate_var (v : var) (t : t) =
     assert (Option.is_none v.contents);
-    (* [t_op] is always [Some _]. Takes [option] only for performance. *)
-    let t = Option.get t_op in
-    (* [v.level] is meaningful and should affect all variables in [t]. *)
-    update_level v.level t;
-    (* [v.contents] is set, which renders [v.level] meaningless, so we don't
-       need to update that. *)
-    set_without_level v t_op
-
-  let[@inline] set_to_compress : var -> t option -> unit =
-   fun v t_op ->
-    assert (Option.is_some v.contents);
-    (* [v.contents] is [Some _], hence [v.level] safe to ignore *)
-    set_without_level v t_op
+    (* Variables at [subject_level] are rigid. *)
+    if v.level != subject_level
+    then (
+      update_level v.level t;
+      set_var_contents v (Some t);
+      true)
+    else false
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
@@ -705,22 +683,14 @@ module Sort = struct
     { contents = None; level; id = !last_var_id }
 
   let new_var ~level =
-    (* Guard against accidentally creating a genvar or rigidvar via this path:
-       those require special handling (instance_map registration for genvars;
-       refusal to unify for rigidvars). [level_fresh] is intentionally
-       not guarded here — it behaves like any other unifiable variable and its
-       level is simply lowered by [update_level] upon unification. *)
-    if level >= level_rigid
-    then Misc.fatal_error "Jkind_types.new_var: level >= level_rigid";
+    assert (level >= 0 && level <= generic_level);
     new_var_unsafe ~level
 
-  let new_genvar () = new_var_unsafe ~level:level_generic
+  let new_genvar () = new_var_unsafe ~level:generic_level
 
   let new_genvar_for_cmi () =
     decr last_var_cmi_id;
-    { contents = None; level = level_generic; id = !last_var_cmi_id }
-
-  let new_rigidvar () = new_var_unsafe ~level:level_rigid
+    { contents = None; level = generic_level; id = !last_var_cmi_id }
 
   let instance_map : (var * var) list ref = ref []
 
@@ -731,7 +701,7 @@ module Sort = struct
           assert (is_genvar v);
           (* ensure the variable is not a CMI serialised variable *)
           assert (v.id > 0);
-          let v' = new_var_unsafe ~level in
+          let v' = new_var ~level in
           v, v')
         vars
     in
@@ -748,14 +718,7 @@ module Sort = struct
     | None when is_genvar v ->
       begin match List.assq_opt v !instance_map with
       | Some v' -> Var v'
-      | None ->
-        (* If the caller didn't set up layout instantiation, conservatively
-           return a rigid variable (which is not equal to anything) *)
-        (* CR-someday zqian: explicitly distinguish among three cases:
-        - instantiating layouts properly
-        - knowingly instantiating to rigidvar conservatively
-        - unknown context, in which case we should crash *)
-        Var (new_rigidvar ())
+      | None -> Misc.fatal_error "Jkind_types.instance_var: free genvar"
       end
     | None -> Var v
     | Some t -> instance t
@@ -779,47 +742,9 @@ module Sort = struct
       | None -> t
       | Some s ->
         let result = get s in
-        if result != s then set_to_compress r (Some result);
         (* path compression *)
+        if result != s then set_var_contents r (Some result);
         result)
-
-  let rec get_representable : t -> t option = function
-    | (Base _ | Univar _) as t -> Some t
-    | Product ts ->
-      begin match get_representable_product ts with
-      | None -> None
-      | Some ts' -> Some (Product ts')
-      end
-    | Addressable s ->
-      begin match get_representable s with
-      | None -> None
-      | Some s' -> Some (Addressable s')
-      end
-    | Var v -> get_representable_var v
-
-  and get_representable_product : t list -> t list option =
-   fun ts ->
-    List.fold_right
-      (fun t acc ->
-        match acc, get_representable t with
-        | None, _ | _, None -> None
-        | Some ts, Some t -> Some (t :: ts))
-      ts (Some [])
-
-  and get_representable_var : var -> t option =
-   fun v ->
-    match v.contents with
-    | None ->
-      begin if is_rigidvar v then Some (Var v) else None
-      end
-    | Some t -> get_representable t
-
-  let rec strip_head_addressable : t -> t = function
-    | Addressable s -> strip_head_addressable s
-    | Var { contents = Some s; _ } as t ->
-      let s' = strip_head_addressable s in
-      if s' == s then t else s'
-    | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
   let rec subst s t =
     match t with
@@ -834,72 +759,41 @@ module Sort = struct
     | Product ts -> Product (List.map (subst s) ts)
     | Addressable t -> Addressable (subst s t)
 
-  (* Sort generalization context for let poly_ *)
-  let in_sort_generalization_context : var list ref option ref = ref None
+  (** During a call to [generalize_with], [!generalized] is [Some] list of
+      generalized variables. Outside of a call, [!generalized] is [None]. *)
+  let generalized : var list ref option ref = ref None
 
-  (* Generalize sort variables when in sort generalization context.
-     This is called from Ctype.generalize when processing let poly_ bindings.
-     For each free sort variable, the level is set to Ident.highest_scope,
-     making it a generic sort variable (genvar), and the var is accumulated. *)
-  let rec generalize_rec ~current_level ~vars_ref sort =
-    match sort with
-    | Var v ->
-      assert (Option.is_none v.contents);
-      if v.level > current_level && v.level <> Ident.highest_scope
-      then begin
-        v.level <- Ident.highest_scope;
-        vars_ref := v :: !vars_ref
-      end
-    | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
-    | Addressable sort -> generalize_rec ~current_level ~vars_ref sort
-    | Base _ | Univar _ -> ()
-
+  (** All free sort variables above the [current_level] are generalized: their
+      level is set to [generic_level]. *)
   let generalize ~current_level sort =
-    match !in_sort_generalization_context with
+    match !generalized with
     | None -> () (* Not in generalization context *)
-    | Some vars_ref -> generalize_rec ~current_level ~vars_ref (get sort)
+    | Some generalized ->
+      let rec loop sort =
+        match sort with
+        | Var v ->
+          assert (Option.is_none v.contents);
+          if v.level > current_level && v.level <> generic_level
+          then begin
+            v.level <- generic_level;
+            generalized := v :: !generalized
+          end
+        | Product sorts -> List.iter loop sorts
+        | Addressable sort -> loop sort
+        | Base _ | Univar _ -> ()
+      in
+      loop (get sort)
 
-  (* Wrapper to run a function in sort generalization context. Returns the
-     result of [f] and the vars generalized during [f]. *)
+  (** Calls [f] with sort variable generalization enabled, returning its result
+      and sort variables generalized during the call. *)
   let generalize_with f =
-    let vars_ref = ref [] in
-    let old_context = !in_sort_generalization_context in
-    in_sort_generalization_context := Some vars_ref;
+    let prev_generalized = !generalized in
+    let curr_generalized = ref [] in
+    generalized := Some curr_generalized;
     let result =
-      Misc.try_finally f ~always:(fun () ->
-          in_sort_generalization_context := old_context)
+      Misc.try_finally f ~always:(fun () -> generalized := prev_generalized)
     in
-    result, List.rev !vars_ref
-
-  let rec default_to_scannable_and_get : t -> Const.t = function
-    | Base b -> Static.Const.of_base b
-    | Product ts -> Product (List.map default_to_scannable_and_get ts)
-    | Univar uv -> Univar uv
-    | Var r -> var_default_to_scannable_and_get r
-    | Addressable s -> Const.addressable (default_to_scannable_and_get s)
-
-  and var_default_to_scannable_and_get r : Const.t =
-    match r.contents with
-    | None when is_genvar r -> Genvar r
-    | None when is_rigidvar r ->
-      Misc.fatal_error
-        "Jkind_types.var_default_to_scannable_and_get: cannot default rigid \
-         variables"
-    | None ->
-      set r Static.T_option.scannable;
-      Static.Const.scannable
-    | Some s ->
-      let result = default_to_scannable_and_get s in
-      set_to_compress r (Static.T_option.of_const result);
-      (* path compression *)
-      result
-
-  let get_concrete_defaulting_to_scannable s =
-    let const = default_to_scannable_and_get s in
-    if Const.is_concrete const then Const.some const else None
-
-  (* CR layouts v12: Default to void instead. *)
-  let default_for_transl_and_get s = default_to_scannable_and_get s
+    result, List.rev !curr_generalized
 
   let rec to_const_opt : t -> Const.t option = function
     | Base b -> Some (Static.Const.of_base b)
@@ -919,211 +813,106 @@ module Sort = struct
     in
     go (get s)
 
+  let crosses_externality s =
+    let rec go = function
+      | Base b -> base_crosses_externality b
+      | Var _ | Univar _ -> false
+      | Product ts -> List.for_all go ts
+      | Addressable s -> go s
+    in
+    go (get s)
+
   (***********************)
   (* equality *)
 
-  type equate_result =
-    | Unequal
-    | Equal_mutated_first
-    | Equal_mutated_second
-    | Equal_mutated_both
-    | Equal_no_mutation
-
-  let swap_equate_result = function
-    | Equal_mutated_first -> Equal_mutated_second
-    | Equal_mutated_second -> Equal_mutated_first
-    | (Unequal | Equal_no_mutation | Equal_mutated_both) as r -> r
-
-  let combine_equate_results r1 r2 =
-    match r1, r2 with
-    | Unequal, _ | _, Unequal -> Unequal
-    | Equal_no_mutation, r | r, Equal_no_mutation -> r
-    | Equal_mutated_both, _ | _, Equal_mutated_both -> Equal_mutated_both
-    | Equal_mutated_first, Equal_mutated_first -> Equal_mutated_first
-    | Equal_mutated_second, Equal_mutated_second -> Equal_mutated_second
-    | Equal_mutated_first, Equal_mutated_second
-    | Equal_mutated_second, Equal_mutated_first ->
-      Equal_mutated_both
-
-  type constrain_addressable_result =
-    | Addressable_mutated
-    | Addressable_no_mutation
-    | Not_known_addressable
-
-  let combine_constrain_addressable_results r1 r2 =
-    match r1, r2 with
-    | Not_known_addressable, _ | _, Not_known_addressable ->
-      Not_known_addressable
-    | Addressable_mutated, _ | _, Addressable_mutated -> Addressable_mutated
-    | Addressable_no_mutation, Addressable_no_mutation ->
-      Addressable_no_mutation
-
-  let rec constrain_addressable ~allow_mutation :
-      t -> constrain_addressable_result = function
-    | Addressable _ -> Addressable_no_mutation
-    | Base b ->
-      if base_is_addressable b
-      then Addressable_no_mutation
-      else Not_known_addressable
-    | Product ts ->
-      List.fold_left
-        (fun acc t ->
-          match acc with
-          | Not_known_addressable -> Not_known_addressable
-          | (Addressable_mutated | Addressable_no_mutation) as acc ->
-            combine_constrain_addressable_results acc
-              (constrain_addressable ~allow_mutation t))
-        Addressable_no_mutation ts
-    | Univar _ -> Not_known_addressable
+  let rec constrain_addressable ~allow_mutation : t -> bool = function
+    | Addressable _ -> true
+    | Base b -> base_is_addressable b
+    | Product ts -> List.for_all (constrain_addressable ~allow_mutation) ts
+    | Univar _ -> false
     | Var v -> (
       match v.contents with
       | Some s -> constrain_addressable ~allow_mutation s
-      | None when is_rigidvar v -> Not_known_addressable
-      | None when not allow_mutation -> Not_known_addressable
-      | None ->
-        set v (Some (Addressable (of_var (new_var ~level:level_fresh))));
-        Addressable_mutated)
+      | None when not allow_mutation -> false
+      | None -> equate_var v (Addressable (Var (new_genvar ()))))
 
-  let is_surely_addressable t =
-    match constrain_addressable ~allow_mutation:false t with
-    | Not_known_addressable -> false
-    | Addressable_no_mutation | Addressable_mutated -> true
+  let is_surely_addressable = constrain_addressable ~allow_mutation:false
 
-  let[@inline] sorts_of_product s =
-    (* In the equate functions, it's useful to pass around lists of sorts inside
-       the product constructor they came from to avoid re-allocating it if we
-       end up wanting to store it in a variable. We could probably eliminate the
-       use of this by collapsing a bunch of the functions below into each other,
-       but that would be much less readable. *)
-    match s with
-    | Product sorts -> sorts
-    | Var _ | Base _ | Univar _ | Addressable _ ->
-      Misc.fatal_error "Jkind_types.sorts_of_product"
+  let rec strip_head_addressable : t -> t = function
+    | Addressable s -> strip_head_addressable s
+    | Var { contents = Some s; _ } as t ->
+      let s' = strip_head_addressable s in
+      if s' == s then t else s'
+    | (Var _ | Base _ | Product _ | Univar _) as t -> t
 
-  let rec equate_sort_sort s1 s2 =
-    match s1 with
-    | Base b1 -> swap_equate_result (equate_sort_base s2 b1)
-    | Var v1 -> equate_var_sort v1 s2
-    | Product _ -> swap_equate_result (equate_sort_product s2 s1)
-    | Univar uv1 -> swap_equate_result (equate_sort_univar s2 uv1)
-    | Addressable arg1 -> swap_equate_result (equate_sort_addressable s2 arg1)
+  let rec equate ~allow_mutation s1 s2 =
+    match s1, s2 with
+    | Var v1, Var v2 when v1.id = v2.id -> true
+    | Var { contents = Some s1 }, _ -> equate ~allow_mutation s1 s2
+    | _, Var { contents = Some s2 } -> equate ~allow_mutation s1 s2
+    | Var _, Var _ when not allow_mutation -> false
+    | Var ({ contents = None } as v1), Var ({ contents = None } as v2) ->
+      if v1.level >= v2.level then equate_var v1 s2 else equate_var v2 s1
+    | Var ({ contents = None } as v1), _ -> equate_var v1 s2
+    | _, Var ({ contents = None } as v2) -> equate_var v2 s1
+    | Addressable _, _ | _, Addressable _ ->
+      (* We reduce the problem to [s1 addressable = s2 addressable], since if
+         one side is addressable, then the other is too. At this point we
+         proceed by proving [s1 = s2], which is incomplete:
 
-  and equate_sort_base s1 b2 =
-    match s1 with
-    | Base b1 -> if equal_base b1 b2 then Equal_no_mutation else Unequal
-    | Var v1 -> equate_var_base v1 b2
-    | Addressable _ -> equate_sort_sort s1 (Static.T.of_base b2)
-    | Product _ | Univar _ -> Unequal
-
-  and equate_sort_univar s1 uv2 =
-    match s1 with
-    | Univar uv1 ->
-      if equal_univar_univar uv1 uv2 then Equal_no_mutation else Unequal
-    | Base _ | Product _ | Addressable _ -> Unequal
-    | Var v1 -> equate_var_univar v1 uv2
-
-  and equate_var_univar v1 uv2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_univar s1 uv2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Some (Univar uv2));
-      Equal_mutated_first
-
-  and equate_var_base v1 b2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_base s1 b2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Static.T_option.of_base b2);
-      Equal_mutated_first
-
-  and equate_var_sort v1 s2 =
-    match s2 with
-    | Base b2 -> equate_var_base v1 b2
-    | Var v2 -> equate_var_var v1 v2
-    | Product _ -> equate_var_product v1 s2
-    | Univar uv2 -> equate_var_univar v1 uv2
-    | Addressable arg2 -> equate_sort_addressable (of_var v1) arg2
-
-  and equate_var_var v1 v2 =
-    if v1.id = v2.id (* equal id means physical equality *)
-    then Equal_no_mutation
-    else
-      match v1.contents, v2.contents with
-      | Some s1, _ -> swap_equate_result (equate_var_sort v2 s1)
-      | _, Some s2 -> equate_var_sort v1 s2
-      | None, None when not @@ is_rigidvar v1 ->
-        set v1 (Some (of_var v2));
-        Equal_mutated_first
-      | None, None when not @@ is_rigidvar v2 ->
-        set v2 (Some (of_var v1));
-        Equal_mutated_second
-      | None, None -> Unequal
-
-  and equate_var_product v1 s2 =
-    match v1.contents with
-    | Some s1 -> equate_sort_product s1 s2
-    | None when is_rigidvar v1 -> Unequal
-    | None ->
-      set v1 (Some s2);
-      Equal_mutated_first
-
-  and equate_sort_product s1 s2 =
-    match s1 with
-    | Base _ | Univar _ -> Unequal
-    | Product sorts1 ->
-      let sorts2 = sorts_of_product s2 in
-      equate_sorts sorts1 sorts2
-    | Var v1 -> equate_var_product v1 s2
-    | Addressable _ -> equate_sort_sort s1 s2
-
-  and equate_sort_addressable s1 arg2 =
-    (* We currently solve [s1 = arg2 addressable] by (incompletely) reducing it
-       to solving [s1 = s1 addressable] and [s1 = arg2].
-
-       There is no complete solution as long as sort variables only support
-       unification. For example, if [s1 = 'var addressable] and [arg2 = bits8],
-       we could unify ['var = bits8] or ['var = bits8 addressable], and neither
-       is strictly better. *)
-    match constrain_addressable ~allow_mutation:true s1 with
-    | Not_known_addressable -> Unequal
-    | Addressable_no_mutation ->
-      equate_sort_sort (strip_head_addressable s1) (strip_head_addressable arg2)
-    | Addressable_mutated ->
-      combine_equate_results Equal_mutated_first
-        (equate_sort_sort
+         Consider [s1 = 'var addressable] and [s2 = bits8 addressable].
+         We could unify ['var = bits8] or ['var = bits8 addressable], but
+         neither is more general. *)
+      constrain_addressable ~allow_mutation s1
+      && constrain_addressable ~allow_mutation s2
+      && equate ~allow_mutation
            (strip_head_addressable s1)
-           (strip_head_addressable arg2))
-
-  and equate_sorts sorts1 sorts2 =
-    let rec go sorts1 sorts2 acc =
-      match sorts1, sorts2 with
-      | [], [] -> acc
-      | sort1 :: sorts1, sort2 :: sorts2 -> (
-        match equate_sort_sort sort1 sort2 with
-        | Unequal -> Unequal
-        | r -> go sorts1 sorts2 (combine_equate_results acc r))
-      | _, _ -> assert false
-    in
-    if List.compare_lengths sorts1 sorts2 = 0
-    then go sorts1 sorts2 Equal_no_mutation
-    else Unequal
-
-  let equate_tracking_mutation = equate_sort_sort
-
-  (* Don't expose whether or not mutation happened; we just need that for
-     [Jkind] *)
-  let equate s1 s2 =
-    match equate_tracking_mutation s1 s2 with
-    | Unequal -> false
-    | Equal_mutated_first | Equal_mutated_second | Equal_no_mutation
-    | Equal_mutated_both ->
-      true
+           (strip_head_addressable s2)
+    | Base b1, Base b2 -> equal_base b1 b2
+    | Product sorts1, Product sorts2 -> (
+      try List.for_all2 (equate ~allow_mutation) sorts1 sorts2
+      with Invalid_argument _ -> false)
+    | Univar uv1, Univar uv2 -> equal_univar_univar uv1 uv2
+    | _, (Base _ | Product _ | Univar _) -> false
 
   let decompose_into_product t n =
-    let ts = List.init n (fun _ -> of_var (new_var ~level:level_fresh)) in
-    if equate t (Product ts) then Some ts else None
+    let ts = List.init n (fun _ -> of_var (new_genvar ())) in
+    if equate ~allow_mutation:true t (Product ts) then Some ts else None
+
+  (*** defaulting ***)
+
+  let rec default_to_scannable_and_get (s : t) : Const.t =
+    match s with
+    | Base b -> Static.Const.of_base b
+    | Product ts -> Product (List.map default_to_scannable_and_get ts)
+    | Univar uv -> Univar uv
+    | Var v -> default_to_scannable_and_get_var v
+    | Addressable s -> Const.addressable (default_to_scannable_and_get s)
+
+  and default_to_scannable_and_get_var (v : var) : Const.t =
+    let compress_to s =
+      set_var_contents v (Static.T_option.of_const s);
+      s
+    in
+    begin match v.contents with
+    | Some s -> compress_to (default_to_scannable_and_get s)
+    | None ->
+      if is_genvar v
+      then Const.Genvar v
+      else if equate_var v Static.T.scannable
+      then compress_to Static.Const.scannable
+      else
+        Misc.fatal_error
+          "Jkind_types.default_to_scannable_and_get: cannot default rigid \
+           variables"
+    end
+
+  let get_concrete_defaulting_to_scannable s =
+    let const = default_to_scannable_and_get s in
+    if Const.is_concrete const then Const.some const else None
+
+  (* CR layouts v12: Default to void instead. *)
+  let default_for_transl_and_get s = default_to_scannable_and_get s
 
   (*** pretty printing ***)
 
@@ -1265,6 +1054,12 @@ module Layout = struct
       | Univar _ -> false
       | Genvar _ -> false
       | Addressable t -> is_scannable_or_any t
+
+    let rec crosses_externality = function
+      | Any _ | Univar _ | Genvar _ -> false
+      | Base (b, _) -> Sort.base_crosses_externality b
+      | Product ts -> List.for_all crosses_externality ts
+      | Addressable t -> crosses_externality t
 
     let rec is_surely_addressable = function
       | Base (b, _) -> Sort.base_is_addressable b

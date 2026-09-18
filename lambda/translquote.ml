@@ -2627,9 +2627,9 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_arrow
             ( arg_label,
               go ty,
-              Typemode.transl_alloc_mode [],
+              Typemode.transl_mode_with_locality [],
               go ty',
-              Typemode.transl_alloc_mode [] )
+              Typemode.transl_mode_with_locality [] )
         | Tpoly (ty, tyl) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
@@ -3412,9 +3412,9 @@ and quote_expression_extra ~env ~scopes _stage extra lambda =
                     | Some sch ->
                       type_for_annotation ~env ~loc:(to_location loc) sch
                     | None -> newcorevar env loc),
-                    Typemode.transl_alloc_mode [],
+                    Typemode.transl_mode_with_locality [],
                     spine,
-                    Typemode.transl_alloc_mode [] );
+                    Typemode.transl_mode_with_locality [] );
               ctyp_type = newvar ();
               ctyp_env = env;
               ctyp_loc = to_location loc;
@@ -3660,7 +3660,7 @@ and quote_expression_desc ~scopes ~transl stage e : Exp_desc.t =
       in
       let base =
         Option.map
-          (fun (e, _, _) -> quote_expression ~scopes ~transl stage e)
+          (fun (e, _, _, _) -> quote_expression ~scopes ~transl stage e)
           extended_expression
       in
       Exp_desc.record loc (Array.to_list lbl_exps) base

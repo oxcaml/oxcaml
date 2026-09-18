@@ -19,9 +19,6 @@
 /* This runtime provides some OxCaml-specific features */
 #define OXCAML_RUNTIME 1
 
-/* CR ocaml 5 all-runtime5: remove this and all uses of it */
-#define CAML_RUNTIME_5
-
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"
@@ -193,9 +190,9 @@ typedef uint64_t uintnat;
 /* Number of words used in the control structure at the start of a stack
    (must match sizeof(struct stack_info) from fiber.h) */
 #ifdef ARCH_SIXTYFOUR
-#define Stack_ctx_words (13 + 1)
+#define Stack_ctx_words (12 + 1)
 #else
-#define Stack_ctx_words (13 + 2)
+#define Stack_ctx_words (12 + 2)
 #endif
 
 /* Whether to use guard pages for fiber stacks */

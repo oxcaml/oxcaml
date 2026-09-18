@@ -2115,7 +2115,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     match head.pat_desc with
     | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
       let shape =
-        Typedecl.finalize_constructor_representation head.pat_env
+        Typeopt.transl_constructor_representation head.pat_env
           head.pat_loc shape
       in
       let arg_sorts =
@@ -2127,11 +2127,10 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
-  let make_void_access binding_kind sort pos =
-    (* Constructors whose arguments are all void, e.g.
-       [A of #(void * void) * void], are immediate. Accesses to their arguments
-       must create a void (represented in lambda as an empty unboxed product)
-       or product of voids rather than access a block.
+  let make_void_access binding_kind sort =
+    (* Accesses to the void arguments of a constant constructor must create a
+       void (represented in lambda as an empty unboxed product) or product of
+       voids rather than access a block.
 
        This is necessary for bytecode, where [Pmixedfield]s that access void are
        not erased but translated into field access(es) (as unboxed products are
@@ -2151,26 +2150,29 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
     match cstr_shape with
-    | Constructor_uniform_value ->
-      fatal_error
-        "Matching.get_exr_args_constr: constant Constructor_uniform_value"
-    | Constructor_mixed shape ->
-      let shape = transl_mixed_product_shape shape in
-      let e, layout = lambda_void_of_el shape.(pos) in
+    | Constructor_immediate_all_void ->
+      let shape =
+        transl_mixed_product_shape
+          [| Types.mixed_block_element_of_const_sort sort |]
+      in
+      let e, layout = lambda_void_of_el shape.(0) in
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
-    | (Constructor_undetermined | Constructor_variable _) ->
-      fatal_error "Matching.get_exr_args_constr: variable representation"
+    | Constructor_uniform_value ->
+      fatal_error "Matching.get_exr_args_constr: if constant, should have no \
+                   args and then shouldn't produce accesses"
+    | Constructor_mixed _ ->
+      fatal_error "Matching.get_exr_args_constr: not constant"
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
-      make_void_access binding_kind sort pos
+      make_void_access binding_kind sort
     else
       let prim =
         match cstr_shape with
         | Constructor_uniform_value -> Pfield (pos, Pointer, sem)
         | Constructor_mixed shape ->
             let shape =
-              Lambda.transl_mixed_product_shape_for_read
+              Lambda.mixed_product_shape_for_read
                 ~get_value_kind:(fun _i -> Lambda.generic_value)
                 ~get_mode:(fun _i ->
                   Misc.fatal_error
@@ -2179,8 +2181,8 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
                 shape
             in
             Pmixedfield ([pos], shape, sem)
-        | (Constructor_undetermined | Constructor_variable _) ->
-            fatal_error "Matching.get_exr_args_constr: variable representation"
+        | Constructor_immediate_all_void ->
+            fatal_error "Matching.get_exr_args_constr: non-constant immediate"
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       {
@@ -2580,7 +2582,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         assert false
   in
   let lbl_repres, ~variable_sorts =
-    Typedecl.finalize_record_representation_and_sorts head.pat_env
+    Typeopt.transl_record_representation_and_sorts head.pat_env
       head.pat_loc repres
   in
   let rec make_args pos =
@@ -2590,7 +2592,8 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
       let lbl_sort =
-        finalized_label_sort lbl lbl_repres ~record_sort:sort ~variable_sorts
+        Typeopt.label_sort_for_representation lbl lbl_repres ~record_sort:sort
+          ~variable_sorts
       in
       let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
@@ -2601,7 +2604,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
       let access, sort, layout =
         match lbl_repres with
         | Record_boxed
-        | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
+        | Record_inlined (_, Constructor_uniform_value, Variant_boxed) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_unboxed
@@ -2622,10 +2625,10 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             (* CR layouts v5.9: support this *)
             fatal_error
               "Mixed inlined records not supported for extensible variants"
-        | Record_inlined (_, Constructor_mixed shape, Variant_boxed _)
+        | Record_inlined (_, Constructor_mixed shape, Variant_boxed)
         | Record_mixed shape ->
             let shape =
-              Lambda.transl_mixed_product_shape_for_read
+              Lambda.mixed_product_shape_for_read
                 ~get_value_kind:(fun _i -> Lambda.generic_value)
                 ~get_mode:(fun _i ->
                   (* TODO: could optimise to Alloc_local sometimes *)
@@ -2635,13 +2638,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
-        | Record_dummy _ ->
-          fatal_error "get_expr_args_record: unexpected dummy representation"
-        | Record_inlined
-            (_, (Constructor_undetermined
-                | Constructor_variable _), _)
-        | Record_undetermined | Record_variable _ ->
-          fatal_error "get_expr_args_record: unexpected variable representation"
+        | Record_inlined (_, Constructor_immediate_all_void, _) ->
+          fatal_error
+            "get_expr_args_record: unexpected immediate representation"
       in
       let binding_kind =
         if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
@@ -3315,7 +3314,7 @@ let complete_pats_constrs = function
         cstr_pat.pat_desc in
       let pat_of_constr cstr =
         let open Patterns.Head in
-        let fake_repr : constructor_representation =
+        let fake_repr : Types.constructor_representation =
           Constructor_mixed [| Types.Bits64 |]
         in
         let sorts =
@@ -4748,7 +4747,7 @@ let rec map_return f = function
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
     | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lkindtemplate _
-    | Lkindinstantiate _ )
+    | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ )
     as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
@@ -4819,44 +4818,30 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_fun_layout { id; uid = duid; sort; mode; lpoly; env_alloc_mode; _ }
+  | Tpat_fun_layout { id; uid = duid; lpoly; env_locality_mode; _ }
       when not (List.is_empty (Lpoly.get_exn lpoly)) ->
     assert (mutable_flag == Asttypes.Immutable);
-    let sort = Jkind.Sort.default_for_transl_and_get sort in
-    let return = Typeopt.layout pat.pat_env pat.pat_loc sort pat.pat_type in
-    let mode = Mode.value_to_alloc_r2l mode in
-    let locality = Mode.Alloc.proj_comonadic Areality mode in
-    let ret_mode = Translmode.transl_return_mode_l locality in
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_alloc_mode = Translmode.transl_alloc_mode_r env_alloc_mode in
-    let free_vars =
-      Lambda.free_variables param
-      |> Ident.Set.to_list
-      |> List.filter_map (fun ident ->
-          Option.map
-            (fun layout -> ident, layout)
-            (Typeopt.layout_of_ident pat.pat_env ident))
+    let env_locality_mode =
+      Translmode.transl_typed_locality_mode_r env_locality_mode
     in
-    let fresh_vars, env =
-      List.fold_left
-        (fun (fresh_vars, env) (old_name, layout) ->
-          let new_name = Ident.rename old_name in
-          let fresh_vars = Ident.Map.add old_name new_name fresh_vars in
-          let env = Ident.Map.add new_name (Lvar old_name, layout) env in
-          (fresh_vars, env))
-        (Ident.Map.empty, Ident.Map.empty)
-        free_vars
+    let param =
+      match param with
+      | Lfunction lfun -> lfun
+      | _ -> Misc.fatal_error "let poly_ definitions must be functions"
+    in
+    let ktmpl_body, ktmpl_env =
+      Lambda.extract_free_var_env param
+        ~layout_of_ident:(Typeopt.layout_of_ident pat.pat_env)
     in
     let f =
       Lkindtemplate
         { ktmpl_params = kind_params;
-          ktmpl_return = return;
-          ktmpl_body = Lambda.rename fresh_vars param;
-          ktmpl_ret_mode = ret_mode;
-          ktmpl_env = env;
-          ktmpl_env_mode = env_alloc_mode;
+          ktmpl_body;
+          ktmpl_env;
+          ktmpl_env_mode = env_locality_mode;
           ktmpl_loc = Scoped_location.of_location ~scopes loc;
         }
     in

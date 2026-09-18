@@ -276,8 +276,8 @@ let create_typedef_die ~reference ~parent_proto_die ?name child_die =
     | [value] kind                     | [size_addr]   | regular OCaml value   |
     | [int8#]                          | 1 byte        | densely packed 8/word |
     | [int16#]                         | 2 bytes       | densely packed 4/word |
-    | [int32#], [float32#]             | 4 bytes       | densely packed 2/word |
-    | [int64#], [float#], [nativeint#] | 8 bytes       | exactly one word      |
+    | [int32_u], [float32_u]           | 4 bytes       | densely packed 2/word |
+    | [int64_u],[float#],[nativeint_u] | 8 bytes       | exactly one word      |
     | unboxed product                  | sum of word-  | e.g. #{int8#; int8#}  |
     |                                  | extended      | takes 16 bytes per    |
     |                                  | fields        | element               |
@@ -980,10 +980,14 @@ let create_exception_die ~reference ~fallback_value_die ~parent_proto_die ?name
         DAH.create_type ~proto_die:structure_type ]
     ();
   let tag_type =
+    (* The tag byte must be read as unsigned so that the comparison against the
+       [DW_AT_discr_value] of 248 ([Object_tag]) below can ever succeed: with a
+       signed 1-byte type, a conforming consumer would read the byte 0xF8 as
+       -8. *)
     Proto_die.create ~parent:(Some parent_proto_die)
       ~attribute_values:
         [ DAH.create_byte_size_exn ~byte_size:1;
-          DAH.create_encoding ~encoding:Encoding_attribute.signed ]
+          DAH.create_encoding ~encoding:Encoding_attribute.unsigned ]
       ~tag:Dwarf_tag.Base_type ()
   in
   let exception_tag_discriminant_ref = Proto_die.create_reference () in
@@ -1244,9 +1248,9 @@ let partition_constructors constructors ~f =
     (fun (constr : RS.constructor) ->
       let constr_name = RS.constructor_name constr in
       let args = RS.constructor_args constr in
-      match args with
-      | [] -> Left constr_name
-      | _ :: _ ->
+      if RS.constructor_is_constant constr
+      then Left constr_name
+      else
         let args =
           List.map (fun { RS.label; field_type } -> f label field_type) args
         in
@@ -1618,34 +1622,27 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
     let complex_shape_flattened =
       Complex_shape.flatten_complex_shape complex_shape
     in
+    let non_void_shapes = RS.Or_void.erase_void complex_shape_flattened in
     let runtime_shape =
-      match complex_shape_flattened, unboxed_projection with
-      | [Other runtime_shape], None -> Some runtime_shape
-      | ([] | _ :: _ :: _ | [Void]), None ->
+      match non_void_shapes, unboxed_projection with
+      | [runtime_shape], None -> Some runtime_shape
+      | ([] | _ :: _ :: _), None ->
         err ~fallback:None (fun f ->
             f "Expected a single runtime shape, but got %a" Complex_shape.print
               complex_shape)
-      | _, Some i -> (
-        if i < 0 || i >= List.length complex_shape_flattened
+      | _, Some i ->
+        if i < 0 || i >= List.length non_void_shapes
         then
           err ~fallback:None (fun f ->
               f
-                "Attempted to access field %d of a layout with %d fields, \
-                 namely %a"
+                "Attempted to access field %d of a layout with %d non-void \
+                 fields, namely %a"
                 i
-                (List.length complex_shape_flattened)
+                (List.length non_void_shapes)
                 (Format.pp_print_list ~pp_sep:Format.pp_print_space
                    (RS.Or_void.print RS.print))
                 complex_shape_flattened)
-        else
-          match List.nth complex_shape_flattened i with
-          | Other runtime_shape -> Some runtime_shape
-          | Void ->
-            err ~fallback:None (fun f ->
-                f
-                  "Unarization projection %d is a void field without a runtime \
-                   shape"
-                  i))
+        else Some (List.nth non_void_shapes i)
     in
     match runtime_shape with
     | None ->
@@ -1660,7 +1657,7 @@ let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
         (* CR sspies: In case of unboxed projections, we do not have the type
            names of the individual fields available. And obtaining them in
            general is not straightforward, since they could be hidden behind a
-           type alias (e.g., [type prod = #{ a: int64#; b: float# }]). What we
+           type alias (e.g., [type prod = #{ a: int64_u; b: float# }]). What we
            currently do is match the style of unarization variables by appending
            "_unboxed" for the projections to indicate that the type is not the
            same. *)

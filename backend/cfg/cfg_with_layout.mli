@@ -33,15 +33,31 @@ val create : Cfg.t -> layout:layout -> t
 
 val cfg : t -> Cfg.t
 
+(** [with_cfg t cfg] returns a value that shares the layout and section table of
+    [t], but holds [cfg]. It is intended for updates to function-level fields of
+    the cfg: the graph itself is expected to be unchanged. *)
+val with_cfg : t -> Cfg.t -> t
+
 val layout : t -> layout
 
 val set_layout : t -> layout -> unit
 
-(** Add to cfg, layout, and other data-structures that track labels. *)
+(** Add to cfg, layout, and other data-structures that track labels. The new
+    block inherits the section of the [after] block, if any. *)
 val add_block : t -> Cfg.basic_block -> after:Label.t -> unit
 
+(** Assign [labels] to the basic block section [name]. Fails if any of the
+    labels already has a section.
+
+    The section table is consulted by [Cfg_to_linear] only when
+    [-basic-block-sections] is set. Nothing in the compiler itself populates it:
+    it is intended for external tools linked against the compiler libraries,
+    such as ocamlfdo. In a regular compilation it therefore stays empty and
+    every block is emitted in the function's section. *)
 val assign_blocks_to_section : t -> Label.t list -> string -> unit
 
+(** The section assigned to [label] by [assign_blocks_to_section] or inherited
+    through [add_block] / [insert_block]; [None] if the table has no entry. *)
 val get_section : t -> Label.t -> string option
 
 (** Remove from cfg, layout, and other data-structures that track labels. *)
@@ -109,7 +125,8 @@ val fold_instructions :
 
 (* Insert specified instructions along all outgoing edges from the block
    [after]; if [before] it not [None], the insertion is restricted to edges
-   having [before] as their destination. *)
+   having [before] as their destination. Inserted blocks inherit the section of
+   the [after] block, if any. *)
 val insert_block :
   t ->
   Cfg.basic_instruction_list ->

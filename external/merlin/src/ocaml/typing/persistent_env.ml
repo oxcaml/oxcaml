@@ -599,8 +599,8 @@ let check_for_unset_parameters penv global =
 
 let mode_pers_mod staticity =
   let hint : _ Mode.Hint.const = Legacy Compilation_unit in
-  Mode.Value.of_const
-    { Mode.Value.Const.legacy with staticity }
+  Mode.With_regionality.of_const
+    { Mode.With_regionality.Const.legacy with staticity }
     ~hint_monadic:hint ~hint_comonadic:hint
 
 let rec global_of_global_name penv ~check name ~allow_excess_args =
@@ -755,7 +755,7 @@ and acknowledge_new_pers_name penv check global_name global import =
     sign.bound_globals;
   let pn_sign =
     let signature, staticity = sign.sign in
-    let mode = Mode.Value.disallow_right (mode_pers_mod staticity) in
+    let mode = Mode.With_regionality.disallow_right (mode_pers_mod staticity) in
     let mode =
       match import.imp_visibility with
       | Visible { cmx_guaranteed = true } ->
@@ -764,9 +764,9 @@ and acknowledge_new_pers_name penv check global_name global import =
         (* Without a guaranteed [.cmx], the unit is not available for
            compile-time evaluation, so its staticity is forced to [Dynamic]
            regardless of what the [.cmi] claims. *)
-        Mode.Value.join
+        Mode.With_regionality.join
           [ mode;
-            Mode.Value.min_with_monadic Staticity
+            Mode.With_regionality.min_with_monadic Staticity
               (Mode.Staticity.of_const
                  ~hint:(Cmx_not_guaranteed import.imp_impl)
                  Mode.Staticity.Dynamic) ]
@@ -871,7 +871,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
     Constant unit
 
 type address =
-  | Aunit of Compilation_unit.t * Mode.Value.l
+  | Aunit of Compilation_unit.t * Mode.With_regionality.l
   | Alocal of Ident.t
   | Adot of address * Types.module_representation * int
 

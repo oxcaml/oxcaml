@@ -794,11 +794,21 @@ let mk_simplify_stubs f =
       (format_default Flambda2.Default.simplify_stubs) )
 
 let mk_no_simplify_stubs f =
-  ( "-flambda2-no-simplify-stubs",
+  ( "-no-flambda2-simplify-stubs",
     Arg.Unit f,
     Printf.sprintf
-      " Prevent the simplification of stub functions%s (Flambda2 only)"
-      (format_not_default Flambda2.Default.simplify_stubs) )
+      " Prevent the simplification of stub functions (Flambda2 only)" )
+
+let mk_stubs_forward_inlining f =
+  ( "-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf " Forward inlining information on stubs (Flambda2 only)" )
+
+let mk_no_stubs_forward_inlining f =
+  ( "-no-stubs-forward-inlining",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not forward inlining information on stubs (Flambda2 only)" )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -1216,6 +1226,12 @@ let mk_no_dwarf_inlined_frames f =
     Arg.Unit f,
     " Do not emit DWARF inlined frame information" )
 
+let mk_gdwarf_version f =
+  ( "-gdwarf-version",
+    Arg.String f,
+    "<version>  Set the DWARF version for OxCaml debugging information\n\
+    \         (4 (default) or 5)" )
+
 let mk_ddebug_avail_sets f =
   ( "-ddebug-avail-sets",
     Arg.Unit f,
@@ -1462,6 +1478,8 @@ module type Oxcaml_options = sig
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
   val no_simplify_stubs : unit -> unit
+  val stubs_forward_inlining : unit -> unit
+  val no_stubs_forward_inlining : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
@@ -1676,6 +1694,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
       mk_no_simplify_stubs F.no_simplify_stubs;
+      mk_stubs_forward_inlining F.stubs_forward_inlining;
+      mk_no_stubs_forward_inlining F.no_stubs_forward_inlining;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -2178,6 +2198,8 @@ module Oxcaml_options_impl = struct
 
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
+  let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
+  let no_stubs_forward_inlining = clear' Clflags.stubs_forward_inlining
 
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
@@ -2350,6 +2372,7 @@ end
 module type Debugging_options = sig
   val dwarf_inlined_frames : unit -> unit
   val no_dwarf_inlined_frames : unit -> unit
+  val gdwarf_version : string -> unit
   val ddebug_avail_sets : unit -> unit
   val dwarf_for_startup_file : unit -> unit
   val no_dwarf_for_startup_file : unit -> unit
@@ -2368,6 +2391,7 @@ module Make_debugging_options (F : Debugging_options) = struct
     [
       mk_dwarf_inlined_frames F.dwarf_inlined_frames;
       mk_no_dwarf_inlined_frames F.no_dwarf_inlined_frames;
+      mk_gdwarf_version F.gdwarf_version;
       mk_ddebug_avail_sets F.ddebug_avail_sets;
       mk_dwarf_for_startup_file F.dwarf_for_startup_file;
       mk_no_dwarf_for_startup_file F.no_dwarf_for_startup_file;
@@ -2387,6 +2411,17 @@ end
 module Debugging_options_impl = struct
   let dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := true
   let no_dwarf_inlined_frames () = Debugging.dwarf_inlined_frames := false
+
+  let gdwarf_version version =
+    match version with
+    | "4" -> Debugging.gdwarf_version := Dwarf_flags.Four
+    | "5" -> Debugging.gdwarf_version := Dwarf_flags.Five
+    | _ ->
+        raise
+          (Arg.Bad
+             (Printf.sprintf "invalid DWARF version '%s' (must be 4 or 5)"
+                version))
+
   let ddebug_avail_sets () = Debugging.debug_avail_sets := true
   let dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := true
   let no_dwarf_for_startup_file () = Debugging.dwarf_for_startup_file := false
@@ -2807,6 +2842,7 @@ module Extra_params = struct
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
+    | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
     | "dissector-partition-size" -> (
         match float_of_string_opt v with

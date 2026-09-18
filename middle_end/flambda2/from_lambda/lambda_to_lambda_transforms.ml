@@ -432,7 +432,7 @@ let makearray_dynamic_non_scannable_unboxed_product env
          | Alloc_local -> L.modify_maybe_stack)
          lambda_array_kind)
       (* There is no packing in unboxed product arrays, even if the elements are
-         all float32# or int32#. *)
+         all float32_u or int32_u. *)
       Sixty_four_or_more ~init term
 
 let makearray_dynamic_scannable_unboxed_product0
@@ -1120,7 +1120,6 @@ let transform_primitive0 env (prim : L.primitive) args loc =
       | Ostype_win32 -> "ostype_win32"
       | Ostype_cygwin -> "ostype_cygwin"
       | Backend_type -> "backend_type"
-      | Runtime5 -> "runtime5"
       | Arch_amd64 -> "arch_amd64"
       | Arch_arm64 -> "arch_arm64"
     in

@@ -68,7 +68,7 @@ type pattern_variable_kind =
 type pattern_variable =
   {
     pv_id: Ident.t;
-    pv_mode: Mode.Value.l;
+    pv_mode: Mode.With_regionality.l;
     pv_value_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
@@ -126,6 +126,12 @@ type mutable_restriction =
   | In_group
   | In_rec
 
+type layout_poly_restriction =
+  | Class
+
+type layout_poly_inst_restriction =
+  | Binding_op
+
 type module_patterns_restriction =
   | Modules_allowed of { scope: int }
   | Modules_rejected
@@ -157,10 +163,13 @@ val check_partial:
         ?lev:int -> Env.t -> type_expr ->
         Location.t -> Typedtree.value Typedtree.case list -> Typedtree.partial
 val type_expect:
-        Env.t -> ?mode:Mode.Value.r -> Parsetree.expression -> type_expected ->
-          Typedtree.expression
+        Env.t ->
+        ?mode:Mode.With_regionality.r ->
+        Parsetree.expression ->
+        type_expected ->
+        Typedtree.expression
 val type_exp:
-        Env.t -> ?mode: Mode.Value.r -> Parsetree.expression ->
+        Env.t -> ?mode: Mode.With_regionality.r -> Parsetree.expression ->
           Typedtree.expression
 val type_approx:
         Env.t -> Parsetree.expression -> type_expr -> unit
@@ -226,7 +235,12 @@ type submode_reason =
       (* Check that this constructor is allowed in this context. *)
   | Other (* add more cases here for better hints *)
 
-val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allowed * 'r) Mode.Value.t -> unit
+val escape :
+  loc:Location.t ->
+  env:Env.t ->
+  reason:submode_reason ->
+  (Mode.allowed * 'r) Mode.With_regionality.t ->
+  unit
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
@@ -333,7 +347,6 @@ type error =
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
   | Atomic_in_functional_update of label
-  | Mixed_record_atomic_loc of Longident.t
   | Polymorphic_atomic_loc of Longident.t
   | Probe_format
   | Probe_name_format of string
@@ -378,11 +391,10 @@ type error =
   | Block_index_modality_mismatch of
       { mut : bool; err : Mode.Modality.equate_error }
   | Mutable_block_index_polymorphic_field of Longident.t
-  | Submode_failed of Mode.Value.error * submode_reason
+  | Submode_failed of Mode.With_regionality.error * submode_reason
   | Curried_application_complete of
-      arg_label * Mode.Alloc.error * [`Prefix|`Single_arg|`Entire_apply]
-  | Mode_mismatch of mode_mismatch_kind * Mode.Alloc.equate_error
-  | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+      arg_label * Mode.With_locality.error * [`Prefix|`Single_arg|`Entire_apply]
+  | Uncurried_function_escapes_comonadic of Mode.With_locality.Comonadic.error
   | Uncurried_function_escapes_locality
   | Function_returns_local
   | Tail_call_local_returning
@@ -413,13 +425,10 @@ type error =
       { some_args_ok : bool; ty_fun : type_expr; jkind : jkind_lr }
   | Overwrite_of_invalid_term
   | Unexpected_hole
-  | Let_poly_not_yet_implemented
-  | Let_poly_not_syntactic_value
-  | Layout_poly_inst_not_yet_supported of invalid_layout_poly_inst_context
+  | Layout_poly_not_yet_supported of layout_poly_restriction
+  | Layout_poly_inst_not_yet_supported of layout_poly_inst_restriction
+  | Let_poly_not_function
   | Useless_lpoly
-
-and invalid_layout_poly_inst_context =
-  | Binding_op
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

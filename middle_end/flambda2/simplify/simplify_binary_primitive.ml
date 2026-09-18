@@ -1094,7 +1094,7 @@ let simplify_bigarray_get_alignment _align ~original_prim dacc ~original_term
     (P.result_kind' original_prim)
     ~original_term
 
-let simplify_atomic_load_field ~original_prim dacc ~original_term _dbg ~arg1:_
+let simplify_atomic_load ~original_prim dacc ~original_term _dbg ~arg1:_
     ~arg1_ty:_ ~arg2:_ ~arg2_ty:_ ~result_var =
   SPR.create_unknown dacc ~result_var
     (P.result_kind' original_prim)
@@ -1166,7 +1166,7 @@ let simplify_binary_primitive0 dacc original_prim (prim : P.binary_primitive)
         ~original_prim
     | Bigarray_get_alignment align ->
       simplify_bigarray_get_alignment align ~original_prim
-    | Atomic_load_field _ -> simplify_atomic_load_field ~original_prim
+    | Atomic_load _ -> simplify_atomic_load ~original_prim
     | Poke _ -> simplify_poke
     | Read_offset _ -> simplify_read_offset ~original_prim
   in
@@ -1202,7 +1202,7 @@ let recover_comparison_primitive dacc (prim : P.binary_primitive) ~arg1 ~arg2 =
   | Block_set _ | Array_load _ | Int_arith _ | Int_shift _
   | Int_comp (_, Yielding_int_like_compare_functions _)
   | Float_arith _ | Float_comp _ | String_or_bigstring_load _ | Bigarray_load _
-  | Bigarray_get_alignment _ | Atomic_load_field _ | Poke _ | Read_offset _ ->
+  | Bigarray_get_alignment _ | Atomic_load _ | Poke _ | Read_offset _ ->
     None
   | Phys_equal op ->
     (* Integer (in)equality reaches Flambda2 as [Phys_equal] (cf.

@@ -722,18 +722,13 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
             (fun () -> value_kind_variant env ~loc ~visited ~depth
                          ~num_nodes_visited ~params:decl.type_params ~args
                          cstrs rep)
-        | Type_record
-            (_,
-             (Record_undetermined
-             | Record_inlined (_, Constructor_undetermined, _)),
-             _) ->
-          num_nodes_visited, non_nullable Pgenval
         | Type_record (labels, rep, _) ->
           let depth = depth + 1 in
           fallback_if_missing_cmi
             ~default:(num_nodes_visited, nullable Pgenval)
             (fun () -> value_kind_record env ~loc ~visited ~depth
-                         ~num_nodes_visited labels rep)
+                         ~num_nodes_visited ~params:decl.type_params ~args
+                         labels rep)
         | Type_record_unboxed_product
             (_, Record_unboxed_product_undetermined, _) ->
           num_nodes_visited, nullable Pgenval
@@ -780,7 +775,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
         num_nodes_visited,
         non_nullable
           (Pvariant { consts = [];
-                      non_consts = [0, Constructor_uniform fields] }))
+                      non_consts = [0, Constructor_shape_uniform fields] }))
   | Tvariant row ->
     num_nodes_visited,
     if Btype.tvariant_not_immediate row
@@ -795,11 +790,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
     add_nullability_from_ty env scty Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      (field : Types.mixed_block_element) ty
+      (field : unit Lambda.mixed_block_element) ty
   : int * unit Lambda.mixed_block_element =
   match field with
-  | Scannable { separability } ->
-    let pointerness = pointerness_of_separability separability in
+  | Value original_kind ->
     begin match ty with
     | Some ty ->
       let num_nodes_visited, kind =
@@ -812,31 +806,18 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
          (e.g. a pointerness of [Immediate] could remove the non-constant
          constructors from [Pvariant _]) *)
       let kind =
-        match pointerness, kind.raw_kind with
-        | Immediate, Pgenval -> { kind with raw_kind = Pintval }
-        | Immediate, _ | Pointer, _ -> kind
+        match original_kind.raw_kind, kind.raw_kind with
+        | Pintval, Pgenval -> { kind with raw_kind = Pintval }
+        | _ -> kind
       in
       num_nodes_visited, Value kind
     | None ->
       num_nodes_visited,
-      Value
-        { generic_value with raw_kind = value_kind_of_pointerness pointerness }
+      Value original_kind
     (* CR layouts v7.1: assess whether it is important for performance to
        support deep value_kinds here *)
     end
-  | Float_boxed -> num_nodes_visited, Float_boxed ()
-  | Float64 -> num_nodes_visited, Float64
-  | Float32 -> num_nodes_visited, Float32
-  | Bits8 -> num_nodes_visited, Bits8
-  | Bits16 -> num_nodes_visited, Bits16
-  | Bits32 -> num_nodes_visited, Bits32
-  | Bits64 -> num_nodes_visited, Bits64
-  | Vec128 -> num_nodes_visited, Vec128
-  | Vec256 -> num_nodes_visited, Vec256
-  | Vec512 -> num_nodes_visited, Vec512
-  | Mask -> num_nodes_visited, Mask
-  | Word -> num_nodes_visited, Word
-  | Untagged_immediate -> num_nodes_visited, Untagged_immediate
+  | Product [||] -> num_nodes_visited, field
   | Product fs ->
     let unknown () = Array.init (Array.length fs) (fun _ -> None) in
     let types =
@@ -884,13 +865,14 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       ) (0, num_nodes_visited) fs
     in
     num_nodes_visited, Product kinds
-  | Void -> num_nodes_visited, Product [||]
-  | Addressable field ->
-    value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
-      field ty
+  | ( Float_boxed () | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+    | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate
+    | Splice_variable _ ) as field ->
+    num_nodes_visited, field
 
 and value_kind_mixed_block
       env ~loc ~visited ~depth ~num_nodes_visited ~shape types =
+  let shape = Lambda.transl_mixed_product_shape shape in
   let (_, num_nodes_visited), shape =
     List.fold_left_map
       (fun (i, num_nodes_visited) typ ->
@@ -901,10 +883,11 @@ and value_kind_mixed_block
          (i+1, num_nodes_visited), kind)
       (0, num_nodes_visited) types
   in
-  num_nodes_visited, Constructor_mixed (Array.of_list shape)
+  num_nodes_visited, Constructor_shape_mixed (Array.of_list shape)
 
 and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
-      ~params ~args (cstrs : Types.constructor_declaration list) rep =
+      ~params ~args (cstrs : Types.constructor_declaration list)
+      (rep : Types.variant_representation) =
   match rep with
   | Variant_extensible -> assert false
   | Variant_with_null -> begin
@@ -951,7 +934,7 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           num_nodes_visited
           fields
       in
-      num_nodes_visited, Lambda.Constructor_uniform shape
+      num_nodes_visited, Lambda.Constructor_shape_uniform shape
     in
     let for_one_constructor (constructor : Types.constructor_declaration)
           ~depth ~num_nodes_visited
@@ -968,6 +951,9 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) fields)
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
           | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
@@ -989,39 +975,17 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | Constructor_mixed shape ->
               value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
                 ~shape (List.map (fun f -> Some (field_to_type f)) labels)
+          | Constructor_immediate_all_void ->
+              Misc.fatal_error
+                "Typeopt.value_kind_variant: unexpected immediate constructor"
           | Constructor_undetermined | Constructor_variable _ ->
               Misc.fatal_error
                 "Typeopt.value_kind_variant: unexpected variable representation"
         in
         (is_mutable, num_nodes_visited), fields
     in
-    let is_constant (cstr: Types.constructor_declaration) =
-      let all_void_opt sort =
-        match sort with
-        | Some sort -> Jkind.Sort.Const.all_void sort
-        | None ->
-          (* CR rtjoa: It's important to NOT treat constructors with
-             any-args-refined-to-void as constant, as those are represented as
-             blocks rather than immediates. This footgun should no longer exist
-             once we make all-void constructors no longer immediate. *)
-          false
-      in
-      match cstr.cd_args with
-      | Cstr_tuple [] -> true
-      | Cstr_tuple args ->
-        List.for_all (fun ca -> all_void_opt ca.ca_sort) args
-      | Cstr_record lbls ->
-        List.for_all (fun lbl -> all_void_opt lbl.ld_sort) lbls
-    in
-    let rec mixed_block_shape_is_empty shape =
-      Array.for_all mixed_block_element_is_empty shape
-    and mixed_block_element_is_empty (element : _ mixed_block_element) =
-      match element with
-      | Product shape -> mixed_block_shape_is_empty shape
-      | _ -> false
-    in
     let num_nodes_visited, raw_kind =
-    if List.for_all is_constant cstrs then
+    if Array.for_all Types.cstr_layout_is_constant cstr_layouts then
       (num_nodes_visited, Pintval)
     else
       let _idx, result =
@@ -1032,53 +996,34 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
           | None -> None
           | Some (num_nodes_visited,
                   next_const, consts, next_tag, non_consts) ->
-            let ~variable_repr, cstr_shape_opt, constructor =
-              match cstr_layouts.(idx) with
-              | Cstr_layout_known { shape; _ } ->
-                ~variable_repr:false, Some shape, constructor
-              | Cstr_layout_undetermined ->
-                (match substitute_cd_args constructor.cd_args with
-                 | exception Ctype.Cannot_apply ->
-                   ~variable_repr:true, None, constructor
-                 | cd_args ->
-                   let cd_args, ~constant:_, repr, _arg_sorts =
-                     Typedecl.update_constructor_representation
-                       env loc cd_args ~is_extension_constructor:false
-                   in
-                   ~variable_repr:true, Result.to_option repr,
-                   { constructor with cd_args })
-            in
-            match cstr_shape_opt with
-            | None -> None
-            | Some cstr_shape ->
-                let (is_mutable, num_nodes_visited), fields =
-                  for_one_constructor constructor ~depth ~num_nodes_visited
-                    ~cstr_shape
-                in
-                if is_mutable then None
-                else match fields with
-                | Constructor_uniform xs
-                    when List.compare_length_with xs 0 = 0 ->
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape
-                    when mixed_block_shape_is_empty shape
-                         && not variable_repr ->
-                  (* CR rtjoa: We gate on [variable_repr] because it's important
-                     to NOT treat constructors with any-args-refined-to-void as
-                     constant, as those are represented as blocks rather than
-                     immediates. This footgun should no longer exist once we
-                     make all-void constructors no longer immediate. *)
-                  let consts = next_const :: consts in
-                  Some (num_nodes_visited,
-                        next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed _ | Constructor_uniform _ ->
-                  let non_consts =
-                    (next_tag, fields) :: non_consts
+            if Types.cstr_layout_is_constant cstr_layouts.(idx) then
+              Some (num_nodes_visited,
+                    next_const + 1, next_const :: consts, next_tag, non_consts)
+            else
+              let cstr_shape_opt, constructor =
+                match cstr_layouts.(idx) with
+                | Cstr_layout_known { shape; _ } -> Some shape, constructor
+                | Cstr_layout_undetermined ->
+                  (match substitute_cd_args constructor.cd_args with
+                   | exception Ctype.Cannot_apply -> None, constructor
+                   | cd_args ->
+                     let cd_args, ~constant:_, repr, _arg_sorts =
+                       Typedecl.update_constructor_representation
+                         env loc cd_args ~is_extension_constructor:false
+                     in
+                     Result.to_option repr, { constructor with cd_args })
+              in
+              match cstr_shape_opt with
+              | None -> None
+              | Some cstr_shape ->
+                  let (is_mutable, num_nodes_visited), fields =
+                    for_one_constructor constructor ~depth ~num_nodes_visited
+                      ~cstr_shape
                   in
-                  Some (num_nodes_visited,
-                        next_const, consts, next_tag + 1, non_consts))
+                  if is_mutable then None
+                  else
+                    Some (num_nodes_visited, next_const, consts, next_tag + 1,
+                          (next_tag, fields) :: non_consts))
           (0, Some (num_nodes_visited, 0, [], 0, []))
           cstrs
       in
@@ -1087,9 +1032,6 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
       | Some (num_nodes_visited, _, consts, _, non_consts) ->
         match non_consts with
         | [] ->
-          (* CR rtjoa: An refined any-constructor shouldn't become constant.
-             This footgun should no longer exist once we make all-void
-             constructors no longer immediate. *)
           Misc.fatal_error "Typeopt.value_kind_variant: became all-constant"
         | _::_ ->
           (num_nodes_visited, Pvariant { consts; non_consts })
@@ -1098,8 +1040,51 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
     num_nodes_visited, non_nullable raw_kind
 
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
-      (labels : Types.label_declaration list) rep =
+      ~params ~args (labels : Types.label_declaration list)
+      (rep : Types.record_representation) =
+  let is_mutable =
+    List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
+      labels
+  in
+  if is_mutable then
+    num_nodes_visited, non_nullable Pgenval
+  else
+    value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args labels rep
+
+and value_kind_immutable_record env ~loc ~visited ~depth ~num_nodes_visited
+      ~params ~args (labels : Types.label_declaration list)
+      (rep : Types.record_representation) =
+  let recompute make_rep =
+    match
+      List.map (fun (label : Types.label_declaration) ->
+        { label with ld_type = Ctype.apply env params label.ld_type args })
+        labels
+    with
+    | exception Ctype.Cannot_apply ->
+        (* Reachable if a cmi is missing *)
+        num_nodes_visited, non_nullable Pgenval
+    | labels ->
+        let types = List.map (fun label -> label.Types.ld_type) labels in
+        match Typedecl.compute_block_shape env types with
+        | `Undetermined -> num_nodes_visited, non_nullable Pgenval
+        | (`Not_mixed | `Mixed _) as shape ->
+            value_kind_immutable_record env ~loc ~visited ~depth
+              ~num_nodes_visited ~params ~args labels (make_rep shape)
+  in
   match rep with
+  | Record_undetermined ->
+      recompute (function
+        | `Not_mixed -> Types.Record_boxed
+        | `Mixed shape -> Types.Record_mixed shape)
+  | Record_inlined (tag, Constructor_undetermined, vrep) ->
+      recompute (fun shape ->
+        let shape =
+          match shape with
+          | `Not_mixed -> Types.Constructor_uniform_value
+          | `Mixed shape -> Types.Constructor_mixed shape
+        in
+        Types.Record_inlined (tag, shape, vrep))
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
          cmi, according to the comment on scrape_ty.  Reevaluate whether it's
@@ -1112,81 +1097,74 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
   | Record_dummy _ ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected dummy representation"
-  | Record_undetermined | Record_variable _
-  | Record_inlined (_, (Constructor_undetermined
-                       | Constructor_variable _), _) ->
+  | Record_variable _
+  | Record_inlined (_, Constructor_variable _, _) ->
     Misc.fatal_error
       "Typeopt.value_kind_record: unexpected variable representation"
   | Record_inlined (_, _, Variant_with_null) -> assert false
   | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible))
   | Record_boxed | Record_float | Record_ufloat | Record_mixed _ -> begin
-      let is_mutable =
-        List.exists (fun label -> Types.is_mutable label.Types.ld_mutable)
-          labels
+      let num_nodes_visited, fields =
+        match rep with
+        | Record_unboxed | Record_dummy _ | Record_undetermined
+        | Record_variable _
+        | Record_inlined (_, (Constructor_undetermined
+                             | Constructor_variable _
+                             | Constructor_immediate_all_void), _) ->
+            (* The outer match guards against this *)
+            assert false
+        | Record_inlined (_, Constructor_uniform_value, _)
+        | Record_boxed | Record_float | Record_ufloat ->
+            let num_nodes_visited, fields =
+              List.fold_left_map
+                (fun num_nodes_visited (label:Types.label_declaration) ->
+                  let num_nodes_visited = num_nodes_visited + 1 in
+                  let num_nodes_visited, field =
+                    (* We're using the `Pboxedfloatval` value kind for unboxed
+                      floats inside of records. This is kind of a lie, but
+                       that was already happening here due to the float record
+                      optimization. *)
+                    match rep with
+                    | Record_float | Record_ufloat ->
+                      num_nodes_visited,
+                      non_nullable (Pboxedfloatval Boxed_float64)
+                    | Record_inlined _ | Record_boxed ->
+                        value_kind env ~loc ~visited ~depth ~num_nodes_visited
+                          label.ld_type
+                    | Record_mixed _ | Record_unboxed | Record_dummy _
+                    | Record_undetermined | Record_variable _ ->
+                        (* The outer match guards against this *)
+                        assert false
+                  in
+                  num_nodes_visited, field)
+                num_nodes_visited labels
+            in
+            num_nodes_visited, Constructor_shape_uniform fields
+        | Record_inlined (_, Constructor_mixed shape, _)
+        | Record_mixed shape ->
+          let types = List.map (fun label -> label.Types.ld_type) labels in
+          value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
+            ~shape (List.map (fun t -> Some t) types)
       in
-      if is_mutable then
-        num_nodes_visited, non_nullable Pgenval
-      else
-        let num_nodes_visited, fields =
-          match rep with
-          | Record_unboxed | Record_dummy _ | Record_undetermined
-          | Record_variable _
-          | Record_inlined (_, (Constructor_undetermined
-                               | Constructor_variable _), _) ->
-              (* The outer match guards against this *)
-              assert false
-          | Record_inlined (_, Constructor_uniform_value, _)
-          | Record_boxed | Record_float | Record_ufloat ->
-              let num_nodes_visited, fields =
-                List.fold_left_map
-                  (fun num_nodes_visited (label:Types.label_declaration) ->
-                    let num_nodes_visited = num_nodes_visited + 1 in
-                    let num_nodes_visited, field =
-                      (* We're using the `Pboxedfloatval` value kind for unboxed
-                        floats inside of records. This is kind of a lie, but
-                         that was already happening here due to the float record
-                        optimization. *)
-                      match rep with
-                      | Record_float | Record_ufloat ->
-                        num_nodes_visited,
-                        non_nullable (Pboxedfloatval Boxed_float64)
-                      | Record_inlined _ | Record_boxed ->
-                          value_kind env ~loc ~visited ~depth ~num_nodes_visited
-                            label.ld_type
-                      | Record_mixed _ | Record_unboxed | Record_dummy _
-                      | Record_undetermined | Record_variable _ ->
-                          (* The outer match guards against this *)
-                          assert false
-                    in
-                    num_nodes_visited, field)
-                  num_nodes_visited labels
-              in
-              num_nodes_visited, Constructor_uniform fields
-          | Record_inlined (_, Constructor_mixed shape, _)
-          | Record_mixed shape ->
-            let types = List.map (fun label -> label.Types.ld_type) labels in
-            value_kind_mixed_block env ~loc ~visited ~depth ~num_nodes_visited
-              ~shape (List.map (fun t -> Some t) types)
-        in
-        let non_consts =
-          match rep with
-          | Record_inlined (Ordinary {runtime_tag}, _, _) ->
-            [runtime_tag, fields]
-          | Record_float | Record_ufloat ->
-            [ Obj.double_array_tag, fields ]
-          | Record_boxed ->
-            [0, fields]
-          | Record_inlined (Extension _, _, _) ->
-            [0, fields]
-          | Record_mixed _ ->
-            [0, fields]
-          | Record_unboxed -> assert false
-          | Record_inlined (Null, _, _) -> assert false
-          | Record_dummy _ -> assert false
-          | Record_undetermined | Record_variable _ -> assert false
-        in
-        (num_nodes_visited,
-         non_nullable (Pvariant { consts = []; non_consts }))
+      let non_consts =
+        match rep with
+        | Record_inlined (Ordinary {runtime_tag}, _, _) ->
+          [runtime_tag, fields]
+        | Record_float | Record_ufloat ->
+          [ Obj.double_array_tag, fields ]
+        | Record_boxed ->
+          [0, fields]
+        | Record_inlined (Extension _, _, _) ->
+          [0, fields]
+        | Record_mixed _ ->
+          [0, fields]
+        | Record_unboxed -> assert false
+        | Record_inlined (Null, _, _) -> assert false
+        | Record_dummy _ -> assert false
+        | Record_undetermined | Record_variable _ -> assert false
+      in
+      (num_nodes_visited,
+       non_nullable (Pvariant { consts = []; non_consts }))
     end
 
 let value_kind env loc ty =
@@ -1200,7 +1178,163 @@ let value_kind env loc ty =
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
 
-let transl_mixed_block_element env loc ty mbe =
+let assert_mixed_product_support_for_lambda_shape loc kind shape =
+  let counts = Mixed_product_bytes.count (Product shape) in
+  if not (Mixed_product_bytes.all_value counts) then
+    Typedecl.assert_mixed_product_support loc kind
+      ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
+
+let transl_instantiated_shape env loc sorts_and_types kind =
+  let consts =
+    Array.map
+      (fun (sort, _ty) -> Jkind.Sort.default_for_transl_and_get sort)
+      sorts_and_types
+  in
+  let all_scannable =
+    let rec is_scannable : Jkind.Sort.Const.t -> bool = function
+      | Base Scannable -> true
+      | Addressable const -> is_scannable const
+      | Base _ | Product _ | Univar _ | Genvar _ -> false
+    in
+    Array.for_all is_scannable consts
+  in
+  let shape =
+    if all_scannable then `Not_mixed
+    else
+      let rec element (layout : Jkind_types.Layout.Const.t)
+          : unit Lambda.mixed_block_element =
+        match layout with
+        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+        | Product layouts ->
+            Product (Array.of_list (List.map element layouts))
+        | Addressable layout -> element layout
+        | Base (base, axes) ->
+            Typedecl.Element_repr.classify_base base axes
+            |> Typedecl.Element_repr.to_shape_element
+            |> Lambda.transl_mixed_product_element
+        | Any _ | Univar _ ->
+            Misc.fatal_error
+              "Typeopt.transl_instantiated_shape: unrepresentable layout"
+      in
+      let shape =
+        Array.map (fun (_sort, ty) ->
+          match Jkind.get_layout env (Ctype.type_jkind env ty) with
+          | Some layout -> element layout
+          | None ->
+              Misc.fatal_error
+                "Typeopt.transl_instantiated_shape: missing layout")
+          sorts_and_types
+      in
+      (* Shapes containing splices are checked after static evaluation *)
+      if not (Lambda.mixed_block_shape_has_splices shape) then
+        assert_mixed_product_support_for_lambda_shape loc kind shape;
+      `Mixed shape
+  in
+  shape, consts
+
+let transl_instantiated_constructor env loc sorts_and_types kind
+    : Lambda.constructor_representation =
+  match transl_instantiated_shape env loc sorts_and_types kind with
+  | `Not_mixed, _ -> Constructor_uniform_value
+  | `Mixed shape, _ -> Constructor_mixed shape
+
+let transl_constructor_representation env loc
+    (shape : Types.constructor_representation)
+    : Lambda.constructor_representation =
+  match shape with
+  | Constructor_uniform_value -> Constructor_uniform_value
+  | Constructor_mixed shape ->
+      Constructor_mixed (Lambda.transl_mixed_product_shape shape)
+  | Constructor_immediate_all_void -> Constructor_immediate_all_void
+  | Constructor_variable sorts_and_types ->
+      transl_instantiated_constructor env loc sorts_and_types Cstr_tuple
+  | Constructor_undetermined ->
+      Misc.fatal_error
+        "Typeopt.transl_constructor_representation: representation was \
+         not instantiated"
+
+let transl_variant_representation : Types.variant_representation
+    -> Lambda.variant_representation = function
+  | Variant_unboxed -> Variant_unboxed
+  | Variant_boxed _ -> Variant_boxed
+  | Variant_extensible -> Variant_extensible
+  | Variant_with_null -> Variant_with_null
+
+let transl_record_representation_and_sorts env loc
+    (repres : Types.record_representation)
+    : Lambda.record_representation
+      * variable_sorts:Jkind.Sort.Const.t array option =
+  match repres with
+  | Record_variable sorts_and_types ->
+      let shape, consts =
+        transl_instantiated_shape env loc sorts_and_types Record
+      in
+      let repres : Lambda.record_representation =
+       match shape with
+       | `Not_mixed -> Record_boxed
+       | `Mixed shape -> Record_mixed shape
+      in
+      repres, ~variable_sorts:(Some consts)
+  | Record_inlined (tag, Constructor_variable sorts_and_types,
+                    vrep) ->
+      let shape, consts =
+        transl_instantiated_shape env loc sorts_and_types Cstr_record
+      in
+      let shape : Lambda.constructor_representation =
+        match shape with
+        | `Not_mixed -> Constructor_uniform_value
+        | `Mixed shape -> Constructor_mixed shape
+      in
+      Record_inlined (tag, shape, transl_variant_representation vrep),
+      ~variable_sorts:(Some consts)
+  | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
+      Misc.fatal_error
+        "Typeopt.transl_record_representation: representation was not \
+         instantiated"
+  | Record_dummy _ ->
+      Misc.fatal_error
+        "Typeopt.transl_record_representation: dummy representation"
+  | Record_inlined (tag, shape, vrep) ->
+      Record_inlined
+        (tag, transl_constructor_representation env loc shape,
+         transl_variant_representation vrep), ~variable_sorts:None
+  | Record_unboxed -> Record_unboxed, ~variable_sorts:None
+  | Record_boxed -> Record_boxed, ~variable_sorts:None
+  | Record_float -> Record_float, ~variable_sorts:None
+  | Record_ufloat -> Record_ufloat, ~variable_sorts:None
+  | Record_mixed shape ->
+      Record_mixed (Lambda.transl_mixed_product_shape shape),
+      ~variable_sorts:None
+
+let transl_record_representation env loc repres =
+  let repres, ~variable_sorts:_ =
+    transl_record_representation_and_sorts env loc repres
+  in
+  repres
+
+let label_sort_for_representation (label : Data_types.label_description)
+      (repres : Lambda.record_representation) ~record_sort ~variable_sorts =
+  match repres with
+  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> record_sort
+  | Record_boxed | Record_float | Record_ufloat | Record_mixed _
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_mixed _), _) ->
+    begin match variable_sorts with
+    | Some sorts -> sorts.(label.lbl_pos)
+    | None ->
+      begin match label.lbl_sort with
+      | Some sort -> sort
+      | None ->
+        Misc.fatal_errorf
+          "no sort for label %s despite finalized representation"
+          label.lbl_name
+      end
+    end
+  | Record_inlined (_, Constructor_immediate_all_void, _) ->
+    Misc.fatal_error
+      "label_sort_for_representation: unexpected immediate representation"
+
+let refine_mixed_block_element env loc ty mbe =
   try
     let (_num_nodes_visited, value_kind) =
       value_kind_mixed_block_field env ~loc ~visited:Numbers.Int.Set.empty
@@ -1210,6 +1344,10 @@ let transl_mixed_block_element env loc ty mbe =
   with
   | Missing_cmi_fallback ->
     raise (Error (loc, Non_value_layout (env, ty, None)))
+
+let transl_mixed_block_element env loc ty mbe =
+  refine_mixed_block_element env loc ty
+    (Lambda.transl_mixed_product_element mbe)
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
@@ -1294,19 +1432,12 @@ let layout env loc sort ty =
 
 let layout_of_ident env ident =
   let path = Path.Pident ident in
-  match Env.find_module path env with
-  | _ -> Some layout_any_value
-  | exception Not_found ->
-    let value_desc =
-      try Env.find_value path env
-      with Not_found ->
-        Misc.fatal_errorf "Failed to find value_desc for %a"
-          Ident.print ident
-    in
+  match Env.find_value path env with
+  | value_desc ->
     let { val_type; val_kind; val_loc; _ } =
       Subst.Lazy.force_value_description value_desc
     in
-    match val_kind with
+    begin match val_kind with
     | Val_reg sort | Val_mut (_, sort) ->
       let const_sort = Jkind.Sort.default_for_transl_and_get sort in
       let layout = layout env val_loc const_sort val_type in
@@ -1314,6 +1445,23 @@ let layout_of_ident env ident =
     | Val_prim _ -> None
     | Val_ivar _ | Val_self _ | Val_anc _ ->
       Some layout_any_value
+    end
+  | exception Not_found ->
+    match Env.find_module path env with
+    | _ -> Some layout_module
+    | exception Not_found ->
+      match Env.find_ident_constructor ident env with
+      | { cstr_tag = Extension _ } -> Some layout_extensible_variant_constructor
+      | _ | exception Not_found ->
+        match Env.find_class path env with
+        | _ -> Some Lambda.layout_class
+        | exception Not_found ->
+            (match Translobj.layout_of_ident ident with
+            | Some _ as layout -> layout
+            | None ->
+              Misc.fatal_errorf "Failed to find value_desc for %a"
+                Ident.print ident)
+
 
 let layout_of_sort loc sort =
   layout_of_const_sort_generic sort ~value_kind:(lazy Lambda.generic_value)

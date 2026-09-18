@@ -28,6 +28,10 @@
 open Lambda
 module Fmt = Format_doc
 
+type error = Block_index_gap_overflow_possible
+
+exception Error of Location.t * error
+
 module Or_missing = struct
   type 'a t =
     | Present of 'a
@@ -105,10 +109,15 @@ module rec Types : sig
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   val print_closure : Fmt.formatter -> closure -> unit
@@ -126,10 +135,15 @@ end = struct
       slv_runtime : lambda
     }
 
+  and record =
+    { id : string;
+      values : value Or_missing.t array
+    }
+
   and value =
     | SLVhalves of halves
     | SLVlayout of layout
-    | SLVrecord of value Or_missing.t array
+    | SLVrecord of record
     | SLVclosure of Template_id.t
 
   let print_closure ppf { clo_params; clo_body; clo_env = _ } =
@@ -151,13 +165,13 @@ end = struct
         slv_runtime
     | SLVlayout layout ->
       Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
-    | SLVrecord fields ->
+    | SLVrecord { id; values } ->
       let print_fields ppf =
         Array.iter
           (fun field -> Fmt.fprintf ppf "@ %a;" print_value_or_missing field)
-          fields
+          values
       in
-      Fmt.fprintf ppf "@[<hv 2>[%t@;<1 -2>]@]" print_fields
+      Fmt.fprintf ppf "@[<hv 2>%s[%t@;<1 -2>]@]" id print_fields
     | SLVclosure id -> Template_id.print ppf id
 
   and print_value_or_missing ppf = function
@@ -267,8 +281,10 @@ end = struct
   let symbol_arg_of_value (v : Types.value) =
     match v with
     | SLVlayout l -> symbol_arg_of_layout l
-    | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
-      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
+    | SLVrecord { id; values = _ } -> id
+    | SLVhalves _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected halves"
+    | SLVclosure id -> Fmt.asprintf "%a" Template_id.print id
 end
 
 module CU_data = struct
@@ -290,12 +306,45 @@ module CU_data = struct
       Template_store.print templates
 end
 
-module Ctx = struct
+module Ctx : sig
+  type t
+
+  (** [cu_static_data] is used to look up the [CU_data.t] for a give compilation
+      unit, calls to it are memoized. *)
+  val create : cu_static_data:(Compilation_unit.t -> CU_data.t option) -> t
+
+  (** Memoized fetch of the compile-time data for the given unit. *)
+  val cu_static_data : t -> Compilation_unit.t -> Types.value Or_missing.t
+
+  (** A template store, used to store the templates for the current unit. *)
+  val store : t -> Template_store.t
+
+  (** Instantiate a template. This is memoized so if this template has already
+      been instantiated with these arguments it just returns the previously
+      computed results, otherwise it uses [eval_apply] to evaluate the closure.
+      The returned runtime half is a reference to the instantiated function. *)
+  val instantiate :
+    t ->
+    eval_apply:(Types.closure -> Types.value array -> Types.halves) ->
+    Template_id.t ->
+    Types.value array ->
+    Types.value Or_missing.t
+
+  (** All of the template instantiations cached by [instantiate]. These are in
+      dependency order; entries earlier in the list may depend on later ones. *)
+  val instantiations : t -> (Ident.t * lambda) list
+
+  (** Makes the given string unique in the context of this [Ctx.t] by adding a
+      stamp to the end. It should already be unique across [Ctx.t]s, which is
+      usually achievable by including the [Compilation_unit.t]. *)
+  val uniqueify : t -> string -> string
+end = struct
   type t =
     { cu_static_data : Compilation_unit.t -> CU_data.t option;
       store : Template_store.t;
-      mutable instantiated_template_ids : Ident.Set.t;
-      mutable instantiations : (Ident.t * lambda) list
+      instantiated_templates : Types.value Or_missing.t option Ident.Tbl.t;
+      mutable instantiations : (Ident.t * lambda) list;
+      uniqueify : int Misc.Stdlib.String.Tbl.t
     }
 
   let create ~cu_static_data =
@@ -303,8 +352,9 @@ module Ctx = struct
     { cu_static_data =
         (fun cu -> Compilation_unit.Tbl.memoize cu_data_cache cu_static_data cu);
       store = Template_store.empty ();
-      instantiated_template_ids = Ident.Set.empty;
-      instantiations = []
+      instantiated_templates = Ident.Tbl.create 10;
+      instantiations = [];
+      uniqueify = Misc.Stdlib.String.Tbl.create 10
     }
 
   let cu_static_data t cu =
@@ -312,10 +362,8 @@ module Ctx = struct
     | Some { cu; _ } -> cu
     | None -> Or_missing.Missing
 
-  (** Instantiate a template. This is memoized so if this template has already
-      been instantiated with these arguments it just returns the previously
-      computed results, otherwise it uses [eval_apply] to evaluate the closure.
-      The returned runtime half is a reference to the instantiated function. *)
+  let store t = t.store
+
   let instantiate t ~eval_apply (id : Template_id.t) args :
       Types.value Or_missing.t =
     let closure =
@@ -343,18 +391,36 @@ module Ctx = struct
         arg_names
       |> Ident.create_persistent
     in
-    if not (Ident.Set.mem name t.instantiated_template_ids)
-    then begin
-      (* f might recursively call this function so make sure to mark this name
-         as visited before calling it. *)
-      t.instantiated_template_ids
-        <- Ident.Set.add name t.instantiated_template_ids;
-      let lam = eval_apply closure args in
-      t.instantiations <- (name, lam) :: t.instantiations
-    end;
-    Present (SLVhalves { slv_comptime = Missing; slv_runtime = Lvar name })
+    let slv_comptime =
+      match Ident.Tbl.find_opt t.instantiated_templates name with
+      | Some (Some value) -> value
+      | Some None ->
+        Misc.fatal_errorf "Recursive template instantiation of %a" Ident.print
+          name
+      | None -> begin
+        (* eval_apply might recursively call this function so mark this name as
+           visited before calling it. *)
+        Ident.Tbl.replace t.instantiated_templates name None;
+        let { Types.slv_comptime; slv_runtime } = eval_apply closure args in
+        Ident.Tbl.replace t.instantiated_templates name (Some slv_comptime);
+        let instantiation =
+          Lambda.subst
+            (fun _ _ env -> env)
+            ~freshen_bound_variables:true Ident.Map.empty slv_runtime
+        in
+        t.instantiations <- (name, instantiation) :: t.instantiations;
+        slv_comptime
+        end
+    in
+    Present (SLVhalves { slv_comptime; slv_runtime = Lvar name })
 
   let instantiations t = t.instantiations
+
+  let uniqueify t id =
+    let counter = Misc.Stdlib.String.Tbl.find_opt t.uniqueify id in
+    let counter = Option.value counter ~default:0 in
+    Misc.Stdlib.String.Tbl.replace t.uniqueify id (counter + 1);
+    Fmt.asprintf "%s/%i" id counter
 end
 
 include Types
@@ -366,7 +432,7 @@ let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 type _ value_type =
   | Thalves : halves value_type
   | Tlayout : layout value_type
-  | Trecord : value Or_missing.t array value_type
+  | Trecord : record value_type
   | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
@@ -423,10 +489,18 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
   | SLmissing -> Missing
   | SLrecord slams ->
     let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
-    Present (SLVrecord values)
+    let id =
+      Fmt.asprintf "%a/%a"
+        (Fmt.pp_print_option Compilation_unit.print)
+        (Current_unit.get_cu ())
+        (Fmt.pp_print_option Fmt.pp_print_string)
+        (Option.map Slambdaident.name name)
+    in
+    let id = Ctx.uniqueify ctx id in
+    Present (SLVrecord { id; values })
   | SLfield (slam, i) ->
     let* fields = eval_slam ctx env slam |>> expect Trecord in
-    fields.(i)
+    fields.values.(i)
   | SLproj_comptime slam ->
     let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
     halves.slv_comptime
@@ -435,7 +509,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
       { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
     in
     let cu = Current_unit.get_cu () in
-    let closure_id = Template_store.add ctx.store ~cu ~name closure in
+    let closure_id = Template_store.add (Ctx.store ctx) ~cu ~name closure in
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
@@ -446,13 +520,14 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     Ctx.instantiate ctx closure args
       ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
         let env_body =
-          Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          try
+            Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
+          with Invalid_argument _ ->
+            Misc.fatal_error
+              "Slambda eval doesn't support partial or over application of \
+               functors."
         in
-        let { slv_comptime = _; slv_runtime } =
-          eval_slam ctx env_body clo_body
-          |> expect_not_missing |> expect Thalves
-        in
-        slv_runtime)
+        eval_slam ctx env_body clo_body |> expect_not_missing |> expect Thalves)
 
 and eval_var env id = Env.find env id
 
@@ -514,7 +589,7 @@ and eval_lam_shallow ctx env lam =
     let new_bindings = Misc.Stdlib.List.map_sharing eval_binding old_bindings in
     if new_bindings == old_bindings then lam else Lletrec (new_bindings, body)
   | Lprim (old_prim, args, loc) ->
-    let new_prim = eval_prim env old_prim in
+    let new_prim = eval_prim env loc old_prim in
     if new_prim == old_prim then lam else Lprim (new_prim, args, loc)
   | Lswitch (scrutinee, switch, loc, old_layout) ->
     let new_layout = eval_layout env old_layout in
@@ -566,7 +641,7 @@ and eval_lam_shallow ctx env lam =
       eval_slam ctx env slam |> expect_not_missing |> expect Thalves
     in
     halves.slv_runtime
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     (* These constructors only exist in tlambda, fracturing has removed them
        (and replaced them with SLtemplate and SLinstantiate). *)
     Lambda.fatal_error_invalid_constructor lam
@@ -592,7 +667,13 @@ and eval_lam_shallow ctx env lam =
 and eval_structured_const env const =
   match const with
   | Const_mixed_block (n, old_shape, old_consts) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape =
+      (* [Lconst] doesn't carry a source location, so we use [Loc_unknown].
+         Plus the check here is only defensive: we don't currently support lpoly
+         structured constants, and non-lpoly blocks that fail the block shape
+         check are rejected earlier during typechecking. *)
+      eval_mixed_block_shape env old_shape ~check_at:(Some Loc_unknown)
+    in
     let new_consts =
       Misc.Stdlib.List.map_sharing (eval_structured_const env) old_consts
     in
@@ -608,17 +689,49 @@ and eval_structured_const env const =
   | Const_null ->
     const
 
-and eval_block_shape env block_shape =
+and eval_block_shape env loc block_shape =
   match block_shape with
   | All_value -> block_shape
   | Shape old_shape ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape then block_shape else Shape new_shape
 
+and eval_record_representation env loc (repr : record_representation) =
+  match repr with
+  | Record_mixed old_shape ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape then repr else Record_mixed new_shape
+  | Record_inlined (tag, Constructor_mixed old_shape, variant_repr) ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then repr
+    else Record_inlined (tag, Constructor_mixed new_shape, variant_repr)
+  | Record_unboxed | Record_boxed | Record_float | Record_ufloat
+  | Record_inlined
+      (_, (Constructor_uniform_value | Constructor_immediate_all_void), _) ->
+    repr
+
 and eval_mixed_block_shape :
-    'a. Env.t -> 'a mixed_block_element array -> 'a mixed_block_element array =
- fun env shape ->
-  Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
+    'a.
+    Env.t ->
+    'a mixed_block_element array ->
+    check_at:scoped_location option
+      (* If [Some loc], perform block shape check, reporting errors at [loc].
+      *) ->
+    'a mixed_block_element array =
+ fun env shape ~check_at ->
+  let shape' =
+    Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) shape
+  in
+  (match check_at with
+  (* Only check shapes if they changed during evaluation. Shapes that were
+      already concrete were validated during typechecking. *)
+  | Some loc when shape' != shape ->
+    Typeopt.assert_mixed_product_support_for_lambda_shape
+      (Debuginfo.Scoped_location.to_location loc)
+      Block shape'
+  | Some _ | None -> ());
+  shape'
 
 and eval_mixed_block_element :
     'a. Env.t -> 'a mixed_block_element -> 'a mixed_block_element =
@@ -644,9 +757,56 @@ and eval_layout env layout =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
     in
     if new_layouts == old_layouts then layout else Punboxed_product new_layouts
-  | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
-  | Punboxed_vector _ | Punboxed_mask | Pbottom ->
+  | Pvalue old_value_kind ->
+    let new_value_kind = eval_value_kind env old_value_kind in
+    if new_value_kind == old_value_kind then layout else Pvalue new_value_kind
+  | Ptop | Punboxed_float _ | Punboxed_or_untagged_integer _ | Punboxed_vector _
+  | Punboxed_mask | Pbottom ->
     layout
+
+and eval_value_kind env ({ raw_kind = old_raw_kind; nullable } as value_kind) =
+  let new_raw_kind = eval_raw_value_kind env old_raw_kind in
+  if new_raw_kind == old_raw_kind
+  then value_kind
+  else { raw_kind = new_raw_kind; nullable }
+
+and eval_raw_value_kind env value_kind =
+  match value_kind with
+  | Pvariant { consts; non_consts = old_non_consts } ->
+    let new_non_consts =
+      Misc.Stdlib.List.map_sharing
+        (fun ((i, old_constructor_shape) as non_const) ->
+          let new_constructor_shape =
+            eval_constructor_shape env old_constructor_shape
+          in
+          if new_constructor_shape == old_constructor_shape
+          then non_const
+          else i, new_constructor_shape)
+        old_non_consts
+    in
+    if new_non_consts == old_non_consts
+    then value_kind
+    else Pvariant { consts; non_consts = new_non_consts }
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+    value_kind
+
+and eval_constructor_shape env constructor_shape =
+  match constructor_shape with
+  | Constructor_shape_uniform old_value_kinds ->
+    let new_value_kinds =
+      Misc.Stdlib.List.map_sharing (eval_value_kind env) old_value_kinds
+    in
+    if new_value_kinds == old_value_kinds
+    then constructor_shape
+    else Constructor_shape_uniform new_value_kinds
+  | Constructor_shape_mixed old_mixed_block_shape ->
+    let new_mixed_block_shape =
+      eval_mixed_block_shape env old_mixed_block_shape ~check_at:None
+    in
+    if new_mixed_block_shape == old_mixed_block_shape
+    then constructor_shape
+    else Constructor_shape_mixed new_mixed_block_shape
 
 and eval_lfunction_shallow env
     ({ kind;
@@ -673,19 +833,32 @@ and eval_lfunction_shallow env
     lfunction' ~kind ~params:new_params ~return:new_return ~body ~attr ~loc
       ~mode ~ret_mode
 
-and eval_prim env prim =
+and eval_prim env loc prim =
   match prim with
   | Pmakeblock (n, mut, old_shape, mode) ->
-    let new_shape = eval_block_shape env old_shape in
+    let new_shape = eval_block_shape env loc old_shape in
     if new_shape == old_shape then prim else Pmakeblock (n, mut, new_shape, mode)
+  | Pduprecord (old_repr, size) ->
+    let new_repr = eval_record_representation env loc old_repr in
+    if new_repr == old_repr then prim else Pduprecord (new_repr, size)
   | Pmixedfield (is, old_shape, sem) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape then prim else Pmixedfield (is, new_shape, sem)
   | Psetmixedfield (is, old_shape, init_or_assign) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
     if new_shape == old_shape
     then prim
     else Psetmixedfield (is, new_shape, init_or_assign)
+  | Patomic_load_mixed_field { index; shape = old_shape } ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then prim
+    else Patomic_load_mixed_field { index; shape = new_shape }
+  | Patomic_set_mixed_field { index; shape = old_shape; mode } ->
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    if new_shape == old_shape
+    then prim
+    else Patomic_set_mixed_field { index; shape = new_shape; mode }
   | Pmake_unboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -701,7 +874,16 @@ and eval_prim env prim =
     then prim
     else Punboxed_product_field (i, new_layouts)
   | Pmake_idx_mixed_field (old_shape, i, path) ->
-    let new_shape = eval_mixed_block_shape env old_shape in
+    let new_shape = eval_mixed_block_shape env old_shape ~check_at:(Some loc) in
+    (* We check for gap overflow after static evaluation to account for layout-
+       polymorphic blocks, but this check covers non-lpoly blocks, too. *)
+    let counts = Mixed_product_bytes.Wrt_path.count_shape new_shape i path in
+    if Option.is_none (Mixed_product_bytes.Wrt_path.offset_and_gap counts)
+    then
+      raise
+        (Error
+           ( Debuginfo.Scoped_location.to_location loc,
+             Block_index_gap_overflow_possible ));
     if new_shape == old_shape
     then prim
     else Pmake_idx_mixed_field (new_shape, i, path)
@@ -762,10 +944,35 @@ and eval_prim env prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_idx { layout = new_layout; mode }
+  | Patomic_load_ptr { layout = old_layout } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_load_ptr { layout = new_layout }
+  | Patomic_set_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_set_ptr { layout = new_layout; mode }
+  | Patomic_exchange_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_exchange_ptr { layout = new_layout; mode }
+  | Patomic_compare_exchange_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_compare_exchange_ptr { layout = new_layout; mode }
+  | Patomic_compare_set_ptr { layout = old_layout; mode } ->
+    let new_layout = eval_layout env old_layout in
+    if new_layout == old_layout
+    then prim
+    else Patomic_compare_set_ptr { layout = new_layout; mode }
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
-  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _ | Pduprecord _
+  | Psetfloatfield _ | Psetufloatfield _ | Pufloatfield _
   | Parray_element_size_in_bytes _ | Pmake_idx_field _ | Pwith_stack
   | Pwith_stack_preemptible | Pperform | Pcontinue | Pdiscontinue
   | Pdiscontinue_with_backtrace | Preperform | Pccall _ | Praise _ | Psequand
@@ -795,16 +1002,16 @@ and eval_prim env prim =
   | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
-  | Patomic_load_field _ | Patomic_load_mixed_field _ | Patomic_set_field _
-  | Patomic_set_mixed_field _ | Patomic_exchange_field _
+  | Patomic_load_field _ | Patomic_set_field _ | Patomic_exchange_field _
   | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
   | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
   | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field
   | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx | Patomic_land_idx
-  | Patomic_lor_idx | Patomic_lxor_idx | Pprobe_is_enabled _ | Pobj_dup
-  | Punbox_unit | Punbox_vector _ | Pbox_vector _ | Punbox_mask | Pbox_mask _
-  | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
-  | Preinterpret_tuple_as_boxed_vector _
+  | Patomic_lor_idx | Patomic_lxor_idx | Patomic_fetch_add_ptr | Patomic_add_ptr
+  | Patomic_sub_ptr | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr
+  | Pprobe_is_enabled _ | Pobj_dup | Punbox_unit | Punbox_vector _
+  | Pbox_vector _ | Punbox_mask | Pbox_mask _ | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _ | Preinterpret_tuple_as_boxed_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
@@ -814,14 +1021,6 @@ and eval_prim env prim =
 (* Helpers for asserting that slambda is trivial. *)
 
 exception Found_a_splice
-
-let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
-  | Psplicevar _ -> raise Found_a_splice
-  | Ptop | Pbottom | Pvalue _ | Punboxed_float _
-  | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask ->
-    ()
-  | Punboxed_product layouts ->
-    List.iter assert_layout_contains_no_splices layouts
 
 let rec assert_mixed_block_element_contains_no_splices : type a.
     a Lambda.mixed_block_element -> unit = function
@@ -835,6 +1034,34 @@ let rec assert_mixed_block_element_contains_no_splices : type a.
 let assert_mixed_block_shape_contains_no_splices shape =
   Array.iter assert_mixed_block_element_contains_no_splices shape
 
+let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
+  | Psplicevar _ -> raise Found_a_splice
+  | Ptop | Pbottom | Punboxed_float _ | Punboxed_or_untagged_integer _
+  | Punboxed_vector _ | Punboxed_mask ->
+    ()
+  | Pvalue value_kind -> assert_value_kind_contains_no_splices value_kind
+  | Punboxed_product layouts ->
+    List.iter assert_layout_contains_no_splices layouts
+
+and assert_value_kind_contains_no_splices { raw_kind; nullable = _ } =
+  assert_raw_value_kind_contains_no_splices raw_kind
+
+and assert_raw_value_kind_contains_no_splices = function
+  | Pvariant { consts = _; non_consts } ->
+    List.iter
+      (fun (_, constructor_shape) ->
+        assert_constructor_shape_contains_no_splices constructor_shape)
+      non_consts
+  | Pgenval | Pintval | Pboxedfloatval _ | Pboxedintval _ | Parrayval _
+  | Pboxedvectorval _ | Pboxedmaskval ->
+    ()
+
+and assert_constructor_shape_contains_no_splices = function
+  | Constructor_shape_uniform value_kinds ->
+    List.iter assert_value_kind_contains_no_splices value_kinds
+  | Constructor_shape_mixed mixed_block_shape ->
+    assert_mixed_block_shape_contains_no_splices mixed_block_shape
+
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
   | Popaque layout | Pobj_magic layout ->
@@ -843,6 +1070,11 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   | Pset_idx (layout, _)
   | Patomic_load_idx { layout }
   | Patomic_set_idx { layout; _ }
+  | Patomic_load_ptr { layout }
+  | Patomic_set_ptr { layout; _ }
+  | Patomic_exchange_ptr { layout; _ }
+  | Patomic_compare_exchange_ptr { layout; _ }
+  | Patomic_compare_set_ptr { layout; _ }
   | Pget_ptr (layout, _)
   | Pset_ptr (layout, _)
   | Pget_ext_ptr (layout, _)
@@ -850,7 +1082,12 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     assert_layout_contains_no_splices layout
   | Pmake_unboxed_product layouts | Punboxed_product_field (_, layouts) ->
     List.iter assert_layout_contains_no_splices layouts
-  | Pmakeblock (_, _, Shape shape, _) ->
+  | Pmakeblock (_, _, Shape shape, _)
+  | Patomic_load_mixed_field { shape; _ }
+  | Patomic_set_mixed_field { shape; _ }
+  | Pduprecord
+      ((Record_mixed shape | Record_inlined (_, Constructor_mixed shape, _)), _)
+    ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmixedfield (_, shape, _) ->
     Array.iter assert_mixed_block_element_contains_no_splices shape
@@ -896,7 +1133,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
   | Lsplice _ -> raise Found_a_splice
-  | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
@@ -922,4 +1159,22 @@ let eval ~cu_static_data slam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
-      { CU_data.templates = ctx.store; cu = slv_comptime }, slv_runtime)
+      { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, slv_runtime)
+
+let report_error_doc ppf = function
+  | Block_index_gap_overflow_possible ->
+    (* This message describes a more conservative rule than we enforce; see
+       [Mixed_product_bytes.Wrt_path.offset_and_gap]. *)
+    Fmt.fprintf ppf
+      "This block index cannot be created because it refers to values@ and \
+       non-values that are separated by 2^%d or more bytes in their@ block, or \
+       could be deepened to such an index."
+      (64 - Mixed_product_bytes.block_index_offset_bits)
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (loc, err) ->
+      Some (Location.error_of_printer ~loc report_error_doc err)
+    | _ -> None)
+
+let report_error = Fmt.compat report_error_doc

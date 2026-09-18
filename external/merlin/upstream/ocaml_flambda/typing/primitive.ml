@@ -785,7 +785,7 @@ let prim_has_valid_reprs ~loc prim =
     (* This doesn't prevent
 
        {|
-          external get : float# array -> int -> int32# =
+          external get : float# array -> int -> int32_u =
             "%array_safe_get"
        |}
 
@@ -1043,6 +1043,37 @@ let prim_has_valid_reprs ~loc prim =
       check [
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_load_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_set_ptr"
+    | "%unsafe_atomic_exchange_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_cas_ptr"
+    | "%unsafe_atomic_compare_exchange_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+        is (Same_as_ocaml_repr C.scannable);
+      ]
+    | "%unsafe_atomic_fetch_add_ptr"
+    | "%unsafe_atomic_add_ptr"
+    | "%unsafe_atomic_sub_ptr"
+    | "%unsafe_atomic_land_ptr"
+    | "%unsafe_atomic_lor_ptr"
+    | "%unsafe_atomic_lxor_ptr" ->
+      check [
+        is (Same_as_ocaml_repr (C.product [C.scannable; C.bits64]));
         is (Same_as_ocaml_repr C.scannable);
         is (Same_as_ocaml_repr C.scannable);
       ]

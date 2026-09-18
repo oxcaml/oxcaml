@@ -241,14 +241,21 @@ module type Solver_mono = sig
       Raises exception if the condition does not hold. *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
+  (** Composes [to_const] and [of_const] while preserving the original hint *)
+  val to_of_const_exn :
+    'a obj -> ('a, allowed * allowed) mode -> ('a, allowed * allowed) mode
+
   (** The minimum mode in the lattice *)
   val min : 'a obj -> ('a, 'l * 'r) mode
 
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
 
-  (** The level of generic variables *)
+  (** The level of generic variables. *)
   val generic_level : int
+
+  (** The level of rigid variables used during subsumption. *)
+  val rigid_level : int
 
   (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
      the source code where zapping happens *)
@@ -357,16 +364,24 @@ module type Solver_mono = sig
     ('a, 'l * 'r) mode
 
   (** Creates a new mode variable above the given mode and returns [true]. In
-      the speical case where the given mode is top, returns the constant top and
+      the special case where the given mode is top, returns the constant top and
       [false]. *)
   val newvar_above :
-    'a obj -> int -> ('a, allowed * 'r_) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, allowed * 'r_) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Creates a new mode variable below the given mode and returns [true]. In
-      the speical case where the given mode is bottom, returns the constant
+      the special case where the given mode is bottom, returns the constant
       bottom and [false]. *)
   val newvar_below :
-    'a obj -> int -> ('a, 'l_ * allowed) mode -> ('a, 'l * 'r) mode * bool
+    'a obj ->
+    int ->
+    ('a, 'l_ * allowed) mode ->
+    log:changes ref option ->
+    ('a, 'l * 'r) mode * bool
 
   (** Returns the join of the list of modes. *)
   val join : 'a obj -> ('a, allowed * 'r) mode list -> ('a, left_only) mode

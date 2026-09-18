@@ -147,6 +147,23 @@ module Unboxed_fields = struct
           | Unboxed fields1, Unboxed fields2 ->
             fold2_subset_with_kind f fields1 fields2 acc))
       fields1 acc
+
+  let rec equal_shape_u fields1 fields2 =
+    match fields1, fields2 with
+    | Not_unboxed _, Not_unboxed _ -> true
+    | Unboxed _, Not_unboxed _ | Not_unboxed _, Unboxed _ -> false
+    | Unboxed fields1, Unboxed fields2 -> equal_shape fields1 fields2
+
+  and equal_shape fields1 fields2 =
+    (* CR ncourant: we can't use [Field.Map.equal] here because it doesn't have
+       a type that is general enough :( *)
+    let bindings1 = Field.Map.bindings fields1 in
+    let bindings2 = Field.Map.bindings fields2 in
+    List.compare_lengths bindings1 bindings2 = 0
+    && List.for_all2
+         (fun (f1, fields1) (f2, fields2) ->
+           Field.equal f1 f2 && equal_shape_u fields1 fields2)
+         bindings1 bindings2
 end
 
 (* CR-someday ncourant: track fields that are known to be constant, here and in
@@ -169,6 +186,24 @@ type changed_representation =
       Value_slot.t Unboxed_fields.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
+
+type param_decision =
+  | Keep of Variable.t * Flambda_kind.With_subkind.t
+  | Delete
+  | Unbox of Variable.t Unboxed_fields.t
+
+type my_closure_param_decision =
+  | Keep_my_closure
+  | Unbox_my_closure of Variable.t Unboxed_fields.t
+
+let print_param_decision ppf param_decision =
+  match param_decision with
+  | Keep (v, kind) ->
+    Format.fprintf ppf "Keep (%a, %a)" Variable.print v
+      Flambda_kind.With_subkind.print kind
+  | Delete -> Format.fprintf ppf "Delete"
+  | Unbox fields ->
+    Format.fprintf ppf "Unbox %a" (Unboxed_fields.print Variable.print) fields
 
 let pp_changed_representation ff = function
   | Block_representation (fields, size) ->
@@ -208,6 +243,9 @@ let to_change_representation_tbl =
   Datalog.create_relation ~name:"to_change_representation" Cols.[n]
 
 let to_change_representation x = to_change_representation_tbl % [x]
+
+let lambda_lifting =
+  Oxcaml_args.Extra_options.bool __LOC__ "reaper-lambda-lifting"
 
 let datalog_rules =
   saturate_in_order
@@ -410,6 +448,18 @@ let datalog_rules =
            ~from:codeid;
          cannot_change_calling_convention codeid ]
        ==> cannot_unbox0 x);
+      (* Unless [-X reaper-lambda-lifting=1], prevent unboxing a closure that is
+         called. If the closure is never called (and still is used), it is
+         because it has been inlined and the closure block serves only for
+         holding data; so unboxing it is a good thing. However, if the closure
+         is called, unboxing it can prevent specialization of the closure,
+         especially for higher-order functions. In that case, we prevent the
+         unboxing of the closure, that is, we prevent lambda-lifting. *)
+      (let$ [x; call_witness] = ["x"; "call_witness"] in
+       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
+         has_usage call_witness;
+         filter (fun [] -> not (lambda_lifting ())) [] ]
+       ==> cannot_unbox0 x);
       (* An allocation that is one of the results of a function can only be
          unboxed if the function's calling conventation can be changed. *)
       (let$ [alias; allocation_id; relation; call_witness; codeid] =
@@ -506,6 +556,14 @@ type result =
       (changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
 
+type calling_convention_change =
+  | Not_changing_calling_convention
+  | Changing_calling_convention of
+      { my_closure_decision : my_closure_param_decision;
+        params_decisions : param_decision list;
+        return_decisions : param_decision list
+      }
+
 let pp_result ppf res = Format.fprintf ppf "%a@." Datalog.print res.db
 
 let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
@@ -590,7 +648,16 @@ let query_dominated_by =
     (let^$ [x], [y] = ["x"], ["y"] in
      [dominated_by_allocation_point x y] =>? [y])
 
-let perform_analysis db ~stats =
+let cannot_change_calling_convention_query =
+  let^? [x], [] = ["x"], [] in
+  [cannot_change_calling_convention x]
+
+let cannot_change_calling_convention uses v =
+  (not (Flambda_features.reaper_change_calling_conventions ()))
+  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
+  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+
+let perform_analysis0 db ~stats =
   let db =
     Profile.record_call ~accumulate:true "compute_unboxing_decisions" (fun () ->
         (* We need to do this after [field_of_constructor_is_used] is computed,
@@ -772,21 +839,299 @@ let perform_analysis db ~stats =
             !changed_representation;
         unboxed, !changed_representation)
   in
+  { db; unboxed_fields = unboxed; changed_representation }
+
+let perform_analysis db ~stats =
   if
     Flambda_features.reaper_unbox ()
     && Flambda_features.reaper_change_calling_conventions ()
-  then { db; unboxed_fields = unboxed; changed_representation }
+  then perform_analysis0 db ~stats
   else
     { db;
       unboxed_fields = Code_id_or_name.Map.empty;
       changed_representation = Code_id_or_name.Map.empty
     }
 
-let cannot_change_calling_convention_query =
-  let^? [x], [] = ["x"], [] in
-  [cannot_change_calling_convention x]
+type code_change =
+  { calling_convention_change : calling_convention_change;
+    code_metadata : Code_metadata.t
+  }
 
-let cannot_change_calling_convention uses v =
-  (not (Flambda_features.reaper_change_calling_conventions ()))
-  || (not (Current_unit.is_current (Code_id.get_compilation_unit v)))
-  || cannot_change_calling_convention_query [Code_id_or_name.code_id v] uses.db
+type code_changes = code_change Code_id.Map.t
+
+let arity_of_decisions params_decisions =
+  let arity =
+    List.fold_left
+      (fun acc param_decision ->
+        match param_decision with
+        | Delete -> acc
+        | Keep (_, kind) -> kind :: acc
+        | Unbox fields ->
+          Unboxed_fields.fold_with_kind
+            (fun kind _ acc -> Flambda_kind.With_subkind.anything kind :: acc)
+            fields acc)
+      [] params_decisions
+    |> List.rev
+  in
+  Flambda_arity.(
+    create
+      [ Unboxed_product
+          (List.map (fun k -> Component_for_creation.Singleton k) arity) ])
+
+let get_arity_and_modes params_decisions =
+  let rev_arity, rev_modes =
+    List.fold_left
+      (fun (rev_kinds, rev_modes) l ->
+        let rev_kinds_param, rev_modes =
+          List.fold_left
+            (fun (rev_kinds, rev_modes) (param_decision, mode) ->
+              match param_decision with
+              | Delete -> rev_kinds, rev_modes
+              | Keep (_, kind) -> kind :: rev_kinds, mode :: rev_modes
+              | Unbox fields ->
+                (* CR ncourant: isn't this incorrect, in the case the mode tells
+                   us the value is always local? Unboxing a local value could
+                   point to heap-allocated blocks. I think for now the modes in
+                   the arities can never be [Local], only [Heap] or
+                   [Heap_or_local], so this should not cause problems. *)
+                Unboxed_fields.fold_with_kind
+                  (fun kind _ (rev_kinds, modes) ->
+                    ( Flambda_kind.With_subkind.anything kind :: rev_kinds,
+                      mode :: modes ))
+                  fields (rev_kinds, rev_modes))
+            ([], rev_modes) l
+        in
+        List.rev rev_kinds_param :: rev_kinds, rev_modes)
+      ([], []) params_decisions
+  in
+  let arity, modes = List.rev rev_arity, List.rev rev_modes in
+  ( Flambda_arity.(
+      create
+        (List.map
+           (fun kinds ->
+             Component_for_creation.Unboxed_product
+               (List.map (fun k -> Component_for_creation.Singleton k) kinds))
+           arity)),
+    modes )
+
+let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
+    ~code_deps =
+  let get_unboxed_fields cn =
+    Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  in
+  let is_var_used var =
+    match Variable.kind var with
+    | Region | Rec_info -> true
+    | Value | Naked_number _ -> PTA.has_use uses.db (Code_id_or_name.var var)
+  in
+  let forget_all_types = Flambda_features.debug_reaper "forget-types" in
+  Code_id.Map.mapi
+    (fun code_id (code_dep : Traverse_acc.code_dep) ->
+      let code_metadata = code_dep.code_metadata in
+      let is_my_closure_used = is_var_used code_dep.my_closure in
+      let code_metadata =
+        if
+          Bool.equal is_my_closure_used
+            (Code_metadata.is_my_closure_used code_metadata)
+        then code_metadata
+        else if is_my_closure_used
+        then
+          if
+            (* If the code is opaque or zero-alloc checked, it can look like the
+               closure is used when it actually is not. *)
+            Code_metadata.is_opaque code_metadata
+            ||
+            match Code_metadata.zero_alloc_attribute code_metadata with
+            | Check _ -> true
+            | Default_zero_alloc | Assume _ -> false
+          then code_metadata
+          else
+            Misc.fatal_errorf
+              "For code_metadata %a, the analysis says my_closure is used, but \
+               the original code did not use my_closure"
+              Code_metadata.print code_metadata
+        else Code_metadata.with_is_my_closure_used false code_metadata
+      in
+      let calling_convention_change, code_metadata =
+        if cannot_change_calling_convention uses code_id
+        then
+          (* We still need to rewrite the kinds and subkinds of parameters and
+             returns, as they could be poisoned. *)
+          let rewrite_kinds vars kinds =
+            List.map2
+              (fun var kind -> rewrite_kind_with_subkind (Name.var var) kind)
+              vars kinds
+          in
+          let params_arity =
+            Flambda_arity.create
+              (List.map
+                 (fun kinds ->
+                   Flambda_arity.Component_for_creation.(
+                     Unboxed_product
+                       (List.map (fun kind -> Singleton kind) kinds)))
+                 (Flambda_arity.group_by_parameter code_dep.arity
+                    (rewrite_kinds code_dep.params
+                       (Flambda_arity.unarize code_dep.arity))))
+          in
+          let result_arity =
+            Flambda_arity.create_singletons
+              (rewrite_kinds code_dep.return
+                 (Flambda_arity.unarized_components code_dep.result_arity))
+          in
+          ( Not_changing_calling_convention,
+            Code_metadata.with_params_arity params_arity
+              (Code_metadata.with_result_arity result_arity code_metadata) )
+        else
+          let params_decisions =
+            List.map2
+              (fun param kind ->
+                match get_unboxed_fields (Code_id_or_name.var param) with
+                | None ->
+                  let kind = rewrite_kind_with_subkind (Name.var param) kind in
+                  if is_var_used param then Keep (param, kind) else Delete
+                | Some fields -> Unbox fields)
+              code_dep.params
+              (Flambda_arity.unarize code_dep.arity)
+          in
+          let my_closure_decision, code_metadata =
+            match
+              get_unboxed_fields (Code_id_or_name.var code_dep.my_closure)
+            with
+            | None -> Keep_my_closure, code_metadata
+            | Some unboxed_fields ->
+              ( Unbox_my_closure unboxed_fields,
+                Code_metadata.with_is_my_closure_used false code_metadata )
+          in
+          let return_decisions =
+            List.map2
+              (fun v kind ->
+                match get_unboxed_fields (Code_id_or_name.var v) with
+                | None ->
+                  let kind = rewrite_kind_with_subkind (Name.var v) kind in
+                  if is_var_used v then Keep (v, kind) else Delete
+                | Some fields -> Unbox fields)
+              code_dep.return
+              (Flambda_arity.unarized_components code_dep.result_arity)
+          in
+          let result_arity =
+            Flambda_arity.unarize_t (arity_of_decisions return_decisions)
+          in
+          let code_metadata =
+            Code_metadata.with_is_tupled false
+              (Code_metadata.with_result_arity result_arity code_metadata)
+          in
+          let params_decisions_and_modes =
+            Flambda_arity.group_by_parameter
+              (Code_metadata.params_arity code_metadata)
+              (List.combine params_decisions
+                 (Code_metadata.param_modes code_metadata))
+          in
+          let params_decisions_and_modes =
+            match params_decisions_and_modes with
+            | [] ->
+              Misc.fatal_errorf
+                "Empty parameter groups when changing calling convention for \
+                 code id %a"
+                Code_id.print code_id
+            | first :: rest ->
+              let my_closure_decision =
+                match my_closure_decision with
+                (* If we're not unboxing we need to "delete" the extra mode we
+                   prepend below, ultimately this is a no-op. *)
+                | Keep_my_closure -> Delete
+                | Unbox_my_closure fields -> Unbox fields
+              in
+              ((my_closure_decision, Alloc_mode.For_types.unknown ()) :: first)
+              :: rest
+          in
+          let params_arity, modes =
+            get_arity_and_modes params_decisions_and_modes
+          in
+          let code_metadata =
+            Code_metadata.with_params_arity params_arity
+              (Code_metadata.with_param_modes modes code_metadata)
+          in
+          (* We only change the calling convention if the analysis has shown
+             there are no partial applications. *)
+          let code_metadata =
+            Code_metadata.with_first_complex_local_param
+              First_complex_local_param.Never_partially_applied code_metadata
+          in
+          ( Changing_calling_convention
+              { params_decisions; return_decisions; my_closure_decision },
+            code_metadata )
+      in
+      let code_metadata =
+        match Code_metadata.result_types code_metadata with
+        | Unknown | Bottom -> code_metadata
+        | Ok result_types ->
+          let result_types =
+            if forget_all_types
+            then Or_unknown_or_bottom.Unknown
+            else
+              let params_vars_and_keep, results_vars_and_keep =
+                match calling_convention_change with
+                | Not_changing_calling_convention ->
+                  ( List.map
+                      (fun p -> p, Points_to_analysis.Keep)
+                      code_dep.params,
+                    List.map
+                      (fun p -> p, Points_to_analysis.Keep)
+                      code_dep.return )
+                | Changing_calling_convention
+                    { my_closure_decision = _;
+                      params_decisions;
+                      return_decisions
+                    } ->
+                  ( List.map2
+                      (fun p decision ->
+                        match decision with
+                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                        | Delete -> p, Points_to_analysis.Delete)
+                      code_dep.params params_decisions,
+                    List.map2
+                      (fun p decision ->
+                        match decision with
+                        | Keep _ | Unbox _ -> p, Points_to_analysis.Keep
+                        | Delete -> p, Points_to_analysis.Delete)
+                      code_dep.return return_decisions )
+              in
+              rewrite_result_types ~my_closure:code_dep.my_closure
+                ~params:params_vars_and_keep ~results:results_vars_and_keep
+                result_types
+          in
+          Code_metadata.with_result_types result_types code_metadata
+      in
+      { calling_convention_change; code_metadata })
+    code_deps
+
+let get_calling_convention_change t code_id =
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    if Current_unit.is_current (Code_id.get_compilation_unit code_id)
+    then
+      Misc.fatal_errorf
+        "[get_calling_convention_change]: code_id %a is in current unit but \
+         missing in code changes"
+        Code_id.print code_id
+    else Not_changing_calling_convention
+  | Some code_change -> code_change.calling_convention_change
+
+let is_changing_calling_convention t code_id =
+  match get_calling_convention_change t code_id with
+  | Not_changing_calling_convention -> false
+  | Changing_calling_convention _ -> true
+
+let get_code_metadata t code_id =
+  if not (Current_unit.is_current (Code_id.get_compilation_unit code_id))
+  then
+    Misc.fatal_errorf
+      "[get_code_metadata]: code_id %a is not from the current unit"
+      Code_id.print code_id;
+  match Code_id.Map.find_opt code_id t with
+  | None ->
+    Misc.fatal_errorf
+      "[get_code_metadata]: code_id %a is in current unit but missing in code \
+       changes"
+      Code_id.print code_id
+  | Some code_change -> code_change.code_metadata

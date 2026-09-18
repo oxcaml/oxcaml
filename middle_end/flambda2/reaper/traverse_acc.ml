@@ -26,6 +26,8 @@ module Env = Traverse_env
 
 type code_dep =
   { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
+    code_metadata : Code_metadata.t;
     params : Variable.t list;
     my_closure : Variable.t;
     return : Variable.t list; (* Dummy variable representing return value *)
@@ -59,7 +61,10 @@ type t =
     mutable continuation_info : continuation_info Continuation.Map.t;
     mutable set_of_closures_graph : Code_id.Set.t Code_id.Map.t;
     mutable all_sets_of_closures :
-      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+      (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list;
+    mutable closure_function_decls :
+      Function_declarations.code_id_in_function_declaration
+      Code_id_or_name.Map.t
   }
 
 let code_deps t = t.code_deps
@@ -73,7 +78,8 @@ let create () =
     fixed_arity_conts = Continuation.Set.empty;
     continuation_info = Continuation.Map.empty;
     set_of_closures_graph = Code_id.Map.empty;
-    all_sets_of_closures = []
+    all_sets_of_closures = [];
+    closure_function_decls = Code_id_or_name.Map.empty
   }
 
 (* CR-someday ncourant: it would be great if we kept constants and symbols from
@@ -308,6 +314,31 @@ let create_unknown_arity_tupled_call_witnesses t code_id ~params ~returns ~exn =
       add_accessor_dep t ~to_:(Code_id_or_name.var v) (Field.block i K.value)
         ~base:untuple_var)
     params;
+  (* We can't ever remove the accessors from the tuple, because they are inside
+     the [caml_tuplify*] functions and not in our control. As such, even if no
+     component of the tuple is used, the tuple itself must never be replaced by
+     a poison value, because otherwise [caml_tuplify*] will try to load the
+     fields from the poison value and cause a segfault.
+
+     To force the tuple to remain alive, we read its [Is_int] field, and force
+     the result to be used if the function could be called. Ideally, we would
+     want to force the tuple to stay the same length, reading from a
+     [Block_length] field, but this does not exist yet. However, we also never
+     change the length or representation of blocks, so reading the [Is_int]
+     field is enough to ensure the block remains alive and of the same size,
+     even if all its fields turn to poison.
+
+     If we ever start changing the representation of blocks, or if we change
+     their length in another way, it will become necessary to do something else
+     here to ensure the size of the tuple cannot change. *)
+  let keep_tuple_alive_var =
+    Code_id_or_name.var (Variable.create "keep_tuple_alive_var" K.value)
+  in
+  add_accessor_dep t ~to_:keep_tuple_alive_var Field.is_int ~base:untuple_var;
+  (* Make sure [keep_tuple_alive_var] is used if [code_id] is used. *)
+  add_use_dep t
+    ~to_:(Code_id_or_name.code_id code_id)
+    ~from:keep_tuple_alive_var;
   [witness]
 
 let create_unknown_arity_non_tupled_call_witnesses t code_id ~arity ~params
@@ -460,6 +491,12 @@ let record_set_of_closures_deps t =
 let add_set_of_closures t set_of_closures =
   t.all_sets_of_closures <- set_of_closures :: t.all_sets_of_closures
 
+let add_closure_function_decl t name decl =
+  t.closure_function_decls
+    <- Code_id_or_name.Map.add
+         (Code_id_or_name.name name)
+         decl t.closure_function_decls
+
 let deps t ~all_constants =
   List.iter
     (fun { function_containing_apply_expr;
@@ -515,3 +552,5 @@ let sort_code_ids t =
     r
 
 let get_all_sets_of_closures t = t.all_sets_of_closures
+
+let get_closure_function_decls t = t.closure_function_decls

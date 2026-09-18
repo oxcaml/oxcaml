@@ -545,6 +545,12 @@ val log2_nativeint: nativeint -> int
     [n = Nativeint.shift_left 1n s]
 *)
 
+val count_leading_zeroes_nativeint: nativeint -> int
+(** [count_leading_zeroes_nativeint n] computes the number of leading zeroes
+    when [n] is written in binary using [Nativeint.size] bits.
+    [count_leading_zeroes_nativeint 0n = Nativeint.size].
+*)
+
 val power : base:int -> int -> int
 (** [power ~base x] computes [base**x]. *)
 

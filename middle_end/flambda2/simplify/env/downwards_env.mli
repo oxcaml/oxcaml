@@ -36,8 +36,6 @@ val create :
   propagating_float_consts:bool ->
   unit_toplevel_exn_continuation:Continuation.t ->
   unit_toplevel_return_continuation:Continuation.t ->
-  toplevel_my_region:Variable.t ->
-  toplevel_my_ghost_region:Variable.t ->
   toplevel_my_alloc_region:Variable.t ->
   t
 
@@ -146,7 +144,11 @@ val find_code_metadata_exn : t -> Code_id.t -> Code_metadata.t
 
 val set_inlined_debuginfo : t -> from:t -> t
 
-val merge_inlined_debuginfo : t -> from_apply_expr:Inlined_debuginfo.t -> t
+val merge_inlined_debuginfo_and_forward_inlined_attribute :
+  t ->
+  from_apply_expr:Inlined_debuginfo.t ->
+  inlined_attribute:Inlined_attribute.t ->
+  t
 
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
@@ -193,6 +195,14 @@ end
 val disable_inlining : t -> Disable_inlining.t
 
 val disable_partial_application_stub_generation : t -> bool
+
+(** This is the [@inlined] attribute (after forwarding) that was provided on the
+    [apply] to the innermost inlined function we are currently simplifying, and
+    the value that should be used for [@inlined forward] calls within.
+
+    It is [None] if we are not currently inside an inlined body. *)
+val inlined_attribute_to_forward :
+  t -> (Inlined_attribute.t * forwarded_from:Inlined_debuginfo.t) option
 
 val enter_set_of_closures : t -> t
 

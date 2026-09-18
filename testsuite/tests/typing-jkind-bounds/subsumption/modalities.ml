@@ -471,7 +471,100 @@ Error: This value is "contended"
        However, the highlighted expression is expected to be "uncontended".
 |}]
 
+module Direct_middle_bound_saturates_with_bound : sig
+  type 'a t : value mod shared
+end = struct
+  type 'a t : value mod shared with 'a @@ shared
+end
+[%%expect{|
+module Direct_middle_bound_saturates_with_bound :
+  sig type 'a t : value mod shared end
+|}]
+
+module Incomparable_middle_bound_remains_relevant : sig
+  type 'a t : value mod shared
+end = struct
+  type 'a t : value mod shared with 'a @@ corrupted
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod shared with 'a @@ corrupted
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t : value mod shared with 'a end
+       is not included in
+         sig type 'a t : value mod shared end
+       Type declarations do not match:
+         type 'a t : value mod shared with 'a
+       is not included in
+         type 'a t : value mod shared
+       The kind of the first is value mod shared with 'a
+         because of the definition of t at line 4, characters 2-51.
+       But the kind of the first must be a subkind of value mod shared
+         because of the definition of t at line 2, characters 2-30.
+|}]
+
+module Incomparable_middle_bounds_with_constrained_parameter : sig
+  type ('a : value mod shared) t : value mod contended
+end = struct
+  type ('a : value mod shared) t : value mod contended with 'a @@ corrupted
+end
+[%%expect{|
+module Incomparable_middle_bounds_with_constrained_parameter :
+  sig type ('a : value mod shared) t : value mod contended end
+|}]
+
 (* Non-modal axis: external_ in with-bounds *)
+
+module External64_with_bound_is_middle : sig
+  type ('a : value mod external64) t : value mod external_
+end = struct
+  type ('a : value mod external64) t : value mod external_
+    with 'a @@ external64
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   type ('a : value mod external64) t : value mod external_
+5 |     with 'a @@ external64
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type ('a : value mod external64) t
+             : value mod external_ with 'a @@ external64
+         end
+       is not included in
+         sig type ('a : value mod external64) t : value mod external_ end
+       Type declarations do not match:
+         type ('a : value mod external64) t
+           : value mod external_ with 'a @@ external64
+       is not included in
+         type ('a : value mod external64) t : value mod external_
+       The kind of the first is value mod external_ with 'a @@ external64
+         because of the definition of t at lines 4-5, characters 2-25.
+       But the kind of the first must be a subkind of value mod external_
+         because of the definition of t at line 2, characters 2-58.
+
+       The first mode-crosses less than the second along:
+         externality: mod external_ with 'a @@ external64 ≰ mod external_
+|}]
+
+module Type_parameter_bound_saturates_with_bound : sig
+  type ('a : value mod external64) t : value mod external_
+    with 'a @@ external64
+end = struct
+  type ('a : value mod external64) t : value mod external_ with 'a
+end
+[%%expect{|
+module Type_parameter_bound_saturates_with_bound :
+  sig
+    type ('a : value mod external64) t
+      : value mod external_ with 'a @@ external64
+  end
+|}]
 
 (* [value mod portable external_ with 'a @@ external_]
   always crosses externality, but crosses [portable] with ['a] *)
@@ -637,7 +730,7 @@ Error: Unrecognized modality separable.
 
 module M : sig
   type ('a : bits64) t : bits64 mod portable with 'a @@ external_
-  (* CR layouts: the below type should also be [portable with 'a @@ external_]*)
+  (* CR layouts: the below type should also be [mod portable with 'a] *)
   type ('a : bits64) t2 : bits64 with 'a @@ external_
 end = struct
   type ('a : bits64) t = { x : 'a } [@@unboxed]
@@ -649,7 +742,7 @@ type 'a check_m_t2_always_external : bits64 = 'a M.t2
 [%%expect{|
 module M :
   sig
-    type ('a : bits64) t : bits64 mod portable with 'a @@ external_
+    type ('a : bits64) t : bits64 mod portable with 'a
     type ('a : bits64) t2 : bits64
   end
 type ('a : bits64) check_m_t_always_external = 'a M.t
@@ -661,13 +754,10 @@ type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
 Line 1, characters 0-65:
 1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a M.t" is bits64 mod portable with 'a @@ external_
+Error: The kind of type "'a M.t" is bits64 mod portable with 'a
          because of the definition of t at line 2, characters 2-65.
        But the kind of type "'a M.t" must be a subkind of any mod portable
          because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
 |}]
 
 type 'a check_m_t2_not_always_portable : any mod portable = 'a M.t2
@@ -694,8 +784,7 @@ type 'a check_m_t_always_external : bits64 & bits64 = 'a M.t
 module M :
   sig
     type ('a : bits64) t
-      : bits64 mod portable with 'a @@ external_
-        & bits64 mod portable with 'a @@ external_
+      : bits64 mod portable with 'a & bits64 mod portable with 'a
   end
 type ('a : bits64) check_m_t_always_external = 'a M.t
 |}]
@@ -706,14 +795,10 @@ Line 1, characters 0-65:
 1 | type 'a check_m_t_not_always_portable : any mod portable = 'a M.t
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The kind of type "'a M.t" is
-           bits64 mod portable with 'a @@ external_
-           & bits64 mod portable with 'a @@ external_
+           bits64 mod portable with 'a & bits64 mod portable with 'a
          because of the definition of t at line 2, characters 2-74.
        But the kind of type "'a M.t" must be a subkind of any mod portable
          because of the definition of check_m_t_not_always_portable at line 1, characters 0-65.
-
-       The first mode-crosses less than the second along:
-         portability: mod portable with 'a ≰ mod portable
 |}]
 
 

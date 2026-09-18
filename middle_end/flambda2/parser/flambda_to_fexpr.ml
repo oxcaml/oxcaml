@@ -692,6 +692,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       match Apply_expr.inlined app with
       | Default_inlined -> Some Default_inlined
       | Hint_inlined -> Some Hint_inlined
+      | Forward_inlined -> Some Forward_inlined
       | Always_inlined _ -> Some Always_inlined
       | Unroll (n, _) -> Some (Unroll n)
       | Never_inlined -> Some Never_inlined
@@ -866,13 +867,6 @@ let conv flambda_unit =
   let env =
     Env.bind_toplevel_alloc_region env
       (Flambda_unit.toplevel_my_alloc_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_region env (Flambda_unit.toplevel_my_region flambda_unit)
-  in
-  let env =
-    Env.bind_toplevel_ghost_region env
-      (Flambda_unit.toplevel_my_ghost_region flambda_unit)
   in
   (* Bind all code ids in toplevel let bindings at the start, since they don't
      necessarily occur in dependency order *)

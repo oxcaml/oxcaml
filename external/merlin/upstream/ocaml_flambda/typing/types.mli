@@ -35,7 +35,7 @@ type atomic =
 type mutability =
   | Immutable
   | Mutable of
-      { mode : Mode.Value.Comonadic.lr
+      { mode : Mode.With_regionality.Comonadic.lr
         (** Mode of new field value in mutation. *)
       ; atomic : atomic
       }
@@ -49,7 +49,9 @@ val is_mutable : mutability -> bool
 val is_atomic : mutability -> bool
 
 (** Given the parameter [m0] on mutable, return the mode of future writes. *)
-val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
+val mutable_mode :
+  ('l * 'r) Mode.With_regionality.Comonadic.t ->
+  ('l * 'r) Mode.With_regionality.t
 
 (** Type expressions for the core language.
 
@@ -85,8 +87,10 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
 
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
-  (** The axes that the with-bound applies to *)
-  type t = { relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+  (** The with-bound contributes the meet of the type's modal and externality
+      bounds and [bounds_mask]. On each axis, [top] preserves the type's bound,
+      [bot] ignores it, and a middle element caps its contribution there. *)
+  type t = { bounds_mask : Axis_lattice.t } [@@unboxed]
 
   val join : t -> t -> t
 end
@@ -312,7 +316,7 @@ and arg_label =
   | Position of string (** [label:[%call_pos] -> ...] *)
 
 and arrow_desc =
-  arg_label * Mode.Alloc.lr * Mode.Alloc.lr
+  arg_label * Mode.With_locality.lr * Mode.With_locality.lr
 
 (** [package] corresponds to the type of a first-class module *)
 and package =
@@ -753,7 +757,7 @@ module Vars  : Map.S with type key = string
 
 type value_kind =
     Val_reg of Jkind_types.Sort.t       (* Regular value *)
-  | Val_mut of Mode.Value.Comonadic.lr * Jkind_types.Sort.t
+  | Val_mut of Mode.With_regionality.Comonadic.lr * Jkind_types.Sort.t
                                         (* Mutable variable *)
   | Val_prim of Primitive.description   (* Primitive *)
   | Val_ivar of mutable_flag * string   (* Instance variable (mutable ?) *)
@@ -893,7 +897,7 @@ type type_declaration =
 and type_decl_kind = (label_declaration, label_declaration, constructor_declaration) type_kind
 
 and unsafe_mode_crossing =
-  { unsafe_mod_bounds : Mode.Crossing.t
+  { unsafe_mod_bounds : mod_bounds
   ; unsafe_with_bounds : (allowed * disallowed) with_bounds
   }
 
@@ -1038,11 +1042,16 @@ and cstr_layout =
 and constructor_representation =
   | Constructor_uniform_value
   (* A constant constructor or a constructor all of whose fields are values.
-     This is named 'uniform_value' to distinguish from the 'Constructor_uniform'
-     of [lambda.mli], which can also represent all-flat-float records.
+     This is named 'uniform_value' to distinguish from the
+     'Constructor_shape_uniform' of [lambda.mli], which can also represent
+     all-flat-float records.
   *)
   | Constructor_mixed of mixed_product_shape
   (* A constructor that has some non-value fields. *)
+  | Constructor_immediate_all_void
+  (* A constructor with all-void args, represented as a constant rather than a
+     block: one annotated with [@immediate_all_void_constructor], or the null
+     constructor of a [Variant_with_null]. *)
   | Constructor_undetermined
   (* The constructor has an inlined record argument with a field of layout
      [any], so its shape cannot be determined at typedecl time. *)
@@ -1240,20 +1249,20 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
+  | Mty_functor of functor_parameter * module_type * Mode.With_locality.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type * Mode.Alloc.lr
+  | Named of Ident.t option * module_type * Mode.With_locality.lr
 
   and signature = signature_item list wrapped
 
   (** A left mode instead of a constant mode, in order to encode mode hints.
       Note that cmi record constant modes anyway. *)
-  and persistent_signature = signature * Mode.Value.l
+  and persistent_signature = signature * Mode.With_regionality.l
 
   and signature_item =
     Sig_value of Ident.t * value_description * visibility
@@ -1347,6 +1356,13 @@ val equal_record_unboxed_product_representation_up_to_scannable_axes :
 val equal_variant_representation_up_to_scannable_axes :
   variant_representation -> variant_representation -> bool
 
+val equal_constructor_representation_up_to_scannable_axes :
+  constructor_representation -> constructor_representation -> bool
+
+(** Whether the constructor is represented as a constant rather than a block:
+    it is nullary, or its shape is [Constructor_immediate_all_void]. *)
+val cstr_layout_is_constant : cstr_layout -> bool
+
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
@@ -1372,10 +1388,6 @@ val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 
 val equal_mixed_product_shape_up_to_scannable_axes :
   mixed_product_shape -> mixed_product_shape -> bool
-
-val equal_unsafe_mode_crossing :
-  type_equal:(type_expr -> type_expr -> bool) ->
-  unsafe_mode_crossing -> unsafe_mode_crossing -> bool
 
 (**** Utilities for backtracking ****)
 
@@ -1420,5 +1432,5 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
-val class_mode : Mode.Value.lr
-val toplevel_mode : Mode.Value.lr
+val class_mode : Mode.With_regionality.lr
+val toplevel_mode : Mode.With_regionality.lr

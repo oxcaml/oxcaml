@@ -337,14 +337,11 @@ Line 1, characters 16-45:
 Error: Layout polymorphism is not supported in term-level type annotations
 |}]
 
-(* CR-soon zqian: should work once layout instantiation is handled by slambda *)
 module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end  @ static) = struct
   let () = let _ = M.f in ()
 end
 [%%expect{|
->> Fatal error: slambda eval: unexpected missing value
-Uncaught exception: Misc.Fatal_error
-
+module F : functor (M : sig val poly_ f : 'a -> 'a end @ static) -> sig end
 |}]
 
 (* You can add additional constraint on the modal bounds, which doesn't affect
@@ -682,3 +679,33 @@ Error: Abstract kinds are not yet supported in products.
  *       layout_ l. ('a : value & l) 'b. 'a -> 'b -> #('a * 'b)
  *   end
  * |}] *)
+
+(** Nested generalize **)
+
+(* both [val poly_] and the inclusion check for unifying packages generalizes *)
+module type A = sig val x : int end
+module type B = sig val x : int end
+module type T = sig
+  val poly_ f : ((module A) as 'a) -> ((module B) as 'a) -> 'b
+end
+[%%expect {|
+module type A = sig val x : int end
+module type B = sig val x : int end
+module type T = sig val poly_ f : (module B) -> (module B) -> 'b end
+|}, Principal{|
+module type A = sig val x : int end
+module type B = sig val x : int end
+module type T = sig val poly_ f : (module A) -> (module B) -> 'b end
+|}]
+
+(** Classes and objects **)
+
+module type Class = module type of struct
+  class c = let poly_ id x = x in object end
+end
+[%%expect {|
+Line 4, characters 12-30:
+4 |   class c = let poly_ id x = x in object end
+                ^^^^^^^^^^^^^^^^^^
+Error: Defining layout-polymorphic values is not yet supported in classes.
+|}]

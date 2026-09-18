@@ -213,6 +213,7 @@ module Predef : sig
     | Unboxed_int8
     | Unboxed_mask
     | Unboxed_simd of simd_vec_split
+    | Unboxed_unit
 
   type t =
     | Array
@@ -342,6 +343,7 @@ and 'a constructor =
   { name : string;
     constr_uid: Uid.t option;
     kind : constructor_representation;
+    is_constant : bool;
     args : 'a constructor_argument list
   }
 

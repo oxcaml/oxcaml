@@ -463,15 +463,15 @@ type ok = t8 req
 type ok = t8 req
 |}]
 
-type ok = int64# req
+type ok = int64_u req
 [%%expect{|
-type ok = int64# req
+type ok = int64_u req
 |}]
 
 (* An unboxed product is addressable iff all of its components are *)
-type ok = #(int64# * string) req
+type ok = #(int64_u * string) req
 [%%expect{|
-type ok = #(int64# * string) req
+type ok = #(int64_u * string) req
 |}]
 
 type bad = #(float# * string) req
@@ -681,9 +681,9 @@ let g (x : t8) (y : string) = y
 val g : t8 -> string -> string = <fun>
 |}]
 
-type r : bits8 addressable & bits64 = #{ a : t8; b : int64# }
+type r : bits8 addressable & bits64 = #{ a : t8; b : int64_u }
 [%%expect{|
-type r = #{ a : t8; b : int64#; }
+type r = #{ a : t8; b : int64_u; }
 |}]
 
 let proj (#{ a; b = _ } : r) = a

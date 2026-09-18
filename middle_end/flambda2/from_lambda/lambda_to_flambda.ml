@@ -1209,7 +1209,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ ->
     Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
@@ -1413,7 +1414,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(0, Constructor_uniform field_kinds)]
+                non_consts = [(0, Constructor_shape_uniform field_kinds)]
               }
         } ->
       Some
@@ -1427,7 +1428,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           raw_kind =
             Pvariant
               { consts = [];
-                non_consts = [(tag, Constructor_uniform field_kinds)]
+                non_consts = [(tag, Constructor_shape_uniform field_kinds)]
               }
         }
       when tag = Obj.double_array_tag ->
@@ -1503,7 +1504,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
           ~name:(Ident.name fid ^ "_unboxed")
           ~is_always_immediate:false Flambda_kind.value
       in
-      let unboxed_return =
+      let return_unboxing =
         match unboxing_kind return, attr.unbox_return with
         | Some kind, Some mode -> Some (kind, mode)
         | _, _ -> None
@@ -1513,7 +1514,7 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
         then unboxing_kind param.layout
         else None
       in
-      let unboxed_params =
+      let params_unboxing =
         List.concat
           (List.map2
              (fun param kinds ->
@@ -1524,15 +1525,35 @@ and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
                  Misc.fatal_error "Trying to unbox an unboxed product.")
              params unarized_per_param)
       in
+      (* If an unboxable parameter is locally-allocated, but this function is
+         [not_alloc_stack], we need to introduce a wrapper after the return to
+         close the local region introduced for the parameter. We can't allocate
+         the parameter on the heap instead, because the parameter might contain
+         pointers to locally-allocated blocks, for instance if it is a block
+         itself. *)
+      let needs_region_wrapper =
+        Lambda.is_not_alloc_stack ret_mode
+        && List.exists
+             (fun (param : Lambda.lparam) ->
+               param.attributes.unbox_param && Lambda.is_local_mode param.mode)
+             params
+      in
       Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot)
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper
+        }
   in
   let body_cont =
     match calling_convention with
-    | Normal_calling_convention | Unboxed_calling_convention (_, None, _) ->
+    | Normal_calling_convention
+    | Unboxed_calling_convention
+        { return_unboxing = None; needs_region_wrapper = false; _ } ->
       Continuation.create ~sort:Return ()
-    | Unboxed_calling_convention (_, Some _, _) ->
-      Continuation.create ~sort:Normal_or_exn ~name:"boxed_return" ()
+    | Unboxed_calling_convention { needs_region_wrapper = true; _ }
+    | Unboxed_calling_convention { return_unboxing = Some _; _ } ->
+      Continuation.create ~sort:Normal_or_exn ~name:"return_wrapper" ()
   in
   let body_exn_cont = Continuation.create () in
   let free_idents_of_body =
@@ -1719,7 +1740,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ ->
+        | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+        | Linstantiate _ ->
           Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
@@ -1853,13 +1875,9 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
 (* CR pchambart: define a record `target_config` to hold things like
    `big_endian` *)
 let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
-    ~compilation_unit ~module_repr ~sections (lam : Lambda.lambda) =
+    ~compilation_unit ~module_repr (lam : Lambda.lambda) =
   let return_continuation = Continuation.create ~sort:Define_root_symbol () in
   let exn_continuation = Continuation.create () in
-  let toplevel_my_region = Ident.create_local "toplevel_my_region" in
-  let toplevel_my_ghost_region =
-    Ident.create_local "toplevel_my_ghost_region"
-  in
   let toplevel_my_alloc_region =
     Ident.create_local "toplevel_my_alloc_region"
   in
@@ -1873,5 +1891,5 @@ let lambda_to_flambda ~mode ~machine_width ~big_endian ~cmx_loader
   in
   CC.close_program ~mode ~machine_width ~big_endian ~cmx_loader
     ~compilation_unit ~module_repr ~program
-    ~prog_return_cont:return_continuation ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections
+    ~prog_return_cont:return_continuation ~exn_continuation
+    ~toplevel_my_alloc_region

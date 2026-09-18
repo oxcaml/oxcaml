@@ -201,11 +201,11 @@ val mixed : 'a rep2 * 'a -> int = <fun>
 |}]
 
 (* Sound: two mixed blocks whose flat suffixes disagree ([float#] versus
-   [float32#]) cannot be joined -- their representations differ -- so the
+   [float32_u]) cannot be joined -- their representations differ -- so the
    whole component widens to a generic value even though the scannable
    prefixes agree. *)
 type fa = { fx : int; fd : float# }
-type fb = { gx : int; ge : float32# }
+type fb = { gx : int; ge : float32_u }
 type _ rep3 = RF : fa rep3 | RG : fb rep3
 
 let mixed_flat : type a. a rep3 * a -> int = function
@@ -215,7 +215,7 @@ let mixed_flat : type a. a rep3 * a -> int = function
 0
 type fa = { fx : int; fd : float#; }
 0
-type fb = { gx : int; ge : float32#; }
+type fb = { gx : int; ge : float32_u; }
 0
 type _ rep3 = RF : fa rep3 | RG : fb rep3
 (let

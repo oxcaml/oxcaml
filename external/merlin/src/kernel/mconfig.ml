@@ -785,8 +785,10 @@ let ocaml_ignored_flags =
     "-no-flambda2-match-in-match";
     "-frametables-in-rodata";
     "-no-frametables-in-rodata";
-    "-flambda2-no-simplify-stubs";
-    "-flambda2-simplify-stubs"
+    "-no-flambda2-simplify-stubs";
+    "-flambda2-simplify-stubs";
+    "-stubs-forward-inlining";
+    "-no-stubs-forward-inlining"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -881,6 +883,7 @@ let ocaml_ignored_parametrized_flags =
     "-gdwarf-config-max-evaluation-steps-per-variable";
     "-gdwarf-config-shape-reduce-fuel";
     "-gdwarf-fidelity";
+    "-gdwarf-version";
     "-llvm-path";
     "-afl-inst-ratio";
     "-config-var";

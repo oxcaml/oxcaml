@@ -45,6 +45,7 @@ Error: Signature mismatch:
        The type "unit -> [ `A | `B of 'a -> 'a ]"
        is not compatible with the type
          "unit -> [ `A | `B of 'a -> 'a ] @ portable"
+       The return mode was expected to be "portable" but is "nonportable"
 |}]
 
 (* In this example, the inferred type does not allow crossing portability, but
@@ -73,15 +74,16 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : unit -> int @ local end
+         sig val f : unit -> int @ local forkable unyielding end
        is not included in
          sig val f : unit -> int end
        Values do not match:
-         val f : unit -> int @ local
+         val f : unit -> int @ local forkable unyielding
        is not included in
          val f : unit -> int
-       The type "unit -> int @ local" is not compatible with the type
-         "unit -> int"
+       The type "unit -> int @ local forkable unyielding"
+       is not compatible with the type "unit -> int"
+       The return mode was expected to be "global" but is "local"
 |}]
 
 module M : sig
@@ -307,10 +309,69 @@ type s = { v : t @@ contended; } [@@unboxed]
 |}]
 type s : value = { v : t @@ shared } [@@unboxed]
 type s : value = { v : t @@ corrupted } [@@unboxed]
-(* CR layouts: Ideally, these should have better jkinds than [value], but we
-   don't yet support the interaction between middle modes (like [shared] and
-   [poisoned]) and modal kinds. *)
+type s : value mod shared = { f : (int -> int) @@ shared } [@@unboxed]
+type s : value mod corrupted = { f : (int -> int) @@ corrupted } [@@unboxed]
+type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
+type concrete_corrupted : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
 [%%expect{|
 type s = { v : t @@ shared; } [@@unboxed]
 type s = { v : t @@ corrupted; } [@@unboxed]
+type s = { f : int -> int @@ shared; } [@@unboxed]
+type s = { f : int -> int @@ corrupted; } [@@unboxed]
+type concrete_shared = { v : t @@ shared; } [@@unboxed]
+type concrete_corrupted = { v : t @@ corrupted; } [@@unboxed]
+|}]
+
+let concrete_shared_from_shared
+    (x : concrete_shared @ shared) : concrete_shared @ uncontended =
+  x
+
+let concrete_shared_from_contended
+    (x : concrete_shared @ contended) : concrete_shared @ corrupted =
+  x
+
+[%%expect{|
+val concrete_shared_from_shared : concrete_shared @ shared -> concrete_shared =
+  <fun>
+val concrete_shared_from_contended :
+  concrete_shared @ contended -> concrete_shared @ corrupted = <fun>
+|}]
+
+let concrete_shared_no_cross
+    (x : concrete_shared @ contended) : concrete_shared @ shared =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let concrete_corrupted_from_corrupted
+    (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
+  x
+
+let concrete_corrupted_from_contended
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ shared =
+  x
+
+[%%expect{|
+val concrete_corrupted_from_corrupted :
+  concrete_corrupted @ corrupted -> concrete_corrupted = <fun>
+val concrete_corrupted_from_contended :
+  concrete_corrupted @ contended -> concrete_corrupted @ shared = <fun>
+|}]
+
+let concrete_corrupted_no_cross
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
 |}]

@@ -219,22 +219,22 @@ module _ = Bytes_tests (struct
 end)
 
 module _ = Bytes_tests (struct
-  external get_mask_prim : bytes -> int32# -> mask
+  external get_mask_prim : bytes -> int32_u -> mask
     = "%caml_bytes_getmask_indexed_by_int32#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
 
-  external get_mask_unsafe_prim : bytes -> int32# -> mask
+  external get_mask_unsafe_prim : bytes -> int32_u -> mask
     = "%caml_bytes_getmasku_indexed_by_int32#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
 
-  external set_mask_prim : bytes -> int32# -> mask -> unit
+  external set_mask_prim : bytes -> int32_u -> mask -> unit
     = "%caml_bytes_setmask_indexed_by_int32#"
 
   let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
 
-  external set_mask_unsafe_prim : bytes -> int32# -> mask -> unit
+  external set_mask_unsafe_prim : bytes -> int32_u -> mask -> unit
     = "%caml_bytes_setmasku_indexed_by_int32#"
 
   let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
@@ -253,22 +253,22 @@ module _ = Bytes_tests (struct
 end)
 
 module _ = Bytes_tests (struct
-  external get_mask_prim : bytes -> int64# -> mask
+  external get_mask_prim : bytes -> int64_u -> mask
     = "%caml_bytes_getmask_indexed_by_int64#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
 
-  external get_mask_unsafe_prim : bytes -> int64# -> mask
+  external get_mask_unsafe_prim : bytes -> int64_u -> mask
     = "%caml_bytes_getmasku_indexed_by_int64#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
 
-  external set_mask_prim : bytes -> int64# -> mask -> unit
+  external set_mask_prim : bytes -> int64_u -> mask -> unit
     = "%caml_bytes_setmask_indexed_by_int64#"
 
   let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
 
-  external set_mask_unsafe_prim : bytes -> int64# -> mask -> unit
+  external set_mask_unsafe_prim : bytes -> int64_u -> mask -> unit
     = "%caml_bytes_setmasku_indexed_by_int64#"
 
   let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
@@ -287,22 +287,22 @@ module _ = Bytes_tests (struct
 end)
 
 module _ = Bytes_tests (struct
-  external get_mask_prim : bytes -> nativeint# -> mask
+  external get_mask_prim : bytes -> nativeint_u -> mask
     = "%caml_bytes_getmask_indexed_by_nativeint#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
 
-  external get_mask_unsafe_prim : bytes -> nativeint# -> mask
+  external get_mask_unsafe_prim : bytes -> nativeint_u -> mask
     = "%caml_bytes_getmasku_indexed_by_nativeint#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
 
-  external set_mask_prim : bytes -> nativeint# -> mask -> unit
+  external set_mask_prim : bytes -> nativeint_u -> mask -> unit
     = "%caml_bytes_setmask_indexed_by_nativeint#"
 
   let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
-  external set_mask_unsafe_prim : bytes -> nativeint# -> mask -> unit
+  external set_mask_unsafe_prim : bytes -> nativeint_u -> mask -> unit
     = "%caml_bytes_setmasku_indexed_by_nativeint#"
 
   let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
@@ -431,12 +431,12 @@ module _ = String_tests (struct
 end)
 
 module _ = String_tests (struct
-  external get_mask_prim : string -> int32# -> mask
+  external get_mask_prim : string -> int32_u -> mask
     = "%caml_string_getmask_indexed_by_int32#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
 
-  external get_mask_unsafe_prim : string -> int32# -> mask
+  external get_mask_unsafe_prim : string -> int32_u -> mask
     = "%caml_string_getmasku_indexed_by_int32#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
@@ -453,12 +453,12 @@ module _ = String_tests (struct
 end)
 
 module _ = String_tests (struct
-  external get_mask_prim : string -> int64# -> mask
+  external get_mask_prim : string -> int64_u -> mask
     = "%caml_string_getmask_indexed_by_int64#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
 
-  external get_mask_unsafe_prim : string -> int64# -> mask
+  external get_mask_unsafe_prim : string -> int64_u -> mask
     = "%caml_string_getmasku_indexed_by_int64#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
@@ -475,12 +475,12 @@ module _ = String_tests (struct
 end)
 
 module _ = String_tests (struct
-  external get_mask_prim : string -> nativeint# -> mask
+  external get_mask_prim : string -> nativeint_u -> mask
     = "%caml_string_getmask_indexed_by_nativeint#"
 
   let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
 
-  external get_mask_unsafe_prim : string -> nativeint# -> mask
+  external get_mask_unsafe_prim : string -> nativeint_u -> mask
     = "%caml_string_getmasku_indexed_by_nativeint#"
 
   let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
@@ -689,22 +689,22 @@ open struct
 
 
   module _ = Bigstring_tests (struct
-    external get_mask_prim : bigstring -> int32# -> mask
+    external get_mask_prim : bigstring -> int32_u -> mask
       = "%caml_bigstring_getmask_indexed_by_int32#"
 
     let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
 
-    external get_mask_unsafe_prim : bigstring -> int32# -> mask
+    external get_mask_unsafe_prim : bigstring -> int32_u -> mask
       = "%caml_bigstring_getmasku_indexed_by_int32#"
 
     let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i))
 
-    external set_mask_prim : bigstring -> int32# -> mask -> unit
+    external set_mask_prim : bigstring -> int32_u -> mask -> unit
       = "%caml_bigstring_setmask_indexed_by_int32#"
 
     let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
 
-    external set_mask_unsafe_prim : bigstring -> int32# -> mask -> unit
+    external set_mask_unsafe_prim : bigstring -> int32_u -> mask -> unit
       = "%caml_bigstring_setmasku_indexed_by_int32#"
 
     let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
@@ -724,22 +724,22 @@ open struct
 
 
   module _ = Bigstring_tests (struct
-    external get_mask_prim : bigstring -> int64# -> mask
+    external get_mask_prim : bigstring -> int64_u -> mask
       = "%caml_bigstring_getmask_indexed_by_int64#"
 
     let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
 
-    external get_mask_unsafe_prim : bigstring -> int64# -> mask
+    external get_mask_unsafe_prim : bigstring -> int64_u -> mask
       = "%caml_bigstring_getmasku_indexed_by_int64#"
 
     let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i))
 
-    external set_mask_prim : bigstring -> int64# -> mask -> unit
+    external set_mask_prim : bigstring -> int64_u -> mask -> unit
       = "%caml_bigstring_setmask_indexed_by_int64#"
 
     let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
 
-    external set_mask_unsafe_prim : bigstring -> int64# -> mask -> unit
+    external set_mask_unsafe_prim : bigstring -> int64_u -> mask -> unit
       = "%caml_bigstring_setmasku_indexed_by_int64#"
 
     let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
@@ -759,22 +759,22 @@ open struct
 
 
   module _ = Bigstring_tests (struct
-    external get_mask_prim : bigstring -> nativeint# -> mask
+    external get_mask_prim : bigstring -> nativeint_u -> mask
       = "%caml_bigstring_getmask_indexed_by_nativeint#"
 
     let get_mask b i = (get_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
 
-    external get_mask_unsafe_prim : bigstring -> nativeint# -> mask
+    external get_mask_unsafe_prim : bigstring -> nativeint_u -> mask
       = "%caml_bigstring_getmasku_indexed_by_nativeint#"
 
     let get_mask_unsafe b i = (get_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i))
 
-    external set_mask_prim : bigstring -> nativeint# -> mask -> unit
+    external set_mask_prim : bigstring -> nativeint_u -> mask -> unit
       = "%caml_bigstring_setmask_indexed_by_nativeint#"
 
     let set_mask b i v = set_mask_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
 
-    external set_mask_unsafe_prim : bigstring -> nativeint# -> mask -> unit
+    external set_mask_unsafe_prim : bigstring -> nativeint_u -> mask -> unit
       = "%caml_bigstring_setmasku_indexed_by_nativeint#"
 
     let set_mask_unsafe b i v = set_mask_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v

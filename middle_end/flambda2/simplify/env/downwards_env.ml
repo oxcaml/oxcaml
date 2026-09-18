@@ -55,6 +55,8 @@ type t =
     inlined_debuginfo : Inlined_debuginfo.t;
     disable_inlining : Disable_inlining.t;
     disable_partial_application_stub_generation : bool;
+    inlined_attribute_to_forward :
+      (Inlined_attribute.t * forwarded_from:Inlined_debuginfo.t) option;
     inlining_state : Inlining_state.t;
     propagating_float_consts : bool;
     at_unit_toplevel : bool;
@@ -107,6 +109,7 @@ type t =
 let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
                 inlined_debuginfo; disable_inlining;
                 disable_partial_application_stub_generation;
+                inlined_attribute_to_forward;
                 inlining_state; propagating_float_consts;
                 at_unit_toplevel; unit_toplevel_exn_continuation;
                 variables_defined_at_toplevel; cse; comparison_results;
@@ -124,6 +127,7 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
       @[<hov 1>(inlined_debuginfo@ %a)@]@ \
       @[<hov 1>(disable_inlining@ %a)@]@ \
       @[<hov 1>(disable_partial_application_stub_generation@ %b)@]@ \
+      %a\
       @[<hov 1>(inlining_state@ %a)@]@ \
       @[<hov 1>(propagating_float_consts@ %b)@]@ \
       @[<hov 1>(at_unit_toplevel@ %b)@]@ \
@@ -150,6 +154,10 @@ let [@ocamlformat "disable"] print ppf { round; machine_width; typing_env;
     Inlined_debuginfo.print inlined_debuginfo
     Disable_inlining.print disable_inlining
     disable_partial_application_stub_generation
+    (Format.pp_print_option (fun ppf (attribute, ~forwarded_from) ->
+      Format.fprintf ppf "@[<hov 1>(inlined_attribute_to_forward@ %a@ %a)@]@ "
+        Inlined_attribute.print attribute Inlined_debuginfo.print forwarded_from))
+    inlined_attribute_to_forward
     Inlining_state.print inlining_state
     propagating_float_consts
     at_unit_toplevel
@@ -224,49 +232,39 @@ let define_extra_variable t var kind =
 let create ~round ~machine_width ~(resolver : resolver)
     ~(get_imported_code : get_imported_code) ~propagating_float_consts
     ~unit_toplevel_exn_continuation ~unit_toplevel_return_continuation
-    ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region =
+    ~toplevel_my_alloc_region =
   let typing_env = TE.create ~machine_width ~resolver in
-  let t =
-    { round;
-      machine_width;
-      typing_env;
-      inlined_debuginfo = Inlined_debuginfo.none;
-      disable_inlining = Do_not_disable_inlining;
-      disable_partial_application_stub_generation = false;
-      inlining_state = Inlining_state.default ~round;
-      propagating_float_consts;
-      at_unit_toplevel = true;
-      unit_toplevel_return_continuation;
-      unit_toplevel_exn_continuation;
-      unit_toplevel_alloc_region = toplevel_my_alloc_region;
-      variables_defined_at_toplevel = Variable.Set.empty;
-      cse = CSE.empty;
-      comparison_results = Variable.Map.empty;
-      are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
-      closure_info = Closure_info.not_in_a_closure;
-      all_code = Code_id.Map.empty;
-      get_imported_code;
-      inlining_history_tracker =
-        Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
-      loopify_state = Loopify_state.do_not_loopify;
-      replay_history = Replay_history.first_pass;
-      specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
-      defined_variables_by_scope = [Lifted_cont_params.empty];
-      lifted = Variable.Set.empty;
-      cost_of_lifting_continuations_out_of_current_one = 0;
-      has_seen_a_non_liftable_continuation = false;
-      join_analysis = None
-    }
-  in
-  let my_region_duid = Flambda_debug_uid.none in
-  let my_ghost_region_duid = Flambda_debug_uid.none in
-  define_variable
-    (define_variable t
-       (Bound_var.create toplevel_my_region my_region_duid Name_mode.normal)
-       K.region)
-    (Bound_var.create toplevel_my_ghost_region my_ghost_region_duid
-       Name_mode.normal)
-    K.region
+  { round;
+    machine_width;
+    typing_env;
+    inlined_debuginfo = Inlined_debuginfo.none;
+    disable_inlining = Do_not_disable_inlining;
+    disable_partial_application_stub_generation = false;
+    inlined_attribute_to_forward = None;
+    inlining_state = Inlining_state.default ~round;
+    propagating_float_consts;
+    at_unit_toplevel = true;
+    unit_toplevel_return_continuation;
+    unit_toplevel_exn_continuation;
+    unit_toplevel_alloc_region = toplevel_my_alloc_region;
+    variables_defined_at_toplevel = Variable.Set.empty;
+    cse = CSE.empty;
+    comparison_results = Variable.Map.empty;
+    are_rebuilding_terms = Are_rebuilding_terms.are_rebuilding;
+    closure_info = Closure_info.not_in_a_closure;
+    all_code = Code_id.Map.empty;
+    get_imported_code;
+    inlining_history_tracker =
+      Inlining_history.Tracker.empty (Current_unit.get_cu_exn ());
+    loopify_state = Loopify_state.do_not_loopify;
+    replay_history = Replay_history.first_pass;
+    specialization_cost = Specialization_cost.cannot_specialize At_toplevel;
+    defined_variables_by_scope = [Lifted_cont_params.empty];
+    lifted = Variable.Set.empty;
+    cost_of_lifting_continuations_out_of_current_one = 0;
+    has_seen_a_non_liftable_continuation = false;
+    join_analysis = None
+  }
 
 let all_code t = t.all_code
 
@@ -284,6 +282,8 @@ let disable_inlining t = t.disable_inlining
 
 let disable_partial_application_stub_generation t =
   t.disable_partial_application_stub_generation
+
+let inlined_attribute_to_forward t = t.inlined_attribute_to_forward
 
 let propagating_float_consts t = t.propagating_float_consts
 
@@ -335,6 +335,7 @@ let enter_set_of_closures
       inlined_debuginfo = _;
       disable_inlining;
       disable_partial_application_stub_generation;
+      inlined_attribute_to_forward = _;
       inlining_state;
       propagating_float_consts;
       at_unit_toplevel = _;
@@ -364,6 +365,7 @@ let enter_set_of_closures
     inlined_debuginfo = Inlined_debuginfo.none;
     disable_inlining;
     disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = None;
     inlining_state;
     propagating_float_consts;
     at_unit_toplevel = false;
@@ -657,8 +659,28 @@ let set_inlining_arguments arguments t =
 let set_inlined_debuginfo t ~from =
   { t with inlined_debuginfo = from.inlined_debuginfo }
 
-let merge_inlined_debuginfo t ~from_apply_expr =
+let inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
+    ~inlined_attribute =
+  match (inlined_attribute : Inlined_attribute.t) with
+  | Forward_inlined ->
+    Option.map
+      (fun (inlined, ~forwarded_from) ->
+        ( inlined,
+          ~forwarded_from:(Inlined_debuginfo.merge forwarded_from
+                             ~from_apply_expr) ))
+      t.inlined_attribute_to_forward
+  | ( Always_inlined _ | Hint_inlined | Never_inlined | Unroll _
+    | Default_inlined ) as inlined ->
+    Some (inlined, ~forwarded_from:from_apply_expr)
+
+let merge_inlined_debuginfo_and_forward_inlined_attribute t ~from_apply_expr
+    ~inlined_attribute =
+  let inlined_attribute_to_forward =
+    inlined_attribute_to_forward_through_inlined_apply t ~from_apply_expr
+      ~inlined_attribute
+  in
   { t with
+    inlined_attribute_to_forward;
     inlined_debuginfo =
       Inlined_debuginfo.merge t.inlined_debuginfo ~from_apply_expr
   }
@@ -700,8 +722,14 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
     Inlined_debuginfo.create ~called_code_id:(Code.code_id called_code)
       ~apply_dbg:(Apply.dbg apply)
   in
+  let inlined_attribute_to_forward =
+    inlined_attribute_to_forward_through_inlined_apply t
+      ~from_apply_expr:inlined_debuginfo
+      ~inlined_attribute:(Apply.inlined apply)
+  in
   { t with
     inlined_debuginfo;
+    inlined_attribute_to_forward;
     inlining_state;
     inlining_history_tracker =
       Inlining_history.Tracker.enter_inlined_apply
@@ -818,6 +846,7 @@ let denv_for_lifted_continuation ~denv_for_join ~denv =
     disable_inlining = denv.disable_inlining;
     disable_partial_application_stub_generation =
       denv.disable_partial_application_stub_generation;
+    inlined_attribute_to_forward = denv.inlined_attribute_to_forward;
     inlining_state = denv.inlining_state;
     inlining_history_tracker = denv.inlining_history_tracker;
     (* denv_for_join *)

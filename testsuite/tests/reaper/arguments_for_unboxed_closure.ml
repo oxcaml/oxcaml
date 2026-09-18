@@ -1,6 +1,7 @@
 (* TEST
    flambda2;
    flags += "-flambda2-reaper -reaper-debug-flags=nostamps";
+   flags += " -X reaper-lambda-lifting=1";
    { native with dump-raw, dump-simplify, dump-reaper; check-fexpr-dump; }
  *)
 

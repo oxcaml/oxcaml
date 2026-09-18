@@ -35,9 +35,9 @@ type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
       (Exported_code.t
+      * Code_or_metadata.t Value_approximation.t Symbol.Map.t
       * Name_occurrences.t
-      * Flambda_cmx_format.raw option
-      * Exported_offsets.t)
+      * Slot_offsets.t)
       -> [`Classic] close_program_metadata
 
 type 'a close_program_result =
@@ -380,7 +380,8 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
-          ~are_rebuilding_terms Definition_says_not_to_inline;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None
+          Definition_says_not_to_inline;
         Not_inlinable)
       else
         (* These calculations are all in terms of non-unarized parameters. *)
@@ -407,7 +408,7 @@ module Inlining = struct
               Not_inlinable )
           | Always_inlined _ | Hint_inlined ->
             Call_site_inlining_decision_type.Attribute_always, Inlinable code
-          | Default_inlined | Unroll _ ->
+          | Default_inlined | Forward_inlined | Unroll _ ->
             (* Closure ignores completely [@unrolled] attributes, so it seems
                safe to do the same. *)
             ( Call_site_inlining_decision_type.Definition_says_inline
@@ -417,13 +418,14 @@ module Inlining = struct
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
           ~callee:(Code.absolute_history code)
-          ~are_rebuilding_terms decision;
+          ~are_rebuilding_terms ~inlined_forwarded_from:None decision;
         res
 
-  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into ~params
-      ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
-      ~exn_continuation ~return_continuation ~apply_exn_continuation
-      ~apply_return_continuation ~apply_depth ~apply_dbg =
+  let make_inlined_body acc ~callee ~called_code_id ~region_inlined_into
+      ~inlined_attribute ~params ~args ~my_closure ~my_alloc_mode ~my_depth
+      ~body ~free_names_of_body ~exn_continuation ~return_continuation
+      ~apply_exn_continuation ~apply_return_continuation ~apply_depth ~apply_dbg
+      =
     let my_depth_duid = Flambda_debug_uid.none in
     let my_closure_duid = Flambda_debug_uid.none in
     let rec_info =
@@ -473,7 +475,8 @@ module Inlining = struct
       (Bound_pattern.singleton
          (VB.create inlined_dbg_var inlined_dbg_var_duid Name_mode.normal))
       (Named.create_prim
-         (Nullary (Enter_inlined_apply { dbg = inlined_debuginfo }))
+         (Nullary
+            (Enter_inlined_apply { dbg = inlined_debuginfo; inlined_attribute }))
          Debuginfo.none)
       ~body
 
@@ -507,6 +510,7 @@ module Inlining = struct
            function call."
     in
     let region_inlined_into = Apply.return_mode apply in
+    let inlined_attribute = Apply.inlined apply in
     let args = Apply.args apply in
     let apply_return_continuation = Apply.continuation apply in
     let apply_exn_continuation = Apply.exn_continuation apply in
@@ -533,7 +537,7 @@ module Inlining = struct
         in
         let make_inlined_body =
           make_inlined_body ~callee ~called_code_id:(Code.code_id code)
-            ~region_inlined_into
+            ~region_inlined_into ~inlined_attribute
             ~params:(Bound_parameters.vars_and_uids params)
             ~args ~my_closure ~my_alloc_mode ~my_depth ~body ~free_names_of_body
             ~exn_continuation ~return_continuation ~apply_depth ~apply_dbg
@@ -1247,21 +1251,16 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     let acc, sym =
       match prim with
       | Pmakeblock (tag, _, shape, _mode) ->
-        if tag <> 0
+        if Lambda.is_uniform_block_shape shape
         then
-          (* There should not be any way to reach this from Ocaml code. *)
-          Misc.fatal_error
-            "Non-zero tag on empty block allocation in [Closure_conversion]"
+          register_const0 acc
+            (Static_const.block
+               (Tag.Scannable.create_exn tag)
+               Immutable Value_only [])
+            "empty_block"
         else
-          begin if Lambda.is_uniform_block_shape shape
-          then
-            register_const0 acc
-              (Static_const.block Tag.Scannable.zero Immutable Value_only [])
-              "empty_block"
-          else
-            Misc.fatal_error
-              "Unexpected empty mixed block in [Closure_conversion]"
-          end
+          Misc.fatal_error
+            "Unexpected empty mixed block in [Closure_conversion]"
       | Pmakefloatblock _ ->
         Misc.fatal_error "Unexpected empty float block in [Closure_conversion]"
       | Pmakeufloatblock _ ->
@@ -1321,7 +1320,11 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Patomic_load_idx _ | Patomic_set_idx _ | Patomic_exchange_idx _
       | Patomic_compare_exchange_idx _ | Patomic_compare_set_idx _
       | Patomic_fetch_add_idx | Patomic_add_idx | Patomic_sub_idx
-      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx | Pdls_get
+      | Patomic_land_idx | Patomic_lor_idx | Patomic_lxor_idx
+      | Patomic_load_ptr _ | Patomic_set_ptr _ | Patomic_exchange_ptr _
+      | Patomic_compare_exchange_ptr _ | Patomic_compare_set_ptr _
+      | Patomic_fetch_add_ptr | Patomic_add_ptr | Patomic_sub_ptr
+      | Patomic_land_ptr | Patomic_lor_ptr | Patomic_lxor_ptr | Pdls_get
       | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
       | Patomic_load_mixed_field _ | Patomic_set_field _
       | Patomic_set_mixed_field _ | Preinterpret_tagged_int63_as_unboxed_int64
@@ -2157,8 +2160,18 @@ let boxing_primitive (k : Function_decl.unboxing_kind) alloc_mode
 let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
     ~unarized_params:params params_arity ~unarized_param_modes:param_modes
     function_slot compute_body return return_continuation unboxed_params
-    unboxed_return unboxed_function_slot =
+    unboxed_return unboxed_function_slot ~needs_region_wrapper =
   let my_closure_duid = Flambda_debug_uid.none in
+  let local_param_region =
+    if needs_region_wrapper
+    then Some (Variable.create "unboxed_param_region" K.region)
+    else None
+  in
+  let current_region =
+    match local_param_region with
+    | None -> my_region
+    | Some region -> Some region
+  in
   let rec box_params params params_arity param_modes params_unboxing body =
     match params, params_arity, param_modes, params_unboxing with
     | [], [], [], [] -> [], [], [], body
@@ -2183,7 +2196,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
           let acc, body = body acc in
           let alloc_mode =
             Alloc_mode.For_allocations.from_lambda
-              ~current_alloc_region:my_alloc_region ~current_region:my_region
+              ~current_alloc_region:my_alloc_region ~current_region
               (Alloc_mode.For_types.to_lambda param_mode)
           in
           let param_duid = Flambda_debug_uid.none in
@@ -2231,9 +2244,56 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
   in
   let acc, unboxed_body, result_arity_main_code, unboxed_return_continuation =
     match unboxed_return with
-    | None ->
-      let acc, body = body acc in
-      acc, body, return, return_continuation
+    | None -> (
+      match local_param_region with
+      | None ->
+        let acc, body = body acc in
+        acc, body, return, return_continuation
+      | Some local_param_region ->
+        (* We need to close the region we used for the unboxed parameter before
+           returning from the function, so we need a return wrapper. *)
+        let outer_return_continuation =
+          Continuation.create ~sort:Return ~name:"return" ()
+        in
+        let handler_params =
+          Bound_parameters.create
+            (List.mapi
+               (fun i kind ->
+                 let var =
+                   Variable.create
+                     ("unboxed_param_result" ^ string_of_int i)
+                     (Flambda_kind.With_subkind.kind kind)
+                 in
+                 Bound_parameter.create var kind Flambda_debug_uid.none)
+               (Flambda_arity.unarized_components return))
+        in
+        let handler acc =
+          let acc, apply_cont =
+            Apply_cont_with_acc.create acc outer_return_continuation
+              ~args:
+                (List.map Bound_parameter.simple
+                   (Bound_parameters.to_list handler_params))
+              ~dbg:Debuginfo.none
+          in
+          let acc, apply_cont =
+            Expr_with_acc.create_apply_cont acc apply_cont
+          in
+          Let_with_acc.create acc
+            (Bound_pattern.singleton
+               (Bound_var.create
+                  (Variable.create "unit" K.value)
+                  Flambda_debug_uid.none Name_mode.normal))
+            (Named.create_prim
+               (Flambda_primitive.Unary
+                  (End_region { ghost = false }, Simple.var local_param_region))
+               Debuginfo.none)
+            ~body:apply_cont
+        in
+        let acc, unboxed_body =
+          Let_cont_with_acc.build_non_recursive acc return_continuation
+            ~handler_params ~handler ~body ~is_exn_handler:false ~is_cold:false
+        in
+        acc, unboxed_body, return, outer_return_continuation)
     | Some (k, _) ->
       let vars_with_kinds = variables_for_unboxing "result" k in
       let unboxed_return_continuation =
@@ -2263,6 +2323,21 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
             ~dbg:Debuginfo.none
         in
         let acc, apply_cont = Expr_with_acc.create_apply_cont acc apply_cont in
+        let acc, expr =
+          match local_param_region with
+          | None -> acc, apply_cont
+          | Some local_param_region ->
+            Let_with_acc.create acc
+              (Bound_pattern.singleton
+                 (Bound_var.create
+                    (Variable.create "unit" K.value)
+                    Flambda_debug_uid.none Name_mode.normal))
+              (Named.create_prim
+                 (Flambda_primitive.Unary
+                    (End_region { ghost = false }, Simple.var local_param_region))
+                 Debuginfo.none)
+              ~body:apply_cont
+        in
         let (acc, expr), _ =
           List.fold_left
             (fun ((acc, expr), i) (var, var_duid, _kind) ->
@@ -2275,7 +2350,7 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
                      Debuginfo.none)
                   ~body:expr,
                 Target_ocaml_int.(add (one (Acc.machine_width acc)) i) ))
-            ((acc, apply_cont), Target_ocaml_int.zero (Acc.machine_width acc))
+            ((acc, expr), Target_ocaml_int.zero (Acc.machine_width acc))
             vars_with_kinds
         in
         acc, expr
@@ -2289,6 +2364,19 @@ let compute_body_of_unboxed_function acc my_region my_alloc_region my_closure
         Flambda_arity.create_singletons
           (List.map (fun (_, _, kind) -> kind) vars_with_kinds),
         unboxed_return_continuation )
+  in
+  let acc, unboxed_body =
+    match local_param_region with
+    | None -> acc, unboxed_body
+    | Some local_param_region ->
+      Let_with_acc.create acc
+        (Bound_pattern.singleton
+           (Bound_var.create local_param_region Flambda_debug_uid.none
+              Name_mode.normal))
+        (Named.create_prim
+           (Flambda_primitive.Variadic (Begin_region { ghost = false }, []))
+           Debuginfo.none)
+        ~body:unboxed_body
   in
   let my_unboxed_closure = Variable.create "my_unboxed_closure" K.value in
   let acc, unboxed_body =
@@ -2420,7 +2508,8 @@ let make_unboxed_function_wrapper acc function_slot ~unarized_params:params
              (Function_decl.result_mode decl)
              ~current_alloc_region:my_alloc_region ~current_region:my_region
              ~current_ghost_region:my_ghost_region)
-        Debuginfo.none ~inlined:Inlined_attribute.Default_inlined
+        Debuginfo.none
+        ~inlined:(Inlined_attribute.forward_inlined ())
         ~inlining_state:(Inlining_state.default ~round:0)
         ~probe:None ~position:Normal
         ~relative_history:(Env.relative_history_from_scoped ~loc external_env)
@@ -2881,11 +2970,15 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
         return_continuation,
         my_closure )
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper
+        } ->
       compute_body_of_unboxed_function acc my_region alloc_region my_closure
         ~unarized_params params_arity ~unarized_param_modes function_slot
-        compute_body return return_continuation unboxed_params unboxed_return
-        unboxed_function_slot
+        compute_body return return_continuation params_unboxing return_unboxing
+        unboxed_function_slot ~needs_region_wrapper
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
@@ -2997,14 +3090,18 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
     | Normal_calling_convention ->
       main_code, by_function_slot, function_code_ids, acc
     | Unboxed_calling_convention
-        (unboxed_params, unboxed_return, unboxed_function_slot) ->
+        { params_unboxing;
+          return_unboxing;
+          unboxed_function_slot;
+          needs_region_wrapper = _
+        } ->
       make_unboxed_function_wrapper acc function_slot ~unarized_params
         params_arity ~unarized_param_modes return result_arity_main_code code_id
         main_code_id decl loc external_env recursive
         contains_no_escaping_local_allocs cost_metrics dbg is_tupled
         inlining_decision absolute_history relative_history main_code
-        by_function_slot function_code_ids unboxed_function_slot unboxed_params
-        unboxed_return
+        by_function_slot function_code_ids unboxed_function_slot params_unboxing
+        return_unboxing
   in
   let approx =
     let code = Code_or_metadata.create code in
@@ -3479,7 +3576,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
         args_arity = arity;
         continuation = return_continuation;
         exn_continuation;
-        inlined = Lambda.Default_inlined;
+        inlined = Lambda.forward_inlined_attribute ();
         mode = result_mode;
         return_arity = result_arity;
         region = my_region;
@@ -3840,7 +3937,7 @@ let close_apply acc env (apply : IR.apply) : Expr_with_acc.t =
           (Warnings.Inlining_impossible
              Inlining_helpers.(
                inlined_attribute_on_partial_application_msg Inlined))
-      | Never_inlined | Hint_inlined | Default_inlined -> ());
+      | Never_inlined | Hint_inlined | Forward_inlined | Default_inlined -> ());
       wrap_partial_application acc env apply.continuation apply approx ~provided
         ~provided_arity ~missing_arity ~missing_param_modes ~result_arity
         ~arity:params_arity ~first_complex_local_param ~result_mode
@@ -4138,8 +4235,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
 
 let close_program (type mode) ~(mode : mode Flambda_features.mode)
     ~machine_width ~big_endian ~cmx_loader ~compilation_unit ~module_repr
-    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_region
-    ~toplevel_my_ghost_region ~toplevel_my_alloc_region ~sections :
+    ~program ~prog_return_cont ~exn_continuation ~toplevel_my_alloc_region :
     mode close_program_result =
   let env = Env.create ~big_endian in
   let module_symbol =
@@ -4147,14 +4243,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
       (Flambda2_import.Symbol.for_compilation_unit compilation_unit)
   in
   let return_cont = Continuation.create ~sort:Toplevel_return () in
-  let env, toplevel_my_region =
-    Env.add_var_like env toplevel_my_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
-  let env, toplevel_my_ghost_region =
-    Env.add_var_like env toplevel_my_ghost_region Not_user_visible
-      Flambda_kind.With_subkind.region
-  in
   let env, toplevel_my_alloc_region =
     Env.add_var_like env toplevel_my_alloc_region Not_user_visible
       Flambda_kind.With_subkind.region
@@ -4210,9 +4298,6 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
   if Option.is_some (Acc.top_closure_info acc)
   then
     Misc.fatal_error "Information on nested closures should be empty at the end";
-  let get_code_metadata code_id =
-    Code_id.Map.find code_id (Acc.code_map acc) |> Code.code_metadata
-  in
   let code_slot_offsets = Acc.code_slot_offsets acc in
   match mode with
   | Normal ->
@@ -4221,8 +4306,7 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
        offsets constraints accumulation is not needed in "normal" mode. *)
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit; code_slot_offsets; metadata = Normal }
   | Classic ->
@@ -4232,34 +4316,16 @@ let close_program (type mode) ~(mode : mode Flambda_features.mode)
         (Exported_code.mark_as_imported
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
-    let Slot_offsets.{ used_value_slots; exported_offsets } =
-      let used_slots =
-        let free_names = Acc.free_names acc in
-        Slot_offsets.
-          { function_slots_in_normal_projections =
-              Name_occurrences.function_slots_in_normal_projections free_names;
-            all_function_slots =
-              Name_occurrences.all_function_slots_at_normal_mode free_names;
-            value_slots_in_normal_projections =
-              Name_occurrences.value_slots_in_normal_projections free_names;
-            all_value_slots =
-              Name_occurrences.all_value_slots_at_normal_mode free_names
-          }
-      in
-      Slot_offsets.finalize_offsets (Acc.slot_offsets acc) ~get_code_metadata
-        ~used_slots
-    in
-    let reachable_names, cmx =
-      Flambda_cmx.prepare_cmx_from_approx ~machine_width:(Acc.machine_width acc)
-        ~approxs:symbols_approximations ~module_symbol ~exported_offsets
-        ~used_value_slots ~sections all_code
-    in
     let unit =
       Flambda_unit.create ~return_continuation:return_cont ~exn_continuation
-        ~toplevel_my_region ~toplevel_my_ghost_region ~toplevel_my_alloc_region
-        ~body ~module_symbol
+        ~toplevel_my_alloc_region ~body ~module_symbol
     in
     { unit;
       code_slot_offsets;
-      metadata = Classic (all_code, reachable_names, cmx, exported_offsets)
+      metadata =
+        Classic
+          ( all_code,
+            symbols_approximations,
+            Acc.free_names acc,
+            Acc.slot_offsets acc )
     }

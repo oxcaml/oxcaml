@@ -17,7 +17,7 @@
 
 let type_arrow ta tb =
   let arrow_desc =
-    Types.Nolabel,Mode.Alloc.legacy,Mode.Alloc.legacy
+    Types.Nolabel,Mode.With_locality.legacy,Mode.With_locality.legacy
   in
   Ctype.newty
     (Tarrow (arrow_desc, Ctype.newmono ta, tb, Types.commu_var ()))

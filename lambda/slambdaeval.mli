@@ -35,6 +35,8 @@ end
 
 type closure
 
+type record
+
 type halves =
   { slv_comptime : value Or_missing.t;
     slv_runtime : lambda
@@ -43,7 +45,7 @@ type halves =
 and value =
   | SLVhalves of halves
   | SLVlayout of layout
-  | SLVrecord of value Or_missing.t array
+  | SLVrecord of record
   | SLVclosure of closure
 
 module CU_data : sig
@@ -66,3 +68,11 @@ val eval :
   CU_data.t * lambda
 
 val print_value_or_missing : Format_doc.formatter -> value Or_missing.t -> unit
+
+type error = Block_index_gap_overflow_possible
+
+exception Error of Location.t * error
+
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer

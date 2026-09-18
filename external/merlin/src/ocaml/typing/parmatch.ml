@@ -65,7 +65,7 @@ let extra_pat =
     (Tpat_var { id = Ident.create_local "+"; name = mknoloc "+";
       uid = Uid.internal_not_actually_unique;
       sort = Jkind.Sort.(of_const Const.for_boxed_variant);
-      mode = Mode.Value.disallow_right Mode.Value.max })
+      mode = Mode.With_regionality.disallow_right Mode.With_regionality.max })
     Ctype.none Env.empty
 
 
@@ -1068,7 +1068,7 @@ let build_other_constrs env p =
   let open Patterns.Head in
   match p.pat_desc with
   | Construct ({ cstr_tag = Extension _ }, _, _) -> extra_pat
-  | Construct ({ cstr_tag = Ordinary _} as c, _, _) ->
+  | Construct ({ cstr_tag = Ordinary _ | Null } as c, _, _) ->
       let constr = { p with pat_desc = c } in
       let get_constr q =
         match q.pat_desc with
@@ -1121,7 +1121,9 @@ let build_other ext env =
                        name = {txt="*extension*"; loc = d.pat_loc};
                        uid = Uid.internal_not_actually_unique;
                        sort = Jkind.Sort.(of_const Const.for_constructor);
-                       mode = Mode.Value.disallow_right Mode.Value.max })
+                       mode =
+                         Mode.With_regionality.disallow_right
+                           Mode.With_regionality.max })
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with

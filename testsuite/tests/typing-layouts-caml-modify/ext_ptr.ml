@@ -36,16 +36,16 @@ let test ~(call_pos : [%call_pos]) ~expect_caml_modifies f =
    off-heap and don't call caml_modify. *)
 
 module Int64_u = struct
-  external to_int64 : int64# -> (int64[@local_opt]) = "%box_int64"
-  external of_int64 : (int64[@local_opt]) -> int64# = "%unbox_int64"
+  external to_int64 : int64_u -> (int64[@local_opt]) = "%box_int64"
+  external of_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
   let[@inline always] add x y = of_int64 (Int64.add (to_int64 x) (to_int64 y))
 end
 
-external addr_of_value : ('a : value_or_null). 'a @ local -> int64#
+external addr_of_value : ('a : value_or_null). 'a @ local -> int64_u
   = "" "caml_native_pointer_of_value"
 
 external unsafe_set_ext_ptr : ('b : any).
-  int64# -> ('b[@local_opt]) -> unit = "%unsafe_set_ext_ptr"
+  int64_u -> ('b[@local_opt]) -> unit = "%unsafe_set_ext_ptr"
 [@@layout_poly]
 
 (* Immediate field: no write barrier needed regardless. *)
@@ -62,7 +62,7 @@ let () =
 (* Non-scannable flat field. *)
 let () =
   let open struct
-    type t = { x : string; mutable y : int64# }
+    type t = { x : string; mutable y : int64_u }
   end in
   let t = { x = "x"; y = #0L } in
   let y_addr = Int64_u.add (addr_of_value t) #8L in

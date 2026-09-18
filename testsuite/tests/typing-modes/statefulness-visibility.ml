@@ -18,6 +18,102 @@ type 'a myref = { mutable a : 'a; b : 'a }
 type 'a myref = { mutable a : 'a; b : 'a; }
 |}]
 
+type middle_payload
+type s : value mod read = { v : middle_payload @@ read } [@@unboxed]
+type t : value mod write = { v : middle_payload @@ write } [@@unboxed]
+type u : value mod reading = { v : middle_payload @@ reading } [@@unboxed]
+type v : value mod writing = { v : middle_payload @@ writing } [@@unboxed]
+type s_arrow : value mod read = { f : (int -> int) @@ read } [@@unboxed]
+type t_arrow : value mod write = { f : (int -> int) @@ write } [@@unboxed]
+
+[%%expect{|
+type middle_payload
+type s = { v : middle_payload @@ read; } [@@unboxed]
+type t = { v : middle_payload @@ write; } [@@unboxed]
+type u = { v : middle_payload @@ reading; } [@@unboxed]
+type v = { v : middle_payload @@ writing; } [@@unboxed]
+type s_arrow = { f : int -> int @@ read; } [@@unboxed]
+type t_arrow = { f : int -> int @@ write; } [@@unboxed]
+|}]
+
+let read_from_read (x : s @ read) : s @ read_write = x
+
+let read_from_immutable (x : s @ immutable) : s @ write = x
+
+[%%expect{|
+val read_from_read : s @ read -> s = <fun>
+val read_from_immutable : s @ immutable -> s @ write = <fun>
+|}]
+
+let read_no_cross (x : s @ immutable) : s @ read = x
+
+[%%expect{|
+Line 1, characters 51-52:
+1 | let read_no_cross (x : s @ immutable) : s @ read = x
+                                                       ^
+Error: This value is "write" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "read" or "read_write".
+|}]
+
+let write_from_write (x : t @ write) : t @ read_write = x
+
+let write_from_immutable (x : t @ immutable) : t @ read = x
+
+[%%expect{|
+val write_from_write : t @ write -> t = <fun>
+val write_from_immutable : t @ immutable -> t @ read = <fun>
+|}]
+
+let write_no_cross (x : t @ immutable) : t @ write = x
+
+[%%expect{|
+Line 1, characters 53-54:
+1 | let write_no_cross (x : t @ immutable) : t @ write = x
+                                                         ^
+Error: This value is "read" because it crosses with something
+         which is "immutable".
+       However, the highlighted expression is expected to be "write" or "read_write".
+|}]
+
+let reading_from_writing (x : u @ writing) : u @ stateless = x
+
+let reading_from_stateful (x : u @ stateful) : u @ reading = x
+
+[%%expect{|
+val reading_from_writing : u @ writing -> u @ stateless = <fun>
+val reading_from_stateful : u -> u @ reading = <fun>
+|}]
+
+let reading_no_cross (x : u @ reading) : u @ stateless = x
+
+[%%expect{|
+Line 1, characters 57-58:
+1 | let reading_no_cross (x : u @ reading) : u @ stateless = x
+                                                             ^
+Error: This value is "reading"
+       but is expected to be "writing" because it crosses with something
+         which is expected to be "stateless".
+|}]
+
+let writing_from_reading (x : v @ reading) : v @ stateless = x
+
+let writing_from_stateful (x : v @ stateful) : v @ writing = x
+
+[%%expect{|
+val writing_from_reading : v @ reading -> v @ stateless = <fun>
+val writing_from_stateful : v -> v @ writing = <fun>
+|}]
+
+let writing_no_cross (x : v @ writing) : v @ reading = x
+
+[%%expect{|
+Line 1, characters 55-56:
+1 | let writing_no_cross (x : v @ writing) : v @ reading = x
+                                                           ^
+Error: This value is "writing" but is expected to be "reading".
+|}]
+
 let foo x a = x.a <- a
 [%%expect{|
 val foo : 'a myref -> 'a -> unit = <fun>
@@ -1496,6 +1592,9 @@ Error: Signature mismatch:
        The type "'a -> 'b @ write -> 'a * 'b @ write"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ write"
+       The argument mode was expected to be "write" or "read_write"
+       because it is an element of the tuple at line 4, characters 14-20
+       which is expected to be "write" or "read_write" but is "read"
 |}]
 
 module _ : sig
@@ -1511,18 +1610,19 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b @ write -> 'a * 'b @ write end
+         sig val f : 'a -> 'b @ write -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ read -> 'b @ write -> 'a * 'b @ read end
        Values do not match:
-         val f : 'a -> 'b @ write -> 'a * 'b @ write
+         val f : 'a -> 'b @ write -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ read -> 'b @ write -> 'a * 'b @ read
-       The type "'a -> 'b @ write -> 'a * 'b @ write"
+       The type "'a -> 'b @ write -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ read -> 'b @ write -> 'a * 'b @ read"
-       Type "'b @ write -> 'a * 'b @ write" is not compatible with type
+       Type "'b @ write -> 'a * 'b @ immutable" is not compatible with type
          "'b @ write -> 'a * 'b @ read"
+       The return mode was expected to be "read" or "read_write" but is "write"
 |}]
 
 module _ : sig
@@ -1549,6 +1649,7 @@ Error: Signature mismatch:
        is not compatible with the type "'a @ read -> 'b @ write -> 'a * 'b"
        Type "'b @ write -> 'a * 'b @ write" is not compatible with type
          "'b @ write -> 'a * 'b"
+       The return mode was expected to be "read_write" but is "write"
 |}]
 
 module _ : sig
@@ -1564,18 +1665,19 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b @ read -> 'a * 'b @ read end
+         sig val f : 'a -> 'b @ read -> 'a * 'b @ immutable end
        is not included in
          sig val f : 'a @ write -> 'b @ read -> 'a * 'b @ write end
        Values do not match:
-         val f : 'a -> 'b @ read -> 'a * 'b @ read
+         val f : 'a -> 'b @ read -> 'a * 'b @ immutable
        is not included in
          val f : 'a @ write -> 'b @ read -> 'a * 'b @ write
-       The type "'a -> 'b @ read -> 'a * 'b @ read"
+       The type "'a -> 'b @ read -> 'a * 'b @ immutable"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ write"
-       Type "'b @ read -> 'a * 'b @ read" is not compatible with type
+       Type "'b @ read -> 'a * 'b @ immutable" is not compatible with type
          "'b @ read -> 'a * 'b @ write"
+       The return mode was expected to be "write" or "read_write" but is "read"
 |}]
 
 module _ : sig
@@ -1601,6 +1703,9 @@ Error: Signature mismatch:
        The type "'a -> 'b @ read -> 'a * 'b @ read"
        is not compatible with the type
          "'a @ write -> 'b @ read -> 'a * 'b @ read"
+       The argument mode was expected to be "read" or "read_write"
+       because it is an element of the tuple at line 4, characters 14-20
+       which is expected to be "read" or "read_write" but is "write"
 |}]
 
 module _ : sig
@@ -1627,6 +1732,7 @@ Error: Signature mismatch:
        is not compatible with the type "'a @ write -> 'b @ read -> 'a * 'b"
        Type "'b @ read -> 'a * 'b @ read" is not compatible with type
          "'b @ read -> 'a * 'b"
+       The return mode was expected to be "read_write" but is "read"
 |}]
 
 (* Lattice structure: [reading] and [writing] join to become [stateful].
@@ -1659,16 +1765,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
+         sig val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing end
        Values do not match:
-         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
+         val f : 'a @ stateless -> 'b @ writing -> 'a * 'b @ writing
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ writing
-       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       The type "'a @ stateless -> 'b @ writing -> 'a * 'b @ writing"
        is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ writing"
+       The argument mode was expected to be "writing" but is "reading"
 |}]
 
 module _ : sig
@@ -1695,6 +1802,7 @@ Error: Signature mismatch:
          "'a @ reading -> 'b @ writing -> 'a * 'b @ reading"
        Type "'b -> 'a * 'b" is not compatible with type
          "'b @ writing -> 'a * 'b @ reading"
+       The return mode was expected to be "reading" but is "writing"
 |}]
 
 module _ : sig
@@ -1710,17 +1818,19 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
+         sig val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing end
        is not included in
          sig val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless end
        Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
+         val f : 'a @ writing -> 'b @ writing -> 'a * 'b @ writing
        is not included in
          val f : 'a @ reading -> 'b @ writing -> 'a * 'b @ stateless
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+       The type "'a @ writing -> 'b @ writing -> 'a * 'b @ writing"
+       is not compatible with the type
          "'a @ reading -> 'b @ writing -> 'a * 'b @ stateless"
-       Type "'b -> 'a * 'b" is not compatible with type
+       Type "'b @ writing -> 'a * 'b @ writing" is not compatible with type
          "'b @ writing -> 'a * 'b @ stateless"
+       The return mode was expected to be "stateless" but is "writing"
 |}]
 
 module _ : sig
@@ -1747,6 +1857,7 @@ Error: Signature mismatch:
          "'a @ writing -> 'b @ reading -> 'a * 'b @ writing"
        Type "'b -> 'a * 'b" is not compatible with type
          "'b @ reading -> 'a * 'b @ writing"
+       The return mode was expected to be "writing" but is "reading"
 |}]
 
 module _ : sig
@@ -1762,16 +1873,17 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
+         sig val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading end
        Values do not match:
-         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
+         val f : 'a @ stateless -> 'b @ reading -> 'a * 'b @ reading
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ reading
-       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       The type "'a @ stateless -> 'b @ reading -> 'a * 'b @ reading"
        is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ reading"
+       The argument mode was expected to be "reading" but is "writing"
 |}]
 
 module _ : sig
@@ -1787,17 +1899,19 @@ Lines 3-5, characters 6-3:
 5 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : 'a -> 'b -> 'a * 'b end
+         sig val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading end
        is not included in
          sig val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless end
        Values do not match:
-         val f : 'a -> 'b -> 'a * 'b
+         val f : 'a @ reading -> 'b @ reading -> 'a * 'b @ reading
        is not included in
          val f : 'a @ writing -> 'b @ reading -> 'a * 'b @ stateless
-       The type "'a -> 'b -> 'a * 'b" is not compatible with the type
+       The type "'a @ reading -> 'b @ reading -> 'a * 'b @ reading"
+       is not compatible with the type
          "'a @ writing -> 'b @ reading -> 'a * 'b @ stateless"
-       Type "'b -> 'a * 'b" is not compatible with type
+       Type "'b @ reading -> 'a * 'b @ reading" is not compatible with type
          "'b @ reading -> 'a * 'b @ stateless"
+       The return mode was expected to be "stateless" but is "reading"
 |}]
 
 (* Lattice structure: [read] and [write] meet to become [read_write].
@@ -1844,6 +1958,12 @@ Error: Signature mismatch:
          val f : 'a * 'b @ read -> 'a read * 'b write
        The type "'a * 'b @ read -> 'a read * 'b write @ read"
        is not compatible with the type "'a * 'b @ read -> 'a read * 'b write"
+       The return mode was expected to be "read_write" but is "read"
+       because it is a tuple that contains the expression at line 4, characters 31-44
+       which is "read"
+       because it is a record whose field "write" is the expression at line 4, characters 41-42
+       which is "read"
+       because it is an element of the tuple at file "_none_", line 1
 |}]
 
 module _ : sig
@@ -1868,6 +1988,12 @@ Error: Signature mismatch:
          val f : 'a * 'b @ write -> 'a read * 'b write
        The type "'a * 'b @ write -> 'a read * 'b write @ write"
        is not compatible with the type "'a * 'b @ write -> 'a read * 'b write"
+       The return mode was expected to be "read_write" but is "write"
+       because it is a tuple that contains the expression at line 4, characters 17-29
+       which is "write"
+       because it is a record whose field "read" is the expression at line 4, characters 26-27
+       which is "write"
+       because it is an element of the tuple at file "_none_", line 1
 |}]
 
 module _ : sig
@@ -1895,6 +2021,10 @@ Error: Signature mismatch:
        The type "'a * 'b @ immutable -> 'a read * 'b write @ immutable"
        is not compatible with the type
          "'a * 'b @ immutable -> 'a read * 'b write"
+       The return mode was expected to be "read_write" but is weaker than "write"
+       because it is a tuple that contains the expression at line 4, characters 17-29
+       which is "write"
+       because it is a record whose field "read" (with some modality) is the expression at line 4, characters 26-27
 |}]
 
 (* Lattice structure: [reading] and [writing] meet to become [stateless].
@@ -1942,6 +2072,7 @@ Error: Signature mismatch:
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ reading -> 'a reading * 'b writing"
+       The argument mode was expected to be stronger than "writing" but is "reading"
 |}]
 
 module _ : sig
@@ -1967,6 +2098,7 @@ Error: Signature mismatch:
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type
          "'a * 'b @ writing -> 'a reading * 'b writing"
+       The argument mode was expected to be stronger than "reading" but is "writing"
 |}]
 
 module _ : sig
@@ -1991,6 +2123,7 @@ Error: Signature mismatch:
          val f : 'a * 'b -> 'a reading * 'b writing
        The type "'a * 'b @ stateless -> 'a reading * 'b writing"
        is not compatible with the type "'a * 'b -> 'a reading * 'b writing"
+       The argument mode was expected to be stronger than "reading" but is "stateful"
 |}]
 
 (* Modality composition: visibility. *)

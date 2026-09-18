@@ -62,8 +62,6 @@ val fold :
 module Iterator : sig
   include Leapfrog.Iterator
 
-  include Heterogenous_list.S with type 'a t := 'a t
-
   (** [create is_trie name input output] creates a trie iterator.
 
       The [input] reference is used to initialize the first iterator when [init]
@@ -72,5 +70,8 @@ module Iterator : sig
       The [output] reference is set to the corresponding value when [accept] is
       called on the last iterator. *)
   val create :
-    ('m, 'k, 'v) is_trie -> 'm Channel.receiver -> 'v Channel.sender -> 'k hlist
+    ('m, 'k -> nil, 'v) is_trie ->
+    'm Channel.or_null_receiver ->
+    'v Channel.or_null_sender ->
+    'k t
 end

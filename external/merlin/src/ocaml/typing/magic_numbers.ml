@@ -91,6 +91,8 @@ module Cmi = struct
     | "Caml1999I583" -> Some "5.4.0+ox4"
     | "Caml1999I584" -> Some "5.4.0-ox5"
     | "Caml1999I585" -> Some "5.4.0-ox6"
+    | "Caml1999I586" -> Some "5.4.0-ox7"
+    | "Caml1999I587" -> Some "5.4.0-ox8"
     | _ -> None
 
   let () = assert (to_version_opt Config.cmi_magic_number <> None)
