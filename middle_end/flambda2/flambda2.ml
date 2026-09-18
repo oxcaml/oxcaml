@@ -120,7 +120,8 @@ let run_reaper ~ppf ~prefixname ~machine_width ~cmx_loader ~all_code
   let { unit;
         exported_code;
         slot_offsets;
-        final_typing_env = With_types final_typing_env
+        final_typing_env = With_types final_typing_env;
+        free_names = _
       } =
     Profile.record_call ~accumulate:true "reaper" (fun () ->
         Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
