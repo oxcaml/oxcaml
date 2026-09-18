@@ -30,6 +30,10 @@ val length : t -> int
 
 val get : t -> Idx.t -> Obj.t
 
+(** Like [get], but leaves sections read from the file uncached. Sections
+    already loaded or held in memory are returned unchanged. *)
+val get_uncached : t -> Idx.t -> Obj.t
+
 val serialize : t -> string array * int array * int
 
 val from_array : Obj.t array -> t
