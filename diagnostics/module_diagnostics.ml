@@ -97,7 +97,7 @@ type modality_requirement = Mode_diagnostics.modality_requirement =
   | At_least_as_strong
 
 type modality_input = Mode_diagnostics.modality_input =
-  { axis : Mode.Value.Axis.packed;
+  { axis : Mode.With_regionality.Axis.packed;
     subject : modality_subject;
     expected : modality_side;
     actual : modality_side;
@@ -165,7 +165,8 @@ let collapse_whitespace (s : string) : string =
     s;
   Buffer.contents buf
 
-let crossing_on_axis (Mode.Value.Axis.P vax as packed) (t : Mode.Crossing.t) :
+let crossing_on_axis (Mode.With_regionality.Axis.P vax as packed)
+    (t : Mode.Crossing.t) :
     (string * string) option =
   match Mode.Crossing.Axis.of_modality (Mode.Modality.Axis.of_value packed) with
   | Mode.Crossing.Axis.P cax ->
@@ -174,7 +175,7 @@ let crossing_on_axis (Mode.Value.Axis.P vax as packed) (t : Mode.Crossing.t) :
     then None
     else
       Some
-        ( Format_doc.asprintf "%a" Mode.Value.Axis.print vax,
+        ( Format_doc.asprintf "%a" Mode.With_regionality.Axis.print vax,
           Format_doc.asprintf "%a" (Mode.Crossing.Per_axis.print cax) value )
 
 let crossing_bounds_difference (expected : Mode.Crossing.t)
@@ -189,7 +190,7 @@ let crossing_bounds_difference (expected : Mode.Crossing.t)
         if String.equal e a
         then expected_only, actual_only, differing
         else expected_only, actual_only, (name, e, a) :: differing)
-    ([], [], []) Mode.Value.Axis.all
+    ([], [], []) Mode.With_regionality.Axis.all
   |> fun (e, a, d) -> List.rev e, List.rev a, List.rev d
 
 let located loc (words : term Phrase.t) : term Phrase.t =
@@ -667,9 +668,7 @@ module Inclusion = struct
     | Value_descriptions { symptom = Includecore.Zero_alloc _; _ } -> []
     | Value_descriptions
         { symptom =
-            Includecore.(
-              ( Primitive_mismatch _ | Not_a_primitive | Type _
-              | Layout_poly_coercion _ ));
+            Includecore.(Primitive_mismatch _ | Not_a_primitive | Type _);
           _
         } ->
       []

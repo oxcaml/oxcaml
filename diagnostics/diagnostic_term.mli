@@ -1,6 +1,6 @@
 type mode_term =
   | Reported_mode of Mode.Reported_mode.t
-  | Alloc_mode of Mode.Alloc.atom
+  | Alloc_mode of Mode.With_locality.atom
 
 type concept =
   | Unsafe_mode_crossing
@@ -34,7 +34,7 @@ val side_name : sides -> Side.t -> t Diagnostic_nlg.Phrase.t
 val mode_property : Mode.Reported_mode.t -> t Diagnostic_nlg.Property.t
 
 val mode_const_property :
-  'a Mode.Alloc.Axis.t -> 'a -> t Diagnostic_nlg.Property.t
+  'a Mode.With_locality.Axis.t -> 'a -> t Diagnostic_nlg.Property.t
 
 val mode_word : Mode.Reported_mode.t -> t Diagnostic_nlg.Phrase.segment
 
@@ -43,7 +43,7 @@ val modality_word : Mode.Modality.atom -> t Diagnostic_nlg.Phrase.segment
 val concept_word : concept -> t Diagnostic_nlg.Phrase.segment
 
 val mode_const_word :
-  'a Mode.Alloc.Axis.t -> 'a -> t Diagnostic_nlg.Phrase.segment
+  'a Mode.With_locality.Axis.t -> 'a -> t Diagnostic_nlg.Phrase.segment
 
 val words : t -> t Diagnostic_nlg.Phrase.t
 

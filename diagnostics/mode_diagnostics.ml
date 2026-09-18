@@ -343,8 +343,9 @@ let annotation_fragments ~mode_name ~mode ~subject:owner
           term (Diagnostic_term.Written_modality_term mode_name);
           txt " modality by default" ] ]
 
-let same_alloc_axis (Mode.Alloc.Axis.P left) (Mode.Alloc.Axis.P right) =
-  Int.equal (Mode.Alloc.Axis.compare left right) 0
+let same_alloc_axis (Mode.With_locality.Axis.P left)
+    (Mode.With_locality.Axis.P right) =
+  Int.equal (Mode.With_locality.Axis.compare left right) 0
 
 let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
     chain : fragment list =
@@ -400,7 +401,7 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
         Nonempty.append
           [Dsl.(reason (clause accessed (is (property access))))]
           (match axis with
-          | Mode.Alloc.Axis.P (Monadic (Contention | Visibility)) ->
+          | Mode.With_locality.Axis.P (Monadic (Contention | Visibility)) ->
             let part, owner =
               match (part : Mode.Hint.mutable_part) with
               | Record_field _ -> "a mutable field", "the value"
@@ -408,8 +409,9 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
             in
             let required =
               match axis, writing with
-              | Mode.Alloc.Axis.P (Monadic Contention), true -> [uncontended]
-              | Mode.Alloc.Axis.P (Monadic Contention), false ->
+              | Mode.With_locality.Axis.P (Monadic Contention), true ->
+                [uncontended]
+              | Mode.With_locality.Axis.P (Monadic Contention), false ->
                 [shared; txt " or "; uncontended]
               | _, true -> [write; txt " or "; read_write]
               | _, false -> [read; txt " or "; read_write]
@@ -463,8 +465,8 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
                (let step_on wanted (step : Step.t) =
                   match Mode.reported_mode_as_alloc_atom step.mode with
                   | None -> false
-                  | Some (Mode.Alloc.Atom (axis, _)) ->
-                    same_alloc_axis (Mode.Alloc.Axis.P axis) wanted
+                  | Some (Mode.With_locality.Atom (axis, _)) ->
+                    same_alloc_axis (Mode.With_locality.Axis.P axis) wanted
                 in
                 let crosses ~source ~target =
                   step_on source s
@@ -473,8 +475,12 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
                   | [] -> false
                   | next :: _ -> step_on target next
                 in
-                let portability = Mode.Alloc.Axis.P (Comonadic Portability) in
-                let contention = Mode.Alloc.Axis.P (Monadic Contention) in
+                let portability =
+                  Mode.With_locality.Axis.P (Comonadic Portability)
+                in
+                let contention =
+                  Mode.With_locality.Axis.P (Monadic Contention)
+                in
                 if
                   same_alloc_axis axis portability
                   && crosses ~source:portability ~target:contention
@@ -618,7 +624,7 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
                       then escape
                       else ref_source loc [escape]) ] ]
                (match axis with
-               | Mode.Alloc.Axis.P (Comonadic Areality) ->
+               | Mode.With_locality.Axis.P (Comonadic Areality) ->
                  [rule [local; txt " values cannot escape their region"]]
                | _ -> []))
         | Fact Quoted_computation ->
@@ -742,16 +748,17 @@ let explain_chain ?(necessity = Inherit) ~axis ~side ~subject:initial_subject
   | Side.Actual, Some cause -> Nlg.focus ~on:cause fragments
   | Side.Expected, _ | Side.Actual, None -> fragments
 
-let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
+let plan_partial_application_hint ~(axis : Mode.With_locality.Axis.packed)
     (result_type : Types.type_expr) : fragment list =
   match axis with
-  | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) -> begin
+  | Mode.With_locality.Axis.P (Mode.With_locality.Axis.Comonadic Areality) ->
+    begin
     let rec non_local_arity sure n ty =
       match Types.get_desc ty with
       | Types.Tarrow ((_, _, res_mode), _, res_ty, _) ->
         begin match
           Mode.Locality.Guts.check_const
-            (Mode.Alloc.proj_comonadic Areality res_mode)
+            (Mode.With_locality.proj_comonadic Areality res_mode)
         with
         | Some Global -> Some (n + 1, true)
         | Some Local -> non_local_arity sure (n + 1) res_ty
@@ -770,7 +777,7 @@ let plan_partial_application_hint ~(axis : Mode.Alloc.Axis.packed)
               ("adding " ^ string_of_int n ^ " more " ^ arguments ^ " "
              ^ qualifier ^ " make the value non-local") ] ]
     end
-  | Mode.Alloc.Axis.P _ -> []
+  | Mode.With_locality.Axis.P _ -> []
 
 type actuality_note = Arguments_do_not_cross
 
@@ -782,7 +789,7 @@ type extra_rules =
 let no_extra_rules = { for_actual = []; for_expected = [] }
 
 type axis_input =
-  { axis : Mode.Alloc.Axis.packed;
+  { axis : Mode.With_locality.Axis.packed;
     actual : mismatch_step list;
     expected : mismatch_step list;
     actual_description : term Property.t;
@@ -811,7 +818,8 @@ let signature_reason ~axis ~subject:owner
     | None -> []
     | Some modalities -> (
       let (Mode.Modality.Axis.P axis) =
-        Mode.Modality.Axis.of_value (Mode.Const.Axis.alloc_as_value axis)
+        Mode.Modality.Axis.of_value
+          (Mode.Const.Axis.with_locality_as_regionality axis)
       in
       let modality = Mode.Modality.Const.proj axis modalities in
       if Mode.Modality.Per_axis.is_id axis modality
@@ -864,8 +872,8 @@ let plan_axis ~extra_rules ~actuality_note ~subject_override
     | Some Arguments_do_not_cross ->
       let axis_name =
         match axis with
-        | Mode.Alloc.Axis.P axis ->
-          Format_doc.asprintf "%a" Mode.Alloc.Axis.print axis
+        | Mode.With_locality.Axis.P axis ->
+          Format_doc.asprintf "%a" Mode.With_locality.Axis.print axis
       in
       [ elaborate
           [ txt "the argument types of ";
@@ -919,9 +927,9 @@ let prepare_axis
       mismatch_step list Mode.folded_axis) =
   match Mode.reported_mode_as_alloc_atom actual_mode with
   | None -> None
-  | Some (Mode.Alloc.Atom (axis, _)) ->
+  | Some (Mode.With_locality.Atom (axis, _)) ->
     Some
-      { axis = Mode.Alloc.Axis.P axis;
+      { axis = Mode.With_locality.Axis.P axis;
         actual;
         expected;
         actual_description = describe_mode `Actual actual_mode;
@@ -932,20 +940,20 @@ let prepare_axis
 
 type expression_error =
   | Submode_failed of
-      { error : Mode.Value.error;
+      { error : Mode.With_regionality.error;
         context : Typecore.submode_reason
       }
   | Curried_application_complete of
       { label : Typedtree.arg_label;
-        error : Mode.Alloc.error;
+        error : Mode.With_locality.error;
         part : [`Prefix | `Single_arg | `Entire_apply]
       }
   | Function_mode_mismatch of
       { part : Typecore.mode_mismatch_kind;
         direction : Mode.equate_step;
-        error : Mode.Alloc.error
+        error : Mode.With_locality.error
       }
-  | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+  | Uncurried_function_escapes_comonadic of Mode.With_locality.Comonadic.error
   | Overwrite_of_invalid_term
   | Block_index_modality_mismatch of
       { mutable_elements : bool;
@@ -965,7 +973,7 @@ type error =
       }
   | Constructor_submode_failed of
       { loc : Location.t;
-        error : Mode.Value.error
+        error : Mode.With_regionality.error
       }
   | Local_value_used_in_exclave of
       { loc : Location.t;
@@ -998,7 +1006,7 @@ type modality_requirement =
   | At_least_as_strong
 
 type modality_input =
-  { axis : Mode.Value.Axis.packed;
+  { axis : Mode.With_regionality.Axis.packed;
     subject : modality_subject;
     expected : modality_side;
     actual : modality_side;
@@ -1009,7 +1017,8 @@ let modality_fragment ~(sides : Diagnostic_term.sides) (input : modality_input)
     : fragment =
   let axis_name =
     match input.axis with
-    | Mode.Value.Axis.P ax -> Format_doc.asprintf "%a" Mode.Value.Axis.print ax
+    | Mode.With_regionality.Axis.P ax ->
+      Format_doc.asprintf "%a" Mode.With_regionality.Axis.print ax
   in
   let subject : subject =
     let span =
@@ -1082,7 +1091,7 @@ let mode_fragments ~error_loc ?extra_rules ?actuality_note ?subject_override
 
 let mode_error_fragments ~error_loc ?expected_declaration pinpoint error =
   mode_fragments ~error_loc ?expected_declaration
-    (Mode.Value.fold_error ~init:[] ~step:fold_step pinpoint error)
+    (Mode.With_regionality.fold_error ~init:[] ~step:fold_step pinpoint error)
 
 let describe_usage usage =
   let open Uniqueness_analysis.Usage in
@@ -1106,12 +1115,12 @@ let describe_usage usage =
 let diagnose ~error_loc = function
   | Expression_error { loc; error = err } -> begin
     let fold_value error =
-      Mode.Value.fold_error ~init:[] ~step:fold_step
+      Mode.With_regionality.fold_error ~init:[] ~step:fold_step
         (loc, Mode.Hint.Expression)
         error
     in
     let fold_alloc error =
-      Mode.Alloc.fold_error ~init:[] ~step:fold_step
+      Mode.With_locality.fold_error ~init:[] ~step:fold_step
         (loc, Mode.Hint.Expression)
         error
     in
@@ -1157,11 +1166,15 @@ let diagnose ~error_loc = function
             (subject ~span:loc
                (Phrase.Text "the application up to " :: argument_words))
       in
-      let restricted_word (axis : Mode.Alloc.Axis.packed) =
+      let restricted_word (axis : Mode.With_locality.Axis.packed) =
         match axis with
-        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Areality) -> Some local
-        | Mode.Alloc.Axis.P (Mode.Alloc.Axis.Comonadic Linearity) -> Some once
-        | Mode.Alloc.Axis.P _ -> None
+        | Mode.With_locality.Axis.P
+            (Mode.With_locality.Axis.Comonadic Areality) ->
+          Some local
+        | Mode.With_locality.Axis.P
+            (Mode.With_locality.Axis.Comonadic Linearity) ->
+          Some once
+        | Mode.With_locality.Axis.P _ -> None
       in
       let suggestion_phrases : term Phrase.t list =
         match part with
@@ -1235,7 +1248,7 @@ let diagnose ~error_loc = function
         }
       in
       mode_fragments ~error_loc ~extra_rules ?subject_override
-        (fold_alloc (Mode.Alloc.Comonadic e))
+        (fold_alloc (Mode.With_locality.Comonadic e))
     | Overwrite_of_invalid_term ->
       [ block
           [ state [ref_source loc [txt "this term cannot be overwritten"]];
@@ -1253,8 +1266,8 @@ let diagnose ~error_loc = function
       let _step, Mode.Modality.Error (ax, { left; right = _ }) = err in
       let axis_name =
         match Mode.Modality.Axis.to_value (Mode.Modality.Axis.P ax) with
-        | Mode.Value.Axis.P vax ->
-          Format_doc.asprintf "%a" Mode.Value.Axis.print vax
+        | Mode.With_regionality.Axis.P vax ->
+          Format_doc.asprintf "%a" Mode.With_regionality.Axis.print vax
       in
       let actual_words =
         if Mode.Modality.Per_axis.is_id ax left
@@ -1430,7 +1443,8 @@ let diagnose ~error_loc = function
     in
     mode_fragments ~error_loc ~extra_rules
       ~actuality_note:Arguments_do_not_cross
-      (Mode.Value.fold_error ~init:[] ~step:fold_step (loc, Mode.Hint.Unknown) e)
+      (Mode.With_regionality.fold_error ~init:[] ~step:fold_step
+         (loc, Mode.Hint.Unknown) e)
   | Local_value_used_in_exclave { loc; description = desc } ->
     let (item : Mode.Hint.lock_item), name =
       match desc with

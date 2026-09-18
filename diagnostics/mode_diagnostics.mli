@@ -9,20 +9,20 @@ type mismatch_step =
 
 type expression_error =
   | Submode_failed of
-      { error : Mode.Value.error;
+      { error : Mode.With_regionality.error;
         context : Typecore.submode_reason
       }
   | Curried_application_complete of
       { label : Typedtree.arg_label;
-        error : Mode.Alloc.error;
+        error : Mode.With_locality.error;
         part : [`Prefix | `Single_arg | `Entire_apply]
       }
   | Function_mode_mismatch of
       { part : Typecore.mode_mismatch_kind;
         direction : Mode.equate_step;
-        error : Mode.Alloc.error
+        error : Mode.With_locality.error
       }
-  | Uncurried_function_escapes_comonadic of Mode.Alloc.Comonadic.error
+  | Uncurried_function_escapes_comonadic of Mode.With_locality.Comonadic.error
   | Overwrite_of_invalid_term
   | Block_index_modality_mismatch of
       { mutable_elements : bool;
@@ -42,7 +42,7 @@ type error =
       }
   | Constructor_submode_failed of
       { loc : Location.t;
-        error : Mode.Value.error
+        error : Mode.With_regionality.error
       }
   | Local_value_used_in_exclave of
       { loc : Location.t;
@@ -75,7 +75,7 @@ type modality_requirement =
   | At_least_as_strong
 
 type modality_input =
-  { axis : Mode.Value.Axis.packed;
+  { axis : Mode.With_regionality.Axis.packed;
     subject : modality_subject;
     expected : modality_side;
     actual : modality_side;
@@ -91,7 +91,7 @@ val mode_error_fragments :
   error_loc:Location.t ->
   ?expected_declaration:Types.value_description ->
   Mode.Hint.pinpoint ->
-  Mode.Value.error ->
+  Mode.With_regionality.error ->
   Diagnostic_term.t Diagnostic_nlg.fragment list
 
 val diagnose :

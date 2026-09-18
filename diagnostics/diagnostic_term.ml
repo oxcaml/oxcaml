@@ -2,7 +2,7 @@ module Nlg = Diagnostic_nlg
 
 type mode_term =
   | Reported_mode of Mode.Reported_mode.t
-  | Alloc_mode of Mode.Alloc.atom
+  | Alloc_mode of Mode.With_locality.atom
 
 type concept =
   | Unsafe_mode_crossing
@@ -42,7 +42,7 @@ let mode_property (mode : Mode.Reported_mode.t) : t Nlg.Property.t =
   Nlg.Property.term (Mode_term (Reported_mode mode))
 
 let mode_const_property ax c : t Nlg.Property.t =
-  Nlg.Property.term (Mode_term (Alloc_mode (Mode.Alloc.Atom (ax, c))))
+  Nlg.Property.term (Mode_term (Alloc_mode (Mode.With_locality.Atom (ax, c))))
 
 let mode_word (mode : Mode.Reported_mode.t) : t Nlg.Phrase.segment =
   Nlg.term (Mode_term (Reported_mode mode))
@@ -54,7 +54,7 @@ let concept_word (concept : concept) : t Nlg.Phrase.segment =
   Nlg.term (Concept_term concept)
 
 let mode_const_word ax c : t Nlg.Phrase.segment =
-  Nlg.term (Mode_term (Alloc_mode (Mode.Alloc.Atom (ax, c))))
+  Nlg.term (Mode_term (Alloc_mode (Mode.With_locality.Atom (ax, c))))
 
 let display_parts (t : t) : string * string option =
   match t with
@@ -63,8 +63,9 @@ let display_parts (t : t) : string * string option =
     | [] -> Mode.Reported_mode.name mode, None
     | description :: _ ->
       Mode.Reported_mode.name description.displayed, description.suffix)
-  | Mode_term (Alloc_mode (Mode.Alloc.Atom (axis, mode))) ->
-    Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis axis) mode, None
+  | Mode_term (Alloc_mode (Mode.With_locality.Atom (axis, mode))) ->
+    ( Format_doc.asprintf "%a" (Mode.With_locality.Const.print_axis axis) mode,
+      None )
   | Written_modality_term name -> "@@ " ^ name, None
   | Modality_term (Atom (ax, m)) ->
     Format_doc.asprintf "@@@@ %a" (Mode.Modality.Per_axis.print ax) m, None
