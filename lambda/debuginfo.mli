@@ -15,6 +15,10 @@
 
 module ZA = Zero_alloc_utils
 
+type allocation_mode_check = private
+  { strict : bool;
+    loc : Location.t }
+
 module Scoped_location : sig
   type scope_item = private
     | Sc_anonymous_function
@@ -31,6 +35,8 @@ module Scoped_location : sig
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
+               allocation_mode_check: allocation_mode_check option;
+               is_source_function_call: bool;
                mangling_item:
                  Compilation_unit.t Structured_mangling.path_item option}
 
@@ -59,6 +65,10 @@ module Scoped_location : sig
   val update_assume_zero_alloc :
     scopes:scopes -> assume_zero_alloc:ZA.Assume_info.t -> scopes
   val get_assume_zero_alloc : scopes:scopes -> ZA.Assume_info.t
+  val update_allocation_mode_check :
+    scopes:scopes -> allocation_mode:Mode.Allocation.Const.t -> loc:Location.t ->
+    scopes
+  val mark_source_function_call : scopes:scopes -> loc:Location.t -> scopes
 
   type t =
     | Loc_unknown
@@ -140,6 +150,12 @@ val print_compact_extended : Format.formatter -> t -> unit
 val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
+
+val allocation_mode_check : t -> allocation_mode_check option
+
+val is_source_function_call : t -> bool
+
+val inside_inlined_source_function_call : t -> bool
 
 (** [to_structured_mangling_path] converts the debug info into a mangling path.
     In all cases, the [name] is used to populate the last element of the path.

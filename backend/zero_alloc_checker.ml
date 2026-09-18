@@ -1453,6 +1453,8 @@ module Annotation : sig
 
   val expected_value : t -> Value.t
 
+  val for_allocation_mode : Debuginfo.allocation_mode_check -> t
+
   (** [valid t value] returns true if and only if the [value] satisfies the
       annotation, i.e., [value] is less or equal to [expected_value a] when
       ignoring witnesses. *)
@@ -1491,6 +1493,19 @@ end = struct
       loc : Location.t;
           (** Source location of the annotation, used for error messages. *)
       custom_error_msg : string option
+    }
+
+  let for_allocation_mode (check : Debuginfo.allocation_mode_check) =
+    { strict = check.strict;
+      assume = false;
+      never_returns_normally = false;
+      never_raises = false;
+      loc = check.loc;
+      custom_error_msg =
+        Some
+          ("Backend verification of inferred "
+          ^ (if check.strict then "noalloc_strict" else "noalloc")
+          ^ " mode failed.")
     }
 
   let get_loc t = t.loc
@@ -1600,7 +1615,12 @@ end
 module Metadata : sig
   (* CR-someday gyorsh: propagate assert of arbitrary expressions. *)
   val assume_value :
-    Debuginfo.t -> can_raise:bool -> Witnesses.t -> Value.t option
+    ?allocation_mode_check:Debuginfo.allocation_mode_check ->
+    Debuginfo.t ->
+    on_call:bool ->
+    can_raise:bool ->
+    Witnesses.t ->
+    Value.t option
 end = struct
   (* CR gyorsh: The return type of [Assume_info.get_value] is
      [Assume_info.Value.t]. It is not the same as [Zero_alloc_checker.Value.t],
@@ -1614,10 +1634,28 @@ end = struct
   let transl w (v : Zero_alloc_utils.Assume_info.Value.t) : Value.t =
     { nor = transl w v.nor; exn = transl w v.exn; div = transl w v.div }
 
-  let assume_value dbg ~can_raise w =
+  let assume_value ?allocation_mode_check dbg ~on_call ~can_raise w =
     (* [loc] can be obtained by [Debuginfo.to_location dbg], For now just return
        [Location.none] because it is not used. *)
     let a = Debuginfo.assume_zero_alloc dbg in
+    (* We can assume that any variable that *may* be `noalloc/_strict` *is*,
+       since the mode is conditional on all arguments being noalloc, so either
+       (1.) all the arguments *are* noalloc, in which case this is sound, or
+       (2.) *not* all the arguments are noalloc, so this is vacuous.
+       The argument is similar for captured variables: not our responsibility.
+       Note that this applies only to mode-related checks, not `zero_alloc`. *)
+    let a =
+      match allocation_mode_check with
+      | Some (check : Debuginfo.allocation_mode_check)
+        when Debuginfo.inside_inlined_source_function_call dbg
+             || (on_call && Debuginfo.is_source_function_call dbg) ->
+        let conditional =
+          Zero_alloc_utils.Assume_info.create ~strict:check.strict
+            ~never_returns_normally:false ~never_raises:false ~inferred:true
+        in
+        Zero_alloc_utils.Assume_info.meet a conditional
+      | _ -> a
+    in
     match Zero_alloc_utils.Assume_info.get_value a with
     | None -> None
     | Some v ->
@@ -1881,9 +1919,10 @@ module Func_info : sig
     { name : string;  (** function name *)
       dbg : Debuginfo.t;  (** debug info associated with the function *)
       mutable value : Value.t;  (** the result of the check *)
-      annotation : Annotation.t option
+      annotation : Annotation.t option;
           (** [value] must be lessequal than the expected value if there is
               user-defined annotation on this function. *)
+      mutable allocation_mode_check : (Annotation.t * Value.t) option
     }
 
   val create : string -> Value.t -> Debuginfo.t -> Annotation.t option -> t
@@ -1891,22 +1930,29 @@ module Func_info : sig
   val print : witnesses:bool -> msg:string -> Format.formatter -> t -> unit
 
   val update : t -> Value.t -> unit
+
+  val set_allocation_mode_check : t -> Annotation.t -> Value.t -> unit
 end = struct
   type t =
     { name : string;  (** function name *)
       dbg : Debuginfo.t;  (** debug info associated with the function *)
       mutable value : Value.t;  (** the result of the check *)
-      annotation : Annotation.t option
+      annotation : Annotation.t option;
           (** [value] must be lessequal than the expected value if there is
               user-defined annotation on this function. *)
+      mutable allocation_mode_check : (Annotation.t * Value.t) option
     }
 
-  let create name value dbg annotation = { name; dbg; value; annotation }
+  let create name value dbg annotation =
+    { name; dbg; value; annotation; allocation_mode_check = None }
 
   let print ~witnesses ~msg ppf t =
     Format.fprintf ppf "%s %s %a@." msg t.name (Value.print ~witnesses) t.value
 
   let update t value = t.value <- value
+
+  let set_allocation_mode_check t annotation value =
+    t.allocation_mode_check <- Some (annotation, value)
 end
 
 (* CR-someday gyorsh: We may also want annotations on call sites, not only on
@@ -2128,7 +2174,8 @@ end = struct
       current_fun_name : string;
       future_funcnames : String.Set.t;
       unit_info : Unit_info.t;  (** must be the current compilation unit. *)
-      keep_witnesses : bool
+      keep_witnesses : bool;
+      allocation_mode_check : Debuginfo.allocation_mode_check option
     }
 
   let should_keep_witnesses keep =
@@ -2139,7 +2186,13 @@ end = struct
 
   let create ppf current_fun_name future_funcnames unit_info annot =
     let keep_witnesses = should_keep_witnesses (Option.is_some annot) in
-    { ppf; current_fun_name; future_funcnames; unit_info; keep_witnesses }
+    { ppf;
+      current_fun_name;
+      future_funcnames;
+      unit_info;
+      keep_witnesses;
+      allocation_mode_check = None
+    }
 
   let analysis_name = "zero_alloc"
 
@@ -2181,15 +2234,11 @@ end = struct
   let check_and_save_unit_info ppf unit_info =
     let errors = ref [] in
     let record (func_info : Func_info.t) =
-      (match func_info.annotation with
-      | None -> ()
-      | Some a ->
-        Builtin_attributes.mark_zero_alloc_attribute_checked analysis_name
-          (Annotation.get_loc a);
+      let check a value ~check_enabled =
         if
           (not (Annotation.is_assume a))
-          && enabled ()
-          && not (Annotation.valid a func_info.value)
+          && check_enabled
+          && not (Annotation.valid a value)
         then
           (* CR-soon gyorsh: keeping track of all the witnesses until the end of
              the compilation unit will be expensive. For functions that do not
@@ -2200,14 +2249,30 @@ end = struct
           (* CR gyorsh: we can add error recovering mode where we sets the
              expected value as the actual value and continue analysis of other
              functions. *)
-          let witnesses = Annotation.diff_witnesses a func_info.value in
+          let witnesses = Annotation.diff_witnesses a value in
           errors
             := { Report.a;
                  fun_name = func_info.name;
                  fun_dbg = func_info.dbg;
                  witnesses
                }
-               :: !errors);
+               :: !errors
+      in
+      Option.iter
+        (fun a ->
+          Builtin_attributes.mark_zero_alloc_attribute_checked analysis_name
+            (Annotation.get_loc a);
+          check a func_info.value ~check_enabled:(enabled ()))
+        func_info.annotation;
+      Option.iter
+        (fun (a, value) ->
+          let value =
+            Value.apply value (fun var ->
+                let callee = Unit_info.find_exn unit_info (Var.name var) in
+                Some (Value.get_component callee.value (Var.tag var)))
+          in
+          check a value ~check_enabled:true)
+        func_info.allocation_mode_check;
       report_func_info ~msg:"record" ppf func_info;
       Compilenv_utils.set_value func_info.name func_info.value
     in
@@ -2309,9 +2374,12 @@ end = struct
     report t r ~msg:"transform result" ~desc dbg;
     r
 
-  let transform_top t ~next ~exn w desc dbg =
+  let transform_top t ~on_call ~next ~exn w desc dbg =
     let effect_ =
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match
+        Metadata.assume_value ?allocation_mode_check:t.allocation_mode_check dbg
+          ~on_call ~can_raise:true w
+      with
       | Some v -> v
       | None -> Value.top w
     in
@@ -2323,7 +2391,10 @@ end = struct
     let v = find_callee t callee ~desc dbg k in
     let effect_ =
       let w = create_witnesses t k dbg in
-      match Metadata.assume_value dbg ~can_raise:true w with
+      match
+        Metadata.assume_value ?allocation_mode_check:t.allocation_mode_check dbg
+          ~on_call:true ~can_raise:true w
+      with
       | Some v' ->
         assert (Value.is_resolved v');
         if Value.is_resolved v then Value.meet v v' else v'
@@ -2338,7 +2409,10 @@ end = struct
     report t exn ~msg:"transform_specific exn" ~desc dbg;
     let effect_ =
       let w = create_witnesses t (Arch_specific s) dbg in
-      match Metadata.assume_value dbg ~can_raise:false w with
+      match
+        Metadata.assume_value ?allocation_mode_check:t.allocation_mode_check dbg
+          ~on_call:false ~can_raise:false w
+      with
       | Some v -> v
       | None ->
         (* Conservatively assume that operation can return normally. *)
@@ -2602,7 +2676,11 @@ end = struct
               let v = find_callee t callee ~desc dbg k in
               let w = create_witnesses t k dbg in
               let effect_ =
-                match Metadata.assume_value dbg ~can_raise:true w with
+                match
+                  Metadata.assume_value
+                    ?allocation_mode_check:t.allocation_mode_check dbg
+                    ~on_call:true ~can_raise:true w
+                with
                 | Some v' ->
                   assert (Value.is_resolved v');
                   if Value.is_resolved v then Value.meet v v' else v'
@@ -2662,7 +2740,11 @@ end = struct
         | Alloc { mode = Heap; bytes; dbginfo } ->
           let w = create_witnesses t (Alloc { bytes; dbginfo }) dbg in
           let effect_ =
-            match Metadata.assume_value dbg ~can_raise:false w with
+            match
+              Metadata.assume_value
+                ?allocation_mode_check:t.allocation_mode_check dbg
+                ~on_call:false ~can_raise:false w
+            with
             | Some effect_ -> effect_
             | None -> Value.{ nor = V.top w; exn = V.bot; div = V.bot }
           in
@@ -2714,8 +2796,8 @@ end = struct
           let w =
             create_witnesses t (Indirect_tailcall { callee = None }) dbg
           in
-          transform_top t ~next:Value.normal_return ~exn:Value.exn_escape w
-            "indirect tailcall" dbg
+          transform_top t ~on_call:true ~next:Value.normal_return
+            ~exn:Value.exn_escape w "indirect tailcall" dbg
         | Call_no_return { alloc = false; _ } ->
           (* Sound to ignore [next] and [exn] because the call never returns or
              raises. *)
@@ -2724,7 +2806,7 @@ end = struct
           (* Sound to ignore [next] because the call never returns. *)
           (* CR gyorsh: we do not currently generate this, but may later. *)
           let w = create_witnesses t (Extcall { callee = func }) dbg in
-          transform_top t ~next:Value.bot ~exn w
+          transform_top t ~on_call:false ~next:Value.bot ~exn w
             ("external call to " ^ func)
             dbg
         | Prim { op = External { alloc = false; _ }; _ } ->
@@ -2733,7 +2815,9 @@ end = struct
           next
         | Prim { op = External { alloc = true; func_symbol = func; _ }; _ } ->
           let w = create_witnesses t (Extcall { callee = func }) dbg in
-          transform_top t ~next ~exn w ("external call to " ^ func) dbg
+          transform_top t ~on_call:false ~next ~exn w
+            ("external call to " ^ func)
+            dbg
         | Prim { op = Probe { name; handler_code_sym; enabled_at_init = _ }; _ }
           ->
           let desc =
@@ -2743,7 +2827,7 @@ end = struct
           transform_call t ~next ~exn handler_code_sym k ~desc dbg
         | Call { op = Indirect None; _ } ->
           let w = create_witnesses t (Indirect_call { callee = None }) dbg in
-          transform_top t ~next ~exn w "indirect call" dbg
+          transform_top t ~on_call:true ~next ~exn w "indirect call" dbg
         | Call { op = Indirect (Some callees); _ } ->
           transform_call_indirect t ~next ~exn callees
             (fun callee -> Witness.Indirect_call { callee = Some callee })
@@ -2790,7 +2874,17 @@ end = struct
         res
     in
     check_fun fd.fun_name fd.fun_dbg a check_body ~future_funcnames unit_info
-      unresolved_deps ppf
+      unresolved_deps ppf;
+    match Debuginfo.allocation_mode_check fd.fun_dbg with
+    | None -> ()
+    | Some _ when !Oxcaml_flags.disable_zero_alloc_checker -> ()
+    | Some check ->
+      let a = Annotation.for_allocation_mode check in
+      let t = create ppf fd.fun_name future_funcnames unit_info (Some a) in
+      let t = { t with allocation_mode_check = Some check } in
+      let value = check_body t in
+      let func_info = Unit_info.find_exn unit_info fd.fun_name in
+      Func_info.set_allocation_mode_check func_info a value
 end
 
 (** Information about the current unit. *)

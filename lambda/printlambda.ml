@@ -1711,10 +1711,15 @@ and function_params kind ppf params =
         params;
       fprintf ppf ")"
 
-and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
-  fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
-    (locality_kind mode) (function_params kind) params
-    function_attribute attr return_kind (ret_mode, return) lam body
+and lfunction ppf {kind; params; return; body; attr; ret_mode; mode; loc} =
+  fprintf ppf "@[<2>(function%s%a@ %a"
+    (locality_kind mode) (function_params kind) params function_attribute attr;
+  begin match Debuginfo.allocation_mode_check (Debuginfo.from_location loc) with
+  | None -> ()
+  | Some { strict; _ } ->
+      fprintf ppf "audit_noalloc%s@ " (if strict then "_strict" else "")
+  end;
+  fprintf ppf "%a%a)@]" return_kind (ret_mode, return) lam body
 
 and template_env ppf env =
   fprintf ppf "{@[";

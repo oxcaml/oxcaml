@@ -518,7 +518,7 @@ and expression_desc =
         ret_sort : Jkind.sort;
         locality_mode : locality_mode_r;
         (* Mode at which the closure is allocated *)
-        allocation_mode : Mode.Allocation.r;
+        allocation_mode : Mode.Allocation.l;
         yielding : Mode.Yielding.l;
         (* Whether fully applying this function can perform a free effect. This
            is the closure's own mode joined with its parameter modes. *)

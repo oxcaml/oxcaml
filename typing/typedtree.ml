@@ -324,7 +324,7 @@ and expression_desc =
         ret_mode : return_mode modes;
         ret_sort : Jkind.sort;
         locality_mode : locality_mode_r;
-        allocation_mode : Mode.Allocation.r;
+        allocation_mode : Mode.Allocation.l;
         yielding : Mode.Yielding.l;
         zero_alloc : Zero_alloc.t;
       }

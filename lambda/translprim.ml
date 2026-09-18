@@ -2463,6 +2463,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
   | Identity, [arg] -> arg
   | Apply (pos, layout), [func; arg]
   | Revapply (pos, layout), [arg; func] ->
+      let loc = map_scopes mark_source_function_call loc in
       Lapply {
         ap_func = func;
         ap_args = [arg];

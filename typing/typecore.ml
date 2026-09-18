@@ -6443,6 +6443,7 @@ type split_function_ty =
     closure_mode: Mode.With_locality.Comonadic.lr;
     env_mode: Mode.With_locality.Monadic.r;
     locality_mode: Locality.lr;
+    body_allocation_mode: Allocation.lr;
     really_poly: bool
   }
 
@@ -6562,6 +6563,7 @@ let split_function_ty
   env,
   { filtered_arrow; arg_sort; ret_sort;
     locality_mode;
+    body_allocation_mode;
     closure_mode=closure_mode.comonadic;
     ty_arg_mono;
     expected_inner_mode; expected_pat_mode;
@@ -6576,6 +6578,7 @@ type type_function_result_param =
 
 type fun_alloc_mode =
   { locality_mode: Locality.lr;
+    body_allocation_mode: Allocation.lr;
     fun_closure_mode: Mode.With_locality.Comonadic.lr
   }
 
@@ -9748,6 +9751,7 @@ and type_function
             arg_sort; ret_sort;
             ty_arg_mono; expected_pat_mode; expected_inner_mode;
             locality_mode;
+            body_allocation_mode;
             closure_mode;
             really_poly;
             env_mode
@@ -9849,7 +9853,7 @@ and type_function
                   assert(is_final_val_param);
                   Final_arg
                 | Some
-                    { fun_closure_mode; locality_mode } ->
+                    { fun_closure_mode; locality_mode; _ } ->
                   assert(not is_final_val_param);
                   (* Handle mode crossing of [arg_mode]. Note that [close_over]
                      uses the [arg_mode.comonadic] as a left mode, and
@@ -10040,6 +10044,7 @@ and type_function
       in
       let fun_alloc_mode =
         { fun_closure_mode = closure_mode;
+          body_allocation_mode;
           locality_mode }
       in
       { function_ = exp_type, param :: params, body;
@@ -10789,7 +10794,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
                   mode_desc = [] };
               ret_sort;
               locality_mode = Typedtree.create_locality_mode_r locality_mode;
-              allocation_mode = Allocation.disallow_left Allocation.alloc;
+              allocation_mode = Allocation.disallow_right Allocation.alloc;
               yielding = Yielding.disallow_right Yielding.yielding;
               zero_alloc = Zero_alloc.default
             }
@@ -11805,7 +11810,7 @@ and type_function_cases_expect
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
-          arg_sort; ret_sort; closure_mode;
+          arg_sort; ret_sort; closure_mode; body_allocation_mode;
           ty_arg_mono; expected_pat_mode; expected_inner_mode;
           locality_mode
         } =
@@ -11867,6 +11872,7 @@ and type_function_cases_expect
     in
     let fun_alloc_mode =
       { fun_closure_mode = closure_mode;
+        body_allocation_mode;
         locality_mode }
     in
     let calling_convention_sorts =
@@ -12618,8 +12624,12 @@ and type_n_ary_function
                 Typedtree.create_locality_mode_r
                   (Locality.disallow_left fun_alloc_mode.locality_mode);
               allocation_mode =
-                With_regionality.proj_comonadic Allocation
-                  (as_single_mode expected_mode);
+                Allocation.join
+                  [ Allocation.disallow_right
+                      fun_alloc_mode.body_allocation_mode;
+                    With_locality.Comonadic.proj Allocation
+                      (With_locality.Comonadic.disallow_right
+                         fun_alloc_mode.fun_closure_mode) ];
               ret_mode; yielding;
               zero_alloc
             };

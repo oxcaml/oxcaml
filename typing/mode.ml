@@ -6383,6 +6383,8 @@ module Allocation = struct
   let zap_to_legacy_force = zap_to_ceil_force
 
   module Guts = struct
+    let get_floor m = Guts.get_floor m
+
     let get_ceil m = Guts.get_ceil m
   end
 end

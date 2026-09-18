@@ -639,6 +639,8 @@ module type S = sig
     val alloc : lr
 
     module Guts : sig
+      val get_floor : (allowed * 'r) t -> Const.t
+
       (** Returns the upper bound of the given mode. Unlike the lower bound, it
           is precise. See [get_ceil] in [solver_intf.mli]. *)
       val get_ceil : ('l * allowed) t -> Const.t

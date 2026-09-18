@@ -19,6 +19,10 @@ open Location
 
 module ZA = Zero_alloc_utils
 
+type allocation_mode_check =
+  { strict : bool;
+    loc : Location.t }
+
 module Scoped_location = struct
   type scope_item =
     | Sc_anonymous_function
@@ -46,6 +50,8 @@ module Scoped_location = struct
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
                assume_zero_alloc: ZA.Assume_info.t;
+               allocation_mode_check: allocation_mode_check option;
+               is_source_function_call: bool;
                mangling_item:
                  Compilation_unit.t Structured_mangling.path_item option}
 
@@ -57,9 +63,15 @@ module Scoped_location = struct
     | Empty -> "(fun)"
     | Cons r -> r.str_fun
 
+  let get_allocation_mode_check = function
+    | Empty -> None
+    | Cons r -> r.allocation_mode_check
+
   let cons scopes item str name mangling_item ~assume_zero_alloc =
     Cons {item; str; str_fun = str ^ ".(fun)"; name; prev = scopes;
-          assume_zero_alloc; mangling_item}
+          assume_zero_alloc; mangling_item;
+          allocation_mode_check = get_allocation_mode_check scopes;
+          is_source_function_call = false}
 
   let empty_scopes = Empty
 
@@ -88,7 +100,8 @@ module Scoped_location = struct
       Some (Anonymous_function (line, col, Some file))
     in
     Cons {item = Sc_anonymous_function; str; str_fun = str; name = ""; prev = scopes;
-          assume_zero_alloc; mangling_item }
+          assume_zero_alloc; mangling_item;
+          allocation_mode_check = None; is_source_function_call = false }
 
   let enter_anonymous_module ~scopes ~loc =
     let str = str scopes in
@@ -99,7 +112,9 @@ module Scoped_location = struct
     in
     Cons {item = Sc_module_definition; str; str_fun = str ^ ".(fun)"; name = "";
           prev = scopes; assume_zero_alloc = ZA.Assume_info.none;
-          mangling_item }
+          mangling_item;
+          allocation_mode_check = get_allocation_mode_check scopes;
+          is_source_function_call = false }
 
   let enter_value_definition ~scopes ~assume_zero_alloc id =
     cons scopes Sc_value_definition (dot scopes (Ident.name id)) (Ident.name id)
@@ -157,6 +172,24 @@ module Scoped_location = struct
     match scopes with
     | Empty -> ZA.Assume_info.none
     | Cons { assume_zero_alloc; _ } -> assume_zero_alloc
+
+  let update_allocation_mode_check ~scopes
+      ~(allocation_mode : Mode.Allocation.Const.t) ~loc =
+    match scopes with
+    | Empty -> Empty
+    | Cons r ->
+      let allocation_mode_check =
+        match allocation_mode with
+        | Alloc -> None
+        | Noalloc -> Some { strict = false; loc }
+        | Noalloc_strict -> Some { strict = true; loc }
+      in
+      Cons { r with allocation_mode_check; is_source_function_call = false }
+
+  let mark_source_function_call ~scopes ~loc:_ =
+    match scopes with
+    | Empty -> Empty
+    | Cons r -> Cons { r with is_source_function_call = true }
 
   let string_of_scopes ~include_zero_alloc = function
     | Empty -> "<unknown>"
@@ -334,20 +367,24 @@ module Dbg = struct
 
 end
 
-type t = { dbg : Dbg.t; assume_zero_alloc : ZA.Assume_info.t }
+type t =
+  { dbg : Dbg.t;
+    assume_zero_alloc : ZA.Assume_info.t;
+    is_source_function_call : bool;
+    inside_inlined_source_function_call : bool }
 
-let none = { dbg = []; assume_zero_alloc = ZA.Assume_info.none }
+let none =
+  { dbg = []; assume_zero_alloc = ZA.Assume_info.none;
+    is_source_function_call = false;
+    inside_inlined_source_function_call = false }
 
-let of_items items = { dbg = items; assume_zero_alloc = ZA.Assume_info.none }
+let of_items items = { none with dbg = items }
 
-let mapi_items { dbg; assume_zero_alloc } ~f =
-  { dbg = List.mapi f dbg;
-    assume_zero_alloc
-  }
+let mapi_items t ~f = { t with dbg = List.mapi f t.dbg }
 
 let to_items t = t.dbg
 
-let to_string { dbg; assume_zero_alloc; } =
+let to_string { dbg; assume_zero_alloc; _ } =
   let s = Dbg.to_string dbg in
   let a = ZA.Assume_info.to_string assume_zero_alloc in
   s^a
@@ -377,11 +414,17 @@ let item_from_location ~scopes loc =
 
 let from_location = function
   | Scoped_location.Loc_unknown ->
-    { dbg = []; assume_zero_alloc = ZA.Assume_info.none; }
+    none
   | Scoped_location.Loc_known {scopes; loc} ->
     assert (not (Location.is_none loc));
     let assume_zero_alloc = Scoped_location.get_assume_zero_alloc ~scopes in
-    { dbg = [item_from_location ~scopes loc]; assume_zero_alloc; }
+    let is_source_function_call =
+      match scopes with
+      | Cons { is_source_function_call; _ } -> is_source_function_call
+      | Empty -> false
+    in
+    { dbg = [item_from_location ~scopes loc]; assume_zero_alloc;
+      is_source_function_call; inside_inlined_source_function_call = false }
 
 (* The build root against which a relative [-directory] argument is to be
    interpreted.  By convention (see the documentation of [-directory] in
@@ -426,7 +469,7 @@ let item_file_path d =
              carries more information than the bare filename. *)
           composed)
 
-let to_location { dbg; assume_zero_alloc=_ } =
+let to_location { dbg; _ } =
   let rec last = function
     | [] -> None
     | [x] -> Some x
@@ -449,23 +492,28 @@ let to_location { dbg; assume_zero_alloc=_ } =
       } in
     { loc_ghost = false; loc_start; loc_end; }
 
-let to_file_path { dbg; assume_zero_alloc = _ } =
+let to_file_path { dbg; _ } =
   Option.map item_file_path (Misc.last dbg)
 
-let inline { dbg = dbg1; assume_zero_alloc = a1; }
-      ~from_inlined_body:{ dbg = dbg2; assume_zero_alloc = a2; } =
-  { dbg = dbg1 @ dbg2;
+let inline call ~from_inlined_body:body =
+  { dbg = call.dbg @ body.dbg;
     assume_zero_alloc =
       (* Drop "inferred" zero_alloc annotation from a call when
          the callee is inlined. *)
-      if ZA.Assume_info.is_inferred a1 then a2 else
-      ZA.Assume_info.meet a1 a2; }
+      if ZA.Assume_info.is_inferred call.assume_zero_alloc
+      then body.assume_zero_alloc
+      else ZA.Assume_info.meet call.assume_zero_alloc body.assume_zero_alloc;
+    is_source_function_call = body.is_source_function_call;
+    inside_inlined_source_function_call =
+      call.is_source_function_call
+      || call.inside_inlined_source_function_call
+      || body.inside_inlined_source_function_call }
 
-let is_none { dbg; assume_zero_alloc } =
+let is_none { dbg; assume_zero_alloc; _ } =
   ZA.Assume_info.is_none assume_zero_alloc && Dbg.is_none dbg
 
-let compare { dbg = dbg1; assume_zero_alloc = a1; }
-      { dbg = dbg2; assume_zero_alloc = a2; } =
+let compare { dbg = dbg1; assume_zero_alloc = a1; _ }
+      { dbg = dbg2; assume_zero_alloc = a2; _ } =
   let res = Dbg.compare dbg1 dbg2 in
   if res <> 0 then res else ZA.Assume_info.compare a1 a2
 
@@ -514,8 +562,11 @@ let rec print_compact_extended ppf t =
 
 let print_compact_extended ppf { dbg; } = print_compact_extended ppf dbg
 
-let merge ~into:{ dbg = dbg1; assume_zero_alloc = a1; }
-      { dbg = dbg2; assume_zero_alloc = a2 } =
+let merge
+      ~into:{ dbg = dbg1; assume_zero_alloc = a1; is_source_function_call = c1;
+              inside_inlined_source_function_call = i1 }
+      { dbg = dbg2; assume_zero_alloc = a2; is_source_function_call = c2;
+        inside_inlined_source_function_call = i2 } =
   (* Keep the first [dbg] info to match existing behavior.
      When assume_zero_alloc is only on one of the inputs but not both, keep [dbg]
      from the other.
@@ -526,10 +577,22 @@ let merge ~into:{ dbg = dbg1; assume_zero_alloc = a1; }
     | _,  _ -> dbg1
   in
   { dbg;
-    assume_zero_alloc = ZA.Assume_info.join a1 a2
+    assume_zero_alloc = ZA.Assume_info.join a1 a2;
+    is_source_function_call = c1 && c2;
+    inside_inlined_source_function_call = i1 && i2
   }
 
 let assume_zero_alloc t = t.assume_zero_alloc
+
+let allocation_mode_check t =
+  match Misc.last t.dbg with
+  | None -> None
+  | Some item ->
+    Scoped_location.get_allocation_mode_check item.dinfo_scopes
+
+let is_source_function_call t = t.is_source_function_call
+
+let inside_inlined_source_function_call t = t.inside_inlined_source_function_call
 
 let get_dbg t = t.dbg
 

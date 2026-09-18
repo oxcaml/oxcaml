@@ -1705,6 +1705,7 @@ and transl_apply ~scopes
       lam sargs loc
   =
   let lapply ~inlined funct args loc pos mode result_layout =
+    let loc = map_scopes mark_source_function_call loc in
     match funct, pos with
     | Lsend((Self | Public) as k, lmet, lobj, [], _, _, _, _, sy), _ ->
         Lsend(k, lmet, lobj, args, pos, mode, loc, result_layout,
@@ -2364,29 +2365,7 @@ and transl_function
       ~yielding =
   let attrs = e.exp_attributes in
   let mode = transl_typed_locality_mode_r locality_mode in
-  let zero_alloc =
-    let zero_alloc = Zero_alloc.get zero_alloc in
-    match Mode.Allocation.Guts.get_ceil allocation_mode with
-    | Alloc -> zero_alloc
-    | (Noalloc | Noalloc_strict) as allocation ->
-      let strict = allocation = Mode.Allocation.Const.Noalloc_strict in
-      begin match zero_alloc with
-      | Check check when check.strict || not strict ->
-        Builtin_attributes.Check { check with opt = false }
-      | Default_zero_alloc | Ignore_assert_all | Assume _ | Check _ ->
-        let mode_name = if strict then "noalloc_strict" else "noalloc" in
-        Builtin_attributes.Check
-          { strict;
-            opt = false;
-            arity = Typedtree.function_arity params body;
-            loc = e.exp_loc;
-            custom_error_msg =
-              Some
-                ("Backend verification of inferred " ^ mode_name
-                 ^ " mode failed.");
-          }
-      end
-  in
+  let zero_alloc = Zero_alloc.get zero_alloc in
   let assume_zero_alloc =
     match zero_alloc with
     | Default_zero_alloc | Check _ | Ignore_assert_all ->
@@ -2398,6 +2377,11 @@ and transl_function
     if in_new_scope then
       update_assume_zero_alloc ~scopes ~assume_zero_alloc
     else enter_anonymous_function ~scopes ~assume_zero_alloc ~loc:e.exp_loc
+  in
+  let scopes =
+    update_allocation_mode_check ~scopes
+      ~allocation_mode:(Mode.Allocation.Guts.get_floor allocation_mode)
+      ~loc:e.exp_loc
   in
   let sreturn_mode = transl_ret_mode sreturn_mode.mode_modes in
   let { params; body; return_sort; return_mode; region } =
@@ -2435,9 +2419,7 @@ and transl_function
          then Check { strict = false; loc = e.exp_loc; custom_error_msg = None; }
          else Default_zero_alloc)
     | Check { strict; opt; arity = _; loc; custom_error_msg; } ->
-      if Mode.Allocation.Guts.get_ceil allocation_mode
-           <> Mode.Allocation.Const.Alloc
-         || Builtin_attributes.is_zero_alloc_check_enabled ~opt
+      if Builtin_attributes.is_zero_alloc_check_enabled ~opt
       then Check { strict; loc; custom_error_msg }
       else Default_zero_alloc
     | Assume { strict; never_returns_normally; never_raises; loc; arity = _; } ->
