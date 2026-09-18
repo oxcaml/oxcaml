@@ -17,7 +17,7 @@
    that the attached path prevails for transitive references.
 *)
 
-subdirectories = "liba liba_alt libb libc";
+subdirectories = "liba liba_alt libb libc libd";
 setup-ocamlc.byte-build-env;
 
 flags = "-I liba -nocwd";
@@ -176,6 +176,58 @@ ocamlc.byte;
   module = "libb/uses_string.ml";
   setup-ocamlc.byte-build-env;
   ocamlc.byte;
+}
+
+(* Test that inferred signatures print members of an [-open-cmi]'d library
+   under their member name rather than the mangled unit name, so that tools
+   re-parsing the output in the same context (such as menhir's --infer
+   pipeline) can resolve them. [libd/d.cmi] is a facade compiled with warning
+   49 disabled, so mentions of [Attr] are saved in mock.cmi as its target
+   [D__Attr] (with the cmi path attached); with the facade hidden, the printer
+   must fall back to the in-scope member name [Attr]. *)
+{
+  flags = "-I libd -nocwd";
+  module = "libd/d__Attr.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  flags = "-nocwd -no-alias-deps -w -49";
+  module = "libd/d.ml";
+  ocamlc.byte;
+
+  flags = "-nocwd -open-cmi libd/d.cmi -H libd";
+  module = "libc/mock.ml";
+  ocamlc.byte;
+
+  flags = "-i -nocwd -open-cmi libd/d.cmi -I libc -H libd";
+  module = "libc/c7.ml";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/member_name_printing.ocamlc.reference";
+  check-ocamlc.byte-output;
+}
+
+(* Under -short-paths, a nominal type and an abbreviation of the same member
+   print through different routes (the printing map and the double-underscore
+   rewrite); both must produce the member name uniformly, or the ident
+   disambiguator suffixes them with fake stamps (Attr/1.t * Attr/2.lst). This
+   is what menhir's --infer output hit. *)
+{
+  flags = "-I libd -nocwd";
+  module = "libd/d__Attr.ml";
+  setup-ocamlc.byte-build-env;
+  ocamlc.byte;
+
+  flags = "-nocwd -no-alias-deps -w -49";
+  module = "libd/d.ml";
+  ocamlc.byte;
+
+  flags = "-i -short-paths -nocwd -open-cmi libd/d.cmi -H libd";
+  module = "libc/c9.ml";
+  ocamlc.byte;
+  compiler_reference =
+    "${test_source_directory}/member_name_printing_short_paths.ocamlc.reference";
+  check-ocamlc.byte-output;
 }
 
 *)
