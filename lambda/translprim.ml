@@ -2935,6 +2935,12 @@ let fully_applied_allocation env loc p ~poly_mode ~ty ~arg_exps =
       match prim with
       | External prim when prim.prim_alloc ->
           Allocation_at_locality Mode.Locality.global
+      | Primitive
+          ((Pbigarrayref (_, _, Pbigarray_unknown, _)
+           | Pbigarrayref (_, _, _, Pbigarray_unknown_layout)
+           | Pbigarrayset (_, _, Pbigarray_unknown, _)
+           | Pbigarrayset (_, _, _, Pbigarray_unknown_layout)), _) ->
+          Allocation_at_locality Mode.Locality.global
       | _ ->
           if prim_may_allocate ~arity:p.prim_arity prim then
             result_allocation p ~poly_mode
