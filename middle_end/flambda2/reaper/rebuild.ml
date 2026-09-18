@@ -2355,7 +2355,8 @@ type 'f result =
   { unit : Flambda_unit.t;
     exported_code : Exported_code.t;
     slot_offsets : Slot_offsets.result;
-    final_typing_env : ('f, typing_env) Traverse.With_types.t
+    final_typing_env : ('f, typing_env) Traverse.With_types.t;
+    free_names : Name_occurrences.t
   }
 
 let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
@@ -2451,5 +2452,6 @@ let rebuild (type f) ~machine_width ~cmx_loader ~all_code ~skeleton
   { unit = Flambda_unit.create_from_metadata_and_body metadata rebuilt_expr.expr;
     exported_code;
     slot_offsets = Analysis.slot_offsets solution;
-    final_typing_env = Analysis.final_typing_env solution
+    final_typing_env = Analysis.final_typing_env solution;
+    free_names = rebuilt_expr.free_names
   }
