@@ -198,6 +198,34 @@ module For_lto = struct
         code_changes : Unboxing_analysis.code_changes;
         slot_offsets : Slot_offsets.result
       }
+
+    let offsets_for_free_names t free_names =
+      let solved = t.slot_offsets.Slot_offsets.exported_offsets in
+      let offsets =
+        Function_slot.Set.fold
+          (fun function_slot offsets ->
+            match
+              Exported_offsets.function_slot_offset solved function_slot
+            with
+            | Some info ->
+              Exported_offsets.add_function_slot_offset offsets function_slot
+                info
+            | None ->
+              Misc.fatal_errorf "Reaper: no solved offset for function slot %a"
+                Function_slot.print function_slot)
+          (Name_occurrences.all_function_slots_at_normal_mode free_names)
+          Exported_offsets.empty
+      in
+      Value_slot.Set.fold
+        (fun value_slot offsets ->
+          match Exported_offsets.value_slot_offset solved value_slot with
+          | Some info ->
+            Exported_offsets.add_value_slot_offset offsets value_slot info
+          | None ->
+            Misc.fatal_errorf "Reaper: no solved offset for value slot %a"
+              Value_slot.print value_slot)
+        (Name_occurrences.all_value_slots_at_normal_mode free_names)
+        offsets
   end
 
   let traverse ~free_names unit =
@@ -271,8 +299,8 @@ module For_lto = struct
         } =
       rebuild_inputs
     in
-    let { Solution.analysis; code_changes; slot_offsets } = solution in
-    let Rebuild.{ body; all_code; code_ids_to_remember } =
+    let Solution.{ analysis; code_changes; _ } = solution in
+    let Rebuild.{ body; all_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
         ~fixed_arity_continuations ~continuation_info ~final_typing_env:None
         ~rewrite_kind_with_subkind:(fun _ kind ->
@@ -282,9 +310,12 @@ module For_lto = struct
     let all_code =
       make_exported_code ~code_ids_to_remember ~all_code ~cmx_loader
     in
+    let exported_offsets =
+      Solution.offsets_for_free_names solution free_names
+    in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,
-      slot_offsets )
+      exported_offsets )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
@@ -328,7 +359,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let slot_offsets =
     Slot_offsets_analysis.compute ~free_names ~analysis_scope solved_dep
   in
-  let Rebuild.{ body; all_code; code_ids_to_remember } =
+  let Rebuild.{ body; all_code; code_ids_to_remember; _ } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
       ~continuation_info ~final_typing_env
       ~rewrite_kind_with_subkind:

@@ -69,7 +69,7 @@ module For_lto : sig
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    Flambda_unit.t * Exported_code.t * Slot_offsets.result
+    Flambda_unit.t * Exported_code.t * Exported_offsets.t
 end
 
 val run :
