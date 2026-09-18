@@ -2007,11 +2007,6 @@ end = struct
   type 'a interval = { lo: 'a; hi: 'a }
   let construct_raw_bounds { monadic; comonadic } :
       string interval =
-    let bound_diff bound trivial =
-      erase_implied_axes bound
-      |> Alloc.Const.Option.value ~default:trivial
-      |> fun bound -> Alloc.Const.diff bound trivial
-    in
     let mupper = dupper_lr Alloc.obj_monadic monadic in
     let mlower = dlower_lr Alloc.obj_monadic monadic in
     let cupper = dupper_lr Alloc.obj_comonadic comonadic in
@@ -2024,8 +2019,8 @@ end = struct
       Alloc.Const.merge
         { monadic = mlower; comonadic = cupper }
     in
-    let lower = bound_diff lower Alloc.Const.min in
-    let upper = bound_diff upper Alloc.Const.max in
+    let lower = Alloc.Const.diff lower Alloc.Const.min in
+    let upper = Alloc.Const.diff upper Alloc.Const.max in
     { lo = Fmt.asprintf "%a"
              Alloc.Const.Option.partial_print lower;
       hi = Fmt.asprintf "%a"

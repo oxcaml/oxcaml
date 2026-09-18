@@ -24,8 +24,9 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< past('m) & global write] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | writing] =
+  'a myref @ [< past('m) & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) mod many forkable unyielding | corruptible writing] =
   <fun>
 |}, Principal{|
 (let
@@ -34,8 +35,9 @@ val foo :
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
 val foo :
-  'a myref @ [< past('m) & global write] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
+  'a myref @ [< past('m) & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) | corruptible writing] =
   <fun>
 |}]
 
@@ -47,8 +49,9 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< past('m) & write > local] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | local writing] =
+  'a myref @ [< past('m) & corrupted write > local] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) mod many forkable unyielding | local corruptible writing] =
   <fun>
 |}, Principal{|
 (let
@@ -57,8 +60,9 @@ val foo :
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
 val foo :
-  'a myref @ [< past('m) & write > local] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | local writing] =
+  'a myref @ [< past('m) & corrupted write > local] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) | local corruptible writing] =
   <fun>
 |}]
 
@@ -68,15 +72,17 @@ let foo (r @ global) x = r.i <- x
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< past('m) & global write] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) mod many forkable unyielding | writing] =
+  'a myref @ [< past('m) & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) mod many forkable unyielding | corruptible writing] =
   <fun>
 |}, Principal{|
 (let (foo/2 = (function {nlocal = 0} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
 val foo :
-  'a myref @ [< past('m) & global write] ->
-  ('a @ [< global many read_write] -> unit @ 'n) @ [> past('m) | writing] =
+  'a myref @ [< past('m) & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> past('m) | corruptible writing] =
   <fun>
 |}]
 
@@ -95,7 +101,8 @@ let foo () =
          (function {nlocal = 1} param/1[L][value<int>] : int
            (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
-val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
+val foo :
+  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
   <fun>
 |}]
 
@@ -117,7 +124,8 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit @ 'o -> (string myref @ [< write] -> unit @ 'n) @ 'm = <fun>
+val foo : unit @ 'o -> (string myref @ [< corrupted write] -> unit @ 'n) @ 'm =
+  <fun>
 |}]
 
 let foo () =
@@ -135,7 +143,8 @@ let foo () =
          (function {nlocal = 1} param/4[L][value<int>] : int
            (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
-val foo : unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> writing] =
+val foo :
+  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
   <fun>
 |}]
 
@@ -294,7 +303,8 @@ let rec forward =
           (makeblock 0 g/0)))
       (apply (field_imm 1 (global Toploop!)) "forward" forward/0))))
 val forward :
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  int @ [< global > dynamic] = <fun>
 |}]
 
 (* Same wrapper, but closing over the yielding [y]: all calls must be
@@ -330,7 +340,8 @@ let forward_yielding (y @ yielding) =
     forward_yielding/0))
 val forward_yielding :
   'a @ [< global many > yielding] ->
-  int @ [< many read_write > dynamic] -> int @ [< global > dynamic] = <fun>
+  int @ [< many uncontended read_write > dynamic] ->
+  int @ [< global > dynamic] = <fun>
 |}]
 
 (* A first-class primitive's synthesized application ([Id_prim]) uses its
