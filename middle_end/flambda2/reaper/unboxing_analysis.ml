@@ -961,7 +961,7 @@ let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
   in
   let forget_all_types = Flambda_features.debug_reaper "forget-types" in
   Code_id.Map.mapi
-    (fun code_id (code_dep : Traverse_acc.code_dep) ->
+    (fun code_id (code_dep : Traverse_acc.Code_dep.t) ->
       let code_metadata = code_dep.code_metadata in
       let is_my_closure_used = is_var_used code_dep.my_closure in
       let code_metadata =
