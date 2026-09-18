@@ -139,7 +139,7 @@ let get_unit t cu =
       | None -> Rebuild_solution.empty_data
       | Some idx ->
         let shard : Shard.t =
-          try Obj.obj (File_sections.get t.sections idx)
+          try Obj.obj (File_sections.get_uncached t.sections idx)
           with End_of_file | Failure _ -> raise (Error (Corrupted t.filename))
         in
         let data =

@@ -87,6 +87,10 @@ module Rebuild = struct
     }
 end
 
+(* CR sspies: the sections stay live until the .cmx is written, after the
+   backend has run. Marshalling them here would let the graph and rebuild data
+   be collected earlier, if [File_sections] learnt to store pre-marshalled
+   sections. *)
 let to_sections ~sections
     { unit_metadata; imported_offsets; solve_inputs; rebuild_inputs } =
   let solve = Solve.create ~imported_offsets solve_inputs in
@@ -107,7 +111,7 @@ type error =
 exception Error of error
 
 let read_section (type a) ~filename ~sections idx : a =
-  try Obj.obj (File_sections.get sections idx)
+  try Obj.obj (File_sections.get_uncached sections idx)
   with End_of_file | Failure _ -> raise (Error (Corrupted filename))
 
 let read_header ~filename ~sections idx =
