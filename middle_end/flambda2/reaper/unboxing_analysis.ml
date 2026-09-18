@@ -1008,7 +1008,12 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
                 match get_unboxed_fields (Code_id_or_name.var v) with
                 | None ->
                   let kind = rewrite_kind_with_subkind (Name.var v) kind in
-                  if is_var_used v then Keep (v, kind) else Delete
+                  (* CR-someday ncourant: make it possible to delete function
+                     returns. Why is this not done now? The comment previously
+                     said that we "need the mapping between code ids of
+                     functions and their return continuations", but I don't see
+                     why unboxing would work and not deletion. *)
+                  if true || is_var_used v then Keep (v, kind) else Delete
                 | Some fields -> Unbox fields)
               code_dep.return
               (Flambda_arity.unarized_components code_dep.result_arity)
