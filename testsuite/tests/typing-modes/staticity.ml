@@ -584,9 +584,7 @@ module (L @ static) = List
 Line 1, characters 22-26:
 1 | module (L @ static) = List
                           ^^^^
-Error: The module is "dynamic"
-         because it is a compilation unit and thus always at the legacy modes.
-       However, the module highlighted is expected to be "static".
+Error: The module is "dynamic" but is expected to be "static".
 |}]
 
 (* primitives are always static, unless you override *)

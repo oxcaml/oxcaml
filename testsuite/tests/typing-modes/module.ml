@@ -231,13 +231,7 @@ let (bar @ portable) () =
     end in
     N.L.foo ()
 [%%expect{|
-Line 3, characters 19-20:
-3 |         module L = M
-                       ^
-Error: The module "M" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-5, characters 21-14
-         which is expected to be "portable".
+val bar : unit -> unit = <fun>
 |}]
 
 module F (X : S @ portable) = struct

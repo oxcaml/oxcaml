@@ -3452,8 +3452,24 @@ and type_module_aux ~alias ~hold_locks ~strengthen ~funct_body anchor env
 
 and type_module_path_aux ~alias ~hold_locks ~strengthen env path
   (mode, locks) (lid : _ loc) smod =
+  let aliasable = not (Env.is_functor_arg path env) in
+  let opaque = alias && aliasable in
+  let mode =
+    (* The mode recorded for a module alias is just the max mode; its real
+       mode is its target's. When the module is used opaquely (an alias
+       binding, without holding locks), the mode is unused and the target is
+       not loaded; any other use inspects the target anyway, so resolve its
+       mode (possibly reading its cmi). For a path that is not an alias,
+       [find_module_mode] returns the recorded mode. *)
+    if opaque && not hold_locks then mode
+    else Env.find_module_mode path env
+  in
   let mod_mode =
     if hold_locks then mode, Some (locks, lid.txt, lid.loc)
+    else if opaque then
+      (* A module alias is opaque: it doesn't close over its target, so
+         there are no locks to walk. *)
+      mode, None
     else
       let vmode =
         Env.walk_locks ~env ~loc:lid.loc lid.txt ~item:Module None (mode, locks)
@@ -3466,7 +3482,6 @@ and type_module_path_aux ~alias ~hold_locks ~strengthen env path
              mod_env = env;
              mod_attributes = smod.pmod_attributes;
              mod_loc = smod.pmod_loc } in
-  let aliasable = not (Env.is_functor_arg path env) in
   let shape =
     Env.shape_of_path ~namespace:Shape.Sig_component_kind.Module env path
   in
