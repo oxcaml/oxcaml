@@ -191,6 +191,7 @@ module Solver = struct
   and ctx =
     { env : Env.t option;
       lookup_of_env : Env.t -> Path.t -> constr_decl;
+      normalize_path : Env.t -> Path.t -> Path.t;
       mode : mode;
       provenance : provenance_ctx option;
       ty_to_kind : Ldd.node TyTbl.t;
@@ -203,11 +204,13 @@ module Solver = struct
     ConstrTbl.create 1
 
   let create_ctx ~(mode : mode) ~(env : Env.t option)
-      ~(lookup_of_env : Env.t -> Path.t -> constr_decl) =
+      ~(lookup_of_env : Env.t -> Path.t -> constr_decl)
+      ~(normalize_path : Env.t -> Path.t -> Path.t) =
     TyTbl.clear global_ty_to_kind;
     ConstrTbl.clear global_constr_to_coeffs;
     { env;
       lookup_of_env;
+      normalize_path;
       mode;
       provenance = None;
       ty_to_kind = global_ty_to_kind;
@@ -350,7 +353,24 @@ module Solver = struct
     (* Return placeholder nodes stored in [constr_to_coeffs] for recursion. *)
     match ConstrTbl.find_opt ctx.constr_to_coeffs path with
     | Some base_and_coeffs -> base_and_coeffs
-    | None -> (
+    | None ->
+      let npath =
+        match ctx.env with
+        | Some env -> ctx.normalize_path env path
+        | None -> path
+      in
+      if not (Path.same npath path)
+      then begin
+        (* Mixed spellings of one constructor - a path through a module alias
+           and the target unit's own path, say, when some cmis were saved
+           with normalized mentions - must share one entry: a duplicate entry
+           re-solves the constructor's whole dependency closure, and on large
+           units the duplicated solving can exhaust the ldd variable range. *)
+        let res = constr_kind ctx ~min_arity npath in
+        ConstrTbl.add ctx.constr_to_coeffs path res;
+        res
+      end
+      else (
       match lookup_constr ctx ~min_arity path with
       | Poly (base, coeffs) ->
         (* Install placeholder nodes before rehydrating cached
@@ -1403,8 +1423,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) : Solver.constr_decl =
 
 (* Package the above into a full evaluation context. *)
 let create_ctx ~(mode : Solver.mode) ~(env : Env.t option) =
-  Solver.create_ctx ~mode ~env ~lookup_of_env:(fun env path ->
-      lookup_of_env ~env path)
+  Solver.create_ctx ~mode ~env
+    ~lookup_of_env:(fun env path -> lookup_of_env ~env path)
+    ~normalize_path:(fun env path ->
+      match Env.normalize_type_path None env path with
+      | npath -> npath
+      | exception Not_found -> path)
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   let ctx = create_ctx ~mode:Solver.Normal ~env in
