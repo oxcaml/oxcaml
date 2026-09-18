@@ -1,0 +1,769 @@
+(* TEST
+    flags+="-extension mode_alpha";
+   expect;
+*)
+
+let portable_use : 'a @ portable -> unit = fun _ -> ()
+
+module type S = sig val x : 'a -> unit end
+
+module type SL = sig type 'a t end
+
+module M = struct
+    type 'a t = int
+    let x _ = ()
+end
+let (foo @ nonportable) () = ()
+module F (X : S) = struct
+    type t = int
+    let x = X.x
+    let _ = foo
+end
+[%%expect{|
+val portable_use : 'a @ portable -> unit = <fun>
+module type S = sig val x : 'a -> unit end
+module type SL = sig type 'a t end
+module M : sig type 'a t = int val x : 'a -> unit end @@ stateless
+val foo : unit -> unit = <fun>
+module F : functor (X : S) -> sig type t = int val x : 'a -> unit end
+|}]
+
+let u =
+    let foo () =
+        let module X = struct
+            let x _ = ()
+        end
+        in
+        let module R = F(X) in
+        ()
+    in
+    portable_use foo
+[%%expect{|
+Line 10, characters 17-20:
+10 |     portable_use foo
+                      ^^^
+Error: This value is "nonportable"
+         because it closes over the module "F" at line 7, characters 23-24
+         which is "nonportable"
+         because it closes over the value "foo" at line 15, characters 12-15
+         which is "nonportable".
+       However, the highlighted expression is expected to be "portable".
+|}]
+
+let u =
+    let foo () =
+        let m = (module struct let x _ = () end : S) in
+        let module M = (val m) in
+        M.x
+    in
+    portable_use foo
+[%%expect{|
+val u : unit = ()
+|}]
+
+(* Packing produces first class modules at the same mode as the module *)
+let () = portable_use (module M : S)
+[%%expect{|
+|}]
+
+(* Unpacking produces module at the same mode as the first class module *)
+let foo (m : (module S)) =
+    let module M @ portable = (val m) in
+    portable_use M.x
+[%%expect{|
+val foo : (module S) @ portable -> unit = <fun>
+|}]
+
+let foo () =
+    let bar () =
+        let _ : F(M).t = 42 in
+        ()
+    in
+    let _ = (bar : _ @ portable) in
+    ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+    let bar () =
+        let module _ : sig
+            open M
+        end = struct end
+        in
+        ()
+    in
+    let _ = (bar : _ @ portable) in
+    ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+    let bar () =
+        let module _ : (sig
+            module M' : sig  end
+        end with module M' := M) = struct
+        end
+        in
+        ()
+    in
+    let _ = (bar : _ @ portable) in
+    ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+(* Replacing [:=] in the above example with [=] should work similarly, but I
+   couldn't construct an example to test this properly. *)
+
+let foo () =
+    let bar () =
+        let module _ : module type of M = struct
+            type 'a t = int
+            let x _ = ()
+        end
+        in
+        ()
+    in
+    let _ = (bar : _ @ portable) in
+    ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+let foo () =
+    let bar () =
+        let module _ : (sig
+            module M' := M
+        end) = struct
+        end
+        in
+        ()
+    in
+    let _ = (bar : _ @ portable) in
+    ()
+[%%expect{|
+val foo : unit -> unit = <fun>
+|}]
+
+(* Pmty_alias is not testable *)
+
+(* module alias *)
+module type S = sig
+    val foo : 'a -> 'a
+    val baz : 'a -> 'a @@ portable
+end
+
+module M : S = struct
+    let foo @ nonportable = fun x -> x
+    let baz = fun x -> x
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a val baz : 'a -> 'a @@ portable end
+module M : S @@ stateless nonportable
+|}]
+
+let (bar @ portable) () =
+    let module N = M in
+    M.baz ();
+    N.baz ()
+[%%expect{|
+val bar : unit -> unit = <fun>
+|}]
+
+let (bar @ portable) () =
+    let module N = M in
+    N.foo ()
+[%%expect{|
+Line 3, characters 4-9:
+3 |     N.foo ()
+        ^^^^^
+Error: The value "N.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-3, characters 21-12
+         which is expected to be "portable".
+|}]
+
+let (bar @ portable) () =
+    let module N = M in
+    M.foo ()
+[%%expect{|
+Line 3, characters 4-9:
+3 |     M.foo ()
+        ^^^^^
+Error: The value "M.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-3, characters 21-12
+         which is expected to be "portable".
+|}]
+
+(* chained aliases. Creating alias of alias is fine. *)
+let (bar @ portable) () =
+    let module N = M in
+    let module N' = N in
+    M.baz ();
+    N.baz ();
+    N'.baz ()
+[%%expect{|
+val bar : unit -> unit = <fun>
+|}]
+
+(* locks are accumulated and not lost *)
+let (bar @ portable) () =
+    let module N = M in
+    let module N' = N in
+    N'.foo ()
+[%%expect{|
+Line 4, characters 4-10:
+4 |     N'.foo ()
+        ^^^^^^
+Error: The value "N'.foo" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-4, characters 21-13
+         which is expected to be "portable".
+|}]
+
+(* module aliases in structures still walk locks. *)
+let (bar @ portable) () =
+    let module N = struct
+        module L = M
+    end in
+    N.L.foo ()
+[%%expect{|
+Line 3, characters 19-20:
+3 |         module L = M
+                       ^
+Error: The module "M" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at lines 1-5, characters 21-14
+         which is expected to be "portable".
+|}]
+
+module F (X : S @ portable) = struct
+end
+[%%expect{|
+module F : functor (X : S @ portable) -> sig end @@ stateless
+|}]
+
+module type S = functor () (M : S @ portable) (_ : S @ portable) -> S
+[%%expect{|
+module type S = functor () (M : S @ portable) -> S @ portable -> S
+|}]
+
+module type S = functor () (M : S) (_ : S) -> S @ portable
+[%%expect{|
+module type S = functor () (M : S) -> S -> S @ portable
+|}]
+
+module F () = struct
+    let (foo @ once) () = ()
+end
+[%%expect{|
+module F : functor () -> sig val foo : unit -> unit @@ stateless end @ once
+  @@ stateless
+|}]
+
+module type Empty = sig end
+[%%expect{|
+module type Empty = sig end
+|}]
+
+let _ =
+    let module F (X : Empty) = struct end in
+    let module M @ local = struct end in
+    let module _ = F(M) in
+    ()
+[%%expect{|
+Line 4, characters 19-23:
+4 |     let module _ = F(M) in
+                       ^^^^
+Error: Modules do not match: sig end @ local is not included in
+       Empty @ global
+     Got "local" but expected "global".
+|}]
+
+let _ =
+    let module F (X : Empty) (Y : Empty) = struct end in
+    let module M = struct end in
+    let module N @ local = struct end in
+    let module _ = F(M)(N) in
+    ()
+[%%expect{|
+Line 5, characters 19-26:
+5 |     let module _ = F(M)(N) in
+                       ^^^^^^^
+Error: This application of the functor "F" is ill-typed.
+       These arguments:
+         M N
+       do not match these parameters:
+         (X : Empty) (Y : Empty) -> ...
+       1. Module M matches the expected module type Empty
+       2. Modules do not match:
+            N : sig end @ local
+          is not included in
+            Empty @ global
+          Got "local" but expected "global".
+|}]
+
+(* [include] should rebase modalities relative to the current structure *)
+module Test_incl = struct
+    module M = struct
+        let foo x = x
+    end
+    module type S = module type of M
+    (* [M] is portable, so inside [S] there is no [portable] modality on [foo] *)
+    module N = struct
+        let x  : int ref = ref 42
+        let f () = x := 24
+        (* [N] cannot be [portable] due to [f] *)
+
+        include M
+    end
+
+    let () = portable_use N.foo
+end
+[%%expect{|
+module Test_incl :
+  sig
+    module M : sig val foo : 'a -> 'a @@ stateless end
+    module type S = sig val foo : 'a -> 'a @@ stateless end
+    module N :
+      sig
+        val x : int ref @@ stateless
+        val f : unit -> unit
+        val foo : 'a -> 'a @@ stateless
+      end
+  end
+|}]
+
+let use_unique : 'a @ unique -> unit = fun _ -> ()
+
+(* Functors are [many], and can't close over unique values*)
+
+let foo (x @ unique) =
+  let module Foo (_ : sig end) = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo(struct end) in
+  ()
+[%%expect{|
+val use_unique : 'a @ unique -> unit = <fun>
+Line 7, characters 24-25:
+7 |     let () = use_unique x
+                            ^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let foo (x @ unique) =
+  let module Foo () = struct
+    let () = use_unique x
+  end in
+  let module _ = Foo() in
+  ()
+[%%expect{|
+Line 3, characters 24-25:
+3 |     let () = use_unique x
+                            ^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let (foo @ nonportable) () = ()
+
+module (F @ portable) () = struct
+    let bar = foo
+end
+[%%expect{|
+val foo : unit -> unit = <fun>
+Lines 3-5, characters 22-3:
+3 | ......................() = struct
+4 |     let bar = foo
+5 | end
+Error: The module is "nonportable"
+         because it closes over the value "foo" at line 4, characters 14-17
+         which is "nonportable".
+       However, the module highlighted is expected to be "portable".
+|}]
+
+module (F @ portable) (X : sig val x : int -> int end) = struct
+    let bar = X.x
+end
+[%%expect{|
+module F :
+  functor (X : sig val x : int -> int end) -> sig val bar : int -> int end @@
+  stateless
+|}]
+
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module G (X : sig end) : sig
+        module type T = module type of (F (X))
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module G : functor (X : sig end) -> sig module type T = sig end end
+  end
+|}]
+
+module type S = sig
+    module F (X : sig end) : sig end
+    module rec M : sig
+        module N : sig
+        end
+        include module type of F(N)
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    module F : functor (X : sig end) -> sig end
+    module rec M : sig module N : sig end end
+  end
+|}]
+
+module rec Foo : sig
+    val bar : unit -> unit
+end = struct
+include (Foo : module type of struct
+    include Foo
+end)
+let (bar @ stateful) () = ()
+end
+[%%expect{|
+module rec Foo : sig val bar : unit -> unit end
+|}]
+
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+
+end
+[%%expect{|
+module type S =
+  sig
+    module type S = sig end
+    module type Key = sig module M0 : S end
+    module L :
+      sig
+        module M : Key
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+    module L' :
+      sig
+        module M : sig module M0 : sig end end
+        module N :
+          sig
+            module Label : sig module M0 = M.M0 end
+            module Key : sig module M0 = M.M0 end
+          end
+      end
+  end
+|}]
+
+(* CR zqian: fix [make_aliases_absent]. *)
+module type S = sig
+    module type S = sig end
+
+    module type Key = sig
+    module M0 : S
+    end
+
+    module L : sig
+    module M : Key
+
+    module N : sig
+        module Label : Key with M
+
+        include sig
+            module Key : S
+        end
+        with module Key = Label
+        @@ portable
+    end
+    end
+
+    include sig
+        module L' : S
+    end
+    with module L' = L
+    @@ portable
+end
+[%%expect{|
+>> Fatal error: Env.module_declaration_address
+Uncaught exception: Misc.Fatal_error
+
+|}]
+
+(* Testing modalities on module declarations in signatures.
+   Those are currently treated as modalities on signatures, not on the module. *)
+
+module type SigS = sig
+  val f : unit -> unit
+end
+[%%expect{|
+module type SigS = sig val f : unit -> unit end
+|}]
+
+module type SigWithModalModule = sig
+  module (M @@ portable) : SigS
+end
+[%%expect{|
+module type SigWithModalModule =
+  sig module M : sig val f : unit -> unit @@ portable end end
+|}]
+
+module type SigWithNonmodalModule = sig
+  module M : SigS
+end
+[%%expect{|
+module type SigWithNonmodalModule = sig module M : SigS end
+|}]
+
+(* Both behave identically when accessed from a nonportable first-class module:
+   the contents are nonportable. *)
+let use_portable_module ((module M) : (module SigWithModalModule) @ nonportable) =
+  let module _ @ portable = M.M in ()
+[%%expect{|
+Line 2, characters 28-31:
+2 |   let module _ @ portable = M.M in ()
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
+|}]
+
+let use_nonportable_module
+    ((module M) : (module SigWithNonmodalModule) @ nonportable) =
+  let module _ @ portable = M.M in ()
+[%%expect{|
+Line 3, characters 28-31:
+3 |   let module _ @ portable = M.M in ()
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
+|}]
+
+(* However, a module satisfying SigWithModalModule can be used as
+   SigWithNonmodalModule (portable is more restrictive), but not vice versa. *)
+module F (M : SigWithModalModule) = (M : SigWithNonmodalModule)
+[%%expect{|
+module F : functor (M : SigWithModalModule) -> SigWithNonmodalModule @@
+  stateless
+|}]
+
+module F (M : SigWithNonmodalModule) = (M : SigWithModalModule)
+[%%expect{|
+Line 1, characters 40-41:
+1 | module F (M : SigWithNonmodalModule) = (M : SigWithModalModule)
+                                            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig module M : sig val f : unit -> unit end end @ nonportable
+       is not included in
+         SigWithModalModule @ nonportable
+       In module "M":
+       Modules do not match:
+         sig val f : unit -> unit end @ nonportable
+       is not included in
+         sig val f : unit -> unit @@ portable end @ nonportable
+       In module "M":
+       Values do not match:
+         val f : unit -> unit (* in a structure at nonportable *)
+       is not included in
+         val f : unit -> unit @@ portable (* in a structure at nonportable *)
+       The first is "nonportable"
+       but the second is "portable".
+|}]
+
+(* Testing modalities on module aliases in signatures.
+   Default modalities like `sig @@ portable` apply to the alias module itself. *)
+
+module AliasTarget = struct
+  let f () = ()
+end
+[%%expect{|
+module AliasTarget : sig val f : unit -> unit end @@ stateless
+|}]
+
+module type SigWithModalAlias = sig @@ portable
+  module M = AliasTarget
+end
+[%%expect{|
+module type SigWithModalAlias = sig module M = AliasTarget @@ portable end
+|}]
+
+(* The alias M is portable (due to sig @@ portable), so it can be accessed
+   as portable even from a nonportable first-class module. *)
+let test_modal_alias
+    ((module X) : (module SigWithModalAlias) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_modal_alias : (module SigWithModalAlias) -> unit = <fun>
+|}]
+
+(* Without the default modality, accessing the alias as portable fails. *)
+module type SigWithNonmodalAlias = sig
+  module M = AliasTarget
+end
+
+let test_nonmodal_alias
+    ((module X) : (module SigWithNonmodalAlias) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+module type SigWithNonmodalAlias = sig module M = AliasTarget end
+Line 7, characters 28-31:
+7 |   let module _ @ portable = X.M in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
+|}]
+
+(* Explicit modality on alias: `module M = AliasTarget @@ portable` syntax *)
+module type SigWithExplicitModalAlias1 = sig
+  module M = AliasTarget @@ portable
+end
+[%%expect{|
+module type SigWithExplicitModalAlias1 =
+  sig module M = AliasTarget @@ portable end
+|}]
+
+let test_explicit_modal_alias1
+    ((module X) : (module SigWithExplicitModalAlias1) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_explicit_modal_alias1 : (module SigWithExplicitModalAlias1) -> unit =
+  <fun>
+|}]
+
+(* Explicit modality on alias: `module (M @@ portable) = AliasTarget` syntax *)
+module type SigWithExplicitModalAlias2 = sig
+  module (M @@ portable) = AliasTarget
+end
+[%%expect{|
+module type SigWithExplicitModalAlias2 =
+  sig module M = AliasTarget @@ portable end
+|}]
+
+let test_explicit_modal_alias2
+    ((module X) : (module SigWithExplicitModalAlias2) @ nonportable) =
+  let module _ @ portable = X.M in
+  ()
+[%%expect{|
+val test_explicit_modal_alias2 : (module SigWithExplicitModalAlias2) -> unit =
+  <fun>
+|}]
+
+(* Mode crossing through a wrapped library's alias chain. *)
+module type Sexp = sig
+  module Utf8 : sig val to_string : int -> string @@ portable end
+end
+
+let alias_chain_crossing ((module Lib__Sexp) : (module Sexp) @ nonportable) =
+  let module Lib__ = struct module Sexp = Lib__Sexp end in
+  let module Lib = struct module Sexp = Lib__.Sexp end in
+  let module M : sig @@ portable module Utf8 = Lib.Sexp.Utf8 end = struct
+    include (Lib.Sexp : module type of struct include Lib.Sexp end)
+  end in
+  ()
+[%%expect{|
+module type Sexp =
+  sig module Utf8 : sig val to_string : int -> string @@ portable end end
+val alias_chain_crossing : (module Sexp) @ stateless nonportable -> unit =
+  <fun>
+|}]
+
+(* Abstract module types do not provide mode crossing. *)
+module type Abstract = sig
+  module type S
+  module M : S
+end
+
+let abstract_alias ((module X) : (module Abstract) @ nonportable) =
+  let module M : sig @@ portable module N = X.M end = struct
+    module N = X.M
+  end in
+  ()
+[%%expect{|
+module type Abstract = sig module type S module M : S end
+Lines 7-9, characters 54-5:
+7 | ......................................................struct
+8 |     module N = X.M
+9 |   end...
+Error: Signature mismatch:
+       Modules do not match:
+         sig module N = X.M @@ stateless nonportable end @ nonportable
+       is not included in
+         sig module N = X.M @@ portable end @ nonportable
+       In module "N":
+       Got "nonportable"
+       but expected "portable".
+|}]
+
+(* Nonportable contents prevent crossing. *)
+module type Sexp' = sig
+  module Utf8 : sig val to_string : int -> string end
+end
+
+let alias_chain_no_crossing
+    ((module Lib__Sexp) : (module Sexp') @ nonportable) =
+  let module Lib__ = struct module Sexp = Lib__Sexp end in
+  let module Lib = struct module Sexp = Lib__.Sexp end in
+  let module M : sig @@ portable module Utf8 = Lib.Sexp.Utf8 end = struct
+    include (Lib.Sexp : module type of struct include Lib.Sexp end)
+  end in
+  ()
+[%%expect{|
+module type Sexp' =
+  sig module Utf8 : sig val to_string : int -> string end end
+Lines 9-11, characters 67-5:
+ 9 | ...................................................................struct
+10 |     include (Lib.Sexp : module type of struct include Lib.Sexp end)
+11 |   end...
+Error: Signature mismatch:
+       Modules do not match:
+         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
+       is not included in
+         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
+       In module "Utf8":
+       Modules do not match:
+         (module Lib.Sexp.Utf8) @ nonportable
+       is not included in
+         (module Lib.Sexp.Utf8) @ portable
+       In module "Utf8":
+       Values do not match:
+         val to_string : int -> string (* in a structure at nonportable *)
+       is not included in
+         val to_string : int -> string (* in a structure at portable *)
+       The first is "nonportable"
+       but the second is "portable".
+|}]

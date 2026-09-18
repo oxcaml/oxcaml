@@ -1,0 +1,5 @@
+    frame #N: <ADDRESS> test_addressable_dwarf.exe`Test_addressable_dwarf.f_start(param=() : unit @ value)
+    frame #N: <ADDRESS> test_addressable_dwarf.exe`Test_addressable_dwarf.f_addressable_bits8(x=#42s : t8 @ bits8)
+    frame #N: <ADDRESS> test_addressable_dwarf.exe`Test_addressable_dwarf.f_addressable_product(x_XXX_unboxed0=#7L : tp_unboxed0 @ bits64, x_XXX_unboxed1=#8s : tp_unboxed1 @ bits8)
+    frame #N: <ADDRESS> test_addressable_dwarf.exe`Test_addressable_dwarf.f_unboxed_record(r={ x = #3s } : r_unboxed @ bits8)
+    frame #N: <ADDRESS> test_addressable_dwarf.exe`Test_addressable_dwarf.f_rec_record(r={ tl = Some { tl = None; hd = #2s }; hd = #1s } : rec_record @ value)

@@ -1,0 +1,572 @@
+(**********************************************************************************
+ *                             MIT License                                        *
+ *                                                                                *
+ *                                                                                *
+ * Copyright (c) 2019-2021 Jane Street Group LLC                                  *
+ *                                                                                *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy   *
+ * of this software and associated documentation files (the "Software"), to deal  *
+ * in the Software without restriction, including without limitation the rights   *
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell      *
+ * copies of the Software, and to permit persons to whom the Software is          *
+ * furnished to do so, subject to the following conditions:                       *
+ *                                                                                *
+ * The above copyright notice and this permission notice shall be included in all *
+ * copies or substantial portions of the Software.                                *
+ *                                                                                *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR     *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    *
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  *
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  *
+ * SOFTWARE.                                                                      *
+ *                                                                                *
+ **********************************************************************************)
+[@@@ocaml.warning "+a-40-41-42"]
+
+open! Int_replace_polymorphic_compare
+module C = Cfg
+module Dll = Doubly_linked_list
+
+(* Convert simple [Switch] to branches. *)
+let simplify_switch (block : C.basic_block) labels =
+  let len = Array.length labels in
+  if len < 1
+  then Misc.fatal_error "Malformed terminator: switch with empty arms";
+  (* Count continuous repeated occurrences of labels *)
+  let labels_with_counts =
+    Array.fold_right
+      (fun l acc ->
+        if List.compare_length_with acc 3 > 0
+        then acc
+        else
+          match acc with
+          | [] -> [l, 1]
+          | (hd, n) :: tl ->
+            if Label.equal hd l then (hd, n + 1) :: tl else (l, 1) :: acc)
+      labels []
+  in
+  match labels_with_counts with
+  | [(l, _)] ->
+    (* All labels are the same and equal to l *)
+    block.terminator
+      <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
+  | [(l0, n); (ln, k)] ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(n) ln);
+    assert (len = n + k);
+    let desc =
+      C.Int_test
+        { is_signed = Unsigned; imm = Some n; lt = l0; eq = ln; gt = ln }
+    in
+    block.terminator <- { block.terminator with desc }
+  | [(l0, m); (l1, 1); (l2, n)] when Label.equal l0 l2 ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(m) l1);
+    assert (Label.equal labels.(m + 1) l2);
+    assert (len = m + 1 + n);
+    let desc =
+      C.Int_test
+        { is_signed = Unsigned; imm = Some m; lt = l0; eq = l1; gt = l0 }
+    in
+    block.terminator <- { block.terminator with desc }
+  | [(l0, 1); (l1, 1); (l2, n)] ->
+    assert (Label.equal labels.(0) l0);
+    assert (Label.equal labels.(1) l1);
+    assert (Label.equal labels.(2) l2);
+    assert (len = n + 2);
+    let desc =
+      C.Int_test
+        { is_signed = Unsigned; imm = Some 1; lt = l0; eq = l1; gt = l2 }
+    in
+    block.terminator <- { block.terminator with desc }
+  | _ -> ()
+
+(* CR-soon xclerc for xclerc: extend to other constants. *)
+type known_value =
+  | Const_int of nativeint
+  | Const_float32 of int32
+  | Const_float of int64
+
+let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
+  let is_valid_shift =
+    Nativeint.compare right 0n >= 0
+    && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+  in
+  match (op : Operation.integer_operation) with
+  | Iadd -> Some (Nativeint.add left right)
+  | Isub -> Some (Nativeint.sub left right)
+  | Iand -> Some (Nativeint.logand left right)
+  | Ior -> Some (Nativeint.logor left right)
+  | Ixor -> Some (Nativeint.logxor left right)
+  | Ilsl ->
+    if is_valid_shift
+    then Some (Nativeint.shift_left left (Nativeint.to_int right))
+    else None
+  | Ilsr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right_logical left (Nativeint.to_int right))
+    else None
+  | Iasr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right left (Nativeint.to_int right))
+    else None
+  (* CR xclerc for xclerc: some of the following operations could be supported
+     in the future; care is needed as some may clobber registers beyond
+     [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
+     writing only to the destination). *)
+  | Imul | Imulh _ | Idiv _ | Imod _ | Iclz | Ictz | Ipopcnt | Icomp _ -> None
+
+let eval_float_op op (left : float) (right : float option) : float option =
+  match (op : Operation.float_operation) with
+  | Iaddf -> Option.map (Float.add left) right
+  | Isubf -> Option.map (Float.sub left) right
+  | Imulf -> Option.map (Float.mul left) right
+  | Idivf -> Option.map (Float.div left) right
+  | Inegf -> Some (Float.neg left)
+  | Iabsf -> Some (Float.abs left)
+  | Icompf _ -> None
+
+(* CR-someday xclerc for xclerc: consider moving to `Misc`. *)
+let find_unique_index : 'a array -> f:('a -> bool) -> int option =
+ fun arr ~f ->
+  let rec find arr idx f acc =
+    if idx < 0
+    then acc
+    else
+      begin if f (Array.unsafe_get arr idx)
+      then
+        begin match acc with
+        | None -> find arr (idx - 1) f (Some idx)
+        | Some _ -> None
+        end
+      else find arr (idx - 1) f acc
+      end
+  in
+  find arr (Array.length arr - 1) f None
+
+(* Iterates over the passed instructions, and updates `known_values` so that it
+   contains a map from registers to known values after the instructions have
+   been executed. Currently only tracks constant values, moves between
+   registers, basic integer arithmetic, and basic float64 arithmetic over known
+   values. *)
+let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
+    known_value Reg.UsingLocEquality.Tbl.t =
+  let known_values = Reg.UsingLocEquality.Tbl.create 17 in
+  let replace reg value =
+    if not (Reg.is_unknown reg)
+    then Reg.UsingLocEquality.Tbl.replace known_values reg value
+    else Misc.fatal_errorf "unexpected unknown location (%a)" Printreg.reg reg
+  in
+  let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
+  let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
+  let remove_destroyed (instr : Cfg.basic Cfg.instruction) =
+    let destroyed_regs = Proc.destroyed_at_basic instr.desc in
+    Reg.UsingLocEquality.Tbl.filter_map_inplace
+      (fun reg known_value ->
+        let is_destroyed =
+          Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
+        in
+        if is_destroyed then None else Some known_value)
+      known_values
+  in
+  let infer_known_values_from_predecessor () =
+    (* When there is only one predecessor, we can sometimes infer the value of a
+       temporary from the predecessor's terminator. For instance, if the
+       terminator is a truth test and we are in the "ifnot" block, then we can
+       infer the tested temporary is equal to zero at the start of the block. *)
+    (* CR-someday xclerc for xclerc: that could be extended to multiple
+    predecessors, if all lead to the same inference. *)
+    begin match Label.Set.cardinal block.predecessors with
+    | 1 ->
+      let predecessor_block =
+        Cfg.get_block_exn cfg (Label.Set.choose block.predecessors)
+      in
+      let predecessor_terminator = predecessor_block.terminator in
+      begin[@ocaml.warning "-4"] match predecessor_terminator.desc with
+      | Truth_test { ifso; ifnot } ->
+        if Label.equal ifnot block.start && not (Label.equal ifso ifnot)
+        then replace predecessor_block.terminator.arg.(0) (Const_int 0n)
+      | Int_test { lt; eq; gt; is_signed = Signed; imm = Some const } ->
+        if
+          Label.equal eq block.start
+          && (not (Label.equal eq gt))
+          && not (Label.equal eq lt)
+        then
+          replace
+            predecessor_terminator.arg.(0)
+            (Const_int (Nativeint.of_int const))
+      | Switch labels ->
+        let idx =
+          find_unique_index labels ~f:(fun label ->
+              Label.equal block.start label)
+        in
+        begin match idx with
+        | None -> ()
+        | Some idx ->
+          replace
+            predecessor_terminator.arg.(0)
+            (Const_int (Nativeint.of_int idx))
+        end
+      | _ -> ()
+      end
+    | _ -> ()
+    end
+  in
+  if !Oxcaml_flags.cfg_value_propagation_flow
+  then infer_known_values_from_predecessor ();
+  Dll.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+      let apply_int_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_int left) -> (
+            match right_opt with
+            | Some right -> eval_int_op op left right
+            | None -> None)
+          | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        (match result_opt with
+        | Some result -> replace instr.res.(0) (Const_int result)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
+      let apply_float_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_float left_bits) ->
+            let left = Int64.float_of_bits left_bits in
+            Option.map Int64.bits_of_float (eval_float_op op left right_opt)
+          | Some (Const_int _ | Const_float32 _) | None -> None
+        in
+        (match result_opt with
+        | Some bits -> replace instr.res.(0) (Const_float bits)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
+      match instr.desc with
+      | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
+      | Op (Const_float32 c) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then replace instr.res.(0) (Const_float32 c)
+      | Op (Const_float c) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then replace instr.res.(0) (Const_float c)
+      | Op Move -> (
+        (* CR xclerc for xclerc: double check the "magic" / conversions behind
+           moves in `Emit` will not result in invalid tracking here. *)
+        match find_opt instr.arg.(0) with
+        | Some value
+          when Cmm.equal_machtype_component instr.res.(0).typ instr.arg.(0).typ
+          ->
+          replace instr.res.(0) value
+        | Some _ | None -> remove instr.res.(0))
+      | Op (Intop_imm (op, imm)) ->
+        apply_int_op op (Some (Nativeint.of_int imm))
+      | Op (Intop op) ->
+        let right_opt =
+          if Operation.is_unary_integer_operation op
+          then None
+          else
+            match find_opt instr.arg.(1) with
+            | Some (Const_int v) -> Some v
+            | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        apply_int_op op right_opt
+      | Op (Floatop (Float64, op)) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then
+          let right_opt =
+            match (op : Operation.float_operation) with
+            | Inegf | Iabsf -> None
+            | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
+              match find_opt instr.arg.(1) with
+              | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
+              | Some (Const_int _ | Const_float32 _) | None -> None)
+          in
+          apply_float_op op right_opt
+        else begin
+          Array.iter remove instr.res;
+          remove_destroyed instr
+        end
+      | Op
+          ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+          | Const_vec512 _ | Const_mask _ | Stackoffset _ | Load _ | Store _
+          | Int128op _ | Intop_atomic _
+          | Floatop (Float32, _)
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | End_region | Specific _
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
+          | Domain_index )
+      | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
+      | Stack_check _ ->
+        Array.iter
+          (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
+          instr.res;
+        remove_destroyed instr);
+  known_values
+
+(* Compute the destination of a terminator, using [known_values] to determine
+   the values of some registers, returning [None] if the destination is not
+   statically known. *)
+let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
+    (term : Cfg.terminator Cfg.instruction) : Label.t option =
+  let[@inline] get_known_value ~(arg_idx : int) : known_value option =
+    if arg_idx >= 0 && arg_idx < Array.length term.arg
+    then
+      Reg.UsingLocEquality.Tbl.find_opt known_values
+        (Array.unsafe_get term.arg arg_idx)
+    else
+      Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
+        InstructionId.format term.id
+  in
+  let[@inline] apply_constructor : type a b.
+      known_value option ->
+      extract:(known_value -> a option) ->
+      f:(a -> b option) ->
+      b option =
+   fun value ~extract ~f ->
+    let res = Option.map f (Option.bind value extract) in
+    Option.join res
+  in
+  let[@inline] apply_constructors : type a b.
+      known_value option ->
+      known_value option ->
+      extract:(known_value -> a option) ->
+      f:(a -> a -> b option) ->
+      b option =
+   fun left right ~extract ~f ->
+    let left = Option.bind left extract in
+    let right = Option.bind right extract in
+    match left, right with
+    | None, None | None, Some _ | Some _, None -> None
+    | Some left, Some right -> f left right
+  in
+  let[@inline] const_int = function
+    | Const_int const -> Some const
+    | Const_float32 _ -> None
+    | Const_float _ -> None
+  in
+  let[@inline] const_float32 = function
+    | Const_int _ -> None
+    | Const_float32 const -> Some const
+    | Const_float _ -> None
+  in
+  let[@inline] const_float = function
+    | Const_int _ -> None
+    | Const_float32 _ -> None
+    | Const_float const -> Some const
+  in
+  match term.desc with
+  | Parity_test { ifso; ifnot } ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if Nativeint.equal (Nativeint.logand const 1n) 0n
+        then Some ifso
+        else Some ifnot)
+  | Truth_test { ifso; ifnot } ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if not (Nativeint.equal const 0n) then Some ifso else Some ifnot)
+  | Int_test { lt; eq; gt; is_signed; imm } ->
+    let left_arg = get_known_value ~arg_idx:0 in
+    let right_arg =
+      match imm with
+      | Some const -> Some (Const_int (Nativeint.of_int const))
+      | None -> get_known_value ~arg_idx:1
+    in
+    apply_constructors left_arg right_arg ~extract:const_int
+      ~f:(fun left_const right_const ->
+        let result =
+          match is_signed with
+          | Signed -> Nativeint.compare left_const right_const
+          | Unsigned -> Nativeint.unsigned_compare left_const right_const
+        in
+        if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
+  | Float_test { width; lt : Label.t; eq : Label.t; gt : Label.t; uo } -> (
+    let apply_float_constructors : type a.
+        known_value option ->
+        known_value option ->
+        extract:(known_value -> a option) ->
+        convert:(a -> float) ->
+        Label.t option =
+     fun left right ~extract ~convert ->
+      apply_constructors left right ~extract
+        ~f:(fun (left_const : a) (right_const : a) ->
+          let left_const = convert left_const in
+          let right_const = convert right_const in
+          if Float.is_nan left_const || Float.is_nan right_const
+          then Some uo
+          else
+            let result = Float.compare left_const right_const in
+            if result < 0
+            then Some lt
+            else if result > 0
+            then Some gt
+            else Some eq)
+    in
+    match width with
+    | Float32 ->
+      apply_float_constructors
+        (get_known_value ~arg_idx:0)
+        (get_known_value ~arg_idx:1)
+        ~extract:const_float32 ~convert:Int32.float_of_bits
+    | Float64 ->
+      apply_float_constructors
+        (get_known_value ~arg_idx:0)
+        (get_known_value ~arg_idx:1)
+        ~extract:const_float ~convert:Int64.float_of_bits)
+  | Switch labels ->
+    apply_constructor (get_known_value ~arg_idx:0) ~extract:const_int
+      ~f:(fun const ->
+        if Nativeint.compare const (Nativeint.of_int Int.max_int) <= 0
+        then
+          let idx = Nativeint.to_int const in
+          if idx >= 0 && idx < Array.length labels
+          then Some (Array.unsafe_get labels idx)
+          else None
+        else None)
+  | Never ->
+    Misc.fatal_error
+      "Simplify_terminator.evaluate_terminator: unexpected Never terminator"
+  | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+    None
+
+let block_known_values (cfg : Cfg.t) (block : C.basic_block)
+    ~(is_after_regalloc : bool) ~(allowed_to_be_irreducible : bool) : bool =
+  if
+    !Oxcaml_flags.cfg_value_propagation
+    && is_after_regalloc && allowed_to_be_irreducible
+  then (
+    let known_values = collect_known_values cfg block in
+    match evaluate_terminator known_values block.terminator with
+    | None -> false
+    | Some succ ->
+      block.terminator
+        <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
+      true)
+  else false
+
+(* [block cfg b] simplifies the terminator of [b], and returns [true] when the
+    simplification may have changed the set of successor labels of [b]. In that
+    case it is the caller's responsibility to make predecessor sets consistent
+    again, e.g. via [Cfg.register_predecessors_for_all_blocks].  If it returns
+    [false], successor sets are unchanged, even though the terminator may have
+    been rewritten. *)
+(* CR-someday gyorsh: merge (Lbranch | Lcondbranch | Lcondbranch3)+ into a
+   single terminator when the argments are the same. Enables reordering of
+   branch instructions and save cmp instructions. The main problem is that it
+   involves boolean combination of conditionals of type Mach.test that can arise
+   from a sequence of branches. When all conditions in the combination are
+   integer comparisons, we can simplify them into a single condition, but it
+   doesn't work for Ieventest and Ioddtest (which come from the primitive "is
+   integer"). The advantage is that it will enable us to reorder branch
+   instructions to avoid generating jmp to fallthrough location in the new
+   order. Also, for linear to cfg and back will be harder to generate exactly
+   the same layout. Also, how do we map execution counts about branches onto
+   this terminator? *)
+let block (cfg : C.t) (block : C.basic_block) : bool =
+  let is_after_regalloc = cfg.register_locations_are_set in
+  match block.terminator.desc with
+  | Always successor_label ->
+    (* If we have a jump to an empty block whose terminator is a condition, we
+       can try and evaluate the condition at compile-time and short-circuit the
+       empty block if we know the value(s) involved in the condition. *)
+    let successor_block = C.get_block_exn cfg successor_label in
+    if Dll.is_empty successor_block.body
+    then
+      (* CR-soon xclerc for xclerc: this logic is similar to the one of
+         `block_known_values`, except for the guard and whether one or two
+         blocks are involved. *)
+      let new_successor =
+        (* The graph may become irreducible if the successor block is the header
+           block of a loop. Indeed, if we shortcircuit that block, it means we
+           are jumping "inside" the loop directly, which in turn means the loop
+           is no longer natural. This is acceptable if we are past the last use
+           of the loop information. *)
+        if
+          !Oxcaml_flags.cfg_value_propagation
+          && is_after_regalloc && cfg.allowed_to_be_irreducible
+        then
+          let known_values = collect_known_values cfg block in
+          evaluate_terminator known_values successor_block.terminator
+        else None
+      in
+      match new_successor with
+      | Some succ ->
+        block.terminator
+          <- { block.terminator with
+               desc = Always succ;
+               arg = [||];
+               res = [||]
+             };
+        true
+      | None -> (
+        if
+          Label.equal block.start cfg.entry_label
+          || not cfg.allowed_to_be_irreducible
+        then false
+        else
+          (* If we jump to a block that is empty, we can copy the terminator
+             from the successor to the current block. There might be size
+             considerations, so we currently do so only for "tests" and return.
+             The optimization is disabled because of a CFG invariant expecting
+             "the tailrec block to be the entry block or the only successor of
+             the entry block". *)
+          match successor_block.terminator.desc with
+          | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ | Return ->
+            block.terminator
+              <- { block.terminator with
+                   desc = successor_block.terminator.desc;
+                   arg = Array.copy successor_block.terminator.arg;
+                   res = Array.copy successor_block.terminator.res;
+                   dbg = successor_block.terminator.dbg
+                 };
+            true
+          | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
+          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
+            false)
+    else false
+  | Never ->
+    Misc.fatal_errorf "Cannot simplify terminator: Never (in block %a)"
+      Label.format block.start
+  | Parity_test _ | Truth_test _ | Int_test _ | Float_test _ ->
+    let labels = C.successor_labels ~normal:true ~exn:false block in
+    if Label.Set.cardinal labels = 1
+    then (
+      let l = Label.Set.min_elt labels in
+      block.terminator
+        <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
+      false)
+    else
+      block_known_values cfg block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
+  | Switch labels ->
+    let shortcircuit =
+      block_known_values cfg block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
+    in
+    if shortcircuit
+    then true
+    else (
+      simplify_switch block labels;
+      false)
+  | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
+  | Call _ | Prim _ | Invalid _ ->
+    false
+
+let run cfg =
+  let registration_needed =
+    C.fold_blocks cfg ~init:false ~f:(fun _ b registration_needed ->
+        let shortcircuit = block cfg b in
+        registration_needed || shortcircuit)
+  in
+  if registration_needed
+  then (
+    (* We may need to remove predecessors, and
+       `register_predecessors_for_all_blocks` is only adding predecessors, so we
+       first set all to empty. *)
+    C.iter_blocks cfg ~f:(fun _label block ->
+        block.predecessors <- Label.Set.empty);
+    Cfg.register_predecessors_for_all_blocks cfg)

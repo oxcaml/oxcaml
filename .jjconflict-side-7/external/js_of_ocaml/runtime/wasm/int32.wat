@@ -1,0 +1,140 @@
+;; Wasm_of_ocaml runtime support
+;; http://www.ocsigen.org/js_of_ocaml/
+;;
+;; This program is free software; you can redistribute it and/or modify
+;; it under the terms of the GNU Lesser General Public License as published by
+;; the Free Software Foundation, with linking exception;
+;; either version 2.1 of the License, or (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU Lesser General Public License for more details.
+;;
+;; You should have received a copy of the GNU Lesser General Public License
+;; along with this program; if not, write to the Free Software
+;; Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+(module
+   (import "ints" "parse_int"
+      (func $parse_int
+         (param (ref eq)) (param i32) (param (ref eq)) (result i32)))
+   (import "ints" "format_int"
+      (func $format_int
+         (param (ref eq)) (param i32) (param i32) (result (ref eq))))
+   (import "fail" "caml_raise_zero_divide" (func $caml_raise_zero_divide))
+   (import "marshal" "caml_serialize_int_4"
+      (func $caml_serialize_int_4 (param (ref eq)) (param i32)))
+   (import "marshal" "caml_deserialize_int_4"
+      (func $caml_deserialize_int_4 (param (ref eq)) (result i32)))
+
+   (type $bytes (array (mut i8)))
+   (type $compare
+      (func (param (ref eq)) (param (ref eq)) (param i32) (result i32)))
+   (type $hash
+      (func (param (ref eq)) (result i32)))
+   (type $fixed_length (struct (field $bsize_32 i32) (field $bsize_64 i32)))
+   (type $serialize
+      (func (param (ref eq)) (param (ref eq)) (result i32) (result i32)))
+   (type $deserialize (func (param (ref eq)) (result (ref eq)) (result i32)))
+   (type $dup (func (param (ref eq)) (result (ref eq))))
+   (type $custom_operations
+      (struct
+         (field $id (ref $bytes))
+         (field $compare (ref null $compare))
+         (field $compare_ext (ref null $compare))
+         (field $hash (ref null $hash))
+         (field $fixed_length (ref null $fixed_length))
+         (field $serialize (ref null $serialize))
+         (field $deserialize (ref null $deserialize))
+         (field $dup (ref null $dup))))
+   (type $custom (sub (struct (field $ops (ref $custom_operations)))))
+
+   (global $int32_ops (export "int32_ops") (ref $custom_operations)
+      (struct.new $custom_operations
+         (@string "_i")
+         (ref.func $int32_cmp)
+         (ref.null $compare)
+         (ref.func $int32_hash)
+         (struct.new $fixed_length (i32.const 4) (i32.const 4))
+         (ref.func $int32_serialize)
+         (ref.func $int32_deserialize)
+         (ref.func $int32_dup)))
+
+   (type $int32
+      (sub final $custom (struct (field (ref $custom_operations)) (field $i32 i32))))
+
+   (func $int32_cmp (export "int32_cmp")
+      (param $v1 (ref eq)) (param $v2 (ref eq)) (param i32) (result i32)
+      (local $i1 i32) (local $i2 i32)
+      (local.set $i1
+         (struct.get $int32 1 (ref.cast (ref $int32) (local.get $v1))))
+      (local.set $i2
+         (struct.get $int32 1 (ref.cast (ref $int32) (local.get $v2))))
+      (i32.sub (i32.gt_s (local.get $i1) (local.get $i2))
+               (i32.lt_s (local.get $i1) (local.get $i2))))
+
+   (func $int32_hash (export "int32_hash") (param $v (ref eq)) (result i32)
+      (struct.get $int32 1 (ref.cast (ref $int32) (local.get $v))))
+
+   (func $int32_serialize
+      (param $s (ref eq)) (param $v (ref eq)) (result i32) (result i32)
+      (call $caml_serialize_int_4 (local.get $s)
+         (struct.get $int32 1 (ref.cast (ref $int32) (local.get $v))))
+      (i32.const 4) (i32.const 4))
+
+   (func $int32_deserialize (param $s (ref eq)) (result (ref eq)) (result i32)
+      (struct.new $int32 (global.get $int32_ops)
+         (call $caml_deserialize_int_4 (local.get $s)))
+      (i32.const 4))
+
+   (func $int32_dup (export "int32_dup") (param $v (ref eq)) (result (ref eq))
+      (local $d (ref $int32))
+      (local.set $d (ref.cast (ref $int32) (local.get $v)))
+      (struct.new $int32
+         (struct.get $int32 0 (local.get $d))
+         (struct.get $int32 1 (local.get $d))))
+
+   (func $caml_copy_int32 (export "caml_copy_int32")
+      (param $i32 i32) (result (ref eq))
+      (struct.new $int32 (global.get $int32_ops) (local.get $i32)))
+
+   (func $Int32_val (export "Int32_val") (param $v (ref eq)) (result i32)
+      (struct.get $int32 1 (ref.cast (ref $int32) (local.get $v))))
+
+   (func $caml_int32_bswap (export "caml_int32_bswap")
+      (param $i i32) (result i32)
+      (i32.or
+         (i32.rotr (i32.and (local.get $i) (i32.const 0x00FF00FF))
+                   (i32.const 8))
+         (i32.rotl (i32.and (local.get $i) (i32.const 0xFF00FF00))
+                   (i32.const 8))))
+
+   (func (export "caml_int32_unsigned_div")
+      (param $x i32) (param $y i32) (result i32)
+      (if (i32.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+      (i32.div_u (local.get $x) (local.get $y)))
+
+   (func (export "caml_int32_unsigned_mod")
+      (param $x i32) (param $y i32) (result i32)
+      (if (i32.eqz (local.get $y)) (then (call $caml_raise_zero_divide)))
+      (i32.rem_u (local.get $x) (local.get $y)))
+
+   (@string $INT32_ERRMSG "Int32.of_string")
+
+   (func (export "caml_int32_of_string") (param $v (ref eq)) (result (ref eq))
+      (return_call $caml_copy_int32
+         (call $parse_int
+            (local.get $v) (i32.const 32) (global.get $INT32_ERRMSG))))
+
+   (func $caml_int32_compare (export "caml_int32_compare")
+      (param $i1 i32) (param $i2 i32) (result i32)
+      (i32.sub (i32.gt_s (local.get $i1) (local.get $i2))
+               (i32.lt_s (local.get $i1) (local.get $i2))))
+
+   (func $caml_int32_format (export "caml_int32_format")
+      (param $v (ref eq)) (param $vi (ref eq)) (result (ref eq))
+      (return_call $format_int (local.get $v)
+         (struct.get $int32 1
+            (ref.cast (ref $int32) (local.get $vi))) (i32.const 0)))
+)

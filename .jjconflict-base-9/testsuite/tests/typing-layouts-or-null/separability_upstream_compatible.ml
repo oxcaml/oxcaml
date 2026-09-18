@@ -1,0 +1,94 @@
+(* TEST
+ flags = "-extension-universe upstream_compatible";
+ expect;
+*)
+
+(* For tests of [@@unboxed] existentials whose acceptance depends on the
+   flat float array optimization, see separability_upstream_compatible-no-flat-float-array.ml. *)
+
+(* [non_float] annotations allow us to bypass this check, but are erased. *)
+type 'a non_float : value mod non_float
+
+type packed = P : 'a non_float -> packed [@@unboxed]
+
+[%%expect{|
+type 'a non_float : value non_float
+Line 3, characters 0-52:
+3 | type packed = P : 'a non_float -> packed [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+  and would not be accepted by upstream OCaml.
+
+type packed = P : 'a non_float -> packed [@@unboxed]
+|}]
+
+type 'a non_float_external : value mod non_float external_
+[%%expect{|
+type 'a non_float_external : value non_float mod external_
+|}]
+
+(* CR separability: this type should warn, but the incompatibility-with-upstream
+   warning doesn't account for the fact that externality crossing
+   information is not available upstream *)
+type packed_non_float_external =
+    P : 'a non_float_external -> packed_non_float_external [@@unboxed]
+[%%expect{|
+type packed_non_float_external =
+    P : 'a non_float_external -> packed_non_float_external [@@unboxed]
+|}]
+
+
+(* [: immediate] gets erased to [@@immediate] and is upstream-compatible. *)
+
+type 'a immediate : immediate
+
+type packed = P : 'a immediate -> packed [@@unboxed]
+
+[%%expect{|
+type 'a immediate : immediate
+type packed = P : 'a immediate -> packed [@@unboxed]
+|}]
+
+(* Annots on existential variables. *)
+
+type exists = E : ('a : value mod non_float) . 'a -> exists [@@unboxed]
+
+[%%expect{|
+Line 1, characters 0-71:
+1 | type exists = E : ('a : value mod non_float) . 'a -> exists [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+  and would not be accepted by upstream OCaml.
+
+type exists = E : ('a : value non_float). 'a -> exists [@@unboxed]
+|}]
+
+
+(* Non-value layouts *)
+
+type 'a void_with_bound : void with string
+
+(* CR separability: like CR above, this type should warn, but the
+   incompatibility-with-upstream warning doesn't account for the fact that
+   externality crossing information is not available upstream
+
+   ([void] crosses because non-value layouts cross externality.) *)
+type packed_void_with_bound =
+    P : 'a void_with_bound -> packed_void_with_bound [@@unboxed]
+[%%expect{|
+type 'a void_with_bound : void
+type packed_void_with_bound =
+    P : 'a void_with_bound -> packed_void_with_bound [@@unboxed]
+|}]
+
+type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
+
+[%%expect{|
+Line 1, characters 0-66:
+1 | type exists_word = W : ('a : word) . 'a -> exists_word [@@unboxed]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
+  and would not be accepted by upstream OCaml.
+
+type exists_word = W : ('a : word). 'a -> exists_word [@@unboxed]
+|}]

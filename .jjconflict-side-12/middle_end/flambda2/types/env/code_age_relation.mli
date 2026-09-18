@@ -1,0 +1,57 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2019 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** Tracking of new versions of code such that it can be determined, for any two
+    pieces of code, which one is newer (or that the pieces of code are
+    unrelated). *)
+
+(* CR-someday lwhite/mshinwell: Perhaps inlining benefit could be attached to
+   the edges of this graph *)
+
+type t
+
+val print : Format.formatter -> t -> unit
+
+val empty : t
+
+val add : t -> newer:Code_id.t -> older:Code_id.t -> t
+
+val get_older_version_of : t -> Code_id.t -> Code_id.t option
+
+(** [meet] calculates which of the given pieces of code is newer, or identifies
+    that the pieces of code are unrelated.
+
+    Returns [Unknown] if it was not possible to determine whether the pieces or
+    code are related, e.g. due to a missing cmx file. *)
+val meet :
+  t ->
+  resolver:(Compilation_unit.t -> t option) ->
+  Code_id.t ->
+  Code_id.t ->
+  Code_id.t Or_unknown_or_bottom.t
+
+val meet_set :
+  t ->
+  resolver:(Compilation_unit.t -> t option) ->
+  Code_id.Set.t ->
+  Code_id.Set.t ->
+  Code_id.Set.t Or_bottom.t
+
+val union : t -> t -> t
+
+val all_code_ids_for_export : t -> Code_id.Set.t
+
+val apply_renaming : t -> Renaming.t -> t
+
+val clean_for_export : t -> reachable_names:Name_occurrences.t -> t

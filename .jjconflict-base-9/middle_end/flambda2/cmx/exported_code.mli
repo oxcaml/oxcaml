@@ -1,0 +1,62 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Vincent Laviron, OCamlPro                        *)
+(*                                                                        *)
+(*   Copyright 2020 OCamlPro SAS                                          *)
+(*   Copyright 2014--2021 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+type t
+
+type raw
+
+include Contains_ids.S with type t := t
+
+val apply_renaming : Code_id.importer -> Renaming.t -> t -> t
+
+val print : Format.formatter -> t -> unit
+
+val print_view : Format.formatter -> t -> unit
+
+val empty : t
+
+val free_function_slots_and_value_slots : t -> Name_occurrences.t
+
+val add_code : keep_code:(Code_id.t -> bool) -> Code.t Code_id.Map.t -> t -> t
+
+val mark_as_imported : t -> t
+
+val merge : t -> t -> t
+
+val mem : Code_id.t -> t -> bool
+
+(** This function raises an exception if the code ID is unbound. *)
+val find_exn : t -> Code_id.t -> Code_or_metadata.t
+
+val get_code_metadata : t -> Code_id.t -> Code_metadata.t
+
+(** This function is only really for use in unusual cases where there needs to
+    be special handling if a code ID is unbound (see comment in the .ml file) *)
+val find : t -> Code_id.t -> Code_or_metadata.t option
+
+val prepare_for_export :
+  t ->
+  reachable_names:Name_occurrences.t ->
+  used_value_slots:Value_slot.Set.t ->
+  canonicalise:(Simple.t -> Simple.t) ->
+  t
+
+val iter_code : t -> f:(Code.t -> unit) -> unit
+
+val from_raw : sections:File_sections.t -> raw -> t
+
+val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+
+val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw

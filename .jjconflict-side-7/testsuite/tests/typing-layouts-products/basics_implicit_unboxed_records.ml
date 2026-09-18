@@ -1,0 +1,678 @@
+(* TEST
+ flambda2;
+ include stdlib_upstream_compatible;
+ {
+   expect;
+ }
+*)
+
+(* NOTE: When adding tests to this file, also update
+   [typing-layouts-products/basics_unboxed_records.ml] *)
+
+open Stdlib_upstream_compatible
+
+(**************************************************************************)
+(* Basic examples: construction, functional updates, projection, matching *)
+
+(* We can change the type of an unboxed record with a functional update. *)
+
+type 'a t = { x : 'a ; y : string }
+let f : (int * string) t# -> (string * int) t# =
+  fun (#{ x = (i, s); y } as r) -> #{ r with x = (s, i) }
+[%%expect{|
+type 'a t = { x : 'a; y : string; }
+val f : (int * string) t# -> (string * int) t# = <fun>
+|}]
+
+(* Patterns, as-patterns, partial patterns *)
+
+type t = { i: int; j : int }
+let add (#{ i; _} as r) = i + r.#j
+[%%expect{|
+type t = { i : int; j : int; }
+val add : t# -> int = <fun>
+|}]
+
+let bad_match (x : t#) =
+  match x with
+  | _ -> .
+[%%expect{|
+Line 3, characters 4-5:
+3 |   | _ -> .
+        ^
+Error: This match case could not be refuted.
+       Here is an example of a value that would reach it: "#{ _ }"
+|}]
+
+(* Top-level products *)
+
+let unboxed_product = #{ i = 1; j = 2 }
+[%%expect{|
+val unboxed_product : t# = #{i = 1; j = 2}
+|}]
+
+;;
+#{ i = 1; j = 2 };;
+[%%expect{|
+- : t# = #{i = 1; j = 2}
+|}]
+
+type m_record = { i1 : int }
+module M = struct
+  let x = #{ i1 = 1 }
+end
+[%%expect{|
+type m_record = { i1 : int; }
+module M : sig val x : m_record# end
+|}]
+
+type wrap_int = { i : int }
+type wrap_wrap_int = { wi : wrap_int# }
+let w5 = #{ i = 5 }
+let ww5 = #{ wi = #{ i = 5 }}
+[%%expect{|
+type wrap_int = { i : int; }
+type wrap_wrap_int = { wi : wrap_int#; }
+val w5 : wrap_int# = #{i = 5}
+val ww5 : wrap_wrap_int# = #{wi = #{i = 5}}
+|}]
+
+type t = { s : string }
+let s = #{ s = "hi" }
+[%%expect{|
+type t = { s : string; }
+val s : t# = #{s = "hi"}
+|}]
+
+;;
+#{ i1 = 1 };;
+[%%expect{|
+- : m_record# = #{i1 = 1}
+|}]
+
+(* Accessing inner products *)
+
+type t = { is: #(int * int) }
+
+let add t =
+  let #(x, y) = t.#is in
+  x + y
+[%%expect{|
+type t = { is : #(int * int); }
+val add : t# -> int = <fun>
+|}]
+
+(* An unboxed record is not an allocation, but a regular record is *)
+
+type ('a, 'b) ab = { left : 'a ; right : 'b }
+type ('a, 'b) ab_u = { left : 'a ; right : 'b }
+
+let f_unboxed_record (local_ left) (local_ right) =
+  let t = #{ left; right } in
+  let #{ left = left'; _ } = t in
+  left'
+[%%expect{|
+type ('a, 'b) ab = { left : 'a; right : 'b; }
+type ('a, 'b) ab_u = { left : 'a; right : 'b; }
+val f_unboxed_record : 'a @ local -> 'b @ local -> 'a @ local = <fun>
+|}]
+
+let f_boxed_record (local_ left) (local_ right) =
+  let t = { left; right } in
+  let { left = left'; _ } = t in
+  left'
+[%%expect{|
+Line 4, characters 2-7:
+4 |   left'
+      ^^^^^
+Error: This value is "local"
+         because it is the field "left" of the record at line 3, characters 6-25
+         which is "local"
+         because it is allocated at line 2, characters 10-25 containing data
+         which is "local" to the parent region
+         because it is a record whose field "left" is the expression at line 2, characters 12-16
+         which is "local" to the parent region.
+       However, the highlighted expression is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
+(* Mutable fields cannot be read from
+   (this test is for the possible future where the normal record
+   set operator works for unboxed records too) *)
+type mut = { mutable i : int }
+let f (x : mut#) = x.i <-  5
+[%%expect{|
+type mut = { mutable i : int; }
+Line 2, characters 19-20:
+2 | let f (x : mut#) = x.i <-  5
+                       ^
+Error: This expression has type "mut#",
+       which is an unboxed record rather than a boxed one.
+|}]
+
+(*********************************)
+(* Parameterized unboxed records *)
+
+(* Checks of constrain_type_jkind *)
+
+type 'a r = { i: 'a }
+type int_r : immediate = int r#
+[%%expect{|
+type 'a r = { i : 'a; }
+type int_r = int r#
+|}]
+
+type 'a t = { i : 'a ; j : 'a }
+type int_t : immediate & immediate = int t#
+[%%expect{|
+type 'a t = { i : 'a; j : 'a; }
+type int_t = int t#
+|}]
+
+type ('a : float64) t = { x : string; y : 'a }
+[%%expect{|
+type ('a : float64) t = { x : string; y : 'a; }
+|}];;
+
+type ('a : float64, 'b : immediate) t = { x : string; y : 'a; z : 'b }
+[%%expect{|
+type ('a : float64, 'b : immediate) t = { x : string; y : 'a; z : 'b; }
+|}];;
+
+type ('a : value & float64 & value) t1
+type ('a : value) t2
+[%%expect{|
+type ('a : value & float64 & value) t1
+type 'a t2
+|}]
+
+type s = r# t1
+and r = { x : int; y : float#; z : s t2 }
+[%%expect{|
+type s = r# t1
+and r = { x : int; y : float#; z : s t2; }
+|}]
+
+type s = r_bad# t1
+and r_bad = { y : float#; z : s t2 }
+[%%expect{|
+Line 2, characters 0-36:
+2 | and r_bad = { y : float#; z : s t2 }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error:
+       The layout of r_bad# is any & any
+         because it is an unboxed record.
+       But the layout of r_bad# must be a sublayout of
+           value & float64 & value
+         because of the definition of t1 at line 1, characters 0-38.
+|}]
+
+(* CR layouts-scannable: The annotation on ['a] is temporarily necessary while
+   inference for mutual recursive types + scannable axes is broken. See tests
+   in [typing-layouts-scannable/mutual_recursion.ml] for more examples. *)
+type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r#
+and r = { i : int ; f : float# }
+[%%expect{|
+type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r#
+and r = { i : int; f : float#; }
+|}]
+
+type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r#
+and r = { i : int }
+[%%expect{|
+type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r#
+and r = { i : int; }
+|}]
+
+(*******************)
+(* Types with [as] *)
+
+let f (x : < m: 'a. ([< `Foo of int & float] as 'a) -> unit>)
+         : < m: 'a. ([< `Foo of int & float] as 'a) -> unit> = x;;
+
+type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit };;
+let f t = #{ x = t.#x };;
+[%%expect{|
+val f :
+  < m : 'a. ([< `Foo of int & float ] as 'a) -> unit > ->
+  < m : 'b. ([< `Foo of int & float ] as 'b) -> unit > = <fun>
+type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit; }
+val f : t# -> t# = <fun>
+|}]
+
+module Bad : sig
+  type t = { i : int ; a: (<x:'a> as 'a) }
+end = struct
+  type t = { i : int ; a: (<x:'a * 'a> as 'a) }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { i : int ; a: (<x:'a * 'a> as 'a) }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { i : int; a : < x : 'a * 'a > as 'a; } end
+       is not included in
+         sig type t = { i : int; a : < x : 'a > as 'a; } end
+       Type declarations do not match:
+         type t = { i : int; a : < x : 'a * 'a > as 'a; }
+       is not included in
+         type t = { i : int; a : < x : 'a > as 'a; }
+       Fields do not match:
+         "a : < x : 'a * 'a > as 'a;"
+       is not the same as:
+         "a : < x : 'a > as 'a;"
+       The type "< x : 'a * 'a > as 'a" is not equal to the type
+         "< x : 'b > as 'b"
+       The method "x" has type "< x : 'c > * < x : 'c > as 'c",
+       but the expected method type was "< x : 'b > as 'b"
+|}]
+
+(**********************)
+(* Signature checking *)
+
+(* Must expose non-value kind *)
+module Bad : sig
+  type u
+end = struct
+  type t = { s: string; r: string }
+  type u = t#
+end
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   type t = { s: string; r: string }
+5 |   type u = t#
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { s : string; r : string; } type u = t# end
+       is not included in
+         sig type u end
+       Type declarations do not match: type u = t# is not included in type u
+       The layout of the first is value non_float & value non_float
+         because it is an unboxed record.
+       But the layout of the first must be a value layout
+         because of the definition of u at line 2, characters 2-8.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
+
+module M : sig
+  type t = { s : string; t : string }
+end = struct
+  type t = { s : string; t : string }
+end
+[%%expect{|
+module M : sig type t = { s : string; t : string; } end
+|}]
+
+module M2 : sig
+  type u : value & value
+end = struct
+  include M
+  type nonrec u = t#
+end
+[%%expect{|
+module M2 : sig type u : value & value end
+|}]
+
+module M : sig
+  type u : value & value
+end = struct
+  type t = { s : string; t : string }
+  type nonrec u = t#
+end
+[%%expect{|
+module M : sig type u : value & value end
+|}]
+
+module M : sig
+  type u
+end = struct
+  type t = #{ s : string }
+  type nonrec u = t#
+end
+[%%expect{|
+Line 5, characters 18-20:
+5 |   type nonrec u = t#
+                      ^^
+Error: The type "t" has no unboxed version.
+Hint: It is already an unboxed record.
+|}]
+
+(* Records with atomic fields don't get unboxed versions. *)
+type t_atomic = { i : int; mutable j : int [@atomic] }
+type u_atomic = t_atomic#
+[%%expect{|
+type t_atomic = { i : int; mutable j : int [@atomic]; }
+Line 2, characters 16-25:
+2 | type u_atomic = t_atomic#
+                    ^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+Hint: Records with [@atomic] fields don't get unboxed versions.
+|}]
+
+(* Same, but in a recursive group, in both orders. *)
+type t_atomic = { i : int; mutable j : int [@atomic] }
+and u_atomic = t_atomic#
+[%%expect{|
+Line 2, characters 0-24:
+2 | and u_atomic = t_atomic#
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+|}]
+
+type u_atomic = t_atomic#
+and t_atomic = { i : int; mutable j : int [@atomic] }
+[%%expect{|
+Line 1, characters 0-25:
+1 | type u_atomic = t_atomic#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The type "t_atomic" has no unboxed version.
+|}]
+
+(*************************************)
+(* Types that mode cross externality *)
+
+(* No corresponding tests for implicit unboxed records *)
+
+(********************)
+(* Recursive groups *)
+
+type ('a : float64) t_float64_id = 'a
+type ('a : immediate) t_immediate_id = 'a
+[%%expect{|
+type ('a : float64) t_float64_id = 'a
+type ('a : immediate) t_immediate_id = 'a
+|}];;
+
+type 'a t_float = 'a t_float64_id
+and 'a t_imm = 'a t_immediate_id
+and ('a, 'b, 'ptr) t =
+  {ptr : 'ptr; x : 'a; y : 'a t_float; z : 'b; w : 'b t_imm}
+and ('a, 'b, 'ptr) u = ('a, 'b, 'ptr) t#
+[%%expect{|
+Line 4, characters 27-37:
+4 |   {ptr : 'ptr; x : 'a; y : 'a t_float; z : 'b; w : 'b t_imm}
+                               ^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of 'a is float64
+           because of the definition of t_float64_id at line 1, characters 0-37.
+         But the layout of 'a must be a value layout
+           because it instantiates an unannotated type parameter of t,
+           chosen to have layout value.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
+|}];;
+
+(* We don't yet have syntax for setting an unboxed record field.
+   However, the below, using a boxed set field, will never work. *)
+
+type r = { i : int }
+let f = #{ i = 1 }
+[%%expect{|
+type r = { i : int; }
+val f : r# = #{i = 1}
+|}]
+
+let () = f.i <- 2
+[%%expect{|
+Line 1, characters 9-10:
+1 | let () = f.i <- 2
+             ^
+Error: This expression has type "r#",
+       which is an unboxed record rather than a boxed one.
+|}]
+
+(*****************************************)
+(* Private implicit unboxed record types *)
+
+module M : sig
+  type u = private #{ x : int; y : bool }
+end = struct
+  type t = { x : int; y : bool }
+  type u = t# = #{ x : int ; y : bool }
+end
+[%%expect{|
+module M : sig type u = private #{ x : int; y : bool; } end
+|}]
+
+module Bad : sig
+  type u = #{ x : int; y : bool }
+end = struct
+  type t = private { x : int; y : bool }
+  type u = t# = #{ x : int; y : bool }
+end
+[%%expect{|
+Line 5, characters 2-38:
+5 |   type u = t# = #{ x : int; y : bool }
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "t#"
+       A private unboxed record constructor would be revealed.
+|}]
+
+module Bad = struct
+  type t = private { x : int; y : bool }
+  type u = t# = #{ x : int; y : bool }
+end
+[%%expect{|
+Line 3, characters 2-38:
+3 |   type u = t# = #{ x : int; y : bool }
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "t/2#"
+       A private unboxed record constructor would be revealed.
+|}]
+
+module Bad : sig
+  type u = #{ x : int }
+end = struct
+  type t = private { x : int; y : bool }
+  type u = t# = private #{ x : int; y : bool }
+end;;
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   type t = private { x : int; y : bool }
+5 |   type u = t# = private #{ x : int; y : bool }
+6 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t = private { x : int; y : bool; }
+           type u = t# = private #{ x : int; y : bool; }
+         end
+       is not included in
+         sig type u = #{ x : int; } end
+       Type declarations do not match:
+         type u = t# = private #{ x : int; y : bool; }
+       is not included in
+         type u = #{ x : int; }
+       A private unboxed record constructor would be revealed.
+|}];;
+
+module Bad : sig
+  type u = #{ x : int; y : bool }
+end = struct
+  type t = private { x : int }
+  type u = t# = private #{ x : int }
+end;;
+[%%expect{|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   type t = private { x : int }
+5 |   type u = t# = private #{ x : int }
+6 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t = private { x : int; }
+           type u = t# = private #{ x : int; }
+         end
+       is not included in
+         sig type u = #{ x : int; y : bool; } end
+       Type declarations do not match:
+         type u = t# = private #{ x : int; }
+       is not included in
+         type u = #{ x : int; y : bool; }
+       A private unboxed record constructor would be revealed.
+|}];;
+
+type t = private { i : int }
+let f #{ i } = i
+[%%expect{|
+type t = private { i : int; }
+val f : t# -> int = <fun>
+|}]
+
+module M = struct
+  type 'a t = private { f : 'a -> int }
+end
+
+type 'a t = 'a M.t = private { f : 'a -> int }
+module type S = module type of M with type 'a t := 'a t
+[%%expect{|
+module M : sig type 'a t = private { f : 'a -> int; } end
+type 'a t = 'a M.t = private { f : 'a -> int; }
+module type S = sig end
+|}]
+
+(*****************************************************)
+(* Special-cased errors for boxed/unboxed mismatches *)
+
+(* Doesn't apply to implicit unboxed records *)
+
+(*****************************************************************************)
+(* Initial expressions for functionally updated records are always evaluated *)
+
+type t = { x : string }
+
+let [@warning "-23"] update_t t =
+  let updated = ref false in
+  let _ = #{ (updated := true; t) with x = "" } in
+  assert !updated
+
+let _ = update_t #{ x = "x" }
+[%%expect{|
+type t = { x : string; }
+val update_t : t# -> unit = <fun>
+- : unit = ()
+|}]
+
+type t = { x : string ; y : float ; z : unit}
+
+let [@warning "-23"] update_t t =
+  let counter = ref 0 in
+  let _ = #{ (incr counter; t) with x = ""; y = 0.0 ; z = ()} in
+  assert (!counter = 1);
+  let _ = #{ (incr counter; t) with y = 0.0 } in
+  assert (!counter = 2)
+
+let _ = update_t #{ x = "x" ; y = 1.0 ; z = ()}
+[%%expect{|
+type t = { x : string; y : float; z : unit; }
+val update_t : t# -> unit = <fun>
+- : unit = ()
+|}]
+
+(************************************************************)
+(* Basic tests for construction/projection representability *)
+
+type ('a : any) t = { x : int; y : 'a }
+[%%expect{|
+type ('a : any) t = { x : int; y : 'a; }
+|}]
+
+let f = fun t -> t.#y
+[%%expect{|
+val f : 'a t# -> 'a = <fun>
+|}]
+
+(* CR layouts v7.2: once we allow record declarations with unknown kind (right
+   now, ['a] in the decl above is defaulted to value), then this should give an
+   error saying that records being projected from must be representable.
+
+   Update: The kind is now indeed unknown but we can't really get this error
+   since the argument is not representable either. *)
+let f : ('a : any). 'a t# -> 'a = fun t -> t.#y
+[%%expect{|
+Line 1, characters 34-47:
+1 | let f : ('a : any). 'a t# -> 'a = fun t -> t.#y
+                                      ^^^^^^^^^^^^^
+Error: This definition has type "'b t# -> 'b" which is less general than
+         "('a : any). 'a t# -> 'a"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+let f = fun a -> #{ x = 1; y = a }
+[%%expect{|
+val f : 'a -> 'a t# = <fun>
+|}]
+
+(* CR layouts v7.2: once we allow record declarations with unknown kind
+   (right now, ['a] in the decl above is defaulted to value), then this should
+   give an error saying that records used in functional updates must be
+   representable.
+
+   Update: Similar issue to above.
+*)
+let f : ('a : any). 'a -> 'a t# = fun a -> #{ x = 1; y = a }
+[%%expect{|
+Line 1, characters 34-60:
+1 | let f : ('a : any). 'a -> 'a t# = fun a -> #{ x = 1; y = a }
+                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This definition has type "'b -> 'b t#" which is less general than
+         "('a : any). 'a -> 'a t#"
+       The layout of 'a is any
+         because of the annotation on the universal variable 'a.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
+|}]
+
+
+(************************************************************)
+
+(* This is a regression test. Previously, we hit a fatal error because the [any]
+   annotation obscured the fact that the unboxed record is a product, breaking
+   an invariant assumed by [Ctype.constrain_type_jkind].
+
+   [a] was necessary to trigger the error because it called
+   [check_representable] on [b], constraining its kind to be a sort variable. *)
+type a = B of b
+and b : any = r#
+and r = { i : int ; j : int }
+[%%expect{|
+type a = B of b
+and b = r#
+and r = { i : int; j : int; }
+|}]
+type a = B of b_portable
+and b_portable : any mod portable = r#
+and r = { i : int ; j : int }
+[%%expect{|
+type a = B of b_portable
+and b_portable = r#
+and r = { i : int; j : int; }
+|}]
+type a = B of b
+and b : any & any & any = r#
+and r = { i : int ; j : int }
+[%%expect{|
+Line 2, characters 0-28:
+2 | and b : any & any & any = r#
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "r#" is value non_pointer & value non_pointer
+         because it is an unboxed record.
+       But the layout of type "r#" must be a sublayout of any & any & any
+         because of the definition of b at line 2, characters 0-28.
+       Note: The layout of immediate is value non_pointer.
+|}]

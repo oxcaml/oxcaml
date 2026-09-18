@@ -1,0 +1,24 @@
+File "immediate_all_void_constructor_unused.ml", line 16, characters 21-51:
+16 | type t1 = A of int [@immediate_all_void_constructor] | B
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the immediate_all_void_constructor attribute cannot appear in this context
+
+File "immediate_all_void_constructor_unused.ml", line 19, characters 14-44:
+19 | type t2 = C [@immediate_all_void_constructor] | D
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the immediate_all_void_constructor attribute cannot appear in this context
+
+File "immediate_all_void_constructor_unused.ml", line 22, characters 29-59:
+22 | type t3 = E of { x : int } [@immediate_all_void_constructor]
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the immediate_all_void_constructor attribute cannot appear in this context
+
+File "immediate_all_void_constructor_unused.ml", line 25, characters 24-54:
+25 | type t4 = F of unit_u [@immediate_all_void_constructor] [@@unboxed]
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the immediate_all_void_constructor attribute cannot appear in this context
+
+File "immediate_all_void_constructor_unused.ml", line 28, characters 5-35:
+28 | let[@immediate_all_void_constructor] f x = x
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 53 [misplaced-attribute]: the immediate_all_void_constructor attribute cannot appear in this context

@@ -1,0 +1,17 @@
+# Upstream has a workflow for testing with thread sanitization. See
+# https://github.com/ocaml/ocaml/blob/master/.github/workflows/tsan.yml.
+name: tsan
+on:
+  workflow_dispatch:  # Manual trigger only
+permissions: {}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+jobs:
+  placeholder:
+    name: TSan placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "TSan workflow not yet implemented for OxCaml"
+          exit 1

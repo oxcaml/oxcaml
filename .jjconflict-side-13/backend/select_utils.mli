@@ -1,0 +1,343 @@
+(* -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+module DLL = Doubly_linked_list
+module Int = Numbers.Int
+module V = Backend_var
+module VP = Backend_var.With_provenance
+
+type trap_stack_info =
+  | Unreachable
+  | Reachable of Operation.trap_stack
+
+type static_handler =
+  { regs : Reg.t array list;
+    traps_ref : trap_stack_info ref;
+    label : Label.t
+  }
+
+type environment =
+  { vars :
+      (Reg.t array * V.Provenance.t option * Asttypes.mutable_flag) V.Map.t;
+    static_exceptions : static_handler Static_label.Map.t;
+    trap_stack : Operation.trap_stack;
+    tailrec_label : Label.t;
+    phantom_lets : V.Set.t;
+    all_phantom_lets :
+      (V.Provenance.t option * Cfg.phantom_defining_expr) V.Map.t ref
+        (** Accumulates every phantom let encountered in the current function
+            (unlike [phantom_lets], which is scoped). The [ref] is created
+            afresh by [env_create], once per function, and shared between all
+            environments derived from that environment; it is read at the end of
+            function construction by [phantom_lets_for_fundecl]. *)
+  }
+
+val env_create : tailrec_label:Label.t -> environment
+
+val env_add :
+  ?mut:Asttypes.mutable_flag ->
+  VP.t ->
+  Reg.t array ->
+  environment ->
+  environment
+
+val env_add_phantom_let :
+  VP.t -> Cmm.phantom_defining_expr option -> environment -> environment
+
+val phantom_lets_for_fundecl :
+  environment ->
+  (V.Provenance.t option * Cfg.phantom_defining_expr) Backend_var.Map.t
+
+val env_add_static_exception :
+  Static_label.t ->
+  Reg.t array list ->
+  environment ->
+  Label.t ->
+  environment * trap_stack_info ref
+
+val env_find : V.Map.key -> environment -> Reg.t array
+
+val env_find_mut :
+  V.Map.key -> environment -> Reg.t array * Backend_var.Provenance.t option
+
+val env_find_regs_for_exception_extra_args :
+  Cmm.trywith_shared_label -> environment -> Reg.t array list
+
+val env_find_static_exception : Static_label.t -> environment -> static_handler
+
+val env_set_trap_stack : environment -> Operation.trap_stack -> environment
+
+val phantom_vars_from_env : environment -> V.Set.t option
+
+val print_traps : Format.formatter -> Operation.trap_stack -> unit
+
+val set_traps :
+  Lambda.static_label ->
+  trap_stack_info ref ->
+  Operation.trap_stack ->
+  Cmm.trap_action list ->
+  unit
+
+val set_traps_for_raise : environment -> unit
+
+val trap_stack_is_empty : environment -> bool
+
+val pop_all_traps : environment -> Cmm.trap_action list
+
+val select_mutable_flag : Asttypes.mutable_flag -> Operation.mutable_flag
+
+val oper_result_type : Cmm.operation -> Cmm.machtype
+
+val size_component : Cmx_format.machtype_component -> int
+
+val size_machtype : Cmx_format.machtype_component array -> int
+
+(** Compute the size in bytes of a (simple) Cmm expression, using [size_of_var]
+    to determine the size of free variables. *)
+val size_expr_with : size_of_var:(Backend_var.t -> int) -> Cmm.expression -> int
+
+val size_expr : environment -> Cmm.expression -> int
+
+val current_function_name : string ref
+
+val current_function_is_check_enabled : bool ref
+
+module Effect : sig
+  type t =
+    | None
+    | Raise
+    | Arbitrary
+
+  val join : t -> t -> t
+
+  val pure : t -> bool
+end
+
+module Coeffect : sig
+  type t =
+    | None
+    | Read_mutable
+    | Arbitrary
+
+  val join : t -> t -> t
+
+  val copure : t -> bool
+end
+
+module Effect_and_coeffect : sig
+  type t
+
+  val none : t
+
+  val arbitrary : t
+
+  val effect_ : t -> Effect.t
+
+  val coeffect : t -> Coeffect.t
+
+  val pure_and_copure : t -> bool
+
+  val effect_only : Effect.t -> t
+
+  val coeffect_only : Coeffect.t -> t
+
+  val create : Effect.t -> Coeffect.t -> t
+
+  val join : t -> t -> t
+
+  val join_list_map : 'a list -> ('a -> t) -> t
+end
+
+val select_effects : Cmm.effects -> Effect.t
+
+val select_coeffects : Cmm.coeffects -> Coeffect.t
+
+module Or_never_returns : sig
+  type 'a t =
+    | Ok of 'a
+    | Never_returns
+
+  module Syntax : sig
+    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
+
+    val ( let** ) : 'a t -> ('a -> unit) -> unit
+  end
+end
+
+(** Prepare the arguments [exp_list] of an operation for right-to-left
+    evaluation (as required by the Flambda [Un_anf] pass, and to be consistent
+    with the bytecode compiler). Expressions that may safely be deferred (per
+    their (co)effects and [is_simple_expr]) are returned unchanged for the
+    caller to evaluate in place; every other expression is evaluated immediately
+    (right to left) via [emit] and replaced by a fresh [Cvar] whose binding is
+    recorded in the environment by [bind_result]. *)
+val emit_parts_list :
+  effects_of:(Cmm.expression -> Effect_and_coeffect.t) ->
+  is_simple_expr:(Cmm.expression -> bool) ->
+  emit:('env -> Cmm.expression -> 'value array Or_never_returns.t) ->
+  bind_result:('env -> Backend_var.t -> 'value array -> 'env) ->
+  'env ->
+  Cmm.expression list ->
+  (Cmm.expression list * 'env) Or_never_returns.t
+
+(** The memory chunk to use when storing one component of a value, e.g. when
+    initialising the fields of a freshly allocated block ([emit_stores]). *)
+val chunk_of_machtype_component : Cmm.machtype_component -> Cmm.memory_chunk
+
+(** Whether moving a call result out of its ABI location [src] into [dst] needs
+    a [Reinterpret_cast Mask_of_int64] rather than a plain [Move]. [Proc] types
+    a C-ABI mask location as [Int] so that whoever materialises ABI locations
+    inserts the conversion; targets with mask registers type it [Mask]. *)
+val result_needs_mask_of_int64 : Reg.t -> Reg.t -> bool
+
+val float_test_of_float_comparison :
+  Cmm.float_width ->
+  Scalar.Float_comparison.t ->
+  label_false:Label.t ->
+  label_true:Label.t ->
+  Cfg.float_test
+
+val int_test_of_integer_comparison :
+  Scalar.Integer_comparison.t ->
+  immediate:int option ->
+  label_false:Label.t ->
+  label_true:Label.t ->
+  Cfg.int_test
+
+val terminator_of_test :
+  Operation.test -> label_false:Label.t -> label_true:Label.t -> Cfg.terminator
+
+module Stack_offset_and_exn : sig
+  val update_cfg : Cfg.t -> unit
+end
+
+val make_stack_offset : int -> Cfg.basic
+
+val make_name_for_debugger :
+  ident:Ident.t ->
+  which_parameter:int option ->
+  provenance:Backend_var.Provenance.t option ->
+  regs:Reg.t array ->
+  Cfg.basic
+
+val make_const_int : nativeint -> Operation.t
+
+val make_const_float32 : int32 -> Operation.t
+
+val make_const_float : int64 -> Operation.t
+
+val make_const_vec128 : Cmm.vec128_bits -> Operation.t
+
+val make_const_vec256 : Cmm.vec256_bits -> Operation.t
+
+val make_const_vec512 : Cmm.vec512_bits -> Operation.t
+
+val make_const_symbol : Cmm.symbol -> Operation.t
+
+val make_opaque : unit -> Operation.t
+
+val insert_debug :
+  environment ->
+  Sub_cfg.t ->
+  Cfg.basic ->
+  Debuginfo.t ->
+  Reg.t array ->
+  Reg.t array ->
+  unit
+
+val insert_op_debug_returning_id :
+  environment ->
+  Sub_cfg.t ->
+  Operation.t ->
+  Debuginfo.t ->
+  Reg.t array ->
+  Reg.t array ->
+  InstructionId.t
+
+val insert :
+  environment -> Sub_cfg.t -> Cfg.basic -> Reg.t array -> Reg.t array -> unit
+
+val insert' :
+  environment ->
+  Sub_cfg.t ->
+  Cfg.terminator ->
+  Reg.t array ->
+  Reg.t array ->
+  unit
+
+val insert_debug' :
+  environment ->
+  Sub_cfg.t ->
+  Cfg.terminator ->
+  Debuginfo.t ->
+  Reg.t array ->
+  Reg.t array ->
+  unit
+
+val insert_op_debug' :
+  environment ->
+  Sub_cfg.t ->
+  Cfg.terminator ->
+  Debuginfo.t ->
+  Reg.t array ->
+  Reg.t array ->
+  Reg.t array
+
+val insert_move : environment -> Sub_cfg.t -> Reg.t -> Reg.t -> unit
+
+val insert_moves :
+  environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> unit
+
+val insert_move_args :
+  environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> int -> unit
+
+val insert_move_results :
+  environment -> Sub_cfg.t -> Reg.t array -> Reg.t array -> int -> unit
+
+val maybe_emit_naming_op :
+  environment ->
+  Sub_cfg.t ->
+  bound_name:Backend_var.With_provenance.t option ->
+  Reg.t array ->
+  unit
+
+val join :
+  environment ->
+  Reg.t array Or_never_returns.t ->
+  Sub_cfg.t ->
+  Reg.t array Or_never_returns.t ->
+  Sub_cfg.t ->
+  bound_name:Backend_var.With_provenance.t option ->
+  Reg.t array Or_never_returns.t
+
+val join_array :
+  environment ->
+  (Reg.t array Or_never_returns.t * Sub_cfg.t) array ->
+  bound_name:Backend_var.With_provenance.t option ->
+  Reg.t array Or_never_returns.t
+
+val basic_op : Operation.t -> Cfg.basic_or_terminator

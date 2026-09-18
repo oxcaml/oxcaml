@@ -1,0 +1,84 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* Insertion of debugging events *)
+
+val event_before : Lambda.scoped_location -> Typedtree.expression
+                   -> Lambda.lambda -> Lambda.lambda
+
+val event_after : Lambda.scoped_location -> Typedtree.expression
+                  -> Lambda.lambda -> Lambda.lambda
+
+(* Translation of primitives *)
+
+val add_exception_ident : Ident.t -> unit
+val remove_exception_ident : Ident.t -> unit
+
+val clear_used_primitives : unit -> unit
+val get_units_with_used_primitives: unit -> Compilation_unit.t list
+
+val check_primitive_arity :
+  Location.t -> Primitive.description -> unit
+
+val transl_primitive :
+  Lambda.scoped_location -> Primitive.description -> Env.t ->
+  Types.type_expr ->
+  poly_mode:Mode.Locality.l option ->
+  poly_sort:Jkind.Sort.t option ->
+  yielding:Mode.Yielding.l ->
+  zero_alloc_check:Zero_alloc.check option ->
+  Path.t option ->
+  Lambda.lambda
+
+val transl_primitive_application :
+  Lambda.scoped_location -> Primitive.description -> Env.t ->
+  Types.type_expr ->
+  poly_mode:Mode.Locality.l option -> stack:bool ->
+  poly_sort:Jkind.Sort.t option ->
+  yielding:Lambda.yielding_kind -> Path.t ->
+  Typedtree.expression option ->
+  Lambda.lambda list -> Typedtree.expression list ->
+  Lambda.region_close -> Lambda.lambda
+
+(** [sort_of_native_repr] returns the sort expected after typechecking (which
+    may be different than the sort used in the external interface).
+
+    [poly_sort] must be [Some sort] when [Repr_poly] is given. It will produce
+    fatal error if it's [None].  *)
+val sort_of_native_repr :
+  poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Jkind.Sort.Const.t
+
+(* Errors *)
+
+type invalid_stack_primitive =
+  | Not_primitive
+  | Not_allocating
+  | Allocating_on_heap
+
+type error =
+  | Unknown_builtin_primitive of string
+  | Wrong_arity_builtin_primitive of string
+  | Wrong_layout_for_peek_or_poke of string
+  | Layout_poly_arguments_unsupported of string
+  | Invalid_floatarray_glb
+  | Invalid_array_kind_for_uninitialized_makearray_dynamic
+  | Invalid_stack_primitive of invalid_stack_primitive
+  | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Element_would_be_reordered_in_record
+
+exception Error of Location.t * error
+
+val report_error :  error Format_doc.format_printer
+val report_error_doc:  error Format_doc.printer

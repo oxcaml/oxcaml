@@ -33,7 +33,9 @@ module Staged : sig
   end
 
   (** Traverse the compilation unit. [free_names] are the free names of the
-      whole unit as output by simplify. *)
+      whole unit as output by simplify. The value passed to the unit's return
+      continuation is not marked as used by unknown code: a whole-program
+      analysis records those uses from the other units analysed. *)
   val traverse :
     free_names:Name_occurrences.t ->
     cmx_loader:Flambda_cmx.loader ->

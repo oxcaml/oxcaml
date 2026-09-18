@@ -1,0 +1,1 @@
+let text = Foo.hello

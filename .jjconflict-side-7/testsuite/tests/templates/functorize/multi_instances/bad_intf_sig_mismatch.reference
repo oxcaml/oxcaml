@@ -1,0 +1,31 @@
+File "bad_intf_sig_mismatch.ml", line 4, characters 39-59:
+4 | module R : Bundle2.Intf(P_int_alt).S = Bundle2.Make (P_int) ()
+                                           ^^^^^^^^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         Bundle2.Intf(P_int).S
+       is not included in
+         Bundle2.Intf(P_int_alt).S
+       In module Basic_transparent:
+       Modules do not match:
+         sig
+           type t = P_int.t
+           val create : t -> t @@ stateless
+           val to_string : P_int.t -> string
+         end
+       is not included in
+         sig
+           type t = P_int_alt.t
+           val create : t -> t @@ stateless
+           val to_string : P_int_alt.t -> string
+         end
+       In module Basic_transparent:
+       Type declarations do not match:
+         type t = P_int.t
+       is not included in
+         type t = P_int_alt.t
+       The type P_int.t = int is not equal to the type P_int_alt.t
+       File "basic_transparent/basic_transparent.ml", line 4, characters 0-12:
+         Expected declaration
+       File "basic_transparent/basic_transparent.ml", line 4, characters 0-12:
+         Actual declaration

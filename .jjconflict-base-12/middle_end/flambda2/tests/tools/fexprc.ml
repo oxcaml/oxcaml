@@ -1,0 +1,47 @@
+open Import
+
+let check_invariants program =
+  (* CR Keryan : do we want to restore this at some point ? *)
+  try () (* Flambda_unit.invariant program *)
+  with exn ->
+    Format.eprintf "Program which failed invariant check:@ %a\n%!"
+      Flambda_unit.print program;
+    raise exn
+
+let parse_flambda filename =
+  match Parse_flambda.parse_fexpr filename with
+  | Ok unit ->
+    let unit_info = Parse_flambda.make_unit_info ~filename in
+    let comp_unit = Unit_info.modname unit_info in
+    Env.set_current_unit unit_info;
+    let fl2 = Fexpr_to_flambda.conv comp_unit unit in
+    check_invariants fl2.unit;
+    Flambda2.flambda_to_flambda ~ppf_dump:Format.std_formatter
+      ~prefixname:(Filename.chop_extension filename)
+      ~machine_width:Sixty_four ~code_slot_offsets:fl2.code_slot_offsets
+      fl2.unit
+  | Error e ->
+    Test_utils.dump_error e;
+    exit 1
+
+module Options = Oxcaml_args.Make_optcomp_options (Oxcaml_args.Default.Optmain)
+
+let _ =
+  (* Setting [Clflags.native_code := true] is how we tell the option parsing
+     machinery that we are going to use flambda2. *)
+  Clflags.native_code := true;
+  let file_action = ref (fun () -> Misc.fatal_error "Missing a flambda file") in
+  let defer_file file =
+    let ext = Filename.extension file in
+    match ext with
+    | ".fl" -> file_action := fun () -> parse_flambda file
+    | _ -> Misc.fatal_errorf "Unrecognized extension %s" ext
+  in
+  Compenv.warnings_for_discarded_params := true;
+  Compenv.set_extra_params (Some Oxcaml_args.Extra_params.read_param);
+  Compenv.readenv Format.err_formatter Before_args;
+  Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
+  Clflags.Opt_flag_handler.set Oxcaml_flags.opt_flag_handler;
+  Compenv.parse_arguments (ref Sys.argv) defer_file "fexprc";
+  Location.read_clflags_from_env ();
+  !file_action ()

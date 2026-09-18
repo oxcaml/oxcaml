@@ -1,0 +1,166 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Mark Shinwell, Jane Street Europe                     *)
+(*                                                                        *)
+(*   Copyright 2014--2018 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+open Asm_targets
+open Dwarf_low
+
+[@@@ocaml.warning "+a-4-30-40-41-42-69"]
+
+module ASS = Dwarf_attributes.Attribute_specification.Sealed
+module ATS = Dwarf_attributes.Attribute.Sealed
+module AV = Dwarf_attribute_values.Attribute_value
+module Int = Numbers.Int
+
+type reference = Asm_label.t
+
+let create_reference () = Asm_label.create (DWARF Debug_info)
+
+type t =
+  { parent : t option;
+    mutable children_by_sort_priority : t list Int.Map.t;
+    tag : Dwarf_tag.t;
+    (* Keyed on attributes without their forms: a DIE must never contain two
+       attributes with the same name, whatever their forms. *)
+    mutable attribute_values : AV.t ATS.Map.t;
+    label : Asm_label.t;
+    (* For references between DIEs within a single unit *)
+    (* CR-someday mshinwell: consider combining [label] and [name] into one "how
+       to reference this DIE" value. *)
+    mutable name : Asm_symbol.t option;
+    (* For references between DIEs across units *)
+    location_list_in_debug_loc_table : Dwarf_4_location_list.t option
+  }
+
+(* CR mshinwell/xclerc: maybe this could avoid using phys-equal? *)
+let equal t1 t2 = t1 == t2
+
+let attribute_of_value attribute_value =
+  ASS.attribute (AV.attribute_spec attribute_value)
+
+let attribute_values_map attribute_values =
+  List.fold_left
+    (fun map attribute_value ->
+      ATS.Map.add (attribute_of_value attribute_value) attribute_value map)
+    ATS.Map.empty attribute_values
+
+(* CR-someday mshinwell: Resurrect support for sibling links. *)
+
+let create ?reference ?(sort_priority = -1) ?location_list_in_debug_loc_table
+    ~parent ~tag ~attribute_values () =
+  (match parent with
+  | None ->
+    if Dwarf_tag.compare tag Dwarf_tag.Compile_unit <> 0
+    then failwith "only compilation unit proto-DIEs may be without parents"
+  | Some _parent -> ());
+  let reference =
+    match reference with
+    | None -> Asm_label.create (DWARF Debug_info)
+    | Some reference -> reference
+  in
+  let attribute_values = attribute_values_map attribute_values in
+  let t =
+    { parent;
+      children_by_sort_priority = Int.Map.empty;
+      tag;
+      attribute_values;
+      label = reference;
+      name = None;
+      location_list_in_debug_loc_table
+    }
+  in
+  (match parent with
+  | None -> ()
+  | Some parent ->
+    let with_same_sort_priority =
+      match Int.Map.find sort_priority parent.children_by_sort_priority with
+      | exception Not_found -> []
+      | children -> children
+    in
+    let with_same_sort_priority = t :: with_same_sort_priority in
+    parent.children_by_sort_priority
+      <- Int.Map.add sort_priority with_same_sort_priority
+           parent.children_by_sort_priority);
+  t
+
+let create_ignore ?reference ?sort_priority ?location_list_in_debug_loc_table
+    ~parent ~tag ~attribute_values () =
+  let (_ : t) =
+    create ?reference ?sort_priority ?location_list_in_debug_loc_table ~parent
+      ~tag ~attribute_values ()
+  in
+  ()
+
+let add_or_replace_attribute_value t attribute_value =
+  (* Since the map is keyed on attributes without their forms, this replaces any
+     existing value for the attribute even if its form differs (for example a
+     [Data8] high PC value being replaced by a [Data4] one). *)
+  t.attribute_values
+    <- ATS.Map.add
+         (attribute_of_value attribute_value)
+         attribute_value t.attribute_values
+
+let replace_all_attribute_values t attribute_values =
+  (* Note that [t] must be mutated: it has already been linked into its parent's
+     list of children (and may already be referenced by other DIEs), so
+     returning a functional copy would leave the old attribute values to be
+     emitted. *)
+  t.attribute_values <- attribute_values_map attribute_values
+
+let set_name t name = t.name <- Some name
+
+type fold_arg =
+  | DIE of
+      { tag : Dwarf_tag.t;
+        has_children : Child_determination.t;
+        attribute_values : AV.t ATS.Map.t;
+        label : Asm_label.t;
+        name : Asm_symbol.t option;
+        location_list_in_debug_loc_table :
+          (* optional name *)
+          Dwarf_4_location_list.t option
+      }
+  | End_of_siblings
+
+let rec depth_first_fold t ~init ~f =
+  let has_children : Child_determination.t =
+    if Int.Map.is_empty t.children_by_sort_priority then No else Yes
+  in
+  let acc =
+    f init
+      (DIE
+         { tag = t.tag;
+           has_children;
+           attribute_values = t.attribute_values;
+           label = t.label;
+           name = t.name;
+           location_list_in_debug_loc_table = t.location_list_in_debug_loc_table
+         })
+  in
+  if Int.Map.is_empty t.children_by_sort_priority
+  then acc
+  else
+    let acc =
+      Int.Map.fold
+        (fun _sort_priority children_rev acc ->
+          List.fold_left
+            (fun acc child -> depth_first_fold child ~init:acc ~f)
+            acc (List.rev children_rev))
+        t.children_by_sort_priority acc
+    in
+    f acc End_of_siblings
+
+let reference t = t.label
+
+let location_list_in_debug_loc_table t = t.location_list_in_debug_loc_table

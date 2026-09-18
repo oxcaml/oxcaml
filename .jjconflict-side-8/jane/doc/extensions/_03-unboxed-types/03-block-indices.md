@@ -1,0 +1,233 @@
+---
+layout: documentation-page
+collectionName: Unboxed types
+title: Block indices
+---
+
+# Block indices
+
+This document describes the language feature and implementation for explicit
+_indices_ into a block. Before reading this document, you may wish to read up
+through the [layouts](../intro#layouts) section of the main document.
+
+As a quick example:
+```ocaml
+open Stdlib_stable
+
+type pt = { x : int; y : int }
+type line = { p : pt#; q : pt# }
+
+(* Creating an immutable block index into a nested record *)
+let mk_idx () : (line, int) idx_imm = (.q.#y)
+
+let get_coord (line : line) (i : (line, int) idx_imm) : int =
+  (* If [i] is [(.q.#y)], then the below is similar to to [line.q.#y] *)
+  Idx_imm.get line i
+
+(* Creating a block index into an array *)
+let first_int () : (int array, int) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
+
+let inc_coord (pts : 'a) (i : ('a, int) idx_mut) =
+  (* Equivalent to [pts.(i) <- pts.(i) + 1] when [i] is in bounds and [pts] is
+     an [int array]. But this function could also be used update a mutable
+     record containing an [int]. *)
+  Idx_mut.set pts i (Idx_mut.get pts i + 1)
+```
+
+# Overview
+
+A block index is an opaque, explicit index to an element in a larger structure.
+The language feature includes these predefined types:
+
+```ocaml
+type ('a, 'b : any) idx_imm : bits64
+type ('a, 'b : any) idx_mut : bits64
+type ('a, 'b : any) idx_atomic : bits64
+```
+
+Given an `('a, 'b) idx_imm` (or other index type), we refer to `'a` as the "base
+type" and `'b` as the "element type." A block index thus represents the position
+of an element type within the base type. For example,
+`(.q.#y) : (line, int) idx_imm` in the example above represents the position of
+this `int` in a `line`:
+```
+                           v
+{ p = #{ x; y }; q = #{ x; y } }
+```
+
+**Index creation.** Block index creation uses the syntax `(.foo.#bar)`.
+Specifically, it consists of one "block access" followed by zero or more
+"unboxed accesses" within parentheses.
+
+Block accesses take the following forms:
+- Record field: `.foo`
+- Block index: `.idx_imm(idx)`, `.idx_mut(idx)`, or `.idx_atomic(idx)`.
+
+Unboxed accesses take the following forms:
+- Unboxed record field: `.#bar`
+
+To determine whether a use of the block index syntax should result in an
+`idx_imm`, `idx_mut`, or `idx_atomic`, we look at its block access component.
+If it is a reference to a record field, we use the corresponding index type.
+If we are deepening an existing index, the new index has the same variety as
+the original.
+
+**Array indices.** Array indices are created via functions in `Stdlib_stable`:
+- `Idx_mut.unsafe_create_into_array : int -> ('a array, 'a) idx_mut`
+- `Idx_imm.unsafe_create_into_iarray : int -> ('a iarray, 'a) idx_imm`
+- Atomic array indices are not currently supported.
+
+These functions are marked `unsafe` because they cannot check array bounds, so
+using the index later could perform an unchecked out-of-bounds access.
+
+**Using indices.** Block indices can be used to read and write values within blocks.
+[`Stdlib_stable`](https://github.com/oxcaml/oxcaml/blob/main/otherlibs/stdlib_stable)
+exposes `get` and `set` functions for `idx_imm`, `idx_mut`, and `idx_atomic`.
+
+_A key advantage of block indices is that these accessor functions are
+polymorphic in both the base type and element type._ Index reading roughly
+(ignoring mutability, layouts, modes) has the type signature
+`'a -> ('a, 'b) idx -> 'b`, and index writing roughly has the type
+signature `'a -> ('a, 'b) idx -> 'b -> unit`.
+
+**Index deepening.** Block indices themselves are included as a type of block
+access so that indices can be _deepened_. For example, given
+`idx : ('a, pt#) idx_imm`, one may obtain
+`(.idx_imm(idx).#y) : ('a, int) idx_imm`.
+
+# Example use cases
+
+## Implement "interior pointers"
+
+By packing the base type parameter, block indices can be used to implement
+pointers into a block. (There is ongoing work to create a standardized library
+for interior pointers, but we include this example for illustrative purposes.)
+
+```ocaml
+type ('a : any) iptr = P : #('base * ('base, 'a) idx_imm) -> 'a iptr [@@unboxed]
+type ('a : any) mptr = P : #('base * ('base, 'a) idx_mut) -> 'a mptr [@@unboxed]
+```
+
+## Allow polymorphic APIs to support fine-grained access
+
+```ocaml
+module Stack : sig
+  type 'a t
+  val empty : 'a t
+  val push : 'a t -> 'a -> unit
+  val pop : 'a t -> 'a
+  val update_top : 'a t -> ('a, 'b) idx_mut -> 'b -> unit
+  (* [update_top] normally isn't possible without exposing the representation.
+     One could use ['a t -> ('a -> unit) -> unit], but the closure is less
+     efficient. *)
+end
+
+(* ... *)
+
+type pt = { x : int; y : int }
+type line = { mutable p : pt#; mutable q : pt# }
+
+let drop_last_to_y_axis (s : line Stack.t) =
+  Stack.update_top s (.q.#y) 0
+```
+
+# Edge cases and limitations
+
+1. For block indices to arrays, the array type parameter must be `mod
+   non_float`.
+2. Indices cannot be taken to `[@@unboxed]` records,
+   `[@@represent_as_float_array]` records, records that store `float`s flatly,
+   or `private` records.
+3. Indices to some records containing both values and non-values, and occupying
+   over 2^12 bytes, cannot be created. See [Representation of block
+   indices](#representation-of-block-indices) for details.
+4. Indices to structures with non-default modalities are not supported.
+   Specifically, the composition of modalities of the accesses of an `idx_imm`
+   must have the identity modality, while the composition of modalities of the
+   accesses of an `idx_mut` must have the modality
+   `global many aliased unyielding`.
+
+# Representation of block indices
+
+_We document the compilation of block indices here, but do not guarantee this
+representation to be stable between versions._
+
+Consider the following type:
+
+```ocaml
+type a = #{ s : string; i : int64_u }
+type b = #{ i : int64_u; a : a; s : string }
+type c = { mutable b : b; s : string }
+```
+
+The record `c` presents an interesting problem for block indices: the fields of
+its contained unboxed records `a` and `b` are not actually contiguous at runtime
+when using the native code compiler. This problem is caused by the
+[mixed block representation](../intro#the-mixed-block-representation),
+which mandates that we reorder fields so that values come before unboxed types.
+
+While the layout of `c` has the shape
+`((b_i64, (a_string, a_i64), b_string), c_string)`,
+its representation on the native code compiler looks like this:
+```
+   a_string b_string c_string b_i64 a_i64
+b  ^^^^^^^^^^^^^^^^^          ^^^^^^^^^^^
+a  ^^^^^^^^                         ^^^^^
+```
+
+And in the bytecode compiler, unboxed records are actually boxed, and not
+reordered.
+
+Acccordingly, block indices also have two different representations. In the
+native compiler, they are the offset into the block and the gap between the
+values and non-values of the pointed-to payload, both in bytes. In the
+bytecode compiler, block indices are represented as a sequence of field
+positions.
+
+| Idx in `c` | Native repr. | Bytecode repr. |
+|------------|--------------|----------------|
+| `(.b)` | offset 0, gap 8 | { 0 } |
+| `(.s)` | offset 16, gap 0 | { 1 } |
+| `(.b.#i)` | offset 24, gap 0 | { 0; 0 } |
+| `(.b.#a)` | offset 0, gap 24 | { 0; 1 } |
+| `(.b.#s)` | offset 8, gap 0 | { 0; 2 } |
+| `(.b.#a.#s)` | offset 0, gap 0 | { 0; 1; 0 } |
+| `(.b.#a.#i)` | offset 32, gap 0 | { 0; 1; 1 } |
+
+
+In-memory representation:
+- In the native compiler, the offset and gap are packed into
+  a single `bits64`. There are two subcases:
+  * The index is to product containing both values and non-values. In this
+    case, the offset is the lower 52 bits and the gap is the upper 12 bits.
+  * The index is to all values/non-values. In this case, all 64 bits are used
+    for the offset.
+- In the bytecode compiler, the field positions are stored as tagged integers
+  in single block with tag 0.
+  * Unboxed record fields in the index into singleton unboxed records are
+    _not_ included in the list of positions, as singleton unboxed records are
+    erased during translation to lambda.
+
+While marshaling data should be consistent between bytecode and native, this
+case is safe because mixed blocks (the only `value`s that can contain `bits64`s)
+cannot be marshaled.
+
+For a visualization of the native representation of block indices, and the
+implementation of deepening, see below.
+
+## Native implementation of index deepening
+
+While from the perspective of the layout, deepening an index simply entails
+"moving to a subtree," deepening the native representation is more involved.
+Below, we show the different cases to consider. Note that:
+- The "left" and "right" of an element refers to the layout, *not* the native
+  representation.
+- `o1` and `g1` refer to the offset and gap of the index before deepening (light
+   orange), while `o2` and `g2` refer to the offset and gap of the index after
+   deepening (blue).
+
+<img src="/documentation/all_values_or_flats.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_mixed.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_values.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_flats.png" width="600" height="auto" />

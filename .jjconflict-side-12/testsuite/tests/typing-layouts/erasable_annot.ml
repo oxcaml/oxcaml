@@ -1,0 +1,500 @@
+(* TEST
+ flags = "-extension-universe upstream_compatible";
+ expect;
+*)
+
+(* All usages of immediate/immediate64 are allowed *)
+module type S1 = sig
+  type t_immediate : immediate
+  type t_immediate64 : immediate64
+end;;
+[%%expect {|
+module type S1 =
+  sig type t_immediate : immediate type t_immediate64 : immediate64 end
+|}];;
+
+(* immediate *)
+module type S = sig
+  val f_immediate : ('a : immediate). 'a -> 'a -> 'a
+end;;
+[%%expect {|
+module type S = sig val f_immediate : ('a : immediate). 'a -> 'a -> 'a end
+|}];;
+
+module type S = sig
+  val f_immediate : ('a : immediate) -> 'a -> 'a
+end;;
+[%%expect {|
+module type S = sig val f_immediate : ('a : immediate). 'a -> 'a -> 'a end
+|}];;
+
+module type S = sig
+  type ('a : immediate) t
+end;;
+[%%expect {|
+module type S = sig type ('a : immediate) t end
+|}];;
+
+module type S = sig
+  type _ g = | MkG : ('a : immediate). 'a g
+end;;
+[%%expect {|
+module type S = sig type _ g = MkG : ('a : immediate). 'a g end
+|}];;
+
+let f (type a : immediate): a -> a = fun x -> x
+[%%expect {|
+val f : ('a : immediate). 'a -> 'a = <fun>
+|}];;
+
+let f x = (x : (_ : immediate))
+[%%expect {|
+val f : ('a : immediate). 'a -> 'a = <fun>
+|}];;
+
+let f v: ((_ : immediate)[@error_message "Custom message"]) = v
+[%%expect {|
+val f : ('a : immediate). 'a -> 'a = <fun>
+|}];;
+
+(* immediate64 *)
+module type S = sig
+  val f_immediate64 : ('a : immediate64). 'a -> 'a -> 'a
+end;;
+[%%expect {|
+module type S =
+  sig val f_immediate64 : ('a : immediate64). 'a -> 'a -> 'a end
+|}];;
+
+module type S = sig
+  val f_immediate64 : ('a : immediate64) -> 'a -> 'a
+end;;
+[%%expect {|
+module type S =
+  sig val f_immediate64 : ('a : immediate64). 'a -> 'a -> 'a end
+|}];;
+
+module type S = sig
+  type ('a : immediate64) t
+end;;
+[%%expect {|
+module type S = sig type ('a : immediate64) t end
+|}];;
+
+module type S = sig
+  type _ g = | MkG : ('a : immediate64). 'a g
+end;;
+[%%expect {|
+module type S = sig type _ g = MkG : ('a : immediate64). 'a g end
+|}];;
+
+let f (type a : immediate64): a -> a = fun x -> x
+[%%expect {|
+val f : ('a : immediate64). 'a -> 'a = <fun>
+|}];;
+
+let f x = (x : (_ : immediate64))
+[%%expect {|
+val f : ('a : immediate64). 'a -> 'a = <fun>
+|}];;
+
+let f v: ((_ : immediate64)[@error_message "Custom message"]) = v
+[%%expect {|
+val f : ('a : immediate64). 'a -> 'a = <fun>
+|}];;
+
+module type S = sig
+  type t[@@immediate64]
+end
+
+module type K = sig
+  val f : 'a -> (module S with type t = 'a) -> 'a
+end
+
+[%%expect {|
+module type S = sig type t : immediate64 end
+module type K =
+  sig val f : ('a : immediate64). 'a -> (module S with type t = 'a) -> 'a end
+|}];;
+
+(* Annotations here do nothing and should be accepted *)
+module type S = sig
+  val f : (int as (_ : immediate)) -> (int as (_ : immediate64))
+end
+
+[%%expect {|
+module type S = sig val f : int -> int end
+|}];;
+
+
+(* Annotation would affect ['a] and should be rejected *)
+module type S = sig
+  type 'b id = 'b
+  val f : ('a id as (_ : immediate)) -> 'a
+end
+
+[%%expect {|
+module type S = sig type 'b id = 'b val f : ('a : immediate). 'a id -> 'a end
+|}];;
+
+(* Inferring [f] to have an immediate type parameter is enough *)
+module type S = sig
+  type t [@@immediate]
+end
+
+let f (module _ : S with type t = 'a) (x : 'a) = x
+;;
+
+[%%expect{|
+module type S = sig type t : immediate end
+val f : ('a : immediate). (module S with type t = 'a) -> 'a -> 'a = <fun>
+|}]
+
+module type S = sig
+  type t [@@immediate]
+end
+
+let x =
+  ignore (fun (module _ : S with type t = 'a) (_ : 'a) -> 10);
+  15
+;;
+
+[%%expect{|
+module type S = sig type t : immediate end
+val x : int = 15
+|}]
+
+let y =
+  ignore (fun (type a : immediate) (x : a) ->
+    let module _ : S = struct
+      type t = a
+    end in
+    ());
+  4
+;;
+
+[%%expect{|
+val y : int = 4
+|}]
+
+(* Other annotations are not effected by this flag *)
+module type S = sig
+  val f_any : ('a : any). ('a : any) -> (('a : any)[@error_message ""])
+  type ('a : any) t_any : any
+  type (_ : any) t_any_ = MkG : ('a : any). 'a t_any_
+  val f_bits64 : ('a : bits64). ('a : bits64) -> (('a : bits64)[@error_message ""])
+  type ('a : bits64) t_bits64 : bits64
+  type (_ : bits64) t_bits64_ = MkG : ('a : bits64). 'a t_bits64_
+  val f_bits32 : ('a : bits32). ('a : bits32) -> (('a : bits32)[@error_message ""])
+  type ('a : bits32) t_bits32 : bits32
+  type (_ : bits32) t_bits32_ = MkG : ('a : bits32). 'a t_bits32_
+  val f_float64 : ('a : float64). ('a : float64) -> (('a : float64)[@error_message ""])
+  type ('a : float64) t_float64 : float64
+  type (_ : float64) t_float64_ = MkG : ('a : float64). 'a t_float64_
+  val f_word : ('a : word). ('a : word) -> (('a : word)[@error_message ""])
+  type ('a : word) t_word : word
+  type (_ : word) t_word_ = MkG : ('a : word). 'a t_word_
+end
+
+module M = struct
+  let f_any (type a : any) = ()
+  let f_bits64 (type a : bits64) = ()
+  let f_bits32 (type a : bits32) = ()
+  let f_float64 (type a : float64) = ()
+  let f_word (type a : word) = ()
+end
+[%%expect {|
+module type S =
+  sig
+    val f_any : ('a : any). 'a -> 'a
+    type ('a : any) t_any : any
+    type (_ : any) t_any_ = MkG : ('a : any). 'a t_any_
+    val f_bits64 : ('a : bits64). 'a -> 'a
+    type ('a : bits64) t_bits64 : bits64
+    type (_ : bits64) t_bits64_ = MkG : ('a : bits64). 'a t_bits64_
+    val f_bits32 : ('a : bits32). 'a -> 'a
+    type ('a : bits32) t_bits32 : bits32
+    type (_ : bits32) t_bits32_ = MkG : ('a : bits32). 'a t_bits32_
+    val f_float64 : ('a : float64). 'a -> 'a
+    type ('a : float64) t_float64 : float64
+    type (_ : float64) t_float64_ = MkG : ('a : float64). 'a t_float64_
+    val f_word : ('a : word). 'a -> 'a
+    type ('a : word) t_word : word
+    type (_ : word) t_word_ = MkG : ('a : word). 'a t_word_
+  end
+module M :
+  sig
+    val f_any : unit
+    val f_bits64 : unit
+    val f_bits32 : unit
+    val f_float64 : unit
+    val f_word : unit
+  end
+|}];;
+
+(* Externals *)
+
+external f_1 : int -> bool -> int64_u = "foo" "bar";;
+[%%expect{|
+Line 1, characters 30-37:
+1 | external f_1 : int -> bool -> int64_u = "foo" "bar";;
+                                  ^^^^^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits64 for upstream compatibility.
+
+external f_1 : int -> bool -> (int64_u [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_2 : int32_u -> bool -> int = "foo" "bar";;
+[%%expect{|
+Line 1, characters 15-22:
+1 | external f_2 : int32_u -> bool -> int = "foo" "bar";;
+                   ^^^^^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits32 for upstream compatibility.
+
+external f_2 : (int32_u [@unboxed]) -> bool -> int = "foo" "bar"
+|}];;
+
+external f_3 : (float#[@unboxed]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+external f_3 : (float# [@unboxed]) -> bool -> string = "foo" "bar"
+|}];;
+
+external f_4 : string -> (nativeint_u[@unboxed])  = "foo" "bar";;
+[%%expect{|
+external f_4 : string -> (nativeint_u [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_5 : int64 -> int64_u  = "foo" "bar" [@@unboxed];;
+[%%expect{|
+external f_5 : int64 -> int64_u = "foo" "bar" [@@unboxed]
+|}];;
+
+external f_6 : (int32_u[@untagged]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 16-23:
+1 | external f_6 : (int32_u[@untagged]) -> bool -> string  = "foo" "bar";;
+                    ^^^^^^^
+Error: Don't know how to untag this type. Only "int", and
+       other immediate types can be untagged.
+|}];;
+
+external f_7 : string -> (int64_u[@untagged])  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 26-33:
+1 | external f_7 : string -> (int64_u[@untagged])  = "foo" "bar";;
+                              ^^^^^^^
+Error: Don't know how to untag this type. Only "int", and
+       other immediate types can be untagged.
+|}];;
+
+(* Aliases *)
+
+type ('a : any) int64' = int64_u
+type int32' = int32_u
+type float' = float
+type 'a nativeint' = nativeint_u
+type nativeint'' = int nativeint'
+[%%expect{|
+type ('a : any) int64' = int64_u
+type int32' = int32_u
+type float' = float
+type 'a nativeint' = nativeint_u
+type nativeint'' = int nativeint'
+|}]
+
+external f_1 : int -> bool -> int int64' = "foo" "bar";;
+[%%expect{|
+Line 1, characters 30-40:
+1 | external f_1 : int -> bool -> int int64' = "foo" "bar";;
+                                  ^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits64 for upstream compatibility.
+
+external f_1 : int -> bool -> (int int64' [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_2 : int32' -> bool -> int = "foo" "bar";;
+[%%expect{|
+Line 1, characters 15-21:
+1 | external f_2 : int32' -> bool -> int = "foo" "bar";;
+                   ^^^^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout bits32 for upstream compatibility.
+
+external f_2 : (int32' [@unboxed]) -> bool -> int = "foo" "bar"
+|}];;
+
+external f_3 : (float'#[@unboxed]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+external f_3 : (float'# [@unboxed]) -> bool -> string = "foo" "bar"
+|}];;
+
+external f_4 : string -> (nativeint''[@unboxed])  = "foo" "bar";;
+[%%expect{|
+external f_4 : string -> (nativeint'' [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_4b : string -> (int nativeint'[@unboxed])  = "foo" "bar";;
+[%%expect{|
+external f_4b : string -> (int nativeint' [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_5 : int64 -> string int64'  = "foo" "bar" [@@unboxed];;
+[%%expect{|
+external f_5 : int64 -> string int64' = "foo" "bar" [@@unboxed]
+|}];;
+
+external f_5b : int64 -> (string int64' [@unboxed])  = "foo" "bar";;
+[%%expect{|
+external f_5b : int64 -> (string int64' [@unboxed]) = "foo" "bar"
+|}];;
+
+external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 16-22:
+1 | external f_6 : (int32'[@untagged]) -> bool -> string  = "foo" "bar";;
+                    ^^^^^^
+Error: Don't know how to untag this type. Only "int", and
+       other immediate types can be untagged.
+|}];;
+
+external f_7 : string -> (int64_u int64'[@untagged])  = "foo" "bar";;
+[%%expect{|
+Line 1, characters 26-40:
+1 | external f_7 : string -> (int64_u int64'[@untagged])  = "foo" "bar";;
+                              ^^^^^^^^^^^^^^
+Error: Don't know how to untag this type. Only "int", and
+       other immediate types can be untagged.
+|}];;
+
+(* With [@layout_poly] *)
+
+external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity"
+[%%expect{|
+external id : ('a : any). 'a -> 'a = "%identity" [@@layout_poly]
+|}];;
+
+
+external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@unboxed]
+[%%expect{|
+Line 1, characters 40-42:
+1 | external[@layout_poly] id : ('a : any). 'a -> 'a = "%identity" [@@unboxed]
+                                            ^^
+Error: Don't know how to unbox this type.
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
+|}];;
+
+
+external[@layout_poly] id : ('a : any). ('a[@unboxed]) -> 'a = "%identity"
+[%%expect{|
+Line 1, characters 41-43:
+1 | external[@layout_poly] id : ('a : any). ('a[@unboxed]) -> 'a = "%identity"
+                                             ^^
+Error: Don't know how to unbox this type.
+       Only "float", "int8", "int16", "int32", "int64", "nativeint", vector primitives, and
+       the corresponding unboxed types can be marked unboxed.
+|}];;
+
+(* module and abstract types *)
+module M : sig
+  type t : float64
+end = struct
+  type t = float#
+end
+
+external f_1 : M.t -> M.t = "%identity";;
+[%%expect{|
+module M : sig type t : float64 end
+Line 7, characters 15-18:
+7 | external f_1 : M.t -> M.t = "%identity";;
+                   ^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout float64 for upstream compatibility.
+
+Line 7, characters 22-25:
+7 | external f_1 : M.t -> M.t = "%identity";;
+                          ^^^
+Warning 187 [incompatible-with-upstream]: "[@unboxed]" attribute must be added
+  to external declaration
+  argument type with layout float64 for upstream compatibility.
+
+external f_1 : M.t -> M.t = "%identity" [@@unboxed]
+|}];;
+
+external f_2 : M.t -> M.t = "%identity" [@@unboxed];;
+[%%expect{|
+Line 1, characters 15-18:
+1 | external f_2 : M.t -> M.t = "%identity" [@@unboxed];;
+                   ^^^
+Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
+  The only types with non-value layouts allowed are
+  float#, int32_u, int64_u, and nativeint_u. Unknown type with layout
+  float64 encountered.
+
+Line 1, characters 22-25:
+1 | external f_2 : M.t -> M.t = "%identity" [@@unboxed];;
+                          ^^^
+Warning 187 [incompatible-with-upstream]: External declaration here is not upstream compatible.
+  The only types with non-value layouts allowed are
+  float#, int32_u, int64_u, and nativeint_u. Unknown type with layout
+  float64 encountered.
+
+external f_2 : M.t -> M.t = "%identity" [@@unboxed]
+|}];;
+
+module M2 : sig
+  type t = float#
+end = struct
+  type t = float#
+end
+
+external f_3 : M2.t -> M2.t = "%identity" [@@unboxed];;
+[%%expect{|
+module M2 : sig type t = float# end
+external f_3 : M2.t -> M2.t = "%identity" [@@unboxed]
+|}];;
+
+(* should also work with private types *)
+module M3 : sig
+  type t = private float#
+end = struct
+  type t = float#
+end
+
+external f_4 : M3.t -> M3.t = "%identity" [@@unboxed]
+[%%expect{|
+module M3 : sig type t = private float# end
+external f_4 : M3.t -> M3.t = "%identity" [@@unboxed]
+|}];;
+
+(* Disabled warnings. *)
+external[@warning "-187"] f_ok : int -> bool -> int64_u = "foo" "bar";;
+
+[%%expect{|
+external f_ok : int -> bool -> (int64_u [@unboxed]) = "foo" "bar"
+|}]
+
+external f_2_ok : M.t -> M.t = "%identity" [@@unboxed] [@@warning "-187"];;
+
+[%%expect{|
+external f_2_ok : M.t -> M.t = "%identity" [@@unboxed]
+|}]
+
+(* [@unpacked] is not upstream compatible *)
+external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar";;
+[%%expect{|
+Line 1, characters 23-36:
+1 | external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar";;
+                           ^^^^^^^^^^^^^
+Warning 187 [incompatible-with-upstream]: [@unpacked] is not supported by upstream OCaml.
+
+external f_unpacked : (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+|}]
