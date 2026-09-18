@@ -131,3 +131,17 @@ module Unboxable :
   sig val constant : unit -> float val identity : float -> float end @@
   stateless noalloc_strict
 |}]
+
+let (apply @ noalloc_strict) f = f ()
+[%%expect{|
+Line 1, characters 5-37:
+1 | let (apply @ noalloc_strict) f = f ()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Annotation check for zero_alloc strict failed on function TOP10.apply (camlTOP10__apply_8_17_code).
+Backend verification of inferred noalloc_strict mode failed.
+
+Line 1, characters 33-37:
+1 | let (apply @ noalloc_strict) f = f ()
+                                     ^^^^
+Error: called function may allocate (indirect tailcall)
+|}]
