@@ -112,6 +112,12 @@ val find_type: Path.t -> t -> type_declaration
 val find_type_descrs: Path.t -> t -> type_descriptions
 val find_module_lazy: Path.t -> t -> Subst.Lazy.module_declaration
 val find_module: Path.t -> t -> module_declaration
+
+val find_module_mode: Path.t -> t -> Mode.Value.l
+(** The mode of the module at the given path, resolving through module
+    aliases (which carry no modality; their mode is the target's). Returns
+    the max mode if the path cannot be resolved. *)
+
 val find_modtype_lazy: Path.t -> t -> Subst.Lazy.modtype_declaration
 val find_modtype: Path.t -> t -> modtype_declaration
 val find_class: Path.t -> t -> class_declaration
@@ -538,7 +544,8 @@ val filter_non_loaded_persistent : (Ident.t -> bool) -> t -> t
 (* Insertion of all fields of a signature. *)
 
 val add_signature: signature -> t -> t
-val add_signature_lazy: Subst.Lazy.signature_item list -> t -> t
+val add_signature_lazy: ?mode:(Mode.allowed * 'r) Mode.Value.t ->
+  Subst.Lazy.signature_item list -> t -> t
 
 (* Insertion of all fields of a signature, relative to the given path.
    Used to implement open. Returns None if the path refers to a functor,

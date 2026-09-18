@@ -65,6 +65,14 @@ val sig_make_manifest : signature -> signature
            the originals and assume they are defined in the context in which
            this signature appears.  *)
 
+val modality_of_alias_target: Env.t -> Path.t -> Mode.Modality.t
+        (* When a module alias (which carries no modality) is expanded into a
+           real module declaration, recover the modality from the mode of the
+           alias's target, relative to a fresh mode variable standing for the
+           enclosing module. The result is a constant modality, as the
+           expansion appears in module types, which cannot contain inferred
+           modalities. *)
+
 val nondep_supertype: Env.t -> Ident.t list -> module_type -> module_type
         (* Return the smallest supertype of the given type
            in which none of the given idents appears.

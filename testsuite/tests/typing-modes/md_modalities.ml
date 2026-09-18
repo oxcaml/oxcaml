@@ -114,7 +114,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module M : T @@ stateless nonportable
-module type S = sig module M' = M @@ portable end
+module type S = sig module M' = M end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)
@@ -134,10 +134,7 @@ Lines 1-3, characters 15-3:
 2 |   module M' = M
 3 | end
 Error: Signature mismatch:
-       Modules do not match:
-         sig module M' = M @@ stateless nonportable end
-       is not included in
-         S
+       Modules do not match: sig module M' = M end is not included in S
        In module "M'":
        Modules do not match:
          sig val foo : 'a -> 'a end @ nonportable

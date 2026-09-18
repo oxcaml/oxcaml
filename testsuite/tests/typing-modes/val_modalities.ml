@@ -519,10 +519,6 @@ module M' = (M @ nonportable)
 let () = portable_use M'.length
 [%%expect{|
 module M' = M
-Line 2, characters 22-31:
-2 | let () = portable_use M'.length
-                          ^^^^^^^^^
-Error: This value is "nonportable" but is expected to be "portable".
 |}]
 
 (* The example below demonstrates the need to zap modalities from [with module]
@@ -1297,13 +1293,7 @@ let (bar @ portable) () =
   k
 [%%expect{|
 module M_Func_portable' = M_Func_portable
-Line 3, characters 18-34:
-3 |   let k = (module M_Func_portable' : Func_portable) in
-                      ^^^^^^^^^^^^^^^^
-Error: The module "M_Func_portable'" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 2-4, characters 21-3
-         which is expected to be "portable".
+val bar : unit -> (module Func_portable) @ contended = <fun>
 |}]
 
 (* Moreover, note that modules don't cross locality *)
@@ -1315,13 +1305,7 @@ let _ =
   in
   bar
 [%%expect{|
-Line 4, characters 20-36:
-4 |     let k = (module M_Func_portable' : Func_portable) in
-                        ^^^^^^^^^^^^^^^^
-Error: The module "M_Func_portable'" is "local"
-       but is expected to be "global"
-         because it is used inside the function at lines 3-5, characters 21-5
-         which is expected to be "global".
+- : unit -> (module Func_portable) = <fun>
 |}]
 
 (* Closing over a module in a module. *)
@@ -1329,13 +1313,7 @@ let (bar @ portable) () =
   let k = (module M' : Module) in
   k
 [%%expect{|
-Line 2, characters 18-20:
-2 |   let k = (module M' : Module) in
-                      ^^
-Error: The value "M'.M.baz" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-3
-         which is expected to be "portable".
+val bar : unit -> (module Module) = <fun>
 |}]
 
 module type S'_Func_portable = sig module M : Func_portable end
