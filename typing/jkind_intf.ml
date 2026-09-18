@@ -335,6 +335,12 @@ module type Sort = sig
       within {!generalize_with}. *)
   val generalize : current_level:int -> t -> unit
 
+  val update_level : int -> t -> unit
+
+  val get_level : t -> int
+
+  val iter_var : f:(var -> unit) -> t -> unit
+
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
 

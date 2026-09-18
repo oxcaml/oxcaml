@@ -207,7 +207,7 @@ let mark_persistent_in_quotations env =
 let with_local_level_gen ~begin_def ~structure ?before_generalize f =
   begin_def ();
   let level = !current_level in
-  let result, pool =
+  let result, pool, sort_pool =
     with_new_pool ~level:!current_level begin fun () ->
       let result = wrap_end_def f in
       Option.iter (fun g -> g result) before_generalize;
@@ -263,6 +263,17 @@ let with_local_level_gen ~begin_def ~structure ?before_generalize f =
           | _ -> ()
         end
   end pool;
+  List.iter begin fun s ->
+    let open Jkind_types.Sort in
+    (* In contrast to types, which can be generalised implicitly, sort variables
+       need to be explicitly generalized and instantiated in [Typecore].
+       Hence, we lower all non-generic variables. *)
+    iter_var s ~f:(fun v ->
+      let t = of_var v in
+      if get_level t = generic_level then () else
+      update_level !nongen_level t;
+      add_to_sort_pool ~level:(get_level t) t)
+  end sort_pool;
   result
 
 let with_local_level_generalize ~before_generalize f =
@@ -1274,6 +1285,9 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
+    | Tvar { jkind } ->
+      set_level ();
+      Jkind.update_level level jkind
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1312,7 +1326,11 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar _ -> if contra then set_level ty var_level
+      Tvar { jkind } ->
+        if contra then begin
+          set_level ty var_level;
+          Jkind.update_level var_level jkind
+        end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -2186,7 +2204,9 @@ let instance_prim_layout env (desc : Primitive.description) ty =
     match !new_sort with
     | Some sort -> sort
     | None ->
-      let sort = Jkind.Sort.(of_var (new_var ~level:!current_level)) in
+      (* CR-soon jbachurski: Should be [!current_level] once primitives are
+         layout-polymorphic *)
+      let sort = Jkind.Sort.(of_var (new_var ~level:lowest_level)) in
       new_sort := Some sort;
       sort
   in

@@ -14,19 +14,19 @@ let id x =
   let poly_ id x = x in
   id x;;
 [%%expect{|
-val poly_ id : 'a -> 'a = <lpoly>
+val id : 'a -> 'a = <fun>
 |}]
 
 let id =
   let poly_ id x = x in
   id;;
 [%%expect{|
-val poly_ id : 'a -> 'a = <lpoly>
+val id : 'a -> 'a = <fun>
 |}]
 
 let id =
   let poly_ id x = x in
   fun x -> id x;;
 [%%expect{|
-val poly_ id : 'a -> 'a = <lpoly>
+val id : 'a -> 'a = <fun>
 |}]
