@@ -131,7 +131,7 @@ let compile_file ?output ?(opt="") ?stable_name name =
             (List.map (Misc.expand_directory Config.standard_library)
                (List.rev (  !Clflags.hidden_include_dirs
                           @ List.map
-                              (fun (e : Clflags.visible_include) -> e.path)
+                              (fun (e : Clflags.include_dir) -> e.path)
                               !Clflags.include_dirs))))
          (Clflags.std_include_flag "-I")
          (Filename.quote name)

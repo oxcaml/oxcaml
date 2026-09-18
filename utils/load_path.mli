@@ -61,7 +61,7 @@ val no_auto_include : auto_include_callback
 
 val init :
   auto_include:auto_include_callback ->
-  visible:Clflags.visible_include list ->
+  visible:Clflags.include_dir list ->
   hidden:string list -> unit
 (** [init ~visible ~hidden] is the same as
     [reset ();
@@ -78,7 +78,7 @@ val get_path_list : unit -> string list
 (** Return the list of directories passed to [add_dir] so far. *)
 
 type paths =
-  { visible : Clflags.visible_include list;
+  { visible : Clflags.include_dir list;
     hidden : string list }
 
 val get_paths : unit -> paths

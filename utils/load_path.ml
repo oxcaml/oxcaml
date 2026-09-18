@@ -339,7 +339,7 @@ end = struct
   module STbl = Misc.Stdlib.String.Tbl
 
   (* Mappings from basenames to full filenames *)
-  type visible_registry = Clflags.visible_include STbl.t
+  type visible_registry = Clflags.include_dir STbl.t
   type hidden_registry = string STbl.t
 
   let visible_files : visible_registry ref = s_table STbl.create 42
@@ -457,11 +457,11 @@ let get_path_list () =
   Misc.rev_map_end Dir.path !visible_dirs (List.rev_map Dir.path !hidden_dirs)
 
 type paths =
-  { visible : Clflags.visible_include list;
+  { visible : Clflags.include_dir list;
     hidden : string list }
 
 let get_paths () =
-  let visible_dir_to_include dir : Clflags.visible_include =
+  let visible_dir_to_include dir : Clflags.include_dir =
     let cmx_guaranteed =
       match Dir.visibility dir with
       | Hidden _ -> Misc.fatal_error "Load_path.get_paths"
@@ -557,7 +557,7 @@ let init ~auto_include ~visible ~hidden =
   reset ();
   visible_dirs :=
     List.rev_map
-      (fun ({ path; cmx_guaranteed } : Clflags.visible_include) ->
+      (fun ({ path; cmx_guaranteed } : Clflags.include_dir) ->
         Dir.create (Visible { cmx_guaranteed }) path)
       visible;
   hidden_dirs :=

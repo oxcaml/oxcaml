@@ -440,7 +440,7 @@ let process_file_as process_fun def source_file =
   let cwd = if !nocwd then [] else [Filename.current_dir_name] in
   List.iter add_to_load_path !Clflags.hidden_include_dirs;
   List.iter
-    (fun (dir : Clflags.visible_include) -> add_to_load_path dir.path)
+    (fun (dir : Clflags.include_dir) -> add_to_load_path dir.path)
     (!Compenv.last_include_dirs @
      !Clflags.include_dirs @
      !Compenv.first_include_dirs);

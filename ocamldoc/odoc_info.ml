@@ -110,7 +110,7 @@ module Module = Odoc_module
 
 let analyse_files
     ?(merge_options=([] : Odoc_types.merge_option list))
-    ?(include_dirs=([] : Clflags.visible_include list))
+    ?(include_dirs=([] : Clflags.include_dir list))
     ?(hidden_include_dirs=([] : string list))
     ?(labels=false)
     ?(sort_modules=false)

@@ -41,7 +41,7 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
       [!Compenv.last_include_dirs;
        visible;
        List.map
-         (fun path : Clflags.visible_include ->
+         (fun path : Clflags.include_dir ->
             { path; cmx_guaranteed = false })
          (* Config.flexdll_dirs is either [] or ["+flexdll"]: don't include a
             reference to the Standard Library when -nostdlib was specified. *)
@@ -49,7 +49,7 @@ let init_path ?(auto_include=auto_include) ?(dir="") () =
        !Compenv.first_include_dirs]
   in
   let visible =
-    List.map (fun (e : Clflags.visible_include) : Clflags.visible_include ->
+    List.map (fun (e : Clflags.include_dir) : Clflags.include_dir ->
       { path = Misc.expand_directory Config.standard_library e.path;
         cmx_guaranteed = e.cmx_guaranteed })
       visible

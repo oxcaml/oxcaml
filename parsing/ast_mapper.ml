@@ -1152,7 +1152,7 @@ module PpxContext = struct
     let Load_path.{ visible; hidden } = Load_path.get_paths () in
     let visible_load_dir_pairs dirs =
       List.map
-        (fun (e : Clflags.visible_include) -> (e.path, e.cmx_guaranteed))
+        (fun (e : Clflags.include_dir) -> (e.path, e.cmx_guaranteed))
         dirs
     in
     let fields =
@@ -1279,7 +1279,7 @@ module PpxContext = struct
           in
           let visible =
             List.map
-              (fun (path, cmx_guaranteed) : Clflags.visible_include ->
+              (fun (path, cmx_guaranteed) : Clflags.include_dir ->
                  { path; cmx_guaranteed })
               visible
           in

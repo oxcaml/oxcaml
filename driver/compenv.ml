@@ -490,7 +490,7 @@ let read_one_param ppf position name v =
 
   | "I" | "Ix" ->
     let cmx_guaranteed = String.equal name "Ix" in
-    let entry : Clflags.visible_include = { path = v; cmx_guaranteed } in
+    let entry : Clflags.include_dir = { path = v; cmx_guaranteed } in
     begin match position with
     | Before_args -> first_include_dirs := entry :: !first_include_dirs
     | Before_link | Before_compile _ ->

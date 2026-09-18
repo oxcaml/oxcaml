@@ -208,7 +208,7 @@ let print_cmt_infos cmt =
     Array.iter print_spaced_string cmt.cmt_args;
     printf "\nLoad path:\n  Visible:";
     List.iter
-      (fun (dir : Clflags.visible_include) ->
+      (fun (dir : Clflags.include_dir) ->
         if dir.cmx_guaranteed then
           printf " %s(cmx guaranteed)" dir.path
         else

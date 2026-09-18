@@ -33,7 +33,7 @@ let verbose = ref false
 
 let output_file = ref None
 
-let include_dirs : Clflags.visible_include list ref = ref []
+let include_dirs : Clflags.include_dir list ref = ref []
 
 let include_manifests = ref []
 
