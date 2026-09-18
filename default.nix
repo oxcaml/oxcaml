@@ -397,6 +397,7 @@ stdenv.mkDerivation {
 
   preConfigure = ''
     rm -rf _build _install _runtest
+    rm -f duneconf/*.ws duneconf/*.inc
 
     # We don't use autoreconfHook because libtoolize and autoheader are
     # incompatible with ocaml-flambda
