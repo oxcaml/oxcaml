@@ -109,6 +109,12 @@ then this will run all the tests in those three directories.
 
 == Useful environment variables
 
+`RUNPARAM=v=0x400`::
+  Appends the given components to `OCAMLRUNPARAM` in the environment of
+  the compiled test programs that ocamltest runs (the `run` action).
+  The compilers and other tools are unaffected, unlike with
+  `OCAMLRUNPARAM` itself, which reaches every program ocamltest starts.
+
 `KEEP_TEST_DIR_ON_SUCCESS=1`::
   Keeps temporary output files from a test run. This is handy to validate the
   content of temporary output files, run a produced executable by hand, etc.
