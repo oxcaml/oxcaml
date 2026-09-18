@@ -285,7 +285,7 @@ module Array1 = struct
   external is_stack
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ immutable -> bool @@ stateless
-    = "caml_ba_is_stack" [@@noalloc]
+    = "caml_ba_is_stack" [@@noalloc] [@@no_effects]
 
   external change_layout
     : ('a : any) ('b : any) ('c : any).

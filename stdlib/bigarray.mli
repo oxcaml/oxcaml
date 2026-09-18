@@ -711,7 +711,7 @@ module Array1 : sig
   external is_stack
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ immutable -> bool @@ stateless
-    = "caml_ba_is_stack" [@@noalloc]
+    = "caml_ba_is_stack" [@@noalloc] [@@no_effects]
   (** Whether the given Bigarray custom block is stack-allocated, independently of its
       backing storage. Always [false] when stack allocation is disabled, including in
       bytecode. *)
