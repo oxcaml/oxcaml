@@ -225,6 +225,7 @@
            : (consts ()) (non_consts ([0: ?, ?])) (makelocalblock 0 x1 x152))))
    create_local =
      (function {nlocal = 1} param[value<int>]
+       assert_zero_alloc_strict customer_error_message "Backend verification of inferred noalloc_strict mode failed."
        : (consts ())
           (non_consts ([0: *, *, *, *, *, *, *, *, *, *, *, *, *, *]))
        (let
