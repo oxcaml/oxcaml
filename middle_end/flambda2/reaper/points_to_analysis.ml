@@ -356,11 +356,20 @@ module Datalog_schedule = struct
 
   let ( let$$ ) x f = with_priority 1 x f
 
+  (* CR-someday ncourant: For LTO, a single fixpoint is more efficient that the
+     priority-split rules. However, I think neither is optimal: we could try to
+     saturate priority-0 rules first, then perform a single step of priority-1
+     rules, saturate priority-0 again, and so on. *)
   let make_schedule l =
-    Schedule.fixpoint
-      (List.init 2 (fun i ->
-           Schedule.saturate
-             (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
+    if !Clflags.reaper_solve
+    then Schedule.saturate (List.map snd l)
+    else
+      Schedule.fixpoint
+        (List.init 2 (fun i ->
+             Schedule.saturate
+               (List.filter_map
+                  (fun (p, r) -> if i = p then Some r else None)
+                  l)))
 
   let reverse_rules =
     (* Reverse relations, because datalog does not implement a more efficient
