@@ -31,12 +31,18 @@ module Side = struct
 end
 
 type sides =
-  { expected_name : t Nlg.Phrase.segment list;
-    actual_name : t Nlg.Phrase.segment list
+  { expected_name : t Nlg.Phrase.t;
+    actual_name : t Nlg.Phrase.t
   }
 
 let side_name sides side =
   Side.select side ~expected:sides.expected_name ~actual:sides.actual_name
+
+let mode_property (mode : Mode.Reported_mode.t) : t Nlg.Property.t =
+  Nlg.Property.term (Mode_term (Reported_mode mode))
+
+let mode_const_property ax c : t Nlg.Property.t =
+  Nlg.Property.term (Mode_term (Alloc_mode (Mode.Alloc.Atom (ax, c))))
 
 let mode_word (mode : Mode.Reported_mode.t) : t Nlg.Phrase.segment =
   Nlg.term (Mode_term (Reported_mode mode))
@@ -73,7 +79,7 @@ let is_code (t : t) : bool =
   | Mode_term _ | Modality_term _ | Written_modality_term _ -> true
   | Concept_term (Unsafe_mode_crossing | With_bounds) -> false
 
-let words (t : t) : t Nlg.Phrase.segment list =
+let words (t : t) : t Nlg.Phrase.t =
   let name, suffix = display_parts t in
   (if is_code t then Nlg.code name else Nlg.txt name)
   :: (match suffix with None -> [] | Some suffix -> [Nlg.txt suffix])
@@ -128,8 +134,7 @@ type diagnostic =
   }
 
 let realize (fragments : t Nlg.fragment list) =
-  Nlg.naturalize fragments
-  |> Nlg.realize ~term_entry:entry ~term_words:words
+  Nlg.naturalize fragments |> Nlg.realize ~term_entry:entry ~term_words:words
 
 let rendered_children (fragment : t Nlg.fragment) :
     Structured_diagnostic.Block.t =

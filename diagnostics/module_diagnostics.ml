@@ -8,8 +8,8 @@ type term = Diagnostic_term.t
 type fragment = term Nlg.fragment
 
 type sides = Diagnostic_term.sides =
-  { expected_name : Diagnostic_term.t Phrase.segment list;
-    actual_name : Diagnostic_term.t Phrase.segment list
+  { expected_name : Diagnostic_term.t Phrase.t;
+    actual_name : Diagnostic_term.t Phrase.t
   }
 
 type error =
@@ -192,7 +192,7 @@ let crossing_bounds_difference (expected : Mode.Crossing.t)
     ([], [], []) Mode.Value.Axis.all
   |> fun (e, a, d) -> List.rev e, List.rev a, List.rev d
 
-let located loc words =
+let located loc (words : term Phrase.t) : term Phrase.t =
   match loc with None -> words | Some l -> [Nlg.ref_source l words]
 
 let crossing_fragment ~sides (input : crossing_input) : fragment =
@@ -203,8 +203,10 @@ let crossing_fragment ~sides (input : crossing_input) : fragment =
     | Some l, _ | None, Some l -> Some l
     | None, None -> None
   in
-  let subject = Nlg.subject ?span [Phrase.Text "the declarations"] in
-  let header =
+  let subject =
+    Nlg.subject ?span ~number:Plural [Phrase.Text "the declarations"]
+  in
+  let header : term Phrase.t =
     [ Nlg.mention ~case:Subject subject;
       txt " disagree on ";
       Diagnostic_term.concept_word Diagnostic_term.Unsafe_mode_crossing ]
@@ -219,11 +221,12 @@ let crossing_fragment ~sides (input : crossing_input) : fragment =
       in
       let declaring_loc = side_loc declared_on in
       let other_loc = side_loc (Side.other declared_on) in
-      [ reason
+      [ elaborate
           (located declaring_loc
-             (txt "only " :: declaring
-             @ [txt " is marked "; code attribute]));
-        but (located other_loc (other @ [txt " is not"]))
+             (txt "only "
+             :: (Nonempty.to_list declaring
+                @ [txt " is marked "; code attribute])));
+        but (located other_loc (Nonempty.append other [txt " is not"]))
         |> with_children
              [ rule
                  [ code attribute;
@@ -240,17 +243,20 @@ let crossing_fragment ~sides (input : crossing_input) : fragment =
         | axes ->
           let plural = match axes with [_] -> " axis" | _ -> " axes" in
           let crosses = " crosses the " ^ String.concat ", " axes ^ plural in
-          Some (reason (located loc (txt "only " :: name @ [txt crosses])))
+          Some
+            (elaborate
+               (located loc
+                  (txt "only " :: (Nonempty.to_list name @ [txt crosses]))))
       in
       let differing_lines =
         List.map
           (fun (axis, e, a) ->
-            reason
+            elaborate
               (txt ("both cross the " ^ axis ^ " axis, but ")
-               :: located input.expected_loc name_of_expected
-              @ txt " to " :: code e :: txt " and "
-                :: located input.actual_loc name_of_actual
-              @ [txt " to "; code a]))
+              :: (Nonempty.to_list (located input.expected_loc name_of_expected)
+                 @ txt " to " :: code e :: txt " and "
+                   :: Nonempty.to_list (located input.actual_loc name_of_actual)
+                 @ [txt " to "; code a])))
           differing
       in
       let with_lines =
@@ -258,27 +264,27 @@ let crossing_fragment ~sides (input : crossing_input) : fragment =
         then []
         else
           let line ~name ~loc with_ =
-            let words =
-              (txt "the crossing in " :: name)
-              @
-              if String.equal with_ ""
-              then
-                [ txt " has no ";
-                  Diagnostic_term.concept_word Diagnostic_term.With_bounds ]
-              else [txt " includes "; code with_]
+            let words : term Phrase.t =
+              txt "the crossing in "
+              :: (Nonempty.to_list name
+                 @
+                 if String.equal with_ ""
+                 then
+                   [ txt " has no ";
+                     Diagnostic_term.concept_word Diagnostic_term.With_bounds ]
+                 else [txt " includes "; code with_])
             in
-            reason (located loc words)
+            elaborate (located loc words)
           in
-          [ line ~name:sides.expected_name ~loc:input.expected_loc
-              expected_with;
+          [ line ~name:sides.expected_name ~loc:input.expected_loc expected_with;
             line ~name:sides.actual_name ~loc:input.actual_loc actual_with ]
       in
       let explanation_lines =
         List.filter_map Fun.id
           [ axes_line ~name:sides.expected_name ~loc:input.expected_loc
               expected_only;
-            axes_line ~name:sides.actual_name ~loc:input.actual_loc
-              actual_only ]
+            axes_line ~name:sides.actual_name ~loc:input.actual_loc actual_only
+          ]
         @ differing_lines @ with_lines
       in
       let matching_rule =
@@ -289,17 +295,17 @@ let crossing_fragment ~sides (input : crossing_input) : fragment =
       in
       explanation_lines @ [matching_rule]
   in
-  Nlg.state ~subject header |> Nlg.with_children children
+  Nlg.state header |> Nlg.with_children children
 
-let declarations_do_not_match ?(rules = []) ~noun ~name ~expected_loc
-    ~got_loc children : fragment =
+let declarations_do_not_match ?(rules = []) ~noun ~name ~expected_loc ~got_loc
+    children : fragment =
   let span =
     match expected_loc, got_loc with
     | Some loc, _ | None, Some loc -> Some loc
     | None, None -> None
   in
   let subject = Nlg.subject ?span [Phrase.Text noun; Phrase.Code name] in
-  Nlg.state ~subject
+  Nlg.state
     [ Nlg.txt "the declarations of ";
       Nlg.mention ~case:Subject subject;
       Nlg.txt " do not match" ]
@@ -318,8 +324,9 @@ let parameters_do_not_match ~position children : fragment =
 let is_not_included_in ~sides ~(not_included : Side.t) children : fragment =
   let name side = Diagnostic_term.side_name sides side in
   Nlg.state
-    (name not_included
-    @ (Nlg.txt " is not included in " :: name (Side.other not_included)))
+    (Nlg.Nonempty.append (name not_included)
+       (Nlg.txt " is not included in "
+       :: Nlg.Nonempty.to_list (name (Side.other not_included))))
   |> Nlg.with_children children
 
 let same_children (left : fragment) (right : fragment) =
@@ -331,7 +338,7 @@ let frame ~subject predicate children =
   match children with
   | [] -> []
   | children ->
-    [ Nlg.state ~subject (Nlg.mention ~case:Subject subject :: predicate)
+    [ Nlg.state (Nlg.mention ~case:Subject subject :: predicate)
       |> Nlg.with_children children ]
 
 let field_fragments ~sides ~orientation
@@ -367,8 +374,8 @@ let constructor_fragments ~sides ~orientation
     (fun (change : Includecore.variant_change) ->
       match change with
       | Diffing_with_keys.Change
-          (Type { got = cd1, _; expected = cd2, _; reason; _ }) -> begin
-        match (reason : Includecore.constructor_mismatch) with
+          (Type { got = cd1, _; expected = cd2, _; reason; _ }) ->
+        begin match (reason : Includecore.constructor_mismatch) with
         | Includecore.Modality (i, equate) ->
           [ Mode_diagnostics.modality_fragment ~sides
               (equate_modality_input ~orientation
@@ -456,8 +463,8 @@ module Inclusion = struct
     { ctx with orientation = Orientation.reverse ctx.orientation }
 
   let mode_fragments ?expected_declaration (ctx : context) pinpoint error =
-    Mode_diagnostics.mode_error_fragments
-      ~error_loc:ctx.reported_loc ?expected_declaration pinpoint error
+    Mode_diagnostics.mode_error_fragments ~error_loc:ctx.reported_loc
+      ?expected_declaration pinpoint error
 
   let rec fragments_of_all (ctx : context) (all : all) : fragment list =
     match all with
@@ -505,8 +512,8 @@ module Inclusion = struct
          (fun index change ->
            match (change : _ Diffing.change) with
            | Diffing.Keep _ -> []
-           | Diffing.Change (_, _, Mismatch d) -> begin
-             match fragments_of_module_type_diff (reversed ctx) d with
+           | Diffing.Change (_, _, Mismatch d) ->
+             begin match fragments_of_module_type_diff (reversed ctx) d with
              | [] -> []
              | children ->
                [ parameters_do_not_match
@@ -532,8 +539,8 @@ module Inclusion = struct
   and fragments_of_sigitem (ctx : context) id (symptom : sigitem_symptom) =
     match symptom with
     | Core c -> fragments_of_core ctx id c
-    | Module_type_declaration { got; expected; symptom } -> begin
-      match fragments_of_mtd_symptom ctx symptom with
+    | Module_type_declaration { got; expected; symptom } ->
+      begin match fragments_of_mtd_symptom ctx symptom with
       | [] -> []
       | children ->
         let expected_loc, got_loc =
@@ -550,8 +557,8 @@ module Inclusion = struct
               ]
             children ]
       end
-    | Module_type d -> begin
-      match fragments_of_module_type_diff ctx d with
+    | Module_type d ->
+      begin match fragments_of_module_type_diff ctx d with
       | [] -> []
       | children ->
         [ declarations_do_not_match ~noun:"module " ~name:(Ident.name id)
@@ -572,14 +579,13 @@ module Inclusion = struct
     | Not_less_than d -> direction ctx ~not_included:got_not_included d
     | Not_greater_than d ->
       direction (reversed ctx) ~not_included:expected_not_included d
-    | Incomparable { less_than; greater_than } -> begin
-      match
+    | Incomparable { less_than; greater_than } ->
+      begin match
         ( direction ctx ~not_included:got_not_included less_than,
           direction (reversed ctx) ~not_included:expected_not_included
             greater_than )
       with
-      | [first], [second] when same_children first second ->
-        [Nlg.without_text first]
+      | [first], [second] when same_children first second -> Nlg.children first
       | first, second -> first @ second
       end
 
@@ -603,8 +609,8 @@ module Inclusion = struct
       [ Mode_diagnostics.modality_fragment ~sides:ctx.sides
           (modality_input ~orientation:ctx.orientation
              ~subject:(Modality_item (Ident.name id))
-             ~expected_loc:None ~actual_loc:None
-             ~requirement:At_least_as_strong e) ]
+             ~expected_loc:None ~actual_loc:None ~requirement:At_least_as_strong
+             e) ]
     | Type_declarations { got; expected; symptom } -> begin
       let expected_loc, got_loc =
         Orientation.expected_and_actual ctx.orientation
@@ -683,13 +689,11 @@ module Inclusion = struct
 
   let fragments ~sides ~fallback ~reported_loc
       ((i_env, all) : Includemod.explanation) =
-    fragments_of_all
-      (initial ~i_env ~fallback ~sides ~reported_loc) all
+    fragments_of_all (initial ~i_env ~fallback ~sides ~reported_loc) all
 
   let module_type_fragments ~env ~sides ~reported_loc symptom =
     fragments_of_module_type_symptom
-      (initial ~i_env:env ~fallback:reported_loc ~sides
-         ~reported_loc)
+      (initial ~i_env:env ~fallback:reported_loc ~sides ~reported_loc)
       symptom
 end
 
@@ -708,16 +712,15 @@ let diagnose ~reported_loc (error : error) =
           [Nlg.txt " does not match its interface"] )
       | ( _,
           Includemod.Error.(
-            ( In_Signature _ | In_Include_functor_signature _
-            | In_Module_type _ | In_Module_type_substitution _
-            | In_Type_declaration _ | In_Jkind_declaration _
-            | In_Expansion _ )) ) ->
+            ( In_Signature _ | In_Include_functor_signature _ | In_Module_type _
+            | In_Module_type_substitution _ | In_Type_declaration _
+            | In_Jkind_declaration _ | In_Expansion _ )) ) ->
         ( Nlg.subject ~span:reported_loc [Phrase.Text "the module"],
           [Nlg.txt " does not match its signature"] )
     in
     frame ~subject predicate
-      (Inclusion.fragments ~sides:declaration_sides ~fallback:loc
-         ~reported_loc explanation)
+      (Inclusion.fragments ~sides:declaration_sides ~fallback:loc ~reported_loc
+         explanation)
   | Strengthening_mismatch { loc; path = lid; explanation } ->
     let sides =
       { expected_name = [Nlg.txt "the module type"];
@@ -732,8 +735,7 @@ let diagnose ~reported_loc (error : error) =
     in
     frame ~subject
       [Nlg.txt " does not match the module type it strengthens"]
-      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
-         explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc explanation)
   | Applicative_functor_mismatch
       { loc; constrained = lid; type_path = path; explanation } ->
     let sides =
@@ -758,8 +760,7 @@ let diagnose ~reported_loc (error : error) =
           Nlg.txt " constraint" ]
     in
     frame ~subject predicate
-      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
-         explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc explanation)
   | Substitution_mismatch { loc; path = lid; explanation } ->
     let sides =
       { expected_name = [Nlg.txt "the new definition"];
@@ -774,8 +775,7 @@ let diagnose ~reported_loc (error : error) =
     in
     frame ~subject
       [Nlg.txt " does not match its original definition"]
-      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc
-         explanation)
+      (Inclusion.fragments ~sides ~fallback:loc ~reported_loc explanation)
   | Functor_application_mismatch { env; app_name; mty_f; args } -> begin
     let failing =
       List.filter_map
@@ -799,8 +799,7 @@ let diagnose ~reported_loc (error : error) =
         in
         Nlg.subject ~span:reported_loc
           (match argument with
-          | Some argument ->
-            [Phrase.Text "the argument "; Phrase.Code argument]
+          | Some argument -> [Phrase.Text "the argument "; Phrase.Code argument]
           | None -> [Phrase.Text "the argument"])
       in
       let predicate =
@@ -813,8 +812,7 @@ let diagnose ~reported_loc (error : error) =
         in
         match functor_name with
         | Some functor_name ->
-          [ Nlg.txt " does not match the parameter of ";
-            Nlg.code functor_name ]
+          [Nlg.txt " does not match the parameter of "; Nlg.code functor_name]
         | None -> [Nlg.txt " does not match the functor's parameter"]
       in
       let sides =
@@ -825,12 +823,12 @@ let diagnose ~reported_loc (error : error) =
       frame ~subject predicate
         (List.concat_map
            (fun (_, (diff : Includemod.Error.module_type_diff)) ->
-             Inclusion.module_type_fragments ~env ~sides
-               ~reported_loc diff.symptom)
+             Inclusion.module_type_fragments ~env ~sides ~reported_loc
+               diff.symptom)
            failing)
     end
-  | Type_definition_mismatch { loc; type_expr; env; mismatch } -> begin
-    match Types.get_desc type_expr with
+  | Type_definition_mismatch { loc; type_expr; env; mismatch } ->
+    begin match Types.get_desc type_expr with
     | Types.Tconstr (path, _, _) ->
       let name = Path.name path in
       let equated_loc =
@@ -848,7 +846,7 @@ let diagnose ~reported_loc (error : error) =
       in
       let predicate =
         Nlg.txt " does not match the definition of "
-        :: located equated_loc [Nlg.code name]
+        :: Nlg.Nonempty.to_list (located equated_loc [Nlg.code name])
       in
       frame ~subject predicate
         (type_fragments ~sides ~orientation:Orientation.Got_is_actual
