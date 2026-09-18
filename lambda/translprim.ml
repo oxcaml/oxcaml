@@ -235,6 +235,14 @@ let sort_of_native_repr ~poly_sort repr =
      Unboxed_vector _ | Unboxed_mask) ->
     Jkind.Sort.Const.scannable
 
+let extern_result_requires_boxing : Lambda.extern_repr -> bool = function
+  | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
+  | Unboxed_or_untagged_integer
+      (Unboxed_int64 | Unboxed_int32 | Unboxed_nativeint) -> true
+  | Same_as_ocaml_repr _
+  | Unboxed_or_untagged_integer
+      (Untagged_int | Untagged_int8 | Untagged_int16) -> false
+
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =
     List.map
@@ -2873,7 +2881,9 @@ let prim_may_allocate ~arity prim =
   match prim with
   | Primitive (prim, _) -> primitive_may_allocate prim
   | Sys_argv -> primitive_may_allocate (Pccall prim_sys_argv)
-  | External prim -> primitive_may_allocate (Pccall prim)
+  | External prim ->
+      primitive_may_allocate (Pccall prim)
+      || extern_result_requires_boxing (snd prim.prim_native_repr_res)
   | Comparison (comp, knd) ->
       primitive_may_allocate (comparison_primitive comp knd)
   | Raise _ -> false
