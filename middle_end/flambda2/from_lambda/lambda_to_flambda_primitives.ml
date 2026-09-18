@@ -3752,7 +3752,47 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_product _ -> assert false (* contradicts outer match *))
-  | Punbox layout, [[arg]] -> (
+  | Punbox (Punboxed_product layouts), [[arg]] ->
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
+    in
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+    (* CR zeisbach: this will have to change with inherit *)
+    let tag = Or_unknown.Known Tag.Scannable.zero in
+    let size =
+      Or_unknown.Known
+        (Target_ocaml_int.of_int machine_width
+           (Array.length flattened_reordered_shape))
+    in
+    (* CR zeisbach: conservatively [Mutable], as in the non-product case
+       below. *)
+    let mut = Mutability.Mutable in
+    let all_indices =
+      List.concat
+        (List.mapi
+           (fun i _layout ->
+             Mixed_block_shape.lookup_path_producing_new_indexes shape [i])
+           layouts)
+    in
+    List.map
+      (fun index : H.expr_primitive ->
+        let field = Target_ocaml_int.of_int machine_width index in
+        let kind =
+          H.block_access_kind_of_mixed_field_element ~kind_shape ~tag ~size
+            flattened_reordered_shape.(index)
+        in
+        Unary (Block_load { kind; mut; field }, arg))
+      all_indices
+  | ( Punbox
+        (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+         | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask )
+         as layout),
+      [[arg]] ) -> (
     (* CR zeisbach: [Punbox] does not carry a mutability, so the load is
        conservatively [Mutable]. Refine this (as [Pbox] does) so that the
        simplifier can fold [unbox (box x)] for immutable boxes. *)
@@ -3786,12 +3826,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Punboxed_vector v ->
       load_mixed_singleton (flat_suffix_element_of_unboxed_vector v)
     | Punboxed_mask -> load_mixed_singleton Naked_mask
-    | Punboxed_product _ ->
-      (* CR zeisbach: implement this translation! *)
-      Misc.fatal_error "convert_lprim: Punbox: products not yet implemented"
     | Ptop -> Misc.fatal_error "convert_lprim: Punbox: Ptop layout"
     | Pbottom -> Misc.fatal_error "convert_lprim: Punbox: Pbottom layout"
-    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+    | Punboxed_product _ -> assert false (* contradicts outer match *))
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
