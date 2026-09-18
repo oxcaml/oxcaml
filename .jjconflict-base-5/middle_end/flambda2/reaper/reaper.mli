@@ -73,8 +73,8 @@ module Staged : sig
 
   (** Rebuild the traversed unit according to the solution. No typing
       information is used, so the exported types of the rebuilt code are left
-      unknown. Returns the rebuilt unit, its code and the solved slot offsets.
-  *)
+      unknown. Returns the rebuilt unit, its code and the offsets of the slots
+      occurring in it, looked up in the solution. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
@@ -82,7 +82,7 @@ module Staged : sig
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    Flambda_unit.t * Exported_code.t * Slot_offsets.result
+    Flambda_unit.t * Exported_code.t * Exported_offsets.t
 end
 
 val run :
