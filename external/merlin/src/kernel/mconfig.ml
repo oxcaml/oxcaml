@@ -437,7 +437,10 @@ let query_flags =
   ]
 
 let ocaml_ignored_flags =
-  [ "-a";
+  [ "-structured";
+    "-json";
+    "-structured-diagnostics";
+    "-a";
     "-absname";
     "-alias-deps";
     "-annot";

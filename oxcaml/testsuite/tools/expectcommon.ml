@@ -22,7 +22,14 @@ type string_constant =
   ; tag : string
   }
 
-type expectation_filter = Principal | X86_64 | Raw | Simplify | Reaper
+type expectation_filter =
+  | Principal
+  | Structured
+  | StructuredTxt
+  | X86_64
+  | Raw
+  | Simplify
+  | Reaper
 
 type expectation_kind =
   | Expect_toplevel
@@ -62,6 +69,8 @@ type correction =
 
 let filter_of_string = function
   | "Principal" -> Some Principal
+  | "Structured" -> Some Structured
+  | "StructuredTxt" -> Some StructuredTxt
   | "X86_64" -> Some X86_64
   | "Raw" -> Some Raw
   | "Simplify" -> Some Simplify
@@ -70,10 +79,19 @@ let filter_of_string = function
 
 let string_of_filter = function
   | Principal -> "Principal"
+  | Structured -> "Structured"
+  | StructuredTxt -> "StructuredTxt"
   | X86_64 -> "X86_64"
   | Raw -> "Raw"
   | Simplify -> "Simplify"
   | Reaper -> "Reaper"
+
+let is_structured_filter = function
+  | [Structured] | [StructuredTxt] -> true
+  | _ -> false
+
+let structured_filter () =
+  if !Clflags.json then Structured else StructuredTxt
 
 let match_expect_extension (ext : Parsetree.extension) =
   let match_ext_name = function
@@ -154,22 +172,27 @@ let match_expect_extension (ext : Parsetree.extension) =
     in
     let is_arch_filter = function
       | X86_64 -> true
-      | Principal | Raw | Simplify | Reaper -> false
+      | Principal | Structured | StructuredTxt | Raw | Simplify | Reaper ->
+        false
     in
     let is_pass_filter = function
       | Raw | Simplify | Reaper -> true
-      | Principal | X86_64 -> false
+      | Principal | Structured | StructuredTxt | X86_64 -> false
     in
     let validate_expect_toplevel entries =
-      (* Valid formats:
-         - [{|...|}] (one untagged)
-         - [{|...|}, Principal{|...|}] (non-principal + principal)*)
+      let rec valid_filters seen = function
+        | [] -> true
+        | ([(Principal | Structured | StructuredTxt) as filter], _) :: rest ->
+          not (List.mem ~set:seen filter)
+          && valid_filters (filter :: seen) rest
+        | _ -> false
+      in
       match entries with
-      | [([], _)] -> entries
-      | [([], _); ([Principal], _)]-> entries
+      | ([], _) :: rest when valid_filters [] rest -> entries
       | _ ->
         let msg = "expected [%%expect {|...|}] or \
-                   [%%expect {|...|}, Principal{|...|}]"
+                   [%%expect {|...|}, Principal{|...|}, \
+                    Structured{|...|}, StructuredTxt{|...|}]"
         in
         invalid_payload ~msg ()
     in
@@ -328,8 +351,23 @@ let current_arch_filter () =
 (* For [%%expect]:
    - {|...|} alone: used for both principal and non-principal
    - {|...|}, Principal{|...|}: first for non-principal, second for principal
+   - Structured{|...|} and StructuredTxt{|...|}: structured JSON and text
+     diagnostics, alongside the normal output
+   - Combining Principal with Structured or StructuredTxt: not allowed
+
+   With [structured_diagnostics = "true"] in TEST, both structured entries
+   are added for failing phrases and removed for successful phrases.
 *)
 let eval_toplevel_expectation expectation ~output =
+  let is_structured (filters, _) = is_structured_filter filters in
+  let structured =
+    List.filter ~f:is_structured expectation.expected_output
+  in
+  let ordinary =
+    List.filter
+      ~f:(fun entry -> not (is_structured entry))
+      expectation.expected_output
+  in
   let corrected s = { s with str = output } in
   let combine if_not_principal if_principal =
     if if_not_principal.str = if_principal.str
@@ -337,7 +375,7 @@ let eval_toplevel_expectation expectation ~output =
     else [([], if_not_principal); ([Principal], if_principal)]
   in
   let expected_output =
-    match expectation.expected_output, !Clflags.principal with
+    match ordinary, !Clflags.principal with
     | [([], if_not_principal)], false -> [([], corrected if_not_principal)]
     | [([], expected)], true -> combine expected (corrected expected)
     | [([], if_not_principal); ([Principal], if_principal)], false ->
@@ -346,6 +384,7 @@ let eval_toplevel_expectation expectation ~output =
       combine if_not_principal (corrected if_principal)
     | _ -> Misc.fatal_error "impossible: already validated"
   in
+  let expected_output = expected_output @ structured in
   if expected_output = expectation.expected_output
   then None
   else Some { expectation with expected_output }
@@ -368,22 +407,85 @@ let eval_filtered_expectation expectation ~output ~to_update =
       "duplicate architectures in [%%%%expect_asm]"
   | _ -> None
 
-let eval_expectation expectation ~output =
+let update_automatic_structured_expectation expectation ~output ~success =
   match expectation.kind with
-  | Expect_toplevel -> eval_toplevel_expectation expectation ~output
-  | Expect_fexpr ->
-    eval_filtered_expectation expectation ~output
-      ~to_update:expectation.expected_output
-  | Expect_asm _ ->
-    let to_update =
-      List.filter
-        ~f:(fun (f, _) ->
-            match current_arch_filter () with
-            | None -> false
-            | Some arch -> List.mem ~set:f arch)
-        expectation.expected_output
+  | Expect_asm _ | Expect_fexpr -> None
+  | Expect_toplevel ->
+    let filter = structured_filter () in
+    let is_structured (filters, _) = filters = [filter] in
+    let structured =
+      List.filter ~f:is_structured expectation.expected_output
     in
-    eval_filtered_expectation expectation ~output ~to_update
+    if success || String.equal output "" then
+      match structured with
+      | [] -> None
+      | _ ->
+        Some
+          { expectation with
+            expected_output =
+              List.filter
+                ~f:(fun entry -> not (is_structured entry))
+                expectation.expected_output
+          }
+    else
+      match structured with
+      | [] ->
+        let tag =
+          match expectation.expected_output with
+          | [] -> ""
+          | (_, output) :: _ -> output.tag
+        in
+        Some
+          { expectation with
+            expected_output =
+              expectation.expected_output
+              @ [[filter], { str = output; tag }]
+          }
+      | [(filters, expected)] when not (String.equal expected.str output) ->
+        let expected = { expected with str = output } in
+        Some
+          { expectation with
+            expected_output =
+              List.map
+                ~f:(fun (candidate, previous) ->
+                  if candidate = filters then candidate, expected
+                  else candidate, previous)
+                expectation.expected_output
+          }
+      | [_] -> None
+      | _ :: _ :: _ ->
+        Location.raise_errorf
+          ~loc:expectation.payload_loc
+          "duplicate %s fields in [%%%%expect]" (string_of_filter filter)
+
+let eval_expectation expectation ~output ~success
+    ~automatic_structured_diagnostics =
+  if !Clflags.structured_diagnostics && automatic_structured_diagnostics then
+    update_automatic_structured_expectation expectation ~output ~success
+  else
+    match expectation.kind with
+    | Expect_toplevel when !Clflags.structured_diagnostics ->
+      let to_update =
+        List.filter
+          ~f:(fun (filters, _) -> filters = [structured_filter ()])
+          expectation.expected_output
+      in
+      eval_filtered_expectation expectation ~output ~to_update
+    | Expect_toplevel -> eval_toplevel_expectation expectation ~output
+    | (Expect_asm _ | Expect_fexpr) when !Clflags.structured_diagnostics -> None
+    | Expect_asm _ ->
+      let to_update =
+        List.filter
+          ~f:(fun (f, _) ->
+              match current_arch_filter () with
+              | None -> false
+              | Some arch -> List.mem ~set:f arch)
+          expectation.expected_output
+      in
+      eval_filtered_expectation expectation ~output ~to_update
+    | Expect_fexpr ->
+      eval_filtered_expectation expectation ~output
+        ~to_update:expectation.expected_output
 
 let shift_lines delta phrases =
   let position (pos : Lexing.position) =
@@ -414,13 +516,100 @@ let visible_inline_code () =
   let inline_code = { ansi = []; text_open = {|"|}; text_close={|"|} } in
   set_styles { default with inline_code }
 
-let eval_expect_file fname ~file_contents ~execute_phrase =
+let format_structured_diagnostic ppf
+    (diagnostic : Structured_diagnostic.t) =
+  let module Diagnostic = Structured_diagnostic in
+  let rec render_inlines ppf inlines =
+    List.iter inlines ~f:(render_inline ppf)
+  and render_inline ppf (inline : Diagnostic.Inline.t) =
+    match inline with
+    | Text text -> Format.pp_print_string ppf text
+    | Annotated { annotation; content } -> (match annotation with
+      | Code -> Format.fprintf ppf "`%a`" render_inlines content
+      | Source _ -> Format.fprintf ppf "[%a]" render_inlines content
+      | Mention { entity = _; form } ->
+        Format.fprintf ppf "{%s:%a}"
+          (match form with Name -> "" | Pronoun -> "*")
+          render_inlines content
+      | Term _ -> Format.fprintf ppf "%a#" render_inlines content)
+  in
+  let rec inlines_are_empty inlines =
+    List.for_all inlines ~f:(fun (inline : Diagnostic.Inline.t) ->
+      match inline with
+      | Text text -> String.equal text ""
+      | Annotated { annotation = _; content } -> inlines_are_empty content)
+  in
+  let kind_marker (kind : Diagnostic.Kind.t) =
+    match kind with
+    | Explanation -> "-"
+    | Rule -> "- [rule]"
+    | Suggestion -> "- [hint]"
+  in
+  let relation_marker (relation : Diagnostic.Relation.t) =
+    match relation with Claim -> "" | Elaboration -> "~"
+  in
+  let render_list render ppf items =
+    Format.pp_print_list ~pp_sep:Format.pp_print_cut render ppf items
+  in
+  let rec render_block ppf ~relation (block : Diagnostic.Block.t) =
+    if inlines_are_empty block.content then
+      render_children ppf block.children
+    else
+      Format.fprintf ppf "@[<v 2>%s%s %a%a@]" relation
+        (kind_marker block.kind) render_inlines block.content
+        render_nested_children block.children
+  and render_child ppf (relation, block) =
+    render_block ppf ~relation:(relation_marker relation) block
+  and render_children ppf children =
+    render_list render_child ppf children
+  and render_nested_children ppf = function
+    | [] -> ()
+    | children ->
+      Format.pp_print_cut ppf ();
+      render_children ppf children
+  in
+  Format.fprintf ppf "@[<v 0>%a@]"
+    (render_list (render_block ~relation:"")) diagnostic.body
+
+let format_structured_output output =
+  let diagnostics =
+    String.split_on_char ~sep:'\n' output
+    |> List.filter_map ~f:(fun line ->
+      if String.equal line "" || not (Char.equal line.[0] '{') then None
+      else
+      match Structured_diagnostic.of_json line with
+      | Ok diagnostic ->
+        Some
+          (Format.asprintf "%a" format_structured_diagnostic diagnostic
+           |> Misc.replace_substring ~before:".corrected" ~after:""
+           |> Misc.delete_eol_spaces)
+      | Error message ->
+        Misc.fatal_errorf "invalid structured diagnostic JSON: %s" message)
+  in
+  match diagnostics with
+  | [] -> ""
+  | diagnostics -> "\n" ^ String.concat ~sep:"\n" diagnostics ^ "\n"
+
+let has_structured_expectation expectation =
+  match expectation.kind with
+  | Expect_toplevel ->
+    List.exists expectation.expected_output ~f:(fun (filters, _) ->
+      is_structured_filter filters)
+  | Expect_asm _ | Expect_fexpr -> false
+
+let eval_expect_file fname ~file_contents ~execute_phrase
+    ~automatic_structured_diagnostics =
   Warnings.reset_fatal ();
   let chunks, trailing_code =
-    parse_contents ~fname:"" file_contents |> split_chunks
+    parse_contents
+      ~fname:(if !Clflags.structured_diagnostics && !Clflags.json
+              then fname else "")
+      file_contents
+    |> split_chunks
   in
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
+  let saw_error = ref false in
   let () =
     visible_inline_code ();
     Misc.Style.set_tag_handling ppf in
@@ -492,7 +681,7 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         | Raw -> read_dump_file "raw"
         | Simplify -> read_dump_file "simplify"
         | Reaper -> read_dump_file "reaper"
-        | Principal | X86_64 -> "")
+        | Principal | Structured | StructuredTxt | X86_64 -> "")
     |> String.concat ~sep:"\n"
     |> (^) "\n"
   in
@@ -533,6 +722,24 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
               Clflags.keep_asm_file := keep_asm)
             (fun () -> exec_phrases chunk.phrases)
         in
+        let has_toplevel_expectation =
+          List.exists chunk.expectations ~f:(fun expectation ->
+            match expectation.kind with
+            | Expect_toplevel -> true
+            | Expect_asm _ | Expect_fexpr -> false)
+        in
+        if not success && has_toplevel_expectation then saw_error := true;
+        let toplevel_output =
+          if
+            !Clflags.structured_diagnostics && !Clflags.json
+            && (List.exists
+                  chunk.expectations
+                  ~f:has_structured_expectation
+                || automatic_structured_diagnostics && not success)
+          then
+            format_structured_output toplevel_output
+          else toplevel_output
+        in
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
@@ -549,14 +756,17 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
                   fexpr_outputs last_unit filters
                 else toplevel_output
           in
-          eval_expectation expectation ~output)))
+          eval_expectation expectation ~output ~success
+            ~automatic_structured_diagnostics)))
   in
   let trailing_output =
     match trailing_code with
     | None -> ""
     | Some phrases ->
       capture_everything buf ppf
-        ~f:(fun () -> let (_, r, _, _) = exec_phrases phrases in r)
+        ~f:(fun () ->
+          let (_, output, _, _) = exec_phrases phrases in
+          if !Clflags.structured_diagnostics then "" else output)
   in
   let needs_principal =
     Option.is_some trailing_code
@@ -567,7 +777,13 @@ let eval_expect_file fname ~file_contents ~execute_phrase =
         | Expect_toplevel -> true
         | Expect_asm _ | Expect_fexpr -> false))
   in
-  { corrected_expectations; trailing_output }, ~needs_principal
+  let needs_structured =
+    List.exists chunks ~f:(fun chunk ->
+      List.exists chunk.expectations ~f:has_structured_expectation)
+    || automatic_structured_diagnostics && !saw_error
+  in
+  { corrected_expectations; trailing_output }, ~needs_principal,
+  ~needs_structured
 
 let output_slice oc s a b =
   output_string oc (String.sub s ~pos:a ~len:(b - a))
@@ -604,7 +820,8 @@ let write_corrected ~file ~file_contents correction =
   output_corrected oc ~file_contents correction;
   close_out oc
 
-let process_expect_file fname ~execute_phrase =
+let process_expect_file fname ~execute_phrase
+    ~automatic_structured_diagnostics =
   let corrected_fname = fname ^ ".corrected" in
   let file_contents =
     let ic = open_in_bin fname in
@@ -612,11 +829,12 @@ let process_expect_file fname ~execute_phrase =
     | s           -> close_in ic; Misc.normalise_eol s
     | exception e -> close_in ic; raise e
   in
-  let correction, ~needs_principal =
+  let correction, ~needs_principal, ~needs_structured =
     eval_expect_file fname ~file_contents ~execute_phrase
+      ~automatic_structured_diagnostics
   in
   write_corrected ~file:corrected_fname ~file_contents correction;
-  needs_principal
+  needs_principal, needs_structured
 
 let repo_root = ref None
 let keep_original_error_size = ref false
@@ -644,7 +862,8 @@ let read_anonymous_arg ~object_extensions fname =
     Printf.eprintf "expect_test: multiple input source files\n";
     exit 2
 
-let main (module Toplevel : Toplevel) fname =
+let main (module Toplevel : Toplevel) fname
+    ~automatic_structured_diagnostics =
   if not !keep_original_error_size then
     Clflags.error_size := 0;
   Toplevel.override_sys_argv
@@ -676,12 +895,17 @@ let main (module Toplevel : Toplevel) fname =
       exit 2);
   (* We are in interactive mode and should record directive error on stdout *)
   Sys.interactive := true;
-  let needs_principal =
+  let needs_principal, needs_structured =
     process_expect_file fname ~execute_phrase:Toplevel.execute_phrase
+      ~automatic_structured_diagnostics
   in
-  exit (if needs_principal then 3 else 0)
+  if !Clflags.structured_diagnostics then exit 0;
+  exit
+    ((if needs_principal then 3 else 0)
+     + if needs_structured then 4 else 0)
 
 let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
+  let automatic_structured_diagnostics = ref false in
   let args =
     Arg.align
       ( [ "-repo-root", Arg.String (fun s -> repo_root := Some s),
@@ -690,6 +914,19 @@ let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
            one."
         ; "-keep-original-error-size", Arg.Set keep_original_error_size,
           " truncate long error messages as the compiler would"
+        ; "-structured",
+          Arg.Unit Diagnostics.enable_structured_diagnostics,
+          " use structured diagnostics to produce messages"
+        ; "-json", Arg.Unit Diagnostics.enable_json,
+          " report diagnostics as JSON"
+        ; "-structured-diagnostics",
+          Arg.Unit (fun () ->
+            Diagnostics.enable_structured_diagnostics ();
+            Diagnostics.enable_json ()),
+          " alias for -structured -json"
+        ; "-automatic-structured-diagnostics",
+          Arg.Set automatic_structured_diagnostics,
+          " add structured expectations for errors"
         ] @ extra_args
       )
   in
@@ -707,8 +944,15 @@ let run ~read_anonymous_arg ~extra_args ~extra_init toplevel =
   in
   try
     Arg.parse args read_anonymous_arg usage;
+    if !Clflags.structured_diagnostics && !Clflags.principal then begin
+      Printf.eprintf "expect: %s cannot be combined with -principal\n"
+        "-structured";
+      exit 2
+    end;
     match !main_file with
-    | Some fname -> main toplevel fname
+    | Some fname ->
+      main toplevel fname
+        ~automatic_structured_diagnostics:!automatic_structured_diagnostics
     | None ->
       Printf.eprintf "expect: no input file\n";
       exit 2
