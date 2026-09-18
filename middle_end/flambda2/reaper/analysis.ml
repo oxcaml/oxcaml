@@ -307,16 +307,21 @@ let solve_single (problem : _ Traverse.Problem.t) =
   solve0 deps ~analysis_scope:Current_unit ~code_deps ~applications ~free_names
     ~all_sets_of_closures ~final_typing_env ~module_symbol
 
-(* The offsets in [solved] of the given slots. The slots without offsets are
-   skipped. *)
-let offsets_of_slots solved ~function_slots ~value_slots =
+(* The offsets in [solved] of the given slots. If [strict] is false, the slots
+   without offsets are skipped. *)
+let offsets_of_slots ~strict solved ~function_slots ~value_slots =
   let offsets =
     Function_slot.Set.fold
       (fun function_slot offsets ->
         match Exported_offsets.function_slot_offset solved function_slot with
         | Some info ->
           Exported_offsets.add_function_slot_offset offsets function_slot info
-        | None -> offsets)
+        | None ->
+          if strict
+          then
+            Misc.fatal_errorf "Reaper: no solved offset for function slot %a"
+              Function_slot.print function_slot;
+          offsets)
       function_slots Exported_offsets.empty
   in
   Value_slot.Set.fold
@@ -324,7 +329,12 @@ let offsets_of_slots solved ~function_slots ~value_slots =
       match Exported_offsets.value_slot_offset solved value_slot with
       | Some info ->
         Exported_offsets.add_value_slot_offset offsets value_slot info
-      | None -> offsets)
+      | None ->
+        if strict
+        then
+          Misc.fatal_errorf "Reaper: no solved offset for value slot %a"
+            Value_slot.print value_slot;
+        offsets)
     value_slots offsets
 
 (* A whole-program solution is restricted to what the rebuild of each unit
@@ -454,7 +464,8 @@ let restrict_to_units (solution : [`Without_types] Solution.t) problems
             { Slot_offsets.used_value_slots =
                 Value_slot.Set.inter used_value_slots value_slots;
               exported_offsets =
-                offsets_of_slots exported_offsets ~function_slots ~value_slots
+                offsets_of_slots ~strict:false exported_offsets ~function_slots
+                  ~value_slots
             };
           types_rewrite_context = Without_types;
           final_typing_env = Without_types
@@ -636,6 +647,12 @@ let find_code_metadata (solution : _ Solution.t) code_id =
     ~analysis_scope:solution.analysis_scope code_id
 
 let slot_offsets (solution : _ Solution.t) = solution.slot_offsets
+
+let offsets_for_free_names (solution : _ Solution.t) free_names =
+  offsets_of_slots ~strict:true solution.slot_offsets.exported_offsets
+    ~function_slots:
+      (Name_occurrences.all_function_slots_at_normal_mode free_names)
+    ~value_slots:(Name_occurrences.all_value_slots_at_normal_mode free_names)
 
 let rewrite_kind_with_subkind (solution : _ Solution.t) =
   rewrite_kind_with_subkind solution.types_rewrite_context
