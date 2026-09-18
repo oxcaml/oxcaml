@@ -1,6 +1,6 @@
 (* TEST
  modules = "stubs.c";
- flags = "-extension layouts_beta -extension simd_beta";
+ flags = "-extension layouts_alpha -extension simd_beta";
  flambda2;
  native;
 *)
