@@ -66,7 +66,7 @@ module Staged = struct
             all_sets_of_closures = _;
             closure_function_decls
           } =
-      Traverse.run unit
+      Traverse.run ~top_level_return_escapes:false unit
     in
     let slot_offsets_inputs =
       Slot_offsets_analysis.Inputs.create ~free_names ~closure_function_decls
@@ -176,7 +176,7 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
           all_sets_of_closures;
           closure_function_decls
         } =
-    Traverse.run unit
+    Traverse.run ~top_level_return_escapes:true unit
   in
   Cross_unit_calls.link deps ~analysis_scope ~code_deps ~le_monde_exterieur
     code_references;
