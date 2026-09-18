@@ -2881,7 +2881,7 @@ let remove_functor_mode_variables ~zap_scope = function
       zap_mode ~arg:false mres;
       begin match arg_opt with
       | Unit -> ()
-      | Named (_, _, marg) -> zap_mode ~arg:true marg
+      | Named (_, _, _, marg) -> zap_mode ~arg:true marg
       end
   | _ -> ()
 
