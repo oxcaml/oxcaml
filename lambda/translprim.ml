@@ -243,15 +243,24 @@ let extern_result_requires_boxing : Lambda.extern_repr -> bool = function
   | Unboxed_or_untagged_integer
       (Untagged_int | Untagged_int8 | Untagged_int16) -> false
 
-let to_lambda_prim prim ~poly_sort =
+let to_lambda_prim prim ~poly_mode ~poly_sort =
   let native_repr_args =
     List.map
-    (fun (m, r) -> m, extern_repr_of_native_repr ~poly_sort r)
+      (fun (mode, repr) -> mode, extern_repr_of_native_repr ~poly_sort repr)
       prim.prim_native_repr_args
   in
   let native_repr_res =
-    let (m, r) = prim.prim_native_repr_res in
-    m, extern_repr_of_native_repr ~poly_sort r
+    let mode, repr = prim.prim_native_repr_res in
+    let repr = extern_repr_of_native_repr ~poly_sort repr in
+    let mode =
+      match mode with
+      | Prim_poly when extern_result_requires_boxing repr ->
+          if Lambda.is_local_mode
+               (to_locality ~poly:poly_mode prim.prim_native_repr_res)
+          then Prim_local else Prim_global
+      | Prim_global | Prim_local | Prim_poly -> mode
+    in
+    mode, repr
   in
   Primitive.make
     ~name:prim.prim_name
@@ -650,7 +659,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
                            arguments"
           p.prim_name
   in
-  let lambda_prim = to_lambda_prim p ~poly_sort in
+  let lambda_prim = to_lambda_prim p ~poly_mode ~poly_sort in
   let layout =
     (* Extract the result layout of the primitive.  This can be a non-value
        layout even without the use of [@layout_poly]. For example:
