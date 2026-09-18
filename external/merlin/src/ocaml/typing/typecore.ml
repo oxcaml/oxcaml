@@ -896,10 +896,40 @@ tail-call. Returns [expected_mode] and [With_regionality.lr] which are backed by
 the same mode variable. We encode extra position information in the former.
 We need the latter to the both left and right mode
 because of how it will be used. *)
-let mode_argument ~funct ~index ~position_and_mode ~partial_app marg =
+let mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app marg =
+  let marg_as_regionality =
+    let callee : Mode.Hint.pinpoint =
+      match funct.exp_desc with
+      | Texp_ident { lid; _ } ->
+        funct.exp_loc, Ident { category = Value; lid = lid.txt }
+      | _ -> funct.exp_loc, Expression
+    in
+    let label =
+      match (lbl : Types.arg_label) with
+      | Nolabel -> Hint.Unlabelled
+      | Labelled label -> Hint.Labelled label
+      | Optional label -> Hint.Optional label
+      | Position label -> Hint.Position label
+    in
+    let parameter_to_argument : Mode.Hint.parameter_to_argument =
+      { parameter = { label; index_in_callee_arrow_type = index }; callee }
+    in
+    let monadic_hint : _ Mode.Hint.morph =
+      Parameter_to_argument (Monadic, parameter_to_argument)
+    in
+    let comonadic_hint : _ Mode.Hint.morph =
+      Parameter_to_argument (Comonadic, parameter_to_argument)
+    in
+    let { monadic; comonadic } =
+      With_regionality.disallow_left (with_locality_as_regionality marg)
+    in
+    { monadic = With_regionality.Monadic.apply_hint monadic_hint monadic;
+      comonadic = With_regionality.Comonadic.apply_hint comonadic_hint comonadic
+    }
+  in
   let vmode , _ =
     With_regionality.newvar_below
-      (Ctype.get_current_level ()) (with_locality_as_regionality marg)
+      (Ctype.get_current_level ()) marg_as_regionality
   in
   if partial_app then mode_default vmode, vmode
   else match funct.exp_desc, index, position_and_mode.apply_position with
@@ -11262,7 +11292,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
   match arg with
   | Arg (Unknown_arg { sarg; ty_arg_mono; mode_fun; mode_arg; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
+        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+          mode_arg in
       let arg = type_expect env expected_mode sarg (mk_expected ty_arg_mono) in
       (match lbl with
        | Labelled _ | Nolabel -> ()
@@ -11277,7 +11308,8 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app
   | Arg (Known_arg { sarg; ty_arg; ty_arg0;
                      mode_fun; mode_arg; wrapped_in_some; sort_arg }) ->
       let expected_mode, mode_arg =
-        mode_argument ~funct ~index ~position_and_mode ~partial_app mode_arg in
+        mode_argument ~funct ~index ~lbl ~position_and_mode ~partial_app
+          mode_arg in
       let ty_arg', vars = tpoly_get_poly ty_arg in
       let arg, sch =
         if vars = [] then begin
@@ -11373,7 +11405,7 @@ and type_application env app_loc expected_mode position_and_mode
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
       let arg_mode, _ =
-        mode_argument ~funct ~index:0 ~position_and_mode
+        mode_argument ~funct ~index:0 ~lbl:Nolabel ~position_and_mode
           ~partial_app:false arg_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
