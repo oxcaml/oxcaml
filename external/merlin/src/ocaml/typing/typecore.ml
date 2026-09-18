@@ -1471,6 +1471,20 @@ let mode_annots_from_pat pat =
   in
   Typemode.transl_mode_annots modes
 
+let mode_annotation_hint
+    (m : With_locality.Const.Option.t Typemode.modes) =
+  let annotated_modes =
+    List.map
+      (fun { txt = With_locality.Atom (axis, mode); loc } ->
+        let name =
+          Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode
+        in
+        name, Hint.Written_mode { Location.txt = name; loc })
+      m.mode_desc
+  in
+  Hint.Annotation
+    { annotated_modes; contained_by = None }
+
 let apply_mode_annots
     ~loc
     kind
@@ -1486,28 +1500,12 @@ let apply_mode_annots
       ~default:With_locality.Const.max
       m.mode_modes
   in
-  let annot_loc =
-    if List.is_empty m.mode_desc then loc else
-    Location.merge (List.map (fun a -> a.loc) m.mode_desc)
-  in
-  let written_modes =
-    List.map
-      (Location.map (fun (With_locality.Atom (axis, mode)) ->
-         Format_doc.asprintf "%a" (With_locality.Const.print_axis axis) mode))
-      m.mode_desc
-  in
-  let hint = Hint.Annotation { loc = annot_loc; written_modes } in
+  let hint = mode_annotation_hint m in
   let min =
-    With_locality.of_const
-      ~hint_monadic:hint
-      ~hint_comonadic:hint
-      min
+    With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint min
   in
   let max =
-    With_locality.of_const
-      ~hint_monadic:hint
-      ~hint_comonadic:hint
-      max
+    With_locality.of_const ~hint_monadic:hint ~hint_comonadic:hint max
   in
   let pp : Hint.pinpoint = loc, kind in
   With_locality.submode_err pp min mode;
@@ -8583,7 +8581,7 @@ and type_expect_
   | Pexp_constraint (sarg, None, modes) ->
       let modes = Typemode.transl_mode_annots modes in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
       { exp with exp_loc = loc
@@ -8624,7 +8622,7 @@ and type_expect_
         type_constraint env sty mode_with_locality
       in
       let expected_mode =
-        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+        type_expect_mode ~loc ~env ~modes expected_mode
       in
       let ty' = instance ty in
       let error_message_attr_opt =
@@ -12914,38 +12912,22 @@ and type_andops env sarg sands expected_sort expected_ty =
   in
   let_arg, sort_let_arg, List.rev rev_ands
 
-and type_expect_mode
-    ~loc
-    ~env
-    ~(modes : With_locality.Const.Option.t)
-    expected_mode =
-    let min =
-      With_locality.Const.Option.value
-        ~default:With_locality.Const.min
-        modes
+and type_expect_mode ~loc ~env
+    ~(modes : With_locality.Const.Option.t Typemode.modes) expected_mode =
+    let hint = mode_annotation_hint modes in
+    let bound default =
+      With_locality.Const.Option.value ~default modes.mode_modes
       |> Const.with_locality_as_regionality
+      |> With_regionality.of_const ~hint_monadic:hint ~hint_comonadic:hint
     in
+    submode ~loc ~env ~reason:Other
+      (bound With_locality.Const.min) expected_mode;
     let max =
-      With_locality.Const.Option.value
-        ~default:With_locality.Const.max
-        modes
-      |> Const.with_locality_as_regionality
+      With_regionality.disallow_left (bound With_locality.Const.max)
     in
-    submode
-      ~loc
-      ~env
-      ~reason:Other
-      (With_regionality.of_const
-         min)
-      expected_mode;
+    let expected_mode = mode_coerce max expected_mode in
     let expected_mode =
-      mode_coerce
-        (With_regionality.of_const
-           max)
-        expected_mode
-    in
-    let expected_mode =
-      match modes.areality with
+      match modes.mode_modes.areality with
       | Some Local -> mode_strictly_local expected_mode
       | _ -> expected_mode
     in
