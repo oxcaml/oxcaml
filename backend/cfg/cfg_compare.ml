@@ -790,7 +790,8 @@ let compare ~old_cfg ~new_cfg ppf =
   let ppf_m = Format.formatter_of_buffer mismatches in
   begin
     (* We did run [Cfg_simplify] already in both pipelines, but it does not
-       always reach a fixed-point. *)
+       always reach a fixed-point. Doing it one more time seems to be enough in
+       practice. *)
     let old_cfg = Cfg_with_layout.cfg (Cfg_simplify.run old_cfg) in
     let new_cfg = Cfg_with_layout.cfg (Cfg_simplify.run new_cfg) in
     (* Phase 1: structural matching *)

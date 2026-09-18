@@ -51,7 +51,7 @@ module Tail_call_reducer : Reducer = struct
   include Default_reducer
 
   let returns_args_unchanged (block : finished Block.t) : bool =
-    match[@warning "-fragile-match"] Block.terminator block with
+    match Block.terminator block with
     | Continue { continuation = Return; args } ->
       (* Skipping the block must not lose any observable effect; effect-free
          instructions (including debug-info markers) are fine since their

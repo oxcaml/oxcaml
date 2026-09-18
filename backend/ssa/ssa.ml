@@ -67,11 +67,8 @@ open! Int_replace_polymorphic_compare
       [keep_unused_ops] is false, also drops dead [Op]s and replaces
       [Continue (Goto _)] args going to params scheduled for removal with
       [Omitted_since_unused].
-    - [check_value_invariants]: every use is dominated by its definition,
-      [Omitted_since_unused] only feeds block params scheduled for removal, and
-      raise arguments do not smuggle derived pointers into their handler's
-      parameters ([Goto] arguments are checked at [Cursor.finish_block] time
-      instead, see [check_args_fit_params]). *)
+    - [check_value_invariants]: every use is dominated by its definition and
+      [Omitted_since_unused] only feeds block params scheduled for removal. *)
 
 module Block_id = Id_counter.Make ()
 module Instruction_id = Id_counter.Make ()

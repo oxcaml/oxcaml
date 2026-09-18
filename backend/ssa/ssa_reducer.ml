@@ -282,11 +282,11 @@ module Make_run (R : Reducer) = struct
     in
     let op_map :
         (finished, under_construction Value.t array) Instruction.Id.Tbl.t =
-      Instruction.Id.Tbl.create 256
+      Instruction.Id.Tbl.create ((Block.Tbl.stats block_map).num_buckets * 10)
     in
     let block_param_values : under_construction Terminator.arg array Block.Tbl.t
         =
-      Block.Tbl.create 64
+      Block.Tbl.create (Block.Tbl.stats block_map).num_buckets
     in
     (* Step 1: create an output block for each input block. The entry's params
        come from the function ABI and are kept verbatim; other blocks drop the
