@@ -3752,9 +3752,45 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_product _ -> assert false (* contradicts outer match *))
-  | Punbox _layout, [[_arg]] ->
-    (* CR zeisbach: implement this translation! *)
-    Misc.fatal_errorf "implement this!"
+  | Punbox layout, [[arg]] -> (
+    (* CR zeisbach: [Punbox] does not carry a mutability, so the load is
+       conservatively [Mutable]. Refine this (as [Pbox] does) so that the
+       simplifier can fold [unbox (box x)] for immutable boxes. *)
+    let mutability = Mutability.Mutable in
+    (* The box is a singleton tag-0 block; see [Pbox] above. *)
+    let tag = Or_unknown.Known Tag.Scannable.zero in
+    let size = Or_unknown.Known (Target_ocaml_int.of_int machine_width 1) in
+    let field = Target_ocaml_int.of_int machine_width 0 in
+    let load_mixed_singleton elt : H.expr_primitive list =
+      let shape =
+        K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
+      in
+      let kind : P.Block_access_kind.t =
+        Mixed { tag; size; field_kind = Flat_suffix elt; shape }
+      in
+      [Unary (Block_load { kind; mut = mutability; field }, arg)]
+    in
+    (* CR zeisbach: like [Pbox], this assumes that everything is addressable and
+       hence boxed as a singleton tag-0 mixed block. *)
+    match layout with
+    | Pvalue _ ->
+      let kind : P.Block_access_kind.t =
+        Values { tag; size; field_kind = Any_value }
+      in
+      [Unary (Block_load { kind; mut = mutability; field }, arg)]
+    | Punboxed_float f ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_float f)
+    | Punboxed_or_untagged_integer i ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_integer i)
+    | Punboxed_vector v ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_vector v)
+    | Punboxed_mask -> load_mixed_singleton Naked_mask
+    | Punboxed_product _ ->
+      (* CR zeisbach: implement this translation! *)
+      Misc.fatal_error "convert_lprim: Punbox: products not yet implemented"
+    | Ptop -> Misc.fatal_error "convert_lprim: Punbox: Ptop layout"
+    | Pbottom -> Misc.fatal_error "convert_lprim: Punbox: Pbottom layout"
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
