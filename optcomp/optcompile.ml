@@ -50,7 +50,7 @@ module type S = sig
 
   val instantiate : src:string -> args:string list -> string -> unit
 
-  val functorize : Compilation_unit.Name.Set.t -> string -> unit
+  val functorize : Compilation_unit_intf.Set.t -> string -> unit
 
   val package_files :
     ppf_dump:Format.formatter -> Env.t -> string list -> string -> unit
