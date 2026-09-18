@@ -1,1 +1,3 @@
-include Hof_intf.S
+module type S = Hof_intf.S
+
+include S
