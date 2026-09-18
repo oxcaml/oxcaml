@@ -72,10 +72,10 @@ Error: Signature mismatch:
              'a @ [< 'm] ->
              (get:('a @ [< past('n) > 'm] ->
                    ('b @ [> 'q | aliased] -> 'c @ [< 'p]) @ [> past('n) | past('o)]) @ [< past('mm4) & past('mm2) & past('o) & past('mm0)] ->
-              (lo:'b @ [< 'mm1 & 'q & many read_write] ->
-               (hi:'b @ [< past('mm3) & many read_write] ->
+              (lo:'b @ [< 'mm1 & 'q & many uncontended read_write] ->
+               (hi:'b @ [< past('mm3) & many uncontended read_write] ->
                 (pred:('c @ [> 'p | dynamic] -> bool @ 'mm5) @ 'mm6 ->
-                 'b option @ [> 'mm1 | local aliased dynamic]) @ [> close('mm1) | close('q) | close('m) | past('mm3) | past('mm4) | local stateful]) @ [> close('mm1) | close('q) | close('m) | past('mm2) | local stateful]) @ [> close('m) | past('mm0) | local stateful]) @ [> close('m) | stateful]
+                 'b option @ [> 'mm1 | local aliased dynamic]) @ [> close('mm1) | close('q) | close('m) | past('mm3) | past('mm4) | local nonportable stateful]) @ [> close('mm1) | close('q) | close('m) | past('mm2) | local nonportable stateful]) @ [> close('m) | past('mm0) | local stateful]) @ [> close('m) | stateful]
            val find_first_satisfying :
              'a @ [< 'm & 'n & many] ->
              (get:('a @ [> 'n | aliased] ->
@@ -88,15 +88,18 @@ Error: Signature mismatch:
              (pred:('b @ [> 'p | dynamic] -> bool @ 'o) @ [< past('mm2) & past('q)] ->
               (get:('a @ [> 'n | aliased] ->
                     (int @ [> aliased] -> 'b @ [< 'p]) @ 'mm0) @ [< past('mm1)] ->
-               (length:('a @ [> 'm | aliased] -> int @ [< many read_write]) @ [< many] ->
+               (length:('a @ [> 'm | aliased] ->
+                        int @ [< many uncontended read_write]) @ [< many] ->
                 int option @ [> local dynamic]) @ [> close('m) | close('n) | past('mm1) | past('mm2) | local stateful]) @ [> close('m) | close('n) | past('q) | local stateful]) @ [> close('m) | close('n) | stateful]
            val binary_search :
              'a @ [< past('mm0) & 'm & 'n & many] ->
-             (length:('a @ [> 'n | aliased] -> int @ [< many read_write]) @ [< past('mm7) & past('mm3) & past('o) & many > local] ->
+             (length:('a @ [> 'n | aliased] ->
+                      int @ [< many uncontended read_write]) @ [< past('mm7) & past('mm3) & past('o) & many > local] ->
               (get:('a @ [< past('p) > 'm | aliased] ->
                     (int @ [> aliased] -> 'b @ [< 'mm1]) @ [> past('p) | past('q) | past('mm0) | local]) @ [< past('mm6) & past('q) & past('mm2) & many > local] ->
                (compare:('b @ [> 'mm1 | dynamic] ->
-                         'c @ [> 'mm4 | aliased] -> int @ [< many read_write]) @ [< past('mm5) & many > local] ->
+                         'c @ [> 'mm4 | aliased] ->
+                         int @ [< many uncontended read_write]) @ [< past('mm5) & many > local] ->
                 ('c @ [< 'mm4 & many] ->
                  int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | past('mm5) | past('mm6) | past('mm7) | local stateful]) @ [> close('m) | close('n) | past('mm2) | past('mm3) | local stateful]) @ [> close('m) | close('n) | past('o) | local stateful]) @ [> close('m) | close('n) | stateful]
          end
@@ -105,11 +108,13 @@ Error: Signature mismatch:
        Values do not match:
          val binary_search :
            'a @ [< past('mm0) & 'm & 'n & many] ->
-           (length:('a @ [> 'n | aliased] -> int @ [< many read_write]) @ [< past('mm7) & past('mm3) & past('o) & many > local] ->
+           (length:('a @ [> 'n | aliased] ->
+                    int @ [< many uncontended read_write]) @ [< past('mm7) & past('mm3) & past('o) & many > local] ->
             (get:('a @ [< past('p) > 'm | aliased] ->
                   (int @ [> aliased] -> 'b @ [< 'mm1]) @ [> past('p) | past('q) | past('mm0) | local]) @ [< past('mm6) & past('q) & past('mm2) & many > local] ->
              (compare:('b @ [> 'mm1 | dynamic] ->
-                       'c @ [> 'mm4 | aliased] -> int @ [< many read_write]) @ [< past('mm5) & many > local] ->
+                       'c @ [> 'mm4 | aliased] ->
+                       int @ [< many uncontended read_write]) @ [< past('mm5) & many > local] ->
               ('c @ [< 'mm4 & many] -> int option @ [> local aliased dynamic]) @ [> close('m) | close('n) | past('mm5) | past('mm6) | past('mm7) | local stateful]) @ [> close('m) | close('n) | past('mm2) | past('mm3) | local stateful]) @ [> close('m) | close('n) | past('o) | local stateful]) @ [> close('m) | close('n) | stateful]
        is not included in
          val binary_search :
@@ -118,16 +123,16 @@ Error: Signature mismatch:
            get:('t -> int -> 'elt) @ local ->
            compare:('elt -> 'key -> int) @ local -> 'key -> int option
        The type
-         "'a @ [< 'n & 'm & global many read_write] ->
-         length:('a @ [< global many read_write > 'm | aliased] ->
-                 int @ [< many read_write > dynamic]) @ [< many > local] ->
-         get:('a @ [< global many read_write > 'n | aliased] ->
+         "'a @ [< 'n & 'm & global many uncontended forkable unyielding read_write] ->
+         length:('a @ [< global many uncontended forkable unyielding read_write > 'm | aliased] ->
+                 int @ [< many uncontended read_write > dynamic]) @ [< many > local] ->
+         get:('a @ [< global many uncontended forkable unyielding read_write > 'n | aliased] ->
               (int @ [> aliased] ->
-               'b @ [< global many read_write > aliased stateful dynamic]) @ [> local stateful dynamic]) @ [< many > local] ->
-         compare:('b @ [< global many read_write > aliased stateful dynamic] ->
-                  ('c @ [< global many read_write > aliased stateful dynamic] ->
-                   int @ [< many read_write > dynamic]) @ [> local stateful dynamic]) @ [< many > local] ->
-         'c @ [< global many read_write > aliased stateful dynamic] ->
+               'b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
+         compare:('b @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+                  ('c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
+                   int @ [< many uncontended read_write > dynamic]) @ [> local nonportable unforkable yielding stateful dynamic]) @ [< many > local] ->
+         'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
          int option @ [> local aliased dynamic]"
        is not compatible with the type
          "'a ->
@@ -135,7 +140,7 @@ Error: Signature mismatch:
          get:('a -> int -> 'b) @ local ->
          compare:('b -> 'c -> int) @ local -> 'c -> int option"
        Type
-         "'c @ [< global many read_write > aliased stateful dynamic] ->
+         "'c @ [< global many uncontended forkable unyielding read_write > aliased nonportable stateful dynamic] ->
          int option @ [> local aliased dynamic]"
        is not compatible with type "'c -> int option"
        The return mode was expected to be "global" but is "local"

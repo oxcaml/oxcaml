@@ -106,15 +106,19 @@ val local_closure :
 let use_and_return g x = ignore (g x); g
 [%%expect{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'o mod aliased contended immutable & past('n) & global many] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'o mod aliased contended immutable & past('n) & global many] ->
   ('a @ [< 'm] ->
-   ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'o | aliased]) @ [> past('n) | stateful] =
+   ('a @ [> 'm] ->
+    'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'o | aliased]) @ [> past('n) | stateful] =
   <fun>
 |}, Principal{|
 val use_and_return :
-  ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [< 'n & global many] ->
+  ('a @ [> 'm] ->
+   'b @ [< global many uncontended forkable unyielding read_write]) @ [< 'n & global many] ->
   ('a @ [< 'm] ->
-   ('a @ [> 'm] -> 'b @ [< global many read_write]) @ [> 'n | aliased]) @ [> close('n) | stateful] =
+   ('a @ [> 'm] ->
+    'b @ [< global many uncontended forkable unyielding read_write]) @ [> 'n | aliased]) @ [> close('n) | stateful] =
   <fun>
 |}]
 
@@ -139,8 +143,8 @@ type 'a cell = { mutable v : 'a; }
 let store_and_call c g x = c.v <- g; c.v x
 [%%expect{|
 val store_and_call :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global read_write] ->
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many read_write] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) cell @ [< global uncontended read_write] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global many uncontended forkable unyielding read_write] ->
   'a @ [< 'n] -> 'b @ [> 'm | dynamic] = <fun>
 |}]
 
@@ -161,14 +165,15 @@ val unique_closure :
 let unique_cell (c @ unique) x = c.v <- x; c
 [%%expect{|
 val unique_cell :
-  'a cell @ [< 'm & global unique write] ->
-  ('a @ [< global many read_write] ->
-   'a cell @ [> 'm mod many forkable unyielding]) @ [> close('m) mod many | writing] =
+  'a cell @ [< 'm & global unique corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   'a cell @ [> 'm mod many forkable unyielding]) @ [> close('m) mod many | corruptible writing] =
   <fun>
 |}, Principal{|
 val unique_cell :
-  'a cell @ [< 'm & global unique write] ->
-  ('a @ [< global many read_write] -> 'a cell @ [> 'm]) @ [> close('m) | writing] =
+  'a cell @ [< 'm & global unique corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   'a cell @ [> 'm]) @ [> close('m) | corruptible writing] =
   <fun>
 |}]
 
