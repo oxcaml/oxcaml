@@ -793,6 +793,22 @@ let mk_no_reaper_change_calling_conventions f =
        functions%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
+let mk_lto_support f =
+  ( "-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Store data the Reaper's link time optimisation data in the .cmx file, \
+       for use by -reaper-solve and -reaper-rebuild.%s (Flambda2 only)"
+      (format_default Flambda2.Default.lto_support) )
+
+let mk_no_lto_support f =
+  ( "-no-lto-support",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not store the Reaper's link time optimisation data in the .cmx \
+       file.%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.lto_support) )
+
 let mk_flambda2_match_in_match f =
   ( "-flambda2-match-in-match",
     Arg.Unit f,
@@ -1534,6 +1550,8 @@ module type Oxcaml_options = sig
   val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
+  val lto_support : unit -> unit
+  val no_lto_support : unit -> unit
   val flambda2_match_in_match : unit -> unit
   val no_flambda2_match_in_match : unit -> unit
   val simplify_stubs : unit -> unit
@@ -1761,6 +1779,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
+      mk_lto_support F.lto_support;
+      mk_no_lto_support F.no_lto_support;
       mk_flambda2_match_in_match F.flambda2_match_in_match;
       mk_no_flambda2_match_in_match F.no_flambda2_match_in_match;
       mk_simplify_stubs F.simplify_stubs;
@@ -2267,6 +2287,8 @@ module Oxcaml_options_impl = struct
   let no_reaper_change_calling_conventions =
     clear Flambda2.reaper_change_calling_conventions
 
+  let lto_support = set Flambda2.lto_support
+  let no_lto_support = clear Flambda2.lto_support
   let simplify_stubs = set Flambda2.simplify_stubs
   let no_simplify_stubs = clear Flambda2.simplify_stubs
   let stubs_forward_inlining = set' Clflags.stubs_forward_inlining
@@ -2947,6 +2969,7 @@ module Extra_params = struct
     | "reaper-unbox" -> set Flambda2.reaper_unbox
     | "reaper-change-calling-conventions" ->
         set Flambda2.reaper_change_calling_conventions
+    | "lto-support" -> set Flambda2.lto_support
     | "flambda2-simplify-stubs" -> set Flambda2.simplify_stubs
     | "stubs-forward-inlining" -> set' Clflags.stubs_forward_inlining
     | "dissector" -> set' Clflags.dissector
