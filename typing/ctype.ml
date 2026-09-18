@@ -1182,7 +1182,7 @@ let rec check_scope_escape mark env level ty =
         | ty' ->
             check_scope_escape mark env level ty'
         | exception Cannot_expand ->
-            raise_escape_exn (Constructor p)
+            raise_escape_exn (Constructor (Type, p))
         end
     | Tpackage ({pack_path = p} as pack) when level < Path.scope p ->
         let p' = normalize_package_path env p in
@@ -1242,7 +1242,7 @@ let rec update_level env level expand ty =
           link_type ty ty';
           update_level env level expand ty'
         with Cannot_expand ->
-          raise_escape_exn (Constructor p)
+          raise_escape_exn (Constructor (Type, p))
         end
     | Tconstr(p, (_ :: _ as tl), _) ->
         let variance =
@@ -1285,9 +1285,13 @@ let rec update_level env level expand ty =
     | Tfield(lab, _, ty1, _)
       when lab = dummy_method && level < get_scope ty1 ->
         raise_escape_exn Self
-    | Tvar { jkind } ->
-      set_level ();
-      Jkind.update_level level jkind
+    | Tvar { jkind }
+    | Tunivar { jkind } ->
+      begin match Jkind.update_level env level jkind with
+      | Ok () -> ()
+      | Error path -> raise_escape_exn (Constructor (Kind, path))
+      end;
+      set_level ()
     | _ ->
         set_level ();
         (* XXX what about abbreviations in Tconstr ? *)
@@ -1329,7 +1333,9 @@ let rec lower_contravariant env var_level visited contra ty =
       Tvar { jkind } ->
         if contra then begin
           set_level ty var_level;
-          Jkind.update_level var_level jkind
+          match Jkind.update_level env var_level jkind with
+          | Ok () -> ()
+          | Error path -> raise_escape_exn (Constructor (Kind, path))
         end
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
@@ -4397,7 +4403,7 @@ let reify uenv t =
           let path, t = create_fresh_constr level name jkind in
           link_type ty t;
           if level < fresh_constr_scope then
-            raise_for Unify (Escape (escape (Constructor path)))
+            raise_for Unify (Escape (escape (Constructor (Type, path))))
       | Tvariant r ->
           if not (static_row r) then begin
             if is_fixed r then iterator (row_more r) else
@@ -4412,7 +4418,7 @@ let reify uenv t =
                     ~name:(row_name r) ~closed:(row_closed r) in
                 link_type m (newty2 ~level (Tvariant row));
                 if level < fresh_constr_scope then
-                  raise_for Unify (Escape (escape (Constructor path)))
+                  raise_for Unify (Escape (escape (Constructor (Type, path))))
             | _ -> assert false
           end;
           iter_row iterator r
