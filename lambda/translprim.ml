@@ -1339,7 +1339,9 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
       let layout = List.nth (get_arg_layouts ()) 0 in
       (* mutability may get refined by [specialize_primitive] *)
       Primitive(Pbox (layout, Mutable, mode), 1)
-    | "%unbox" -> Primitive(Punbox layout, 1)
+    | "%unbox" ->
+      (* mutability may get refined by [specialize_primitive] *)
+      Primitive(Punbox (layout, Mutable), 1)
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode
@@ -2071,25 +2073,11 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       raise (Error (loc, Element_would_be_reordered_in_record));
     end
   | Primitive (Pbox (layout, _, mode), arity), _ ->
-      let mut =
-        (* CR zeisbach: maybe we should fail if we cannot find this? it seems
-           like continuing to be conservative seems fine? *)
-        match Types.get_desc (Ctype.expand_head_opt env rest_ty) with
-        | Tconstr (p, _, _) -> begin
-            match (Env.find_type p env).type_kind with
-            | Type_record (labels, _, _) ->
-              if List.exists
-                   (fun (lbl : Types.label_declaration) ->
-                      Types.is_mutable lbl.ld_mutable)
-                   labels
-              then Mutable
-              else Immutable
-            | _ -> Immutable
-            | exception Not_found -> Mutable
-          end
-        | _ -> Immutable
-      in
-      Some (Primitive (Pbox (layout, mut, mode), arity))
+      (* the box is the *result* *)
+      Some (Primitive (Pbox (layout, box_type_mut env rest_ty, mode), arity))
+  | Primitive (Punbox (layout, _), arity), [boxed_ty] ->
+      (* the box is the *argument* *)
+      Some (Primitive (Punbox (layout, box_type_mut env boxed_ty), arity))
   | _ -> None
 
 let caml_equal =

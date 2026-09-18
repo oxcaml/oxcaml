@@ -1230,7 +1230,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
       | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
-    | Punbox _layout ->
+    | Punbox (_layout, _mut) ->
       (* CR zeisbach: implement! also, ordering? *)
       Misc.fatal_errorf "implement this!")
 

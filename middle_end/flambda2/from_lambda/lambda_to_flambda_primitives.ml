@@ -3752,7 +3752,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_product _ -> assert false (* contradicts outer match *))
-  | Punbox (Punboxed_product layouts), [[arg]] ->
+  | Punbox (Punboxed_product layouts, mut), [[arg]] ->
     let shape =
       Mixed_block_shape.of_mixed_block_elements
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -3769,9 +3769,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Target_ocaml_int.of_int machine_width
            (Array.length flattened_reordered_shape))
     in
-    (* CR zeisbach: conservatively [Mutable], as in the non-product case
-       below. *)
-    let mut = Mutability.Mutable in
+    let mut = Mutability.from_lambda mut in
     let all_indices =
       List.concat
         (List.mapi
@@ -3789,14 +3787,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Unary (Block_load { kind; mut; field }, arg))
       all_indices
   | ( Punbox
-        (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
-         | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask )
-         as layout),
+        ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+             ) as layout),
+          mut ),
       [[arg]] ) -> (
-    (* CR zeisbach: [Punbox] does not carry a mutability, so the load is
-       conservatively [Mutable]. Refine this (as [Pbox] does) so that the
-       simplifier can fold [unbox (box x)] for immutable boxes. *)
-    let mutability = Mutability.Mutable in
+    let mutability = Mutability.from_lambda mut in
     (* CR zeisbach: this will have to change with [inherit] fields *)
     let tag = Or_unknown.Known Tag.Scannable.zero in
     (* CR zeisbach: products are actually larger... *)

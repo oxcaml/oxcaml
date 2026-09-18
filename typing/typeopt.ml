@@ -446,6 +446,25 @@ let array_type_mut env ty =
   | Some (Tconstr(p, [_], _)) when Path.same p Predef.path_iarray -> Immutable
   | _ -> Mutable
 
+let box_type_mut env ty : Lambda.mutable_flag =
+  match scrape_poly env ty with
+  | Some (Tconstr (p, _, _)) -> begin
+      match (Env.find_type p env).type_kind with
+      | Type_record (labels, _, _) ->
+        if List.exists
+             (fun (lbl : Types.label_declaration) ->
+                Types.is_mutable lbl.ld_mutable)
+             labels
+        then Mutable
+        else Immutable
+      | _ -> Immutable
+      | exception Not_found -> Mutable
+    end
+  (* CR zeisbach: can this even be hit? if so, we need to be conservative;
+     but maybe variables should no longer be floating around by now. *)
+  | Some (Tvar _ | Tunivar _) -> Mutable
+  | _ -> Immutable
+
 let array_kind exp =
   array_type_kind ~elt_ty:None exp.exp_env exp.exp_loc exp.exp_type
 
