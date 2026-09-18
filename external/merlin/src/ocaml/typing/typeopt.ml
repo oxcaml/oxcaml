@@ -1184,6 +1184,20 @@ let assert_mixed_product_support_for_lambda_shape loc kind shape =
     Typedecl.assert_mixed_product_support loc kind
       ~value_prefix_len:(Mixed_product_bytes.value_prefix_len counts)
 
+let rec transl_const_layout (layout : Jkind_types.Layout.Const.t)
+    : unit Lambda.mixed_block_element =
+  match layout with
+  | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
+  | Product layouts ->
+      Product (Array.of_list (List.map transl_const_layout layouts))
+  | Addressable layout -> transl_const_layout layout
+  | Base (base, axes) ->
+      Typedecl.Element_repr.classify_base base axes
+      |> Typedecl.Element_repr.to_shape_element
+      |> Lambda.transl_mixed_product_element
+  | Any _ | Univar _ ->
+      Misc.fatal_error "Typeopt.transl_const_layout: unrepresentable layout"
+
 let transl_instantiated_shape env loc sorts_and_types kind =
   let consts =
     Array.map
@@ -1201,25 +1215,10 @@ let transl_instantiated_shape env loc sorts_and_types kind =
   let shape =
     if all_scannable then `Not_mixed
     else
-      let rec element (layout : Jkind_types.Layout.Const.t)
-          : unit Lambda.mixed_block_element =
-        match layout with
-        | Genvar var -> Splice_variable (Slambdaident.of_sort_var var)
-        | Product layouts ->
-            Product (Array.of_list (List.map element layouts))
-        | Addressable layout -> element layout
-        | Base (base, axes) ->
-            Typedecl.Element_repr.classify_base base axes
-            |> Typedecl.Element_repr.to_shape_element
-            |> Lambda.transl_mixed_product_element
-        | Any _ | Univar _ ->
-            Misc.fatal_error
-              "Typeopt.transl_instantiated_shape: unrepresentable layout"
-      in
       let shape =
         Array.map (fun (_sort, ty) ->
           match Jkind.get_layout env (Ctype.type_jkind env ty) with
-          | Some layout -> element layout
+          | Some layout -> transl_const_layout layout
           | None ->
               Misc.fatal_error
                 "Typeopt.transl_instantiated_shape: missing layout")
