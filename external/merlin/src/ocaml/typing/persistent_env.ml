@@ -533,6 +533,22 @@ let load_import_unrecorded penv intf =
                  the load-path lookup and the read. *)
               None
 
+let current_unit_is_aux name ~allow_args =
+  match Current_unit.get_cu () with
+  | None -> false
+  | Some current ->
+      match CU.to_global_name current with
+      | Some { head; args } ->
+          (args = [] || allow_args)
+          && CUI.equal name (CUI.Found.intf head)
+      | None -> false
+
+let current_unit_is name =
+  current_unit_is_aux name ~allow_args:false
+
+let current_unit_is_instance_of name =
+  current_unit_is_aux name ~allow_args:true
+
 type member =
   | Member_module_alias of Path.t
   | Member_verified
@@ -557,15 +573,47 @@ let import_status penv ~may_load intf =
       in
       Some (imp, is_closed)
 
-let items_of_import imp =
-  match imp.imp_params with
-  | _ :: _ ->
-      (* The signature of a parameterised unit is not meaningful without its
-         arguments substituted. *)
-      []
-  | [] ->
-      let sign, _ = imp.imp_raw_sign.Signature_with_global_bindings.sign in
-      Subst.Lazy.force_signature_once sign
+(* The top-level members a mention can be resolved through, per interface. *)
+type raw_member =
+  | Raw_module_alias of Path.t
+  | Raw_type of Types.type_declaration
+
+type verify_status =
+  | Verifying
+  | Verified of bool
+
+type mention_state = {
+  members : (string, raw_member) Hashtbl.t CUI.Tbl.t;
+  verified : (CUI.t * string, verify_status) Hashtbl.t;
+}
+
+let fresh_mention_state () =
+  { members = CUI.Tbl.create 8; verified = Hashtbl.create 8 }
+
+let member_index state intf imp =
+  match CUI.Tbl.find state.members intf with
+  | tbl -> tbl
+  | exception Not_found ->
+      let tbl = Hashtbl.create 16 in
+      begin match imp.imp_params with
+      | _ :: _ ->
+          (* The signature of a parameterised unit is not meaningful without
+             its arguments substituted. *)
+          ()
+      | [] ->
+          let sign, _ = imp.imp_raw_sign.Signature_with_global_bindings.sign in
+          List.iter
+            (fun (item : Subst.Lazy.signature_item) ->
+               match item with
+               | Sig_module (id, _, { md_type = Mty_alias p; _ }, _, _) ->
+                   Hashtbl.replace tbl (Ident.name id) (Raw_module_alias p)
+               | Sig_type (id, decl, _, _) ->
+                   Hashtbl.replace tbl (Ident.name id) (Raw_type decl)
+               | _ -> ())
+            (Subst.Lazy.force_signature_once sign)
+      end;
+      CUI.Tbl.add state.members intf tbl;
+      tbl
 
 (* Verification that everything reachable from a top-level type member of a
    non-closed interface can be resolved by a consumer of that interface
@@ -575,30 +623,46 @@ let items_of_import imp =
    global units through idents that carry an attached cmi path - which they do
    when the interface's compilation loaded the unit, even under [-w -49] -
    provided their cmis are closed or, recursively, the reference is to such a
-   verifiable member. *)
-let rec verify_member penv ~may_load ~depth items name =
-  depth > 0
-  && List.exists
-       (fun (item : Subst.Lazy.signature_item) ->
-          match item with
-          | Sig_type (id, decl, _, _) when String.equal (Ident.name id) name ->
-              verify_type_decl penv ~may_load ~depth ~items decl
-          | _ -> false)
-       items
+   verifiable member.
 
-and verify_type_decl penv ~may_load ~depth ~items
+   Results are memoized in [state], and a member whose verification is already
+   in progress is taken to be closed: mutually recursive declarations (say, an
+   AST) form reference cycles, and a cycle all of whose escapes are verified
+   is itself closed. Without the memoization the re-verification of such
+   declarations, one per reference, is exponential. *)
+let rec verify_member penv ~may_load ~state ~depth members intf name =
+  depth > 0
+  && (match Hashtbl.find members name with
+      | exception Not_found -> false
+      | Raw_module_alias _ -> false
+      | Raw_type decl ->
+          let key = (intf, name) in
+          match Hashtbl.find state.verified key with
+          | Verifying -> true
+          | Verified ok -> ok
+          | exception Not_found ->
+              Hashtbl.add state.verified key Verifying;
+              let ok =
+                verify_type_decl penv ~may_load ~state ~depth ~members ~intf
+                  decl
+              in
+              Hashtbl.replace state.verified key (Verified ok);
+              ok)
+
+and verify_type_decl penv ~may_load ~state ~depth ~members ~intf
       (decl : Types.type_declaration) =
   let ok = ref true in
   Types.with_type_mark (fun mark ->
     let super = Btype.type_iterators mark in
     let it_path p =
-      if not (verify_path penv ~may_load ~depth ~items p) then ok := false
+      if not (verify_path penv ~may_load ~state ~depth ~members ~intf p) then
+        ok := false
     in
     let it = { super with Btype.it_path } in
     it.Btype.it_type_declaration it decl);
   !ok
 
-and verify_path penv ~may_load ~depth ~items p =
+and verify_path penv ~may_load ~state ~depth ~members ~intf p =
   let rec split acc : Path.t -> _ = function
     | Path.Pident id -> Some (id, acc)
     | Path.Pdot (p, l) -> split (l :: acc) p
@@ -612,8 +676,9 @@ and verify_path penv ~may_load ~depth ~items p =
           (* A reference to another top-level member of the same interface,
              which the consumer resolves without leaving it. *)
           match labels with
-          | [] -> verify_member penv ~may_load ~depth:(depth - 1) items
-                    (Ident.name id)
+          | [] ->
+              verify_member penv ~may_load ~state ~depth:(depth - 1) members
+                intf (Ident.name id)
           | _ :: _ -> false
         end
       | Some gname ->
@@ -622,6 +687,7 @@ and verify_path penv ~may_load ~depth ~items p =
           | [] ->
               let intf = CUI.Found.intf gname.head in
               CUI.equal intf CUI.predef_exn
+              || current_unit_is intf
               || (* The consumer follows the attached path. *)
                  (match CUI.Found.cmi_path gname.head with
                   | None -> false
@@ -632,33 +698,31 @@ and verify_path penv ~may_load ~depth ~items p =
                       | Some (imp, false) ->
                           match labels with
                           | [label] ->
-                              verify_member penv ~may_load ~depth:(depth - 1)
-                                (items_of_import imp) label
+                              verify_member penv ~may_load ~state
+                                ~depth:(depth - 1)
+                                (member_index state intf imp) intf label
                           | _ -> false)
 
-let member_module_alias name (item : Subst.Lazy.signature_item) =
-  match item with
-  | Sig_module (id, _, { md_type = Mty_alias p; _ }, _, _)
-    when String.equal (Ident.name id) name -> Some p
-  | _ -> None
-
-let mention_head penv ~may_load intf =
+let mention_head penv ~may_load ~state intf =
   match import_status penv ~may_load intf with
   | None -> Head_unavailable
   | Some (imp, true) -> Head_closed imp.imp_filename
   | Some (imp, false) ->
-      let items = items_of_import imp in
+      let members = member_index state intf imp in
       let member name =
-        match List.find_map (member_module_alias name) items with
-        | Some p -> Some (Member_module_alias p)
-        | None ->
-            if verify_member penv ~may_load ~depth:20 items name
+        match Hashtbl.find members name with
+        | exception Not_found -> None
+        | Raw_module_alias p -> Some (Member_module_alias p)
+        | Raw_type _ ->
+            if verify_member penv ~may_load ~state ~depth:100 members intf name
             then Some Member_verified
             else None
       in
       Head_open (imp.imp_filename, member)
 
 let add_weak_import penv intf = add_import penv intf
+
+let is_current_unit intf = current_unit_is intf
 
 let remember_global { globals; _ } global ~precision ~mentioned_by =
   let global_name = Global_module.to_name global in
@@ -722,22 +786,6 @@ let rec approximate_global_by_name penv global_name =
   let global = Global_module.create_exn head visible_args ~hidden_args in
   remember_global penv global ~precision:Approximate ~mentioned_by:Current;
   global
-
-let current_unit_is_aux name ~allow_args =
-  match Current_unit.get_cu () with
-  | None -> false
-  | Some current ->
-      match CU.to_global_name current with
-      | Some { head; args } ->
-          (args = [] || allow_args)
-          && CUI.equal name (CUI.Found.intf head)
-      | None -> false
-
-let current_unit_is name =
-  current_unit_is_aux name ~allow_args:false
-
-let current_unit_is_instance_of name =
-  current_unit_is_aux name ~allow_args:true
 
 (* Enforce the subset rule: we can only refer to a module if that module's
    parameters are also our parameters. This assumes that all of the arguments in

@@ -212,7 +212,19 @@ type mention_head =
   | Head_unavailable
     (* The cmi is not loaded, and [may_load] was false or loading failed. *)
 
-val mention_head : 'a t -> may_load:bool -> CUI.t -> mention_head
+(* Caches carried across the mentions of one signature being saved: member
+   verification results (including in-progress ones, to handle reference
+   cycles among mutually recursive declarations) and per-interface member
+   indexes. *)
+type mention_state
+
+val fresh_mention_state : unit -> mention_state
+
+val mention_head :
+  'a t -> may_load:bool -> state:mention_state -> CUI.t -> mention_head
+
+(* Whether [intf] is the interface of the unit being compiled. *)
+val is_current_unit : CUI.t -> bool
 
 (* Record [intf] as an import of the current unit without loading it or
    recording a crc, like an alias reference does: used for the target of a

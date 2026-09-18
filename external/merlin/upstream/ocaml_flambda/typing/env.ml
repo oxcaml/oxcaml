@@ -3359,6 +3359,7 @@ let persistent_structures_of_dir dir =
 let normalize_mentions_for_save sg =
   let penv = !persistent_env in
   let may_load = Warnings.is_active (Warnings.No_cmi_file ("", None)) in
+  let state = Persistent_env.fresh_mention_state () in
   let closed = ref true in
   let subst = ref (Subst.identity : Subst.t) in
   let processed = ref Path.Set.empty in
@@ -3391,9 +3392,13 @@ let normalize_mentions_for_save sg =
       subst := Subst.add_same_module_path key value !subst
     in
     let intf = CUI.Found.intf head.Global_module.Name.head in
-    if CUI.equal intf CUI.predef_exn then ()
+    if CUI.equal intf CUI.predef_exn
+       (* The unit being compiled: consumers of its cmi have the cmi in hand,
+          so a self-mention needs no path attached. A facade may alias it. *)
+       || Persistent_env.is_current_unit intf
+    then ()
     else
-      match Persistent_env.mention_head penv ~may_load intf with
+      match Persistent_env.mention_head penv ~may_load ~state intf with
       | Persistent_env.Head_unavailable -> closed := false
       | Persistent_env.Head_closed filename ->
           register filename;
