@@ -17,11 +17,32 @@ module For_lto : sig
   (** A unit's inputs to the solve. *)
   module Solve_inputs : sig
     type t
+
+    (** Throw away the information the whole-program solve does not need: the
+        result types of the code metadata and the sets of closures, which only
+        the single-unit Reaper's type rewriting uses. *)
+    val prune_for_lto : t -> t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    (** Fields are hashconsed, so for serialisation the [Field.view] of each one
+        needs serialising separately. *)
+    val fields_for_export : t -> Field.Set.t
+
+    (** The units mentioned by the delayed dependencies. *)
+    val referenced_compilation_units : t -> Compilation_unit.Set.t
+
+    val apply_renaming :
+      t -> Renaming.t -> rename_field:(Field.t -> Field.t) -> t
   end
 
   (** The data needed to rebuild a traversed unit. *)
   module Rebuild_inputs : sig
     type t
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    val apply_renaming : t -> Renaming.t -> t
   end
 
   (** The decisions computed by the solve. *)
@@ -42,7 +63,7 @@ module For_lto : sig
 
   (** Rebuild a single unit with the decisions coming from the solution. *)
   val rebuild :
-    unit:Flambda_unit.t ->
+    unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
     solution:Solution.t ->
     machine_width:Target_system.Machine_width.t ->

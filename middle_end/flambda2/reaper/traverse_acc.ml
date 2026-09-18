@@ -109,6 +109,19 @@ module Applications = struct
 
   let union a b =
     Code_id_or_name.Map.union (fun _ a b -> Some (union_bounds a b)) a b
+
+  let ids_for_export t =
+    Code_id_or_name.Map.fold
+      (fun id _bounds ids -> Ids_for_export.add_code_id_or_name ids id)
+      t Ids_for_export.empty
+
+  let apply_renaming t renaming =
+    Code_id_or_name.Map.fold
+      (fun id bounds t ->
+        Code_id_or_name.Map.add
+          (Renaming.apply_code_id_or_name renaming id)
+          bounds t)
+      t Code_id_or_name.Map.empty
 end
 
 type t =
@@ -661,3 +674,134 @@ let sort_code_ids t =
     r
 
 let get_all_sets_of_closures t = t.all_sets_of_closures
+
+let fold_delayed_deps_ids { apply_deps; set_of_closures_deps; imported_symbols }
+    ~init ~f =
+  let acc =
+    List.fold_left
+      (fun acc
+           { function_containing_apply_expr;
+             apply_code_id;
+             apply_closure;
+             apply_call_witness
+           } ->
+        let acc =
+          f (f acc apply_call_witness) (Code_id_or_name.code_id apply_code_id)
+        in
+        let acc = Option.fold ~none:acc ~some:(f acc) apply_closure in
+        Option.fold ~none:acc
+          ~some:(fun code_id -> f acc (Code_id_or_name.code_id code_id))
+          function_containing_apply_expr)
+      init apply_deps
+  in
+  let acc =
+    List.fold_left
+      (fun acc
+           { let_bound_name_of_the_closure;
+             closure_code_id;
+             only_full_applications = _
+           } ->
+        f
+          (f acc (Code_id_or_name.name let_bound_name_of_the_closure))
+          (Code_id_or_name.code_id closure_code_id))
+      acc set_of_closures_deps
+  in
+  Symbol.Set.fold
+    (fun symbol acc -> f acc (Code_id_or_name.symbol symbol))
+    imported_symbols acc
+
+let ids_for_export_delayed_deps delayed_deps =
+  fold_delayed_deps_ids delayed_deps ~init:Ids_for_export.empty
+    ~f:Ids_for_export.add_code_id_or_name
+
+let delayed_deps_compilation_units delayed_deps =
+  fold_delayed_deps_ids delayed_deps ~init:Compilation_unit.Set.empty
+    ~f:(fun units id ->
+      Compilation_unit.Set.add (Code_id_or_name.compilation_unit id) units)
+
+let apply_renaming_delayed_deps
+    { apply_deps; set_of_closures_deps; imported_symbols } renaming =
+  { apply_deps =
+      List.map
+        (fun { function_containing_apply_expr;
+               apply_code_id;
+               apply_closure;
+               apply_call_witness
+             } ->
+          { function_containing_apply_expr =
+              Option.map
+                (Renaming.apply_code_id renaming)
+                function_containing_apply_expr;
+            apply_code_id = Renaming.apply_code_id renaming apply_code_id;
+            apply_closure =
+              Option.map (Renaming.apply_code_id_or_name renaming) apply_closure;
+            apply_call_witness =
+              Renaming.apply_code_id_or_name renaming apply_call_witness
+          })
+        apply_deps;
+    set_of_closures_deps =
+      List.map
+        (fun { let_bound_name_of_the_closure;
+               closure_code_id;
+               only_full_applications
+             } ->
+          { let_bound_name_of_the_closure =
+              Renaming.apply_name renaming let_bound_name_of_the_closure;
+            closure_code_id = Renaming.apply_code_id renaming closure_code_id;
+            only_full_applications
+          })
+        set_of_closures_deps;
+    imported_symbols = Renaming.apply_symbol_set renaming imported_symbols
+  }
+
+let ids_for_export_continuation_info { is_exn_handler = _; params; arity = _ } =
+  Ids_for_export.create ~variables:(Variable.Set.of_list params) ()
+
+let ids_for_export_code_dep
+    { code_metadata;
+      params;
+      my_closure;
+      return;
+      exn;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } =
+  let variables =
+    Variable.Set.of_list (List.concat [params; return; [my_closure; exn]])
+  in
+  let ids = Ids_for_export.create ~variables () in
+  let ids =
+    Ids_for_export.union ids (Code_metadata.ids_for_export code_metadata)
+  in
+  let ids = Ids_for_export.add_code_id_or_name ids known_arity_call_witness in
+  List.fold_left Ids_for_export.add_code_id_or_name ids
+    unknown_arity_call_witnesses
+
+let apply_renaming_continuation_info { is_exn_handler; params; arity } renaming
+    =
+  { is_exn_handler;
+    params = List.map (Renaming.apply_variable renaming) params;
+    arity
+  }
+
+let apply_renaming_code_dep
+    { code_metadata;
+      params;
+      my_closure;
+      return;
+      exn;
+      known_arity_call_witness;
+      unknown_arity_call_witnesses
+    } renaming =
+  { code_metadata = Code_metadata.apply_renaming code_metadata renaming;
+    params = List.map (Renaming.apply_variable renaming) params;
+    my_closure = Renaming.apply_variable renaming my_closure;
+    return = List.map (Renaming.apply_variable renaming) return;
+    exn = Renaming.apply_variable renaming exn;
+    known_arity_call_witness =
+      Renaming.apply_code_id_or_name renaming known_arity_call_witness;
+    unknown_arity_call_witnesses =
+      List.map
+        (Renaming.apply_code_id_or_name renaming)
+        unknown_arity_call_witnesses
+  }

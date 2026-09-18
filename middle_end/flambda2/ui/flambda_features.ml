@@ -31,6 +31,9 @@ type 'a mode =
 
 type any_mode = Mode : _ mode -> any_mode
 
+let support_lto () =
+  !Oxcaml_flags.Flambda2.support_lto |> with_default ~f:(fun d -> d.support_lto)
+
 let classic_mode () =
   !Oxcaml_flags.Flambda2.classic_mode
   |> with_default ~f:(fun d -> d.classic_mode)
