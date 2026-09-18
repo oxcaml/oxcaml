@@ -276,18 +276,11 @@ module Make_run (R : Reducer) = struct
     let out_graph =
       Ssa.create_graph (Ssa.function_info in_graph) ~keep_unused_ops
     in
+    let in_graph_size = Ssa.blocks in_graph |> List.length in
     (* Map each input block to its output counterpart. *)
-    let block_map : under_construction Block.t Block.Tbl.t =
-      Block.Tbl.create (2 * (Ssa.blocks in_graph |> List.length))
-    in
-    let op_map :
-        (finished, under_construction Value.t array) Instruction.Id.Tbl.t =
-      Instruction.Id.Tbl.create ((Block.Tbl.stats block_map).num_buckets * 10)
-    in
-    let block_param_values : under_construction Terminator.arg array Block.Tbl.t
-        =
-      Block.Tbl.create (Block.Tbl.stats block_map).num_buckets
-    in
+    let block_map = Block.Tbl.create (2 * in_graph_size) in
+    let op_map = Instruction.Id.Tbl.create (20 * in_graph_size) in
+    let block_param_values = Block.Tbl.create (2 * in_graph_size) in
     (* Step 1: create an output block for each input block. The entry's params
        come from the function ABI and are kept verbatim; other blocks drop the
        params [Ssa] scheduled for removal (unused, and droppable given their
