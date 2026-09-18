@@ -1,0 +1,9 @@
+# @configure_input@
+
+version = "@VERSION@"
+description = "Runtime support for quotation evaluation"
+# Archives are in the stdlib dir; "+" avoids duplicate auto-link paths.
+directory = "+"
+requires = "ocaml-jit"
+archive(native) = "eval.cmxa"
+plugin(native) = "eval.cmxs"

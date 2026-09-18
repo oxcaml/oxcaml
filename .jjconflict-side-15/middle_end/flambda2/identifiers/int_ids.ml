@@ -1,0 +1,1094 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2013--2020 OCamlPro SAS                                    *)
+(*   Copyright 2014--2020 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+let hash_seed =
+  let seed = Random.bits () in
+  if seed mod 2 = 0 then seed + 1 else seed
+
+(* Fast integer hashing algorithm for sdolan. With the stdlib Hashtbl
+   implementation it's ok that this returns > 30 bits. *)
+let hash2 a b =
+  let a = Hashtbl.hash a in
+  let b = Hashtbl.hash b in
+  let r = (a * hash_seed) + b in
+  r lxor (r lsr 17)
+
+module Id = Table_by_int_id.Id
+
+let var_flags = 0
+
+let symbol_flags = 1
+
+let const_flags = 2
+
+let simple_flags = 3
+
+let code_id_flags = 4
+
+module Const_data = struct
+  type t =
+    | Naked_immediate of Target_ocaml_int.t
+    | Tagged_immediate of Target_ocaml_int.t
+    | Naked_float32 of Numeric_types.Float32_by_bit_pattern.t
+    | Naked_float of Numeric_types.Float_by_bit_pattern.t
+    | Naked_int8 of Numeric_types.Int8.t
+    | Naked_int16 of Numeric_types.Int16.t
+    | Naked_int32 of Int32.t
+    | Naked_int64 of Int64.t
+    | Naked_nativeint of Targetint_32_64.t
+    | Naked_vec128 of Vector_types.Vec128.Bit_pattern.t
+    | Naked_vec256 of Vector_types.Vec256.Bit_pattern.t
+    | Naked_vec512 of Vector_types.Vec512.Bit_pattern.t
+    | Naked_mask of Vector_types.Mask.Bit_pattern.t
+    | Null
+    | Poison of Flambda_kind.t * string
+
+  let flags = const_flags
+
+  include Container_types.Make (struct
+    type nonrec t = t
+
+    let [@ocamlformat "disable"] print ppf (t : t) =
+      match t with
+      | Naked_immediate i ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Target_ocaml_int.print i
+          Flambda_colours.pop
+      | Tagged_immediate i ->
+        Format.fprintf ppf "%t%a%t"
+          Flambda_colours.tagged_immediate
+          Target_ocaml_int.print i
+          Flambda_colours.pop
+      | Naked_float32 f ->
+        Format.fprintf ppf "%t#%as%t"
+          Flambda_colours.naked_number
+          Numeric_types.Float32_by_bit_pattern.print f
+          Flambda_colours.pop
+      | Naked_float f ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Float_by_bit_pattern.print f
+          Flambda_colours.pop
+      | Naked_int8 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int8.print
+          n
+          Flambda_colours.pop
+      | Naked_int16 n ->
+        Format.fprintf ppf "%t#%a%t"
+          Flambda_colours.naked_number
+          Numeric_types.Int16.print
+          n
+          Flambda_colours.pop
+      | Naked_int32 n ->
+        Format.fprintf ppf "%t#%ldl%t"
+          Flambda_colours.naked_number
+          n
+          Flambda_colours.pop
+      | Naked_int64 n ->
+        Format.fprintf ppf "%t#%LdL%t"
+          Flambda_colours.naked_number
+          n
+          Flambda_colours.pop
+      | Naked_nativeint n ->
+        Format.fprintf ppf "%t#%an%t"
+          Flambda_colours.naked_number
+          Targetint_32_64.print n
+          Flambda_colours.pop
+      | Naked_vec128 (v) ->
+        Format.fprintf ppf "%t#vec128[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Vec128.Bit_pattern.print v
+          Flambda_colours.pop
+      | Naked_vec256 (v) ->
+        Format.fprintf ppf "%t#vec256[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Vec256.Bit_pattern.print v
+          Flambda_colours.pop
+      | Naked_vec512 (v) ->
+        Format.fprintf ppf "%t#vec512[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Vec512.Bit_pattern.print v
+          Flambda_colours.pop
+      | Naked_mask v ->
+        Format.fprintf ppf "%t#mask[%a]%t"
+          Flambda_colours.naked_number
+          Vector_types.Mask.Bit_pattern.print v
+          Flambda_colours.pop
+      | Null ->
+        Format.fprintf ppf "%t#null%t"
+          Flambda_colours.naked_number
+          Flambda_colours.pop
+      | Poison (kind, name) ->
+        Format.fprintf ppf "%t#poison[%s][%a]%t"
+          Flambda_colours.invalid_keyword
+          name
+          Flambda_kind.print kind
+          Flambda_colours.pop
+
+    let compare t1 t2 =
+      match t1, t2 with
+      | Naked_immediate i1, Naked_immediate i2 -> Target_ocaml_int.compare i1 i2
+      | Tagged_immediate i1, Tagged_immediate i2 ->
+        Target_ocaml_int.compare i1 i2
+      | Naked_float32 f1, Naked_float32 f2 ->
+        Numeric_types.Float32_by_bit_pattern.compare f1 f2
+      | Naked_float f1, Naked_float f2 ->
+        Numeric_types.Float_by_bit_pattern.compare f1 f2
+      | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.compare n1 n2
+      | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.compare n1 n2
+      | Naked_int32 n1, Naked_int32 n2 -> Int32.compare n1 n2
+      | Naked_int64 n1, Naked_int64 n2 -> Int64.compare n1 n2
+      | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.compare n1 n2
+      | Naked_vec128 v1, Naked_vec128 v2 ->
+        Vector_types.Vec128.Bit_pattern.compare v1 v2
+      | Naked_vec256 v1, Naked_vec256 v2 ->
+        Vector_types.Vec256.Bit_pattern.compare v1 v2
+      | Naked_vec512 v1, Naked_vec512 v2 ->
+        Vector_types.Vec512.Bit_pattern.compare v1 v2
+      | Naked_mask v1, Naked_mask v2 ->
+        Vector_types.Mask.Bit_pattern.compare v1 v2
+      | Null, Null -> 0
+      | Poison (kind1, name1), Poison (kind2, name2) ->
+        let c = Flambda_kind.compare kind1 kind2 in
+        if c <> 0 then c else String.compare name1 name2
+      | Naked_immediate _, _ -> -1
+      | _, Naked_immediate _ -> 1
+      | Tagged_immediate _, _ -> -1
+      | _, Tagged_immediate _ -> 1
+      | Naked_float _, _ -> -1
+      | _, Naked_float _ -> 1
+      | Naked_float32 _, _ -> -1
+      | _, Naked_float32 _ -> 1
+      | Naked_int8 _, _ -> -1
+      | _, Naked_int8 _ -> 1
+      | Naked_int16 _, _ -> -1
+      | _, Naked_int16 _ -> 1
+      | Naked_int32 _, _ -> -1
+      | _, Naked_int32 _ -> 1
+      | Naked_int64 _, _ -> -1
+      | _, Naked_int64 _ -> 1
+      | Naked_nativeint _, _ -> -1
+      | _, Naked_nativeint _ -> 1
+      | Naked_vec128 _, _ -> -1
+      | _, Naked_vec128 _ -> 1
+      | Naked_vec256 _, _ -> -1
+      | _, Naked_vec256 _ -> 1
+      | Naked_vec512 _, _ -> -1
+      | _, Naked_vec512 _ -> 1
+      | Naked_mask _, _ -> -1
+      | _, Naked_mask _ -> 1
+      | Poison _, _ -> -1
+      | _, Poison _ -> 1
+
+    let equal t1 t2 =
+      if t1 == t2
+      then true
+      else
+        match t1, t2 with
+        | Naked_immediate i1, Naked_immediate i2 -> Target_ocaml_int.equal i1 i2
+        | Tagged_immediate i1, Tagged_immediate i2 ->
+          Target_ocaml_int.equal i1 i2
+        | Naked_float32 f1, Naked_float32 f2 ->
+          Numeric_types.Float32_by_bit_pattern.equal f1 f2
+        | Naked_float f1, Naked_float f2 ->
+          Numeric_types.Float_by_bit_pattern.equal f1 f2
+        | Naked_int8 n1, Naked_int8 n2 -> Numeric_types.Int8.equal n1 n2
+        | Naked_int16 n1, Naked_int16 n2 -> Numeric_types.Int16.equal n1 n2
+        | Naked_int32 n1, Naked_int32 n2 -> Int32.equal n1 n2
+        | Naked_int64 n1, Naked_int64 n2 -> Int64.equal n1 n2
+        | Naked_nativeint n1, Naked_nativeint n2 -> Targetint_32_64.equal n1 n2
+        | Naked_vec128 v1, Naked_vec128 v2 ->
+          Vector_types.Vec128.Bit_pattern.equal v1 v2
+        | Naked_vec256 v1, Naked_vec256 v2 ->
+          Vector_types.Vec256.Bit_pattern.equal v1 v2
+        | Naked_vec512 v1, Naked_vec512 v2 ->
+          Vector_types.Vec512.Bit_pattern.equal v1 v2
+        | Naked_mask v1, Naked_mask v2 ->
+          Vector_types.Mask.Bit_pattern.equal v1 v2
+        | Null, Null -> true
+        | Poison (kind1, name1), Poison (kind2, name2) ->
+          Flambda_kind.equal kind1 kind2 && String.equal name1 name2
+        | ( ( Naked_immediate _ | Tagged_immediate _ | Naked_float _
+            | Naked_float32 _ | Naked_vec128 _ | Naked_vec256 _ | Naked_vec512 _
+            | Naked_mask _ | Naked_int8 _ | Naked_int16 _ | Naked_int32 _
+            | Naked_int64 _ | Naked_nativeint _ | Null | Poison _ ),
+            _ ) ->
+          false
+
+    let hash t =
+      match t with
+      | Naked_immediate n -> Target_ocaml_int.hash n
+      | Tagged_immediate n -> Target_ocaml_int.hash n
+      | Naked_float32 n -> Numeric_types.Float32_by_bit_pattern.hash n
+      | Naked_float n -> Numeric_types.Float_by_bit_pattern.hash n
+      | Naked_int8 n -> Numeric_types.Int8.hash n
+      | Naked_int16 n -> Numeric_types.Int16.hash n
+      | Naked_int32 n -> Hashtbl.hash n
+      | Naked_int64 n -> Hashtbl.hash n
+      | Naked_nativeint n -> Targetint_32_64.hash n
+      | Naked_vec128 v -> Vector_types.Vec128.Bit_pattern.hash v
+      | Naked_vec256 v -> Vector_types.Vec256.Bit_pattern.hash v
+      | Naked_vec512 v -> Vector_types.Vec512.Bit_pattern.hash v
+      | Naked_mask v -> Vector_types.Mask.Bit_pattern.hash v
+      | Null -> Hashtbl.hash 0
+      | Poison (kind, name) ->
+        Hashtbl.hash (Flambda_kind.hash kind, String.hash name)
+  end)
+end
+
+module Variable_data = struct
+  type t =
+    { compilation_unit : Compilation_unit.t;
+      name : string;
+      name_stamp : int;
+      kind : Flambda_kind.t;
+      user_visible : bool
+    }
+
+  let flags = var_flags
+
+  let [@ocamlformat "disable"] print ppf { compilation_unit; name; name_stamp;
+                                           kind; user_visible; } =
+    Format.fprintf ppf "@[<hov 1>(\
+        @[<hov 1>(compilation_unit@ %a)@]@ \
+        @[<hov 1>(name@ %s)@]@ \
+        @[<hov 1>(name_stamp@ %d)@]@ \
+        @[<hov 1>(kind@ %a)@]@ \
+        @[<hov 1>(user_visible@ %b)@]\
+        )@]"
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
+      name
+      name_stamp
+      Flambda_kind.print kind
+      user_visible
+
+  let hash
+      { compilation_unit; name = _; name_stamp; kind = _; user_visible = _ } =
+    hash2 (Compilation_unit.hash compilation_unit) (Hashtbl.hash name_stamp)
+
+  let equal t1 t2 =
+    if t1 == t2
+    then true
+    else
+      let { compilation_unit = compilation_unit1;
+            name = _;
+            name_stamp = name_stamp1;
+            kind = _;
+            user_visible = _
+          } =
+        t1
+      in
+      let { compilation_unit = compilation_unit2;
+            name = _;
+            name_stamp = name_stamp2;
+            kind = _;
+            user_visible = _
+          } =
+        t2
+      in
+      Int.equal name_stamp1 name_stamp2
+      && Compilation_unit.equal compilation_unit1 compilation_unit2
+end
+
+module Symbol0 = Flambda2_import.Symbol
+
+module Symbol_data = struct
+  include Symbol0
+
+  let unsafe_create compilation_unit linkage_name =
+    Symbol0.unsafe_create compilation_unit linkage_name
+
+  let flags = symbol_flags
+
+  let [@ocamlformat "disable"] print ppf symbol =
+    let compilation_unit = Symbol0.compilation_unit symbol in
+    let linkage_name = Symbol0.linkage_name symbol in
+    Format.fprintf ppf "@[<hov 1>(\
+        @[<hov 1>(compilation_unit@ %a)@]@ \
+        @[<hov 1>(linkage_name@ %a)@]\
+        )@]"
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
+      Linkage_name.print linkage_name
+end
+
+module Code_id_data = struct
+  type t =
+    { compilation_unit : Compilation_unit.t;
+      name : string;
+      debug_info : Debuginfo.t;
+      linkage_name : Linkage_name.t
+    }
+
+  let flags = code_id_flags
+
+  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
+    Format.fprintf ppf "@[<hov 1>(\
+        @[<hov 1>(compilation_unit@ %a)@]@ \
+        @[<hov 1>(name@ %s)@]@ \
+        @[<hov 1>(linkage_name@ %a)@]@ \
+        )@]"
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
+      name
+      Linkage_name.print linkage_name
+
+  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
+    (* Linkage names are unique across a whole project, so there's no need to
+       hash the other fields. *)
+    Linkage_name.hash linkage_name
+
+  let equal
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name1
+      }
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name2
+      } =
+    Linkage_name.equal linkage_name1 linkage_name2
+end
+
+module Const = struct
+  type t = Id.t
+
+  module Table = Table_by_int_id.Make (Const_data)
+
+  let grand_table_of_constants = ref (Table.create ())
+
+  let initialise () = grand_table_of_constants := Table.create ()
+
+  let find_data t = Table.find !grand_table_of_constants t
+
+  module Descr = Const_data
+
+  let create (data : Const_data.t) = Table.add !grand_table_of_constants data
+
+  let naked_immediate imm = create (Naked_immediate imm)
+
+  let tagged_immediate imm = create (Tagged_immediate imm)
+
+  let naked_float32 f = create (Naked_float32 f)
+
+  let naked_float f = create (Naked_float f)
+
+  let naked_int8 i = create (Naked_int8 i)
+
+  let naked_int16 i = create (Naked_int16 i)
+
+  let naked_int32 i = create (Naked_int32 i)
+
+  let naked_int64 i = create (Naked_int64 i)
+
+  let naked_nativeint i = create (Naked_nativeint i)
+
+  let naked_vec128 i = create (Naked_vec128 i)
+
+  let naked_vec256 i = create (Naked_vec256 i)
+
+  let naked_vec512 i = create (Naked_vec512 i)
+
+  let naked_mask i = create (Naked_mask i)
+
+  let const_true machine_width =
+    tagged_immediate (Target_ocaml_int.bool_true machine_width)
+
+  let const_false machine_width =
+    tagged_immediate (Target_ocaml_int.bool_false machine_width)
+
+  let untagged_const_true machine_width =
+    naked_immediate (Target_ocaml_int.bool_true machine_width)
+
+  let untagged_const_false machine_width =
+    naked_immediate (Target_ocaml_int.bool_false machine_width)
+
+  let untagged_const_zero machine_width =
+    naked_immediate (Target_ocaml_int.zero machine_width)
+
+  let untagged_const_int i = naked_immediate i
+
+  let const_int i = tagged_immediate i
+
+  let const_zero machine_width =
+    tagged_immediate (Target_ocaml_int.zero machine_width)
+
+  let const_one machine_width =
+    tagged_immediate (Target_ocaml_int.one machine_width)
+
+  let const_unit machine_width = const_zero machine_width
+
+  let const_null = create Null
+
+  let const_poison kind name = create (Poison (kind, name))
+
+  let descr t = find_data t
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let [@ocamlformat "disable"] print ppf t = Const_data.print ppf (descr t)
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+
+  type importer = Table.serializable
+
+  let export consts =
+    Table.export !grand_table_of_constants ~iter:(fun f -> Set.iter f consts)
+
+  let import importer t =
+    Table.add !grand_table_of_constants (Table.import importer t)
+end
+
+module Variable = struct
+  type t = Id.t
+
+  module Table = Table_by_int_id.Make (Variable_data)
+
+  let grand_table_of_variables = ref (Table.create ())
+
+  let initialise () = grand_table_of_variables := Table.create ()
+
+  let find_data t = Table.find !grand_table_of_variables t
+
+  let compilation_unit t = (find_data t).compilation_unit
+
+  let name t = (find_data t).name
+
+  let name_stamp t = (find_data t).name_stamp
+
+  let kind t = (find_data t).kind
+
+  let user_visible t = (find_data t).user_visible
+
+  let previous_name_stamp = ref (-1)
+
+  let create_in_compilation_unit ~compilation_unit ?user_visible name kind =
+    let name_stamp =
+      (* CR mshinwell: check for overflow on 32 bit *)
+      incr previous_name_stamp;
+      !previous_name_stamp
+    in
+    let data : Variable_data.t =
+      { compilation_unit;
+        name;
+        name_stamp;
+        kind;
+        user_visible = Option.is_some user_visible
+      }
+    in
+    Table.add !grand_table_of_variables data
+
+  let create ?user_visible name kind =
+    create_in_compilation_unit
+      ~compilation_unit:(Current_unit.get_cu_exn ())
+      ?user_visible name kind
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      let cu = compilation_unit t in
+      if Current_unit.is_current cu
+      then
+        Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
+          (if user_visible t then "UV" else "N")
+      else
+        Format.fprintf ppf "%a.%s/%d%s"
+          (Format_doc.compat Compilation_unit.print)
+          cu (name t) (name_stamp t)
+          (if user_visible t then "UV" else "N")
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+  module Lmap = Lmap.Make (T)
+
+  type importer = Table.serializable
+
+  let export vars =
+    Table.export !grand_table_of_variables ~iter:(fun f -> Set.iter f vars)
+
+  let import importer t =
+    Table.add !grand_table_of_variables (Table.import importer t)
+
+  let export_name_stamp_counter () = !previous_name_stamp
+end
+
+module Symbol = struct
+  type t = Id.t
+
+  module Table = Table_by_int_id.Make (Symbol_data)
+
+  let grand_table_of_symbols = ref (Table.create ())
+
+  let initialise () = grand_table_of_symbols := Table.create ()
+
+  let find_data t = Table.find !grand_table_of_symbols t
+
+  let create_wrapped data = Table.add !grand_table_of_symbols data
+
+  let unsafe_create compilation_unit linkage_name =
+    Symbol_data.unsafe_create compilation_unit linkage_name |> create_wrapped
+
+  let extern_syms = "*extern*" |> Compilation_unit.of_string
+
+  let external_symbols_compilation_unit () = extern_syms
+
+  let create compilation_unit linkage_name =
+    let data =
+      if Compilation_unit.equal compilation_unit extern_syms
+      then
+        (* Use linkage name without prefixing the compilation unit *)
+        Symbol0.unsafe_create compilation_unit linkage_name
+      else
+        Symbol0.for_name compilation_unit
+          (linkage_name |> Linkage_name.to_string)
+    in
+    create_wrapped data
+
+  let compilation_unit t = Symbol0.compilation_unit (find_data t)
+
+  let for_compilation_unit t = Symbol0.for_compilation_unit t |> create_wrapped
+
+  let linkage_name t = Symbol0.linkage_name (find_data t)
+
+  let linkage_name_as_string t = Linkage_name.to_string (linkage_name t)
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      Format.fprintf ppf "%t" Flambda_colours.symbol;
+      (Format_doc.compat Compilation_unit.print) ppf (compilation_unit t);
+      Format.pp_print_string ppf ".";
+      Linkage_name.print ppf (linkage_name t);
+      Format.fprintf ppf "%t" Flambda_colours.pop
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+
+  type importer = Table.serializable
+
+  let export symbols =
+    Table.export !grand_table_of_symbols ~iter:(fun f -> Set.iter f symbols)
+
+  let import importer t =
+    Table.add !grand_table_of_symbols (Table.import importer t)
+end
+
+module Name = struct
+  type t = Id.t
+
+  let var v = v
+
+  let var_set s = s
+
+  let var_map m = m
+
+  let symbol s = s
+
+  let[@inline always] pattern_match t ~var ~symbol =
+    let flags = Id.flags t in
+    if flags = var_flags
+    then (var [@inlined hint]) t
+    else if flags = symbol_flags
+    then (symbol [@inlined hint]) t
+    else assert false
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      Format.fprintf ppf "%t" Flambda_colours.name;
+      pattern_match t
+        ~var:(fun var -> Variable.print ppf var)
+        ~symbol:(fun symbol -> Symbol.print ppf symbol);
+      Format.fprintf ppf "%t" Flambda_colours.pop
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+end
+
+module Rec_info_expr = Rec_info_expr0.Make (Variable)
+module Coercion = Coercion0.Make (Rec_info_expr)
+
+module Simple_data = struct
+  type t =
+    { simple : Id.t;
+      (* always without [Coercion] *)
+      coercion : Coercion.t
+    }
+
+  let flags = simple_flags
+
+  let [@ocamlformat "disable"] print ppf { simple = _; coercion; } =
+    Format.fprintf ppf "@[<hov 1>\
+        @[<hov 1>(coercion@ %a)@]\
+        @]"
+      Coercion.print coercion
+
+  let hash { simple; coercion } =
+    Hashtbl.hash (Id.hash simple, Coercion.hash coercion)
+
+  let equal t1 t2 =
+    if t1 == t2
+    then true
+    else
+      let { simple = simple1; coercion = coercion1 } = t1 in
+      let { simple = simple2; coercion = coercion2 } = t2 in
+      Id.equal simple1 simple2 && Coercion.equal coercion1 coercion2
+end
+
+module Simple = struct
+  type t = Id.t
+
+  module Table = Table_by_int_id.Make (Simple_data)
+
+  (* This table only holds [Simple]s that have auxiliary data associated with
+     them, as indicated by the setting of the [simple_flags]. *)
+  let grand_table_of_simples = ref (Table.create ())
+
+  let initialise () = grand_table_of_simples := Table.create ()
+
+  let find_data t = Table.find !grand_table_of_simples t
+
+  let has_coercion t = Id.flags t = simple_flags
+
+  let name n = n
+
+  let var v = v
+
+  let vars vars = vars
+
+  let symbol s = s
+
+  let const cst = cst
+
+  let[@inline always] pattern_match t ~name ~const =
+    let flags = Id.flags t in
+    if flags = var_flags
+    then (name [@inlined hint]) (Name.var t) ~coercion:Coercion.id
+    else if flags = symbol_flags
+    then (name [@inlined hint]) (Name.symbol t) ~coercion:Coercion.id
+    else if flags = const_flags
+    then (const [@inlined hint]) t
+    else if flags = simple_flags
+    then
+      let { Simple_data.simple = t; coercion } = find_data t in
+      let flags = Id.flags t in
+      if flags = var_flags
+      then (name [@inlined hint]) (Name.var t) ~coercion
+      else if flags = symbol_flags
+      then (name [@inlined hint]) (Name.symbol t) ~coercion
+      else if flags = const_flags
+      then (const [@inlined hint]) t
+      else assert false
+    else assert false
+
+  let same t1 t2 =
+    let name n1 ~coercion:co1 =
+      pattern_match t2
+        ~name:(fun n2 ~coercion:co2 ->
+          Name.equal n1 n2 && Coercion.equal co1 co2)
+        ~const:(fun _ -> false)
+    in
+    let const c1 =
+      pattern_match t2
+        ~name:(fun _ ~coercion:_ -> false)
+        ~const:(fun c2 -> Const.equal c1 c2)
+    in
+    pattern_match t1 ~name ~const
+
+  let[@inline always] coercion t =
+    let flags = Id.flags t in
+    if flags = simple_flags then (find_data t).coercion else Coercion.id
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      let print ppf t =
+        pattern_match t
+          ~name:(fun name ~coercion:_ -> Name.print ppf name)
+          ~const:(fun cst -> Const.print ppf cst)
+      in
+      let coercion = coercion t in
+      if Coercion.is_id coercion
+      then print ppf t
+      else
+        Format.fprintf ppf "@[<hov 1>(coerce@ %a@ %a)@]" print t Coercion.print
+          coercion
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  let with_coercion t new_coercion =
+    if Coercion.is_id new_coercion || Id.flags t = const_flags
+    then t
+    else if Coercion.is_id (coercion t)
+    then
+      let data : Simple_data.t = { simple = t; coercion = new_coercion } in
+      Table.add !grand_table_of_simples data
+    else
+      Misc.fatal_errorf
+        "Cannot add [Coercion] to [Simple] %a that already has non-identity \
+         [Coercion]"
+        print t
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+
+  type importer = Table.serializable
+
+  let export simples =
+    Table.export !grand_table_of_simples ~iter:(fun f -> Set.iter f simples)
+
+  let import importer t ~import_const ~import_symbol ~import_var =
+    let flags = Id.flags t in
+    if flags = var_flags
+    then (import_var [@inlined hint]) t
+    else if flags = symbol_flags
+    then (import_symbol [@inlined hint]) t
+    else if flags = const_flags
+    then (import_const [@inlined hint]) t
+    else if flags = simple_flags
+    then
+      let { Simple_data.simple = t; coercion } = Table.import importer t in
+      let coercion = Coercion.map_depth_variables coercion ~f:import_var in
+      let flags = Id.flags t in
+      if flags = var_flags
+      then with_coercion ((import_var [@inlined hint]) t) coercion
+      else if flags = symbol_flags
+      then with_coercion ((import_symbol [@inlined hint]) t) coercion
+      else if flags = const_flags
+      then (import_const [@inlined hint]) t
+      else assert false
+    else assert false
+end
+
+module Code_id = struct
+  type t = Id.t
+
+  module Table = Table_by_int_id.Make (Code_id_data)
+
+  let grand_table_of_code_ids = ref (Table.create ())
+
+  let initialise () = grand_table_of_code_ids := Table.create ()
+
+  let find_data t = Table.find !grand_table_of_code_ids t
+
+  let get_compilation_unit t = (find_data t).compilation_unit
+
+  let linkage_name t = (find_data t).linkage_name
+
+  let name t = (find_data t).name
+
+  let debug t = (find_data t).debug_info
+
+  let previous_name_stamp = ref (-1)
+
+  let create ~name ~(debug : Debuginfo.t) compilation_unit =
+    let name_stamp =
+      if !previous_name_stamp = max_int
+      then Misc.fatal_error "Have run out of name stamps";
+      incr previous_name_stamp;
+      !previous_name_stamp
+    in
+    let linkage_name =
+      match Compilation_unit.name_mangling_scheme_for_current_unit () with
+      | Flat ->
+        let name =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "%s_%d" name name_stamp
+          else Printf.sprintf "%s_%d_code" name name_stamp
+        in
+        Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
+      | Structured ->
+        let suffix =
+          if Flambda_features.Expert.shorten_symbol_names ()
+          then Printf.sprintf "_%d" name_stamp
+          else Printf.sprintf "_%d_code" name_stamp
+        in
+        let path = Debuginfo.to_structured_mangling_path ~name debug in
+        Symbol0.for_structured_mangling_path ~compilation_unit ~path ~suffix
+        |> Symbol0.linkage_name
+    in
+    let data : Code_id_data.t =
+      { compilation_unit; name; debug_info = debug; linkage_name }
+    in
+    Table.add !grand_table_of_code_ids data
+
+  let rename t =
+    create ~name:(name t) ~debug:(debug t) (Current_unit.get_cu_exn ())
+
+  let in_compilation_unit t comp_unit =
+    Compilation_unit.equal (get_compilation_unit t) comp_unit
+
+  let is_imported t = not (Current_unit.is_current (get_compilation_unit t))
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      Format.fprintf ppf "%t%a%t" Flambda_colours.code_id Linkage_name.print
+        (linkage_name t) Flambda_colours.pop
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+  module Lmap = Lmap.Make (T)
+
+  let invert_map map =
+    Map.fold
+      (fun older newer invert_map -> Map.add newer older invert_map)
+      map Map.empty
+
+  type importer = Table.serializable
+
+  let export symbols =
+    Table.export !grand_table_of_code_ids ~iter:(fun f -> Set.iter f symbols)
+
+  let import importer t =
+    Table.add !grand_table_of_code_ids (Table.import importer t)
+
+  let export_name_stamp_counter () = !previous_name_stamp
+end
+
+module Code_id_or_symbol = struct
+  type t = Table_by_int_id.Id.t
+
+  let create_code_id code_id = code_id
+
+  let create_symbol symbol = symbol
+
+  let[@inline always] pattern_match t ~code_id ~symbol =
+    let flags = Table_by_int_id.Id.flags t in
+    if flags = Code_id_data.flags
+    then (code_id [@inlined hint]) t
+    else if flags = Symbol_data.flags
+    then (symbol [@inlined hint]) t
+    else
+      Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
+
+  let compilation_unit t =
+    pattern_match t ~code_id:Code_id.get_compilation_unit
+      ~symbol:Symbol.compilation_unit
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      pattern_match t
+        ~code_id:(fun code_id ->
+          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
+        ~symbol:(fun symbol ->
+          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Tree = Patricia_tree.Make (struct
+    let print = print
+  end)
+
+  module Set = Tree.Set
+  module Map = Tree.Map
+  module Lmap = Lmap.Make (T)
+
+  let set_of_code_id_set (code_ids : Code_id.Set.t) : Set.t = code_ids
+
+  let set_of_symbol_set (symbols : Symbol.Set.t) : Set.t = symbols
+end
+
+module Code_id_or_name = struct
+  type t = Table_by_int_id.Id.t
+
+  let code_id code_id = code_id
+
+  let name name = name
+
+  let var var = var
+
+  let symbol symbol = symbol
+
+  let[@inline always] pattern_match t ~code_id ~var ~symbol =
+    let flags = Table_by_int_id.Id.flags t in
+    if flags = Code_id_data.flags
+    then (code_id [@inlined hint]) t
+    else if flags = Symbol_data.flags
+    then (symbol [@inlined hint]) t
+    else if flags = Variable_data.flags
+    then (var [@inlined hint]) t
+    else
+      Misc.fatal_errorf "Code_id_or_symbol 0x%x with wrong flags 0x%x" t flags
+
+  module T0 = struct
+    let compare = Id.compare
+
+    let equal = Id.equal
+
+    let hash = Id.hash
+
+    let print ppf t =
+      pattern_match t
+        ~code_id:(fun code_id ->
+          Format.fprintf ppf "@[<hov 1>(code_id@ %a)@]" Code_id.print code_id)
+        ~symbol:(fun symbol ->
+          Format.fprintf ppf "@[<hov 1>(symbol@ %a)@]" Symbol.print symbol)
+        ~var:(fun var ->
+          Format.fprintf ppf "@[<hov 1>(var@ %a)@]" Variable.print var)
+  end
+
+  include T0
+
+  module T = struct
+    type nonrec t = t
+
+    include T0
+  end
+
+  module Column = Datalog.Column.Make (struct
+    let name = "code_id_or_name"
+
+    let print = print
+  end)
+
+  module Set = Column.Set
+  module Map = Column.Map
+
+  let datalog_column_id = Column.datalog_column_id
+end
+
+let initialise () =
+  Const.initialise ();
+  Variable.initialise ();
+  Symbol.initialise ();
+  Simple.initialise ();
+  Code_id.initialise ()
+
+let reset () = initialise ()

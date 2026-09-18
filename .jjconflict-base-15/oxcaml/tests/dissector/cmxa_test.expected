@@ -1,0 +1,15 @@
+=== CMXA archive test ===
+
+Test 1: Direct calls to Mylib_a
+  Counter: 1, 2
+  double(5): 10
+  triple(5): 15
+  square(5): 25
+
+Test 2: Calls through Mylib_b
+  call_increment: 3
+  call_double(7): 14
+  combined(10): 46
+  get_data_element(2): 2
+
+=== All tests passed! ===

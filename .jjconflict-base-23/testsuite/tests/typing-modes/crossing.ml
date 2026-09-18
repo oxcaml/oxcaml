@@ -1,0 +1,377 @@
+(* TEST
+ expect;
+*)
+
+(* Some tests below use deliberately redundant modifiers; silence the warning. *)
+[@@@warning "-211"]
+[%%expect{|
+|}]
+
+(* mode crossing during inclusion check is according to the written type, not
+the inferred type. *)
+
+(* In this example, the inferred type does not allow mode crossing, but the
+written type does. *)
+module M : sig
+    val f : int @ nonportable -> int @ portable
+end = struct
+    let f (x @ portable) = (x : _ @ nonportable)
+end
+[%%expect{|
+module M : sig val f : int -> int @ portable end
+|}]
+
+(* In this example, the inferred type allows crossing to portable, but the
+written type does not. *)
+module M : sig
+    val f : unit -> [`A | `B of 'a -> 'a] @ portable
+end = struct
+    let f () = (`A : _ @ nonportable)
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |     let f () = (`A : _ @ nonportable)
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : unit -> [> `A ] end
+       is not included in
+         sig val f : unit -> [ `A | `B of 'a -> 'a ] @ portable end
+       Values do not match:
+         val f : unit -> [> `A ]
+       is not included in
+         val f : unit -> [ `A | `B of 'a -> 'a ] @ portable
+       The type "unit -> [ `A | `B of 'a -> 'a ]"
+       is not compatible with the type
+         "unit -> [ `A | `B of 'a -> 'a ] @ portable"
+       The return mode was expected to be "portable" but is "nonportable"
+|}]
+
+(* In this example, the inferred type does not allow crossing portability, but
+the written type does. *)
+module M : sig
+    val f : [`A] @ nonportable -> unit
+end = struct
+    let f (x : [< `A | `B of string -> string] @ portable) =
+        match x with
+        | `A -> ()
+        | `B f -> ()
+end
+[%%expect{|
+module M : sig val f : [ `A ] -> unit end
+|}]
+
+module M : sig
+    val f : unit -> int
+end = struct
+    let f () = exclave_ 42
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |     let f () = exclave_ 42
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : unit -> int @ local forkable unyielding end
+       is not included in
+         sig val f : unit -> int end
+       Values do not match:
+         val f : unit -> int @ local forkable unyielding
+       is not included in
+         val f : unit -> int
+       The type "unit -> int @ local forkable unyielding"
+       is not compatible with the type "unit -> int"
+       The return mode was expected to be "global" but is "local"
+|}]
+
+module M : sig
+    val f : local_ int -> int
+end = struct
+    let f (_ @ global) = 42
+end
+[%%expect{|
+module M : sig val f : int @ local -> int end
+|}]
+
+(* Check all the mode crossing coercions *)
+
+type cross_global : value mod global
+type cross_local : value mod local
+type cross_many : value mod many
+type cross_once : value mod once
+type cross_portable : value mod portable
+type cross_nonportable : value mod nonportable
+type cross_unyielding : value mod unyielding
+type cross_yielding : value mod yielding
+type cross_aliased : value mod aliased
+type cross_unique : value mod unique
+type cross_contended : value mod contended
+type cross_shared : value mod shared
+type cross_corrupted : value mod corrupted
+type cross_uncontended : value mod uncontended
+[%%expect{|
+type cross_global : value mod global
+type cross_local
+type cross_many : value mod many
+type cross_once
+type cross_portable : value mod portable
+type cross_nonportable
+type cross_unyielding : value mod unyielding
+type cross_yielding
+type cross_aliased : value mod aliased
+type cross_unique
+type cross_contended : value mod contended
+type cross_shared : value mod shared
+type cross_corrupted : value mod corrupted
+type cross_uncontended
+|}]
+
+let cross_global (x : cross_global @ local) : _ @ global = x
+[%%expect{|
+val cross_global : cross_global @ local -> cross_global = <fun>
+|}]
+
+let cross_local (x : cross_local @ local) : _ @ global = x
+[%%expect{|
+Line 1, characters 57-58:
+1 | let cross_local (x : cross_local @ local) : _ @ global = x
+                                                             ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+let cross_many (x : cross_many @ once) : _ @ many = x
+[%%expect{|
+val cross_many : cross_many @ once -> cross_many = <fun>
+|}]
+
+let cross_once (x : cross_once @ once) : _ @ many = x
+[%%expect{|
+Line 1, characters 52-53:
+1 | let cross_once (x : cross_once @ once) : _ @ many = x
+                                                        ^
+Error: This value is "once" but is expected to be "many".
+|}]
+
+let cross_portable (x : cross_portable @ nonportable) : _ @ portable = x
+[%%expect{|
+val cross_portable : cross_portable -> cross_portable @ portable = <fun>
+|}]
+
+let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
+[%%expect{|
+Line 1, characters 77-78:
+1 | let cross_nonportable (x : cross_nonportable @ nonportable) : _ @ portable = x
+                                                                                 ^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let cross_unyielding (x : cross_unyielding @ yielding) : _ @ unyielding = x
+[%%expect{|
+val cross_unyielding : cross_unyielding @ yielding -> cross_unyielding =
+  <fun>
+|}]
+
+let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
+[%%expect{|
+Line 1, characters 70-71:
+1 | let cross_yielding (x : cross_yielding @ yielding) : _ @ unyielding = x
+                                                                          ^
+Error: This value is "yielding" but is expected to be "unyielding".
+|}]
+
+let cross_aliased (x : cross_aliased @ aliased) : _ @ unique = x
+[%%expect{|
+val cross_aliased : cross_aliased -> cross_aliased @ unique = <fun>
+|}]
+
+let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
+[%%expect{|
+Line 1, characters 61-62:
+1 | let cross_unique (x : cross_unique @ aliased) : _ @ unique = x
+                                                                 ^
+Error: This value is "aliased" but is expected to be "unique".
+|}]
+
+let cross_contended1 (x : cross_contended @ shared) : _ @ uncontended = x
+[%%expect{|
+val cross_contended1 : cross_contended @ shared -> cross_contended = <fun>
+|}]
+
+let cross_contended2 (x : cross_contended @ contended) : _ @ shared = x
+[%%expect{|
+val cross_contended2 :
+  cross_contended @ contended -> cross_contended @ shared = <fun>
+|}]
+
+let cross_contended3 (x : cross_contended @ corrupted) : _ @ uncontended = x
+[%%expect{|
+val cross_contended3 : cross_contended @ corrupted -> cross_contended = <fun>
+|}]
+
+let cross_contended4 (x : cross_contended @ contended) : _ @ corrupted = x
+[%%expect{|
+val cross_contended4 :
+  cross_contended @ contended -> cross_contended @ corrupted = <fun>
+|}]
+
+let cross_shared1 (x : cross_shared @ shared) : _ @ uncontended = x
+[%%expect{|
+val cross_shared1 : cross_shared @ shared -> cross_shared = <fun>
+|}]
+
+let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
+[%%expect{|
+Line 1, characters 64-65:
+1 | let cross_shared2 (x : cross_shared @ contended) : _ @ shared = x
+                                                                    ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let cross_corrupted1 (x : cross_corrupted @ corrupted) : _ @ uncontended = x
+[%%expect{|
+val cross_corrupted1 : cross_corrupted @ corrupted -> cross_corrupted = <fun>
+|}]
+
+let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
+[%%expect{|
+Line 1, characters 73-74:
+1 | let cross_corrupted2 (x : cross_corrupted @ contended) : _ @ corrupted = x
+                                                                             ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+|}]
+
+let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
+[%%expect{|
+Line 1, characters 76-77:
+1 | let cross_uncontended1 (x : cross_uncontended @ shared) : _ @ uncontended = x
+                                                                                ^
+Error: This value is "shared" but is expected to be "uncontended".
+|}]
+
+let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
+[%%expect{|
+Line 1, characters 74-75:
+1 | let cross_uncontended2 (x : cross_uncontended @ contended) : _ @ shared = x
+                                                                              ^
+Error: This value is "contended" but is expected to be "shared" or "uncontended".
+|}]
+
+let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
+[%%expect{|
+Line 1, characters 79-80:
+1 | let cross_uncontended3 (x : cross_uncontended @ corrupted) : _ @ uncontended = x
+                                                                                   ^
+Error: This value is "corrupted" but is expected to be "uncontended".
+|}]
+
+let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
+[%%expect{|
+Line 1, characters 77-78:
+1 | let cross_uncontended4 (x : cross_uncontended @ contended) : _ @ corrupted = x
+                                                                                 ^
+Error: This value is "contended"
+       but is expected to be "corrupted" or "uncontended".
+|}]
+
+(* Check that all modalities cross modes *)
+
+type t
+type s : value mod global = { v : t @@ global } [@@unboxed]
+[%%expect{|
+type t
+type s = { v : t @@ global; } [@@unboxed]
+|}]
+type s : value mod many = { v : t @@ many } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ many; } [@@unboxed]
+|}]
+type s : value mod portable = { v : t @@ portable } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ portable; } [@@unboxed]
+|}]
+type s : value mod unyielding = { v : t @@ unyielding } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ unyielding; } [@@unboxed]
+|}]
+type s : value mod aliased = { v : t @@ aliased } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ aliased; } [@@unboxed]
+|}]
+type s : value mod contended = { v : t @@ contended } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ contended; } [@@unboxed]
+|}]
+type s : value = { v : t @@ shared } [@@unboxed]
+type s : value = { v : t @@ corrupted } [@@unboxed]
+type s : value mod shared = { f : (int -> int) @@ shared } [@@unboxed]
+type s : value mod corrupted = { f : (int -> int) @@ corrupted } [@@unboxed]
+type concrete_shared : value mod shared = { v : t @@ shared } [@@unboxed]
+type concrete_corrupted : value mod corrupted = { v : t @@ corrupted } [@@unboxed]
+[%%expect{|
+type s = { v : t @@ shared; } [@@unboxed]
+type s = { v : t @@ corrupted; } [@@unboxed]
+type s = { f : int -> int @@ shared; } [@@unboxed]
+type s = { f : int -> int @@ corrupted; } [@@unboxed]
+type concrete_shared = { v : t @@ shared; } [@@unboxed]
+type concrete_corrupted = { v : t @@ corrupted; } [@@unboxed]
+|}]
+
+let concrete_shared_from_shared
+    (x : concrete_shared @ shared) : concrete_shared @ uncontended =
+  x
+
+let concrete_shared_from_contended
+    (x : concrete_shared @ contended) : concrete_shared @ corrupted =
+  x
+
+[%%expect{|
+val concrete_shared_from_shared : concrete_shared @ shared -> concrete_shared =
+  <fun>
+val concrete_shared_from_contended :
+  concrete_shared @ contended -> concrete_shared @ corrupted = <fun>
+|}]
+
+let concrete_shared_no_cross
+    (x : concrete_shared @ contended) : concrete_shared @ shared =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "corrupted" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "shared" or "uncontended".
+|}]
+
+let concrete_corrupted_from_corrupted
+    (x : concrete_corrupted @ corrupted) : concrete_corrupted @ uncontended =
+  x
+
+let concrete_corrupted_from_contended
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ shared =
+  x
+
+[%%expect{|
+val concrete_corrupted_from_corrupted :
+  concrete_corrupted @ corrupted -> concrete_corrupted = <fun>
+val concrete_corrupted_from_contended :
+  concrete_corrupted @ contended -> concrete_corrupted @ shared = <fun>
+|}]
+
+let concrete_corrupted_no_cross
+    (x : concrete_corrupted @ contended) : concrete_corrupted @ corrupted =
+  x
+[%%expect{|
+Line 3, characters 2-3:
+3 |   x
+      ^
+Error: This value is "shared" because it crosses with something
+         which is "contended".
+       However, the highlighted expression is expected to be "corrupted" or "uncontended".
+|}]

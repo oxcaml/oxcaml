@@ -79,6 +79,10 @@ type unit_infos =
                                   (* Compile-time (comptime) value of the unit's
                                      main module block, as produced by
                                      [Slambda.eval]. *)
+    ui_lto_info: File_sections.Idx.t option;
+                                  (* Section holding the Reaper's LTO header
+                                     (see [Flambda2_reaper.Lto_sections]),
+                                     present iff compiled with -support-lto *)
     ui_file_sections: File_sections.t;
   }
 
@@ -101,6 +105,7 @@ type unit_infos_raw =
                                       this record *)
     uir_external_symbols: string array;
     uir_static_data: Slambdaeval.CU_data.raw;
+    uir_lto_info: File_sections.Idx.t option;
     uir_sections_length: int;      (* Byte length of all sections *)
   }
 

@@ -1,0 +1,4 @@
+(library
+ (name chamelon_compat)
+ (libraries compiler-libs.common
+    (select compat.ml from ( -> compat.upstream.ml))))

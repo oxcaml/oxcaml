@@ -1,0 +1,822 @@
+(* TEST
+ modules = "replace_caml_modify.c";
+ {
+   not-macos;
+   (* Remove layout_beta here when block indices are out of beta *)
+   flags = "-extension layouts_beta -extension layout_poly_alpha \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify \
+            -cclib -Xlinker -cclib --wrap -cclib -Xlinker -cclib caml_modify_local";
+   native;
+ }
+*)
+
+(* This test verifies that external_ and external64 prevent calls to caml_modify when
+   appropriate. This is done by utilizing the --wrap argument to the C compiler, which
+   allows us to wrap caml_modify and caml_modify_local. replace_caml_modify.c defines
+   these wrappers, which track whether caml_modify/caml_modify_local has been called.
+
+   Note: caml_modify is always called in bytecode, so this test is only performed on
+   native *)
+
+external called_caml_modify : unit -> int = "replace_caml_modify_called_modify" [@@noalloc]
+external reset : unit -> unit = "replace_caml_modify_reset" [@@noalloc]
+
+(* Test whether executing f results in caml_modify being called *)
+let test ~(call_pos : [%call_pos]) ~expect_caml_modifies f =
+  reset ();
+  f ();
+  let actual_modifies = called_caml_modify () in
+  if not (expect_caml_modifies = actual_modifies) then
+    failwith @@
+      Format.sprintf
+        "On line %d, expected %d calls to caml_modify, but saw %d"
+        call_pos.pos_lnum expect_caml_modifies actual_modifies
+
+(* Validate testing technique *)
+
+let () =
+  test ~expect_caml_modifies:1 (fun () ->
+    let foo = Array.make 1 "hello" in
+    foo.(0) <- "world")
+
+let () =
+  test ~expect_caml_modifies:2 (fun () ->
+    let foo = Array.make 1 "hello" in
+    foo.(0) <- "world";
+    foo.(0) <- "")
+
+let () =
+  test ~expect_caml_modifies:0 (fun () ->
+    let foo = Array.make 1 0 in
+    foo.(0) <- 0)
+
+(* Some type definitions for below tests *)
+
+type 'a boxed_variant = Boxed of 'a
+type 'a unboxed_variant = Unboxed of 'a [@@unboxed]
+module External_variant : sig
+  type t : value mod external_
+  val make : t
+end = struct
+  type t = External
+  let make = External
+end
+type 'a unboxed_record = { unboxed : 'a } [@@unboxed]
+type 'a internal_record = { boxed : 'a }
+
+(* Internal values result in caml_modify calls *)
+let () =
+  let f (type t) (x : t) =
+    let foo = Array.make 1 x in
+    foo.(0) <- x
+  in
+  let expect_caml_modifies = 1 in
+  test ~expect_caml_modifies (fun () -> f 10);
+  test ~expect_caml_modifies (fun () -> f "hello");
+  test ~expect_caml_modifies (fun () -> f true);
+  test ~expect_caml_modifies (fun () -> f { boxed = 10 });
+  test ~expect_caml_modifies (fun () -> f { boxed = "hello" });
+  test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
+  test ~expect_caml_modifies (fun () -> f { unboxed = "hello" });
+  test ~expect_caml_modifies (fun () -> f External_variant.make);
+  test ~expect_caml_modifies (fun () -> f (Boxed 10));
+  test ~expect_caml_modifies (fun () -> f (Boxed "hello"));
+  test ~expect_caml_modifies (fun () -> f (Unboxed 10));
+  test ~expect_caml_modifies (fun () -> f (Unboxed "hello"))
+
+(* External values result in no caml_modify calls *)
+let () =
+  let f (type (t : value mod external_)) (x : t) =
+    let foo = Array.make 1 x in
+    foo.(0) <- x
+  in
+  let expect_caml_modifies = 0 in
+  test ~expect_caml_modifies (fun () -> f 10);
+  test ~expect_caml_modifies (fun () -> f true);
+  test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
+  test ~expect_caml_modifies (fun () -> f External_variant.make);
+  test ~expect_caml_modifies (fun () -> f (Unboxed 10))
+
+(* Inlining a function that takes internal values should result in no caml_modify call
+   for external values *)
+let () =
+  let[@inline always] f (type t) (x : t) =
+    let foo = Array.make 1 x in
+    foo.(0) <- x
+  in
+  let expect_caml_modifies = 1 in
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
+  test ~expect_caml_modifies (fun () -> f 10);
+  test ~expect_caml_modifies (fun () -> f "hello");
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385.*)
+  test ~expect_caml_modifies (fun () -> f true);
+  test ~expect_caml_modifies (fun () -> f { boxed = 10 });
+  test ~expect_caml_modifies (fun () -> f { boxed = "hello" });
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
+  test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
+  test ~expect_caml_modifies (fun () -> f { unboxed = "hello" });
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
+  test ~expect_caml_modifies (fun () -> f External_variant.make);
+  test ~expect_caml_modifies (fun () -> f (Boxed 10));
+  test ~expect_caml_modifies (fun () -> f (Boxed "hello"));
+  (* CR layouts v2.8: should have no caml_modify call. Internal ticket 4385. *)
+  test ~expect_caml_modifies (fun () -> f (Unboxed 10));
+  test ~expect_caml_modifies (fun () -> f (Unboxed "hello"))
+
+(* External64 values result in no caml_modify calls iff the system is 64 bit *)
+let () =
+  let f (type (t : value mod external_)) (x : t) =
+    let foo = Array.make 1 x in
+    foo.(0) <- x
+  in
+  let is_64_bit =
+    match Sys.word_size with
+    | 64 -> true
+    | 32 ->
+      (* This case is never excersized because native tests are never run on a 32-bit
+         system *)
+      false
+    | _ -> failwith "Expected word size of 32 or 64"
+  in
+  let expect_caml_modifies = if is_64_bit then 0 else 1 in
+  test ~expect_caml_modifies (fun () -> f 10);
+  test ~expect_caml_modifies (fun () -> f true);
+  test ~expect_caml_modifies (fun () -> f { unboxed = 10 });
+  test ~expect_caml_modifies (fun () -> f External_variant.make);
+  test ~expect_caml_modifies (fun () -> f (Unboxed 10))
+
+(* Record modification with shallow external product *)
+let () =
+  let open struct
+    type outer = { mutable x : #(int * int) }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #(1, 2) } in
+    outer.x <- #(3, 4);
+    ignore (Sys.opaque_identity outer)
+  )
+
+
+let () =
+  let open struct
+    type inner = #{ a : int; b : int }
+    type outer = { mutable x : inner }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #{ a = 1; b = 2 } } in
+    outer.x <- #{ a = 3; b = 4 };
+    ignore (Sys.opaque_identity outer)
+  )
+
+let () =
+  let open struct
+    type inner = { a : int; b : int }
+    type outer = { mutable x : inner# }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #{ a = 1; b = 2 } } in
+    outer.x <- #{ a = 3; b = 4 };
+    ignore (Sys.opaque_identity outer)
+  )
+
+(* Record modification with nested external product *)
+let () =
+  let open struct
+    type outer = { mutable x : #(int * #(int * bool)) }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #(1, #(2, true)) } in
+    outer.x <- #(3, #(4, false));
+    ignore (Sys.opaque_identity outer)
+  )
+
+let () =
+  let open struct
+    type inner1 = #{ a : int; b : int }
+    type inner2 = #{ c : int; d : inner1 }
+    type outer = { mutable x : inner2 }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #{ c = 1; d = #{ a = 2; b = 3 } } } in
+    outer.x <- #{ c = 4; d = #{ a = 5; b = 6 } };
+    ignore (Sys.opaque_identity outer)
+  )
+
+let () =
+  let open struct
+    type inner1 = { a : int; b : int }
+    type inner2 = { c : int; d : inner1# }
+    type outer = { mutable x : inner2#}
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer = { x = #{ c = 1; d = #{ a = 2; b = 3 } } } in
+    outer.x <- #{ c = 4; d = #{ a = 5; b = 6 } };
+    ignore (Sys.opaque_identity outer)
+  )
+
+(* Record modification with nested mixed product *)
+let () =
+  let open struct
+    type outer =
+      { mutable x : #(int * #(int * #(string * bool) * #(bool option * char))) }
+  end in
+  test ~expect_caml_modifies:2
+  (fun () ->
+    let outer = { x = #(1, #(2, #("a", true), #(Some true, 'a'))) } in
+    outer.x <- #(3, #(4, #("b", false), #(None, 'b')));
+    ignore (Sys.opaque_identity outer)
+  )
+
+let () =
+  let open struct
+    type inner1 = #{ a : string; b : bool }
+    type inner2 = #{ c : bool option; d : char }
+    type inner3 = #{ e : int; f : inner1; g : inner2 }
+    type inner4 = #{ h : int; i : inner3 }
+    type outer = { mutable x : inner4 }
+  end in
+  test ~expect_caml_modifies:2
+  (fun () ->
+    let outer =
+      { x = #{ h = 1; i = #{ e = 2;
+                             f = #{ a = "a"; b = true };
+                             g = #{ c = Some true; d = 'a' } } } }
+    in
+    outer.x <- #{ h = 3; i = #{ e = 4;
+                                f = #{ a = "b"; b = false };
+                                g = #{ c = None; d = 'b' } } };
+    ignore (Sys.opaque_identity outer)
+  )
+
+let () =
+  let open struct
+    type inner1 = { a : string; b : bool }
+    type inner2 = { c : bool option; d : char }
+    type inner3 = { e : int; f : inner1#; g : inner2# }
+    type inner4 = { h : int; i : inner3# }
+    type outer = { mutable x : inner4# }
+  end in
+  test ~expect_caml_modifies:2
+  (fun () ->
+    let outer =
+      { x = #{ h = 1; i = #{ e = 2;
+                             f = #{ a = "a"; b = true };
+                             g = #{ c = Some true; d = 'a' } } } }
+    in
+    outer.x <- #{ h = 3; i = #{ e = 4;
+                                f = #{ a = "b"; b = false };
+                                g = #{ c = None; d = 'b' } } };
+    ignore (Sys.opaque_identity outer)
+  )
+
+(* Hiding the product in an [@@unboxed] record *)
+type ('a : value & value) not_a_box_record_1 = { u : 'a } [@@unboxed]
+type ('a : value & value) not_a_box_variant_1 = U of 'a [@@unboxed]
+
+let () =
+  let open struct
+    type outer = { mutable x : #(int * int) not_a_box_record_1;
+                   mutable y : #(int * int) not_a_box_variant_1; }
+  end in
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let outer =
+      { x = { u = #(1, 2) };
+        y = U #(1, 2) }
+    in
+    outer.x <- { u = #(3, 4) };
+    outer.y <- U #(3, 4);
+    ignore (Sys.opaque_identity outer)
+  )
+
+type ('a : value & (value & (value & value) & (value & value)))
+       not_a_box_record_2 = { u : 'a } [@@unboxed]
+type ('a : value & (value & (value & value) & (value & value)))
+       not_a_box_variant_2 = U of 'a [@@unboxed]
+
+let () =
+  let open struct
+    type inner1 = { a : string; b : bool }
+    type inner2 = { c : bool option; d : char }
+    type inner3 = { e : int; f : inner1#; g : inner2# }
+    type inner4 = { h : int; i : inner3# }
+    type outer = { mutable x : inner4# not_a_box_record_2;
+                   mutable y : inner4# not_a_box_variant_2; }
+  end in
+  test ~expect_caml_modifies:4
+  (fun () ->
+    let inner4_1 =
+      #{ h = 1; i = #{ e = 2;
+                       f = #{ a = "a"; b = true };
+                       g = #{ c = Some true; d = 'a' } } }
+    in
+    let inner4_2 =
+      #{ h = 3; i = #{ e = 4;
+                       f = #{ a = "b"; b = false };
+                       g = #{ c = None; d = 'b' } } }
+    in
+    let outer =
+      { x = { u = inner4_1 }; y = U inner4_1 }
+    in
+    outer.x <- { u = inner4_2 };
+    outer.y <- U inner4_2;
+    ignore (Sys.opaque_identity outer)
+  )
+
+(* Records with fields of kind [any] *)
+
+let () =
+  let open struct
+    type ('a : any) singleton_any = { mutable a : 'a }
+    type ('b : any, 'c : any) pair_any_any = { mutable b : 'b; mutable c : 'c }
+    type ('d : any) pair_any_int = { mutable d : 'd; mutable i : int }
+    type ('e : any, 'v : value) pair_any_value = { mutable e : 'e;
+                                                   mutable v : 'v; }
+  end in
+
+  test ~expect_caml_modifies:0
+  (fun () ->
+    let sa_int = { a = 1 } in
+    sa_int.a <- 2;
+    ignore (Sys.opaque_identity sa_int);
+
+    let sa_int64u = { a = #1L } in
+    sa_int64u.a <- #2L;
+    ignore (Sys.opaque_identity sa_int64u);
+
+    let paa_array_int = { b = [| 1 |]; c = 2 } in
+    paa_array_int.c <- 3;
+    ignore (Sys.opaque_identity paa_array_int);
+
+    let paa_array_int64u = { b = [| 1 |]; c = #2L } in
+    paa_array_int64u.c <- #3L;
+    ignore (Sys.opaque_identity paa_array_int64u);
+
+    let pai_array = { d = [| 1 |]; i = 2 } in
+    pai_array.i <- 3;
+    ignore (Sys.opaque_identity paa_array_int64u);
+
+    let pav_array_int = { e = [| 1 |]; v = 2 } in
+    pav_array_int.v <- 3;
+    ignore (Sys.opaque_identity pav_array_int);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let sa_array = { a = [| 1 |] } in
+    sa_array.a <- [| 2 |];
+    ignore (Sys.opaque_identity sa_array)
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let paa_array_int = { b = [| 1 |]; c = 2 } in
+    paa_array_int.b <- [| 3 |];
+    ignore (Sys.opaque_identity paa_array_int);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let paa_array_int64u = { b = [| 1 |]; c = #2L } in
+    paa_array_int64u.b <- [| 3 |];
+    ignore (Sys.opaque_identity paa_array_int64u);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pai_array = { d = [| 1 |]; i = 2 } in
+    pai_array.d <- [| 3 |];
+    ignore (Sys.opaque_identity pai_array);
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pav_array_int = { e = [| 1 |]; v = 2 } in
+    pav_array_int.e <- [| 3 |];
+    ignore (Sys.opaque_identity pav_array_int)
+  );
+
+  test ~expect_caml_modifies:1
+  (fun () ->
+    let pav_int64u_array = { e = #1L; v = [| 2 |] } in
+    pav_int64u_array.v <- [| 3 |];
+    ignore (Sys.opaque_identity pav_int64u_array)
+  );
+
+(* Setting an immediate or non-value block index should give only the needed
+   number of caml_modifies *)
+
+(* First layout poly versions *)
+external unsafe_set : ('a : value) ('b : any).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+[@@layout_poly]
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set t idx 1; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64_u }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set t idx #1L; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set t idx #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic set primitive. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set r (.x) x in
+  (* both [string] and [int] share the same specialization of [set_x],
+     and so we have to do the conservative thing and emit [caml_modify]
+     in either case. *)
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  (* [float#] has a distinct layout and gets its own specialization where
+     [caml_modify] is skipped. *)
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
+
+(* Second, specialized versions *)
+external unsafe_set_imm : ('a : value) ('b : immediate).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm t idx 1; ignore (Sys.opaque_identity t))
+
+external unsafe_set_i64 : ('a : value) ('b : bits64).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64_u }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_i64 t idx #1L; ignore (Sys.opaque_identity t))
+
+external unsafe_set_prod : ('a : value) ('b : bits64 & value & immediate).
+  'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_prod t idx #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+external unsafe_set_or_null
+  : ('a : value) ('b : any).
+  'a or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
+  @@ portable
+  = "%set_idx"
+[@@layout_poly]
+
+let () =
+  let open struct
+    type ('base : value, 'data : any) impl =
+      #{ x : 'base or_null
+      ; global_ idx : ('base, 'data) idx_mut
+      }
+
+    type ('data : any) t = T : ('base : value) ('data : any). ('base, 'data) impl -> 'data t
+    [@@unboxed]
+
+    type 'a s = { mutable y : int or_null }
+  end in
+  (* Basic int or_null case without extra indirection *)
+  let t = This { y = This 1 } in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null t (.y) (This 0);
+               let _ = Sys.opaque_identity t in ());
+  (* Two cases with specialization on both concrete and abstract types *)
+  let unsafe_set_or_null_int (t : int or_null t) v =
+    let (T #{ x; idx }) = t in
+    unsafe_set_or_null x idx v
+  in
+  let unsafe_set_or_null_imm64 (type a : immediate64) (t : a or_null t) v =
+    let (T #{ x; idx }) = t in
+    unsafe_set_or_null x idx v
+  in
+  let t : int or_null t = T #{ x = This { y = This 1 }; idx = (.y) } in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null_int t (This 0);
+               let _ = Sys.opaque_identity t in ());
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_or_null_imm64 t (This 0);
+               let _ = Sys.opaque_identity t in ())
+
+(* specialized, but on abstract type with product kind *)
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_imm64 (type a : immediate64 & immediate64) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  (* Only the product's mod bound says its components are GC-ignorable. *)
+  let[@inline never] unsafe_set_external
+      (type a : (value & value) mod external_)
+      box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_imm64 t idx #(0, 0);
+               ignore (Sys.opaque_identity t));
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_external t idx #(3, 4);
+               ignore (Sys.opaque_identity t))
+
+(* An internal component must not hide another component's externality. *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #('a * string) }
+  end in
+  let[@inline never] unsafe_set_external
+      (type a : value mod external_) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let[@inline never] unsafe_set_external64
+      (type a : value mod external64) (t : a t) v =
+    unsafe_set t (.x) v
+  in
+  let t = { x = #(1, "before") } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external t #(2, "after");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 2 && s = "after"));
+  test ~expect_caml_modifies:1
+    (fun () ->
+      unsafe_set_external64 t #(3, "after64");
+      let #(i, s) = (Sys.opaque_identity t).x in
+      assert (i = 3 && s = "after64"))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * int) }
+  end in
+  let unsafe_set_imm64_imm (type a : immediate64 & immediate) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, 2) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm64_imm t idx #(0, 0);
+               ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { mutable a : #(int * #(int * int)) }
+  end in
+  let unsafe_set_imm_and_imm_imm (type a : immediate & (immediate & immediate)) box (idx : (_, a) idx_mut) (v : a) =
+    unsafe_set box idx v
+  in
+  let t = { a = #(1, #(2, 3)) } in
+  let idx = (.a) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_imm_and_imm_imm t idx #(0, #(0, 0));
+               ignore (Sys.opaque_identity t))
+
+(* Setting an immediate or non-value block index via the ptr primitives should
+   give only the needed number of caml_modifies *)
+
+(* First layout poly versions *)
+external[@layout_poly] unsafe_set_ptr :
+  'a ('b : any).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr #(t, idx) 1; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64_u }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr #(t, idx) #1L; ignore (Sys.opaque_identity t))
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_ptr #(t, idx) #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* A layout-polymorphic function calling a layout-polymorphic ptr set
+   primitive. As above, [string] and [int] share a specialization of [set_x]
+   that must call [caml_modify], while [float#] gets its own. *)
+let () =
+  let open struct
+    type ('a : any) t = { mutable x : 'a }
+    external box_float : float# -> float = "%box_float"
+  end in
+  let[@inline never] poly_ set_x r x = unsafe_set_ptr #(r, (.x)) x in
+  let string_record = { x = "before" } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x string_record "after";
+      assert ((Sys.opaque_identity string_record).x = "after"));
+  let int_record = { x = 1 } in
+  test ~expect_caml_modifies:1
+    (fun () ->
+      set_x int_record 2;
+      assert ((Sys.opaque_identity int_record).x = 2));
+  let float_record = { x = #1.5 } in
+  test ~expect_caml_modifies:0
+    (fun () ->
+      set_x float_record #2.5;
+      assert (box_float (Sys.opaque_identity float_record).x = 2.5))
+
+(* Second, specialized versions *)
+external unsafe_set_ptr_imm :
+  'a ('b : immediate).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int }
+  end in
+  let t = { x = "x"; y = 0 } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr_imm #(t, idx) 1; ignore (Sys.opaque_identity t))
+
+external unsafe_set_ptr_i64 :
+  'a ('b : bits64).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : int64_u }
+  end in
+  let t = { x = "x"; y = #0L } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:0
+    (fun () -> unsafe_set_ptr_i64 #(t, idx) #1L; ignore (Sys.opaque_identity t))
+
+external unsafe_set_ptr_prod :
+  'a ('b : bits64 & value & immediate).
+  (#('a * ('a, 'b) idx_mut)[@local_opt]) -> ('b[@local_opt]) -> unit
+  = "%unsafe_set_ptr"
+
+let () =
+  let open struct
+    type t = { x : string; mutable y : #(int64_u * string * bool)}
+  end in
+  let t = { x = "x"; y = #(#0L, "a", true) } in
+  let idx = (.y) in
+  test ~expect_caml_modifies:1
+    (fun () -> unsafe_set_ptr_prod #(t, idx) #(#1L, "b", false);
+               ignore (Sys.opaque_identity t))
+
+(* Parameterized unboxed records: type args must be substituted for params *)
+let () =
+  let open struct
+    type ('a : value_or_null) pair = #{ x : 'a; y : 'a }
+    type t = { mutable is : int pair }
+  end in
+  let[@inline never] f t is =
+    t.is <- is
+  in
+  let t = { is = #{ x = 1; y = 2 } } in
+  test ~expect_caml_modifies:0
+    (fun () -> f t #{ x = 3; y = 4 };
+               ignore (Sys.opaque_identity t))
+
+(* Two type params, one immediate and one pointer *)
+let () =
+  let open struct
+    type ('a : value_or_null, 'b : value_or_null) t2 =
+      #{ x : 'a; y : 'b }
+    type t = { mutable p : (int, string) t2 }
+  end in
+  let[@inline never] f t p = t.p <- p in
+  let t = { p = #{ x = 1; y = "a" } } in
+  test ~expect_caml_modifies:1
+    (fun () -> f t #{ x = 3; y = "b" };
+               ignore (Sys.opaque_identity t))
+
+(* Unboxed GADT: the existential component's immediacy is only visible in the
+   declared [immediate & immediate] field shape *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type t : immediate & immediate = T : #('a t' * 'a) -> t [@@unboxed]
+    type holder = { mutable t : t }
+  end in
+  let r = { t = T #(Int, 1) } in
+  test ~expect_caml_modifies:0
+    (fun () -> r.t <- T #(Unit, ()); ignore (Sys.opaque_identity r));
+  let[@inline never] set r v = r.t <- v in
+  test ~expect_caml_modifies:0
+    (fun () -> set r (T #(Int, 2)); ignore (Sys.opaque_identity r))
+
+(* Same shape but with a genuinely pointer-carrying component *)
+let () =
+  let open struct
+    type ('a : immediate) t' : immediate = Int : int t' | Unit : unit t'
+    type p : immediate & value = P : #('a t' * string) -> p [@@unboxed]
+    type holder = { mutable p : p }
+  end in
+  let r = { p = P #(Int, "a") } in
+  test ~expect_caml_modifies:1
+    (fun () -> r.p <- P #(Unit, "b"); ignore (Sys.opaque_identity r))
+
+(* Polymorphic write where ['a]'s kind at the use site is more precise than
+   the declared [value] parameter: only the string word needs the barrier *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+  end in
+  let[@inline never] set : ('a : immediate). 'a t -> #(string * 'a) -> unit =
+    fun t v -> t.x <- v
+  in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, via a polymorphic record field *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type setter = { apply : ('b : immediate). 'b t -> #(string * 'b) -> unit }
+  end in
+  let s = Sys.opaque_identity { apply = fun t v -> t.x <- v } in
+  let t = { x = #("s", 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> s.apply t #("u", 2); ignore (Sys.opaque_identity t))
+
+(* Same, where the parameter is instantiated to an unboxed existential *)
+let () =
+  let open struct
+    type 'a t = { mutable x : #(string * 'a) }
+    type u = U : ('a : immediate). 'a -> u [@@unboxed]
+  end in
+  let[@inline never] set (t : u t) v = t.x <- v in
+  let t = { x = #("s", U 1) } in
+  test ~expect_caml_modifies:1
+    (fun () -> set t #("u", U 2); ignore (Sys.opaque_identity t))

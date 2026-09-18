@@ -1,0 +1,19 @@
+(library
+ (name ocaml_typing)
+ (public_name merlin-lib.ocaml_typing)
+ (flags
+  -open
+  Ocaml_utils
+  -open
+  Ocaml_parsing
+  -open
+  Merlin_utils
+  (:standard -w -9-47))
+ (modules_without_implementation
+  annot
+  outcometree
+  mode_hint
+  mode_intf
+  solver_intf
+  value_rec_types)
+ (libraries merlin_utils ocaml_parsing ocaml_utils))

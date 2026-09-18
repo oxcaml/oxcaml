@@ -1,0 +1,7 @@
+File "unqualified.ml", line 17, characters 13-19:
+17 |   let e = <[ answer ]> in
+                  ^^^^^^
+Error: Identifier answer is used at file "unqualified.ml", line 17, characters 13-19,
+       inside a quotation (<[ ... ]>);
+       it is introduced at file "unqualified.ml", line 14, characters 4-10,
+       outside any quotations.

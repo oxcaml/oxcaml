@@ -1,0 +1,24 @@
+(rule
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (targets test.output.corrected a.o b.o a.cmi b.cmx)
+ (deps a.mli a.ml b.ml c.ml ../filter.sh)
+ (action
+   (with-outputs-to test.output.corrected
+     (progn
+     (run %{bin:ocamlopt.opt} a.mli a.ml -g -color never -error-style short -c
+          -zero-alloc-checker-details-cutoff 20 -O3)
+     (run %{bin:ocamlopt.opt} b.ml -g -color never -error-style short -c
+          -zero-alloc-checker-details-cutoff 20 -O3)
+     (with-accepted-exit-codes 0
+       (bash "rm a.cmx"))
+     (pipe-outputs
+     (with-accepted-exit-codes 2
+     (run %{bin:ocamlopt.opt} c.ml -g -color never -error-style short -c
+          -zero-alloc-checker-details-cutoff 20 -O3 -w "-58"))
+     (run "../filter.sh"))))))
+
+(rule
+ (alias   runtest)
+ (enabled_if (and (= %{context_name} "main") (= %{architecture} "amd64")) )
+ (deps test.output test.output.corrected)
+ (action (diff test.output test.output.corrected)))

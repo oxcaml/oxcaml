@@ -1,0 +1,239 @@
+/**************************************************************************/
+/*                                                                        */
+/*                                 OCaml                                  */
+/*                                                                        */
+/*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           */
+/*                                                                        */
+/*   Copyright 2007 Institut National de Recherche en Informatique et     */
+/*     en Automatique.                                                    */
+/*                                                                        */
+/*   All rights reserved.  This file is distributed under the terms of    */
+/*   the GNU Lesser General Public License version 2.1, with the          */
+/*   special exception on linking described in the file LICENSE.          */
+/*                                                                        */
+/**************************************************************************/
+
+#define CAML_INTERNALS
+
+#include <unistd.h>
+#define __USE_GNU
+#if !defined(__OpenBSD__)
+#define _GNU_SOURCE
+#include <sys/ucontext.h>
+#endif
+
+/* Signal handling, code specific to the native-code compiler */
+
+#include <signal.h>
+#include <errno.h>
+#include <stdio.h>
+#include "caml/codefrag.h"
+#include "caml/domain.h"
+#include "caml/fail.h"
+#include "caml/fiber.h"
+#include "caml/frame_descriptors.h"
+#include "caml/memory.h"
+#include "caml/osdeps.h"
+#include "caml/signals.h"
+#include "caml/stack.h"
+
+/* The number of allocations in a frame descriptor fits in a byte. */
+#define Alloc_len_bufsize 256
+
+/* Get allocation info for the current frame, for re-doing allocations after GC
+   or resuming preemption.
+
+   Returns the allocation size in words (wosize, without header).
+   Sets *alloc_len_out and *nallocs_out if they are non-NULL.
+
+   [unpacked] is caller-owned scratch space of at least
+   [Alloc_len_bufsize] bytes; *alloc_len_out may point into it. It
+   must not be shared (static or thread-local): the result is
+   consumed across operations which can re-enter this function on the
+   same thread (memprof sampling captures callstacks, which can
+   allocate, run pending memprof callbacks, and so trigger a nested
+   caml_garbage_collection), and a shared buffer would be overwritten
+   while still in use. */
+Caml_inline intnat current_frame_alloc_wosize(unsigned char* unpacked,
+                                              unsigned char** alloc_len_out,
+                                              int* nallocs_out)
+{
+  frame_descr* d;
+  caml_domain_state * dom_st = Caml_state;
+  caml_frame_descrs* fds = caml_get_frame_descrs();
+  struct stack_info* stack = dom_st->current_stack;
+
+  char * sp = (char*)stack->sp;
+  sp = First_frame(sp);
+  uintnat retaddr = Saved_return_address(sp);
+
+  /* Find the frame descriptor for the current allocation */
+  d = caml_find_frame_descr(fds, retaddr);
+  CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
+
+  /* Compute the total allocation size at this point, including allocations
+     combined by Comballoc. The encoded allocation lengths are returned as a
+     byte-per-allocation array. In the short descriptor format they are stored
+     as 4-bit nibbles, so we unpack them into the caller's buffer. */
+  unsigned char* alloc_len;
+  int nallocs;
+  struct frame_descr_decoded dec;
+  caml_decode_frame_descr(d, &dec);
+  nallocs = dec.num_allocs;
+  if (nallocs == 0) {
+    return 0; /* This is a poll */
+  }
+  if (dec.is_short) {
+    for (int i = 0; i < nallocs; i++) {
+      unsigned char byte = dec.short_allocs[i / 2];
+      unpacked[i] = (i & 1) ? (byte >> 4) : (byte & 0xf);
+    }
+    alloc_len = unpacked;
+  } else {
+    /* escaped: byte sizes follow the num_allocs byte */
+    alloc_len = (unsigned char *)dec.end_of_live + 1;
+  }
+
+  intnat allocsz = 0;
+  for (int i = 0; i < nallocs; i++) {
+    allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
+  }
+  /* We have computed whsize (including header) but need wosize (without) */
+  allocsz -= 1;
+
+  if (alloc_len_out != NULL) *alloc_len_out = alloc_len;
+  if (nallocs_out != NULL) *nallocs_out = nallocs;
+
+  return allocsz;
+}
+
+/* This routine is the common entry point for garbage collection
+   and signal handling.  It can trigger a callback to OCaml code.
+   With system threads, this callback can cause a context switch.
+   Hence [caml_garbage_collection] must not be called from regular C code
+   (e.g. the [caml_alloc] function) because the context of the call
+   (e.g. [intern_val]) may not allow context switching.
+   Only generated assembly code can call [caml_garbage_collection],
+   via the caml_call_gc assembly stubs.  */
+
+void caml_garbage_collection(void)
+{
+  caml_domain_state * dom_st = Caml_state;
+
+  /* Synchronise for the case when [young_limit] was used to interrupt
+     us. */
+  atomic_thread_fence(memory_order_acquire);
+
+  unsigned char alloc_len_buf[Alloc_len_bufsize];
+  unsigned char* alloc_len = NULL;
+  int nallocs = 0;
+  intnat allocsz =
+    current_frame_alloc_wosize(alloc_len_buf, &alloc_len, &nallocs);
+
+  if (nallocs == 0) {
+    /* This is a poll */
+    caml_process_pending_actions_flags(CAML_FROM_CAML);
+    return;
+  }
+
+  caml_alloc_small_dispatch(dom_st, allocsz, CAML_DO_TRACK | CAML_FROM_CAML,
+                            nallocs, alloc_len);
+}
+
+/* Redo the allocation that was interrupted by preemption. */
+void caml_redo_preempted_allocation(void)
+{
+  caml_domain_state * dom_st = Caml_state;
+
+  unsigned char alloc_len_buf[Alloc_len_bufsize];
+  intnat allocsz = current_frame_alloc_wosize(alloc_len_buf, NULL, NULL);
+
+  if (allocsz == 0) {
+    /* This is a poll - no allocation to redo */
+    return;
+  }
+
+  dom_st->young_ptr -= Whsize_wosize(allocsz);
+  /* Check to see if that put us over the limit, and GC if so */
+  if (Caml_check_gc_interrupt(dom_st)) {
+    Alloc_small_enter_GC(dom_st, allocsz);
+  }
+}
+
+#ifdef STACK_GUARD_PAGES
+
+#if !defined(POSIX_SIGNALS)
+#error "stack checks cannot be disabled if POSIX signals are not available"
+#endif
+
+typedef void (*sigaction_t)(int sig, siginfo_t *info, void *context);
+
+#define DECLARE_SIGNAL_HANDLER(name) \
+  static void name(int sig, siginfo_t * info, ucontext_t * context)
+
+#define SET_SIGACT(sigact,name)                                       \
+  sigact.sa_sigaction = (sigaction_t) (name);    \
+  sigact.sa_flags = SA_SIGINFO
+
+CAMLextern void caml_raise_stack_overflow_nat(void);
+
+static sigaction_t prior_segv_handler = NULL;
+
+DECLARE_SIGNAL_HANDLER(segv_handler)
+{
+  struct sigaction act;
+  if (Caml_state) {
+    struct stack_info *block = Caml_state->current_stack;
+    char* fault_addr = info->si_addr;
+    char* protected_low = Protected_stack_page(block);
+    char* protected_high = protected_low + caml_plat_pagesize;
+    if ((fault_addr >= protected_low) && (fault_addr < protected_high)) {
+      /* Faulting in the current guard page; presume stack overflow. Raise the
+         exception. */
+#ifdef SYS_macosx
+      context->uc_mcontext->__ss.__rip = (unsigned long long) &caml_raise_stack_overflow_nat;
+#else
+      context->uc_mcontext.gregs[REG_RIP]= (greg_t) &caml_raise_stack_overflow_nat;
+#endif
+      return; /* to caml_raise_stack_overflow_nat */
+    }
+  }
+
+  /* Not a stack-overflow on our current Caml stack */
+  if (prior_segv_handler) {
+    /* Somebody else installed a SEGV handler before us. We make
+     * "reasonable best efforts" to invoke it, as maybe it's a SEGV
+     * they know about and can fix. We can't apply whatever sa_flags
+     * they had, but we can call their handler. */
+    prior_segv_handler(sig, info, context);
+  } else { /* default SEGV behaviour */
+    act.sa_handler = SIG_DFL;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGSEGV, &act, NULL);
+  }
+  /* returning from SEGV handler restarts the failing instruction */
+}
+
+void caml_init_nat_signals(void)
+{
+  struct sigaction act, oldact;
+  extern uintnat caml_enable_segv_handler;
+  if (!caml_enable_segv_handler)
+    return;
+  SET_SIGACT(act, segv_handler);
+  act.sa_flags |= SA_ONSTACK;
+  sigemptyset(&act.sa_mask);
+  sigaction(SIGSEGV, &act, &oldact);
+  if (oldact.sa_sigaction != (sigaction_t)SIG_DFL) {
+    prior_segv_handler = oldact.sa_sigaction;
+  }
+}
+
+#else
+
+void caml_init_nat_signals(void)
+{
+}
+
+#endif

@@ -1,0 +1,52 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Mark Shinwell, Jane Street Europe                     *)
+(*                                                                        *)
+(*   Copyright 2013--2018 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* DWARF-4 standard section 7.4. *)
+
+[@@@ocaml.warning "+a-4-30-40-41-42"]
+
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+
+(* Even on a 32-bit platform, a DWARF section may be larger than the maximum
+   representable positive signed 32-bit integer... *)
+type t = Dwarf_int.t
+
+let create initial_length = initial_length
+
+let to_dwarf_int t = t
+
+let size t = Dwarf_int.size t
+
+let sixty_four_bit_indicator = 0xffffffffl
+
+let emit_as_label_difference ~asm_directives ~upper ~lower =
+  (* As [emit] below, but with the length computed by the assembler as the
+     distance between the two labels. *)
+  (match Dwarf_format.get () with
+  | Thirty_two -> ()
+  | Sixty_four ->
+    Dwarf_value.emit ~asm_directives
+      (Dwarf_value.int32 ~comment:"64-bit indicator" sixty_four_bit_indicator));
+  Dwarf_value.emit ~asm_directives
+    (Dwarf_value.distance_between_labels_format_width ~comment:"initial length"
+       ~upper ~lower ())
+
+let emit ~asm_directives t =
+  match Dwarf_format.get () with
+  | Thirty_two ->
+    Dwarf_int.emit ~asm_directives ~comment:"32-bit initial length" t
+  | Sixty_four ->
+    Dwarf_value.emit ~asm_directives
+      (Dwarf_value.int32 ~comment:"64-bit indicator" sixty_four_bit_indicator);
+    Dwarf_int.emit ~asm_directives ~comment:"64-bit initial length" t

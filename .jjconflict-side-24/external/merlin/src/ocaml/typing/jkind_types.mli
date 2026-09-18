@@ -1,0 +1,252 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Liam Stevenson, Jane Street, New York                 *)
+(*                                                                        *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** You should use the types defined in [Jkind] (which redefines the types in
+    this file) rather than using this file directly, unless you are in [Types]
+    or [Primitive]. *)
+
+(* This module defines types used in the module Jkind. This is to avoid a mutual
+   dependencies between jkind.ml(i) and types.ml(i) and bewteen jkind.ml(i) and
+   primitive.ml(i). Polymorphic versions of types are defined here, with type
+   parameters that are meant to be filled by types defined in
+   types.ml(i). jkind.ml(i) redefines the types from this file types.ml with the
+   type variables instantiated. types.ml also redefines the types from this file
+   with the type variables instantiated, but only for internal
+   use. primitive.ml(i) uses the type [Jkind.Const.t], and types.ml(i) depends
+   on primitive.ml(i), so [Jkind.Const.t] is defined here and primitive.ml(i)
+   also uses this module.
+
+   Dependency chain without Jkind_types:
+         _____________________
+         |         |         |
+         |         |         V
+   Primitive <-- Types <-- Jkind
+
+   Dependency chain with Jkind_types:
+        ______________________________________
+        |                          |         |
+        V                          |         |
+   Jkind_types <-- Primitive <-- Types <-- Jkind
+
+   All definitions here are commented in jkind.ml or jkind.mli. *)
+
+module Sort : sig
+  (* We need to expose these details for use in [Jkind] *)
+
+  (* Comments in [Jkind_intf.ml] *)
+  type base =
+    | Void
+    | Scannable
+    | Untagged_immediate
+    | Float64
+    | Float32
+    | Word
+    | Bits8
+    | Bits16
+    | Bits32
+    | Bits64
+    | Vec128
+    | Vec256
+    | Vec512
+    | Mask
+
+  val to_string_base : base -> string
+
+  val equal_base : base -> base -> bool
+
+  val base_is_addressable : base -> bool
+
+  type univar = { name : string option }
+
+  type t =
+    | Var of var
+    | Base of base
+    | Product of t list
+    | Univar of univar
+    | Addressable of t
+
+  and var
+
+  include
+    Jkind_intf.Sort
+      with type t := t
+       and type var := var
+       and type univar := univar
+       and type base := base
+
+  val set_change_log : (change -> unit) -> unit
+
+  val equate : allow_mutation:bool -> t -> t -> bool
+
+  val constrain_addressable : allow_mutation:bool -> t -> bool
+
+  val strip_head_addressable : t -> t
+
+  (** Post-condition (which holds deeply within the sort): If the result is a
+      [Var v], then [!v] is [None]. *)
+  val get : t -> t
+
+  (** Determines if the sort is [Scannable] or an unfilled sort variable,
+      possibly under [Addressable] wrappers *)
+  val is_scannable_or_var : t -> bool
+
+  val implied_externality :
+    separability:Jkind_axis.Separability.t -> t -> Jkind_axis.Externality.t
+
+  (** Decompose a sort into a list (of the given length) of fresh sort
+      variables, equating the input sort with the product of the output sorts.
+  *)
+  val decompose_into_product : t -> int -> t list option
+
+  module Flat : sig
+    type t =
+      | Var of Var.id
+      | Genvar of var
+      | Univar of univar
+      | Base of base
+  end
+end
+
+module Kind_operator : sig
+  type t =
+    | Id
+    | Addressable
+
+  val equal : t -> t -> bool
+
+  val compose : t -> t -> t
+end
+
+module Scannable_axes : sig
+  type t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
+
+  val max : t
+
+  val value_axes : t
+
+  val equal : t -> t -> bool
+
+  val less_or_equal : t -> t -> Misc.Le_result.t
+
+  val meet : t -> t -> t
+
+  (** [residual sa sa'] is the greatest [r] such that [meet sa r = meet sa sa'].
+  *)
+  val residual : t -> t -> t
+end
+
+module Layout : sig
+  (** Note that:
+
+      1. Products have two possible encodings: as [Product ...] or as
+      [Sort (Product ...]. This duplication is hard to eliminate because of the
+      possibility that a sort variable may be instantiated by a product sort.
+
+      2. Scannable axes are meaningful only when the layout might be scannable
+      ([any], [scannable], a sort variable, or an abstract kind). On other
+      layouts they are ignored, so e.g. [float64 non_pointer] is equivalent to
+      [float64]. See [Layout.Const.get_root_scannable_axes].
+
+      3. Like products, [Addressable] has two possible encodings: at the layout
+      level or within a sort. [Addressable (Any _)] can only be encoded at the
+      layout level. *)
+  type 'sort t =
+    | Sort of 'sort * Scannable_axes.t
+    | Product of 'sort t list
+    | Any of Scannable_axes.t
+    | Addressable of 'sort t
+    | Box of 'sort t * Scannable_axes.t
+        (** The contents of a box imply some scannable axes (see
+            [Const.implied_box_axes]), so the scannable axes of a box are the
+            meet of those implied axes and the axes applied outside of the box
+            constructor. *)
+
+  module Const : sig
+    type t = private
+      | Any of Scannable_axes.t
+      | Base of Sort.base * Scannable_axes.t
+      | Product of t list
+      | Univar of Sort.univar
+      | Genvar of Sort.var
+      | Addressable of t
+          (** See Note [Addressable kinds].
+
+              Invariant: this constructor is never redundantly applied. I.e.,
+              given [Addressable t], [not (is_surely_addressable t)]. *)
+      | Box of t * Scannable_axes.t
+          (** Invariant: axes on const boxes incorporate the axes implied by the
+              contents. I.e., given [Box (t, sa)],
+              [Scannable_axes.meet (implied_box_axes t) sa = sa]. *)
+
+    val any : Scannable_axes.t -> t
+
+    val product : t list -> t
+
+    val univar : Sort.univar -> t
+
+    val genvar : Sort.var -> t
+
+    module Static : sig
+      val of_base : Sort.base -> Scannable_axes.t -> t
+    end
+
+    val equal : t -> t -> bool
+
+    val max : t
+
+    val get_sort : t -> Sort.Const.t option
+
+    val implied_externality : t -> Jkind_axis.Externality.t
+
+    val is_surely_addressable : t -> bool
+
+    val addressable : t -> t
+
+    val apply_operator : t -> Kind_operator.t -> t
+
+    (** The scannable axes implied by boxing data of layout [t]. *)
+    val implied_box_axes : t -> Scannable_axes.t
+
+    (** Given a layout [t] and scannable axes [sa], this function constructs the
+        layout [(t box) sa] while maintaining the invariant on [Box] above. *)
+    val box : t -> Scannable_axes.t -> t
+
+    (** Returns [None] if the root of [t] has no meaningful scannable axes (e.g.
+        [Base Float64], [Product], [Univar], [Genvar]). *)
+    val get_root_scannable_axes : t -> Scannable_axes.t option
+
+    (** Updates the scannable axes at the root of [t] (changes nothing when
+        [get_root_scannable_axes] would return [None]). *)
+    val set_root_scannable_axes : t -> Scannable_axes.t -> t
+
+    (** Meets [sa] into [t]'s root scannable axes (if [t] has meaningful ones;
+        otherwise returns [t] unchanged). *)
+    val meet_root_scannable_axes : t -> Scannable_axes.t -> t
+  end
+
+  val of_const : Const.t -> Sort.t t
+
+  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
+
+  val get_const : Sort.t t -> Const.t option
+
+  val get_flat_const : Sort.Flat.t t -> Const.t option
+
+  val product : 'a t list -> 'a t
+
+  val apply_operator : 'a t -> Kind_operator.t -> 'a t
+end

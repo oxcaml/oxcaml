@@ -1,0 +1,173 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                  Mark Shinwell, Jane Street Europe                     *)
+(*                                                                        *)
+(*   Copyright 2014--2019 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+[@@@ocaml.warning "+a-4-30-40-41-42"]
+
+open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
+open Dwarf_low
+module O = Dwarf_operator
+module OB = Operator_builder
+
+type t = Simple_location_description.t
+
+type lvalue = t
+
+type lvalue_without_address = t
+
+type normal
+
+type implicit
+
+type _ rvalue = t
+
+let empty = []
+
+let byte_offset_of_words offset_in_words =
+  Targetint.mul offset_in_words Targetint.size_in_bytes_as_targetint
+
+(* We emit special code to catch the case where evaluation of the location
+   description [t] fails (for example due to unavailability). In the event of
+   an unavailability failure, the [DW_OP_call*] evaluation of [t] does nothing
+   to the stack, leaving the sentinel zero (pushed before [t] runs) as the
+   result. If evaluation of [t] succeeds, the sentinel is dropped and the
+   [if_successful] operators run with the result of [t] on top of the stack. *)
+(* TODO: This guard scheme conflates a genuine value of zero computed by [t]
+   with failure to evaluate [t]: both leave the sentinel zero as the result.
+   The guard exists because failed evaluation of a location description caused
+   errors in GDB. We aim to fix LLDB so that failed evaluation is not an issue
+   there, at which point the guard (and with it the conflation) can be
+   removed. *)
+let guard_evaluation_failure t ~if_successful =
+  (OB.signed_int_const Targetint.zero :: t)
+  @ [O.DW_op_dup]
+  @ OB.conditional ~if_zero:[]
+      ~if_nonzero:([O.DW_op_swap; O.DW_op_drop] @ if_successful)
+      ~at_join:[] ()
+
+module Lvalue = struct
+  type t = lvalue
+
+  let in_register ~dwarf_reg_number = [OB.register_as_lvalue ~dwarf_reg_number]
+
+  let in_stack_slot ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    OB.address_of_stack_slot ~offset_in_bytes
+
+  let in_domainstate_slot ~offset_in_words
+      ~domainstate_ptr_dwarf_register_number =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    OB.address_of_domainstate_slot ~offset_in_bytes
+      ~domainstate_ptr_dwarf_register_number
+
+  let in_symbol_field symbol ~field =
+    let offset_in_bytes = byte_offset_of_words field in
+    OB.value_of_symbol ~symbol :: OB.add_unsigned_const offset_in_bytes
+
+  let read_field ~block ~field =
+    let offset_in_bytes = byte_offset_of_words field in
+    guard_evaluation_failure block
+      ~if_successful:(OB.add_unsigned_const offset_in_bytes)
+
+  let offset_pointer t ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    guard_evaluation_failure t
+      ~if_successful:(OB.add_signed_const offset_in_bytes)
+
+  let read_field_unguarded ~block ~field =
+    let offset_in_bytes = byte_offset_of_words field in
+    block @ OB.add_unsigned_const offset_in_bytes
+
+  let offset_pointer_unguarded t ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    t @ OB.add_signed_const offset_in_bytes
+
+  let location_from_another_die ~die_label ~compilation_unit_header_label =
+    [OB.call ~die_label ~compilation_unit_header_label]
+end
+
+module Lvalue_without_address = struct
+  type t = lvalue_without_address
+
+  (* Note that due to the phantom parameter in the .mli on type [_ Rvalue.t],
+     this function can never be called with an implicit pointer construction.
+     This is important since it would be wrong to put [DW_OP_stack_value] after
+     such a construction. *)
+  let of_rvalue t = t @ [O.DW_op_stack_value]
+
+  let implicit_pointer ~offset_in_bytes ~die_label dwarf_version =
+    [OB.implicit_pointer ~offset_in_bytes ~die_label dwarf_version]
+end
+
+module Rvalue = struct
+  type 'a t = 'a rvalue
+
+  let signed_int_const i = [OB.signed_int_const i]
+
+  let float_const i = [OB.float_const i]
+
+  let const_symbol symbol = [OB.value_of_symbol ~symbol]
+
+  let address_of_label label = [OB.address_of_label ~label]
+
+  let in_register ~dwarf_reg_number = [OB.contents_of_register ~dwarf_reg_number]
+
+  let in_stack_slot ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    OB.contents_of_stack_slot ~offset_in_bytes
+
+  let in_domainstate_slot ~offset_in_words =
+    let offset_in_bytes = byte_offset_of_words offset_in_words in
+    OB.contents_of_domainstate_slot ~offset_in_bytes
+
+  let read_field ~block ~field =
+    let offset_in_bytes = byte_offset_of_words field in
+    guard_evaluation_failure block
+      ~if_successful:(OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref])
+
+  let read_field_unguarded ~block ~field =
+    (* The address computation is the same as in the lvalue case; the value is
+       then obtained by dereferencing. (This does not work for [read_field],
+       above: on the failure path of the guard the sentinel zero is left on the
+       stack, so a trailing dereference would read address 0. The dereference
+       there has to happen inside the guarded branch, where it only executes
+       when evaluation of [block] has succeeded.) *)
+    Lvalue.read_field_unguarded ~block ~field @ [O.DW_op_deref]
+
+  let offset_pointer t ~offset_in_words =
+    (* The operator sequence is identical to the lvalue case: the pointer value,
+       rather than an address, is what lies on the stack, but the offsetting
+       computation (and the guard against failed evaluation of [t]) is the same.
+       No dereference is involved: see the .mli. *)
+    Lvalue.offset_pointer t ~offset_in_words
+
+  let read_symbol_field symbol ~field =
+    read_field ~block:(const_symbol symbol) ~field
+
+  let location_from_another_die ~die_label ~compilation_unit_header_label =
+    [OB.call ~die_label ~compilation_unit_header_label]
+
+  let entry_value_of_register ~dwarf_reg_number dwarf_version =
+    [OB.entry_value_of_register ~dwarf_reg_number dwarf_version]
+
+  let implicit_pointer ~offset_in_bytes ~die_label dwarf_version =
+    [OB.implicit_pointer ~offset_in_bytes ~die_label dwarf_version]
+end
+
+let of_lvalue t = t
+
+let of_lvalue_without_address t = t
+
+let of_rvalue t = t
+
+let compile t = t

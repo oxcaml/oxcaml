@@ -1,0 +1,17 @@
+(lldb) breakpoint set --name Test_tailrec_dwarf.loop --skip-prologue false
+(lldb) run
+(lldb) frame variable
+(lldb) si
+(lldb) frame variable
+(lldb) si
+(lldb) frame variable
+(lldb) si
+(lldb) frame variable
+(lldb) breakpoint set --address $pc
+(lldb) c
+(lldb) frame variable
+(lldb) c
+(lldb) frame variable
+(lldb) c
+(lldb) frame variable
+(lldb) c

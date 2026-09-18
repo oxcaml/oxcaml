@@ -1,0 +1,37 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*          Jerome Vouillon, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Lambda
+
+val oo_prim: string -> lambda
+
+val share: structured_constant -> lambda
+val meth: lambda -> string -> lambda * lambda list
+
+val reset_labels: unit -> unit
+val transl_label_init: (unit -> lambda * 'a) -> lambda * 'a
+
+val method_ids: Ident.Set.t ref (* reset when starting a new wrapper *)
+
+val oo_wrap: Env.t -> bool -> ('a -> lambda) -> 'a -> lambda
+val oo_wrap_gen: Env.t -> bool -> ('a -> lambda * 'b) -> 'a -> lambda * 'b
+val oo_add_class: Ident.t -> Env.t * bool
+
+val layout_of_ident: Ident.t -> Lambda.layout option
+(** The layout of an identifier bound around the term being translated by
+    [oo_wrap] (a class table) or by [transl_label_init] (a shared constant or
+    the method cache). *)
+
+val reset: unit -> unit

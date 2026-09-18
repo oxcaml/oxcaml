@@ -1,0 +1,325 @@
+(**********************************************************************************
+ *                             MIT License                                        *
+ *                                                                                *
+ *                                                                                *
+ * Copyright (c) 2019-2021 Jane Street Group LLC                                  *
+ *                                                                                *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy   *
+ * of this software and associated documentation files (the "Software"), to deal  *
+ * in the Software without restriction, including without limitation the rights   *
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell      *
+ * copies of the Software, and to permit persons to whom the Software is          *
+ * furnished to do so, subject to the following conditions:                       *
+ *                                                                                *
+ * The above copyright notice and this permission notice shall be included in all *
+ * copies or substantial portions of the Software.                                *
+ *                                                                                *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR     *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    *
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  *
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  *
+ * SOFTWARE.                                                                      *
+ *                                                                                *
+ **********************************************************************************)
+[@@@ocaml.warning "+a-40-41-42"]
+
+val verbose : bool ref
+
+include module type of struct
+  include Cfg_intf.S
+end
+
+type basic_instruction_list = basic instruction Doubly_linked_list.t
+
+type basic_block =
+  { mutable start : Label.t;
+    body : basic_instruction_list;
+    mutable terminator : terminator instruction;
+    mutable predecessors : Label.Set.t;
+        (** All predecessors, both normal and exceptional paths. *)
+    mutable stack_offset : int;
+        (** Stack offset of the start of the block. Used for emitting adjust
+            trap on edges from one block to the next. *)
+    mutable exn : Label.t option;
+        (** All possible handlers of a raise that (1) can be triggered either by
+            an explicit raise, or instructions such as calls and allocations,
+            that appear(s) in this block; and (2) are within the same function.
+            [exns] is a subset of the trap handler block labels of the cfg. *)
+    mutable can_raise : bool;
+        (** Does this block contain any instruction that can raise, such as a
+            call, bounds check, allocation, or an explicit [raise]? *)
+    mutable is_trap_handler : bool;
+        (** Is this block a trap handler (i.e. is it an exn successor of another
+            block) or not? *)
+    mutable cold : bool
+        (* CR-someday gyorsh: The current implementation allows multiple
+           pushtraps in each block means that different trap stacks are
+           associated with the block at different points. At most one
+           instruction in each block can raise, and always the last one. If we
+           split the blocks based on Pushtrap/Poptrap, each block will have a
+           unique trap stack associated with it. [exns] will not be needed, as
+           the exn-successor will be uniquely determined by can_raise + top of
+           trap stack. *)
+  }
+
+type phantom_defining_expr = private
+  | Cphantom_const_int of Targetint.t
+  | Cphantom_const_symbol of Cmm.symbol
+  | Cphantom_var of Backend_var.t
+  | Cphantom_offset_var of
+      { var : Backend_var.t;
+        offset_in_words : int
+      }
+  | Cphantom_read_field of
+      { var : Backend_var.t;
+        field : int
+      }
+  | Cphantom_read_symbol_field of
+      { sym : Cmm.symbol;
+        field : int
+      }
+  | Cphantom_block of
+      { tag : int;
+        fields : Backend_var.t list
+      }
+  | Cphantom_optimised_out
+
+val phantom_defining_expr_of_cmm :
+  Cmm.phantom_defining_expr -> phantom_defining_expr
+
+val phantom_optimised_out : phantom_defining_expr
+
+(* Subset of Cmm.codegen_option. *)
+type codegen_option =
+  | Reduce_code_size
+  | No_CSE
+  | Use_linscan_regalloc
+    (* CR-soon xclerc for xclerc: remove the `Use_linscan_regalloc`, and use
+       `Use_regalloc_param` instead. *)
+  | Use_regalloc of Clflags.Register_allocator.t
+  | Use_regalloc_param of string list
+  | Cold
+  | Assume_zero_alloc of
+      { strict : bool;
+        never_returns_normally : bool;
+        never_raises : bool;
+        loc : Location.t
+      }
+  | Check_zero_alloc of
+      { strict : bool;
+        loc : Location.t;
+        custom_error_msg : string option
+      }
+
+val of_cmm_codegen_option : Cmm.codegen_option list -> codegen_option list
+
+(* CR-someday xclerc: we should probably make `t` abstract and make each and
+   every modifiction through accessors; that would help enforce invariants. *)
+
+(** Control Flow Graph of a function. *)
+type t =
+  { blocks : basic_block Label.Tbl.t;  (** Map from labels to blocks *)
+    fun_name : string;  (** Function name, used for printing messages *)
+    fun_args : Reg.t array;
+        (** Function arguments. When Cfg is constructed from Linear, this
+            information is not needed (Linear.fundecl does not have fun_args
+            field) and [fun_args] is an empty array as a dummy value. *)
+    fun_codegen_options : codegen_option list;
+        (** Code generation options passed from Cmm. *)
+    fun_dbg : Debuginfo.t;  (** Dwarf debug info for function entry. *)
+    entry_label : Label.t;
+        (** This label must be the first in all layouts of this cfg. *)
+    fun_contains_calls : bool;
+        (** Precomputed during selection and poll insertion. *)
+    fun_num_stack_slots : int Stack_class.Tbl.t;
+        (** Precomputed at register allocation time *)
+    mutable fun_frame_required : bool;
+        (** Whether the function needs a stack frame, set by [Cfg_prologue]. *)
+    mutable fun_prologue_required : bool;
+        (** Whether the function needs a prologue, set by [Cfg_prologue]. *)
+    fun_poll : Lambda.poll_attribute; (* Whether to insert polling points. *)
+    next_instruction_id : InstructionId.sequence; (* Next instruction id. *)
+    fun_ret_type : Cmm.machtype;
+        (** Function return type. As in [fun_args], this value is not used when
+            starting from Linear. *)
+    fun_phantom_lets :
+      (Backend_var.Provenance.t option * phantom_defining_expr)
+      Backend_var.Map.t;
+        (** Phantom variables and their defining expressions *)
+    mutable allowed_to_be_irreducible : bool;
+        (* Whether rewrites are allowed to make the CFG irreducible (if the CFG
+           is irreducible, the information about loops cannot be trusted). *)
+    mutable register_locations_are_set : bool
+        (* Whether register allocation has set the locations of the `Reg.t`
+           values. *)
+  }
+
+val create :
+  fun_name:string ->
+  fun_args:Reg.t array ->
+  fun_codegen_options:codegen_option list ->
+  fun_dbg:Debuginfo.t ->
+  fun_contains_calls:bool ->
+  fun_num_stack_slots:int Stack_class.Tbl.t ->
+  fun_poll:Lambda.poll_attribute ->
+  next_instruction_id:InstructionId.sequence ->
+  fun_ret_type:Cmm.machtype ->
+  fun_phantom_lets:
+    (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t ->
+  allowed_to_be_irreducible:bool ->
+  t
+
+val fun_name : t -> string
+
+val fun_phantom_lets :
+  t ->
+  (Backend_var.Provenance.t option * phantom_defining_expr) Backend_var.Map.t
+
+val entry_label : t -> Label.t
+
+val predecessor_labels : basic_block -> Label.t list
+
+(** [exn] does not account for exceptional flow from the block that goes outside
+    of the function. *)
+val successor_labels : normal:bool -> exn:bool -> basic_block -> Label.Set.t
+
+val replace_successor_labels :
+  t -> normal:bool -> exn:bool -> basic_block -> f:(Label.t -> Label.t) -> unit
+
+(** Returns [true] iff the passed block raises an exn that is not handled in
+    this function, [can_raise_interproc] implies [can_raise] but not necessarily
+    vice versa. *)
+val can_raise_interproc : basic_block -> bool
+
+val first_instruction_id : basic_block -> InstructionId.t
+
+val first_instruction_stack_offset : basic_block -> int
+
+val mem_block : t -> Label.t -> bool
+
+val add_block_exn : t -> basic_block -> unit
+
+val remove_blocks : t -> Label.Set.t -> unit
+
+val get_block : t -> Label.t -> basic_block option
+
+val get_block_exn : t -> Label.t -> basic_block
+
+val iter_blocks_dfs : t -> f:(Label.t -> basic_block -> unit) -> unit
+
+val iter_blocks : t -> f:(Label.t -> basic_block -> unit) -> unit
+
+val fold_blocks : t -> f:(Label.t -> basic_block -> 'a -> 'a) -> init:'a -> 'a
+
+val fold_body_instructions :
+  t -> f:('a -> basic instruction -> 'a) -> init:'a -> 'a
+
+val iter_instructions :
+  t ->
+  instruction:(basic instruction -> unit) ->
+  terminator:(terminator instruction -> unit) ->
+  unit
+
+type instruction_iterator = { f : 'a. 'a instruction -> unit } [@@unboxed]
+
+val iter_all_instructions : t -> instruction_iterator -> unit
+
+type 'a instruction_folder = { f : 'b. 'a -> 'b instruction -> 'a } [@@unboxed]
+
+val fold_all_instructions : t -> f:'a instruction_folder -> init:'a -> 'a
+
+(* CR-soon xclerc for xclerc: [register_predecessors_for_all_blocks] only adds
+   blocks to the predecessor sets, and does not clear the sets beforehand. This
+   looks like a mistake; at the very least a named boolean parameter should be
+   added so that the caller has to explicitly decide whether or not to clear the
+   sets before registration . *)
+val register_predecessors_for_all_blocks : t -> unit
+
+(* CR-someday gyorsh: Current version of cfg is a half-way house in terms of its
+   exception handling. It has a lot of redundancy and the result of the
+   computation is not used.
+
+   CFG instructions still include push/poptraps. To remove these push/poptraps
+   from CFG IR, we need to split blocks at every push/poptrap. Then, we can
+   annotate the blocks with the top of the trap stack, instead of carrying the
+   copy of the stack. *)
+
+(* CR-someday gyorsh: store label after separately and update after
+   reordering. *)
+
+val can_raise_terminator : terminator -> bool
+
+val is_pure_terminator : terminator -> bool
+
+val is_never_terminator : terminator -> bool
+
+val is_return_terminator : terminator -> bool
+
+val is_pure_basic : basic -> bool
+
+(** [is_dead_basic instr ~live_after] holds when [instr] is pure and all its
+    results are unused (disjoint from [live_after], the registers live
+    immediately after [instr]). Shared by [Cfg_liveness] (optimistic dead-code
+    case) and [Cfg_deadcode] (actual removal) so the two tests stay in sync. *)
+val is_dead_basic : basic instruction -> live_after:Reg.Set.t -> bool
+
+val is_noop_move : basic instruction -> bool
+
+val is_alloc : basic instruction -> bool
+
+val is_heap_alloc : basic instruction -> bool
+
+val is_poll : basic instruction -> bool
+
+val is_end_region : basic -> bool
+
+val set_stack_offset : 'a instruction -> int -> unit
+
+val set_live : 'a instruction -> Reg.Set.t -> unit
+
+val make_instruction :
+  desc:'a ->
+  ?arg:Reg.t array ->
+  ?res:Reg.t array ->
+  ?dbg:Debuginfo.t ->
+  ?fdo:Fdo_info.t ->
+  ?live:Reg.Set.t ->
+  stack_offset:int ->
+  id:InstructionId.t ->
+  ?available_before:Reg_availability_set.t ->
+  ?available_across:Reg_availability_set.t ->
+  ?phantom_available_before:Backend_var.Set.t option ->
+  unit ->
+  'a instruction
+
+val make_instruction_from_copy :
+  'a instruction ->
+  desc:'b ->
+  id:InstructionId.t ->
+  ?arg:Reg.t array ->
+  ?res:Reg.t array ->
+  unit ->
+  'b instruction
+
+val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
+
+(** "Contains calls" in the traditional sense as used in upstream [Selectgen].
+*)
+val basic_block_contains_calls : basic_block -> bool
+
+val equal_func_call_operation :
+  func_call_operation -> func_call_operation -> bool
+
+val equal_external_call_operation :
+  external_call_operation -> external_call_operation -> bool
+
+val equal_prim_call_operation :
+  prim_call_operation -> prim_call_operation -> bool
+
+val equal_basic : basic -> basic -> bool
+
+val equal_terminator : terminator -> terminator -> bool
+
+val invalid_stack_offset : int

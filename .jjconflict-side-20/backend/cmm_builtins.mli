@@ -1,0 +1,37 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+open Cmm
+
+type t =
+  { extcall : expression;
+    builtin_sign_extends : bool
+  }
+
+(** Create a C function call. *)
+val extcall :
+  dbg:Debuginfo.t ->
+  returns:bool ->
+  alloc:bool ->
+  is_c_builtin:bool ->
+  effects:Cmm.effects ->
+  coeffects:Cmm.coeffects ->
+  ty_args:exttype list ->
+  string ->
+  machtype ->
+  expression list ->
+  t

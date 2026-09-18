@@ -1,0 +1,5 @@
+File "int8_shim.mli", line 1, characters 9-13:
+1 | type t = int8
+             ^^^^
+Error: Unbound type constructor int8
+Hint:              Did you mean int?

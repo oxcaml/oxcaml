@@ -1,0 +1,5 @@
+csel false 1 2 = 2
+csel true 3 4 = 3
+min 2 3 = 2
+min 3 2 = 2
+min 1 1 = 1

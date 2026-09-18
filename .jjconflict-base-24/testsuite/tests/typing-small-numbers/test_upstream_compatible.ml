@@ -1,0 +1,318 @@
+(* TEST
+ flags = "-extension-universe upstream_compatible";
+ expect;
+*)
+
+(* Boxed float32 *)
+
+type t = float32;;
+[%%expect{|
+Line 1, characters 9-16:
+1 | type t = float32;;
+             ^^^^^^^
+Error: Unbound type constructor "float32"
+Hint:              Did you mean "float"?
+|}];;
+
+let _ = 1.0s;;
+[%%expect{|
+Line 1, characters 8-12:
+1 | let _ = 1.0s;;
+            ^^^^
+Error: Found 32-bit float literal 1.0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1.s;;
+[%%expect{|
+Line 1, characters 8-11:
+1 | let _ = 1.s;;
+            ^^^
+Error: Found 32-bit float literal 1.s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1e10s;;
+[%%expect{|
+Line 1, characters 8-13:
+1 | let _ = 1e10s;;
+            ^^^^^
+Error: Found 32-bit float literal 1e10s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1e+1s;;
+[%%expect{|
+Line 1, characters 8-13:
+1 | let _ = 1e+1s;;
+            ^^^^^
+Error: Found 32-bit float literal 1e+1s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1e-1s;;
+[%%expect{|
+Line 1, characters 8-13:
+1 | let _ = 1e-1s;;
+            ^^^^^
+Error: Found 32-bit float literal 1e-1s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 0x111.000s;;
+[%%expect{|
+Line 1, characters 8-18:
+1 | let _ = 0x111.000s;;
+            ^^^^^^^^^^
+Error: Found 32-bit float literal 0x111.000s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 0x1.4p+0s;;
+[%%expect{|
+Line 1, characters 8-17:
+1 | let _ = 0x1.4p+0s;;
+            ^^^^^^^^^
+Error: Found 32-bit float literal 0x1.4p+0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 0xf.ffffffffffff8p+1020s;;
+[%%expect{|
+Line 1, characters 8-32:
+1 | let _ = 0xf.ffffffffffff8p+1020s;;
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Found 32-bit float literal 0xf.ffffffffffff8p+1020s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 0x8p-972s;;
+[%%expect{|
+Line 1, characters 8-17:
+1 | let _ = 0x8p-972s;;
+            ^^^^^^^^^
+Error: Found 32-bit float literal 0x8p-972s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 0xc.d5e6fp+1_24s;;
+[%%expect{|
+Line 1, characters 8-24:
+1 | let _ = 0xc.d5e6fp+1_24s;;
+            ^^^^^^^^^^^^^^^^
+Error: Found 32-bit float literal 0xc.d5e6fp+1_24s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () =
+  match 0.0s with
+  | _ -> ()
+;;
+[%%expect{|
+Line 2, characters 8-12:
+2 |   match 0.0s with
+            ^^^^
+Error: Found 32-bit float literal 0.0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+(* Unboxed float32 *)
+
+type t : float32;;
+[%%expect{|
+type t : float32
+|}]
+
+let f : ('a : float32). 'a -> 'a = fun x -> x;;
+[%%expect{|
+val f : ('a : float32). 'a -> 'a = <fun>
+|}]
+
+type t = float32_u;;
+[%%expect{|
+Line 1, characters 9-18:
+1 | type t = float32_u;;
+             ^^^^^^^^^
+Error: Unbound type constructor "float32_u"
+|}];;
+
+let () = ignore #1.0s;;
+[%%expect{|
+Line 1, characters 16-21:
+1 | let () = ignore #1.0s;;
+                    ^^^^^
+Error: Found 32-bit float literal #1.0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #1.s;;
+[%%expect{|
+Line 1, characters 16-20:
+1 | let () = ignore #1.s;;
+                    ^^^^
+Error: Found 32-bit float literal #1.s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #1e10s;;
+[%%expect{|
+Line 1, characters 16-22:
+1 | let () = ignore #1e10s;;
+                    ^^^^^^
+Error: Found 32-bit float literal #1e10s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #1e+1s;;
+[%%expect{|
+Line 1, characters 16-22:
+1 | let () = ignore #1e+1s;;
+                    ^^^^^^
+Error: Found 32-bit float literal #1e+1s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #1e-1s;;
+[%%expect{|
+Line 1, characters 16-22:
+1 | let () = ignore #1e-1s;;
+                    ^^^^^^
+Error: Found 32-bit float literal #1e-1s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #0x111.000s;;
+[%%expect{|
+Line 1, characters 16-27:
+1 | let () = ignore #0x111.000s;;
+                    ^^^^^^^^^^^
+Error: Found 32-bit float literal #0x111.000s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #0x1.4p+0s;;
+[%%expect{|
+Line 1, characters 16-26:
+1 | let () = ignore #0x1.4p+0s;;
+                    ^^^^^^^^^^
+Error: Found 32-bit float literal #0x1.4p+0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #0xf.ffffffffffff8p+1020s;;
+[%%expect{|
+Line 1, characters 16-41:
+1 | let () = ignore #0xf.ffffffffffff8p+1020s;;
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Found 32-bit float literal #0xf.ffffffffffff8p+1020s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #0x8p-972s;;
+[%%expect{|
+Line 1, characters 16-26:
+1 | let () = ignore #0x8p-972s;;
+                    ^^^^^^^^^^
+Error: Found 32-bit float literal #0x8p-972s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () = ignore #0xc.d5e6fp+1_24s;;
+[%%expect{|
+Line 1, characters 16-33:
+1 | let () = ignore #0xc.d5e6fp+1_24s;;
+                    ^^^^^^^^^^^^^^^^^
+Error: Found 32-bit float literal #0xc.d5e6fp+1_24s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let () =
+  match #0.0s with
+  | _ -> ()
+;;
+[%%expect{|
+Line 2, characters 8-13:
+2 |   match #0.0s with
+            ^^^^^
+Error: Found 32-bit float literal #0.0s, but float32 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+type t : bits8;;
+[%%expect{|
+type t : bits8
+|}]
+
+type t : bits16;;
+[%%expect{|
+type t : bits16
+|}]
+
+let f : ('a : bits8). 'a -> 'a = fun x -> x;;
+[%%expect{|
+val f : ('a : bits8). 'a -> 'a = <fun>
+|}]
+
+let f : ('a : bits16). 'a -> 'a = fun x -> x;;
+[%%expect{|
+val f : ('a : bits16). 'a -> 'a = <fun>
+|}]
+
+type t = char#;;
+[%%expect{|
+type t = char#
+|}];;
+
+type t = int8;;
+[%%expect{|
+Line 1, characters 9-13:
+1 | type t = int8;;
+             ^^^^
+Error: Unbound type constructor "int8"
+Hint:              Did you mean "int"?
+|}];;
+
+type t = int8#;;
+[%%expect{|
+Line 1, characters 9-14:
+1 | type t = int8#;;
+             ^^^^^
+Error: Unbound type constructor "int8"
+Hint:              Did you mean "int"?
+|}];;
+
+type t = int16;;
+[%%expect{|
+Line 1, characters 9-14:
+1 | type t = int16;;
+             ^^^^^
+Error: Unbound type constructor "int16"
+Hint:              Did you mean "int", "int32" or "int64"?
+|}];;
+
+type t = int16#;;
+[%%expect{|
+Line 1, characters 9-15:
+1 | type t = int16#;;
+             ^^^^^^
+Error: Unbound type constructor "int16"
+Hint:              Did you mean "int", "int32" or "int64"?
+|}];;
+
+let f () = #'a';;
+[%%expect{|
+Line 1, characters 11-15:
+1 | let f () = #'a';;
+               ^^^^
+Error: Found untagged char literal #'a', but char# is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1s;;
+[%%expect{|
+Line 1, characters 8-10:
+1 | let _ = 1s;;
+            ^^
+Error: Found 8-bit int literal 1s, but int8 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = 1S;;
+[%%expect{|
+Line 1, characters 8-10:
+1 | let _ = 1S;;
+            ^^
+Error: Found 16-bit int literal 1S, but int16 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = #1s;;
+[%%expect{|
+Line 1, characters 8-11:
+1 | let _ = #1s;;
+            ^^^
+Error: Found 8-bit int literal #1s, but int8 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;
+
+let _ = #1S;;
+[%%expect{|
+Line 1, characters 8-11:
+1 | let _ = #1S;;
+            ^^^
+Error: Found 16-bit int literal #1S, but int16 is not enabled. You must enable -extension small_numbers to use this feature.
+|}];;

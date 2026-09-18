@@ -1,0 +1,769 @@
+[@@@ocaml.warning "+a-30-40-41-42"]
+
+open! Int_replace_polymorphic_compare
+open! Regalloc_utils
+open! Regalloc_irc_utils
+module Doubly_linked_list = Doubly_linked_list
+
+module RegWorkListSet = Arrayset.Make (struct
+  type t = Reg.t
+
+  let compare = Reg.compare
+
+  let dummy = Reg.dummy_for_regalloc
+end)
+
+let reg_set_of_reg_work_list (rwl : RegWorkListSet.t) : Reg.Set.t =
+  RegWorkListSet.fold rwl ~init:Reg.Set.empty ~f:(fun acc elem ->
+      Reg.Set.add elem acc)
+
+module InstructionWorkList = Arrayset.Make (struct
+  type t = Instruction.t
+
+  let compare = Instruction.compare
+
+  let dummy = Instruction.dummy
+end)
+
+let instruction_set_of_instruction_work_list (iwl : InstructionWorkList.t) :
+    Instruction.Set.t =
+  InstructionWorkList.fold iwl ~init:Instruction.Set.empty ~f:(fun acc elem ->
+      Instruction.Set.add elem acc)
+
+module Priority = struct
+  (* Moves with equal priorities are extracted from the work list in decreasing
+     id order, matching the behaviour of the previously-used
+     `InstructionWorkList` (an `Arrayset` whose `choose_and_remove` returned the
+     greatest element). In particular, when the "AFFINITY" parameter is unset
+     all moves have the same priority, and the allocator hence behaves as it did
+     before the introduction of priorities. *)
+  type t =
+    { priority : int;
+      id : InstructionId.t
+    }
+
+  let compare left right =
+    let c = Int.compare left.priority right.priority in
+    if c <> 0 then c else InstructionId.compare left.id right.id
+
+  let to_string { priority; id } =
+    Printf.sprintf "%d(%s)" priority (InstructionId.to_string id)
+end
+
+module PrioritizedWorkList = Priority_queue.Make (Priority)
+
+let instruction_set_of_prioritized_work_list
+    (mwl : Instruction.t PrioritizedWorkList.t) : Instruction.Set.t =
+  PrioritizedWorkList.fold_unordered mwl ~init:Instruction.Set.empty
+    ~f:(fun acc { PrioritizedWorkList.priority = _; data = elem } ->
+      Instruction.Set.add elem acc)
+
+type t =
+  { mutable initial : Reg.t Doubly_linked_list.t;
+    simplify_work_list : RegWorkListSet.t;
+    freeze_work_list : RegWorkListSet.t;
+    spill_work_list : RegWorkListSet.t;
+    spilled_nodes : RegWorkListSet.t;
+    coalesced_nodes : RegWorkListSet.t;
+    colored_nodes : Reg.t Doubly_linked_list.t;
+    mutable select_stack : Reg.t list;
+    coalesced_moves : InstructionWorkList.t;
+    constrained_moves : InstructionWorkList.t;
+    frozen_moves : InstructionWorkList.t;
+    work_list_moves : Instruction.t PrioritizedWorkList.t;
+    active_moves : InstructionWorkList.t;
+    graph : Regalloc_interf_graph.t;
+    move_list : Instruction.Set.t Reg.Tbl.t;
+    stack_slots : Regalloc_stack_slots.t;
+    affinity : Regalloc_affinity.t;
+    mutable inst_temporaries : Reg.Set.t;
+    mutable block_temporaries : Reg.Set.t;
+    reg_work_list : RegWorkList.t Reg.Tbl.t;
+    reg_color : Regs.Phys_reg.t option Reg.Tbl.t;
+    reg_alias : Reg.t option Reg.Tbl.t;
+    instr_work_list : InstrWorkList.t InstructionId.Tbl.t
+  }
+
+(* CR-someday xclerc for xclerc: the magic `8` default value is the priority
+   giving the best results on the compiler distribution. It is currently a
+   parameter only to make testing / benchmarking easy. *)
+let same_phi_class_prio : int Param.t =
+  Regalloc_utils.int_of_param ~default:8 "IRC_SAME_PHI_CLASS_PRIO"
+
+let priority_of_instruction : t -> Cfg.basic Cfg.instruction -> int =
+ fun state instr ->
+  if not (Param.get Regalloc_utils.affinity)
+  then 0
+  else
+    match[@ocaml.warning "-fragile-match"] instr.desc with
+    | Cfg.Op Move -> (
+      let src = instr.arg.(0) in
+      let dst = instr.res.(0) in
+      match src.loc, dst.loc with
+      | Unknown, Reg phys_reg ->
+        Regalloc_affinity.priority state.affinity ~temp:src ~phys_reg
+      | Reg phys_reg, Unknown ->
+        Regalloc_affinity.priority state.affinity ~temp:dst ~phys_reg
+      | Unknown, Unknown ->
+        if Regalloc_affinity.same_phi_class state.affinity src dst
+        then Param.get same_phi_class_prio
+        else 0
+      | _ -> 0)
+    | _ -> 0
+
+let[@inline] make ~initial ~stack_slots ~affinity () =
+  let num_registers = List.length (Reg.all_relocatable_regs ()) in
+  let graph = Regalloc_interf_graph.make () in
+  let reg_work_list = Reg.Tbl.create num_registers in
+  let reg_color = Reg.Tbl.create num_registers in
+  let reg_alias = Reg.Tbl.create num_registers in
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
+      Reg.Tbl.replace reg_work_list reg RegWorkList.Unknown_list;
+      Reg.Tbl.replace reg_color reg None;
+      Reg.Tbl.replace reg_alias reg None;
+      Regalloc_interf_graph.init_register graph reg);
+  List.iter initial ~f:(fun reg ->
+      Reg.Tbl.replace reg_work_list reg RegWorkList.Initial);
+  Reg.Set.iter
+    (fun reg ->
+      Reg.Tbl.replace reg_work_list reg RegWorkList.Precolored;
+      Reg.Tbl.replace reg_color reg
+        (match reg.Reg.loc with
+        | Reg color -> Some color
+        | Unknown | Stack _ ->
+          fatal "precolored register %a is not an hardware register"
+            Printreg.reg reg);
+      Reg.Tbl.replace reg_alias reg None;
+      Regalloc_interf_graph.init_register_with_infinite_degree graph reg)
+    (all_precolored_regs ());
+  let original_capacity = num_registers in
+  let simplify_work_list = RegWorkListSet.make ~original_capacity in
+  let freeze_work_list = RegWorkListSet.make ~original_capacity in
+  let spill_work_list = RegWorkListSet.make ~original_capacity in
+  let spilled_nodes = RegWorkListSet.make ~original_capacity in
+  let coalesced_nodes = RegWorkListSet.make ~original_capacity in
+  let colored_nodes = Doubly_linked_list.make_empty () in
+  let select_stack = [] in
+  let original_capacity = 128 in
+  let coalesced_moves = InstructionWorkList.make ~original_capacity in
+  let constrained_moves = InstructionWorkList.make ~original_capacity in
+  let frozen_moves = InstructionWorkList.make ~original_capacity in
+  let work_list_moves =
+    PrioritizedWorkList.make ~initial_capacity:original_capacity
+  in
+  let active_moves = InstructionWorkList.make ~original_capacity in
+  let move_list = Reg.Tbl.create 128 in
+  let inst_temporaries = Reg.Set.empty in
+  let block_temporaries = Reg.Set.empty in
+  let initial = Doubly_linked_list.of_list initial in
+  let instr_work_list = InstructionId.Tbl.create 32 in
+  { initial;
+    simplify_work_list;
+    freeze_work_list;
+    spill_work_list;
+    spilled_nodes;
+    coalesced_nodes;
+    colored_nodes;
+    select_stack;
+    coalesced_moves;
+    constrained_moves;
+    frozen_moves;
+    work_list_moves;
+    active_moves;
+    graph;
+    move_list;
+    stack_slots;
+    affinity;
+    inst_temporaries;
+    block_temporaries;
+    reg_work_list;
+    reg_color;
+    reg_alias;
+    instr_work_list
+  }
+
+let[@inline] set_instr_work_list state ~instruction_id ~work_list =
+  InstructionId.Tbl.replace state.instr_work_list instruction_id work_list
+
+let[@inline] get_instr_work_list state ~instruction_id =
+  try InstructionId.Tbl.find state.instr_work_list instruction_id
+  with Not_found -> InstrWorkList.Unknown_list
+
+let[@inline] add_initial_one state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial;
+  Reg.Tbl.replace state.reg_color reg None;
+  Reg.Tbl.replace state.reg_alias reg None;
+  Regalloc_interf_graph.init_register state.graph reg;
+  Doubly_linked_list.add_begin state.initial reg
+
+let[@inline] add_initial_list state regs =
+  List.iter regs ~f:(fun reg ->
+      Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial;
+      Reg.Tbl.replace state.reg_color reg None;
+      Reg.Tbl.replace state.reg_alias reg None;
+      Regalloc_interf_graph.init_register state.graph reg;
+      Doubly_linked_list.add_begin state.initial reg)
+
+let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
+  Regalloc_interf_graph.clear state.graph;
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
+      Reg.Tbl.replace state.reg_color reg None;
+      Reg.Tbl.replace state.reg_alias reg None;
+      Regalloc_interf_graph.init_register state.graph reg);
+  Reg.Set.iter
+    (fun reg ->
+      assert (
+        RegWorkList.equal
+          (Reg.Tbl.find state.reg_work_list reg)
+          RegWorkList.Precolored);
+      (match reg.Reg.loc, Reg.Tbl.find state.reg_color reg with
+      | Reg color, Some color' -> assert (Regs.Phys_reg.equal color color')
+      | Reg _, None | (Unknown | Stack _), _ ->
+        fatal
+          "Regalloc_irc_state.reset: precolored register %a has unexpected \
+           location/color"
+          Printreg.reg reg);
+      Reg.Tbl.replace state.reg_alias reg None;
+      Regalloc_interf_graph.init_register_with_infinite_degree state.graph reg;
+      assert (Regalloc_interf_graph.degree state.graph reg = Degree.infinite))
+    (all_precolored_regs ());
+  state.initial <- Doubly_linked_list.of_list new_inst_temporaries;
+  Doubly_linked_list.add_list state.initial new_block_temporaries;
+  Doubly_linked_list.transfer ~from:state.colored_nodes ~to_:state.initial ();
+  RegWorkListSet.iter state.coalesced_nodes ~f:(fun reg ->
+      Doubly_linked_list.add_end state.initial reg);
+  Doubly_linked_list.iter state.initial ~f:(fun reg ->
+      Reg.Tbl.replace state.reg_work_list reg RegWorkList.Initial);
+  RegWorkListSet.clear state.simplify_work_list;
+  RegWorkListSet.clear state.freeze_work_list;
+  RegWorkListSet.clear state.spill_work_list;
+  RegWorkListSet.clear state.spilled_nodes;
+  RegWorkListSet.clear state.coalesced_nodes;
+  assert (Misc.Stdlib.List.is_empty state.select_stack);
+  InstructionWorkList.clear state.coalesced_moves;
+  InstructionWorkList.clear state.constrained_moves;
+  InstructionWorkList.clear state.frozen_moves;
+  PrioritizedWorkList.clear state.work_list_moves;
+  InstructionWorkList.clear state.active_moves;
+  Reg.Tbl.clear state.move_list;
+  InstructionId.Tbl.clear state.instr_work_list
+
+let[@inline] reg_work_list state reg =
+  match Reg.Tbl.find_opt state.reg_work_list reg with
+  | None -> fatal "%a is not in the work_list map" Printreg.reg reg
+  | Some x -> x
+
+let[@inline] color state reg =
+  match Reg.Tbl.find_opt state.reg_color reg with
+  | None -> fatal "%a is not in the color map" Printreg.reg reg
+  | Some x -> x
+
+let[@inline] set_color state reg color =
+  Reg.Tbl.replace state.reg_color reg color
+
+let[@inline] degree state reg = Regalloc_interf_graph.degree state.graph reg
+
+let[@inline] set_degree state reg degree =
+  Regalloc_interf_graph.set_degree state.graph reg degree
+
+let[@inline] get_max_degree state =
+  Regalloc_interf_graph.get_max_degree state.graph
+
+let[@inline] is_precolored state reg =
+  RegWorkList.equal (reg_work_list state reg) RegWorkList.Precolored
+
+let[@inline] is_precolored_or_colored state reg =
+  match reg_work_list state reg with
+  | Precolored | Colored -> true
+  | Unknown_list | Initial | Simplify | Freeze | Spill | Spilled | Coalesced
+  | Select_stack ->
+    false
+
+let[@inline] iter_and_clear_initial state ~f =
+  Doubly_linked_list.iter state.initial ~f:(fun reg ->
+      Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list);
+  Doubly_linked_list.iter state.initial ~f;
+  Doubly_linked_list.clear state.initial
+
+let[@inline] is_empty_simplify_work_list state =
+  RegWorkListSet.is_empty state.simplify_work_list
+
+let[@inline] add_simplify_work_list state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Simplify;
+  RegWorkListSet.add state.simplify_work_list reg
+
+let[@inline] choose_and_remove_simplify_work_list state =
+  match RegWorkListSet.choose_and_remove state.simplify_work_list with
+  | None -> fatal "simplify_work_list is empty"
+  | Some res ->
+    Reg.Tbl.replace state.reg_work_list res RegWorkList.Unknown_list;
+    res
+
+let[@inline] is_empty_freeze_work_list state =
+  RegWorkListSet.is_empty state.freeze_work_list
+
+let[@inline] mem_freeze_work_list state reg =
+  RegWorkList.equal (reg_work_list state reg) RegWorkList.Freeze
+
+let[@inline] add_freeze_work_list state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Freeze;
+  RegWorkListSet.add state.freeze_work_list reg
+
+let[@inline] remove_freeze_work_list state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list;
+  RegWorkListSet.remove state.freeze_work_list reg
+
+let[@inline] choose_and_remove_freeze_work_list state =
+  match RegWorkListSet.choose_and_remove state.freeze_work_list with
+  | None -> fatal "freeze_work_list is empty"
+  | Some res ->
+    Reg.Tbl.replace state.reg_work_list res RegWorkList.Unknown_list;
+    res
+
+let[@inline] is_empty_spill_work_list state =
+  RegWorkListSet.is_empty state.spill_work_list
+
+let[@inline] mem_spill_work_list state reg =
+  RegWorkList.equal (reg_work_list state reg) RegWorkList.Spill
+
+let[@inline] add_spill_work_list state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Spill;
+  RegWorkListSet.add state.spill_work_list reg
+
+let[@inline] remove_spill_work_list state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list;
+  RegWorkListSet.remove state.spill_work_list reg
+
+let[@inline] fold_spill_work_list state ~f ~init =
+  RegWorkListSet.fold state.spill_work_list ~f ~init
+
+let[@inline] spill_work_list state =
+  reg_set_of_reg_work_list state.spill_work_list
+
+let[@inline] is_empty_spilled_nodes state =
+  RegWorkListSet.is_empty state.spilled_nodes
+
+let[@inline] add_spilled_nodes state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Spilled;
+  RegWorkListSet.add state.spilled_nodes reg
+
+let[@inline] spilled_nodes state = RegWorkListSet.to_list state.spilled_nodes
+
+let[@inline] clear_spilled_nodes state =
+  RegWorkListSet.iter state.spilled_nodes ~f:(fun reg ->
+      Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list);
+  RegWorkListSet.clear state.spilled_nodes
+
+let[@inline] add_coalesced_nodes state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Coalesced;
+  RegWorkListSet.add state.coalesced_nodes reg
+
+let[@inline] iter_coalesced_nodes state ~f =
+  RegWorkListSet.iter state.coalesced_nodes ~f
+
+let[@inline] add_colored_nodes state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Colored;
+  Doubly_linked_list.add_begin state.colored_nodes reg
+
+let[@inline] is_empty_select_stack state =
+  Misc.Stdlib.List.is_empty state.select_stack
+
+let[@inline] push_select_stack state reg =
+  Reg.Tbl.replace state.reg_work_list reg RegWorkList.Select_stack;
+  state.select_stack <- reg :: state.select_stack
+
+let[@inline] pop_select_stack state =
+  match state.select_stack with
+  | [] -> fatal "select_stack is empty"
+  | hd :: tl ->
+    state.select_stack <- tl;
+    Reg.Tbl.replace state.reg_work_list hd RegWorkList.Unknown_list;
+    hd
+
+let[@inline] iter_and_clear_select_stack state ~f =
+  List.iter state.select_stack ~f;
+  state.select_stack <- []
+
+let[@inline] add_coalesced_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Coalesced;
+  InstructionWorkList.add state.coalesced_moves instr
+
+let[@inline] add_constrained_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Constrained;
+  InstructionWorkList.add state.constrained_moves instr
+
+let[@inline] add_frozen_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Frozen;
+  InstructionWorkList.add state.frozen_moves instr
+
+let[@inline] is_empty_work_list_moves state =
+  PrioritizedWorkList.is_empty state.work_list_moves
+
+let[@inline] add_work_list_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Work_list;
+  let priority = priority_of_instruction state instr in
+  PrioritizedWorkList.add state.work_list_moves
+    ~priority:{ Priority.priority; id = instr.id }
+    ~data:instr
+
+let[@inline] choose_and_remove_work_list_moves state =
+  match PrioritizedWorkList.is_empty state.work_list_moves with
+  | true -> fatal "work_list_moves is empty"
+  | false ->
+    let { PrioritizedWorkList.priority = _; data = res } =
+      PrioritizedWorkList.get_and_remove state.work_list_moves
+    in
+    set_instr_work_list state ~instruction_id:(res : Instruction.t).id
+      ~work_list:Unknown_list;
+    res
+
+let[@inline] mem_active_moves state (instr : Instruction.t) =
+  InstrWorkList.equal
+    (get_instr_work_list state ~instruction_id:instr.id)
+    InstrWorkList.Active
+
+let[@inline] add_active_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Active;
+  InstructionWorkList.add state.active_moves instr
+
+let[@inline] remove_active_moves state (instr : Instruction.t) =
+  set_instr_work_list state ~instruction_id:instr.id ~work_list:Unknown_list;
+  InstructionWorkList.remove state.active_moves instr
+
+let[@inline] mem_adj_set state reg1 reg2 =
+  Regalloc_interf_graph.mem_edge state.graph reg1 reg2
+
+let[@inline] adj_list state reg = Regalloc_interf_graph.adj_list state.graph reg
+
+let[@inline] add_edge state u v = Regalloc_interf_graph.add_edge state.graph u v
+
+let[@inline] iter_adjacent state reg ~f =
+  let should_visit r =
+    match reg_work_list state r with
+    | Select_stack | Coalesced -> false
+    | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill | Spilled
+    | Colored ->
+      true
+  in
+  Regalloc_interf_graph.iter_adjacent_if state.graph reg ~should_visit ~f
+
+let[@inline] for_all_adjacent state reg ~f =
+  let should_visit r =
+    match reg_work_list state r with
+    | Select_stack | Coalesced -> false
+    | Unknown_list | Precolored | Initial | Simplify | Freeze | Spill | Spilled
+    | Colored ->
+      true
+  in
+  Regalloc_interf_graph.for_all_adjacent_if state.graph reg ~should_visit ~f
+
+let[@inline] cardinal_edges state =
+  Regalloc_interf_graph.For_debug.cardinal_edges state.graph
+
+let[@inline] iter_edges state ~f =
+  Regalloc_interf_graph.For_debug.iter_edges state.graph ~f
+
+let[@inline] is_empty_node_moves state reg =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None -> true
+  | Some move_list ->
+    not
+      (Instruction.Set.exists
+         (fun (instr : Instruction.t) ->
+           match get_instr_work_list state ~instruction_id:instr.id with
+           | Active | Work_list -> true
+           | Unknown_list | Coalesced | Constrained | Frozen -> false)
+         move_list)
+
+let[@inline] iter_node_moves state reg ~f =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None -> ()
+  | Some move_list ->
+    Instruction.Set.iter
+      (fun (instr : Instruction.t) ->
+        match get_instr_work_list state ~instruction_id:instr.id with
+        | Active | Work_list -> f instr
+        | Unknown_list | Coalesced | Constrained | Frozen -> ())
+      move_list
+
+let[@inline] is_move_related state reg =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None -> false
+  | Some move_list ->
+    Instruction.Set.exists
+      (fun (instr : Instruction.t) ->
+        match get_instr_work_list state ~instruction_id:instr.id with
+        | Active | Work_list -> true
+        | Unknown_list | Coalesced | Constrained | Frozen -> false)
+      move_list
+
+let[@inline] enable_moves_one state reg =
+  let n = reg in
+  iter_node_moves state n ~f:(fun (m : Instruction.t) ->
+      match get_instr_work_list state ~instruction_id:m.id with
+      | Active ->
+        set_instr_work_list state ~instruction_id:m.id ~work_list:Work_list;
+        InstructionWorkList.remove state.active_moves m;
+        let priority = priority_of_instruction state m in
+        PrioritizedWorkList.add state.work_list_moves
+          ~priority:{ Priority.priority; id = m.id }
+          ~data:m
+      | Unknown_list | Coalesced | Constrained | Frozen | Work_list -> ())
+
+let[@inline] decr_degree state reg =
+  let d = degree state reg in
+  if d = Degree.infinite
+  then ()
+  else (
+    Regalloc_interf_graph.decr_degree state.graph reg;
+    if Int.equal d (k reg)
+    then (
+      enable_moves_one state reg;
+      iter_adjacent state reg ~f:(fun r -> enable_moves_one state r);
+      Reg.Tbl.replace state.reg_work_list reg RegWorkList.Unknown_list;
+      RegWorkListSet.remove state.spill_work_list reg;
+      if is_move_related state reg
+      then (
+        Reg.Tbl.replace state.reg_work_list reg RegWorkList.Freeze;
+        RegWorkListSet.add state.freeze_work_list reg)
+      else (
+        Reg.Tbl.replace state.reg_work_list reg RegWorkList.Simplify;
+        RegWorkListSet.add state.simplify_work_list reg)))
+
+let[@inline] find_move_list state reg =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None -> Instruction.Set.empty
+  | Some res -> res
+
+let[@inline] add_move_list state reg instr =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None ->
+    Reg.Tbl.replace state.move_list reg (Instruction.Set.singleton instr)
+  | Some existing ->
+    Reg.Tbl.replace state.move_list reg (Instruction.Set.add instr existing)
+
+let[@inline] union_move_list state reg set =
+  match Reg.Tbl.find_opt state.move_list reg with
+  | None -> Reg.Tbl.replace state.move_list reg set
+  | Some existing ->
+    Reg.Tbl.replace state.move_list reg (Instruction.Set.union existing set)
+
+let[@inline] rec find_alias state reg =
+  if RegWorkList.equal (reg_work_list state reg) RegWorkList.Coalesced
+  then
+    match Reg.Tbl.find state.reg_alias reg with
+    | None -> fatal "register %a has no alias" Printreg.reg reg
+    | Some reg' -> find_alias state reg'
+  else reg
+
+let[@inline] add_alias state v u =
+  (* We should never generate moves between registers of different types.
+     Bit-casting operations have specific instructions. *)
+  if not (Proc.types_are_compatible v u)
+  then
+    fatal
+      "trying to create an alias between %a and %a but they have incompatible \
+       types"
+      Printreg.reg v Printreg.reg u;
+  Reg.Tbl.replace state.reg_alias v (Some u)
+
+let[@inline] stack_slots state = state.stack_slots
+
+let[@inline] affinity state = state.affinity
+
+let[@inline] add_inst_temporaries_list state regs =
+  state.inst_temporaries
+    <- Reg.Set.add_seq (List.to_seq regs) state.inst_temporaries
+
+let[@inline] add_block_temporaries_list state regs =
+  state.block_temporaries
+    <- Reg.Set.add_seq (List.to_seq regs) state.block_temporaries
+
+let[@inline] mem_inst_temporaries state reg =
+  Reg.Set.mem reg state.inst_temporaries
+
+let[@inline] mem_block_temporaries state reg =
+  Reg.Set.mem reg state.block_temporaries
+
+let[@inline] mem_all_introduced_temporaries state reg =
+  mem_inst_temporaries state reg || mem_block_temporaries state reg
+
+let[@inline] diff_all_introduced_temporaries state set =
+  Reg.Set.diff (Reg.Set.diff set state.inst_temporaries) state.block_temporaries
+
+let update_register_locations state =
+  if debug then log "update_register_locations";
+  List.iter (Reg.all_relocatable_regs ()) ~f:(fun reg ->
+      match reg.Reg.loc with
+      | Reg _ -> ()
+      | Stack _ -> ()
+      | Unknown -> (
+        match Reg.Tbl.find state.reg_color reg with
+        | None ->
+          (* because of rewrites, the register may no longer be present *)
+          ()
+        | Some color ->
+          if debug
+          then
+            log "updating %a to %a" Printreg.reg reg Regs.Phys_reg.print color;
+          Reg.set_loc reg (Reg color)))
+
+let[@inline] check_disjoint sets ~is_disjoint =
+  List.iter sets ~f:(fun (name1, set1) ->
+      List.iter sets ~f:(fun (name2, set2) ->
+          if String.compare name1 name2 < 0
+          then
+            if not (is_disjoint set1 set2)
+            then fatal "sets %s and %s are not disjoint" name1 name2))
+
+let[@inline] check_set_and_field_consistency_reg state
+    (worklist, set, field_value) =
+  Reg.Set.iter
+    (fun reg ->
+      if not (RegWorkList.equal (reg_work_list state reg) field_value)
+      then
+        fatal "register %a is in %s but its field equals %S" Printreg.reg reg
+          worklist
+          (RegWorkList.to_string (reg_work_list state reg)))
+    set
+
+let[@inline] check_set_and_field_consistency_instr state
+    (work_list, set, field_value) =
+  Instruction.Set.iter
+    (fun (instr : Instruction.t) ->
+      let instr_work_list =
+        get_instr_work_list state ~instruction_id:instr.id
+      in
+      if not (InstrWorkList.equal instr_work_list field_value)
+      then
+        fatal "instruction %a is in %s but its field equals %S"
+          InstructionId.format instr.id work_list
+          (InstrWorkList.to_string instr_work_list))
+    set
+
+let[@inline] check_inter_has_no_duplicates state (reg : Reg.t) : unit =
+  let l = adj_list state reg in
+  let s = Reg.Set.of_list l in
+  if List.length l <> Reg.Set.cardinal s
+  then fatal "interf list for %a is not a set" Printreg.reg reg
+
+let reg_set_of_doubly_linked_list (l : Reg.t Doubly_linked_list.t) : Reg.Set.t =
+  Doubly_linked_list.fold_right l ~init:Reg.Set.empty ~f:Reg.Set.add
+
+let[@inline] invariant state =
+  (* CR xclerc for xclerc: avoid multiple conversions to sets. *)
+  if debug && Param.get invariants
+  then (
+    (* interf (list) is morally a set *)
+    List.iter
+      (Reg.all_relocatable_regs ())
+      ~f:(check_inter_has_no_duplicates state);
+    Reg.Set.iter (check_inter_has_no_duplicates state) (all_precolored_regs ());
+    (* register sets are disjoint *)
+    check_disjoint ~is_disjoint:Reg.Set.disjoint
+      [ "precolored", all_precolored_regs ();
+        "initial", reg_set_of_doubly_linked_list state.initial;
+        "simplify_work_list", reg_set_of_reg_work_list state.simplify_work_list;
+        "freeze_work_list", reg_set_of_reg_work_list state.freeze_work_list;
+        "spill_work_list", reg_set_of_reg_work_list state.spill_work_list;
+        "spilled_nodes", reg_set_of_reg_work_list state.spilled_nodes;
+        "coalesced_nodes", reg_set_of_reg_work_list state.coalesced_nodes;
+        "colored_nodes", reg_set_of_doubly_linked_list state.colored_nodes;
+        "select_stack", Reg.Set.of_list state.select_stack ];
+    List.iter
+      ~f:(check_set_and_field_consistency_reg state)
+      [ "precolored", all_precolored_regs (), RegWorkList.Precolored;
+        ( "initial",
+          reg_set_of_doubly_linked_list state.initial,
+          RegWorkList.Initial );
+        ( "simplify_work_list",
+          reg_set_of_reg_work_list state.simplify_work_list,
+          RegWorkList.Simplify );
+        ( "freeze_work_list",
+          reg_set_of_reg_work_list state.freeze_work_list,
+          RegWorkList.Freeze );
+        ( "spill_work_list",
+          reg_set_of_reg_work_list state.spill_work_list,
+          RegWorkList.Spill );
+        ( "spilled_nodes",
+          reg_set_of_reg_work_list state.spilled_nodes,
+          RegWorkList.Spilled );
+        ( "coalesced_nodes",
+          reg_set_of_reg_work_list state.coalesced_nodes,
+          RegWorkList.Coalesced );
+        ( "colored_nodes",
+          reg_set_of_doubly_linked_list state.colored_nodes,
+          RegWorkList.Colored );
+        ( "select_stack",
+          Reg.Set.of_list state.select_stack,
+          RegWorkList.Select_stack ) ];
+    (* move sets are disjoint *)
+    check_disjoint ~is_disjoint:Instruction.Set.disjoint
+      [ ( "coalesced_moves",
+          instruction_set_of_instruction_work_list state.coalesced_moves );
+        ( "constrained_moves",
+          instruction_set_of_instruction_work_list state.constrained_moves );
+        ( "frozen_moves",
+          instruction_set_of_instruction_work_list state.frozen_moves );
+        ( "work_list_moves",
+          instruction_set_of_prioritized_work_list state.work_list_moves );
+        ( "active_moves",
+          instruction_set_of_instruction_work_list state.active_moves ) ];
+    List.iter
+      ~f:(check_set_and_field_consistency_instr state)
+      [ ( "coalesced_moves",
+          instruction_set_of_instruction_work_list state.coalesced_moves,
+          InstrWorkList.Coalesced );
+        ( "constrained_moves",
+          instruction_set_of_instruction_work_list state.constrained_moves,
+          InstrWorkList.Constrained );
+        ( "frozen_moves",
+          instruction_set_of_instruction_work_list state.frozen_moves,
+          InstrWorkList.Frozen );
+        ( "work_list_moves",
+          instruction_set_of_prioritized_work_list state.work_list_moves,
+          InstrWorkList.Work_list );
+        ( "active_moves",
+          instruction_set_of_instruction_work_list state.active_moves,
+          InstrWorkList.Active ) ];
+    (* degree is consistent with adjacency lists/sets *)
+    let work_lists =
+      Reg.Set.union
+        (reg_set_of_reg_work_list state.simplify_work_list)
+        (Reg.Set.union
+           (reg_set_of_reg_work_list state.freeze_work_list)
+           (reg_set_of_reg_work_list state.spill_work_list))
+    in
+    let work_lists_or_precolored =
+      Reg.Set.union (all_precolored_regs ()) work_lists
+    in
+    Reg.Set.iter
+      (fun u ->
+        let degree = degree state u in
+        if degree = Degree.infinite
+        then fatal "invariant: infinite degree for %a" Printreg.reg u
+        else
+          let adj_list_set = Reg.Set.of_list (adj_list state u) in
+          let cardinal =
+            Reg.Set.cardinal
+              (Reg.Set.inter adj_list_set work_lists_or_precolored)
+          in
+          if not (Int.equal degree cardinal)
+          then (
+            List.iter (adj_list state u) ~f:(fun r ->
+                log "%a <- interf[%a]" Printreg.reg r Printreg.reg u);
+            Reg.Set.iter
+              (fun r -> log "%a <- adj_list[%a]" Printreg.reg r Printreg.reg u)
+              adj_list_set;
+            Reg.Set.iter
+              (fun r ->
+                log "%a <- work_lists_or_precolored[%a]" Printreg.reg r
+                  Printreg.reg u)
+              (Reg.Set.inter adj_list_set work_lists_or_precolored);
+            fatal
+              "invariant expected degree for %a to be %d but got %d\n\
+              \ (#adj_list=%d, #work_lists_or_precolored=%d)"
+              Printreg.reg u cardinal degree
+              (Reg.Set.cardinal adj_list_set)
+              (Reg.Set.cardinal work_lists_or_precolored)))
+      work_lists)

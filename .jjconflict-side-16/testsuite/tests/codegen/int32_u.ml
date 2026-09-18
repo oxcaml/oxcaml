@@ -1,0 +1,135 @@
+(* TEST
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
+ only-default-codegen;
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -experimental-optimizations";
+ expect.opt;
+*)
+
+open Intrinsics
+
+(* CR ttebbi: We should use 32bit instructions. If we change the register
+   representation of 32bit values, we could also remove the sign extension.
+*)
+let add x y = Int32_u.add x y
+[%%expect_asm X86_64{|
+add:
+  addq  %rbx, %rax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* CR ttebbi: This should be branchfree. *)
+let min x y = Int32_u.min x y
+[%%expect_asm X86_64{|
+min:
+  cmpq  %rbx, %rax
+  jg    .L0
+  ret
+.L0:
+  movq  %rbx, %rax
+  ret
+|}]
+
+let bswap x = Int32_u.bswap x
+[%%expect_asm X86_64{|
+bswap:
+  bswap %eax
+  movslq %eax, %rax
+  ret
+|}]
+
+(* CR ttebbi: `movq  $-1, %rsi` has a large encoding. *)
+let compare x y = Int32_u.compare x y
+[%%expect_asm X86_64{|
+compare:
+  movq  %rax, %rsi
+  movq  $-1, %rdi
+  xorl  %eax, %eax
+  cmpq  %rbx, %rsi
+  setg  %al
+  cmovge %rax, %rdi
+  leaq  1(%rdi,%rdi), %rax
+  ret
+|}]
+
+(* CR ttebbi: This should be right-shift by 1 followed by sign extension. *)
+let of_int x = Int32_u.of_int x
+[%%expect_asm X86_64{|
+of_int:
+  salq  $31, %rax
+  sarq  $32, %rax
+  ret
+|}]
+
+let to_int x = Int32_u.to_int x
+[%%expect_asm X86_64{|
+to_int:
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let unsigned_div x y = Int32_u.unsigned_div x y
+[%%expect_asm X86_64{|
+unsigned_div:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsigned_rem x y = Int32_u.unsigned_rem x y
+[%%expect_asm X86_64{|
+unsigned_rem:
+  testq %rbx, %rbx
+  je    .L0
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
+  ret
+.L0:
+  movq  caml_exn_Division_by_zero@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+|}]
+
+let unsafe_unsigned_div x y = Int32_u.unsafe_unsigned_div x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_div:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %eax, %rax
+  ret
+|}]
+
+let unsafe_unsigned_rem x y = Int32_u.unsafe_unsigned_rem x y
+[%%expect_asm X86_64{|
+unsafe_unsigned_rem:
+  movl  %ebx, %ecx
+  movl  %eax, %eax
+  xorl  %edx, %edx
+  divq  %rcx
+  movslq %edx, %rax
+  ret
+|}]

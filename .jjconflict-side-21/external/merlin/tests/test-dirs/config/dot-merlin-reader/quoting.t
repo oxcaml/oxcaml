@@ -1,0 +1,80 @@
+  $ cat > .merlin <<EOF
+  > EXCLUDE_QUERY_DIR
+  > FLG -pp 'I/definitly/need/quoting.exe -nothing'
+  > FLG -ppx '/path/to/ppx.exe --as-ppx --cookie '\\''library-name="model"'\\'''
+  > FLG -w @3
+  > EOF
+
+  $ FILE=$(pwd)/test.ml; dot-merlin-reader <<EOF | sed 's#[0-9]*:#?:#g'
+  > (4:File${#FILE}:$FILE)
+  > EOF
+  ((?:EXCLUDE_QUERY_DIR)(?:FLG(?:-pp?:I/definitly/need/quoting.exe -nothing))(?:FLG(?:-ppx?:/path/to/ppx.exe --as-ppx --cookie 'library-name="model"'))(?:FLG(?:-w?:@3)))
+
+  $ echo | $MERLIN single dump-configuration -filename test.ml 2> /dev/null | jq '.value.merlin'
+  {
+    "build_path": [],
+    "source_path": [],
+    "hidden_build_path": [],
+    "hidden_source_path": [],
+    "cmi_path": [],
+    "cmt_path": [],
+    "index_files": [],
+    "flags_applied": [
+      {
+        "workdir": "$TESTCASE_ROOT",
+        "workval": [
+          "-pp",
+          "I/definitly/need/quoting.exe -nothing"
+        ]
+      },
+      {
+        "workdir": "$TESTCASE_ROOT",
+        "workval": [
+          "-ppx",
+          "/path/to/ppx.exe --as-ppx --cookie 'library-name=\"model\"'"
+        ]
+      },
+      {
+        "workdir": "$TESTCASE_ROOT",
+        "workval": [
+          "-w",
+          "@3"
+        ]
+      }
+    ],
+    "extensions": [],
+    "suffixes": [
+      {
+        "impl": ".ml",
+        "intf": ".mli"
+      },
+      {
+        "impl": ".re",
+        "intf": ".rei"
+      }
+    ],
+    "stdlib": "lib/ocaml",
+    "source_root": null,
+    "unit_name": null,
+    "unit_name_for": {},
+    "wrapping_prefix": null,
+    "reader": [],
+    "protocol": "json",
+    "log_file": null,
+    "log_sections": [],
+    "flags_to_apply": [],
+    "failures": [],
+    "assoc_suffixes": [
+      {
+        "extension": ".re",
+        "reader": "reason"
+      },
+      {
+        "extension": ".rei",
+        "reader": "reason"
+      }
+    ],
+    "cache_lifespan": "5"
+  }
+
+  $ rm .merlin

@@ -1,0 +1,96 @@
+module Lex = Flambda_lex
+module Parser = Flambda_parser
+
+type error =
+  | Lexing_error of Lex.error * Location.t
+  | Parsing_error of string * Location.t
+
+let add_pos (pos1 : Lexing.position) (pos2 : Lexing.position) : Lexing.position
+    =
+  { pos_fname = pos1.pos_fname;
+    pos_lnum = pos1.pos_lnum + pos2.pos_lnum - 1;
+    pos_bol = pos1.pos_bol + pos2.pos_bol;
+    pos_cnum = pos1.pos_cnum + pos2.pos_cnum
+  }
+
+let make_loc ?relative_to (startpos, endpos) =
+  let abs pos =
+    match relative_to with Some base -> add_pos base pos | None -> pos
+  in
+  { Location.loc_start = abs startpos;
+    Location.loc_end = abs endpos;
+    Location.loc_ghost = false
+  }
+
+let initial_pos filename =
+  { Lexing.pos_fname = filename; pos_lnum = 1; pos_bol = 0; pos_cnum = 0 }
+
+let run_parser ~start_symbol ~start_pos (lb : Lexing.lexbuf) =
+  let supplier =
+    Parser.MenhirInterpreter.lexer_lexbuf_to_supplier Lex.token lb
+  in
+  (* [Lexing] assumes that the position it starts in has cnum = bol = 0, so we
+     humor it and then add [start_pos] back in if there's an error. *)
+  let pos = initial_pos Lexing.(start_pos.pos_fname) in
+  let start = start_symbol pos in
+  try
+    Parser.MenhirInterpreter.loop_handle
+      (fun ans -> Ok ans)
+      (function
+        | HandlingError error_state ->
+          let s = Parser.MenhirInterpreter.current_state_number error_state in
+          let msg =
+            try Flambda_parser_messages.message s
+            with Not_found -> Format.sprintf "Unknown error in state %d" s
+          in
+          (* CR-someday lmaurer: Fix the error messages. This is not a small
+           * task - there are (or should be) 175 of them as of this writing,
+           * many of them need to be rewritten entirely, and even for the ones
+           * that need small tweaks, I don't know of any good way of updating
+           * the comments in the .messages file that tell you the state of
+           * the parser corresponding to an error message.
+           *
+           * A good alternative would be to generate something sensible
+           * automatically by inspecting the grammar, but I don't see any
+           * straightforward way to do that either. *)
+          let msg = msg ^ " (note: error messages are wildly out of date)" in
+          let loc =
+            make_loc ~relative_to:start_pos
+              (Parser.MenhirInterpreter.positions error_state)
+          in
+          Error (Parsing_error (msg, loc))
+        | _ ->
+          (* the manual promises that HandlingError is the only possible
+             constructor *)
+          assert false)
+      supplier start
+  with Lex.Error (error, loc) ->
+    Error (Lexing_error (error, make_loc ~relative_to:start_pos loc))
+[@@ocaml.warning "-fragile-match"]
+
+let run_parser_on_file ~start_symbol filename =
+  let ic = open_in filename in
+  Misc.try_finally
+    ~always:(fun () -> close_in ic)
+    (fun () ->
+      let start_pos = initial_pos filename in
+      let lb = Lexing.from_channel ic in
+      run_parser ~start_symbol ~start_pos lb)
+
+let parse_fexpr filename =
+  run_parser_on_file ~start_symbol:Parser.Incremental.flambda_unit filename
+
+let make_unit_info ~filename =
+  Unit_info.make ~source_file:filename
+    ~for_pack_prefix:Compilation_unit.Prefix.empty Impl filename
+
+let parse filename =
+  parse_fexpr filename
+  |> Result.map (fun fexpr ->
+      let unit_info = make_unit_info ~filename in
+      let comp_unit = Unit_info.modname unit_info in
+      let old_unit_info = Env.get_current_unit () in
+      Env.set_current_unit unit_info;
+      let flambda = Fexpr_to_flambda.conv comp_unit fexpr in
+      Option.iter Env.set_current_unit old_unit_info;
+      flambda.unit)

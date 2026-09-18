@@ -43,6 +43,7 @@ type unit_infos_builder =
     mutable uib_force_link : bool;
     mutable uib_requires_metaprogramming : bool;
     mutable uib_external_symbols : string list;
+    mutable uib_lto_info : File_sections.Idx.t option;
     uib_file_sections : File_sections.Builder.t;
   }
 
@@ -70,6 +71,7 @@ let current_unit =
     uib_force_link = false;
     uib_requires_metaprogramming = false;
     uib_external_symbols = [];
+    uib_lto_info = None;
     uib_file_sections = File_sections.Builder.create 0;
   }
 
@@ -95,6 +97,7 @@ let reset unit_info =
   current_unit.uib_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
   current_unit.uib_external_symbols <- [];
+  current_unit.uib_lto_info <- None;
   File_sections.Builder.clear current_unit.uib_file_sections
 
 let record_external_symbols () =
@@ -133,6 +136,7 @@ let read_unit_info filename =
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
       ui_static_data = uir.uir_static_data;
+      ui_lto_info = uir.uir_lto_info;
       ui_file_sections = sections;
     }
     in
@@ -247,6 +251,9 @@ let cache_unit_info ui =
 let set_export_info export_info =
   current_unit.uib_export_info <- Some export_info
 
+let set_lto_info lto_info =
+  current_unit.uib_lto_info <- Some lto_info
+
 (* Record that a currying function or application function is needed *)
 
 let need_curry_fun kind arity result =
@@ -313,6 +320,7 @@ let write_unit_info info filename =
     uir_section_toc = toc;
     uir_external_symbols = Array.of_list info.ui_external_symbols;
     uir_static_data = info.ui_static_data;
+    uir_lto_info = info.ui_lto_info;
     uir_sections_length = total_length;
   } in
   Misc.protect_output_to_file filename (fun oc ->
@@ -351,6 +359,7 @@ let build_unit_info ~main_module_block_format ~arg_descr ~static_data =
     ui_requires_metaprogramming = current_unit.uib_requires_metaprogramming;
     ui_static_data = static_data;
     ui_external_symbols = current_unit.uib_external_symbols;
+    ui_lto_info = current_unit.uib_lto_info;
     ui_file_sections =
       File_sections.Builder.build current_unit.uib_file_sections;
   }

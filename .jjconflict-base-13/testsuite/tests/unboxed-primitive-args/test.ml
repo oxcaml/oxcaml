@@ -1,0 +1,28 @@
+(* TEST
+ readonly_files = "common.mli common.ml test_common.c test_common.h";
+ flambda2;
+ setup-ocamlopt.opt-build-env;
+ test_file = "${test_source_directory}/gen_test.ml";
+ ocaml_script_as_argument = "true";
+ arguments = "c";
+ compiler_output = "stubs.c";
+ ocaml;
+ arguments = "ml";
+ compiler_output = "main.ml";
+ ocaml;
+ all_modules = "test_common.c stubs.c common.mli common.ml test0.ml test1.ml test2.ml test3.ml test4.ml main.ml";
+ {
+  arch_amd64;
+  ocamlopt_flags = "-cc '${cc} -msse4.2' -ccopt '${cflags}'";
+  ocamlopt.opt;
+  run;
+  check-program-output;
+ }
+ {
+  arch_arm64;
+  ocamlopt.opt;
+  run;
+  check-program-output;
+ }
+*)
+(* We use flambda2 above as a proxy to indicate SIMD is supported *)

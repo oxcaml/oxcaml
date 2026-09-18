@@ -1,0 +1,890 @@
+open! Fexpr
+
+let pp_list ~sep f ppf =
+  Format.pp_print_list f ~pp_sep:(fun ppf () -> Format.fprintf ppf sep) ppf
+
+let pp_star_list f = pp_list ~sep:" *@ " f
+
+let pp_comma_list f = pp_list ~sep:",@ " f
+
+let pp_semi_list f = pp_list ~sep:";@ " f
+
+let pp_pipe_list f = pp_list ~sep:"@ |" f
+
+let empty_fmt : (unit, Format.formatter, unit) format = ""
+
+let space_fmt : (unit, Format.formatter, unit) format = "@ "
+
+let pp_with ?(prefix = empty_fmt) ?(suffix = empty_fmt) ppf =
+  Format.kdprintf (fun pp ->
+      Format.fprintf ppf prefix;
+      pp ppf;
+      Format.fprintf ppf suffix)
+
+let pp_like fmt f ppf = Format.fprintf ppf fmt f
+
+type spacing =
+  | Before
+  | After
+  | Neither
+
+let pp_spaced ~space ppf =
+  let prefix, suffix =
+    match space with
+    | Before -> space_fmt, empty_fmt
+    | After -> empty_fmt, space_fmt
+    | Neither -> empty_fmt, empty_fmt
+  in
+  pp_with ~prefix ~suffix ppf
+
+let pp_option ~space f ppf = function
+  | None -> ()
+  | Some a -> pp_spaced ~space ppf "%a" f a
+
+let recursive ~space ppf r =
+  match (r : is_recursive) with
+  | Nonrecursive -> ()
+  | Recursive -> pp_spaced ~space ppf "rec"
+
+let continuation_sort ppf sort =
+  Format.pp_print_string ppf
+  @@
+  match sort with
+  | Normal -> "normal"
+  | Exn -> "exn"
+  | Define_root_symbol -> "define_root_symbol"
+
+let char_between c (low, high) =
+  Char.compare low c <= 0 && Char.compare c high <= 0
+
+let is_identstart c =
+  Char.equal c '_' || char_between c ('a', 'z') || char_between c ('A', 'Z')
+
+let is_identchar c =
+  is_identstart c || Char.equal c '\'' || char_between c ('0', '9')
+
+let is_unquoted_symbol s =
+  (not (String.equal s "")) && Misc.Stdlib.String.for_all is_identchar s
+
+let is_unquoted_ident s =
+  let name, stamp =
+    match String.split_on_char '/' s with
+    | [] | [_] | _ :: _ :: _ :: _ -> s, ""
+    | [name; stamp] -> name, stamp
+  in
+  (not (String.equal s ""))
+  && is_identstart s.[0]
+  && Misc.Stdlib.String.for_all is_identchar name
+  && Misc.Stdlib.String.for_all (fun c -> char_between c ('0', '9')) stamp
+
+let symbol_part ppf s =
+  if is_unquoted_symbol s
+  then Format.pp_print_string ppf s
+  else Format.fprintf ppf "`%s`" s
+
+let directive directive pp ppf v =
+  Format.fprintf ppf "%t%a%t" directive pp v Flambda_colours.pop
+
+let symbol0 ppf { txt = cunit, s; loc = _ } =
+  Format.pp_print_char ppf '$';
+  cunit
+  |> Option.iter (fun { ident; linkage_name } ->
+      symbol_part ppf ident;
+      linkage_name
+      |> Option.iter (fun linkage_name ->
+          Format.fprintf ppf "/%a" symbol_part linkage_name);
+      Format.pp_print_char ppf '.');
+  symbol_part ppf s
+
+let symbol = directive Flambda_colours.symbol symbol0
+
+let ident ppf s =
+  if is_unquoted_ident s && not (Flambda_lex.is_keyword s)
+  then Format.pp_print_string ppf s
+  else Format.fprintf ppf "`%s`" s
+
+let variable ppf { txt = s; loc = _ } =
+  directive Flambda_colours.variable ident ppf s
+
+let value_slot ppf { txt = s; loc = _ } =
+  directive Flambda_colours.value_slot ident ppf s
+
+let code_id ppf ({ txt = s; loc = _ } : code_id) =
+  directive Flambda_colours.code_id ident ppf s
+
+let function_slot ppf ({ txt = s; loc = _ } : function_slot) =
+  directive Flambda_colours.function_slot ident ppf s
+
+let continuation_id ppf ({ txt = s; loc = _ } : continuation_id) =
+  directive Flambda_colours.continuation ident ppf s
+
+let special_continuation ppf special_cont =
+  match special_cont with
+  | Done -> Format.fprintf ppf "done"
+  | Error -> Format.fprintf ppf "error"
+
+let continuation ppf (cont : continuation) =
+  match cont with
+  | Named id -> continuation_id ppf id
+  | Special special_cont ->
+    directive Flambda_colours.continuation special_continuation ppf special_cont
+
+let result_continuation ppf rcont =
+  match rcont with
+  | Return c -> continuation ppf c
+  | Never_returns ->
+    Format.fprintf ppf "%tnever%t" Flambda_colours.continuation
+      Flambda_colours.pop
+
+let region ppf (r : region) =
+  match r with
+  | Named v -> variable ppf v
+  | Toplevel_alloc_region -> Format.pp_print_string ppf "toplevel"
+
+let cfprintf directive ppf fmt =
+  directive ppf;
+  Format.kfprintf Flambda_colours.pop ppf fmt
+
+let naked_number ppf fmt = cfprintf Flambda_colours.naked_number ppf fmt
+
+let float ppf f = naked_number ppf "%h" f
+
+let float32 ppf f = naked_number ppf "%hs" f
+
+let int ppf i = naked_number ppf "%Li" i
+
+let int8 ppf i = naked_number ppf "%as" Numeric_types.Int8.print i
+
+let int16 ppf i = naked_number ppf "%aS" Numeric_types.Int16.print i
+
+let int32 ppf i = naked_number ppf "%lil" i
+
+let int64 ppf i = naked_number ppf "%LiL" i
+
+let nativeint ppf i = naked_number ppf "%Lin" i
+
+let vec128 ppf ({ word0; word1 } : Vector_types.Vec128.Bit_pattern.bits) =
+  naked_number ppf "vec128[%016Lx:%016Lx]" word0 word1
+
+let vec256 ppf
+    ({ word0; word1; word2; word3 } : Vector_types.Vec256.Bit_pattern.bits) =
+  naked_number ppf "vec256[%016Lx:%016Lx:%016Lx:%016Lx]" word0 word1 word2 word3
+
+let vec512 ppf
+    ({ word0; word1; word2; word3; word4; word5; word6; word7 } :
+      Vector_types.Vec512.Bit_pattern.bits) =
+  naked_number ppf
+    "vec512[%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx:%016Lx]" word0
+    word1 word2 word3 word4 word5 word6 word7
+
+let mask ppf ({ word0 } : Vector_types.Mask.Bit_pattern.bits) =
+  naked_number ppf "mask[%016Lx]" word0
+
+let naked_number_kind ppf (nnk : Flambda_kind.Naked_number_kind.t) =
+  Format.pp_print_string ppf
+  @@
+  match nnk with
+  | Naked_immediate -> "imm"
+  | Naked_float32 -> "float32"
+  | Naked_float -> "float"
+  | Naked_int8 -> "int8"
+  | Naked_int16 -> "int16"
+  | Naked_int32 -> "int32"
+  | Naked_int64 -> "int64"
+  | Naked_nativeint -> "nativeint"
+  | Naked_vec128 -> "vec128"
+  | Naked_vec256 -> "vec256"
+  | Naked_vec512 -> "vec512"
+  | Naked_mask -> "mask"
+
+let rec subkind ppf (k : subkind) =
+  let str s = Format.pp_print_string ppf s in
+  match k with
+  | Anything -> str "val"
+  | Float_block { num_fields } -> Format.fprintf ppf "float ^ %d" num_fields
+  | Boxed_float -> str "float boxed"
+  | Boxed_float32 -> str "float32 boxed"
+  | Boxed_int32 -> str "int32 boxed"
+  | Boxed_int64 -> str "int64 boxed"
+  | Boxed_nativeint -> str "nativeint boxed"
+  | Boxed_vec128 -> str "vec128 boxed"
+  | Boxed_vec256 -> str "vec256 boxed"
+  | Boxed_vec512 -> str "vec512 boxed"
+  | Boxed_mask -> str "mask boxed"
+  | Variant { consts; non_consts } -> variant_subkind ppf consts non_consts
+  | Tagged_immediate -> str "imm tagged"
+  | Float_array -> str "float array"
+  | Immediate_array -> str "imm array"
+  | Value_array -> str "val array"
+  | Generic_array -> str "any array"
+  | Untagged_int_array -> str "int array"
+  | Untagged_int8_array -> str "int8 array"
+  | Untagged_int16_array -> str "int16 array"
+  | Unboxed_int32_array -> str "int32 array"
+  | Unboxed_int64_array -> str "int64 array"
+  | Unboxed_nativeint_array -> str "nativeint array"
+  | Unboxed_float32_array -> str "float32 array"
+  | Unboxed_vec128_array -> str "vec128 array"
+  | Unboxed_vec256_array -> str "vec256 array"
+  | Unboxed_vec512_array -> str "vec512 array"
+  | Unboxed_mask_array -> str "mask array"
+  | Unboxed_product_array -> str "product array"
+
+and variant_subkind ppf consts non_consts =
+  match consts, non_consts with
+  | [], [] ->
+    Format.pp_print_string ppf "[ ]" (* Empty variant? Sure, whatever *)
+  | _, _ ->
+    (* Align first | in line with opening [*)
+    Format.fprintf ppf "@[<hov 0>[ ";
+    pp_pipe_list (fun ppf -> Format.fprintf ppf "%Ld") ppf consts;
+    let () =
+      match consts, non_consts with
+      | [], _ | _, [] -> ()
+      | _ :: _, _ :: _ -> Format.fprintf ppf "@ | "
+    in
+    let pp_pair ppf (tag, sk) =
+      let pp_fields ppf = function
+        | None -> Format.pp_print_string ppf "any"
+        | Some fields -> pp_star_list kind_with_subkind ppf fields
+      in
+      Format.fprintf ppf "@[<hov 2>%d of %a@]" tag pp_fields sk
+    in
+    pp_pipe_list pp_pair ppf non_consts;
+    Format.fprintf ppf "@ ]@]"
+
+and kind_with_subkind ppf (k : kind_with_subkind) =
+  let str s = Format.pp_print_string ppf s in
+  match k with
+  | Naked_number nnk -> naked_number_kind ppf nnk
+  | Rec_info -> str "rec_info"
+  | Region -> str "region"
+  | Value sk -> subkind ppf sk
+
+let kind_with_subkind ppf k =
+  directive Flambda_colours.kind kind_with_subkind ppf k
+
+let const ppf (c : Fexpr.const) =
+  match c with
+  | Naked_immediate i ->
+    Format.fprintf ppf "%t%si%t" Flambda_colours.naked_number i
+      Flambda_colours.pop
+  | Tagged_immediate i ->
+    Format.fprintf ppf "%t%s%t" Flambda_colours.tagged_immediate i
+      Flambda_colours.pop
+  | Naked_float f -> float ppf f
+  | Naked_float32 f -> float32 ppf f
+  | Naked_int8 i -> int8 ppf i
+  | Naked_int16 i -> int16 ppf i
+  | Naked_int32 i -> int32 ppf i
+  | Naked_int64 i -> int64 ppf i
+  | Naked_nativeint i -> nativeint ppf i
+  | Naked_vec128 v -> vec128 ppf v
+  | Naked_vec256 v -> vec256 ppf v
+  | Naked_vec512 v -> vec512 ppf v
+  | Naked_mask v -> mask ppf v
+  | Null -> Format.fprintf ppf "null"
+  | Poison (kind, name) ->
+    Format.fprintf ppf "%tpoison.%a.%s%t" Flambda_colours.invalid_keyword
+      kind_with_subkind kind name Flambda_colours.pop
+
+let arity ppf (a : arity) =
+  match a with
+  | [] -> directive Flambda_colours.kind Format.pp_print_string ppf "unit"
+  | _ -> Format.fprintf ppf "@[<hv>%a@]" (pp_star_list kind_with_subkind) a
+
+let kinded_variable ppf (v, (k : kind_with_subkind option)) =
+  match k with
+  | None -> variable ppf v
+  | Some k ->
+    Format.fprintf ppf "@[<2>%a :@ %a@]" variable v kind_with_subkind k
+
+let field_of_block ppf : field_of_block -> unit = function
+  | Symbol s -> symbol ppf s
+  | Dynamically_computed v -> variable ppf v
+  | Const cst -> const ppf cst
+
+type parens =
+  | Never
+  | If_complex
+
+let rec rec_info ~parens ppf (ri : Fexpr.rec_info) =
+  let with_parens ~f ppf =
+    match parens with
+    | Never -> f ppf ()
+    | If_complex -> Format.fprintf ppf "(%a)" f ()
+  in
+  match ri with
+  | Depth d -> Format.fprintf ppf "%d" d
+  | Infinity -> Format.pp_print_string ppf "inf"
+  | Do_not_inline -> Format.pp_print_string ppf "do_not_inline"
+  | Var dv -> variable ppf dv
+  | Succ ri ->
+    with_parens ppf ~f:(fun ppf () ->
+        Format.fprintf ppf "succ %a" (rec_info ~parens:If_complex) ri)
+  | Unroll (d, ri) ->
+    with_parens ppf ~f:(fun ppf () ->
+        Format.fprintf ppf "unroll %d %a" d (rec_info ~parens:If_complex) ri)
+
+let rec_info ~parens ppf ri =
+  directive Flambda_colours.rec_info (rec_info ~parens) ppf ri
+
+let coercion ppf : coercion -> unit = function
+  | Id -> Format.pp_print_string ppf "id"
+  | Change_depth { from; to_ } ->
+    Format.fprintf ppf "depth %a -> %a" (rec_info ~parens:Never) from
+      (rec_info ~parens:Never) to_
+
+let coercion ppf coercion_ =
+  directive Flambda_colours.coercion coercion ppf coercion_
+
+let rec simple ppf : simple -> unit = function
+  | Symbol s -> symbol ppf s
+  | Var v -> variable ppf v
+  | Const c -> const ppf c
+  | Coerce (s, co) -> Format.fprintf ppf "%a ~ %a" simple s coercion co
+
+let simple_args ~space ~omit_if_empty ppf = function
+  | [] when omit_if_empty -> ()
+  | args -> pp_spaced ~space ppf "(@[<hv>%a@])" (pp_comma_list simple) args
+
+let cont_extra_args ppf ea =
+  match ea with
+  | [] -> ()
+  | _ ->
+    Format.fprintf ppf " (%a)"
+      (pp_comma_list (fun ppf (s, k) ->
+           Format.fprintf ppf "%a %a" simple s kind_with_subkind k))
+      ea
+
+let exn_continuation ppf (c, ea) =
+  Format.fprintf ppf "* %a%a" continuation c cont_extra_args ea
+
+let mutability ~space ppf mut =
+  let str =
+    match mut with
+    | Mutable -> Some "mutable"
+    | Immutable -> None
+    | Immutable_unique -> Some "immutable_unique"
+  in
+  pp_option ~space Format.pp_print_string ppf str
+
+let empty_array_kind ~space ppf (ak : empty_array_kind) =
+  let str =
+    match ak with
+    | Values_or_immediates_or_naked_floats -> None
+    | Naked_float32s -> Some "float32"
+    | Naked_ints -> Some "int"
+    | Naked_int8s -> Some "int8"
+    | Naked_int16s -> Some "int16"
+    | Naked_int32s -> Some "int32"
+    | Naked_int64s -> Some "int64"
+    | Naked_nativeints -> Some "nativeint"
+    | Naked_vec128s -> Some "vec128"
+    | Naked_vec256s -> Some "vec256"
+    | Naked_vec512s -> Some "vec512"
+    | Naked_masks -> Some "mask"
+    | Unboxed_products -> Some "product"
+  in
+  pp_option ~space Format.pp_print_string ppf str
+
+let alloc_mode_for_applications pp ppf (alloc : _ alloc_mode_for_applications)
+    ~space =
+  match alloc with
+  | Not_alloc_stack { alloc_region } ->
+    pp_spaced ~space ppf "&%a" pp alloc_region
+  | Maybe_alloc_stack { alloc_region; region; ghost_region } ->
+    pp_spaced ~space ppf "&%a &%a &%a" pp alloc_region pp region pp ghost_region
+
+let boxed_variable ppf var ~kind =
+  Format.fprintf ppf "%a : %s boxed" variable var kind
+
+let or_variable const ppf : _ or_variable -> unit = function
+  | Const f -> const ppf f
+  | Var v -> variable ppf v
+
+let static_data ppf : static_data -> unit = function
+  | Block { tag; mutability = mut; elements = elts } ->
+    Format.fprintf ppf "Block %a%i (@[<hv>%a@])" (mutability ~space:After) mut
+      tag
+      (pp_comma_list field_of_block)
+      elts
+  | Boxed_float32 (Const f) -> float32 ppf f
+  | Boxed_float (Const f) -> float ppf f
+  | Boxed_int32 (Const i) -> int32 ppf i
+  | Boxed_int64 (Const i) -> int64 ppf i
+  | Boxed_nativeint (Const i) -> nativeint ppf i
+  | Boxed_vec128 (Const v) -> vec128 ppf v
+  | Boxed_vec256 (Const v) -> vec256 ppf v
+  | Boxed_vec512 (Const v) -> vec512 ppf v
+  | Boxed_mask (Const v) -> mask ppf v
+  | Boxed_float (Var v) -> boxed_variable ppf v ~kind:"float"
+  | Boxed_float32 (Var v) -> boxed_variable ppf v ~kind:"float32"
+  | Boxed_int32 (Var v) -> boxed_variable ppf v ~kind:"int32"
+  | Boxed_int64 (Var v) -> boxed_variable ppf v ~kind:"int64"
+  | Boxed_nativeint (Var v) -> boxed_variable ppf v ~kind:"nativeint"
+  | Boxed_vec128 (Var v) -> boxed_variable ppf v ~kind:"vec128"
+  | Boxed_vec256 (Var v) -> boxed_variable ppf v ~kind:"vec256"
+  | Boxed_vec512 (Var v) -> boxed_variable ppf v ~kind:"vec512"
+  | Boxed_mask (Var v) -> boxed_variable ppf v ~kind:"mask"
+  | Immutable_float_block elements ->
+    Format.fprintf ppf "Float_block (%a)"
+      (pp_comma_list @@ or_variable float)
+      elements
+  | Immutable_float_array elements ->
+    Format.fprintf ppf "Float_array [|%a|]"
+      (pp_semi_list @@ or_variable float)
+      elements
+  | Immutable_float32_array elements ->
+    Format.fprintf ppf "Float32_array [|%a|]"
+      (pp_semi_list @@ or_variable float32)
+      elements
+  | Immutable_value_array elements ->
+    Format.fprintf ppf "Value_array [|%a|]"
+      (pp_semi_list field_of_block)
+      elements
+  | Immutable_int_array elements ->
+    Format.fprintf ppf "Int_array [|%a|]"
+      (pp_semi_list @@ or_variable int)
+      elements
+  | Immutable_int8_array elements ->
+    Format.fprintf ppf "Int8_array [|%a|]"
+      (pp_semi_list @@ or_variable int8)
+      elements
+  | Immutable_int16_array elements ->
+    Format.fprintf ppf "Int16_array [|%a|]"
+      (pp_semi_list @@ or_variable int16)
+      elements
+  | Immutable_int32_array elements ->
+    Format.fprintf ppf "Int32_array [|%a|]"
+      (pp_semi_list @@ or_variable int32)
+      elements
+  | Immutable_int64_array elements ->
+    Format.fprintf ppf "Int64_array [|%a|]"
+      (pp_semi_list @@ or_variable int64)
+      elements
+  | Immutable_nativeint_array elements ->
+    Format.fprintf ppf "Nativeint_array [|%a|]"
+      (pp_semi_list @@ or_variable nativeint)
+      elements
+  | Immutable_vec128_array elements ->
+    Format.fprintf ppf "Vec128_array [|%a|]"
+      (pp_semi_list @@ or_variable vec128)
+      elements
+  | Immutable_vec256_array elements ->
+    Format.fprintf ppf "Vec256_array [|%a|]"
+      (pp_semi_list @@ or_variable vec256)
+      elements
+  | Immutable_vec512_array elements ->
+    Format.fprintf ppf "Vec512_array [|%a|]"
+      (pp_semi_list @@ or_variable vec512)
+      elements
+  | Immutable_mask_array elements ->
+    Format.fprintf ppf "Mask_array [|%a|]"
+      (pp_semi_list @@ or_variable mask)
+      elements
+  | Empty_array kind ->
+    Format.fprintf ppf "Empty_array%a" (empty_array_kind ~space:Before) kind
+  | Immutable_string s -> Format.fprintf ppf "\"%s\"" (s |> String.escaped)
+
+let static_data_binding ppf { symbol = s; defining_expr = sp } =
+  Format.fprintf ppf "%a =@ %a" symbol s static_data sp
+
+let rec prim_param ppf = function
+  | Labeled (f, []) -> Format.fprintf ppf "%a" ident f.txt
+  | Labeled (label, ps) ->
+    Format.fprintf ppf "%a[%a]" ident label.txt prim_sub_params ps
+  | Anonymous ps -> Format.fprintf ppf "[%a]" prim_sub_params ps
+
+and prim_sub_params ppf params = pp_comma_list prim_param ppf params
+
+let prim_params ppf params =
+  pp_list
+    (fun ppf -> Format.fprintf ppf ".%a" prim_param)
+    ~sep:empty_fmt ppf params
+
+let prim_op ppf ({ prim; params } : prim_op) =
+  (* CR bclement: use [Flambda_primitive.classify_for_printing]. *)
+  Format.fprintf ppf "@[<2>%t%s%a%t@]" Flambda_colours.prim_neither prim
+    prim_params params Flambda_colours.pop
+
+let prim ppf ((op, args) : prim) =
+  Format.fprintf ppf "@[<2>%a%a@]" prim_op op
+    (simple_args ~space:Before ~omit_if_empty:false)
+    args
+
+let parameter ppf { param; kind = k } = kinded_variable ppf (param, k)
+
+let kinded_parameters ~space ppf = function
+  | [] -> ()
+  | args -> pp_spaced ~space ppf "(@[<hv>%a@])" (pp_comma_list parameter) args
+
+let cont_recursive ~space ppf recu =
+  match (recu : is_cont_recursive) with
+  | Nonrecursive -> ()
+  | Recursive l ->
+    pp_spaced ~space ppf "rec%a" (kinded_parameters ~space:Neither) l
+
+let raise_kind ppf rt =
+  Format.pp_print_string ppf
+  @@
+  match rt with
+  | Regular -> "regular"
+  | Reraise -> "reraise"
+  | No_trace -> "notrace"
+
+let trap_action ppf = function
+  | Push { exn_handler } ->
+    Format.fprintf ppf "push(%a)" continuation exn_handler
+  | Pop { exn_handler; raise_kind = rk } ->
+    Format.fprintf ppf "@[<h>pop(%a%a)@]"
+      (pp_option ~space:After raise_kind)
+      rk continuation exn_handler
+
+let apply_cont ppf ({ cont; trap_action = action; args } : Fexpr.apply_cont) =
+  Format.fprintf ppf "@[<hv2>%a%a%a@]" continuation cont
+    (pp_option ~space:Before trap_action)
+    action
+    (simple_args ~space:Before ~omit_if_empty:true)
+    args
+
+let value_slots expr_or_static ppf = function
+  | None -> ()
+  | Some ces ->
+    Format.fprintf ppf "@ @[<hv2>%twith%t {" expr_or_static Flambda_colours.pop;
+    pp_list ~sep:";"
+      (fun ppf ({ var; value; kind } : one_value_slot) ->
+        match kind with
+        | None ->
+          Format.fprintf ppf "@ @[<hv2>%a =@ %a@]" value_slot var simple value
+        | Some kind ->
+          Format.fprintf ppf "@ @[<hv2>%a :@ %a =@ %a@]" value_slot var
+            naked_number_kind kind simple value)
+      ppf ces;
+    Format.fprintf ppf "@;<1 -2>}@]"
+
+let alloc_mode_for_allocations ppf (alloc_mode : alloc_mode_for_allocations) =
+  match alloc_mode with
+  | Heap { alloc_region } -> Format.fprintf ppf "@ &%a" region alloc_region
+  | Local { alloc_region; region = r } ->
+    Format.fprintf ppf "@ &%a@ &%a" region alloc_region region r
+
+let fun_decl expr_or_static ppf (decl : fun_decl) =
+  let pp_at_function_slot ppf cid =
+    pp_option ~space:Before (pp_like "@@%a" function_slot) ppf cid
+  in
+  Format.fprintf ppf "@[<2>%tclosure%t@ %a%a%a@]" expr_or_static
+    Flambda_colours.pop code_id decl.code_id pp_at_function_slot
+    decl.function_slot alloc_mode_for_allocations decl.alloc
+
+let named ppf = function
+  | (Simple s : named) -> simple ppf s
+  | Prim p -> prim ppf p
+  | (Closure decl : named) -> fun_decl Flambda_colours.expr_keyword ppf decl
+  | Rec_info ri ->
+    Format.fprintf ppf "@[<hv 2>rec_info@ %a@]" (rec_info ~parens:If_complex) ri
+
+let static_closure_binding ppf (scb : static_closure_binding) =
+  Format.fprintf ppf "%a =@ %a" symbol scb.symbol
+    (fun_decl Flambda_colours.static_keyword)
+    scb.fun_decl
+
+let method_kind ppf mk =
+  match (mk : Call_kind.Method_kind.t) with
+  | Self -> Format.pp_print_string ppf "self"
+  | Public -> Format.pp_print_string ppf "public"
+  | Cached -> Format.pp_print_string ppf "cached"
+
+let call_kind_and_alloc_mode ~space ppf (ck, alloc_mode) =
+  match ck with
+  | Function Indirect ->
+    (alloc_mode_for_applications region) ppf alloc_mode ~space
+  | Function (Direct { code_id = c; function_slot = cl }) ->
+    pp_spaced ~space ppf "@[direct(%a%a%a)@]" code_id c
+      (pp_option ~space:Before (pp_like "@@%a" function_slot))
+      cl
+      (alloc_mode_for_applications region ~space:Before)
+      alloc_mode
+  | C_call { alloc } ->
+    let noalloc_kwd = if alloc then None else Some "noalloc" in
+    pp_spaced ~space ppf "ccall%a"
+      (pp_option ~space:Before Format.pp_print_string)
+      noalloc_kwd
+  | Method { kind; obj } ->
+    pp_spaced ~space ppf "mcall(%a%a)" method_kind kind
+      (fun ppf -> pp_spaced ~space:Before ppf "%a" simple)
+      obj
+
+let inline_attribute ~space ppf (i : Inline_attribute.t) =
+  let str =
+    match i with
+    | Always_inline -> Some "inline(always)"
+    | Available_inline -> Some "inline(available)"
+    | Never_inline -> Some "inline(never)"
+    | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
+    | Default_inline -> None
+  in
+  pp_option ~space Format.pp_print_string ppf str
+
+let inline_attribute_opt ~space ppf i =
+  pp_option ~space (inline_attribute ~space:Neither) ppf i
+
+let inlined_attribute ~space ppf (i : Fexpr.inlined_attribute) =
+  let str =
+    match i with
+    | Always_inlined -> Some "inlined(always)"
+    | Hint_inlined -> Some "inlined(hint)"
+    | Forward_inlined -> Some "inlined(forward)"
+    | Never_inlined -> Some "inlined(never)"
+    | Unroll i -> Some (Format.sprintf "unroll(%d)" i)
+    | Default_inlined -> None
+  in
+  pp_option ~space Format.pp_print_string ppf str
+
+let inlined_attribute_opt ~space ppf i =
+  pp_option ~space (inlined_attribute ~space:Neither) ppf i
+
+let inlining_state ppf { depth } = Format.fprintf ppf "depth(%d)" depth
+
+let loopify_attribute ppf (loopify : loopify_attribute) =
+  Format.pp_print_string ppf
+  @@
+  match loopify with
+  | Always_loopify -> "loopify(always)"
+  | Never_loopify -> "loopify(never)"
+  | Already_loopified -> "loopify(done)"
+  | Default_loopify_and_tailrec -> "loopify(default tailrec)"
+  | Default_loopify_and_not_tailrec -> "loopify(default)"
+
+let loopify_attribute_opt ~space ppf l =
+  pp_option ~space loopify_attribute ppf l
+
+let code_size ppf code_size = Format.fprintf ppf "%d" code_size
+
+let or_blank f ppf ob =
+  match ob with None -> Format.pp_print_string ppf "_" | Some a -> f ppf a
+
+let func_name_with_optional_arities ppf (n, arities) =
+  match n with
+  | None -> ()
+  | Some n -> (
+    match arities with
+    | None -> simple ppf n
+    | Some { params_arity; ret_arity } ->
+      Format.fprintf ppf "@[<1>(%a@ : @[%a ->@ %a@]@,)@]" simple n
+        (or_blank arity) params_arity arity ret_arity)
+
+type scope =
+  | Outer
+  | Where_body
+  | Continuation_body
+
+let parens ~if_scope_is scope ppf f =
+  match if_scope_is, scope with
+  | Outer, Outer | Where_body, Where_body | Continuation_body, Continuation_body
+    ->
+    Format.fprintf ppf "(%t)" (f Outer)
+  | (Outer | Where_body | Continuation_body), _ -> f scope ppf
+
+let rec expr scope ppf = function
+  | Invalid { message } ->
+    Format.fprintf ppf "@[%tinvalid%t \"%s\"@]" Flambda_colours.invalid_keyword
+      Flambda_colours.pop
+      (message |> String.escaped)
+  | Apply_cont ac ->
+    Format.fprintf ppf "@[%tcont%t %a@]" Flambda_colours.expr_keyword
+      Flambda_colours.pop apply_cont ac
+  | Let let_ ->
+    parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
+        let_expr scope ppf let_)
+  | Let_cont
+      { recursive = recu;
+        body;
+        bindings = { name; params; sort; handler } :: rem_cont
+      } ->
+    parens ~if_scope_is:Continuation_body scope ppf (fun _scope ppf ->
+        Format.fprintf ppf
+          "@[<v 2>%a@ @[<v>@[<v 2>@[%twhere%t%a @]@[<hv 2>%a%a%a@] =@ \
+           %a@]%a@]@]"
+          (expr Where_body) body Flambda_colours.expr_keyword
+          Flambda_colours.pop
+          (cont_recursive ~space:Before)
+          recu continuation_id name
+          (pp_option continuation_sort ~space:Before)
+          sort
+          (kinded_parameters ~space:Before)
+          params (expr Continuation_body) handler andk rem_cont)
+  | Let_cont _ -> Format.pp_print_string ppf "<malformed letk>"
+  | Let_symbol l ->
+    parens ~if_scope_is:Where_body scope ppf (fun scope ppf ->
+        let_symbol_expr scope ppf l)
+  | Switch { scrutinee; cases } ->
+    Format.fprintf ppf "@[<v 2>%tswitch%t %a%a@]" Flambda_colours.expr_keyword
+      Flambda_colours.pop simple scrutinee
+      (pp_list ~sep:"" switch_case)
+      cases
+    (* (fun ppf () -> if cases <> [] then Format.pp_print_cut ppf ()) () *)
+  | Apply
+      { call_kind = kind;
+        alloc_mode;
+        inlined;
+        inlining_state = is;
+        continuation = ret;
+        exn_continuation = ek;
+        args;
+        func;
+        arities
+      } ->
+    let pp_inlining_state ppf () =
+      pp_option ~space:Before
+        (pp_like "inlining_state(%a)" inlining_state)
+        ppf is
+    in
+    Format.fprintf ppf
+      "@[<hv 2>%tapply%t@[<2>%t%a%a%a%t@]@ @[<hv 2>%a%a@ @[<hov>-> %a@ %a@]@]@]"
+      Flambda_colours.expr_keyword Flambda_colours.pop Flambda_colours.elide
+      (call_kind_and_alloc_mode ~space:Before)
+      (kind, alloc_mode)
+      (inlined_attribute_opt ~space:Before)
+      inlined pp_inlining_state () Flambda_colours.pop
+      func_name_with_optional_arities (func, arities)
+      (simple_args ~space:Before ~omit_if_empty:true)
+      args result_continuation ret exn_continuation ek
+
+(* CR keryan/bclement: Printing inlined goto only occurs when reprinting parsed
+   fexpr, conversion to and from flambda does not preserve this.
+
+   To do so without breaking scoping, it requires three properties to inline:
+   single use goto, last one declared yet to be inlined, no let expression
+   between declaration and use.
+
+   We could use a stack of declared single use gotos to preserve scoping order,
+   droping it when meeting lets or out of order use. But since a switch is
+   almost always preceded by a get_tag of is_int, we would never inline in
+   practice, except for converted inlining written by hand (which does add let
+   conts right above switches). We deem this not worth the effort for now. *)
+and apply_or_inlined_cont ppf (ac : Fexpr.apply_or_inlined_cont) =
+  match ac with
+  | Named_cont ac -> apply_cont ppf ac
+  | Inlined_goto e -> Format.fprintf ppf "(%a)" (expr Outer) e
+
+and switch_case ppf (v, c) =
+  Format.fprintf ppf "@;@[<hov 2>| %i ->@ %a@]" v apply_or_inlined_cont c
+
+and let_expr scope ppf : let_ -> unit = function
+  | { bindings = first :: rest; body; value_slots = ces } ->
+    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%t %a =@ %a@]"
+      Flambda_colours.expr_keyword Flambda_colours.pop variable first.var named
+      first.defining_expr;
+    List.iter
+      (fun ({ var; defining_expr } : let_binding) ->
+        Format.fprintf ppf "@ @[<hv2>%tand%t %a =@ %a@]"
+          Flambda_colours.expr_keyword Flambda_colours.pop variable var named
+          defining_expr)
+      rest;
+    Format.fprintf ppf "%a@ %tin%t@]@ %a@]"
+      (value_slots Flambda_colours.expr_keyword)
+      ces Flambda_colours.expr_keyword Flambda_colours.pop (expr scope) body
+  | _ -> failwith "empty let?"
+
+and let_symbol_expr scope ppf = function
+  | { bindings; value_slots; body } ->
+    Format.fprintf ppf "@[<v>@[<hv>@[<hv2>%tlet%t %a@]@ %tin%t@]@ %a@]"
+      Flambda_colours.static_keyword Flambda_colours.pop symbol_bindings
+      (bindings, value_slots) Flambda_colours.static_keyword Flambda_colours.pop
+      (expr scope) body
+
+and andk ppf l =
+  let cont { name; params; sort; handler } =
+    Format.fprintf ppf "@ @[<v 2>andwhere%a %a@[<hv2>%a@] =@ %a@]"
+      (pp_option continuation_sort ~space:Before)
+      sort continuation_id name
+      (kinded_parameters ~space:Before)
+      params (expr Continuation_body) handler
+  in
+  List.iter cont l
+
+and symbol_bindings ppf (bindings, elements) =
+  let first = ref true in
+  let pp_and ppf () =
+    if not !first
+    then
+      Format.fprintf ppf "@;<1 -2>%tand%t " Flambda_colours.static_keyword
+        Flambda_colours.pop
+  in
+  List.iter
+    (fun b ->
+      Format.fprintf ppf "%a%a" pp_and () symbol_binding b;
+      first := false)
+    bindings;
+  value_slots Flambda_colours.static_keyword ppf elements
+
+and symbol_binding ppf (sb : symbol_binding) =
+  match sb with
+  | Data ss -> static_data_binding ppf ss
+  | Code code -> code_binding ppf code
+  | Deleted_code id ->
+    Format.fprintf ppf "@[<hov 1>%tcode%t@ %a@ deleted@]"
+      Flambda_colours.static_keyword Flambda_colours.pop code_id id
+  | Closure clo -> static_closure_binding ppf clo
+  | Set_of_closures soc ->
+    Format.fprintf ppf "@[<hv>@[<hv2>%tset_of_closures%t@ "
+      Flambda_colours.static_keyword Flambda_colours.pop;
+    (* Somewhat clumsily reuse the logic in [symbol_bindings] *)
+    let closure_bindings_as_symbol_bindings =
+      List.map
+        (fun binding : Fexpr.symbol_binding -> Closure binding)
+        soc.bindings
+    in
+    symbol_bindings ppf (closure_bindings_as_symbol_bindings, soc.elements);
+    Format.fprintf ppf "@]@ end@]"
+
+and code_binding ppf
+    ({ recursive = rec_;
+       inline;
+       id;
+       newer_version_of;
+       param_arity = _;
+       ret_arity;
+       params_and_body;
+       code_size = cs;
+       is_tupled;
+       stub;
+       loopify;
+       result_mode
+     } :
+      code) =
+  Format.fprintf ppf
+    "@[<hv 2>%tcode%t@[<h>%t%a%a%a@ size(%a)%a%a%a%t@]@ @[<hv2>@[<hv 2>%a"
+    Flambda_colours.static_keyword Flambda_colours.pop Flambda_colours.elide
+    (recursive ~space:Before) rec_
+    (inline_attribute_opt ~space:Before)
+    inline
+    (loopify_attribute_opt ~space:Before)
+    loopify code_size cs
+    (pp_option ~space:Before (pp_like "newer_version_of(%a)" code_id))
+    newer_version_of
+    (fun ppf is_tupled -> if is_tupled then Format.fprintf ppf "@ tupled@ ")
+    is_tupled
+    (fun ppf stub -> if stub then Format.fprintf ppf "@ stub")
+    stub Flambda_colours.pop code_id id;
+  let { params; closure_var; region_vars; depth_var; ret_cont; exn_cont; body }
+      =
+    params_and_body
+  in
+  Format.fprintf ppf
+    "%a@]@ @[<hov 2>%a%a@ %a@]@ @[<hv 2>-> %a@ * %a@]%a%s@]@] =@ %a"
+    (kinded_parameters ~space:Before)
+    params variable closure_var
+    (alloc_mode_for_applications variable ~space:Before)
+    region_vars variable depth_var continuation_id ret_cont continuation_id
+    exn_cont
+    (pp_option ~space:Before (pp_like ": %a" arity))
+    ret_arity
+    (match result_mode with
+    | Not_alloc_stack -> ""
+    | Maybe_alloc_stack -> " stack")
+    (expr Outer) body
+
+let flambda_unit ppf ({ body } : flambda_unit) =
+  Format.fprintf ppf "@[<v>@[%a@]@ @]" (expr Outer) body

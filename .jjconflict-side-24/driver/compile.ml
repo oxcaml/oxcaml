@@ -1,0 +1,173 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 2002 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Misc
+open Compile_common
+
+let tool_name = "ocamlc"
+
+let with_info =
+  Compile_common.with_info ~backend:Byte ~tool_name
+
+let interface ~source_file ~output_prefix =
+  let unit_info =
+    unit_info_from_cu_or_output_prefix ~source_file Intf ~output_prefix
+      ~compilation_unit:Inferred_from_output_prefix
+  in
+  with_info ~dump_ext:"cmi" unit_info @@ fun info ->
+  Compile_common.interface
+    ~hook_parse_tree:Fun.id
+    ~hook_typed_tree:ignore
+    info
+
+(** Bytecode compilation backend for .ml files. *)
+
+let make_arg_descr ~param ~arg_block_idx : Lambda.arg_descr option =
+  match param, arg_block_idx with
+  | Some arg_param, Some arg_block_idx ->
+    Some { arg_param; arg_block_idx }
+  | None, None -> None
+  | Some _, None -> Misc.fatal_error "No argument field"
+  | None, Some _ -> Misc.fatal_error "Unexpected argument field"
+
+let tlambda_to_bytecode i tlambda ~as_arg_for =
+  tlambda
+  |> Profile.(record ~accumulate:true generate)
+    (fun { Lambda.code = tlambda; required_globals; main_module_block_format;
+           arg_block_idx }  ->
+       Builtin_attributes.warn_unused ();
+       tlambda
+       |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+       |> Slambda.eval
+            ~cu_static_data:(fun _ ->
+              Misc.fatal_errorf
+                "Cross-module static evaluation not implemented in bytecode")
+            (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
+       |> fun (_static_data, lambda) ->
+          (* CR layout poly: Drop the comptime part until top-level modules can
+             be static. *)
+          lambda
+       |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
+          (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
+       |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
+       |> Simplif.simplify_lambda_for_bytecode
+       |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+       |> Blambda_of_lambda.blambda_of_lambda
+            ~compilation_unit:(Some i.module_name)
+       |> print_if i.ppf_dump Clflags.dump_blambda Printblambda.blambda
+       |> Bytegen.compile_implementation i.module_name
+       |> print_if i.ppf_dump Clflags.dump_instr Printinstr.instrlist
+       |> fun bytecode ->
+          let arg_descr = make_arg_descr ~param:as_arg_for ~arg_block_idx in
+          bytecode, required_globals, main_module_block_format, arg_descr
+    )
+
+let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
+  let argument_coercion =
+    match argument_interface with
+    | Some { ai_coercion_from_primary; ai_signature = _ } ->
+        Some ai_coercion_from_primary
+    | None -> None
+  in
+  let loc = Location.in_file (Unit_info.original_source_file i.target) in
+  (structure, coercion, argument_coercion)
+  |> Profile.(record transl)
+    (Translmod.transl_implementation ~loc i.module_name)
+  |> tlambda_to_bytecode i
+
+let emit_bytecode i
+      (bytecode, required_globals, main_module_block_format, arg_descr) =
+  let cmo = Unit_info.cmo i.target in
+  Misc.protect_output_to_file (Unit_info.Artifact.filename cmo) (fun oc ->
+       bytecode
+       |> Profile.(record ~accumulate:true generate)
+         (Emitcode.to_file oc i.module_name cmo ~required_globals
+            ~main_module_block_format ~arg_descr);
+    )
+
+let emit_lambda_program info program =
+  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
+  then emit_bytecode info bytecode
+
+type starting_point =
+  | Parsing
+  | Instantiation of {
+      runtime_args : Translmod.runtime_arg list;
+      main_module_block_repr : Lambda.module_representation;
+      arg_descr : Lambda.arg_descr option;
+    }
+
+let starting_point_of_compiler_pass start_from =
+  match (start_from:Clflags.Compiler_pass.t) with
+  | Parsing -> Parsing
+  | _ -> Misc.fatal_errorf "Cannot start from %s"
+           (Clflags.Compiler_pass.to_string start_from)
+
+let implementation_aux ~start_from ~source_file ~output_prefix
+    ~keep_symbol_tables:_
+    ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
+  let unit_info =
+    unit_info_from_cu_or_output_prefix
+      ~source_file Impl ~output_prefix ~compilation_unit
+  in
+  with_info ~dump_ext:"cmo" unit_info @@ fun info ->
+  match start_from with
+  | Parsing ->
+    let backend info typed =
+      let as_arg_for =
+        !Clflags.as_argument_for
+        |> Option.map Global_module.Parameter_name.of_string
+      in
+      let bytecode = to_bytecode info typed ~as_arg_for in
+      emit_bytecode info bytecode
+    in
+    Compile_common.implementation
+      ~hook_parse_tree:Fun.id
+      ~hook_typed_tree:ignore
+      info ~backend
+  | Instantiation { runtime_args; main_module_block_repr; arg_descr } ->
+    begin
+      match !Clflags.as_argument_for with
+      | Some _ ->
+        (* CR lmaurer: Needs nicer error message (this is a user error) *)
+        Misc.fatal_error
+          "-as-argument-for is not allowed (and not needed) with -instantiate"
+      | None -> ()
+    end;
+    let as_arg_for, arg_block_idx =
+      match (arg_descr : Lambda.arg_descr option) with
+      | Some { arg_param; arg_block_idx } -> Some arg_param, Some arg_block_idx
+      | None -> None, None
+    in
+    let impl =
+      Translmod.transl_instance info.module_name ~runtime_args
+        ~main_module_block_repr ~arg_block_idx
+    in
+    let bytecode = tlambda_to_bytecode info impl ~as_arg_for in
+    emit_bytecode info bytecode
+
+let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =
+  let start_from = start_from |> starting_point_of_compiler_pass in
+  implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
+    ~compilation_unit:Inferred_from_output_prefix
+
+let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
+    ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+  let start_from =
+    Instantiation { runtime_args; main_module_block_repr; arg_descr }
+  in
+  implementation_aux ~start_from ~source_file ~output_prefix ~keep_symbol_tables
+    ~compilation_unit:(Exactly compilation_unit)

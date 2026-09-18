@@ -1,0 +1,37 @@
+\chapter{Language extensions} \label{c:extensions}
+%HEVEA\cutname{extn.html}
+
+This chapter describes language extensions and convenience features
+that are implemented in OCaml, but not described in chapter \ref{c:refman}.
+
+
+%HEVEA\cutdef{section}
+
+\input{letrecvalues.tex}
+\input{recursivemodules.tex}
+\input{privatetypes.tex}
+\input{locallyabstract.tex}
+\input{firstclassmodules.tex}
+\input{moduletypeof.tex}
+\input{signaturesubstitution.tex}
+\input{modulealias.tex}
+\input{overridingopen.tex}
+\input{gadts.tex}
+\input{bigarray.tex}
+\input{attributes.tex}
+\input{extensionnodes.tex}
+\input{extensiblevariants.tex}
+\input{generativefunctors.tex}
+\input{extensionsyntax.tex}
+\input{inlinerecords.tex}
+\input{doccomments.tex}
+\input{indexops.tex}
+\input{emptyvariants.tex}
+\input{alerts.tex}
+\input{generalizedopens.tex}
+\input{bindingops.tex}
+\input{effects.tex}
+\input{arrayliterals.tex}
+\input{labeledtuples.tex}
+
+%HEVEA\cutend

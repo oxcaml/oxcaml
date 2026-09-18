@@ -1,0 +1,371 @@
+(* TEST
+ flags = "-extension layouts_alpha";
+ expect;
+*)
+
+(* unit# can be ignored with [;] *)
+
+external unbox_unit : unit -> unit# = "%unbox_unit"
+[%%expect{|
+external unbox_unit : unit -> unit# = "%unbox_unit"
+|}]
+
+let () =
+  unbox_unit ();
+  ()
+[%%expect{|
+|}]
+
+type unit_u : void mod everything
+[%%expect{|
+type unit_u : void mod everything
+|}]
+
+(* Variants whose all-void constructors carry
+   [@immediate_all_void_constructor] are immediates *)
+
+type v : immediate = A of unit_u [@immediate_all_void_constructor]
+[%%expect{|
+type v = A of unit_u [@immediate_all_void_constructor]
+|}]
+
+type v : immediate =
+  | A of unit_u [@immediate_all_void_constructor]
+  | B of #(unit_u * #(unit_u * unit_u)) [@immediate_all_void_constructor]
+  | C
+[%%expect{|
+type v =
+    A of unit_u [@immediate_all_void_constructor]
+  | B of #(unit_u * #(unit_u * unit_u)) [@immediate_all_void_constructor]
+  | C
+|}]
+
+type bad : immediate = A of unit_u [@immediate_all_void_constructor] | B of int
+[%%expect{|
+Line 1, characters 0-79:
+1 | type bad : immediate = A of unit_u [@immediate_all_void_constructor] | B of int
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "bad" is value non_float
+         because it's a boxed variant type.
+       But the layout of type "bad" must be a sublayout of value non_pointer
+         because of the annotation on the declaration of the type bad.
+       Note: The layout of immediate is value non_pointer.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
+
+(* With-bounds for all-void variants *)
+
+type key : void
+type key_holder1 : immediate with key = A of key [@immediate_all_void_constructor]
+type ('a : void) r = #{ a : 'a }
+type key_holder2 : immediate with key =
+  | A of #(unit_u * key r) [@immediate_all_void_constructor]
+[%%expect{|
+type key : void
+type key_holder1 = A of key [@immediate_all_void_constructor]
+type ('a : void) r = #{ a : 'a; }
+type key_holder2 = A of #(unit_u * key r) [@immediate_all_void_constructor]
+|}]
+
+type bad : immediate = A of key [@immediate_all_void_constructor]
+[%%expect{|
+Line 1, characters 0-65:
+1 | type bad : immediate = A of key [@immediate_all_void_constructor]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation immediate,
+       because key is not mod global many stateless immutable.
+|}]
+type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
+[%%expect{|
+Line 1, characters 0-79:
+1 | type bad : immediate = A of #(unit_u * key r) [@immediate_all_void_constructor]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation immediate,
+       because key is not mod global many stateless immutable.
+|}]
+
+
+type void_mod_global : void mod global
+type t : value mod global = A of void_mod_global [@immediate_all_void_constructor]
+type t2 : immediate with void_mod_global =
+  | A of void_mod_global [@immediate_all_void_constructor]
+[%%expect{|
+type void_mod_global : void mod global
+type t = A of void_mod_global [@immediate_all_void_constructor]
+type t2 = A of void_mod_global [@immediate_all_void_constructor]
+|}]
+
+type v1 : void
+type v2 : void
+type t : immediate with v1 with v2 =
+  | A of v1 [@immediate_all_void_constructor]
+  | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
+[%%expect{|
+type v1 : void
+type v2 : void
+type t =
+    A of v1 [@immediate_all_void_constructor]
+  | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
+|}]
+
+type bad : immediate with v1 =
+  | A of v1 [@immediate_all_void_constructor]
+  | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
+[%%expect{|
+Lines 1-3, characters 0-59:
+1 | type bad : immediate with v1 =
+2 |   | A of v1 [@immediate_all_void_constructor]
+3 |   | B of #(unit_u * v2 r) [@immediate_all_void_constructor]
+Error: This type definition does not satisfy its kind annotation
+         immediate with v1,
+       because v2 is not mod global many stateless immutable.
+|}]
+
+type vme : void
+type t : value mod external_ = A of vme [@immediate_all_void_constructor]
+[%%expect{|
+type vme : void
+type t = A of vme [@immediate_all_void_constructor]
+|}]
+
+(* All-`void` boxed and inline records *)
+
+type u1 = #{ a : unit_u }
+type u2 = #{ a : unit_u; b : unit_u }
+type u3 = { a : unit_u } [@@unboxed]
+type nested = #{ a : unit_u; b : #(unit_u * unit_u) }
+type b1 = { a : unit_u }
+type b1_unboxed : void = b1#
+type inline = A of { a : nested }
+[%%expect{|
+type u1 = #{ a : unit_u; }
+type u2 = #{ a : unit_u; b : unit_u; }
+type u3 = { a : unit_u; } [@@unboxed]
+type nested = #{ a : unit_u; b : #(unit_u * unit_u); }
+type b1 = { a : unit_u; }
+type b1_unboxed = b1#
+type inline = A of { a : nested; }
+|}]
+
+(* Mutability of `void` fields in all-`void` records. *)
+
+type t = A of { x : unit# }
+let set (A r) = r.x <- #()
+[%%expect{|
+type t = A of { x : unit#; }
+Line 2, characters 16-26:
+2 | let set (A r) = r.x <- #()
+                    ^^^^^^^^^^
+Error: The record field "x" is not mutable
+|}]
+
+type t : immutable_data = { mutable x : unit# }
+[%%expect{|
+Line 1, characters 0-47:
+1 | type t : immutable_data = { mutable x : unit# }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because mutable fields are not mod immutable.
+|}]
+
+module Bad : sig type t : immutable_data end = struct
+  type t = A of { mutable x : unit# }
+end
+[%%expect{|
+Lines 1-3, characters 47-3:
+1 | ...............................................struct
+2 |   type t = A of { mutable x : unit# }
+3 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = A of { mutable x : unit#; } end
+       is not included in
+         sig type t : immutable_data end
+       Type declarations do not match:
+         type t = A of { mutable x : unit#; }
+       is not included in
+         type t : immutable_data
+       The kind of the first is mutable_data
+         because of the definition of t at line 2, characters 2-37.
+       But the kind of the first must be a subkind of immutable_data
+         because of the definition of t at line 1, characters 17-40.
+|}]
+
+(* An abstract void field contributes with-bounds despite occupying no space. *)
+
+type record : immutable_data with key = { x : key }
+type inline_record : immutable_data with key = A of { x : key }
+[%%expect{|
+type record = { x : key; }
+type inline_record = A of { x : key; }
+|}]
+
+type bad : immutable_data = { x : key }
+[%%expect{|
+Line 1, characters 0-39:
+1 | type bad : immutable_data = { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
+|}]
+
+type bad : immutable_data = A of { x : key }
+[%%expect{|
+Line 1, characters 0-44:
+1 | type bad : immutable_data = A of { x : key }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         immutable_data,
+       because key is not mod forkable unyielding many stateless immutable.
+|}]
+
+(* Refining a generic field to void preserves mutability. *)
+
+type ('a : any) generic = A of { mutable x : 'a }
+type bad : immutable_data = unit# generic
+[%%expect{|
+type ('a : any) generic = A of { mutable x : 'a; }
+Line 2, characters 0-41:
+2 | type bad : immutable_data = unit# generic
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "unit# generic" is mutable_data
+         because of the definition of generic at line 1, characters 0-49.
+       But the kind of type "unit# generic" must be a subkind of immutable_data
+         because of the definition of bad at line 2, characters 0-41.
+|}]
+
+(* [void] in arrays is not yet allowed *)
+
+external length : ('a : any mod separable) . 'a array -> int = "%array_length"
+[@@layout_poly]
+external get : ('a : any mod separable). 'a array -> int -> 'a = "%array_safe_get"
+[@@layout_poly]
+[%%expect{|
+external length : ('a : any separable). 'a array -> int = "%array_length"
+  [@@layout_poly]
+external get : ('a : any separable). 'a array -> int -> 'a
+  = "%array_safe_get" [@@layout_poly]
+|}]
+
+let f (a : unit_u array) = length a
+[%%expect{|
+Line 1, characters 34-35:
+1 | let f (a : unit_u array) = length a
+                                      ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : #(int * unit_u) array) = length a
+[%%expect{|
+Line 1, characters 43-44:
+1 | let f (a : #(int * unit_u) array) = length a
+                                               ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : unit_u array) i = get a i
+[%%expect{|
+Line 1, characters 33-34:
+1 | let f (a : unit_u array) i = get a i
+                                     ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : #(int * unit_u) array) i = get a i
+[%%expect{|
+Line 1, characters 42-43:
+1 | let f (a : #(int * unit_u) array) i = get a i
+                                              ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : u1 array) i = get a i
+[%%expect{|
+Line 1, characters 29-30:
+1 | let f (a : u1 array) i = get a i
+                                 ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : u2 array) i = get a i
+[%%expect{|
+Line 1, characters 29-30:
+1 | let f (a : u2 array) i = get a i
+                                 ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+let f (a : u3 array) i = get a i
+[%%expect{|
+Line 1, characters 29-30:
+1 | let f (a : u3 array) i = get a i
+                                 ^
+Error: Types whose layout contains [void] are not yet supported in arrays.
+|}]
+
+(* [@immediate_all_void_constructor] makes a constructor whose arguments are
+   all void an immediate; without it, such a constructor is a block. *)
+
+type t = A of unit_u [@immediate_all_void_constructor]
+[%%expect{|
+type t = A of unit_u [@immediate_all_void_constructor]
+|}]
+
+type t = A of unit_u [@immediate_all_void_constructor] | B of int | C
+[%%expect{|
+type t = A of unit_u [@immediate_all_void_constructor] | B of int | C
+|}]
+
+type t = A of unit_u * #(unit_u * unit_u) [@immediate_all_void_constructor]
+[%%expect{|
+type t = A of unit_u * #(unit_u * unit_u) [@immediate_all_void_constructor]
+|}]
+
+type t = A : unit_u -> t [@immediate_all_void_constructor]
+[%%expect{|
+type t = A : unit_u -> t [@immediate_all_void_constructor]
+|}]
+
+module type S = sig
+  type t = A of unit_u [@immediate_all_void_constructor]
+end
+[%%expect{|
+module type S =
+  sig type t = A of unit_u [@immediate_all_void_constructor] end
+|}]
+
+(* Without the attribute *)
+
+type t = A of unit_u
+[%%expect{|
+type t = A of unit_u
+|}]
+
+type t = A of #(unit_u * unit_u) | B of int
+[%%expect{|
+type t = A of #(unit_u * unit_u) | B of int
+|}]
+
+module type S = sig
+  type t = A of unit_u
+end
+[%%expect{|
+module type S = sig type t = A of unit_u end
+|}]
+
+(* A misplaced attribute is a warning, not an error, so the type is still
+   accepted. The warning (53) isn't reported here because expect tests run at
+   toplevel; see [immediate_all_void_constructor_unused.ml]. *)
+
+type t = A of int [@immediate_all_void_constructor]
+[%%expect{|
+type t = A of int
+|}]
+
+type t = A of unit_u [@@unboxed]
+[%%expect{|
+type t = A of unit_u [@@unboxed]
+|}]

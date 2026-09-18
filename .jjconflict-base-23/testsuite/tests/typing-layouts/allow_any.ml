@@ -1,0 +1,725 @@
+(* TEST
+ flags = "-extension layouts_alpha";
+ expect;
+*)
+
+let use_as_value : ('a : value) -> 'a = fun x -> x
+let use_uncontended : 'a @ uncontended -> 'a = fun x -> x
+
+(* Baseline: if the jkind doesn't match, we should get an error. *)
+type t : value mod contended = { mutable contents : string }
+[%%expect{|
+val use_as_value : 'a -> 'a = <fun>
+val use_uncontended : 'a -> 'a = <fun>
+Line 5, characters 0-60:
+5 | type t : value mod contended = { mutable contents : string }
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This type definition does not satisfy its kind annotation
+         value mod contended,
+       because mutable fields are not mod contended.
+|}]
+
+(* On the other hand, if we set the attribute, we shouldn't get an error. *)
+type t : value mod contended = { mutable contents : string }
+[@@unsafe_allow_any_mode_crossing]
+let f (x : t @ contended) = use_uncontended x
+[%%expect{|
+type t : value non_float mod contended = { mutable contents : string; }
+[@@unsafe_allow_any_mode_crossing]
+val f : t @ contended -> t = <fun>
+|}]
+
+(* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
+type t : value mod many portable = string
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+Lines 1-2, characters 0-34:
+1 | type t : value mod many portable = string
+2 | [@@unsafe_allow_any_mode_crossing]
+Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
+       Only records, unboxed products, and variants are supported.
+|}]
+
+(* The attribute shouldn't allow us to change the layout *)
+type t : float64 mod contended = { mutable contents : string }
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+Lines 1-2, characters 0-34:
+1 | type t : float64 mod contended = { mutable contents : string }
+2 | [@@unsafe_allow_any_mode_crossing]
+Error: The layout of type "t" is value non_float
+         because it's a boxed record type.
+       But the layout of type "t" must be a sublayout of float64
+         because of the annotation on the declaration of the type t.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}]
+
+(* Can't change the layout for mutually recursive types. This *should*
+   typecheck; i.e. allow_any_mode_crossing shouldn't replace [t]'s layout with
+   [any]. *)
+type ('a : float64) require_f64
+
+type t : any = #{ f : float# }
+[@@unsafe_allow_any_mode_crossing]
+
+and s : value = t require_f64
+[%%expect{|
+type ('a : float64) require_f64
+type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
+and s = t require_f64
+|}]
+
+(* Annotations with with-bounds are allowed *)
+type 'a t : value mod contended with 'a = { mutable contents : 'a }
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+type 'a t
+  : value non_float mod contended with 'a = {
+  mutable contents : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+(* Abstract types in signatures should work with the unsafe kind *)
+module M : sig
+  type t : value mod contended
+end = struct
+  type t : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let f (x : t @ contended) = use_uncontended x
+end
+[%%expect{|
+module M : sig type t : value mod contended end
+|}]
+
+(* Setting the attribute on an open or abstract type is not allowed *)
+module type S = sig
+  type abstract [@@unsafe_allow_any_mode_crossing]
+end
+[%%expect{|
+Line 2, characters 2-50:
+2 |   type abstract [@@unsafe_allow_any_mode_crossing]
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
+       Only records, unboxed products, and variants are supported.
+|}]
+
+type open_ = .. [@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+Line 1, characters 0-50:
+1 | type open_ = .. [@@unsafe_allow_any_mode_crossing]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
+       Only records, unboxed products, and variants are supported.
+|}]
+
+
+module M1 : sig
+  type t : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let f (x : t @ contended) = use_uncontended x
+end
+module M2 : sig
+  type t : value mod contended = M1.t = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t : value mod contended = M1.t = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let f (x : t @ contended) = use_uncontended x
+end
+[%%expect{|
+module M1 :
+  sig
+    type t : value non_float mod contended = { mutable contents : string; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M2 :
+  sig
+    type t
+      : value non_float mod contended =
+      M1.t = {
+      mutable contents : string;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+|}]
+
+(* Private types still require the attribute *)
+module Private : sig
+  type t : value mod contended = private { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t  : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let f (x : t @ contended) = use_uncontended x
+end
+[%%expect{|
+module Private :
+  sig
+    type t
+      : value non_float mod contended = private {
+      mutable contents : string;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+|}]
+
+(* Non-abstract types in signatures should work as long as they specify the attribute *)
+module M : sig
+  type t1 : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  type t2 : value mod contended = private { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  type t3 : value mod contended =
+    | Immut of string
+    | Mut of { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t1 : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  type t2 : value mod contended = { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  type t3 : value mod contended =
+    | Immut of string
+    | Mut of { mutable contents : string }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let f1 (x : t1 @ contended) = use_uncontended x
+  let f2 (x : t2 @ contended) = use_uncontended x
+  let f3 (x : t3 @ contended) = use_uncontended x
+end
+[%%expect{|
+module M :
+  sig
+    type t1 : value non_float mod contended = { mutable contents : string; }
+    [@@unsafe_allow_any_mode_crossing]
+    type t2
+      : value non_float mod contended = private {
+      mutable contents : string;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+    type t3
+      : value non_float mod contended =
+        Immut of string
+      | Mut of { mutable contents : string; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+|}]
+
+(* [@@unsafe_allow_any_mode_crossing] should not allow you to weaken the modal bounds on a
+   kind in module inclusion *)
+module M : sig
+  type t : value mod contended = { mutable x : int } [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t = { mutable x : int }
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { mutable x : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { mutable x : int; } end
+       is not included in
+         sig
+           type t : value non_float mod contended = { mutable x : int; }
+           [@@unsafe_allow_any_mode_crossing]
+         end
+       Type declarations do not match:
+         type t = { mutable x : int; }
+       is not included in
+         type t : value non_float mod contended = { mutable x : int; }
+       [@@unsafe_allow_any_mode_crossing]
+       They have different unsafe mode crossing behavior:
+       the second has [@@unsafe_allow_any_mode_crossing], but the first does not
+|}]
+
+
+module type S = sig
+  type t : value mod contended = { mutable x : int } [@@unsafe_allow_any_mode_crossing]
+end
+
+module M = struct
+    type t = { mutable x : int }
+end
+
+module _ = (M : S)
+[%%expect{|
+module type S =
+  sig
+    type t : value non_float mod contended = { mutable x : int; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M : sig type t = { mutable x : int; } end
+Line 9, characters 12-13:
+9 | module _ = (M : S)
+                ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = M.t = { mutable x : int; } end
+       is not included in
+         S
+       Type declarations do not match:
+         type t = M.t = { mutable x : int; }
+       is not included in
+         type t : value non_float mod contended = { mutable x : int; }
+       [@@unsafe_allow_any_mode_crossing]
+       They have different unsafe mode crossing behavior:
+       the second has [@@unsafe_allow_any_mode_crossing], but the first does not
+|}]
+
+module type S2 = S with type t = M.t
+[%%expect{|
+Line 1, characters 24-36:
+1 | module type S2 = S with type t = M.t
+                            ^^^^^^^^^^^^
+Error: This variant or record definition does not match that of type "M.t"
+       They have different unsafe mode crossing behavior:
+       this has [@@unsafe_allow_any_mode_crossing], but the original does not
+|}]
+
+(** The mod-bounds must be equal if the attribute is specified in both the sig and the
+    struct *)
+module M : sig
+  type t : value mod contended = { mutable x : int }
+  [@@unsafe_allow_any_mode_crossing]
+end = struct
+  type t : value mod portable contended = { mutable x : int }
+  [@@unsafe_allow_any_mode_crossing]
+end
+[%%expect{|
+Lines 4-7, characters 6-3:
+4 | ......struct
+5 |   type t : value mod portable contended = { mutable x : int }
+6 |   [@@unsafe_allow_any_mode_crossing]
+7 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t
+             : value non_float mod portable contended = {
+             mutable x : int;
+           }
+           [@@unsafe_allow_any_mode_crossing]
+         end
+       is not included in
+         sig
+           type t : value non_float mod contended = { mutable x : int; }
+           [@@unsafe_allow_any_mode_crossing]
+         end
+       Type declarations do not match:
+         type t
+           : value non_float mod portable contended = {
+           mutable x : int;
+         }
+       [@@unsafe_allow_any_mode_crossing]
+       is not included in
+         type t : value non_float mod contended = { mutable x : int; }
+       [@@unsafe_allow_any_mode_crossing]
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the first has: mod portable contended
+         but the second has: mod contended
+|}]
+
+module A : sig
+  type t : value mod external_ global portable many
+end = struct
+  type t = int
+end
+
+module B = struct
+  type t : value mod portable contended = { a : A.t }
+  [@@unsafe_allow_any_mode_crossing]
+
+  let a t = t.a
+end
+[%%expect{|
+module A : sig type t : value mod global many portable external_ end
+module B :
+  sig
+    type t : value non_float mod portable contended = { a : A.t; }
+    [@@unsafe_allow_any_mode_crossing]
+    val a : t -> A.t
+  end
+|}]
+
+(* Adding with-bounds using unsafe-allow-any *)
+
+type ('a, 'k) imm : immutable_data with 'a = { inner : 'a }
+type 'a t : immutable_data with 'a = P : ('a, 'k) imm -> 'a t
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+type ('a, 'k) imm = { inner : 'a; }
+type 'a t : immutable_data with 'a = P : ('a, 'k) imm -> 'a t
+[@@unsafe_allow_any_mode_crossing]
+|}]
+
+let f (x : int t @ contended) = use_uncontended x
+[%%expect{|
+val f : int t @ contended -> int t = <fun>
+|}]
+
+let bad (x : int ref t @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 54-55:
+1 | let bad (x : int ref t @ contended) = use_uncontended x
+                                                          ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+(* Reexporting after adding with-bounds *)
+module B = struct
+  type 'a t_reexported : immutable_data with 'a = 'a t = P : ('a, 'k) imm -> 'a t_reexported
+  [@@unsafe_allow_any_mode_crossing]
+end
+[%%expect{|
+module B :
+  sig
+    type 'a t_reexported
+      : immutable_data with 'a =
+      'a t =
+        P : ('a, 'k) imm -> 'a t_reexported
+    [@@unsafe_allow_any_mode_crossing]
+  end
+|}]
+
+let f (x : int B.t_reexported @ contended) = use_uncontended x
+[%%expect{|
+val f : int B.t_reexported @ contended -> int B.t_reexported = <fun>
+|}]
+
+let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
+[%%expect{|
+Line 1, characters 67-68:
+1 | let bad (x : int ref B.t_reexported @ contended) = use_uncontended x
+                                                                       ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+type 'a bad_reexport : immutable_data = 'a t = P : ('a, 'k) imm -> 'a bad_reexport
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+Lines 1-2, characters 0-34:
+1 | type 'a bad_reexport : immutable_data = 'a t = P : ('a, 'k) imm -> 'a bad_reexport
+2 | [@@unsafe_allow_any_mode_crossing]
+Error: This variant or record definition does not match that of type "'a t"
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended
+|}]
+
+type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a, 'b) bad_reexport_2 : immutable_data with 'a = ('a, 'b) arity_2 = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+[%%expect{|
+type ('a, 'b) arity_2 : immutable_data with 'b = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+Lines 4-5, characters 0-34:
+4 | type ('a, 'b) bad_reexport_2 : immutable_data with 'a = ('a, 'b) arity_2 = { x : 'a }
+5 | [@@unsafe_allow_any_mode_crossing]
+Error: This variant or record definition does not match that of type
+         "('a, 'b) arity_2"
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'b
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a
+|}]
+
+type 'a unsafe_saturated : value mod shared with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_saturated_reexport
+  : value mod shared with 'a @@ corrupted = 'a unsafe_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared = 'a unsafe_parameter_saturated =
+  { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated
+  : value mod shared with 'a @@ external64 = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_externality_saturated_reexport
+  : value mod shared with 'a = 'a unsafe_externality_saturated = { mutable x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated
+  : immutable_data with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type ('a : value mod shared) unsafe_parameter_saturated_reexport
+  : immutable_data with 'a @@ shared =
+  'a unsafe_parameter_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated
+  : value non_float mod shared with 'a = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+type 'a unsafe_externality_saturated_reexport
+  : value non_float mod shared with 'a =
+  'a unsafe_externality_saturated = {
+  mutable x : 'a;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+
+type unsafe_middle_original
+  : immutable_data
+    with unsafe_middle_payload @@ shared
+    with unsafe_middle_alias @@ corrupted = { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload = unsafe_middle_original =
+  { mutable x : unsafe_middle_payload }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type unsafe_middle_payload
+type unsafe_middle_alias = unsafe_middle_payload
+type unsafe_middle_original
+  : immutable_data
+      with unsafe_middle_alias @@ corrupted
+      with unsafe_middle_payload @@ shared = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+type unsafe_middle_reexport
+  : immutable_data with unsafe_middle_payload =
+  unsafe_middle_original = {
+  mutable x : unsafe_middle_payload;
+} [@@unsafe_allow_any_mode_crossing]
+|}]
+
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+type 'a unsafe_corrupted
+  : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+[@@unsafe_allow_any_mode_crossing]
+
+[%%expect{|
+type 'a unsafe_shared : immutable_data with 'a @@ shared = { x : 'a; }
+[@@unsafe_allow_any_mode_crossing]
+Lines 4-6, characters 0-34:
+4 | type 'a unsafe_corrupted
+5 |   : immutable_data with 'a @@ corrupted = 'a unsafe_shared = { x : 'a }
+6 | [@@unsafe_allow_any_mode_crossing]
+Error: This variant or record definition does not match that of type
+         "'a unsafe_shared"
+       They have different unsafe mode crossing behavior:
+       Both specify [@@unsafe_allow_any_mode_crossing], but their bounds are not equal
+         the original has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ shared
+         but this has: mod forkable unyielding many stateless immutable
+         portable contended with 'a @@ corrupted
+|}]
+
+(* mcomp *)
+
+type (_, _) eq = Refl : ('a, 'a) eq
+
+module M1 = struct
+  type 'a t : value mod contended = { x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M2 = struct
+  type 'a t : value mod contended = { x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M3 = struct
+  type 'a t : value mod portable = { x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M4 = struct
+  type 'a t : value mod contended with 'a = { mutable x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M5 = struct
+  type 'a t : value mod contended with 'a = { mutable x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M6 = struct
+  type 'a t : immutable_data with 'a = { mutable x : 'a }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M7 = struct
+  type ('a, 'b) t : value mod contended with 'a = { mutable x : 'b }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M8 = struct
+  type ('a, 'b) t : value mod contended with 'a = { mutable x : 'b }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+module M9 = struct
+  type ('a, 'b) t : value mod contended with 'b = { mutable x : 'b }
+  [@@unsafe_allow_any_mode_crossing]
+end
+
+[%%expect{|
+type (_, _) eq = Refl : ('a, 'a) eq
+module M1 :
+  sig
+    type 'a t : value non_float mod contended = { x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M2 :
+  sig
+    type 'a t : value non_float mod contended = { x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M3 :
+  sig
+    type 'a t : value non_float mod portable = { x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M4 :
+  sig
+    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M5 :
+  sig
+    type 'a t : value non_float mod contended with 'a = { mutable x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M6 :
+  sig
+    type 'a t : immutable_data with 'a = { mutable x : 'a; }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M7 :
+  sig
+    type ('a, 'b) t
+      : value non_float mod contended with 'a = {
+      mutable x : 'b;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M8 :
+  sig
+    type ('a, 'b) t
+      : value non_float mod contended with 'a = {
+      mutable x : 'b;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+module M9 :
+  sig
+    type ('a, 'b) t
+      : value non_float mod contended with 'b = {
+      mutable x : 'b;
+    }
+    [@@unsafe_allow_any_mode_crossing]
+  end
+|}]
+
+
+let f (type a) (eq : (a M1.t, a M2.t) eq) = match eq with Refl -> ()
+[%%expect{|
+val f : ('a M1.t, 'a M2.t) eq -> unit = <fun>
+|}]
+
+let f (eq : ('a M1.t, 'a M3.t) eq) = match eq with _ -> .
+[%%expect{|
+val f : ('a M1.t, 'a M3.t) eq -> 'b = <fun>
+|}]
+
+let f (type a) (eq : (a M4.t, a M5.t) eq) = match eq with Refl -> ()
+[%%expect{|
+val f : ('a M4.t, 'a M5.t) eq -> unit = <fun>
+|}]
+
+let f (type a) (eq : (a M4.t, a M6.t) eq) = match eq with _ -> .
+[%%expect{|
+val f : ('a M4.t, 'a M6.t) eq -> 'b = <fun>
+|}]
+
+let f (type a b) (eq : ((a, b) M7.t, (a, b) M8.t) eq) = match eq with Refl -> ()
+[%%expect{|
+val f : (('a, 'b) M7.t, ('a, 'b) M8.t) eq -> unit = <fun>
+|}]
+
+let f (type a b) (eq : ((a, b) M7.t, (a, b) M9.t) eq) = match eq with Refl -> ()
+[%%expect{|
+val f : (('a, 'b) M7.t, ('a, 'b) M9.t) eq -> unit = <fun>
+|}]
+
+module M : sig
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
+
+module M : sig
+  type t : immutable_data
+end = struct
+  type q : immutable_data = { bar : int ref }
+  [@@unsafe_allow_any_mode_crossing]
+  type t : immutable_data = q list
+end
+[%%expect{|
+module M : sig type t : immutable_data end
+|}]
+
+(* A type in the same mutually recursive group sees the crossed jkind of an
+   [@@unsafe_allow_any_mode_crossing] type, not its structural one. *)
+type t : value mod contended = { mutable i : int }
+[@@unsafe_allow_any_mode_crossing]
+and s : value mod contended = { t : t } [@@unboxed]
+[%%expect{|
+type t : value non_float mod contended = { mutable i : int; }
+[@@unsafe_allow_any_mode_crossing]
+and s = { t : t; } [@@unboxed]
+|}]

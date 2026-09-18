@@ -1,0 +1,315 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*           Nathanaëlle Courant, Pierre Chambart, OCamlPro               *)
+(*                                                                        *)
+(*   Copyright 2024 OCamlPro SAS                                          *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** Accumulator used during the downward traversal of the Flambda 2 term to
+    build the global flow graph for the reaper. *)
+
+module Graph = Global_flow_graph
+
+(** Information about a continuation, including its parameters, arity, and
+    whether it is an exception handler. This is used to register dependencies on
+    the continuation at call sites. *)
+type continuation_info =
+  { is_exn_handler : bool;
+    params : Variable.t list;
+    arity : Flambda_kind.With_subkind.t list
+  }
+
+(** Information about a function's code that is needed for building the
+    dependency graph. Created by [prepare_code] during traversal and looked up
+    when processing function bodies and call sites at the end of the traversal.
+*)
+type code_dep =
+  { arity : [`Complex] Flambda_arity.t;
+    result_arity : [`Unarized] Flambda_arity.t;
+    code_metadata : Code_metadata.t;
+    params : Variable.t list;
+    my_closure : Variable.t;
+    return : Variable.t list;
+    exn : Variable.t;
+    is_tupled : bool;
+    known_arity_call_witness : Code_id_or_name.t;
+    unknown_arity_call_witnesses : Code_id_or_name.t list
+  }
+
+(** A reference to code outside the current compilation unit: a closure whose
+    code is external, or a direct call to external code. [deps] returns these
+    instead of adding graph edges; [link_code_references] resolves them by
+    connecting each to the code's call witnesses or making it escape. *)
+type code_reference =
+  | Closure of
+      { closure : Code_id_or_name.t;
+        code_id : Code_id.t
+      }
+  | Direct_call of
+      { call : Code_id_or_name.t;
+            (** The call witness of the application, guarded as in [apply_dep]
+                for the [Auto] mode of
+                [Traverse_env.should_preserve_direct_calls]. *)
+        code_id : Code_id.t;
+        closure : Code_id_or_name.t option;
+            (** The callee closure, if any, guarded likewise. *)
+        caller : Code_id.t option
+            (** The code containing the application, if any. *)
+      }
+
+(** A record of a direct function application, to be resolved into graph edges
+    once all code has been traversed. *)
+type apply_dep =
+  { function_containing_apply_expr : Code_id.t option;
+    apply_code_id : Code_id.t;
+    apply_closure : Simple.t option;
+    apply_call_witness : Code_id_or_name.t
+  }
+
+(** The function applications seen during traversal: for each callee, the size
+    of the largest (complex) arguments. *)
+module Applications : sig
+  (* CR-someday ncourant: the arguments and return relations are *not* separated
+     by kind, unlike block fields, which means that they can introduce aliases
+     between variables of different kinds... We might want to change that; it
+     would require changing the type here as well to retain, for each possible
+     position, the possible kinds. *)
+  type bounds =
+    { (* The maximum number of arguments in a known-arity call, if any. *)
+      known : int option;
+      (* For each complex argument, the maximum number of unarized variables in
+         an unknown-arity call. *)
+      unknown : int list option
+    }
+
+  type t = bounds Code_id_or_name.Map.t
+
+  val empty : t
+
+  val union : t -> t -> t
+end
+
+(** The type of traversal accumulators. *)
+type t
+
+(** Create a fresh, empty accumulator. *)
+val create : unit -> t
+
+(** Record an application, so that the queries that will be needed for
+    rebuilding can be precomputed. *)
+val record_apply_for_rebuild : t -> Flambda.Apply.t -> unit
+
+val applications : t -> Applications.t
+
+(** Mark a continuation as having fixed arity (mostly function return
+    continuations): the rebuild pass may not change its number of parameters. *)
+val fixed_arity_continuation : t -> Continuation.t -> unit
+
+(** Return the set of all fixed-arity continuations. *)
+val fixed_arity_continuations : t -> Continuation.Set.t
+
+(** Record metadata about a continuation (parameters, arity, and whether it is
+    an exception handler). *)
+val continuation_info :
+  t ->
+  Continuation.t ->
+  params:Variable.t list ->
+  arity:Flambda_kind.With_subkind.t list ->
+  is_exn_handler:bool ->
+  unit
+
+(** Return the map of all recorded continuation metadata. *)
+val get_continuation_info : t -> continuation_info Continuation.Map.t
+
+(** Register a [code_dep] for a code id, recording the function's parameters,
+    returns, and call witnesses in the accumulator. *)
+val add_code_dep : t -> Code_id.t -> code_dep -> unit
+
+(** Look up the [code_dep] for a code id. Returns [None] if the code id has not
+    been registered (e.g. it belongs to another compilation unit). *)
+val find_code_dep : t -> Code_id.t -> code_dep option
+
+(** Return the map of all registered code deps. *)
+val code_deps : t -> code_dep Code_id.Map.t
+
+val add_code : t -> Code_id.t -> Rev_expr.rev_code -> unit
+
+val get_all_code : t -> Rev_expr.rev_code Code_id.Map.t
+
+(** Add a (directed) alias edge: [from] flows into [to_], meaning that every
+    usage of [to_] is a usage of [from]; and every source of [from] is a source
+    of [to_]. *)
+val add_alias : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+(** Convenience wrapper around [add_alias] for variables. *)
+val add_alias_vars : t -> to_:Variable.t -> from:Variable.t -> unit
+
+(** Add a use-dependency edge: if [to_] has an usage, then [from] is
+    [any_usage]. Besides, this is a source for [to_]. *)
+val add_use_dep : t -> to_:Code_id_or_name.t -> from:Code_id_or_name.t -> unit
+
+(** Add an accessor edge: the field [relation] of [base] flows into [to_]. *)
+val add_accessor_dep :
+  t -> to_:Code_id_or_name.t -> Field.t -> base:Code_id_or_name.t -> unit
+
+(** Add a constructor edge: [from] flows into field [relation] of [base]. *)
+val add_constructor_dep :
+  t -> base:Code_id_or_name.t -> Field.t -> from:Code_id_or_name.t -> unit
+
+(** Add an argument edge: [from] flows into parameters of sources of [base]. *)
+val add_argument_dep :
+  t -> from:Code_id_or_name.t -> Cofield.t -> base:Code_id_or_name.t -> unit
+
+(** Add a parameter edge: arguments of usages of [base] flow into [to_]. *)
+val add_parameter_dep :
+  t -> base:Code_id_or_name.t -> Cofield.t -> to_:Code_id_or_name.t -> unit
+
+(** Add a conditional propagation edge: if [if_used] is [any_usage] then add an
+    alias from [from] to [to_]. *)
+val add_propagate_dep :
+  t ->
+  if_used:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+(** Add a conditional alias edge: if [if_any_source] is marked as [any_source]
+    then add an alias from [from] to [to_]. *)
+val add_alias_if_any_source_dep :
+  t ->
+  if_any_source:Code_id_or_name.t ->
+  to_:Code_id_or_name.t ->
+  from:Code_id_or_name.t ->
+  unit
+
+(** Mark a node as unconditionally used. *)
+val add_any_usage : t -> Code_id_or_name.t -> unit
+
+(** Mark a node as having any possible source (i.e. it could contain any value).
+*)
+val add_any_source : t -> Code_id_or_name.t -> unit
+
+(** Mark a node as a "magic" source for zero-alloc checking purposes. This is a
+    hack to mostly preserve zero_alloc correctness before we have zero_alloc
+    regions. *)
+val add_zero_alloc_source : t -> Code_id_or_name.t -> unit
+
+(** Record the [my_closure] variable associated with a code id. *)
+val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
+
+(** Convert a [Simple.t] to a dependency graph node. Constants map to the
+    [all_constants] node; variables map to themselves; symbols from other
+    compilation units are recorded as imports for the solve. *)
+val simple_to_node : t -> denv:Traverse_env.t -> Simple.t -> Code_id_or_name.t
+
+(** Mark a [Simple.t] as used, conditional on the current function (if any)
+    being used. At the top level, marks it unconditionally. *)
+val add_cond_any_usage : t -> denv:Traverse_env.t -> Simple.t -> unit
+
+(** Mark a node as [any_source], conditional on the current function (if any)
+    being used. At the top level, marks it unconditionally. *)
+val add_cond_any_source : t -> denv:Traverse_env.t -> Code_id_or_name.t -> unit
+
+(** Record a direct function application to be resolved later by [deps].
+    Applications to code ids from other compilation units become
+    [code_reference]s. *)
+val add_apply : t -> apply_dep -> unit
+
+(** Create the call witness node for a known-arity function definition. The
+    witness carries parameter, return, exception, and code-id edges
+    corresponding to the function's signature. *)
+val create_known_arity_call_witness :
+  t ->
+  Code_id.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+(** Create a call widget for a known-arity application. Links the apply's
+    arguments to the witness's parameters, and the witness's returns and
+    exception to the continuation parameters. Returns a node that can be
+    connected to the callee's closure via an accessor dependency. *)
+val make_known_arity_apply_widget :
+  t ->
+  denv:Traverse_env.t ->
+  Apply_expr.t ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+(** Create the call witness nodes for an unknown-arity function definition. For
+    tupled functions, a single witness with tuple-field accessors is created.
+    For curried functions, a chain of witnesses is created, one per complex
+    parameter, linked via partial-application nodes. *)
+val create_unknown_arity_call_witnesses :
+  t ->
+  Code_id.t ->
+  is_tupled:bool ->
+  arity:[`Complex] Flambda_arity.t ->
+  params:Variable.t list ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t list
+
+(** Create a call widget for an unknown-arity application, analogous to
+    [make_known_arity_apply_widget] but for calls where the callee's arity is
+    not statically known. *)
+val make_unknown_arity_apply_widget :
+  t ->
+  denv:Traverse_env.t ->
+  Apply_expr.t ->
+  returns:Variable.t list ->
+  exn:Variable.t ->
+  Code_id_or_name.t
+
+(** Record a dependency between a closure binding and its code id. This is
+    resolved later by [deps] to connect closures to their function code in the
+    graph. *)
+val add_set_of_closures_dep :
+  t ->
+  Name.t ->
+  closure_code_id:Code_id.t ->
+  only_full_applications:bool ->
+  defined_in_code_id:Code_id.t option ->
+  unit
+
+(** Finalize the graph by resolving all deferred apply and set-of-closures
+    dependencies, and return the completed dependency graph, together with the
+    references to code from other compilation units. *)
+val deps : t -> all_constants:Name.t -> Graph.graph * code_reference list
+
+(** Resolve the [code_reference]s returned by [deps] into edges of the
+    dependency graph. A reference to code that has a [code_dep] in [code_deps]
+    is connected to that code's call witnesses; every other reference escapes to
+    [le_monde_exterieur]. *)
+val link_code_references :
+  Graph.graph ->
+  code_deps:code_dep Code_id.Map.t ->
+  le_monde_exterieur:Symbol.t ->
+  code_reference list ->
+  unit
+
+val sort_code_ids : t -> Code_id.t array
+
+val add_set_of_closures :
+  t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t -> unit
+
+val get_all_sets_of_closures :
+  t -> (Name.t * Code_id.t Or_unknown.t) Function_slot.Lmap.t list
+
+(** Record the function declaration a closure is bound to. *)
+val add_closure_function_decl :
+  t -> Name.t -> Function_declarations.code_id_in_function_declaration -> unit
+
+val get_closure_function_decls :
+  t ->
+  Function_declarations.code_id_in_function_declaration Code_id_or_name.Map.t

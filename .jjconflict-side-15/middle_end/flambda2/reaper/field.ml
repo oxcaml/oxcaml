@@ -1,0 +1,294 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*           Nathanaëlle Courant, Pierre Chambart, OCamlPro               *)
+(*                                                                        *)
+(*   Copyright 2024 OCamlPro SAS                                          *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+type closure_entry_point =
+  | Unknown_arity_code_pointer
+  | Known_arity_code_pointer
+
+let closure_entry_point_to_int = function
+  | Unknown_arity_code_pointer -> 0
+  | Known_arity_code_pointer -> 1
+
+let closure_entry_point_to_string = function
+  | Unknown_arity_code_pointer -> "Unknown_arity_code_pointer"
+  | Known_arity_code_pointer -> "Known_arity_code_pointer"
+
+type return_kind =
+  | Normal of int
+  | Exn
+
+let hash_seed =
+  let seed = Random.bits () in
+  if seed mod 2 = 0 then seed + 1 else seed
+
+let hash2 a b =
+  let r = (a * hash_seed) + b in
+  r lxor (r lsr 17)
+
+let hash3 a b c =
+  let r = (((a * hash_seed) + b) * hash_seed) + c in
+  r lxor (r lsr 17)
+
+type view =
+  | Block of int * Flambda_kind.t
+  | Value_slot of Value_slot.t
+  | Function_slot of Function_slot.t
+  | Call_witness of closure_entry_point
+  | Is_int
+  | Get_tag
+  | Boxed_number of Flambda_kind.Boxable_number.t
+  | Return_of_call of return_kind
+  | Code_id_of_call_witness
+
+let hash_view = function
+  | Block (i, kind) -> hash3 0 i (Flambda_kind.hash kind)
+  | Value_slot vs -> hash2 1 (Value_slot.hash vs)
+  | Function_slot fs -> hash2 2 (Function_slot.hash fs)
+  | Call_witness ep -> hash2 3 (closure_entry_point_to_int ep)
+  | Is_int -> 4
+  | Get_tag -> 5
+  | Return_of_call Exn -> 6
+  | Return_of_call (Normal i) -> hash2 7 i
+  | Code_id_of_call_witness -> 8
+  | Boxed_number bn -> hash2 9 (Flambda_kind.Boxable_number.hash bn)
+
+let equal_view v1 v2 =
+  match v1, v2 with
+  | Block (i1, kind1), Block (i2, kind2) ->
+    i1 = i2 && Flambda_kind.equal kind1 kind2
+  | Value_slot vs1, Value_slot vs2 -> Value_slot.equal vs1 vs2
+  | Function_slot fs1, Function_slot fs2 -> Function_slot.equal fs1 fs2
+  | Call_witness ep1, Call_witness ep2 ->
+    closure_entry_point_to_int ep1 = closure_entry_point_to_int ep2
+  | Is_int, Is_int
+  | Get_tag, Get_tag
+  | Code_id_of_call_witness, Code_id_of_call_witness ->
+    true
+  | Boxed_number bn1, Boxed_number bn2 ->
+    Flambda_kind.Boxable_number.equal bn1 bn2
+  | Return_of_call Exn, Return_of_call Exn -> true
+  | Return_of_call (Normal i1), Return_of_call (Normal i2) -> i1 = i2
+  | ( ( Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int
+      | Get_tag | Boxed_number _
+      | Return_of_call Exn
+      | Return_of_call (Normal _)
+      | Code_id_of_call_witness ),
+      _ ) ->
+    false
+
+let compare_view v1 v2 =
+  let constructor_numbering = function
+    | Block _ -> 0
+    | Value_slot _ -> 1
+    | Function_slot _ -> 2
+    | Call_witness _ -> 3
+    | Is_int -> 4
+    | Get_tag -> 5
+    | Boxed_number _ -> 6
+    | Return_of_call _ -> 7
+    | Code_id_of_call_witness -> 8
+  in
+  match v1, v2 with
+  | Block (i1, kind1), Block (i2, kind2) ->
+    let c = Int.compare i1 i2 in
+    if c <> 0 then c else Flambda_kind.compare kind1 kind2
+  | Value_slot vs1, Value_slot vs2 -> Value_slot.compare vs1 vs2
+  | Function_slot fs1, Function_slot fs2 -> Function_slot.compare fs1 fs2
+  | Call_witness ep1, Call_witness ep2 ->
+    Int.compare
+      (closure_entry_point_to_int ep1)
+      (closure_entry_point_to_int ep2)
+  | Is_int, Is_int
+  | Get_tag, Get_tag
+  | Code_id_of_call_witness, Code_id_of_call_witness ->
+    0
+  | Boxed_number bn1, Boxed_number bn2 ->
+    Flambda_kind.Boxable_number.compare bn1 bn2
+  | Return_of_call Exn, Return_of_call Exn -> 0
+  | Return_of_call (Normal i1), Return_of_call (Normal i2) -> Int.compare i1 i2
+  | Return_of_call (Normal _), Return_of_call Exn -> -1
+  | Return_of_call Exn, Return_of_call (Normal _) -> 1
+  | ( ( Block _ | Value_slot _ | Function_slot _ | Call_witness _ | Is_int
+      | Get_tag | Boxed_number _
+      | Return_of_call Exn
+      | Return_of_call (Normal _)
+      | Code_id_of_call_witness ),
+      _ ) ->
+    Int.compare (constructor_numbering v1) (constructor_numbering v2)
+
+let print_view ppf = function
+  | Block (i, k) -> Format.fprintf ppf "%i_%a" i Flambda_kind.print k
+  | Value_slot s -> Format.fprintf ppf "%a" Value_slot.print s
+  | Function_slot f -> Format.fprintf ppf "%a" Function_slot.print f
+  | Call_witness ep ->
+    Format.fprintf ppf "Code %s" (closure_entry_point_to_string ep)
+  | Is_int -> Format.fprintf ppf "Is_int"
+  | Get_tag -> Format.fprintf ppf "Get_tag"
+  | Boxed_number bn ->
+    Format.fprintf ppf "Boxed_%a" Flambda_kind.Boxable_number.print_lowercase bn
+  | Return_of_call (Normal i) -> Format.fprintf ppf "Apply (Normal %i)" i
+  | Return_of_call Exn -> Format.fprintf ppf "Apply Exn"
+  | Code_id_of_call_witness -> Format.fprintf ppf "Code_id_of_call_witness"
+
+module Table = Table_by_int_id.Make (struct
+  type t = view
+
+  let flags = 0
+
+  let print = print_view
+
+  let hash = hash_view
+
+  let equal = equal_view
+end)
+
+(* CR bclement: Should this table be hooked up to
+   [Flambda2.reset_symbol_tables]? *)
+let grand_table_of_fields = Table.create ()
+
+let create view = Table.add grand_table_of_fields view
+
+let view t = Table.find grand_table_of_fields t
+
+module Column = Datalog.Column.Make (struct
+  let name = "field"
+
+  let print ppf t = print_view ppf (view t)
+end)
+
+type t = Column.t
+
+let print = Column.print
+
+module Set = Column.Set
+
+module Map = struct
+  include Column.Map
+
+  let ordered_fold f m acc =
+    List.fold_left
+      (fun acc (field, elt) -> f field elt acc)
+      acc
+      (List.sort
+         (fun (field1, _) (field2, _) ->
+           compare_view (view field1) (view field2))
+         (bindings m))
+end
+
+let datalog_column_id = Column.datalog_column_id
+
+let block i k = create (Block (i, k))
+
+let value_slot vs = create (Value_slot vs)
+
+let function_slot fs = create (Function_slot fs)
+
+let is_int = create Is_int
+
+let get_tag = create Get_tag
+
+let boxed_number bn = create (Boxed_number bn)
+
+let normal_return_of_call n = create (Return_of_call (Normal n))
+
+let exn_return_of_call = create (Return_of_call Exn)
+
+let code_id_of_call_witness = create Code_id_of_call_witness
+
+let known_arity_call_witness = create (Call_witness Known_arity_code_pointer)
+
+let unknown_arity_call_witness =
+  create (Call_witness Unknown_arity_code_pointer)
+
+let call_witness = function
+  | Known_arity_code_pointer -> known_arity_call_witness
+  | Unknown_arity_code_pointer -> unknown_arity_call_witness
+
+let kind t =
+  match view t with
+  | Block (_, kind) -> kind
+  | Value_slot vs -> Value_slot.kind vs
+  | Function_slot _ -> Flambda_kind.value
+  | Is_int | Get_tag -> Flambda_kind.naked_immediate
+  | Boxed_number bn -> Flambda_kind.Boxable_number.unboxed_kind bn
+  | (Call_witness _ | Return_of_call _ | Code_id_of_call_witness) as view ->
+    Misc.fatal_errorf "[field_kind] for virtual field %a" print_view view
+
+let is_value_slot t =
+  match view t with
+  | Value_slot _ -> true
+  | Block _ | Function_slot _ | Is_int | Get_tag | Boxed_number _
+  | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
+    false
+
+let is_function_slot t =
+  match view t with
+  | Function_slot _ -> true
+  | Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _ | Call_witness _
+  | Return_of_call _ | Code_id_of_call_witness ->
+    false
+
+let is_real_field t =
+  match view t with
+  | Call_witness _ | Return_of_call _ | Code_id_of_call_witness -> false
+  | Is_int | Get_tag | Boxed_number _ | Block _ | Value_slot _ | Function_slot _
+    ->
+    true
+
+let is_virtual_field t = not (is_real_field t)
+
+let must_be_function_slot t =
+  match view t with
+  | Function_slot fs -> fs
+  | ( Block _ | Value_slot _ | Is_int | Get_tag | Boxed_number _
+    | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ) as view ->
+    Misc.fatal_errorf "[must_be_function_slot] got %a instead" print_view view
+
+let is_local f ~analysis_scope =
+  Flambda_features.reaper_local_fields ()
+  &&
+  match view f with
+  | Value_slot vs ->
+    Analysis_scope.contains_unit analysis_scope
+      (Value_slot.get_compilation_unit vs)
+  | Function_slot fs ->
+    Analysis_scope.contains_unit analysis_scope
+      (Function_slot.get_compilation_unit fs)
+  | Block _ | Call_witness _ | Return_of_call _ | Code_id_of_call_witness
+  | Is_int | Get_tag | Boxed_number _ ->
+    false
+
+let debug_nostamps = lazy (Flambda_features.debug_reaper "nostamps")
+
+let print_for_variable_name ppf x =
+  let view = view x in
+  if not (Lazy.force debug_nostamps)
+  then Flambda_colours.without_colours ~f:(fun () -> print_view ppf view)
+  else
+    match view with
+    | Block (i, _k) -> Format.fprintf ppf "%i" i
+    | Value_slot s -> Format.fprintf ppf "%s" (Value_slot.name s)
+    | Is_int -> Format.fprintf ppf "is_int"
+    | Get_tag -> Format.fprintf ppf "tag"
+    | Boxed_number bn ->
+      Format.fprintf ppf "unboxed_%a"
+        Flambda_kind.Boxable_number.print_lowercase_short bn
+    | Function_slot _ | Return_of_call _ | Code_id_of_call_witness
+    | Call_witness _ ->
+      Misc.fatal_errorf
+        "[Field.print_for_variable_name] got field %a but this field was not \
+         expected to be possible to occur in unboxed blocks"
+        print_view view
+
+let equal (t1 : t) (t2 : t) = t1 = t2

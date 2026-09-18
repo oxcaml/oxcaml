@@ -1,0 +1,1519 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                 Jacob Van Buren, Jane Street, New York                 *)
+(*                                                                        *)
+(*   Copyright 2024 Jane Street Group LLC                                 *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Blambda
+
+type tagged_integer = Scalar.Integral.Taggable.Width.t
+
+(* We represent small integers as sign-extended immediates in bytecode.
+   Additionally, all boxable integers are boxed, there are no naked integers,
+   and there are no local allocations. *)
+
+let is_nontail : Lambda.region_close -> bool = function
+  | Rc_nontail -> true
+  | Rc_normal | Rc_close_at_apply -> false
+
+module Storer = Switch.Store (struct
+  type t = Lambda.lambda
+
+  type key = t
+
+  let compare_key = Stdlib.compare
+
+  let make_key = Lambda.make_key
+end)
+
+let constant_int integral n : constant =
+  match Scalar.Integral.width integral with
+  | Taggable Int -> Const_int n
+  | Taggable Int8 -> Const_int (Numbers.Int8.to_int (Numbers.Int8.of_int_exn n))
+  | Taggable Int16 ->
+    Const_int (Numbers.Int16.to_int (Numbers.Int16.of_int_exn n))
+  | Boxable (Int32 Any_locality_mode) -> Const_int32 (Int32.of_int n)
+  | Boxable (Int64 Any_locality_mode) -> Const_int64 (Int64.of_int n)
+  | Boxable (Nativeint Any_locality_mode) ->
+    Const_nativeint (Nativeint.of_int n)
+
+let const_int size n = Const_base (constant_int size n)
+
+let tagged_immediate n = Const (const_int (Value (Taggable Int)) n)
+
+let unit = Const Lambda.const_unit
+
+let boolnot x = Prim (Boolnot, [x])
+
+let kccallf f fmt = Printf.ksprintf (fun name -> f (Ccall name)) fmt
+
+let ccallf fmt = kccallf Fun.id fmt
+
+let is_immed n = Instruct.immed_min <= n && n <= Instruct.immed_max
+
+let is_representable_const_int = function
+  | Const (Const_base (Const_int i)) -> is_immed i
+  | _ -> false
+
+let caml_sys_const name =
+  let const_name =
+    (* clearly [Lambda.compile_time_constant] is a bad name as in bytecode mode
+       it's a runtime constant *)
+    match (name : Lambda.compile_time_constant) with
+    | Big_endian -> "big_endian"
+    | Word_size -> "word_size"
+    | Int_size -> "int_size"
+    | Max_wosize -> "max_wosize"
+    | Ostype_unix -> "ostype_unix"
+    | Ostype_win32 -> "ostype_win32"
+    | Ostype_cygwin -> "ostype_cygwin"
+    | Backend_type -> "backend_type"
+    | Arch_amd64 -> "arch_amd64"
+    | Arch_arm64 -> "arch_arm64"
+  in
+  ccallf "caml_sys_const_%s" const_name
+
+let sign_extend width exp =
+  let go ~bits =
+    let unused_bits = Sys.int_size - bits in
+    match exp with
+    | Const (Const_base (Const_int n))
+      when is_immed ((n lsl unused_bits) asr unused_bits) ->
+      Const (Const_base (Const_int ((n lsl unused_bits) asr unused_bits)))
+    | exp ->
+      let width = tagged_immediate bits in
+      let int_size = Prim (caml_sys_const Int_size, [unit]) in
+      let unused_bits = Prim (Subint, [int_size; width]) in
+      Prim (Asrint, [Prim (Lslint, [exp; unused_bits]); unused_bits])
+  in
+  match (width : tagged_integer) with
+  | Int -> exp
+  | Int8 -> go ~bits:8
+  | Int16 -> go ~bits:16
+
+let zero_extend width exp =
+  let go ~bits =
+    let mask = (1 lsl bits) - 1 in
+    match exp with
+    | Const (Const_base (Const_int n)) when is_immed (n land mask) ->
+      Const (Const_base (Const_int (n land mask)))
+    | exp -> Prim (Andint, [exp; tagged_immediate mask])
+  in
+  match (width : tagged_integer) with
+  | Int -> exp
+  | Int8 -> go ~bits:8
+  | Int16 -> go ~bits:16
+
+let static_cast ~src ~dst x =
+  let open struct
+    type boxed =
+      | Int32
+      | Nativeint
+      | Int64
+      | Float
+      | Float32
+
+    type builtin =
+      | Boxed of boxed
+      | Int
+
+    type value =
+      | Boxed of boxed
+      | Tagged of tagged_integer
+
+    let value : Scalar.any_locality_mode Scalar.Width.t -> value = function
+      | Integral (Taggable tagged) -> Tagged tagged
+      | Integral (Boxable (Int32 Any_locality_mode)) -> Boxed Int32
+      | Integral (Boxable (Nativeint Any_locality_mode)) -> Boxed Nativeint
+      | Integral (Boxable (Int64 Any_locality_mode)) -> Boxed Int64
+      | Floating (Float64 Any_locality_mode) -> Boxed Float
+      | Floating (Float32 Any_locality_mode) -> Boxed Float32
+
+    let name : builtin -> string = function
+      | Int -> "int"
+      | Boxed Int32 -> "int32"
+      | Boxed Nativeint -> "nativeint"
+      | Boxed Int64 -> "int64"
+      | Boxed Float -> "float"
+      | Boxed Float32 -> "float32"
+  end in
+  let rec builtin x ~src ~dst =
+    match (src : builtin), (dst : builtin) with
+    | Boxed Int32, Boxed Int32
+    | Boxed Int64, Boxed Int64
+    | Boxed Nativeint, Boxed Nativeint
+    | Boxed Float, Boxed Float
+    | Boxed Float32, Boxed Float32
+    | Int, Int ->
+      (* the identity function *)
+      x
+    | Boxed Float32, Boxed Int64 ->
+      Prim (Ccall "caml_float32_to_int64_bytecode", [x])
+    | Boxed Int64, Boxed Float32 ->
+      Prim (Ccall "caml_float32_of_int64_bytecode", [x])
+    | Boxed Nativeint, Boxed Float32 ->
+      (* Convert exactly to int64 to avoid double-rounding. *)
+      x
+      |> builtin ~src ~dst:(Boxed Int64 : builtin)
+      |> builtin ~src:(Boxed Int64 : builtin) ~dst
+    | Boxed Float32, Boxed (Nativeint | Int32) | Boxed Int32, Boxed Float32 ->
+      (* there are no builtins to convert directly, so we go indirectly via
+         float *)
+      x
+      |> builtin ~src ~dst:(Boxed Float : builtin)
+      |> builtin ~src:(Boxed Float : builtin) ~dst
+    | Boxed Int64, (Int | Boxed (Int32 | Nativeint | Float))
+    | Boxed Nativeint, (Int | Boxed (Int32 | Float))
+    | Boxed Int32, (Int | Boxed Float) ->
+      (* these happen to break from the more favored naming rule of
+         caml_dst_of_src *)
+      Prim (ccallf "caml_%s_to_%s" (name src) (name dst), [x])
+    | Boxed (Float | Float32), Int
+    | (Int | Boxed (Float | Int32 | Nativeint)), Boxed Int64
+    | (Int | Boxed (Float | Int32)), Boxed Nativeint
+    | (Int | Boxed Float), Boxed Int32
+    | (Int | Boxed Float), Boxed Float32
+    | (Int | Boxed Float32), Boxed Float ->
+      Prim (ccallf "caml_%s_of_%s" (name dst) (name src), [x])
+  in
+  match value src, value dst with
+  | Boxed src, Boxed dst -> builtin x ~src:(Boxed src) ~dst:(Boxed dst)
+  | Tagged (Int | Int16 | Int8), Boxed dst ->
+    (* we don't need to sign-extend in this case because tagged small integers
+       are always represented sign-extended in bytecode, and none of these
+       are narrowing conversions *)
+    builtin x ~src:Int ~dst:(Boxed dst)
+  | Boxed src, Tagged dst ->
+    (* this can be a narrowing conversion, so must be sign extended, in order
+       that the value is taken mod 2^31 or 2^63 as appropriate.  In addition
+       this avoids any ambiguity about whether a random boxed int32 is already
+       sign extended (on a 64-bit target). *)
+    builtin x ~src:(Boxed src) ~dst:Int |> sign_extend dst
+  | Tagged Int8, Tagged (Int8 | Int16 | Int)
+  | Tagged Int16, Tagged (Int16 | Int)
+  | Tagged Int, Tagged Int ->
+    (* we don't need to sign-extend in this case because tagged small integers
+       are always represented sign-extended in bytecode, and none of these are
+       narrowing conversions *)
+    x
+  | Tagged Int, Tagged ((Int16 | Int8) as dst)
+  | Tagged Int16, Tagged (Int8 as dst) ->
+    (* we need to sign-extend for these narrowing conversions because the input
+       values are stored in full-width immediates, and we need to take them
+       modulo 2^8 or 2^16. *)
+    sign_extend dst x
+
+(** [copy_mixed_block_element elt expr] generates Blambda code that creates a
+    fresh deep copy of [expr] if [elt] is an unboxed product. For non-product
+    elements, returns [expr] unchanged. For products, allocates a fresh block
+    and recursively copies each field.
+
+    This is needed because in bytecode, unboxed products are represented as
+    boxed blocks. Without copying, reading or writing an unboxed product from/to
+    a mutable field (or to/from an array slot) would alias the original, causing
+    mutations to affect both. *)
+let rec copy_mixed_block_element (elt : _ Lambda.mixed_block_element)
+    (expr : Blambda.blambda) : Blambda.blambda =
+  match elt with
+  | Product elements ->
+    (* Bind expr to a variable so it's only evaluated once *)
+    let id = Ident.create_local "copy_src" in
+    let copied_fields =
+      Array.to_list
+        (Array.mapi
+           (fun i field_elt ->
+             copy_mixed_block_element field_elt (Prim (Getfield i, [Var id])))
+           elements)
+    in
+    Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+  | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+  | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+    expr
+  | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
+
+(** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
+    a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
+    product. *)
+let copy_unboxed_product shape ~path expr =
+  copy_mixed_block_element
+    (Lambda.project_from_mixed_block_shape shape ~path)
+    expr
+
+(** [element_of_array_kind k] returns the [mixed_block_element] describing one
+    element of an array of [array_kind] [k]. *)
+let element_of_array_kind (k : Lambda.array_kind) :
+    unit Lambda.mixed_block_element =
+  Lambda.mixed_block_element_of_layout (Lambda.element_layout_of_array_kind k)
+
+(** Build a chain of nested [Let] bindings around [body]. *)
+let lets (bindings : (Ident.t * Blambda.blambda) list) (body : Blambda.blambda)
+    : Blambda.blambda =
+  List.fold_right
+    (fun (id, arg) body -> Blambda.Let { id; arg; body })
+    bindings body
+
+(** [in_place_copy_array_slice ~length ~offset ~array ~elt] evaluates [length],
+    then [offset], then [array], binding each to a local. Then, for each [i] in
+    [0 .. length - 1], it overwrites the slot at index [offset + i] with a fresh
+    deep copy of its current contents. Returns the (bound) array. *)
+let in_place_copy_array_slice ~(length : Blambda.blambda)
+    ~(offset : Blambda.blambda) ~(array : Blambda.blambda)
+    ~(elt : unit Lambda.mixed_block_element) : Blambda.blambda =
+  let len_id = Ident.create_local "len" in
+  let offset_id = Ident.create_local "offset" in
+  let arr_id = Ident.create_local "arr" in
+  let i_id = Ident.create_local "i" in
+  lets
+    [len_id, length; offset_id, offset; arr_id, array]
+    (Sequence
+       ( Blambda.For
+           { id = i_id;
+             from = Const (Const_base (Const_int 0));
+             to_ = Prim (Offsetint (-1), [Var len_id]);
+             dir = Upto;
+             body =
+               (let idx = Prim (Addint, [Var offset_id; Var i_id]) in
+                Prim
+                  ( Setvectitem,
+                    [ Var arr_id;
+                      idx;
+                      copy_mixed_block_element elt
+                        (Prim (Getvectitem, [Var arr_id; idx])) ] ))
+           },
+         Var arr_id ))
+
+let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
+  let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :
+      Blambda.bfunction =
+    (* assume kind = Curried *)
+    { params = List.map (fun (p : Lambda.lparam) -> p.name) params;
+      body = comp_expr body;
+      free_variables = Lambda.free_variables (Lfunction lfunction)
+    }
+  in
+  let comp_rec_binding ({ id; def } : Lambda.rec_binding) : Blambda.rec_binding
+      =
+    { id; def = comp_fun def }
+  in
+  match (exp : Lambda.lambda) with
+  | Lsplice _ | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _
+  | Linstantiate _ ->
+    Lambda.fatal_error_invalid_constructor exp
+  | Lvar id | Lmutvar id -> Var id
+  | Lconst cst -> Const cst
+  | Lapply { ap_func; ap_args; ap_region_close; ap_yielding } ->
+    Apply
+      { func = comp_expr ap_func;
+        args = List.map comp_expr ap_args;
+        nontail = is_nontail ap_region_close;
+        yielding = ap_yielding
+      }
+  | Lsend (kind, met, obj, args, rc, _, _, _, yielding) ->
+    Send
+      { method_kind =
+          (match (kind : Lambda.meth_kind) with
+          | Self -> Self
+          | Public -> Public
+          | Cached -> assert false);
+        met = comp_expr met;
+        obj = comp_expr obj;
+        args = List.map comp_expr args;
+        nontail = is_nontail rc;
+        yielding
+      }
+  | Lfunction f -> Pseudo_event (Function (comp_fun f), f.loc)
+  | Llet (_, _k, id, _duid, arg, body) | Lmutlet (_k, id, _duid, arg, body) ->
+    (* We are intentionally dropping the [debug_uid] identifiers here. *)
+    Let { id; arg = comp_expr arg; body = comp_expr body }
+  | Lletrec (decl, body) ->
+    Letrec
+      { decls = List.map comp_rec_binding decl;
+        body = comp_expr body;
+        free_variables_of_decls =
+          Lambda.free_variables (Lletrec (decl, Lambda.lambda_unit))
+      }
+  | Lstaticcatch (body, (static_label, args), handler, _, _) ->
+    Staticcatch
+      { body = comp_expr body;
+        id = static_label;
+        args = List.map (fun (id, _, _) -> id) args;
+        handler = comp_expr handler
+      }
+  | Lstaticraise (static_label, args) ->
+    Staticraise (static_label, List.map comp_expr args)
+  | Ltrywith (body, param, _param_duid, handler, _kind) ->
+    (* We are intentionally dropping the [debug_uid] identifiers here. *)
+    Trywith { body = comp_expr body; param; handler = comp_expr handler }
+  | Lifthenelse (cond, ifso, ifnot, _kind) ->
+    Ifthenelse
+      { cond = comp_expr cond; ifso = comp_expr ifso; ifnot = comp_expr ifnot }
+  | Lsequence (exp1, exp2) -> Sequence (comp_expr exp1, comp_expr exp2)
+  | Lwhile { wh_cond; wh_body } ->
+    While { cond = comp_expr wh_cond; body = comp_expr wh_body }
+  | Lfor { for_id; for_from; for_to; for_dir; for_body } ->
+    For
+      { id = for_id;
+        from = comp_expr for_from;
+        to_ = comp_expr for_to;
+        dir = for_dir;
+        body = comp_expr for_body
+      }
+  | Lswitch
+      ( arg,
+        { sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction },
+        _loc,
+        _kind ) ->
+    (* Build indirection vectors *)
+    let store = Storer.mk_store () in
+    let fail =
+      match sw_failaction with
+      | Some fail -> store.act_store () fail
+      | None ->
+        (* if there is no failaction (i.e., default action) either
+           1. all of the potential cases have been covered, or
+           2. Some cases have been refuted.
+
+           In both cases, we arbitrarily pick the first case as the value to put
+        *)
+        0
+    in
+    let compile_cases src ~size =
+      let dst = Array.make size fail in
+      ListLabels.iter src ~f:(fun (n, case) ->
+          dst.(n) <- store.act_store () case);
+      dst
+    in
+    (* Compile and label actions *)
+    let arg = comp_expr arg in
+    let const_cases = compile_cases sw_consts ~size:sw_numconsts in
+    let block_cases = compile_cases sw_blocks ~size:sw_numblocks in
+    let cases = Array.map comp_expr (store.act_get ()) in
+    Switch { arg; const_cases; block_cases; cases }
+  | Lstringswitch (arg, sw, d, loc, kind) ->
+    comp_expr (Matching.expand_stringswitch loc kind arg sw d)
+  | Lassign (id, expr) -> Assign (id, comp_expr expr)
+  | Levent (lam, lev) -> Event (comp_expr lam, lev)
+  | Lifused (_, exp) | Lregion (exp, _) | Lexclave exp -> comp_expr exp
+  | Lprim (primitive, args, loc) -> (
+    let simd_is_not_supported () =
+      let args = List.map comp_expr args in
+      Blambda.Prim (Ccall "caml_simd_bytecode_not_supported", args)
+    in
+    let wrong_arity ~expected =
+      Misc.fatal_errorf "Blambda_of_lambda: %a takes exactly %d %s"
+        Printlambda.primitive primitive expected
+        (if expected = 1 then "argument" else "arguments")
+    in
+    let check_arity ~arity =
+      match List.compare_length_with args arity with
+      | 0 -> List.map comp_expr args
+      | _ -> wrong_arity ~expected:arity
+    in
+    let context_switch c ~arity =
+      Blambda.Context_switch (c, check_arity ~arity)
+    in
+    let pseudo_event t = Blambda.Pseudo_event (t, loc) in
+    let variadic primitive =
+      Blambda.Prim (primitive, List.map comp_expr args)
+    in
+    let n_ary primitive ~arity = Blambda.Prim (primitive, check_arity ~arity) in
+    let nullary = n_ary ~arity:0 in
+    let unary = n_ary ~arity:1 in
+    let binary = n_ary ~arity:2 in
+    let ternary = n_ary ~arity:3 in
+    let indexing_primitive (index_kind : Lambda.array_index_kind) prefix :
+        Blambda.primitive =
+      let suffix =
+        match index_kind with
+        | Ptagged_int_index
+        | Punboxed_or_untagged_integer_index
+            (Untagged_int16 | Untagged_int8 | Untagged_int) ->
+          ""
+        | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+          "_indexed_by_int64"
+        | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+          "_indexed_by_int32"
+        | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+          "_indexed_by_nativeint"
+      in
+      Ccall (prefix ^ suffix)
+    in
+    (* [array_ref ~unsafe ref_kind index_kind] compiles a Parrayref{s,u} of the
+       given [ref_kind] and [index_kind] to Blambda. For product ref kinds the
+       result is deep-copied so it doesn't alias the array slot; for other
+       kinds the copy is identity. *)
+    let array_ref ~unsafe (ref_kind : Lambda.array_ref_kind)
+        (index_kind : Lambda.array_index_kind) =
+      match ref_kind with
+      | Punspecializedarray_ref _ ->
+        Misc.fatal_error
+          "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
+      | Punboxedvectorarray_ref _ | Punboxedmaskarray_ref ->
+        simd_is_not_supported ()
+      | _ ->
+        let primitive : Blambda.primitive =
+          match ref_kind, index_kind with
+          | Pgenarray_ref _, _
+          | ( ( Paddrarray_ref | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pfloatarray_ref _
+              | Punboxedfloatarray_ref (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_ref _
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
+            indexing_primitive index_kind
+              (if unsafe then "caml_array_unsafe_get" else "caml_array_get")
+          | ( (Punboxedfloatarray_ref Unboxed_float64 | Pfloatarray_ref _),
+              Ptagged_int_index ) ->
+            Ccall
+              (if unsafe
+               then "caml_floatarray_unsafe_get"
+               else "caml_floatarray_get")
+          | ( ( Punboxedfloatarray_ref Unboxed_float32
+              | Punboxedoruntaggedintarray_ref _ | Paddrarray_ref
+              | Pgcignorableaddrarray_ref | Pintarray_ref
+              | Pgcscannableproductarray_ref _ | Pgcignorableproductarray_ref _
+                ),
+              Ptagged_int_index ) ->
+            if unsafe then Getvectitem else Ccall "caml_array_get_addr"
+          | ( ( Punspecializedarray_ref _ | Punboxedvectorarray_ref _
+              | Punboxedmaskarray_ref ),
+              _ ) ->
+            (* Handled by the outer match. *)
+            assert false
+        in
+        copy_mixed_block_element
+          (element_of_array_kind (Lambda.array_kind_of_array_ref_kind ref_kind))
+          (binary primitive)
+    in
+    (* [array_set ~unsafe set_kind index_kind] compiles a Parrayset{s,u} of the
+       given [set_kind] and [index_kind] to Blambda. For product set kinds the
+       value being written is deep-copied; for other kinds the copy is
+       identity. *)
+    let array_set ~unsafe (set_kind : Lambda.array_set_kind)
+        (index_kind : Lambda.array_index_kind) =
+      match set_kind with
+      | Punspecializedarray_set _ ->
+        Misc.fatal_error
+          "Blambda_of_lambda: array primitive with Punspecializedarray_ref"
+      | Punboxedvectorarray_set _ | Punboxedmaskarray_set ->
+        simd_is_not_supported ()
+      | _ -> (
+        let primitive : Blambda.primitive =
+          match set_kind, index_kind with
+          | Pgenarray_set _, _
+          | ( ( Paddrarray_set _ | Pgcignorableaddrarray_set | Pintarray_set
+              | Pfloatarray_set
+              | Punboxedfloatarray_set (Unboxed_float64 | Unboxed_float32)
+              | Punboxedoruntaggedintarray_set _
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Punboxed_or_untagged_integer_index _ ) ->
+            indexing_primitive index_kind
+              (if unsafe then "caml_array_unsafe_set" else "caml_array_set")
+          | ( (Punboxedfloatarray_set Unboxed_float64 | Pfloatarray_set),
+              Ptagged_int_index ) ->
+            Ccall
+              (if unsafe
+               then "caml_floatarray_unsafe_set"
+               else "caml_floatarray_set")
+          | ( ( Punboxedfloatarray_set Unboxed_float32
+              | Punboxedoruntaggedintarray_set _ | Paddrarray_set _
+              | Pgcignorableaddrarray_set | Pintarray_set
+              | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _
+                ),
+              Ptagged_int_index ) ->
+            if unsafe then Setvectitem else Ccall "caml_array_set_addr"
+          | ( ( Punspecializedarray_set _ | Punboxedvectorarray_set _
+              | Punboxedmaskarray_set ),
+              _ ) ->
+            (* Handled by the outer match. *)
+            assert false
+        in
+        match args with
+        | [arr; idx; value] ->
+          let copied_value =
+            copy_mixed_block_element
+              (element_of_array_kind
+                 (Lambda.array_kind_of_array_set_kind set_kind))
+              (comp_expr value)
+          in
+          Prim (primitive, [comp_expr arr; comp_expr idx; copied_value])
+        | _ -> wrong_arity ~expected:3)
+    in
+    match (primitive : Lambda.primitive) with
+    | Pphys_equal cmp -> (
+      match check_arity ~arity:2 with
+      | [] | [_] | _ :: _ :: _ :: _ -> assert false
+      | [x; y] ->
+        let prim = match cmp with Eq -> Intcomp Eq | Noteq -> Intcomp Neq in
+        (* Optimization for comparisons when the first argument is suitable:
+           see [Emitcode]. *)
+        if is_representable_const_int y && not (is_representable_const_int x)
+        then Prim (prim, [y; x])
+        else Prim (prim, [x; y]))
+    | Popaque _ | Pobj_magic _ -> (
+      match args with
+      | [arg] ->
+        (* in bytecode we only deal with boxed+tagged floats/ints/units *)
+        comp_expr arg
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Punbox_unit -> (
+      match args with
+      | [x] -> comp_expr x
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pignore -> (
+      match args with
+      | [arg] -> Sequence (comp_expr arg, unit)
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pnot -> unary Boolnot
+    | Psequand -> (
+      match args with
+      | [x; y] -> Sequand (comp_expr x, comp_expr y)
+      | _ -> wrong_arity ~expected:2)
+    | Psequor -> (
+      match args with
+      | [x; y] -> Sequor (comp_expr x, comp_expr y)
+      | _ -> wrong_arity ~expected:2)
+    | Praise k -> unary (Raise k)
+    | Pmakefloatblock _ | Pmakeufloatblock _ ->
+      (* In bytecode, float# is boxed, so we can treat these two primitives the
+         same. *)
+      pseudo_event (variadic Makefloatblock)
+    | Pmakearray (kind, _, _) ->
+      pseudo_event
+        (match kind with
+        (* arrays of unboxed types have the same representation as the boxed
+           ones on bytecode. Product elements need an extra deep copy so the
+           array slot does not alias the caller's product block. *)
+        | ( Pintarray | Paddrarray | Pgcignorableaddrarray
+          | Punboxedoruntaggedintarray _
+          | Punboxedfloatarray Unboxed_float32
+          | Pgcscannableproductarray _ | Pgcignorableproductarray _ ) as kind ->
+          let elt = element_of_array_kind kind in
+          Prim
+            ( Makeblock { tag = 0 },
+              List.map
+                (fun a -> copy_mixed_block_element elt (comp_expr a))
+                args )
+        | Pfloatarray | Punboxedfloatarray Unboxed_float64 ->
+          variadic Makefloatblock
+        | Punboxedvectorarray _ -> simd_is_not_supported ()
+        | Punboxedmaskarray -> simd_is_not_supported ()
+        | Pgenarray -> (
+          let block = variadic (Makeblock { tag = 0 }) in
+          match args with
+          | [] -> block
+          | _ :: _ ->
+            (* for the floatarray hack *)
+            Prim (Ccall "caml_array_of_uniform_array", [block]))
+        | Punspecializedarray ->
+          Misc.fatal_error "Blambda_of_lambda: Pmakearray Punspecializedarray")
+    | Pcontinue -> context_switch Continue ~arity:2
+    | Pdiscontinue -> context_switch Discontinue ~arity:2
+    | Pdiscontinue_with_backtrace ->
+      context_switch Discontinue_with_backtrace ~arity:3
+    | Pwith_stack -> context_switch With_stack ~arity:5
+    | Pwith_stack_preemptible -> context_switch With_stack_preemptible ~arity:6
+    | Preperform -> context_switch Reperform ~arity:3
+    | Pmakearray_dynamic (kind, locality, Uninitialized) -> (
+      (* Use a dummy initializer to implement the "uninitialized" primitive *)
+      try
+        let init : Lambda.lambda =
+          match kind with
+          | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray
+          | Pfloatarray | Pgcscannableproductarray _ ->
+            Misc.fatal_errorf
+              "Array kind %s should have been ruled out by the frontend for \
+               %%makearray_dynamic_uninit"
+              (Printlambda.array_kind kind)
+          | Punspecializedarray ->
+            Misc.fatal_error
+              "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray"
+          | Punboxedfloatarray Unboxed_float32 ->
+            Lconst (Const_base (Const_float32 "0.0"))
+          | Punboxedfloatarray Unboxed_float64 ->
+            Lconst (Const_base (Const_float "0.0"))
+          | Punboxedoruntaggedintarray Untagged_int ->
+            Lconst (Const_base (Const_int 0))
+          | Punboxedoruntaggedintarray Untagged_int8 ->
+            Lconst (Const_base (Const_int8 0))
+          | Punboxedoruntaggedintarray Untagged_int16 ->
+            Lconst (Const_base (Const_int16 0))
+          | Punboxedoruntaggedintarray Unboxed_int32 ->
+            Lconst (Const_base (Const_int32 0l))
+          | Punboxedoruntaggedintarray Unboxed_int64 ->
+            Lconst (Const_base (Const_int64 0L))
+          | Punboxedoruntaggedintarray Unboxed_nativeint ->
+            Lconst (Const_base (Const_nativeint 0n))
+          | Punboxedvectorarray _ -> raise Not_found
+          | Punboxedmaskarray -> raise Not_found
+          | Pgcignorableproductarray ignorables ->
+            let rec convert_ignorable
+                (ign : Lambda.ignorable_product_element_kind) : Lambda.lambda =
+              match ign with
+              | Pint_ignorable -> Lconst (Const_base (Const_int 0))
+              | Punboxedfloat_ignorable Unboxed_float32 ->
+                Lconst (Const_base (Const_float32 "0.0"))
+              | Punboxedfloat_ignorable Unboxed_float64 ->
+                Lconst (Const_base (Const_float "0.0"))
+              | Punboxedoruntaggedint_ignorable Untagged_int ->
+                Lconst (Const_base (Const_int 0))
+              | Punboxedoruntaggedint_ignorable Untagged_int8 ->
+                Lconst (Const_base (Const_int8 0))
+              | Punboxedoruntaggedint_ignorable Untagged_int16 ->
+                Lconst (Const_base (Const_int16 0))
+              | Punboxedoruntaggedint_ignorable Unboxed_int32 ->
+                Lconst (Const_base (Const_int32 0l))
+              | Punboxedoruntaggedint_ignorable Unboxed_int64 ->
+                Lconst (Const_base (Const_int64 0L))
+              | Punboxedoruntaggedint_ignorable Unboxed_nativeint ->
+                Lconst (Const_base (Const_nativeint 0n))
+              | Punboxedvector_ignorable _ -> raise Not_found
+              | Pproduct_ignorable ignorables ->
+                let fields = List.map convert_ignorable ignorables in
+                Lprim
+                  ( Pmakeblock (0, Immutable, All_value, Lambda.alloc_heap),
+                    fields,
+                    loc )
+            in
+            convert_ignorable (Pproduct_ignorable ignorables)
+        in
+        match args with
+        | [len] ->
+          comp_expr
+            (Lprim
+               ( Pmakearray_dynamic (kind, locality, With_initializer),
+                 [len; init],
+                 loc )
+              : Lambda.lambda)
+        | _ -> wrong_arity ~expected:1
+      with Not_found -> simd_is_not_supported ())
+    | Pduparray (kind, mutability) -> (
+      match args with
+      | [Lprim (Pmakearray (kind', _, m), args, _)] ->
+        assert (kind = kind');
+        comp_expr (Lambda.Lprim (Pmakearray (kind, mutability, m), args, loc))
+      | _ -> (
+        match kind with
+        | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
+          (* In bytecode, [caml_obj_dup] only does a shallow copy, so each slot
+             of the duplicate would alias the corresponding slot in the source.
+             For product arrays we deep-copy every slot.
+
+             This extra copying of products is currently defensive, though: in
+             practice [Translcore] only produces [Pduparray] of a product array
+             with a [Pmakearray] argument, which the case above already handles.
+          *)
+          let src_arg =
+            match args with [s] -> comp_expr s | _ -> wrong_arity ~expected:1
+          in
+          let src_id = Ident.create_local "dup_src" in
+          Let
+            { id = src_id;
+              arg = src_arg;
+              body =
+                in_place_copy_array_slice
+                  ~length:(Prim (Vectlength, [Var src_id]))
+                  ~offset:(tagged_immediate 0)
+                  ~array:(Prim (Ccall "caml_obj_dup", [Var src_id]))
+                  ~elt:(element_of_array_kind kind)
+            }
+        | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
+        | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
+        | Punboxedvectorarray _ | Punboxedmaskarray ->
+          unary (Ccall "caml_obj_dup")
+        | Punspecializedarray ->
+          Misc.fatal_error "Blambda_of_lambda: Pduparray Punspecializedarray"))
+    | Pmakeblock (tag, _mut, shape, _) -> (
+      match Lambda.mixed_block_of_block_shape shape with
+      | None -> pseudo_event (variadic (Makeblock { tag }))
+      | Some shape ->
+        (* There is no notion of a mixed block at runtime in bytecode.
+              Further, source-level unboxed types are represented as boxed in
+              bytecode, so no ceremony is needed to box values before inserting
+              them into the (normal, unmixed) block. *)
+        let total_len = Array.length shape in
+        pseudo_event (variadic (Make_faux_mixedblock { total_len; tag })))
+    | Pmake_unboxed_product _ -> pseudo_event (variadic (Makeblock { tag = 0 }))
+    | Pgetglobal (cu, _) -> nullary (Getglobal cu)
+    | Pgetpredef id -> nullary (Getpredef id)
+    | Pfield (n, _, _) | Punboxed_product_field (n, _) -> unary (Getfield n)
+    | Parray_element_size_in_bytes _array_kind -> (
+      match args with
+      | [arg] ->
+        let word_size =
+          comp_expr
+            (Lambda.Lprim (Pctconst Word_size, [Lambda.lambda_unit], loc))
+        in
+        let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
+        Sequence (comp_expr arg, element_size)
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pget_idx (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (binary (Ccall "caml_get_idx_bytecode"))
+    | Pset_idx (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [arr; idx; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim
+          ( Ccall "caml_set_idx_bytecode",
+            [comp_expr arr; comp_expr idx; copied_value] )
+      | _ -> wrong_arity ~expected:3)
+    | Pget_ptr (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (unary (Ccall "caml_get_ptr_bytecode"))
+    | Pset_ptr (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [ptr; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (Ccall "caml_set_ptr_bytecode", [comp_expr ptr; copied_value])
+      | _ -> wrong_arity ~expected:2)
+    | Pget_ext_ptr (layout, _) ->
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      copy_mixed_block_element elt (unary (Ccall "caml_get_ext_ptr_bytecode"))
+    | Pset_ext_ptr (layout, _) -> (
+      let elt = Lambda.mixed_block_element_of_layout layout in
+      match args with
+      | [ptr; value] ->
+        let copied_value = copy_mixed_block_element elt (comp_expr value) in
+        Prim (Ccall "caml_set_ext_ptr_bytecode", [comp_expr ptr; copied_value])
+      | _ -> wrong_arity ~expected:2)
+    | Pmake_idx_field pos ->
+      Const (Const_block (0, [Const_base (Const_int pos)]))
+    | Pmake_idx_mixed_field (_, pos, path) ->
+      let path_consts =
+        List.map (fun x -> Const_base (Const_int x)) (pos :: path)
+      in
+      Const (Const_block (0, path_consts))
+    | Pmake_idx_array (_, ik, _, path) -> (
+      (* Make a block containing [ to_int index ] ++ path.
+         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
+      match args with
+      | [index] ->
+        let index =
+          match ik with
+          (* [int8#]/[int16#] are already tagged ints on bytecode *)
+          | Punboxed_or_untagged_integer_index
+              (Untagged_int8 | Untagged_int16 | Untagged_int)
+          | Ptagged_int_index ->
+            comp_expr index
+            (* CR mshinwell: this is probably ok for now, but it seems like
+               these conversions could silently overflow *)
+          | Punboxed_or_untagged_integer_index Unboxed_int64 ->
+            unary (Ccall "caml_int64_to_int")
+          | Punboxed_or_untagged_integer_index Unboxed_int32 ->
+            unary (Ccall "caml_int32_to_int")
+          | Punboxed_or_untagged_integer_index Unboxed_nativeint ->
+            unary (Ccall "caml_nativeint_to_int")
+        in
+        let path =
+          List.map (fun pos -> Const (Const_base (Const_int pos))) path
+        in
+        Blambda.Prim (Makeblock { tag = 0 }, index :: path)
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pidx_deepen (_, path) -> (
+      (* In bytecode, an index is a block storing a series of positions; deepening
+         an index "appends" to the end (by making a new block) *)
+      match args with
+      | [path_prefix] ->
+        let path_prefix = comp_expr path_prefix in
+        let path_suffix_consts =
+          List.map (fun x -> Const_base (Const_int x)) path
+        in
+        let path_suffix = Const (Const_block (0, path_suffix_consts)) in
+        Blambda.Prim
+          (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pfield_computed _sem -> binary Getvectitem
+    | Psetfield (n, _ptr, _init) -> binary (Setfield n)
+    | Psetfield_computed (_ptr, _init) -> ternary Setvectitem
+    (* In bytecode, float#s are boxed.  So, we can use the existing float
+       instructions for the ufloat primitives. *)
+    | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
+      pseudo_event (unary (Getfloatfield n))
+    | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
+    | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
+    | Pmixedfield (path, shape, _sem) ->
+      (* Non-value mixed fields are always boxed in bytecode; they aren't
+         stored flat like they are in native code. *)
+      let read_expr =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          (unary (Getfield (List.hd path)))
+          (List.tl path)
+      in
+      copy_unboxed_product shape ~path read_expr
+    | Psetmixedfield (path, shape, _init) ->
+      let block, value =
+        match args with
+        | [block; value] -> comp_expr block, comp_expr value
+        | _ -> wrong_arity ~expected:2
+      in
+      let value_expr = copy_unboxed_product shape ~path value in
+      let parent_path, last_idx =
+        match List.rev path with
+        | last :: rest -> List.rev rest, last
+        | [] -> assert false
+      in
+      let target_block =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          block parent_path
+      in
+      Prim (Setfield last_idx, [target_block; value_expr])
+    | Pduprecord _ -> unary (Ccall "caml_obj_dup")
+    | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
+    | Pperform -> context_switch Perform ~arity:1
+    | Poffsetref n -> unary (Offsetref n)
+    | Pstringlength -> unary (Ccall "caml_ml_string_length")
+    | Pbyteslength -> unary (Ccall "caml_ml_bytes_length")
+    | Pstringrefs -> binary (Ccall "caml_string_get")
+    | Pbytesrefs -> binary (Ccall "caml_bytes_get")
+    | Pbytessets -> ternary (Ccall "caml_bytes_set")
+    | Pstringrefu -> binary Getstringchar
+    | Pbytesrefu -> binary Getbyteschar
+    | Pbytessetu -> ternary Setbyteschar
+    | Pstring_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti8")
+    | Pstring_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti16")
+    | Pstring_load_16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_get16")
+    | Pstring_load_32 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_get32")
+    | Pstring_load_f32 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_getf32")
+    | Pstring_load_64 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_get64")
+    | Pbytes_set_8 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set8")
+    | Pbytes_set_16 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set16")
+    | Pbytes_set_32 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set32")
+    | Pbytes_set_f32 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_setf32")
+    | Pbytes_set_64 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set64")
+    | Pbytes_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti8")
+    | Pbytes_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti16")
+    | Pbytes_load_16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_get16")
+    | Pbytes_load_32 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_get32")
+    | Pbytes_load_f32 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_getf32")
+    | Pbytes_load_64 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_get64")
+    | Parraylength _ -> unary Vectlength
+    (* In bytecode, nothing is ever actually stack-allocated, so we ignore the
+       array modes (allocation for [Parrayref{s,u}], modification for
+       [Parrayset{s,u}]). *)
+    | Parrayrefs (ref_kind, index_kind, _) ->
+      array_ref ~unsafe:false ref_kind index_kind
+    | Parrayrefu (ref_kind, index_kind, _) ->
+      array_ref ~unsafe:true ref_kind index_kind
+    | Parraysets (set_kind, index_kind) ->
+      array_set ~unsafe:false set_kind index_kind
+    | Parraysetu (set_kind, index_kind) ->
+      array_set ~unsafe:true set_kind index_kind
+    | Pctconst c -> unary (caml_sys_const c)
+    | Pisint _ -> unary Isint
+    | Pisout -> binary (Intcomp Ultint)
+    | Pbigarrayref (_, n, Pbigarray_float32_t, _) ->
+      n_ary (Ccall ("caml_ba_float32_get_" ^ Int.to_string n)) ~arity:(n + 1)
+    | Pbigarrayset (_, n, Pbigarray_float32_t, _) ->
+      n_ary (Ccall ("caml_ba_float32_set_" ^ Int.to_string n)) ~arity:(n + 2)
+    | Pbigarrayref (_, n, _, _) ->
+      n_ary (Ccall ("caml_ba_get_" ^ Int.to_string n)) ~arity:(n + 1)
+    | Pbigarrayset (_, n, _, _) ->
+      n_ary (Ccall ("caml_ba_set_" ^ Int.to_string n)) ~arity:(n + 2)
+    | Pbigarraydim n -> unary (Ccall ("caml_ba_dim_" ^ Int.to_string n))
+    | Pbigstring_load_i8 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti8")
+    | Pbigstring_load_i16 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti16")
+    | Pbigstring_load_16 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_get16")
+    | Pbigstring_load_32 { unsafe = _; mode = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_get32")
+    | Pbigstring_load_f32 { unsafe = _; mode = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_getf32")
+    | Pbigstring_load_64 { unsafe = _; mode = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_get64")
+    | Pbigstring_set_8 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set8")
+    | Pbigstring_set_16 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set16")
+    | Pbigstring_set_32 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set32")
+    | Pbigstring_set_f32 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_setf32")
+    | Pbigstring_set_64 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set64")
+    | Pint_as_pointer _ -> unary (Ccall "caml_int_as_pointer")
+    | Pbytes_to_string -> unary (Ccall "caml_string_of_bytes")
+    | Pbytes_of_string -> unary (Ccall "caml_bytes_of_string")
+    | Parray_to_iarray -> unary (Ccall "caml_iarray_of_array")
+    | Parray_of_iarray -> unary (Ccall "caml_array_of_iarray")
+    | Pget_header _ -> unary (Ccall "caml_get_header")
+    | Pobj_dup -> unary (Ccall "caml_obj_dup")
+    | Patomic_load_field _ -> binary (Ccall "caml_atomic_load_field")
+    | Patomic_load_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record] ->
+        (* In bytecode, mixed record fields aren't reordered, so the shape
+             index [index] is also a field index at runtime. *)
+        Prim
+          ( Ccall "caml_atomic_load_field",
+            [comp_expr record; Const (Const_base (Const_int index))] )
+      | _ -> wrong_arity ~expected:1)
+    | Patomic_set_field _ -> ternary (Ccall "caml_atomic_set_field")
+    | Patomic_set_mixed_field { index; shape = _ } -> (
+      match args with
+      | [record; value] ->
+        let record = comp_expr record in
+        let value = comp_expr value in
+        Prim
+          ( Ccall "caml_atomic_set_field",
+            [record; Const (Const_base (Const_int index)); value] )
+      | _ -> wrong_arity ~expected:2)
+    | Patomic_exchange_field _ -> ternary (Ccall "caml_atomic_exchange_field")
+    | Patomic_compare_exchange_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_field")
+    | Patomic_compare_set_field _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_field")
+    | Patomic_fetch_add_field -> ternary (Ccall "caml_atomic_fetch_add_field")
+    | Patomic_add_field -> ternary (Ccall "caml_atomic_add_field")
+    | Patomic_sub_field -> ternary (Ccall "caml_atomic_sub_field")
+    | Patomic_land_field -> ternary (Ccall "caml_atomic_land_field")
+    | Patomic_lor_field -> ternary (Ccall "caml_atomic_lor_field")
+    | Patomic_lxor_field -> ternary (Ccall "caml_atomic_lxor_field")
+    (*
+       The following operations do not call [copy_mixed_block_element], so using them with
+       an unboxed product would result in unintended aliasing. Atomic fields are
+       restricted to layout [value_or_null], so this check is purely defensive.
+    *)
+    | Patomic_load_idx { layout = Punboxed_product _ }
+    | Patomic_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_idx { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_idx { layout = Punboxed_product _; _ }
+    | Patomic_load_ptr { layout = Punboxed_product _ }
+    | Patomic_set_ptr { layout = Punboxed_product _; _ }
+    | Patomic_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_exchange_ptr { layout = Punboxed_product _; _ }
+    | Patomic_compare_set_ptr { layout = Punboxed_product _; _ } ->
+      Misc.fatal_errorf
+        "Blambda_of_lambda: primitive %a may not be used with unboxed products"
+        Printlambda.primitive primitive
+    | Patomic_load_idx _ -> binary (Ccall "caml_atomic_load_idx_bytecode")
+    | Patomic_set_idx _ -> ternary (Ccall "caml_atomic_set_idx_bytecode")
+    | Patomic_exchange_idx _ ->
+      ternary (Ccall "caml_atomic_exchange_idx_bytecode")
+    | Patomic_compare_exchange_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_compare_exchange_idx_bytecode")
+    | Patomic_compare_set_idx _ ->
+      n_ary ~arity:4 (Ccall "caml_atomic_cas_idx_bytecode")
+    | Patomic_fetch_add_idx ->
+      ternary (Ccall "caml_atomic_fetch_add_idx_bytecode")
+    | Patomic_add_idx -> ternary (Ccall "caml_atomic_add_idx_bytecode")
+    | Patomic_sub_idx -> ternary (Ccall "caml_atomic_sub_idx_bytecode")
+    | Patomic_land_idx -> ternary (Ccall "caml_atomic_land_idx_bytecode")
+    | Patomic_lor_idx -> ternary (Ccall "caml_atomic_lor_idx_bytecode")
+    | Patomic_lxor_idx -> ternary (Ccall "caml_atomic_lxor_idx_bytecode")
+    | Patomic_load_ptr _ -> unary (Ccall "caml_atomic_load_ptr_bytecode")
+    | Patomic_set_ptr _ -> binary (Ccall "caml_atomic_set_ptr_bytecode")
+    | Patomic_exchange_ptr _ ->
+      binary (Ccall "caml_atomic_exchange_ptr_bytecode")
+    | Patomic_compare_exchange_ptr _ ->
+      ternary (Ccall "caml_atomic_compare_exchange_ptr_bytecode")
+    | Patomic_compare_set_ptr _ ->
+      ternary (Ccall "caml_atomic_cas_ptr_bytecode")
+    | Patomic_fetch_add_ptr ->
+      binary (Ccall "caml_atomic_fetch_add_ptr_bytecode")
+    | Patomic_add_ptr -> binary (Ccall "caml_atomic_add_ptr_bytecode")
+    | Patomic_sub_ptr -> binary (Ccall "caml_atomic_sub_ptr_bytecode")
+    | Patomic_land_ptr -> binary (Ccall "caml_atomic_land_ptr_bytecode")
+    | Patomic_lor_ptr -> binary (Ccall "caml_atomic_lor_ptr_bytecode")
+    | Patomic_lxor_ptr -> binary (Ccall "caml_atomic_lxor_ptr_bytecode")
+    | Pdls_get -> unary (Ccall "caml_domain_dls_get")
+    | Ptls_get -> unary (Ccall "caml_domain_tls_get")
+    | Pdomain_index -> unary (Ccall "caml_ml_domain_index")
+    | Ppoll -> unary (Ccall "caml_process_pending_actions_with_root")
+    | Pcpu_relax -> unary (Ccall "caml_ml_domain_cpu_relax")
+    | Pisnull -> unary (Ccall "caml_is_null")
+    | Pstring_load_vec _ | Pbytes_load_vec _ | Pbytes_set_vec _
+    | Pstring_load_mask _ | Pbytes_load_mask _ | Pbytes_set_mask _
+    | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
+    | Pbigstring_load_mask _ | Pbigstring_set_mask _ | Pint_array_load_vec _
+    | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
+    | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
+    | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
+    | Pint_array_set_vec _ | Punboxed_float_array_set_vec _
+    | Punboxed_float32_array_set_vec _ | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _ | Punboxed_int32_array_set_vec _
+    | Punboxed_int64_array_set_vec _ | Punboxed_nativeint_array_set_vec _
+    | Pbox_vector _ | Punbox_vector _ | Pbox_mask _ | Punbox_mask | Pjoin_vec256
+    | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _ ->
+      simd_is_not_supported ()
+    | Preinterpret_tagged_int63_as_unboxed_int64 ->
+      if Target_system.is_64_bit ()
+      then unary (Ccall "caml_reinterpret_tagged_int63_as_unboxed_int64")
+      else
+        Misc.fatal_error
+          "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on \
+           64-bit targets"
+    | Preinterpret_unboxed_int64_as_tagged_int63 ->
+      if Target_system.is_64_bit ()
+      then unary (Ccall "caml_reinterpret_unboxed_int64_as_tagged_int63")
+      else
+        Misc.fatal_error
+          "Preinterpret_unboxed_int64_as_tagged_int63 can only be used on \
+           64-bit targets"
+    | Pmakearray_dynamic (kind, locality, With_initializer) -> (
+      if List.compare_length_with args 2 <> 0
+      then
+        Misc.fatal_error
+          "Bytegen.comp_primitive: Pmakearray_dynamic takes two arguments for \
+           [With_initializer]";
+      (* CR layouts v4.0: This is "wrong" for unboxed types. It should construct
+         blocks that can't be marshalled. We've decided to ignore that problem
+         in the short term, as it's unlikely to cause issues - see the internal
+         arrays epic for out plan to deal with it. *)
+      match kind with
+      | Punboxedvectorarray _ -> simd_is_not_supported ()
+      | Punboxedmaskarray -> simd_is_not_supported ()
+      | (Pgcscannableproductarray _ | Pgcignorableproductarray _) as kind ->
+        (* In bytecode, [caml_array_make n init] makes every slot point to the
+           same [init] block. For unboxed products (boxed in bytecode), we must
+           overwrite each slot with a fresh deep copy so slots don't alias the
+           caller's initializer or each other. *)
+        let n_arg, init_arg =
+          match args with
+          | [n; init] -> comp_expr n, comp_expr init
+          | _ -> wrong_arity ~expected:2
+        in
+        let cname =
+          match locality with
+          | Alloc_heap -> "caml_array_make"
+          | Alloc_local -> "caml_array_make_local"
+        in
+        let init_id = Ident.create_local "init" in
+        let n_id = Ident.create_local "n" in
+        lets
+          [init_id, init_arg; n_id, n_arg]
+          (in_place_copy_array_slice ~length:(Var n_id)
+             ~offset:(tagged_immediate 0)
+             ~array:(Prim (Ccall cname, [Var n_id; Var init_id]))
+             ~elt:(element_of_array_kind kind))
+      | Pfloatarray | Punboxedfloatarray Unboxed_float64 -> (
+        (* These kinds are flat [Double_array_tag] arrays even under
+           [-no-flat-float-array], so [caml_array_make] must not be used. *)
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_floatarray_make")
+        | Alloc_local -> binary (Ccall "caml_floatarray_make_local"))
+      | Pgenarray | Pintarray | Paddrarray | Pgcignorableaddrarray
+      | Punboxedoruntaggedintarray _
+      | Punboxedfloatarray Unboxed_float32 -> (
+        match locality with
+        | Alloc_heap -> binary (Ccall "caml_array_make")
+        | Alloc_local -> binary (Ccall "caml_array_make_local"))
+      | Punspecializedarray ->
+        Misc.fatal_error
+          "Blambda_of_lambda: Pmakearray_dynamic Punspecializedarray")
+    | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
+      match dst_array_set_kind with
+      | Punboxedvectorarray_set _ -> simd_is_not_supported ()
+      | Punboxedmaskarray_set -> simd_is_not_supported ()
+      | (Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _) as
+        set_kind ->
+        (* [caml_array_blit] is a shallow copy: each blitted slot of [dst]
+           ends up aliasing the corresponding block in [src]. For unboxed
+           product arrays we follow the blit with a pass that overwrites each
+           slot in the destination range with a fresh deep copy of itself. *)
+        let elt =
+          element_of_array_kind (Lambda.array_kind_of_array_set_kind set_kind)
+        in
+        let src_arg, srcofs_arg, dst_arg, dstofs_arg, len_arg =
+          match args with
+          | [s; so; d; doff; n] ->
+            comp_expr s, comp_expr so, comp_expr d, comp_expr doff, comp_expr n
+          | _ -> wrong_arity ~expected:5
+        in
+        let src_id = Ident.create_local "blit_src" in
+        let srcofs_id = Ident.create_local "blit_srcofs" in
+        let dst_id = Ident.create_local "blit_dst" in
+        let dstofs_id = Ident.create_local "blit_dstofs" in
+        let len_id = Ident.create_local "blit_len" in
+        let blit_call =
+          Blambda.Prim
+            ( Ccall "caml_array_blit",
+              [Var src_id; Var srcofs_id; Var dst_id; Var dstofs_id; Var len_id]
+            )
+        in
+        let copy_pass =
+          in_place_copy_array_slice ~length:(Var len_id) ~offset:(Var dstofs_id)
+            ~array:(Var dst_id) ~elt
+        in
+        lets
+          [ len_id, len_arg;
+            dstofs_id, dstofs_arg;
+            dst_id, dst_arg;
+            srcofs_id, srcofs_arg;
+            src_id, src_arg ]
+          (Sequence (Sequence (blit_call, copy_pass), unit))
+      | Pgenarray_set _ | Pintarray_set | Paddrarray_set _
+      | Pgcignorableaddrarray_set | Punboxedoruntaggedintarray_set _
+      | Pfloatarray_set | Punboxedfloatarray_set _ ->
+        n_ary (Ccall "caml_array_blit") ~arity:5
+      | Punspecializedarray_set _ ->
+        Misc.fatal_error "Blambda_of_lambda: Parrayblit Punspecializedarray_set"
+      )
+    | Pprobe_is_enabled _ | Ppeek _ | Ppoke _ ->
+      Misc.fatal_errorf "Blambda_of_lambda: %a is not supported in bytecode"
+        Printlambda.primitive primitive
+    | Pmakelazyblock Lazy_tag ->
+      pseudo_event (variadic (Makeblock { tag = Config.lazy_tag }))
+    | Pmakelazyblock Forward_tag ->
+      pseudo_event (variadic (Makeblock { tag = Obj.forward_tag }))
+    | Pscalar (Unary unary) -> (
+      match args with
+      | [x] -> comp_unary_scalar_intrinsic unary (comp_expr x)
+      | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pscalar (Binary binary) -> (
+      match args with
+      | [x; y] ->
+        comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
+      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
+
+and comp_binary_scalar_intrinsic : type a.
+    a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
+ fun op x y ->
+  let prim prim = Prim (prim, [x; y]) in
+  let ccall fmt = kccallf prim fmt in
+  match (op : _ Scalar.Operation.Binary.t) with
+  | Integral (size, op) -> (
+    match Scalar.Integral.width size with
+    | Taggable taggable -> (
+      match op with
+      | Add ->
+        (match y with
+          | Const (Const_base (Const_int y)) when is_immed y ->
+            Prim (Offsetint y, [x])
+          | _ -> prim Addint)
+        |> sign_extend taggable
+      | Sub ->
+        (match y with
+          | Const (Const_base (Const_int y)) when is_immed (-y) ->
+            Prim (Offsetint (-y), [x])
+          | _ -> prim Subint)
+        |> sign_extend taggable
+      | Mul -> prim Mulint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Signed) -> prim Divint |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Signed) -> prim Modint |> sign_extend taggable
+      | Div ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_div",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | Mod ((Safe | Unsafe), Unsigned) ->
+        Prim
+          ( Ccall "caml_int_unsigned_mod",
+            [zero_extend taggable x; zero_extend taggable y] )
+        |> sign_extend taggable
+      | And -> prim Andint
+      | Or -> prim Orint
+      | Xor -> prim Xorint)
+    | Boxable
+        (( Int32 Any_locality_mode
+         | Nativeint Any_locality_mode
+         | Int64 Any_locality_mode ) as size) -> (
+      let size = Scalar.Integral.Boxable.Width.to_string size in
+      let c suffix = ccall "caml_%s_%s" size suffix in
+      match op with
+      | Add -> c "add"
+      | Sub -> c "sub"
+      | Mul -> c "mul"
+      | Div ((Safe | Unsafe), Signed) -> c "div"
+      | Mod ((Safe | Unsafe), Signed) -> c "mod"
+      | Div ((Safe | Unsafe), Unsigned) -> c "unsigned_div"
+      | Mod ((Safe | Unsafe), Unsigned) -> c "unsigned_mod"
+      | And -> c "and"
+      | Or -> c "or"
+      | Xor -> c "xor"))
+  | Floating (size, ((Add | Sub | Mul | Div) as op)) ->
+    let op = Scalar.Operation.Binary.Float_op.to_string op in
+    let size = Scalar.Floating.Width.to_string (Scalar.Floating.width size) in
+    ccall "caml_%s_%s" op size
+  | Shift (size, op, Int) -> (
+    match Scalar.Integral.width size with
+    | Taggable taggable -> (
+      match op with
+      | Asr -> prim Asrint
+      | Lsl -> sign_extend taggable (prim Lslint)
+      | Lsr -> sign_extend taggable (Prim (Lsrint, [zero_extend taggable x; y]))
+      )
+    | Boxable
+        (( Int32 Any_locality_mode
+         | Nativeint Any_locality_mode
+         | Int64 Any_locality_mode ) as size) -> (
+      let size = Scalar.Integral.Boxable.Width.to_string size in
+      match op with
+      | Lsl -> ccall "caml_%s_shift_left" size
+      | Lsr -> ccall "caml_%s_shift_right_unsigned" size
+      | Asr -> ccall "caml_%s_shift_right" size))
+  | Icmp (size, cmp) -> (
+    match Scalar.Integral.width size with
+    | Taggable (Int | Int8 | Int16) ->
+      let x, cmp, y =
+        (* Optimization in emitcode.ml if one operand is a constant. *)
+        if is_representable_const_int y && not (is_representable_const_int x)
+        then y, Scalar.Integer_comparison.swap cmp, x
+        else x, cmp, y
+      in
+      let x, cmp, y =
+        match (cmp : Scalar.Integer_comparison.t) with
+        | Ceq -> x, Eq, y
+        | Cne -> x, Neq, y
+        | Clt -> x, Ltint, y
+        | Cgt -> x, Gtint, y
+        | Cle -> x, Leint, y
+        | Cge -> x, Geint, y
+        | Cult -> x, Ultint, y
+        | Cuge -> x, Ugeint, y
+        (* Bytecode only has Ultint and Ugeint instructions.
+           For Cugt and Cule, we swap arguments and use the opposite comparison. *)
+        | Cugt ->
+          (* [x >u y] becomes [y <u x] *)
+          y, Ultint, x
+        | Cule ->
+          (* [x <=u y] becomes [y >=u x] *)
+          y, Ugeint, x
+      in
+      Prim (Intcomp cmp, [x; y])
+    | Boxable
+        ( Int32 Any_locality_mode
+        | Nativeint Any_locality_mode
+        | Int64 Any_locality_mode ) -> (
+      let make_unsigned_comparison name =
+        make_unsigned_comparison size (fun x y -> Prim (Ccall name, [x; y])) x y
+      in
+      match cmp with
+      | Ceq -> ccall "caml_equal"
+      | Cne -> ccall "caml_notequal"
+      | Clt -> ccall "caml_lessthan"
+      | Cle -> ccall "caml_lessequal"
+      | Cgt -> ccall "caml_greaterthan"
+      | Cge -> ccall "caml_greaterequal"
+      | Cult -> make_unsigned_comparison "caml_lessthan"
+      | Cugt -> make_unsigned_comparison "caml_greaterthan"
+      | Cule -> make_unsigned_comparison "caml_lessequal"
+      | Cuge -> make_unsigned_comparison "caml_greaterequal"))
+  | Fcmp (size, cmp) -> (
+    match Scalar.Floating.width size with
+    | (Float64 Any_locality_mode | Float32 Any_locality_mode) as size -> (
+      let size = Scalar.Floating.Width.to_string size in
+      let c name = ccall "caml_%s_%s" name size in
+      match cmp with
+      | CFeq -> c "eq"
+      | CFneq -> c "neq"
+      | CFlt -> c "lt"
+      | CFnlt -> c "lt" |> boolnot
+      | CFgt -> c "gt"
+      | CFngt -> c "gt" |> boolnot
+      | CFle -> c "le"
+      | CFnle -> c "le" |> boolnot
+      | CFge -> c "ge"
+      | CFnge -> c "ge" |> boolnot))
+  | Three_way_compare_int (signedness, size) -> (
+    let make_signed_compare x y =
+      match Scalar.Integral.width size with
+      | Taggable (Int | Int8 | Int16) -> Prim (Ccall "caml_int_compare", [x; y])
+      | Boxable (Int32 _) -> Prim (Ccall "caml_int32_compare", [x; y])
+      | Boxable (Int64 _) -> Prim (Ccall "caml_int64_compare", [x; y])
+      | Boxable (Nativeint _) -> Prim (Ccall "caml_nativeint_compare", [x; y])
+    in
+    match (signedness : Scalar.Signedness.t) with
+    | Signed -> make_signed_compare x y
+    | Unsigned -> make_unsigned_comparison size make_signed_compare x y)
+  | Three_way_compare_float size -> (
+    match Scalar.Floating.width size with
+    | Float64 Any_locality_mode -> ccall "caml_float_compare"
+    | Float32 Any_locality_mode -> ccall "caml_float32_compare")
+
+and comp_unary_scalar_intrinsic op x =
+  let prim prim = Prim (prim, [x]) in
+  let ccall fmt = kccallf prim fmt in
+  match (op : _ Scalar.Operation.Unary.t) with
+  | Integral (size, op) -> (
+    let comp_offset n =
+      comp_binary_scalar_intrinsic
+        (Scalar.Operation.Binary.Integral (size, Add))
+        x
+        (Const (const_int size n))
+    in
+    match op with
+    | Succ -> comp_offset 1
+    | Pred -> comp_offset (-1)
+    | Neg -> (
+      match Scalar.Integral.width size with
+      | Boxable
+          (( Int32 Any_locality_mode
+           | Nativeint Any_locality_mode
+           | Int64 Any_locality_mode ) as size) ->
+        ccall "caml_%s_neg" (Scalar.Integral.Boxable.Width.to_string size)
+      | Taggable taggable -> sign_extend taggable (prim Negint))
+    | Bswap -> (
+      match Scalar.Integral.width size with
+      | Taggable Int8 -> x
+      | Taggable ((Int16 | Int) as bswap16) ->
+        sign_extend bswap16 (ccall "caml_bswap16")
+      | Boxable boxed ->
+        ccall "caml_%s_bswap" (Scalar.Integral.Boxable.Width.to_string boxed)))
+  | Floating (size, ((Abs | Neg) as op)) -> (
+    match Scalar.Floating.width size with
+    | (Float32 Any_locality_mode | Float64 Any_locality_mode) as size ->
+      ccall "caml_%s_%s"
+        (Scalar.Operation.Unary.Float_op.to_string op)
+        (Scalar.Floating.Width.to_string size))
+  | Static_cast { src; dst } ->
+    static_cast x ~src:(Scalar.width src) ~dst:(Scalar.width dst)
+
+and make_unsigned_comparison size signed_comparison x y =
+  (* For unsigned comparisons, we flip the sign bit of both operands and use
+     signed comparison (see z3 proof [*] below) *)
+  let min_int_at_runtime const_name =
+    let num_bits = Prim (caml_sys_const const_name, [unit]) in
+    let one = Const (const_int size 1) in
+    let num_bits =
+      assert (is_immed (-1));
+      Prim (Offsetint (-1), [num_bits])
+      (* this computation is just "num_bits - 1" *)
+    in
+    comp_binary_scalar_intrinsic (Shift (size, Lsl, Int)) one num_bits
+  in
+  let min_int =
+    (* For int and nativeint, we don't know the target platform width so we have
+       to compute min_int at runtime.  For other widths we can do better. *)
+    match Scalar.Integral.width size with
+    | Taggable Int8 -> Const (const_int size (-0x80))
+    | Taggable Int16 -> Const (const_int size (-0x8000))
+    | Taggable Int -> min_int_at_runtime Int_size
+    | Boxable (Int32 Any_locality_mode) ->
+      Const (Const_base (Const_int32 Int32.min_int))
+    | Boxable (Int64 Any_locality_mode) ->
+      Const (Const_base (Const_int64 Int64.min_int))
+    | Boxable (Nativeint Any_locality_mode) -> min_int_at_runtime Word_size
+  in
+  let flip_sign_bit arg =
+    comp_binary_scalar_intrinsic (Integral (size, Xor)) arg min_int
+  in
+  signed_comparison (flip_sign_bit x) (flip_sign_bit y)
+
+(* z3 proof of the above property [*]:
+
+   (define-sort int64 () (_ BitVec 64))
+
+   (declare-const x int64)
+   (declare-const y int64)
+
+   (define-fun flip_sign ((v int64)) int64
+     (bvxor v #x8000000000000000)
+   )
+
+   (push)
+   (echo "checking `lt`...")
+   (assert (not (=
+     (bvult x y)
+     (bvslt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `le`...")
+   (assert (not (=
+     (bvule x y)
+     (bvsle (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `gt`...")
+   (assert (not (=
+     (bvugt x y)
+     (bvsgt (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+
+   (push)
+   (echo "checking `ge`...")
+   (assert (not (=
+     (bvuge x y)
+     (bvsge (flip_sign x) (flip_sign y))
+   )))
+   (check-sat)
+   ;(get-model)
+   (echo "")
+   (pop)
+*)
+
+let thunkify_compilation_unit_initialization ~thunk_name blam =
+  (* Transforms [blam] into something like [let thunk () = blam in thunk ()].
+     Assumes no free variables in [blam]. *)
+  let thunk = Ident.create_local thunk_name in
+  Blambda.Let
+    { id = thunk;
+      arg =
+        Function
+          { params = [Ident.create_local "null"];
+            body = blam;
+            free_variables = Ident.Set.empty
+          };
+      body =
+        Apply
+          { func = Var thunk;
+            args = [Const Const_null];
+            nontail = false;
+            yielding = Unyielding
+          }
+    }
+
+let blambda_of_lambda ~compilation_unit x =
+  let blam = comp_expr x in
+  match compilation_unit with
+  | None -> blam
+  | Some cu ->
+    let blam =
+      if !Clflags.thunkify_cu_init
+      then
+        thunkify_compilation_unit_initialization
+          ~thunk_name:("init_" ^ Compilation_unit.full_path_as_string cu)
+          blam
+      else blam
+    in
+    Blambda.Prim (Blambda.Setglobal cu, [blam])

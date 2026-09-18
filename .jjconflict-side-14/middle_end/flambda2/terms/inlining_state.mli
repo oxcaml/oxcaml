@@ -1,0 +1,44 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2013--2019 OCamlPro SAS                                    *)
+(*   Copyright 2014--2019 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** Abstracts the state used during inlining. *)
+
+type t
+
+val print : Format.formatter -> t -> unit
+
+val equal : t -> t -> bool
+
+val default : round:int -> t
+
+val create : arguments:Inlining_arguments.t -> depth:int -> stub_depth:int -> t
+
+val depth : t -> int
+
+val stub_depth : t -> int
+
+val increment_depth : t -> is_stub:bool -> by:int -> t
+
+val is_depth_exceeded : t -> bool
+
+(** The depths are summed and the arguments are combined (see
+    [Inlining_arguments.combine]; [from_env] must be the state of the current
+    simplification environment). *)
+val combine : from_env:t -> from_metadata:t -> t
+
+val with_arguments : Inlining_arguments.t -> t -> t
+
+val arguments : t -> Inlining_arguments.t

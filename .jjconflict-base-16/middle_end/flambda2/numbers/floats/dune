@@ -1,0 +1,24 @@
+(include_subdirs unqualified)
+
+(library
+ (name flambda2_floats)
+ (wrapped true)
+ (instrumentation
+  (backend bisect_ppx))
+ (foreign_stubs
+  (language c)
+  (names float32_stubs)
+  (flags
+   ((:include %{project_root}/%{env:OC_CFLAGS_SEXP=oc_cflags.sexp})
+    (:include %{project_root}/sharedlib_cflags.sexp)
+    (:include %{project_root}/oc_cppflags.sexp))))
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3)))
+
+(install
+ (files
+  (dllflambda2_floats_stubs.so as stublibs/dllflambda2_floats_stubs.so))
+ (section lib)
+ (package ocaml))

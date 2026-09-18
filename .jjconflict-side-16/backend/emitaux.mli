@@ -1,0 +1,188 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* Common functions for emitting assembly code *)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+val output_channel : out_channel ref
+
+val output_prefix : string ref
+
+val emit_string : string -> unit
+
+val emit_buffer : Buffer.t -> unit
+
+val reset : unit -> unit
+
+val reset_debug_info : unit -> unit
+
+val emit_debug_info_gen :
+  ?discriminator:int ->
+  Debuginfo.t ->
+  (file_num:int -> file_name:string -> unit) ->
+  (file_num:int -> line:int -> col:int -> ?discriminator:int -> unit -> unit) ->
+  unit
+
+type frame_debuginfo =
+  | Dbg_alloc of Cmm.alloc_dbginfo
+  | Dbg_raise of Debuginfo.t
+  | Dbg_other of Debuginfo.t
+
+val record_frame_descr :
+  label:Label.t ->
+  (* Return address *)
+  frame_size:int ->
+  (* Size of stack frame *)
+  live_offset:int list ->
+  (* Offsets/regs of live addresses *)
+  frame_debuginfo ->
+  (* Location, if any *)
+  unit
+
+(** The backends call this whenever they switch text section, with the section's
+    name; it maintains a section epoch for the compact frame-descriptor format,
+    whose return addresses are deltas from the previous descriptor -- an
+    assembly-time constant only when both lie in the same section, so
+    descriptors at a section boundary escape to the full format. Re-entering the
+    current section does not bump the epoch. *)
+val enter_code_section : string -> unit
+
+(* When set before [emit_frames], every frame descriptor escapes to the normal
+   format instead of the short encoding. Backends set this when the short format
+   cannot be emitted (currently only MASM, which lacks .uleb128). *)
+val disable_short_descriptors : bool ref
+
+(** [with_snapshot f] runs [f] and returns its result, but also ensures that the
+    state of this [Emitaux] module is unchanged after [f] returns. *)
+val with_snapshot : f:(unit -> 'a) -> 'a
+
+type emit_frame_actions =
+  { efa_code_label : Label.t -> unit;
+    efa_data_label : Label.t -> unit;
+    efa_i8 : Numbers.Int8.t -> unit;
+    efa_i16 : Numbers.Int16.t -> unit;
+    efa_i32 : Int32.t -> unit;
+    efa_u8 : Numbers.Uint8.t -> unit;
+    efa_u16 : Numbers.Uint16.t -> unit;
+    efa_u32 : Numbers.Uint32.t -> unit;
+    efa_word : int -> unit;
+    efa_align : int -> unit;
+    efa_label_rel : Label.t -> int32 -> unit;
+    efa_label_delta : Label.t -> Label.t -> unit;
+    efa_def_label : Label.t -> unit
+  }
+
+(* Emits the frame table into the current section which must be
+   [Read_only_data]. Debuginfo strings go in [debug_strings_section]: pass
+   [Asm_section.Debuginfo_strings] so that the linker de-duplicates them, or
+   [Read_only_data] to keep them inline in the frametable (the binary emitter
+   needs this, having no relocations that can target the mergeable section). *)
+val emit_frames :
+  debug_strings_section:Asm_targets.Asm_section.t -> emit_frame_actions -> unit
+
+val is_generic_function : string -> bool
+
+(** Is a binary backend available. If yes, we don't need to generate the textual
+    assembly file (unless the user request it with -S). *)
+val binary_backend_available : bool ref
+
+(** Clear global state and compact the heap, so that an external program (such
+    as the assembler or linker) may have more memory available to it.
+
+    When this frees up around 1.1GB of memory, it takes around 0.6s. We only
+    take this time when the job is large enough that we're worried that we'll
+    either run out of memory or constrain the number of parallel jobs. We
+    heuristically measure how big the job is by how much heap we're using
+    ourselves.
+
+    The [reset] parameter will be called before [Gc.compact] if we go ahead with
+    the compaction. It should clear as much as possible from the global state,
+    since the fewer live words there are after GC, the smaller the new heap can
+    be. *)
+val reduce_heap_size : reset:(unit -> unit) -> unit
+
+type error =
+  | Stack_frame_too_large of int
+  | Stack_frame_way_too_large of int
+  | Inconsistent_probe_init of string * Debuginfo.t
+
+module Dwarf_helpers : sig
+  val init :
+    ppf_dump:Format.formatter ->
+    disable_dwarf:bool ->
+    sourcefile:string option ->
+    unit
+
+  val begin_dwarf :
+    code_begin:string ->
+    code_end:string ->
+    file_emitter:(file_num:int -> file_name:string -> unit) ->
+    unit
+
+  val emit_dwarf : unit -> unit
+
+  val emit_delayed_dwarf : unit -> unit
+
+  val record_dwarf_for_fundecl : Linear.fundecl -> Dwarf.fundecl option
+
+  val record_function_range :
+    function_symbol:Asm_targets.Asm_symbol.t ->
+    start_label:Asm_targets.Asm_label.t ->
+    end_label:Asm_targets.Asm_label.t ->
+    offset_past_end_label:int option ->
+    unit
+end
+
+exception Error of error
+
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer
+
+type preproc_stack_check_result =
+  { max_frame_size : int;
+    contains_nontail_calls : bool
+  }
+
+val preproc_stack_check :
+  fun_body:Linear.instruction ->
+  frame_size:int ->
+  trap_size:int ->
+  preproc_stack_check_result
+
+val add_stack_checks_if_needed :
+  Linear.fundecl ->
+  stack_offset:int ->
+  stack_threshold_size:int ->
+  trap_size:int ->
+  Linear.fundecl
+
+val emit_stapsdt_base_section : unit -> unit
+
+val emit_elf_note :
+  section:Asm_targets.Asm_section.t ->
+  owner:string ->
+  typ:int32 ->
+  emit_desc:(unit -> unit) ->
+  unit
+
+type emit_data_item_actions =
+  { global_maybe_protected : Asm_targets.Asm_symbol.t -> unit;
+    symbol_defined : string -> unit;
+    symbol_used : string -> unit
+  }
+
+val emit_data_item : emit_data_item_actions -> Cmm.data_item -> unit

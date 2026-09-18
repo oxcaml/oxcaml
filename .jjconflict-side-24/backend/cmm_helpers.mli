@@ -1,0 +1,1801 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+[@@@ocaml.warning "+a-40-41-42"]
+
+open Cmm
+
+(** Tags for unboxed or untagged arrays using mixed block headers with
+    scannable_prefix = 0 *)
+module Unboxed_or_untagged_array_tags : sig
+  val untagged_int_array_tag : int
+
+  val unboxed_int64_array_tag : int
+
+  val unboxed_nativeint_array_tag : int
+
+  val untagged_int8_array_zero_tag : int
+
+  val untagged_int8_array_one_tag : int
+
+  val untagged_int8_array_two_tag : int
+
+  val untagged_int8_array_three_tag : int
+
+  val untagged_int8_array_four_tag : int
+
+  val untagged_int8_array_five_tag : int
+
+  val untagged_int8_array_six_tag : int
+
+  val untagged_int8_array_seven_tag : int
+
+  val untagged_int16_array_zero_tag : int
+
+  val untagged_int16_array_one_tag : int
+
+  val untagged_int16_array_two_tag : int
+
+  val untagged_int16_array_three_tag : int
+
+  val unboxed_int32_array_zero_tag : int
+
+  val unboxed_int32_array_one_tag : int
+
+  val unboxed_float32_array_zero_tag : int
+
+  val unboxed_float32_array_one_tag : int
+
+  val unboxed_vec128_array_tag : int
+
+  val unboxed_vec256_array_tag : int
+
+  val unboxed_vec512_array_tag : int
+
+  val unboxed_mask_array_tag : int
+
+  (* Given the length of an int8 array, return its tag *)
+  val untagged_int8_array_tag : int -> int
+
+  (* Given the length of an int16 array, return its tag *)
+  val untagged_int16_array_tag : int -> int
+
+  (* Given the length of an int32 array, return its tag *)
+  val unboxed_int32_array_tag : int -> int
+
+  (* Given the length of an float32 array, return its tag *)
+  val unboxed_float32_array_tag : int -> int
+end
+
+val arch_bits : int
+
+val log2_size_addr : int
+
+type arity =
+  { function_kind : Lambda.function_kind;
+    params_layout : Lambda.layout list;
+    return_layout : Lambda.layout
+  }
+
+(** [bind name arg fn] is equivalent to [let name = arg in fn name], or simply
+    [fn arg] if [arg] is simple enough *)
+val bind : string -> expression -> (expression -> expression) -> expression
+
+(** Headers *)
+
+(** A constant equal to the tag for float arrays *)
+val floatarray_tag : Debuginfo.t -> expression
+
+(** [block_header tag size] creates a header with tag [tag] for a block of size
+    [size] *)
+val block_header : int -> int -> nativeint
+
+(** Same as block_header, but with GC bits set to black *)
+val black_block_header : int -> int -> nativeint
+
+(** Same as black_block_header, but for a mixed block *)
+val black_mixed_block_header :
+  int -> int -> scannable_prefix_len:int -> nativeint
+
+val black_closure_header : int -> nativeint
+
+(** Infix header at the given offset *)
+val infix_header : int -> nativeint
+
+val black_custom_header : size:int -> nativeint
+
+val pack_closure_info : arity:int -> startenv:int -> is_last:bool -> nativeint
+
+(** Closure info for a closure of given arity and distance to environment *)
+val closure_info : arity:arity -> startenv:int -> is_last:bool -> nativeint
+
+val closure_info' :
+  arity:Lambda.function_kind * 'a list ->
+  startenv:int ->
+  is_last:bool ->
+  nativeint
+
+(** Wrappers *)
+val alloc_infix_header : int -> Debuginfo.t -> expression
+
+(** Make an integer constant from the given integer (tags the integer) *)
+val int_const : Debuginfo.t -> int -> expression
+
+(** Arithmetical operations on integers *)
+val add_int : expression -> expression -> Debuginfo.t -> expression
+
+val sub_int : expression -> expression -> Debuginfo.t -> expression
+
+val neg_int : expression -> Debuginfo.t -> expression
+
+val lsl_int : expression -> expression -> Debuginfo.t -> expression
+
+val mul_int : expression -> expression -> Debuginfo.t -> expression
+
+val lsr_int : expression -> expression -> Debuginfo.t -> expression
+
+val asr_int : expression -> expression -> Debuginfo.t -> expression
+
+val and_int : expression -> expression -> Debuginfo.t -> expression
+
+val or_int : expression -> expression -> Debuginfo.t -> expression
+
+val xor_int : expression -> expression -> Debuginfo.t -> expression
+
+(** Similar to [add_int] but produces a result with machtype [Addr] iff
+    [ptr_out_of_heap] is [false]. *)
+val add_int_ptr :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+(** Integer tagging. [tag_int x = (x lsl 1) + 1] *)
+val tag_int : expression -> Debuginfo.t -> expression
+
+(** Integer untagging. [untag_int x = (x asr 1)] *)
+val untag_int : expression -> Debuginfo.t -> expression
+
+(** Unsigned integer untagging. [untag_int x = (x lsr 1)] *)
+val unsigned_untag_int : expression -> Debuginfo.t -> expression
+
+(** signed division of two register-width integers *)
+val div_int :
+  ?dividend_cannot_be_min_int:bool ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+(** unsigned division of two register-width integers *)
+val unsigned_div_int : expression -> expression -> Debuginfo.t -> expression
+
+(** signed remainder of two register-width integers *)
+val mod_int :
+  ?dividend_cannot_be_min_int:bool ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+(** unsigned remainder of two register-width integers *)
+val unsigned_mod_int : expression -> expression -> Debuginfo.t -> expression
+
+(** Boolean negation *)
+val mk_not : Debuginfo.t -> expression -> expression
+
+(** Conditional selection: [ifso] when [cond] is non-zero, [ifnot] otherwise.
+    Both arms are always evaluated. Simplifies away the conditional move when
+    the result does not depend on the condition. *)
+val csel :
+  dbg:Debuginfo.t ->
+  machtype ->
+  cond:expression ->
+  ifso:expression ->
+  ifnot:expression ->
+  expression
+
+(** Integer and float comparison that returns int not bool. The untagged
+    versions do not tag the result and do not optimise known-constant cases. *)
+val mk_compare_ints : Debuginfo.t -> expression -> expression -> expression
+
+val mk_compare_floats : Debuginfo.t -> expression -> expression -> expression
+
+val mk_compare_ints_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
+val mk_unsigned_compare_ints_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
+val mk_compare_floats_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
+val mk_compare_float32s_untagged :
+  Debuginfo.t -> expression -> expression -> expression
+
+(** Convert a tagged integer into a raw integer with boolean meaning *)
+val test_bool : Debuginfo.t -> expression -> expression
+
+(** Conversions for 16-bit floats *)
+val float_of_float16 : Debuginfo.t -> expression -> expression
+
+val float16_of_float : Debuginfo.t -> expression -> expression
+
+(** Float boxing and unboxing *)
+val box_float32 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_float32 : Debuginfo.t -> expression -> expression
+
+val box_float : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_float : Debuginfo.t -> expression -> expression
+
+(** Vector boxing and unboxing *)
+val box_vec128 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec128 : Debuginfo.t -> expression -> expression
+
+val box_vec256 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec256 : Debuginfo.t -> expression -> expression
+
+val box_vec512 : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_vec512 : Debuginfo.t -> expression -> expression
+
+val box_mask : Debuginfo.t -> Cmm.Alloc_mode.t -> expression -> expression
+
+val unbox_mask : Debuginfo.t -> expression -> expression
+
+(** Make the given expression return a unit value *)
+val return_unit : Debuginfo.t -> expression -> expression
+
+(** Blocks *)
+
+(** Non-atomic load of a mutable field *)
+val mk_load_mut : memory_chunk -> operation
+
+(** [strided_field_address ptr ~index ~stride dbg] returns an expression for the
+    address of the [index]th field of the block pointed to by [ptr]. The field
+    width is determined by [stride]. *)
+val strided_field_address :
+  expression -> index:int -> stride:int -> Debuginfo.t -> expression
+
+(** [field_address ptr n dbg] returns an expression for the address of the [n]th
+    field of the block pointed to by [ptr]. [memory_chunk] is only used for
+    computation of the field width; it defaults to a memory chunk matching the
+    machine width. *)
+val field_address :
+  ?memory_chunk:memory_chunk -> expression -> int -> Debuginfo.t -> expression
+
+(** [get_field_gen mut ptr n dbg] returns an expression for the access to the
+    [n]th field of the block pointed to by [ptr]. The [memory_chunk] used is
+    always [Word_val]. *)
+val get_field_gen :
+  Asttypes.mutable_flag -> expression -> int -> Debuginfo.t -> expression
+
+(** Like [get_field_gen] but allows use of a different [memory_chunk]. *)
+val get_field_gen_given_memory_chunk :
+  Cmm.memory_chunk ->
+  Asttypes.mutable_flag ->
+  expression ->
+  int ->
+  Debuginfo.t ->
+  expression
+
+(** Get the field of the given [block] whose index is specified by the Cmm
+    expresson [index] (in words). *)
+val get_field_computed :
+  Lambda.immediate_or_pointer ->
+  Asttypes.mutable_flag ->
+  block:expression ->
+  index:expression ->
+  Debuginfo.t ->
+  expression
+
+(** [field_address_computed ptr ofs dbg] returns an expression for the address
+    at offset [ofs] (in machine words) of the block pointed to by [ptr]. The
+    resulting expression is a derived pointer of type [Addr]. *)
+val field_address_computed :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Load a block's header *)
+val get_header : expression -> Debuginfo.t -> expression
+
+(** Load a block's tag *)
+val get_tag : expression -> Debuginfo.t -> expression
+
+(** Arrays *)
+
+val wordsize_shift : int
+
+val numfloat_shift : int
+
+(** Array loads and stores
+
+    [unboxed_float_array_ref] and [float_array_ref] differ in the boxing of the
+    result; [float_array_set] takes an unboxed float *)
+val addr_array_ref : expression -> expression -> Debuginfo.t -> expression
+
+val int_array_ref : expression -> expression -> Debuginfo.t -> expression
+
+val unboxed_float_array_ref :
+  Asttypes.mutable_flag ->
+  block:expression ->
+  index:expression ->
+  Debuginfo.t ->
+  expression
+
+val float_array_ref :
+  Cmm.Alloc_mode.t -> expression -> expression -> Debuginfo.t -> expression
+
+val addr_array_set_heap :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val addr_array_set_local :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val addr_array_initialize :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val addr_array_set :
+  Lambda.modify_mode ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val int_array_set :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val float_array_set :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+(** Strings *)
+
+val string_length : expression -> Debuginfo.t -> expression
+
+val bigstring_get_alignment :
+  expression -> expression -> int -> Debuginfo.t -> expression
+
+module Extended_machtype_component : sig
+  (** Like [Cmm.machtype_component] but has a case explicitly for tagged
+      integers. This enables caml_apply functions to be insensitive to whether a
+      particular argument or return value is a tagged integer or a normal value.
+      In turn this significantly reduces the number of caml_apply functions that
+      are generated. *)
+  type t =
+    | Val
+    | Addr
+    | Val_and_int
+    | Any_int
+    | Float
+    | Vec128
+    | Vec256
+    | Vec512
+    | Mask
+    | Float32
+end
+
+module Extended_machtype : sig
+  type t = Extended_machtype_component.t array
+
+  val typ_val : t
+
+  val typ_tagged_int : t
+
+  val typ_any_int : t
+
+  val typ_float : t
+
+  val typ_float32 : t
+
+  val typ_void : t
+
+  val typ_vec128 : t
+
+  val typ_vec256 : t
+
+  val typ_vec512 : t
+
+  val typ_mask : t
+
+  (** Conversion from a normal Cmm machtype. *)
+  val of_machtype : machtype -> t
+
+  (** Conversion from a Lambda layout. *)
+  val of_layout : Lambda.layout -> t
+
+  (** Conversion to a normal Cmm machtype. *)
+  val to_machtype : t -> machtype
+
+  (** Like [to_machtype] but tagged integer extended machtypes are mapped to
+      value machtypes. This is used to avoid excessive numbers of generic
+      functions being generated (see comments in cmm_helpers.ml). *)
+  val change_tagged_int_to_val : t -> machtype
+end
+
+(** Allocations *)
+
+(** Allocate a block of regular values with the given tag *)
+val make_alloc :
+  mode:Cmm.Alloc_mode.t ->
+  Debuginfo.t ->
+  tag:int ->
+  expression list ->
+  expression
+
+(** Allocate a block of unboxed floats with the given tag *)
+val make_float_alloc :
+  mode:Cmm.Alloc_mode.t ->
+  Debuginfo.t ->
+  tag:int ->
+  expression list ->
+  expression
+
+(** Allocate a closure block, to hold a set of closures.
+
+    This takes a list of expressions [exprs] and a list of [memory_chunk]s that
+    correspond pairwise. Both lists must be the same length.
+
+    The list of expressions includes _all_ fields of the closure block,
+    including the code pointers and closure information fields. *)
+val make_closure_alloc :
+  mode:Cmm.Alloc_mode.t ->
+  Debuginfo.t ->
+  tag:int ->
+  expression list ->
+  memory_chunk list ->
+  expression
+
+(** Allocate an mixed block of the corresponding tag and scannable prefix size.
+    The [memory_chunk] list should give the memory_chunk corresponding to each
+    element from the [expression] list. *)
+val make_mixed_alloc :
+  mode:Cmm.Alloc_mode.t ->
+  Debuginfo.t ->
+  tag:int ->
+  value_prefix_size:int ->
+  expression list ->
+  memory_chunk list ->
+  expression
+
+(** Sys.opaque_identity *)
+val opaque : expression -> Debuginfo.t -> expression
+
+(** Generic application functions *)
+
+(** Get an identifier for a given machtype, used in the name of the generic
+    functions. *)
+val machtype_identifier : machtype -> string
+
+(** Get the symbol for the generic currying or tuplifying wrapper with [n]
+    arguments, and ensure its presence in the set of defined symbols. *)
+val curry_function_sym :
+  Lambda.function_kind -> machtype list -> machtype -> Cmm.symbol
+
+val fail_if_called_indirectly_sym : Cmm.symbol
+
+(** Bigarrays *)
+
+(** Returns the size (in number of bytes) of a single element contained in a
+    bigarray. *)
+val bigarray_elt_size_in_bytes : Lambda.bigarray_kind -> int
+
+(** Returns the memory chunk corresponding to the kind of elements stored in a
+    bigarray. *)
+val bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk
+
+(** Operations on n-bit integers *)
+
+(** Simplify the given expression knowing the low bit of the argument will be
+    irrelevant *)
+val ignore_low_bit_int : expression -> expression
+
+(** Simplify the given expression knowing that bits other than the low [bits]
+    bits will be irrelevant *)
+val low_bits : bits:int -> dbg:Debuginfo.t -> expression -> expression
+
+(** sign-extend a given integer expression from [bits] bits to an entire
+    register *)
+val sign_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression
+
+(** zero-extend a given integer expression from [bits] bits to an entire
+    register *)
+val zero_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression
+
+(** Box a given integer, without sharing of constants *)
+val box_int_gen :
+  Debuginfo.t ->
+  Primitive.boxed_integer ->
+  Cmm.Alloc_mode.t ->
+  expression ->
+  expression
+
+(** Unbox a given boxed integer *)
+val unbox_int :
+  Debuginfo.t -> Primitive.boxed_integer -> expression -> expression
+
+(** For example, [bit_count Unboxed_int32] is [32] *)
+val bit_count : Primitive.unboxed_or_untagged_integer -> int
+
+(** Used to prepare small integers for a bitwise operations *)
+val make_unsigned_int :
+  Primitive.unboxed_or_untagged_integer ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_16 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_16 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_32 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_32 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_f32 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_f32 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_64 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_64 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_128 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_128 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_128 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_128 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_256 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_256 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val unaligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_512 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val aligned_load_512 :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_512 :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+val load_mask :
+  ptr_out_of_heap:bool -> expression -> expression -> Debuginfo.t -> expression
+
+val set_mask :
+  ptr_out_of_heap:bool ->
+  expression ->
+  expression ->
+  expression ->
+  Debuginfo.t ->
+  expression
+
+(** Primitives *)
+
+type unary_primitive = expression -> Debuginfo.t -> expression
+
+(** Int_as_pointer primitive *)
+val int_as_pointer : unary_primitive
+
+(** Raise primitive *)
+val raise_prim :
+  Lambda.raise_kind -> extra_args:expression list -> unary_primitive
+
+(** Unary negation of an OCaml integer *)
+val negint : unary_primitive
+
+(** Return the length of the array argument, as an OCaml integer *)
+val addr_array_length : unary_primitive
+
+(** Byte swap primitive Operates on Cmm integers (unboxed values) *)
+val bbswap : bswap_bitwidth -> unary_primitive
+
+type binary_primitive = expression -> expression -> Debuginfo.t -> expression
+
+(** [setfield offset value_is_ptr init ptr value dbg] *)
+val setfield :
+  int ->
+  Lambda.immediate_or_pointer ->
+  Lambda.initialization_or_assignment ->
+  binary_primitive
+
+(** Operations on OCaml integers *)
+val add_int_caml : binary_primitive
+
+val sub_int_caml : binary_primitive
+
+val mul_int_caml : binary_primitive
+
+val div_int_caml : binary_primitive
+
+val unsigned_div_int_caml : binary_primitive
+
+val mod_int_caml : binary_primitive
+
+val unsigned_mod_int_caml : binary_primitive
+
+val and_int_caml : binary_primitive
+
+val or_int_caml : binary_primitive
+
+val xor_int_caml : binary_primitive
+
+type ternary_primitive =
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+(** Same as setfield, except the offset is one of the arguments. Args: pointer
+    (structure/array/...), index, value *)
+val setfield_computed :
+  Lambda.immediate_or_pointer ->
+  Lambda.initialization_or_assignment ->
+  ternary_primitive
+
+(** [transl_switch_clambda loc kind arg index cases] *)
+val transl_switch_clambda :
+  Debuginfo.t -> expression -> int array -> expression array -> expression
+
+(** Method call : [send kind met obj args dbg]
+
+    - [met] is a method identifier, which can be a hashed variant or an index in
+      [obj]'s method table, depending on [kind]
+
+    - [obj] is the object whose method is being called
+
+    - [args] is the extra arguments to the method call (Note: I'm not aware of
+      any way for the frontend to generate any arguments other than the cache
+      and cache position) *)
+val send :
+  Lambda.meth_kind ->
+  expression ->
+  expression ->
+  expression list ->
+  Extended_machtype.t list ->
+  Extended_machtype.t ->
+  Lambda.region_close * Cmx_format.return_mode ->
+  Debuginfo.t ->
+  expression
+
+(** Entry point *)
+val entry_point : Compilation_unit.t list -> phrase list
+
+(** Generate the caml_globals table *)
+val global_table : Compilation_unit.t list -> phrase
+
+(** Generate the caml_unit_deps_table for shared objects / complete objects.
+    Maps compilation unit names to their entry functions, gc_roots, and
+    dependencies. *)
+val unit_deps_table : (Compilation_unit.t * Import_info.t list) list -> phrase
+
+(** Add references to the given symbols *)
+val reference_symbols : symbol list -> phrase
+
+(** Generate the caml_globals_map structure, as a marshalled string constant.
+    The runtime representation of the type here must match that of
+    [type global_map] in the natdynlink code. *)
+val globals_map :
+  (Compilation_unit.t * Digest.t option * Digest.t option * Symbol.t list) list ->
+  phrase
+
+(** Generate the caml_frametable table, referencing the frametables from the
+    given compilation units *)
+val frame_table : Compilation_unit.t list -> phrase
+
+(** Generate the tables for data and code positions respectively of the given
+    compilation units *)
+val data_segment_table : Compilation_unit.t list -> phrase
+
+val code_segment_table : Compilation_unit.t list -> phrase
+
+(** Generate data for a predefined exception *)
+val predef_exception : int -> string -> phrase
+
+val plugin_header : Cmxs_format.dynunit list -> phrase
+
+(** Emit constant symbols *)
+
+(** Produce the data_item list corresponding to a symbol definition *)
+val cdefine_symbol : symbol -> data_item list
+
+(** [emit_block symb white_header cont] prepends to [cont] the header and symbol
+    for the block. [cont] must already contain the fields of the block (and may
+    contain additional data items afterwards). *)
+val emit_block : symbol -> nativeint -> data_item list -> data_item list
+
+(** Emit specific kinds of constant blocks as data items *)
+val emit_float32_constant : symbol -> float -> data_item list -> data_item list
+
+val emit_float_constant : symbol -> float -> data_item list -> data_item list
+
+val emit_string_constant : symbol -> string -> data_item list -> data_item list
+
+val emit_int32_constant : symbol -> int32 -> data_item list -> data_item list
+
+val emit_int64_constant : symbol -> int64 -> data_item list -> data_item list
+
+val emit_nativeint_constant :
+  symbol -> nativeint -> data_item list -> data_item list
+
+val emit_mask_constant : symbol -> int64 -> data_item list -> data_item list
+
+val emit_vec128_constant :
+  symbol -> Cmm.vec128_bits -> data_item list -> data_item list
+
+val emit_vec256_constant :
+  symbol -> Cmm.vec256_bits -> data_item list -> data_item list
+
+val emit_vec512_constant :
+  symbol -> Cmm.vec512_bits -> data_item list -> data_item list
+
+val emit_float_array_constant :
+  symbol -> float list -> data_item list -> data_item list
+
+(** {1 Helper functions and values used by Flambda 2.} *)
+
+(* CR mshinwell: [dbg] should not be optional. *)
+
+(** The void (i.e. empty tuple) cmm value. Not to be confused with [() : unit].
+*)
+val void : Cmm.expression
+
+(** Create the single unit value. *)
+val unit : dbg:Debuginfo.t -> Cmm.expression
+
+(** Create an expression from a variable. *)
+val var : Backend_var.t -> Cmm.expression
+
+(** Create an expression that gives the value of an object file symbol. *)
+val symbol : dbg:Debuginfo.t -> Cmm.symbol -> Cmm.expression
+
+(** Create a constant float expression. *)
+val float : dbg:Debuginfo.t -> float -> expression
+
+(** Create a constant float32 expression. *)
+val float32 : dbg:Debuginfo.t -> float -> expression
+
+(** Create a constant int expression. *)
+val int : dbg:Debuginfo.t -> int -> expression
+
+(** Create a constant int expression from an int32. *)
+val int32 : dbg:Debuginfo.t -> int32 -> expression
+
+(** Create a constant int expression from an int64. *)
+val int64 : dbg:Debuginfo.t -> int64 -> expression
+
+(** Create a constant vec128 expression from two int64s. *)
+val vec128 : dbg:Debuginfo.t -> Cmm.vec128_bits -> expression
+
+(** Create a constant vec256 expression from four int64s. *)
+val vec256 : dbg:Debuginfo.t -> Cmm.vec256_bits -> expression
+
+(** Create a constant vec512 expression from eight int64s. *)
+val vec512 : dbg:Debuginfo.t -> Cmm.vec512_bits -> expression
+
+(** Create a constant mask expression from its int64 bit pattern. *)
+val mask : dbg:Debuginfo.t -> int64 -> expression
+
+(** Create a constant int expression from a nativeint. *)
+val nativeint : dbg:Debuginfo.t -> Nativeint.t -> expression
+
+(** Create a [Clet], except if the body just returns the bound variable, in
+    which case the [Clet] is elided. *)
+val letin :
+  Backend_var.With_provenance.t ->
+  defining_expr:expression ->
+  body:expression ->
+  expression
+
+(** Create a sequence of expressions. Will erase void expressions as needed. *)
+val sequence : expression -> expression -> expression
+
+(** Creates a conditional branching on the given condition. *)
+val ite :
+  dbg:Debuginfo.t ->
+  then_dbg:Debuginfo.t ->
+  then_:expression ->
+  else_dbg:Debuginfo.t ->
+  else_:expression ->
+  expression ->
+  expression
+
+(** Create a try-with structure. The [exn_var] is the variable bound to the
+    caught exception in the handler. *)
+val trywith :
+  dbg:Debuginfo.t ->
+  body:expression ->
+  exn_var:Backend_var.With_provenance.t ->
+  extra_args:(Backend_var.With_provenance.t * machtype) list ->
+  handler_cont:trywith_shared_label ->
+  handler:expression ->
+  unit ->
+  expression
+
+(** {2 Static jumps} *)
+
+(** [handler id vars body is_cold] creates a static handler for exit number
+    [id], binding variables [vars] in [body]. *)
+val handler :
+  dbg:Debuginfo.t ->
+  Lambda.static_label ->
+  (Backend_var.With_provenance.t * Cmm.machtype) list ->
+  Cmm.expression ->
+  bool ->
+  Cmm.static_handler
+
+(** [cexit id args] creates the cmm expression for static to a static handler
+    with exit number [id], with arguments [args]. *)
+val cexit :
+  Lambda.static_label ->
+  Cmm.expression list ->
+  Cmm.trap_action list ->
+  Cmm.expression
+
+(** [trap_return res traps] creates the cmm expression for returning [res] after
+    applying the trap actions in [traps]. *)
+val trap_return : Cmm.expression -> Cmm.trap_action list -> Cmm.expression
+
+(** Enclose a body with some static handlers. *)
+val create_ccatch :
+  rec_flag:bool ->
+  handlers:Cmm.static_handler list ->
+  body:Cmm.expression ->
+  Cmm.expression
+
+(** Shift operations. Inputs: a tagged caml integer and an untagged machine
+    integer. Outputs: a tagged caml integer. Takes as first argument a tagged
+    caml integer, and as second argument an untagged machine intger which is the
+    amount to shift the first argument by. *)
+
+val lsl_int_caml_raw : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val lsr_int_caml_raw : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val asr_int_caml_raw : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Reinterpret cast functions *)
+
+val int64_as_float : dbg:Debuginfo.t -> expression -> expression
+
+val float_as_int64 : dbg:Debuginfo.t -> expression -> expression
+
+(** Conversions functions between integers and floats. *)
+
+val int_of_float : dbg:Debuginfo.t -> expression -> expression
+
+val float_of_int : dbg:Debuginfo.t -> expression -> expression
+
+val int_of_float32 : dbg:Debuginfo.t -> expression -> expression
+
+val float32_of_int : dbg:Debuginfo.t -> expression -> expression
+
+val float32_of_float : dbg:Debuginfo.t -> expression -> expression
+
+val float_of_float32 : dbg:Debuginfo.t -> expression -> expression
+
+val eq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Integer arithmetic (dis)equality of cmm expressions. Returns an untagged
+    integer (either 0 or 1) to represent the result of the comparison. *)
+val neq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val lt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val le : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val gt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Integer arithmetic signed comparisons on cmm expressions. Returns an
+    untagged integer (either 0 or 1) to represent the result of the comparison.
+*)
+val ge : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val ult : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val ule : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val ugt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Integer arithmetic unsigned comparisons on cmm expressions. Returns an
+    untagged integer (either 0 or 1) to represent the result of the comparison.
+*)
+val uge : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Asbolute value on floats. *)
+val float_abs : dbg:Debuginfo.t -> expression -> expression
+
+val float32_abs : dbg:Debuginfo.t -> expression -> expression
+
+(** Arithmetic negation on floats. *)
+val float_neg : dbg:Debuginfo.t -> expression -> expression
+
+val float_add : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_sub : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_mul : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_neg : dbg:Debuginfo.t -> expression -> expression
+
+val float32_add : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_sub : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_mul : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Float arithmetic operations. *)
+val float_div : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_eq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_div : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_eq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Float arithmetic (dis)equality of cmm expressions. Returns an untagged
+    integer (either 0 or 1) to represent the result of the comparison. *)
+val float_neq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_lt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_le : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float_gt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_neq : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_lt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_le : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_gt : dbg:Debuginfo.t -> expression -> expression -> expression
+
+(** Float arithmetic comparisons on cmm expressions. Returns an untagged integer
+    (either 0 or 1) to represent the result of the comparison. *)
+val float_ge : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val float32_ge : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val beginregion : dbg:Debuginfo.t -> expression
+
+val endregion : dbg:Debuginfo.t -> expression -> expression
+
+val probe :
+  dbg:Debuginfo.t ->
+  name:string ->
+  handler_code_linkage_name:string ->
+  enabled_at_init:bool ->
+  args:expression list ->
+  expression
+
+val load :
+  dbg:Debuginfo.t ->
+  memory_chunk ->
+  Asttypes.mutable_flag ->
+  addr:expression ->
+  expression
+
+(** [store ~dbg memory_chunk init ~addr ~new_value] stores [new_value] at
+    [addr]. For integer chunks narrower than a word, [new_value] is simplified
+    with [low_bits] since only its low bits are stored. *)
+val store :
+  dbg:Debuginfo.t ->
+  memory_chunk ->
+  initialization_or_assignment ->
+  addr:expression ->
+  new_value:expression ->
+  expression
+
+val caml_modify : dbg:Debuginfo.t -> expression -> expression -> expression
+
+val caml_modify_local :
+  dbg:Debuginfo.t -> expression -> expression -> expression -> expression
+
+(** [direct_call ty f_code args] creates a direct call to the function code
+    [f_code] with arguments [args], with a return value of type [ty].
+
+    If a closure needs to be passed, it must be included in [args]. *)
+val direct_call :
+  dbg:Debuginfo.t ->
+  machtype ->
+  Lambda.region_close ->
+  symbol ->
+  expression list ->
+  expression
+
+(** Same as {!direct_call} but for an indirect call. *)
+val indirect_call :
+  dbg:Debuginfo.t ->
+  Extended_machtype.t ->
+  Lambda.region_close ->
+  Cmx_format.return_mode ->
+  expression ->
+  Extended_machtype.t list ->
+  expression list ->
+  expression
+
+(** Same as {!direct_call} but for an indirect call that is know to be a full
+    application (since this enables a few optimisations). *)
+val indirect_full_call :
+  dbg:Debuginfo.t ->
+  Extended_machtype.t ->
+  Lambda.region_close ->
+  expression ->
+  callees:symbol list option ->
+  Extended_machtype.t list ->
+  expression list ->
+  expression
+
+val bigarray_load :
+  dbg:Debuginfo.t ->
+  elt_kind:Lambda.bigarray_kind ->
+  elt_size:int ->
+  elt_chunk:memory_chunk ->
+  bigarray:expression ->
+  index:expression ->
+  expression
+
+val bigarray_store :
+  dbg:Debuginfo.t ->
+  elt_kind:Lambda.bigarray_kind ->
+  elt_size:int ->
+  elt_chunk:memory_chunk ->
+  bigarray:expression ->
+  index:expression ->
+  new_value:expression ->
+  expression
+
+(** [infix_field_address ptr n dbg] returns an expression for the address of the
+    [n]-th field of the set of closures block pointed to by [ptr]. This function
+    assumes that the [n-1]-th field of the block is an infix header, so that the
+    returned address is in fact a correct ocaml value. *)
+val infix_field_address : dbg:Debuginfo.t -> expression -> int -> expression
+
+(** {2 Data items} *)
+
+(** Static integer. *)
+val cint : nativeint -> data_item
+
+(** Static 32-bit integer. *)
+val cint32 : int32 -> data_item
+
+(** Static float32. *)
+val cfloat32 : float -> data_item
+
+(** Static float. *)
+val cfloat : float -> data_item
+
+(** Static 128-bit vector. *)
+val cvec128 : Cmm.vec128_bits -> data_item
+
+(** Static 256-bit vector. *)
+val cvec256 : Cmm.vec256_bits -> data_item
+
+(** Static 512-bit vector. *)
+val cvec512 : Cmm.vec512_bits -> data_item
+
+(** Static symbol. *)
+val symbol_address : symbol -> data_item
+
+val symbol_offset : symbol -> int -> data_item
+
+(** Definition for a static symbol. *)
+val define_symbol : symbol -> data_item list
+
+(** {2 Static structure helpers} *)
+
+(** [fundecl name args body codegen_options dbg] creates a cmm function
+    declaration for a function [name] with binding [args] over [body]. *)
+val fundecl :
+  symbol ->
+  (Backend_var.With_provenance.t * machtype) list ->
+  expression ->
+  codegen_option list ->
+  Debuginfo.t ->
+  Lambda.poll_attribute ->
+  machtype ->
+  fundecl
+
+(** Create a cmm phrase for a function declaration. *)
+val cfunction : fundecl -> phrase
+
+(** Create a cmm phrase for a static data item. *)
+val cdata : data_item list -> phrase
+
+(** Create the gc root table from a list of root symbols. *)
+val gc_root_table : Cmm.symbol list -> phrase
+
+(* An estimate of the number of arithmetic instructions in a Cmm expression.
+   This is currently used in Flambda 2 to determine whether untagging an
+   expression resulted in a smaller expression or not (as can happen because of
+   some arithmetic simplifications performed by functions in this file).
+
+   If [None] is returned, that means "no estimate available". The expression
+   should be assumed to be potentially large. *)
+val cmm_arith_size : expression -> int option
+
+(* CR lmaurer: Return [Linkage_name.t] instead *)
+val make_symbol : ?compilation_unit:Compilation_unit.t -> string -> string
+
+(** Linkage name of the module initialization ("entry") function of the given
+    compilation unit (default: the current unit). The startup file references
+    this symbol for every linked unit, and the dissector passes it to the linker
+    via -u to select the required archive members. Object files contain the
+    assembler-encoded form of this name (see [Asm_targets.Asm_symbol.encode]).
+*)
+val entry_symbol_name : ?compilation_unit:Compilation_unit.t -> unit -> string
+
+val machtype_of_layout : Lambda.layout -> machtype
+
+val machtype_of_layout_changing_tagged_int_to_val : Lambda.layout -> machtype
+
+val make_tuple : expression list -> expression
+
+val tuple_field :
+  expression -> component_tys:machtype array -> int -> Debuginfo.t -> expression
+
+(* Generated functions *)
+val curry_function :
+  Lambda.function_kind * Cmm.machtype list * Cmm.machtype -> Cmm.phrase list
+
+val send_function :
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
+
+val apply_function :
+  Cmm.machtype list * Cmm.machtype * Cmx_format.return_mode -> Cmm.phrase
+
+val fail_if_called_indirectly_function : unit -> Cmm.phrase list
+
+val emit_gc_roots_table : symbols:symbol list -> phrase list -> phrase list
+
+val perform : dbg:Debuginfo.t -> expression -> expression
+
+val with_stack :
+  dbg:Debuginfo.t ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  f:expression ->
+  arg:expression ->
+  expression
+
+val with_stack_preemptible :
+  dbg:Debuginfo.t ->
+  valuec:expression ->
+  exnc:expression ->
+  effc:expression ->
+  handle_tick:expression ->
+  f:expression ->
+  arg:expression ->
+  expression
+
+val continue :
+  dbg:Debuginfo.t -> cont:expression -> value:expression -> expression
+
+val discontinue :
+  dbg:Debuginfo.t -> cont:expression -> exn:expression -> expression
+
+val discontinue_with_backtrace :
+  dbg:Debuginfo.t ->
+  cont:expression ->
+  exn:expression ->
+  bt:expression ->
+  expression
+
+val reperform :
+  dbg:Debuginfo.t ->
+  eff:expression ->
+  cont:expression ->
+  last_fiber:expression ->
+  expression
+
+(* CR mshinwell: change unboxed scalar arrays to use mixed block (or similar)
+   representations rather than custom blocks *)
+
+(** Allocate a block to hold an unboxed float32 array for the given number of
+    elements. *)
+val allocate_unboxed_float32_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int array for the given number of
+    elements. *)
+val allocate_untagged_int_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int8 array for the given number of
+    elements. *)
+val allocate_untagged_int8_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an untagged int16 array for the given number of
+    elements. *)
+val allocate_untagged_int16_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed int32 array for the given number of
+    elements. *)
+val allocate_unboxed_int32_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed int64 array for the given number of
+    elements. *)
+val allocate_unboxed_int64_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed nativeint array for the given number of
+    elements. *)
+val allocate_unboxed_nativeint_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed mask array for the given number of
+    elements. *)
+val allocate_unboxed_mask_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed vec128 array for the given number of
+    elements. *)
+val allocate_unboxed_vec128_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed vec256 array for the given number of
+    elements. *)
+val allocate_unboxed_vec256_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Allocate a block to hold an unboxed vec512 array for the given number of
+    elements. *)
+val allocate_unboxed_vec512_array :
+  elements:Cmm.expression list -> Cmm.Alloc_mode.t -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed float32 array. *)
+val unboxed_float32_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int8 array. *)
+val untagged_int8_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int16 array. *)
+val untagged_int16_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed int32 array. *)
+val unboxed_int32_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an untagged int or unboxed int64 or unboxed nativeint
+    array. *)
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_length :
+  expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed mask array. *)
+val unboxed_mask_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec128 array. *)
+val unboxed_vec128_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec256 array. *)
+val unboxed_vec256_array_length : expression -> Debuginfo.t -> expression
+
+(** Compute the length of an unboxed vec512 array. *)
+val unboxed_vec512_array_length : expression -> Debuginfo.t -> expression
+
+(** Read from an unboxed float32 array (without bounds check). *)
+val unboxed_float32_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read an unboxed float32 from a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
+
+    The float32 is expected to be in the least significant bits of the 64-bit
+    field. The most significant 32 bits of such field are ignored.
+
+    The zero-indexed element number is specified as a tagged immediate. *)
+val unboxed_mutable_float32_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(* CR mshinwell/mslater: We could do movss xmm xmm, movsd mem xmm instead of
+   separate writes *)
+
+(** Write an unboxed float32 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The float32 will be written to the least significant bits of the 64-bit
+    field. The top 32 bits of the written word will be initialized to zero. Note
+    that two writes are involved. *)
+val unboxed_mutable_float32_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Read from an untagged int8 array (without bounds check). *)
+val untagged_int8_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read from an untagged int16 array (without bounds check). *)
+val untagged_int16_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read from an unboxed int32 array (without bounds check). *)
+val unboxed_int32_array_ref :
+  expression -> expression -> Debuginfo.t -> expression
+
+(** Read an untagged int8 from (the least significant bits of) a 64-bit field in
+    an array represented as a mixed block (with tag zero), as used for unboxed
+    product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
+val untagged_mutable_int8_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Read an untagged int16 from (the least significant bits of) a 64-bit field
+    in an array represented as a mixed block (with tag zero), as used for
+    unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
+val untagged_mutable_int16_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Read an unboxed int32 from (the least significant bits of) a 64-bit field in
+    an array represented as a mixed block (with tag zero), as used for unboxed
+    product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The returned value is always sign extended, but it is not assumed that the
+    64-bit field in the array contains a sign-extended representation. *)
+val unboxed_mutable_int32_unboxed_product_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Write an untagged int8 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value]. *)
+val untagged_mutable_int8_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Write an untagged int16 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value]. *)
+val untagged_mutable_int16_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Write an unboxed int32 into a 64-bit field in an array represented as a
+    mixed block (with tag zero), as used for unboxed product arrays.
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    The write is done as a 64-bit write of a sign-extended version of the
+    supplied [new_value]. *)
+val unboxed_mutable_int32_unboxed_product_array_set :
+  expression ->
+  array_index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Read from an untagged int, unboxed int64, or unboxed nativeint array
+    (without bounds check).
+
+    The zero-indexed element number is specified as a tagged immediate.
+
+    A better name would be `naked_int_or_int64_or_nativeint_array_ref`, but this
+    name was chosen for consistency. *)
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Read from an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_ref :
+  expression -> array_index:expression -> Debuginfo.t -> expression
+
+(** Update an unboxed float32 array (without bounds check). *)
+val unboxed_float32_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an untagged int8 array (without bounds check). *)
+val untagged_int8_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an untagged int16 array (without bounds check). *)
+val untagged_int16_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an unboxed int32 array (without bounds check). *)
+val unboxed_int32_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an unboxed int64 or unboxed nativeint or untagged int array (without
+    bounds check). *)
+val unboxed_or_untagged_int_or_int64_or_nativeint_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** Update an unboxed mask array (without bounds check). *)
+val unboxed_mask_array_set :
+  expression ->
+  index:expression ->
+  new_value:expression ->
+  Debuginfo.t ->
+  expression
+
+(** {2 Getters and setters for unboxed fields of mixed blocks}
+
+    The first argument is the heap block to modify a field of. The
+    [index_in_words] should be an untagged integer.
+
+    In contrast to [setfield] and [setfield_computed], [immediate_or_pointer] is
+    not needed as the layout is known from the [memory_chunk] argument, and
+    [initialization_or_assignment] is not needed as unboxed ints can always be
+    assigned without caml_modify (etc.). *)
+
+val get_field_unboxed :
+  dbg:Debuginfo.t ->
+  memory_chunk ->
+  Asttypes.mutable_flag ->
+  expression ->
+  index_in_words:expression ->
+  expression
+
+val set_field_unboxed :
+  dbg:Debuginfo.t ->
+  memory_chunk ->
+  expression ->
+  index_in_words:expression ->
+  expression ->
+  expression
+
+val dls_get : dbg:Debuginfo.t -> expression
+
+val tls_get : dbg:Debuginfo.t -> expression
+
+val domain_index : dbg:Debuginfo.t -> expression
+
+val cpu_relax : dbg:Debuginfo.t -> expression
+
+val poll : dbg:Debuginfo.t -> expression
+
+(** This module defines the various kinds of scalars usable in Cmm. It also
+    provides ways to generate expressions to cast between them. *)
+module Scalar_type : sig
+  (** A static_cast from a larger integral type to a smaller one logically
+      truncates the upper bits. Note that values are stored in registers sign-
+      or zero- extended according to their signdness, so the result may be
+      sign-extended.
+
+      A static_cast from a smaller integral type to an equal or larger
+      sized-integral type sign- or zero-extends the input value according to the
+      sign of the result.
+
+      A static_cast from an integral type to a float is pretty self-explanatory.
+
+      A static_cast from a float to an integral type always rounds toward zero.
+      If the resulting integral does not fit in the destination type, the result
+      is unspecified (although it's generally zero).
+
+      Casting floats to/from unsigned register-width integers is not implemented
+      and will raise in the compiler. *)
+  type 'a static_cast :=
+    dbg:Debuginfo.t -> src:'a -> dst:'a -> expression -> expression
+
+  (** Conjugate f by [static_cast ~src:outer ~dst:inner].
+
+      Shorthand for:
+      - [static_cast] the argument from [outer] to [inner]
+      - apply [f]
+      - [static_cast] back from [inner] to [outer] *)
+  type 'a conjugate :=
+    outer:'a ->
+    inner:'a ->
+    dbg:Debuginfo.t ->
+    f:(expression -> expression) ->
+    expression ->
+    expression
+
+  (** An IEEE 754 floating-point number *)
+  module Float_width : sig
+    type t = Cmm.float_width =
+      | Float64
+      | Float32
+
+    val static_cast : t static_cast
+  end
+
+  module Signedness : sig
+    type t =
+      | Signed
+      | Unsigned
+
+    val equal : t -> t -> bool
+
+    val print : Format.formatter -> t -> unit
+  end
+
+  module type Integral_ops := sig
+    type t
+
+    val print : Format.formatter -> t -> unit
+
+    val equal : t -> t -> bool
+
+    val signedness : t -> Signedness.t
+
+    val with_signedness : t -> signedness:Signedness.t -> t
+
+    val signed : t -> t
+
+    val unsigned : t -> t
+
+    (** This function relates to the set of possible values that each type can
+        represent. Even if it returns [true], it does not necessarily mean that
+        casting from [src] to [dst] is a no-op. *)
+    val can_cast_without_losing_information : src:t -> dst:t -> bool
+
+    val static_cast : t static_cast
+
+    val conjugate : t conjugate
+  end
+
+  (** An integer stored the lower [bits] bits of a register-width
+      twos-complement integer, and sign- or zero-extended as needed, according
+      to [signedness]. *)
+  module Integer : sig
+    type t [@@immediate]
+
+    val nativeint : t
+
+    val create_exn : bit_width:int -> signedness:Signedness.t -> t
+
+    val bit_width : t -> int
+
+    include Integral_ops with type t := t
+  end
+
+  (** An {!Integer.t} but with the additional stipulation that its lowest bit is
+      always set to 1 and is not considered in mathematical operations on the
+      numbers. *)
+  module Tagged_integer : sig
+    type t [@@immediate]
+
+    val immediate : t
+
+    val create_exn :
+      bit_width_including_tag_bit:int -> signedness:Signedness.t -> t
+
+    val bit_width_excluding_tag_bit : t -> int
+
+    val bit_width_including_tag_bit : t -> int
+
+    val untagged : t -> Integer.t
+
+    include Integral_ops with type t := t
+  end
+
+  module Integral : sig
+    type t =
+      | Untagged of Integer.t
+      | Tagged of Tagged_integer.t
+
+    val nativeint : t
+
+    (** Gets the integer resulting from untagging the integeral iff it is
+        tagged.
+
+        E.g., you can use [static_cast ~src ~dst:(Untagged (untagged src))] to
+        untag a value of type [src], And in the cas where [src] is already
+        untagged, this becomes the identity function *)
+    val untagged_or_identity : t -> Integer.t
+
+    include Integral_ops with type t := t
+  end
+
+  type t =
+    | Integral of Integral.t
+    | Float of Float_width.t
+
+  val static_cast : t static_cast
+
+  val conjugate : t conjugate
+
+  module Untagged : sig
+    type numeric = t
+
+    type t =
+      | Untagged of Integer.t
+      | Float of float_width
+
+    val to_numeric : t -> numeric
+
+    val static_cast : t static_cast
+  end
+end
+
+(* Atomics *)
+
+type atomic_offset =
+  | Field_index of
+      { index : expression;
+        index_type : Scalar_type.Integral.t
+      }
+  | Byte_offset of
+      { offset : expression;
+        offset_type : Scalar_type.Integral.t
+      }
+
+val atomic_load :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  expression ->
+  atomic_offset ->
+  expression
+
+val atomic_exchange :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  new_value:expression ->
+  expression
+
+val atomic_fetch_and_add :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_add :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_sub :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_land :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_lor :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_lxor :
+  dbg:Debuginfo.t -> expression -> atomic_offset -> expression -> expression
+
+val atomic_compare_and_set :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  old_value:expression ->
+  new_value:expression ->
+  expression
+
+val atomic_compare_exchange :
+  dbg:Debuginfo.t ->
+  Lambda.immediate_or_pointer ->
+  mode:Lambda.modify_mode ->
+  expression ->
+  atomic_offset ->
+  old_value:expression ->
+  new_value:expression ->
+  expression

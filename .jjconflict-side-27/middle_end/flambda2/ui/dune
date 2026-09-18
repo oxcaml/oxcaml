@@ -1,0 +1,14 @@
+(include_subdirs unqualified)
+
+(library
+ (name flambda2_ui)
+ (wrapped true)
+ (instrumentation
+  (backend bisect_ppx))
+ (ocamlopt_flags
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)
+   -O3
+   -open
+   Int_replace_polymorphic_compare))
+ (libraries ocamlfrontend oxcaml_common))

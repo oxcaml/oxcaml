@@ -1,0 +1,164 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           *)
+(*                 Benedikt Meurer, University of Siegen                  *)
+(*                                                                        *)
+(*   Copyright 2013 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*   Copyright 2012 Benedikt Meurer.                                      *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+[@@@ocaml.warning "+a-40-41-42"]
+(* Specific operations for the ARM processor, 64-bit mode *)
+
+val macosx : bool
+val is_asan_enabled : bool ref
+val feat_cssc : bool ref
+val trap_notes : bool ref
+(* Machine-specific command-line options *)
+
+val command_line_options : (string * Arg.spec * string) list
+
+(* Addressing modes *)
+
+type addressing_mode =
+  | Iindexed of Arm64_ast.Ast.DSL.Validated_mem_offset.t  (* reg + displ *)
+  | Ibased of Asm_targets.Asm_symbol.t * int              (* symbol + displ *)
+
+(* We do not support the reg + shifted reg addressing mode, because
+   what we really need is reg + shifted reg + displ,
+   and this is decomposed in two instructions (reg + shifted reg -> tmp,
+   then addressing tmp + displ). *)
+
+(* Specific operations *)
+
+type cmm_label = Label.t
+  (* Do not introduce a dependency to Cmm *)
+
+type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
+
+type specific_operation =
+  | Ifar_poll
+  | Ifar_alloc of
+      { bytes : int;
+        dbginfo : Cmm.alloc_dbginfo;
+        mode : Cmm.Alloc_mode.t
+      }
+  | Ifar_stackcheck of { max_frame_size_bytes : int }
+  | Ishiftarith of arith_operation * int
+  | Imuladd       (* multiply and add *)
+  | Imulsub       (* multiply and subtract *)
+  | Inegmulf      (* floating-point negate and multiply *)
+  | Imuladdf      (* floating-point multiply and add *)
+  | Inegmuladdf   (* floating-point negate, multiply and add *)
+  | Imulsubf      (* floating-point multiply and subtract *)
+  | Inegmulsubf   (* floating-point negate, multiply and subtract *)
+  | Isqrtf        (* floating-point square root *)
+  | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
+  | Imove32       (* 32-bit integer move *)
+  | Isignext of int (* sign extension *)
+  | Isimd of Simd.operation
+  | Illvm_intrinsic of string
+
+and arith_operation =
+    Ishiftadd
+  | Ishiftsub
+
+val equal_specific_operation : specific_operation -> specific_operation -> bool
+
+(* Sizes, endianness *)
+
+val big_endian : bool
+
+val size_addr : int
+
+val size_int : int
+
+val size_float : int
+
+(** Registers encodable in the short frame descriptors' hot-register bitmap,
+    numbered as in [compute_live_offset]; must agree with
+    [caml_frame_hot_regs] in runtime/caml/frame_descriptors.h. *)
+val frame_hot_regs : int array
+
+val size_vec128 : int
+
+val size_vec256 : int
+
+val size_vec512 : int
+
+val allow_unaligned_access : bool
+
+(* Whether Ocaml provides shift operations where the shift amount is interpreted
+   modulo bitwidth. *)
+
+val ocaml_shifts_are_wrapping : bool
+
+(* Behavior of division *)
+
+val division_crashes_on_overflow : bool
+
+(* Operations on addressing modes *)
+
+val equal_addressing_mode : addressing_mode -> addressing_mode -> bool
+
+val identity_addressing : addressing_mode
+
+val offset_addressing : addressing_mode -> int -> addressing_mode
+
+val num_args_addressing : addressing_mode -> int
+
+(** [fold_delta_into_specific_operation op ~arg_is_folded_reg ~delta] is used
+    by the peephole optimizer to delete an instruction [r := r + delta] that
+    immediately precedes the instruction carrying [op].
+    [arg_is_folded_reg.(i)] is true iff the [i]-th argument of that
+    instruction is [r]. Returns [Some op'] where [op'], reading the value [r]
+    had before the deleted addition, computes the same result as [op] reading
+    [r + delta]; returns [None] when [op] cannot absorb the delta. Never
+    returns [Some] when [op] does not read [r] (this preserves liveness). *)
+val fold_delta_into_specific_operation :
+  specific_operation -> arg_is_folded_reg:bool array -> delta:int ->
+  specific_operation option
+
+val addressing_displacement_for_llvmize : addressing_mode -> int
+
+(* Printing operations and addressing modes *)
+
+val print_addressing :
+  (Format.formatter -> 'a -> unit) -> addressing_mode ->
+  Format.formatter -> 'a array -> unit
+
+val specific_operation_name : specific_operation -> string
+
+val print_specific_operation :
+  (Format.formatter -> 'a -> unit) -> specific_operation ->
+  Format.formatter -> 'a array -> unit
+
+(* Specific operations that are pure *)
+
+val operation_is_pure : specific_operation -> bool
+
+(* Specific operations that allocate *)
+
+val operation_allocates : specific_operation -> bool
+
+(* Specific operations that can raise *)
+
+val isomorphic_specific_operation : specific_operation -> specific_operation -> bool
+
+(* See `amd64/arch.mli`. *)
+val equal_addressing_mode_without_displ : addressing_mode -> addressing_mode -> bool
+
+val addressing_offset_in_bytes
+  : addressing_mode
+  -> addressing_mode
+  -> arg_offset_in_bytes:('a -> 'a -> int option)
+  -> 'a array
+  -> 'a array
+  -> int option

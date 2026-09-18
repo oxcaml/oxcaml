@@ -77,6 +77,8 @@ val apply_continuation : t -> Continuation.t -> Continuation.t
 (* This is only used by the importing code. We don't permute code ids. *)
 val apply_code_id : t -> Code_id.t -> Code_id.t
 
+val apply_code_id_or_name : t -> Code_id_or_name.t -> Code_id_or_name.t
+
 (* This is only used by the importing code. We don't permute constants. *)
 val apply_const : t -> Reg_width_const.t -> Reg_width_const.t
 

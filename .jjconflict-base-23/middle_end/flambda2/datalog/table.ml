@@ -1,0 +1,194 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                        Basile Clément, OCamlPro                        *)
+(*                                                                        *)
+(*   Copyright 2024--2025 OCamlPro SAS                                    *)
+(*   Copyright 2024--2025 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+module Int = struct
+  include Numbers.Int
+  module Tree = Patricia_tree.Make (Numbers.Int)
+  module Map = Tree.Map
+end
+
+type _ result_repr = Unit_repr : unit result_repr
+
+let unit_repr = Unit_repr
+
+let result_repr_print (type t) (repr : t result_repr) :
+    Format.formatter -> t -> unit =
+  let Unit_repr = repr in
+  fun ppf () -> Format.fprintf ppf "()"
+
+let result_repr_default_value (type t) (repr : t result_repr) : t =
+  match repr with Unit_repr -> ()
+
+let result_repr_union (type t) (repr : t result_repr) : t -> t -> t =
+  match repr with Unit_repr -> fun () () -> ()
+
+let result_repr_diff_or_null (type t) (repr : t result_repr) :
+    t -> t -> t Or_null.t =
+  match repr with Unit_repr -> fun () () -> Or_null.null
+
+let rec union : type t k v.
+    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t =
+ fun columns repr t1 t2 ->
+  match columns with
+  | [] -> result_repr_union repr t1 t2
+  | column :: columns -> Column.union_total column (union columns repr) t1 t2
+
+let rec diff_or_null : type t k v.
+    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t Or_null.t =
+ fun columns repr t1 t2 ->
+  match columns with
+  | [] -> result_repr_diff_or_null repr t1 t2
+  | column :: columns ->
+    Column.diff_or_null column (diff_or_null columns repr) t1 t2
+
+let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
+    =
+ fun columns ~earlier ~later ->
+  match columns with
+  | [] -> later
+  | column :: columns ->
+    Column.union_total column
+      (fun earlier later -> concat columns ~earlier ~later)
+      earlier later
+
+module Id = struct
+  type (!'t, !'k, !'v) t =
+    { id : ('t * 'k) Type.Id.t;
+      name : string;
+      is_trie : ('t, 'k, 'v) Trie.is_trie;
+      columns : ('t, 'k, 'v) Column.hlist;
+      result_repr : 'v result_repr;
+      provenance : bool
+    }
+
+  let is_trie { is_trie; _ } = is_trie
+
+  let name { name; _ } = name
+
+  type ('k, 'v) poly = Id : ('t, 'k, 'v) t -> ('k, 'v) poly
+
+  let print ppf t = Format.fprintf ppf "%s" t.name
+
+  let hash { id; _ } = Hashtbl.hash (Type.Id.uid id)
+
+  let equal { id = id1; _ } { id = id2; _ } = Type.Id.uid id1 = Type.Id.uid id2
+
+  let[@inline] provably_equal_keys_exn (type a k v a' k' v') (r1 : (a, k, v) t)
+      (r2 : (a', k', v') t) : (k, k') Type.eq =
+    match Type.Id.provably_equal r1.id r2.id with
+    | Some Equal -> Equal
+    | None -> Misc.fatal_error "Inconsistent type for uid."
+
+  let[@inline] provably_equal_exn (type a k v a' k' v') (r1 : (a, k, v) t)
+      (r2 : (a', k', v') t) : (a, a') Type.eq =
+    match Type.Id.provably_equal r1.id r2.id with
+    | Some Equal -> Equal
+    | None -> Misc.fatal_error "Inconsistent type for uid."
+
+  let compare { id = id1; _ } { id = id2; _ } =
+    compare (Type.Id.uid id1) (Type.Id.uid id2)
+
+  let create ~provenance ~name ~columns ~result_repr =
+    (* Store the [is_trie] value in order to avoid a double loop to create it
+       when it is used. *)
+    (* CR bclement: most iterations on [is_trie] could probably be replaced with
+       iterations on [columns] instead, at which point we could get rid of
+       [is_trie] entirely. *)
+    let is_trie = Column.is_trie columns in
+    { id = Type.Id.make (); name; is_trie; columns; result_repr; provenance }
+
+  let has_provenance { provenance; _ } = provenance
+
+  let[@inline] result_repr { result_repr; _ } = result_repr
+
+  let[@inline] default_value { result_repr; _ } =
+    result_repr_default_value result_repr
+
+  let[@inline] columns { columns; _ } = columns
+
+  let[@inline] uid { id; _ } = Type.Id.uid id
+
+  let[@inline] cast_exn (type a b k v k' v') (r1 : (a, k, v) t)
+      (r2 : (b, k', v') t) (t : a) : b =
+    match Type.Id.provably_equal r1.id r2.id with
+    | Some Equal -> t
+    | None -> Misc.fatal_error "Inconsistent type for uid."
+end
+
+let iter id f table =
+  let is_trie = Id.is_trie id in
+  Trie.iter is_trie f table
+
+let print id ?(pp_sep = Format.pp_print_cut) pp_row ppf table =
+  let first = ref true in
+  iter id
+    (fun keys value ->
+      if !first then first := false else pp_sep ppf ();
+      pp_row keys value)
+    table
+
+let print_table (id : (_, _, _) Id.t) ppf table =
+  Format.fprintf ppf "@[<v>%a@]"
+    (print id (fun keys _ ->
+         Format.fprintf ppf "@[%a(%a).@]" Id.print id
+           (Column.print_keys id.columns)
+           keys))
+    table
+
+let print id ppf table =
+  let header = Format.asprintf "%a" Id.print id in
+  Format.fprintf ppf "@[<v>%s@ %s@ %a@]" header
+    (String.make (String.length header) '=')
+    (print_table id) table
+
+module Map = struct
+  type binding = Binding : ('t, 'k, 'v) Id.t * 't -> binding
+
+  type t = binding Int.Map.t
+
+  let print ppf tables =
+    let first = ref true in
+    Format.fprintf ppf "@[<v>";
+    Int.Map.iter
+      (fun _ (Binding (id, table)) ->
+        if !first then first := false else Format.fprintf ppf "@ @ ";
+        print id ppf table)
+      tables;
+    Format.fprintf ppf "@]"
+
+  let get (type t k v) (id : (t, k, v) Id.t) tables : t =
+    match Int.Map.find_opt (Id.uid id) tables with
+    | Some (Binding (existing_id, table)) -> Id.cast_exn existing_id id table
+    | None -> Trie.empty (Id.is_trie id)
+
+  let set (type t k v) (id : (t, k, v) Id.t) (table : t) tables =
+    Int.Map.add (Id.uid id) (Binding (id, table)) tables
+
+  let empty = Int.Map.empty
+
+  let is_empty = Int.Map.is_empty
+
+  let concat ~earlier:tables1 ~later:tables2 =
+    Int.Map.union_total
+      (fun _ (Binding (id1, table1)) (Binding (id2, table2)) ->
+        let table =
+          concat (Id.columns id1) ~earlier:table1
+            ~later:(Id.cast_exn id2 id1 table2)
+        in
+        Binding (id1, table))
+      tables1 tables2
+
+  let fold ~f m ~init = Int.Map.fold (fun _ binding acc -> f binding acc) m init
+end

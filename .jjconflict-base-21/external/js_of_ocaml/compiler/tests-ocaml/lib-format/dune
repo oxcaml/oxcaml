@@ -1,0 +1,12 @@
+(tests
+ (names
+  pr6824
+  print_if_newline
+  pp_print_custom_break
+  print_seq
+  tformat
+  print_array)
+ (build_if
+  (>= %{ocaml_version} 5.1))
+ (libraries ocaml_testing)
+ (modes js wasm))

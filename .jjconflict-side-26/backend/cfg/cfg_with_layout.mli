@@ -1,0 +1,119 @@
+(**********************************************************************************
+ *                             MIT License                                        *
+ *                                                                                *
+ *                                                                                *
+ * Copyright (c) 2019-2021 Jane Street Group LLC                                  *
+ *                                                                                *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy   *
+ * of this software and associated documentation files (the "Software"), to deal  *
+ * in the Software without restriction, including without limitation the rights   *
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell      *
+ * copies of the Software, and to permit persons to whom the Software is          *
+ * furnished to do so, subject to the following conditions:                       *
+ *                                                                                *
+ * The above copyright notice and this permission notice shall be included in all *
+ * copies or substantial portions of the Software.                                *
+ *                                                                                *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR     *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,       *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE    *
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER         *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,  *
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE  *
+ * SOFTWARE.                                                                      *
+ *                                                                                *
+ **********************************************************************************)
+[@@@ocaml.warning "+a-40-41-42"]
+
+type t
+
+type layout = Label.t Doubly_linked_list.t
+
+val create : Cfg.t -> layout:layout -> t
+
+val cfg : t -> Cfg.t
+
+(** [with_cfg t cfg] returns a value that shares the layout of [t], but holds
+    [cfg]. It is intended for updates to function-level fields of the cfg: the
+    graph itself is expected to be unchanged. *)
+val with_cfg : t -> Cfg.t -> t
+
+val layout : t -> layout
+
+val set_layout : t -> layout -> unit
+
+(** Add to cfg, layout, and other data-structures that track labels. *)
+val add_block : t -> Cfg.basic_block -> after:Label.t -> unit
+
+(** Remove from cfg, layout, and other data-structures that track labels. *)
+val remove_blocks : t -> Label.Set.t -> unit
+
+val is_trap_handler : t -> Label.t -> bool
+
+val save_as_dot :
+  ?show_instr:bool ->
+  ?show_exn:bool ->
+  ?annotate_instr:
+    (Format.formatter ->
+    [ `Basic of Cfg.basic Cfg.instruction
+    | `Terminator of Cfg.terminator Cfg.instruction ] ->
+    unit)
+    list ->
+  ?annotate_block:(Label.t -> string) ->
+  ?annotate_block_end:(Format.formatter -> Cfg.basic_block -> unit) ->
+  ?annotate_succ:(Label.t -> Label.t -> string) ->
+  ?filename:string ->
+  t ->
+  string ->
+  unit
+
+val print_dot :
+  ?show_instr:bool ->
+  ?show_exn:bool ->
+  ?annotate_instr:
+    (Format.formatter ->
+    [ `Basic of Cfg.basic Cfg.instruction
+    | `Terminator of Cfg.terminator Cfg.instruction ] ->
+    unit)
+    list ->
+  ?annotate_block:(Label.t -> string) ->
+  ?annotate_block_end:(Format.formatter -> Cfg.basic_block -> unit) ->
+  ?annotate_succ:(Label.t -> Label.t -> string) ->
+  Format.formatter ->
+  t ->
+  unit
+
+(** Change layout: randomly reorder the blocks, keeping the entry block first.
+    This function is intended for testing and enabled by compiler flag
+    "-reorder-blocks-random".
+
+    Side-effects [random_state] by repeated calls to [Random.State.int] and
+    [Random.State.bool]. *)
+val reorder_blocks_random : ?random_state:Random.State.t -> t -> unit
+
+val reorder_blocks : comparator:(Label.t -> Label.t -> int) -> t -> unit
+
+val iter_blocks : t -> f:(Cfg.basic_block -> unit) -> unit
+
+val iter_instructions :
+  t ->
+  instruction:(Cfg.basic Cfg.instruction -> unit) ->
+  terminator:(Cfg.terminator Cfg.instruction -> unit) ->
+  unit
+
+val fold_instructions :
+  t ->
+  instruction:('a -> Cfg.basic Cfg.instruction -> 'a) ->
+  terminator:('a -> Cfg.terminator Cfg.instruction -> 'a) ->
+  init:'a ->
+  'a
+
+(* Insert specified instructions along all outgoing edges from the block
+   [after]; if [before] it not [None], the insertion is restricted to edges
+   having [before] as their destination. *)
+val insert_block :
+  t ->
+  Cfg.basic_instruction_list ->
+  after:Cfg.basic_block ->
+  before:Cfg.basic_block option ->
+  Cfg.basic_block list

@@ -22,13 +22,14 @@ type raw
 
 val from_raw : sections:File_sections.t -> raw -> t
 
-(** [final_typing_env] is absent when the unit's initialiser does not return
-    normally; the code and offsets are still exported. *)
+(** [extra_ids_for_lto] are the identifiers of the unit's LTO sections (see
+    [Flambda2_reaper.Lto_sections]), which share this unit's table. *)
 val create_raw :
   final_typing_env:Flambda2_types.Typing_env.Serializable.t option ->
   all_code:Exported_code.t ->
   exported_offsets:Exported_offsets.t ->
   used_value_slots:Value_slot.Set.t ->
+  extra_ids_for_lto:Ids_for_export.t ->
   sections:File_sections.Builder.t ->
   raw
 

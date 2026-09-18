@@ -1,0 +1,7 @@
+Test: Based on pr11186.ml (tests [wrap_id_pos_list])
+Expected: 10.0 20.0 30.0 Hello world!
+Actual:   10.0 20.0 30.0 Hello world!
+
+Test: Coercion with aliases, modules, and vals
+Expected: 10.0 20.0 30.0 40.0
+Actual:   10.0 20.0 30.0 40.0

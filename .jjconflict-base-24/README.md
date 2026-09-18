@@ -1,0 +1,56 @@
+# OxCaml
+
+A performance-focused version of OCaml.
+This is also the home of the Flambda 2 optimiser and the Cfg backend.
+
+OxCaml is currently based on OCaml 5.4 (plus some patches from later
+upstream revisions, mainly in the runtime).
+
+The following gives basic instructions for getting set up.  Please see
+[`HACKING.md`](HACKING.md) for more detailed instructions if you want to develop in this repo.
+That file also contains instructions for installing the OxCaml compiler in a way
+that it can be used to build OPAM packages.
+
+## One-time setup for dev work or installation
+
+The supported platforms are x86-64 and arm64 Linux; and arm64 macOS.  x86 macOS may still work.
+
+One-time setup:
+```
+$ opam switch create oxcaml-dev --empty
+$ opam pin add -ny git+https://github.com/oxcaml/oxcaml
+$ opam switch set-invariant -y --packages oxcaml-dev
+$ eval $(opam env)
+```
+
+You can check that an existing opam switch is using the currently required versions of tools by
+running:
+```
+$ opam upgrade oxcaml-dev
+```
+
+You probably then want to fork the `oxcaml/oxcaml` repo to your own Github org.
+
+## Branching and configuring
+
+Use normal commands to make a branch from the desired upstream branch (typically `main`), e.g.:
+```
+$ git clone https://github.com/oxcaml/oxcaml
+$ cd oxcaml
+$ git checkout -b myfeature origin/main
+```
+
+The OxCaml tree has to be configured before building.  The configure script is not checked
+in; you have to run `autoconf`.  For example:
+```
+$ autoconf
+$ ./configure --prefix=/path/to/install/dir
+```
+
+## Building and installing
+
+To build and install OxCaml, which produces a compiler installation directory whose
+layout is compatible with upstream, run:
+```
+$ make install
+```

@@ -38,6 +38,8 @@ module type S = sig
   val payload : t -> payload
 
   val rename : t -> t
+
+  val export_stamp_counter : unit -> int
 end
 
 module Make (P : sig

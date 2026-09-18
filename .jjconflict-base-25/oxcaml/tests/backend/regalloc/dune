@@ -1,0 +1,3 @@
+(tests
+ (names interf_graph)
+ (libraries ocamloptcomp))

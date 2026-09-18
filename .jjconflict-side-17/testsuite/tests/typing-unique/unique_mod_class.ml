@@ -1,0 +1,179 @@
+(* TEST
+ expect;
+*)
+
+(* This file tests the interaction between a module/class and its surrounding environment *)
+
+let unique_id (x @ unique) = ignore x
+
+
+(* you cannot use env vars as unique in classes/objects  *)
+let texp_object () =
+  let x = "foo" in
+  object (self)
+  val bar = (x : @ unique)
+  end;
+[%%expect{|
+val unique_id : 'a @ unique -> unit = <fun>
+Line 8, characters 13-14:
+8 |   val bar = (x : @ unique)
+                 ^
+Error: This value is "aliased"
+         because it is used in an object (at lines 7-9, characters 2-5).
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+(* you can use env vars as aliased and many, but they might collide with the external uses *)
+let texp_object () =
+  let x = "foo" in
+  unique_id x;
+  object (self)
+  val bar = x
+  end;
+[%%expect{|
+Line 5, characters 12-13:
+5 |   val bar = x
+                ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 12-13:
+3 |   unique_id x;
+                ^
+
+|}]
+
+(* you are not allowed to use x uniquely inside the module *)
+let texp_letmodule () =
+  let x = "foo" in
+  let module Bar = struct
+    let y = (x : @ unique)
+  end
+  in
+  ()
+[%%expect{|
+Line 4, characters 12-26:
+4 |     let y = (x : @ unique)
+                ^^^^^^^^^^^^^^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+(* you can use x as aliased and many, but it might collide with external uses. *)
+let texp_letmodule () =
+  let x = "foo" in
+  unique_id x;
+  let module Bar = struct
+    let y = x
+  end
+  in
+  ()
+[%%expect{|
+Line 5, characters 12-13:
+5 |     let y = x
+                ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 12-13:
+3 |   unique_id x;
+                ^
+
+|}]
+
+let texp_open () =
+  let x = "foo" in
+  let open (struct let y = (x : @ unique) end) in
+  ()
+[%%expect{|
+Line 3, characters 27-41:
+3 |   let open (struct let y = (x : @ unique) end) in
+                               ^^^^^^^^^^^^^^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let texp_open () =
+  let x = "foo" in
+  unique_id x;
+  let open (struct let y = x end) in
+  ()
+[%%expect{|
+Line 4, characters 27-28:
+4 |   let open (struct let y = x end) in
+                               ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 12-13:
+3 |   unique_id x;
+                ^
+
+|}]
+
+module type bar = sig val y : string end
+
+let texp_pack () =
+  let x = "foo" in
+  let z = (module struct let y = (x : @ unique) end : bar) in
+  ()
+[%%expect{|
+module type bar = sig val y : string end
+Line 5, characters 33-47:
+5 |   let z = (module struct let y = (x : @ unique) end : bar) in
+                                     ^^^^^^^^^^^^^^
+Error: This value is aliased but used as unique.
+Hint: This value comes from outside the current module or class.
+|}]
+
+let texp_pack () =
+  let x = "foo" in
+  unique_id x;
+  let z = (module struct let y = x end : bar) in
+  ()
+[%%expect{|
+Line 4, characters 33-34:
+4 |   let z = (module struct let y = x end : bar) in
+                                     ^
+Error: This value is used here, but it has already been used as unique at:
+Line 3, characters 12-13:
+3 |   unique_id x;
+                ^
+
+|}]
+
+module M = struct
+  let foo = "hello"
+end
+
+
+let value_from_module () =
+  unique_id M.foo
+[%%expect{|
+module M : sig val foo : string end
+Line 7, characters 12-17:
+7 |   unique_id M.foo
+                ^^^^^
+Error: This value is "aliased"
+         because it is used inside the function at lines 6-7, characters 22-17
+         which is expected to be "many".
+       However, the highlighted expression is expected to be "unique".
+|}]
+
+
+let foo (local_ x : string ref) =
+  let module M = struct
+    class c =
+      let y = !x in
+      fun () ->
+      object method m = y end
+  end in new M.c
+[%%expect{|
+val foo : string ref @ local -> (unit -> < m : string >) = <fun>
+|}]
+
+let () =
+    let module M =
+        struct
+        let () =
+          let x = "hello" in
+          let _ = unique_id x in
+          ()
+        end
+    in ()
+[%%expect{|
+|}]

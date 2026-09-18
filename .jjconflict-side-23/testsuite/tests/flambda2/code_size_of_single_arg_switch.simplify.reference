@@ -1,0 +1,73 @@
+let code switch_converted_to_lookup_table_0 deleted in
+let code switch_converted_to_lookup_table'_1 deleted in
+let code switch_converted_to_affine_2 deleted in
+let code switch_converted_to_affine'_3 deleted in
+let $camlCode_size_of_single_arg_switch__switch_block_2 =
+  Value_array [|1;
+  2;
+  4|]
+in
+let code loopify(never) size(2) newer_version_of(switch_converted_to_lookup_table_0)
+      switch_converted_to_lookup_table_0_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let arg =
+    %array_load.`imm`
+      ($camlCode_size_of_single_arg_switch__switch_block_2, x)
+  in
+  cont k (arg)
+in
+let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1 =
+  closure switch_converted_to_lookup_table_0_1
+    @switch_converted_to_lookup_table &toplevel
+in
+let code loopify(never) size(4) newer_version_of(switch_converted_to_lookup_table'_1)
+      switch_converted_to_lookup_table'_1_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(switch_converted_to_lookup_table_0_1 &my_alloc_region)
+    ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1
+     : _ -> imm tagged)
+      (x)
+      -> k * k1
+in
+let $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_3 =
+  closure switch_converted_to_lookup_table'_1_1
+    @switch_converted_to_lookup_table' &toplevel
+in
+let code loopify(never) size(3) newer_version_of(switch_converted_to_affine_2)
+      switch_converted_to_affine_2_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let final_arg = %int_barith.add (7, x) in
+  cont k (final_arg)
+in
+let $camlCode_size_of_single_arg_switch__switch_converted_to_affine_4 =
+  closure switch_converted_to_affine_2_1 @switch_converted_to_affine
+    &toplevel
+in
+let code loopify(never) size(4) newer_version_of(switch_converted_to_affine'_3)
+      switch_converted_to_affine'_3_1 (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(switch_converted_to_affine_2_1 &my_alloc_region)
+    ($camlCode_size_of_single_arg_switch__switch_converted_to_affine_4
+     : _ -> imm tagged)
+      (x)
+      -> k * k1
+in
+let $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_5 =
+  closure switch_converted_to_affine'_3_1 @switch_converted_to_affine'
+    &toplevel
+in
+let $camlCode_size_of_single_arg_switch =
+  Block 0 ($camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table_1,
+           $camlCode_size_of_single_arg_switch__switch_converted_to_lookup_table'_3,
+           $camlCode_size_of_single_arg_switch__switch_converted_to_affine_4,
+           $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_5)
+in
+cont done ($camlCode_size_of_single_arg_switch)

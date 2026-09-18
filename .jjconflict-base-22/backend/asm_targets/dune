@@ -1,0 +1,12 @@
+(include_subdirs unqualified)
+
+(library
+  (name asm_targets)
+  (wrapped true)
+  ; FIXME Fix warning 27
+  (flags (:standard -w -27-70))
+  (ocamlopt_flags
+   (:standard
+    (:include %{project_root}/ocamlopt_flags.sexp)))
+  (libraries ocamlfrontend dwarf_flags)
+)

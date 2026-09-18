@@ -1,0 +1,2151 @@
+open Stdlib
+
+[@@@ocaml.warning "-unused-value-declaration"]
+[@@@ocaml.warning "-unused-module"]
+
+external int8x16_of_int64s : int64 -> int64 -> int8x16 = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
+external int8x16_low_int64 : int8x16 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external int8x16_high_int64 : int8x16 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+external int16x8_of_int64s : int64 -> int64 -> int16x8 = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
+external int16x8_low_int64 : int16x8 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external int16x8_high_int64 : int16x8 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+external int64x2_of_int64s : int64 -> int64 -> int64x2 = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
+external int64x2_low_int64 : int64x2 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external int64x2_high_int64 : int64x2 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+external int32x4_of_int64s : int64 -> int64 -> int32x4 = "" "vec128_of_int64s" [@@noalloc] [@@unboxed]
+external int32x4_low_int64 : int32x4 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external int32x4_high_int64 : int32x4 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+external float64x2_low_int64 : float64x2 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external float64x2_high_int64 : float64x2 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+external float32x4_low_int64 : float32x4 -> int64 = "" "vec128_low_int64" [@@noalloc] [@@unboxed]
+external float32x4_high_int64 : float32x4 -> int64 = "" "vec128_high_int64" [@@noalloc] [@@unboxed]
+
+let eq lv hv l h =
+  if l <> lv then Printf.printf "%016Lx <> %016Lx\n" lv l;
+  if h <> hv then Printf.printf "%016Lx <> %016Lx\n" hv h
+;;
+
+let assert_raises_out_of_bounds thunk =
+  try
+    thunk ();
+    assert false
+  with
+  | Invalid_argument s when s = "index out of bounds" -> ()
+  | _ -> assert false
+;;
+
+module Bytes (Primitives : sig
+  val get_int8x16_unaligned : bytes -> int -> int8x16
+  val get_int8x16_unaligned_unsafe : bytes -> int -> int8x16
+  val set_int8x16_unaligned : bytes -> int -> int8x16 -> unit
+  val set_int8x16_unaligned_unsafe : bytes -> int -> int8x16 -> unit
+  val extra_checks : bytes -> unit
+end) =
+struct
+  open Primitives
+
+  let data = Bytes.of_string "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00\x01\x02\x03\x04\x05\x06\x07"
+
+  let low = 0x0706050403020100L
+  let high = 0x0f0e0d0c0b0a0908L
+
+  (* Getters *)
+
+  let () =
+    let v = get_int8x16_unaligned data 0 in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned_unsafe data 0 in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned data 8 in
+    eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned_unsafe data 8 in
+    eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+  ;;
+
+  let () =
+    for bad = 9 to 24 do
+      try
+        let _ = get_int8x16_unaligned data bad in
+        assert false
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    done;
+  ;;
+
+  (* Setters *)
+
+  let set_unaligned low high offset =
+    let set = int8x16_of_int64s low high in
+    set_int8x16_unaligned data offset set;
+    let v = get_int8x16_unaligned data offset in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+  ;;
+
+  let set_unaligned_unsafe low high offset =
+    let set = int8x16_of_int64s low high in
+    set_int8x16_unaligned_unsafe data offset set;
+    let v = get_int8x16_unaligned data offset in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+  ;;
+
+  let () =
+    set_unaligned 0x1010101010101010L 0x1010101010101010L 0;
+    set_unaligned 0x2020202020202020L 0x2020202020202020L 8;
+    set_unaligned_unsafe 0x3030303030303030L 0x3030303030303030L 0;
+    set_unaligned_unsafe 0x4040404040404040L 0x4040404040404040L 8;
+    Random.init 1234;
+    for _ = 1 to 1000 do
+      set_unaligned (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) (Random.int 9);
+      set_unaligned_unsafe (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) (Random.int 9)
+    done;
+  ;;
+
+  let () =
+    let set = int8x16_of_int64s 0xFFFFFFFFFFFFFFFFL 0xFFFFFFFFFFFFFFFFL in
+    for bad = 9 to 24 do
+      try
+        let _ = set_int8x16_unaligned data bad set in
+        assert false
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    done;
+  ;;
+
+  (* Extra checks *)
+
+  let () = extra_checks data
+end
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned : bytes -> int -> int8x16 = "%caml_bytes_getu128"
+  external get_int8x16_unaligned_unsafe : bytes -> int -> int8x16 = "%caml_bytes_getu128u"
+
+  external set_int8x16_unaligned : bytes -> int -> int8x16 -> unit = "%caml_bytes_setu128"
+  external set_int8x16_unaligned_unsafe : bytes -> int -> int8x16 -> unit = "%caml_bytes_setu128u"
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned bytes index (int8x16_of_int64s 1L 2L)))
+      Int.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned_prim : bytes -> int8# -> int8x16 = "%caml_bytes_getu128_indexed_by_int8#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : bytes -> int8# -> int8x16 = "%caml_bytes_getu128u_indexed_by_int8#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i)
+
+  external set_int8x16_unaligned_prim : bytes -> int8# -> int8x16 -> unit = "%caml_bytes_setu128_indexed_by_int8#"
+  let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i) v
+  external set_int8x16_unaligned_unsafe_prim : bytes -> int8# -> int8x16 -> unit = "%caml_bytes_setu128u_indexed_by_int8#"
+  let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i) v
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int8_u.of_int8 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned_prim bytes index (int8x16_of_int64s 1L 2L)))
+      Stdlib_stable.Int8.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned_prim : bytes -> int16# -> int8x16 = "%caml_bytes_getu128_indexed_by_int16#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : bytes -> int16# -> int8x16 = "%caml_bytes_getu128u_indexed_by_int16#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i)
+
+  external set_int8x16_unaligned_prim : bytes -> int16# -> int8x16 -> unit = "%caml_bytes_setu128_indexed_by_int16#"
+  let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_stable.Int16_u.of_int i) v
+  external set_int8x16_unaligned_unsafe_prim : bytes -> int16# -> int8x16 -> unit = "%caml_bytes_setu128u_indexed_by_int16#"
+  let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i) v
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int16_u.of_int16 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned_prim bytes index (int8x16_of_int64s 1L 2L)))
+      Stdlib_stable.Int16.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned_prim : bytes -> int32_u -> int8x16 = "%caml_bytes_getu128_indexed_by_int32#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : bytes -> int32_u -> int8x16 = "%caml_bytes_getu128u_indexed_by_int32#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external set_int8x16_unaligned_prim : bytes -> int32_u -> int8x16 -> unit = "%caml_bytes_setu128_indexed_by_int32#"
+  let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external set_int8x16_unaligned_unsafe_prim : bytes -> int32_u -> int8x16 -> unit = "%caml_bytes_setu128u_indexed_by_int32#"
+  let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Int32_u.of_int32 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned_prim bytes index (int8x16_of_int64s 1L 2L)))
+      Int32.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned_prim : bytes -> int64_u -> int8x16 = "%caml_bytes_getu128_indexed_by_int64#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : bytes -> int64_u -> int8x16 = "%caml_bytes_getu128u_indexed_by_int64#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external set_int8x16_unaligned_prim : bytes -> int64_u -> int8x16 -> unit = "%caml_bytes_setu128_indexed_by_int64#"
+  let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external set_int8x16_unaligned_unsafe_prim : bytes -> int64_u -> int8x16 -> unit = "%caml_bytes_setu128u_indexed_by_int64#"
+  let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Int64_u.of_int64 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned_prim bytes index (int8x16_of_int64s 1L 2L)))
+      Int64.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = Bytes(struct
+  external get_int8x16_unaligned_prim : bytes -> nativeint_u -> int8x16 = "%caml_bytes_getu128_indexed_by_nativeint#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : bytes -> nativeint_u -> int8x16 = "%caml_bytes_getu128u_indexed_by_nativeint#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external set_int8x16_unaligned_prim : bytes -> nativeint_u -> int8x16 -> unit = "%caml_bytes_setu128_indexed_by_nativeint#"
+  let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external set_int8x16_unaligned_unsafe_prim : bytes -> nativeint_u -> int8x16 -> unit = "%caml_bytes_setu128u_indexed_by_nativeint#"
+  let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  let extra_checks bytes =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim bytes index in
+          ());
+        assert_raises_out_of_bounds (fun () ->
+          set_int8x16_unaligned_prim bytes index (int8x16_of_int64s 1L 2L)))
+      Nativeint.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module String_ (Primitives : sig
+  val get_int8x16_unaligned : string -> int -> int8x16
+  val get_int8x16_unaligned_unsafe : string -> int -> int8x16
+  val extra_checks : string -> unit
+end) =
+struct
+  open Primitives
+
+  let data = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00\x01\x02\x03\x04\x05\x06\x07"
+
+  let low = 0x0706050403020100L
+  let high = 0x0f0e0d0c0b0a0908L
+
+  (* Getters *)
+
+  let () =
+    let v = get_int8x16_unaligned data 0 in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned_unsafe data 0 in
+    eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned data 8 in
+    eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+    let v = get_int8x16_unaligned_unsafe data 8 in
+    eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+  ;;
+
+  let () =
+    for bad = 9 to 24 do
+      try
+        let _ = get_int8x16_unaligned data bad in
+        assert false
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    done;
+  ;;
+
+  (* Extra checks *)
+
+  let () = extra_checks data
+end
+
+module _ = String_(struct
+  external get_int8x16_unaligned : string -> int -> int8x16 = "%caml_string_getu128"
+  external get_int8x16_unaligned_unsafe : string -> int -> int8x16 = "%caml_string_getu128u"
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned string index in
+          ()))
+      Int.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_(struct
+  external get_int8x16_unaligned_prim : string -> int8# -> int8x16 = "%caml_string_getu128_indexed_by_int8#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : string -> int8# -> int8x16 = "%caml_string_getu128u_indexed_by_int8#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i)
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int8_u.of_int8 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim string index in
+          ()))
+      Stdlib_stable.Int8.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_(struct
+  external get_int8x16_unaligned_prim : string -> int16# -> int8x16 = "%caml_string_getu128_indexed_by_int16#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : string -> int16# -> int8x16 = "%caml_string_getu128u_indexed_by_int16#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i)
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        let index = Stdlib_stable.Int16_u.of_int16 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim string index in
+          ()))
+      Stdlib_stable.Int16.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_(struct
+  external get_int8x16_unaligned_prim : string -> int32_u -> int8x16 = "%caml_string_getu128_indexed_by_int32#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : string -> int32_u -> int8x16 = "%caml_string_getu128u_indexed_by_int32#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Int32_u.of_int32 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim string index in
+          ()))
+      Int32.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_(struct
+  external get_int8x16_unaligned_prim : string -> int64_u -> int8x16 = "%caml_string_getu128_indexed_by_int64#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : string -> int64_u -> int8x16 = "%caml_string_getu128u_indexed_by_int64#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Int64_u.of_int64 index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim string index in
+          ()))
+      Int64.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+module _ = String_(struct
+  external get_int8x16_unaligned_prim : string -> nativeint_u -> int8x16 = "%caml_string_getu128_indexed_by_nativeint#"
+  let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external get_int8x16_unaligned_unsafe_prim : string -> nativeint_u -> int8x16 = "%caml_string_getu128u_indexed_by_nativeint#"
+  let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  let extra_checks string =
+    List.iter
+      (fun index ->
+        let index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint index in
+        assert_raises_out_of_bounds (fun () ->
+          let _ = get_int8x16_unaligned_prim string index in
+          ()))
+      Nativeint.[ min_int; add min_int one; sub zero one; max_int ]
+  ;;
+end)
+
+open struct
+  open Bigarray
+  type bigstring = (char, int8_unsigned_elt, c_layout) Array1.t
+
+  module Bigstring (Primitives : sig
+    val get_int8x16_unaligned : bigstring -> int -> int8x16
+    val get_int8x16_unaligned_unsafe : bigstring -> int -> int8x16
+    val get_int8x16_aligned : bigstring -> int -> int8x16
+    val get_int8x16_aligned_unsafe : bigstring -> int -> int8x16
+
+    val set_int8x16_unaligned : bigstring -> int -> int8x16 -> unit
+    val set_int8x16_unaligned_unsafe : bigstring -> int -> int8x16 -> unit
+    val set_int8x16_aligned : bigstring -> int -> int8x16 -> unit
+    val set_int8x16_aligned_unsafe : bigstring -> int -> int8x16 -> unit
+
+    val extra_checks : bigstring -> unit
+  end) =
+  struct
+    open Primitives
+
+    let bigstring_of_string s =
+      let a = Array1.create char c_layout (String.length s) in
+      for i = 0 to String.length s - 1 do
+        a.{i} <- s.[i]
+      done;
+      a
+
+    (* Data is allocated off-heap, and will always be 16-byte aligned. *)
+    let data = bigstring_of_string "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x00\x01\x02\x03\x04\x05\x06\x07"
+
+    let low = 0x0706050403020100L
+    let high = 0x0f0e0d0c0b0a0908L
+
+    (* Getters *)
+
+    let () =
+      let v = get_int8x16_unaligned data 0 in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+      let v = get_int8x16_unaligned_unsafe data 0 in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+      let v = get_int8x16_unaligned data 8 in
+      eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+      let v = get_int8x16_unaligned_unsafe data 8 in
+      eq high low (int8x16_low_int64 v) (int8x16_high_int64 v);
+    ;;
+
+    let () =
+      for bad = 9 to 24 do
+        try
+          let _ = get_int8x16_unaligned data bad in
+          assert false
+        with | Invalid_argument s when s = "index out of bounds" -> ()
+      done;
+    ;;
+
+    let () =
+      let v = get_int8x16_aligned data 0 in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+      let v = get_int8x16_aligned_unsafe data 0 in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+      for bad = 1 to 8 do
+        try
+          let _ = get_int8x16_aligned data bad in
+          assert false
+        with | Invalid_argument s when s = "address was misaligned" -> ()
+      done;
+      for bad = 9 to 24 do
+        try
+          let _ = get_int8x16_aligned data bad in
+          assert false
+        with | Invalid_argument s when s = "index out of bounds" -> ()
+      done;
+    ;;
+
+    (* Setters *)
+
+    let set_unaligned low high offset =
+      let set = int8x16_of_int64s low high in
+      set_int8x16_unaligned data offset set;
+      let v = get_int8x16_unaligned data offset in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    ;;
+
+    let set_unaligned_unsafe low high offset =
+      let set = int8x16_of_int64s low high in
+      set_int8x16_unaligned_unsafe data offset set;
+      let v = get_int8x16_unaligned data offset in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    ;;
+
+    let set_aligned low high offset =
+      let set = int8x16_of_int64s low high in
+      set_int8x16_aligned data offset set;
+      let v = get_int8x16_aligned data offset in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    ;;
+
+    let set_aligned_unsafe low high offset =
+      let set = int8x16_of_int64s low high in
+      set_int8x16_aligned_unsafe data offset set;
+      let v = get_int8x16_aligned_unsafe data offset in
+      eq low high (int8x16_low_int64 v) (int8x16_high_int64 v);
+    ;;
+
+    let () =
+      set_unaligned 0x1010101010101010L 0x1010101010101010L 0;
+      set_unaligned 0x2020202020202020L 0x2020202020202020L 8;
+      set_unaligned_unsafe 0x3030303030303030L 0x3030303030303030L 0;
+      set_unaligned_unsafe 0x4040404040404040L 0x4040404040404040L 8;
+      set_aligned 0x5050505050505050L 0x5050505050505050L 0;
+      set_aligned_unsafe 0x6060606060606060L 0x6060606060606060L 0;
+      Random.init 1234;
+      for _ = 1 to 1000 do
+        set_unaligned (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) (Random.int 9);
+        set_unaligned_unsafe (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) (Random.int 9);
+        set_aligned (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) 0;
+        set_aligned_unsafe (Random.int64 Int64.max_int) (Random.int64 Int64.max_int) 0;
+      done;
+    ;;
+
+    let () =
+      let set = int8x16_of_int64s 0xFFFFFFFFFFFFFFFFL 0xFFFFFFFFFFFFFFFFL in
+      for bad = 1 to 8 do
+        try
+          let _ = set_int8x16_aligned data bad set in
+          assert false
+        with | Invalid_argument s when s = "address was misaligned" -> ()
+      done;
+      for bad = 9 to 24 do
+        try
+          let _ = get_int8x16_aligned data bad in
+          assert false
+        with | Invalid_argument s when s = "index out of bounds" -> ()
+      done;
+    ;;
+
+    (* Extra checks *)
+
+    let () = extra_checks data
+  end
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned : bigstring -> int -> int8x16 = "%caml_bigstring_getu128"
+    external get_int8x16_unaligned_unsafe : bigstring -> int -> int8x16 = "%caml_bigstring_getu128u"
+    external get_int8x16_aligned : bigstring -> int -> int8x16 = "%caml_bigstring_geta128"
+    external get_int8x16_aligned_unsafe : bigstring -> int -> int8x16 = "%caml_bigstring_geta128u"
+
+    external set_int8x16_unaligned : bigstring -> int -> int8x16 -> unit = "%caml_bigstring_setu128"
+    external set_int8x16_unaligned_unsafe : bigstring -> int -> int8x16 -> unit = "%caml_bigstring_setu128u"
+    external set_int8x16_aligned : bigstring -> int -> int8x16 -> unit = "%caml_bigstring_seta128"
+    external set_int8x16_aligned_unsafe : bigstring -> int -> int8x16 -> unit = "%caml_bigstring_seta128u"
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned bigstring index (int8x16_of_int64s 1L 2L)))
+        Int.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned_prim : bigstring -> int8# -> int8x16 = "%caml_bigstring_getu128_indexed_by_int8#"
+    let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i)
+    external get_int8x16_unaligned_unsafe_prim : bigstring -> int8# -> int8x16 = "%caml_bigstring_getu128u_indexed_by_int8#"
+    let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i)
+    external get_int8x16_aligned_prim : bigstring -> int8# -> int8x16 = "%caml_bigstring_geta128_indexed_by_int8#"
+    let get_int8x16_aligned b i = get_int8x16_aligned_prim b (Stdlib_stable.Int8_u.of_int i)
+    external get_int8x16_aligned_unsafe_prim : bigstring -> int8# -> int8x16 = "%caml_bigstring_geta128u_indexed_by_int8#"
+    let get_int8x16_aligned_unsafe b i = get_int8x16_aligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i)
+
+    external set_int8x16_unaligned_prim : bigstring -> int8# -> int8x16 -> unit = "%caml_bigstring_setu128_indexed_by_int8#"
+    let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_stable.Int8_u.of_int i) v
+    external set_int8x16_unaligned_unsafe_prim : bigstring -> int8# -> int8x16 -> unit = "%caml_bigstring_setu128u_indexed_by_int8#"
+    let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i) v
+    external set_int8x16_aligned_prim : bigstring -> int8# -> int8x16 -> unit = "%caml_bigstring_seta128_indexed_by_int8#"
+    let set_int8x16_aligned b i v = set_int8x16_aligned_prim b (Stdlib_stable.Int8_u.of_int i) v
+    external set_int8x16_aligned_unsafe_prim : bigstring -> int8# -> int8x16 -> unit = "%caml_bigstring_seta128u_indexed_by_int8#"
+    let set_int8x16_aligned_unsafe b i v = set_int8x16_aligned_unsafe_prim b (Stdlib_stable.Int8_u.of_int i) v
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          let index = Stdlib_stable.Int8_u.of_int8 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned_prim bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned_prim bigstring index (int8x16_of_int64s 1L 2L)))
+        Stdlib_stable.Int8.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned_prim : bigstring -> int16# -> int8x16 = "%caml_bigstring_getu128_indexed_by_int16#"
+    let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_stable.Int16_u.of_int i)
+    external get_int8x16_unaligned_unsafe_prim : bigstring -> int16# -> int8x16 = "%caml_bigstring_getu128u_indexed_by_int16#"
+    let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i)
+    external get_int8x16_aligned_prim : bigstring -> int16# -> int8x16 = "%caml_bigstring_geta128_indexed_by_int16#"
+    let get_int8x16_aligned b i = get_int8x16_aligned_prim b (Stdlib_stable.Int16_u.of_int i)
+    external get_int8x16_aligned_unsafe_prim : bigstring -> int16# -> int8x16 = "%caml_bigstring_geta128u_indexed_by_int16#"
+    let get_int8x16_aligned_unsafe b i = get_int8x16_aligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i)
+
+    external set_int8x16_unaligned_prim : bigstring -> int16# -> int8x16 -> unit = "%caml_bigstring_setu128_indexed_by_int16#"
+    let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_stable.Int16_u.of_int i) v
+    external set_int8x16_unaligned_unsafe_prim : bigstring -> int16# -> int8x16 -> unit = "%caml_bigstring_setu128u_indexed_by_int16#"
+    let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i) v
+    external set_int8x16_aligned_prim : bigstring -> int16# -> int8x16 -> unit = "%caml_bigstring_seta128_indexed_by_int16#"
+    let set_int8x16_aligned b i v = set_int8x16_aligned_prim b (Stdlib_stable.Int16_u.of_int i) v
+    external set_int8x16_aligned_unsafe_prim : bigstring -> int16# -> int8x16 -> unit = "%caml_bigstring_seta128u_indexed_by_int16#"
+    let set_int8x16_aligned_unsafe b i v = set_int8x16_aligned_unsafe_prim b (Stdlib_stable.Int16_u.of_int i) v
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          let index = Stdlib_stable.Int16_u.of_int16 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned_prim bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned_prim bigstring index (int8x16_of_int64s 1L 2L)))
+        Stdlib_stable.Int16.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned_prim : bigstring -> int32_u -> int8x16 = "%caml_bigstring_getu128_indexed_by_int32#"
+    let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+    external get_int8x16_unaligned_unsafe_prim : bigstring -> int32_u -> int8x16 = "%caml_bigstring_getu128u_indexed_by_int32#"
+    let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+    external get_int8x16_aligned_prim : bigstring -> int32_u -> int8x16 = "%caml_bigstring_geta128_indexed_by_int32#"
+    let get_int8x16_aligned b i = get_int8x16_aligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+    external get_int8x16_aligned_unsafe_prim : bigstring -> int32_u -> int8x16 = "%caml_bigstring_geta128u_indexed_by_int32#"
+    let get_int8x16_aligned_unsafe b i = get_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+    external set_int8x16_unaligned_prim : bigstring -> int32_u -> int8x16 -> unit = "%caml_bigstring_setu128_indexed_by_int32#"
+    let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+    external set_int8x16_unaligned_unsafe_prim : bigstring -> int32_u -> int8x16 -> unit = "%caml_bigstring_setu128u_indexed_by_int32#"
+    let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+    external set_int8x16_aligned_prim : bigstring -> int32_u -> int8x16 -> unit = "%caml_bigstring_seta128_indexed_by_int32#"
+    let set_int8x16_aligned b i v = set_int8x16_aligned_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+    external set_int8x16_aligned_unsafe_prim : bigstring -> int32_u -> int8x16 -> unit = "%caml_bigstring_seta128u_indexed_by_int32#"
+    let set_int8x16_aligned_unsafe b i v = set_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          let index = Stdlib_upstream_compatible.Int32_u.of_int32 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned_prim bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned_prim bigstring index (int8x16_of_int64s 1L 2L)))
+        Int32.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned_prim : bigstring -> int64_u -> int8x16 = "%caml_bigstring_getu128_indexed_by_int64#"
+    let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+    external get_int8x16_unaligned_unsafe_prim : bigstring -> int64_u -> int8x16 = "%caml_bigstring_getu128u_indexed_by_int64#"
+    let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+    external get_int8x16_aligned_prim : bigstring -> int64_u -> int8x16 = "%caml_bigstring_geta128_indexed_by_int64#"
+    let get_int8x16_aligned b i = get_int8x16_aligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+    external get_int8x16_aligned_unsafe_prim : bigstring -> int64_u -> int8x16 = "%caml_bigstring_geta128u_indexed_by_int64#"
+    let get_int8x16_aligned_unsafe b i = get_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+    external set_int8x16_unaligned_prim : bigstring -> int64_u -> int8x16 -> unit = "%caml_bigstring_setu128_indexed_by_int64#"
+    let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+    external set_int8x16_unaligned_unsafe_prim : bigstring -> int64_u -> int8x16 -> unit = "%caml_bigstring_setu128u_indexed_by_int64#"
+    let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+    external set_int8x16_aligned_prim : bigstring -> int64_u -> int8x16 -> unit = "%caml_bigstring_seta128_indexed_by_int64#"
+    let set_int8x16_aligned b i v = set_int8x16_aligned_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+    external set_int8x16_aligned_unsafe_prim : bigstring -> int64_u -> int8x16 -> unit = "%caml_bigstring_seta128u_indexed_by_int64#"
+    let set_int8x16_aligned_unsafe b i v = set_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          let index = Stdlib_upstream_compatible.Int64_u.of_int64 index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned_prim bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned_prim bigstring index (int8x16_of_int64s 1L 2L)))
+        Int64.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+
+  module _ = Bigstring(struct
+    external get_int8x16_unaligned_prim : bigstring -> nativeint_u -> int8x16 = "%caml_bigstring_getu128_indexed_by_nativeint#"
+    let get_int8x16_unaligned b i = get_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+    external get_int8x16_unaligned_unsafe_prim : bigstring -> nativeint_u -> int8x16 = "%caml_bigstring_getu128u_indexed_by_nativeint#"
+    let get_int8x16_unaligned_unsafe b i = get_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+    external get_int8x16_aligned_prim : bigstring -> nativeint_u -> int8x16 = "%caml_bigstring_geta128_indexed_by_nativeint#"
+    let get_int8x16_aligned b i = get_int8x16_aligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+    external get_int8x16_aligned_unsafe_prim : bigstring -> nativeint_u -> int8x16 = "%caml_bigstring_geta128u_indexed_by_nativeint#"
+    let get_int8x16_aligned_unsafe b i = get_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+    external set_int8x16_unaligned_prim : bigstring -> nativeint_u -> int8x16 -> unit = "%caml_bigstring_setu128_indexed_by_nativeint#"
+    let set_int8x16_unaligned b i v = set_int8x16_unaligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+    external set_int8x16_unaligned_unsafe_prim : bigstring -> nativeint_u -> int8x16 -> unit = "%caml_bigstring_setu128u_indexed_by_nativeint#"
+    let set_int8x16_unaligned_unsafe b i v = set_int8x16_unaligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+    external set_int8x16_aligned_prim : bigstring -> nativeint_u -> int8x16 -> unit = "%caml_bigstring_seta128_indexed_by_nativeint#"
+    let set_int8x16_aligned b i v = set_int8x16_aligned_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+    external set_int8x16_aligned_unsafe_prim : bigstring -> nativeint_u -> int8x16 -> unit = "%caml_bigstring_seta128u_indexed_by_nativeint#"
+    let set_int8x16_aligned_unsafe b i v = set_int8x16_aligned_unsafe_prim b (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+    let extra_checks bigstring =
+      List.iter
+        (fun index ->
+          let index = Stdlib_upstream_compatible.Nativeint_u.of_nativeint index in
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_unaligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_unaligned_prim bigstring index (int8x16_of_int64s 1L 2L));
+          assert_raises_out_of_bounds (fun () ->
+            let _ = get_int8x16_aligned_prim bigstring index in
+            ());
+          assert_raises_out_of_bounds (fun () ->
+            set_int8x16_aligned_prim bigstring index (int8x16_of_int64s 1L 2L)))
+        Nativeint.[ min_int; add min_int one; sub zero one; max_int ]
+    ;;
+  end)
+end
+
+module Float_arrays (Primitives : sig
+
+  val floatarray_get_float64x2 : floatarray -> int -> float64x2
+  val floatarray_get_float64x2_unsafe : floatarray -> int -> float64x2
+
+  val floatarray_set_float64x2 : floatarray -> int -> float64x2 -> unit
+  val floatarray_set_float64x2_unsafe : floatarray -> int -> float64x2 -> unit
+
+  val unboxed_float_array_get_float64x2 : float# array -> int -> float64x2
+  val unboxed_float_array_get_float64x2_unsafe : float# array -> int -> float64x2
+
+  val unboxed_float_array_set_float64x2 : float# array -> int -> float64x2 -> unit
+  val unboxed_float_array_set_float64x2_unsafe : float# array -> int -> float64x2 -> unit
+
+  val unboxed_float32_array_get_float32x4 : float32_u array -> int -> float32x4
+  val unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int -> float32x4
+
+  val unboxed_float32_array_set_float32x4 : float32_u array -> int -> float32x4 -> unit
+  val unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int -> float32x4 -> unit
+
+end)= struct
+  open Primitives
+
+  external interleave_low_32 : float32x4 -> float32x4 -> float32x4 = "caml_vec128_unreachable" "caml_simd_vec128_interleave_low_32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external interleave_low_64s : float32x4 -> float32x4 -> float32x4 = "caml_vec128_unreachable" "caml_simd_vec128_interleave_low_64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external interleave_low_64 : float64x2 -> float64x2 -> float64x2 = "caml_vec128_unreachable" "caml_simd_vec128_interleave_low_64"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external low_of64 : float -> float64x2 = "caml_vec128_unreachable" "caml_float64x2_low_of_float"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  external low_of32 : float32 -> float32x4 = "caml_vec128_unreachable" "caml_float32x4_low_of_float32"
+    [@@noalloc] [@@unboxed] [@@builtin]
+
+  let f64x2 x y =
+    let x = low_of64 x in
+    let y = low_of64 y in
+    interleave_low_64 x y
+
+  let f32x4 x y z w =
+    let x = low_of32 x in
+    let y = low_of32 y in
+    let z = low_of32 z in
+    let w = low_of32 w in
+    let xy = interleave_low_32 x y in
+    let zw = interleave_low_32 z w in
+    interleave_low_64s xy zw
+
+  let floatarray () =
+    let a = Array.Floatarray.create 4 in
+    Array.Floatarray.set a 0 0.0;
+    Array.Floatarray.set a 1 1.0;
+    Array.Floatarray.set a 2 2.0;
+    Array.Floatarray.set a 3 3.0;
+    a
+  ;;
+  let unboxed_float_array () = [| #0.0; #1.0; #2.0; #3.0 |]
+  let unboxed_float32_array () = [| #0.0s; #1.0s; #2.0s; #3.0s; #4.0s; #5.0s; #6.0s; #7.0s |]
+
+  let () =
+    let floatarray = floatarray () in
+    let f_01 = f64x2 0.0 1.0 in
+    let f_12 = f64x2 1.0 2.0 in
+    let get = floatarray_get_float64x2_unsafe floatarray 0 in
+    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    let get = floatarray_get_float64x2_unsafe floatarray 1 in
+    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+
+    let f_45 = f64x2 4.0 5.0 in
+    let f_67 = f64x2 6.0 7.0 in
+    floatarray_set_float64x2_unsafe floatarray 0 f_45;
+    let get = floatarray_get_float64x2_unsafe floatarray 0 in
+    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    floatarray_set_float64x2_unsafe floatarray 1 f_67;
+    let get = floatarray_get_float64x2_unsafe floatarray 1 in
+    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
+       (float64x2_low_int64 get) (float64x2_high_int64 get)
+  ;;
+
+  let () =
+    let a = floatarray () in
+    let f_0 = f64x2 0.0 0.0 in
+    let fail a i =
+      try
+        let _ = floatarray_get_float64x2 a i in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ();
+      try
+        let _ = floatarray_set_float64x2 a i f_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail (Array.Floatarray.create 0) 0;
+    let a = Array.Floatarray.create 1 in
+    Array.Floatarray.set a 0 0.0;
+    fail a 0;
+    fail a 1;
+    fail a (-1)
+  ;;
+
+  let () =
+    let unboxed_float_array = unboxed_float_array () in
+    let f_01 = f64x2 0.0 1.0 in
+    let f_12 = f64x2 1.0 2.0 in
+    let get = unboxed_float_array_get_float64x2 unboxed_float_array 0 in
+    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    let get = unboxed_float_array_get_float64x2 unboxed_float_array 1 in
+    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+
+    let f_45 = f64x2 4.0 5.0 in
+    let f_67 = f64x2 6.0 7.0 in
+    unboxed_float_array_set_float64x2 unboxed_float_array 0 f_45;
+    let get = unboxed_float_array_get_float64x2 unboxed_float_array 0 in
+    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    unboxed_float_array_set_float64x2 unboxed_float_array 1 f_67;
+    let get = unboxed_float_array_get_float64x2 unboxed_float_array 1 in
+    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
+       (float64x2_low_int64 get) (float64x2_high_int64 get)
+  ;;
+
+  let () =
+    let unboxed_float_array = unboxed_float_array () in
+    let f_01 = f64x2 0.0 1.0 in
+    let f_12 = f64x2 1.0 2.0 in
+    let get = unboxed_float_array_get_float64x2_unsafe unboxed_float_array 0 in
+    eq (float64x2_low_int64 f_01) (float64x2_high_int64 f_01)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    let get = unboxed_float_array_get_float64x2_unsafe unboxed_float_array 1 in
+    eq (float64x2_low_int64 f_12) (float64x2_high_int64 f_12)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+
+    let f_45 = f64x2 4.0 5.0 in
+    let f_67 = f64x2 6.0 7.0 in
+    unboxed_float_array_set_float64x2_unsafe unboxed_float_array 0 f_45;
+    let get = unboxed_float_array_get_float64x2_unsafe unboxed_float_array 0 in
+    eq (float64x2_low_int64 f_45) (float64x2_high_int64 f_45)
+       (float64x2_low_int64 get) (float64x2_high_int64 get);
+    unboxed_float_array_set_float64x2_unsafe unboxed_float_array 1 f_67;
+    let get = unboxed_float_array_get_float64x2_unsafe unboxed_float_array 1 in
+    eq (float64x2_low_int64 f_67) (float64x2_high_int64 f_67)
+       (float64x2_low_int64 get) (float64x2_high_int64 get)
+  ;;
+
+  let () =
+    let a = unboxed_float_array () in
+    let f_0 = f64x2 0.0 0.0 in
+    let fail a i =
+      try
+        let _ = unboxed_float_array_get_float64x2 a i in
+        let _ = unboxed_float_array_set_float64x2 a i f_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail [||] 0;
+    fail [|#0.0|] 0;
+    fail [|#0.0|] 1;
+    fail [|#0.0|] (-1)
+  ;;
+
+  let () =
+    let unboxed_float32_array = unboxed_float32_array () in
+    let f_0123 = f32x4 0.0s 1.0s 2.0s 3.0s in
+    let f_3456 = f32x4 3.0s 4.0s 5.0s 6.0s in
+    let get = unboxed_float32_array_get_float32x4 unboxed_float32_array 0 in
+    eq (float32x4_low_int64 f_0123) (float32x4_high_int64 f_0123)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+    let get = unboxed_float32_array_get_float32x4 unboxed_float32_array 3 in
+    eq (float32x4_low_int64 f_3456) (float32x4_high_int64 f_3456)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+
+    let f_89ab = f32x4 8.0s 9.0s 10.0s 11.0s in
+    let f_cdef = f32x4 12.0s 13.0s 14.0s 15.0s in
+    unboxed_float32_array_set_float32x4 unboxed_float32_array 0 f_89ab;
+    let get = unboxed_float32_array_get_float32x4 unboxed_float32_array 0 in
+    eq (float32x4_low_int64 f_89ab) (float32x4_high_int64 f_89ab)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+    unboxed_float32_array_set_float32x4 unboxed_float32_array 3 f_cdef;
+    let get = unboxed_float32_array_get_float32x4 unboxed_float32_array 3 in
+    eq (float32x4_low_int64 f_cdef) (float32x4_high_int64 f_cdef)
+       (float32x4_low_int64 get) (float32x4_high_int64 get)
+  ;;
+
+  let () =
+    let unboxed_float32_array = unboxed_float32_array () in
+    let f_0123 = f32x4 0.0s 1.0s 2.0s 3.0s in
+    let f_3456 = f32x4 3.0s 4.0s 5.0s 6.0s in
+    let get = unboxed_float32_array_get_float32x4_unsafe unboxed_float32_array 0 in
+    eq (float32x4_low_int64 f_0123) (float32x4_high_int64 f_0123)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+    let get = unboxed_float32_array_get_float32x4_unsafe unboxed_float32_array 3 in
+    eq (float32x4_low_int64 f_3456) (float32x4_high_int64 f_3456)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+
+    let f_89ab = f32x4 8.0s 9.0s 10.0s 11.0s in
+    let f_cdef = f32x4 12.0s 13.0s 14.0s 15.0s in
+    unboxed_float32_array_set_float32x4_unsafe unboxed_float32_array 0 f_89ab;
+    let get = unboxed_float32_array_get_float32x4_unsafe unboxed_float32_array 0 in
+    eq (float32x4_low_int64 f_89ab) (float32x4_high_int64 f_89ab)
+       (float32x4_low_int64 get) (float32x4_high_int64 get);
+    unboxed_float32_array_set_float32x4_unsafe unboxed_float32_array 3 f_cdef;
+    let get = unboxed_float32_array_get_float32x4_unsafe unboxed_float32_array 3 in
+    eq (float32x4_low_int64 f_cdef) (float32x4_high_int64 f_cdef)
+       (float32x4_low_int64 get) (float32x4_high_int64 get)
+  ;;
+
+  let () =
+    let a = unboxed_float32_array () in
+    let f_0 = f32x4 0.0s 0.0s 0.0s 0.0s in
+    let fail a i =
+      try
+        let _ = unboxed_float32_array_get_float32x4 a i in
+        let _ = unboxed_float32_array_set_float32x4 a i f_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 5;
+    fail a 6;
+    fail [||] 0;
+    fail [|#0.0s|] 0;
+    fail [|#0.0s;#0.0s|] 0;
+    fail [|#0.0s;#0.0s;#0.0s|] 0;
+    fail [|#0.0s;#0.0s;#0.0s;#0.0s|] 1;
+    fail [|#0.0s|] (-1)
+  ;;
+end
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> int -> float64x2 = "%caml_floatarray_get128"
+  external floatarray_get_float64x2_unsafe : floatarray -> int -> float64x2 = "%caml_floatarray_get128u"
+
+  external floatarray_set_float64x2 : floatarray -> int -> float64x2 -> unit = "%caml_floatarray_set128"
+  external floatarray_set_float64x2_unsafe : floatarray -> int -> float64x2 -> unit = "%caml_floatarray_set128u"
+
+  external unboxed_float_array_get_float64x2 : float# array -> int -> float64x2 = "%caml_unboxed_float_array_get128"
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> int -> float64x2 = "%caml_unboxed_float_array_get128u"
+
+  external unboxed_float_array_set_float64x2 : float# array -> int -> float64x2 -> unit = "%caml_unboxed_float_array_set128"
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> int -> float64x2 -> unit = "%caml_unboxed_float_array_set128u"
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> int -> float32x4 = "%caml_unboxed_float32_array_get128"
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int -> float32x4 = "%caml_unboxed_float32_array_get128u"
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> int -> float32x4 -> unit = "%caml_unboxed_float32_array_set128"
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u"
+
+end)
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> int8# -> float64x2 = "%caml_floatarray_get128_indexed_by_int8#"
+  let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external floatarray_get_float64x2_unsafe : floatarray -> int8# -> float64x2 = "%caml_floatarray_get128u_indexed_by_int8#"
+  let floatarray_get_float64x2_unsafe arr i = floatarray_get_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external floatarray_set_float64x2 : floatarray -> int8# -> float64x2 -> unit = "%caml_floatarray_set128_indexed_by_int8#"
+  let floatarray_set_float64x2 arr i v = floatarray_set_float64x2 arr (Stdlib_stable.Int8_u.of_int i) v
+  external floatarray_set_float64x2_unsafe : floatarray -> int8# -> float64x2 -> unit = "%caml_floatarray_set128u_indexed_by_int8#"
+  let floatarray_set_float64x2_unsafe arr i v = floatarray_set_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external unboxed_float_array_get_float64x2 : float# array -> int8# -> float64x2 = "%caml_unboxed_float_array_get128_indexed_by_int8#"
+  let unboxed_float_array_get_float64x2 arr i = unboxed_float_array_get_float64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> int8# -> float64x2 = "%caml_unboxed_float_array_get128u_indexed_by_int8#"
+  let unboxed_float_array_get_float64x2_unsafe arr i = unboxed_float_array_get_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external unboxed_float_array_set_float64x2 : float# array -> int8# -> float64x2 -> unit = "%caml_unboxed_float_array_set128_indexed_by_int8#"
+  let unboxed_float_array_set_float64x2 arr i v = unboxed_float_array_set_float64x2 arr (Stdlib_stable.Int8_u.of_int i) v
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> int8# -> float64x2 -> unit = "%caml_unboxed_float_array_set128u_indexed_by_int8#"
+  let unboxed_float_array_set_float64x2_unsafe arr i v = unboxed_float_array_set_float64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> int8# -> float32x4 = "%caml_unboxed_float32_array_get128_indexed_by_int8#"
+  let unboxed_float32_array_get_float32x4 arr i = unboxed_float32_array_get_float32x4 arr (Stdlib_stable.Int8_u.of_int i)
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int8# -> float32x4 = "%caml_unboxed_float32_array_get128u_indexed_by_int8#"
+  let unboxed_float32_array_get_float32x4_unsafe arr i = unboxed_float32_array_get_float32x4_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> int8# -> float32x4 -> unit = "%caml_unboxed_float32_array_set128_indexed_by_int8#"
+  let unboxed_float32_array_set_float32x4 arr i v = unboxed_float32_array_set_float32x4 arr (Stdlib_stable.Int8_u.of_int i) v
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int8# -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u_indexed_by_int8#"
+  let unboxed_float32_array_set_float32x4_unsafe arr i v = unboxed_float32_array_set_float32x4_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> int16# -> float64x2 = "%caml_floatarray_get128_indexed_by_int16#"
+  let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external floatarray_get_float64x2_unsafe : floatarray -> int16# -> float64x2 = "%caml_floatarray_get128u_indexed_by_int16#"
+  let floatarray_get_float64x2_unsafe arr i = floatarray_get_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external floatarray_set_float64x2 : floatarray -> int16# -> float64x2 -> unit = "%caml_floatarray_set128_indexed_by_int16#"
+  let floatarray_set_float64x2 arr i v = floatarray_set_float64x2 arr (Stdlib_stable.Int16_u.of_int i) v
+  external floatarray_set_float64x2_unsafe : floatarray -> int16# -> float64x2 -> unit = "%caml_floatarray_set128u_indexed_by_int16#"
+  let floatarray_set_float64x2_unsafe arr i v = floatarray_set_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external unboxed_float_array_get_float64x2 : float# array -> int16# -> float64x2 = "%caml_unboxed_float_array_get128_indexed_by_int16#"
+  let unboxed_float_array_get_float64x2 arr i = unboxed_float_array_get_float64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> int16# -> float64x2 = "%caml_unboxed_float_array_get128u_indexed_by_int16#"
+  let unboxed_float_array_get_float64x2_unsafe arr i = unboxed_float_array_get_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external unboxed_float_array_set_float64x2 : float# array -> int16# -> float64x2 -> unit = "%caml_unboxed_float_array_set128_indexed_by_int16#"
+  let unboxed_float_array_set_float64x2 arr i v = unboxed_float_array_set_float64x2 arr (Stdlib_stable.Int16_u.of_int i) v
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> int16# -> float64x2 -> unit = "%caml_unboxed_float_array_set128u_indexed_by_int16#"
+  let unboxed_float_array_set_float64x2_unsafe arr i v = unboxed_float_array_set_float64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> int16# -> float32x4 = "%caml_unboxed_float32_array_get128_indexed_by_int16#"
+  let unboxed_float32_array_get_float32x4 arr i = unboxed_float32_array_get_float32x4 arr (Stdlib_stable.Int16_u.of_int i)
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int16# -> float32x4 = "%caml_unboxed_float32_array_get128u_indexed_by_int16#"
+  let unboxed_float32_array_get_float32x4_unsafe arr i = unboxed_float32_array_get_float32x4_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> int16# -> float32x4 -> unit = "%caml_unboxed_float32_array_set128_indexed_by_int16#"
+  let unboxed_float32_array_set_float32x4 arr i v = unboxed_float32_array_set_float32x4 arr (Stdlib_stable.Int16_u.of_int i) v
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int16# -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u_indexed_by_int16#"
+  let unboxed_float32_array_set_float32x4_unsafe arr i v = unboxed_float32_array_set_float32x4_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> int32_u -> float64x2 = "%caml_floatarray_get128_indexed_by_int32#"
+  let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external floatarray_get_float64x2_unsafe : floatarray -> int32_u -> float64x2 = "%caml_floatarray_get128u_indexed_by_int32#"
+  let floatarray_get_float64x2_unsafe arr i = floatarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external floatarray_set_float64x2 : floatarray -> int32_u -> float64x2 -> unit = "%caml_floatarray_set128_indexed_by_int32#"
+  let floatarray_set_float64x2 arr i v = floatarray_set_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external floatarray_set_float64x2_unsafe : floatarray -> int32_u -> float64x2 -> unit = "%caml_floatarray_set128u_indexed_by_int32#"
+  let floatarray_set_float64x2_unsafe arr i v = floatarray_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_float_array_get_float64x2 : float# array -> int32_u -> float64x2 = "%caml_unboxed_float_array_get128_indexed_by_int32#"
+  let unboxed_float_array_get_float64x2 arr i = unboxed_float_array_get_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> int32_u -> float64x2 = "%caml_unboxed_float_array_get128u_indexed_by_int32#"
+  let unboxed_float_array_get_float64x2_unsafe arr i = unboxed_float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_float_array_set_float64x2 : float# array -> int32_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128_indexed_by_int32#"
+  let unboxed_float_array_set_float64x2 arr i v = unboxed_float_array_set_float64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> int32_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128u_indexed_by_int32#"
+  let unboxed_float_array_set_float64x2_unsafe arr i v = unboxed_float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> int32_u -> float32x4 = "%caml_unboxed_float32_array_get128_indexed_by_int32#"
+  let unboxed_float32_array_get_float32x4 arr i = unboxed_float32_array_get_float32x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int32_u -> float32x4 = "%caml_unboxed_float32_array_get128u_indexed_by_int32#"
+  let unboxed_float32_array_get_float32x4_unsafe arr i = unboxed_float32_array_get_float32x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> int32_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128_indexed_by_int32#"
+  let unboxed_float32_array_set_float32x4 arr i v = unboxed_float32_array_set_float32x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int32_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u_indexed_by_int32#"
+  let unboxed_float32_array_set_float32x4_unsafe arr i v = unboxed_float32_array_set_float32x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> int64_u -> float64x2 = "%caml_floatarray_get128_indexed_by_int64#"
+  let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external floatarray_get_float64x2_unsafe : floatarray -> int64_u -> float64x2 = "%caml_floatarray_get128u_indexed_by_int64#"
+  let floatarray_get_float64x2_unsafe arr i = floatarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external floatarray_set_float64x2 : floatarray -> int64_u -> float64x2 -> unit = "%caml_floatarray_set128_indexed_by_int64#"
+  let floatarray_set_float64x2 arr i v = floatarray_set_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external floatarray_set_float64x2_unsafe : floatarray -> int64_u -> float64x2 -> unit = "%caml_floatarray_set128u_indexed_by_int64#"
+  let floatarray_set_float64x2_unsafe arr i v = floatarray_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_float_array_get_float64x2 : float# array -> int64_u -> float64x2 = "%caml_unboxed_float_array_get128_indexed_by_int64#"
+  let unboxed_float_array_get_float64x2 arr i = unboxed_float_array_get_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> int64_u -> float64x2 = "%caml_unboxed_float_array_get128u_indexed_by_int64#"
+  let unboxed_float_array_get_float64x2_unsafe arr i = unboxed_float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_float_array_set_float64x2 : float# array -> int64_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128_indexed_by_int64#"
+  let unboxed_float_array_set_float64x2 arr i v = unboxed_float_array_set_float64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> int64_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128u_indexed_by_int64#"
+  let unboxed_float_array_set_float64x2_unsafe arr i v = unboxed_float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> int64_u -> float32x4 = "%caml_unboxed_float32_array_get128_indexed_by_int64#"
+  let unboxed_float32_array_get_float32x4 arr i = unboxed_float32_array_get_float32x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> int64_u -> float32x4 = "%caml_unboxed_float32_array_get128u_indexed_by_int64#"
+  let unboxed_float32_array_get_float32x4_unsafe arr i = unboxed_float32_array_get_float32x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> int64_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128_indexed_by_int64#"
+  let unboxed_float32_array_set_float32x4 arr i v = unboxed_float32_array_set_float32x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> int64_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u_indexed_by_int64#"
+  let unboxed_float32_array_set_float32x4_unsafe arr i v = unboxed_float32_array_set_float32x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+end)
+
+module _ = Float_arrays(struct
+
+  external floatarray_get_float64x2 : floatarray -> nativeint_u -> float64x2 = "%caml_floatarray_get128_indexed_by_nativeint#"
+  let floatarray_get_float64x2 arr i = floatarray_get_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external floatarray_get_float64x2_unsafe : floatarray -> nativeint_u -> float64x2 = "%caml_floatarray_get128u_indexed_by_nativeint#"
+  let floatarray_get_float64x2_unsafe arr i = floatarray_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external floatarray_set_float64x2 : floatarray -> nativeint_u -> float64x2 -> unit = "%caml_floatarray_set128_indexed_by_nativeint#"
+  let floatarray_set_float64x2 arr i v = floatarray_set_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external floatarray_set_float64x2_unsafe : floatarray -> nativeint_u -> float64x2 -> unit = "%caml_floatarray_set128u_indexed_by_nativeint#"
+  let floatarray_set_float64x2_unsafe arr i v = floatarray_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_float_array_get_float64x2 : float# array -> nativeint_u -> float64x2 = "%caml_unboxed_float_array_get128_indexed_by_nativeint#"
+  let unboxed_float_array_get_float64x2 arr i = unboxed_float_array_get_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_float_array_get_float64x2_unsafe : float# array -> nativeint_u -> float64x2 = "%caml_unboxed_float_array_get128u_indexed_by_nativeint#"
+  let unboxed_float_array_get_float64x2_unsafe arr i = unboxed_float_array_get_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_float_array_set_float64x2 : float# array -> nativeint_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128_indexed_by_nativeint#"
+  let unboxed_float_array_set_float64x2 arr i v = unboxed_float_array_set_float64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_float_array_set_float64x2_unsafe : float# array -> nativeint_u -> float64x2 -> unit = "%caml_unboxed_float_array_set128u_indexed_by_nativeint#"
+  let unboxed_float_array_set_float64x2_unsafe arr i v = unboxed_float_array_set_float64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_float32_array_get_float32x4 : float32_u array -> nativeint_u -> float32x4 = "%caml_unboxed_float32_array_get128_indexed_by_nativeint#"
+  let unboxed_float32_array_get_float32x4 arr i = unboxed_float32_array_get_float32x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_float32_array_get_float32x4_unsafe : float32_u array -> nativeint_u -> float32x4 = "%caml_unboxed_float32_array_get128u_indexed_by_nativeint#"
+  let unboxed_float32_array_get_float32x4_unsafe arr i = unboxed_float32_array_get_float32x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_float32_array_set_float32x4 : float32_u array -> nativeint_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128_indexed_by_nativeint#"
+  let unboxed_float32_array_set_float32x4 arr i v = unboxed_float32_array_set_float32x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_float32_array_set_float32x4_unsafe : float32_u array -> nativeint_u -> float32x4 -> unit = "%caml_unboxed_float32_array_set128u_indexed_by_nativeint#"
+  let unboxed_float32_array_set_float32x4_unsafe arr i v = unboxed_float32_array_set_float32x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+end)
+
+module Int_arrays (Primitives : sig
+
+  val int_array_get_int64x2 : int array -> int -> int64x2
+  val int_array_get_int64x2_unsafe : int array -> int -> int64x2
+
+  val int_iarray_get_int64x2 : int iarray -> int -> int64x2
+  val int_iarray_get_int64x2_unsafe : int iarray -> int -> int64x2
+
+  val int_array_set_int64x2 : int array -> int -> int64x2 -> unit
+  val int_array_set_int64x2_unsafe : int array -> int -> int64x2 -> unit
+
+  val unboxed_int64_array_get_int64x2 : int64_u array -> int -> int64x2
+  val unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int -> int64x2
+
+  val unboxed_int64_array_set_int64x2 : int64_u array -> int -> int64x2 -> unit
+  val unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int -> int64x2 -> unit
+
+  val unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int -> int64x2
+  val unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int -> int64x2
+
+  val unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int -> int64x2 -> unit
+  val unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int -> int64x2 -> unit
+
+  val unboxed_int32_array_get_int32x4 : int32_u array -> int -> int32x4
+  val unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int -> int32x4
+
+  val unboxed_int32_array_set_int32x4 : int32_u array -> int -> int32x4 -> unit
+  val unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int -> int32x4 -> unit
+
+  val untagged_int16_array_get_int16x8 : int16# array -> int -> int16x8
+  val untagged_int16_array_get_int16x8_unsafe : int16# array -> int -> int16x8
+
+  val untagged_int16_array_set_int16x8 : int16# array -> int -> int16x8 -> unit
+  val untagged_int16_array_set_int16x8_unsafe : int16# array -> int -> int16x8 -> unit
+
+  val untagged_int8_array_get_int8x16 : int8# array -> int -> int8x16
+  val untagged_int8_array_get_int8x16_unsafe : int8# array -> int -> int8x16
+
+  val untagged_int8_array_set_int8x16 : int8# array -> int -> int8x16 -> unit
+  val untagged_int8_array_set_int8x16_unsafe : int8# array -> int -> int8x16 -> unit
+end) = struct
+  open Primitives
+
+  let i64x2 x y = int64x2_of_int64s x y
+  let i32x4 x y z w = int32x4_of_int64s Int64.(logor (shift_left (of_int32 y) 32) (of_int32 x)) Int64.(logor (shift_left (of_int32 w) 32) (of_int32 z))
+  let i16x8 a b c d
+            e f g h =
+    let cons x y =
+      Int64.(logor (shift_left y 16) (of_int (Stdlib_stable.Int16.to_int x)))
+    in
+    int16x8_of_int64s
+      (cons a @@ cons b @@ cons c @@ cons d 0L)
+      (cons e @@ cons f @@ cons g @@ cons h 0L)
+  let i8x16 a b c d e f g h
+            i j k l m n o p =
+    let cons x y =
+      Int64.(logor (shift_left y 8) (of_int (Stdlib_stable.Int8.to_int x)))
+    in
+    int8x16_of_int64s
+      (cons a @@ cons b @@ cons c @@ cons d @@ cons e @@ cons f @@ cons g @@ cons h 0L)
+      (cons i @@ cons j @@ cons k @@ cons l @@ cons m @@ cons n @@ cons o @@ cons p 0L)
+  let tag i = Int64.(add (shift_left i 1) 1L)
+  let int_array () = [| 0; 1; 2; 3 |]
+  let int_iarray () = [: 0; 1; 2; 3 :]
+  let unboxed_int64_array () = [| #0L; #1L; #2L; #3L |]
+  let unboxed_nativeint_array () = [| #0n; #1n; #2n; #3n |]
+  let unboxed_int32_array () = [| #0l; #1l; #2l; #3l; #4l; #5l; #6l; #7l |]
+  let untagged_int16_array () =
+    [| #0S; #1S; #2S; #3S; #4S; #5S; #6S; #7S;
+       #8S; #9S; #10S; #11S; #12S; #13S; #14S; #15S |]
+  let untagged_int8_array () =
+    [| #0s; #1s; #2s; #3s; #4s; #5s; #6s; #7s;
+       #8s; #9s; #10s; #11s; #12s; #13s; #14s; #15s;
+       #16s; #17s; #18s; #19s; #20s; #21s; #22s; #23s;
+       #24s; #25s; #26s; #27s; #28s; #29s; #30s; #31s |]
+
+  let () =
+    let int_array = int_array () in
+    let i_01 = i64x2 (tag 0L) (tag 1L) in
+    let i_12 = i64x2 (tag 1L) (tag 2L) in
+    let get = int_array_get_int64x2 int_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = int_array_get_int64x2 int_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 (tag 4L) (tag 5L) in
+    let i_67 = i64x2 (tag 6L) (tag 7L) in
+    int_array_set_int64x2 int_array 0 i_45;
+    let get = int_array_get_int64x2 int_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    int_array_set_int64x2 int_array 1 i_67;
+    let get = int_array_get_int64x2 int_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let int_array = int_array () in
+    let i_01 = i64x2 (tag 0L) (tag 1L) in
+    let i_12 = i64x2 (tag 1L) (tag 2L) in
+    let get = int_array_get_int64x2_unsafe int_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = int_array_get_int64x2_unsafe int_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 (tag 4L) (tag 5L) in
+    let i_67 = i64x2 (tag 6L) (tag 7L) in
+    int_array_set_int64x2 int_array 0 i_45;
+    let get = int_array_get_int64x2_unsafe int_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    int_array_set_int64x2 int_array 1 i_67;
+    let get = int_array_get_int64x2_unsafe int_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let a = int_array () in
+    let i_0 = i64x2 (tag 0L) (tag 0L) in
+    let fail a i =
+      try
+        let _ = int_array_get_int64x2 a i in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ();
+      try
+        let _ = int_array_set_int64x2 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail [||] 0;
+    fail [|0|] 0;
+    fail [|0|] 1;
+    fail [|0|] (-1)
+  ;;
+
+  let () =
+    let int_iarray = int_iarray () in
+    let i_01 = i64x2 (tag 0L) (tag 1L) in
+    let i_12 = i64x2 (tag 1L) (tag 2L) in
+    let get = int_iarray_get_int64x2_unsafe int_iarray 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = int_iarray_get_int64x2_unsafe int_iarray 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+  ;;
+
+  let () =
+    let a = int_iarray () in
+    let fail a i =
+      try
+        let _ = int_iarray_get_int64x2 a i in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ();
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail [::] 0;
+    fail [: 0 :] 0;
+    fail [: 0 :] 1;
+    fail [: 0 :] (-1)
+  ;;
+
+  let () =
+    let unboxed_int64_array = unboxed_int64_array () in
+    let i_01 = i64x2 0L 1L in
+    let i_12 = i64x2 1L 2L in
+    let get = unboxed_int64_array_get_int64x2 unboxed_int64_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = unboxed_int64_array_get_int64x2 unboxed_int64_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 4L 5L in
+    let i_67 = i64x2 6L 7L in
+    unboxed_int64_array_set_int64x2 unboxed_int64_array 0 i_45;
+    let get = unboxed_int64_array_get_int64x2 unboxed_int64_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    unboxed_int64_array_set_int64x2 unboxed_int64_array 1 i_67;
+    let get = unboxed_int64_array_get_int64x2 unboxed_int64_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let unboxed_int64_array = unboxed_int64_array () in
+    let i_01 = i64x2 0L 1L in
+    let i_12 = i64x2 1L 2L in
+    let get = unboxed_int64_array_get_int64x2_unsafe unboxed_int64_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = unboxed_int64_array_get_int64x2_unsafe unboxed_int64_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 4L 5L in
+    let i_67 = i64x2 6L 7L in
+    unboxed_int64_array_set_int64x2_unsafe unboxed_int64_array 0 i_45;
+    let get = unboxed_int64_array_get_int64x2_unsafe unboxed_int64_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    unboxed_int64_array_set_int64x2_unsafe unboxed_int64_array 1 i_67;
+    let get = unboxed_int64_array_get_int64x2_unsafe unboxed_int64_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let a = unboxed_int64_array () in
+    let i_0 = i64x2 0L 0L in
+    let fail a i =
+      try
+        let _ = unboxed_int64_array_get_int64x2 a i in
+        let _ = unboxed_int64_array_set_int64x2 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail [||] 0;
+    fail [|#0L|] 0;
+    fail [|#0L|] 1;
+    fail [|#0L|] (-1)
+  ;;
+
+  let () =
+    let unboxed_nativeint_array = unboxed_nativeint_array () in
+    let i_01 = i64x2 0L 1L in
+    let i_12 = i64x2 1L 2L in
+    let get = unboxed_nativeint_array_get_int64x2 unboxed_nativeint_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = unboxed_nativeint_array_get_int64x2 unboxed_nativeint_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 4L 5L in
+    let i_67 = i64x2 6L 7L in
+    unboxed_nativeint_array_set_int64x2 unboxed_nativeint_array 0 i_45;
+    let get = unboxed_nativeint_array_get_int64x2 unboxed_nativeint_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    unboxed_nativeint_array_set_int64x2 unboxed_nativeint_array 1 i_67;
+    let get = unboxed_nativeint_array_get_int64x2 unboxed_nativeint_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let unboxed_nativeint_array = unboxed_nativeint_array () in
+    let i_01 = i64x2 0L 1L in
+    let i_12 = i64x2 1L 2L in
+    let get = unboxed_nativeint_array_get_int64x2_unsafe unboxed_nativeint_array 0 in
+    eq (int64x2_low_int64 i_01) (int64x2_high_int64 i_01)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    let get = unboxed_nativeint_array_get_int64x2_unsafe unboxed_nativeint_array 1 in
+    eq (int64x2_low_int64 i_12) (int64x2_high_int64 i_12)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+
+    let i_45 = i64x2 4L 5L in
+    let i_67 = i64x2 6L 7L in
+    unboxed_nativeint_array_set_int64x2_unsafe unboxed_nativeint_array 0 i_45;
+    let get = unboxed_nativeint_array_get_int64x2_unsafe unboxed_nativeint_array 0 in
+    eq (int64x2_low_int64 i_45) (int64x2_high_int64 i_45)
+       (int64x2_low_int64 get) (int64x2_high_int64 get);
+    unboxed_nativeint_array_set_int64x2_unsafe unboxed_nativeint_array 1 i_67;
+    let get = unboxed_nativeint_array_get_int64x2_unsafe unboxed_nativeint_array 1 in
+    eq (int64x2_low_int64 i_67) (int64x2_high_int64 i_67)
+       (int64x2_low_int64 get) (int64x2_high_int64 get)
+  ;;
+
+  let () =
+    let a = unboxed_nativeint_array () in
+    let i_0 = i64x2 0L 0L in
+    let fail a i =
+      try
+        let _ = unboxed_nativeint_array_get_int64x2 a i in
+        let _ = unboxed_nativeint_array_set_int64x2 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 3;
+    fail a 4;
+    fail [||] 0;
+    fail [|#0n|] 0;
+    fail [|#0n|] 1;
+    fail [|#0n|] (-1)
+  ;;
+
+  let () =
+    let unboxed_int32_array = unboxed_int32_array () in
+    let i_0123 = i32x4 0l 1l 2l 3l in
+    let i_2345 = i32x4 2l 3l 4l 5l in
+    let get = unboxed_int32_array_get_int32x4 unboxed_int32_array 0 in
+    eq (int32x4_low_int64 i_0123) (int32x4_high_int64 i_0123)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+    let get = unboxed_int32_array_get_int32x4 unboxed_int32_array 2 in
+    eq (int32x4_low_int64 i_2345) (int32x4_high_int64 i_2345)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+
+    let i_4567 = i32x4 4l 5l 6l 7l in
+    let i_6789 = i32x4 6l 7l 8l 9l in
+    unboxed_int32_array_set_int32x4 unboxed_int32_array 0 i_4567;
+    let get = unboxed_int32_array_get_int32x4 unboxed_int32_array 0 in
+    eq (int32x4_low_int64 i_4567) (int32x4_high_int64 i_4567)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+    unboxed_int32_array_set_int32x4 unboxed_int32_array 1 i_6789;
+    let get = unboxed_int32_array_get_int32x4 unboxed_int32_array 1 in
+    eq (int32x4_low_int64 i_6789) (int32x4_high_int64 i_6789)
+       (int32x4_low_int64 get) (int32x4_high_int64 get)
+  ;;
+
+  let () =
+    let unboxed_int32_array = unboxed_int32_array () in
+    let i_0123 = i32x4 0l 1l 2l 3l in
+    let i_2345 = i32x4 2l 3l 4l 5l in
+    let get = unboxed_int32_array_get_int32x4_unsafe unboxed_int32_array 0 in
+    eq (int32x4_low_int64 i_0123) (int32x4_high_int64 i_0123)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+    let get = unboxed_int32_array_get_int32x4_unsafe unboxed_int32_array 2 in
+    eq (int32x4_low_int64 i_2345) (int32x4_high_int64 i_2345)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+
+    let i_4567 = i32x4 4l 5l 6l 7l in
+    let i_6789 = i32x4 6l 7l 8l 9l in
+    unboxed_int32_array_set_int32x4_unsafe unboxed_int32_array 0 i_4567;
+    let get = unboxed_int32_array_get_int32x4_unsafe unboxed_int32_array 0 in
+    eq (int32x4_low_int64 i_4567) (int32x4_high_int64 i_4567)
+       (int32x4_low_int64 get) (int32x4_high_int64 get);
+    unboxed_int32_array_set_int32x4_unsafe unboxed_int32_array 1 i_6789;
+    let get = unboxed_int32_array_get_int32x4_unsafe unboxed_int32_array 1 in
+    eq (int32x4_low_int64 i_6789) (int32x4_high_int64 i_6789)
+       (int32x4_low_int64 get) (int32x4_high_int64 get)
+  ;;
+
+  let () =
+    let a = unboxed_int32_array () in
+    let i_0 = i32x4 0l 0l 0l 0l in
+    let fail a i =
+      try
+        let _ = unboxed_int32_array_get_int32x4 a i in
+        let _ = unboxed_int32_array_set_int32x4 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 5;
+    fail a 6;
+    fail [||] 0;
+    fail [|#0l|] 0;
+    fail [|#0l|] 1;
+    fail [|#0l|] 2;
+    fail [|#0l|] 3;
+    fail [|#0l;#1l|] 0;
+    fail [|#0l;#1l|] 1;
+    fail [|#0l;#1l|] 2;
+    fail [|#0l;#1l|] 3;
+    fail [|#0l;#1l;#2l|] 0;
+    fail [|#0l;#1l;#2l|] 1;
+    fail [|#0l;#1l;#2l|] 2;
+    fail [|#0l;#1l;#2l|] 3;
+    fail [|#0l|] (-1)
+  ;;
+
+  let () =
+    let untagged_int16_array = untagged_int16_array () in
+    let i_01234567 = i16x8 0S 1S 2S 3S 4S 5S 6S 7S in
+    let i_456789ab = i16x8 4S 5S 6S 7S 8S 9S 10S 11S in
+    let get = untagged_int16_array_get_int16x8 untagged_int16_array 0 in
+    eq (int16x8_low_int64 i_01234567) (int16x8_high_int64 i_01234567)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+    let get = untagged_int16_array_get_int16x8 untagged_int16_array 4 in
+    eq (int16x8_low_int64 i_456789ab) (int16x8_high_int64 i_456789ab)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+
+    let i_89abcdef = i16x8 8S 9S 10S 11S 12S 13S 14S 15S in
+    let i_cdefghij = i16x8 12S 13S 14S 15S 16S 17S 18S 19S in
+    untagged_int16_array_set_int16x8 untagged_int16_array 0 i_89abcdef;
+    let get = untagged_int16_array_get_int16x8 untagged_int16_array 0 in
+    eq (int16x8_low_int64 i_89abcdef) (int16x8_high_int64 i_89abcdef)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+    untagged_int16_array_set_int16x8 untagged_int16_array 1 i_cdefghij;
+    let get = untagged_int16_array_get_int16x8 untagged_int16_array 1 in
+    eq (int16x8_low_int64 i_cdefghij) (int16x8_high_int64 i_cdefghij)
+      (int16x8_low_int64 get) (int16x8_high_int64 get)
+  ;;
+
+  let () =
+    let untagged_int16_array = untagged_int16_array () in
+    let i_01234567 = i16x8 0S 1S 2S 3S 4S 5S 6S 7S in
+    let i_456789ab = i16x8 4S 5S 6S 7S 8S 9S 10S 11S in
+    let get = untagged_int16_array_get_int16x8_unsafe untagged_int16_array 0 in
+    eq (int16x8_low_int64 i_01234567) (int16x8_high_int64 i_01234567)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+    let get = untagged_int16_array_get_int16x8_unsafe untagged_int16_array 4 in
+    eq (int16x8_low_int64 i_456789ab) (int16x8_high_int64 i_456789ab)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+
+    let i_89abcdef = i16x8 8S 9S 10S 11S 12S 13S 14S 15S in
+    let i_cdefghij = i16x8 12S 13S 14S 15S 16S 17S 18S 19S in
+    untagged_int16_array_set_int16x8_unsafe untagged_int16_array 0 i_89abcdef;
+    let get = untagged_int16_array_get_int16x8_unsafe untagged_int16_array 0 in
+    eq (int16x8_low_int64 i_89abcdef) (int16x8_high_int64 i_89abcdef)
+      (int16x8_low_int64 get) (int16x8_high_int64 get);
+    untagged_int16_array_set_int16x8_unsafe untagged_int16_array 1 i_cdefghij;
+    let get = untagged_int16_array_get_int16x8_unsafe untagged_int16_array 1 in
+    eq (int16x8_low_int64 i_cdefghij) (int16x8_high_int64 i_cdefghij)
+      (int16x8_low_int64 get) (int16x8_high_int64 get)
+  ;;
+
+  let () =
+    let a = untagged_int16_array () in
+    let i_0 = i16x8 0S 0S 0S 0S 0S 0S 0S 0S in
+    let fail a i =
+      try
+        let _ = untagged_int16_array_get_int16x8 a i in
+        let _ = untagged_int16_array_set_int16x8 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 12;
+    fail a 13;
+    fail [||] 0;
+    fail [|#0S|] 0;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 0;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 1;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 2;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 3;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 4;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 5;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 6;
+    fail [|#0S;#1S;#2S;#3S;#4S;#5S;#6S|] 7;
+    fail [|#0S|] (-1)
+  ;;
+
+  let () =
+    let untagged_int8_array = untagged_int8_array () in
+    let i_0123456789abcdef = i8x16 0s 1s 2s 3s 4s 5s 6s 7s 8s 9s 10s 11s 12s 13s 14s 15s in
+    let i_89abcdefghijklmn = i8x16 8s 9s 10s 11s 12s 13s 14s 15s 16s 17s 18s 19s 20s 21s 22s 23s in
+    let get = untagged_int8_array_get_int8x16 untagged_int8_array 0 in
+    eq (int8x16_low_int64 i_0123456789abcdef) (int8x16_high_int64 i_0123456789abcdef)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+    let get = untagged_int8_array_get_int8x16 untagged_int8_array 8 in
+    eq (int8x16_low_int64 i_89abcdefghijklmn) (int8x16_high_int64 i_89abcdefghijklmn)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+
+    let i_ghijklmnopqrstuv = i8x16 16s 17s 18s 19s 20s 21s 22s 23s 24s 25s 26s 27s 28s 29s 30s 31s in
+    let i_opqrstuvwxyzABCD = i8x16 24s 25s 26s 27s 28s 29s 30s 31s 32s 33s 34s 35s 36s 37s 38s 39s in
+    untagged_int8_array_set_int8x16 untagged_int8_array 0 i_ghijklmnopqrstuv;
+    let get = untagged_int8_array_get_int8x16 untagged_int8_array 0 in
+    eq (int8x16_low_int64 i_ghijklmnopqrstuv) (int8x16_high_int64 i_ghijklmnopqrstuv)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+    untagged_int8_array_set_int8x16 untagged_int8_array 1 i_opqrstuvwxyzABCD;
+    let get = untagged_int8_array_get_int8x16 untagged_int8_array 1 in
+    eq (int8x16_low_int64 i_opqrstuvwxyzABCD) (int8x16_high_int64 i_opqrstuvwxyzABCD)
+      (int8x16_low_int64 get) (int8x16_high_int64 get)
+  ;;
+
+  let () =
+    let untagged_int8_array = untagged_int8_array () in
+    let i_0123456789abcdef = i8x16 0s 1s 2s 3s 4s 5s 6s 7s 8s 9s 10s 11s 12s 13s 14s 15s in
+    let i_89abcdefghijklmn = i8x16 8s 9s 10s 11s 12s 13s 14s 15s 16s 17s 18s 19s 20s 21s 22s 23s in
+    let get = untagged_int8_array_get_int8x16_unsafe untagged_int8_array 0 in
+    eq (int8x16_low_int64 i_0123456789abcdef) (int8x16_high_int64 i_0123456789abcdef)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+    let get = untagged_int8_array_get_int8x16_unsafe untagged_int8_array 8 in
+    eq (int8x16_low_int64 i_89abcdefghijklmn) (int8x16_high_int64 i_89abcdefghijklmn)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+
+    let i_ghijklmnopqrstuv = i8x16 16s 17s 18s 19s 20s 21s 22s 23s 24s 25s 26s 27s 28s 29s 30s 31s in
+    let i_opqrstuvwxyzABCD = i8x16 24s 25s 26s 27s 28s 29s 30s 31s 32s 33s 34s 35s 36s 37s 38s 39s in
+    untagged_int8_array_set_int8x16_unsafe untagged_int8_array 0 i_ghijklmnopqrstuv;
+    let get = untagged_int8_array_get_int8x16_unsafe untagged_int8_array 0 in
+    eq (int8x16_low_int64 i_ghijklmnopqrstuv) (int8x16_high_int64 i_ghijklmnopqrstuv)
+      (int8x16_low_int64 get) (int8x16_high_int64 get);
+    untagged_int8_array_set_int8x16_unsafe untagged_int8_array 1 i_opqrstuvwxyzABCD;
+    let get = untagged_int8_array_get_int8x16_unsafe untagged_int8_array 1 in
+    eq (int8x16_low_int64 i_opqrstuvwxyzABCD) (int8x16_high_int64 i_opqrstuvwxyzABCD)
+      (int8x16_low_int64 get) (int8x16_high_int64 get)
+  ;;
+
+  let () =
+    let a = untagged_int8_array () in
+    let i_0 = i8x16 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s 0s in
+    let fail a i =
+      try
+        let _ = untagged_int8_array_get_int8x16 a i in
+        let _ = untagged_int8_array_set_int8x16 a i i_0 in
+        Printf.printf "Did not fail on index %d\n" i
+      with | Invalid_argument s when s = "index out of bounds" -> ()
+    in
+    fail a (-1);
+    fail a 25;
+    fail a 31;
+    fail [||] 0;
+    fail [|#0s|] 0;
+    let b =
+      [|#0s;#1s;#2s;#3s;#4s;#5s;#6s;#7s;#8s;#9s;#10s;#11s;#12s;#13s;#14s|]
+    in
+    fail b 0;
+    fail b 1;
+    fail b 2;
+    fail b 3;
+    fail b 4;
+    fail b 5;
+    fail b 6;
+    fail b 7;
+    fail b 8;
+    fail b 9;
+    fail b 10;
+    fail b 11;
+    fail b 12;
+    fail b 13;
+    fail b 14;
+    fail b 15;
+    fail [|#0s|] (-1)
+  ;;
+end
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> int -> int64x2 = "%caml_int_array_get128"
+  external int_array_get_int64x2_unsafe : int array -> int -> int64x2 = "%caml_int_array_get128u"
+
+  external int_iarray_get_int64x2 : int iarray -> int -> int64x2 = "%caml_int_array_get128"
+  external int_iarray_get_int64x2_unsafe : int iarray -> int -> int64x2 = "%caml_int_array_get128u"
+
+  external int_array_set_int64x2 : int array -> int -> int64x2 -> unit = "%caml_int_array_set128"
+  external int_array_set_int64x2_unsafe : int array -> int -> int64x2 -> unit = "%caml_int_array_set128u"
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> int -> int64x2 = "%caml_unboxed_int64_array_get128"
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int -> int64x2 = "%caml_unboxed_int64_array_get128u"
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> int -> int64x2 -> unit = "%caml_unboxed_int64_array_set128"
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u"
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int -> int64x2 = "%caml_unboxed_nativeint_array_get128"
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int -> int64x2 = "%caml_unboxed_nativeint_array_get128u"
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128"
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u"
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> int -> int32x4 = "%caml_unboxed_int32_array_get128"
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int -> int32x4 = "%caml_unboxed_int32_array_get128u"
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> int -> int32x4 -> unit = "%caml_unboxed_int32_array_set128"
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u"
+
+  external untagged_int16_array_get_int16x8 : int16# array -> int -> int16x8 = "%caml_untagged_int16_array_get128"
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> int -> int16x8 = "%caml_untagged_int16_array_get128u"
+
+  external untagged_int16_array_set_int16x8 : int16# array -> int -> int16x8 -> unit = "%caml_untagged_int16_array_set128"
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> int -> int16x8 -> unit = "%caml_untagged_int16_array_set128u"
+
+  external untagged_int8_array_get_int8x16 : int8# array -> int -> int8x16 = "%caml_untagged_int8_array_get128"
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> int -> int8x16 = "%caml_untagged_int8_array_get128u"
+
+  external untagged_int8_array_set_int8x16 : int8# array -> int -> int8x16 -> unit = "%caml_untagged_int8_array_set128"
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> int -> int8x16 -> unit = "%caml_untagged_int8_array_set128u"
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> int8# -> int64x2 = "%caml_int_array_get128_indexed_by_int8#"
+  let int_array_get_int64x2 arr i = int_array_get_int64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external int_array_get_int64x2_unsafe : int array -> int8# -> int64x2 = "%caml_int_array_get128u_indexed_by_int8#"
+  let int_array_get_int64x2_unsafe arr i = int_array_get_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external int_iarray_get_int64x2 : int iarray -> int8# -> int64x2 = "%caml_int_array_get128_indexed_by_int8#"
+  let int_iarray_get_int64x2 arr i = int_iarray_get_int64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external int_iarray_get_int64x2_unsafe : int iarray -> int8# -> int64x2 = "%caml_int_array_get128u_indexed_by_int8#"
+  let int_iarray_get_int64x2_unsafe arr i = int_iarray_get_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external int_array_set_int64x2 : int array -> int8# -> int64x2 -> unit = "%caml_int_array_set128_indexed_by_int8#"
+  let int_array_set_int64x2 arr i v = int_array_set_int64x2 arr (Stdlib_stable.Int8_u.of_int i) v
+  external int_array_set_int64x2_unsafe : int array -> int8# -> int64x2 -> unit = "%caml_int_array_set128u_indexed_by_int8#"
+  let int_array_set_int64x2_unsafe arr i v = int_array_set_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> int8# -> int64x2 = "%caml_unboxed_int64_array_get128_indexed_by_int8#"
+  let unboxed_int64_array_get_int64x2 arr i = unboxed_int64_array_get_int64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int8# -> int64x2 = "%caml_unboxed_int64_array_get128u_indexed_by_int8#"
+  let unboxed_int64_array_get_int64x2_unsafe arr i = unboxed_int64_array_get_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> int8# -> int64x2 -> unit = "%caml_unboxed_int64_array_set128_indexed_by_int8#"
+  let unboxed_int64_array_set_int64x2 arr i v = unboxed_int64_array_set_int64x2 arr (Stdlib_stable.Int8_u.of_int i) v
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int8# -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u_indexed_by_int8#"
+  let unboxed_int64_array_set_int64x2_unsafe arr i v = unboxed_int64_array_set_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int8# -> int64x2 = "%caml_unboxed_nativeint_array_get128_indexed_by_int8#"
+  let unboxed_nativeint_array_get_int64x2 arr i = unboxed_nativeint_array_get_int64x2 arr (Stdlib_stable.Int8_u.of_int i)
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int8# -> int64x2 = "%caml_unboxed_nativeint_array_get128u_indexed_by_int8#"
+  let unboxed_nativeint_array_get_int64x2_unsafe arr i = unboxed_nativeint_array_get_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int8# -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128_indexed_by_int8#"
+  let unboxed_nativeint_array_set_int64x2 arr i v = unboxed_nativeint_array_set_int64x2 arr (Stdlib_stable.Int8_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int8# -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u_indexed_by_int8#"
+  let unboxed_nativeint_array_set_int64x2_unsafe arr i v = unboxed_nativeint_array_set_int64x2_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> int8# -> int32x4 = "%caml_unboxed_int32_array_get128_indexed_by_int8#"
+  let unboxed_int32_array_get_int32x4 arr i = unboxed_int32_array_get_int32x4 arr (Stdlib_stable.Int8_u.of_int i)
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int8# -> int32x4 = "%caml_unboxed_int32_array_get128u_indexed_by_int8#"
+  let unboxed_int32_array_get_int32x4_unsafe arr i = unboxed_int32_array_get_int32x4_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> int8# -> int32x4 -> unit = "%caml_unboxed_int32_array_set128_indexed_by_int8#"
+  let unboxed_int32_array_set_int32x4 arr i v = unboxed_int32_array_set_int32x4 arr (Stdlib_stable.Int8_u.of_int i) v
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int8# -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u_indexed_by_int8#"
+  let unboxed_int32_array_set_int32x4_unsafe arr i v = unboxed_int32_array_set_int32x4_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external untagged_int16_array_get_int16x8 : int16# array -> int8# -> int16x8 = "%caml_untagged_int16_array_get128_indexed_by_int8#"
+  let untagged_int16_array_get_int16x8 arr i = untagged_int16_array_get_int16x8 arr (Stdlib_stable.Int8_u.of_int i)
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> int8# -> int16x8 = "%caml_untagged_int16_array_get128u_indexed_by_int8#"
+  let untagged_int16_array_get_int16x8_unsafe arr i = untagged_int16_array_get_int16x8_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external untagged_int16_array_set_int16x8 : int16# array -> int8# -> int16x8 -> unit = "%caml_untagged_int16_array_set128_indexed_by_int8#"
+  let untagged_int16_array_set_int16x8 arr i v = untagged_int16_array_set_int16x8 arr (Stdlib_stable.Int8_u.of_int i) v
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> int8# -> int16x8 -> unit = "%caml_untagged_int16_array_set128u_indexed_by_int8#"
+  let untagged_int16_array_set_int16x8_unsafe arr i v = untagged_int16_array_set_int16x8_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+  external untagged_int8_array_get_int8x16 : int8# array -> int8# -> int8x16 = "%caml_untagged_int8_array_get128_indexed_by_int8#"
+  let untagged_int8_array_get_int8x16 arr i = untagged_int8_array_get_int8x16 arr (Stdlib_stable.Int8_u.of_int i)
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> int8# -> int8x16 = "%caml_untagged_int8_array_get128u_indexed_by_int8#"
+  let untagged_int8_array_get_int8x16_unsafe arr i = untagged_int8_array_get_int8x16_unsafe arr (Stdlib_stable.Int8_u.of_int i)
+
+  external untagged_int8_array_set_int8x16 : int8# array -> int8# -> int8x16 -> unit = "%caml_untagged_int8_array_set128_indexed_by_int8#"
+  let untagged_int8_array_set_int8x16 arr i v = untagged_int8_array_set_int8x16 arr (Stdlib_stable.Int8_u.of_int i) v
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> int8# -> int8x16 -> unit = "%caml_untagged_int8_array_set128u_indexed_by_int8#"
+  let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_stable.Int8_u.of_int i) v
+
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> int16# -> int64x2 = "%caml_int_array_get128_indexed_by_int16#"
+  let int_array_get_int64x2 arr i = int_array_get_int64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external int_array_get_int64x2_unsafe : int array -> int16# -> int64x2 = "%caml_int_array_get128u_indexed_by_int16#"
+  let int_array_get_int64x2_unsafe arr i = int_array_get_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external int_iarray_get_int64x2 : int iarray -> int16# -> int64x2 = "%caml_int_array_get128_indexed_by_int16#"
+  let int_iarray_get_int64x2 arr i = int_iarray_get_int64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external int_iarray_get_int64x2_unsafe : int iarray -> int16# -> int64x2 = "%caml_int_array_get128u_indexed_by_int16#"
+  let int_iarray_get_int64x2_unsafe arr i = int_iarray_get_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external int_array_set_int64x2 : int array -> int16# -> int64x2 -> unit = "%caml_int_array_set128_indexed_by_int16#"
+  let int_array_set_int64x2 arr i v = int_array_set_int64x2 arr (Stdlib_stable.Int16_u.of_int i) v
+  external int_array_set_int64x2_unsafe : int array -> int16# -> int64x2 -> unit = "%caml_int_array_set128u_indexed_by_int16#"
+  let int_array_set_int64x2_unsafe arr i v = int_array_set_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> int16# -> int64x2 = "%caml_unboxed_int64_array_get128_indexed_by_int16#"
+  let unboxed_int64_array_get_int64x2 arr i = unboxed_int64_array_get_int64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int16# -> int64x2 = "%caml_unboxed_int64_array_get128u_indexed_by_int16#"
+  let unboxed_int64_array_get_int64x2_unsafe arr i = unboxed_int64_array_get_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> int16# -> int64x2 -> unit = "%caml_unboxed_int64_array_set128_indexed_by_int16#"
+  let unboxed_int64_array_set_int64x2 arr i v = unboxed_int64_array_set_int64x2 arr (Stdlib_stable.Int16_u.of_int i) v
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int16# -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u_indexed_by_int16#"
+  let unboxed_int64_array_set_int64x2_unsafe arr i v = unboxed_int64_array_set_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int16# -> int64x2 = "%caml_unboxed_nativeint_array_get128_indexed_by_int16#"
+  let unboxed_nativeint_array_get_int64x2 arr i = unboxed_nativeint_array_get_int64x2 arr (Stdlib_stable.Int16_u.of_int i)
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int16# -> int64x2 = "%caml_unboxed_nativeint_array_get128u_indexed_by_int16#"
+  let unboxed_nativeint_array_get_int64x2_unsafe arr i = unboxed_nativeint_array_get_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int16# -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128_indexed_by_int16#"
+  let unboxed_nativeint_array_set_int64x2 arr i v = unboxed_nativeint_array_set_int64x2 arr (Stdlib_stable.Int16_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int16# -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u_indexed_by_int16#"
+  let unboxed_nativeint_array_set_int64x2_unsafe arr i v = unboxed_nativeint_array_set_int64x2_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> int16# -> int32x4 = "%caml_unboxed_int32_array_get128_indexed_by_int16#"
+  let unboxed_int32_array_get_int32x4 arr i = unboxed_int32_array_get_int32x4 arr (Stdlib_stable.Int16_u.of_int i)
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int16# -> int32x4 = "%caml_unboxed_int32_array_get128u_indexed_by_int16#"
+  let unboxed_int32_array_get_int32x4_unsafe arr i = unboxed_int32_array_get_int32x4_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> int16# -> int32x4 -> unit = "%caml_unboxed_int32_array_set128_indexed_by_int16#"
+  let unboxed_int32_array_set_int32x4 arr i v = unboxed_int32_array_set_int32x4 arr (Stdlib_stable.Int16_u.of_int i) v
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int16# -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u_indexed_by_int16#"
+  let unboxed_int32_array_set_int32x4_unsafe arr i v = unboxed_int32_array_set_int32x4_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external untagged_int16_array_get_int16x8 : int16# array -> int16# -> int16x8 = "%caml_untagged_int16_array_get128_indexed_by_int16#"
+  let untagged_int16_array_get_int16x8 arr i = untagged_int16_array_get_int16x8 arr (Stdlib_stable.Int16_u.of_int i)
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> int16# -> int16x8 = "%caml_untagged_int16_array_get128u_indexed_by_int16#"
+  let untagged_int16_array_get_int16x8_unsafe arr i = untagged_int16_array_get_int16x8_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external untagged_int16_array_set_int16x8 : int16# array -> int16# -> int16x8 -> unit = "%caml_untagged_int16_array_set128_indexed_by_int16#"
+  let untagged_int16_array_set_int16x8 arr i v = untagged_int16_array_set_int16x8 arr (Stdlib_stable.Int16_u.of_int i) v
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> int16# -> int16x8 -> unit = "%caml_untagged_int16_array_set128u_indexed_by_int16#"
+  let untagged_int16_array_set_int16x8_unsafe arr i v = untagged_int16_array_set_int16x8_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+
+  external untagged_int8_array_get_int8x16 : int8# array -> int16# -> int8x16 = "%caml_untagged_int8_array_get128_indexed_by_int16#"
+  let untagged_int8_array_get_int8x16 arr i = untagged_int8_array_get_int8x16 arr (Stdlib_stable.Int16_u.of_int i)
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> int16# -> int8x16 = "%caml_untagged_int8_array_get128u_indexed_by_int16#"
+  let untagged_int8_array_get_int8x16_unsafe arr i = untagged_int8_array_get_int8x16_unsafe arr (Stdlib_stable.Int16_u.of_int i)
+
+  external untagged_int8_array_set_int8x16 : int8# array -> int16# -> int8x16 -> unit = "%caml_untagged_int8_array_set128_indexed_by_int16#"
+  let untagged_int8_array_set_int8x16 arr i v = untagged_int8_array_set_int8x16 arr (Stdlib_stable.Int16_u.of_int i) v
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> int16# -> int8x16 -> unit = "%caml_untagged_int8_array_set128u_indexed_by_int16#"
+  let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_stable.Int16_u.of_int i) v
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> int32_u -> int64x2 = "%caml_int_array_get128_indexed_by_int32#"
+  let int_array_get_int64x2 arr i = int_array_get_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external int_array_get_int64x2_unsafe : int array -> int32_u -> int64x2 = "%caml_int_array_get128u_indexed_by_int32#"
+  let int_array_get_int64x2_unsafe arr i = int_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external int_iarray_get_int64x2 : int iarray -> int32_u -> int64x2 = "%caml_int_array_get128_indexed_by_int32#"
+  let int_iarray_get_int64x2 arr i = int_iarray_get_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external int_iarray_get_int64x2_unsafe : int iarray -> int32_u -> int64x2 = "%caml_int_array_get128u_indexed_by_int32#"
+  let int_iarray_get_int64x2_unsafe arr i = int_iarray_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external int_array_set_int64x2 : int array -> int32_u -> int64x2 -> unit = "%caml_int_array_set128_indexed_by_int32#"
+  let int_array_set_int64x2 arr i v = int_array_set_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external int_array_set_int64x2_unsafe : int array -> int32_u -> int64x2 -> unit = "%caml_int_array_set128u_indexed_by_int32#"
+  let int_array_set_int64x2_unsafe arr i v = int_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> int32_u -> int64x2 = "%caml_unboxed_int64_array_get128_indexed_by_int32#"
+  let unboxed_int64_array_get_int64x2 arr i = unboxed_int64_array_get_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int32_u -> int64x2 = "%caml_unboxed_int64_array_get128u_indexed_by_int32#"
+  let unboxed_int64_array_get_int64x2_unsafe arr i = unboxed_int64_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> int32_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128_indexed_by_int32#"
+  let unboxed_int64_array_set_int64x2 arr i v = unboxed_int64_array_set_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int32_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u_indexed_by_int32#"
+  let unboxed_int64_array_set_int64x2_unsafe arr i v = unboxed_int64_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int32_u -> int64x2 = "%caml_unboxed_nativeint_array_get128_indexed_by_int32#"
+  let unboxed_nativeint_array_get_int64x2 arr i = unboxed_nativeint_array_get_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int32_u -> int64x2 = "%caml_unboxed_nativeint_array_get128u_indexed_by_int32#"
+  let unboxed_nativeint_array_get_int64x2_unsafe arr i = unboxed_nativeint_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int32_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128_indexed_by_int32#"
+  let unboxed_nativeint_array_set_int64x2 arr i v = unboxed_nativeint_array_set_int64x2 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int32_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u_indexed_by_int32#"
+  let unboxed_nativeint_array_set_int64x2_unsafe arr i v = unboxed_nativeint_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> int32_u -> int32x4 = "%caml_unboxed_int32_array_get128_indexed_by_int32#"
+  let unboxed_int32_array_get_int32x4 arr i = unboxed_int32_array_get_int32x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int32_u -> int32x4 = "%caml_unboxed_int32_array_get128u_indexed_by_int32#"
+  let unboxed_int32_array_get_int32x4_unsafe arr i = unboxed_int32_array_get_int32x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> int32_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128_indexed_by_int32#"
+  let unboxed_int32_array_set_int32x4 arr i v = unboxed_int32_array_set_int32x4 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int32_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u_indexed_by_int32#"
+  let unboxed_int32_array_set_int32x4_unsafe arr i v = unboxed_int32_array_set_int32x4_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external untagged_int16_array_get_int16x8 : int16# array -> int32_u -> int16x8 = "%caml_untagged_int16_array_get128_indexed_by_int32#"
+  let untagged_int16_array_get_int16x8 arr i = untagged_int16_array_get_int16x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> int32_u -> int16x8 = "%caml_untagged_int16_array_get128u_indexed_by_int32#"
+  let untagged_int16_array_get_int16x8_unsafe arr i = untagged_int16_array_get_int16x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external untagged_int16_array_set_int16x8 : int16# array -> int32_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128_indexed_by_int32#"
+  let untagged_int16_array_set_int16x8 arr i v = untagged_int16_array_set_int16x8 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> int32_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128u_indexed_by_int32#"
+  let untagged_int16_array_set_int16x8_unsafe arr i v = untagged_int16_array_set_int16x8_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+
+  external untagged_int8_array_get_int8x16 : int8# array -> int32_u -> int8x16 = "%caml_untagged_int8_array_get128_indexed_by_int32#"
+  let untagged_int8_array_get_int8x16 arr i = untagged_int8_array_get_int8x16 arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> int32_u -> int8x16 = "%caml_untagged_int8_array_get128u_indexed_by_int32#"
+  let untagged_int8_array_get_int8x16_unsafe arr i = untagged_int8_array_get_int8x16_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i)
+
+  external untagged_int8_array_set_int8x16 : int8# array -> int32_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128_indexed_by_int32#"
+  let untagged_int8_array_set_int8x16 arr i v = untagged_int8_array_set_int8x16 arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> int32_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128u_indexed_by_int32#"
+  let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Int32_u.of_int i) v
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> int64_u -> int64x2 = "%caml_int_array_get128_indexed_by_int64#"
+  let int_array_get_int64x2 arr i = int_array_get_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external int_array_get_int64x2_unsafe : int array -> int64_u -> int64x2 = "%caml_int_array_get128u_indexed_by_int64#"
+  let int_array_get_int64x2_unsafe arr i = int_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external int_iarray_get_int64x2 : int iarray -> int64_u -> int64x2 = "%caml_int_array_get128_indexed_by_int64#"
+  let int_iarray_get_int64x2 arr i = int_iarray_get_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external int_iarray_get_int64x2_unsafe : int iarray -> int64_u -> int64x2 = "%caml_int_array_get128u_indexed_by_int64#"
+  let int_iarray_get_int64x2_unsafe arr i = int_iarray_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external int_array_set_int64x2 : int array -> int64_u -> int64x2 -> unit = "%caml_int_array_set128_indexed_by_int64#"
+  let int_array_set_int64x2 arr i v = int_array_set_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external int_array_set_int64x2_unsafe : int array -> int64_u -> int64x2 -> unit = "%caml_int_array_set128u_indexed_by_int64#"
+  let int_array_set_int64x2_unsafe arr i v = int_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> int64_u -> int64x2 = "%caml_unboxed_int64_array_get128_indexed_by_int64#"
+  let unboxed_int64_array_get_int64x2 arr i = unboxed_int64_array_get_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> int64_u -> int64x2 = "%caml_unboxed_int64_array_get128u_indexed_by_int64#"
+  let unboxed_int64_array_get_int64x2_unsafe arr i = unboxed_int64_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> int64_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128_indexed_by_int64#"
+  let unboxed_int64_array_set_int64x2 arr i v = unboxed_int64_array_set_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> int64_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u_indexed_by_int64#"
+  let unboxed_int64_array_set_int64x2_unsafe arr i v = unboxed_int64_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> int64_u -> int64x2 = "%caml_unboxed_nativeint_array_get128_indexed_by_int64#"
+  let unboxed_nativeint_array_get_int64x2 arr i = unboxed_nativeint_array_get_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> int64_u -> int64x2 = "%caml_unboxed_nativeint_array_get128u_indexed_by_int64#"
+  let unboxed_nativeint_array_get_int64x2_unsafe arr i = unboxed_nativeint_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> int64_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128_indexed_by_int64#"
+  let unboxed_nativeint_array_set_int64x2 arr i v = unboxed_nativeint_array_set_int64x2 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> int64_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u_indexed_by_int64#"
+  let unboxed_nativeint_array_set_int64x2_unsafe arr i v = unboxed_nativeint_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> int64_u -> int32x4 = "%caml_unboxed_int32_array_get128_indexed_by_int64#"
+  let unboxed_int32_array_get_int32x4 arr i = unboxed_int32_array_get_int32x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> int64_u -> int32x4 = "%caml_unboxed_int32_array_get128u_indexed_by_int64#"
+  let unboxed_int32_array_get_int32x4_unsafe arr i = unboxed_int32_array_get_int32x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> int64_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128_indexed_by_int64#"
+  let unboxed_int32_array_set_int32x4 arr i v = unboxed_int32_array_set_int32x4 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> int64_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u_indexed_by_int64#"
+  let unboxed_int32_array_set_int32x4_unsafe arr i v = unboxed_int32_array_set_int32x4_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external untagged_int16_array_get_int16x8 : int16# array -> int64_u -> int16x8 = "%caml_untagged_int16_array_get128_indexed_by_int64#"
+  let untagged_int16_array_get_int16x8 arr i = untagged_int16_array_get_int16x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> int64_u -> int16x8 = "%caml_untagged_int16_array_get128u_indexed_by_int64#"
+  let untagged_int16_array_get_int16x8_unsafe arr i = untagged_int16_array_get_int16x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external untagged_int16_array_set_int16x8 : int16# array -> int64_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128_indexed_by_int64#"
+  let untagged_int16_array_set_int16x8 arr i v = untagged_int16_array_set_int16x8 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> int64_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128u_indexed_by_int64#"
+  let untagged_int16_array_set_int16x8_unsafe arr i v = untagged_int16_array_set_int16x8_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+  external untagged_int8_array_get_int8x16 : int8# array -> int64_u -> int8x16 = "%caml_untagged_int8_array_get128_indexed_by_int64#"
+  let untagged_int8_array_get_int8x16 arr i = untagged_int8_array_get_int8x16 arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> int64_u -> int8x16 = "%caml_untagged_int8_array_get128u_indexed_by_int64#"
+  let untagged_int8_array_get_int8x16_unsafe arr i = untagged_int8_array_get_int8x16_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i)
+
+  external untagged_int8_array_set_int8x16 : int8# array -> int64_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128_indexed_by_int64#"
+  let untagged_int8_array_set_int8x16 arr i v = untagged_int8_array_set_int8x16 arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> int64_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128u_indexed_by_int64#"
+  let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Int64_u.of_int i) v
+
+end)
+
+module _ = Int_arrays(struct
+
+  external int_array_get_int64x2 : int array -> nativeint_u -> int64x2 = "%caml_int_array_get128_indexed_by_nativeint#"
+  let int_array_get_int64x2 arr i = int_array_get_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external int_array_get_int64x2_unsafe : int array -> nativeint_u -> int64x2 = "%caml_int_array_get128u_indexed_by_nativeint#"
+  let int_array_get_int64x2_unsafe arr i = int_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external int_iarray_get_int64x2 : int iarray -> nativeint_u -> int64x2 = "%caml_int_array_get128_indexed_by_nativeint#"
+  let int_iarray_get_int64x2 arr i = int_iarray_get_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external int_iarray_get_int64x2_unsafe : int iarray -> nativeint_u -> int64x2 = "%caml_int_array_get128u_indexed_by_nativeint#"
+  let int_iarray_get_int64x2_unsafe arr i = int_iarray_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external int_array_set_int64x2 : int array -> nativeint_u -> int64x2 -> unit = "%caml_int_array_set128_indexed_by_nativeint#"
+  let int_array_set_int64x2 arr i v = int_array_set_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external int_array_set_int64x2_unsafe : int array -> nativeint_u -> int64x2 -> unit = "%caml_int_array_set128u_indexed_by_nativeint#"
+  let int_array_set_int64x2_unsafe arr i v = int_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_int64_array_get_int64x2 : int64_u array -> nativeint_u -> int64x2 = "%caml_unboxed_int64_array_get128_indexed_by_nativeint#"
+  let unboxed_int64_array_get_int64x2 arr i = unboxed_int64_array_get_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_int64_array_get_int64x2_unsafe : int64_u array -> nativeint_u -> int64x2 = "%caml_unboxed_int64_array_get128u_indexed_by_nativeint#"
+  let unboxed_int64_array_get_int64x2_unsafe arr i = unboxed_int64_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_int64_array_set_int64x2 : int64_u array -> nativeint_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128_indexed_by_nativeint#"
+  let unboxed_int64_array_set_int64x2 arr i v = unboxed_int64_array_set_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_int64_array_set_int64x2_unsafe : int64_u array -> nativeint_u -> int64x2 -> unit = "%caml_unboxed_int64_array_set128u_indexed_by_nativeint#"
+  let unboxed_int64_array_set_int64x2_unsafe arr i v = unboxed_int64_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_nativeint_array_get_int64x2 : nativeint_u array -> nativeint_u -> int64x2 = "%caml_unboxed_nativeint_array_get128_indexed_by_nativeint#"
+  let unboxed_nativeint_array_get_int64x2 arr i = unboxed_nativeint_array_get_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_nativeint_array_get_int64x2_unsafe : nativeint_u array -> nativeint_u -> int64x2 = "%caml_unboxed_nativeint_array_get128u_indexed_by_nativeint#"
+  let unboxed_nativeint_array_get_int64x2_unsafe arr i = unboxed_nativeint_array_get_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_nativeint_array_set_int64x2 : nativeint_u array -> nativeint_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128_indexed_by_nativeint#"
+  let unboxed_nativeint_array_set_int64x2 arr i v = unboxed_nativeint_array_set_int64x2 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_nativeint_array_set_int64x2_unsafe : nativeint_u array -> nativeint_u -> int64x2 -> unit = "%caml_unboxed_nativeint_array_set128u_indexed_by_nativeint#"
+  let unboxed_nativeint_array_set_int64x2_unsafe arr i v = unboxed_nativeint_array_set_int64x2_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external unboxed_int32_array_get_int32x4 : int32_u array -> nativeint_u -> int32x4 = "%caml_unboxed_int32_array_get128_indexed_by_nativeint#"
+  let unboxed_int32_array_get_int32x4 arr i = unboxed_int32_array_get_int32x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external unboxed_int32_array_get_int32x4_unsafe : int32_u array -> nativeint_u -> int32x4 = "%caml_unboxed_int32_array_get128u_indexed_by_nativeint#"
+  let unboxed_int32_array_get_int32x4_unsafe arr i = unboxed_int32_array_get_int32x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external unboxed_int32_array_set_int32x4 : int32_u array -> nativeint_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128_indexed_by_nativeint#"
+  let unboxed_int32_array_set_int32x4 arr i v = unboxed_int32_array_set_int32x4 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external unboxed_int32_array_set_int32x4_unsafe : int32_u array -> nativeint_u -> int32x4 -> unit = "%caml_unboxed_int32_array_set128u_indexed_by_nativeint#"
+  let unboxed_int32_array_set_int32x4_unsafe arr i v = unboxed_int32_array_set_int32x4_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external untagged_int16_array_get_int16x8 : int16# array -> nativeint_u -> int16x8 = "%caml_untagged_int16_array_get128_indexed_by_nativeint#"
+  let untagged_int16_array_get_int16x8 arr i = untagged_int16_array_get_int16x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external untagged_int16_array_get_int16x8_unsafe : int16# array -> nativeint_u -> int16x8 = "%caml_untagged_int16_array_get128u_indexed_by_nativeint#"
+  let untagged_int16_array_get_int16x8_unsafe arr i = untagged_int16_array_get_int16x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external untagged_int16_array_set_int16x8 : int16# array -> nativeint_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128_indexed_by_nativeint#"
+  let untagged_int16_array_set_int16x8 arr i v = untagged_int16_array_set_int16x8 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external untagged_int16_array_set_int16x8_unsafe : int16# array -> nativeint_u -> int16x8 -> unit = "%caml_untagged_int16_array_set128u_indexed_by_nativeint#"
+  let untagged_int16_array_set_int16x8_unsafe arr i v = untagged_int16_array_set_int16x8_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+  external untagged_int8_array_get_int8x16 : int8# array -> nativeint_u -> int8x16 = "%caml_untagged_int8_array_get128_indexed_by_nativeint#"
+  let untagged_int8_array_get_int8x16 arr i = untagged_int8_array_get_int8x16 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+  external untagged_int8_array_get_int8x16_unsafe : int8# array -> nativeint_u -> int8x16 = "%caml_untagged_int8_array_get128u_indexed_by_nativeint#"
+  let untagged_int8_array_get_int8x16_unsafe arr i = untagged_int8_array_get_int8x16_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i)
+
+  external untagged_int8_array_set_int8x16 : int8# array -> nativeint_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128_indexed_by_nativeint#"
+  let untagged_int8_array_set_int8x16 arr i v = untagged_int8_array_set_int8x16 arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+  external untagged_int8_array_set_int8x16_unsafe : int8# array -> nativeint_u -> int8x16 -> unit = "%caml_untagged_int8_array_set128u_indexed_by_nativeint#"
+  let untagged_int8_array_set_int8x16_unsafe arr i v = untagged_int8_array_set_int8x16_unsafe arr (Stdlib_upstream_compatible.Nativeint_u.of_int i) v
+
+end)
+
+(* Regression test for a bug in the arm64 backend's unaligned 128-bit
+   load/store address computation (backend/arm64/emit.ml, [Onetwentyeight_unaligned]).
+
+   The effective address [base + offset] was materialised with a raw
+   ADD-immediate ([O.imm n]).  An ARM64 ADD/SUB immediate can only encode an
+   unsigned 12-bit value (optionally shifted left by 12), so a statically-known
+   negative offset (e.g. from [set128u a (-2) v], offset -16) or a large,
+   non-12-bit-encodable offset could not be encoded.  This surfaced as a fatal
+   "imm: value -16 not encodable ..." at emit time once the AST constructor
+   started validating its argument (oxcaml/oxcaml#6313).  The fix computes the
+   address with [emit_addimm], which emits SUB / split-ADD as needed.
+
+   These accesses are deliberately guarded by [Sys.opaque_identity false]: the
+   bug is purely at instruction *emission*, so we only need the compiler to
+   emit the load/store at a negative / large constant offset.  We must NOT
+   actually execute an out-of-bounds unsafe access, and the opaque guard both
+   defeats dead-code elimination (so the instructions are still emitted) and
+   ensures they never run. *)
+module _ = struct
+  external get128u : int64_u array -> int -> int64x2
+    = "%caml_unboxed_int64_array_get128u"
+  external set128u : int64_u array -> int -> int64x2 -> unit
+    = "%caml_unboxed_int64_array_set128u"
+
+  let () =
+    if Sys.opaque_identity false
+    then begin
+      let a = [| #0L; #1L; #2L; #3L |] in
+      let v = int64x2_of_int64s 0xAAAAAAAAAAAAAAAAL 0xBBBBBBBBBBBBBBBBL in
+      (* Negative constant offsets: -8 and -16 (the value from the original
+         failure).  These are encoded via SUB after the fix. *)
+      set128u a (-1) v;
+      set128u a (-2) v;
+      ignore (Sys.opaque_identity (get128u a (-1)));
+      ignore (Sys.opaque_identity (get128u a (-2)));
+      (* Large positive offset with nonzero low 12 bits: index 514 is byte
+         offset 514*8 = 0x1010, which is not a single 12-bit immediate and must
+         be materialised with a split ADD. *)
+      set128u a 514 v;
+      ignore (Sys.opaque_identity (get128u a 514))
+    end
+  ;;
+end

@@ -1,0 +1,207 @@
+[
+  structure_item 
+    Pstr_value Rec
+    [
+      <def>
+        pattern 
+          Ppat_var "fib" 
+        expression 
+          Pexp_function
+          []
+          None
+          Pfunction_cases 
+            [
+              <case>
+                pattern 
+                  Ppat_or
+                  pattern 
+                    Ppat_constant
+                    constant 
+                      PConst_int (0,None)
+                  pattern 
+                    Ppat_constant
+                    constant 
+                      PConst_int (1,None)
+                expression 
+                  Pexp_constant
+                  constant 
+                    PConst_int (1,None)
+              <case>
+                pattern 
+                  Ppat_var "n" 
+                expression 
+                  Pexp_apply
+                  expression 
+                    Pexp_ident "+" 
+                  [
+                    <arg>
+                    Nolabel
+                      expression 
+                        Pexp_apply
+                        expression 
+                          Pexp_ident "fib" 
+                        [
+                          <arg>
+                          Nolabel
+                            expression 
+                              Pexp_apply
+                              expression 
+                                Pexp_ident "-" 
+                              [
+                                <arg>
+                                Nolabel
+                                  expression 
+                                    Pexp_ident "n" 
+                                <arg>
+                                Nolabel
+                                  expression 
+                                    Pexp_constant
+                                    constant 
+                                      PConst_int (1,None)
+                              ]
+                        ]
+                    <arg>
+                    Nolabel
+                      expression 
+                        Pexp_apply
+                        expression 
+                          Pexp_ident "fib" 
+                        [
+                          <arg>
+                          Nolabel
+                            expression 
+                              Pexp_apply
+                              expression 
+                                Pexp_ident "-" 
+                              [
+                                <arg>
+                                Nolabel
+                                  expression 
+                                    Pexp_ident "n" 
+                                <arg>
+                                Nolabel
+                                  expression 
+                                    Pexp_constant
+                                    constant 
+                                      PConst_int (2,None)
+                              ]
+                        ]
+                  ]
+            ]
+    ]
+]
+
+let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
+[
+  structure_item 
+    Tstr_value Rec
+    [
+      <def_rec>
+        pattern 
+          Tpat_var "fib"
+          sort value
+          value_mode global,many,portable,forkable,unyielding,stateful;meet(unique,uncontended,read_write,static,id(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+        expression 
+          Texp_function
+          alloc_mode global
+          yielding_mode unyielding
+          return_mode global
+          []
+          []
+          Tfunction_cases 
+            locality_mode global
+            value
+            [
+              <case>
+                pattern 
+                  Tpat_or
+                  pattern 
+                    Tpat_constant Const_int 0
+                  pattern 
+                    Tpat_constant Const_int 1
+                expression 
+                  Texp_constant Const_int 1
+              <case>
+                pattern 
+                  Tpat_var "n"
+                  sort value
+                  value_mode global,many,portable,forkable,unyielding,stateless;unique,uncontended,read_write,dynamic
+                expression 
+                  Texp_apply
+                  apply_mode Tail
+                  return_mode global
+                  yielding_mode unyielding
+                  expression 
+                    Texp_ident "Stdlib!.+"
+                  [
+                    <arg>
+                      Nolabel
+                      expression 
+                        Texp_apply
+                        apply_mode Default
+                        return_mode global
+                        yielding_mode unyielding
+                        expression 
+                          Texp_ident "fib"
+                        [
+                          <arg>
+                            Nolabel
+                            expression 
+                              Texp_apply
+                              apply_mode Default
+                              return_mode global
+                              yielding_mode unyielding
+                              expression 
+                                Texp_ident "Stdlib!.-"
+                              [
+                                <arg>
+                                  Nolabel
+                                  expression 
+                                    Texp_ident "n"
+                                <arg>
+                                  Nolabel
+                                  expression 
+                                    Texp_constant Const_int 1
+                              ]
+                        ]
+                    <arg>
+                      Nolabel
+                      expression 
+                        Texp_apply
+                        apply_mode Default
+                        return_mode global
+                        yielding_mode unyielding
+                        expression 
+                          Texp_ident "fib"
+                        [
+                          <arg>
+                            Nolabel
+                            expression 
+                              Texp_apply
+                              apply_mode Default
+                              return_mode global
+                              yielding_mode unyielding
+                              expression 
+                                Texp_ident "Stdlib!.-"
+                              [
+                                <arg>
+                                  Nolabel
+                                  expression 
+                                    Texp_ident "n"
+                                <arg>
+                                  Nolabel
+                                  expression 
+                                    Texp_constant Const_int 2
+                              ]
+                        ]
+                  ]
+            ]
+    ]
+]
+
+(letrec
+  (fib
+     (function {nlocal = 0} n[value<int>] : int
+       (if (isout 1 n)
+         (%int_add (apply fib (%int_sub n 1)) (apply fib (%int_sub n 2))) 1)))
+  (makeblock 0 fib))

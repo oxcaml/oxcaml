@@ -1,0 +1,2 @@
+File "support_lto_with_opaque.ml", line 1:
+Error: -support-lto is incompatible with -opaque

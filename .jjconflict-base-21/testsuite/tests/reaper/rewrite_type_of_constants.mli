@@ -1,0 +1,2 @@
+val f : bool -> int
+

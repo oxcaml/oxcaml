@@ -1,0 +1,1146 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                       Pierre Chambart, OCamlPro                        *)
+(*           Mark Shinwell and Leo White, Jane Street Europe              *)
+(*                                                                        *)
+(*   Copyright 2013--2021 OCamlPro SAS                                    *)
+(*   Copyright 2014--2021 Jane Street Group LLC                           *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** The interface to the Flambda type system. This is parameterised over the
+    expression language via [Code_id]. *)
+
+type t
+
+type flambda_type = t
+
+val print : Format.formatter -> t -> unit
+
+val arity_of_list : t list -> [`Unarized] Flambda_arity.t
+
+val apply_renaming : t -> Renaming.t -> t
+
+include Contains_ids.S with type t := t
+
+val remove_unused_value_slots_and_shortcut_aliases :
+  t ->
+  used_value_slots:Value_slot.Set.t ->
+  canonicalise:(Simple.t -> Simple.t) ->
+  t
+
+type typing_env
+
+type typing_env_extension
+
+module Code_age_relation : sig
+  type t
+
+  val print : Format.formatter -> t -> unit
+
+  val empty : t
+
+  val get_older_version_of : t -> Code_id.t -> Code_id.t option
+
+  val all_code_ids_for_export : t -> Code_id.Set.t
+
+  val apply_renaming : t -> Renaming.t -> t
+
+  val union : t -> t -> t
+
+  val meet_set :
+    t ->
+    resolver:(Compilation_unit.t -> t option) ->
+    Code_id.Set.t ->
+    Code_id.Set.t ->
+    Code_id.Set.t Or_bottom.t
+end
+
+module Typing_env_extension : sig
+  type t = typing_env_extension
+
+  val print : Format.formatter -> t -> unit
+
+  val invariant : t -> unit
+
+  val empty : t
+
+  val has_equation : Name.t -> t -> bool
+
+  val one_equation : Name.t -> flambda_type -> t
+
+  val add_or_replace_equation : t -> Name.t -> flambda_type -> t
+
+  val add_is_null_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
+
+  val add_is_int_relation :
+    machine_width:Target_system.Machine_width.t ->
+    t ->
+    Name.t ->
+    scrutinee:Simple.t ->
+    t
+
+  val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val disjoint_union : t -> t -> t
+
+  module With_extra_variables : sig
+    type t
+
+    val print : Format.formatter -> t -> unit
+
+    val empty : t
+
+    val add_definition : t -> Variable.t -> Flambda_kind.t -> t
+
+    val add_or_replace_equation : t -> Name.t -> flambda_type -> t
+
+    val map_types : t -> f:(flambda_type -> flambda_type) -> t
+
+    val existential_vars : t -> Variable.Set.t
+
+    include Contains_ids.S with type t := t
+
+    include Contains_names.S with type t := t
+  end
+end
+
+module Typing_env : sig
+  type t = typing_env
+
+  module Pre_serializable : sig
+    type t
+
+    (* This function ensures that all occurrences of aliases in the returned
+       environment are canonical. But some types, like function return types,
+       live outside the typing environment. To ensure that they can be exported
+       safely, they must go through
+       [remove_unused_closure_vars_and_shortcut_aliases] too, with the
+       [canonicalise] argument set to the function returned here. *)
+    val create :
+      typing_env ->
+      used_value_slots:Value_slot.Set.t ->
+      t * (Simple.t -> Simple.t)
+
+    val find : t -> Name.t -> flambda_type
+  end
+
+  module Serializable : sig
+    type t
+
+    val create : Pre_serializable.t -> reachable_names:Name_occurrences.t -> t
+
+    val create_from_closure_conversion_approx :
+      machine_width:Target_system.Machine_width.t ->
+      'a Value_approximation.t Symbol.Map.t ->
+      t
+
+    val predefined_exceptions : Symbol.Set.t -> t
+
+    val free_function_slots_and_value_slots : t -> Name_occurrences.t
+
+    val print : Format.formatter -> t -> unit
+
+    val ids_for_export : t -> Ids_for_export.t
+
+    val apply_renaming : t -> Renaming.t -> t
+
+    val merge : t -> t -> t
+
+    val extract_symbol_approx :
+      t -> Symbol.t -> (Code_id.t -> 'code) -> 'code Value_approximation.t
+  end
+
+  val print : Format.formatter -> t -> unit
+
+  val create :
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> Serializable.t option) ->
+    t
+
+  (** Convert closure conversion approximations to a typing environment. * *)
+  val create_from_closure_conversion_approx :
+    machine_width:Target_system.Machine_width.t ->
+    resolver:(Compilation_unit.t -> Serializable.t option) ->
+    'a Value_approximation.t Symbol.Map.t ->
+    t
+
+  val machine_width : t -> Target_system.Machine_width.t
+
+  val closure_env : t -> t
+
+  val resolver : t -> Compilation_unit.t -> Serializable.t option
+
+  val code_age_relation_resolver :
+    t -> Compilation_unit.t -> Code_age_relation.t option
+
+  val current_scope : t -> Scope.t
+
+  val increment_scope : t -> t
+
+  val add_definition : t -> Bound_name.t -> Flambda_kind.t -> t
+
+  val add_definitions_of_params : t -> params:Bound_parameters.t -> t
+
+  val add_symbol_definition : t -> Symbol.t -> t
+
+  val add_symbol_definitions : t -> Symbol.Set.t -> t
+
+  val add_symbol_projection : t -> Variable.t -> Symbol_projection.t -> t
+
+  val find_symbol_projection : t -> Variable.t -> Symbol_projection.t option
+
+  val add_equation : t -> Name.t -> flambda_type -> t
+
+  val add_equations_on_params :
+    t -> params:Bound_parameters.t -> param_types:flambda_type list -> t
+
+  val add_is_null_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_is_int_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val add_get_tag_relation : t -> Name.t -> scrutinee:Simple.t -> t
+
+  val mem : ?min_name_mode:Name_mode.t -> t -> Name.t -> bool
+
+  val mem_simple : ?min_name_mode:Name_mode.t -> t -> Simple.t -> bool
+
+  val find : t -> Name.t -> Flambda_kind.t option -> flambda_type
+
+  val find_params : t -> Bound_parameters.t -> flambda_type list
+
+  val add_env_extension : t -> Typing_env_extension.t -> t
+
+  val add_env_extension_with_extra_variables :
+    t -> Typing_env_extension.With_extra_variables.t -> t
+
+  (** Raises [Not_found] if no canonical [Simple] was found.
+      [name_mode_of_existing_simple] can be provided to improve performance of
+      this function. *)
+  val get_canonical_simple_exn :
+    t ->
+    ?min_name_mode:Name_mode.t ->
+    ?name_mode_of_existing_simple:Name_mode.t ->
+    Simple.t ->
+    Simple.t
+
+  (** Raises [Not_found] if no canonical [Simple] was found. *)
+  val type_simple_in_term_exn :
+    t -> ?min_name_mode:Name_mode.t -> Simple.t -> flambda_type * Simple.t
+
+  (** Raises [Not_found] if no canonical [Simple] was found. *)
+  val get_alias_then_canonical_simple_exn :
+    t ->
+    ?min_name_mode:Name_mode.t ->
+    ?name_mode_of_existing_simple:Name_mode.t ->
+    flambda_type ->
+    Simple.t
+
+  val code_age_relation : t -> Code_age_relation.t
+
+  val with_code_age_relation : t -> Code_age_relation.t -> t
+
+  val add_to_code_age_relation :
+    t -> new_code_id:Code_id.t -> old_code_id:Code_id.t option -> t
+
+  val free_names_transitive : t -> flambda_type -> Name_occurrences.t
+
+  val bump_current_level_scope : t -> t
+
+  val stable_compare_simples : t -> Simple.t -> Simple.t -> int
+
+  module Alias_set : sig
+    type t
+
+    val filter : t -> f:(Simple.t -> bool) -> t
+
+    val get_singleton : t -> Simple.t option
+
+    val find_best : t -> Simple.t option
+
+    val inter : t -> t -> t
+
+    val singleton : Simple.t -> t
+
+    val print : Format.formatter -> t -> unit
+  end
+
+  val aliases_of_simple :
+    t -> min_name_mode:Name_mode.t -> Simple.t -> Alias_set.t
+end
+
+val meet : Typing_env.t -> t -> t -> (t * Typing_env.t) Or_bottom.t
+
+val meet_shape : Typing_env.t -> t -> shape:t -> Typing_env.t Or_bottom.t
+
+module Join_analysis : sig
+  type 'a t
+
+  val print : Format.formatter -> 'a t -> unit
+
+  module Variable_refined_at_join : sig
+    type 'a t
+
+    val fold_values_at_uses :
+      ('a -> Reg_width_const.t Or_unknown.t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  type 'a simple_refined_at_join =
+    | Not_refined_at_join
+    | Invariant_in_all_uses of Simple.t
+    | Variable_refined_at_these_uses of 'a Variable_refined_at_join.t
+
+  val simple_refined_at_join :
+    'a t -> Typing_env.t -> Simple.t -> 'a simple_refined_at_join
+
+  module Simples_at_join : sig
+    type 'a t
+
+    type definition_at_use = At_normal_mode of Simple.t [@@unboxed]
+
+    val fold_definitions_at_uses :
+      ('a -> definition_at_use -> 'b -> 'b) -> 'a t -> 'b -> 'b
+  end
+
+  (* Fold over the variables created during the join with information about
+     their value at each use.
+
+     Note that the variable may not have a value at all uses; for uses with no
+     value, the variable does not exist and can be poisoned. *)
+  val fold_variables_created_at_join :
+    f:(Name.t -> 'a Simples_at_join.t -> Flambda_kind.t -> 'b -> 'b) ->
+    'a t ->
+    init:'b ->
+    'b
+end
+
+val cut_and_n_way_join :
+  Typing_env.t ->
+  (Typing_env.t * Apply_cont_rewrite_id.t * Continuation_use_kind.t) list ->
+  params:Bound_parameters.t ->
+  cut_after:Scope.t ->
+  extra_lifted_consts_in_use_envs:Symbol.Set.t ->
+  extra_allowed_names:Name_occurrences.t ->
+  Typing_env.t * Apply_cont_rewrite_id.t Join_analysis.t option
+
+module Function_type : sig
+  type t
+
+  val create : Code_id.t -> rec_info:flambda_type -> t
+
+  val code_id : t -> Code_id.t
+
+  val rec_info : t -> flambda_type
+end
+
+module Closures_entry : sig
+  type t
+
+  val find_function_type : t -> Function_slot.t -> Function_type.t Or_unknown.t
+
+  val function_slot_types : t -> flambda_type Function_slot.Map.t
+
+  val value_slot_types : t -> flambda_type Value_slot.Map.t
+end
+
+val free_names : t -> Name_occurrences.t
+
+type to_erase =
+  | Everything_not_in of Typing_env.t
+  | All_variables_except of Variable.Set.t
+
+(** Adjust a type so it can be used in a different environment. There are two
+    modes of operation: either a target environment can be specified, in which
+    the resulting type is to be valid; or a set of variables may be supplied
+    which are the only ones allowed to occur in the resulting type. *)
+val make_suitable_for_environment :
+  Typing_env.t ->
+  to_erase ->
+  (Name.t * flambda_type) list ->
+  Typing_env_extension.With_extra_variables.t
+
+(** [type_is_useful full_kind env ty] returns [true] if knowing the type of
+    [name] (which is known to have kind [full_kind]) in environment [env] is
+    useful.
+
+    The exact definition of being "useful" is left to the typing env, and is an
+    approximation of the answer to the question: is the current type of [name]
+    in [env] more precise (in the sense that it would generally allow to [prove]
+    more properties) than [full_kind]? *)
+val type_is_useful :
+  Flambda_kind.With_subkind.t -> Typing_env.t -> Name.t -> bool
+
+val apply_coercion : flambda_type -> Coercion.t -> flambda_type
+
+(** Construct a bottom type of the given kind. *)
+val bottom : Flambda_kind.t -> t
+
+(** Construct a top ("unknown") type of the given kind. *)
+val unknown : Flambda_kind.t -> t
+
+val unknown_with_subkind :
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_kind.With_subkind.t ->
+  t
+
+(** Create an bottom type with the same kind as the given type. *)
+val bottom_like : t -> t
+
+(** Create an "unknown" type with the same kind as the given type. *)
+val unknown_like : t -> t
+
+val any_value : t
+
+val any_tagged_immediate : t
+
+val any_tagged_immediate_or_null : t
+
+val any_tagged_bool : machine_width:Target_system.Machine_width.t -> t
+
+val any_boxed_float32 : t
+
+val any_boxed_float : t
+
+val any_boxed_int32 : t
+
+val any_boxed_int64 : t
+
+val any_boxed_nativeint : t
+
+val any_naked_immediate : t
+
+val any_naked_bool : machine_width:Target_system.Machine_width.t -> t
+
+val any_naked_float32 : t
+
+val any_naked_float : t
+
+val any_naked_int8 : t
+
+val any_naked_int16 : t
+
+val any_naked_int32 : t
+
+val any_naked_int64 : t
+
+val any_naked_nativeint : t
+
+val any_region : t
+
+val any_rec_info : t
+
+(** Building of types representing tagged / boxed values from specified
+    constants. *)
+val this_tagged_immediate : Target_ocaml_int.t -> t
+
+val this_boxed_float32 :
+  Numeric_types.Float32_by_bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_float :
+  Numeric_types.Float_by_bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_int32 : Numeric_types.Int32.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_int64 : Numeric_types.Int64.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_nativeint : Targetint_32_64.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_vec128 :
+  Vector_types.Vec128.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_vec256 :
+  Vector_types.Vec256.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_vec512 :
+  Vector_types.Vec512.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val this_boxed_mask :
+  Vector_types.Mask.Bit_pattern.t -> Alloc_mode.For_types.t -> t
+
+val these_tagged_immediates : Target_ocaml_int.Set.t -> t
+
+val these_boxed_float32s :
+  Numeric_types.Float32_by_bit_pattern.Set.t -> Alloc_mode.For_types.t -> t
+
+val these_boxed_floats :
+  Numeric_types.Float_by_bit_pattern.Set.t -> Alloc_mode.For_types.t -> t
+
+val these_boxed_int32s :
+  Numeric_types.Int32.Set.t -> Alloc_mode.For_types.t -> t
+
+val these_boxed_int64s :
+  Numeric_types.Int64.Set.t -> Alloc_mode.For_types.t -> t
+
+val these_boxed_nativeints :
+  Targetint_32_64.Set.t -> Alloc_mode.For_types.t -> t
+
+(** Building of types representing untagged / unboxed values from specified
+    constants. *)
+val this_naked_immediate : Target_ocaml_int.t -> t
+
+val this_naked_float32 : Numeric_types.Float32_by_bit_pattern.t -> t
+
+val this_naked_float : Numeric_types.Float_by_bit_pattern.t -> t
+
+val this_naked_int8 : Numeric_types.Int8.t -> t
+
+val this_naked_int16 : Numeric_types.Int16.t -> t
+
+val this_naked_int32 : Numeric_types.Int32.t -> t
+
+val this_naked_int64 : Numeric_types.Int64.t -> t
+
+val this_naked_nativeint : Targetint_32_64.t -> t
+
+val this_naked_vec128 : Vector_types.Vec128.Bit_pattern.t -> t
+
+val this_naked_vec256 : Vector_types.Vec256.Bit_pattern.t -> t
+
+val this_naked_vec512 : Vector_types.Vec512.Bit_pattern.t -> t
+
+val this_naked_mask : Vector_types.Mask.Bit_pattern.t -> t
+
+val this_rec_info : Rec_info_expr.t -> t
+
+val these_naked_immediates : Target_ocaml_int.Set.t -> t
+
+val these_naked_float32s : Numeric_types.Float32_by_bit_pattern.Set.t -> t
+
+val these_naked_floats : Numeric_types.Float_by_bit_pattern.Set.t -> t
+
+val these_naked_int8s : Numeric_types.Int8.Set.t -> t
+
+val these_naked_int16s : Numeric_types.Int16.Set.t -> t
+
+val these_naked_int32s : Numeric_types.Int32.Set.t -> t
+
+val these_naked_int64s : Numeric_types.Int64.Set.t -> t
+
+val these_naked_nativeints : Targetint_32_64.Set.t -> t
+
+val boxed_float32_alias_to :
+  naked_float32:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_float_alias_to : naked_float:Variable.t -> Alloc_mode.For_types.t -> t
+
+val tagged_int8_alias_to :
+  naked_int8:Variable.t -> machine_width:Target_system.Machine_width.t -> t
+
+val tagged_int16_alias_to :
+  naked_int16:Variable.t -> machine_width:Target_system.Machine_width.t -> t
+
+val boxed_int32_alias_to : naked_int32:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_int64_alias_to : naked_int64:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_nativeint_alias_to :
+  naked_nativeint:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_vec128_alias_to :
+  naked_vec128:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_vec256_alias_to :
+  naked_vec256:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_vec512_alias_to :
+  naked_vec512:Variable.t -> Alloc_mode.For_types.t -> t
+
+val boxed_mask_alias_to : naked_mask:Variable.t -> Alloc_mode.For_types.t -> t
+
+val box_float32 : t -> Alloc_mode.For_types.t -> t
+
+val box_float : t -> Alloc_mode.For_types.t -> t
+
+val box_int32 : t -> Alloc_mode.For_types.t -> t
+
+val box_int64 : t -> Alloc_mode.For_types.t -> t
+
+val box_nativeint : t -> Alloc_mode.For_types.t -> t
+
+val box_vec128 : t -> Alloc_mode.For_types.t -> t
+
+val box_vec256 : t -> Alloc_mode.For_types.t -> t
+
+val box_vec512 : t -> Alloc_mode.For_types.t -> t
+
+val box_mask : t -> Alloc_mode.For_types.t -> t
+
+val tagged_immediate_alias_to : naked_immediate:Variable.t -> t
+
+val tag_immediate : t -> t
+
+val any_block : t
+
+(** The type of an immutable block with a known tag, size and field types. *)
+val immutable_block :
+  machine_width:Target_system.Machine_width.t ->
+  is_unique:bool ->
+  Tag.t ->
+  shape:Flambda_kind.Block_shape.t ->
+  Alloc_mode.For_types.t ->
+  fields:t list ->
+  t
+
+(** The type of an immutable block with at least [n] fields and an unknown tag.
+    The type of the [n - 1]th field is taken to be an [Equals] to the given
+    variable. *)
+val immutable_block_with_size_at_least :
+  machine_width:Target_system.Machine_width.t ->
+  tag:Tag.t Or_unknown.t ->
+  n:Target_ocaml_int.t ->
+  shape:Flambda_kind.Block_shape.t ->
+  field_n_minus_one:Variable.t ->
+  t
+
+val mutable_block : Alloc_mode.For_types.t -> t
+
+val variant :
+  machine_width:Target_system.Machine_width.t ->
+  const_ctors:t ->
+  non_const_ctors:(Flambda_kind.Block_shape.t * t list) Tag.Scannable.Map.t ->
+  Alloc_mode.For_types.t ->
+  t
+
+val this_immutable_string : string -> t
+
+val exactly_this_closure :
+  Function_slot.t ->
+  all_function_slots_in_set:Function_type.t Or_unknown.t Function_slot.Map.t ->
+  all_closure_types_in_set:t Function_slot.Map.t ->
+  all_value_slots_in_set:flambda_type Value_slot.Map.t ->
+  Alloc_mode.For_types.t ->
+  flambda_type
+
+val closure_with_at_least_these_function_slots :
+  this_function_slot:Function_slot.t ->
+  Simple.t Function_slot.Map.t ->
+  flambda_type
+
+val closure_with_at_least_this_value_slot :
+  this_function_slot:Function_slot.t ->
+  Value_slot.t ->
+  value_slot_var:Variable.t ->
+  value_slot_kind:Flambda_kind.t ->
+  flambda_type
+
+val closure_with_at_least_these_value_slots :
+  this_function_slot:Function_slot.t ->
+  (Variable.t * Flambda_kind.t) Value_slot.Map.t ->
+  flambda_type
+
+val array_of_length :
+  element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
+  length:flambda_type ->
+  Alloc_mode.For_types.t ->
+  flambda_type
+
+val mutable_array :
+  element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
+  length:flambda_type ->
+  Alloc_mode.For_types.t ->
+  flambda_type
+
+val immutable_array :
+  element_kind:Flambda_kind.With_subkind.t Or_unknown_or_bottom.t ->
+  fields:flambda_type list ->
+  Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  flambda_type
+
+(** Construct a type equal to the type of the given name. (The name must be
+    present in the given environment when calling e.g. [join].) *)
+val alias_type_of : Flambda_kind.t -> Simple.t -> t
+
+(** Determine the (unique) kind of a type. *)
+val kind : t -> Flambda_kind.t
+
+(** For each of the kinds in an arity, create an "unknown" type. *)
+val unknown_types_from_arity :
+  ?alloc_mode:Alloc_mode.For_types.t ->
+  machine_width:Target_system.Machine_width.t ->
+  [`Unarized] Flambda_arity.t ->
+  t list
+
+(** Whether the given type says that a term of that type can never be
+    constructed (in other words, it is [Invalid]). *)
+val is_bottom : Typing_env.t -> t -> bool
+
+val is_unknown : Typing_env.t -> t -> bool
+
+(** Whether the given type contains no information, except about nullability
+    (i.e. returns `true` for both `value` and `value_or_null`, whereas
+    `is_unknown` returns `false` for `value` because we know something -- it
+    can't be `null`). *)
+val is_unknown_maybe_null : Typing_env.t -> t -> bool
+
+val is_alias_to_a_symbol : t -> bool
+
+val type_for_const : Reg_width_const.t -> t
+
+val kind_for_const : Reg_width_const.t -> Flambda_kind.t
+
+type 'a meet_shortcut = private
+  | Known_result of 'a
+  | Need_meet
+  | Invalid
+
+type 'a proof_of_property = private
+  | Proved of 'a
+  | Unknown
+
+(* CR mshinwell: Should remove "_equals_" from these names *)
+val prove_equals_tagged_immediates :
+  Typing_env.t -> t -> Target_ocaml_int.Set.t proof_of_property
+
+val meet_equals_tagged_immediates :
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
+
+val meet_naked_immediates :
+  Typing_env.t -> t -> Target_ocaml_int.Set.t meet_shortcut
+
+val meet_equals_single_tagged_immediate :
+  Typing_env.t -> t -> Target_ocaml_int.t meet_shortcut
+
+val meet_naked_float32s :
+  Typing_env.t -> t -> Numeric_types.Float32_by_bit_pattern.Set.t meet_shortcut
+
+val meet_naked_floats :
+  Typing_env.t -> t -> Numeric_types.Float_by_bit_pattern.Set.t meet_shortcut
+
+val meet_naked_int8s :
+  Typing_env.t -> t -> Numeric_types.Int8.Set.t meet_shortcut
+
+val meet_naked_int16s :
+  Typing_env.t -> t -> Numeric_types.Int16.Set.t meet_shortcut
+
+val meet_naked_int32s :
+  Typing_env.t -> t -> Numeric_types.Int32.Set.t meet_shortcut
+
+val meet_naked_int64s :
+  Typing_env.t -> t -> Numeric_types.Int64.Set.t meet_shortcut
+
+val meet_naked_nativeints :
+  Typing_env.t -> t -> Targetint_32_64.Set.t meet_shortcut
+
+type variant_like_proof = private
+  { const_ctors : Target_ocaml_int.Set.t Or_unknown.t;
+    non_const_ctors_with_sizes :
+      (Target_ocaml_int.t * Flambda_kind.Block_shape.t) Tag.Scannable.Map.t
+  }
+
+val meet_variant_like : Typing_env.t -> t -> variant_like_proof meet_shortcut
+
+val prove_variant_like :
+  Typing_env.t -> t -> variant_like_proof proof_of_property
+
+(** If [ty] is known to represent a boxed number or a tagged integer,
+    [prove_is_a_boxed_number env ty] is [Proved (alloc_mode,kind,contents_ty)].
+    [kind] is the kind of the unboxed number.
+
+    If [ty] is known to represent something of kind value that is not a number
+    [prove_is_a_boxed_number env ty] is [Invalid].
+
+    Otherwise it is [Unknown] or [Wrong_kind] when [ty] is not of kind value. *)
+type boxed_or_tagged_number = private
+  | Boxed of Alloc_mode.For_types.t * Flambda_kind.Boxable_number.t * t
+  | Tagged_immediate
+
+val prove_is_a_boxed_or_tagged_number :
+  Typing_env.t -> t -> boxed_or_tagged_number proof_of_property
+
+val prove_nothing : Typing_env.t -> t -> _ proof_of_property
+
+val prove_is_a_tagged_immediate : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_float32 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_float : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_int32 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_int64 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_nativeint : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_vec128 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_vec256 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_vec512 : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_a_boxed_mask : Typing_env.t -> t -> unit proof_of_property
+
+val prove_is_or_is_not_a_boxed_float :
+  Typing_env.t -> t -> bool proof_of_property
+
+val prove_unique_tag_and_size :
+  Typing_env.t ->
+  t ->
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t) proof_of_property
+
+val prove_unique_fully_constructed_immutable_heap_block :
+  Typing_env.t ->
+  t ->
+  (Tag.t * Flambda_kind.Block_shape.t * Target_ocaml_int.t * Simple.t list)
+  proof_of_property
+
+val prove_is_int : Typing_env.t -> t -> bool proof_of_property
+
+(* Either a tagged integer or a null poitner. *)
+val prove_is_not_a_pointer : Typing_env.t -> t -> bool proof_of_property
+
+(* Returns the result of [Is_flat_float_array] *)
+val meet_is_flat_float_array : Typing_env.t -> t -> bool meet_shortcut
+
+(* Checks that it is an unboxed array of the corresponding kind *)
+val meet_is_non_empty_naked_number_array :
+  Flambda_kind.Naked_number_kind.t -> Typing_env.t -> t -> unit meet_shortcut
+
+val prove_is_immediates_array : Typing_env.t -> t -> unit proof_of_property
+
+val meet_is_immutable_array :
+  Typing_env.t ->
+  t ->
+  (Flambda_kind.With_subkind.t Or_unknown_or_bottom.t
+  * t array
+  * Alloc_mode.For_types.t)
+  meet_shortcut
+
+val prove_is_immutable_array :
+  Typing_env.t ->
+  t ->
+  (Flambda_kind.With_subkind.t Or_unknown_or_bottom.t
+  * t array
+  * Alloc_mode.For_types.t)
+  proof_of_property
+
+val meet_single_closures_entry :
+  Typing_env.t ->
+  t ->
+  (Function_slot.t
+  * Alloc_mode.For_types.t
+  * Closures_entry.t
+  * Function_type.t)
+  meet_shortcut
+
+val prove_single_closures_entry :
+  Typing_env.t ->
+  t ->
+  (Function_slot.t
+  * Alloc_mode.For_types.t
+  * Closures_entry.t
+  * Function_type.t)
+  proof_of_property
+
+val meet_code_ids : Typing_env.t -> t -> Code_id.Set.t meet_shortcut
+
+val prove_code_ids : Typing_env.t -> t -> Code_id.Set.t proof_of_property
+
+val meet_strings : Typing_env.t -> t -> String_info.Set.t meet_shortcut
+
+val prove_strings : Typing_env.t -> t -> String_info.Set.t proof_of_property
+
+(** Attempt to show that the provided type describes the tagged version of a
+    unique naked immediate [Simple].
+
+    This function will return [Unknown] if values of the provided type might
+    sometimes, but not always, be a tagged immediate (for example if it is a
+    variant type involving blocks). *)
+val prove_tagging_of_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t proof_of_property
+
+(** Attempt to show that the provided type _can_ describe, but might not always
+    describe, the tagged version of a unique naked immediate [Simple]. It is
+    guaranteed that if a [Simple] is returned, the type does not describe any
+    other tagged immediate. *)
+val meet_tagging_of_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_float32_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_float_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_int32_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_int64_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_nativeint_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_vec128_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_vec256_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_vec512_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_boxed_mask_containing_simple :
+  Typing_env.t -> min_name_mode:Name_mode.t -> t -> Simple.t meet_shortcut
+
+val meet_block_field_simple :
+  Typing_env.t ->
+  min_name_mode:Name_mode.t ->
+  field_kind:Flambda_kind.t ->
+  t ->
+  Target_ocaml_int.t ->
+  Simple.t meet_shortcut
+
+val meet_project_value_slot_simple :
+  Typing_env.t ->
+  min_name_mode:Name_mode.t ->
+  t ->
+  Value_slot.t ->
+  Simple.t meet_shortcut
+
+val meet_project_function_slot_simple :
+  Typing_env.t ->
+  min_name_mode:Name_mode.t ->
+  t ->
+  Function_slot.t ->
+  Simple.t meet_shortcut
+
+val meet_rec_info : Typing_env.t -> t -> Rec_info_expr.t meet_shortcut
+
+val prove_alloc_mode_of_boxed_number :
+  Typing_env.t -> t -> Alloc_mode.For_types.t proof_of_property
+
+val prove_physical_equality : Typing_env.t -> t -> t -> bool proof_of_property
+
+type to_lift = private
+  | Immutable_block of
+      { tag : Tag.Scannable.t;
+        is_unique : bool;
+        shape : Flambda_kind.Scannable_block_shape.t;
+        fields : Simple.t list
+      }
+  | Boxed_float32 of Numeric_types.Float32_by_bit_pattern.t
+  | Boxed_float of Numeric_types.Float_by_bit_pattern.t
+  | Boxed_int32 of Numeric_types.Int32.t
+  | Boxed_int64 of Numeric_types.Int64.t
+  | Boxed_nativeint of Targetint_32_64.t
+  | Boxed_vec128 of Vector_types.Vec128.Bit_pattern.t
+  | Boxed_vec256 of Vector_types.Vec256.Bit_pattern.t
+  | Boxed_vec512 of Vector_types.Vec512.Bit_pattern.t
+  | Boxed_mask of Vector_types.Mask.Bit_pattern.t
+  | Immutable_float32_array of
+      { fields : Numeric_types.Float32_by_bit_pattern.t list }
+  | Immutable_float_array of
+      { fields : Numeric_types.Float_by_bit_pattern.t list }
+  | Immutable_int_array of { fields : Target_ocaml_int.t list }
+  | Immutable_int8_array of { fields : Numeric_types.Int8.t list }
+  | Immutable_int16_array of { fields : Numeric_types.Int16.t list }
+  | Immutable_int32_array of { fields : Int32.t list }
+  | Immutable_int64_array of { fields : Int64.t list }
+  | Immutable_nativeint_array of { fields : Targetint_32_64.t list }
+  | Immutable_vec128_array of
+      { fields : Vector_types.Vec128.Bit_pattern.t list }
+  | Immutable_vec256_array of
+      { fields : Vector_types.Vec256.Bit_pattern.t list }
+  | Immutable_vec512_array of
+      { fields : Vector_types.Vec512.Bit_pattern.t list }
+  | Immutable_mask_array of { fields : Vector_types.Mask.Bit_pattern.t list }
+  | Immutable_value_array of { fields : Simple.t list }
+  | Empty_array of Empty_array_kind.t
+
+type reification_result = private
+  | Lift of to_lift
+  | Simple of Simple.t
+  | Cannot_reify
+  | Invalid
+
+val reify :
+  allowed_if_free_vars_defined_in:Typing_env.t ->
+  var_is_defined_at_toplevel:(Variable.t -> bool) ->
+  var_is_symbol_projection:(Variable.t -> bool) ->
+  Typing_env.t ->
+  t ->
+  reification_result
+
+val never_holds_locally_allocated_values :
+  Typing_env.t -> Variable.t -> unit proof_of_property
+
+val remove_outermost_alias : Typing_env.t -> t -> t
+
+module Equal_types_for_debug : sig
+  val equal_type : Typing_env.t -> t -> t -> bool
+
+  val equal_env_extension :
+    Typing_env.t -> Typing_env_extension.t -> Typing_env_extension.t -> bool
+end
+
+module Rewriter : sig
+  module Var : sig
+    type t
+
+    module Map : Container_types.Map with type key = t
+
+    val create : unit -> t
+  end
+
+  type 'a pattern
+
+  module Pattern : sig
+    type 'a t = 'a pattern
+
+    val any : 'a t
+
+    val var : Var.t -> 'a -> 'a t
+
+    val untag : 'a t -> 'a t
+
+    type 'a block_field
+
+    val block_field :
+      Target_ocaml_int.t -> Flambda_kind.t -> 'a t -> 'a block_field
+
+    val is_int : 'a t -> 'a block_field
+
+    val get_tag : 'a t -> 'a block_field
+
+    val block : ?tag:Tag.t -> 'a block_field list -> 'a t
+
+    type 'a array_field
+
+    val array_field :
+      Target_ocaml_int.t -> Flambda_kind.t -> 'a t -> 'a array_field
+
+    val array : 'a array_field list -> 'a t
+
+    type 'a closure_field
+
+    val rec_info : Function_slot.t -> 'a t -> 'a closure_field
+
+    val value_slot : Value_slot.t -> 'a t -> 'a closure_field
+
+    val function_slot : Function_slot.t -> 'a t -> 'a closure_field
+
+    val closure : 'a closure_field list -> 'a t
+
+    (** [boxed_number bn t] matches a boxed number of the given kind, with [t]
+        matching the type of its (unboxed) contents. *)
+    val boxed_number : Flambda_kind.Boxable_number.t -> 'a t -> 'a t
+  end
+
+  type 'a expr
+
+  module Expr : sig
+    type 'a t = 'a expr
+
+    module Function_type : sig
+      type 'a t
+
+      val create : Code_id.t -> rec_info:'a -> 'a t
+    end
+
+    val var : 'a -> 'a t
+
+    val unknown : Flambda_kind.t -> 'a t
+
+    val tag_immediate : 'a t -> 'a t
+
+    val immutable_block :
+      is_unique:bool ->
+      Tag.t ->
+      shape:Flambda_kind.Block_shape.t ->
+      Alloc_mode.For_types.t ->
+      fields:'a t list ->
+      'a t
+
+    val exactly_this_closure :
+      Function_slot.t ->
+      all_function_slots_in_set:
+        'a t Function_type.t Or_unknown.t Function_slot.Map.t ->
+      all_closure_types_in_set:'a t Function_slot.Map.t ->
+      all_value_slots_in_set:'a t Value_slot.Map.t ->
+      Alloc_mode.For_types.t ->
+      'a t
+
+    val at_least_this_closure :
+      Function_slot.t ->
+      at_least_these_function_slots:
+        'a t Function_type.t Or_unknown.t Function_slot.Map.t ->
+      at_least_these_closure_types:'a t Function_slot.Map.t ->
+      at_least_these_value_slots:'a t Value_slot.Map.t ->
+      Alloc_mode.For_types.t ->
+      'a t
+  end
+
+  module Rule : sig
+    type 'a t
+
+    val identity : 'a t
+
+    val rewrite : 'a Pattern.t -> Var.t expr -> 'a t
+  end
+
+  module Make (X : sig
+    type t
+
+    val print : Format.formatter -> t -> unit
+
+    module Map : Container_types.Map with type key = t
+
+    val in_coercion : t -> t
+
+    val rewrite : t -> typing_env -> flambda_type -> t Rule.t
+
+    (** [block_slot t ofs env ty] returns the abstraction of a field at offset
+        [ofs] of a block with abstraction [t]. [ty] is the type of the field.
+
+        If a [tag] is provided, the block is guaranteed to have the
+        corresponding tag; otherwise, it could have any tag. *)
+    val block_slot :
+      ?tag:Tag.t -> t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
+
+    (** [array_slot t ofs env ty] returns the abstraction of an array field at
+        offset [ofs] of an array with abstraction [t]. [ty] is the type of the
+        field. *)
+    val array_slot : t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
+
+    type set_of_closures
+
+    val set_of_closures :
+      t -> Function_slot.t -> typing_env -> Closures_entry.t -> set_of_closures
+
+    val rec_info :
+      typing_env ->
+      set_of_closures ->
+      Function_slot.t ->
+      Code_id.t ->
+      flambda_type ->
+      t
+
+    val value_slot :
+      set_of_closures -> Value_slot.t -> typing_env -> flambda_type -> t
+
+    val function_slot :
+      set_of_closures -> Function_slot.t -> typing_env -> flambda_type -> t
+  end) : sig
+    val rewrite : typing_env -> (Symbol.t -> X.t) -> typing_env
+
+    val rewrite_env_extension_with_extra_variables :
+      Typing_env.t ->
+      ((string * X.t) pattern * Flambda_kind.t) Variable.Map.t ->
+      Typing_env_extension.With_extra_variables.t ->
+      Var.t list ->
+      Variable.t Var.Map.t * Typing_env_extension.With_extra_variables.t
+  end
+end
