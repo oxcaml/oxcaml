@@ -70,6 +70,17 @@ external unsafe_sub :
 external unsafe_sub_local :
   ('a : any mod separable). local_ 'a iarray -> int -> int -> local_ 'a iarray
   @@ portable = "caml_array_sub_local"
+
+(* Make sure these functions are marked zero-alloc because we can't annotate
+   externals as zero-alloc. They're not [noalloc] because they can raise. *)
+let[@inline][@zero_alloc assume] concat_local l = exclave_ concat_local l
+
+let[@inline][@zero_alloc assume] append_prim_local a1 a2 =
+  exclave_ append_prim_local a1 a2
+
+let[@inline][@zero_alloc assume] unsafe_sub_local a ofs len =
+  exclave_ unsafe_sub_local a ofs len
+
 external unsafe_of_array : ('a : any mod separable). 'a array -> 'a iarray
   @@ portable = "%array_to_iarray"
 external unsafe_to_array : ('a : any mod separable). 'a iarray -> 'a array

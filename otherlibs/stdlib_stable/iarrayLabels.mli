@@ -88,6 +88,7 @@ val append
 val append_local
   : ('a : value_or_null mod separable).
   local_ 'a iarray -> local_ 'a iarray -> local_ 'a iarray
+[@@zero_alloc]
 (** The locally-allocating version of [append]. *)
 
 val concat : ('a : value_or_null mod separable). 'a iarray list -> 'a iarray
@@ -96,6 +97,7 @@ val concat : ('a : value_or_null mod separable). 'a iarray list -> 'a iarray
 val concat_local
   : ('a : value_or_null mod separable).
   local_ 'a iarray list -> local_ 'a iarray
+[@@zero_alloc]
 (** The locally-allocating version of [concat]. *)
 
 val sub
@@ -113,6 +115,7 @@ val sub
 val sub_local
   : ('a : value_or_null mod separable).
   local_ 'a iarray -> pos:int -> len:int -> local_ 'a iarray
+[@@zero_alloc]
 (** The locally-allocating version of [sub]. *)
 
 val to_list : ('a : value_or_null mod separable). 'a iarray -> 'a list
