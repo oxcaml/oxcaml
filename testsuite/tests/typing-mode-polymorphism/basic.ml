@@ -26,7 +26,8 @@ let foo =
   let _ = foo y in
   foo
 [%%expect{|
-val foo : '_weak1 -> '_weak1 @ [> aliased stateful dynamic] = <fun>
+val foo : '_weak1 -> '_weak1 @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 let id x = x
@@ -131,7 +132,7 @@ val g :
 val which :
   bool @ 'n ->
   (string @ [< 'm mod contended immutable & portable] ->
-   string @ [> 'm mod many portable forkable unyielding stateless]) @ [> aliased stateful dynamic] =
+   string @ [> 'm mod many portable forkable unyielding stateless]) @ [> aliased nonportable stateful dynamic] =
   <fun>
 |}]
 
@@ -245,7 +246,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
 [%%expect{|
 val foo :
   int @ [< portable] ->
-  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> stateful] = <fun>
+  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> nonportable stateful] =
+  <fun>
 |}, Principal{|
 val foo :
   int @ [< global portable] -> int @ [> nonportable] -> unit @ [> dynamic] =
