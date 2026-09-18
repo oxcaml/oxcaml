@@ -1016,6 +1016,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
          uniqueness: mod unique ≰ mod aliased
+         borrowedness: mod owned ≰ mod borrowed
 |}]
 
 type ('a : immediate) t : value mod aliased = { mutable x : 'a }
@@ -1030,6 +1031,7 @@ Error: The kind of type "t" is mutable_data with 'a @@ forkable unyielding many
 
        The first mode-crosses less than the second along:
          uniqueness: mod unique ≰ mod aliased
+         borrowedness: mod owned ≰ mod borrowed
 |}]
 
 type ('a : immediate) t : value mod contended = { mutable x : 'a }
@@ -1283,6 +1285,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ forkable unyielding
        The first mode-crosses less than the second along:
          locality: mod local ≰ mod global
          uniqueness: mod unique ≰ mod aliased
+         borrowedness: mod owned ≰ mod borrowed
 |}]
 
 (*****************************)
@@ -2021,6 +2024,7 @@ Error: The kind of type "t" is immutable_data with 'a @@ portable
          yielding: mod unyielding with 'a ≰ mod unyielding with 'a r
          statefulness: mod stateless with 'a ≰ mod stateless with 'a r
          visibility: mod immutable with 'a ≰ mod immutable with 'a r
+         borrowability: mod borrowable with 'a ≰ mod borrowable with 'a r
 |}]
 
 type 'a portable = { portable : 'a @@ portable }

@@ -21,7 +21,7 @@ let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
 val alloc :
-  'a @ [< 'm mod aliased dynamic & global many] ->
+  'a @ [< 'm mod aliased dynamic borrowed & global many borrowable] ->
   'a myref @ [> 'm | stateful] = <fun>
 |}]
 
@@ -29,14 +29,14 @@ let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
   'a myref @ [< write > local] ->
-  'a @ [< global many read_write] -> unit @ 'm = <fun>
+  'a @ [< global many read_write borrowable] -> unit @ 'm = <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< global write] -> 'a @ [< global many read_write] -> unit @ 'm =
-  <fun>
+  'a myref @ [< global write] ->
+  'a @ [< global many read_write borrowable] -> unit @ 'm = <fun>
 |}]
 
 let () =
@@ -123,6 +123,6 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased dynamic & global many > contended] ->
+  'a @ [< 'm mod aliased dynamic borrowed & global many borrowable > contended] ->
   'a myref @ [> 'm | contended stateful dynamic] = <fun>
 |}]
