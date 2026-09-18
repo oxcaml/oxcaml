@@ -764,6 +764,7 @@
   flambda2_identifiers
   flambda2_cmx
   flambda2_datalog
+  flambda2_reaper
   jsoo_imports
   compiler_owee
   gc_timings

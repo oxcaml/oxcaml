@@ -1024,16 +1024,31 @@ let run0 unit acc ~free_names ~all_constants () =
          ~function_slots_to_keep ~value_slots_to_keep)
       acc (Flambda_unit.body unit) )
 
-let run (unit : Flambda_unit.t) ~final_typing_env ~free_names =
+let run (type f) (unit : Flambda_unit.t)
+    ~(final_typing_env : (f, _) With_types.t) ~free_names =
   let acc = Acc.create () in
   let all_constants = create_symbol_and_add_any_source acc "all_constants" in
   let toplevel_return, holed =
     Profile.record_call ~accumulate:false "down"
       (run0 unit acc ~free_names ~all_constants)
   in
+  (* If we are forgetting types, forget the result types in the code metadata
+     now, to make sure they won't be stored. *)
+  let code_deps =
+    match final_typing_env with
+    | With_types _ -> Acc.code_deps acc
+    | Without_types ->
+      Code_id.Map.map
+        (fun (code_dep : Acc.Code_dep.t) ->
+          { code_dep with
+            code_metadata =
+              Code_metadata.with_result_types Unknown code_dep.code_metadata
+          })
+        (Acc.code_deps acc)
+  in
   let problem =
     { Problem.deps = Acc.deps acc;
-      code_deps = Acc.code_deps acc;
+      code_deps;
       delayed_deps = Acc.delayed_deps acc;
       applications = Acc.applications acc;
       free_names;
