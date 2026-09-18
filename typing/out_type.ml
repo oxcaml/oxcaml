@@ -2020,11 +2020,6 @@ end = struct
   type 'a interval = { lo: 'a; hi: 'a }
   let construct_raw_bounds { monadic; comonadic } :
       string interval =
-    let bound_diff bound trivial =
-      erase_implied_axes bound
-      |> With_locality.Const.Option.value ~default:trivial
-      |> fun bound -> With_locality.Const.diff bound trivial
-    in
     let mupper = dupper_lr With_locality.obj_monadic monadic in
     let mlower = dlower_lr With_locality.obj_monadic monadic in
     let cupper = dupper_lr With_locality.obj_comonadic comonadic in
@@ -2037,8 +2032,8 @@ end = struct
       With_locality.Const.merge
         { monadic = mlower; comonadic = cupper }
     in
-    let lower = bound_diff lower With_locality.Const.min in
-    let upper = bound_diff upper With_locality.Const.max in
+    let lower = With_locality.Const.diff lower With_locality.Const.min in
+    let upper = With_locality.Const.diff upper With_locality.Const.max in
     { lo = Fmt.asprintf "%a"
              With_locality.Const.Option.partial_print lower;
       hi = Fmt.asprintf "%a"

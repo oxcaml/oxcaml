@@ -13,7 +13,8 @@ let refine (type output) (w : output t) =
 [%%expect{|
 type _ t = A : bool t
 val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
-val refine : 'output t @ 'm -> (bool -> 'output) @ [> stateful dynamic] =
+val refine :
+  'output t @ 'm -> (bool -> 'output) @ [> nonportable stateful dynamic] =
   <fun>
 |}]
 
