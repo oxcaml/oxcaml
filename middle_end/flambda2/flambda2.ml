@@ -254,8 +254,7 @@ let flambda_to_flambda0 : type m.
     build_run_result flambda ~all_code slot_offsets ~prepare_cmx
   in
   (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
+  | None -> () (* Opaque compilation *)
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets = exported_offsets; reachable_names; all_code }
 

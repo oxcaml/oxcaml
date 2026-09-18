@@ -27,7 +27,7 @@ type table_data =
 
 type t0 =
   { original_compilation_unit : Compilation_unit.t;
-    final_typing_env : Flambda2_types.Typing_env.Serializable.t;
+    final_typing_env : Flambda2_types.Typing_env.Serializable.t option;
     all_code : Exported_code.raw;
     exported_offsets : Exported_offsets.t;
     used_value_slots : Value_slot.Set.t;
@@ -48,7 +48,9 @@ let to_raw ~sections (t : t0 list) =
 let create_raw ~final_typing_env ~all_code ~exported_offsets ~used_value_slots
     ~sections =
   let typing_env_exported_ids =
-    Flambda2_types.Typing_env.Serializable.ids_for_export final_typing_env
+    Option.fold ~none:Ids_for_export.empty
+      ~some:Flambda2_types.Typing_env.Serializable.ids_for_export
+      final_typing_env
   in
   let all_code_exported_ids = Exported_code.ids_for_export all_code in
   let exported_ids =
@@ -95,8 +97,11 @@ let import_typing_env_and_code0 ~sections t =
   in
   let typing_env =
     Profile.record_call ~accumulate:true "typing_env_apply_renaming" (fun () ->
-        Flambda2_types.Typing_env.Serializable.apply_renaming t.final_typing_env
-          renaming)
+        Option.map
+          (fun typing_env ->
+            Flambda2_types.Typing_env.Serializable.apply_renaming typing_env
+              renaming)
+          t.final_typing_env)
   in
   let all_code =
     Profile.record_call ~accumulate:true "exported_code_from_raw" (fun () ->
@@ -117,9 +122,15 @@ let import_typing_env_and_code (t, sections) =
       (fun (typing_env, code) t0 ->
         let typing_env0, code0 = import_typing_env_and_code0 ~sections t0 in
         let typing_env =
-          Profile.record_call ~accumulate:true "typing_env_merge" (fun () ->
-              Flambda2_types.Typing_env.Serializable.merge typing_env
-                typing_env0)
+          (* A pack cannot return normally if any member cannot. *)
+          match typing_env, typing_env0 with
+          | Some typing_env, Some typing_env0 ->
+            Some
+              (Profile.record_call ~accumulate:true "typing_env_merge"
+                 (fun () ->
+                   Flambda2_types.Typing_env.Serializable.merge typing_env
+                     typing_env0))
+          | None, _ | _, None -> None
         in
         let code =
           Profile.record_call ~accumulate:true "exported_code_merge" (fun () ->
@@ -197,10 +208,13 @@ let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
   in
   Env.set_current_unit unit_info;
   let typing_env, code = import_typing_env_and_code0 ~sections t in
-  if print_typing_env
-  then
-    Format.fprintf ppf "@[<hov>Typing env:@ %a@]@;"
-      Flambda2_types.Typing_env.Serializable.print typing_env;
+  (if print_typing_env
+   then
+     match typing_env with
+     | None -> Format.fprintf ppf "Typing env: none@;"
+     | Some typing_env ->
+       Format.fprintf ppf "@[<hov>Typing env:@ %a@]@;"
+         Flambda2_types.Typing_env.Serializable.print typing_env);
   if print_code
   then Format.fprintf ppf "@[<hov>Code:@ %a@]@;" Exported_code.print_view code;
   if print_offsets
