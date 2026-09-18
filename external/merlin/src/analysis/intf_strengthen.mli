@@ -22,7 +22,10 @@ end
 (** One arrow position where the implementation supports [impl], a mode
     strictly stronger than the [intf] the interface declares. *)
 type arrow_diff =
-  { path : Arrow_pos.t; impl : Mode.Alloc.Const.t; intf : Mode.Alloc.Const.t }
+  { path : Arrow_pos.t;
+    impl : Mode.With_locality.Const.t;
+    intf : Mode.With_locality.Const.t
+  }
 
 (** The analysis result before it is rendered as text: what each interface
     declaration provably supports, keyed by the declaration's span in the

@@ -31,7 +31,10 @@ module Arrow_pos = struct
 end
 
 type arrow_diff =
-  { path : Arrow_pos.t; impl : Mode.Alloc.Const.t; intf : Mode.Alloc.Const.t }
+  { path : Arrow_pos.t;
+    impl : Mode.With_locality.Const.t;
+    intf : Mode.With_locality.Const.t
+  }
 
 let guard b = if b then Some () else None
 
@@ -67,8 +70,8 @@ end = struct
 
   type zap_entry =
     { pos : Arrow_pos.t;
-      impl_modes : Mode.Alloc.lr;
-      intf_modes : Mode.Alloc.lr;
+      impl_modes : Mode.With_locality.lr;
+      intf_modes : Mode.With_locality.lr;
       ty : Types.type_expr
     }
 
@@ -130,8 +133,8 @@ end = struct
       | Arg -> false
     in
     let level = Ctype.get_current_level () in
-    let impl_var = Mode.Alloc.newvar level in
-    let intf_var = Mode.Alloc.newvar level in
+    let impl_var = Mode.With_locality.newvar level in
+    let intf_var = Mode.With_locality.newvar level in
     let ok_exn = ok_exn ~msg:"Intf_strengthen.Arrow_pass.zap_and_diff" in
     (* Read both sides at the same extremal end as the comparison
        direction (floor for covariant, ceil for contravariant). *)
@@ -141,11 +144,11 @@ end = struct
       |> ok_exn;
       Ctype.submode_with_cross env ~is_ret entry.ty intf_var entry.intf_modes
       |> ok_exn;
-      let (_ : Mode.Alloc.Const.t) =
-        Mode.Alloc.zap_to_floor_exn entry.impl_modes
+      let (_ : Mode.With_locality.Const.t) =
+        Mode.With_locality.zap_to_floor_exn entry.impl_modes
       in
-      let (_ : Mode.Alloc.Const.t) =
-        Mode.Alloc.zap_to_floor_exn entry.intf_modes
+      let (_ : Mode.With_locality.Const.t) =
+        Mode.With_locality.zap_to_floor_exn entry.intf_modes
       in
       ()
     | Contravariant ->
@@ -153,16 +156,20 @@ end = struct
       |> ok_exn;
       Ctype.submode_with_cross env ~is_ret entry.ty entry.intf_modes intf_var
       |> ok_exn;
-      let (_ : Mode.Alloc.Const.t) =
-        Mode.Alloc.zap_to_ceil_exn entry.impl_modes
+      let (_ : Mode.With_locality.Const.t) =
+        Mode.With_locality.zap_to_ceil_exn entry.impl_modes
       in
-      let (_ : Mode.Alloc.Const.t) =
-        Mode.Alloc.zap_to_ceil_exn entry.intf_modes
+      let (_ : Mode.With_locality.Const.t) =
+        Mode.With_locality.zap_to_ceil_exn entry.intf_modes
       in
       ());
-    let impl_c = Mode.Alloc.zap_to_legacy_exn ~arg:(not is_ret) impl_var in
-    let intf_c = Mode.Alloc.zap_to_legacy_exn ~arg:(not is_ret) intf_var in
-    match Mode.Alloc.Const.equal impl_c intf_c with
+    let impl_c =
+      Mode.With_locality.zap_to_legacy_exn ~arg:(not is_ret) impl_var
+    in
+    let intf_c =
+      Mode.With_locality.zap_to_legacy_exn ~arg:(not is_ret) intf_var
+    in
+    match Mode.With_locality.Const.equal impl_c intf_c with
     | true -> diffs
     | false -> { path = entry.pos; impl = impl_c; intf = intf_c } :: diffs
 
@@ -388,14 +395,14 @@ end = struct
      when there is nothing new to claim. *)
   let compute_modality_diff ~crossing impl_mod intf_mod =
     let claim side =
-      let var = Mode.Value.newvar (Ctype.get_current_level ()) in
-      Mode.Value.submode
+      let var = Mode.With_regionality.newvar (Ctype.get_current_level ()) in
+      Mode.With_regionality.submode
         (Crossing.apply_left crossing
-           (Mode.Modality.Const.apply_left side Mode.Value.max))
+           (Mode.Modality.Const.apply_left side Mode.With_regionality.max))
         (Crossing.apply_right crossing var)
       |> ok_exn ~msg:"Intf_strengthen.Arrow_pass.compute_modality_diff";
       Mode.Modality.zap_to_floor
-        (Mode.Modality.infer ~md_mode:Mode.Value.max ~mode:var)
+        (Mode.Modality.infer ~md_mode:Mode.With_regionality.max ~mode:var)
     in
     let impl = claim (Mode.Modality.zap_to_floor impl_mod) in
     let intf = claim (Mode.Modality.to_const_exn intf_mod) in
@@ -1072,13 +1079,13 @@ end = struct
 
     let same_axis (Mode.Modality.Atom (left, _)) (Mode.Modality.Atom (right, _))
         =
-      let (Mode.Value.Axis.P left) =
+      let (Mode.With_regionality.Axis.P left) =
         Mode.Modality.Axis.to_value (Mode.Modality.Axis.P left)
       in
-      let (Mode.Value.Axis.P right) =
+      let (Mode.With_regionality.Axis.P right) =
         Mode.Modality.Axis.to_value (Mode.Modality.Axis.P right)
       in
-      Mode.Value.Axis.compare left right = 0
+      Mode.With_regionality.Axis.compare left right = 0
 
     let canonical_modalities moda =
       Mode.Modality.Const.diff Mode.Modality.Const.id
@@ -1180,14 +1187,16 @@ end = struct
               (Mode.Modality.Per_axis.print ax)
               (Mode.Modality.Const.proj ax intf))
 
-    let alloc_atoms ~(impl : Mode.Alloc.Const.t) ~explicit =
+    let alloc_atoms ~(impl : Mode.With_locality.Const.t) ~explicit =
       (* TODO: gavinleroy: Suppress inferred [@ static] for default extensions;
          remove this reset once the strengthener supports layout polymorphism
          and [layout_poly] is enabled. *)
-      let impl = { impl with staticity = Mode.Alloc.Const.legacy.staticity } in
+      let impl =
+        { impl with staticity = Mode.With_locality.Const.legacy.staticity }
+      in
       List.fold_left explicit ~init:impl
-        ~f:(fun (acc : Mode.Alloc.Const.t) (m : _ Location.loc) ->
-          let (Mode.Alloc.Atom (ax, v)) = m.txt in
+        ~f:(fun (acc : Mode.With_locality.Const.t) (m : _ Location.loc) ->
+          let (Mode.With_locality.Atom (ax, v)) = m.txt in
           match ax with
           | Comonadic Areality -> { acc with areality = v }
           | Comonadic Linearity -> { acc with linearity = v }
@@ -1248,7 +1257,7 @@ end = struct
 
     type arrow_target =
       { reference_pos : Lexing.position;
-        existing : Mode.Alloc.Const.t Typemode.modes
+        existing : Mode.With_locality.Const.t Typemode.modes
       }
 
     (* Navigate a parsed core type along an [Arrow_pos.dir] and find the
@@ -1279,11 +1288,13 @@ end = struct
               else pos
             in
             Some
-              { reference_pos; existing = Typemode.transl_alloc_mode arg_modes }
+              { reference_pos;
+                existing = Typemode.transl_mode_with_locality arg_modes
+              }
           | In_ret Here ->
             Some
               { reference_pos = ret_ct.ptyp_loc.loc_end;
-                existing = Typemode.transl_alloc_mode ret_modes
+                existing = Typemode.transl_mode_with_locality ret_modes
               }
           | In_arg rest -> walk arg_ct rest
           | In_ret rest -> walk ret_ct rest
@@ -1443,13 +1454,13 @@ end = struct
   let rec signature_edits ~lookup ~hoisted (s : Additions.signature_addition) =
     let same_axis (Mode.Modality.Atom (left, _)) (Mode.Modality.Atom (right, _))
         =
-      let (Mode.Value.Axis.P left) =
+      let (Mode.With_regionality.Axis.P left) =
         Mode.Modality.Axis.to_value (Mode.Modality.Axis.P left)
       in
-      let (Mode.Value.Axis.P right) =
+      let (Mode.With_regionality.Axis.P right) =
         Mode.Modality.Axis.to_value (Mode.Modality.Axis.P right)
       in
-      Mode.Value.Axis.compare left right = 0
+      Mode.With_regionality.Axis.compare left right = 0
     in
     let hoisted = s.clause @ hoisted in
     let of_item (item : Additions.item_addition) =
