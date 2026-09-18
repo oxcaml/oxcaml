@@ -14,7 +14,7 @@
 (**************************************************************************)
 
 open Datalog_imports
-module Executor = Bytecode.Make (Trie.Iterator)
+module Executor = Bytecode.Make (Column.Iterator)
 
 type binder =
   | Bind_table : ('t, 'k, 'v) Table.Id.t * 't Channel.or_null_sender -> binder
@@ -38,9 +38,9 @@ let print ppf { executor; original_rule; _ } =
     Lang.print_rule original_rule Executor.print executor
 
 let bind_table (Bind_table (id, handler)) database =
-  let table = Table.Map.get id database in
-  Channel.send_or_null handler (Or_null.this table);
-  not (Trie.is_empty (Table.Id.is_trie id) table)
+  let table = Table.Map.get_or_null id database in
+  Channel.send_or_null handler table;
+  not (Or_null.is_null table)
 
 let bind_table_list binders database =
   List.iter (fun binder -> ignore @@ bind_table binder database) binders
@@ -95,15 +95,31 @@ let[@inline] seminaive_run cursor ~previous ~diff ~current ~output ~added =
           | This output_table -> (
             let columns = Table.Id.columns tid in
             let result_repr = Table.Id.result_repr tid in
-            let current_table = Table.Map.get tid output in
-            let diff_or_null = Table.diff_or_null columns result_repr in
-            match diff_or_null output_table current_table with
+            let current_table = Table.Map.get_or_null tid output in
+            let diff_or_null =
+              Column.diff_or_null_hlist columns
+                (Table.result_repr_diff_or_null result_repr)
+            in
+            let[@inline] diff_or_null' table1 table2 =
+              match table2 with
+              | Or_null.Null -> Or_null.this table1
+              | Or_null.This table2 -> diff_or_null table1 table2
+            in
+            match diff_or_null' output_table current_table with
             | Null -> ~output, ~added
             | This output_table ->
-              let union_trie = Table.union columns result_repr in
-              let current_table = union_trie current_table output_table in
-              let diff_table = Table.Map.get tid added in
-              let diff_table = union_trie diff_table output_table in
+              let union_trie =
+                Column.union_total_hlist columns
+                  (Table.result_repr_union result_repr)
+              in
+              let[@inline] union_trie' table1 table2 =
+                match table1 with
+                | Or_null.Null -> table2
+                | Or_null.This table1 -> union_trie table1 table2
+              in
+              let current_table = union_trie' current_table output_table in
+              let diff_table = Table.Map.get_or_null tid added in
+              let diff_table = union_trie' diff_table output_table in
               let output = Table.Map.set tid current_table output in
               let added = Table.Map.set tid diff_table added in
               ~output, ~added))
@@ -240,15 +256,14 @@ module From_plan = struct
     | Column_iterator (column, _, _) :: _ -> Column column
 
   let rec join_iterators : type k.
-      _ -> k column_iterator list -> _ * k Trie.Iterator.t list with_names =
+      _ -> k column_iterator list -> _ * k Column.Iterator.t list with_names =
    fun env -> function
     | [] -> env, { values = []; names = [] }
     | Column_iterator (column, outer, inner) :: rest ->
       let outer_receiver = Env.must_be_bound env outer in
       let inner_sender, inner_receiver = Channel.create_or_null Or_null.null in
       let iterator =
-        Trie.Iterator.create (Column.is_trie [column]) outer_receiver.value
-          inner_sender
+        Column.Iterator.create column outer_receiver.value inner_sender
       in
       let inner_env, { values; names } = join_iterators env rest in
       let inner_env = Env.bind_var inner_env inner inner_receiver in
@@ -301,7 +316,7 @@ module From_plan = struct
           | Table _ ->
             Misc.fatal_error "*BUG*: Should have been planned as a trie"
           | Unless tid ->
-            Executor.if_not_in (Table.Id.is_trie tid) (Env.get_table env tid)
+            Executor.if_not_in (Table.Id.columns tid) (Env.get_table env tid)
               (Env.must_be_bound_term_hlist env terms)
           | Distinct column ->
             let [term1; term2] = terms in

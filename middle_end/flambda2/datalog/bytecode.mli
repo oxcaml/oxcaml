@@ -76,7 +76,7 @@ module Make (Iterator : Leapfrog.Iterator) : sig
     assembler
 
   val if_not_in :
-    ('t, 'k, _) Trie.is_trie ->
+    ('t, 'k, _) Column.hlist ->
     't Or_null_receiver.t with_name ->
     'k Or_null_receiver.hlist with_names ->
     assembler ->

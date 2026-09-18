@@ -37,33 +37,6 @@ module Datalog = struct
 
       val datalog_column_id : ('a Map.t, t, 'a) id
     end
-
-    module type Columns = sig
-      type keys
-
-      type value
-
-      type t
-
-      val empty : t
-
-      val is_trie : (t, keys, value) Trie.is_trie
-    end
-
-    module Make_operations (C : Columns) = struct
-      let empty = C.empty
-
-      let is_empty trie = Trie.is_empty C.is_trie trie
-
-      let singleton keys value = Trie.singleton C.is_trie keys value
-
-      let add_or_replace keys value trie =
-        Trie.add_or_replace C.is_trie keys value trie
-
-      let remove keys trie = Trie.remove C.is_trie keys trie
-
-      let find_opt keys trie = Trie.find_opt C.is_trie keys trie
-    end
   end
 
   include Datalog
@@ -106,8 +79,6 @@ module Datalog = struct
 
       val add_or_replace : keys Constant.hlist -> value -> t -> t
 
-      val remove : keys Constant.hlist -> t -> t
-
       val find_opt : keys Constant.hlist -> t -> value option
     end
 
@@ -128,27 +99,30 @@ module Datalog = struct
     end
 
     module Cons (C : C) (S : S0) = struct
-      module T = struct
-        type keys = C.t -> S.keys
+      type keys = C.t -> S.keys
 
-        type t = S.t C.Map.t
+      type t = S.t C.Map.t
 
-        type value = S.value
+      type value = S.value
 
-        let columns : (t, keys, value) Column.hlist =
-          C.datalog_column_id :: S.columns
+      let columns : (t, keys, value) Column.hlist =
+        C.datalog_column_id :: S.columns
 
-        let result_repr = S.result_repr
+      let result_repr = S.result_repr
 
-        let create ~name = create_table ~name columns ~result_repr
+      let create ~name = create_table ~name columns ~result_repr
 
-        let is_trie = Column.is_trie columns
+      let empty = C.Map.empty
 
-        let empty = C.Map.empty
-      end
+      let is_empty t = Column.is_empty C.datalog_column_id t
 
-      include T
-      include Column.Make_operations (T)
+      let singleton keys value = Column.singleton_hlist columns keys value
+
+      let add_or_replace keys value table =
+        Column.add_or_replace_hlist columns keys value table
+
+      let find_opt keys table =
+        Or_null.to_option (Column.find_or_null_hlist columns keys table)
     end
 
     module Relation1 (C1 : C) = Cons (C1) (Nil)
@@ -160,15 +134,32 @@ module Datalog = struct
   end
 
   let add_fact id args db =
-    Table.Map.set id
-      (Trie.add_or_replace (Table.Id.is_trie id) args () (Table.Map.get id db))
-      db
+    match Table.Map.get_or_null id db with
+    | Null ->
+      Table.Map.set id (Column.singleton_hlist (Table.Id.columns id) args ()) db
+    | This table ->
+      Table.Map.set id
+        (Column.add_or_replace_hlist (Table.Id.columns id) args () table)
+        db
 
   type database = Table.Map.t
 
   let empty = Table.Map.empty
 
-  let get_table = Table.Map.get
+  let get_table_or_null = Table.Map.get_or_null
+
+  let get_table (type t k v) (id : (t, k, v) Table.Id.t) db : t =
+    match Table.Map.get_or_null id db with
+    | This table -> table
+    | Null -> (
+      match Table.Id.columns id with
+      | [] ->
+        Misc.fatal_error
+          "[get_table] cannot return a missing table of arity 0; use \
+           [get_table_or_null] instead."
+      | column :: _ -> Column.empty column)
+
+  let set_table_or_null = Table.Map.set_or_null
 
   let set_table = Table.Map.set
 

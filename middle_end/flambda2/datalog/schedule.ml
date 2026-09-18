@@ -152,9 +152,12 @@ let create_rule rule =
 
 let provenance_from_db db =
   Table.Map.fold db ~init:FactMap.empty ~f:(fun (Binding (tid, _)) provenance ->
-      Trie.fold (Table.Id.is_trie tid)
-        (fun keys _ provenance -> add_if_not_exists provenance tid keys Input)
-        (Table.Map.get tid db) provenance)
+      match Table.Map.get_or_null tid db with
+      | Null -> provenance
+      | This table ->
+        Column.fold_hlist (Table.Id.columns tid)
+          (fun keys _ provenance -> add_if_not_exists provenance tid keys Input)
+          table provenance)
 
 let create_stats ?(with_provenance = false) db =
   let provenance =
