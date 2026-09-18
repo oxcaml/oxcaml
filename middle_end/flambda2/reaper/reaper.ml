@@ -313,7 +313,7 @@ module Staged = struct
           } =
       rebuild_inputs
     in
-    let Rebuild.{ body; all_code; code_ids_to_remember } =
+    let Rebuild.{ body; all_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~code_deps ~ordered_code_ids
         ~fixed_arity_continuations ~continuation_info ~final_typing_env
         ~types_rewrite_context solution get_code_metadata toplevel_expr code
@@ -333,7 +333,8 @@ module Staged = struct
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,
-      final_typing_env )
+      final_typing_env,
+      free_names )
 end
 
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
@@ -352,12 +353,19 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   let solution =
     Rebuild_solution.create ~analysis_scope:Current_unit ~queries
       ~unboxing:solved_dep ~code_changes
+      ~slot_offsets:slot_offsets.exported_offsets
   in
-  let flambda, all_code, final_typing_env =
+  let flambda, all_code, final_typing_env, free_names =
     Staged.rebuild
       ~unit_metadata:(Flambda_unit.metadata unit)
       ~rebuild_inputs ~solution ~types_rewrite_context
       ~code_deps:solve_inputs.Staged.Solve_inputs.code_deps ~final_typing_env
       ~machine_width ~cmx_loader ~all_code
   in
-  flambda, all_code, slot_offsets, final_typing_env
+  let exported_offsets =
+    Rebuild_solution.offsets_for_free_names solution free_names
+  in
+  ( flambda,
+    all_code,
+    { slot_offsets with Slot_offsets.exported_offsets },
+    final_typing_env )

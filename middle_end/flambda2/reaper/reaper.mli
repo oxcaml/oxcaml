@@ -70,7 +70,7 @@ module Staged : sig
   val solve : analysis_scope:Analysis_scope.t -> Solve_inputs.t -> Solution.t
 
   (** Rebuild the traversed unit according to the solution. Returns the rebuilt
-      unit, its code and its typing environment. *)
+      unit, its code, its typing environment and its free names. *)
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
@@ -81,7 +81,7 @@ module Staged : sig
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->
-    Flambda_unit.t * Exported_code.t * Typing_env.t option
+    Flambda_unit.t * Exported_code.t * Typing_env.t option * Name_occurrences.t
 end
 
 val run :

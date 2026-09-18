@@ -33,7 +33,8 @@ type data =
     unboxed_fields : UA.unboxed Code_id_or_name.Map.t;
     changed_representation :
       (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t;
-    code_changes : UA.code_changes
+    code_changes : UA.code_changes;
+    slot_offsets : Exported_offsets.t
   }
 
 type t =
@@ -41,13 +42,15 @@ type t =
     data : data
   }
 
-let create ~analysis_scope ~queries ~(unboxing : UA.result) ~code_changes =
+let create ~analysis_scope ~queries ~(unboxing : UA.result) ~code_changes
+    ~slot_offsets =
   { analysis_scope;
     data =
       { queries;
         unboxed_fields = unboxing.unboxed_fields;
         changed_representation = unboxing.changed_representation;
-        code_changes
+        code_changes;
+        slot_offsets
       }
   }
 
@@ -103,3 +106,32 @@ let is_changing_calling_convention t code_id =
   match get_calling_convention_change t code_id with
   | UA.Not_changing_calling_convention -> false
   | UA.Changing_calling_convention _ -> true
+
+let offsets_for_free_names t free_names =
+  let offsets =
+    Function_slot.Set.fold
+      (fun function_slot offsets ->
+        match
+          Exported_offsets.function_slot_offset t.data.slot_offsets
+            function_slot
+        with
+        | Some info ->
+          Exported_offsets.add_function_slot_offset offsets function_slot info
+        | None ->
+          Misc.fatal_errorf "Rebuild_solution: no offset for function slot %a"
+            Function_slot.print function_slot)
+      (Name_occurrences.all_function_slots_at_normal_mode free_names)
+      Exported_offsets.empty
+  in
+  Value_slot.Set.fold
+    (fun value_slot offsets ->
+      match
+        Exported_offsets.value_slot_offset t.data.slot_offsets value_slot
+      with
+      | Some info ->
+        Exported_offsets.add_value_slot_offset offsets value_slot info
+      | None ->
+        Misc.fatal_errorf "Rebuild_solution: no offset for value slot %a"
+          Value_slot.print value_slot)
+    (Name_occurrences.all_value_slots_at_normal_mode free_names)
+    offsets

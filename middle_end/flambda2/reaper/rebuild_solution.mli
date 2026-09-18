@@ -36,6 +36,7 @@ val create :
   queries:Rebuild_queries.t ->
   unboxing:Unboxing_analysis.result ->
   code_changes:Unboxing_analysis.code_changes ->
+  slot_offsets:Exported_offsets.t ->
   t
 
 val has_use : t -> Code_id_or_name.t -> bool
@@ -77,3 +78,7 @@ val get_calling_convention_change :
   t -> Code_id.t -> Unboxing_analysis.calling_convention_change
 
 val is_changing_calling_convention : t -> Code_id.t -> bool
+
+(** Copy exactly the offsets of the slots occurring at normal mode. Missing
+    offsets are fatal errors. *)
+val offsets_for_free_names : t -> Name_occurrences.t -> Exported_offsets.t

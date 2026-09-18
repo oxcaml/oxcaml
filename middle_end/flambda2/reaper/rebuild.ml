@@ -2362,7 +2362,8 @@ and rebuild_static_const_or_code env res
 type result =
   { body : Expr.t;
     all_code : Code.t Code_id.Map.t;
-    code_ids_to_remember : Code_id.Set.t
+    code_ids_to_remember : Code_id.Set.t;
+    free_names : Name_occurrences.t
   }
 
 let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
@@ -2435,4 +2436,8 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
         in
         rebuild_expr env res toplevel_expr)
   in
-  { body = rebuilt_expr.expr; all_code; code_ids_to_remember }
+  { body = rebuilt_expr.expr;
+    all_code;
+    code_ids_to_remember;
+    free_names = rebuilt_expr.free_names
+  }
