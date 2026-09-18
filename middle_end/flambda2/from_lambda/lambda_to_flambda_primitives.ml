@@ -3757,8 +3757,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        conservatively [Mutable]. Refine this (as [Pbox] does) so that the
        simplifier can fold [unbox (box x)] for immutable boxes. *)
     let mutability = Mutability.Mutable in
-    (* The box is a singleton tag-0 block; see [Pbox] above. *)
+    (* CR zeisbach: this will have to change with [inherit] fields *)
     let tag = Or_unknown.Known Tag.Scannable.zero in
+    (* CR zeisbach: products are actually larger... *)
     let size = Or_unknown.Known (Target_ocaml_int.of_int machine_width 1) in
     let field = Target_ocaml_int.of_int machine_width 0 in
     let load_mixed_singleton elt : H.expr_primitive list =
@@ -3771,7 +3772,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [Unary (Block_load { kind; mut = mutability; field }, arg)]
     in
     (* CR zeisbach: like [Pbox], this assumes that everything is addressable and
-       hence boxed as a singleton tag-0 mixed block. *)
+       hence boxed as a singleton tag-0 block. *)
     match layout with
     | Pvalue _ ->
       let kind : P.Block_access_kind.t =
