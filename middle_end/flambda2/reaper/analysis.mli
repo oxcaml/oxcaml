@@ -61,6 +61,10 @@ val find_code_metadata : 'f solution -> Code_id.t -> Code_metadata.t option
 
 val slot_offsets : 'f solution -> Slot_offsets.result
 
+(** The solved offsets of the slots occurring in the given free names. *)
+val offsets_for_free_names :
+  'f solution -> Name_occurrences.t -> Exported_offsets.t
+
 val rewrite_kind_with_subkind :
   'f solution ->
   Name.t ->
