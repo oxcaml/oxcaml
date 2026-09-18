@@ -8305,8 +8305,8 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply_left ?is_contained_by t ({ monadic; comonadic } : _ With_regionality.t) :
-        With_regionality.l =
+    let apply_left ?is_contained_by t
+        ({ monadic; comonadic } : _ With_regionality.t) : With_regionality.l =
       let annotations = hint_annotations t.annotations in
       let monadic =
         Monadic.apply_left ~annotations ?is_contained_by t.monadic monadic
@@ -8316,8 +8316,8 @@ module Modality = struct
       in
       { monadic; comonadic }
 
-    let apply_right ?is_contained_by t ({ monadic; comonadic } : _ With_regionality.t) :
-        With_regionality.r =
+    let apply_right ?is_contained_by t
+        ({ monadic; comonadic } : _ With_regionality.t) : With_regionality.r =
       let annotations = hint_annotations t.annotations in
       let monadic = Monadic.apply_right ?is_contained_by t.monadic monadic in
       let comonadic =
