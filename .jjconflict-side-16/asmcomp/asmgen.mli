@@ -47,10 +47,16 @@ val compile_implementation :
 
     Unlike [compile_implementation], this doesn't add information about
     dependencies to the [Compilenv] unit info, because it isn't available here.
-    Instead, [Compilenv.save_resumed_unit_info] gets this from the old .cmx. *)
+    Instead, [Compilenv.save_resumed_unit_info] gets this from the old .cmx.
+
+    [may_reduce_heap] permits compacting the heap before running the external
+    assembler; it defaults to [true] unless [toplevel] is given. Pass [false]
+    when further compilations in this process will use the current heap, e.g.
+    for all but the last unit of a reaper rebuild batch. *)
 val compile_implementation_from_cmm :
   (module Compiler_owee.Unix_intf.S) ->
   ?toplevel:(string -> bool) ->
+  ?may_reduce_heap:bool ->
   sourcefile:string option ->
   prefixname:string ->
   ppf_dump:Format.formatter ->

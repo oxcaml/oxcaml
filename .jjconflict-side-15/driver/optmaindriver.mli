@@ -32,6 +32,7 @@ val main
   -> reaped_flambda2_to_cmm:(
     machine_width:Target_system.Machine_width.t ->
     ltosol_filename:string ->
+    batch_members:Compilation_unit.t list ->
     keep_symbol_tables:bool ->
     cmx_filename:string ->
     paused_unit_infos:Cmx_format.unit_infos ->

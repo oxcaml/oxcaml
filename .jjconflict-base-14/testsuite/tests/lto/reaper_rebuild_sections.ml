@@ -41,6 +41,13 @@
  file = "reaper_rebuild_sections_dep.reaped.cmx";
  file-exists;
 
+ flags = "-reaper-rebuild reaper_rebuild_sections.cmx reaper_rebuild_sections_dep.cmx reaper_rebuild_sections.ltosol -reaper-debug-flags sections";
+ compiler_output2 = "batch.sections";
+ ocamlopt.opt;
+ script = "awk '/^ltosol: loaded section Reaper_rebuild_sections_dep$/ {dep++} /^ltosol: loaded section Reaper_rebuild_sections$/ {caller++} END {exit (dep != 1 || caller != 1)}' batch.sections";
+ script;
+
+ compiler_output2 = "ocamlopt.opt.output";
  flags = "";
  all_modules = "reaper_rebuild_sections_dep.reaped.cmx reaper_rebuild_sections.reaped.cmx";
  ocamlopt.opt;
