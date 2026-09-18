@@ -1,0 +1,56 @@
+let code print_int_0 deleted in
+let code consume_1 deleted in
+let code Make_2 deleted in
+let $camlRewrite_unused_unboxed__Pmakeblock_0 = Block 0 (0) in
+let code inline(never) loopify(never) size(1) newer_version_of(print_int_0)
+      print_int_0_1 (x)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlRewrite_unused_unboxed__print_int_1 =
+  closure print_int_0_1 @print_int &toplevel
+in
+let code inline(never) loopify(never) size(5) newer_version_of(consume_1)
+      consume_1_1 (`(var Pmakeblock/125N)_into_(var m/107UV)_field_0_𝕍`)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : unit =
+  let Pfield = `(var Pmakeblock/125N)_into_(var m/107UV)_field_0_𝕍` in
+  apply direct(print_int_0_1 &my_alloc_region)
+    ($camlRewrite_unused_unboxed__print_int_1 : _ -> imm tagged)
+      (Pfield)
+      -> k2 * k1
+    where k2 (function_return : imm tagged) =
+      cont k
+in
+let $camlRewrite_unused_unboxed__consume_2 =
+  closure consume_1_1 @consume &toplevel
+in
+let code inline(never) loopify(never) size(6) newer_version_of(Make_2)
+      Make_2_1 (N : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : unit =
+  let x = %block_load.[`0`] (N) in
+  let `(var Pmakeblock/125N)_into_(var Pmakeblock/125N)_field_0_𝕍` = x in
+  apply direct(consume_1_1 &my_alloc_region)
+    ($camlRewrite_unused_unboxed__consume_2 : _ -> unit)
+      (`(var Pmakeblock/125N)_into_(var Pmakeblock/125N)_field_0_𝕍`)
+      -> k2 * k1
+    where k2 =
+      cont k
+in
+let $camlRewrite_unused_unboxed__Make_3 = closure Make_2_1 @Make &toplevel in
+apply direct(Make_2_1 &toplevel)
+  ($camlRewrite_unused_unboxed__Make_3 : _ -> unit)
+    ($camlRewrite_unused_unboxed__Pmakeblock_0)
+    -> k1 * error
+  where k1 =
+    cont k
+  where k =
+    let $camlRewrite_unused_unboxed =
+      Block 0 ($camlRewrite_unused_unboxed__print_int_1)
+    in
+    cont done ($camlRewrite_unused_unboxed)

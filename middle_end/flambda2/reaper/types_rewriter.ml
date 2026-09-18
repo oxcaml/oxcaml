@@ -1296,9 +1296,13 @@ let rewrite_result_types context ~old_typing_env ~my_closure:func_my_closure
         Misc.fatal_errorf "In [rewrite_result_types], var %a is unboxed but top"
           Code_id_or_name.print var
       | Bottom ->
-        Misc.fatal_errorf
-          "In [rewrite_result_types], var %a is unboxed but has no usage"
-          Code_id_or_name.print var
+        if not (Field.Map.is_empty unboxed_fields)
+        then
+          Misc.fatal_errorf
+            "In [rewrite_result_types], var %a is unboxed but has no usage"
+            Code_id_or_name.print var;
+        let pat = Flambda2_types.Rewriter.Pattern.any in
+        (pat, kind), []
       | Ok usages ->
         let allocation_point =
           match PTA.get_single_source db var with
