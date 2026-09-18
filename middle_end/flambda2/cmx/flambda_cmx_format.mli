@@ -16,6 +16,27 @@
 
 (** Contents of middle-end-specific portion of .cmx files when using Flambda. *)
 
+(** Tables of hashconsed identifiers, from which their importing process creates
+    its own identifiers. *)
+module Table_data : sig
+  type t
+
+  val create : Ids_for_export.t -> t
+
+  val create_import_map :
+    t ->
+    used_value_slots:Value_slot.Set.t ->
+    original_compilation_unit:Compilation_unit.t ->
+    Renaming.t
+end
+
+(** Snapshots of the stamp counters used to create identifiers. *)
+module Id_stamp_counters : sig
+  type t
+
+  val save : unit -> t
+end
+
 type t
 
 type raw

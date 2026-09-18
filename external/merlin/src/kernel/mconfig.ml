@@ -591,6 +591,8 @@ let ocaml_ignored_flags =
     "-no-symbol-visibility-protected";
     "-flambda2-basic-meet";
     "-flambda2-advanced-meet";
+    "-support-lto";
+    "-no-support-lto";
     "-directory";
     "-typing-recovery";
     (* Jane Street specific *)
