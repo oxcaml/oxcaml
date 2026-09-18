@@ -905,12 +905,12 @@ and eval_prim env prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_ptr { layout = new_layout; mode }
-  | Pbox (old_layout, mut, mode) ->
+  | Pbox (old_layout, mode) ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Pbox (new_layout, mut, mode)
-  | Punbox (old_layout, mut) ->
+    if new_layout == old_layout then prim else Pbox (new_layout, mode)
+  | Punbox old_layout ->
     let new_layout = eval_layout env old_layout in
-    if new_layout == old_layout then prim else Punbox (new_layout, mut)
+    if new_layout == old_layout then prim else Punbox new_layout
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _

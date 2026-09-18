@@ -517,8 +517,8 @@ type primitive =
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
-  | Pbox of layout * mutable_flag * locality_mode
-  | Punbox of layout * mutable_flag
+  | Pbox of layout * locality_mode
+  | Punbox of layout
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -3032,7 +3032,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_mask -> None
   | Pbox_mask m -> Some m
   | Punbox_unit -> None
-  | Pbox (_, _, m) -> Some m
+  | Pbox (_, m) -> Some m
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
@@ -3841,10 +3841,10 @@ let primitive_result_layout (p : primitive) =
   | Pset_ptr _ -> layout_unit
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
-  | Pbox (_layout, _, _) ->
+  | Pbox (_layout, _) ->
     (* CR zeisbach: compute a more precise output layout here! *)
     layout_block
-  | Punbox (layout, _) -> layout
+  | Punbox layout -> layout
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode

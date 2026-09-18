@@ -3688,7 +3688,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
-  | Pbox (Punboxed_product layouts, mut, mode), [args] ->
+  | Pbox (Punboxed_product layouts, mode), [args] ->
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
@@ -3697,12 +3697,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       Shape (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
     in
     (* A boxed all-void product must be [Immutable] for the middle-end *)
-    (* CR zeisbach: could we check this during specialization if we wanted to?
-       or would that be bad bc of splice variables? *)
+    (* CR zeisbach: we default to [Mutable], but we should consider storing
+       mutability information in the primitive and refining it from the type to
+       get better code generation. It's a little weird to not be layout
+       directed. *)
     let mutability =
-      if List.is_empty args
-      then Mutability.Immutable
-      else Mutability.from_lambda mut
+      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
     in
     convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
       shape mutability mode args
@@ -3710,14 +3710,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
            | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
              ) as layout),
-          mut,
           mode ),
       [[arg]] ) -> (
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
         ~current_region
     in
-    let mutability = Mutability.from_lambda mut in
+    (* CR zeisbach: always [Mutable], see above. *)
+    let mutability = Mutability.Mutable in
     let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
       let shape =
         K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
@@ -3759,7 +3759,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
     | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_product _ -> assert false (* contradicts outer match *))
-  | Punbox (Punboxed_product layouts, mut), [[arg]] ->
+  | Punbox (Punboxed_product layouts), [[arg]] ->
     let shape =
       Mixed_block_shape.of_mixed_block_elements
         ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
@@ -3776,7 +3776,10 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Target_ocaml_int.of_int machine_width
            (Array.length flattened_reordered_shape))
     in
-    let mut = Mutability.from_lambda mut in
+    (* CR zeisbach: always [Mutable], see [Pbox] above. In this case, we may
+       actually want to store a list of mutabilities to determine which fields
+       should be read (im)mutably. *)
+    let mut = Mutability.Mutable in
     let all_indices =
       List.concat
         (List.mapi
@@ -3794,12 +3797,12 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Unary (Block_load { kind; mut; field }, arg))
       all_indices
   | ( Punbox
-        ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
-           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
-             ) as layout),
-          mut ),
+        (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+         | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask )
+         as layout),
       [[arg]] ) -> (
-    let mutability = Mutability.from_lambda mut in
+    (* CR zeisbach: always [Mutable], see above. *)
+    let mutability = Mutability.Mutable in
     (* CR zeisbach: this will have to change with [inherit] fields *)
     let tag = Or_unknown.Known Tag.Scannable.zero in
     (* CR zeisbach: products are actually larger... *)

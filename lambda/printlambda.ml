@@ -309,11 +309,6 @@ let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
 
-let box_mutability = function
-  | Immutable -> ""
-  | Immutable_unique -> "_unique"
-  | Mutable -> "_mutable"
-
 let return_mode_kind = function
   | Not_alloc_stack -> ""
   | Maybe_alloc_stack -> "[L]"
@@ -1043,14 +1038,12 @@ let primitive ppf = function
       fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
-  | Pbox (l, mut, mode) ->
-      fprintf ppf "(box%s%s@ %a)"
-        (box_mutability mut)
+  | Pbox (l, mode) ->
+      fprintf ppf "(box%s@ %a)"
         (locality_kind mode)
         layout l
-  | Punbox (l, mut) ->
-      fprintf ppf "(unbox%s@ %a)"
-        (box_mutability mut)
+  | Punbox l ->
+      fprintf ppf "(unbox@ %a)"
         layout l
 
 let name_of_primitive = function

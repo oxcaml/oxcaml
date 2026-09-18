@@ -1197,7 +1197,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
       | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
-    | Pbox (layout, _mut, _mode) -> (
+    | Pbox (layout, _mode) -> (
       match layout with
       | Pvalue _ -> pseudo_event (unary (Makeblock { tag = 0 }))
       | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
@@ -1230,7 +1230,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
       | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
-    | Punbox (_layout, _mut) ->
+    | Punbox _layout ->
       (* CR zeisbach: implement! also, ordering? *)
       Misc.fatal_errorf "implement this!")
 

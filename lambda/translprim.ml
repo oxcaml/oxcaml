@@ -1337,11 +1337,9 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%poke" -> Poke None
     | "%box" ->
       let layout = List.nth (get_arg_layouts ()) 0 in
-      (* mutability may get refined by [specialize_primitive] *)
-      Primitive(Pbox (layout, Mutable, mode), 1)
+      Primitive(Pbox (layout, mode), 1)
     | "%unbox" ->
-      (* mutability may get refined by [specialize_primitive] *)
-      Primitive(Punbox (layout, Mutable), 1)
+      Primitive(Punbox layout, 1)
     | s when String.length s > 0 && s.[0] = '%' ->
       (match String.Map.find_opt s indexing_primitives with
        | Some prim -> prim ~mode
@@ -2072,12 +2070,6 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       (* Either something known to get reordered or an [any] that might be *)
       raise (Error (loc, Element_would_be_reordered_in_record));
     end
-  | Primitive (Pbox (layout, _, mode), arity), _ ->
-      (* the box is the *result* *)
-      Some (Primitive (Pbox (layout, box_type_mut env rest_ty, mode), arity))
-  | Primitive (Punbox (layout, _), arity), [boxed_ty] ->
-      (* the box is the *argument* *)
-      Some (Primitive (Punbox (layout, box_type_mut env boxed_ty), arity))
   | _ -> None
 
 let caml_equal =
