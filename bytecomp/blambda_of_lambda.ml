@@ -1230,9 +1230,28 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
       | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
       | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident)
-    | Punbox _layout ->
-      (* CR zeisbach: implement! also, ordering? *)
-      Misc.fatal_errorf "implement this!")
+    | Punbox layout -> (
+      match layout with
+      | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+        unary (Getfield 0)
+      | Punboxed_product layouts ->
+        let arg =
+          match args with
+          | [arg] -> comp_expr arg
+          | _ -> wrong_arity ~expected:1
+        in
+        let shape =
+          Array.of_list (List.map Lambda.mixed_block_element_of_layout layouts)
+        in
+        copy_product_fields shape arg ~make_block:(fun fields ->
+            (* "Unboxed" products are actually boxed and represented like this
+               on bytecode; we match accordingly and deeply copy to avoid
+               aliasing bugs. *)
+            pseudo_event (Prim (Makeblock { tag = 0 }, fields)))
+      | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+      | Ptop -> Misc.fatal_error "Blambda_of_lambda: Punbox: Ptop layout"
+      | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Punbox: Pbottom layout"
+      | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident))
 
 and comp_binary_scalar_intrinsic : type a.
     a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =
