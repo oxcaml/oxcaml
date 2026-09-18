@@ -2455,7 +2455,8 @@ let find_module_mode path env =
     in
     match mda.mda_declaration.md_type with
     | Mty_alias path -> chase path
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _ ->
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _
+    | Mty_for_hole ->
         snd (Normalize_mode.mda Assert_normalized mda)
   in
   try chase path with Not_found -> Mode.Value.(max |> disallow_right)
@@ -2470,7 +2471,8 @@ let rec components_of_module_maker
        target anyway (see [scrape_alias] below), possibly reading a cmi. *)
     match cm_mty with
     | Mty_alias path -> find_module_mode path cm_env
-    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _ ->
+    | Mty_ident _ | Mty_signature _ | Mty_functor _ | Mty_strengthen _
+    | Mty_for_hole ->
         cm_mode
   in
   match !scrape_alias cm_env cm_mty with
@@ -2615,7 +2617,7 @@ let rec components_of_module_maker
                   Normalize_mode.md Assert_normalized md
                     Mode.Value.(max |> disallow_right)
               | Mty_ident _ | Mty_signature _ | Mty_functor _
-              | Mty_strengthen _ ->
+              | Mty_strengthen _ | Mty_for_hole ->
                   Normalize_mode.md Normalize_exn md cm_mode
             in
             let md' =
