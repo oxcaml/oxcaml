@@ -18,6 +18,19 @@ Error: The allocation is "local"
        However, the allocation highlighted is expected to be "global".
 |}]
 
+module Primitive_result = struct
+  let (f @ noalloc_strict) x = exp x
+end
+[%%expect{|
+Line 2, characters 31-34:
+2 |   let (f @ noalloc_strict) x = exp x
+                                   ^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 2, characters 27-36,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
 module Curried_pattern = struct
   type t = { x : float }
   let f { x } () = x
@@ -44,6 +57,20 @@ Line 4, characters 8-13:
             ^^^^^
 Error: The allocation is "local"
          because it is allocated inside the function at lines 3-4, characters 27-22,
+         which is "noalloc_strict" and thus cannot allocate on the heap.
+       However, the allocation highlighted is expected to be "global".
+|}]
+
+module Allocating_foreign_body = struct
+  external allocate : int -> int -> int array @ local = "caml_make_vect"
+  let (f @ noalloc_strict) n = exclave_ allocate n 0
+end
+[%%expect{|
+Line 3, characters 40-48:
+3 |   let (f @ noalloc_strict) n = exclave_ allocate n 0
+                                            ^^^^^^^^
+Error: The allocation is "local"
+         because it is allocated inside the function at line 3, characters 27-52,
          which is "noalloc_strict" and thus cannot allocate on the heap.
        However, the allocation highlighted is expected to be "global".
 |}]
