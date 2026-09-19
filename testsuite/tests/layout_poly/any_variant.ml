@@ -56,11 +56,14 @@ let poly_ pass (_ : 'a) (r : 'a r) = r
 val poly_ pass : 'a -> 'a r -> 'a r = <lpoly>
 |}]
 
-(* All-[void] records are allowed, so this is fine even when ['a] is
+(* All-[void] records are not allowed, so this is rejected: ['a] may be
    instantiated to [void]. *)
 let poly_ mk v = { x = v }
 [%%expect{|
-val poly_ mk : 'a -> 'a r = <lpoly>
+Line 1, characters 17-26:
+1 | let poly_ mk v = { x = v }
+                     ^^^^^^^^^
+Error: Records must contain at least one runtime value.
 |}]
 
 type ('a : any) r2 = { x : 'a; y : int }
