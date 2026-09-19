@@ -62,8 +62,6 @@ module Datalog = struct
 
       let remove keys trie = Trie.remove C.is_trie keys trie
 
-      let union f trie1 trie2 = Trie.union C.is_trie f trie1 trie2
-
       let find_opt keys trie = Trie.find_opt C.is_trie keys trie
     end
   end
@@ -72,15 +70,15 @@ module Datalog = struct
 
   type (!'t, !'k, !'v) table = ('t, 'k, 'v) Table.Id.t
 
-  let create_table ?(provenance = true) ~name ~default_value columns =
-    Table.Id.create ~provenance ~name ~columns ~default_value
+  let create_table ?(provenance = true) ~name ~result_repr columns =
+    Table.Id.create ~provenance ~name ~columns ~result_repr
 
   let columns table = Table.Id.columns table
 
   type ('t, 'k) relation = ('t, 'k, unit) table
 
   let create_relation ?provenance ~name columns =
-    create_table ?provenance ~name ~default_value:() columns
+    create_table ?provenance ~name ~result_repr:Table.unit_repr columns
 
   module Schema = struct
     module type S0 = sig
@@ -92,7 +90,7 @@ module Datalog = struct
 
       val columns : (t, keys, value) Column.hlist
 
-      val default_value : value
+      val result_repr : value Table.result_repr
     end
 
     module type S = sig
@@ -110,8 +108,6 @@ module Datalog = struct
 
       val remove : keys Constant.hlist -> t -> t
 
-      val union : (value -> value -> value option) -> t -> t -> t
-
       val find_opt : keys Constant.hlist -> t -> value option
     end
 
@@ -128,7 +124,7 @@ module Datalog = struct
 
       let columns : (t, keys, value) Column.hlist = []
 
-      let default_value = ()
+      let result_repr = Table.unit_repr
     end
 
     module Cons (C : C) (S : S0) = struct
@@ -142,9 +138,9 @@ module Datalog = struct
         let columns : (t, keys, value) Column.hlist =
           C.datalog_column_id :: S.columns
 
-        let default_value = S.default_value
+        let result_repr = S.result_repr
 
-        let create ~name = create_table ~name columns ~default_value
+        let create ~name = create_table ~name columns ~result_repr
 
         let is_trie = Column.is_trie columns
 
