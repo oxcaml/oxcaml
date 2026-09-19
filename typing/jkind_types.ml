@@ -486,21 +486,28 @@ module Sort = struct
     | Ccontents t_op -> v.contents <- t_op
     | Clevel level -> v.level <- level
 
+  let rec get_level = function
+    | Var { contents = Some t } -> get_level t
+    | Var { contents = None; level } -> level
+    | Base _ | Univar _ -> generic_level
+    | Product ts ->
+      List.fold_left (fun acc t -> min acc (get_level t)) generic_level ts
+    | Addressable t -> get_level t
+
   let[@inline] set_var_level (v : var) (level : int) =
     if level < v.level
     then (
       log_change (v, Clevel v.level);
       v.level <- level)
 
-  let rec update_level level = function
-    | Var v -> update_level_var level v
+  let rec iter_var ~f = function
+    | Var { contents = Some t } -> iter_var ~f t
+    | Var ({ contents = None } as v) -> f v
     | Base _ | Univar _ -> ()
-    | Product ts -> List.iter (update_level level) ts
-    | Addressable t -> update_level level t
+    | Product ts -> List.iter (iter_var ~f) ts
+    | Addressable t -> iter_var ~f t
 
-  and update_level_var level = function
-    | { contents = Some t; _ } -> update_level level t
-    | { contents = None } as v -> set_var_level v level
+  let update_level level = iter_var ~f:(fun v -> set_var_level v level)
 
   let[@inline] set_var_contents (v : var) (contents : t option) =
     if v.contents != contents
@@ -1301,6 +1308,6 @@ module Layout = struct
   let get_const t = get_const Const.of_sort t
 
   let of_new_sort_var ~level sa =
-    let sort = Sort.(of_var (new_var ~level)) in
-    Sort (sort, sa), sort
+    let var = Sort.new_var ~level in
+    Sort (Sort.of_var var, sa), var
 end
