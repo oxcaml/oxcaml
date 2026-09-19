@@ -65,6 +65,12 @@ let boxable_number_of_boxed_integer (bint : L.boxed_integer) :
   | Boxed_int32 -> Naked_int32
   | Boxed_int64 -> Naked_int64
 
+let flat_suffix_element_of_unboxed_vector :
+    L.unboxed_vector -> K.flat_suffix_element = function
+  | Unboxed_vec128 -> Naked_vec128
+  | Unboxed_vec256 -> Naked_vec256
+  | Unboxed_vec512 -> Naked_vec512
+
 let standard_int_of_unboxed_integer :
     L.unboxed_or_untagged_integer -> K.Standard_int.t = function
   | Untagged_int8 -> Naked_int8
@@ -83,6 +89,20 @@ let standard_int_or_float_of_unboxed_integer
   | Untagged_int16 -> Naked_int16
   | Unboxed_int32 -> Naked_int32
   | Unboxed_int64 -> Naked_int64
+
+let flat_suffix_element_of_unboxed_integer :
+    L.unboxed_or_untagged_integer -> K.flat_suffix_element = function
+  | Untagged_int -> Naked_immediate
+  | Unboxed_nativeint -> Naked_nativeint
+  | Untagged_int8 -> Naked_int8
+  | Untagged_int16 -> Naked_int16
+  | Unboxed_int32 -> Naked_int32
+  | Unboxed_int64 -> Naked_int64
+
+let flat_suffix_element_of_unboxed_float :
+    L.unboxed_float -> K.flat_suffix_element = function
+  | Unboxed_float64 -> Naked_float
+  | Unboxed_float32 -> Naked_float32
 
 let standard_int_or_float_of_peek_or_poke (layout : L.peek_or_poke) :
     K.Standard_int_or_float.t =
@@ -1907,6 +1927,61 @@ let mixed_field_index_and_kind ~machine_width ~prim_name index shape =
   check_non_negative_imm imm prim_name;
   imm, field_kind
 
+let convert_block_creation ~machine_width ~prim_name tag (shape : L.block_shape)
+    mutability mode (args : H.simple_or_prim list) : H.expr_primitive list =
+  match L.mixed_block_of_block_shape shape with
+  | None ->
+    let shape =
+      convert_block_shape ~machine_width shape ~num_fields:(List.length args)
+    in
+    [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
+  | Some shape ->
+    (* Mixed block *)
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        shape
+    in
+    let args =
+      let new_indexes_to_old_indexes =
+        Mixed_block_shape.new_indexes_to_old_indexes shape
+      in
+      let args = Array.of_list args in
+      Array.init (Array.length args) (fun new_index ->
+          args.(new_indexes_to_old_indexes.(new_index)))
+      |> Array.to_list
+    in
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    if List.length args <> Array.length flattened_reordered_shape
+    then
+      Misc.fatal_errorf
+        "%s (mixed): number of arguments (%d) is not consistent with shape \
+         length (%d)"
+        prim_name (List.length args)
+        (Array.length flattened_reordered_shape);
+    let args =
+      List.mapi
+        (fun new_index arg ->
+          match flattened_reordered_shape.(new_index) with
+          | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
+            arg
+          | Float_boxed _ -> unbox_float arg)
+        args
+    in
+    let kind_shape =
+      match K.Scannable_block_shape.from_mixed_block_shape shape with
+      | Mixed_record kind_shape -> kind_shape
+      | Value_only ->
+        Misc.fatal_errorf
+          "%s: mixed_block_of_block_shape returned Some but \
+           from_mixed_block_shape returned Value_only"
+          prim_name
+    in
+    [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -1921,7 +1996,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pphys_equal eq, [[arg1]; [arg2]] ->
     let eq : P.equality_comparison = match eq with Eq -> Eq | Noteq -> Neq in
     [tag_int (Binary (Phys_equal eq, arg1, arg2))]
-  | Pmakeblock (tag, mutability, shape, mode), _ -> (
+  | Pmakeblock (tag, mutability, shape, mode), _ ->
     let args = List.flatten args in
     let mode =
       Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
@@ -1936,57 +2011,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       then Mutability.Immutable
       else Mutability.from_lambda mutability
     in
-    match L.mixed_block_of_block_shape shape with
-    | None ->
-      let shape =
-        convert_block_shape ~machine_width shape ~num_fields:(List.length args)
-      in
-      [Variadic (Make_block (Values (tag, shape), mutability, mode), args)]
-    | Some shape ->
-      (* Mixed block *)
-      let shape =
-        Mixed_block_shape.of_mixed_block_elements
-          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
-          shape
-      in
-      let args =
-        let new_indexes_to_old_indexes =
-          Mixed_block_shape.new_indexes_to_old_indexes shape
-        in
-        let args = Array.of_list args in
-        Array.init (Array.length args) (fun new_index ->
-            args.(new_indexes_to_old_indexes.(new_index)))
-        |> Array.to_list
-      in
-      let flattened_reordered_shape =
-        Mixed_block_shape.flattened_reordered_shape shape
-      in
-      if List.length args <> Array.length flattened_reordered_shape
-      then
-        Misc.fatal_errorf
-          "Pmakeblock (mixed): number of arguments (%d) is not consistent with \
-           shape length (%d)"
-          (List.length args)
-          (Array.length flattened_reordered_shape);
-      let args =
-        List.mapi
-          (fun new_index arg ->
-            match flattened_reordered_shape.(new_index) with
-            | Value _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
-            | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
-              arg
-            | Float_boxed _ -> unbox_float arg)
-          args
-      in
-      let kind_shape =
-        match K.Scannable_block_shape.from_mixed_block_shape shape with
-        | Mixed_record kind_shape -> kind_shape
-        | Value_only ->
-          Misc.fatal_error
-            "Pmakeblock: mixed_block_of_block_shape returned Some but \
-             from_mixed_block_shape returned Value_only"
-      in
-      [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)])
+    convert_block_creation ~machine_width ~prim_name:"Pmakeblock" tag shape
+      mutability mode args
   | Pmakelazyblock lazy_tag, [[arg]] ->
     [Unary (Make_lazy { lazy_tag; alloc_region = current_alloc_region }, arg)]
   | Pmake_unboxed_product layouts, _ ->
@@ -3653,6 +3679,154 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  | Pbox (Punboxed_product layouts, mode), [args] ->
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    let shape : L.block_shape =
+      Shape (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
+    in
+    (* A boxed all-void product must be [Immutable] for the middle-end *)
+    (* CR zeisbach: we default to [Mutable], but we should consider storing
+       mutability information in the primitive and refining it from the type to
+       get better code generation. It's a little weird to not be layout
+       directed. *)
+    let mutability =
+      if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+    in
+    convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
+      shape mutability mode args
+  | ( Pbox
+        ( (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+           | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask
+             ) as layout),
+          mode ),
+      [[arg]] ) -> (
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    (* CR zeisbach: always [Mutable], see above. *)
+    let mutability = Mutability.Mutable in
+    let mixed_singleton (elt : K.flat_suffix_element) : H.expr_primitive list =
+      let shape =
+        K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
+      in
+      [ Variadic
+          ( Make_block (Mixed (Tag.Scannable.zero, shape), mutability, mode),
+            [arg] ) ]
+    in
+    (* CR zeisbach: this assumes that everything is addressable! Meaning small
+       numbers are boxed as singleton tag-0 mixed blocks and not as tagged
+       immediates. Once we have addressable layouts, we will need to handle both
+       ways of boxing. *)
+    match layout with
+    | Pvalue value_kind ->
+      let shape =
+        [K.With_subkind.from_lambda_value_kind ~machine_width value_kind]
+      in
+      [ Variadic
+          ( Make_block (Values (Tag.Scannable.zero, shape), mutability, mode),
+            [arg] ) ]
+    (* CR zeisbach: the current state of the world is a little sad. We either
+       box small numbers as tagged immediates and break representation
+       invariants for singleton unboxed records, or box them as tag-0 blocks and
+       break numeric layout invariants / optimizations. We pick the former, but
+       we need addressability to properly handle these cases. *)
+    | Punboxed_float f ->
+      mixed_singleton (flat_suffix_element_of_unboxed_float f)
+    | Punboxed_or_untagged_integer i ->
+      mixed_singleton (flat_suffix_element_of_unboxed_integer i)
+    (* CR zeisbach: originally I thought we could use [Box_number], but that is
+       immutable (and can be CSE-d). the [Punboxed_vector] here really could
+       correspond to a singleton unboxed record with a mutable field, so the
+       boxed version could actually be a mutable block. double-check this and
+       turn this into a proper comment. *)
+    | Punboxed_vector v ->
+      mixed_singleton (flat_suffix_element_of_unboxed_vector v)
+    | Punboxed_mask -> mixed_singleton Naked_mask
+    | Ptop -> Misc.fatal_error "convert_lprim: Pbox: Ptop layout"
+    | Pbottom -> Misc.fatal_error "convert_lprim: Pbox: Pbottom layout"
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+    | Punboxed_product _ -> assert false (* contradicts outer match *))
+  | Punbox (Punboxed_product layouts), [[arg]] ->
+    let shape =
+      Mixed_block_shape.of_mixed_block_elements
+        ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+        (Array.of_list (List.map L.mixed_block_element_of_layout layouts))
+    in
+    let flattened_reordered_shape =
+      Mixed_block_shape.flattened_reordered_shape shape
+    in
+    let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+    (* CR zeisbach: this will have to change with inherit *)
+    let tag = Or_unknown.Known Tag.Scannable.zero in
+    let size =
+      Or_unknown.Known
+        (Target_ocaml_int.of_int machine_width
+           (Array.length flattened_reordered_shape))
+    in
+    (* CR zeisbach: always [Mutable], see [Pbox] above. In this case, we may
+       actually want to store a list of mutabilities to determine which fields
+       should be read (im)mutably. *)
+    let mut = Mutability.Mutable in
+    let all_indices =
+      List.concat
+        (List.mapi
+           (fun i _layout ->
+             Mixed_block_shape.lookup_path_producing_new_indexes shape [i])
+           layouts)
+    in
+    List.map
+      (fun index : H.expr_primitive ->
+        let field = Target_ocaml_int.of_int machine_width index in
+        let kind =
+          H.block_access_kind_of_mixed_field_element ~kind_shape ~tag ~size
+            flattened_reordered_shape.(index)
+        in
+        Unary (Block_load { kind; mut; field }, arg))
+      all_indices
+  | ( Punbox
+        (( Ptop | Pbottom | Psplicevar _ | Pvalue _ | Punboxed_float _
+         | Punboxed_or_untagged_integer _ | Punboxed_vector _ | Punboxed_mask )
+         as layout),
+      [[arg]] ) -> (
+    (* CR zeisbach: always [Mutable], see above. *)
+    let mutability = Mutability.Mutable in
+    (* CR zeisbach: this will have to change with [inherit] fields *)
+    let tag = Or_unknown.Known Tag.Scannable.zero in
+    (* CR zeisbach: products are actually larger... *)
+    let size = Or_unknown.Known (Target_ocaml_int.of_int machine_width 1) in
+    let field = Target_ocaml_int.of_int machine_width 0 in
+    let load_mixed_singleton elt : H.expr_primitive list =
+      let shape =
+        K.Mixed_block_shape.from_prefix_size_and_suffix_elements 0 [elt]
+      in
+      let kind : P.Block_access_kind.t =
+        Mixed { tag; size; field_kind = Flat_suffix elt; shape }
+      in
+      [Unary (Block_load { kind; mut = mutability; field }, arg)]
+    in
+    (* CR zeisbach: like [Pbox], this assumes that everything is addressable and
+       hence boxed as a singleton tag-0 block. *)
+    match layout with
+    | Pvalue _ ->
+      let kind : P.Block_access_kind.t =
+        Values { tag; size; field_kind = Any_value }
+      in
+      [Unary (Block_load { kind; mut = mutability; field }, arg)]
+    | Punboxed_float f ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_float f)
+    | Punboxed_or_untagged_integer i ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_integer i)
+    | Punboxed_vector v ->
+      load_mixed_singleton (flat_suffix_element_of_unboxed_vector v)
+    | Punboxed_mask -> load_mixed_singleton Naked_mask
+    | Ptop -> Misc.fatal_error "convert_lprim: Punbox: Ptop layout"
+    | Pbottom -> Misc.fatal_error "convert_lprim: Punbox: Pbottom layout"
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+    | Punboxed_product _ -> assert false (* contradicts outer match *))
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3679,7 +3853,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Patomic_load_ptr _ | Pbox _ | Punbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \
