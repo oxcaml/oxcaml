@@ -1223,11 +1223,11 @@ let rebuild_apply env apply =
                         [cont_params_to_keep] *)
                      kind
                    | Unbox _ ->
-                     Misc.fatal_errorf
-                       "[rebuild_apply]: unexpected [Unbox] decision for \
-                        argument of return continuation of non-changing \
-                        calling convention apply %a"
-                       Apply.print apply
+                     (* This can happen if the function can never return. The
+                        return continuation should be deleted anyway by
+                        [make_apply_wrapper]; conservatively erase the
+                        subkind. *)
+                     Types_rewriter.erase_subkind kind
                    | Delete -> Types_rewriter.erase_subkind kind)
                  cont_decisions
                  (Flambda_arity.unarized_components (Apply.return_arity apply)))

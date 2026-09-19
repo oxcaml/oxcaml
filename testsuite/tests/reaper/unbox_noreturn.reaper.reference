@@ -1,0 +1,60 @@
+let code body_1 deleted in
+let code `fn[unbox_noreturn.ml:15,7--28]_2` deleted in
+let code run_0 deleted in
+let code loopify(never) size(3) newer_version_of(`fn[unbox_noreturn.ml:15,7--28]_2`)
+      `fn[unbox_noreturn.ml:15,7--28]_2_1` (x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1472_42)
+in
+let $`camlUnbox_noreturn__fn[unbox_noreturn.ml:15,7--28]_2` =
+  closure `fn[unbox_noreturn.ml:15,7--28]_2_1`
+    @`fn[unbox_noreturn.ml:15,7--28]` &toplevel
+in
+let code inline(never) loopify(never) size(32) newer_version_of(body_1)
+      body_1_1 (return : val)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let b = %project_value_slot.[body].[unboxed_field_b] (my_closure) in
+  let x = %project_value_slot.[body].[unboxed_field_x] (my_closure) in
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let Pmakeblock_into_Pmakeblock_field_0 = x in
+      let Pmakeblock_into_Pmakeblock_field_is_int = 0i in
+      cont k2
+             (Pmakeblock_into_Pmakeblock_field_is_int,
+              Pmakeblock_into_Pmakeblock_field_0)
+    where k3 =
+      apply &my_alloc_region return (0) -> never * k1
+    where k2
+            (`Pmakeblock_into_*match*_field_is_int` : imm,
+             `Pmakeblock_into_*match*_field_0`) =
+      let prim = `Pmakeblock_into_*match*_field_is_int` in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = `Pmakeblock_into_*match*_field_0` in
+           cont k (Pfield))
+in
+let code loopify(never) size(45) newer_version_of(run_0)
+      run_0_1 (b : imm tagged, x : imm tagged)
+        my_closure &my_alloc_region my_depth
+        -> k * k1
+        : imm tagged =
+  let body = closure body_1_1 @body &my_alloc_region
+  with { unboxed_field_b = b; unboxed_field_x = x }
+  in
+  apply direct(body_1_1 &my_alloc_region)
+    (body : _ -> imm tagged)
+      ($`camlUnbox_noreturn__fn[unbox_noreturn.ml:15,7--28]_2`)
+      -> k * k1
+in
+let $camlUnbox_noreturn__run_1 = closure run_0_1 @run &toplevel in
+let $camlUnbox_noreturn = Block 0 ($camlUnbox_noreturn__run_1) in
+cont done ($camlUnbox_noreturn)
