@@ -34,6 +34,8 @@ val reduce: Env.t -> module_type -> module_type option
            no expansion is possible. *)
 val scrape_for_functor_arg: Env.t -> module_type -> module_type
         (* Remove aliases in a functor argument type *)
+val scrape_sig_for_functor_arg: Env.t -> signature -> signature
+        (* Same, for a signature (e.g. a parameter interface) *)
 val scrape_for_type_of:
   remove_aliases:bool -> Env.t -> module_type -> module_type
         (* Process type for module type of *)

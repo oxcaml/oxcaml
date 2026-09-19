@@ -4856,6 +4856,12 @@ let type_interface ~sourcefile modulename env ast =
     cms_register_toplevel_signature_attributes ~uid ~sourcefile ast
   end;
   let sg = transl_signature ~interface_toplevel:true env ast in
+  let sg =
+    if !Clflags.as_parameter then
+      { sg with
+        sig_type = Mtype.scrape_sig_for_functor_arg env sg.sig_type }
+    else sg
+  in
   let arg_type =
     !Clflags.as_argument_for
     |> Option.map Global_module.Parameter_name.of_string
