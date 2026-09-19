@@ -627,24 +627,6 @@ let mk_no_flambda2_join_points f =
       \     zero or one incoming edge(s)%s (Flambda 2 only)"
       (format_not_default Flambda2.Default.join_points) )
 
-let mk_flambda2_unbox_along_intra_function_control_flow f =
-  ( "-flambda2-unbox-along-intra-function-control-flow",
-    Arg.Unit f,
-    Printf.sprintf
-      " Pass values within\n\
-      \     a function as unboxed where possible%s (Flambda 2 only)"
-      (format_default Flambda2.Default.unbox_along_intra_function_control_flow)
-  )
-
-let mk_no_flambda2_unbox_along_intra_function_control_flow f =
-  ( "-no-flambda2-unbox-along-intra-function-control-flow",
-    Arg.Unit f,
-    Printf.sprintf
-      " Pass values within\n\
-      \     a function in their normal representation%s (Flambda 2 only)"
-      (format_not_default
-         Flambda2.Default.unbox_along_intra_function_control_flow) )
-
 let mk_flambda2_backend_cse_at_toplevel f =
   ( "-flambda2-backend-cse-at-toplevel",
     Arg.Unit f,
@@ -1428,8 +1410,6 @@ module type Oxcaml_options = sig
   val flambda2_basic_meet : unit -> unit
   val flambda2_advanced_meet : unit -> unit
   val flambda2_join_algorithm : string -> unit
-  val flambda2_unbox_along_intra_function_control_flow : unit -> unit
-  val no_flambda2_unbox_along_intra_function_control_flow : unit -> unit
   val flambda2_backend_cse_at_toplevel : unit -> unit
   val no_flambda2_backend_cse_at_toplevel : unit -> unit
   val flambda2_cse_depth : int -> unit
@@ -1633,10 +1613,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_basic_meet F.flambda2_basic_meet;
       mk_flambda2_advanced_meet F.flambda2_advanced_meet;
       mk_flambda2_join_algorithm F.flambda2_join_algorithm;
-      mk_flambda2_unbox_along_intra_function_control_flow
-        F.flambda2_unbox_along_intra_function_control_flow;
-      mk_no_flambda2_unbox_along_intra_function_control_flow
-        F.no_flambda2_unbox_along_intra_function_control_flow;
       mk_flambda2_backend_cse_at_toplevel F.flambda2_backend_cse_at_toplevel;
       mk_no_flambda2_backend_cse_at_toplevel
         F.no_flambda2_backend_cse_at_toplevel;
@@ -2102,12 +2078,6 @@ module Oxcaml_options_impl = struct
     | "checked" ->
         Flambda2.join_algorithm := Oxcaml_flags.Set Oxcaml_flags.Checked
     | _ -> () (* This should not occur as we use Arg.Symbol *)
-
-  let flambda2_unbox_along_intra_function_control_flow =
-    set Flambda2.unbox_along_intra_function_control_flow
-
-  let no_flambda2_unbox_along_intra_function_control_flow =
-    clear Flambda2.unbox_along_intra_function_control_flow
 
   let flambda2_backend_cse_at_toplevel = set Flambda2.backend_cse_at_toplevel
 
@@ -2663,8 +2633,6 @@ module Extra_params = struct
             Misc.fatal_error
               "Syntax: flambda2-join-algorithm=binary|n-way|checked");
         true
-    | "flambda2-unbox-along-intra-function-control-flow" ->
-        set Flambda2.unbox_along_intra_function_control_flow
     | "flambda2-backend-cse-at-toplevel" -> set Flambda2.backend_cse_at_toplevel
     | "flambda2-cse-depth" -> set_int Flambda2.cse_depth
     | "flambda2-join-depth" -> set_int Flambda2.join_depth

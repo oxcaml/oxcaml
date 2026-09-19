@@ -737,7 +737,30 @@ let primitives env prim1 prim2 : Flambda_primitive.t Comparison.t =
         Variadic (prim_op1, List.map (subst_simple env) args1)
       in
       Different { approximant }
-  | _, _ -> Different { approximant = subst_primitive env prim1 }
+  | ( Quaternary (prim_op1, arg1_1, arg2_1, arg3_1, arg4_1),
+      Quaternary (prim_op2, arg1_2, arg2_2, arg3_2, arg4_2) ) ->
+    if Flambda_primitive.equal_quaternary_primitive prim_op1 prim_op2
+    then
+      simple_lists env
+        [arg1_1; arg2_1; arg3_1; arg4_1]
+        [arg1_2; arg2_2; arg3_2; arg4_2]
+      |> Comparison.map ~f:(function
+        | [arg1; arg2; arg3; arg4] ->
+          Flambda_primitive.Quaternary (prim_op1, arg1, arg2, arg3, arg4)
+        | _ -> assert false)
+    else
+      let approximant =
+        Flambda_primitive.Quaternary
+          ( prim_op1,
+            subst_simple env arg1_1,
+            subst_simple env arg2_1,
+            subst_simple env arg3_1,
+            subst_simple env arg4_1 )
+      in
+      Different { approximant }
+  | (Nullary _ | Unary _ | Binary _ | Ternary _ | Quaternary _ | Variadic _), _
+    ->
+    Different { approximant = subst_primitive env prim1 }
 
 (* Returns unit because the approximant isn't used by sets_of_closures *)
 let function_decls env

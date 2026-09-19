@@ -100,7 +100,7 @@ let any_tagged_immediate_or_null =
       is_null = Maybe_null { is_null = None }
     }
 
-let these_tagged_immediates0 imms =
+let these_tagged_immediates imms =
   match Target_ocaml_int.Set.get_singleton imms with
   | Some imm -> TG.this_tagged_immediate imm
   | _ ->
@@ -110,8 +110,6 @@ let these_tagged_immediates0 imms =
       TG.create_variant ~is_unique:false
         ~immediates:(Known (these_naked_immediates imms))
         ~blocks:(Known TG.Row_like_for_blocks.bottom) ~extensions:No_extensions
-
-let these_tagged_immediates imms = these_tagged_immediates0 imms
 
 let any_tagged_bool ~machine_width =
   these_tagged_immediates (Target_ocaml_int.all_bools machine_width)

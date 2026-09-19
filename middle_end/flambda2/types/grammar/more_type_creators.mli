@@ -57,8 +57,6 @@ val any_tagged_immediate : Type_grammar.t
 
 val any_tagged_immediate_or_null : Type_grammar.t
 
-val these_tagged_immediates0 : Target_ocaml_int.Set.t -> Type_grammar.t
-
 val these_tagged_immediates : Target_ocaml_int.Set.t -> Type_grammar.t
 
 val any_tagged_bool :
