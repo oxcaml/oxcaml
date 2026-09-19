@@ -40,9 +40,11 @@ val create : Code.t -> t
 
 val create_metadata_only : Code_metadata.t -> t
 
-val from_raw : sections:File_sections.t -> raw -> t
+val from_raw :
+  sections:File_sections.t -> import_map:Renaming.import_map -> raw -> t
 
-val to_raw : add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw
+val to_raw :
+  add_section:(Obj.t -> File_sections.Idx.t) -> t -> raw * Ids_for_export.t
 
 val remember_only_metadata : t -> t
 
@@ -58,6 +60,4 @@ val map_raw_index : (File_sections.Idx.t -> File_sections.Idx.t) -> raw -> raw
 
 (** As for [Code_metadata], the free names of a value of type [t] do not include
     the code ID, which is only kept for convenience. *)
-include Contains_names.S with type t := t
-
-include Contains_ids.S with type t := t
+val free_names : t -> Name_occurrences.t
