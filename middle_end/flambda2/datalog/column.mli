@@ -31,6 +31,8 @@ open Heterogenous_list
 
 type ('t, 'k, 'v) id
 
+val provably_equal : ('a, 'k, 'v) id -> ('b, 'k, 'v) id -> ('a, 'b) Type.eq
+
 val singleton : ('t, 'k, 'v) id -> 'k -> 'v -> 't
 
 val union_total : ('t, 'k, 'v) id -> ('v -> 'v -> 'v) -> 't -> 't -> 't

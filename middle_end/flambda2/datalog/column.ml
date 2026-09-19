@@ -44,6 +44,10 @@ type ('t, 'k, 'v) id =
     repr : ('t, 'k, 'v) repr
   }
 
+let provably_equal : type t s k v.
+    (t, k, v) id -> (s, k, v) id -> (t, s) Type.eq =
+ fun { repr = Patricia_tree_repr; _ } { repr = Patricia_tree_repr; _ } -> Equal
+
 let singleton : type t k v. (t, k, v) id -> k -> v -> t =
  fun { repr; _ } key value ->
   let Patricia_tree_repr = repr in

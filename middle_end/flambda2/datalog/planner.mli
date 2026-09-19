@@ -42,12 +42,28 @@ type stage =
 type bound_table =
   | Bound_table : ('t, 'k, 'v) Table.Id.t * 't variable -> bound_table
 
+type _ output_relation =
+  | Union :
+      't variable
+      * ('t, 'k, 's) Column.hlist
+      * ('s, _, 'v) Column.hlist
+      * 'v Table.result_repr
+      * 's variable
+      -> 'k output_relation
+  | Callback_with_bindings :
+      (Bytecode.bindings_ref -> 'k Constant.hlist -> unit) * string
+      -> 'k output_relation
+
+type output_atom =
+  | Output_atom : 'k output_relation * 'k Term.hlist -> output_atom
+
 type ('p, 'v) plan =
   { tables : bound_table iarray;
     parameters : 'p Variable.hlist;
     input_stages : stage iarray;
     num_existentials : int;
-    output_atoms : atom iarray;
+    output_atoms : output_atom iarray;
+    output_tables : bound_table iarray;
     callback : ('v Constant.hlist -> unit) ref
   }
 
