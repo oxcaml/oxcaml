@@ -28,11 +28,11 @@ The compiler uses the externality axis for certain runtime optimizations. In
 particular, updating a mutable reference to a type that is `external_` can skip
 the write barrier (i.e., it does not need a call to `caml_modify`).
 
-Writes of types with non-`value` (i.e. unboxed) base layouts never require a
-write barrier, as values of such types must never be seen by the garbage
-collector. For this reason, the layouts `bits8`, `bits16`, `bits32`, `bits64`,
-`float32`, `float64`, `untagged_immediate`, `vec128`, `vec256`, `vec512`,
-`void`, and `word` are all inherently `mod external_`.
+Writes of types with non-scanned layouts never require a write barrier. For this
+reason, the layouts `scannable non_pointer`, `bits8`, `bits16`, `bits32`,
+`bits64`, `float32`, `float64`, `untagged_immediate`, `vec128`, `vec256`,
+`vec512`, `void`, and `word` are all inherently `mod external_`, and the layout
+`scannable non_pointer64` is inherently `mod external64`.
 
 In the future, we plan to make externality a mode, rather than just a property
 of types.
