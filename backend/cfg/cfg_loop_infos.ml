@@ -7,23 +7,28 @@ let fatal = Misc.fatal_errorf
 
 let debug = false
 
-let compute_back_edges cfg dominators =
-  Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty
-    ~f:(fun src_label src_block acc ->
-      let dst_labels =
-        (* CR-soon xclerc for xclerc: probably safe to pass `~exn:false`. *)
-        Cfg.successor_labels ~normal:true ~exn:true src_block
-      in
-      Label.Set.fold
-        (fun dst_label acc ->
-          let is_back_edge =
-            Cfg_dominators.is_dominating dominators dst_label src_label
-          in
-          if is_back_edge
-          then
-            Cfg_edge.Set.add { Cfg_edge.src = src_label; dst = dst_label } acc
-          else acc)
-        dst_labels acc)
+(* Computes back edges from a DFS traversal.
+
+   In a reducible CFG, this is the set of edges where the destination dominates
+   the source. In a non-reducible CFG, this may not be the case, but it will be
+   a (not necessarily unique) set of edges such that every cycle in the CFG
+   traverses at least one of them. *)
+let compute_back_edges (cfg : Cfg.t) =
+  let visited = Label.Tbl.create 10 in
+  let back_edges = ref [] in
+  let rec visit src =
+    Label.Tbl.add visited src `Visiting;
+    let src_blk = Cfg.get_block_exn cfg src in
+    Cfg.successor_labels ~normal:true ~exn:true src_blk
+    |> Label.Set.iter (fun dst ->
+        match Label.Tbl.find visited dst with
+        | `Visited -> ()
+        | `Visiting -> back_edges := Cfg_edge.{ src; dst } :: !back_edges
+        | exception Not_found -> visit dst);
+    Label.Tbl.replace visited src `Visited
+  in
+  visit cfg.entry_label;
+  Cfg_edge.Set.of_list !back_edges
 
 type loop = Label.Set.t
 
@@ -135,17 +140,17 @@ type t =
     loop_depths : loop_depths
   }
 
-let build : Cfg.t -> Cfg_dominators.t -> t =
- fun cfg doms ->
+let build : Cfg.t -> t =
+ fun cfg ->
   if cfg.allowed_to_be_irreducible
   then
     fatal
       "cannot compute loop infos since the CFG is not guaranteed to be \
        reducible";
-  let back_edges = compute_back_edges cfg doms in
+  let back_edges = compute_back_edges cfg in
   let loops = compute_loops_of_back_edges cfg back_edges in
   let header_map = compute_header_map loops in
-  if debug then invariant_header_map doms header_map;
+  if debug then invariant_header_map (Cfg_dominators.build cfg) header_map;
   let loop_depths = compute_loop_depths cfg header_map in
   if debug
   then (
