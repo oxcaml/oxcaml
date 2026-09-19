@@ -1,0 +1,14 @@
+File "static_mli_include_dynamic.ml", line 1:
+Error: The implementation static_mli_include_dynamic.ml
+       does not match the interface ./static_mli_include_dynamic.cmi: 
+       Values do not match:
+         val poly_ f : 'a -> 'a @@ dynamic (* in a structure at static *)
+       is not included in
+         val poly_ f : 'a -> 'a (* in a structure at static *)
+       The first is dynamic
+         because it is the value f in the structure at file "static_mli_include_dynamic.ml", line 20, characters 8-27
+         which is dynamic.
+       However, the second is static.
+       File "static_mli_include_dynamic.mli", line 7, characters 0-22:
+         Expected declaration
+       File "dynamic_lib.mli", line 5, characters 2-24: Actual declaration

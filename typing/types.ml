@@ -1861,6 +1861,17 @@ let class_mode =
     ~hint_comonadic:hint
     Const.legacy)
 
+let class_modality =
+  (* [Sig_class] carries no modalities, so this is the modality implicitly on
+     every class item: the identity, except that a class is always projected
+     as [dynamic]. A class can never be instantiated as a template, so nothing
+     is lost, and it stops a class (whose own mode is legacy, i.e. dynamic)
+     from forcing its enclosing structure to be dynamic, which a unit without
+     an [.mli] (always saved as [static]) could not satisfy. *)
+  Mode.Modality.Const.set (Monadic Staticity)
+    (Mode.Modality.Monadic.Atom.Join_const Mode.Staticity.Dynamic)
+    Mode.Modality.Const.id
+
 let toplevel_mode =
   let hint : _ Mode.Hint.const = Legacy Toplevel in
   Mode.With_regionality.(of_const

@@ -4226,7 +4226,12 @@ and type_structure ?(toplevel = None) ~funct_body anchor env sstr =
           |> fun (cls : _ Typeclass.class_info) ->
               cls.cls_id, cls.cls_decl.cty_loc
         in
-        let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
+        (* Classes have no modalities in signatures; [Types.class_modality] is
+           the one they implicitly carry. *)
+        let mode =
+          apply_is_contained_by ~loc_md (Class, first_id)
+            ~modalities:Types.class_modality md_mode
+        in
         With_regionality.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
@@ -4688,6 +4693,12 @@ let type_implementation target modulename initial_env ast =
         cms_register_toplevel_struct_attributes ~sourcefile ~uid ast;
       let simple_sg = Signature_names.simplify finalenv names sg in
       if !Clflags.print_types then begin
+        (* Unlike the no-[.mli] case below, the structure's staticity is left
+           unbounded here: the printed interface carries no file-level
+           [@@ static], so it is read as dynamic and its items need no
+           [@@ dynamic] modalities. (Bounding it would also make [-i] emit
+           [@@ dynamic] on every application-bound value, which breaks
+           consumers of [-i] output such as Menhir's [--infer].) *)
         remove_mode_and_jkind_variables finalenv sg;
         let zap_modality =
           Ctype.zap_modalities_to_floor_if_modes_enabled_at Alpha
@@ -4750,6 +4761,13 @@ let type_implementation target modulename initial_env ast =
           let dclsig, staticity =
             Env.read_signature global_name compiled_intf_file
           in
+          (* Bound the structure's staticity by what the [.mli] declares before
+             the inclusion check. Inferred modalities are [Diff (mode, m)], so
+             without this ceiling a dynamic item would be accepted by pushing
+             [mode] to [Dynamic] rather than failing against the interface. *)
+          With_regionality.submode_err
+            (Location.in_file sourcefile, Structure)
+            mode (Persistent_env.mode_pers_mod staticity);
           if Env.is_parameter_unit global_name then
             error (Cannot_implement_parameter (cu_name, source_intf));
           let arg_type_from_cmi = Env.implemented_parameter global_name in
@@ -4800,9 +4818,17 @@ let type_implementation target modulename initial_env ast =
           Location.prerr_warning
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
+          (* No [.mli], so the inferred signature has no file-level [@@]; the
+             unit is saved as [Static] below. Bound the structure's staticity
+             accordingly *before* zapping the inferred modalities: they are
+             [Diff (mode, m)] and zap against the ceiling of [mode], so this is
+             what makes dynamic items (e.g. those brought in by [include] of a
+             dynamic module) come out as [@@ dynamic] rather than the dynamism
+             being absorbed into [mode] and then discarded. *)
+          With_regionality.submode_err
+            (Location.in_file sourcefile, Structure)
+            mode (Persistent_env.mode_pers_mod Static);
           let coercion, shape =
-            (* No [.mli], so the inferred signature has no file-level [@@] so we
-               make it [Static] and zapping handles things that are dynamic. *)
             let modes =
               let mode =
                 Persistent_env.mode_pers_mod Static

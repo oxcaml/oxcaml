@@ -1,0 +1,4 @@
+File "use_mli_less_include_dynamic_value.ml", line 24, characters 20-46:
+24 | let () = use_static Mli_less_include_dynamic.g
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This value is dynamic but is expected to be static.

@@ -904,7 +904,14 @@ let read_pers_struct penv check modname cmi =
   let pers_name =
     read_pers_name penv check modname cmi ~allow_excess_args:false
   in
-  pers_name.pn_sign
+  let sign, _ = pers_name.pn_sign in
+  (* [pn_sign]'s mode is downgraded to [Dynamic] when no [.cmx] is guaranteed,
+     which is always the case for a [.cmi] read by explicit path (see
+     [read_import]). Callers of this function ([Env.read_signature]) want the
+     staticity the interface *declares*, e.g. to check an implementation against
+     its own [.mli], so recover it from the raw signature. *)
+  let _, staticity = pers_name.pn_import.imp_raw_sign.sign in
+  sign, Mode.With_regionality.disallow_right (mode_pers_mod staticity)
 
 let find_pers_struct
     ~allow_hidden penv val_of_pers_sig ~check name ~allow_excess_args =
