@@ -19,6 +19,8 @@
 #ifdef CAML_INTERNALS
 
 #include "backtrace.h"
+#include "misc.h"
+#include "mlvalues.h"
 
 /* Backtrace generation is split in [backtrace.c] and [backtrace_prim].
  *

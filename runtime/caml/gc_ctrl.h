@@ -19,6 +19,9 @@
 #ifdef CAML_INTERNALS
 
 #include "misc.h"
+#include "mlvalues.h"
+#include "config.h"
+#include "domain_state.h"
 
 CAMLextern atomic_uintnat caml_max_stack_wsize;
 CAMLextern uintnat caml_fiber_wsz;

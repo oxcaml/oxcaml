@@ -64,14 +64,10 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
-#include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/misc.h"
 #include "caml/osdeps.h"
 #include "caml/signals.h"
-#include "caml/sys.h"
-#include "caml/io.h"
-#include "caml/alloc.h"
 #include "caml/platform.h"
 #include "caml/startup_aux.h"
 
