@@ -8,13 +8,7 @@
 open Runtime_events
 
 (* Compaction runs in several phases: evacuation, forwarding, and
-releasing.
-
-With the OCaml 5.2 compaction
-algorithm (OCAMLRUNPARAM=-Xcompaction=52), there is exactly one of
-each phase, in that order, in each compaction.
-
-With the chunk compactor, the phases are:
+releasing. The phases are:
 
   evacuate,
   forward,
