@@ -96,8 +96,18 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     tlambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
-        program.code
-        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+        let code =
+          program.code
+          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+        in
+        (* Everything from slambda eval onwards needs the static data (the
+           .cmx) of static dependencies, which a build that only wants this
+           unit's .cmi need not provide; [-stop-after tlambda] stops before
+           that, having already run the checks on attributes. *)
+        if Clflags.(should_stop_after Compiler_pass.Tlambda)
+        then ()
+        else
+        code
         |> Slambda.eval ~cu_static_data:Compilenv.get_static_data
              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
         |> fun (static_data, lambda) ->

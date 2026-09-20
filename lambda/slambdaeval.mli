@@ -73,7 +73,11 @@ val eval :
 
 val print_value_or_missing : Format_doc.formatter -> value Or_missing.t -> unit
 
-type error = Block_index_gap_overflow_possible
+type error =
+  | Block_index_gap_overflow_possible
+  | No_static_data of Compilation_unit.t
+      (** A unit the type checker treated as static (its [.cmx] declared
+          available, e.g. via [-Ix]) has no readable [.cmx]. *)
 
 exception Error of Location.t * error
 

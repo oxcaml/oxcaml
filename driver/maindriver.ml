@@ -61,7 +61,7 @@ let main argv ppf =
           Compenv.fatal
             "Please specify at most one of -pack, -a, -c, -output-obj, \
              -instantiate, -functorize";
-      | Some ((P.Parsing | P.Typing | P.Lambda) as p) ->
+      | Some ((P.Parsing | P.Typing | P.Tlambda | P.Lambda) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal
           "Options -i and -stop-after (%s) \

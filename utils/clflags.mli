@@ -337,7 +337,7 @@ module Compiler_ir : sig
 end
 
 module Compiler_pass : sig
-  type t = Parsing | Typing | Lambda | Middle_end
+  type t = Parsing | Typing | Tlambda | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
          | Register_allocation | Llvmize
   val of_string : string -> t option

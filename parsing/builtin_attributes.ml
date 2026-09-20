@@ -55,12 +55,14 @@ let warn_unchecked_zero_alloc_attribute () =
   Warnings.restore w_old
 
 let compiler_stops_before_attributes_consumed () =
-  let stops_before_lambda =
+  (* Attributes are consumed by the translation to (t)lambda, so stopping
+     after [Tlambda] is late enough to report the misplaced ones. *)
+  let stops_before_tlambda =
     match !Clflags.stop_after with
     | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
+    | Some pass -> Clflags.Compiler_pass.(compare pass Tlambda) < 0
   in
-  stops_before_lambda || !Clflags.print_types
+  stops_before_tlambda || !Clflags.print_types
 
 let warn_misplaced_attributes () =
   let keys = List.of_seq (Attribute_table.to_seq_keys unused_attrs) in

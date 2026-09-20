@@ -1,0 +1,6 @@
+File "stop_after_tlambda.ml", line 14, characters 5-12:
+14 | let[@inlined] f x = x
+          ^^^^^^^
+Error (warning 53 [misplaced-attribute]): the inlined attribute cannot appear in this context
+(let (*match*/0 =[value<int>] ( 1) f/0 = (function {nlocal = 0} x/0? x/0))
+  (makeblock 0 f/0))

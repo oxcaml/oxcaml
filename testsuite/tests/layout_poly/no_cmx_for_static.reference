@@ -1,0 +1,7 @@
+File "no_cmx_for_static.ml", line 27, characters 8-26:
+27 | let _ = Static_only_intf.f 1
+             ^^^^^^^^^^^^^^^^^^
+Error: The module Static_only_intf is static (its .cmx file was declared to be available),
+       but no .cmx file for it was found in the load path. It is needed to
+       evaluate the layout-polymorphic code that uses it at compile time;
+       make sure its .cmx file is provided (see -Ix and -Hx).

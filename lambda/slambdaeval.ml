@@ -28,7 +28,9 @@
 open Lambda
 module Fmt = Format_doc
 
-type error = Block_index_gap_overflow_possible
+type error =
+  | Block_index_gap_overflow_possible
+  | No_static_data of Compilation_unit.t
 
 exception Error of Location.t * error
 
@@ -378,8 +380,10 @@ module Ctx : sig
       unit, calls to it are memoized. *)
   val create : cu_static_data:(Compilation_unit.t -> CU_data.t option) -> t
 
-  (** Memoized fetch of the compile-time data for the given unit. *)
-  val cu_static_data : t -> Compilation_unit.t -> Types.value Or_missing.t
+  (** Memoized fetch of the compile-time data for the given unit. [None] if
+      the unit's static data cannot be read at all (typically no [.cmx]). *)
+  val cu_static_data :
+    t -> Compilation_unit.t -> Types.value Or_missing.t option
 
   (** A template store, used to store the templates for the current unit. *)
   val store : t -> Template_store.t
@@ -423,9 +427,7 @@ end = struct
     }
 
   let cu_static_data t cu =
-    match t.cu_static_data cu with
-    | Some { cu; _ } -> cu
-    | None -> Or_missing.Missing
+    Option.map (fun { CU_data.cu; _ } -> cu) (t.cu_static_data cu)
 
   let store t = t.store
 
@@ -538,22 +540,28 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
 
-let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
+let rec eval_slam ?name ~loc (ctx : Ctx.t) env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
-    let slv_comptime = eval_slam ?name ctx env sval_comptime in
-    let slv_runtime = eval_lam ctx env sval_runtime in
+    let slv_comptime = eval_slam ?name ~loc ctx env sval_comptime in
+    let slv_runtime = eval_lam ~loc ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
   | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
-  | SLglobal cu -> Ctx.cu_static_data ctx cu
+  | SLglobal cu -> (
+    (* [SLglobal] only arises for units the type checker deemed static, i.e.
+       whose [.cmx] was declared to be available; not finding it is a build
+       configuration error, not a missing value. *)
+    match Ctx.cu_static_data ctx cu with
+    | Some v -> v
+    | None -> raise (Error (loc, No_static_data cu)))
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
-    let value = eval_slam ~name:slet_name ctx env slet_value in
+    let value = eval_slam ~name:slet_name ~loc ctx env slet_value in
     let env_body = Env.add env slet_name value in
-    eval_slam ?name ctx env_body slet_body
+    eval_slam ?name ~loc ctx env_body slet_body
   | SLmissing -> Missing
   | SLrecord slams ->
-    let values = Array.map (eval_slam ctx env) (Array.of_list slams) in
+    let values = Array.map (eval_slam ~loc ctx env) (Array.of_list slams) in
     let id =
       Fmt.asprintf "%a/%a"
         (Fmt.pp_print_option Compilation_unit.print)
@@ -564,10 +572,10 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     let id = Ctx.uniqueify ctx id in
     Present (SLVrecord { id; values })
   | SLfield (slam, i) ->
-    let* fields = eval_slam ctx env slam |>> expect Trecord in
+    let* fields = eval_slam ~loc ctx env slam |>> expect Trecord in
     fields.values.(i)
   | SLproj_comptime slam ->
-    let* halves = eval_slam ?name ctx env slam |>> expect Thalves in
+    let* halves = eval_slam ?name ~loc ctx env slam |>> expect Thalves in
     halves.slv_comptime
   | SLtemplate { sfun_params; sfun_body } ->
     let closure =
@@ -578,9 +586,9 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     Present (SLVclosure closure_id)
   | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
-      eval_slam ctx env sapp_func |> expect_not_missing |> expect Tclosure
+      eval_slam ~loc ctx env sapp_func |> expect_not_missing |> expect Tclosure
     in
-    let eval_arg arg = eval_slam ctx env arg |> expect_not_missing in
+    let eval_arg arg = eval_slam ~loc ctx env arg |> expect_not_missing in
     let args = Array.map eval_arg sapp_args in
     Ctx.instantiate ctx closure args
       ~eval_apply:(fun { clo_params; clo_body; clo_env } args ->
@@ -592,13 +600,13 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
               "Slambda eval doesn't support partial or over application of \
                functors."
         in
-        eval_slam ctx env_body clo_body |> expect_not_missing |> expect Thalves)
+        eval_slam ~loc ctx env_body clo_body |> expect_not_missing |> expect Thalves)
 
 and eval_var env id = Env.find env id
 
-and eval_lam ctx env lam = Lambda.map (eval_lam_shallow ctx env) lam
+and eval_lam ~loc ctx env lam = Lambda.map (eval_lam_shallow ~loc ctx env) lam
 
-and eval_lam_shallow ctx env lam =
+and eval_lam_shallow ~loc ctx env lam =
   match lam with
   | Lconst old_const ->
     let new_const = eval_structured_const env old_const in
@@ -701,9 +709,11 @@ and eval_lam_shallow ctx env lam =
   | Lregion (body, old_layout) ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then lam else Lregion (body, new_layout)
-  | Lsplice (_loc, slam) ->
+  | Lsplice (splice_loc, slam) ->
+    let splice_loc = Debuginfo.Scoped_location.to_location splice_loc in
+    let loc = if Location.is_none splice_loc then loc else splice_loc in
     let halves =
-      eval_slam ctx env slam |> expect_not_missing |> expect Thalves
+      eval_slam ~loc ctx env slam |> expect_not_missing |> expect Thalves
     in
     halves.slv_runtime
   | Lkindtemplate _ | Lkindinstantiate _ | Ltemplate _ | Linstantiate _ ->
@@ -1204,7 +1214,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
 
 let do_eval (ctx : Ctx.t) slam =
   let { slv_comptime; slv_runtime } =
-    eval_slam ctx Env.empty slam
+    eval_slam ~loc:(Location.in_file !Location.input_name) ctx Env.empty slam
     |> expect_not_missing
     |> expect Thalves ~reason:"toplevel module"
   in
@@ -1227,6 +1237,13 @@ let eval ~cu_static_data slam =
       { CU_data.templates = Ctx.store ctx; cu = slv_comptime }, slv_runtime)
 
 let report_error_doc ppf = function
+  | No_static_data cu ->
+    Fmt.fprintf ppf
+      "The module %a is static (its .cmx file was declared to be available),@ \
+       but no .cmx file for it was found in the load path.@ It is needed to@ \
+       evaluate the layout-polymorphic code that uses it at compile time;@ \
+       make sure its .cmx file is provided (see -Ix and -Hx)."
+      Compilation_unit.print cu
   | Block_index_gap_overflow_possible ->
     (* This message describes a more conservative rule than we enforce; see
        [Mixed_product_bytes.Wrt_path.offset_and_gap]. *)

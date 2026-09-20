@@ -98,10 +98,19 @@ let emit_bytecode i
             ~main_module_block_format ~arg_descr ~static_data);
     )
 
-let emit_lambda_program info program =
-  let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
-  if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
-  then emit_bytecode info bytecode
+let emit_lambda_program info (program : Lambda.program) =
+  if Clflags.(should_stop_after Compiler_pass.Tlambda) then begin
+    (* Only the checks on attributes and the tlambda dump; see
+       [Optcompile.compile_from_tlambda]. *)
+    Builtin_attributes.warn_unused ();
+    ignore
+      (print_if info.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+         program.code : Lambda.lambda)
+  end else begin
+    let bytecode = tlambda_to_bytecode info program ~as_arg_for:None in
+    if not (Clflags.should_stop_after Clflags.Compiler_pass.Lambda)
+    then emit_bytecode info bytecode
+  end
 
 type starting_point =
   | Parsing

@@ -112,8 +112,8 @@ let main unix argv ppf ~flambda2 =
       | None ->
           Compenv.fatal "Please specify at most one of -pack, -a, -shared, -c, \
                          -output-obj, -instantiate, -functorize";
-      | Some ((P.Parsing | P.Typing | P.Lambda | P.Middle_end | P.Linearization
-              | P.Simplify_cfg | P.Emit | P.Selection
+      | Some ((P.Parsing | P.Typing | P.Tlambda | P.Lambda | P.Middle_end
+              | P.Linearization | P.Simplify_cfg | P.Emit | P.Selection
               | P.Register_allocation | P.Llvmize) as p) ->
         assert (P.is_compilation_pass p);
         Printf.ksprintf Compenv.fatal

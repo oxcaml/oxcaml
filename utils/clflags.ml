@@ -724,13 +724,14 @@ module Compiler_pass = struct
      - the manpages in man/ocaml{c,opt}.m
      - the manual manual/src/cmds/unified-options.etex
   *)
-  type t = Parsing | Typing | Lambda | Middle_end
+  type t = Parsing | Typing | Tlambda | Lambda | Middle_end
          | Linearization | Emit | Simplify_cfg | Selection
          | Register_allocation | Llvmize
 
   let to_string = function
     | Parsing -> "parsing"
     | Typing -> "typing"
+    | Tlambda -> "tlambda"
     | Lambda -> "lambda"
     | Middle_end -> "middle_end"
     | Linearization -> "linearization"
@@ -743,6 +744,7 @@ module Compiler_pass = struct
   let of_string = function
     | "parsing" -> Some Parsing
     | "typing" -> Some Typing
+    | "tlambda" -> Some Tlambda
     | "lambda" -> Some Lambda
     | "middle_end" -> Some Middle_end
     | "linearization" -> Some Linearization
@@ -756,8 +758,9 @@ module Compiler_pass = struct
   let rank = function
     | Parsing -> 0
     | Typing -> 1
-    | Lambda -> 2
-    | Middle_end -> 3
+    | Tlambda -> 2
+    | Lambda -> 3
+    | Middle_end -> 4
     | Selection -> 20
     | Llvmize -> 25
     | Register_allocation -> 30
@@ -768,6 +771,7 @@ module Compiler_pass = struct
   let passes = [
     Parsing;
     Typing;
+    Tlambda;
     Lambda;
     Middle_end;
     Linearization;
@@ -785,7 +789,7 @@ module Compiler_pass = struct
     | Simplify_cfg -> true
     | Selection -> true
     | Register_allocation -> true
-    | Parsing | Typing | Lambda -> false
+    | Parsing | Typing | Tlambda | Lambda -> false
     | Llvmize -> true
 
   let enabled is_native t = not (is_native_only t) || is_native
@@ -794,13 +798,13 @@ module Compiler_pass = struct
     | Simplify_cfg -> true
     | Selection -> true
     | Register_allocation -> false
-    | Parsing | Typing | Lambda | Middle_end | Emit -> false
+    | Parsing | Typing | Tlambda | Lambda | Middle_end | Emit -> false
     | Llvmize -> true
 
     let can_save_ir_before = function
     | Register_allocation -> true
     | Linearization | Simplify_cfg | Selection
-    | Parsing | Typing | Lambda | Middle_end | Emit | Llvmize -> false
+    | Parsing | Typing | Tlambda | Lambda | Middle_end | Emit | Llvmize -> false
 
   let available_pass_names ~filter ~native =
     passes
@@ -818,7 +822,8 @@ module Compiler_pass = struct
     | Selection -> prefix ^ Compiler_ir.(extension Cfg) ^ "-sel"
     | Register_allocation ->  prefix ^ Compiler_ir.(extension Cfg) ^ "-regalloc"
     | Llvmize -> prefix ^ Compiler_ir.(extension Llvmir)
-    | Emit | Parsing | Typing | Lambda | Middle_end -> Misc.fatal_error "Not supported"
+    | Emit | Parsing | Typing | Tlambda | Lambda | Middle_end ->
+      Misc.fatal_error "Not supported"
 
   let of_input_filename name =
     match Compiler_ir.extract_extension_with_pass name with
