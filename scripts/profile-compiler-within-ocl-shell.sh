@@ -84,24 +84,16 @@ if [[ ${#reports[@]} -eq 0 ]]; then
   exit 1
 fi
 
-total_allocated=0
-for report in "${reports[@]}"; do
-  while read -r amount label; do
-    if [[ "$label" == alloc ]]; then
-      total_allocated=$((total_allocated + ${amount%b}))
-    fi
-  done < "$report"
-done
-
 echo
-formatted_allocated="$(numfmt --to-unit=Gi --round=nearest --format='%.2f GiB' "$total_allocated")"
-echo "Allocated ${formatted_allocated} total."
 awk '
-  /^[0-9]/ && $1 ~ /s$/ && $2 != "gc" {total += $1}
+  $2 == "alloc" {allocated_bytes += $1}
+  /^[0-9]/ && $1 ~ /s$/ && $2 != "gc" {cpu_seconds += $1}
   $1 ~ /^[0-9]+$/ && $2 == "minor" {minor += $1}
   $1 ~ /^[0-9]+$/ && $2 == "major" {major += $1}
   END {
-    printf "The compiler spent %.3f seconds of CPU time.\n", total
+    printf "Allocated %.2f GiB total.\n",
+      allocated_bytes / (1024 * 1024 * 1024)
+    printf "The compiler spent %.3f seconds of CPU time.\n", cpu_seconds
     printf "There were %d heap collections (%d minor & %d major).\n",
       minor + major, minor, major
   }
