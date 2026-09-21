@@ -115,7 +115,7 @@ echo "Top ${top_n} source compilations by allocation:"
   ' gc.*.dump |
     sort -nr |
     sed -n "1,${top_n}p" |
-    numfmt --field=1 --to-unit=Gi --round=nearest --format='%8.3fG'
+    numfmt --field=1 --to-unit=Gi --round=nearest --format='%8.3fGiB'
 )
 
 echo
@@ -123,7 +123,7 @@ echo "Top ${top_n} source compilations by CPU time:"
 (
   cd "$output"
   awk '$2 ~ /^file=/ {
-    printf "%8.3fs  %-40s  %s\n",
+    printf "%8.3fsec  %-40s  %s\n",
       $1 + 0, substr($2, 6), FILENAME
   }' gc.*.dump |
     sort -nr |
