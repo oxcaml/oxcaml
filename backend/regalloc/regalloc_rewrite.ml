@@ -363,10 +363,13 @@ let compute_critical_edges : Cfg.t -> Cfg_edge.Set.t =
               else critical_edges)
             successor_labels critical_edges))
 
-(* A destruction edge is an edge following a destruction point. We are inserting
-   blocks on such edges to work around a bug in the split processing phase where
-   such an edge points to a block with another predecessor and that predecessor
-   has not spilled the temporaries destroyed at the destruction point. *)
+(* To work around a bug in split processing (see #4685), we ensure that there
+   are no edges from blocks ending in destruction points to blocks having
+   multiple predecessors, by inserting an extra block along any such edges.
+
+   (The bug involves a second predecessor of the target block which has not
+   spilled temporaries destroyed by the destruction point, and we avoid it by
+   ensuring there is no such second predecessor) *)
 let compute_destruction_edges : Cfg.t -> Cfg_edge.Set.t =
  fun cfg ->
   Cfg.fold_blocks cfg ~init:Cfg_edge.Set.empty

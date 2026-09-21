@@ -43,8 +43,8 @@ type t =
   }
 
 let make_index layout =
-  let tbl = Label.Tbl.create 10 in
-  DLL.iter_cell layout ~f:(fun c -> Label.Tbl.add tbl (DLL.value c) c);
+  let tbl = Label.Tbl.create (DLL.length layout) in
+  DLL.iter_cell layout ~f:(fun c -> Label.Tbl.replace tbl (DLL.value c) c);
   tbl
 
 let create cfg ~layout =
@@ -97,17 +97,21 @@ let remove_blocks t labels_to_remove =
     (* remove from layout *)
     labels_to_remove
     |> Label.Set.iter (fun lbl ->
-        let cell = Label.Tbl.find t.index lbl in
+        let cell =
+          try Label.Tbl.find t.index lbl
+          with Not_found ->
+            Misc.fatal_error "Cfg_with_layout.remove_blocks: unknown block"
+        in
         DLL.delete_curr cell;
         Label.Tbl.remove t.index lbl))
 
 let add_block t (block : Cfg.basic_block) ~after =
   match Label.Tbl.find t.index after with
   | exception Not_found ->
-    Misc.fatal_error "Cfg set_layout: 'after' block is not present"
+    Misc.fatal_error "Cfg_with_layout.add_block: 'after' block is not present"
   | cell ->
     let new_cell = DLL.insert_and_return_after cell block.start in
-    Label.Tbl.add t.index block.start new_cell;
+    Label.Tbl.replace t.index block.start new_cell;
     Cfg.add_block_exn t.cfg block
 
 let is_trap_handler t label =
