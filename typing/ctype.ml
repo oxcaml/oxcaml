@@ -6775,6 +6775,12 @@ let rec mgen_fast env subst maxnodes variance t1 t2 =
     begin match variance with
     | None -> raise_notrace Complicated_moregen
     | Some v ->
+      (* bail out for mode variables to avoid copying them *)
+      if With_locality.check_generic a1
+         || With_locality.check_generic r1
+         || With_locality.check_generic a2
+         || With_locality.check_generic r2
+      then raise_notrace Complicated_moregen;
       moregen_mode_fast (neg_variance v) a1 a2;
       moregen_mode_fast v r1 r2;
       mgen_fast env subst maxnodes (some_neg_variance v) t1 t2;
