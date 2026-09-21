@@ -6591,6 +6591,12 @@ let moregeneral_fast env patt subst subj =
          begin match variance with
          | None -> raise_notrace Complicated_moregen
          | Some variance ->
+           (* bail out for mode variables to avoid copying them *)
+           if Alloc.check_generic a1
+              || Alloc.check_generic r1
+              || Alloc.check_generic a2
+              || Alloc.check_generic r2
+           then raise_notrace Complicated_moregen;
            moregen_alloc_mode env t2 ~is_ret:false
              (neg_variance variance) a1 a2;
            moregen_alloc_mode env u2 ~is_ret:true variance r1 r2;
