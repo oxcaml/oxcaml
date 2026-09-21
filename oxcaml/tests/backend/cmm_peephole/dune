@@ -1,0 +1,15 @@
+(executable
+ (name instcombine)
+ (libraries ocamloptcomp))
+
+(rule
+ (targets instcombine.output.corrected)
+ (action
+  (with-stdout-to
+   instcombine.output.corrected
+   (run ./instcombine.exe))))
+
+(rule
+ (alias runtest)
+ (action
+  (diff instcombine.%{env:ARCH=amd64}.output instcombine.output.corrected)))
