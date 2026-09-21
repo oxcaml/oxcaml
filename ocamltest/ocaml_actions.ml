@@ -182,29 +182,19 @@ let get_program_file backend env =
 
 let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
 
-let find_in_path path name =
-  if not (Filename.is_implicit name) then
-    if Sys.file_exists name then name else raise Not_found
-  else begin
-    let rec try_dir = function
-      [] -> raise Not_found
-    | dir::rem ->
-        let fullname = Filename.concat dir name in
-        if Sys.file_exists fullname then fullname else try_dir rem
-    in try_dir path
-  end
+let cmas_need_dynamic_loading _directories _libraries =
+  None
+  (* Upstream OCaml uses the following logic to handle the case of
+     tests requiring `-custom` bytecode builds on platforms with
+     no shared library support. This is unused in OxCaml, and
+     disabled here to remove the dependency on the Cma format.
 
-let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
     match find_in_path directories library with
     | exception Not_found ->
       Some (Error ("file not found in include path: " ^ library))
     | _library ->
        None
-      (* Upstream OCaml uses the following logic to handle the case of
-         tests requiring `-custom` bytecode builds on platforms with
-         no shared library support. This is unused in OxCaml, and
-         disabled here to remove the dependency on the Cma format.
 
       let ic = open_in_bin library in
       try
@@ -222,9 +212,8 @@ let cmas_need_dynamic_loading directories libraries =
          | Sys_error _ ->
            begin try close_in ic with Sys_error _ -> () end;
            Some (Error ("Corrupt or non-CMA file: " ^ library))
-       *)
   in
-  List.find_map loads_c_code (String.words libraries)
+  List.find_map loads_c_code (String.words libraries) *)
 
 let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let (module Compiler) = compiler in
