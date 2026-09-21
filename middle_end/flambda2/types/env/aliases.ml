@@ -115,7 +115,7 @@ end = struct
           "[Aliases_of_canonical_element.invariant]: [aliases] and [all] are \
            not consistent"
 
-  let [@ocamlformat "disable"] print ppf { aliases; all = _; } =
+  let print ppf { aliases; all = _ } =
     Name_mode.Map.print (Name.Map.print Coercion.print) ppf aliases
 
   let empty = { aliases = Name_mode.Map.empty; all = Name.Map.empty }
@@ -249,17 +249,14 @@ module Alias_set = struct
       |> Option.map (fun (name, coercion) ->
           Simple.with_coercion (Simple.name name) coercion)
 
-  let [@ocamlformat "disable"] print ppf { const; names; } =
+  let print ppf { const; names } =
     let none ppf () =
       Format.fprintf ppf "%t()%t" Flambda_colours.elide Flambda_colours.pop
     in
-    Format.fprintf ppf
-      "@[<hov 1>(\
-           @[<hov 1>(const@ %a)@]@ \
-           @[<hov 1>(names@ %a)@]\
-       @]"
-       (Format.pp_print_option Reg_width_const.print ~none) const
-       (Name.Map.print Coercion.print) names
+    let open! Misc.Sexp in
+    print ppf
+      [ a "const" const (Format.pp_print_option Reg_width_const.print ~none);
+        a "names" names (Name.Map.print Coercion.print) ]
 
   let inter { const = const1; names = names1 }
       { const = const2; names = names2 } =
@@ -340,32 +337,24 @@ type t =
  * canonical_elements[elem_j_n] = (canon_j, coercion_j_n)
  *)
 
-let [@ocamlformat "disable"] print ppf
-    { canonical_elements; aliases_of_canonical_names;
-      aliases_of_consts }=
+let print ppf
+    { canonical_elements; aliases_of_canonical_names; aliases_of_consts } =
   let print_element_and_coercion ppf (elt, coercion) =
-    Format.fprintf ppf "@[<hov 1>(\
-                        %a@ \
-                        @[<hov 1>%t(coercion@ %a)%t@]\
-                        )@]"
+    Format.fprintf ppf "@[<hov 1>(%a@ @[<hov 1>%t(coercion@ %a)%t@])@]"
       Simple.print elt
       (if Coercion.is_id coercion
-      then Flambda_colours.elide
-      else Flambda_colours.none)
-      Coercion.print coercion
-      Flambda_colours.pop
+       then Flambda_colours.elide
+       else Flambda_colours.none)
+      Coercion.print coercion Flambda_colours.pop
   in
-  Format.fprintf ppf
-    "@[<hov 1>(\
-      @[<hov 1>(canonical_elements@ %a)@]@ \
-      @[<hov 1>(aliases_of_canonical_names@ %a)@]@ \
-      @[<hov 1>(aliases_of_consts@ %a)@]\
-      )@]"
-    (Name.Map.print print_element_and_coercion) canonical_elements
-    (Name.Map.print Aliases_of_canonical_element.print)
-    aliases_of_canonical_names
-    (Reg_width_const.Map.print Aliases_of_canonical_element.print)
-    aliases_of_consts
+  let open! Misc.Sexp in
+  print ppf
+    [ a "canonical_elements" canonical_elements
+        (Name.Map.print print_element_and_coercion);
+      a "aliases_of_canonical_names" aliases_of_canonical_names
+        (Name.Map.print Aliases_of_canonical_element.print);
+      a "aliases_of_consts" aliases_of_consts
+        (Reg_width_const.Map.print Aliases_of_canonical_element.print) ]
 
 let name_defined_earlier ~binding_time_resolver ~binding_times_and_modes alias
     ~than =
