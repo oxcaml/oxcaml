@@ -8680,6 +8680,9 @@ let nondep_type env id ty =
 
 let () = nondep_type' := nondep_type
 
+let compute_decl_variance =
+  ref (fun _ ~check:_ _ _ -> Misc.fatal_error "Ctype.compute_decl_variance")
+
 (* Preserve sharing inside type declarations. *)
 let rec nondep_type_decl env mid is_covariant decl =
   try
@@ -8719,23 +8722,37 @@ let rec nondep_type_decl env mid is_covariant decl =
       Option.map
         (nondep_type_decl env mid is_covariant) decl.type_unboxed_version
     in
-    { type_params = params;
-      type_arity = decl.type_arity;
-      type_kind = tk;
-      type_jkind = jkind;
-      type_ikind = Types.ikinds_todo "nondep_type_decl";
-      type_manifest = tm;
-      type_private = priv;
-      type_variance = decl.type_variance;
-      type_separability = decl.type_separability;
-      type_is_newtype = false;
-      type_expansion_scope = Btype.lowest_level;
-      type_loc = decl.type_loc;
-      type_attributes = decl.type_attributes;
-      type_unboxed_default = decl.type_unboxed_default;
-      type_uid = decl.type_uid;
-      type_unboxed_version;
-    }
+    let decl =
+      { type_params = params;
+        type_arity = decl.type_arity;
+        type_kind = tk;
+        type_jkind = jkind;
+        type_ikind = Types.ikinds_todo "nondep_type_decl";
+        type_manifest = tm;
+        type_private = priv;
+        type_variance = decl.type_variance;
+        type_separability = decl.type_separability;
+        type_is_newtype = false;
+        type_expansion_scope = Btype.lowest_level;
+        type_loc = decl.type_loc;
+        type_attributes = decl.type_attributes;
+        type_unboxed_default = decl.type_unboxed_default;
+        type_uid = decl.type_uid;
+        type_unboxed_version;
+      }
+    in
+    begin match decl.type_manifest with
+    | None -> decl
+    | Some _ ->
+        let required =
+          List.map (fun var ->
+            let pos, neg = Variance.get_upper var in
+            not neg, not pos, Variance.mem Variance.Inj var)
+            decl.type_variance
+        in
+        let variance = !compute_decl_variance env ~check:None decl required in
+        { decl with type_variance = variance }
+    end
   with Nondep_cannot_erase _ as exn ->
     clear_hash ();
     raise exn

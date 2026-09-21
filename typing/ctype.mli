@@ -671,6 +671,10 @@ val get_current_level: unit -> int
 val wrap_trace_gadt_instances: ?force:bool -> Env.t -> ('a -> 'b) -> 'a -> 'b
 
 (* Stubs *)
+val compute_decl_variance :
+    (Env.t -> check:(Ident.t * bool) option ->
+     type_declaration -> (bool * bool * bool) list -> Variance.t list) ref
+
 val package_subtype :
     (Env.t -> package -> package ->
      (unit,Errortrace.first_class_module) Result.t) ref
