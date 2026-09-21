@@ -657,6 +657,14 @@ let unarize_extern_repr ~machine_width alloc_mode
   | Same_as_ocaml_repr (Addressable sort) ->
     (* Addressability does not affect the non-boxed representation *)
     unarize_const_sort_for_extern_repr sort
+  | Raw_pointer ->
+    (* A fat pointer arrives as two unarized arguments (base, byte offset); they
+       are combined into a single raw pointer at the call site *)
+    [ { kind = K.value; arg_transformer = None; return_transformer = None };
+      { kind = K.naked_int64;
+        arg_transformer = None;
+        return_transformer = None
+      } ]
   | Unboxed_float Boxed_float64 ->
     [ { kind = K.naked_float;
         arg_transformer = Some (P.Unbox_number Naked_float);
@@ -784,6 +792,31 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   let unarized_results =
     unarize_extern_repr alloc_mode ~machine_width (snd prim_native_repr_res)
   in
+  (match snd prim_native_repr_res with
+  | Raw_pointer ->
+    Misc.fatal_errorf "close_c_call: Raw_pointer in result position for %s"
+      prim_name
+  | Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _ | Unboxed_mask
+  | Unboxed_or_untagged_integer _ ->
+    ());
+  let raw_ptr_arg_starts =
+    let _, starts =
+      List.fold_left
+        (fun (index, starts) (_, repr) ->
+          let starts =
+            match (repr : Lambda.extern_repr) with
+            | Raw_pointer -> index :: starts
+            | Same_as_ocaml_repr _ | Unboxed_float _ | Unboxed_vector _
+            | Unboxed_mask | Unboxed_or_untagged_integer _ ->
+              starts
+          in
+          ( index
+            + List.length (unarize_extern_repr alloc_mode ~machine_width repr),
+            starts ))
+        (0, []) prim_native_repr_args
+    in
+    List.rev starts
+  in
   let args = List.flatten args in
   if List.compare_lengths unarized_params args <> 0
   then
@@ -828,7 +861,7 @@ let close_c_call0 acc env ~loc ~let_bound_ids_with_kinds
   let coeffects = Coeffects.from_lambda prim_coeffects in
   let call_kind =
     Call_kind.c_call ~needs_caml_c_call:prim_alloc ~is_c_builtin:prim_c_builtin
-      ~effects ~coeffects
+      ~effects ~coeffects ~raw_ptr_arg_starts
   in
   let call_symbol =
     let prim_name =

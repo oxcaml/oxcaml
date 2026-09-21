@@ -506,6 +506,9 @@ and extern_repr =
   | Unboxed_vector of boxed_vector
   | Unboxed_mask
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Raw_pointer
+  (** A fat-pointer argument (unboxed pair of a [value] base and a [bits64]
+      byte offset), passed to C as a single raw pointer: base + offset. *)
 
 and external_call_description = extern_repr Primitive.description_gen
 

@@ -85,7 +85,7 @@ let fail_if_probe apply =
 
 let translate_external_call env res ~free_vars apply ~callee_simple ~args
     ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-    ~coeffects =
+    ~coeffects ~raw_ptr_arg_starts =
   fail_if_probe apply;
   let callee =
     match callee_simple with
@@ -114,6 +114,43 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
     List.map C.exttype_of_kind
       (Flambda_arity.unarize (Apply.args_arity apply)
       |> List.map K.With_subkind.kind)
+  in
+  (* Fuse each fat-pointer argument pair (base, byte offset) into a single raw
+     pointer, nested directly in the [Cextcall] argument list so that no later
+     pass can separate the pointer arithmetic from the call. [Cadda] gives the
+     result machtype [Addr], which prevents CSE from keeping the derived pointer
+     live across an allocation or poll point. *)
+  let args, ty_args =
+    match raw_ptr_arg_starts with
+    | [] -> args, ty_args
+    | _ :: _ ->
+      let gap_bits =
+        (* Clear any mixed-block gap bits, which occupy the top bits of the
+           offset word (see [Mixed_product_bytes]). *)
+        64 - Mixed_product_bytes.block_index_offset_bits
+      in
+      let rec fuse index args ty_args starts =
+        match starts, args, ty_args with
+        | [], _, _ -> args, ty_args
+        | start :: starts', base :: offset :: args', _ :: _ :: ty_args'
+          when start = index ->
+          let offset =
+            C.lsr_int
+              (C.lsl_int offset (C.int ~dbg gap_bits) dbg)
+              (C.int ~dbg gap_bits) dbg
+          in
+          let ptr = C.add_int_ptr ~ptr_out_of_heap:false base offset dbg in
+          let args'', ty_args'' = fuse (index + 2) args' ty_args' starts' in
+          ptr :: args'', Cmm.XInt :: ty_args''
+        | _ :: _, arg :: args', ty :: ty_args' ->
+          let args'', ty_args'' = fuse (index + 1) args' ty_args' starts in
+          arg :: args'', ty :: ty_args''
+        | _ :: _, _, _ ->
+          Misc.fatal_errorf
+            "translate_external_call: malformed raw_ptr_arg_starts for %s"
+            callee
+      in
+      fuse 0 args ty_args raw_ptr_arg_starts
   in
   let effects = To_cmm_effects.transl_c_call_effects effects in
   let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
@@ -374,10 +411,16 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
         env,
         res,
         Ece.all )
-  | C_call { needs_caml_c_call; is_c_builtin; effects; coeffects } ->
+  | C_call
+      { needs_caml_c_call;
+        is_c_builtin;
+        effects;
+        coeffects;
+        raw_ptr_arg_starts
+      } ->
     translate_external_call env res ~free_vars apply ~callee_simple ~args
       ~return_arity ~return_ty dbg ~needs_caml_c_call ~is_c_builtin ~effects
-      ~coeffects
+      ~coeffects ~raw_ptr_arg_starts
   | Method { kind; obj } ->
     fail_if_probe apply;
     let callee =
