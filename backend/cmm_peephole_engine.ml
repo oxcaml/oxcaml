@@ -349,13 +349,6 @@ let same_simple_value (e1 : Cmm.expression) (e2 : Cmm.expression) =
     String.equal s1.sym_name s2.sym_name
   | _ -> false
 
-(* Whether an expression may be matched several times by [Same] and mentioned a
-   different number of times by a rewritten result. *)
-let is_duplicable (expr : Cmm.expression) =
-  match expr with
-  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> true
-  | _ -> false
-
 let match_clauses_in_order ~default ~matches clauses expr =
   let const_same env v n ~k =
     match Env.find_opt env v with
@@ -374,10 +367,7 @@ let match_clauses_in_order ~default ~matches clauses expr =
       | Same v, expr -> (
         match Env.find_opt env v with
         | None -> Misc.fatal_errorf "Same on unbound var %s" v.name
-        | Some bound ->
-          if is_duplicable expr && Cmm_comparator.equivalent bound expr
-          then k env
-          else None)
+        | Some bound -> if same_simple_value bound expr then k env else None)
       | As (v, pat), expr ->
         match_one_pattern env pat expr ~k:(fun env -> k (Env.add env v expr))
       | Const_int_fixed n1, Cconst_int (n2, _) ->

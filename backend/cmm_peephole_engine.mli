@@ -106,10 +106,10 @@ type cmm_pattern =
   | Any of Cmm.expression pattern_var
       (** Wildcard pattern, binding a variable *)
   | Same of Cmm.expression pattern_var
-      (** Matches an expression equivalent to the one already bound to the
-          variable, provided it is a variable or a constant, so that the
-          rewritten result may mention it any number of times. Using an unbound
-          variable is a fatal error. *)
+      (** Matches a variable or constant denoting the same machine word as the
+          expression already bound to the variable (see [same_simple_value]), so
+          that the rewritten result may mention it any number of times. Using an
+          unbound variable is a fatal error. *)
   | As of Cmm.expression pattern_var * cmm_pattern
       (** Variable binding with nested pattern *)
   | Const_int_fixed of int  (** Matches [Cconst_int] with a given integer *)
