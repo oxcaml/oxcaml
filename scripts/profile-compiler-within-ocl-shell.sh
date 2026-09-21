@@ -4,6 +4,10 @@
 shopt -s nullglob
 set -euo pipefail
 
+# Note important directories:
+root="${PWD}"
+echo 'Building the compiler at `'"${root}"'`...'
+
 # Configure if necessary:
 if ! rg -qx 'WITH_FRAME_POINTERS[[:space:]]*=[[:space:]]*true' Makefile.config
 then
@@ -12,14 +16,11 @@ then
 fi
 
 # Build and install the compiler:
-make -s install 2>/dev/null
-
-# Note important directories:
-root="${PWD}"
-output="$(mktemp -d)"
-mkdir -p "${output}/bin"
+make -s install
 
 # Install all binaries we'll need, so we can surgically overwrite the compiler:
+output="$(mktemp -d)"
+mkdir -p "${output}/bin"
 for tool in "$root/_install/bin/"*; do
   name="$(basename -- "$tool")"
   if [[ ! -e "$output/bin/$name" ]]; then
@@ -56,6 +57,7 @@ sed \
   duneconf/runtime_stdlib.ws > "$output/stdlib.ws"
 
 # Build and collect profiling data:
+echo 'Using that compiler to build stdlib, placing artifacts in `'"${output}"'`...'
 dune build \
   --root "$root" \
   --workspace "$output/stdlib.ws" \
@@ -74,7 +76,6 @@ done
 # Print a summary:
 echo
 echo 'Built successfully.'
-echo
 
 reports=("$output"/gc.*.dump)
 if [[ ${#reports[@]} -eq 0 ]]; then
@@ -91,6 +92,24 @@ for report in "${reports[@]}"; do
   done < "$report"
 done
 
-echo "Allocated ${total_allocated} bytes total"
+echo
+formatted_allocated="$(numfmt --to-unit=Gi --round=nearest --format='%.2f GiB' "$total_allocated")"
+echo "Allocated ${formatted_allocated} total."
 
+echo
+top_n='10'
+echo "Top ${top_n} compiler invocations by allocation:"
+awk '
+  $2 == "alloc" {bytes[FILENAME] = $1 + 0}
+  $2 ~ /^file=/ {source[FILENAME] = substr($2, 6)}
+  END {
+    for (file in bytes)
+      print bytes[file], (file in source ? source[file] : file)
+  }
+' "${reports[@]}" |
+  sort -nr |
+  sed -n "1,${top_n}p" |
+  numfmt --field=1 --to=iec-i --suffix=B --round=nearest --format='%.2f'
+
+echo
 echo 'All profiling files (e.g. `memtrace-dump` `.txt` files) can be found in `'"${output}"'`.'
