@@ -7,6 +7,10 @@ let fatal = Misc.fatal_errorf
 
 let debug = false
 
+type visit_status =
+  | Visiting
+  | Visited
+
 (* Computes back edges from a DFS traversal.
 
    In a reducible CFG, this is the set of edges where the destination dominates
@@ -17,15 +21,15 @@ let compute_back_edges (cfg : Cfg.t) =
   let visited = Label.Tbl.create 10 in
   let back_edges = ref [] in
   let rec visit src =
-    Label.Tbl.add visited src `Visiting;
+    Label.Tbl.replace visited src Visiting;
     let src_blk = Cfg.get_block_exn cfg src in
     Cfg.successor_labels ~normal:true ~exn:true src_blk
     |> Label.Set.iter (fun dst ->
         match Label.Tbl.find visited dst with
-        | `Visited -> ()
-        | `Visiting -> back_edges := Cfg_edge.{ src; dst } :: !back_edges
+        | Visited -> ()
+        | Visiting -> back_edges := Cfg_edge.{ src; dst } :: !back_edges
         | exception Not_found -> visit dst);
-    Label.Tbl.replace visited src `Visited
+    Label.Tbl.replace visited src Visited
   in
   visit cfg.entry_label;
   Cfg_edge.Set.of_list !back_edges
