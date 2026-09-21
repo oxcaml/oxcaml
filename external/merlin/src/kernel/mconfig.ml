@@ -685,6 +685,13 @@ let ocaml_ignored_flags =
     "-no-cfg-value-propagation-float";
     "-cfg-value-propagation-flow";
     "-no-cfg-value-propagation-flow";
+    "-use-ssa";
+    "-no-use-ssa";
+    "-ssa-simplify";
+    "-no-ssa-simplify";
+    "-ssa-validate";
+    "-no-ssa-validate";
+    "-dssa";
     "-gdwarf-pedantic";
     "-ddwarf-metrics";
     "-afl-instrument";

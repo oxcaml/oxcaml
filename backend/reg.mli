@@ -108,6 +108,8 @@ val dummy_for_regalloc : t
 
 val create : Cmm.machtype_component -> t
 
+val create_with_id : id:Ident.t -> Cmm.machtype_component -> t
+
 val create_with_typ : t -> t
 
 val create_with_typ_and_name : ?prefix_if_var:string -> t -> t
