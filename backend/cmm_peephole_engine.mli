@@ -164,6 +164,11 @@ module Syntax : sig
   val ( #. ) : Env.t -> 'a pattern_var -> 'a
 end
 
+(** Whether two expressions are known to denote the same machine word. Only
+    variables and constants are recognised, so that evaluating one of the two
+    expressions instead of both is equivalent. *)
+val same_simple_value : Cmm.expression -> Cmm.expression -> bool
+
 (** Check equivalence of Cmm terms for the purpose of checking that the engine
     produces terms equivalent to the ones produced by the original code. *)
 module Cmm_comparator : sig

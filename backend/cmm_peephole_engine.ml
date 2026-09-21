@@ -337,6 +337,18 @@ let matches_binop (binop : binop) (cop : Cmm.operation) =
   | Bitwise_op, (Cand | Cor | Cxor) -> true
   | _, _ -> false
 
+(* Whether two expressions are known to denote the same machine word. Only
+   variables and constants are recognised, so that evaluating one of the two
+   expressions instead of both is equivalent. *)
+let same_simple_value (e1 : Cmm.expression) (e2 : Cmm.expression) =
+  match e1, e2 with
+  | Cvar v1, Cvar v2 -> Backend_var.same v1 v2
+  | Cconst_int (n1, _), Cconst_int (n2, _) -> Int.equal n1 n2
+  | Cconst_natint (n1, _), Cconst_natint (n2, _) -> Nativeint.equal n1 n2
+  | Cconst_symbol (s1, _), Cconst_symbol (s2, _) ->
+    String.equal s1.sym_name s2.sym_name
+  | _ -> false
+
 (* Whether an expression may be matched several times by [Same] and mentioned a
    different number of times by a rewritten result. *)
 let is_duplicable (expr : Cmm.expression) =
