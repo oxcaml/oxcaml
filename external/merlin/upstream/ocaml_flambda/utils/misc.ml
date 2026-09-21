@@ -2227,6 +2227,57 @@ let remove_double_underscores s =
   loop 0;
   Buffer.contents buf
 
+module Sexp = struct
+
+  type field =
+    | Bool : string * bool -> field
+    | Int : string * int -> field
+    | String : string * string -> field
+    | Float : string * float -> field
+    | Fmt : (Format.formatter -> unit) -> field
+    | Print : string * (Format.formatter -> 'a -> unit) * 'a -> field
+    | Option : string * (Format.formatter -> 'a -> unit) * 'a option -> field
+
+  let s s1 s2 = String (s1, s2)
+  let i s i = Int (s, i)
+  let f s f = Float (s, f)
+  let b s b = Bool (s, b)
+  let p s pp p = Print (s, pp, p)
+  let o s pp p = Option (s, pp, p)
+  let fmt fmt = Format.kdprintf (fun f -> Fmt f) fmt
+
+  let print_field ppf = function
+    | String (name, s) -> Format.fprintf ppf "@[<hov 1>(%s@ %s)@]" name s
+    | Bool (name, b) -> Format.fprintf ppf "@[<hov 1>(%s@ %b)@]" name b
+    | Int (name, i) -> Format.fprintf ppf "@[<hov 1>(%s@ %d)@]" name i
+    | Float (name, f) -> Format.fprintf ppf "@[<hov 1>(%s@ %f)@]" name f
+    | Fmt t -> Format.fprintf ppf "@[<hov 1>%t@]" t
+    | Print (name, pp, x) -> Format.fprintf ppf "@[<hov 1>(%s@ %a)@]" name pp x
+    | Option (name, pp, opt) -> (
+        match opt with
+        | None -> ()
+        | Some x -> Format.fprintf ppf "@[<hov 1>(%s@ %a)@]" name pp x)
+
+  let print ppf (l : field list) =
+    let default () =
+      let pp_sep = Format.pp_print_space in
+      Format.fprintf ppf "@[<hov 1>(%a)@]"
+        (Format.pp_print_list ~pp_sep print_field) l
+    in
+    match l with
+    | [field] ->
+        begin match field with
+        | (String _ | Bool _ | Int _ | Float _ | Print _) ->
+          (* avoid double parenthesis when there is a single field
+             (except for Fmt fields which don't have parentheses) *)
+           print_field ppf field
+          | (Fmt _| Option _) ->
+           default ()
+        end
+    | _ -> default ()
+
+end
+
 module Json = struct
 
   (* [escape_unicode] is based on [Bytes.unsafe_escape], which is used
