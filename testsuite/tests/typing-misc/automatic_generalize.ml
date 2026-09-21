@@ -40,11 +40,12 @@ module Phantom (F : Make) = struct
     !result
 end
 [%%expect{|
-Line 7, characters 9-13:
-7 |     save true;
-             ^^^^
-Error: The constructor "true" has type "bool"
-       but an expression was expected of type "int"
+module Phantom :
+  functor (F : Make) ->
+    sig
+      module M : sig type 'a t = unit val make : 'a -> 'a t end
+      val save_both : unit -> unit option
+    end
 |}]
 
 (* Expansion must also discover phantom parameters through named aliases. *)

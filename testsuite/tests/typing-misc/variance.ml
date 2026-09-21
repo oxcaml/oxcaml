@@ -281,67 +281,31 @@ module Copy :
   functor (X : sig type 'a t end) ->
     sig type 'a t = 'a X.t module Nested : sig type 'a t = 'a X.t end end
 module Phantom :
-  sig type 'a t = unit module Nested : sig type 'a t = unit end end
+  sig type +-'a t = unit module Nested : sig type +-'a t = unit end end
 module Covariant :
-  sig type 'a t = 'a list module Nested : sig type 'a t = 'a list end end
+  sig type +!'a t = 'a list module Nested : sig type +!'a t = 'a list end end
 module Contravariant :
   sig
-    type 'a t = 'a -> unit
-    module Nested : sig type 'a t = 'a -> unit end
+    type -!'a t = 'a -> unit
+    module Nested : sig type -!'a t = 'a -> unit end
   end
 module Invariant :
-  sig type 'a t = 'a ref module Nested : sig type 'a t = 'a ref end end
+  sig type !'a t = 'a ref module Nested : sig type !'a t = 'a ref end end
 |}]
 
 module Phantom_check : sig type +-'a t end = Phantom
 [%%expect{|
-Line 1, characters 45-52:
-1 | module Phantom_check : sig type +-'a t end = Phantom
-                                                 ^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = unit module Nested = Phantom.Nested end
-       is not included in
-         sig type +-'a t end
-       Type declarations do not match:
-         type 'a t = unit
-       is not included in
-         type +-'a t
-       Their variances do not agree.
+module Phantom_check : sig type +-'a t end
 |}]
 
 module Covariant_check : sig type +!'a t end = Covariant
 [%%expect{|
-Line 1, characters 47-56:
-1 | module Covariant_check : sig type +!'a t end = Covariant
-                                                   ^^^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a list module Nested = Covariant.Nested end
-       is not included in
-         sig type +!'a t end
-       Type declarations do not match:
-         type 'a t = 'a list
-       is not included in
-         type +!'a t
-       Their variances do not agree.
+module Covariant_check : sig type +!'a t end
 |}]
 
 module Contravariant_check : sig type -!'a t end = Contravariant
 [%%expect{|
-Line 1, characters 51-64:
-1 | module Contravariant_check : sig type -!'a t end = Contravariant
-                                                       ^^^^^^^^^^^^^
-Error: Signature mismatch:
-       Modules do not match:
-         sig type 'a t = 'a -> unit module Nested = Contravariant.Nested end
-       is not included in
-         sig type -!'a t end
-       Type declarations do not match:
-         type 'a t = 'a -> unit
-       is not included in
-         type -!'a t
-       Their variances do not agree.
+module Contravariant_check : sig type -!'a t end
 |}]
 
 module Invariant_check : sig type +'a t end = Invariant
@@ -351,11 +315,11 @@ Line 1, characters 46-55:
                                                   ^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         sig type 'a t = 'a ref module Nested = Invariant.Nested end
+         sig type !'a t = 'a ref module Nested = Invariant.Nested end
        is not included in
          sig type +'a t end
        Type declarations do not match:
-         type 'a t = 'a ref
+         type !'a t = 'a ref
        is not included in
          type +'a t
        Their variances do not agree.
