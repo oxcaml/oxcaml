@@ -1,5 +1,15 @@
 (library
  (name read_cma)
+ (modules read_cma compunit_name)
  (flags :standard -safe-string)
  (libraries compiler-libs.common compiler-libs.bytecomp)
  (preprocess no_preprocessing))
+
+(rule
+ (targets compunit_name.ml)
+ (deps compunit_name_upstream.ml compunit_name_oxcaml.ml)
+ (action
+  (with-stdout-to
+   %{targets}
+   (system
+    "case '%{ocaml_version}' in *+ox*) cat compunit_name_oxcaml.ml ;; *) cat compunit_name_upstream.ml ;; esac"))))
