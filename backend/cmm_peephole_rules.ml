@@ -157,7 +157,10 @@ let lsl_rules =
   [ create Lsl ~cond:(Eq (m' <<! c', il (-1n) <<! c')) (x &: m, c) (x <<: k c');
     create Lsl (x *: c1, c2) (x *: k (c1' <<! c2')) ]
 
-let lsr_rules = [create Lsr (x <<: c, c) (x &: k (il (-1n) >>! c'))]
+(* For smaller shifts the mask does not fit an immediate operand, and the pair
+   of shifts is cheaper. *)
+let lsr_rules =
+  [create Lsr ~cond:(Slt (il 32n, c')) (x <<: c, c) (x &: k (il (-1n) >>! c'))]
 
 let mul_rules =
   [ create Mul (x *: c1, c2) (x *: k (c1' *! c2'));

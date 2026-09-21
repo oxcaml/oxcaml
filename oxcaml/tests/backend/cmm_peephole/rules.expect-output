@@ -166,7 +166,7 @@ unsat
 (x * c1) << c2 -> x * (c1 << c2) if 0 <= c2 < 64
 unsat
 
-(x << c) >>u c -> x & (-1 >>u c) if 0 <= c < 64
+(x << c) >>u c -> x & (-1 >>u c) if 0 <= c < 64 && 32 < c
 unsat
 
 (x * c1) * c2 -> x * (c1 * c2)

@@ -479,11 +479,18 @@ lsl_mul_const:
   ret
 |}]
 
-let lsr_lsl x = Int64_u.shift_right_logical (Int64_u.shift_left x 8) 8
+let lsr_lsl x = Int64_u.shift_right_logical (Int64_u.shift_left x 40) 40
 [%%expect_asm X86_64{|
 lsr_lsl:
-  movabsq $72057594037927935, %rbx
-  andq  %rbx, %rax
+  andl  $16777215, %eax
+  ret
+|}]
+
+let lsr_lsl_small x = Int64_u.shift_right_logical (Int64_u.shift_left x 8) 8
+[%%expect_asm X86_64{|
+lsr_lsl_small:
+  salq  $8, %rax
+  shrq  $8, %rax
   ret
 |}]
 
