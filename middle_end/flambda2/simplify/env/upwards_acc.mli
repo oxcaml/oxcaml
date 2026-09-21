@@ -84,6 +84,15 @@ val with_cost_metrics : Cost_metrics.t -> t -> t
 
 val add_cost_metrics : Cost_metrics.t -> t -> t
 
+(** Cost metrics of statically-allocated constants whose placement did not
+    contribute to [cost_metrics] because
+    [Flambda_features.Inlining.speculative_inlining_track_lifted_constants] is
+    disabled. Only used to warn when enabling that flag would change a
+    speculative inlining decision. *)
+val cost_metrics_of_untracked_static_consts : t -> Cost_metrics.t
+
+val add_cost_metrics_of_untracked_static_consts : Cost_metrics.t -> t -> t
+
 (* CR lmaurer: This is tragic. We can be rid of it once we have PDCE, if I
    understand correctly. *)
 

@@ -229,20 +229,27 @@ let create_raw_let_symbol uacc bound_static static_consts ~body =
       name_occurrences
   in
   let cost_metrics_of_static_consts =
-    if UA.track_lifted_constants uacc
-    then Rebuilt_static_const.Group.cost_metrics static_consts
-    else
-      (* Static consts used to always have zero cost metrics. That is now
-         considered to be a bug, but it can have unexpected consequences on
-         speculative inlining -- the flags controlling this are used for a
-         progressive rollout of the fix and will be removed in due time. *)
-      Cost_metrics.zero
+    Rebuilt_static_const.Group.cost_metrics static_consts
   in
   let uacc =
     UA.with_name_occurrences uacc ~name_occurrences:free_names_of_let
-    |> UA.add_cost_metrics
-         (Cost_metrics.increase_due_to_let_expr ~is_phantom:false
-            ~cost_metrics_of_defining_expr:cost_metrics_of_static_consts)
+  in
+  let uacc =
+    if UA.track_lifted_constants uacc
+    then
+      UA.add_cost_metrics
+        (Cost_metrics.increase_due_to_let_expr ~is_phantom:false
+           ~cost_metrics_of_defining_expr:cost_metrics_of_static_consts)
+        uacc
+    else
+      (* Static consts used to always have zero cost metrics. That is now
+         considered to be a bug, but it can have unexpected consequences on
+         speculative inlining -- the flag above is used to control a progressive
+         rollout of the fix and will be removed in due time. The metrics are
+         recorded separately so that we can warn when enabling the flag would
+         change a speculative inlining decision. *)
+      UA.add_cost_metrics_of_untracked_static_consts
+        cost_metrics_of_static_consts uacc
   in
   if Are_rebuilding_terms.do_not_rebuild_terms (UA.are_rebuilding_terms uacc)
   then RE.term_not_rebuilt, uacc

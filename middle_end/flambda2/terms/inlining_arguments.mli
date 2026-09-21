@@ -60,4 +60,6 @@ val small_functor_size : t -> int
 
 val large_functor_size : t -> int
 
+val with_large_functor_size : t -> large_functor_size:int -> t
+
 val threshold : t -> float

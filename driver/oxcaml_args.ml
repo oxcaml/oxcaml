@@ -1045,6 +1045,16 @@ let mk_flambda2_inline_large_functor_size f =
       \     (Flambda 2 only)"
       Flambda2_inlining_default.default_arguments.large_functor_size )
 
+let mk_flambda2_inline_ideal_large_functor_size f =
+  ( "-flambda2-inline-ideal-large-functor-size",
+    Arg.Int f,
+    "<int>\n\
+    \     Does not change the behaviour of the compiler.  Gives the value\n\
+    \     that -flambda2-inline-large-functor-size is intended to have\n\
+    \     eventually, so that deviations from that ideal configuration can\n\
+    \     be reported by warning 222 [inlining-deviates-from-ideal]\n\
+    \     (Flambda 2 only)" )
+
 let mk_flambda2_inline_threshold f =
   ( "-flambda2-inline-threshold",
     Arg.String f,
@@ -1493,6 +1503,7 @@ module type Oxcaml_options = sig
   val flambda2_inline_large_function_size : string -> unit
   val flambda2_inline_small_functor_size : string -> unit
   val flambda2_inline_large_functor_size : string -> unit
+  val flambda2_inline_ideal_large_functor_size : int -> unit
   val flambda2_inline_threshold : string -> unit
   val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
   val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
@@ -1729,6 +1740,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_inline_large_function_size;
       mk_flambda2_inline_small_functor_size F.flambda2_inline_small_functor_size;
       mk_flambda2_inline_large_functor_size F.flambda2_inline_large_functor_size;
+      mk_flambda2_inline_ideal_large_functor_size
+        F.flambda2_inline_ideal_large_functor_size;
       mk_flambda2_inline_threshold F.flambda2_inline_threshold;
       mk_flambda2_speculative_inlining_only_if_arguments_useful
         F.flambda2_speculative_inlining_only_if_arguments_useful;
@@ -2297,6 +2310,9 @@ module Oxcaml_options_impl = struct
       "Syntax: -flambda2-inline-large-functor-size <int> | <round>=<int>[,...]"
       Flambda2.Inlining.large_functor_size
 
+  let flambda2_inline_ideal_large_functor_size size =
+    Flambda2.Inlining.ideal_large_functor_size := Some size
+
   let flambda2_inline_threshold spec =
     Clflags.Float_arg_helper.parse spec
       "Syntax: -flambda2-inline-threshold <float> | <round>=<float>[,...]"
@@ -2784,6 +2800,14 @@ module Extra_params = struct
           "Bad syntax in OCAMLPARAM for 'flambda2-inline-large-functor-size'"
           Flambda2.Inlining.large_functor_size;
         true
+    | "flambda2-inline-ideal-large-functor-size" -> (
+        match int_of_string_opt v with
+        | Some size ->
+            Flambda2.Inlining.ideal_large_functor_size := Some size;
+            true
+        | None ->
+            raise
+              (Arg.Bad (Printf.sprintf "Expected int for %s, got %S" name v)))
     | "flambda2-inline-threshold" ->
         Clflags.Float_arg_helper.parse v
           "Bad syntax in OCAMLPARAM for 'flambda2-inline-threshold'"
