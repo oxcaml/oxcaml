@@ -265,3 +265,126 @@ Error: Signature mismatch:
          type +-'a t = private int
        Their variances do not agree.
 |}]
+
+(* Dependency elimination can reveal more precise variance than the functor
+   parameter allows. *)
+module Copy (X : sig type 'a t end) = struct
+  type 'a t = 'a X.t
+  module Nested = struct type 'a t = 'a X.t end
+end
+module Phantom = Copy (struct type 'a t = unit end)
+module Covariant = Copy (struct type 'a t = 'a list end)
+module Contravariant = Copy (struct type 'a t = 'a -> unit end)
+module Invariant = Copy (struct type 'a t = 'a ref end)
+[%%expect{|
+module Copy :
+  functor (X : sig type 'a t end) ->
+    sig type 'a t = 'a X.t module Nested : sig type 'a t = 'a X.t end end
+module Phantom :
+  sig type 'a t = unit module Nested : sig type 'a t = unit end end
+module Covariant :
+  sig type 'a t = 'a list module Nested : sig type 'a t = 'a list end end
+module Contravariant :
+  sig
+    type 'a t = 'a -> unit
+    module Nested : sig type 'a t = 'a -> unit end
+  end
+module Invariant :
+  sig type 'a t = 'a ref module Nested : sig type 'a t = 'a ref end end
+|}]
+
+module Phantom_check : sig type +-'a t end = Phantom
+[%%expect{|
+Line 1, characters 45-52:
+1 | module Phantom_check : sig type +-'a t end = Phantom
+                                                 ^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = unit module Nested = Phantom.Nested end
+       is not included in
+         sig type +-'a t end
+       Type declarations do not match:
+         type 'a t = unit
+       is not included in
+         type +-'a t
+       Their variances do not agree.
+|}]
+
+module Covariant_check : sig type +!'a t end = Covariant
+[%%expect{|
+Line 1, characters 47-56:
+1 | module Covariant_check : sig type +!'a t end = Covariant
+                                                   ^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = 'a list module Nested = Covariant.Nested end
+       is not included in
+         sig type +!'a t end
+       Type declarations do not match:
+         type 'a t = 'a list
+       is not included in
+         type +!'a t
+       Their variances do not agree.
+|}]
+
+module Contravariant_check : sig type -!'a t end = Contravariant
+[%%expect{|
+Line 1, characters 51-64:
+1 | module Contravariant_check : sig type -!'a t end = Contravariant
+                                                       ^^^^^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = 'a -> unit module Nested = Contravariant.Nested end
+       is not included in
+         sig type -!'a t end
+       Type declarations do not match:
+         type 'a t = 'a -> unit
+       is not included in
+         type -!'a t
+       Their variances do not agree.
+|}]
+
+module Invariant_check : sig type +'a t end = Invariant
+[%%expect{|
+Line 1, characters 46-55:
+1 | module Invariant_check : sig type +'a t end = Invariant
+                                                  ^^^^^^^^^
+Error: Signature mismatch:
+       Modules do not match:
+         sig type 'a t = 'a ref module Nested = Invariant.Nested end
+       is not included in
+         sig type +'a t end
+       Type declarations do not match:
+         type 'a t = 'a ref
+       is not included in
+         type +'a t
+       Their variances do not agree.
+|}]
+
+(* Private and constrained declarations retain their variance requirements;
+   abstract declarations retain the variance exposed by their signatures. *)
+module Private_copy (X : sig type 'a t end) : sig
+  type 'a t = private 'a X.t
+end = struct
+  type 'a t = 'a X.t
+end
+module Abstract_copy (X : sig type 'a t end) : sig type 'a t end = struct
+  type 'a t = 'a X.t
+end
+module Constrained_copy (X : sig type 'a t end) = struct
+  type 'a t = 'b X.t constraint 'a = 'b list
+end
+module Private = Private_copy (struct type 'a t = unit end)
+module Abstract = Abstract_copy (struct type 'a t = unit end)
+module Constrained = Constrained_copy (struct type 'a t = unit end)
+[%%expect{|
+module Private_copy :
+  functor (X : sig type 'a t end) -> sig type 'a t = private 'a X.t end
+module Abstract_copy : functor (X : sig type 'a t end) -> sig type 'a t end
+module Constrained_copy :
+  functor (X : sig type 'a t end) ->
+    sig type 'a t = 'b X.t constraint 'a = 'b list end
+module Private : sig type 'a t = private unit end
+module Abstract : sig type 'a t end
+module Constrained : sig type 'a t = unit constraint 'a = 'b list end
+|}]
