@@ -96,6 +96,7 @@ type binop =
   | Asr
   | Or
   | And
+  | Xor
   | Comparison
       (** Matches all versions of the [Ccmpi] and [Ccmpf] operations *)
   | Bitwise_op  (** All binary bit-wise operations: [Cand], [Cor], [Cxor] *)
@@ -115,6 +116,8 @@ type cmm_pattern =
   | Const_any of Nativeint.t pattern_var
       (** Matches any [Cconst_int] or [Cconst_natint] and binds the underlying
           integer as a nativeint *)
+  | Const_word of Nativeint.t pattern_var
+      (** Matches [Cconst_int] or [Cconst_natint] as a machine-word integer *)
   | Binop of binop * cmm_pattern * cmm_pattern
       (** Matches the corresponding [Cop] terms *)
   | Guarded of
