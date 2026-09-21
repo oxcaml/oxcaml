@@ -98,7 +98,13 @@ formatted_allocated="$(numfmt --to-unit=Gi --round=nearest --format='%.2f GiB' "
 echo "Allocated ${formatted_allocated} total."
 awk '
   /^[0-9]/ && $1 ~ /s$/ && $2 != "gc" {total += $1}
-  END {printf "The compiler spent %.3f seconds of CPU time.\n", total}
+  $1 ~ /^[0-9]+$/ && $2 == "minor" {minor += $1}
+  $1 ~ /^[0-9]+$/ && $2 == "major" {major += $1}
+  END {
+    printf "The compiler spent %.3f seconds of CPU time.\n", total
+    printf "There were %d heap collections (%d minor & %d major).\n",
+      minor + major, minor, major
+  }
 ' "${reports[@]}"
 
 echo
