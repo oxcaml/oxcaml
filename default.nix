@@ -381,6 +381,8 @@ stdenv.mkDerivation {
     dune
     pkgs.pkg-config
     pkgs.rsync
+    pkgs.ripgrep
+    pkgs.ocamlPackages.memtrace
     pkgs.which
     pkgs.parallel
     gfortran # Required for Bigarray Fortran tests
