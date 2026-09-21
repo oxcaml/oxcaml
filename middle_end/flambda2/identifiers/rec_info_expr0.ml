@@ -88,16 +88,12 @@ struct
 
     let do_not_unroll = Do_not_unroll
 
-    let [@ocamlformat "disable"] print ppf = function
-      | Not_unrolling ->
-        Format.pp_print_string ppf "Not_unrolling"
+    let print ppf = function
+      | Not_unrolling -> Format.pp_print_string ppf "Not_unrolling"
       | Unrolling { remaining_depth } ->
-        Format.fprintf ppf
-          "@[<hov 1>(Unrolling@ \
-           @[<hov 1>(remaining_depth@ %d)@])@]"
-          remaining_depth
-      | Do_not_unroll ->
-        Format.pp_print_string ppf "Do_not_unroll"
+        let open! Misc.Sexp in
+        print ppf [fmt "Unrolling"; i "remaining_depth" remaining_depth]
+      | Do_not_unroll -> Format.pp_print_string ppf "Do_not_unroll"
 
     let equal t1 t2 =
       match t1, t2 with

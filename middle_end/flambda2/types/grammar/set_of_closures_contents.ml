@@ -22,13 +22,11 @@ type t =
 include Container_types.Make (struct
   type nonrec t = t
 
-  let [@ocamlformat "disable"] print ppf { closures; value_slots; } =
-    Format.fprintf ppf "@[<hov 1>(\
-          @[<hov 1>(closures@ %a)@]@ \
-          @[<hov 1>(value_slots@ %a)@]\
-          )@]"
-      Function_slot.Set.print closures
-      Value_slot.Set.print value_slots
+  let print ppf { closures; value_slots } =
+    let open! Misc.Sexp in
+    print ppf
+      [ p "closures" Function_slot.Set.print closures;
+        p "value_slots" Value_slot.Set.print value_slots ]
 
   let compare { closures = closures1; value_slots = value_slots1 }
       { closures = closures2; value_slots = value_slots2 } =

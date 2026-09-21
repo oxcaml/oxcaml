@@ -19,13 +19,9 @@ type t =
     name_mode : Name_mode.t
   }
 
-let [@ocamlformat "disable"] print ppf { name; name_mode; } =
-  Format.fprintf ppf "@[<hov 1>)\
-      @[<hov 1>(name@ %a)@]@ \
-      @[<hov 1>(name_mode@ %a)@]\
-      )@]"
-    Name.print name
-    Name_mode.print name_mode
+let print ppf { name; name_mode } =
+  let open! Misc.Sexp in
+  print ppf [p "name" Name.print name; p "name_mode" Name_mode.print name_mode]
 
 let create name name_mode =
   (* See note about name modes in [Bound_var.create]. *)

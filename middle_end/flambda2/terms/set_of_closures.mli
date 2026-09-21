@@ -20,8 +20,7 @@ include Expr_std.S with type t := t
 
 include Contains_ids.S with type t := t
 
-val print_with_extra_fields :
-  (Format.formatter -> unit) -> Format.formatter -> t -> unit
+val sexp_fields : t -> Misc.Sexp.field list
 
 val is_empty : t -> bool
 

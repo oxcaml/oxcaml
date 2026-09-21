@@ -19,22 +19,14 @@ type t =
     value_slots : Simple.t Value_slot.Map.t
   }
 
-let [@ocamlformat "disable"] print_with_extra_fields extra_fields ppf
-      { function_decls;
-        value_slots
-      } =
-  Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-      %t\
-      @[<hov 1>(function_decls@ %a)@]@ \
-      @[<hov 1>(value_slots@ %a)@]\
-      )@]"
-    Flambda_colours.prim_constructive
-    Flambda_colours.pop
-    extra_fields
-    (Function_declarations.print) function_decls
-    (Value_slot.Map.print Simple.print) value_slots
+let sexp_fields { function_decls; value_slots } =
+  let open! Misc.Sexp in
+  [ fmt "%tset_of_closures%t" Flambda_colours.prim_constructive
+      Flambda_colours.pop;
+    p "function_decls" Function_declarations.print function_decls;
+    p "value_slots" (Value_slot.Map.print Simple.print) value_slots ]
 
-let print ppf t = print_with_extra_fields (fun _ppf -> ()) ppf t
+let print ppf t = Misc.Sexp.print ppf (sexp_fields t)
 
 include Container_types.Make (struct
   type nonrec t = t
@@ -65,26 +57,16 @@ let value_slots t = t.value_slots
 
 let is_closed t = Value_slot.Map.is_empty t.value_slots
 
-let [@ocamlformat "disable"] print ppf
-      { function_decls;
-        value_slots;
-      } =
-  if Value_slot.Map.is_empty value_slots then
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-        @[<hov 1>%a@]\
-        )@]"
-      Flambda_colours.prim_constructive
-      Flambda_colours.pop
-      (Function_declarations.print) function_decls
-  else
-    Format.fprintf ppf "@[<hov 1>(%tset_of_closures%t@ \
-        @[<hov 1>%a@]@ \
-        @[<hov 1>(env@ %a)@]\
-        )@]"
-      Flambda_colours.prim_constructive
-      Flambda_colours.pop
-      Function_declarations.print function_decls
-      (Value_slot.Map.print Simple.print) value_slots
+let print ppf { function_decls; value_slots } =
+  let open! Misc.Sexp in
+  print ppf
+    (fmt "%tset_of_closures%t" Flambda_colours.prim_constructive
+       Flambda_colours.pop
+    :: fmt "%a" Function_declarations.print function_decls
+    ::
+    (if Value_slot.Map.is_empty value_slots
+     then []
+     else [p "env" (Value_slot.Map.print Simple.print) value_slots]))
 
 let free_names { function_decls; value_slots } =
   let free_names_of_value_slots =

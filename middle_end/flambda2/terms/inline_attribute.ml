@@ -21,13 +21,15 @@ type t =
   | Unroll of int
   | Default_inline
 
-let [@ocamlformat "disable"] print ppf t =
+let print ppf t =
   let fprintf = Format.fprintf in
   match t with
   | Always_inline -> fprintf ppf "Always_inline"
   | Available_inline -> fprintf ppf "Available_inline"
   | Never_inline -> fprintf ppf "Never_inline"
-  | Unroll n -> fprintf ppf "@[(Unroll %d)@]" n
+  | Unroll n ->
+    let open! Misc.Sexp in
+    print ppf [i "Unroll" n]
   | Default_inline -> fprintf ppf "Default_inline"
 
 let equal t1 t2 =

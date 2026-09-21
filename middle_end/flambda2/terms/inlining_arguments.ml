@@ -61,14 +61,22 @@ module Args = struct
     && Int.equal large_functor_size (I.large_functor_size round_or_default)
     && Float.equal threshold (I.threshold round_or_default)
 
-  let[@ocamlformat "disable"] print ppf t =
-    let { max_inlining_depth; max_rec_depth;
-          call_cost; alloc_cost; prim_cost; branch_cost;
-          indirect_call_cost; poly_compare_cost;
-          small_function_size; large_function_size;
-          small_functor_size; large_functor_size;
-          threshold;
-        } = t
+  let print ppf t =
+    let { max_inlining_depth;
+          max_rec_depth;
+          call_cost;
+          alloc_cost;
+          prim_cost;
+          branch_cost;
+          indirect_call_cost;
+          poly_compare_cost;
+          small_function_size;
+          large_function_size;
+          small_functor_size;
+          large_functor_size;
+          threshold
+        } =
+      t
     in
     let module C = Flambda_colours in
     if matches_opt_level t Oclassic
@@ -78,35 +86,21 @@ module Args = struct
     else if matches_opt_level t O3
     then Format.fprintf ppf "%tO3%t" C.elide C.pop
     else
-      Format.fprintf ppf
-        "@[<hov 1>(\
-         @[<hov 1>(max_inlining_depth@ %d)@]@ \
-         @[<hov 1>(max_rec_depth@ %d)@]@ \
-         @[<hov 1>(call_cost@ %f)@]@ \
-         @[<hov 1>(alloc_cost@ %f)@]@ \
-         @[<hov 1>(prim_cost@ %f)@]@ \
-         @[<hov 1>(branch_cost@ %f)@]@ \
-         @[<hov 1>(indirect_call_cost@ %f)@]@ \
-         @[<hov 1>(poly_compare_cost@ %f)@]@ \
-         @[<hov 1>(small_function_size@ %d)@]@ \
-         @[<hov 1>(large_function_size@ %d)@]@ \
-         @[<hov 1>(small_functor_size@ %d)@]@ \
-         @[<hov 1>(large_functor_size@ %d)@]@ \
-         @[<hov 1>(threshold@ %f)@]\
-         )@]"
-        max_inlining_depth
-        max_rec_depth
-        call_cost
-        alloc_cost
-        prim_cost
-        branch_cost
-        indirect_call_cost
-        poly_compare_cost
-        small_function_size
-        large_function_size
-        small_functor_size
-        large_functor_size
-        threshold
+      let open! Misc.Sexp in
+      print ppf
+        [ i "max_inlining_depth" max_inlining_depth;
+          i "max_rec_depth" max_rec_depth;
+          f "call_cost" call_cost;
+          f "alloc_cost" alloc_cost;
+          f "prim_cost" prim_cost;
+          f "branch_cost" branch_cost;
+          f "indirect_call_cost" indirect_call_cost;
+          f "poly_compare_cost" poly_compare_cost;
+          i "small_function_size" small_function_size;
+          i "large_function_size" large_function_size;
+          i "small_functor_size" small_functor_size;
+          i "large_functor_size" large_functor_size;
+          f "threshold" threshold ]
 
   let equal t1 t2 =
     let { max_inlining_depth = t1_max_inlining_depth;
@@ -278,7 +272,7 @@ end
 
 type t = Args.t
 
-let [@ocamlformat "disable"] print ppf = Args.print ppf
+let print ppf = Args.print ppf
 
 let max_inlining_depth t = t.Args.max_inlining_depth
 
