@@ -861,6 +861,7 @@ let ocaml_ignored_parametrized_flags =
     "-flambda2-inline-threshold";
     "-flambda2-inline-small-functor-size";
     "-flambda2-inline-large-functor-size";
+    "-flambda2-inline-ideal-large-functor-size";
     "-flambda2-join-algorithm";
     "-flambda2-expert-cont-specialization-threshold";
     "-regalloc";

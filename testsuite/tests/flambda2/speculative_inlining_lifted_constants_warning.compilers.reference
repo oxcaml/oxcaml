@@ -1,0 +1,13 @@
+File "speculative_inlining_lifted_constants_warning.ml", line 28, characters 9-15:
+28 | let v0 = f zero
+              ^^^^^^
+Warning 222 [inlining-dependent-on-tracking-lifted-constants]: The speculative inlining decision at this application would
+  change if -flambda2-speculative-inlining-track-lifted-constants were
+  enabled: the function would not be inlined.
+
+File "speculative_inlining_lifted_constants_warning.ml", line 32, characters 12-17:
+32 | let v1 () = f one
+                 ^^^^^
+Warning 222 [inlining-dependent-on-tracking-lifted-constants]: The speculative inlining decision at this application would
+  change if -flambda2-speculative-inlining-track-lifted-constants were
+  enabled: the function would not be inlined.

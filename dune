@@ -17,7 +17,7 @@
 (env
  (release
   (flags
-   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70)))
+   (:standard -g -principal -w +a-4-9-40-41-42-44-45-48-66-67-70-222)))
  (main
   (flags
    (:standard
@@ -26,14 +26,14 @@
     -warn-error
     +A
     -w
-    +a-4-9-40-41-42-44-45-48-66-67-70)))
+    +a-4-9-40-41-42-44-45-48-66-67-70-222)))
  (dev
   (flags
    (:standard
     -g
     -principal
     -w
-    +a-4-9-40-41-42-44-45-48-66-67-70
+    +a-4-9-40-41-42-44-45-48-66-67-70-222
     -warn-error
     +A))))
 

@@ -193,6 +193,7 @@ module type Oxcaml_options = sig
   val flambda2_inline_large_function_size : string -> unit
   val flambda2_inline_small_functor_size : string -> unit
   val flambda2_inline_large_functor_size : string -> unit
+  val flambda2_inline_ideal_large_functor_size : int -> unit
   val flambda2_inline_threshold : string -> unit
   val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
   val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit

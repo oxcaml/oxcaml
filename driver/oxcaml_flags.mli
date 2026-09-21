@@ -333,6 +333,12 @@ module Flambda2 : sig
     val small_functor_size : Clflags.Int_arg_helper.parsed ref
     val large_functor_size : Clflags.Int_arg_helper.parsed ref
 
+    (** This value does not change the behaviour of the compiler.  It gives
+        the value that [large_functor_size] is intended to have eventually,
+        so that deviations from that ideal configuration can be reported
+        (see warning 222 [inlining-deviates-from-ideal]). *)
+    val ideal_large_functor_size : int option ref
+
     val threshold : Clflags.Float_arg_helper.parsed ref
 
     val speculative_inlining_only_if_arguments_useful : bool ref

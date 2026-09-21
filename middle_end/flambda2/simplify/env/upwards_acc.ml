@@ -28,6 +28,7 @@ type t =
     all_code : Exported_code.t;
     name_occurrences : Name_occurrences.t;
     cost_metrics : Cost_metrics.t;
+    cost_metrics_of_untracked_static_consts : Cost_metrics.t;
     slot_offsets : Slot_offsets.t Or_unknown.t;
     flow_result : Flow_types.Flow_result.t;
     resimplify : bool
@@ -35,7 +36,9 @@ type t =
 
 let [@ocamlformat "disable"] print ppf
       { uenv; creation_dacc = _; lifted_constants; name_occurrences;
-        all_code = _; cost_metrics; slot_offsets; flow_result; resimplify;
+        all_code = _; cost_metrics;
+        cost_metrics_of_untracked_static_consts = _; slot_offsets;
+        flow_result; resimplify;
       } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(uenv@ %a)@]@ \
@@ -71,6 +74,7 @@ let create ~flow_result ~compute_slot_offsets uenv dacc =
        saved and restored (like free name information is when dealing with a
        [Let_cont]). *)
     cost_metrics = Cost_metrics.zero;
+    cost_metrics_of_untracked_static_consts = Cost_metrics.zero;
     slot_offsets;
     flow_result;
     resimplify = false
@@ -152,6 +156,15 @@ let notify_removed ~operation t =
 
 let add_cost_metrics cost_metrics t =
   { t with cost_metrics = Cost_metrics.( + ) t.cost_metrics cost_metrics }
+
+let cost_metrics_of_untracked_static_consts t =
+  t.cost_metrics_of_untracked_static_consts
+
+let add_cost_metrics_of_untracked_static_consts cost_metrics t =
+  { t with
+    cost_metrics_of_untracked_static_consts =
+      Cost_metrics.( + ) t.cost_metrics_of_untracked_static_consts cost_metrics
+  }
 
 let add_cost_metrics_and_with_name_occurrences t cost_metrics name_occurrences =
   { t with

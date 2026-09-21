@@ -162,6 +162,12 @@ module Inlining : sig
 
   val large_functor_size : round_or_default -> int
 
+  (** Does not change the behaviour of the compiler: the value that
+      [large_functor_size] is intended to have eventually, used only to report
+      deviations from that ideal configuration (see warning 222
+      [inlining-deviates-from-ideal]). *)
+  val ideal_large_functor_size : unit -> int option
+
   val threshold : round_or_default -> float
 
   val speculative_inlining_only_if_arguments_useful : unit -> bool

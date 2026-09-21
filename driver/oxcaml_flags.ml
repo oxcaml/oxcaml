@@ -482,6 +482,12 @@ module Flambda2 = struct
     let large_functor_size =
       ref (I.default Default.default_arguments.large_functor_size)
 
+    (* This value does not change the behaviour of the compiler.  It gives
+       the value that [large_functor_size] is intended to have eventually,
+       so that deviations from that ideal configuration can be reported
+       (see warning 222 [inlining-deviates-from-ideal]). *)
+    let ideal_large_functor_size : int option ref = ref None
+
     let threshold = ref (F.default Default.default_arguments.threshold)
 
     let speculative_inlining_only_if_arguments_useful =

@@ -282,6 +282,9 @@ module Inlining = struct
     | Round round -> IH.get ~key:round !I.large_functor_size
     | Default opt_level -> (default_for_opt_level opt_level).large_functor_size
 
+  let ideal_large_functor_size () =
+    !Oxcaml_flags.Flambda2.Inlining.ideal_large_functor_size
+
   let threshold round_or_default =
     match round_or_default with
     | Round round -> FH.get ~key:round !I.threshold
