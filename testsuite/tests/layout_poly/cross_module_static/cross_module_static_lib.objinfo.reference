@@ -23,10 +23,10 @@ Static data:
     Cross_module_static_lib/counted_id/2;
   ]
   (Cross_module_static_lib/counted_id/2
-    (closure ⟨env⟩ layout_16 ->
+    (closure ⟨env⟩ layout_17 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 0} closure/335 x/326[$layout_16] : $layout_16
+        ⟪(function {nlocal = 0} closure/335 x/326[$layout_17] : $layout_17
            (let (calls/332 =a (mixedfield 0  (*) closure/335))
              (seq (+:=1 calls/332) x/326)))⟫ }))
   (Cross_module_static_lib/id/0
