@@ -7253,6 +7253,7 @@ let moregeneral_slow ~self_check env inst_nongen
   end
 
 
+let debug_moregen = Sys.getenv_opt "MOREGEN_DEBUG" <> None
 let moregeneral ~self_check env inst_nongen
     pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch =
   (* The fast path does not handle layout-polymorphic schemes, so only try it
@@ -7263,10 +7264,17 @@ let moregeneral ~self_check env inst_nongen
     | _, _ -> false
   in
   if fast then []
-  else
+  else begin
+    if debug_moregen then begin
+      Format.printf "moregen:@.  %a@. ~@.   %a@.  [%a]@."
+        !Btype.print_raw pat_sch
+        !Btype.print_raw subj_sch
+        !Btype.print_raw (Subst.type_expr subst subj_sch)
+    end;
     let subj_sch = Subst.type_expr subst subj_sch in
     moregeneral_slow ~self_check env inst_nongen
       pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+  end
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
