@@ -552,30 +552,30 @@ let rec add_const' arg const dbg =
       let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
       let x = P.create_var Int "x" in
       P.run res
-        [ (Binop (Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
+        [ (Binop (Op Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
           ( Guarded
-              { pat = Binop (Add, Const_int x, Const_int n);
+              { pat = Binop (Op Add, Const_int x, Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
           => fun env -> Cconst_int (env#.x + env#.n, dbg) );
           ( Guarded
-              { pat = Binop (Add, Binop (Add, Const_int x, Any c), Const_int n);
+              { pat = Binop (Op Add, Binop (Op Add, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
           => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
           ( Guarded
-              { pat = Binop (Add, Binop (Add, Any c, Const_int x), Const_int n);
+              { pat = Binop (Op Add, Binop (Op Add, Any c, Const_int x), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
           => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
           ( Guarded
-              { pat = Binop (Add, Binop (Sub, Const_int x, Any c), Const_int n);
+              { pat = Binop (Op Add, Binop (Op Sub, Const_int x, Any c), Const_int n);
                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
               }
           => fun env ->
             Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
           ( Guarded
-              { pat = Binop (Add, Binop (Sub, Any c, Const_int x), Const_int n);
+              { pat = Binop (Op Add, Binop (Op Sub, Any c, Const_int x), Const_int n);
                 guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
               }
           => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
@@ -601,13 +601,13 @@ let rec add_int' arg1 arg2 dbg =
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
       let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
-        [ ( Binop (Add, Const_int n, Any c) => fun env ->
+        [ ( Binop (Op Add, Const_int n, Any c) => fun env ->
             add_const env#.c env#.n dbg );
-          ( Binop (Add, Any c, Const_int n) => fun env ->
+          ( Binop (Op Add, Any c, Const_int n) => fun env ->
             add_const env#.c env#.n dbg );
-          ( Binop (Add, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
+          ( Binop (Op Add, Binop (Op Add, Any c1, Const_int n1), Any c2) => fun env ->
             add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
-          ( Binop (Add, Any c1, Binop (Add, Any c2, Const_int n2)) => fun env ->
+          ( Binop (Op Add, Any c1, Binop (Op Add, Any c2, Const_int n2)) => fun env ->
             add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
 
 let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
@@ -628,17 +628,17 @@ let rec sub_int' arg1 arg2 dbg =
       let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
         [ ( Guarded
-              { pat = Binop (Sub, Any c1, Const_int n2);
+              { pat = Binop (Op Sub, Any c1, Const_int n2);
                 guard = (fun env -> env#.n2 <> min_int)
               }
           => fun env -> add_const env#.c1 (-env#.n2) dbg );
           ( Guarded
-              { pat = Binop (Sub, Any c1, Binop (Add, Any c2, Const_int n2));
+              { pat = Binop (Op Sub, Any c1, Binop (Op Add, Any c2, Const_int n2));
                 guard = (fun env -> env#.n2 <> min_int)
               }
           => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
           );
-          ( Binop (Sub, Binop (Add, Any c1, Const_int n1), Any c2) => fun env ->
+          ( Binop (Op Sub, Binop (Op Add, Any c1, Const_int n1), Any c2) => fun env ->
             add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
 
 let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
@@ -687,19 +687,19 @@ let rec max_signed_bit_length' e =
     (prefer_or e)
     [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
       ( Guarded
-          { pat = Binop (And, Any c, Const_int n);
+          { pat = Binop (Op And, Any c, Const_int n);
             guard = (fun env -> env#.n > 0)
           }
       => fun env -> 1 + Misc.log2 env#.n );
       ( Guarded
-          { pat = Binop (Lsl, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Lsl, Any c, Const_int n); guard = is_defined_shift' n }
       => fun env -> Int.min arch_bits (max_signed_bit_length' env#.c + env#.n)
       );
       ( Guarded
-          { pat = Binop (Asr, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Asr, Any c, Const_int n); guard = is_defined_shift' n }
       => fun env -> Int.max 0 (max_signed_bit_length' env#.c - env#.n) );
       ( Guarded
-          { pat = Binop (Lsr, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Lsr, Any c, Const_int n); guard = is_defined_shift' n }
       => fun env ->
         if env#.n = 0 then max_signed_bit_length' env#.c else arch_bits - env#.n
       );
@@ -732,17 +732,17 @@ let rec ignore_low_bit_int' arg =
     [ ( Guarded
           { pat =
               Binop
-                ( Add,
-                  As (c, Binop (Lsl, Any c1, Const_int n)),
+                ( Op Add,
+                  As (c, Binop (Op Lsl, Any c1, Const_int n)),
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
           }
       => fun env -> ignore_low_bit_int' env#.c );
-      ( Binop (Or, Any c, Const_int_fixed 1) => fun env ->
+      ( Binop (Op Or, Any c, Const_int_fixed 1) => fun env ->
         ignore_low_bit_int' env#.c );
-      ( Binop (Lsl, Binop (Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      ( Binop (Op Lsl, Binop (Op Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
       => fun env -> ignore_low_bit_int' env#.c );
-      ( Binop (Lsl, Binop (Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      ( Binop (Op Lsl, Binop (Op Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
       => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =

@@ -65,6 +65,8 @@ module Env : sig
 
   val find_exn : t -> 'a pattern_var -> 'a
 
+  val find_opt : t -> 'a pattern_var -> 'a option
+
   val register_phantom_let :
     t ->
     phantom_var:Backend_var.With_provenance.t ->
@@ -108,6 +110,12 @@ end = struct
     | Expr -> IM.find var.id env.exprs
     | Int -> IM.find var.id env.ints
     | Natint -> IM.find var.id env.natints
+
+  let find_opt (type a) env (var : a pattern_var) : a option =
+    match var.kind with
+    | Expr -> IM.find_opt var.id env.exprs
+    | Int -> IM.find_opt var.id env.ints
+    | Natint -> IM.find_opt var.id env.natints
 
   let register_phantom_let env ~phantom_var ~defining_expr =
     { env with
@@ -274,25 +282,39 @@ module Cmm_comparator = struct
       false
 end
 
-type binop =
+type op =
   | Add
   | Sub
+  | Mul
+  | And
+  | Or
+  | Xor
   | Lsl
   | Lsr
   | Asr
-  | Or
-  | And
+
+type binop =
+  | Op of op
   | Comparison
   | Bitwise_op
 
+let is_commutative = function
+  | Add | Mul | And | Or | Xor -> true
+  | Sub | Lsl | Lsr | Asr -> false
+
 type cmm_pattern =
   | Any of Cmm.expression pattern_var
+  | Same of Cmm.expression pattern_var
   | As of Cmm.expression pattern_var * cmm_pattern
   | Const_int_fixed of int
   | Const_int of int pattern_var
   | Const_natint_fixed of Nativeint.t
   | Const_natint of Nativeint.t pattern_var
+  | Const_any_fixed of Nativeint.t
+  | Const_any of Nativeint.t pattern_var
+  | Const_same of Nativeint.t pattern_var
   | Binop of binop * cmm_pattern * cmm_pattern
+  | Binop_comm of binop * cmm_pattern * cmm_pattern
   | Guarded of
       { pat : cmm_pattern;
         guard : Env.t -> bool
@@ -302,53 +324,92 @@ type 'a clause = cmm_pattern * (Env.t -> 'a)
 
 let matches_binop (binop : binop) (cop : Cmm.operation) =
   match binop, cop with
-  | Add, Caddi -> true
-  | Sub, Csubi -> true
-  | Lsl, Clsl -> true
-  | Lsr, Clsr -> true
-  | Asr, Casr -> true
-  | Or, Cor -> true
-  | And, Cand -> true
+  | Op Add, Caddi -> true
+  | Op Sub, Csubi -> true
+  | Op Mul, Cmuli -> true
+  | Op And, Cand -> true
+  | Op Or, Cor -> true
+  | Op Xor, Cxor -> true
+  | Op Lsl, Clsl -> true
+  | Op Lsr, Clsr -> true
+  | Op Asr, Casr -> true
   | Comparison, (Ccmpi _ | Ccmpf _) -> true
   | Bitwise_op, (Cand | Cor | Cxor) -> true
   | _, _ -> false
 
+(* Whether an expression may be matched several times by [Same] and mentioned a
+   different number of times by a rewritten result. *)
+let is_duplicable (expr : Cmm.expression) =
+  match expr with
+  | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_symbol _ -> true
+  | _ -> false
+
 let match_clauses_in_order ~default ~matches clauses expr =
-  let ( let* ) = Option.bind in
-  let rec match_one_pattern env pat (expr : Cmm.expression) =
+  let const_same env v n ~k =
+    match Env.find_opt env v with
+    | None -> Misc.fatal_errorf "Const_same on unbound var %s" v.name
+    | Some bound -> if Nativeint.equal bound n then k env else None
+  in
+  let rec match_one_pattern env pat (expr : Cmm.expression) ~k =
     match expr with
     | Cphantom_let (phantom_var, defining_expr, expr) ->
       let env = Env.register_phantom_let env ~phantom_var ~defining_expr in
-      match_one_pattern env pat expr
-    | Cname_for_debugger (_, body) -> match_one_pattern env pat body
+      match_one_pattern env pat expr ~k
+    | Cname_for_debugger (_, body) -> match_one_pattern env pat body ~k
     | _ -> (
       match pat, expr with
-      | Any v, expr -> Some (Env.add env v expr)
+      | Any v, expr -> k (Env.add env v expr)
+      | Same v, expr -> (
+        match Env.find_opt env v with
+        | None -> Misc.fatal_errorf "Same on unbound var %s" v.name
+        | Some bound ->
+          if is_duplicable expr && Cmm_comparator.equivalent bound expr
+          then k env
+          else None)
       | As (v, pat), expr ->
-        let* env = match_one_pattern env pat expr in
-        Some (Env.add env v expr)
+        match_one_pattern env pat expr ~k:(fun env -> k (Env.add env v expr))
       | Const_int_fixed n1, Cconst_int (n2, _) ->
-        if Int.equal n1 n2 then Some env else None
-      | Const_int v, Cconst_int (n, _) -> Some (Env.add env v n)
+        if Int.equal n1 n2 then k env else None
+      | Const_int v, Cconst_int (n, _) -> k (Env.add env v n)
       | Const_natint_fixed n1, Cconst_natint (n2, _) ->
-        if Nativeint.equal n1 n2 then Some env else None
-      | Const_natint v, Cconst_natint (n, _) -> Some (Env.add env v n)
+        if Nativeint.equal n1 n2 then k env else None
+      | Const_natint v, Cconst_natint (n, _) -> k (Env.add env v n)
+      | Const_any_fixed n1, Cconst_int (n2, _) ->
+        if Nativeint.equal n1 (Nativeint.of_int n2) then k env else None
+      | Const_any_fixed n1, Cconst_natint (n2, _) ->
+        if Nativeint.equal n1 n2 then k env else None
+      | Const_any v, Cconst_int (n, _) -> k (Env.add env v (Nativeint.of_int n))
+      | Const_any v, Cconst_natint (n, _) -> k (Env.add env v n)
+      | Const_same v, Cconst_int (n, _) ->
+        const_same env v (Nativeint.of_int n) ~k
+      | Const_same v, Cconst_natint (n, _) -> const_same env v n ~k
       | Binop (binop, pat1, pat2), Cop (cop, [expr1; expr2], _) ->
         if matches_binop binop cop
+        then match_pair env (pat1, expr1) (pat2, expr2) ~k
+        else None
+      | Binop_comm (binop, pat1, pat2), Cop (cop, [expr1; expr2], _) ->
+        if matches_binop binop cop
         then
-          let* env = match_one_pattern env pat1 expr1 in
-          match_one_pattern env pat2 expr2
+          match match_pair env (pat1, expr1) (pat2, expr2) ~k with
+          | Some _ as result -> result
+          | None -> match_pair env (pat1, expr2) (pat2, expr1) ~k
         else None
       | Guarded { pat; guard }, expr ->
-        let* env = match_one_pattern env pat expr in
-        if guard env then Some env else None
+        match_one_pattern env pat expr ~k:(fun env ->
+            if guard env then k env else None)
       | _, _ -> None)
+  and match_pair env (pat1, expr1) (pat2, expr2) ~k =
+    match_one_pattern env pat1 expr1 ~k:(fun env ->
+        match_one_pattern env pat2 expr2 ~k)
   in
   let rec find_matching_clause expr = function
     | [] -> default expr
     | (pat, f) :: clauses -> (
-      match match_one_pattern Env.empty pat expr with
-      | Some env -> matches env (f env)
+      match
+        match_one_pattern Env.empty pat expr ~k:(fun env ->
+            Some (matches env (f env)))
+      with
+      | Some result -> result
       | None -> find_matching_clause expr clauses)
   in
   find_matching_clause expr clauses

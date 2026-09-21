@@ -80,16 +80,24 @@ module Env : sig
   type t
 end
 
-(* Binary operator patterns. Some match a single operations, others can match a
-   whole class of operations. *)
-type binop =
+(** Binary integer operations, each corresponding to exactly one [Cop]. *)
+type op =
   | Add
   | Sub
+  | Mul
+  | And
+  | Or
+  | Xor
   | Lsl
   | Lsr
   | Asr
-  | Or
-  | And
+
+val is_commutative : op -> bool
+
+(* Binary operator patterns. Some match a single operations, others can match a
+   whole class of operations. *)
+type binop =
+  | Op of op
   | Comparison
       (** Matches all versions of the [Ccmpi] and [Ccmpf] operations *)
   | Bitwise_op  (** All binary bit-wise operations: [Cand], [Cor], [Cxor] *)
@@ -97,6 +105,11 @@ type binop =
 type cmm_pattern =
   | Any of Cmm.expression pattern_var
       (** Wildcard pattern, binding a variable *)
+  | Same of Cmm.expression pattern_var
+      (** Matches an expression equivalent to the one already bound to the
+          variable, provided it is a variable or a constant, so that the
+          rewritten result may mention it any number of times. Using an unbound
+          variable is a fatal error. *)
   | As of Cmm.expression pattern_var * cmm_pattern
       (** Variable binding with nested pattern *)
   | Const_int_fixed of int  (** Matches [Cconst_int] with a given integer *)
@@ -106,8 +119,20 @@ type cmm_pattern =
       (** Matches [Cconst_natint] with a given integer *)
   | Const_natint of Nativeint.t pattern_var
       (** Matches any [Cconst_natint] and binds the underlying integer *)
+  | Const_any_fixed of Nativeint.t
+      (** Matches [Cconst_int] or [Cconst_natint] with a given integer *)
+  | Const_any of Nativeint.t pattern_var
+      (** Matches any [Cconst_int] or [Cconst_natint] and binds the underlying
+          integer *)
+  | Const_same of Nativeint.t pattern_var
+      (** Matches a [Cconst_int] or [Cconst_natint] equal to the integer already
+          bound to the variable. Using an unbound variable is a fatal error. *)
   | Binop of binop * cmm_pattern * cmm_pattern
       (** Matches the corresponding [Cop] terms *)
+  | Binop_comm of binop * cmm_pattern * cmm_pattern
+      (** Like [Binop], but also tries matching the operands in the other order.
+          Sub-patterns are matched left to right in both cases, so [Same]
+          variables in the right sub-pattern may be bound by the left one. *)
   | Guarded of
       { pat : cmm_pattern;
         guard : Env.t -> bool
