@@ -182,9 +182,9 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 subst ty2 =
   let tc_args =
-    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 subst ty2
   in
   (* We can set uninstantiated variables (given by [None]) to anything,
      including the variable at the same position.
@@ -247,7 +247,7 @@ let uid_is_from_current_unit uid =
 (* [static] is [true] if the [module_coercion] requires a [static] argument *)
 let value_descriptions_without_modes ~loc env name ~self_check
     (vd1 : Types.value_description)
-    (vd2 : Types.value_description)
+    subst2 (vd2 : Types.value_description)
     : module_coercion * static:bool =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
@@ -255,12 +255,17 @@ let value_descriptions_without_modes ~loc env name ~self_check
     loc
     vd1.val_attributes vd2.val_attributes
     name;
+  (* [vd2] does not need [subst2] applied to it, as [Subst.value_description]
+     only makes relevant changes (writing [val_zero_alloc] or renumbering sort
+     variables) when [Prepare_for_saving] or [Saving] / [Loading] respectively.
+     These are only needed when interacting with .cmi files, not here *)
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
   let val_lpoly1 = Lpoly.get_exn vd1.val_lpoly in
   let val_lpoly2 = Lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
   | Val_prim p1 -> begin
      assert (List.is_empty val_lpoly1);
+     let vd2 = Subst.value_description subst2 vd2 in
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -279,7 +284,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              match moregeneral_lpoly ~self_check env
-                 val_lpoly1 val_lpoly2 ty1 ty2 with
+                 val_lpoly1 val_lpoly2 ty1 Subst.identity ty2 with
              | None -> ()
              | Some _ ->
               Misc.fatal_errorf
@@ -303,7 +308,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
         let tc =
           try
             moregeneral_lpoly ~self_check env
-              val_lpoly1 val_lpoly2 ty1 vd2.val_type
+              val_lpoly1 val_lpoly2 ty1 Subst.identity vd2.val_type
             |> Option.value ~default:{ tc_params = []; tc_args = [] }
           with Ctype.Moregen err -> raise (Dont_match (Type err))
         in
@@ -335,7 +340,7 @@ let value_descriptions_without_modes ~loc env name ~self_check
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
-             val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
+             val_lpoly1 val_lpoly2 vd1.val_type subst2 vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | tc -> begin
        match vd2.val_kind with
@@ -348,12 +353,20 @@ let value_descriptions_without_modes ~loc env name ~self_check
           | None -> Tcoerce_none, ~static:false
      end
 
-let value_descriptions ~loc env name ~mmodes ~self_check vd1 vd2 =
+let value_descriptions ~loc env name ~mmodes ~self_check vd1 subst2 vd2 =
   let cc, ~static =
-    value_descriptions_without_modes ~loc env name ~self_check vd1 vd2
+    value_descriptions_without_modes ~loc env name ~self_check vd1 subst2 vd2
   in
   let () =
-    let crossing = Ctype.crossing_of_ty env vd2.val_type in
+    (* CR zeisbach: [vd2] is no longer substituted eagerly, but the crossing
+       must be computed on a type whose paths make sense in [env]. Substituting
+       here preserves the previous behaviour at the cost of a copy, which
+       undoes the saving from the fast path in [Ctype.moregeneral]. A better
+       option would be for [Ctype.moregeneral] to return the substituted
+       subject when it takes the slow path, so that the copy is shared. *)
+    let crossing =
+      Ctype.crossing_of_ty env (Subst.type_expr subst2 vd2.val_type)
+    in
     let modalities = vd1.val_modalities, vd2.val_modalities in
     let modes =
       match child_modes_with_modalities name ~modalities mmodes with
