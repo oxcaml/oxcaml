@@ -669,7 +669,7 @@ let rec add_const_legacy c n dbg =
         | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
           ->
           add_const_legacy c (n - x) dbg
-        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+        | c -> run_rules P.Add (Cop (Caddi, [c; Cconst_int (n, dbg)], dbg)) dbg)
 
 and add_const' arg const dbg =
   let open P.Default_variables in
@@ -677,37 +677,42 @@ and add_const' arg const dbg =
       let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
       let x = P.create_var Int "x" in
       P.run res
-        [ (Binop (Op Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
-          ( Guarded
-              { pat = Binop (Op Add, Const_int x, Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> Cconst_int (env#.x + env#.n, dbg) );
-          ( Guarded
-              { pat =
-                  Binop (Op Add, Binop (Op Add, Const_int x, Any c), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
-          ( Guarded
-              { pat =
-                  Binop (Op Add, Binop (Op Add, Any c, Const_int x), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
-          ( Guarded
-              { pat =
-                  Binop (Op Add, Binop (Op Sub, Const_int x, Any c), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env ->
-            Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
-          ( Guarded
-              { pat =
-                  Binop (Op Add, Binop (Op Sub, Any c, Const_int x), Const_int n);
-                guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
-              }
-          => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
+        ([ (Binop (Op Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
+           ( Guarded
+               { pat = Binop (Op Add, Const_int x, Const_int n);
+                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+               }
+           => fun env -> Cconst_int (env#.x + env#.n, dbg) );
+           ( Guarded
+               { pat =
+                   Binop
+                     (Op Add, Binop (Op Add, Const_int x, Any c), Const_int n);
+                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+               }
+           => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+           ( Guarded
+               { pat =
+                   Binop
+                     (Op Add, Binop (Op Add, Any c, Const_int x), Const_int n);
+                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+               }
+           => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+           ( Guarded
+               { pat =
+                   Binop
+                     (Op Add, Binop (Op Sub, Const_int x, Any c), Const_int n);
+                 guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+               }
+           => fun env ->
+             Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
+           ( Guarded
+               { pat =
+                   Binop
+                     (Op Add, Binop (Op Sub, Any c, Const_int x), Const_int n);
+                 guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
+               }
+           => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ]
+        @ rule_clauses P.Add dbg))
 
 and add_const c n dbg =
   check_equal_3 "add_const" add_const_legacy ~engine:add_const' c n dbg
@@ -724,22 +729,23 @@ and add_int_legacy c1 c2 dbg =
         add_const (add_int_legacy c1 c2 dbg) n1 dbg
       | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
         add_const (add_int_legacy c1 c2 dbg) n2 dbg
-      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
+      | c1, c2 -> run_rules P.Add (Cop (Caddi, [c1; c2], dbg)) dbg)
 
 and add_int' arg1 arg2 dbg =
   let open P.Default_variables in
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
       let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
-        [ ( Binop (Op Add, Const_int n, Any c) => fun env ->
-            add_const env#.c env#.n dbg );
-          ( Binop (Op Add, Any c, Const_int n) => fun env ->
-            add_const env#.c env#.n dbg );
-          ( Binop (Op Add, Binop (Op Add, Any c1, Const_int n1), Any c2)
-          => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
-          ( Binop (Op Add, Any c1, Binop (Op Add, Any c2, Const_int n2))
-          => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg )
-        ])
+        ([ ( Binop (Op Add, Const_int n, Any c) => fun env ->
+             add_const env#.c env#.n dbg );
+           ( Binop (Op Add, Any c, Const_int n) => fun env ->
+             add_const env#.c env#.n dbg );
+           ( Binop (Op Add, Binop (Op Add, Any c1, Const_int n1), Any c2)
+           => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
+           ( Binop (Op Add, Any c1, Binop (Op Add, Any c2, Const_int n2))
+           => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg )
+         ]
+        @ rule_clauses P.Add dbg))
 
 and add_int c1 c2 dbg =
   check_equal_3 "add_int" add_int_legacy ~engine:add_int' c1 c2 dbg
@@ -752,28 +758,29 @@ and sub_int_legacy c1 c2 dbg =
         add_const (sub_int_legacy c1 c2 dbg) (-n2) dbg
       | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
         add_const (sub_int_legacy c1 c2 dbg) n1 dbg
-      | c1, c2 -> Cop (Csubi, [c1; c2], dbg))
+      | c1, c2 -> run_rules P.Sub (Cop (Csubi, [c1; c2], dbg)) dbg)
 
 and sub_int' arg1 arg2 dbg =
   let open P.Default_variables in
   map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
       let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
       P.run res
-        [ ( Guarded
-              { pat = Binop (Op Sub, Any c1, Const_int n2);
-                guard = (fun env -> env#.n2 <> min_int)
-              }
-          => fun env -> add_const env#.c1 (-env#.n2) dbg );
-          ( Guarded
-              { pat =
-                  Binop (Op Sub, Any c1, Binop (Op Add, Any c2, Const_int n2));
-                guard = (fun env -> env#.n2 <> min_int)
-              }
-          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
-          );
-          ( Binop (Op Sub, Binop (Op Add, Any c1, Const_int n1), Any c2)
-          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg )
-        ])
+        ([ ( Guarded
+               { pat = Binop (Op Sub, Any c1, Const_int n2);
+                 guard = (fun env -> env#.n2 <> min_int)
+               }
+           => fun env -> add_const env#.c1 (-env#.n2) dbg );
+           ( Guarded
+               { pat =
+                   Binop (Op Sub, Any c1, Binop (Op Add, Any c2, Const_int n2));
+                 guard = (fun env -> env#.n2 <> min_int)
+               }
+           => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
+           );
+           ( Binop (Op Sub, Binop (Op Add, Any c1, Const_int n1), Any c2)
+           => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg )
+         ]
+        @ rule_clauses P.Sub dbg))
 
 and sub_int c1 c2 dbg =
   check_equal_3 "sub_int" sub_int_legacy ~engine:sub_int' c1 c2 dbg
@@ -788,7 +795,9 @@ and xor_const e n dbg =
         | None -> (
           let[@local] default () =
             (* prefer putting constants on the right *)
-            Cop (Cxor, [e; natint_const_untagged dbg n], dbg)
+            run_rules P.Xor
+              (Cop (Cxor, [e; natint_const_untagged dbg n], dbg))
+              dbg
           in
           match e with
           | Cop (Cxor, [x; y], _) -> (
@@ -808,7 +817,7 @@ and or_const e n dbg =
             if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
           in
           (* prefer putting constants on the right *)
-          Cop (Cor, [e; natint_const_untagged dbg n], dbg)
+          run_rules P.Or (Cop (Cor, [e; natint_const_untagged dbg n], dbg)) dbg
         in
         match get_const e with
         | Some e -> natint_const_untagged dbg (Nativeint.logor e n)
@@ -826,7 +835,7 @@ and xor_int c1 c2 dbg =
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
       | None, Some c2 -> xor_const c1 c2 dbg
       | Some c1, None -> xor_const c2 c1 dbg
-      | None, None -> Cop (Cxor, [c1; c2], dbg))
+      | None, None -> run_rules P.Xor (Cop (Cxor, [c1; c2], dbg)) dbg)
 
 and or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -834,7 +843,7 @@ and or_int c1 c2 dbg =
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logor c1 c2)
       | None, Some c2 -> or_const c1 c2 dbg
       | Some c1, None -> or_const c2 c1 dbg
-      | None, None -> Cop (Cor, [c1; c2], dbg))
+      | None, None -> run_rules P.Or (Cop (Cor, [c1; c2], dbg)) dbg)
 
 and lsr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -858,13 +867,13 @@ and lsr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Clsr, [c1; c2], dbg)))
+          | _ -> run_rules P.Lsr (Cop (Clsr, [c1; c2], dbg)) dbg))
       | Cop (Clsr, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Clsr, [Cop (Clsr, [x; c2], dbg); y], dbg')
-      | c1, c2 -> Cop (Clsr, [c1; c2], dbg))
+      | c1, c2 -> run_rules P.Lsr (Cop (Clsr, [c1; c2], dbg)) dbg)
 
 and asr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -907,13 +916,13 @@ and asr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Casr, [c1; c2], dbg)))
+          | _ -> run_rules P.Asr (Cop (Casr, [c1; c2], dbg)) dbg))
       | Cop (Casr, [x; (Cconst_int (n', _) as y)], z), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Casr, [Cop (Casr, [x; c2], dbg); y], z)
-      | _ -> Cop (Casr, [c1; c2], dbg))
+      | _ -> run_rules P.Asr (Cop (Casr, [c1; c2], dbg)) dbg)
 
 and lsl_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
@@ -938,13 +947,13 @@ and lsl_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_left (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | c1 -> Cop (Clsl, [c1; c2], dbg)))
+          | c1 -> run_rules P.Lsl (Cop (Clsl, [c1; c2], dbg)) dbg))
       | Cop (Clsl, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
            further peephole optimizations *)
         Cop (Clsl, [Cop (Clsl, [x; c2], dbg); y], dbg')
-      | _, _ -> Cop (Clsl, [c1; c2], dbg))
+      | _, _ -> run_rules P.Lsl (Cop (Clsl, [c1; c2], dbg)) dbg)
 
 and lsl_const c n dbg = lsl_int c (Cconst_int (n, dbg)) dbg
 
@@ -967,7 +976,7 @@ and mul_int c1 c2 dbg =
   | Cconst_int (k, _), Cop (Caddi, [c; Cconst_int (n, _)], _)
     when Misc.no_overflow_mul n k ->
     add_const (mul_int c (Cconst_int (k, dbg)) dbg) (n * k) dbg
-  | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
+  | c1, c2 -> run_rules P.Mul (Cop (Cmuli, [c1; c2], dbg)) dbg
 
 and and_const e n dbg =
   match n with
@@ -988,7 +997,9 @@ and and_const e n dbg =
                 ~dbg e
             in
             (* prefer putting constants on the right *)
-            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+            run_rules P.And
+              (Cop (Cand, [e; natint_const_untagged dbg n], dbg))
+              dbg
           in
           match e with
           | Cop (Cand, [x; y], dbg) -> (
@@ -1027,7 +1038,7 @@ and and_int c1 c2 dbg =
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logand c1 c2)
       | None, Some c2 -> and_const c1 c2 dbg
       | Some c1, None -> and_const c2 c1 dbg
-      | None, None -> Cop (Cand, [c1; c2], dbg))
+      | None, None -> run_rules P.And (Cop (Cand, [c1; c2], dbg)) dbg)
 
 (** [low_bits ~bits x] is a (potentially simplified) value which agrees with x
     on at least the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask],
@@ -1074,6 +1085,30 @@ and low_bits ~bits ~dbg x =
               | _ -> Misc.fatal_error "impossible")
             | _ -> x)))
       x
+
+and rule_constructors dbg : P.Rule.constructors =
+  { const = natint_const_untagged dbg;
+    binop =
+      (fun (op : P.op) c1 c2 ->
+        match op with
+        | Add -> add_int c1 c2 dbg
+        | Sub -> sub_int c1 c2 dbg
+        | Mul -> mul_int c1 c2 dbg
+        | And -> and_int c1 c2 dbg
+        | Or -> or_int c1 c2 dbg
+        | Xor -> xor_int c1 c2 dbg
+        | Lsl -> lsl_int c1 c2 dbg
+        | Lsr -> lsr_int c1 c2 dbg
+        | Asr -> asr_int c1 c2 dbg);
+    sequence = (fun e body -> replace e ~with_:body)
+  }
+
+and rule_clauses op dbg =
+  List.map
+    (P.Rule.to_clause (rule_constructors dbg))
+    (Cmm_peephole_rules.for_op op)
+
+and run_rules op e dbg = P.run e (rule_clauses op dbg)
 
 let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
 
