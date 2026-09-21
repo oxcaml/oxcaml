@@ -1,27 +1,27 @@
 or/and disjoint:
   (and (or x 12) 3)
-  => (and (or x 12) 3)
+  => (and x 3)
 or/and covered:
   (and (or x 15) 3)
-  => (and (or x 15) 3)
+  => 3
 xor/and disjoint:
   (and (xor x 12) 3)
-  => (and (xor x 12) 3)
+  => (and x 3)
 and/or covering:
   (or (and x -4) 3)
-  => (or (and x -4) 3)
+  => (or x 3)
 and/or absorbed:
   (or (and x 3) 15)
-  => (or (and x 3) 15)
+  => 15
 xor/or absorbed:
   (or (xor x 3) 15)
-  => (or (xor x 3) 15)
+  => (or x 15)
 or/xor same mask:
   (xor (or x 12) 12)
-  => (xor (or x 12) 12)
+  => (and x -13)
 and/xor complementary mask:
   (xor (and x 12) -13)
-  => (xor (and x 12) -13)
+  => (or x -13)
 or/and overlapping:
   (and (or x 6) 3)
   => (and (or x 6) 3)
@@ -42,40 +42,40 @@ and/xor noncomplementary mask:
   => (xor (and x 12) -14)
 left constant, and:
   (and 3 (or x 12))
-  => (and (or x 12) 3)
+  => (and x 3)
 left constant, or:
   (or 3 (and x -4))
-  => (or (and x -4) 3)
+  => (or x 3)
 left constant, xor:
   (xor 12 (or x 12))
-  => (xor (or x 12) 12)
+  => (and x -13)
 nativeint sign bit disjoint:
   (and (or x -9223372036854775808) 9223372036854775807)
-  => (and (or x -9223372036854775808) 9223372036854775807)
+  => (and x 9223372036854775807)
 nativeint sign bit absorbed:
   (or (xor x -9223372036854775808) -9223372036854775808)
-  => (or (xor x -9223372036854775808) -9223372036854775808)
+  => (or x -9223372036854775808)
 nativeint complementary masks:
   (xor (and x 9223372036854775807) -9223372036854775808)
-  => (xor (and x 9223372036854775807) -9223372036854775808)
+  => (or x -9223372036854775808)
 mixed constant representations:
   (and (xor x 12) 3)
-  => (and (xor x 12) 3)
+  => (and x 3)
 zero mask:
   (xor (or x 0) 0)
   => (or x 0)
 all bits mask:
   (xor (or x -1) -1)
-  => (xor (or x -1) -1)
+  => 0
 lsr/lsl by 0:
   (<< (>>u x 0) 0)
   => (>>u x 0)
 lsr/lsl by 1:
   (<< (>>u x 1) 1)
-  => (<< (>>u x 1) 1)
+  => (and x -2)
 lsr/lsl by 30:
   (<< (>>u x 30) 30)
-  => (<< (>>u x 30) 30)
+  => (and x -1073741824)
 lsr/lsl by 31:
   (<< (>>u x 31) 31)
   => (<< (>>u x 31) 31)
@@ -105,10 +105,10 @@ asr/lsl by 0:
   => (>>s x 0)
 asr/lsl by 1:
   (<< (>>s x 1) 1)
-  => (<< (>>s x 1) 1)
+  => (and x -2)
 asr/lsl by 30:
   (<< (>>s x 30) 30)
-  => (<< (>>s x 30) 30)
+  => (and x -1073741824)
 asr/lsl by 31:
   (<< (>>s x 31) 31)
   => (<< (>>s x 31) 31)
@@ -150,10 +150,10 @@ lsl/lsr by 32:
   => (>>u (<< x 32) 32)
 lsl/lsr by 33:
   (>>u (<< x 33) 33)
-  => (>>u (<< x 33) 33)
+  => (and x 2147483647)
 lsl/lsr by 63:
   (>>u (<< x 63) 63)
-  => (>>u (<< x 63) 63)
+  => (and x 1)
 lsl/lsr by -1:
   (>>u (<< x -1) -1)
   => (>>u (<< x -1) -1)
@@ -171,22 +171,22 @@ nested logical shifts:
   => (>>u (<< x 8) 17)
 complement of addition:
   (xor (+ x 5) -1)
-  => (xor (+ x 5) -1)
+  => (- -6 x)
 complement of subtraction:
   (xor (- 5 x) -1)
-  => (xor (- 5 x) -1)
+  => (+ x -6)
 complement of addition:
   (xor (+ x -9223372036854775808) -1)
-  => (xor (+ x -9223372036854775808) -1)
+  => (- 9223372036854775807 x)
 complement of subtraction:
   (xor (- -9223372036854775808 x) -1)
-  => (xor (- -9223372036854775808 x) -1)
+  => (+ x 9223372036854775807)
 complement of addition:
   (xor (+ x 9223372036854775807) -1)
-  => (xor (+ x 9223372036854775807) -1)
+  => (- -9223372036854775808 x)
 complement of subtraction:
   (xor (- 9223372036854775807 x) -1)
-  => (xor (- 9223372036854775807 x) -1)
+  => (+ x -9223372036854775808)
 addition with partial xor:
   (xor (+ x 5) 7)
   => (xor (+ x 5) 7)
@@ -195,49 +195,49 @@ subtraction with partial xor:
   => (xor (- 5 x) 7)
 call or/xor all bits:
   (xor (or (extcall "observe" ->int) -1) -1)
-  => (xor (or (extcall "observe" ->int) -1) -1)
+  => (seq (extcall "observe" ->int) 0)
 call and/xor zero mask:
   (xor (and (extcall "observe" ->int) 0) -1)
-  => (xor (and (extcall "observe" ->int) 0) -1)
+  => (seq (extcall "observe" ->int) -1)
 call with constant and result:
   (and (or (extcall "observe" ->int) 15) 3)
-  => (and (or (extcall "observe" ->int) 15) 3)
+  => (seq (extcall "observe" ->int) 3)
 call with constant or result:
   (or (and (extcall "observe" ->int) 3) 15)
-  => (or (and (extcall "observe" ->int) 3) 15)
+  => (seq (extcall "observe" ->int) 15)
 call in inverse shifts:
   (<< (>>u (extcall "observe" ->int) 3) 3)
-  => (<< (>>u (extcall "observe" ->int) 3) 3)
+  => (and (extcall "observe" ->int) -8)
 mutable load with constant and result:
   (and (or (load_mut int 4096) 15) 3)
-  => (and (or (load_mut int 4096) 15) 3)
+  => (seq (load_mut int 4096) 3)
 mutable load with constant or result:
   (or (and (load_mut int 4096) 3) 15)
-  => (or (and (load_mut int 4096) 3) 15)
+  => (seq (load_mut int 4096) 15)
 mutable load in inverse shifts:
   (<< (>>u (load_mut int 4096) 3) 3)
-  => (<< (>>u (load_mut int 4096) 3) 3)
+  => (and (load_mut int 4096) -8)
 sequence with constant and result:
   (and (or (seq (extcall "observe" ->int) x) 15) 3)
   => (and (seq (extcall "observe" ->int) (or x 15)) 3)
 sequence with constant or result:
   (or (and (seq (extcall "observe" ->int) x) 3) 15)
-  => (or (and (seq (extcall "observe" ->int) x) 3) 15)
+  => (seq (extcall "observe" ->int) x 15)
 sequence in inverse shifts:
   (<< (>>u (seq (extcall "observe" ->int) x) 3) 3)
-  => (<< (>>u (seq (extcall "observe" ->int) x) 3) 3)
+  => (and (seq (extcall "observe" ->int) x) -8)
 sequence of calls with constant and result:
   (and (or (seq (extcall "first" ->int) (extcall "second" ->int)) 15) 3)
   => (and (seq (extcall "first" ->int) (or (extcall "second" ->int) 15)) 3)
 sequence of calls with constant or result:
   (or (and (seq (extcall "first" ->int) (extcall "second" ->int)) 3) 15)
-  => (or (and (seq (extcall "first" ->int) (extcall "second" ->int)) 3) 15)
+  => (seq (extcall "first" ->int) (extcall "second" ->int) 15)
 sequence of calls in inverse shifts:
   (<< (>>u (seq (extcall "first" ->int) (extcall "second" ->int)) 3) 3)
-  => (<< (>>u (seq (extcall "first" ->int) (extcall "second" ->int)) 3) 3)
+  => (and (seq (extcall "first" ->int) (extcall "second" ->int)) -8)
 phantom bindings around operation and constants:
   (and (let? operation () (or x (let? mask () 12))) (let? outer_mask () 3))
-  => (let? (outer_mask () operation ()) (and (let? mask () (or x 12)) 3))
+  => (let? (outer_mask () operation () mask ()) (and x 3))
 phantom binding around effectful operand:
   (and (or (let? operand () (extcall "observe" ->int)) 15) 3)
-  => (and (let? operand () (or (extcall "observe" ->int) 15)) 3)
+  => (let? operand () (extcall "observe" ->int) 3)
