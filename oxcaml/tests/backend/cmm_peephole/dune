@@ -1,0 +1,28 @@
+; The rewriting rules of Cmm_peephole_rules, printed as SMT-LIB2 problems.
+; The checked-in rules.smt2 must match the generated one; rules.expect-output
+; is the answer of [z3 rules.smt2], every problem being unsat. z3 is not
+; available in CI, so the second check is run by hand (alias runtest-z3).
+
+(executable
+ (name gen_smt)
+ (libraries ocamloptcomp))
+
+(rule
+ (with-stdout-to
+  rules.smt2.gen
+  (run ./gen_smt.exe)))
+
+(rule
+ (alias runtest)
+ (action
+  (diff rules.smt2 rules.smt2.gen)))
+
+(rule
+ (with-stdout-to
+  rules.output
+  (run z3 %{dep:rules.smt2})))
+
+(rule
+ (alias runtest-z3)
+ (action
+  (diff rules.expect-output rules.output)))

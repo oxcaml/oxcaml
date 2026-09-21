@@ -596,6 +596,7 @@
   cmm_builtins
   cmm_invariants
   cmm_peephole_engine
+  cmm_peephole_rules
   cmm
   cmmgen_state
   CSE

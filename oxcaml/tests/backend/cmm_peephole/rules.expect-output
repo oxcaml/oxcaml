@@ -1,0 +1,183 @@
+x & x -> x
+unsat
+
+x & (x ^ -1) -> 0
+unsat
+
+(x | y) & x -> x
+unsat
+
+a & ((a ^ b) ^ -1) -> a & b
+unsat
+
+(a | b) & ((a & b) ^ -1) -> a ^ b
+unsat
+
+(a | (b ^ -1)) & ((a ^ -1) | b) -> (a ^ b) ^ -1
+unsat
+
+(x ^ -1) & (y ^ -1) -> (x | y) ^ -1
+unsat
+
+(x ^ c1) & c2 -> x & c2 if (c1 & c2) = 0
+unsat
+
+(x | c1) & c2 -> x & c2 if (c1 & c2) = 0
+unsat
+
+(x << c) & m -> x << c if 0 <= c < 64 && (m | ((1 << c) - 1)) = -1
+unsat
+
+(x >>u c) & m -> x >>u c if 0 <= c < 64 && (m | (-1 << (64 - c))) = -1
+unsat
+
+x | x -> x
+unsat
+
+x | (x ^ -1) -> -1
+unsat
+
+(x & y) | x -> x
+unsat
+
+(x ^ y) | y -> x | y
+unsat
+
+(a & b) | (a ^ b) -> a | b
+unsat
+
+(a & (b ^ -1)) | ((a ^ -1) & b) -> a ^ b
+unsat
+
+(x ^ -1) | (y ^ -1) -> (x & y) ^ -1
+unsat
+
+(a ^ -1) | (a ^ b) -> (a & b) ^ -1
+unsat
+
+(a & b) | ((a | b) ^ -1) -> (a ^ b) ^ -1
+unsat
+
+(a ^ b) | ((a | b) ^ -1) -> (a & b) ^ -1
+unsat
+
+x ^ x -> 0
+unsat
+
+x ^ (x ^ -1) -> -1
+unsat
+
+((a ^ -1) & b) ^ a -> a | b
+unsat
+
+((x ^ -1) + y) ^ -1 -> x - y
+unsat
+
+((x ^ -1) - y) ^ -1 -> x + y
+unsat
+
+(0 - x) ^ -1 -> x - 1
+unsat
+
+((x ^ -1) ^ y) ^ -1 -> x ^ y
+unsat
+
+((x ^ -1) & y) ^ -1 -> x | (y ^ -1)
+unsat
+
+((x ^ -1) | y) ^ -1 -> x & (y ^ -1)
+unsat
+
+a ^ ((a ^ -1) | b) -> (a & b) ^ -1
+unsat
+
+x + (0 - y) -> x - y
+unsat
+
+(a - b) + b -> a
+unsat
+
+(x & y) + (x | y) -> x + y
+unsat
+
+(x & y) + (x ^ y) -> x | y
+unsat
+
+(x ^ -1) + (y ^ -1) -> -2 - (x + y)
+unsat
+
+(x * c) + x -> x * (c + 1)
+unsat
+
+(x * z) + (y * z) -> (x + y) * z
+unsat
+
+(x + y) - x -> y
+unsat
+
+x - (x + y) -> 0 - y
+unsat
+
+x - (x - y) -> y
+unsat
+
+(x - y) - x -> 0 - y
+unsat
+
+x - (0 - y) -> x + y
+unsat
+
+0 - (x - y) -> y - x
+unsat
+
+0 - (0 - x) -> x
+unsat
+
+0 - (x ^ -1) -> x + 1
+unsat
+
+(x | y) - (x & y) -> x ^ y
+unsat
+
+(x | y) - (x ^ y) -> x & y
+unsat
+
+(x + y) - (x & y) -> x | y
+unsat
+
+(x + y) - (x | y) -> x & y
+unsat
+
+(x ^ -1) - (y ^ -1) -> y - x
+unsat
+
+(x * c) - x -> x * (c - 1)
+unsat
+
+x - (x * c) -> x * (1 - c)
+unsat
+
+(x * z) - (y * z) -> (x - y) * z
+unsat
+
+(x & m) << c -> x << c if 0 <= c < 64 && (m << c) = (-1 << c)
+unsat
+
+(x * c1) << c2 -> x * (c1 << c2) if 0 <= c2 < 64
+unsat
+
+(x << c) >>u c -> x & (-1 >>u c) if 0 <= c < 64
+unsat
+
+(x * c1) * c2 -> x * (c1 * c2)
+unsat
+
+(x << c1) * c2 -> x * (c2 << c1) if 0 <= c1 < 64
+unsat
+
+(0 - x) * (0 - y) -> x * y
+unsat
+
+(0 - x) * c -> x * (0 - c)
+unsat
+

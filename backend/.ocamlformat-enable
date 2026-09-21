@@ -59,6 +59,8 @@ cmmgen_state.ml
 cmmgen_state.mli
 cmm_peephole_engine.ml
 cmm_peephole_engine.mli
+cmm_peephole_rules.ml
+cmm_peephole_rules.mli
 debug/**/*.ml
 debug/**/*.mli
 emitaux.ml
