@@ -6638,6 +6638,12 @@ let moregeneral_fast env patt subst subj =
          begin match variance with
          | None -> raise_notrace Complicated_moregen
          | Some variance ->
+           (* bail out for mode variables to avoid copying them *)
+           if With_locality.check_generic a1
+              || With_locality.check_generic r1
+              || With_locality.check_generic a2
+              || With_locality.check_generic r2
+           then raise_notrace Complicated_moregen;
            moregen_mode_with_locality env t2 ~is_ret:false
              (neg_variance variance) a1 a2;
            moregen_mode_with_locality env u2 ~is_ret:true variance r1 r2;
