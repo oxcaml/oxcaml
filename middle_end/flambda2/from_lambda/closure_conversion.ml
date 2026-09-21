@@ -4137,6 +4137,10 @@ let final_module_block_representation acc
   in
   block_shape, field_count, block_access, kind_of_field
 
+type final_module_block_field =
+  | Simple of Simple.t
+  | Let_bound of Variable.t * Flambda_debug_uid.t * Named.t
+
 let wrap_final_module_block acc env ~program ~prog_return_cont
     ~(module_repr : Lambda.module_representation) ~return_cont ~module_symbol =
   let module_block_var = Variable.create "module_block" K.value in
@@ -4158,18 +4162,34 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       | _ -> simple_var
     in
     let field_vars =
-      List.init field_count (fun pos ->
+      List.init field_count (fun pos : final_module_block_field ->
           let pos_str = string_of_int pos in
-          ( pos,
-            Variable.create ("field_" ^ pos_str) (kind_of_field pos),
-            Flambda_debug_uid.none ))
+          let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
+          let block = module_block_simple in
+          match simplify_block_load acc env ~block ~field with
+          | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
+            Let_bound
+              ( Variable.create ("field_" ^ pos_str) (kind_of_field pos),
+                Flambda_debug_uid.none,
+                Named.create_prim
+                  (Unary
+                     ( Block_load
+                         { kind = block_access pos; mut = Immutable; field },
+                       block ))
+                  Debuginfo.none )
+          | Field_contents sim -> Simple sim)
     in
     let acc, body =
       let static_const : Static_const.t =
         let field_vars =
           List.map
-            (fun (_, var, _) ->
-              Simple.With_debuginfo.create (Simple.var var) Debuginfo.none)
+            (fun field ->
+              let s =
+                match field with
+                | Simple simple -> simple
+                | Let_bound (var, _, _) -> Simple.var var
+              in
+              Simple.With_debuginfo.create s Debuginfo.none)
             field_vars
         in
         Static_const.block module_block_tag Immutable block_shape field_vars
@@ -4196,24 +4216,13 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
         named ~body:return
     in
     List.fold_left
-      (fun (acc, body) (pos, var, var_duid) ->
-        let var = VB.create var var_duid Name_mode.normal in
-        let pat = Bound_pattern.singleton var in
-        let field = Target_ocaml_int.of_int (Acc.machine_width acc) pos in
-        let block = module_block_simple in
-        match simplify_block_load acc env ~block ~field with
-        | Unknown | Not_a_block | Block_but_cannot_simplify _ ->
-          let named =
-            Named.create_prim
-              (Unary
-                 ( Block_load { kind = block_access pos; mut = Immutable; field },
-                   block ))
-              Debuginfo.none
-          in
+      (fun (acc, body) field ->
+        match field with
+        | Let_bound (var, var_duid, named) ->
+          let var = VB.create var var_duid Name_mode.normal in
+          let pat = Bound_pattern.singleton var in
           Let_with_acc.create acc pat named ~body
-        | Field_contents sim ->
-          let named = Named.create_simple sim in
-          Let_with_acc.create acc pat named ~body)
+        | Simple _ -> acc, body)
       (acc, body) (List.rev field_vars)
   in
   let load_fields_handler_param =
