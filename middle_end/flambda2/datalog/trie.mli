@@ -42,8 +42,6 @@ val add_or_replace : ('t, 'k, 'v) is_trie -> 'k Constant.hlist -> 'v -> 't -> 't
 
 val remove : ('t, 'k, 'v) is_trie -> 'k Constant.hlist -> 't -> 't
 
-val union : ('t, 'k, 'v) is_trie -> ('v -> 'v -> 'v option) -> 't -> 't -> 't
-
 val find_or_null :
   ('t, 'k, 'v) is_trie -> 'k Constant.hlist -> 't -> 'v Or_null.t
 

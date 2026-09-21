@@ -50,8 +50,49 @@ module Type = struct
   end
 end
 
-let concat is_trie ~earlier:t1 ~later:t2 =
-  Trie.union is_trie (fun _ v -> Some v) t1 t2
+type _ result_repr = Unit_repr : unit result_repr
+
+let unit_repr = Unit_repr
+
+let result_repr_print (type t) (repr : t result_repr) :
+    Format.formatter -> t -> unit =
+  let Unit_repr = repr in
+  fun ppf () -> Format.fprintf ppf "()"
+
+let result_repr_default_value (type t) (repr : t result_repr) : t =
+  match repr with Unit_repr -> ()
+
+let result_repr_union (type t) (repr : t result_repr) : t -> t -> t =
+  match repr with Unit_repr -> fun () () -> ()
+
+let result_repr_diff_or_null (type t) (repr : t result_repr) :
+    t -> t -> t Or_null.t =
+  match repr with Unit_repr -> fun () () -> Or_null.null
+
+let rec union : type t k v.
+    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t =
+ fun columns repr t1 t2 ->
+  match columns with
+  | [] -> result_repr_union repr t1 t2
+  | column :: columns -> Column.union_total column (union columns repr) t1 t2
+
+let rec diff_or_null : type t k v.
+    (t, k, v) Column.hlist -> v result_repr -> t -> t -> t Or_null.t =
+ fun columns repr t1 t2 ->
+  match columns with
+  | [] -> result_repr_diff_or_null repr t1 t2
+  | column :: columns ->
+    Column.diff_or_null column (diff_or_null columns repr) t1 t2
+
+let rec concat : type t k v. (t, k, v) Column.hlist -> earlier:t -> later:t -> t
+    =
+ fun columns ~earlier ~later ->
+  match columns with
+  | [] -> later
+  | column :: columns ->
+    Column.union_total column
+      (fun earlier later -> concat columns ~earlier ~later)
+      earlier later
 
 module Id = struct
   type (!'t, !'k, !'v) t =
@@ -59,7 +100,7 @@ module Id = struct
       name : string;
       is_trie : ('t, 'k, 'v) Trie.is_trie;
       columns : ('t, 'k, 'v) Column.hlist;
-      default_value : 'v;
+      result_repr : 'v result_repr;
       provenance : bool
     }
 
@@ -90,18 +131,21 @@ module Id = struct
   let compare { id = id1; _ } { id = id2; _ } =
     compare (Type.Id.uid id1) (Type.Id.uid id2)
 
-  let create ~provenance ~name ~columns ~default_value =
+  let create ~provenance ~name ~columns ~result_repr =
     (* Store the [is_trie] value in order to avoid a double loop to create it
        when it is used. *)
     (* CR bclement: most iterations on [is_trie] could probably be replaced with
        iterations on [columns] instead, at which point we could get rid of
        [is_trie] entirely. *)
     let is_trie = Column.is_trie columns in
-    { id = Type.Id.make (); name; is_trie; columns; default_value; provenance }
+    { id = Type.Id.make (); name; is_trie; columns; result_repr; provenance }
 
   let has_provenance { provenance; _ } = provenance
 
-  let[@inline] default_value { default_value; _ } = default_value
+  let[@inline] result_repr { result_repr; _ } = result_repr
+
+  let[@inline] default_value { result_repr; _ } =
+    result_repr_default_value result_repr
 
   let[@inline] columns { columns; _ } = columns
 
@@ -171,7 +215,7 @@ module Map = struct
     Int.Map.union_total
       (fun _ (Binding (id1, table1)) (Binding (id2, table2)) ->
         let table =
-          concat (Id.is_trie id1) ~earlier:table1
+          concat (Id.columns id1) ~earlier:table1
             ~later:(Id.cast_exn id2 id1 table2)
         in
         Binding (id1, table))
