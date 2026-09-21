@@ -1,0 +1,56 @@
+(data
+ global "camlStatic_module_block_classic__gc_roots":
+ addr G:"camlStatic_module_block_classic"
+ addr L:"camlStatic_module_block_classic__s3"
+ int 0)
+(data
+ int 6912
+ global "camlStatic_module_block_classic":
+ int 1
+ int 3
+ addr G:"camlStatic_module_block_classic__s0"
+ addr G:"camlStatic_module_block_classic__s2"
+ addr G:"camlStatic_module_block_classic__s0"
+ int 1)
+(data
+ int 6912
+ "camlStatic_module_block_classic__s3":
+ int 1
+ int 3
+ addr G:"camlStatic_module_block_classic__s0"
+ addr G:"camlStatic_module_block_classic__s2"
+ addr G:"camlStatic_module_block_classic__s0"
+ int 1)
+(data
+ int 3063
+ global "camlStatic_module_block_classic__s0":
+ addr G:"camlStatic_module_block_classic__is_a_0_0"
+ int 108086391056891909)
+(data
+ int 3840
+ global "camlStatic_module_block_classic__s2":
+ addr G:"camlStatic_module_block_classic__s1"
+ int 1
+ int 1)
+(data
+ int 2044
+ global "camlStatic_module_block_classic__s1":
+ string "A"
+ skip 6
+ byte 6)
+(function camlStatic_module_block_classic__is_a_0_0 (param: int) : int
+ (xor 2 param) )
+
+(function no_cse reduce_code_size linscan
+ camlStatic_module_block_classic__entry () : val
+ (catch
+   (let dyn (opaque 85)
+     (extcall "caml_initialize"
+       (+a L:"camlStatic_module_block_classic__s3" 40) dyn ->unit)
+     1
+     (extcall "caml_initialize" (+a G:"camlStatic_module_block_classic" 40)
+       (load val (+a L:"camlStatic_module_block_classic__s3" 40)) ->unit)
+     1 (exit 2 G:"camlStatic_module_block_classic"))
+ with(2 *ret*: val) 1) )
+
+(data)
