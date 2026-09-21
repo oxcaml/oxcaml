@@ -1,0 +1,10 @@
+fill: AAxxxAAA
+fill-gap-bits: AAxxxyyA
+memset: ........
+memmove: 0101234789
+cmp-eq: 0
+cmp-lt: -1
+cmp-gt: 1
+cmp-self: -1
+ptr-id-45bit: true
+ptr-id-gap: true

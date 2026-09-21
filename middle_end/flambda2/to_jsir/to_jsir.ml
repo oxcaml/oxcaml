@@ -441,7 +441,14 @@ and apply_expr ~env ~res e =
             Apply_expr.print e
       in
       apply_fn ~res ~f ~args:(obj :: args) ~exact:false
-    | Some callee, C_call _ ->
+    | Some callee, C_call { ox_ptr_arg_starts; _ } ->
+      (match ox_ptr_arg_starts with
+      | [] -> ()
+      | _ :: _ ->
+        Misc.fatal_errorf
+          "[@ox_ptr] external arguments are not supported when compiling to \
+           JSIR: %a"
+          Apply_expr.print e);
       let symbol =
         match Simple.must_be_symbol callee with
         | Some (symbol, _coercion) -> symbol
