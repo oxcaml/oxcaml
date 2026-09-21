@@ -523,144 +523,6 @@ let[@inline] is_constant = function
   | Cconst_int _ | Cconst_natint _ -> true
   | _ -> false
 
-let rec add_const c n dbg =
-  let c = prefer_add c in
-  if n = 0
-  then c
-  else
-    map_tail1 c ~f:(fun c ->
-        match prefer_add c with
-        | Cconst_int (x, _) when Misc.no_overflow_add x n ->
-          Cconst_int (x + n, dbg)
-        | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
-          ->
-          add_no_overflow n x c dbg
-        | Cop (Caddi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
-          ->
-          add_no_overflow n x c dbg
-        | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
-          ->
-          Cop (Csubi, [Cconst_int (n + x, dbg); c], dbg)
-        | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
-          ->
-          add_const c (n - x) dbg
-        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
-
-let rec add_const' arg const dbg =
-  let open P.Default_variables in
-  map_tail1 arg ~f:(fun arg ->
-      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
-      let x = P.create_var Int "x" in
-      P.run res
-        [ (Binop (Op Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
-          ( Guarded
-              { pat = Binop (Op Add, Const_int x, Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> Cconst_int (env#.x + env#.n, dbg) );
-          ( Guarded
-              { pat = Binop (Op Add, Binop (Op Add, Const_int x, Any c), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
-          ( Guarded
-              { pat = Binop (Op Add, Binop (Op Add, Any c, Const_int x), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
-          ( Guarded
-              { pat = Binop (Op Add, Binop (Op Sub, Const_int x, Any c), Const_int n);
-                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
-              }
-          => fun env ->
-            Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
-          ( Guarded
-              { pat = Binop (Op Add, Binop (Op Sub, Any c, Const_int x), Const_int n);
-                guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
-              }
-          => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
-
-let add_const = check_equal_3 "add_const" add_const ~engine:add_const'
-
-let incr_int c dbg = add_const c 1 dbg
-
-let decr_int c dbg = add_const c (-1) dbg
-
-let rec add_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match prefer_add c1, prefer_add c2 with
-      | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
-        add_const (add_int c1 c2 dbg) n1 dbg
-      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
-        add_const (add_int c1 c2 dbg) n2 dbg
-      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
-
-let rec add_int' arg1 arg2 dbg =
-  let open P.Default_variables in
-  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
-      P.run res
-        [ ( Binop (Op Add, Const_int n, Any c) => fun env ->
-            add_const env#.c env#.n dbg );
-          ( Binop (Op Add, Any c, Const_int n) => fun env ->
-            add_const env#.c env#.n dbg );
-          ( Binop (Op Add, Binop (Op Add, Any c1, Const_int n1), Any c2) => fun env ->
-            add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
-          ( Binop (Op Add, Any c1, Binop (Op Add, Any c2, Const_int n2)) => fun env ->
-            add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg ) ])
-
-let add_int = check_equal_3 "add_int" add_int ~engine:add_int'
-
-let rec sub_int c1 c2 dbg =
-  map_tail2 c1 c2 ~f:(fun c1 c2 ->
-      match prefer_add c1, prefer_add c2 with
-      | c1, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
-      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
-        add_const (sub_int c1 c2 dbg) (-n2) dbg
-      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
-        add_const (sub_int c1 c2 dbg) n1 dbg
-      | c1, c2 -> Cop (Csubi, [c1; c2], dbg))
-
-let rec sub_int' arg1 arg2 dbg =
-  let open P.Default_variables in
-  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
-      let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
-      P.run res
-        [ ( Guarded
-              { pat = Binop (Op Sub, Any c1, Const_int n2);
-                guard = (fun env -> env#.n2 <> min_int)
-              }
-          => fun env -> add_const env#.c1 (-env#.n2) dbg );
-          ( Guarded
-              { pat = Binop (Op Sub, Any c1, Binop (Op Add, Any c2, Const_int n2));
-                guard = (fun env -> env#.n2 <> min_int)
-              }
-          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
-          );
-          ( Binop (Op Sub, Binop (Op Add, Any c1, Const_int n1), Any c2) => fun env ->
-            add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg ) ])
-
-let sub_int = check_equal_3 "sub_int" sub_int ~engine:sub_int'
-
-let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
-
-let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
-  (* The [add_int_addr] case is only used for string access, and it seems
-     unlikely that the more complicated optimizations done for [add_int] will
-     apply.
-
-     For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
-  if ptr_out_of_heap
-  then add_int c1 c2 dbg
-  else
-    match c1, c2 with
-    | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
-    | Cconst_natint (0n, _), c | c, Cconst_natint (0n, _) -> c
-    | _, _ -> add_int_addr c1 c2 dbg
-
-let neg_int c dbg = sub_int (Cconst_int (0, dbg)) c dbg
-
 (** This function conservatively approximates the number of significant bits in
     its signed argument. That is, it computes the number of bits required to
     represent the absolute value of its argument. *)
@@ -692,14 +554,20 @@ let rec max_signed_bit_length' e =
           }
       => fun env -> 1 + Misc.log2 env#.n );
       ( Guarded
-          { pat = Binop (Op Lsl, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Lsl, Any c, Const_int n);
+            guard = is_defined_shift' n
+          }
       => fun env -> Int.min arch_bits (max_signed_bit_length' env#.c + env#.n)
       );
       ( Guarded
-          { pat = Binop (Op Asr, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Asr, Any c, Const_int n);
+            guard = is_defined_shift' n
+          }
       => fun env -> Int.max 0 (max_signed_bit_length' env#.c - env#.n) );
       ( Guarded
-          { pat = Binop (Op Lsr, Any c, Const_int n); guard = is_defined_shift' n }
+          { pat = Binop (Op Lsr, Any c, Const_int n);
+            guard = is_defined_shift' n
+          }
       => fun env ->
         if env#.n = 0 then max_signed_bit_length' env#.c else arch_bits - env#.n
       );
@@ -740,9 +608,11 @@ let rec ignore_low_bit_int' arg =
       => fun env -> ignore_low_bit_int' env#.c );
       ( Binop (Op Or, Any c, Const_int_fixed 1) => fun env ->
         ignore_low_bit_int' env#.c );
-      ( Binop (Op Lsl, Binop (Op Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      ( Binop
+          (Op Lsl, Binop (Op Lsr, Any c, Const_int_fixed 1), Const_int_fixed 1)
       => fun env -> ignore_low_bit_int' env#.c );
-      ( Binop (Op Lsl, Binop (Op Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
+      ( Binop
+          (Op Lsl, Binop (Op Asr, Any c, Const_int_fixed 1), Const_int_fixed 1)
       => fun env -> ignore_low_bit_int' env#.c ) ]
 
 let ignore_low_bit_int =
@@ -765,7 +635,150 @@ let replace x ~with_ =
     with_
   | inner -> Csequence (inner, with_)
 
-let rec xor_const e n dbg =
+let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
+
+let is_power2 n = n = 1 lsl Misc.log2 n
+
+(** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
+let get_const_bitmask = function
+  | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
+    ->
+    Some (x, mask)
+  | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
+    Some (x, Nativeint.of_int mask)
+  | _ -> None
+
+let rec add_const_legacy c n dbg =
+  let c = prefer_add c in
+  if n = 0
+  then c
+  else
+    map_tail1 c ~f:(fun c ->
+        match prefer_add c with
+        | Cconst_int (x, _) when Misc.no_overflow_add x n ->
+          Cconst_int (x + n, dbg)
+        | Cop (Caddi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
+          ->
+          add_no_overflow n x c dbg
+        | Cop (Caddi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_add n x
+          ->
+          add_no_overflow n x c dbg
+        | Cop (Csubi, [Cconst_int (x, _); c], _) when Misc.no_overflow_add n x
+          ->
+          Cop (Csubi, [Cconst_int (n + x, dbg); c], dbg)
+        | Cop (Csubi, [c; Cconst_int (x, _)], _) when Misc.no_overflow_sub n x
+          ->
+          add_const_legacy c (n - x) dbg
+        | c -> Cop (Caddi, [c; Cconst_int (n, dbg)], dbg))
+
+and add_const' arg const dbg =
+  let open P.Default_variables in
+  map_tail1 arg ~f:(fun arg ->
+      let res = Cop (Caddi, [prefer_add arg; Cconst_int (const, dbg)], dbg) in
+      let x = P.create_var Int "x" in
+      P.run res
+        [ (Binop (Op Add, Any c, Const_int_fixed 0) => fun env -> env#.c);
+          ( Guarded
+              { pat = Binop (Op Add, Const_int x, Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> Cconst_int (env#.x + env#.n, dbg) );
+          ( Guarded
+              { pat =
+                  Binop (Op Add, Binop (Op Add, Const_int x, Any c), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          ( Guarded
+              { pat =
+                  Binop (Op Add, Binop (Op Add, Any c, Const_int x), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env -> add_no_overflow env#.n env#.x env#.c dbg );
+          ( Guarded
+              { pat =
+                  Binop (Op Add, Binop (Op Sub, Const_int x, Any c), Const_int n);
+                guard = (fun env -> Misc.no_overflow_add env#.n env#.x)
+              }
+          => fun env ->
+            Cop (Csubi, [Cconst_int (env#.n + env#.x, dbg); env#.c], dbg) );
+          ( Guarded
+              { pat =
+                  Binop (Op Add, Binop (Op Sub, Any c, Const_int x), Const_int n);
+                guard = (fun env -> Misc.no_overflow_sub env#.n env#.x)
+              }
+          => fun env -> add_const' env#.c (env#.n - env#.x) dbg ) ])
+
+and add_const c n dbg =
+  check_equal_3 "add_const" add_const_legacy ~engine:add_const' c n dbg
+
+and incr_int c dbg = add_const c 1 dbg
+
+and decr_int c dbg = add_const c (-1) dbg
+
+and add_int_legacy c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match prefer_add c1, prefer_add c2 with
+      | Cconst_int (n, _), c | c, Cconst_int (n, _) -> add_const c n dbg
+      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
+        add_const (add_int_legacy c1 c2 dbg) n1 dbg
+      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) ->
+        add_const (add_int_legacy c1 c2 dbg) n2 dbg
+      | c1, c2 -> Cop (Caddi, [c1; c2], dbg))
+
+and add_int' arg1 arg2 dbg =
+  let open P.Default_variables in
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
+      let res = Cop (Caddi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ ( Binop (Op Add, Const_int n, Any c) => fun env ->
+            add_const env#.c env#.n dbg );
+          ( Binop (Op Add, Any c, Const_int n) => fun env ->
+            add_const env#.c env#.n dbg );
+          ( Binop (Op Add, Binop (Op Add, Any c1, Const_int n1), Any c2)
+          => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n1 dbg );
+          ( Binop (Op Add, Any c1, Binop (Op Add, Any c2, Const_int n2))
+          => fun env -> add_const (add_int' env#.c1 env#.c2 dbg) env#.n2 dbg )
+        ])
+
+and add_int c1 c2 dbg =
+  check_equal_3 "add_int" add_int_legacy ~engine:add_int' c1 c2 dbg
+
+and sub_int_legacy c1 c2 dbg =
+  map_tail2 c1 c2 ~f:(fun c1 c2 ->
+      match prefer_add c1, prefer_add c2 with
+      | c1, Cconst_int (n2, _) when n2 <> min_int -> add_const c1 (-n2) dbg
+      | c1, Cop (Caddi, [c2; Cconst_int (n2, _)], _) when n2 <> min_int ->
+        add_const (sub_int_legacy c1 c2 dbg) (-n2) dbg
+      | Cop (Caddi, [c1; Cconst_int (n1, _)], _), c2 ->
+        add_const (sub_int_legacy c1 c2 dbg) n1 dbg
+      | c1, c2 -> Cop (Csubi, [c1; c2], dbg))
+
+and sub_int' arg1 arg2 dbg =
+  let open P.Default_variables in
+  map_tail2 arg1 arg2 ~f:(fun arg1 arg2 ->
+      let res = Cop (Csubi, [prefer_add arg1; prefer_add arg2], dbg) in
+      P.run res
+        [ ( Guarded
+              { pat = Binop (Op Sub, Any c1, Const_int n2);
+                guard = (fun env -> env#.n2 <> min_int)
+              }
+          => fun env -> add_const env#.c1 (-env#.n2) dbg );
+          ( Guarded
+              { pat =
+                  Binop (Op Sub, Any c1, Binop (Op Add, Any c2, Const_int n2));
+                guard = (fun env -> env#.n2 <> min_int)
+              }
+          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) (-env#.n2) dbg
+          );
+          ( Binop (Op Sub, Binop (Op Add, Any c1, Const_int n1), Any c2)
+          => fun env -> add_const (sub_int' env#.c1 env#.c2 dbg) env#.n1 dbg )
+        ])
+
+and sub_int c1 c2 dbg =
+  check_equal_3 "sub_int" sub_int_legacy ~engine:sub_int' c1 c2 dbg
+
+and xor_const e n dbg =
   match n with
   | 0n -> e
   | n ->
@@ -784,7 +797,7 @@ let rec xor_const e n dbg =
             | Some y -> xor_const x (Nativeint.logxor y n) dbg)
           | _ -> default ()))
 
-let rec or_const e n dbg =
+and or_const e n dbg =
   match n with
   | 0n -> e
   | -1n -> replace e ~with_:(Cconst_int (-1, dbg))
@@ -807,7 +820,7 @@ let rec or_const e n dbg =
             | Some y -> or_const x (Nativeint.logor y n) dbg)
           | _ -> default ()))
 
-let xor_int c1 c2 dbg =
+and xor_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logxor c1 c2)
@@ -815,7 +828,7 @@ let xor_int c1 c2 dbg =
       | Some c1, None -> xor_const c2 c1 dbg
       | None, None -> Cop (Cxor, [c1; c2], dbg))
 
-let or_int c1 c2 dbg =
+and or_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match get_const c1, get_const c2 with
       | Some c1, Some c2 -> natint_const_untagged dbg (Nativeint.logor c1 c2)
@@ -823,7 +836,7 @@ let or_int c1 c2 dbg =
       | Some c1, None -> or_const c2 c1 dbg
       | None, None -> Cop (Cor, [c1; c2], dbg))
 
-let rec lsr_int c1 c2 dbg =
+and lsr_int c1 c2 dbg =
   map_tail2 c1 c2 ~f:(fun c1 c2 ->
       match c1, c2 with
       | c1, Cconst_int (0, _) -> c1
@@ -939,13 +952,9 @@ and asr_const c n dbg = asr_int c (Cconst_int (n, dbg)) dbg
 
 and lsr_const c n dbg = lsr_int c (Cconst_int (n, dbg)) dbg
 
-let lsl_const0 c n dbg = Cop (Clsl, [c; Cconst_int (n, dbg)], dbg)
-
-let is_power2 n = n = 1 lsl Misc.log2 n
-
 and mult_power2 c n dbg = lsl_int c (Cconst_int (Misc.log2 n, dbg)) dbg
 
-let rec mul_int c1 c2 dbg =
+and mul_int c1 c2 dbg =
   match c1, c2 with
   | c, Cconst_int (0, _) | Cconst_int (0, _), c ->
     Csequence (c, Cconst_int (0, dbg))
@@ -960,16 +969,7 @@ let rec mul_int c1 c2 dbg =
     add_const (mul_int c (Cconst_int (k, dbg)) dbg) (n * k) dbg
   | c1, c2 -> Cop (Cmuli, [c1; c2], dbg)
 
-(** [get_const_bitmask x] returns [Some (y, mask)] if [x] is [y & mask] *)
-let get_const_bitmask = function
-  | Cop (Cand, ([x; Cconst_natint (mask, _)] | [Cconst_natint (mask, _); x]), _)
-    ->
-    Some (x, mask)
-  | Cop (Cand, ([x; Cconst_int (mask, _)] | [Cconst_int (mask, _); x]), _) ->
-    Some (x, Nativeint.of_int mask)
-  | _ -> None
-
-let rec and_const e n dbg =
+and and_const e n dbg =
   match n with
   | 0n -> replace e ~with_:(Cconst_int (0, dbg))
   | -1n -> e
@@ -1074,6 +1074,24 @@ and low_bits ~bits ~dbg x =
               | _ -> Misc.fatal_error "impossible")
             | _ -> x)))
       x
+
+let add_int_addr c1 c2 dbg = Cop (Cadda, [c1; c2], dbg)
+
+let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
+  (* The [add_int_addr] case is only used for string access, and it seems
+     unlikely that the more complicated optimizations done for [add_int] will
+     apply.
+
+     For out-of-heap accesses, we use [add_int], thus allowing more CSE. *)
+  if ptr_out_of_heap
+  then add_int c1 c2 dbg
+  else
+    match c1, c2 with
+    | Cconst_int (0, _), c | c, Cconst_int (0, _) -> c
+    | Cconst_natint (0n, _), c | c, Cconst_natint (0n, _) -> c
+    | _, _ -> add_int_addr c1 c2 dbg
+
+let neg_int c dbg = sub_int (Cconst_int (0, dbg)) c dbg
 
 (** [store ~dbg memory_chunk init ~addr ~new_value] stores [new_value] at
     [addr]. Stores of integers narrower than a word only write the low bits of
