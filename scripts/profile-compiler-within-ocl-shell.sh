@@ -41,6 +41,7 @@ set -euo pipefail
 export MEMTRACE="$output/alloc.\$\$.ctf" # Note that $$ means "this shell's PID"
 printf '%q ' "\$@" > "$output/command.\$\$.txt" # Record the compiler's arguments
 exec "$root/_install/bin/ocamlopt.opt" \
+  -dtimings \
   -dgc-timings \
   -dump-into-file \
   -dump-dir "${output}" \
