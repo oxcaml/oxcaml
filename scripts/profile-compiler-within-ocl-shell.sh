@@ -99,18 +99,34 @@ echo "Allocated ${formatted_allocated} total."
 
 echo
 top_n='10'
-echo "Top ${top_n} compiler invocations by allocation:"
-awk '
-  $2 == "alloc" {bytes[FILENAME] = $1 + 0}
-  $2 ~ /^file=/ {source[FILENAME] = substr($2, 6)}
-  END {
-    for (file in bytes)
-      print bytes[file], (file in source ? source[file] : file)
-  }
-' "${reports[@]}" |
-  sort -nr |
-  sed -n "1,${top_n}p" |
-  numfmt --field=1 --to=iec-i --suffix=B --round=nearest --format='%.2f'
+echo "Top ${top_n} source compilations by allocation:"
+(
+  cd "$output"
+  awk '
+    $2 == "alloc" {bytes[FILENAME] = $1 + 0}
+    $2 ~ /^file=/ {source[FILENAME] = substr($2, 6)}
+    END {
+      for (file in bytes)
+        printf "%.0f  %-40s  %s\n",
+          bytes[file], (file in source ? source[file] : "n/a"), file
+    }
+  ' gc.*.dump |
+    sort -nr |
+    sed -n "1,${top_n}p" |
+    numfmt --field=1 --to-unit=Gi --round=nearest --format='%8.3fG'
+)
+
+echo
+echo "Top ${top_n} source compilations by CPU time:"
+(
+  cd "$output"
+  awk '$2 ~ /^file=/ {
+    printf "%8.3fs  %-40s  %s\n",
+      $1 + 0, substr($2, 6), FILENAME
+  }' gc.*.dump |
+    sort -nr |
+    sed -n "1,${top_n}p"
+)
 
 echo
 echo 'All profiling files (e.g. `memtrace-dump` `.txt` files) can be found in `'"${output}"'`.'
