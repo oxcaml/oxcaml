@@ -129,6 +129,7 @@ type binop =
   | Asr
   | Or
   | And
+  | Xor
   | Comparison
   | Bitwise_op
 
@@ -139,6 +140,7 @@ type cmm_pattern =
   | Const_int of int pattern_var
   | Const_natint_fixed of Nativeint.t
   | Const_natint of Nativeint.t pattern_var
+  | Const_word of Nativeint.t pattern_var
   | Binop of binop * cmm_pattern * cmm_pattern
   | Guarded of
       { pat : cmm_pattern;
@@ -156,6 +158,7 @@ let matches_binop (binop : binop) (cop : Cmm.operation) =
   | Asr, Casr -> true
   | Or, Cor -> true
   | And, Cand -> true
+  | Xor, Cxor -> true
   | Comparison, (Ccmpi _ | Ccmpf _) -> true
   | Bitwise_op, (Cand | Cor | Cxor) -> true
   | _, _ -> false
@@ -180,6 +183,9 @@ let match_clauses_in_order ~default ~matches clauses expr =
       | Const_natint_fixed n1, Cconst_natint (n2, _) ->
         if Nativeint.equal n1 n2 then Some env else None
       | Const_natint v, Cconst_natint (n, _) -> Some (Env.add env v n)
+      | Const_word v, Cconst_int (n, _) ->
+        Some (Env.add env v (Nativeint.of_int n))
+      | Const_word v, Cconst_natint (n, _) -> Some (Env.add env v n)
       | Binop (binop, pat1, pat2), Cop (cop, [expr1; expr2], _) ->
         if matches_binop binop cop
         then

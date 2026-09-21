@@ -476,6 +476,10 @@ let natint_const_untagged dbg n =
   then Cconst_natint (n, dbg)
   else Cconst_int (Nativeint.to_int n, dbg)
 
+let is_immediate_logical = function
+  | Cconst_int (n, _) -> Arch.is_immediate_logical n
+  | _ -> false
+
 let cint_const n =
   Cint (Nativeint.add (Nativeint.shift_left (Nativeint.of_int n) 1) 1n)
 
@@ -765,6 +769,11 @@ let replace x ~with_ =
     with_
   | inner -> Csequence (inner, with_)
 
+(* Proofs: middle_end/flambda2/z3/cmm_peephole.py. *)
+let const1 = P.create_var Natint "const1"
+
+let const2 = P.create_var Natint "const2"
+
 let rec xor_const e n dbg =
   match n with
   | 0n -> e
@@ -774,8 +783,73 @@ let rec xor_const e n dbg =
         | Some e -> natint_const_untagged dbg (Nativeint.logxor e n)
         | None -> (
           let[@local] default () =
+            let res = Cop (Cxor, [e; natint_const_untagged dbg n], dbg) in
+            let open P.Default_variables in
             (* prefer putting constants on the right *)
-            Cop (Cxor, [e; natint_const_untagged dbg n], dbg)
+            P.run res
+              [ ( Guarded
+                    { pat =
+                        Binop
+                          ( Xor,
+                            Binop (Or, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard =
+                        (fun env -> Nativeint.equal env#.const1 env#.const2)
+                    }
+                => fun env ->
+                  let mask = Nativeint.lognot env#.const1 in
+                  if Nativeint.equal mask 0n
+                  then replace env#.c ~with_:(Cconst_int (0, dbg))
+                  else Cop (Cand, [env#.c; natint_const_untagged dbg mask], dbg)
+                );
+                ( Guarded
+                    { pat =
+                        Binop
+                          ( Xor,
+                            Binop (And, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard =
+                        (fun env ->
+                          Nativeint.equal
+                            (Nativeint.lognot env#.const1)
+                            env#.const2)
+                    }
+                => fun env ->
+                  if Nativeint.equal env#.const2 (-1n)
+                  then replace env#.c ~with_:(Cconst_int (-1, dbg))
+                  else
+                    Cop
+                      (Cor, [env#.c; natint_const_untagged dbg env#.const2], dbg)
+                );
+                ( Guarded
+                    { pat =
+                        Binop
+                          ( Xor,
+                            Binop (Add, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard = (fun env -> Nativeint.equal env#.const2 (-1n))
+                    }
+                => fun env ->
+                  Cop
+                    ( Csubi,
+                      [ natint_const_untagged dbg (Nativeint.lognot env#.const1);
+                        env#.c ],
+                      dbg ) );
+                ( Guarded
+                    { pat =
+                        Binop
+                          ( Xor,
+                            Binop (Sub, Const_word const1, Any c),
+                            Const_word const2 );
+                      guard = (fun env -> Nativeint.equal env#.const2 (-1n))
+                    }
+                => fun env ->
+                  Cop
+                    ( Caddi,
+                      [ env#.c;
+                        natint_const_untagged dbg (Nativeint.lognot env#.const1)
+                      ],
+                      dbg ) ) ]
           in
           match e with
           | Cop (Cxor, [x; y], _) -> (
@@ -795,7 +869,51 @@ let rec or_const e n dbg =
             if Nativeint.logand n 1n = 1n then ignore_low_bit_int e else e
           in
           (* prefer putting constants on the right *)
-          Cop (Cor, [e; natint_const_untagged dbg n], dbg)
+          let res = Cop (Cor, [e; natint_const_untagged dbg n], dbg) in
+          let open P.Default_variables in
+          P.run res
+            [ ( Guarded
+                  { pat =
+                      Binop
+                        ( Or,
+                          Binop (And, Any c, Const_word const1),
+                          Const_word const2 );
+                    guard =
+                      (fun env ->
+                        Nativeint.equal
+                          (Nativeint.logor env#.const1 env#.const2)
+                          (-1n))
+                  }
+              => fun env -> or_const env#.c env#.const2 dbg );
+              ( Guarded
+                  { pat =
+                      Binop
+                        ( Or,
+                          Binop (And, Any c, Const_word const1),
+                          Const_word const2 );
+                    guard =
+                      (fun env ->
+                        Nativeint.equal
+                          (Nativeint.logand env#.const1
+                             (Nativeint.lognot env#.const2))
+                          0n)
+                  }
+              => fun env ->
+                replace env#.c ~with_:(natint_const_untagged dbg env#.const2) );
+              ( Guarded
+                  { pat =
+                      Binop
+                        ( Or,
+                          Binop (Xor, Any c, Const_word const1),
+                          Const_word const2 );
+                    guard =
+                      (fun env ->
+                        Nativeint.equal
+                          (Nativeint.logand env#.const1
+                             (Nativeint.lognot env#.const2))
+                          0n)
+                  }
+              => fun env -> or_const env#.c env#.const2 dbg ) ]
         in
         match get_const e with
         | Some e -> natint_const_untagged dbg (Nativeint.logor e n)
@@ -845,7 +963,23 @@ let rec lsr_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_right (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | _ -> Cop (Clsr, [c1; c2], dbg)))
+          | _ ->
+            let res = Cop (Clsr, [c1; c2], dbg) in
+            let open P.Default_variables in
+            let mask env =
+              natint_const_untagged dbg
+                (Nativeint.shift_right_logical (-1n) env#.n2)
+            in
+            P.run res
+              [ ( Guarded
+                    { pat =
+                        Binop
+                          (Lsr, Binop (Lsl, Any c, Const_int n1), Const_int n2);
+                      guard =
+                        (fun env ->
+                          env#.n1 = env#.n2 && is_immediate_logical (mask env))
+                    }
+                => fun env -> Cop (Cand, [env#.c; mask env], dbg) ) ]))
       | Cop (Clsr, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
@@ -925,7 +1059,30 @@ and lsl_int c1 c2 dbg =
           | Cop (Cand, [x; ((Cconst_int _ | Cconst_natint _) as y)], _)
             when Nativeint.shift_left (const_exn y) n = 0n ->
             replace x ~with_:(Cconst_int (0, dbg))
-          | c1 -> Cop (Clsl, [c1; c2], dbg)))
+          | c1 ->
+            let res = Cop (Clsl, [c1; c2], dbg) in
+            let open P.Default_variables in
+            let mask env =
+              natint_const_untagged dbg (Nativeint.shift_left (-1n) env#.n2)
+            in
+            let clear_low_bits env = Cop (Cand, [env#.c; mask env], dbg) in
+            P.run res
+              [ Guarded
+                  { pat =
+                      Binop (Lsl, Binop (Lsr, Any c, Const_int n1), Const_int n2);
+                    guard =
+                      (fun env ->
+                        env#.n1 = env#.n2 && is_immediate_logical (mask env))
+                  }
+                => clear_low_bits;
+                Guarded
+                  { pat =
+                      Binop (Lsl, Binop (Asr, Any c, Const_int n1), Const_int n2);
+                    guard =
+                      (fun env ->
+                        env#.n1 = env#.n2 && is_immediate_logical (mask env))
+                  }
+                => clear_low_bits ]))
       | Cop (Clsl, [x; (Cconst_int (n', _) as y)], dbg'), c2
         when is_defined_shift n' ->
         (* prefer putting the constant shift on the outside to help enable
@@ -988,7 +1145,50 @@ let rec and_const e n dbg =
                 ~dbg e
             in
             (* prefer putting constants on the right *)
-            Cop (Cand, [e; natint_const_untagged dbg n], dbg)
+            let res = Cop (Cand, [e; natint_const_untagged dbg n], dbg) in
+            let open P.Default_variables in
+            P.run res
+              [ ( Guarded
+                    { pat =
+                        Binop
+                          ( And,
+                            Binop (Or, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard =
+                        (fun env ->
+                          Nativeint.equal
+                            (Nativeint.logand env#.const1 env#.const2)
+                            0n)
+                    }
+                => fun env -> and_const env#.c env#.const2 dbg );
+                ( Guarded
+                    { pat =
+                        Binop
+                          ( And,
+                            Binop (Or, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard =
+                        (fun env ->
+                          Nativeint.equal
+                            (Nativeint.logand env#.const1 env#.const2)
+                            env#.const2)
+                    }
+                => fun env ->
+                  replace env#.c ~with_:(natint_const_untagged dbg env#.const2)
+                );
+                ( Guarded
+                    { pat =
+                        Binop
+                          ( And,
+                            Binop (Xor, Any c, Const_word const1),
+                            Const_word const2 );
+                      guard =
+                        (fun env ->
+                          Nativeint.equal
+                            (Nativeint.logand env#.const1 env#.const2)
+                            0n)
+                    }
+                => fun env -> and_const env#.c env#.const2 dbg ) ]
           in
           match e with
           | Cop (Cand, [x; y], dbg) -> (
