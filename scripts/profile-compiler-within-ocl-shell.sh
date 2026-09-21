@@ -96,6 +96,10 @@ done
 echo
 formatted_allocated="$(numfmt --to-unit=Gi --round=nearest --format='%.2f GiB' "$total_allocated")"
 echo "Allocated ${formatted_allocated} total."
+awk '
+  /^[0-9]/ && $1 ~ /s$/ && $2 != "gc" {total += $1}
+  END {printf "The compiler spent %.3f seconds of CPU time.\n", total}
+' "${reports[@]}"
 
 echo
 top_n='10'
@@ -129,4 +133,4 @@ echo "Top ${top_n} source compilations by CPU time:"
 )
 
 echo
-echo 'All profiling files (e.g. `memtrace-dump` `.txt` files) can be found in `'"${output}"'`.'
+echo 'All profiling files can be found in `'"${output}"'`.'
