@@ -26,8 +26,10 @@ let xor_loads (a : int64) (b : int64) =
 xor_loads:
   movq  8(%rbx), %rbx
   movq  8(%rax), %rax
-  addq  %rbx, %rax
-  leaq  1(%rax,%rax), %rax
+  leaq  (%rax,%rbx), %rdi
+  xorq  %rbx, %rax
+  salq  $1, %rax
+  leaq  1(%rax,%rdi,2), %rax
   ret
 |}]
 
@@ -37,9 +39,10 @@ let and_loads (a : int64) (b : int64) =
 and_loads:
   movq  8(%rbx), %rbx
   movq  8(%rax), %rax
-  addq  %rax, %rbx
+  leaq  (%rax,%rbx), %rdi
+  andq  %rbx, %rax
   salq  $1, %rax
-  leaq  1(%rax,%rbx,2), %rax
+  leaq  1(%rax,%rdi,2), %rax
   ret
 |}]
 
@@ -49,9 +52,10 @@ let or_loads (a : int64) (b : int64) =
 or_loads:
   movq  8(%rbx), %rbx
   movq  8(%rax), %rax
-  addq  %rax, %rbx
+  leaq  (%rax,%rbx), %rdi
+  orq   %rbx, %rax
   salq  $1, %rax
-  leaq  1(%rax,%rbx,2), %rax
+  leaq  1(%rax,%rdi,2), %rax
   ret
 |}]
 
