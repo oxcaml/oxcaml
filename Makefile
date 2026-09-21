@@ -232,6 +232,14 @@ ocaml-compiler-libs-build: _install
 	    --build-dir="$(CURDIR)/_build/ocaml-compiler-libs" \
 	    @install
 
+.PHONY: ocaml-compiler-libs-build-boot
+ocaml-compiler-libs-build-boot:
+	mkdir -p _build
+	$(dune) build \
+	  --root=external/ocaml-compiler-libs \
+	  --build-dir="$(CURDIR)/_build/ocaml-compiler-libs-boot" \
+	  @install
+
 .PHONY: fmt
 fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh

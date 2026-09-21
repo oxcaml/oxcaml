@@ -1,7 +1,6 @@
 open StdLabels
 
-let compunit_name Cmo_format.{ cu_name; _ } =
-  Compilation_unit.name_as_string cu_name
+let compunit_name Cmo_format.{ cu_name; _ } = Compunit_name.of_cu_name cu_name
 
 let has_cmi ~dir unit_name =
   let filename = String.uncapitalize_ascii unit_name ^ ".cmi" in
