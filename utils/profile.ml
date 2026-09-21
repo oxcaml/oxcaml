@@ -43,12 +43,17 @@ module Counters = struct
 end
 
 external time_include_children: bool -> float = "caml_sys_time_include_children"
-let cpu_time () = time_include_children true
+let calls = ref 0
+let cpu_time () = incr calls; time_include_children true
 
+(*
+let () = at_exit (fun () -> Printf.eprintf "calls = %d\n%!" !calls)
+*)
 
 module Measure = struct
   type t = {
     time : float;
+    calls : int;
     allocated_words : float;
     top_heap_words : int;
     counters : Counters.t;
@@ -57,17 +62,19 @@ module Measure = struct
     let stat = Gc.quick_stat () in
     {
       time = cpu_time ();
+      calls = !calls;
       allocated_words = stat.minor_words +. stat.major_words;
       top_heap_words = stat.top_heap_words;
       counters = counters;
     }
-  let zero = { time = 0.; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
+  let zero = { time = 0.; calls = 0; allocated_words = 0.; top_heap_words = 0; counters = Counters.create () }
 end
 
 module Measure_diff = struct
   let timestamp = let r = ref (-1) in fun () -> incr r; !r
   type t = {
     timestamp : int;
+    calls : int;
     duration : float;
     allocated_words : float;
     top_heap_words_increase : int;
@@ -75,6 +82,7 @@ module Measure_diff = struct
   }
   let zero () = {
     timestamp = timestamp ();
+    calls = 0;
     duration = 0.;
     allocated_words = 0.;
     top_heap_words_increase = 0;
@@ -82,6 +90,7 @@ module Measure_diff = struct
   }
   let accumulate t (m1 : Measure.t) (m2 : Measure.t) = {
     timestamp = t.timestamp;
+    calls = t.calls + (m2.calls - m1.calls);
     duration = t.duration +. (m2.time -. m1.time);
     allocated_words =
       t.allocated_words +. (m2.allocated_words -. m1.allocated_words);
@@ -160,14 +169,14 @@ type display = {
   worth_displaying : max:float -> bool;
 }
 
-let time_display precision v : display =
+let time_display precision c v : display =
   (* Because indentation is meaningful, and because the durations are
      the first element of each row, we can't pad them with spaces. *)
   let to_string_without_unit v ~width = Printf.sprintf "%0*.*f" width precision v in
   let to_string ~max:_ ~width =
-    to_string_without_unit v ~width:(width - 1) ^ "s" in
+    to_string_without_unit v ~width:(width - 1) ^ "s" ^ " (" ^ string_of_int c ^ ")" in
   let worth_displaying ~max:_ =
-    float_of_string (to_string_without_unit v ~width:0) <> 0. in
+    float_of_string (to_string_without_unit v ~width:0) <> 0. || c > 1 in
   { to_string; worth_displaying }
 
 let memory_word_display =
@@ -239,6 +248,7 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
     let p1 = !r in
     r := {
       timestamp = p1.timestamp;
+      calls = p1.calls - p2.calls;
       duration = p1.duration -. p2.duration;
       allocated_words = p1.allocated_words -. p2.allocated_words;
       top_heap_words_increase =
@@ -299,7 +309,7 @@ let rows_of_hierarchy hierarchy measure_diff initial_measure columns timings_pre
       let make value ~f = value, f value in
       List.map (function
         | `Time ->
-          make p.duration ~f:(time_display timings_precision)
+          make p.duration ~f:(time_display timings_precision p.calls)
         | `Alloc ->
           make p.allocated_words ~f:memory_word_display
         | `Top_heap ->
