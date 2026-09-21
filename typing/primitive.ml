@@ -51,6 +51,7 @@ type mode =
   | Prim_local
   | Prim_global
   | Prim_poly
+  | Prim_really_poly
 
 type 'repr description_gen =
   { prim_name: string;         (* Name of primitive  or C function *)
@@ -342,7 +343,8 @@ let print p osig_val_decl =
   let attrs_of_mode_and_repr (m, repr) =
     (match m with
      | Prim_local | Prim_global -> []
-     | Prim_poly -> [oattr_local_opt])
+     | Prim_poly -> [oattr_local_opt]
+     | Prim_really_poly -> [])
     @
     (match repr with
      | Same_as_ocaml_repr (Base Scannable)

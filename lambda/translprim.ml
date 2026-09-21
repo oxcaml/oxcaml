@@ -191,7 +191,7 @@ let prim_sys_argv =
 let to_locality ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_really_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_locality_mode_l locality
@@ -199,6 +199,7 @@ let to_locality ~poly = function
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
   | Prim_local, _ -> modify_maybe_stack
+  | Prim_really_poly, _ -> modify_maybe_stack
   | Prim_poly, _ ->
     match poly with
     | None -> assert false
@@ -207,7 +208,7 @@ let to_modify_mode ~poly = function
 let to_return_mode ~poly = function
   | Prim_global, _ -> not_alloc_stack
   | Prim_local, _ -> maybe_alloc_stack
-  | Prim_poly, _ ->
+  | (Prim_poly | Prim_really_poly), _ ->
     match poly with
     | None -> assert false
     | Some locality -> transl_return_mode_l locality
@@ -284,22 +285,27 @@ let indexing_primitives =
           Pbigstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bigstring_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbigstring_load_32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getf32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbigstring_load_f32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_get64%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec128; checks; index_kind; mode;
               aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec128; checks; index_kind; mode;
               aligned = true; boxed } );
@@ -337,12 +343,14 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec256; checks; index_kind; mode;
               aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec256; checks; index_kind; mode;
               aligned = true; boxed } );
@@ -361,12 +369,14 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec512; checks; index_kind; mode;
               aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
+          let mode = mode () in
           Pbigstring_load_vec
             { size = Boxed_vec512; checks; index_kind; mode;
               aligned = true; boxed } );
@@ -384,6 +394,7 @@ let indexing_primitives =
               aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getmask%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbigstring_load_mask { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setmask%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
@@ -400,15 +411,19 @@ let indexing_primitives =
           Pbytes_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bytes_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_getf32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_f32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_get64%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_vec { size = Boxed_vec128; unsafe;
                             index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_set8%s%s%s",
@@ -431,6 +446,7 @@ let indexing_primitives =
           Pbytes_set_vec { size = Boxed_vec128; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_vec { size = Boxed_vec256; unsafe;
                             index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu256%s%s%s",
@@ -438,6 +454,7 @@ let indexing_primitives =
           Pbytes_set_vec { size = Boxed_vec256; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_vec { size = Boxed_vec512; unsafe;
                             index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
@@ -445,6 +462,7 @@ let indexing_primitives =
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bytes_getmask%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pbytes_load_mask { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bytes_setmask%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
@@ -461,27 +479,34 @@ let indexing_primitives =
           Pstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_string_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getf32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_f32 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_get64%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_vec { size = Boxed_vec128; unsafe;
                              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_vec { size = Boxed_vec256; unsafe;
                              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_vec { size = Boxed_vec512; unsafe;
                              index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_string_getmask%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let mode = mode () in
           Pstring_load_mask { unsafe; index_kind; mode; boxed } );
       (* We encourage respecting the immutability of [string]s and so do not add
          new [string] setters. However, we keep existing setting primitives for
@@ -531,52 +556,61 @@ let array_vec_primitives =
     [
       ("floatarray",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Pfloatarray_load_vec { size; unsafe; index_kind; mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Pfloatarray_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Punboxed_float_array_load_vec { size; unsafe; index_kind;
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_float_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_float32_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Punboxed_float32_array_load_vec { size; unsafe; index_kind;
                                            mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_float32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("int_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Pint_array_load_vec { size; unsafe; index_kind; mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Pint_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int64_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Punboxed_int64_array_load_vec { size; unsafe; index_kind;
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int64_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_int32_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Punboxed_int32_array_load_vec { size; unsafe; index_kind;
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
       ("untagged_int16_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Puntagged_int16_array_load_vec { size; unsafe; index_kind;
                                           mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed }));
       ("untagged_int8_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Puntagged_int8_array_load_vec { size; unsafe; index_kind;
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         let mode = mode () in
          Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
                                              mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
@@ -623,7 +657,7 @@ let array_vec_primitives =
    then specialize the array kind based on the context.
 *)
 let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
-  let mode = to_locality ~poly:poly_mode p.prim_native_repr_res in
+  let mode () = to_locality ~poly:poly_mode p.prim_native_repr_res in
   let arg_modes =
     List.map (to_modify_mode ~poly:poly_mode) p.prim_native_repr_args
   in
@@ -657,11 +691,11 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
   let int : _ Scalar.Integral.t = Value (Taggable Int) in
   let int8 : _ Scalar.Integral.t = Value (Taggable Int8) in
   let int16 : _ Scalar.Integral.t = Value (Taggable Int16) in
-  let int32 : _ Scalar.Integral.t = Value (Boxable (Int32 mode)) in
-  let int64 : _ Scalar.Integral.t = Value (Boxable (Int64 mode)) in
-  let nativeint : _ Scalar.Integral.t = Value (Boxable (Nativeint mode)) in
-  let float : _ Scalar.Floating.t = Value (Float64 mode) in
-  let float32 : _ Scalar.Floating.t = Value (Float32 mode) in
+  let int32 () : _ Scalar.Integral.t = Value (Boxable (Int32 (mode ()))) in
+  let int64 () : _ Scalar.Integral.t = Value (Boxable (Int64 (mode ()))) in
+  let nativeint () : _ Scalar.Integral.t = Value (Boxable (Nativeint (mode ()))) in
+  let float () : _ Scalar.Floating.t = Value (Float64 (mode ())) in
+  let float32 () : _ Scalar.Floating.t = Value (Float32 (mode ())) in
   let unary op : prim = Primitive (Pscalar (Unary op), 1) in
   let binary op : prim = Primitive (Pscalar (Binary op), 2) in
   let icmp size cmp =
@@ -707,9 +741,9 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
     | "%makeblock" ->
-       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode ())), 1)
     | "%makemutable" ->
-       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode ())), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -750,36 +784,36 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%geint" -> icmp int Cge
     | "%incr" -> Primitive ((Poffsetref(1)), 1)
     | "%decr" -> Primitive ((Poffsetref(-1)), 1)
-    | "%floatoffloat32" -> static_cast ~dst:(f float) ~src:(f float32)
-    | "%float32offloat" -> static_cast ~dst:(f float32) ~src:(f float)
-    | "%intoffloat32" -> static_cast ~dst:(i int) ~src:(f float32)
-    | "%float32ofint" -> static_cast ~dst:(f float32) ~src:(i int)
-    | "%negfloat32" -> unary (Floating (float32, Neg))
-    | "%absfloat32" -> unary (Floating (float32, Abs))
-    | "%addfloat32" -> binary (Floating (float32, Add))
-    | "%subfloat32" -> binary (Floating (float32, Sub))
-    | "%mulfloat32" -> binary (Floating (float32, Mul))
-    | "%divfloat32" -> binary (Floating (float32, Div))
-    | "%eqfloat32" -> fcmp float32 CFeq
-    | "%noteqfloat32" -> fcmp float32 CFneq
-    | "%ltfloat32" -> fcmp float32 CFlt
-    | "%lefloat32" -> fcmp float32 CFle
-    | "%gtfloat32" -> fcmp float32 CFgt
-    | "%gefloat32" -> fcmp float32 CFge
-    | "%intoffloat" -> static_cast ~dst:(i int) ~src:(f float)
-    | "%floatofint" -> static_cast ~dst:(f float) ~src:(i int)
-    | "%negfloat" -> unary (Floating (float, Neg))
-    | "%absfloat" -> unary (Floating (float, Abs))
-    | "%addfloat" -> binary (Floating (float, Add))
-    | "%subfloat" -> binary (Floating (float, Sub))
-    | "%mulfloat" -> binary (Floating (float, Mul))
-    | "%divfloat" -> binary (Floating (float, Div))
-    | "%eqfloat" -> fcmp float CFeq
-    | "%noteqfloat" -> fcmp float CFneq
-    | "%ltfloat" -> fcmp float CFlt
-    | "%lefloat" -> fcmp float CFle
-    | "%gtfloat" -> fcmp float CFgt
-    | "%gefloat" -> fcmp float CFge
+    | "%floatoffloat32" -> static_cast ~dst:(f (float ())) ~src:(f (float32 ()))
+    | "%float32offloat" -> static_cast ~dst:(f (float32 ())) ~src:(f (float ()))
+    | "%intoffloat32" -> static_cast ~dst:(i int) ~src:(f (float32 ()))
+    | "%float32ofint" -> static_cast ~dst:(f (float32 ())) ~src:(i int)
+    | "%negfloat32" -> unary (Floating ((float32 ()), Neg))
+    | "%absfloat32" -> unary (Floating ((float32 ()), Abs))
+    | "%addfloat32" -> binary (Floating ((float32 ()), Add))
+    | "%subfloat32" -> binary (Floating ((float32 ()), Sub))
+    | "%mulfloat32" -> binary (Floating ((float32 ()), Mul))
+    | "%divfloat32" -> binary (Floating ((float32 ()), Div))
+    | "%eqfloat32" -> fcmp (float32 ()) CFeq
+    | "%noteqfloat32" -> fcmp (float32 ()) CFneq
+    | "%ltfloat32" -> fcmp (float32 ()) CFlt
+    | "%lefloat32" -> fcmp (float32 ()) CFle
+    | "%gtfloat32" -> fcmp (float32 ()) CFgt
+    | "%gefloat32" -> fcmp (float32 ()) CFge
+    | "%intoffloat" -> static_cast ~dst:(i int) ~src:(f (float ()))
+    | "%floatofint" -> static_cast ~dst:(f (float ())) ~src:(i int)
+    | "%negfloat" -> unary (Floating ((float ()), Neg))
+    | "%absfloat" -> unary (Floating ((float ()), Abs))
+    | "%addfloat" -> binary (Floating ((float ()), Add))
+    | "%subfloat" -> binary (Floating ((float ()), Sub))
+    | "%mulfloat" -> binary (Floating ((float ()), Mul))
+    | "%divfloat" -> binary (Floating ((float ()), Div))
+    | "%eqfloat" -> fcmp (float ()) CFeq
+    | "%noteqfloat" -> fcmp (float ()) CFneq
+    | "%ltfloat" -> fcmp (float ()) CFlt
+    | "%lefloat" -> fcmp (float ()) CFle
+    | "%gtfloat" -> fcmp (float ()) CFgt
+    | "%gefloat" -> fcmp (float ()) CFge
     | "%string_length" -> Primitive (Pstringlength, 1)
     | "%string_safe_get" -> Primitive (Pstringrefs, 2)
     | "%string_safe_set" -> Primitive (Pbytessets, 3)
@@ -793,7 +827,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%array_length" -> Primitive ((Parraylength Punspecializedarray), 1)
     | "%array_safe_get" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Ptagged_int_index, Mutable)), 2)
     | "%array_safe_set" ->
       Primitive
@@ -802,7 +836,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Ptagged_int_index, Mutable), 2)
     | "%array_unsafe_set" ->
       Primitive
@@ -811,7 +845,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_int64#" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Punboxed_or_untagged_integer_index Unboxed_int64,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int64#" ->
@@ -822,7 +856,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get_indexed_by_int64#" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Punboxed_or_untagged_integer_index Unboxed_int64,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int64#" ->
@@ -833,7 +867,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_int32#" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Punboxed_or_untagged_integer_index Unboxed_int32,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int32#" ->
@@ -844,7 +878,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get_indexed_by_int32#" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Punboxed_or_untagged_integer_index Unboxed_int32,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int32#" ->
@@ -855,7 +889,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_int16#" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Punboxed_or_untagged_integer_index Untagged_int16,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int16#" ->
@@ -866,7 +900,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get_indexed_by_int16#" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Punboxed_or_untagged_integer_index Untagged_int16,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int16#" ->
@@ -877,7 +911,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_int8#" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Punboxed_or_untagged_integer_index Untagged_int8,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_int8#" ->
@@ -888,7 +922,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get_indexed_by_int8#" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Punboxed_or_untagged_integer_index Untagged_int8,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_int8#" ->
@@ -899,7 +933,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%array_safe_get_indexed_by_nativeint#" ->
       Primitive
-        ((Parrayrefs (Punspecializedarray_ref mode,
+        ((Parrayrefs (Punspecializedarray_ref (mode ()),
                       Punboxed_or_untagged_integer_index Unboxed_nativeint,
                       Mutable)), 2)
     | "%array_safe_set_indexed_by_nativeint#" ->
@@ -910,7 +944,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
          3)
     | "%array_unsafe_get_indexed_by_nativeint#" ->
       Primitive
-        (Parrayrefu (Punspecializedarray_ref mode,
+        (Parrayrefu (Punspecializedarray_ref (mode ()),
                      Punboxed_or_untagged_integer_index Unboxed_nativeint,
                      Mutable), 2)
     | "%array_unsafe_set_indexed_by_nativeint#" ->
@@ -921,10 +955,10 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
         3)
     | "%makearray_dynamic" ->
       Primitive
-        (Pmakearray_dynamic (Punspecializedarray, mode, With_initializer), 2)
+        (Pmakearray_dynamic (Punspecializedarray, (mode ()), With_initializer), 2)
     | "%makearray_dynamic_uninit" ->
       Primitive
-        (Pmakearray_dynamic (Punspecializedarray, mode, Uninitialized), 1)
+        (Pmakearray_dynamic (Punspecializedarray, (mode ()), Uninitialized), 1)
     | "%arrayblit" ->
       Primitive (Parrayblit {
         src_mutability = Mutable;
@@ -941,71 +975,71 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%obj_size" -> Primitive ((Parraylength gen_array_kind), 1)
     | "%obj_field" ->
       Primitive
-        ((Parrayrefu (gen_array_ref_kind mode, Ptagged_int_index, Mutable)), 2)
+        ((Parrayrefu (gen_array_ref_kind (mode ()), Ptagged_int_index, Mutable)), 2)
     | "%obj_set_field" ->
       Primitive
         ((Parraysetu
             (gen_array_set_kind (get_first_arg_mode ()),Ptagged_int_index)), 3)
     | "%floatarray_length" -> Primitive ((Parraylength Pfloatarray), 1)
     | "%floatarray_safe_get" ->
-      Primitive ((Parrayrefs (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
+      Primitive ((Parrayrefs (Pfloatarray_ref (mode ()), Ptagged_int_index, Mutable)), 2)
     | "%floatarray_safe_set" ->
       Primitive (Parraysets (Pfloatarray_set, Ptagged_int_index), 3)
     | "%floatarray_unsafe_get" ->
-      Primitive ((Parrayrefu (Pfloatarray_ref mode, Ptagged_int_index, Mutable)), 2)
+      Primitive ((Parrayrefu (Pfloatarray_ref (mode ()), Ptagged_int_index, Mutable)), 2)
     | "%floatarray_unsafe_set" ->
       Primitive ((Parraysetu (Pfloatarray_set, Ptagged_int_index)), 3)
     | "%obj_is_int" -> Primitive (Pisint { variant_only = false }, 1)
     | "%is_null" -> Primitive (Pisnull, 1)
     | "%lazy_force" -> Lazy_force pos
-    | "%nativeint_of_int" -> static_cast ~dst:(i nativeint) ~src:(i int)
-    | "%nativeint_to_int" -> static_cast ~src:(i nativeint) ~dst:(i int)
-    | "%nativeint_neg" -> unary (Integral (nativeint, Neg))
-    | "%nativeint_add" -> binary (Integral (nativeint, Add))
-    | "%nativeint_sub" -> binary (Integral (nativeint, Sub))
-    | "%nativeint_mul" -> binary (Integral (nativeint, Mul))
-    | "%nativeint_div" -> binary (Integral (nativeint, Div (Safe, Signed)))
-    | "%nativeint_mod" -> binary (Integral (nativeint, Mod (Safe, Signed)))
-    | "%nativeint_and" -> binary (Integral (nativeint, And))
-    | "%nativeint_or" -> binary (Integral (nativeint, Or))
-    | "%nativeint_xor" -> binary (Integral (nativeint, Xor))
-    | "%nativeint_lsl" -> binary (Shift (nativeint, Lsl, Int))
-    | "%nativeint_lsr" -> binary (Shift (nativeint, Lsr, Int))
-    | "%nativeint_asr" -> binary (Shift (nativeint, Asr, Int))
-    | "%int32_of_int" -> static_cast ~dst:(i int32) ~src:(i int)
-    | "%int32_to_int" -> static_cast ~src:(i int32) ~dst:(i int)
-    | "%int32_neg" -> unary (Integral (int32, Neg))
-    | "%int32_add" -> binary (Integral (int32, Add))
-    | "%int32_sub" -> binary (Integral (int32, Sub))
-    | "%int32_mul" -> binary (Integral (int32, Mul))
-    | "%int32_div" -> binary (Integral (int32, Div (Safe, Signed)))
-    | "%int32_mod" -> binary (Integral (int32, Mod (Safe, Signed)))
-    | "%int32_and" -> binary (Integral (int32, And))
-    | "%int32_or" -> binary (Integral (int32, Or))
-    | "%int32_xor" -> binary (Integral (int32, Xor))
-    | "%int32_lsl" -> binary (Shift (int32, Lsl, Int))
-    | "%int32_lsr" -> binary (Shift (int32, Lsr, Int))
-    | "%int32_asr" -> binary (Shift (int32, Asr, Int))
-    | "%int64_of_int" -> static_cast ~dst:(i int64) ~src:(i int)
-    | "%int64_to_int" -> static_cast ~src:(i int64) ~dst:(i int)
-    | "%int64_neg" -> unary (Integral (int64, Neg))
-    | "%int64_add" -> binary (Integral (int64, Add))
-    | "%int64_sub" -> binary (Integral (int64, Sub))
-    | "%int64_mul" -> binary (Integral (int64, Mul))
-    | "%int64_div" -> binary (Integral (int64, Div (Safe, Signed)))
-    | "%int64_mod" -> binary (Integral (int64, Mod (Safe, Signed)))
-    | "%int64_and" -> binary (Integral (int64, And))
-    | "%int64_or" -> binary (Integral (int64, Or))
-    | "%int64_xor" -> binary (Integral (int64, Xor))
-    | "%int64_lsl" -> binary (Shift (int64, Lsl, Int))
-    | "%int64_lsr" -> binary (Shift (int64, Lsr, Int))
-    | "%int64_asr" -> binary (Shift (int64, Asr, Int))
-    | "%nativeint_of_int32" -> static_cast ~dst:(i nativeint) ~src:(i int32)
-    | "%nativeint_to_int32" -> static_cast ~src:(i nativeint) ~dst:(i int32)
-    | "%int64_of_int32" -> static_cast ~dst:(i int64) ~src:(i int32)
-    | "%int64_to_int32" -> static_cast ~src:(i int64) ~dst:(i int32)
-    | "%int64_of_nativeint" -> static_cast ~dst:(i int64) ~src:(i nativeint)
-    | "%int64_to_nativeint" -> static_cast ~src:(i int64) ~dst:(i nativeint)
+    | "%nativeint_of_int" -> static_cast ~dst:(i (nativeint ())) ~src:(i int)
+    | "%nativeint_to_int" -> static_cast ~src:(i (nativeint ())) ~dst:(i int)
+    | "%nativeint_neg" -> unary (Integral ((nativeint ()), Neg))
+    | "%nativeint_add" -> binary (Integral ((nativeint ()), Add))
+    | "%nativeint_sub" -> binary (Integral ((nativeint ()), Sub))
+    | "%nativeint_mul" -> binary (Integral ((nativeint ()), Mul))
+    | "%nativeint_div" -> binary (Integral ((nativeint ()), Div (Safe, Signed)))
+    | "%nativeint_mod" -> binary (Integral ((nativeint ()), Mod (Safe, Signed)))
+    | "%nativeint_and" -> binary (Integral ((nativeint ()), And))
+    | "%nativeint_or" -> binary (Integral ((nativeint ()), Or))
+    | "%nativeint_xor" -> binary (Integral ((nativeint ()), Xor))
+    | "%nativeint_lsl" -> binary (Shift ((nativeint ()), Lsl, Int))
+    | "%nativeint_lsr" -> binary (Shift ((nativeint ()), Lsr, Int))
+    | "%nativeint_asr" -> binary (Shift ((nativeint ()), Asr, Int))
+    | "%int32_of_int" -> static_cast ~dst:(i (int32 ())) ~src:(i int)
+    | "%int32_to_int" -> static_cast ~src:(i (int32 ())) ~dst:(i int)
+    | "%int32_neg" -> unary (Integral ((int32 ()), Neg))
+    | "%int32_add" -> binary (Integral ((int32 ()), Add))
+    | "%int32_sub" -> binary (Integral ((int32 ()), Sub))
+    | "%int32_mul" -> binary (Integral ((int32 ()), Mul))
+    | "%int32_div" -> binary (Integral ((int32 ()), Div (Safe, Signed)))
+    | "%int32_mod" -> binary (Integral ((int32 ()), Mod (Safe, Signed)))
+    | "%int32_and" -> binary (Integral ((int32 ()), And))
+    | "%int32_or" -> binary (Integral ((int32 ()), Or))
+    | "%int32_xor" -> binary (Integral ((int32 ()), Xor))
+    | "%int32_lsl" -> binary (Shift ((int32 ()), Lsl, Int))
+    | "%int32_lsr" -> binary (Shift ((int32 ()), Lsr, Int))
+    | "%int32_asr" -> binary (Shift ((int32 ()), Asr, Int))
+    | "%int64_of_int" -> static_cast ~dst:(i (int64 ())) ~src:(i int)
+    | "%int64_to_int" -> static_cast ~src:(i (int64 ())) ~dst:(i int)
+    | "%int64_neg" -> unary (Integral ((int64 ()), Neg))
+    | "%int64_add" -> binary (Integral ((int64 ()), Add))
+    | "%int64_sub" -> binary (Integral ((int64 ()), Sub))
+    | "%int64_mul" -> binary (Integral ((int64 ()), Mul))
+    | "%int64_div" -> binary (Integral ((int64 ()), Div (Safe, Signed)))
+    | "%int64_mod" -> binary (Integral ((int64 ()), Mod (Safe, Signed)))
+    | "%int64_and" -> binary (Integral ((int64 ()), And))
+    | "%int64_or" -> binary (Integral ((int64 ()), Or))
+    | "%int64_xor" -> binary (Integral ((int64 ()), Xor))
+    | "%int64_lsl" -> binary (Shift ((int64 ()), Lsl, Int))
+    | "%int64_lsr" -> binary (Shift ((int64 ()), Lsr, Int))
+    | "%int64_asr" -> binary (Shift ((int64 ()), Asr, Int))
+    | "%nativeint_of_int32" -> static_cast ~dst:(i (nativeint ())) ~src:(i (int32 ()))
+    | "%nativeint_to_int32" -> static_cast ~src:(i (nativeint ())) ~dst:(i (int32 ()))
+    | "%int64_of_int32" -> static_cast ~dst:(i (int64 ())) ~src:(i (int32 ()))
+    | "%int64_to_int32" -> static_cast ~src:(i (int64 ())) ~dst:(i (int32 ()))
+    | "%int64_of_nativeint" -> static_cast ~dst:(i (int64 ())) ~src:(i (nativeint ()))
+    | "%int64_to_nativeint" -> static_cast ~src:(i (int64 ())) ~dst:(i (nativeint ()))
     | "%caml_ba_ref_1" ->
       Primitive
         ((Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout)),
@@ -1106,10 +1140,10 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%caml_ba_dim_2" -> Primitive ((Pbigarraydim(2)), 1)
     | "%caml_ba_dim_3" -> Primitive ((Pbigarraydim(3)), 1)
     | "%bswap16" -> unary (Integral (int, Bswap))
-    | "%bswap_int32" -> unary (Integral (int32, Bswap))
-    | "%bswap_int64" -> unary (Integral (int64, Bswap))
-    | "%bswap_native" -> unary (Integral (nativeint, Bswap))
-    | "%int_as_pointer" -> Primitive (Pint_as_pointer mode, 1)
+    | "%bswap_int32" -> unary (Integral ((int32 ()), Bswap))
+    | "%bswap_int64" -> unary (Integral ((int64 ()), Bswap))
+    | "%bswap_native" -> unary (Integral ((nativeint ()), Bswap))
+    | "%int_as_pointer" -> Primitive (Pint_as_pointer (mode ()), 1)
     | "%opaque" -> Primitive (Popaque layout, 1)
     | "%sys_argv" -> Sys_argv
     | "%send" -> Send (pos, layout)
@@ -1126,21 +1160,21 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%obj_magic" -> Primitive(Pobj_magic layout, 1)
     | "%array_to_iarray" -> Primitive (Parray_to_iarray, 1)
     | "%array_of_iarray" -> Primitive (Parray_of_iarray, 1)
-    | "%unbox_float" -> static_cast ~src:(f float) ~dst:(naked (f float))
-    | "%box_float" -> static_cast ~src:(naked (f float)) ~dst:(f float)
-    | "%unbox_float32" -> static_cast ~src:(f float32) ~dst:(naked (f float32))
-    | "%box_float32" -> static_cast ~src:(naked (f float32)) ~dst:(f float32)
+    | "%unbox_float" -> static_cast ~src:(f (float ())) ~dst:(naked (f (float ())))
+    | "%box_float" -> static_cast ~src:(naked (f (float ()))) ~dst:(f (float ()))
+    | "%unbox_float32" -> static_cast ~src:(f (float32 ())) ~dst:(naked (f (float32 ())))
+    | "%box_float32" -> static_cast ~src:(naked (f (float32 ()))) ~dst:(f (float32 ()))
     | "%unbox_vec128" -> Primitive(Punbox_vector Boxed_vec128, 1)
-    | "%box_vec128" -> Primitive(Pbox_vector (Boxed_vec128, mode), 1)
+    | "%box_vec128" -> Primitive(Pbox_vector (Boxed_vec128, (mode ())), 1)
     | "%unbox_vec256" -> Primitive(Punbox_vector Boxed_vec256, 1)
-    | "%box_vec256" -> Primitive(Pbox_vector (Boxed_vec256, mode), 1)
+    | "%box_vec256" -> Primitive(Pbox_vector (Boxed_vec256, (mode ())), 1)
     | "%join_vec256" -> Primitive(Pjoin_vec256, 2)
     | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
-    | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
+    | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, (mode ())), 1)
     | "%unbox_mask" -> Primitive(Punbox_mask, 1)
-    | "%box_mask" -> Primitive(Pbox_mask mode, 1)
-    | "%get_header" -> Primitive (Pget_header mode, 1)
+    | "%box_mask" -> Primitive(Pbox_mask (mode ()), 1)
+    | "%get_header" -> Primitive (Pget_header (mode ()), 1)
     | "%atomic_load" -> Atomic(Load, Field_like (Ref, Pointer))
     | "%atomic_load_field" -> Atomic(Load, Field_like (Field, Pointer))
     | "%atomic_load_loc" -> Atomic(Load, Field_like (Loc, Pointer))
@@ -1255,19 +1289,19 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%domain_index" -> Primitive (Pdomain_index, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
-      static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
+      static_cast ~src:(i (nativeint ())) ~dst:(naked (i (nativeint ())))
     | "%box_nativeint" ->
-      static_cast ~src:(naked (i nativeint)) ~dst:(i nativeint)
+      static_cast ~src:(naked (i (nativeint ()))) ~dst:(i (nativeint ()))
     | "%untag_int" -> static_cast ~src:(i int) ~dst:(naked (i int))
     | "%tag_int" -> static_cast ~src:(naked (i int)) ~dst:(i int)
     | "%untag_int8" -> static_cast ~src:(i int8) ~dst:(naked (i int8))
     | "%tag_int8" -> static_cast ~src:(naked (i int8)) ~dst:(i int8)
     | "%untag_int16" -> static_cast ~src:(i int16) ~dst:(naked (i int16))
     | "%tag_int16" -> static_cast ~src:(naked (i int16)) ~dst:(i int16)
-    | "%unbox_int32" -> static_cast ~src:(i int32) ~dst:(naked (i int32))
-    | "%box_int32" -> static_cast ~src:(naked (i int32)) ~dst:(i int32)
-    | "%unbox_int64" -> static_cast ~src:(i int64) ~dst:(naked (i int64))
-    | "%box_int64" -> static_cast ~src:(naked (i int64)) ~dst:(i int64)
+    | "%unbox_int32" -> static_cast ~src:(i (int32 ())) ~dst:(naked (i (int32 ())))
+    | "%box_int32" -> static_cast ~src:(naked (i (int32 ()))) ~dst:(i (int32 ()))
+    | "%unbox_int64" -> static_cast ~src:(i (int64 ())) ~dst:(naked (i (int64 ())))
+    | "%box_int64" -> static_cast ~src:(naked (i (int64 ()))) ~dst:(i (int64 ()))
     | "%unbox_unit" -> Primitive(Punbox_unit, 1)
     | "%reinterpret_tagged_int63_as_unboxed_int64" ->
       Primitive(Preinterpret_tagged_int63_as_unboxed_int64, 1)
@@ -1349,7 +1383,7 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
              let arity = Scalar.Operation.arity intrinsic in
              let intrinsic =
                Scalar.Operation.map intrinsic
-                 ~f:(fun Any_locality_mode -> mode)
+                 ~f:(fun Any_locality_mode -> mode ())
              in
              (Primitive (Pscalar intrinsic, arity)))
     | _ -> External lambda_prim
@@ -2495,7 +2529,7 @@ let lambda_of_prim prim_name prim ~yielding loc args arg_exps =
 let check_primitive_arity loc p =
   let mode =
     match p.prim_native_repr_res with
-    | Prim_global, _ | Prim_poly, _ ->
+    | Prim_global, _ | Prim_poly, _ | Prim_really_poly, _ ->
       (* We assume all primitives are compiled to have the same arity for
          different modes and types, so just pick one of the modes in the
          [Prim_poly] case. *)

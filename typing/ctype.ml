@@ -2049,7 +2049,7 @@ let prim_mode' mvars = function
     Locality.allow_right Locality.global, None
   | Primitive.Prim_local, _ ->
     Locality.allow_right Locality.local, None
-  | Primitive.Prim_poly, _ ->
+  | Primitive.(Prim_poly | Prim_really_poly), _ ->
     match mvars with
     | Some (mvar_l, (mvar_f, mvar_y)) -> mvar_l, Some (mvar_f, mvar_y)
     | None -> assert false
@@ -2191,7 +2191,7 @@ let rec instance_prim_locals locals mvar_l mvar_y macc (loc, yld) ty =
    relaying this assumption. *)
 let instance_prim_layout env (desc : Primitive.description) ty =
   if not desc.prim_is_layout_poly
-  then ty, None
+  then generic_instance ty, None
   else
   let new_sort = ref None in
   let get_sort () =
@@ -2248,17 +2248,16 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       end
     in
     with_type_mark (fun mark -> inner mark ty);
-    match !new_sort with
-    | Some sort ->
-      (* We don't want to lower the type vars from generic_level due to usages
-         in [includecore.ml]. This means an extra [instance] call is needed in
-         [type_ident], but we only hit it if it's layout polymorphic. *)
-      generic_instance ty, Some sort
-    | None -> ty, None)
+    generic_instance ty, !new_sort)
 
 
 let instance_prim_mode (desc : Primitive.description) ty =
-  let is_poly = function Primitive.Prim_poly, _ -> true | _ -> false in
+  let is_poly : Primitive.mode * _ -> bool = function
+    | Prim_poly, _ -> true
+    | Prim_really_poly, _ -> true
+    | Prim_global, _ -> false
+    | Prim_local, _ -> false
+  in
   if is_poly desc.prim_native_repr_res ||
        List.exists is_poly desc.prim_native_repr_args then
     let mode_l = Locality.newvar 0 in

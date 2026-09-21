@@ -2809,7 +2809,7 @@ let alloc_mode_of_primitive_description (p : external_call_description) =
          about local allocation.  (However if [p.prim_alloc = false] we
          do actually know that the primitive does not allocate on the heap.) *)
       Some Stack
-    | (Prim_global | Prim_poly), _ ->
+    | (Prim_global | Prim_poly | Prim_really_poly), _ ->
       (* For primitives that definitely do not allocate locally,
          [p.prim_alloc = false] actually tells us that the primitive does
          not allocate at all.

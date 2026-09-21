@@ -9482,7 +9482,7 @@ and type_ident env ?(recarg=Rejected) lid =
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
           we then register allocation for further optimization *)
-       | (Prim_poly, _), Some mode ->
+       | ((Prim_poly | Prim_really_poly), _), Some mode ->
            let mode = Locality.disallow_left mode in
            register_allocation_mode mode
        | _ -> ()
