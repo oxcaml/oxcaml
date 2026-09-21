@@ -6538,7 +6538,7 @@ let path_same_normalized env p1 p2 =
 exception Complicated_moregen
 
 let moregeneral_fast env patt subst subj =
-  For_copy.with_scope (fun scope ->
+  For_copy.with_scope (fun _scope ->
     let snap = snapshot () in
     (* Fixed upper limit of the number of nodes,
        so that we don't diverge on equirecursive types *)
@@ -6549,19 +6549,43 @@ let moregeneral_fast env patt subst subj =
       if eq_type t1 t2 then () else
       match get_desc t1, get_desc t2 with
       | Tsubst (ty, _), _ when eq_type ty t2 -> ()
-      (* CR zeisbach: this is probably unfortunately slow and should be
-         changed. but for now, trying it out... *)
-      | Tvar { jkind }, _ when get_level t1 = generic_level ->
-         (* As in [moregen], the subject must fit the variable's jkind. A
-            failure raises [Moregen_trace] and sends us to the slow path.
-            [t2] is not substituted, so unknown paths estimate to [any] and
-            can only make this check fail, never wrongly succeed.
-            CR zeisbach: [check_type_jkind] may instantiate sort variables in
-            [t2], which here is the original scheme rather than an instance.
-            Confirm that generalised, non-layout-polymorphic schemes cannot
-            contain sort variables, or skip the fast path when they do. *)
-         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
-         For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+      (* CR zeisbach: obviously fix this... *)
+      (*= | Tvar { jkind }, _ when get_level t1 = generic_level ->
+         (* As in [moregen], the subject must fit the variable's jkind. We
+            avoid [check_type_jkind] here: it may normalise with-bounds, which
+            looks up paths that are unsubstituted in [t2], and it may set sort
+            variables in the original schemes (the slow path only ever checks
+            instances). Instead we accept only a cheap, pure sufficient
+            condition: the variable's mod-bounds are maximal, so only the
+            layout matters, and the subject's constant layout is identical.
+            Anything else goes to the slow path. *)
+         if not (Jkind.mod_bounds_are_obviously_max jkind) then
+           raise_notrace Complicated_moregen;
+         let layout1 = Jkind.get_layout env jkind in
+         let layout2 =
+           match get_desc t2 with
+           | Tvar { jkind = jkind2 } -> begin
+               (* Do not let [get_layout] expand an abstract kind through
+                  [env]: its path is unsubstituted. *)
+               match jkind2.jkind.base with
+               | Kconstr _ -> None
+               | Layout _ -> Jkind.get_layout env jkind2
+             end
+           | Tconstr (p, _, _) -> begin
+               (* A constructor's layout is fixed by its declaration. Look it
+                  up through [subst], as the [Tconstr] case below does. *)
+               match Env.find_type (Subst.type_path subst p) env with
+               | decl -> Jkind.get_layout env decl.type_jkind
+               | exception (Not_found | Subst.Not_path) -> None
+             end
+           | Tarrow _ -> Jkind.get_layout env Jkind.for_arrow
+           | _ -> None
+         in
+         begin match layout1, layout2 with
+         | Some l1, Some l2 when Jkind.Layout.Const.equal l1 l2 -> ()
+         | _ -> raise_notrace Complicated_moregen
+         end;
+         For_copy.redirect_desc scope t1 (Tsubst (t2, None)) *)
       | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
            when l1 = l2 ->
          begin match variance with
