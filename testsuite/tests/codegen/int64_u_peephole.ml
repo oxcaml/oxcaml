@@ -16,6 +16,57 @@ open Intrinsics
 (* Codegen tests for the Cmm peephole rules of Cmm_peephole_rules, on
    untagged integers so that [lognot] is [xor -1] and [neg] is [0 - x]. *)
 
+(* Boxed arguments used more than once are unboxed into let-bound temporaries
+   that are all named [prim] in Cmm; a rule must not mistake them for the same
+   variable. *)
+
+let xor_loads (a : int64) (b : int64) =
+  Int64.to_int (Int64.logxor a b) + Int64.to_int (Int64.add a b)
+[%%expect_asm X86_64{|
+xor_loads:
+  movq  8(%rbx), %rbx
+  movq  8(%rax), %rax
+  addq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let and_loads (a : int64) (b : int64) =
+  Int64.to_int (Int64.logand a b) + Int64.to_int (Int64.add a b)
+[%%expect_asm X86_64{|
+and_loads:
+  movq  8(%rbx), %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  salq  $1, %rax
+  leaq  1(%rax,%rbx,2), %rax
+  ret
+|}]
+
+let or_loads (a : int64) (b : int64) =
+  Int64.to_int (Int64.logor a b) + Int64.to_int (Int64.add a b)
+[%%expect_asm X86_64{|
+or_loads:
+  movq  8(%rbx), %rbx
+  movq  8(%rax), %rax
+  addq  %rax, %rbx
+  salq  $1, %rax
+  leaq  1(%rax,%rbx,2), %rax
+  ret
+|}]
+
+let sub_loads (a : int64) (b : int64) =
+  Int64.to_int (Int64.sub (Int64.add a b) a) + Int64.to_int (Int64.mul a b)
+[%%expect_asm X86_64{|
+sub_loads:
+  movq  8(%rbx), %rbx
+  movq  8(%rax), %rax
+  imulq %rbx, %rax
+  salq  $1, %rbx
+  leaq  1(%rbx,%rax,2), %rax
+  ret
+|}]
+
 (* and *)
 
 let and_self x = Int64_u.logand x x
