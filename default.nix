@@ -81,7 +81,12 @@ let
       doCheck = false;
     };
 
-  ocaml_5_4_0 = mkBootOcaml_5_4_0 stdenv;
+  bootstrapCompiler = import (pkgs.fetchFromGitHub {
+    owner = "oxcaml";
+    repo = "oxcaml";
+    rev = "1c543884d56ec67ff52092942c66bf08610254c6";
+    hash = "sha256-hcj3uf5m8Dflmj7sPaB6z1jaq3BW1Y+iqX+HmGYR8HE=";
+  }) { inherit pkgs; };
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
   # Over time, we should probably define something like a "boot environment" and build
@@ -263,7 +268,7 @@ let
 
   # Only the passthru dev-input lists are used here, which don't depend on the
   # testOcaml argument (it only feeds the merlin package's check phase).
-  merlinDev = (mkMerlinPackages ocaml_5_4_0).merlin;
+  merlinDev = (mkMerlinPackages bootstrapCompiler).merlin;
 
   gfortran =
     # we require fortran for some bigarray tests, but adding `pkgs.gfortran`
@@ -371,7 +376,7 @@ stdenv.mkDerivation {
   nativeBuildInputs = [
     pkgs.autoconf
     menhir
-    ocaml_5_4_0
+    bootstrapCompiler
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
@@ -470,7 +475,7 @@ stdenv.mkDerivation {
   passthru = {
     inherit
       ocaml_4_14_2
-      ocaml_5_4_0
+      bootstrapCompiler
       ocamlformat
       lldb
       mkMerlinPackages
