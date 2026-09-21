@@ -381,6 +381,11 @@ stdenv.mkDerivation {
     dune
     pkgs.pkg-config
     pkgs.rsync
+    pkgs.ripgrep
+    pkgs.ocamlPackages.memtrace
+    (pkgs.linkFarm "memtrace-dump" {
+      "bin/memtrace-dump" = "${pkgs.ocamlPackages.memtrace}/bin/memtrace_dump_trace";
+    })
     pkgs.which
     pkgs.parallel
     gfortran # Required for Bigarray Fortran tests
