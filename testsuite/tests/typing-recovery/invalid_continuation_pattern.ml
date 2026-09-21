@@ -1,5 +1,5 @@
 (* TEST
-   flags = " -typing-recovery";
+   flags = " -typing-recovery -keywords 5.3";
    ocamlc_byte_exit_status = "2";
    setup-ocamlc.byte-build-env;
    compile_only = "true";
