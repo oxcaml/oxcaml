@@ -131,10 +131,7 @@ let one_arg name args =
    [effects_of], below. *)
 let inline_ops = ["sqrt"]
 
-(* While -0x8000_0000 is representable as a signed 32bit immediate, we make it
-   symmetric here so that we can negate the immediate when necessary, which is
-   needed to turn subtraction into lea. *)
-let int_is_immediate n = n <= 0x7FFF_FFFF && n >= -0x7FFF_FFFF
+let int_is_immediate = Arch.is_immediate_logical
 
 let is_immediate_natint n =
   Nativeint.compare n 0x7FFF_FFFFn <= 0

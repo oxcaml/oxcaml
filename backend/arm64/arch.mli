@@ -105,6 +105,8 @@ val size_vec256 : int
 
 val size_vec512 : int
 
+val is_immediate_logical : int -> bool
+
 val allow_unaligned_access : bool
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
