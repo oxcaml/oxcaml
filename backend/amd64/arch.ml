@@ -341,6 +341,11 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
+(* While -0x8000_0000 is representable as a signed 32bit immediate, we make it
+   symmetric here so that we can negate the immediate when necessary, which is
+   needed to turn subtraction into lea. *)
+let is_immediate_logical n = n <= 0x7FFF_FFFF && n >= -0x7FFF_FFFF
+
 (* The eight registers that the short frame-descriptor format can record in
    its hot-register bitmap, numbered as in [compute_live_offset] (see
    [Emitaux.emit_frames]). Chosen by measuring which registers are most often

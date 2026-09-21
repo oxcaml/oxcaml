@@ -105,6 +105,9 @@ let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
 
+let is_immediate_logical n =
+  Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
+
 (* The eight registers that the short frame-descriptor format can record in
    its hot-register bitmap, numbered as in [compute_live_offset]: 0-7 are
    x0-x7. An initial guess pending measurement; a suboptimal choice only

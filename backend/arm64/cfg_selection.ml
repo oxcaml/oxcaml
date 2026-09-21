@@ -38,8 +38,7 @@ let scale_of_chunk : Cmm.memory_chunk -> int = function
 let is_offset chunk n =
   Validated_mem_offset.is_valid ~scale:(scale_of_chunk chunk) ~offset:n
 
-let is_logical_immediate_int n =
-  Arm64_ast.Logical_immediates.is_logical_immediate (Nativeint.of_int n)
+let is_logical_immediate_int = Arch.is_immediate_logical
 
 (* Signed immediates are simpler *)
 
