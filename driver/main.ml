@@ -1,2 +1,3 @@
 let () =
-  exit (Maindriver.main Sys.argv Format.err_formatter)
+  exit (Profile.record_action ~gettimeofday:Unix.gettimeofday ~name:"ocamlc"
+    (fun () -> Maindriver.main Sys.argv Format.err_formatter))

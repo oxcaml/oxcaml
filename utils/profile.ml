@@ -115,7 +115,8 @@ let initial_measure = ref None
 let reset () = hierarchy := cpu_time, create (); initial_measure := None
 
 let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
-  if !Clflags.profile_columns = [] then f () else
+  if !Clflags.profile_columns = [] && not (Action_trace.enabled ())
+  then f () else
   let last_time, E prev_hierarchy = !hierarchy in
   let cpu_time = Option.value ~default:last_time cheap in
   let this_measure_diff, this_table =
@@ -264,6 +265,35 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
   ) table;
   !r
 
+let profile_list_with_other ~nesting hierarchy total =
+  let list = profile_list hierarchy in
+  if list <> [] || nesting = 0 then
+    list @ ["other", (compute_other_category hierarchy total, create ())]
+  else []
+
+let rec timings_json ~nesting hierarchy total =
+  let rows = profile_list_with_other ~nesting hierarchy total in
+  `Array (List.map (fun (name, ((measure : Measure_diff.t), children)) ->
+    `Object [
+      "name", `String name;
+      "time", `Number (Printf.sprintf "%.17g" measure.duration);
+      "children", timings_json ~nesting:(nesting + 1) children measure;
+    ]) rows)
+
+let record_action ~gettimeofday ~name f =
+  if not (Action_trace.enabled ()) then f () else
+    let start = gettimeofday () in
+    Fun.protect f ~finally:(fun () ->
+      let finish = gettimeofday () in
+      let total = Measure_diff.of_diff Measure.zero (Measure.create cpu_time) in
+      let args = ["timings", timings_json ~nesting:0 (snd !hierarchy) total] in
+      let nanoseconds seconds = int_of_float (seconds *. 1e9) in
+      Action_trace.with_fresh_context ~name ~f:(fun context ->
+        Action_trace.Context.emit context
+          (Action_trace.Event.span ~category:"compiler" ~name ~args
+             ~start_in_nanoseconds:(nanoseconds start)
+             ~finish_in_nanoseconds:(nanoseconds finish) ())))
+
 type row = R of string * (float * display) list * row list
 
 let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
@@ -275,12 +305,7 @@ let rec rows_of_hierarchy ~nesting make_row name measure_diff hierarchy env =
   R (name, values, rows), env
 
 and rows_of_hierarchy_list ~nesting make_row hierarchy total env =
-  let list = profile_list hierarchy in
-  let list =
-    if list <> [] || nesting = 0
-    then list @ [ "other", (compute_other_category hierarchy total, create ()) ]
-    else []
-  in
+  let list = profile_list_with_other ~nesting hierarchy total in
   let env = ref env in
   List.map (fun (name, (measure_diff, hierarchy)) ->
     let a, env' =

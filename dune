@@ -134,6 +134,7 @@
  (modules_without_implementation parsetree)
  (modules
   ;; UTILS
+  action_trace
   arrayset
   config
   build_path_prefix_map
@@ -399,7 +400,7 @@
  (modes byte)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlfrontend)
+ (libraries ocamlbytecomp ocamlfrontend unix)
  (modules main))
 
 (executable
@@ -407,8 +408,22 @@
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamlbytecomp ocamlfrontend)
+ (libraries ocamlbytecomp ocamlfrontend unix)
  (modules main_native))
+
+(rule
+ (targets boot_ocamlc.ml)
+ (action (copy driver/main.ml %{targets})))
+
+(executable
+ (name boot_ocamlc)
+ (modes native)
+ (flags
+  (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
+ ; Use the bootstrap switch's Unix, not the Unix library being built.
+ (ocamlopt_flags (:standard -I +unix unix.cmxa))
+ (libraries ocamlbytecomp ocamlfrontend)
+ (modules boot_ocamlc))
 
 (library
  (name ocamljcomp)
@@ -425,7 +440,7 @@
  (modes native)
  (flags
   (:standard -strict-sequence -w +67 -bin-annot -safe-string -strict-formats))
- (libraries ocamljcomp ocamlfrontend flambda2)
+ (libraries ocamljcomp ocamlfrontend flambda2 unix)
  (modules ocamlj))
 
 ; Disabled since there can be only one (data_only_dirs) declaration
