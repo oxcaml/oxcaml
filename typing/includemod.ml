@@ -261,11 +261,11 @@ module Core_inclusion = struct
       vd2 =
     if Directionality.mark_as_used direction then
       Env.mark_value_used vd1.val_uid;
-    let vd2 = Subst.value_description subst vd2 in
     try
       Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes
-            ~self_check vd1 vd2)
+            ~self_check vd1 subst vd2)
     with Includecore.Dont_match err ->
+      let vd2 = Subst.value_description subst vd2 in
       Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
   (* Inclusion between type declarations *)

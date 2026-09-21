@@ -396,6 +396,7 @@ let modtype_path s path =
             fatal_error "Subst.modtype_path"
          | Pident _ -> path
 
+exception Not_path
 let jkind_path s path =
   match Path.Map.find path s.jkinds with
   | Jkind_path p -> p
@@ -418,7 +419,7 @@ let value_path s path =
 let rec type_path s path =
   match Path.Map.find path s.types with
   | Path p -> p
-  | Type_function _ -> assert false
+  | Type_function _ -> raise Not_path
   | exception Not_found ->
      match path with
      | Pident _ -> path

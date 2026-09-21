@@ -6526,6 +6526,85 @@ let moregen_alloc_mode env ~is_ret ty v a1 a2 =
   | Ok () -> ()
   | Error _  -> raise_unexplained_for Moregen
 
+let path_same_normalized env p1 p2 =
+  if Path.same p1 p2
+  then true
+  else begin
+    let p1 = Env.normalize_type_path None env p1 in
+    let p2 = Env.normalize_type_path None env p2 in
+    Path.same p1 p2
+  end
+
+exception Complicated_moregen
+
+let moregeneral_fast env patt subst subj =
+  For_copy.with_scope (fun scope ->
+    let snap = snapshot () in
+    (* Fixed upper limit of the number of nodes,
+       so that we don't diverge on equirecursive types *)
+    let maxnodes = ref 200 in
+    let rec mgen variance t1 t2 =
+      decr maxnodes;
+      if !maxnodes = 0 then raise_notrace Complicated_moregen;
+      if eq_type t1 t2 then () else
+      match get_desc t1, get_desc t2 with
+      | Tsubst (ty, _), _ when eq_type ty t2 -> ()
+      (* CR zeisbach: this is probably unfortunately slow and should be
+         changed. but for now, trying it out... *)
+      | Tvar { jkind }, _ when get_level t1 = generic_level ->
+         (* As in [moregen], the subject must fit the variable's jkind. A
+            failure raises [Moregen_trace] and sends us to the slow path.
+            [t2] is not substituted, so unknown paths estimate to [any] and
+            can only make this check fail, never wrongly succeed.
+            CR zeisbach: [check_type_jkind] may instantiate sort variables in
+            [t2], which here is the original scheme rather than an instance.
+            Confirm that generalised, non-layout-polymorphic schemes cannot
+            contain sort variables, or skip the fast path when they do. *)
+         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+         For_copy.redirect_desc scope t1 (Tsubst (t2, None))
+      | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
+           when l1 = l2 ->
+         begin match variance with
+         | None -> raise_notrace Complicated_moregen
+         | Some variance ->
+           moregen_alloc_mode env t2 ~is_ret:false
+             (neg_variance variance) a1 a2;
+           moregen_alloc_mode env u2 ~is_ret:true variance r1 r2;
+           mgen (Some (neg_variance variance)) t1 t2;
+           mgen (Some variance) u1 u2
+         end
+      | Ttuple tl1, Ttuple tl2 ->
+         mgen_labeled variance tl1 tl2
+      | Tconstr (p1, tl1, _), Tconstr (p2, tl2, _) ->
+         (* FIXME: easy cases of alias expansion? *)
+         let p2 =
+           try Subst.type_path subst p2
+           with Subst.Not_path -> raise_notrace Complicated_moregen
+         in
+         if not (path_same_normalized env p1 p2) then
+           raise_notrace Complicated_moregen;
+         List.iter2 (mgen None) tl1 tl2
+      | Tpoly (t1, []), Tpoly(t2, []) ->
+         mgen variance t1 t2
+      | _, _ ->
+         raise_notrace Complicated_moregen
+    and mgen_labeled variance tl1 tl2 =
+      (* This is an actual failure, but we raise [Complicated_moregen] so that
+         the slow path can give a nicer error. *)
+      if List.compare_lengths tl1 tl2 <> 0 then
+        raise_notrace Complicated_moregen;
+      List.iter2
+        (fun (l1, t1) (l2, t2) ->
+          if not (Option.equal String.equal l1 l2) then
+            raise_notrace Complicated_moregen;
+          mgen variance t1 t2)
+        tl1 tl2
+    in
+    match mgen (Some Covariant) patt subj with
+    | () -> true
+    | exception (Complicated_moregen | Moregen_trace _) ->
+      backtrack snap; false)
+
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
   if inst_nongen then level <> subject_level
@@ -6836,7 +6915,7 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
    Usually, the subject is given by the user, and the pattern
    is unimportant.  So, no need to propagate abbreviations.
 *)
-let moregeneral ~self_check env inst_nongen pat_sort_vars
+let moregeneral_slow ~self_check env inst_nongen pat_sort_vars
     subj_sort_vars pat_sch subj_sch =
   let instantiate_modes = not self_check in
   (* Moregen splits the generic level into two finer levels:
@@ -6903,9 +6982,34 @@ let moregeneral ~self_check env inst_nongen pat_sort_vars
     | _, Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
 
+
+let debug_moregen = Sys.getenv_opt "MOREGEN_DEBUG" <> None
+let moregeneral ~self_check env inst_nongen
+    pat_sch_sorts subj_sch_sorts pat_sch subst subj_sch =
+  (* The fast path does not handle layout-polymorphic schemes, so only try it
+     when there are no sort variables on either side. *)
+  let fast =
+    match pat_sch_sorts, subj_sch_sorts with
+    | [], [] -> moregeneral_fast env pat_sch subst subj_sch
+    | _, _ -> false
+  in
+  if fast then []
+  else begin
+    if debug_moregen then begin
+      Format.printf "moregen:@.  %a@. ~@.   %a@.  [%a]@."
+        !Btype.print_raw pat_sch
+        !Btype.print_raw subj_sch
+        !Btype.print_raw (Subst.type_expr subst subj_sch)
+    end;
+    let subj_sch = Subst.type_expr subst subj_sch in
+    moregeneral_slow ~self_check env inst_nongen
+      pat_sch_sorts subj_sch_sorts pat_sch subj_sch
+  end
+
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match
-    moregeneral ~self_check:false env inst_nongen [] [] pat_sch subj_sch
+    moregeneral ~self_check:false env inst_nongen [] []
+      pat_sch Subst.identity subj_sch
   with
   | _ -> true
   | exception Moregen _ -> false

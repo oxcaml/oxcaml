@@ -175,9 +175,9 @@ let value_descriptions_consistency _env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
-let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 ty2 =
+let moregeneral_lpoly ~self_check env pat_lpoly subj_lpoly ty1 subst ty2 =
   let pat_refs =
-    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 ty2
+    Ctype.moregeneral ~self_check env true pat_lpoly subj_lpoly ty1 subst ty2
   in
   (* Map from RHS sort poly var to its 1-indexed position *)
   let subj_index = List.mapi (fun i v -> (v, i + 1)) subj_lpoly in
@@ -245,15 +245,27 @@ let uid_is_from_current_unit uid =
 let value_descriptions ~loc env name
     ~mmodes ~self_check
     (vd1 : Types.value_description)
-    (vd2 : Types.value_description) =
+    subst2 (vd2 : Types.value_description) =
   Builtin_attributes.check_alerts_inclusion
     ~def:vd1.val_loc
     ~use:vd2.val_loc
     loc
     vd1.val_attributes vd2.val_attributes
     name;
+  (* [vd2] does not need [subst2] applied to it, as [Subst.value_description]
+     only makes relevant changes (writing [val_zero_alloc] or renumbering sort
+     variables) when [Prepare_for_saving] or [Saving] / [Loading] respectively.
+     These are only needed when interacting with .cmi files, not here *)
   let prim_coercion_zero_alloc_check = value_descriptions_zero_alloc vd1 vd2 in
-  let crossing = Ctype.crossing_of_ty env vd2.val_type in
+  (* CR zeisbach: [vd2] is no longer substituted eagerly, but the crossing
+     must be computed on a type whose paths make sense in [env]. Substituting
+     here preserves the previous behaviour at the cost of a copy, which
+     undoes the saving from the fast path in [Ctype.moregeneral]. A better
+     option would be for [Ctype.moregeneral] to return the substituted
+     subject when it takes the slow path, so that the copy is shared. *)
+  let crossing =
+    Ctype.crossing_of_ty env (Subst.type_expr subst2 vd2.val_type)
+  in
   let modalities = vd1.val_modalities, vd2.val_modalities in
   let modes =
     match child_modes_with_modalities name ~modalities mmodes with
@@ -269,6 +281,7 @@ let value_descriptions ~loc env name
   match vd1.val_kind with
   | Val_prim p1 -> begin
      assert (List.is_empty val_lpoly1);
+     let vd2 = Subst.value_description subst2 vd2 in
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -288,7 +301,7 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
                moregeneral_lpoly ~self_check env
-                 val_lpoly1 val_lpoly2 ty1 ty2
+                 val_lpoly1 val_lpoly2 ty1 Subst.identity ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
@@ -303,7 +316,7 @@ let value_descriptions ~loc env name
           Ctype.instance_prim env p1 vd1.val_type
         in
         (try moregeneral_lpoly ~self_check env
-               val_lpoly1 val_lpoly2 ty1 vd2.val_type
+               val_lpoly1 val_lpoly2 ty1 Subst.identity vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc_loc =
           (* Prefer a declaration from the current unit.  A foreign primitive
@@ -330,7 +343,7 @@ let value_descriptions ~loc env name
      end
   | _ ->
      match moregeneral_lpoly ~self_check env
-             val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
+             val_lpoly1 val_lpoly2 vd1.val_type subst2 vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
        match vd2.val_kind with
