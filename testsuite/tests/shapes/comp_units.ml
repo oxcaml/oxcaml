@@ -161,7 +161,7 @@ end
 [%%expect{|
 {
  "With_identity_constraint"[module] ->
-   {<.116>
+   {<.115>
     "M"[module] ->
       CU Stdlib . "Set"[module] . "Make"[module](
       CU Stdlib . "Int"[module])<.12>;
@@ -178,12 +178,12 @@ end
 [%%expect{|
 {
  "With_constraining_constraint"[module] ->
-   {<.121>
+   {<.120>
     "M"[module] ->
-      {<.118>
+      {<.117>
        "t"[type] ->
          CU Stdlib . "Set"[module] . "Make"[module](
-         CU Stdlib . "Int"[module])<.118> . "t"[type];
+         CU Stdlib . "Int"[module])<.117> . "t"[type];
        };
     };
  }
