@@ -1,8 +1,8 @@
-val a : float# = <abstr>
-val b : float32_u = <abstr>
-val c : int64_u = <abstr>
-val d : int32_u = <abstr>
-val e : nativeint_u = <abstr>
+val a : float# = #0.
+val b : float32_u = #0.s
+val c : int64_u = #0L
+val d : int32_u = #0l
+val e : nativeint_u = #0n
 type t = #{ x : int; y : int64_u; }
 val a : #(int * int) = <abstr>
 val b : #(float# * int64_u) = <abstr>
@@ -11,10 +11,16 @@ val d : t = <abstr>
 val a : #(int * int) array = <abstr array>
 val b : int ref# array = [|#{contents = 1}; #{contents = 2}|]
 val c : t array = <abstr array>
-val x : int64_u = <abstr>
+val x : int64_u = #42L
 val y : int = 42
 val foo : string = "hello"
 val unboxed_product : #(#(int * float#) * string * int64_u) = <abstr>
-val bar : int64_u = <abstr>
+val bar : int64_u = #42L
 val baz : string = "world"
+val one_slot_product : #(unit# * int) = <abstr>
+val zero_slot_product : #(unit# * unit#) = <abstr>
+type one_slot_record = { payload : #(unit# * int); }
+val one_slot_record : one_slot_record = {payload = <abstr>}
+type inherited_one_slot = { inherit payload : #(unit# * int); }
+val inherited_one_slot : inherited_one_slot = {payload = <abstr>}
 

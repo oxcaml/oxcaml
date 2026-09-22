@@ -24,10 +24,7 @@ type ('a : any) inherited = #{ inherit x : 'a @@ portable; }
 
 type inherited_boxed = { inherit x : float# }
 [%%expect{|
-Line 1, characters 25-43:
-1 | type inherited_boxed = { inherit x : float# }
-                             ^^^^^^^^^^^^^^^^^^
-Error: Inherited labels are only supported in singleton unboxed records
+type inherited_boxed = { inherit x : float#; }
 |}]
 
 type inherited_multiple = #{ x : int; inherit y : float# }
@@ -378,38 +375,84 @@ Error: Signature mismatch:
 (* Inherited boxed fields retain the boxing representation of their contents. *)
 
 type inherited_boxed_float : float64 box = { inherit f : float# }
-[%%expect{| |}]
+[%%expect{|
+type inherited_boxed_float = { inherit f : float#; }
+|}]
 
 type inherited_boxed_bits8 : bits8 box = { inherit i : int8# }
-[%%expect{| |}]
+[%%expect{|
+type inherited_boxed_bits8 = { inherit i : int8#; }
+|}]
 
 type inherited_boxed_void : void box = { inherit v : unit# }
-[%%expect{| |}]
+[%%expect{|
+type inherited_boxed_void = { inherit v : unit#; }
+|}]
 
 type ('a : any) inherited_boxed_any = { inherit a : 'a }
-[%%expect{| |}]
+[%%expect{|
+type ('a : any) inherited_boxed_any = { inherit a : 'a; }
+|}]
 
 type inherited_last = { x : int; inherit f : float# }
-[%%expect{| |}]
+[%%expect{|
+type inherited_last = { x : int; inherit f : float#; }
+|}]
 
 type inherited_after_mutable = { mutable x : int; inherit f : float# }
-[%%expect{| |}]
+[%%expect{|
+type inherited_after_mutable = { mutable x : int; inherit f : float#; }
+|}]
 
 type inherited_before_last = { inherit f : float#; x : int }
-[%%expect{| |}]
+[%%expect{|
+Line 1, characters 31-50:
+1 | type inherited_before_last = { inherit f : float#; x : int }
+                                   ^^^^^^^^^^^^^^^^^^^
+Error: Only the last record label may be inherited
+|}]
 
 type inherited_twice = { inherit x : int; inherit f : float# }
-[%%expect{| |}]
+[%%expect{|
+Line 1, characters 25-41:
+1 | type inherited_twice = { inherit x : int; inherit f : float# }
+                             ^^^^^^^^^^^^^^^^
+Error: Only the last record label may be inherited
+|}]
 
 type inherited_boxed_mutable = { inherit mutable x : int }
-[%%expect{| |}]
+[%%expect{|
+Line 1, characters 33-56:
+1 | type inherited_boxed_mutable = { inherit mutable x : int }
+                                     ^^^^^^^^^^^^^^^^^^^^^^^
+Error: Inherited record labels cannot be mutable
+|}]
 
 module Inherited_boxed_signature : sig
   type t = { inherit x : int }
 end = struct
   type t = { x : int }
 end
-[%%expect{| |}]
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = { x : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = { x : int; } end
+       is not included in
+         sig type t = { inherit x : int; } end
+       Type declarations do not match:
+         type t = { x : int; }
+       is not included in
+         type t = { inherit x : int; }
+       Fields do not match:
+         "x : int;"
+       is not the same as:
+         "inherit x : int;"
+       The second is inherited and the first is not.
+|}]
 
 module Inherited_boxed_kinds : sig
   type f : float64 box
@@ -426,22 +469,50 @@ end = struct
   type mixed = { x : int; inherit y : float# }
   type mixed_u = mixed#
 end
-[%%expect{| |}]
+[%%expect{|
+module Inherited_boxed_kinds :
+  sig
+    type f : float64 box
+    type f_u = f#
+    type i : bits8 box
+    type v : void box
+    type mixed : (value & float64 inherit) box
+    type mixed_u = mixed#
+  end
+|}]
 
 module type Inherited_boxed_index = module type of struct
   type t = { inherit i : int }
   let index : (t, int) idx_imm = (.i)
 end
-[%%expect{| |}]
+[%%expect{|
+module type Inherited_boxed_index =
+  sig
+    type t = { inherit i : int; }
+    val index : (t, int) idx_imm @@ stateless
+  end
+|}]
 
 module type Inherited_boxed_float_index = module type of struct
   type t = { inherit f : float# }
   let index = (.f)
 end
-[%%expect{| |}]
+[%%expect{|
+Line 3, characters 16-17:
+3 |   let index = (.f)
+                    ^
+Error: An index into an inherited field requires addressable contents,
+       but this field has type "float#".
+|}]
 
 module type Inherited_last_float_index = module type of struct
   type t = { i : int; inherit f : float# }
   let index = (.f)
 end
-[%%expect{| |}]
+[%%expect{|
+Line 3, characters 16-17:
+3 |   let index = (.f)
+                    ^
+Error: An index into an inherited field requires addressable contents,
+       but this field has type "float#".
+|}]

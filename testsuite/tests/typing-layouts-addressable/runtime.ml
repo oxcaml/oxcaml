@@ -106,7 +106,7 @@ let () =
 external box : ('a : any). 'a -> 'a box = "%box" [@@layout_poly]
 external unbox : ('a : any). 'a box -> 'a = "%unbox" [@@layout_poly]
 external equal_i8 : int8# -> int8# -> bool = "%int8#_equal"
-external equal_i64 : int64_u -> int64_u -> bool = "%int64_u_equal"
+external equal_i64 : int64_u -> int64_u -> bool = "%int64#_equal"
 
 type inherited_boxed_float : float64 box = { inherit bf : float# }
 type inherited_boxed_bits8 : bits8 box = { inherit bi : int8# }
@@ -138,12 +138,12 @@ let () =
   List.iter
     (fun r ->
       assert (Obj.is_int (Obj.repr r));
-      assert (equal_i8 r.bi #-42s);
+      assert (equal_i8 r.bi (-#42s));
       let { bi } = r in
-      assert (equal_i8 bi #-42s);
+      assert (equal_i8 bi (-#42s));
       let u : inherited_boxed_bits8# = unbox r in
-      assert (equal_i8 u.#bi #-42s))
-    [make_inherited_bits8 #-42s; box #{ bi = #-42s }];
+      assert (equal_i8 u.#bi (-#42s)))
+    [make_inherited_bits8 (-#42s); box #{ bi = -#42s }];
   let r = make_inherited_void #() in
   assert (Obj.is_int (Obj.repr r));
   let { bv = #() } = r in

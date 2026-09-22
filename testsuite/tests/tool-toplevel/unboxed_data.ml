@@ -37,11 +37,11 @@ let unboxed_product = #(#(10, #10.0), "ten", #10L)
 let bar = #42L
 let baz = "world";;
 
-let one_slot_product_bad = #(#(), 42);;
-let zero_slot_product_bad = #(#(), #());;
+let one_slot_product = #(#(), 42);;
+let zero_slot_product = #(#(), #());;
 
 type one_slot_record = { payload : #(unit# * int) };;
-let one_slot_record_bad = { payload = #(#(), 42) };;
+let one_slot_record = { payload = #(#(), 42) };;
 
 type inherited_one_slot = { inherit payload : #(unit# * int) };;
-let inherited_one_slot_bad = { payload = #(#(), 42) };;
+let inherited_one_slot = { payload = #(#(), 42) };;
