@@ -557,3 +557,39 @@ let x =
 [%%expect{|
 val x : int = 42
 |}]
+
+let () =
+  let module M = struct
+    external box : ('a : any). 'a -> 'a box = "%box" [@@layout_poly]
+    external unbox : ('a : any). 'a box -> 'a = "%unbox" [@@layout_poly]
+    external to_int32 : int32_u -> int32 = "%box_int32"
+
+    type addressed_float = #{ f : float# }
+    type addressed_int32 = #{ i : int32_u }
+    type addressed_void = #{ v : unit# }
+  end in
+  let open M in
+  let poly_ boxed x = box x in
+  let poly_ unboxed x = unbox x in
+  let f = Sys.opaque_identity (boxed #3.25) in
+  assert (Obj.tag (Obj.repr f) = Obj.double_tag);
+  assert (to_float (unboxed f : float#) = 3.25);
+  let f = Sys.opaque_identity (boxed #{ f = #3.25 }) in
+  assert (Obj.tag (Obj.repr f) = 0);
+  let #{ f } = unboxed f in
+  assert (to_float f = 3.25);
+  let i = Sys.opaque_identity (boxed #42l) in
+  assert (Obj.is_int (Obj.repr i) = (Sys.word_size = 64));
+  assert (Int32.equal (to_int32 (unboxed i : int32_u)) 42l);
+  let i = Sys.opaque_identity (boxed #{ i = #42l }) in
+  assert (Obj.is_block (Obj.repr i) && Obj.tag (Obj.repr i) = 0);
+  let #{ i } = unboxed i in
+  assert (Int32.equal (to_int32 i) 42l);
+  let v = Sys.opaque_identity (boxed #()) in
+  assert (Obj.is_int (Obj.repr v));
+  let #() = unboxed v in
+  let v = Sys.opaque_identity (boxed #{ v = #() }) in
+  assert (Obj.is_block (Obj.repr v) && Obj.size (Obj.repr v) = 0);
+  let #{ v = _ } = unboxed v in
+  ()
+[%%expect{||}]
