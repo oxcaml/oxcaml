@@ -1,6 +1,5 @@
 (* TEST
  {
-   compiler_reference = "${test_source_directory}/mixed_tuples.byte.reference";
    toplevel;
  }{
    toplevel.opt;
