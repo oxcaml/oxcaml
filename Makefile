@@ -221,6 +221,10 @@ merlin-promote:
 	$(MAKE) -C external/merlin test-promote
 
 # Intermediary library targets
+#
+# Temporary: the external-libs targets below build each library under
+# external/ as its own dune root and chain them by hand through OCAMLPATH.
+# The plan is to replace this with dune aliases in a single workspace.
 
 OCAML_COMPILER_LIBS_DIR := $(CURDIR)/_build/ocaml-compiler-libs
 PPX_DERIVERS_DIR := $(CURDIR)/_build/ppx-derivers
@@ -253,6 +257,25 @@ external-libs-compiler:
 	@mkdir -p "$(CURDIR)/_build"
 	@test -x "$(OXCAML_INSTALL)/bin/ocamlc.opt" || $(MAKE) _install
 
+# ppx_derivers, sexplib0 and stdlib-shims are not part of this repository.
+# The nix devShell and the nix derivations provide their sources via the
+# PPXLIB_*_SRC variables.
+NIX_SOURCE_VARS := PPXLIB_PPX_DERIVERS_SRC PPXLIB_SEXPLIB0_SRC PPXLIB_STDLIB_SHIMS_SRC
+
+.PHONY: check-nix-sources
+check-nix-sources:
+	@missing=""; \
+	for v in $(NIX_SOURCE_VARS); do \
+	  eval val=\$${$$v}; \
+	  if [ -z "$$val" ] || ! [ -d "$$val" ]; then missing="$$missing $$v"; fi; \
+	done; \
+	if [ -n "$$missing" ]; then \
+	  echo "error: unset or not a directory:$$missing" >&2; \
+	  echo "error: this target needs sources provided by nix." >&2; \
+	  echo "error: run it from the nix devShell (nix develop) or via the nix derivation." >&2; \
+	  exit 1; \
+	fi
+
 .PHONY: ocaml-compiler-libs-build
 ocaml-compiler-libs-build: external-libs-compiler
 	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
@@ -282,7 +305,7 @@ ppxlib-jane-build-boot:
 external-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
 
 .PHONY: ppx-derivers-build
-ppx-derivers-build: external-libs-compiler
+ppx-derivers-build: check-nix-sources external-libs-compiler
 	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
 	    --root="$(PPXLIB_PPX_DERIVERS_SRC)" \
@@ -291,7 +314,7 @@ ppx-derivers-build: external-libs-compiler
 	    @install
 
 .PHONY: sexplib0-build
-sexplib0-build: external-libs-compiler
+sexplib0-build: check-nix-sources external-libs-compiler
 	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
 	    --root="$(PPXLIB_SEXPLIB0_SRC)" \
@@ -300,7 +323,7 @@ sexplib0-build: external-libs-compiler
 	    @install
 
 .PHONY: stdlib-shims-build
-stdlib-shims-build: external-libs-compiler
+stdlib-shims-build: check-nix-sources external-libs-compiler
 	env -u OCAMLPATH $(PPXLIB_DUNE_ENV) \
 	  $(dune) build \
 	    --root="$(PPXLIB_STDLIB_SHIMS_SRC)" \
