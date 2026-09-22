@@ -387,127 +387,105 @@ Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 (* The standard-library conversions preserve the boxed type. *)
-let boxed_float_bad : float = Stdlib.box #3.5
+let boxed_float : float = Stdlib.box #3.5
 [%%expect{|
-Line 1, characters 30-40:
-1 | let boxed_float_bad : float = Stdlib.box #3.5
-                                  ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val boxed_float : float = 3.5
 |}]
 
-let unboxed_float_bad : float# = Stdlib.unbox 3.5
+let unboxed_float : float# = Stdlib.unbox 3.5
 [%%expect{|
-Line 1, characters 33-45:
-1 | let unboxed_float_bad : float# = Stdlib.unbox 3.5
-                                     ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+val unboxed_float : float# = <abstr>
 |}]
 
-let boxed_tuple_bad : int * string = Stdlib.box #(7, "seven")
+let boxed_tuple : int * string = Stdlib.box #(7, "seven")
 [%%expect{|
-Line 1, characters 37-47:
-1 | let boxed_tuple_bad : int * string = Stdlib.box #(7, "seven")
-                                         ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val boxed_tuple : int * string = (7, "seven")
 |}]
 
-let unboxed_tuple_bad : #(int * string) = Stdlib.unbox (7, "seven")
+let unboxed_tuple : #(int * string) = Stdlib.unbox (7, "seven")
 [%%expect{|
-Line 1, characters 42-54:
-1 | let unboxed_tuple_bad : #(int * string) = Stdlib.unbox (7, "seven")
-                                              ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+val unboxed_tuple : #(int * string) = #(7, "seven")
 |}]
 
-let copy_ref_bad (x : 'a ref) : 'a ref =
+let copy_ref (x : 'a ref) : 'a ref =
   Stdlib.box (Stdlib.unbox x : 'a ref#)
 [%%expect{|
-Line 2, characters 2-12:
-2 |   Stdlib.box (Stdlib.unbox x : 'a ref#)
-      ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val copy_ref : 'a ref -> 'a ref = <fun>
 |}]
 
-let copy_contents_bad () =
+let copy_contents () =
   let original = ref 7 in
   let copy : int ref = Stdlib.box (Stdlib.unbox original : int ref#) in
   original := 9;
   !copy, !original
-let copied_contents_bad = copy_contents_bad ()
+let copied_contents = copy_contents ()
 [%%expect{|
-Line 3, characters 23-33:
-3 |   let copy : int ref = Stdlib.box (Stdlib.unbox original : int ref#) in
-                           ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val copy_contents : unit -> int * int = <fun>
+val copied_contents : int * int = (7, 9)
 |}]
 
 (* Local payloads remain local through either conversion. *)
-let local_box_bad (x : 'a @ local) : 'a box @ local =
+let local_box (x : 'a @ local) : 'a box @ local =
   exclave_ Stdlib.box x
 [%%expect{|
-Line 2, characters 11-21:
-2 |   exclave_ Stdlib.box x
-               ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val local_box : 'a @ local -> 'a box @ local = <fun>
 |}]
 
-let local_unbox_bad (x : 'a box @ local) : 'a @ local =
+let local_unbox (x : 'a box @ local) : 'a @ local =
   exclave_ Stdlib.unbox x
 [%%expect{|
-Line 2, characters 11-23:
-2 |   exclave_ Stdlib.unbox x
-               ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+val local_unbox : 'a box @ local -> 'a @ local = <fun>
 |}]
 
 let bad_box_escape (x : 'a @ local) : 'a box = Stdlib.box x
 [%%expect{|
-Line 1, characters 47-57:
+Line 1, characters 47-59:
 1 | let bad_box_escape (x : 'a @ local) : 'a box = Stdlib.box x
-                                                   ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+                                                   ^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 let bad_unbox_escape (x : 'a box @ local) : 'a = Stdlib.unbox x
 [%%expect{|
-Line 1, characters 49-61:
+Line 1, characters 49-63:
 1 | let bad_unbox_escape (x : 'a box @ local) : 'a = Stdlib.unbox x
-                                                     ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+                                                     ^^^^^^^^^^^^^^
+Error: This value is "local"
+       but is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
 |}]
 
 (* Unboxing a mutable record reads its fields without granting access. *)
 let bad_unbox_contended (x : int ref @ contended) : int ref# = Stdlib.unbox x
 [%%expect{|
-Line 1, characters 63-75:
+Line 1, characters 76-77:
 1 | let bad_unbox_contended (x : int ref @ contended) : int ref# = Stdlib.unbox x
-                                                                   ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+                                                                                ^
+Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
 let bad_unbox_read (x : bytes ref @ read uncontended) : bytes ref# =
   Stdlib.unbox x
 [%%expect{|
-Line 2, characters 2-14:
+Line 2, characters 15-16:
 2 |   Stdlib.unbox x
-      ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+                   ^
+Error: This value is "read" but is expected to be "read_write".
 |}]
 
-let unbox_immutable_contended_bad (x : int * int @ contended) : #(int * int) =
+let unbox_immutable_contended (x : int * int @ contended) : #(int * int) =
   Stdlib.unbox x
 [%%expect{|
-Line 2, characters 2-14:
-2 |   Stdlib.unbox x
-      ^^^^^^^^^^^^
-Error: Unbound value "Stdlib.unbox"
+val unbox_immutable_contended : int * int @ contended -> #(int * int) = <fun>
 |}]
 
-let portable_box_bad : (int -> int box) @ portable = Stdlib.box
-let portable_unbox_bad : (int box -> int) @ portable = Stdlib.unbox
+let portable_box : (int -> int box) @ portable = Stdlib.box
+let portable_unbox : (int box -> int) @ portable = Stdlib.unbox
 [%%expect{|
-Line 1, characters 53-63:
-1 | let portable_box_bad : (int -> int box) @ portable = Stdlib.box
-                                                         ^^^^^^^^^^
-Error: Unbound value "Stdlib.box"
+val portable_box : int -> int box = <fun>
+val portable_unbox : int box -> int = <fun>
 |}]

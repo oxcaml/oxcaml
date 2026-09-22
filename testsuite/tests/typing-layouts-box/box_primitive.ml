@@ -33,6 +33,8 @@ let check_shape boxed record =
   assert (same_shape (repr boxed) (Obj.repr record))
 [%%expect{|
 val native : unit -> bool = <fun>
+external repr : 'a -> Obj.t = "%obj_magic"
+external magic : 'a -> 'b = "%obj_magic"
 val same_shape : Obj.t -> Obj.t -> bool = <fun>
 val check_shape : 'a -> 'b -> unit = <fun>
 |}]
@@ -180,7 +182,11 @@ let () =
   check_shape (box #{ inherited_f64 = #3.25 }) 3.25;
   let empty = Obj.repr (box #{ addressable_void = #() }) in
   assert (Obj.is_block empty && Obj.tag empty = 0 && Obj.size empty = 0)
-[%%expect{||}]
+[%%expect{|
+type inherited_i8 = #{ inherit inherited_i8 : int8#; }
+type inherited_f64 = #{ inherit inherited_f64 : float#; }
+type addressable_void = #{ addressable_void : unit#; }
+|}]
 
 (* Unboxed products *)
 
@@ -213,7 +219,8 @@ let () =
   let r : p_many = Obj.magic (box #(#1L, #2.5, s, 3, #4L)) in
   assert (eq_i64 r.g #1L && eq_f64 r.h #2.5 && r.k == s && r.l = 3
           && eq_i64 r.m #4L)
-[%%expect{||}]
+[%%expect{|
+|}]
 
 
 type ur = { u1 : int64_u; u2 : string; u3 : int }

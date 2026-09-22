@@ -181,9 +181,9 @@ end @ static) = struct
     (x', y')
 end
 [%%expect{|
-module H :
-  functor (M : sig val poly_ id : 'a -> 'a end @ static) ->
-    sig val use : int -> float# -> int * float# end
+>> Fatal error: slambda eval: unexpected missing value
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Let binding: binding a layout-poly value *)

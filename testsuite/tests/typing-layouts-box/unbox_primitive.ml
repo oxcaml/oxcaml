@@ -134,7 +134,13 @@ let () = both_ways (fun { hide } ->
   let #{ addressed_void = _ } = unbox (hide (box #{ addressed_void = #() })) in
   let #() = unbox (hide (box #())) in
   ())
-[%%expect{||}]
+[%%expect{|
+type addressed_i8 = #{ addressed_i8 : int8#; }
+type inherited_i8 = #{ inherit inherited_i8 : int8#; }
+type addressed_f64 = #{ addressed_f64 : float#; }
+type inherited_f64 = #{ inherit inherited_f64 : float#; }
+type addressed_void = #{ addressed_void : unit#; }
+|}]
 
 let () = both_ways (fun { hide } ->
   List.iter (fun bits ->
@@ -148,7 +154,8 @@ let () = both_ways (fun { hide } ->
     let y = unbox_int32 x in
     assert (eq_i32 (unbox (hide (box y))) y))
     [Int32.min_int; Int32.max_int; -1l; 0l])
-[%%expect{||}]
+[%%expect{|
+|}]
 
 (* Local allocation. Unboxing a local box yields a local value. *)
 

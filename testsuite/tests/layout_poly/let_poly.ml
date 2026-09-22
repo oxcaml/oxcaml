@@ -592,4 +592,5 @@ let () =
   assert (Obj.is_block (Obj.repr v) && Obj.size (Obj.repr v) = 0);
   let #{ v = _ } = unboxed v in
   ()
-[%%expect{||}]
+[%%expect{|
+|}]
