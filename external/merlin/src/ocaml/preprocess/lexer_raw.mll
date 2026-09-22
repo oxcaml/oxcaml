@@ -233,11 +233,31 @@ let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
 (* Syntax mode configuration for the #syntax directive *)
 module Syntax_mode = struct
-  let quotations = ref Config.syntax_quotations
+  (* [None] while no [#syntax quotations] directive has been seen since the
+     last reset; the invocation default [!Clflags.syntax_quotations] then
+     applies. *)
+  let quotations : bool option ref = ref None
+
+  let quotations_enabled () =
+    match !quotations with
+    | Some enabled -> enabled
+    | None -> !Clflags.syntax_quotations
 end
 
+<<<<<<< Merlin:jvb.syntax-quotations-flags
 let _reset_syntax_mode () =
   Syntax_mode.quotations := Config.syntax_quotations
+||||||| Compiler:last-imported
+let reset_syntax_mode () =
+  Syntax_mode.quotations := Config.syntax_quotations
+=======
+let reset_syntax_mode () =
+  Syntax_mode.quotations := None
+
+let protect_syntax_mode f =
+  Misc.protect_refs
+    [ Misc.R (Syntax_mode.quotations, !Syntax_mode.quotations) ] f
+>>>>>>> Compiler:HEAD
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -881,8 +901,16 @@ rule token state = parse
   | ","  { return COMMA }
   | "->" { return MINUSGREATER }
   | "$" {
+<<<<<<< Merlin:jvb.syntax-quotations-flags
       if !(Syntax_mode.quotations) then
         return DOLLAR
+||||||| Compiler:last-imported
+      if !(Syntax_mode.quotations) then
+        DOLLAR
+=======
+      if Syntax_mode.quotations_enabled () then
+        DOLLAR
+>>>>>>> Compiler:HEAD
       else
         return (INFIXOP0 "$")
     }
@@ -898,8 +926,16 @@ rule token state = parse
   | ";;" { return SEMISEMI }
   | "<"  { return LESS }
   | "<[" {
+<<<<<<< Merlin:jvb.syntax-quotations-flags
       if !(Syntax_mode.quotations) then
         return LESSLBRACKET
+||||||| Compiler:last-imported
+      if !(Syntax_mode.quotations) then
+        LESSLBRACKET
+=======
+      if Syntax_mode.quotations_enabled () then
+        LESSLBRACKET
+>>>>>>> Compiler:HEAD
       else
         (* Put back the '[' and return just LESS *)
         produce_and_backtrack lexbuf LESS 1
@@ -913,8 +949,16 @@ rule token state = parse
   | "[>" { return LBRACKETGREATER }
   | "]"  { return RBRACKET }
   | "]>" {
+<<<<<<< Merlin:jvb.syntax-quotations-flags
       if !(Syntax_mode.quotations) then
         return RBRACKETGREATER
+||||||| Compiler:last-imported
+      if !(Syntax_mode.quotations) then
+        RBRACKETGREATER
+=======
+      if Syntax_mode.quotations_enabled () then
+        RBRACKETGREATER
+>>>>>>> Compiler:HEAD
       else
         (* Put back the '>' and return just RBRACKET *)
         produce_and_backtrack lexbuf RBRACKET 1
@@ -1029,8 +1073,16 @@ and directive state already_consumed = parse
         in
         match mode with
         | "quotations" ->
+<<<<<<< Merlin:jvb.syntax-quotations-flags
             Syntax_mode.quotations := toggle;
             let tok = token state lexbuf in
+||||||| Compiler:last-imported
+            Syntax_mode.quotations := toggle;
+            let tok = token lexbuf in
+=======
+            Syntax_mode.quotations := Some toggle;
+            let tok = token lexbuf in
+>>>>>>> Compiler:HEAD
             enqueue_token_from_end_of_lexbuf_window lexbuf SEMISEMI ~len:0;
             tok
         | _ ->
