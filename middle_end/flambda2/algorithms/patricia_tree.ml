@@ -1,15 +1,15 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*           Mark Shinwell and Leo White, Jane Street Europe              *)
-(*                                                                        *)
-(*   Copyright 2015--2020 Jane Street Group LLC                           *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Mark Shinwell and Leo White, Jane Street Europe *)
+(* *)
+(* Copyright 2015--2020 Jane Street Group LLC *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
 
 (* The following is a "big endian" implementation. *)
@@ -31,8 +31,7 @@ external int_clz : int -> (int[@untagged])
    the first [bit] after the entire prefix.
 
    This is represented as the logical "or" of the bit and the prefix. The
-   representation is:
- *)
+   representation is: *)
 (*
  *           ____ bit [b] is the least significant bit
  *          /
@@ -118,7 +117,7 @@ module type Tree = sig
 
   (* A witness that ['a] is a valid type for a value stored in the tree. Maps
      will allow ['a] to be any value but sets will only allow [unit]. *)
-  type 'a is_value [@@immediate]
+  type 'a is_value : immediate
 
   (* Deduce that ['a] is a value type from a pre-existing ['a t]. *)
   val is_value_of : 'a t -> 'a is_value
@@ -281,10 +280,7 @@ module Set0 = struct
   let[@inline always] is_value_of (type a) (Tree t : a t) : a is_value =
     (* Crucially, this compiles down to just [Unit], making this function cost
        nothing. *)
-    match t with
-    | Empty -> Unit
-    | Leaf _ -> Unit
-    | Branch _ -> Unit
+    match t with Empty -> Unit | Leaf _ -> Unit | Branch _ -> Unit
 
   let[@inline always] empty (type a) (Unit : a is_value) : a t = Tree Empty
 
@@ -1044,8 +1040,8 @@ end = struct
 
   let pattern_match_pair_merge_total ~only_left ~only_right =
     pattern_match_pair_merge
-      ~empty:(fun[@inline] _ -> assert false)
-      ~of_tree:(fun[@inline] x -> x)
+      ~empty:(fun [@inline] _ -> assert false)
+      ~of_tree:(fun [@inline] x -> x)
       ~only_left ~only_right
   [@@inline always]
 
@@ -1063,7 +1059,7 @@ end = struct
   [@@inline always]
 
   let toplevel_union_total nonempty_union t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> of_tree (nonempty_union t0 t1)) t0 t1
+    toplevel_union (fun [@inline] t0 t1 -> of_tree (nonempty_union t0 t1)) t0 t1
   [@@inline always]
 
   let rec union_tree f t0 t1 =
@@ -1073,11 +1069,11 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> descr (union_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
   let union f t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> union_tree f t0 t1) t0 t1
+    toplevel_union (fun [@inline] t0 t1 -> union_tree f t0 t1) t0 t1
 
   (* [_sharing] functions are guaranteed to share with their first argument
      only.
@@ -1102,11 +1098,11 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> descr (union_sharing_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
   let union_sharing f t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> union_sharing_tree f t0 t1) t0 t1
+    toplevel_union (fun [@inline] t0 t1 -> union_sharing_tree f t0 t1) t0 t1
 
   let rec union_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1117,11 +1113,11 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> descr (union_shared_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_union f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_union f k t t')
       t0 t1
 
   let union_shared f t0 t1 =
-    toplevel_union (fun[@inline] t0 t1 -> union_shared_tree f t0 t1) t0 t1
+    toplevel_union (fun [@inline] t0 t1 -> union_shared_tree f t0 t1) t0 t1
 
   let rec union_total_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1130,11 +1126,11 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> Non_empty (union_total_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Some (f k t t'))
+      (fun [@inline] k t t' -> Some (f k t t'))
       t0 t1
 
   let union_total f t0 t1 =
-    toplevel_union_total (fun[@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
+    toplevel_union_total (fun [@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
 
   let rec union_total_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1146,12 +1142,12 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> Non_empty (union_total_shared_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Some (f k t t'))
+      (fun [@inline] k t t' -> Some (f k t t'))
       t0 t1
 
   let union_total_shared f t0 t1 =
     toplevel_union_total
-      (fun[@inline] t0 t1 -> union_total_shared_tree f t0 t1)
+      (fun [@inline] t0 t1 -> union_total_shared_tree f t0 t1)
       t0 t1
 
   let rec union_left_biased_tree t0 t1 =
@@ -1164,7 +1160,7 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> Non_empty (union_left_biased_tree t0 t1))
       iv
-      (fun[@inline] _k t _t' -> Some t)
+      (fun [@inline] _k t _t' -> Some t)
       t0 t1
 
   let union_left_biased t0 t1 =
@@ -1180,7 +1176,7 @@ end = struct
       ~only_right:(fun t1 -> Non_empty t1)
       ~both_sides:(fun t0 t1 -> Non_empty (union_right_biased_tree t0 t1))
       iv
-      (fun[@inline] _k _t t' -> Some t')
+      (fun [@inline] _k _t t' -> Some t')
       t0 t1
 
   let union_right_biased t0 t1 =
@@ -1193,7 +1189,7 @@ end = struct
       ~only_right:(fun _ -> Empty)
       ~both_sides:(fun t0 t1 -> descr (diff_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
 
   let toplevel_diff nonempty_diff t0 t1 =
@@ -1204,7 +1200,7 @@ end = struct
   [@@inline always]
 
   let diff f t0 t1 =
-    toplevel_diff (fun[@inline] t0 t1 -> diff_tree f t0 t1) t0 t1
+    toplevel_diff (fun [@inline] t0 t1 -> diff_tree f t0 t1) t0 t1
 
   let rec diff_sharing_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1213,11 +1209,11 @@ end = struct
       ~only_right:(fun _ -> Empty)
       ~both_sides:(fun t0 t1 -> descr (diff_sharing_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
 
   let diff_sharing f t0 t1 =
-    toplevel_diff (fun[@inline] t0 t1 -> diff_sharing_tree f t0 t1) t0 t1
+    toplevel_diff (fun [@inline] t0 t1 -> diff_sharing_tree f t0 t1) t0 t1
 
   let rec diff_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1226,11 +1222,11 @@ end = struct
       ~only_right:(fun _ -> Empty)
       ~both_sides:(fun t0 t1 -> descr (diff_shared_tree f t0 t1))
       iv
-      (fun[@inline] k t t' -> Merge_callback.call_diff f k t t')
+      (fun [@inline] k t t' -> Merge_callback.call_diff f k t t')
       t0 t1
 
   let diff_shared f t0 t1 =
-    toplevel_diff (fun[@inline] t0 t1 -> diff_shared_tree f t0 t1) t0 t1
+    toplevel_diff (fun [@inline] t0 t1 -> diff_shared_tree f t0 t1) t0 t1
 
   let rec subset_domain_tree t0 t1 =
     match tree_descr t0, tree_descr t1 with
@@ -1477,7 +1473,7 @@ end = struct
         unsigned_exists p t0 || unsigned_exists p t1)
 
   let filter p t =
-    let rec loop @ local = fun tree ->
+    let rec (loop @ local) tree =
       let iv = is_value_of_tree tree in
       match tree_descr tree with
       | Leaf leaf ->
@@ -1724,7 +1720,7 @@ end = struct
       ~only_right:(fun t1 -> descr (merge_right iv f t1))
       ~both_sides:(fun t0 t1 -> descr (merge_tree iv f t0 t1))
       iv
-      (fun[@inline always] i d0 d1 -> f i (Some d0) (Some d1))
+      (fun [@inline always] i d0 d1 -> f i (Some d0) (Some d1))
       t0 t1
 
   let merge iv f t0 t1 =
@@ -1832,7 +1828,7 @@ end = struct
       ~only_right:(fun t1 -> descr (update_many_right iv f t1))
       ~both_sides:(fun t0 t1 -> descr (update_many_tree f t0 t1))
       iv
-      (fun[@inline always] k d0 d1 -> f k (Some d0) d1)
+      (fun [@inline always] k d0 d1 -> f k (Some d0) d1)
       t0 t1
 
   let update_many f t0 t1 =

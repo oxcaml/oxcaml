@@ -47,6 +47,24 @@ jobs:
           opam-disable-sandboxing: true
           opam-pin: false
 
+      - name: Restore OxCaml formatter
+        id: formatter-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ocamlformat-ox/bin
+          key: ocamlformat-ox-v1-${{ runner.os }}-${{ runner.arch }}-48863c1bf753474dffbca831f66024535a0ec982
+
+      - name: Build OxCaml formatter
+        if: steps.formatter-cache.outputs.cache-hit != 'true'
+        run: bash tools/ci/actions/build-oxcamlformat.sh
+
+      - name: Save OxCaml formatter
+        if: steps.formatter-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/ocamlformat-ox/bin
+          key: ${{ steps.formatter-cache.outputs.cache-primary-key }}
+
       - name: 'Check for the "skip 80ch" PR tag'
         if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
         run: echo SKIP_80CH=y >> "$GITHUB_ENV"
@@ -75,7 +93,12 @@ jobs:
           fi
 
       - name: Check OCaml Formatting
-        run: opam exec -- bash tools/ci/actions/check-fmt.sh
+        run: |
+          eval "$(opam env)"
+          export UPSTREAM_OCAMLFORMAT="$(command -v ocamlformat)"
+          export OXCAML_OCAMLFORMAT="$RUNNER_TEMP/ocamlformat-ox/bin/ocamlformat-ox"
+          export PATH="$PWD/tools/ci:$PATH"
+          bash tools/ci/actions/check-fmt.sh
 
       - name: Check for Conflict Markers
         if: ${{ !cancelled() }}
