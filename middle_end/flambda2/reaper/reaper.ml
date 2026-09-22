@@ -68,8 +68,10 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env ~free_names
   in
   let Rebuild.{ body; all_code; code_ids_to_remember } =
     Rebuild.rebuild ~machine_width ~ordered_code_ids ~fixed_arity_continuations
-      ~continuation_info ~final_typing_env ~types_rewrite_context ~code_changes
-      uses get_code_metadata toplevel_expr code
+      ~continuation_info ~final_typing_env
+      ~rewrite_kind_with_subkind:
+        (Types_rewriter.rewrite_kind_with_subkind types_rewrite_context)
+      ~code_changes uses get_code_metadata toplevel_expr code
   in
   let all_code =
     Exported_code.add_code
