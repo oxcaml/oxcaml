@@ -1834,3 +1834,25 @@ Line 1, characters 29-44:
                                  ^^^^^^^^^^^^^^^
 Error: The type "ordinary_value" has no unboxed version.
 |}]
+
+let abstract_unbox_slot_bad =
+  fun (type a : value box) -> ref (None : (a -> a#) option)
+[%%expect{|
+val abstract_unbox_slot_bad : ('_weak1 box -> '_weak1) option ref =
+  {contents = None}
+|}]
+
+let () =
+  abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : int))
+[%%expect{|
+|}]
+
+let () =
+  abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : string))
+[%%expect{|
+Line 2, characters 45-59:
+2 |   abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : string))
+                                                 ^^^^^^^^^^^^^^
+Error: This expression has type "int" but an expression was expected of type
+         "string"
+|}]
