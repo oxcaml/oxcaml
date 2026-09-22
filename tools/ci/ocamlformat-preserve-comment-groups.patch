@@ -1,0 +1,14 @@
+diff --git a/lib/Cmts.ml b/lib/Cmts.ml
+index 75e9d38..1c12b6a 100644
+--- a/lib/Cmts.ml
++++ b/lib/Cmts.ml
+@@ -669,7 +669,8 @@ let fmt_cmts_aux t (conf : Conf.t) cmts ~fmt_code pos =
+              in
+              break $ fmt_cmt conf cmt ~fmt_code
+          | group ->
+-             list group "@;<1000 0>" (fun cmt -> fmt_cmt conf cmt ~fmt_code)
++             list group "@;<1000 0>" (fun cmt ->
++                 str "(*" $ str (Cmt.txt cmt) $ str "*)" )
+          )
+          $
+          match next with

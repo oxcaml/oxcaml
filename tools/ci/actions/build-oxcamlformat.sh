@@ -12,6 +12,10 @@ git -C "$formatter_source" fetch --depth=1 origin \
   48863c1bf753474dffbca831f66024535a0ec982
 git -C "$formatter_source" checkout --detach FETCH_HEAD
 
+# Preserve aligned comment blocks, matching upstream ocamlformat 0.29.
+git -C "$formatter_source" apply \
+  "$GITHUB_WORKSPACE/tools/ci/ocamlformat-preserve-comment-groups.patch"
+
 # The formatter fork uses the OCaml 5.2 compiler-libs API.
 opam switch create "$formatter_switch" ocaml-base-compiler.5.2.1 \
   --yes --no-switch

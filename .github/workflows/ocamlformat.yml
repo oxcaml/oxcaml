@@ -52,7 +52,7 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/ocamlformat-ox/bin
-          key: ocamlformat-ox-v1-${{ runner.os }}-${{ runner.arch }}-48863c1bf753474dffbca831f66024535a0ec982
+          key: ocamlformat-ox-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/ci/actions/build-oxcamlformat.sh', 'tools/ci/ocamlformat-preserve-comment-groups.patch') }}
 
       - name: Build OxCaml formatter
         if: steps.formatter-cache.outputs.cache-hit != 'true'
