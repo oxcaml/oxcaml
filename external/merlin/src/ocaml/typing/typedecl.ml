@@ -1373,7 +1373,7 @@ let transl_declaration env sdecl (id, uid) =
 
    3. But not all of these [Record_dummy]s will end up with unboxed versions:
       they become [Record_float]/[Record_boxed]/[Record_mixed], and float
-      records and records with [@atomic] fields don't have unboxed versions.
+      records don't have unboxed versions.
       These unboxed versions are removed in [remove_unboxed_versions].
 
    After steps 2 and 3, the set of unboxed versions decreases, so we check for
