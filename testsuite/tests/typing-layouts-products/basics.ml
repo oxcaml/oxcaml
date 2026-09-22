@@ -127,11 +127,11 @@ Line 1, characters 16-28:
                     ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int) is value non_pointer & value non_pointer
+       The layout of #(int * int) is
+           untagged_immediate box & untagged_immediate box
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
-       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v7.1: The above error should identify the component of the product
    that is problematic. *)
@@ -208,12 +208,12 @@ Line 2, characters 24-38:
                             ^^^^^^^^^^^^^^
 Error: This type "#(int * int64)" should be an instance of type
          "('a : value & bits64)"
-       The layout of #(int * int64) is value non_pointer & value non_float
+       The layout of #(int * int64) is
+           untagged_immediate box & value non_float
          because it is an unboxed tuple.
        But the layout of #(int * int64) must be a sublayout of value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
-       Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
@@ -229,13 +229,12 @@ Line 1, characters 0-54:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
        The layout of t6_wrong_inner_record is
-           value non_pointer & value non_float
+           untagged_immediate box & value non_float
          because it is an unboxed record.
        But the layout of t6_wrong_inner_record must be a sublayout of
            value & bits64
          because of the annotation on 'a in the declaration of the type
                                       t6_wrong.
-       Note: The layout of immediate is value non_pointer.
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
@@ -452,11 +451,10 @@ Line 1, characters 31-44:
 1 | type poly_var_type = [ `Foo of #(int * bool) ]
                                    ^^^^^^^^^^^^^
 Error: Polymorphic variant constructor argument types must have layout value.
-       The layout of "#(int * bool)" is value non_pointer & value non_pointer
+       The layout of "#(int * bool)" is untagged_immediate box & bits8 box
          because it is an unboxed tuple.
        But the layout of "#(int * bool)" must be a value layout
          because it's the type of the field of a polymorphic variant.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 let poly_var_term = `Foo #(1,2)
@@ -518,11 +516,10 @@ Line 1, characters 21-38:
 1 | type object_type = < x : #(int * bool) >
                          ^^^^^^^^^^^^^^^^^
 Error: Object field types must have layout value.
-       The layout of "#(int * bool)" is value non_pointer & value non_pointer
+       The layout of "#(int * bool)" is untagged_immediate box & bits8 box
          because it is an unboxed tuple.
        But the layout of "#(int * bool)" must be a value layout
          because it's the type of an object field.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 let object_term = object val x = #(1, 2) end
@@ -531,11 +528,10 @@ Line 1, characters 29-30:
 1 | let object_term = object val x = #(1, 2) end
                                  ^
 Error: Variables bound in a class must have layout value.
-       The layout of x is value non_pointer & value non_pointer
+       The layout of x is untagged_immediate box & untagged_immediate box
          because it is an unboxed tuple.
        But the layout of x must be a value layout
          because it's the type of a class field.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 class class_ =
@@ -1851,11 +1847,11 @@ Line 1, characters 9-21:
 1 | type t = #(int * int) lazy_t
              ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type "('a : value)"
-       The layout of #(int * int) is value non_pointer & value non_pointer
+       The layout of #(int * int) is
+           untagged_immediate box & untagged_immediate box
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a value layout
          because the type argument of lazy_t has layout value.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 type lazy_record = #{ i1 : int; i2 : int }
@@ -2031,9 +2027,9 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immutable_data non_pointer
+           (untagged_immediate mod everything) box mod immutable
            & immutable_data
-           & immutable_data non_pointer
+           & (untagged_immediate mod everything) box mod immutable
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_
@@ -2046,12 +2042,18 @@ Line 3, characters 9-30:
 Error: This type "#(int * string * int)" should be an instance of type
          "('a : any mod external_)"
        The kind of #(int * string * int) is
-           immediate mod dynamic with int with string
+           (untagged_immediate mod everything) box
+             mod global immutable dynamic unforkable yielding external_
+             with int
+             with string
            & (value mod everything) non_float
                mod dynamic
                with int
                with string
-           & immediate mod dynamic with int with string
+           & (untagged_immediate mod everything) box
+               mod global immutable dynamic unforkable yielding external_
+               with int
+               with string
          because it is an unboxed tuple.
        But the kind of #(int * string * int) must be a subkind of
            any mod external_
@@ -2097,9 +2099,9 @@ Line 4, characters 9-17:
 Error: This type "s_record" should be an instance of type
          "('a : any mod external_)"
        The kind of s_record is
-           immutable_data non_pointer
+           (untagged_immediate mod everything) box mod immutable
            & immutable_data
-           & immutable_data non_pointer
+           & (untagged_immediate mod everything) box mod immutable
          because of the definition of s_record at line 3, characters 0-51.
        But the kind of s_record must be a subkind of any mod external_
          because of the definition of t at line 1, characters 0-31.

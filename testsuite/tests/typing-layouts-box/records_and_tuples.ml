@@ -101,7 +101,7 @@ type bad : value box = { x : float } [@@unboxed]
 Line 1, characters 0-48:
 1 | type bad : value box = { x : float } [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "bad" is value
+Error: The layout of type "bad" is float64 box
          because it is the primitive type float.
        But the layout of type "bad" must be a sublayout of value box
          because of the annotation on the declaration of the type bad.

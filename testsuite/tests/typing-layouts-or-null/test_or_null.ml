@@ -470,7 +470,7 @@ Line 1, characters 0-55:
 1 | type bad : immediate & immediate = #(int or_null * int)
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "#(int or_null * int)" is
-           value_or_null non_pointer & value non_pointer
+           value_or_null non_pointer & untagged_immediate box
          because it is an unboxed tuple.
        But the layout of type "#(int or_null * int)" must be a sublayout of
            value non_pointer & value non_pointer

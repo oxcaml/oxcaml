@@ -44,7 +44,9 @@ type t : value mod dynamic = #{ x : int }
 Line 1, characters 0-41:
 1 | type t : value mod dynamic = #{ x : int }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is immediate
+Error: The kind of type "t" is
+           (untagged_immediate mod everything) box
+             mod global immutable unforkable yielding external_
          because it is an unboxed record.
        But the kind of type "t" must be a subkind of value mod dynamic
          because of the annotation on the declaration of the type t.

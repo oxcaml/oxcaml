@@ -500,9 +500,8 @@ Line 3, characters 0-26:
 3 | and r = #{ x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of r is value non_pointer & value non_pointer
+       The layout of r is untagged_immediate box & bits8 box
          because it is an unboxed record.
        But the layout of r must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
-       Note: The layout of immediate is value non_pointer.
 |}]

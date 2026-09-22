@@ -66,7 +66,9 @@ type t : k = int
 Line 1, characters 0-16:
 1 | type t : k = int
     ^^^^^^^^^^^^^^^^
-Error: The kind of type "int" is immediate
+Error: The kind of type "int" is
+           (untagged_immediate mod everything) box
+             mod global immutable unforkable yielding external_
          because it is the primitive type int.
        But the kind of type "int" must be a subkind of k
          because of the definition of t at line 1, characters 0-16.
