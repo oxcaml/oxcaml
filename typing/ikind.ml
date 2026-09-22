@@ -192,6 +192,7 @@ module Solver = struct
       lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
       provenance : provenance_ctx option;
+      on_type_var : Types.type_expr -> unit;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
@@ -209,6 +210,7 @@ module Solver = struct
       lookup_of_env;
       mode;
       provenance = None;
+      on_type_var = ignore;
       ty_to_kind = global_ty_to_kind;
       constr_to_coeffs = global_constr_to_coeffs
     }
@@ -488,6 +490,9 @@ module Solver = struct
     let constr_ctx =
       match ctx.provenance with None -> ctx | Some _ -> without_provenance ctx
     in
+    (* Variables encountered while computing the constructor's coefficients
+       are not relevant for propagating requirements through with-bounds. *)
+    let constr_ctx = { constr_ctx with on_type_var = ignore } in
     let base, coeffs =
       constr_kind constr_ctx ~min_arity:(List.length args) path
     in
@@ -569,7 +574,8 @@ module Solver = struct
       (ty : Types.type_expr) : Ldd.node =
     if check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
-    else
+    else (
+      if Btype.is_Tvar ty then ctx.on_type_var ty;
       match TyTbl.find_opt ctx.ty_to_kind ty with
       | Some kind_poly -> kind_poly
       | None -> (
@@ -599,7 +605,7 @@ module Solver = struct
             if Option.is_none ctx.provenance
             then TyTbl.add ctx.ty_to_kind ty kind_rhs;
             cache_provenance_kind ctx ty kind_rhs;
-            kind_rhs)
+            kind_rhs))
 
   (* Worker for [kind]; does not memoize.
      Only call from [kind] so caching and LFP handling apply. *)
@@ -700,6 +706,13 @@ module Solver = struct
   let normalize (kind_poly : Ldd.node) : Ldd.node =
     Ldd.solve_pending ();
     kind_poly
+
+  let kind_with_type_vars (ctx : ctx) ty =
+    let type_vars = ref Btype.TypeSet.empty in
+    let on_type_var ty = type_vars := Btype.TypeSet.add ty !type_vars in
+    let ctx = { ctx with on_type_var } in
+    let poly = normalize (kind ~use_tables:true ctx ty) in
+    poly, Btype.TypeSet.elements !type_vars
 
   let node_of_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
     rigid_name ctx name
@@ -1924,6 +1937,45 @@ let sub_or_error ?origin:_origin
     | _ ->
       (* Delegate to Jkind for detailed error reporting. *)
       Jkind.sub_or_error ~type_equal ~context env t1 t2
+
+let type_var_requirements ~type_equal ~context env ty
+    (sub : (Allowance.allowed * 'r1) Types.jkind)
+    (super : ('l2 * Allowance.allowed) Types.jkind) =
+  let check () =
+    match sub_or_intersect ~type_equal ~context env sub super with
+    | Sub -> Ok []
+    | Disjoint reasons | May_have_intersection reasons ->
+      Error
+        (Jkind.Violation.of_ ~context env
+           (Not_a_subjkind (sub, super, Misc.Nonempty_list.to_list reasons)))
+  in
+  if not !Clflags.ikinds
+  then check ()
+  else
+    match Jkind.sub_layout_or_error ~context env sub super with
+    | Error _ as error -> error
+    | Ok () -> (
+      let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+      let super_poly = Solver.normalize (Solver.ckind_of_jkind ctx super) in
+      let sub_poly, tvars = Solver.kind_with_type_vars ctx ty in
+      let rigid_vars =
+        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) tvars
+      in
+      let base, coeffs =
+        Ldd.decompose_into_linear_terms ~universe:rigid_vars sub_poly
+      in
+      match Ldd.leq_with_reason base super_poly with
+      | [] ->
+        Ok
+          (List.map2
+             (fun ty coeff ->
+               let bound = Ldd.round_down (Ldd.imply coeff super_poly) in
+               ty, Jkind.Mod_bounds.of_axis_lattice bound)
+             tvars coeffs)
+      | _ ->
+        (* The estimate may retain information hidden by principality checks
+           in [Solver.kind]. Use it for reporting errors. *)
+        check ())
 
 (** Substitute constructor ikinds according to [lookup] without requiring Env.
 *)

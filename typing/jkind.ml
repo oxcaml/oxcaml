@@ -2967,6 +2967,19 @@ let get_nullability env jk =
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
 
+let of_mod_bounds ~history mod_bounds =
+  { jkind =
+      { base = Layout (Any Scannable_axes.max);
+        mod_bounds;
+        with_bounds = No_with_bounds
+      };
+    annotation = None;
+    history;
+    has_warned = false;
+    ran_out_of_fuel_during_normalize = false;
+    quality = Not_best
+  }
+
 let apply_modality_l modality jk =
   let bounds_mask = Mod_bounds.mask_of_modality ~modality in
   let mod_bounds = Mod_bounds.apply_mask jk.jkind.mod_bounds bounds_mask in
