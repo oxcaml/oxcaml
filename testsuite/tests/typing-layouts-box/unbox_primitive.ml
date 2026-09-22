@@ -450,3 +450,36 @@ let () =
 type inner = #{ ix : int; iy : int; }
 type outer = { mutable u : inner; tag : int; }
 |}]
+
+module Abs : sig
+  type t : (value & float64) box
+  val make : int -> float# -> t
+  val get : t -> int * float
+end = struct
+  type t = { i : int; f : float# }
+  let make i f = { i; f }
+  let get { i; f } = i, box_float f
+end
+[%%expect{|
+module Abs :
+  sig
+    type t : (value & float64) box
+    val make : int -> float# -> t
+    val get : t -> int * float
+  end
+|}]
+
+let unbox_abs_bad : Abs.t -> Abs.t# = unbox
+let box_abs_bad : Abs.t# -> Abs.t = box
+
+let () =
+  let original = Abs.make 42 #3.25 in
+  let contents = unbox_abs_bad (Sys.opaque_identity original) in
+  let copy = box_abs_bad contents in
+  assert (Abs.get copy = (42, 3.25))
+[%%expect{|
+Line 1, characters 29-35:
+1 | let unbox_abs_bad : Abs.t -> Abs.t# = unbox
+                                 ^^^^^^
+Error: The type "Abs.t" has no unboxed version.
+|}]
