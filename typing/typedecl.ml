@@ -2478,10 +2478,13 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       | Unboxed_product ->
         begin match lbls with
         | [(lbl : Types.label_declaration), ty] ->
-          Jkind.for_abbreviation
-            ~type_jkind_purely:(Ctype.type_jkind env)
-            ~modality:lbl.ld_modalities ty
-          |> Jkind.apply_operator env (field_kind_operator lbl.ld_inheritance)
+          let jkind =
+            Jkind.for_abbreviation
+              ~type_jkind_purely:(Ctype.type_jkind env)
+              ~modality:lbl.ld_modalities ty
+            |> Jkind.apply_operator env (field_kind_operator lbl.ld_inheritance)
+          in
+          Jkind.History.update_reason jkind (Product_creation Unboxed_record)
         | [] | _ :: _ :: _ ->
           let lbls_with_layouts =
             List.map2

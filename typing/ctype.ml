@@ -3229,14 +3229,17 @@ and estimate_type_jkind ~expand_components ~ignore_mod_bounds ~mod_bounds_only
           end;
           begin match lbls, Array.to_list label_params_and_tys with
           | [lbl], [(_, ty)] ->
-            Jkind.for_abbreviation
-              ~type_jkind_purely:
-                (estimate_type_jkind ~expand_components ~ignore_mod_bounds
-                   ~mod_bounds_only:false env)
-              ~modality:lbl.ld_modalities ty
-            |> Jkind.apply_operator env
-                 (field_kind_operator lbl.ld_inheritance)
-            |> Jkind.mark_best
+            let jkind =
+              Jkind.for_abbreviation
+                ~type_jkind_purely:
+                  (estimate_type_jkind ~expand_components ~ignore_mod_bounds
+                     ~mod_bounds_only:false env)
+                ~modality:lbl.ld_modalities ty
+              |> Jkind.apply_operator env
+                   (field_kind_operator lbl.ld_inheritance)
+              |> Jkind.mark_best
+            in
+            Jkind.History.update_reason jkind (Product_creation Unboxed_record)
           | _ ->
             let tys = Array.map snd label_params_and_tys |> Array.to_list in
             estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
