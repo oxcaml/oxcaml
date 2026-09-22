@@ -5548,9 +5548,7 @@ let rec check_captures_comonadic env (exp : expression) =
     List.iter (fun (_, e) -> check e) args
   | Texp_variant (_, None) -> ()
   | Texp_variant (_, Some (e, _)) -> check e
-  | Texp_tuple (args, _) ->
-    List.iter (fun (_, e) -> check e) args
-  | Texp_unboxed_tuple args ->
+  | Texp_tuple (args, _) | Texp_unboxed_tuple args ->
     List.iter (fun (_, e, _) -> check e) args
   | Texp_record { fields; extended_expression = None; _ } ->
     Array.iter (fun (_, _, def) ->
