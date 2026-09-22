@@ -355,9 +355,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
     let native_scalar_field obj pos
           (kind : unit Mixed_block_shape.Singleton_mixed_block_element.t) =
       let signed bits =
-        let shift = Sys.int_size - bits in
-        let word = Nativeint.to_int (O.raw_field obj pos) in
-        Some (O.repr (word lsl shift asr shift))
+        let modulus = 1 lsl bits in
+        let word = Nativeint.to_int (O.raw_field obj pos) land (modulus - 1) in
+        Some (O.repr (if word < modulus / 2 then word else word - modulus))
       in
       match kind with
       | Value _ -> Some (O.field obj pos)
