@@ -1,7 +1,8 @@
 ; Link time optimisation of ocamlopt itself, expressed with explicit rules.
 ;
 ; The ordinary build of the main context already compiles every unit with
-; -support-lto (see the lto=yes variable in Makefile.common-ox), which makes
+; -support-lto (see the lto variable in Makefile.common-ox, on by default),
+; which makes
 ; each .cmx carry the Reaper's link time optimisation information. On top of
 ; that, the rules below run the two remaining phases and relink:
 ;
@@ -14,9 +15,11 @@
 ;     independent of one another and run in parallel. The rebuild runs the
 ;     backend again, so each rule passes (after "--") the backend-relevant
 ;     flags of the library's ordinary compilation in the main context: -g and
-;     -directory from (flags ...), -O3 and -fno-asan from (ocamlopt_flags ...)
-;     and, for the libraries that include ocamlopt_flags.sexp, the
-;     -function-sections it contains;
+;     -directory from (flags ...), and -O3 and -fno-asan from
+;     (ocamlopt_flags ...). The libraries that include ocamlopt_flags.sexp
+;     additionally pass -extra-flags naming that file, so that whatever
+;     configure put in it is replayed rather than transcribed here: its
+;     contents vary from one configuration to another;
 ;   * a link of the reaped archives into ocamlopt_lto.exe.
 ;
 ; Everything below the solve rule is mechanical, one block per library. The
@@ -32,7 +35,7 @@
 ;
 ; Build it with
 ;   rm -f duneconf/main.ws && rm -rf _build
-;   make lto=yes lto-compiler
+;   make lto-compiler          (or just "make"; lto=no opts out)
 ;
 ; Do not invoke dune directly on the @lto alias: the root dune file selects the
 ; backend with (copy_files# "backend/%{env:ARCH=amd64}/..."), so a dune command
@@ -100,7 +103,8 @@
  (deps
   program.ltosol
   ../../otherlibs/unix/unix.cmxa
-  (glob_files ../../otherlibs/unix/.unix.objs/native/*.cmx))
+  (glob_files ../../otherlibs/unix/.unix.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -108,8 +112,9 @@
    -ltosol program.ltosol
    -archive ../../otherlibs/unix/unix.cmxa
    -o unix.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets memtrace.lto.cmxa memtrace.lto.a)
@@ -132,7 +137,8 @@
  (deps
   program.ltosol
   ../../middle_end/flambda2/numbers/floats/flambda2_floats.cmxa
-  (glob_files ../../middle_end/flambda2/numbers/floats/.flambda2_floats.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/numbers/floats/.flambda2_floats.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -140,15 +146,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/numbers/floats/flambda2_floats.cmxa
    -o flambda2_floats.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets ocamlcommon.lto.cmxa ocamlcommon.lto.a)
  (deps
   program.ltosol
   ../../ocamlcommon.cmxa
-  (glob_files ../../.ocamlcommon.objs/native/*.cmx))
+  (glob_files ../../.ocamlcommon.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -156,15 +164,17 @@
    -ltosol program.ltosol
    -archive ../../ocamlcommon.cmxa
    -o ocamlcommon.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets ocamlfrontend.lto.cmxa ocamlfrontend.lto.a)
  (deps
   program.ltosol
   ../../ocamlfrontend.cmxa
-  (glob_files ../../.ocamlfrontend.objs/native/*.cmx))
+  (glob_files ../../.ocamlfrontend.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -172,15 +182,17 @@
    -ltosol program.ltosol
    -archive ../../ocamlfrontend.cmxa
    -o ocamlfrontend.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets ocamlbytecomp.lto.cmxa ocamlbytecomp.lto.a)
  (deps
   program.ltosol
   ../../ocamlbytecomp.cmxa
-  (glob_files ../../.ocamlbytecomp.objs/native/*.cmx))
+  (glob_files ../../.ocamlbytecomp.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -188,15 +200,17 @@
    -ltosol program.ltosol
    -archive ../../ocamlbytecomp.cmxa
    -o ocamlbytecomp.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets dwarf_flags.lto.cmxa dwarf_flags.lto.a)
  (deps
   program.ltosol
   ../../backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa
-  (glob_files ../../backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/*.cmx))
+  (glob_files ../../backend/debug/dwarf/dwarf_flags/.dwarf_flags.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -204,15 +218,17 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_flags/dwarf_flags.cmxa
    -o dwarf_flags.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets asm_targets.lto.cmxa asm_targets.lto.a)
  (deps
   program.ltosol
   ../../backend/asm_targets/asm_targets.cmxa
-  (glob_files ../../backend/asm_targets/.asm_targets.objs/native/*.cmx))
+  (glob_files ../../backend/asm_targets/.asm_targets.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -220,15 +236,17 @@
    -ltosol program.ltosol
    -archive ../../backend/asm_targets/asm_targets.cmxa
    -o asm_targets.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets arm64_ast.lto.cmxa arm64_ast.lto.a)
  (deps
   program.ltosol
   ../../backend/arm64/ast/arm64_ast.cmxa
-  (glob_files ../../backend/arm64/ast/.arm64_ast.objs/native/*.cmx))
+  (glob_files ../../backend/arm64/ast/.arm64_ast.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -236,15 +254,17 @@
    -ltosol program.ltosol
    -archive ../../backend/arm64/ast/arm64_ast.cmxa
    -o arm64_ast.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets binary_emitter_intf.lto.cmxa binary_emitter_intf.lto.a)
  (deps
   program.ltosol
   ../../backend/binary_emitter_intf/binary_emitter_intf.cmxa
-  (glob_files ../../backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx))
+  (glob_files ../../backend/binary_emitter_intf/.binary_emitter_intf.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -252,15 +272,17 @@
    -ltosol program.ltosol
    -archive ../../backend/binary_emitter_intf/binary_emitter_intf.cmxa
    -o binary_emitter_intf.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets arm64_binary_emitter.lto.cmxa arm64_binary_emitter.lto.a)
  (deps
   program.ltosol
   ../../backend/arm64/binary_emitter/arm64_binary_emitter.cmxa
-  (glob_files ../../backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx))
+  (glob_files ../../backend/arm64/binary_emitter/.arm64_binary_emitter.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -268,15 +290,17 @@
    -ltosol program.ltosol
    -archive ../../backend/arm64/binary_emitter/arm64_binary_emitter.cmxa
    -o arm64_binary_emitter.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets oxcaml_common.lto.cmxa oxcaml_common.lto.a)
  (deps
   program.ltosol
   ../../oxcaml_common.cmxa
-  (glob_files ../../.oxcaml_common.objs/native/*.cmx))
+  (glob_files ../../.oxcaml_common.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -284,15 +308,17 @@
    -ltosol program.ltosol
    -archive ../../oxcaml_common.cmxa
    -o oxcaml_common.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_algorithms.lto.cmxa flambda2_algorithms.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/algorithms/flambda2_algorithms.cmxa
-  (glob_files ../../middle_end/flambda2/algorithms/.flambda2_algorithms.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/algorithms/.flambda2_algorithms.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -300,15 +326,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/algorithms/flambda2_algorithms.cmxa
    -o flambda2_algorithms.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_ui.lto.cmxa flambda2_ui.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/ui/flambda2_ui.cmxa
-  (glob_files ../../middle_end/flambda2/ui/.flambda2_ui.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/ui/.flambda2_ui.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -316,15 +344,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/ui/flambda2_ui.cmxa
    -o flambda2_ui.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_datalog.lto.cmxa flambda2_datalog.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/datalog/flambda2_datalog.cmxa
-  (glob_files ../../middle_end/flambda2/datalog/.flambda2_datalog.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/datalog/.flambda2_datalog.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -332,15 +362,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/datalog/flambda2_datalog.cmxa
    -o flambda2_datalog.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_numbers.lto.cmxa flambda2_numbers.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/numbers/flambda2_numbers.cmxa
-  (glob_files ../../middle_end/flambda2/numbers/.flambda2_numbers.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/numbers/.flambda2_numbers.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -348,15 +380,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/numbers/flambda2_numbers.cmxa
    -o flambda2_numbers.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_kinds.lto.cmxa flambda2_kinds.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/kinds/flambda2_kinds.cmxa
-  (glob_files ../../middle_end/flambda2/kinds/.flambda2_kinds.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/kinds/.flambda2_kinds.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -364,15 +398,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/kinds/flambda2_kinds.cmxa
    -o flambda2_kinds.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_import.lto.cmxa flambda2_import.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/import/flambda2_import.cmxa
-  (glob_files ../../middle_end/flambda2/import/.flambda2_import.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/import/.flambda2_import.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -380,15 +416,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/import/flambda2_import.cmxa
    -o flambda2_import.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_identifiers.lto.cmxa flambda2_identifiers.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/identifiers/flambda2_identifiers.cmxa
-  (glob_files ../../middle_end/flambda2/identifiers/.flambda2_identifiers.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/identifiers/.flambda2_identifiers.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -396,15 +434,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/identifiers/flambda2_identifiers.cmxa
    -o flambda2_identifiers.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_nominal.lto.cmxa flambda2_nominal.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/nominal/flambda2_nominal.cmxa
-  (glob_files ../../middle_end/flambda2/nominal/.flambda2_nominal.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/nominal/.flambda2_nominal.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -412,15 +452,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/nominal/flambda2_nominal.cmxa
    -o flambda2_nominal.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_bound_identifiers.lto.cmxa flambda2_bound_identifiers.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cmxa
-  (glob_files ../../middle_end/flambda2/bound_identifiers/.flambda2_bound_identifiers.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/bound_identifiers/.flambda2_bound_identifiers.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -428,15 +470,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/bound_identifiers/flambda2_bound_identifiers.cmxa
    -o flambda2_bound_identifiers.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_lattices.lto.cmxa flambda2_lattices.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/lattices/flambda2_lattices.cmxa
-  (glob_files ../../middle_end/flambda2/lattices/.flambda2_lattices.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/lattices/.flambda2_lattices.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -444,15 +488,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/lattices/flambda2_lattices.cmxa
    -o flambda2_lattices.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_term_basics.lto.cmxa flambda2_term_basics.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/term_basics/flambda2_term_basics.cmxa
-  (glob_files ../../middle_end/flambda2/term_basics/.flambda2_term_basics.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/term_basics/.flambda2_term_basics.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -460,15 +506,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/term_basics/flambda2_term_basics.cmxa
    -o flambda2_term_basics.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_classic_mode_types.lto.cmxa flambda2_classic_mode_types.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.cmxa
-  (glob_files ../../middle_end/flambda2/classic_mode_types/.flambda2_classic_mode_types.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/classic_mode_types/.flambda2_classic_mode_types.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -476,15 +524,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/classic_mode_types/flambda2_classic_mode_types.cmxa
    -o flambda2_classic_mode_types.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_types.lto.cmxa flambda2_types.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/types/flambda2_types.cmxa
-  (glob_files ../../middle_end/flambda2/types/.flambda2_types.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/types/.flambda2_types.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -492,15 +542,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/types/flambda2_types.cmxa
    -o flambda2_types.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_terms.lto.cmxa flambda2_terms.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/terms/flambda2_terms.cmxa
-  (glob_files ../../middle_end/flambda2/terms/.flambda2_terms.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/terms/.flambda2_terms.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -508,15 +560,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/terms/flambda2_terms.cmxa
    -o flambda2_terms.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_simplify_shared.lto.cmxa flambda2_simplify_shared.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cmxa
-  (glob_files ../../middle_end/flambda2/simplify_shared/.flambda2_simplify_shared.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/simplify_shared/.flambda2_simplify_shared.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -524,15 +578,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/simplify_shared/flambda2_simplify_shared.cmxa
    -o flambda2_simplify_shared.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_cmx.lto.cmxa flambda2_cmx.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/cmx/flambda2_cmx.cmxa
-  (glob_files ../../middle_end/flambda2/cmx/.flambda2_cmx.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/cmx/.flambda2_cmx.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -540,8 +596,9 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/cmx/flambda2_cmx.cmxa
    -o flambda2_cmx.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets compiler_owee.lto.cmxa compiler_owee.lto.a)
@@ -580,7 +637,8 @@
  (deps
   program.ltosol
   ../../backend/debug/dwarf/dwarf_low/dwarf_low.cmxa
-  (glob_files ../../backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx))
+  (glob_files ../../backend/debug/dwarf/dwarf_low/.dwarf_low.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -588,15 +646,17 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_low/dwarf_low.cmxa
    -o dwarf_low.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets dwarf_high.lto.cmxa dwarf_high.lto.a)
  (deps
   program.ltosol
   ../../backend/debug/dwarf/dwarf_high/dwarf_high.cmxa
-  (glob_files ../../backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx))
+  (glob_files ../../backend/debug/dwarf/dwarf_high/.dwarf_high.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -604,15 +664,17 @@
    -ltosol program.ltosol
    -archive ../../backend/debug/dwarf/dwarf_high/dwarf_high.cmxa
    -o dwarf_high.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets ocamloptcomp.lto.cmxa ocamloptcomp.lto.a)
  (deps
   program.ltosol
   ../../ocamloptcomp.cmxa
-  (glob_files ../../.ocamloptcomp.objs/native/*.cmx))
+  (glob_files ../../.ocamloptcomp.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -620,15 +682,17 @@
    -ltosol program.ltosol
    -archive ../../ocamloptcomp.cmxa
    -o ocamloptcomp.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_from_lambda.lto.cmxa flambda2_from_lambda.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa
-  (glob_files ../../middle_end/flambda2/from_lambda/.flambda2_from_lambda.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/from_lambda/.flambda2_from_lambda.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -636,15 +700,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/from_lambda/flambda2_from_lambda.cmxa
    -o flambda2_from_lambda.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_parser.lto.cmxa flambda2_parser.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/parser/flambda2_parser.cmxa
-  (glob_files ../../middle_end/flambda2/parser/.flambda2_parser.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/parser/.flambda2_parser.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -652,15 +718,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/parser/flambda2_parser.cmxa
    -o flambda2_parser.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_simplify.lto.cmxa flambda2_simplify.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/simplify/flambda2_simplify.cmxa
-  (glob_files ../../middle_end/flambda2/simplify/.flambda2_simplify.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/simplify/.flambda2_simplify.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -668,15 +736,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/simplify/flambda2_simplify.cmxa
    -o flambda2_simplify.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_to_cmm.lto.cmxa flambda2_to_cmm.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa
-  (glob_files ../../middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/to_cmm/.flambda2_to_cmm.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -684,8 +754,9 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/to_cmm/flambda2_to_cmm.cmxa
    -o flambda2_to_cmm.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets jsoo_imports.lto.cmxa jsoo_imports.lto.a)
@@ -708,7 +779,8 @@
  (deps
   program.ltosol
   ../../middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa
-  (glob_files ../../middle_end/flambda2/to_jsir/.flambda2_to_jsir.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/to_jsir/.flambda2_to_jsir.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -716,15 +788,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/to_jsir/flambda2_to_jsir.cmxa
    -o flambda2_to_jsir.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2_reaper.lto.cmxa flambda2_reaper.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/reaper/flambda2_reaper.cmxa
-  (glob_files ../../middle_end/flambda2/reaper/.flambda2_reaper.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/reaper/.flambda2_reaper.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -732,15 +806,17 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/reaper/flambda2_reaper.cmxa
    -o flambda2_reaper.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets flambda2.lto.cmxa flambda2.lto.a)
  (deps
   program.ltosol
   ../../middle_end/flambda2/flambda2.cmxa
-  (glob_files ../../middle_end/flambda2/.flambda2.objs/native/*.cmx))
+  (glob_files ../../middle_end/flambda2/.flambda2.objs/native/*.cmx)
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
@@ -748,20 +824,25 @@
    -ltosol program.ltosol
    -archive ../../middle_end/flambda2/flambda2.cmxa
    -o flambda2.lto.cmxa
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 (rule
  (targets oxcaml_main_native.reaped.cmx oxcaml_main_native.reaped.o)
- (deps program.ltosol ../../.oxcaml_main_native.eobjs/native/oxcaml_main_native.cmx)
+ (deps
+  program.ltosol
+  ../../.oxcaml_main_native.eobjs/native/oxcaml_main_native.cmx
+  ../../ocamlopt_flags.sexp)
  (action
   (run
    ./lto_helper.exe
    -ocamlopt %{ocamlopt}
    -ltosol program.ltosol
    -o oxcaml_main_native.reaped.cmx
+   -extra-flags ../../ocamlopt_flags.sexp
    %{deps}
-   -- -g -O3 -fno-asan -directory compiler-distro -function-sections)))
+   -- -g -O3 -fno-asan -directory compiler-distro)))
 
 ; The flags are those of the ordinary link, with the -I options rebased on
 ; this directory: they are what lets the C stub archives of the libraries be

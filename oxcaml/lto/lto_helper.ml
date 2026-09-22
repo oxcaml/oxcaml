@@ -81,6 +81,23 @@ let copy_file ~src ~dst =
           in
           loop ()))
 
+(* The flags a library was compiled with include whatever configure put in
+   ocamlopt_flags.sexp, which varies per configuration (-function-sections, for
+   instance, only on a tree configured for it). Read that file rather than
+   transcribing its contents into the rules, so the rebuild cannot drift from
+   the ordinary compilation. *)
+let flags_of_sexp_file file =
+  let ic = open_in file in
+  let n = in_channel_length ic in
+  let contents = really_input_string ic n in
+  close_in ic;
+  contents
+  |> String.map (function '(' | ')' -> ' ' | c -> c)
+  |> String.split_on_char ' '
+  |> List.concat_map (String.split_on_char '\n')
+  |> List.concat_map (String.split_on_char '\t')
+  |> List.filter (fun s -> s <> "")
+
 let reaped name = Filename.remove_extension name ^ ".reaped.cmx"
 
 (* Rebuild [members] against [ltosol] in a scratch directory of their own, and
@@ -151,6 +168,7 @@ let rebuild_unit ~ocamlopt ~flags ~ltosol ~output ~cmxs =
 let () =
   let ocamlopt = ref "" and ltosol = ref "" and archive = ref "" in
   let output = ref "" and cmxs = ref [] and flags = ref [] in
+  let extra_flags = ref "" in
   let usage =
     "Usage: lto_helper -ocamlopt <exe> -ltosol <file> [-archive <lib.cmxa>] \
      -o <output> <file>... [-- <ocamlopt flag>...]\n\
@@ -169,6 +187,11 @@ let () =
          members and the C libraries it records; without it a single unit is \
          rebuilt and left as a .cmx" );
       "-o", Arg.Set_string output, "<file> The .cmxa or .cmx to produce";
+      ( "-extra-flags",
+        Arg.Set_string extra_flags,
+        "<file> A generated flags file, in the (a b c) form of\n\
+        \      ocamlopt_flags.sexp, whose contents are appended to the flags\n\
+        \      given after --" );
       ( "--",
         Arg.Rest_all (fun rest -> flags := rest),
         "<flag>... Compiler flags for the rebuild, e.g. -g -directory <dir>" ) ]
@@ -180,7 +203,10 @@ let () =
   List.iter
     (fun (name, value) -> if !value = "" then fatal "missing %s\n%s" name usage)
     ["-ocamlopt", ocamlopt; "-ltosol", ltosol; "-o", output];
-  let cmxs = List.rev !cmxs and flags = !flags in
+  let cmxs = List.rev !cmxs in
+  let flags =
+    !flags @ if !extra_flags = "" then [] else flags_of_sexp_file !extra_flags
+  in
   if !archive = ""
   then
     rebuild_unit ~ocamlopt:!ocamlopt ~flags ~ltosol:!ltosol ~output:!output
