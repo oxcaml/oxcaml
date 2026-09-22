@@ -29,7 +29,8 @@ type op_class =
   | Op_load of Operation.mutable_flag
       (** memory load; [Op_load Mutable] is also used for operations that are
           not loads but whose result may change at safepoints (e.g.
-          [Reinterpret_cast Int_of_value]) *)
+          [Reinterpret_cast Int_of_value]). CR-someday xclerc for xclerc: we may
+          want to use another constructor for that second use. *)
   | Op_store of bool  (** memory store, false = init, true = assign *)
   | Op_other  (** anything else that does not allocate nor store in memory *)
 
