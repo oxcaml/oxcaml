@@ -534,10 +534,10 @@
 (pop)
 
 (push)
-(echo "(x >>s c) << c -> x & (-1 << c) if 0 <= c < 64 && 1 < c && c < 32")
+(echo "(x >>s c) << c -> x & (-1 << c) if 0 <= c < 64 && 0 < c && c < 32")
 (declare-const x word)
 (declare-const c word)
-(assert (and (bvult c #x0000000000000040) (bvslt #x0000000000000001 c) (bvslt c #x0000000000000020)))
+(assert (and (bvult c #x0000000000000040) (bvslt #x0000000000000000 c) (bvslt c #x0000000000000020)))
 (assert (not (= (bvshl (bvashr x c) c) (bvand x (bvshl #xffffffffffffffff c)))))
 (check-sat)
 (echo "")

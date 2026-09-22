@@ -166,15 +166,15 @@ let lsl_rules =
     create Lsl (x *: c1, c2) (x *: k (c1' <<! c2'));
     (* Clearing the low bits with a pair of shifts is a mask. The mask [-1 << c]
        only fits a sign-extended 32-bit immediate for shifts below 32; for
-       larger shifts the pair of shifts is cheaper. The arithmetic variant
-       excludes [c = 1]: [(x asr 1) lsl 1] followed by [+ 1] re-tags an integer,
-       and [asr_int] only recognises the untagging of that form. *)
+       larger shifts the pair of shifts is cheaper. For [c = 1], [(x asr 1) lsl
+       1] followed by [+ 1] re-tags an integer; [Cmm_helpers.ignore_low_bit_int]
+       knows the rewritten form so that a subsequent untagging still cancels. *)
     create Lsl
       ~cond:(All [Slt (il 0n, c'); Slt (c', il 32n)])
       (x >>: c, c)
       (x &: k (il (-1n) <<! c'));
     create Lsl
-      ~cond:(All [Slt (il 1n, c'); Slt (c', il 32n)])
+      ~cond:(All [Slt (il 0n, c'); Slt (c', il 32n)])
       (asr_ x c, c)
       (x &: k (il (-1n) <<! c')) ]
 

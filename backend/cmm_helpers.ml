@@ -540,12 +540,27 @@ let rec max_signed_bit_length e =
     if n = 0 then max_signed_bit_length c else arch_bits - n
   | Cop ((Cand | Cor | Cxor), [x; y], _) ->
     Int.max (max_signed_bit_length x) (max_signed_bit_length y)
+  | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
   | _ -> arch_bits
+
+(* The number of significant bits of a value loaded from memory, per
+   [max_signed_bit_length]. *)
+and loaded_bit_length (memory_chunk : Cmm.memory_chunk) =
+  match memory_chunk with
+  | Byte_unsigned | Byte_signed -> 8
+  | Sixteen_unsigned | Sixteen_signed -> 16
+  | Thirtytwo_unsigned | Thirtytwo_signed -> 32
+  | Word_int | Word_mask | Word_val | Single _ | Double
+  | Onetwentyeight_unaligned | Onetwentyeight_aligned | Twofiftysix_unaligned
+  | Twofiftysix_aligned | Fivetwelve_unaligned | Fivetwelve_aligned ->
+    arch_bits
 
 let rec max_signed_bit_length' e =
   let open P.Default_variables in
   P.run_default
-    ~default:(fun _ -> arch_bits)
+    ~default:(function
+      | Cop (Cload { memory_chunk; _ }, _, _) -> loaded_bit_length memory_chunk
+      | _ -> arch_bits)
     (prefer_or e)
     [ (Binop (Comparison, Any c1, Any c2) => fun _env -> 1);
       ( Guarded
@@ -580,12 +595,25 @@ let max_signed_bit_length =
   check_equal_int_1 "max_signed_bit_length" max_signed_bit_length
     ~engine:max_signed_bit_length'
 
+let low_bit_mask_const = function
+  | Cconst_int (i, _) -> Nativeint.of_int i
+  | Cconst_natint (i, _) -> i
+  | _ -> Misc.fatal_error "low_bit_mask_const: not a constant"
+
 let rec ignore_low_bit_int = function
   | Cop
       ( Caddi,
         [(Cop (Clsl, [_; Cconst_int (n, _)], _) as c); Cconst_int (1, _)],
         _ )
     when n > 0 && is_defined_shift n ->
+    ignore_low_bit_int c
+  | Cop
+      ( Caddi,
+        [ (Cop (Cand, [_; ((Cconst_int _ | Cconst_natint _) as mask)], _) as c);
+          Cconst_int (1, _) ],
+        _ )
+    when Nativeint.equal (Nativeint.logand (low_bit_mask_const mask) 1n) 0n ->
+    (* the mask clears the low bit, so the [+ 1] only sets it *)
     ignore_low_bit_int c
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> ignore_low_bit_int c
   | Cop (Clsl, [Cop (Clsr, [c; Cconst_int (1, _)], _); Cconst_int (1, _)], _) ->
@@ -596,6 +624,7 @@ let rec ignore_low_bit_int = function
 
 let rec ignore_low_bit_int' arg =
   let open P.Default_variables in
+  let mask = P.create_var Natint "mask" in
   P.run arg
     [ ( Guarded
           { pat =
@@ -604,6 +633,16 @@ let rec ignore_low_bit_int' arg =
                   As (c, Binop (Op Lsl, Any c1, Const_int n)),
                   Const_int_fixed 1 );
             guard = (fun env -> env#.n > 0 && is_defined_shift env#.n)
+          }
+      => fun env -> ignore_low_bit_int' env#.c );
+      ( Guarded
+          { pat =
+              Binop
+                ( Op Add,
+                  As (c, Binop (Op And, Any c1, Const_any mask)),
+                  Const_int_fixed 1 );
+            guard =
+              (fun env -> Nativeint.equal (Nativeint.logand env#.mask 1n) 0n)
           }
       => fun env -> ignore_low_bit_int' env#.c );
       ( Binop (Op Or, Any c, Const_int_fixed 1) => fun env ->

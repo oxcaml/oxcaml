@@ -517,13 +517,28 @@ lsl_asr:
   ret
 |}]
 
-(* [(x asr 1) lsl 1] is left alone: followed by [+ 1] it re-tags an integer, and
-   the untagging of that form must still be recognised. *)
 let lsl_asr_one x = Int64_u.shift_left (Int64_u.shift_right x 1) 1
 [%%expect_asm X86_64{|
 lsl_asr_one:
+  andq  $-2, %rax
+  ret
+|}]
+
+(* [(x asr 1) lsl 1 + 1] re-tags an integer; untagging it again must still cancel
+   down to a single shift. *)
+let untag_retag_untag (x : int) = Int64_u.of_int (Int64_u.to_int (Int64_u.of_int x))
+[%%expect_asm X86_64{|
+untag_retag_untag:
   sarq  $1, %rax
-  salq  $1, %rax
+  ret
+|}]
+
+(* A zero-extended byte load fits in 8 bits, so untagging its tagged value is a
+   no-op. *)
+let untag_tagged_byte (s : string) = Int64_u.of_int (Char.code (String.unsafe_get s 0))
+[%%expect_asm X86_64{|
+untag_tagged_byte:
+  movzbq (%rax), %rax
   ret
 |}]
 
