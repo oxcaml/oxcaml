@@ -255,3 +255,17 @@ Construct a module containing an inherited field
   $ $MERLIN single construct -position 3:6 -filename test.ml < test.ml | revert-newlines | jq -r '.value[1][]'
   struct type t = #{
            inherit x: int } end
+
+Stdlib boxing and unboxing preserve record and scalar types
+
+  $ cat > test.ml << EOF
+  > type t = { x : float# }
+  > let boxed : t = Stdlib.box #{ x = #1.0 }
+  > let unboxed : t# = Stdlib.unbox boxed
+  > let scalar : float = Stdlib.box #1.0
+  > let raw : float# = Stdlib.unbox scalar
+  > EOF
+
+  $ $MERLIN single errors -filename test.ml < test.ml | jq .value
+
+  $ $MERLIN single type-enclosing -position 3:6 -filename test.ml < test.ml | jq -r '.value[0].type'

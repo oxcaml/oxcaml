@@ -277,3 +277,18 @@ Test 6.1
     ],
     "notifications": []
   }
+
+Mixed tuples retain element sorts during destructuring and browsing
+
+  $ cat > mixed_tuple.ml << EOF
+  > let f (x : int * float#) =
+  >   x
+  > let project ((_, value) : int * float#) = value
+  > let pair = (1, #2.0)
+  > EOF
+
+  $ $MERLIN single case-analysis -start 2:2 -end 2:3 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[1]'
+
+  $ $MERLIN single type-enclosing -position 3:19 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[0].type'
+
+  $ $MERLIN single type-enclosing -position 4:16 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[0].type'
