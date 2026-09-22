@@ -10995,21 +10995,31 @@ and type_application env app_loc expected_mode position_and_mode
              [args = [(Label "a", Omitted bar);
                       (Optional "opt", Arg (Eliminated_optional_arg baz));
                       (Nolabel, Arg (Known_arg n))]] *)
-          let ty_res =
-            List.fold_left
-              (fun ty_ret (lbl, arg) ->
-                 match arg with
-                 | Omitted { ty_arg; mode_arg; level; _ } ->
-                     let arrow_desc =
-                       (lbl, mode_arg,
-                        With_locality.newvar (get_current_level ()))
-                     in
-                     newty2 ~level
-                       (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
-                 | Arg _ -> ty_ret)
-              ty_ret (List.rev untyped_args)
-          in
-          unify_exp_types app_loc env ty_res (instance ty_expected);
+          (* Result-directed application typing is not principal and differs
+             from upstream OCaml. *)
+          if not (Language_extension.erasable_extensions_only ())
+             && not !Clflags.principal
+          then begin
+            let ty_res =
+              List.fold_left
+                (fun ty_ret (lbl, arg) ->
+                   match arg with
+                   | Omitted { ty_arg; mode_arg; level; _ } ->
+                       let arrow_desc =
+                         (lbl, mode_arg,
+                          With_locality.newvar (get_current_level ()))
+                       in
+                       newty2 ~level
+                         (Tarrow (arrow_desc, ty_arg, ty_ret, commu_ok))
+                   | Arg _ -> ty_ret)
+                ty_ret (List.rev untyped_args)
+            in
+            let snap = snapshot () in
+            (* Quotation inference can fail before its arguments are known. *)
+            begin try Ctype.unify env ty_res (instance ty_expected)
+            with Unify _ | Tags _ -> backtrack snap
+            end
+          end;
           let partial_app = is_partial_apply untyped_args in
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
