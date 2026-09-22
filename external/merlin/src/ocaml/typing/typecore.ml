@@ -8220,7 +8220,7 @@ and type_expect_
       | _ ->
         new_box_ty (newgenvar (Jkind.Builtin.any ~why:Idx_base))
     in
-    let expected_base_ty = expected_base_ty ty_expected in
+    let expected_base_ty = expand_head env (expected_base_ty ty_expected) in
     let principal = is_principal ty_expected in
     let { ba; base_ty; el_ty; modality } =
       with_local_level_generalize_structure_if_principal
