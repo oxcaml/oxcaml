@@ -288,7 +288,10 @@ Mixed tuples retain element sorts during destructuring and browsing
   > EOF
 
   $ $MERLIN single case-analysis -start 2:2 -end 2:3 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[1]'
+  match x with | (_, _) -> _
 
   $ $MERLIN single type-enclosing -position 3:19 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[0].type'
+  float#
 
   $ $MERLIN single type-enclosing -position 4:16 -filename mixed_tuple.ml < mixed_tuple.ml | jq -r '.value[0].type'
+  float#

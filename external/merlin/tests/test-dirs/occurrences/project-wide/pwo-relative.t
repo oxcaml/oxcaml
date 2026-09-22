@@ -33,7 +33,7 @@ Build indices
      "Foo.bar": File "./main/main.ml", line 1, characters 8-15;
      "Foo.bar": File "./main/main.ml", line 2, characters 22-29
    uid: Main.0; locs: "x": File "./main/main.ml", line 1, characters 4-5
-   uid: Stdlib.313; locs:
+   uid: Stdlib.315; locs:
      "print_string": File "./lib/foo.ml", line 2, characters 9-21;
      "print_string": File "./main/main.ml", line 2, characters 9-21
    }, 0 approx shapes: {}, and shapes for CUS .

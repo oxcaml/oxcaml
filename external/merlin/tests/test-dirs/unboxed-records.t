@@ -267,5 +267,7 @@ Stdlib boxing and unboxing preserve record and scalar types
   > EOF
 
   $ $MERLIN single errors -filename test.ml < test.ml | jq .value
+  []
 
   $ $MERLIN single type-enclosing -position 3:6 -filename test.ml < test.ml | jq -r '.value[0].type'
+  t#
