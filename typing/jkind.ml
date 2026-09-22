@@ -141,6 +141,17 @@ module Layout = struct
     | Addressable of 'sort t
     | Box of 'sort t * Scannable_axes.t
 
+  let product_for_printing ~is_addressable ~strip_addressable ts =
+    let inheritance =
+      match List.rev ts with
+      | [] -> Asttypes.Noninherited
+      | last :: _ ->
+        if is_addressable last
+        then Asttypes.Noninherited
+        else Asttypes.Inherited
+    in
+    List.map strip_addressable ts, inheritance
+
   module Const = struct
     include Jkind_types.Layout.Const
 
@@ -223,13 +234,17 @@ module Layout = struct
             (format_scannable_layout ~include_redundant_scannable_axes sa)
         | Base (b, _) -> Sort.to_string_base b
         | Product ts ->
+          let ts, inheritance =
+            product_for_printing ~is_addressable:is_surely_addressable
+              ~strip_addressable:(function Addressable t -> t | t -> t)
+              ts
+          in
           String.concat ""
             [ (if nested then "(" else "");
-              String.concat " & "
-                (List.map
-                   (function
-                     | Addressable t -> to_string true t | t -> to_string true t)
-                   ts);
+              String.concat " & " (List.map (to_string true) ts);
+              (match inheritance with
+              | Noninherited -> ""
+              | Inherited -> " inherit");
               (if nested then ")" else "") ]
         | Univar { name = Some n } -> n
         | Univar { name = None } -> "_"
@@ -380,6 +395,10 @@ module Layout = struct
     | Sort ((Sort.Flat.Var _ | Sort.Flat.Genvar _ | Sort.Flat.Univar _), _) ->
       false
     | Product ts -> List.for_all is_surely_addressable_flat ts
+
+  let product_for_printing_flat ts =
+    product_for_printing ~is_addressable:is_surely_addressable_flat
+      ~strip_addressable:strip_head_addressable_flat ts
 
   let box_scannable_axes t sa =
     match get_const t with
@@ -645,9 +664,19 @@ module Layout = struct
           (* Scannable axes aren't relevant in these cases *)
           Fmt.fprintf ppf "%a" Sort.format s)
       | Product ts ->
-        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf
-          (List.map strip_head_addressable ts)
+        let ts, inheritance =
+          product_for_printing
+            ~is_addressable:(constrain_below_addressable ~allow_mutation:false)
+            ~strip_addressable:strip_head_addressable ts
+        in
+        Fmt.pp_parens_if nested
+          (fun ppf ts ->
+            let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+            Fmt.pp_nested_list ~nested:false ~pp_element ~pp_sep ppf ts;
+            match inheritance with
+            | Noninherited -> ()
+            | Inherited -> Fmt.fprintf ppf " inherit")
+          ppf ts
       | Addressable t ->
         if constrain_below_addressable ~allow_mutation:false t
         then pp_element ~nested ppf t
@@ -2438,10 +2467,10 @@ module Const = struct
       | (Layout _ | Kconstr _), _ -> false)
     && Mod_bounds.equal t.mod_bounds t'.mod_bounds
 
-  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
-      =
+  let jkind_of_product_annotations (type l r) ~loc env ~inheritance
+      (jkinds : (l * r) t list) =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
-        (kind : (l * r) t) =
+        ((kind : (l * r) t), inheritance) =
       let { base; mod_bounds; with_bounds } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
@@ -2450,14 +2479,24 @@ module Const = struct
            ticket 5769 *)
         match base with
         | Kconstr _ -> raise ~loc Abstract_kind_in_product
-        | Layout l -> Layout.Const.addressable l
+        | Layout l -> (
+          match inheritance with
+          | Asttypes.Noninherited -> Layout.Const.addressable l
+          | Asttypes.Inherited -> l)
       in
       ( layout :: layouts_acc,
         Mod_bounds.join mod_bounds mod_bounds_acc,
         With_bounds.join with_bounds with_bounds_acc )
     in
+    let rec add_inheritance = function
+      | [] -> []
+      | [kind] -> [kind, inheritance]
+      | kind :: rest -> (kind, Asttypes.Noninherited) :: add_inheritance rest
+    in
     let layouts, mod_bounds, with_bounds =
-      List.fold_left folder ([], Mod_bounds.min, No_with_bounds) jkinds
+      List.fold_left folder
+        ([], Mod_bounds.min, No_with_bounds)
+        (add_inheritance jkinds)
     in
     { base = Layout (Layout.Const.product (List.rev layouts));
       mod_bounds;
@@ -2554,14 +2593,14 @@ module Const = struct
           (base_jkind, []) ops
       in
       jkind
-    | Pjk_product ts ->
+    | Pjk_product (ts, inheritance) ->
       let jkinds =
         List.map
           (of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
              env context)
           ts
       in
-      jkind_of_product_annotations ~loc env jkinds
+      jkind_of_product_annotations ~loc env ~inheritance jkinds
     | Pjk_with (base, type_, modalities) -> (
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds ~warn
@@ -2690,13 +2729,16 @@ module Desc = struct
          [get_const]: the machinery in [Const.format] works better for atomic
          layouts. *)
       | Layout (Product lays) ->
-        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
-          (List.map
-             (fun layout ->
-               let layout = Layout.strip_head_addressable_flat layout in
-               { desc with base = Layout layout })
-             lays)
+        let lays, inheritance = Layout.product_for_printing_flat lays in
+        Fmt.pp_parens_if nested
+          (fun ppf lays ->
+            let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+            Fmt.pp_nested_list ~nested:false ~pp_element:format_desc ~pp_sep ppf
+              (List.map (fun layout -> { desc with base = Layout layout }) lays);
+            match inheritance with
+            | Noninherited -> ()
+            | Inherited -> Fmt.fprintf ppf " inherit")
+          ppf lays
       | Layout (Addressable lay) when Option.is_none (get_const desc) ->
         if Layout.is_surely_addressable_flat lay
         then format_desc ~nested ppf { desc with base = Layout lay }
@@ -2877,6 +2919,25 @@ let layout_for_boxed_block component_layouts : Sort.t Layout.t =
     ( Layout.product
         (List.map (fun layout -> Layout.Addressable layout) component_layouts),
       Jkind_types.Scannable_axes.non_float_block_axes )
+
+let layout_for_boxed_record components : Sort.t Layout.t =
+  let has_inherited =
+    List.exists
+      (fun (inheritance, _) -> inheritance = Asttypes.Inherited)
+      components
+  in
+  let axes =
+    if has_inherited
+    then Jkind_types.Scannable_axes.max
+    else Jkind_types.Scannable_axes.non_float_block_axes
+  in
+  let layouts =
+    List.map
+      (fun (inheritance, layout) ->
+        Layout.apply_operator layout (Types.field_kind_operator inheritance))
+      components
+  in
+  Layout.Box (Layout.product layouts, axes)
 
 (* CR rtjoa: revisit *)
 let for_boxed_tuple ~component_layouts elts =

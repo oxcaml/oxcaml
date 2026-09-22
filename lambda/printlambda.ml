@@ -340,6 +340,9 @@ let print_bigarray name unsafe kind ppf layout =
 let record_rep ppf r = match r with
   | Record_unboxed -> fprintf ppf "unboxed"
   | Record_boxed -> fprintf ppf "boxed"
+  | Record_boxed_inherited -> fprintf ppf "boxed_inherited"
+  | Record_boxed_inherited_variable _ ->
+    fprintf ppf "boxed_inherited_variable"
   | Record_inlined _ -> fprintf ppf "inlined"
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
@@ -565,7 +568,10 @@ let primitive ppf = function
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
   | Pmake_idx_field (pos, root) ->
       fprintf ppf "idx_field %d%s" pos
-        (match root with Singleton_record -> " singleton" | Other_block -> "")
+        (match root with
+        | Singleton_record -> " singleton"
+        | Inherited_record -> " inherited"
+        | Other_block -> "")
   | Pmake_idx_mixed_field (shape, pos, path, root) ->
       fprintf ppf "idx_mixed_field %a %a %a"
         (mixed_block_shape (fun _ _ -> ())) shape
@@ -574,6 +580,7 @@ let primitive ppf = function
           path;
       (match root with
       | Singleton_record -> fprintf ppf " singleton"
+      | Inherited_record -> fprintf ppf " inherited"
       | Other_block -> ())
   | Pmake_idx_array (ak, ik, mbe, path) ->
       fprintf ppf "idx_array %s %a %a %a"

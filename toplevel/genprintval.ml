@@ -425,6 +425,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           (rep : Types.record_representation) =
       let finalize rep =
         match Typedecl.finalize_record_representation env Location.none rep with
+        | Record_boxed_inherited | Record_boxed_inherited_variable _ -> None
         | Record_unboxed -> Some (Outval_record_unboxed, 0)
         | Record_boxed | Record_float | Record_ufloat ->
             Some (Outval_record_boxed, 0)
@@ -438,6 +439,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             Misc.fatal_error "variable record representation"
       in
       match rep with
+      | Record_boxed_inherited | Record_boxed_inherited_variable _ -> None
       | Record_inlined (_, shape, vrep) ->
           outval_rep_of_constructor env ~sorts_and_types shape vrep
       | Record_undetermined ->

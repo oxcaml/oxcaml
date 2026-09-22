@@ -26,7 +26,7 @@ let is_nontail : Lambda.region_close -> bool = function
 
 let idx_boxed_root_tag : Lambda.idx_boxed_root -> int = function
   | Other_block -> 0
-  | Singleton_record -> 1
+  | Singleton_record | Inherited_record -> 1
 
 module Storer = Switch.Store (struct
   type t = Lambda.lambda
@@ -792,11 +792,13 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pmake_idx_field (pos, root) ->
       let tag = idx_boxed_root_tag root in
       Const (Const_block (tag, [Const_base (Const_int pos)]))
-    | Pmake_idx_mixed_field (_, pos, path, root) ->
-      let path_consts =
-        List.map (fun x -> Const_base (Const_int x)) (pos :: path)
+    | Pmake_idx_mixed_field (shape, pos, path, root) ->
+      let tag, path =
+        match root, shape with
+        | Inherited_record, [| Product _ |] -> 0, path
+        | _ -> idx_boxed_root_tag root, pos :: path
       in
-      let tag = idx_boxed_root_tag root in
+      let path_consts = List.map (fun x -> Const_base (Const_int x)) path in
       Const (Const_block (tag, path_consts))
     | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.

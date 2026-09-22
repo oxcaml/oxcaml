@@ -24,7 +24,7 @@ type constant = Typedtree.constant
 (* Overriding Asttypes.mutable_flag *)
 type mutable_flag = Immutable | Immutable_unique | Mutable
 
-type idx_boxed_root = Singleton_record | Other_block
+type idx_boxed_root = Singleton_record | Inherited_record | Other_block
 
 type compile_time_constant =
   | Big_endian

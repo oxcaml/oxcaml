@@ -88,6 +88,9 @@ type error =
   | Duplicate_label of string
   | Unboxed_mutable_label
   | Inherited_label_not_singleton_unboxed_record
+  | Inherited_label_not_last
+  | Inherited_mutable_label
+  | Inherited_inline_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -573,14 +576,20 @@ let check_no_repr cty =
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       env univars closed lbls kloc ~extension =
   assert (lbls <> []);
-  List.iter
-    (fun { pld_inheritance; pld_loc; _ } ->
+  List.iteri
+    (fun index { pld_inheritance; pld_loc; _ } ->
        match pld_inheritance with
        | Noninherited -> ()
        | Inherited ->
          match record_form, lbls with
          | Unboxed_product, [_] -> ()
-         | Legacy, _ | Unboxed_product, _ ->
+         | Legacy, _ ->
+           if index <> List.length lbls - 1 then
+             raise (Error (pld_loc, Inherited_label_not_last));
+           (match kloc with
+            | Record _ -> ()
+            | _ -> raise (Error (pld_loc, Inherited_inline_label)))
+         | Unboxed_product, _ ->
            raise (Error (pld_loc,
                          Inherited_label_not_singleton_unboxed_record)))
     lbls;
@@ -604,7 +613,10 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
             raise (Error (loc, Atomic_field_must_be_mutable name.txt))
           | Mutable, is_atomic ->
               match record_form with
-              | Legacy -> Mutable {
+              | Legacy ->
+                if inheritance = Inherited then
+                  raise (Error (loc, Inherited_mutable_label));
+                Mutable {
                 mode = Mode.Value.Comonadic.legacy;
                 atomic = if is_atomic then Atomic else Nonatomic
               }
@@ -1214,7 +1226,10 @@ let transl_declaration env sdecl (id, uid) =
             else
               (* See Note [Record_dummy] in [typing/types.mli] *)
               Record_dummy { represent_as_float_array; flatten_floats },
-              Jkind.for_non_float ~why:Boxed_record
+              (if List.exists
+                    (fun ld -> ld.Types.ld_inheritance = Inherited) lbls'
+               then Jkind.Builtin.scannable ~why:Dummy_jkind
+               else Jkind.for_non_float ~why:Boxed_record)
           in
           Ttype_record lbls, Type_record(lbls', rep, None), jkind
       | Ptype_record_unboxed_product lbls ->
@@ -1380,10 +1395,12 @@ let shape_has_float_boxed shape =
 let record_has_float_boxed = function
   | Record_mixed shape -> shape_has_float_boxed shape
   | Record_unboxed | Record_inlined _ | Record_boxed
+  | Record_boxed_inherited
   | Record_float | Record_ufloat -> false
   | Record_dummy _ ->
     fatal_error "record_has_float_boxed: unexpected dummy representation"
-  | Record_undetermined | Record_variable _ ->
+  | Record_undetermined | Record_variable _
+  | Record_boxed_inherited_variable _ ->
     fatal_error "record_has_float_boxed: unexpected variable representation"
 
 let record_has_atomic_field lbls =
@@ -1396,11 +1413,11 @@ let record_gets_unboxed_version lbls repr =
   match repr with
   | Record_unboxed | Record_inlined _
   | Record_float | Record_ufloat -> false
-  | Record_boxed | Record_undetermined -> true
+  | Record_boxed | Record_undetermined | Record_boxed_inherited -> true
   | Record_dummy { represent_as_float_array; flatten_floats } ->
     not represent_as_float_array && not flatten_floats
   | Record_mixed shape -> not (shape_has_float_boxed shape)
-  | Record_variable _ ->
+  | Record_variable _ | Record_boxed_inherited_variable _ ->
     fatal_error
       "record_gets_unboxed_version: unexpected variable representation"
 
@@ -1897,7 +1914,8 @@ let eagerly_check_record_not_all_void loc sorts =
    [transl_declaration] due to mutually recursive types.
 *)
 (* [update_label_sorts] additionally returns the jkinds of the labels *)
-let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
+let update_label_sorts (type rep) ?(allow_all_void = false) env loc types
+    ~(form : rep record_form) =
   let sorts_and_jkinds =
     List.map (fun ld_type ->
       let jkind = Ctype.type_jkind env ld_type in
@@ -1923,7 +1941,9 @@ let update_label_sorts (type rep) env loc types ~(form : rep record_form) =
   let live_sorts, sorts_and_jkinds = List.split sorts_and_jkinds in
   let sorts, jkinds = List.split sorts_and_jkinds in
   (match form with
-   | Legacy -> eagerly_check_record_not_all_void loc live_sorts
+   | Legacy ->
+     if not allow_all_void then
+       eagerly_check_record_not_all_void loc live_sorts
    | Unboxed_product -> ());
   sorts, jkinds
 
@@ -2427,7 +2447,14 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
-    let sorts, jkinds = update_label_sorts env loc types ~form in
+    let inherited_singleton =
+      match lbls with
+      | [({ Types.ld_inheritance = Inherited; _ }, _)] -> true
+      | _ -> false
+    in
+    let sorts, jkinds =
+      update_label_sorts ~allow_all_void:inherited_singleton env loc types ~form
+    in
     let reprs, repr_summary = compute_repr_summary env lbls jkinds in
     let rep : (rep, _) Result.t =
       (* CR layouts: improve the readability of this match *)
@@ -2444,10 +2471,12 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           | _ -> assert false (* outer match *)
         in
         let rep =
-          compute_record_repr loc reprs lbls ~represent_as_float_array
-            ~flatten_floats ~warn ~values ~floats
-            ~atomic_floats ~float64s ~non_float64_unboxed_fields ~atomic_fields
-            ~voids ~first_any
+          if inherited_singleton then Ok Record_boxed_inherited
+          else
+            compute_record_repr loc reprs lbls ~represent_as_float_array
+              ~flatten_floats ~warn ~values ~floats
+              ~atomic_floats ~float64s ~non_float64_unboxed_fields
+              ~atomic_fields ~voids ~first_any
         in
         if represent_as_float_array && rep <> Ok Record_ufloat then
           raise (Error (loc, Bad_represent_as_float_array_attribute));
@@ -2489,7 +2518,10 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
           if record_gets_unboxed_version (List.map fst lbls) rep
           then
             Jkind.set_layout jkind
-              (Jkind.layout_for_boxed_block (field_layouts ()))
+              (Jkind.layout_for_boxed_record
+                 (List.map2
+                    (fun (lbl, _) layout -> lbl.Types.ld_inheritance, layout)
+                    lbls (field_layouts ())))
           else jkind
       | Unboxed_product ->
         begin match lbls with
@@ -2512,7 +2544,8 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
     in
     sorts, rep, jkind
   | Legacy, _,
-    (Record_boxed | Record_inlined _ | Record_float | Record_mixed _
+    (Record_boxed | Record_boxed_inherited | Record_boxed_inherited_variable _
+          | Record_inlined _ | Record_float | Record_mixed _
           | Record_ufloat | Record_unboxed | Record_undetermined
           | Record_variable _)
     ->
@@ -2551,6 +2584,11 @@ let instance_record_representation
   in
   let rep : rep =
     match form, old_repres with
+    | Legacy, Record_boxed_inherited ->
+      (match sorts with
+       | [sort] -> Record_boxed_inherited_variable sort
+       | _ ->
+         Misc.fatal_error "inherited boxed record has multiple fields")
     | Legacy, Record_undetermined ->
       add_delayed_all_void_check ();
       Record_variable (sorts_and_types ())
@@ -2575,6 +2613,7 @@ let instance_record_representation
     | Legacy,
       (Record_unboxed | Record_inlined _ | Record_boxed | Record_float
       | Record_ufloat | Record_mixed _ | Record_dummy _
+      | Record_boxed_inherited_variable _
       | Record_variable _)
     | Unboxed_product,
       (Record_unboxed_product | Record_unboxed_product_variable _) ->
@@ -2644,6 +2683,9 @@ let finalize_constructor_representation env loc
 let finalize_record_representation_and_sorts env loc
     (repres : Types.record_representation) =
   match repres with
+  | Record_boxed_inherited_variable sort ->
+      let const = Jkind.Sort.default_for_transl_and_get sort in
+      repres, ~variable_sorts:(Some [|const|])
   | Record_variable sorts_and_types ->
       let shape, consts =
         finalize_instantiated_shape env loc sorts_and_types Record
@@ -2665,7 +2707,8 @@ let finalize_record_representation_and_sorts env loc
         | `Mixed shape -> Constructor_mixed shape
       in
       Record_inlined (tag, shape, vrep), ~variable_sorts:(Some consts)
-  | Record_undetermined | Record_inlined (_, Constructor_undetermined, _) ->
+  | Record_boxed_inherited | Record_undetermined
+  | Record_inlined (_, Constructor_undetermined, _) ->
       Misc.fatal_error
         "Typedecl.finalize_record_representation: representation was not \
          instantiated"
@@ -5733,6 +5776,12 @@ let report_error ~loc = function
   | Inherited_label_not_singleton_unboxed_record ->
       Location.errorf ~loc
         "Inherited labels are only supported in singleton unboxed records"
+  | Inherited_label_not_last ->
+      Location.errorf ~loc "Only the last record label may be inherited"
+  | Inherited_mutable_label ->
+      Location.errorf ~loc "Inherited record labels cannot be mutable"
+  | Inherited_inline_label ->
+      Location.errorf ~loc "Inline record labels cannot be inherited"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

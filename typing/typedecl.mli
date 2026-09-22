@@ -200,6 +200,9 @@ type error =
   | Duplicate_label of string
   | Unboxed_mutable_label
   | Inherited_label_not_singleton_unboxed_record
+  | Inherited_label_not_last
+  | Inherited_mutable_label
+  | Inherited_inline_label
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path

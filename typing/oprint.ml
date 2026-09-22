@@ -670,9 +670,15 @@ and print_out_jkind ppf ojkind =
     | Ojkind_var (v, nts) ->
       pp_print_string ppf (String.concat " " (v :: nts))
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
-    | Ojkind_product ts ->
-      let pp_sep ppf () = fprintf ppf "@ & " in
-      pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_product (ts, inheritance) ->
+      pp_parens_if nested
+        (fun ppf ts ->
+           let pp_sep ppf () = fprintf ppf "@ & " in
+           pp_nested_list ~nested:false ~pp_element ~pp_sep ppf ts;
+           match inheritance with
+           | Noninherited -> ()
+           | Inherited -> fprintf ppf " inherit")
+        ppf ts
     | Ojkind_addressable t ->
       fprintf ppf "%a addressable" (pp_element ~nested:true) t
     | Ojkind_box (t, axes) ->

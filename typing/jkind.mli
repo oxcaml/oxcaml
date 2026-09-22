@@ -129,6 +129,9 @@ module Layout : sig
 
   val strip_head_addressable_flat : Sort.Flat.t t -> Sort.Flat.t t
 
+  val product_for_printing_flat :
+    Sort.Flat.t t list -> Sort.Flat.t t list * Asttypes.field_inheritance
+
   (** See [Jkind_types.Layout.Const.non_redundant_axes_of_box] *)
   val non_redundant_axes_of_box_flat :
     Sort.Flat.t t -> Scannable_axes.t -> string list
@@ -572,6 +575,9 @@ val for_boxed_tuple :
 (** The layout of a boxed block (record or tuple) whose unboxed version is the
     product of [component_layouts]. *)
 val layout_for_boxed_block : Sort.t Layout.t list -> Sort.t Layout.t
+
+val layout_for_boxed_record :
+  (Asttypes.field_inheritance * Sort.t Layout.t) list -> Sort.t Layout.t
 
 (** Choose an appropriate jkind for a row type. *)
 val for_boxed_row : Types.row_desc -> Types.jkind_l

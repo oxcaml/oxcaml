@@ -2605,6 +2605,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             lbl_sort, lbl_layout
         | Record_unboxed
         | Record_inlined (_, _, Variant_unboxed) -> arg, sort, layout
+        | Record_boxed_inherited_variable sort ->
+            let sort = Jkind.Sort.default_for_transl_and_get sort in
+            Lprim (Punbox sort, [arg], loc), lbl_sort, lbl_layout
         | Record_float ->
            (* TODO: could optimise to Alloc_local sometimes *)
            Lprim (Pfloatfield (lbl.lbl_pos, sem, alloc_heap), [ arg ], loc),
@@ -2634,7 +2637,7 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
             lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
-        | Record_dummy _ ->
+        | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "get_expr_args_record: unexpected dummy representation"
         | Record_inlined
             (_, (Constructor_undetermined
@@ -2643,7 +2646,9 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
           fatal_error "get_expr_args_record: unexpected variable representation"
       in
       let binding_kind =
-        if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
+        match lbl_repres with
+        | Record_boxed_inherited_variable _ -> StrictOpt
+        | _ -> if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
       in
       let binding_kind = add_barrier_to_let_kind ubr binding_kind in
       {

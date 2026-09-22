@@ -107,6 +107,8 @@ let layout_of_fun_arg_ty fun_arg_ty loc sort =
 
 let field_offset_for_label lbl repres =
   match repres with
+  | Record_boxed_inherited | Record_boxed_inherited_variable _ ->
+      fatal_error "field_offset_for_label: inherited record representation"
   | Record_boxed
   | Record_inlined (_, Constructor_uniform_value, Variant_boxed _)
   | Record_inlined (_, Constructor_uniform_value, Variant_with_null) ->
@@ -858,6 +860,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             (_, (Constructor_undetermined | Constructor_variable _), _)
         | Record_inlined (_, Constructor_mixed _, _) | Record_float
         | Record_ufloat | Record_mixed _ | Record_dummy _
+        | Record_boxed_inherited | Record_boxed_inherited_variable _
         | Record_undetermined | Record_variable _ ->
           Misc.fatal_error
             "transl: Texp_atomic_loc got unexpected record representation"
@@ -896,6 +899,9 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           else
             Some (Pfield (lbl.lbl_pos, immediate_or_pointer, sem), [targ])
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> None
+        | Record_boxed_inherited_variable sort ->
+          let sort = Jkind.Sort.default_for_transl_and_get sort in
+          Some (Punbox sort, [targ])
         | Record_float ->
           let alloc_mode =
             match float with
@@ -954,7 +960,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
           else
             Some (Pmixedfield ([lbl.lbl_pos], shape, sem), [targ])
         | Record_inlined (_, _, Variant_with_null) -> assert false
-        | Record_dummy _ ->
+        | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_exp0: dummy record representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
@@ -1041,6 +1047,8 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
             (_, (Constructor_undetermined
                 | Constructor_variable _), _) ->
           fatal_error "transl_exp0: unexpected unknown representation"
+        | Record_boxed_inherited | Record_boxed_inherited_variable _ ->
+          fatal_error "transl_exp0: mutable inherited record"
         | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
           assert false
         | Record_float ->
@@ -2492,6 +2500,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
             | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                 let ptr, _ = maybe_pointer expr in
                 Psetfield(lbl.lbl_pos, ptr, Assignment modify_heap)
+            | Record_boxed_inherited | Record_boxed_inherited_variable _ ->
+                fatal_error "transl_record: large inherited record"
             | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                 assert false
             | Record_float ->
@@ -2575,6 +2585,8 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                  | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
                    let ptr, _ = maybe_pointer_type env typ in
                    Pfield (i, ptr, sem)
+                 | Record_boxed_inherited_variable sort ->
+                   Punbox (Jkind.Sort.default_for_transl_and_get sort)
                  | Record_unboxed | Record_inlined (_, _, Variant_unboxed) ->
                    assert false
                  | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
@@ -2614,7 +2626,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    in
                    Pmixedfield ([i], shape, sem)
                  | Record_inlined (_, _, Variant_with_null) -> assert false
-                 | Record_dummy _ ->
+                 | Record_boxed_inherited | Record_dummy _ ->
                    fatal_error
                      "transl_record: unexpected dummy representation"
                  | Record_inlined
@@ -2673,6 +2685,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                mixed records]. *)
             (* Lconst(Const_block(runtime_tag, cl)) *)
             raise Not_constant
+        | Record_boxed_inherited_variable _ -> raise Not_constant
         | Record_inlined (_, Constructor_mixed _, Variant_boxed _)
         | Record_ufloat ->
             (* CR layouts v5.1: We should support structured constants for
@@ -2682,7 +2695,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
         | Record_inlined (_, _, (Variant_extensible | Variant_with_null))
         | Record_inlined ((Extension _ | Null), _, _) ->
             raise Not_constant
-        | Record_dummy _ ->
+        | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
@@ -2704,6 +2717,9 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                              Option.get mode), ll, loc)
         | Record_unboxed | Record_inlined (Ordinary _, _, Variant_unboxed) ->
             (match ll with [v] -> v | _ -> assert false)
+        | Record_boxed_inherited_variable sort ->
+            let sort = Jkind.Sort.default_for_transl_and_get sort in
+            Lprim (Pbox (sort, Option.get mode), ll, loc)
         | Record_float ->
             Lprim(Pmakefloatblock (mut, Option.get mode), ll, loc)
         | Record_ufloat ->
@@ -2739,7 +2755,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
                    ll, loc)
         | Record_inlined (_, _, Variant_with_null) -> assert false
         | Record_inlined (Null, _, _) -> assert false
-        | Record_dummy _ ->
+        | Record_boxed_inherited | Record_dummy _ ->
           fatal_error "transl_record: unexpected dummy representation"
         | Record_inlined
             (_, (Constructor_undetermined | Constructor_variable _), _)
@@ -2838,6 +2854,17 @@ and transl_idx ~scopes loc env ba uas =
     let root =
       if Array.length lbl.lbl_all = 1 then Singleton_record else Other_block
     in
+    let mixed_field ~root shape =
+      let cts =
+        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
+      in
+      if Option.is_none
+           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
+      then
+        raise (Error (loc, Block_index_gap_overflow_possible));
+      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path, root), [],
+             (of_location ~scopes loc))
+    in
     let repres = Typedecl.finalize_record_representation env loc repres in
     begin match repres with
     | Record_boxed
@@ -2852,20 +2879,15 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pmake_idx_field (lbl.lbl_pos, root), [], (of_location ~scopes loc))
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
+    | Record_boxed_inherited_variable sort ->
+      let sort = Jkind.Sort.default_for_transl_and_get sort in
+      let layout = layout_of_sort lbl.lbl_loc sort in
+      let shape = [| mixed_block_element_of_layout layout |] in
+      mixed_field ~root:Inherited_record shape
     | Record_mixed shape ->
       let shape = Lambda.transl_mixed_product_shape shape in
-      (* Check to make sure the gap never overflows.
-         See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-      let cts =
-        Mixed_product_bytes.Wrt_path.count_shape shape lbl.lbl_pos uas_path
-      in
-      if Option.is_none
-           (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
-      then
-        raise (Error (loc, Block_index_gap_overflow_possible));
-      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path, root), [],
-             (of_location ~scopes loc))
-    | Record_dummy _ ->
+      mixed_field ~root shape
+    | Record_boxed_inherited | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"
     | (Record_undetermined | Record_variable _) ->
       fatal_error "transl_idx: unexpected unknown representation"
@@ -2881,6 +2903,7 @@ and transl_atomic_loc ~scopes arg arg_layout lbl repres =
       (_, (Constructor_undetermined | Constructor_variable _), _) ->
     Misc.fatal_error "transl_atomic_loc: unexpected variable representation"
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) | Record_mixed _
+  | Record_boxed_inherited | Record_boxed_inherited_variable _
   | Record_float | Record_ufloat
     ->
       (* Atomic fields not allowed here *)

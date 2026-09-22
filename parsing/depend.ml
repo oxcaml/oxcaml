@@ -147,7 +147,7 @@ and add_jkind bv (jkind : jkind_annotation) =
       add_type bv typ;
   | Pjk_kind_of typ ->
       add_type bv typ
-  | Pjk_product jkinds ->
+  | Pjk_product (jkinds, _) ->
       List.iter (fun jkind -> add_jkind bv jkind) jkinds
 
 and add_vars_jkinds bv vars_jkinds =

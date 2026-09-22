@@ -259,6 +259,10 @@ let rec classify ~classify_product env ty layout : _ classification =
           match (Env.find_type p env).type_kind with
           | Type_abstract _ ->
               Any
+          | Type_record
+              (_, (Record_boxed_inherited
+                  | Record_boxed_inherited_variable _), _) ->
+              Any
           | Type_record _ | Type_variant _ | Type_open ->
               Addr
           | Type_record_unboxed_product _ ->
@@ -1123,6 +1127,8 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
 and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
       (labels : Types.label_declaration list) rep =
   match rep with
+  | Record_boxed_inherited | Record_boxed_inherited_variable _ ->
+    num_nodes_visited, non_nullable Pgenval
   | (Record_unboxed | (Record_inlined (_, _, Variant_unboxed))) -> begin
       (* CR layouts v1.5: This should only be reachable in the case of a missing
          cmi, according to the comment on scrape_ty.  Reevaluate whether it's
@@ -1153,6 +1159,7 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
         let num_nodes_visited, fields =
           match rep with
           | Record_unboxed | Record_dummy _ | Record_undetermined
+          | Record_boxed_inherited | Record_boxed_inherited_variable _
           | Record_variable _
           | Record_inlined (_, (Constructor_undetermined
                                | Constructor_variable _), _) ->
@@ -1177,6 +1184,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
                           value_kind env ~loc ~visited ~depth ~num_nodes_visited
                             label.ld_type
                       | Record_mixed _ | Record_unboxed | Record_dummy _
+                      | Record_boxed_inherited
+                      | Record_boxed_inherited_variable _
                       | Record_undetermined | Record_variable _ ->
                           (* The outer match guards against this *)
                           assert false
@@ -1203,7 +1212,8 @@ and value_kind_record env ~loc ~visited ~depth ~num_nodes_visited
             [0, fields]
           | Record_mixed _ ->
             [0, fields]
-          | Record_unboxed -> assert false
+          | Record_unboxed | Record_boxed_inherited
+          | Record_boxed_inherited_variable _ -> assert false
           | Record_inlined (Null, _, _) -> assert false
           | Record_dummy _ -> assert false
           | Record_undetermined | Record_variable _ -> assert false

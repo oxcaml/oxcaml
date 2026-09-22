@@ -353,6 +353,7 @@ let compute_static_size lam =
               in
               Block (Mixed_block size)
         | Record_unboxed | Record_ufloat
+        | Record_boxed_inherited | Record_boxed_inherited_variable _
         | Record_inlined (_, _, (Variant_unboxed | Variant_with_null)) ->
             Misc.fatal_error "size_of_primitive"
         | Record_dummy _ ->

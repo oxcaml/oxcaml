@@ -125,6 +125,11 @@ let classify env ty : classification =
         try
           match (Env.find_type p env).type_kind with
           | Type_abstract _ -> Any
+          | Type_record
+              ( _,
+                (Record_boxed_inherited | Record_boxed_inherited_variable _),
+                _ ) ->
+            Any
           | Type_record _ | Type_variant _ | Type_open -> Addr
           | Type_record_unboxed_product _ -> Any
         with Not_found ->
@@ -371,6 +376,7 @@ and value_kind_record env subst ~visited ~depth
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
   | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
+  | Record_boxed_inherited | Record_boxed_inherited_variable _
   | Record_undetermined | Record_variable _
   | Record_inlined (_, (Constructor_undetermined | Constructor_variable _), _)
     ->
@@ -406,6 +412,7 @@ and value_kind_record env subst ~visited ~depth
       | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
       | Record_dummy _ -> Misc.fatal_error "unexpected dummy representation"
+      | Record_boxed_inherited | Record_boxed_inherited_variable _
       | Record_undetermined | Record_variable _ ->
         Misc.fatal_error "unexpected variable representation"
     in
