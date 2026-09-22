@@ -74,13 +74,13 @@ val combine_ts : t -> t -> t = <fun>
 
 let unboxed_product = #{ f = #3.14; i = 0 }
 [%%expect{|
-val unboxed_product : t = #{f = <abstr>; i = 0}
+val unboxed_product : t = #{f = #3.14; i = 0}
 |}]
 
 ;;
 #{ f = #3.14; i = 0};;
 [%%expect{|
-- : t = #{f = <abstr>; i = 0}
+- : t = #{f = #3.14; i = 0}
 |}]
 
 type m_record = #{ i1 : int }

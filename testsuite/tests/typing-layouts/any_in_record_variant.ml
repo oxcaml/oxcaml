@@ -246,7 +246,7 @@ type ('a : any) ubx = U of { u : 'a; } [@@unboxed]
 
 let test = U { u = 42 }
 [%%expect{|
-val test : int ubx = <unknown constructor>
+val test : int ubx = U {u = 42}
 |}]
 
 let test = match U { u = 42 } with U { u } -> u

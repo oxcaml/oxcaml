@@ -1115,7 +1115,7 @@ type t : any mod portable = Foo of bool [@@unboxed]
 let x = (Foo true : _ as (_ : value mod portable contended aliased))
 [%%expect {|
 type t = Foo of bool [@@unboxed]
-val x : t = <unknown constructor>
+val x : t = Foo true
 |}]
 
 type t : value mod global = Foo of int [@@unboxed]

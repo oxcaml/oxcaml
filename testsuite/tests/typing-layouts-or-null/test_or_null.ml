@@ -363,13 +363,13 @@ type unboxed_var = Wrap of int or_null [@@unboxed]
 let var_null = Wrap Null
 
 [%%expect{|
-val var_null : unboxed_var = <unknown constructor>
+val var_null : unboxed_var = Wrap Null
 |}]
 
 let var_some = Wrap (This 99)
 
 [%%expect{|
-val var_some : unboxed_var = <unknown constructor>
+val var_some : unboxed_var = Wrap (This 99)
 |}]
 
 let unwrap = function
@@ -401,13 +401,13 @@ type (_, _ : value_or_null) gadt = Gadt : 'a or_null -> ('a, 'a or_null) gadt [@
 let gadt_null = Gadt Null
 
 [%%expect{|
-val gadt_null : ('a, 'a or_null) gadt = <unknown constructor>
+val gadt_null : ('a, 'a or_null) gadt = Gadt Null
 |}]
 
 let gadt_some = Gadt (This 42)
 
 [%%expect{|
-val gadt_some : (int, int or_null) gadt = <unknown constructor>
+val gadt_some : (int, int or_null) gadt = Gadt (This 42)
 |}]
 
 let unwrap_gadt : type a. (a, a or_null) gadt -> a or_null = function

@@ -72,11 +72,11 @@ val r : '_weak1 list ref = {contents = []}
 val cons_r : '_weak1 -> unit = <fun>
 val id1 : baz -> baz = <fun>
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <abstr>}; a2 = {v = <abstr>}; x = 3; v = {v = <abstr>};
+   z = 42; b1 = {v = <abstr>}; b2 = {v = <abstr>}}
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <abstr>}; a2 = {v = <abstr>}; x = 3; v = {v = <abstr>};
+   z = 42; b1 = {v = <abstr>}; b2 = {v = <abstr>}}
 - : unit = ()
 |}]
 
@@ -101,8 +101,8 @@ let _ = assert (List.for_all2 (=) !r [12;11;10;9;8;7;6;5;4;3;2;1]);;
 [%%expect{|
 val id1' : baz -> baz = <fun>
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <abstr>}; a2 = {v = <abstr>}; x = 3; v = {v = <abstr>};
+   z = 42; b1 = {v = <abstr>}; b2 = {v = <abstr>}}
 - : unit = ()
 |}]
 
@@ -161,9 +161,9 @@ val r : '_weak2 list ref = {contents = []}
 val cons_r : '_weak2 -> unit = <fun>
 val id1 : void_variant -> void_variant = <fun>
 val magic_A : void_variant =
-  A (<void>, <void>, 3, <void>, 42, <void>, <void>)
+  A (<abstr>, {v = <abstr>}, 3, {v = <abstr>}, 42, {v = <abstr>}, <abstr>)
 val magic_A : void_variant =
-  A (<void>, <void>, 3, <void>, 42, <void>, <void>)
+  A (<abstr>, {v = <abstr>}, 3, {v = <abstr>}, 42, {v = <abstr>}, <abstr>)
 - : unit = ()
 |}]
 
@@ -173,8 +173,8 @@ let magic_B = id1 magic_B
 let _ = assert (List.for_all2 (=) !r [2;1]);;
 [%%expect{|
 - : unit = ()
-val magic_B : void_variant = B <void>
-val magic_B : void_variant = B <void>
+val magic_B : void_variant = B <abstr>
+val magic_B : void_variant = B <abstr>
 - : unit = ()
 |}]
 
@@ -184,8 +184,8 @@ let magic_C = id1 magic_C
 let _ = assert (List.for_all2 (=) !r [3;2;1]);;
 [%%expect{|
 - : unit = ()
-val magic_C : void_variant = C (<void>, <void>)
-val magic_C : void_variant = C (<void>, <void>)
+val magic_C : void_variant = C ({v = <abstr>}, <abstr>)
+val magic_C : void_variant = C ({v = <abstr>}, <abstr>)
 - : unit = ()
 |}]
 
@@ -206,12 +206,12 @@ let _ = assert (List.for_all2 (=) !r [10;9;8;7;6;5;4;3;2;1]);;
 - : unit = ()
 val magic_D : void_variant =
   D
-   {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-    b2 = <void>}
+   {a1 = <abstr>; a2 = {v = <abstr>}; x = 3; v = {v = <abstr>}; z = 42;
+    b1 = {v = <abstr>}; b2 = <abstr>}
 val magic_D : void_variant =
   D
-   {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-    b2 = <void>}
+   {a1 = <abstr>; a2 = {v = <abstr>}; x = 3; v = {v = <abstr>}; z = 42;
+    b1 = {v = <abstr>}; b2 = <abstr>}
 - : unit = ()
 |}]
 
@@ -283,7 +283,7 @@ let _ = f4 vh
 let _ = assert (List.for_all2 (=) !r [6;5;4;3;2;1]);;
 [%%expect{|
 type void_holder = V of t_void [@immediate_all_void_constructor]
-val vh : void_holder = V <void>
+val vh : void_holder = V <abstr>
 val f4 : void_holder -> unit = <fun>
 - : unit = ()
 - : unit = ()
@@ -309,8 +309,8 @@ let _ = assert (List.for_all2 (=) !r [8;7;6;5;4;3;2;1]);;
 [%%expect{|
 val local_void_bindings_1 : void_holder -> baz = <fun>
 - : baz =
-{a1 = <void>; a2 = <void>; x = 12; v = <void>; z = 13; b1 = <void>;
- b2 = <void>}
+{a1 = {v = <abstr>}; a2 = {v = <abstr>}; x = 12; v = {v = <abstr>}; z = 13;
+ b1 = {v = <abstr>}; b2 = {v = <abstr>}}
 - : unit = ()
 |}]
 
@@ -325,7 +325,7 @@ let _ = assert (x = 3 && z = 42)
 val local_void_bindings_2 :
   baz -> int * void_holder * void_holder * int * void_holder = <fun>
 val x : int = 3
-val vh2 : void_holder = V <void>
+val vh2 : void_holder = V <abstr>
 val z : int = 42
 - : unit = ()
 |}]
@@ -531,7 +531,7 @@ let _ = assert (List.for_all2 (=) !r [7;6;5;4;3;2;1]);;
 type unboxed_inlined_void_rec = UIVR of { uivr_v : t_void; } [@@unboxed]
 type uivr_holder = { uivrh_x : int; uivrh_v : unboxed_inlined_void_rec; }
 val make_uivr_holder : void_holder -> uivr_holder = <fun>
-- : uivr_holder = {uivrh_x = 7; uivrh_v = <void>}
+- : uivr_holder = {uivrh_x = 7; uivrh_v = UIVR {uivr_v = <abstr>}}
 - : unit = ()
 |}]
 
