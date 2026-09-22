@@ -1145,9 +1145,15 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
          declaration is tupled. *)
       is_function_decl_tupled
   in
-  let type_unavailable () =
+  let type_unavailable call =
     simplify_function_call_where_callee's_type_unavailable dacc apply call
       ~down_to_up
+  in
+  let not_a_closure () =
+    let rebuild uacc ~after_rebuild =
+      EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
+    in
+    down_to_up dacc ~rebuild
   in
   (* CR-someday mshinwell: Should this be using [meet_shape], like for
      primitives? *)
@@ -1157,7 +1163,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
     match call with
     | Direct callee's_code_id -> (
       match DE.find_code_metadata_exn denv callee's_code_id with
-      | exception Not_found -> type_unavailable ()
+      | exception Not_found -> type_unavailable call
       | callee's_code_metadata ->
         simplify_direct_full_application ~simplify_expr dacc apply None
           ~params_arity:(Code_metadata.params_arity callee's_code_metadata)
@@ -1189,7 +1195,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
       in
       let callee's_code_id_from_type = T.Function_type.code_id func_decl_type in
       match DE.find_code_metadata_exn denv callee's_code_id_from_type with
-      | exception Not_found -> type_unavailable ()
+      | exception Not_found -> type_unavailable call
       | callee's_code_metadata_from_type ->
         let must_be_detupled =
           call_must_be_detupled
@@ -1206,12 +1212,33 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
           ~recursive:(Code_metadata.recursive callee's_code_metadata_from_type)
           ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
           ~down_to_up ~call ~inlined_forwarded_from)
-    | Need_meet -> type_unavailable ()
-    | Invalid ->
-      let rebuild uacc ~after_rebuild =
-        EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
-      in
-      down_to_up dacc ~rebuild)
+    | Need_meet -> (
+      match call with
+      | Direct _ | Indirect_known_arity _ -> type_unavailable call
+      | Indirect_unknown_arity -> (
+        (* If the call is to a known set of potential code IDs that all have the
+           same arity as the actual arguments of the call, promote it to an
+           [Indirect_known_arity] call, skipping [caml_applyN]. *)
+        match T.meet_code_ids (DE.typing_env denv) callee_ty with
+        | Known_result code_ids ->
+          let args_arity = Apply.args_arity apply in
+          if
+            Code_id.Set.for_all
+              (fun code_id ->
+                match DE.find_code_metadata_exn denv code_id with
+                | exception Not_found -> false
+                | code_metadata ->
+                  let params_arity = Code_metadata.params_arity code_metadata in
+                  Flambda_arity.equal_ignoring_subkinds args_arity params_arity)
+              code_ids
+          then
+            type_unavailable
+              (Call_kind.Function_call.indirect_known_arity
+                 ~code_ids:(Known code_ids))
+          else type_unavailable call
+        | Need_meet -> type_unavailable call
+        | Invalid -> not_a_closure ()))
+    | Invalid -> not_a_closure ())
 
 type ('a, 'b) simplify_apply_shared_result =
   | Ok of 'a

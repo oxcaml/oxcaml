@@ -864,6 +864,47 @@ let meet_single_closures_entry env t =
 let prove_single_closures_entry env t =
   gen_value_to_proof prove_single_closures_entry_generic_value env t
 
+let prove_code_ids_generic_value _env
+    (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
+  match value_head with
+  | Closures { by_function_slot; alloc_mode = _ } -> (
+    let { TG.known_closures; other_closures } = by_function_slot in
+    try
+      let code_ids = Code_id.Set.empty in
+      let code_ids =
+        match other_closures with
+        | Ok row_like ->
+          Function_slot.Map.fold
+            (fun _function_slot function_type_ou code_ids ->
+              match function_type_ou with
+              | Or_unknown.Unknown -> raise_notrace Not_found
+              | Or_unknown.Known function_type ->
+                Code_id.Set.add function_type.TG.code_id code_ids)
+            row_like.maps_to.function_types code_ids
+        | Bottom -> code_ids
+      in
+      let code_ids =
+        Function_slot.Map.fold
+          (fun function_slot row_like acc ->
+            match
+              Function_slot.Map.find function_slot
+                row_like.TG.maps_to.TG.function_types
+            with
+            | Unknown -> raise_notrace Not_found
+            | Known function_type -> Code_id.Set.add function_type.code_id acc)
+          known_closures code_ids
+      in
+      if Code_id.Set.is_empty code_ids then Invalid else Proved code_ids
+    with Not_found -> Unknown)
+  | Variant _ | Mutable_block _ | Boxed_float _ | Boxed_float32 _
+  | Boxed_int32 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
+  | Boxed_mask _ | Boxed_int64 _ | Boxed_nativeint _ | String _ | Array _ ->
+    Invalid
+
+let meet_code_ids env t = gen_value_to_meet prove_code_ids_generic_value env t
+
+let prove_code_ids env t = gen_value_to_proof prove_code_ids_generic_value env t
+
 let prove_is_immutable_array_generic_value _env
     (value_head : TG.head_of_kind_value_non_null) : _ generic_proof =
   match value_head with
