@@ -848,3 +848,395 @@ Line 1, characters 65-66:
                                                                      ^
 Error: This value is "nonportable" but is expected to be "portable".
 |}]
+
+(***********************************************************************)
+(* Infer requirements on the dependencies of composite kinds. *)
+
+let require_portability : ('a : value mod portable). 'a -> unit = fun _ -> ()
+[%%expect{|
+val require_portability : ('a : value mod portable). 'a -> unit = <fun>
+|}]
+
+let portable_pair x y = require_portability (x, y)
+[%%expect{|
+Line 1, characters 44-50:
+1 | let portable_pair x y = require_portability (x, y)
+                                                ^^^^^^
+Error: This expression has type "'a * 'b"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of 'a * 'b is immutable_data with 'a with 'b
+         because it's a tuple type.
+       But the kind of 'a * 'b must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let portable_nested x y = require_portability (Option.Some [x], y)
+[%%expect{|
+Line 1, characters 46-66:
+1 | let portable_nested x y = require_portability (Option.Some [x], y)
+                                                  ^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a * 'b"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of 'a * 'b is immutable_data with 'a with 'b
+         because it's a tuple type.
+       But the kind of 'a * 'b must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+type ('a, 'b) masked = { masked : 'a @@ portable; plain : 'b }
+[%%expect{|
+type ('a, 'b) masked = { masked : 'a @@ portable; plain : 'b; }
+|}]
+
+let portable_record (x : ('a, 'b) masked) = require_portability x
+[%%expect{|
+Line 1, characters 64-65:
+1 | let portable_record (x : ('a, 'b) masked) = require_portability x
+                                                                    ^
+Error: The value "x" has type "('a, 'b) masked"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of ('a, 'b) masked is
+           immutable_data with 'a @@ portable with 'b
+         because of the definition of masked at line 1, characters 0-62.
+       But the kind of ('a, 'b) masked must be a subkind of
+           value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'b ≰ mod portable
+|}]
+
+let masked_function (x : (int -> int, int) masked) = portable_record x
+[%%expect{|
+Line 1, characters 53-68:
+1 | let masked_function (x : (int -> int, int) masked) = portable_record x
+                                                         ^^^^^^^^^^^^^^^
+Error: Unbound value "portable_record"
+|}]
+
+type 'a shared = { ignored : 'a @@ portable; required : 'a }
+let portable_shared (x : 'a shared) = require_portability x
+[%%expect{|
+type 'a shared = { ignored : 'a @@ portable; required : 'a; }
+Line 2, characters 58-59:
+2 | let portable_shared (x : 'a shared) = require_portability x
+                                                              ^
+Error: The value "x" has type "'a shared" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a shared is immutable_data with 'a
+         because of the definition of shared at line 1, characters 0-60.
+       But the kind of 'a shared must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let rigid (type a) (x : a option) = require_portability x
+[%%expect{|
+Line 1, characters 56-57:
+1 | let rigid (type a) (x : a option) = require_portability x
+                                                            ^
+Error: The value "x" has type "a option" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of a option is immutable_data with a
+         because it's a boxed variant type.
+       But the kind of a option must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let universal : 'a. 'a option -> unit = fun x -> require_portability x
+[%%expect{|
+Line 1, characters 69-70:
+1 | let universal : 'a. 'a option -> unit = fun x -> require_portability x
+                                                                         ^
+Error: The value "x" has type "'a option" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a option is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a option must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let identity x = x
+let portable_instance x = require_portability (Option.Some (identity x))
+let function_instance = identity (fun x -> x)
+[%%expect{|
+val identity : 'a -> 'a = <fun>
+Line 2, characters 46-72:
+2 | let portable_instance x = require_portability (Option.Some (identity x))
+                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This constructor has type "'a Option.t" = "'a option"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a Option.t is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a Option.t must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let weak = ref Option.None
+[%%expect{|
+val weak : '_weak1 Option.t ref = {contents = Option.None}
+|}]
+
+let rejected () = require_portability (!weak, fun x -> x)
+[%%expect{|
+Line 1, characters 38-57:
+1 | let rejected () = require_portability (!weak, fun x -> x)
+                                          ^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "'a * 'b"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of 'a * 'b is immutable_data with 'a with 'b
+         because it's a tuple type.
+       But the kind of 'a * 'b must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let () = weak := Option.Some (fun x -> x)
+[%%expect{|
+|}]
+
+let portable_tree (x : 'a rose_tree2) = require_portability x
+[%%expect{|
+Line 1, characters 60-61:
+1 | let portable_tree (x : 'a rose_tree2) = require_portability x
+                                                                ^
+Error: The value "x" has type "'a rose_tree2"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a rose_tree2 is immutable_data with 'a
+         because of the definition of rose_tree2 at lines 1-4, characters 0-32.
+       But the kind of 'a rose_tree2 must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let nonportable_pair () = portable_pair (fun x -> x) 0
+[%%expect{|
+Line 1, characters 26-39:
+1 | let nonportable_pair () = portable_pair (fun x -> x) 0
+                              ^^^^^^^^^^^^^
+Error: Unbound value "portable_pair"
+|}]
+
+type 'a option_alias = 'a option
+let portable_alias (x : 'a option_alias) = require_portability x
+[%%expect{|
+type 'a option_alias = 'a option
+Line 2, characters 63-64:
+2 | let portable_alias (x : 'a option_alias) = require_portability x
+                                                                   ^
+Error: The value "x" has type "'a option_alias" = "'a option"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a option_alias is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a option_alias must be a subkind of
+           value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let required_list (x : 'a list require_portable) = x
+[%%expect{|
+Line 1, characters 23-30:
+1 | let required_list (x : 'a list require_portable) = x
+                           ^^^^^^^
+Error: This type "'a list" should be an instance of type
+         "('b : value mod portable)"
+       The kind of 'a list is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a list must be a subkind of value mod portable
+         because of the definition of require_portable at line 10, characters 0-47.
+|}]
+
+let require_contention : ('a : value mod contended). 'a -> unit = fun _ -> ()
+let portable_contended x =
+  require_portability (Option.Some x);
+  require_contention [x]
+[%%expect{|
+val require_contention : ('a : value mod contended). 'a -> unit = <fun>
+Line 3, characters 22-37:
+3 |   require_portability (Option.Some x);
+                          ^^^^^^^^^^^^^^^
+Error: This constructor has type "'a Option.t" = "'a option"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a Option.t is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a Option.t must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+type ('a : bits64, 'b) boxed_bits = { bits : 'a; other : 'b }
+let portable_bits (x : ('a, 'b) boxed_bits) = require_portability x
+[%%expect{|
+type ('a : bits64, 'b) boxed_bits = { bits : 'a; other : 'b; }
+Line 2, characters 66-67:
+2 | let portable_bits (x : ('a, 'b) boxed_bits) = require_portability x
+                                                                      ^
+Error: The value "x" has type "('a, 'b) boxed_bits"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of ('a, 'b) boxed_bits is immutable_data with 'a with 'b
+         because of the definition of boxed_bits at line 1, characters 0-61.
+       But the kind of ('a, 'b) boxed_bits must be a subkind of
+           value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+type _ witness = Int : int witness
+let portable_gadt (type a) (w : a witness) (x : a option) =
+  match w with Int -> require_portability (x, Option.None)
+[%%expect{|
+type _ witness = Int : int witness
+Line 3, characters 42-58:
+3 |   match w with Int -> require_portability (x, Option.None)
+                                              ^^^^^^^^^^^^^^^^
+Error: This expression has type "'a * 'b"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of 'a * 'b is immutable_data with 'a with 'b
+         because it's a tuple type.
+       But the kind of 'a * 'b must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let outside_gadt (type a) (w : a witness) (x : a option) =
+  (match w with Int -> require_portability (x, Option.None));
+  require_portability x
+[%%expect{|
+Line 2, characters 43-59:
+2 |   (match w with Int -> require_portability (x, Option.None));
+                                               ^^^^^^^^^^^^^^^^
+Error: This expression has type "'a * 'b"
+       but an expression was expected of type "('c : value mod portable)"
+       The kind of 'a * 'b is immutable_data with 'a with 'b
+         because it's a tuple type.
+       But the kind of 'a * 'b must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+module Abstract : sig
+  type 'a t : immutable_data with 'a
+end = struct
+  type 'a t = 'a option
+end
+let portable_abstract (x : 'a Abstract.t) = require_portability x
+[%%expect{|
+module Abstract : sig type 'a t : immutable_data with 'a end
+Line 6, characters 64-65:
+6 | let portable_abstract (x : 'a Abstract.t) = require_portability x
+                                                                    ^
+Error: The value "x" has type "'a Abstract.t"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a Abstract.t is immutable_data with 'a
+         because of the definition of t at line 2, characters 2-36.
+       But the kind of 'a Abstract.t must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+let contended_portable x =
+  require_contention [x];
+  require_portability (Option.Some x)
+[%%expect{|
+Line 2, characters 21-24:
+2 |   require_contention [x];
+                         ^^^
+Error: This constructor has type "'a list"
+       but an expression was expected of type "('b : value mod contended)"
+       The kind of 'a list is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of 'a list must be a subkind of value mod contended
+         because of the definition of require_contention at line 1, characters 4-22.
+|}]
+
+(* Kind computation can copy type variables, as for the polymorphic field
+   below. Only variables of the checked type itself may be refined. *)
+type ('a : value mod portable) portable
+type 'a poly = { poly : ('b : value mod portable). 'a * 'b option }
+type bad = (int -> int) poly portable
+[%%expect{|
+type ('a : value mod portable) portable
+type 'a poly = { poly : ('b : value mod portable). 'a * 'b option; }
+Line 3, characters 11-28:
+3 | type bad = (int -> int) poly portable
+               ^^^^^^^^^^^^^^^^^
+Error: This type "(int -> int) poly" should be an instance of type
+         "('a : value mod portable)"
+       The kind of (int -> int) poly is value non_float mod portable with 'a
+         because of the definition of poly at line 2, characters 0-67.
+       But the kind of (int -> int) poly must be a subkind of
+           value mod portable
+         because of the definition of portable at line 1, characters 0-39.
+|}]
+
+let id_portable : ('a : value mod portable). 'a -> 'a = fun x -> x
+let escape (g : int -> int) = id_portable { poly = (g, None) }
+[%%expect{|
+val id_portable : ('a : value mod portable). 'a -> 'a = <fun>
+Line 2, characters 42-62:
+2 | let escape (g : int -> int) = id_portable { poly = (g, None) }
+                                              ^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(int -> int) poly"
+       but an expression was expected of type "('a : value mod portable)"
+       The kind of (int -> int) poly is value non_float mod portable with 'a
+         because of the definition of poly at line 2, characters 0-67.
+       But the kind of (int -> int) poly must be a subkind of
+           value mod portable
+         because of the definition of id_portable at line 1, characters 4-15.
+|}]
+
+let portable_poly (x : 'a poly) = require_portability x
+[%%expect{|
+Line 1, characters 54-55:
+1 | let portable_poly (x : 'a poly) = require_portability x
+                                                          ^
+Error: The value "x" has type "'a poly" but an expression was expected of type
+         "('b : value mod portable)"
+       The kind of 'a poly is value non_float mod portable with 'a
+         because of the definition of poly at line 2, characters 0-67.
+       But the kind of 'a poly must be a subkind of value mod portable
+         because of the definition of require_portability at line 1, characters 4-23.
+|}]
+
+(* The same, reaching the polymorphic field by unboxing. *)
+type 'a poly_unboxed =
+  { poly_unboxed : ('b : value mod portable). 'a * 'b option }
+[@@unboxed]
+let portable_poly_unboxed (x : 'a poly_unboxed) = id_portable x
+let escape_unboxed g = portable_poly_unboxed { poly_unboxed = (g, None) }
+let escaped_unboxed = escape_unboxed (fun x -> x)
+[%%expect{|
+type 'a poly_unboxed = {
+  poly_unboxed : ('b : value mod portable). 'a * 'b option;
+} [@@unboxed]
+Line 4, characters 62-63:
+4 | let portable_poly_unboxed (x : 'a poly_unboxed) = id_portable x
+                                                                  ^
+Error: The value "x" has type "'a poly_unboxed"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a poly_unboxed is value non_float mod portable with 'a
+         because it's a tuple type.
+       But the kind of 'a poly_unboxed must be a subkind of
+           value mod portable
+         because of the definition of id_portable at line 1, characters 4-15.
+|}, Principal{|
+type 'a poly_unboxed = {
+  poly_unboxed : ('b : value mod portable). 'a * 'b option;
+} [@@unboxed]
+Line 4, characters 62-63:
+4 | let portable_poly_unboxed (x : 'a poly_unboxed) = id_portable x
+                                                                  ^
+Error: The value "x" has type "'a poly_unboxed"
+       but an expression was expected of type "('b : value mod portable)"
+       The kind of 'a poly_unboxed is
+           immutable_data with 'a with (type : value mod portable) option
+         because it's a tuple type.
+       But the kind of 'a poly_unboxed must be a subkind of
+           value mod portable
+         because of the definition of id_portable at line 1, characters 4-15.
+|}]
+
+(* Declaration parameters are not refined after their uses are checked. *)
+type 'a late : immutable_data = 'a list
+and late_use = (int -> int) late
+[%%expect{|
+Line 1, characters 0-39:
+1 | type 'a late : immutable_data = 'a list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a list" is immutable_data with 'a
+         because it's a boxed variant type.
+       But the kind of type "'a list" must be a subkind of immutable_data
+         because of the definition of late at line 1, characters 0-39.
+|}]

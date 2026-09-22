@@ -1428,6 +1428,49 @@ end
 module M : sig type a : immutable_data with t1 with t2 end
 |}]
 
+(* Propagation against an abstract kind infers constant bounds, while
+   preserving arguments already bounded by that kind. *)
+type ('a : any) with_k1 : k1 with 'a
+[%%expect{|
+type ('a : any) with_k1 : k1 with 'a
+|}]
+
+type 'a inferred = 'a with_k1 require_k1
+[%%expect{|
+Line 1, characters 19-29:
+1 | type 'a inferred = 'a with_k1 require_k1
+                       ^^^^^^^^^^
+Error: This type "'a with_k1" should be an instance of type "('b : k1)"
+       The kind of 'a with_k1 is k1 with 'a
+         because of the definition of with_k1 at line 1, characters 0-36.
+       But the kind of 'a with_k1 must be a subkind of k1
+         because of the definition of require_k1 at line 5, characters 0-25.
+|}]
+
+type ('a : k1) preserved = 'a with_k1 require_k1
+[%%expect{|
+Line 1, characters 27-37:
+1 | type ('a : k1) preserved = 'a with_k1 require_k1
+                               ^^^^^^^^^^
+Error: This type "'a with_k1" should be an instance of type "('b : k1)"
+       The kind of 'a with_k1 is k1 with 'a
+         because of the definition of with_k1 at line 1, characters 0-36.
+       But the kind of 'a with_k1 must be a subkind of k1
+         because of the definition of require_k1 at line 5, characters 0-25.
+|}]
+
+type rejected = (int -> int) with_k1 require_k1
+[%%expect{|
+Line 1, characters 16-36:
+1 | type rejected = (int -> int) with_k1 require_k1
+                    ^^^^^^^^^^^^^^^^^^^^
+Error: This type "(int -> int) with_k1" should be an instance of type "('a : k1)"
+       The kind of (int -> int) with_k1 is k1 with 'a
+         because of the definition of with_k1 at line 1, characters 0-36.
+       But the kind of (int -> int) with_k1 must be a subkind of k1
+         because of the definition of require_k1 at line 5, characters 0-25.
+|}]
+
 (***************************************)
 (* Test: Lack of short paths for kinds *)
 
