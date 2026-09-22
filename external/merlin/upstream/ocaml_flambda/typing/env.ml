@@ -1480,22 +1480,26 @@ type unboxed_version_step =
   | Lacks_unboxed_version
   | Aliases of Path.t * type_expr list
   | Boxes of type_expr
+  | Abstract_box of Jkind_types.Sort.t Jkind_types.Layout.t
   | Has_unboxed_version of type_declaration
 let step_find_unboxed_version decl =
   match decl.type_unboxed_version with
   | Some ud -> Has_unboxed_version ud
   | None ->
-    (* If there's no stored unboxed version, then we must follow aliases. We
-        only follow this alias if the kind is abstract (we could follow all
-        aliases, but this gives better errors when typechecking mutually
-        recursive typedecls). *)
+    (* Only follow aliases for abstract declarations, to give better errors
+       when typechecking mutually recursive declarations. *)
     match decl.type_kind with
     | Type_record_unboxed_product _ | Type_variant _ | Type_open
     | Type_record _ ->
       Lacks_unboxed_version
     | Type_abstract _ ->
       match decl.type_manifest with
-      | None -> Lacks_unboxed_version
+      | None ->
+        begin match decl.type_jkind.jkind.base with
+        | Layout (Box (contents, _)) -> Abstract_box contents
+        | Layout (Sort _ | Product _ | Any _ | Addressable _) | Kconstr _ ->
+          Lacks_unboxed_version
+        end
       | Some ty ->
         match Btype.simple_unbox_ty ty with
         | Some ty -> Boxes ty
@@ -1551,6 +1555,22 @@ and find_type_unboxed_version path env seen =
   match step_find_unboxed_version decl with
   | Has_unboxed_version ud -> ud
   | Lacks_unboxed_version -> raise Not_found
+  | Abstract_box contents ->
+    let type_jkind =
+      { decl.type_jkind with
+        jkind = { decl.type_jkind.jkind with base = Layout contents };
+        annotation = None;
+        quality = Not_best;
+      }
+    in
+    { decl with
+      type_jkind;
+      type_ikind = Types.ikinds_todo "env unboxed abstract box kind";
+      type_separability =
+        Types.Separability.default_signature ~arity:decl.type_arity;
+      type_uid = Uid.unboxed_version decl.type_uid;
+      type_unboxed_version = None;
+    }
   | Boxes inner ->
     {
       type_params = decl.type_params;
