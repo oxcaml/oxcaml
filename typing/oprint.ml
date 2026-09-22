@@ -200,6 +200,9 @@ let print_out_value ppf tree =
         fprintf ppf "@[<2>lazy@ %a@]" print_constr_param param
     | tree -> print_simple_tree ppf tree
   and print_constr_param ppf = function
+    | Oval_unboxed tree ->
+        let s = unboxed_literal tree in
+        parenthesize_if_neg ppf "%s" s (String.starts_with ~prefix:"-" s)
     | Oval_int i -> parenthesize_if_neg ppf "%i" i (i < 0)
     | Oval_int8 i -> parenthesize_if_neg ppf "%is" i (i < 0)
     | Oval_int16 i -> parenthesize_if_neg ppf "%iS" i (i < 0)
@@ -227,6 +230,7 @@ let print_out_value ppf tree =
     | Oval_nativeint i -> fprintf ppf "%nin" i
     | Oval_float f -> pp_print_string ppf (float_repres f)
     | Oval_float32 f -> fprintf ppf "%ss" (float32_to_string f)
+    | Oval_unboxed tree -> pp_print_string ppf (unboxed_literal tree)
     | Oval_char c -> fprintf ppf "%C" c
     | Oval_string (s, maxlen, kind) ->
        begin try
@@ -277,6 +281,12 @@ let print_out_value ppf tree =
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
+  and unboxed_literal tree =
+    let literal = match tree with
+      | Oval_int i -> Printf.sprintf "%im" i
+      | tree -> asprintf "%a" print_simple_tree tree
+    in
+    Misc.format_as_unboxed_literal literal
   and print_fields first ppf =
     function
       [] -> ()

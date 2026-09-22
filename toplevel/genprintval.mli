@@ -27,6 +27,7 @@ module type OBJ =
     val tag : t -> int
     val size : t -> int
     val field : t -> int -> t
+    val raw_field : t -> int -> nativeint
     val double_array_tag : int
     val double_field : t -> int -> float
   end
@@ -46,6 +47,8 @@ type ('a, 'b) gen_printer =
 module type S =
   sig
     type t
+    val module_field_for_printing :
+      t -> Lambda.module_representation -> int -> t option
     val install_printer :
           Path.t -> Types.type_expr -> (formatter -> t -> unit) -> unit
     val install_generic_printer :

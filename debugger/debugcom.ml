@@ -336,6 +336,8 @@ module Remote_value =
             floatbuf
           end
 
+    let raw_field v n = Obj.raw_field (obj v) n
+
     let double_array_tag = Obj.double_array_tag
 
     let of_int n =

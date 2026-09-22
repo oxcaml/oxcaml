@@ -32,6 +32,7 @@ module type OBJ =
     val tag : t -> int
     val size : t -> int
     val field : t -> int -> t
+    val raw_field : t -> int -> nativeint
     val double_array_tag : int
     val double_field : t -> int -> float
   end
@@ -51,6 +52,8 @@ type ('a, 'b) gen_printer =
 module type S =
   sig
     type t
+    val module_field_for_printing :
+      t -> Lambda.module_representation -> int -> t option
     val install_printer :
           Path.t -> Types.type_expr -> (formatter -> t -> unit) -> unit
     val install_generic_printer :
@@ -154,9 +157,35 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Generic of Path.t * (int -> (int -> O.t -> Outcometree.out_value,
                                      O.t -> Outcometree.out_value) gen_printer)
 
-    (* CR mixed blocks v1: It would be good, and not hard, to add proper
-       printing support for unboxed values. *)
     let printers = ref ([
+      ( Pident(Ident.create_local "print_unboxed_unit"),
+        Simple (Predef.type_unboxed_unit,
+                (fun _ -> Oval_unboxed (Oval_stuff "()"))) );
+      ( Pident(Ident.create_local "print_unboxed_int"),
+        Simple (Predef.type_unboxed_int,
+                (fun x -> Oval_unboxed (Oval_int (O.obj x : int)))) );
+      ( Pident(Ident.create_local "print_unboxed_float"),
+        Simple (Predef.type_unboxed_float,
+                (fun x -> Oval_unboxed (Oval_float (O.obj x : float)))) );
+      ( Pident(Ident.create_local "print_float32_u"),
+        Simple (Predef.type_float32_u,
+                (fun x -> Oval_unboxed (Oval_float32 (O.obj x : Obj.t)))) );
+      ( Pident(Ident.create_local "print_unboxed_int8"),
+        Simple (Predef.type_unboxed_int8,
+                (fun x -> Oval_unboxed (Oval_int8 (O.obj x : int)))) );
+      ( Pident(Ident.create_local "print_unboxed_int16"),
+        Simple (Predef.type_unboxed_int16,
+                (fun x -> Oval_unboxed (Oval_int16 (O.obj x : int)))) );
+      ( Pident(Ident.create_local "print_int32_u"),
+        Simple (Predef.type_int32_u,
+                (fun x -> Oval_unboxed (Oval_int32 (O.obj x : int32)))) );
+      ( Pident(Ident.create_local "print_nativeint_u"),
+        Simple (Predef.type_nativeint_u,
+                (fun x ->
+                   Oval_unboxed (Oval_nativeint (O.obj x : nativeint)))) );
+      ( Pident(Ident.create_local "print_int64_u"),
+        Simple (Predef.type_int64_u,
+                (fun x -> Oval_unboxed (Oval_int64 (O.obj x : int64)))) );
       ( Pident(Ident.create_local "print_int"),
         Simple (Predef.type_int,
                 (fun x -> Oval_int (O.obj x : int))) );
@@ -320,22 +349,101 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     (* The main printing function *)
 
+    external float32_of_bits : int32 -> Obj.t =
+      "caml_float32_of_bits_bytecode"
+
+    let native_scalar_field obj pos
+          (kind : unit Mixed_block_shape.Singleton_mixed_block_element.t) =
+      let signed bits =
+        let shift = Sys.int_size - bits in
+        let word = Nativeint.to_int (O.raw_field obj pos) in
+        Some (O.repr (word lsl shift asr shift))
+      in
+      match kind with
+      | Value _ -> Some (O.field obj pos)
+      | Float_boxed () | Float64 -> Some (O.repr (O.double_field obj pos))
+      | Bits8 -> signed 8
+      | Bits16 -> signed 16
+      | Bits32 -> Some (O.repr (Nativeint.to_int32 (O.raw_field obj pos)))
+      | Bits64 -> Some (O.repr (Int64.of_nativeint (O.raw_field obj pos)))
+      | Word -> Some (O.repr (O.raw_field obj pos))
+      | Untagged_immediate ->
+          Some (O.repr (Nativeint.to_int (O.raw_field obj pos)))
+      | Float32 ->
+          Some (O.repr
+            (float32_of_bits (Nativeint.to_int32 (O.raw_field obj pos))))
+      | Vec128 | Vec256 | Vec512 | Mask -> None
+
+    let native_mixed_field obj shape pos =
+      match shape.(pos) with
+      | Lambda.Product elts when Array.length elts <> 0 -> None
+      | _ ->
+          let reordered =
+            Mixed_block_shape.of_mixed_block_elements shape
+              ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+          in
+          match
+            Mixed_block_shape.lookup_path_producing_new_indexes reordered [pos]
+          with
+          | [] -> Some (O.repr ())
+          | [i] ->
+              let counts =
+                Mixed_product_bytes.Wrt_path.count_shape shape pos []
+              in
+              let { Mixed_product_bytes.Wrt_path.offset_bytes; _ } =
+                Mixed_product_bytes.Wrt_path.offset_and_gap_unchecked counts
+              in
+              let word =
+                Mixed_product_bytes.Byte_count.on_64_bit_arch offset_bytes / 8
+              in
+              native_scalar_field obj word
+                (Mixed_block_shape.flattened_reordered_shape reordered).(i)
+          | _ :: _ :: _ -> None
+
+    let module_field_for_printing obj
+          (rep : Lambda.module_representation) pos =
+      match rep with
+      | Module_value_only _ -> Some (O.field obj pos)
+      | Module_mixed (shape, _) -> native_mixed_field obj shape pos
+
+    let inherited_field obj (sort : Jkind.Sort.Const.t) =
+      let block () =
+        if !Clflags.native_code then
+          let element = Lambda.mixed_block_element_of_layout
+              (Lambda.layout_of_const_sort sort) in
+          native_mixed_field obj [|element|] 0
+        else
+          match Lambda.layout_of_const_sort sort with
+          | Punboxed_product _ -> Some obj
+          | _ -> Some (O.field obj 0)
+      in
+      match Lambda.boxed_representation sort with
+      | Block -> block ()
+      | Float_block | Immediate_box -> Some obj
+      | Immediate64_box ->
+          if Sys.word_size <> 64 then block ()
+          else
+            let bits = Int32.of_int (O.obj obj : int) in
+            match sort with
+            | Base Bits32 -> Some (O.repr bits)
+            | Base Float32 -> Some (O.repr (float32_of_bits bits))
+            | _ -> Misc.fatal_error "inherited_field: expected 32-bit scalar"
+
     type outval_record_rep =
       | Outval_record_boxed
       | Outval_record_unboxed
-      | Outval_record_mixed_block of unit Mixed_block_shape.t
+      | Outval_record_inherited of Jkind.Sort.Const.t
+      | Outval_record_mixed_block of Lambda.mixed_block_shape
 
     type printing_jkind =
       | Print_as_value (* can interpret as a value and print *)
       | Print_as of string (* can't print *)
 
     let rec print_sort : Jkind.Sort.Const.t -> _ = function
-      | Base Scannable -> Print_as_value
-      | Base Void -> Print_as "<void>"
       | Base
-          ( Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128
-          | Vec256 | Vec512 | Mask | Word | Untagged_immediate ) ->
-        Print_as "<abstr>"
+          ( Scannable | Void | Float64 | Float32 | Bits8 | Bits16 | Bits32
+          | Bits64 | Word | Untagged_immediate ) -> Print_as_value
+      | Base (Vec128 | Vec256 | Vec512 | Mask) -> Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Addressable sort -> print_sort sort
       | Univar _ -> Print_as "<univar>"
@@ -369,10 +477,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         (* CR box: Update this read once addressability
            affects how elements are stored in blocks *)
         let shape = Lambda.transl_mixed_product_shape shape in
-        Some
-          (Outval_record_mixed_block
-             (Mixed_block_shape.of_mixed_block_elements shape
-                ~print_locality:(fun ppf () -> Format.fprintf ppf "()")))
+        Some (Outval_record_mixed_block shape)
 
     (* The position of the first field: an extension constructor's block
        starts with its extension slot. *)
@@ -425,30 +530,38 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           (rep : Types.record_representation) =
       let finalize rep =
         match Typedecl.finalize_record_representation env Location.none rep with
-        | Record_boxed_inherited | Record_boxed_inherited_variable _ -> None
         | Record_unboxed -> Some (Outval_record_unboxed, 0)
         | Record_boxed | Record_float | Record_ufloat ->
             Some (Outval_record_boxed, 0)
         | Record_mixed shape ->
             Option.map (fun rep -> rep, 0) (outval_mixed_block_rep shape)
+        | Record_boxed_inherited_variable sort ->
+            Some (Outval_record_inherited
+                    (Jkind.Sort.default_for_transl_and_get sort), 0)
         | Record_inlined _ ->
             Misc.fatal_error "inlined record representation"
         | Record_dummy _ ->
             Misc.fatal_error "dummy record representation"
-        | Record_undetermined | Record_variable _ ->
+        | Record_undetermined | Record_variable _ | Record_boxed_inherited ->
             Misc.fatal_error "variable record representation"
       in
       match rep with
-      | Record_boxed_inherited | Record_boxed_inherited_variable _ -> None
       | Record_inlined (_, shape, vrep) ->
           outval_rep_of_constructor env ~sorts_and_types shape vrep
       | Record_undetermined ->
           Option.bind (sorts_and_types ())
             (fun l -> finalize (Record_variable l))
+      | Record_boxed_inherited ->
+          Option.bind (sorts_and_types ()) (function
+            | [|sort, _|] ->
+                Some (Outval_record_inherited
+                        (Jkind.Sort.default_for_transl_and_get sort), 0)
+            | _ -> Misc.fatal_error "inherited record must have one field")
       | Record_variable _ ->
           Misc.fatal_error "variable record representation"
       | (Record_unboxed | Record_boxed | Record_float | Record_ufloat
-        | Record_mixed _ | Record_dummy _) as rep ->
+        | Record_mixed _ | Record_dummy _
+        | Record_boxed_inherited_variable _) as rep ->
           finalize rep
 
     let outval_of_value max_steps max_depth check_depth env obj lpoly ty =
@@ -875,7 +988,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 if first then tree_of_label env path name
                 else tree_of_name name
               and v =
-                if is_void then Oval_stuff "<void>"
+                if is_void then tree_of_val (depth - 1) (O.repr ()) ty_arg
                 else tree_of_field rep obj pos depth ty_arg
               in
               (lid, v) :: tree_of_fields false (pos + 1) remainder
@@ -884,8 +997,18 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       and tree_of_field rep obj pos depth ty_arg =
         let nested fld = nest tree_of_val (depth - 1) fld ty_arg in
+        let optional = function
+          | Some fld -> nested fld
+          | None -> Oval_stuff "<abstr>"
+        in
+        match Option.map Jkind_types.Sort.strip_head_addressable
+                (Jkind.sort_option_of_jkind env (Ctype.type_jkind env ty_arg))
+        with
+        | Some (Base Void) -> nested (O.repr ())
+        | _ ->
         match rep with
         | Outval_record_unboxed -> tree_of_val (depth - 1) obj ty_arg
+        | Outval_record_inherited sort -> optional (inherited_field obj sort)
         | Outval_record_boxed ->
             nested
               (if O.tag obj = O.double_array_tag then
@@ -893,24 +1016,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                else
                  O.field obj pos)
         | Outval_record_mixed_block shape ->
-            (* Native code stores a mixed block's value fields before its
-               flat ones, so [pos] is not necessarily the runtime index. *)
-            match
-              Mixed_block_shape.lookup_path_producing_new_indexes shape [pos]
-            with
-            | [] -> Oval_stuff "<void>"
-            | [i] ->
-                begin match
-                  (Mixed_block_shape.flattened_reordered_shape shape).(i)
-                with
-                | Value _ -> nested (O.field obj i)
-                | Float_boxed () | Float64 ->
-                    nested (O.repr (O.double_field obj i))
-                | Float32 | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
-                | Vec512 | Mask | Word | Untagged_immediate ->
-                    Oval_stuff "<abstr>"
-                end
-            | _ :: _ :: _ -> Oval_stuff "<abstr>"
+            optional (native_mixed_field obj shape pos)
 
       (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params

@@ -118,6 +118,7 @@ module Remote_value :
     val size : t -> int
     val field : t -> int -> t
     val double_field : t -> int -> float
+    val raw_field : t -> int -> nativeint
     val double_array_tag : int
     val same : t -> t -> bool
 

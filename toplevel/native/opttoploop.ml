@@ -382,7 +382,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
 
 let outval_of_id env id val_lpoly val_type =
   let glob, pos, (repr : Lambda.module_representation) = toplevel_value id in
-  match mod_field (global_symbol glob) repr pos with
+  match Printer.module_field_for_printing (global_symbol glob) repr pos with
   | Some obj_to_print -> outval_of_value env obj_to_print val_lpoly val_type
   | None -> Oval_stuff "<abstr>"
 
