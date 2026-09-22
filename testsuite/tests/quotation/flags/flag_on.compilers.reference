@@ -1,0 +1,4 @@
+File "flag_on.ml", line 11, characters 6-7:
+11 | let ( $ ) f x = f x
+           ^
+Error: Syntax error: operator expected.

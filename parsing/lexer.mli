@@ -56,10 +56,21 @@ val token_with_comments : Lexing.lexbuf -> Parser.token
 
 (* Syntax mode configuration *)
 module Syntax_mode : sig
-  val quotations : bool ref
+  (* Whether quotation syntax is currently lexed: the setting of the most
+     recent [#syntax quotations] directive, or [!Clflags.syntax_quotations]
+     if none has been seen since the last [reset_syntax_mode]. *)
+  val quotations_enabled : unit -> bool
 end
 
+(* Forget any [#syntax] directive seen so far, so that lexing continues with
+   the invocation defaults. Called at the start of each source file. *)
 val reset_syntax_mode : unit -> unit
+
+(* [protect_syntax_mode f] runs [f], then restores the [#syntax] directive
+   state to what it was beforehand. The toplevel uses this for [#use]d files:
+   they inherit the session's current mode, and their own directives stay
+   local to them instead of leaking into the session. *)
+val protect_syntax_mode : (unit -> 'a) -> 'a
 
 (*
   [set_preprocessor init preprocessor] registers [init] as the function
