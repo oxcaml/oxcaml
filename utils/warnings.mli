@@ -178,6 +178,11 @@ type t =
         code_size : int;
         current : string;
         ideal : string }                    (* 222 *)
+  | Functor_considered_for_inlining of
+      { code_id : string;
+        location : string;
+        code_size : int;
+        decision : string }                 (* 223 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

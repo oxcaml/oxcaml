@@ -49,6 +49,11 @@ let ideal_warning_is_active () =
     (Warnings.Inlining_deviates_from_ideal
        { is_a_functor = false; code_size = 0; current = ""; ideal = "" })
 
+let functor_warning_is_active () =
+  Warnings.is_active
+    (Warnings.Functor_considered_for_inlining
+       { code_id = ""; location = ""; code_size = 0; decision = "" })
+
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     =
   let dacc = DA.prepare_for_speculative_inlining dacc in
@@ -725,8 +730,41 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else do_not_inline Unrolling_depth_exceeded
           | `Always -> inline_if_code_present Attribute_always)))
 
+(* Warning 223 [Functor_considered_for_inlining] is reported for every functor
+   application that is considered for inlining, whatever the outcome; in
+   particular it is still reported for functors discarded by the small or large
+   functor size thresholds. The decision is only known once it has been taken,
+   so the warning is emitted here rather than upon entry to [make_decision0]. *)
+let report_functor_considered_for_inlining dacc ~apply ~function_type decision =
+  match DE.find_code_metadata_exn (DA.denv dacc) (FT.code_id function_type) with
+  | exception Not_found ->
+    (* Without the metadata we cannot tell whether this is a functor. *)
+    ()
+  | code_metadata ->
+    if Code_metadata.is_a_functor code_metadata
+    then
+      let dbg = Apply.dbg apply in
+      Location.prerr_warning
+        (Debuginfo.to_location dbg)
+        (Warnings.Functor_considered_for_inlining
+           { code_id =
+               Misc.to_string_of_print Code_id.print
+                 (Code_metadata.code_id code_metadata);
+             location = Misc.to_string_of_print Debuginfo.print_compact dbg;
+             code_size = Code_size.to_int (code_size code_metadata);
+             decision =
+               Misc.to_string_of_print Call_site_inlining_decision_type.print
+                 decision
+           })
+
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
-  if !Clflags.jsir
-  then Jsir_inlining_disabled
-  else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+  let decision : Call_site_inlining_decision_type.t =
+    if !Clflags.jsir
+    then Jsir_inlining_disabled
+    else make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity
+  in
+  if functor_warning_is_active ()
+  then
+    report_functor_considered_for_inlining dacc ~apply ~function_type decision;
+  decision

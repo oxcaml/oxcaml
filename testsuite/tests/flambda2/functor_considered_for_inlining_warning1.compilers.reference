@@ -1,0 +1,9 @@
+File "functor_considered_for_inlining_warning1.ml", lines 33-35, characters 11-4:
+33 | ...........F (struct
+34 |   let x = Sys.opaque_identity 1
+35 | end)
+Warning 223 [functor-considered-for-inlining]: This functor application was considered for inlining.
+  Code ID: camlFunctor_considered_for_inlining_warning1__F_0_2_code. Source
+  location: functor_considered_for_inlining_warning1.ml:33,11--57. Code size:
+  23. Inlining decision:
+  (Speculatively_inline (cost_metrics size: 13 removed: {call: 0 alloc: 2 prim: 2 branch: 0 direct: 0 poly_cmp: 0 requested: 0}) (evaluated_to 5.500000) (threshold 100.000000) (is_a_functor true)).

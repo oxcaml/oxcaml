@@ -1,0 +1,8 @@
+File "functor_considered_for_inlining_warning2.ml", lines 34-36, characters 11-4:
+34 | ...........F (struct
+35 |   let x = Sys.opaque_identity 1
+36 | end)
+Warning 223 [functor-considered-for-inlining]: This functor application was considered for inlining.
+  Code ID: camlFunctor_considered_for_inlining_warning2__F_0_2_code. Source
+  location: functor_considered_for_inlining_warning2.ml:34,11--57. Code size:
+  23. Inlining decision: Definition_says_not_to_inline.

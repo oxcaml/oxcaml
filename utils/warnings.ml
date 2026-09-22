@@ -175,6 +175,11 @@ type t =
         code_size : int;
         current : string;
         ideal : string }                    (* 222 *)
+  | Functor_considered_for_inlining of
+      { code_id : string;
+        location : string;
+        code_size : int;
+        decision : string }                 (* 223 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -279,6 +284,7 @@ let number = function
   | Redundant_modality -> 220
   | Unused_alert_disable _ -> 221
   | Inlining_deviates_from_ideal _ -> 222
+  | Functor_considered_for_inlining _ -> 223
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -729,6 +735,10 @@ let descriptions = [
     \    -flambda2-inline-large-functor-size is set to its ideal value, as\n\
     \    given by -flambda2-inline-ideal-large-functor-size).";
     since = since 5 4 };
+  { number = 223;
+    names = ["functor-considered-for-inlining"];
+    description = "A functor application was considered for inlining.";
+    since = since 5 4 };
 ]
 
 let name_to_number =
@@ -742,11 +752,20 @@ let name_to_number =
 
 let parsed_ocamlparam = ref "<not-set>"
 
+(* Warnings that [a] does not include, and which therefore have to be requested
+   explicitly (e.g. [-w +223]).  These are inlining diagnostics: they are
+   reported in such volume that [-w +a] enabling them, in particular alongside
+   [-warn-error +A], would be unhelpful.  They must also be cleared in
+   [defaults_w] below, since warnings start out active. *)
+let not_included_in_letter_a = [222; 223]
+
 (* CR-soon xclerc for xclerc: remove the `for_debug` parameter... *)
 let letter for_debug = function
   | 'a' ->
      let rec loop i = if i = 0 then [] else i :: loop (i - 1) in
-     loop last_warning_number
+     List.filter
+       (fun number -> not (List.mem number not_included_in_letter_a))
+       (loop last_warning_number)
   | 'b' -> []
   | 'c' -> [1; 2]
   | 'd' -> [3]
@@ -1141,7 +1160,7 @@ let parse_options errflag s =
   alerts
 
 (* If you change these, don't forget to change them in man/ocamlc.m *)
-let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221-222"
+let defaults_w = "+a-4-7-9-27-29-30-32..42-44-45-48-50-60-66..70-74-221-222-223"
 let defaults_warn_error = "-a"
 let default_disabled_alerts = [ "unstable"; "unsynchronized_access" ]
 
@@ -1645,6 +1664,12 @@ let message = function
         Style.inline_code
         "-flambda2-inline-large-functor-size"
         what code_size current ideal
+  | Functor_considered_for_inlining
+      { code_id; location; code_size; decision } ->
+      msg "This functor application was considered for inlining.@ \
+           Code@ ID:@ %a.@ Source@ location:@ %s.@ Code@ size:@ %d.@ \
+           Inlining@ decision:@ %s."
+        Style.inline_code code_id location code_size decision
 ;;
 
 let nerrors = ref 0
