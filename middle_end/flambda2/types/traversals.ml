@@ -1179,7 +1179,7 @@ struct
     TG.Row_like_for_blocks.create_raw ~known_tags ~other_tags ~alloc_mode, acc
 
   and rewrite_row_like_for_closures env acc metadata
-      ({ known_closures; other_closures } : TG.row_like_for_closures) =
+      ({ known_closures } : TG.row_like_for_closures) =
     let known_closures, acc =
       Function_slot.Map.fold
         (fun function_slot
@@ -1199,15 +1199,7 @@ struct
         known_closures
         (Function_slot.Map.empty, acc)
     in
-    let other_closures, acc =
-      match other_closures with
-      | Bottom -> Or_bottom.Bottom, acc
-      | Ok { maps_to = _; env_extension = _; index = _ } ->
-        (* CR bclement and vlaviron: The [other_closures] field is currently
-           always [Bottom] and should be removed completely. *)
-        Misc.fatal_error "Found non-bottom `other_closures`"
-    in
-    TG.Row_like_for_closures.create_raw ~known_closures ~other_closures, acc
+    TG.Row_like_for_closures.create_raw ~known_closures, acc
 
   and rewrite_closures_entry env acc metadata
       ({ function_types; closure_types; value_slot_types } : TG.closures_entry)
