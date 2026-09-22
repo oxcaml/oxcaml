@@ -9337,13 +9337,42 @@ and type_newtype
     let result, exp_type = type_body new_env in
     (* Replace every instance of this type constructor in the resulting
        type. *)
+    let unboxed_vars = ref Path.Map.empty in
+    let rec replace_path = function
+      | Path.Pident id' when id == id' -> Some ty
+      | Path.Pextra_ty (path, Punboxed_ty) as unboxed_path ->
+        begin match replace_path path with
+        | None -> None
+        | Some boxed_ty ->
+          match Path.Map.find_opt unboxed_path !unboxed_vars with
+          | Some ty -> Some ty
+          | None ->
+            let level = get_level ty in
+            let contents_decl = Env.find_type unboxed_path new_env in
+            let context = mk_jkind_context_always_principal new_env in
+            let contents_jkind =
+              Jkind.round_up ~context new_env contents_decl.type_jkind
+              |> Option.value ~default:(Jkind.Builtin.any ~why:Dummy_jkind)
+            in
+            let contents = newvar2 level contents_jkind in
+            unify_exp_types name_loc env boxed_ty
+              (newty2 ~level (Tbox contents));
+            unboxed_vars := Path.Map.add unboxed_path contents !unboxed_vars;
+            Some contents
+        end
+      | _ -> None
+    in
     let seen = Hashtbl.create 8 in
     let rec replace t =
       if Hashtbl.mem seen (get_id t) then ()
       else begin
         Hashtbl.add seen (get_id t) ();
         match get_desc t with
-        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
+        | Tconstr (path, _, _) ->
+          begin match replace_path path with
+          | Some ty -> link_type t ty
+          | None -> Btype.iter_type_expr replace (Fun.const ()) t
+          end
         | _ -> Btype.iter_type_expr replace (Fun.const ()) t
       end
     in
