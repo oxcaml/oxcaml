@@ -4,7 +4,8 @@ File "speculative_inlining_lifted_constants_warning.ml", line 28, characters 9-1
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
   -flambda2-speculative-inlining-track-lifted-constants is enabled and
-  -flambda2-inline-large-functor-size is set to its ideal value). Currently,
+  -flambda2-inline-large-functor-size is set to its ideal value). The code
+  size of the function being applied, prior to inlining, is 8. Currently,
   the function is inlined because its speculative cost -4.25 is at or below the inlining threshold 0.
   In the ideal configuration,
   the function would not be inlined because its speculative cost 2.75 would be above the inlining threshold 0.
@@ -15,7 +16,8 @@ File "speculative_inlining_lifted_constants_warning.ml", line 32, characters 12-
 Warning 222 [inlining-deviates-from-ideal]: The inlining decision at this application differs from the one
   that would be taken in the ideal configuration (in which
   -flambda2-speculative-inlining-track-lifted-constants is enabled and
-  -flambda2-inline-large-functor-size is set to its ideal value). Currently,
+  -flambda2-inline-large-functor-size is set to its ideal value). The code
+  size of the function being applied, prior to inlining, is 8. Currently,
   the function is inlined because its speculative cost -4.25 is at or below the inlining threshold 0.
   In the ideal configuration,
   the function would not be inlined because its speculative cost 2.75 would be above the inlining threshold 0.

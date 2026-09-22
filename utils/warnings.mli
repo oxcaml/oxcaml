@@ -173,8 +173,11 @@ type t =
   | Useless_valpoly                         (* 219 *)
   | Redundant_modality                      (* 220 *)
   | Unused_alert_disable of string          (* 221 *)
-  | Inlining_deviates_from_ideal of { current : string; ideal : string }
-                                            (* 222 *)
+  | Inlining_deviates_from_ideal of
+      { is_a_functor : bool;
+        code_size : int;
+        current : string;
+        ideal : string }                    (* 222 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

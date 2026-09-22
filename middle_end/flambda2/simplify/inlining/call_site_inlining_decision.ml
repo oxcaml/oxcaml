@@ -42,6 +42,13 @@ module UE = Upwards_env
 
 module FT = Flambda2_types.Function_type
 
+(* [Warnings.is_active] only inspects the number of the warning, so the payload
+   here is irrelevant. *)
+let ideal_warning_is_active () =
+  Warnings.is_active
+    (Warnings.Inlining_deviates_from_ideal
+       { is_a_functor = false; code_size = 0; current = ""; ideal = "" })
+
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     =
   let dacc = DA.prepare_for_speculative_inlining dacc in
@@ -158,9 +165,7 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
   then
     Cost_metrics.( + ) cost_metrics (cost_metrics_of_lifted_constants ()), None
-  else if
-    Warnings.is_active
-      (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
+  else if ideal_warning_is_active ()
   then
     (* Also compute the cost metrics as they would be if
        [speculative_inlining_track_lifted_constants] were enabled, so that we
@@ -446,7 +451,9 @@ let warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
     Location.prerr_warning
       (Debuginfo.to_location (Apply.dbg apply))
       (Warnings.Inlining_deviates_from_ideal
-         { current = describe_current_behaviour ~code_metadata actual_decision;
+         { is_a_functor = Code_metadata.is_a_functor code_metadata;
+           code_size = Code_size.to_int (code_size code_metadata);
+           current = describe_current_behaviour ~code_metadata actual_decision;
            ideal
          })
 
@@ -565,8 +572,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
     (not in_a_stub)
     && (not doing_speculative_inlining)
     && ideal_configuration_may_differ ()
-    && Warnings.is_active
-         (Warnings.Inlining_deviates_from_ideal { current = ""; ideal = "" })
+    && ideal_warning_is_active ()
   then
     warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
       ~threshold ~code_present ~actual_decision ~speculation ~speculate;
