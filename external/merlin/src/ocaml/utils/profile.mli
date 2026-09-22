@@ -64,6 +64,14 @@ val output_to_csv :
 Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 (** Outputs the selected recorded profiling information in CSV format to the formatter. *)
 
+val record_action :
+  gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
+(** When Dune action tracing is enabled, record a span covering the call,
+    with the complete timing hierarchy in its arguments. Pass
+    [Unix.gettimeofday] as the clock; compiler-libs itself does not depend on
+    [Unix]. Timing values in the arguments are CPU seconds, as in [-dtimings];
+    the span uses wall-clock time. *)
+
 (** Command line flags *)
 
 val options_doc : string
