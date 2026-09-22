@@ -698,20 +698,8 @@ let alias_chain_crossing ((module Lib__Sexp) : (module Sexp) @ nonportable) =
 [%%expect{|
 module type Sexp =
   sig module Utf8 : sig val to_string : int -> string @@ portable end end
-Lines 8-10, characters 67-5:
- 8 | ...................................................................struct
- 9 |     include (Lib.Sexp : module type of struct include Lib.Sexp end)
-10 |   end...
-Error: Signature mismatch:
-       Modules do not match:
-         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end
-       is not included in
-         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end
-       In module "Utf8":
-       Modules do not match:
-         (module Lib.Sexp.Utf8)
-       is not included in
-         (module Lib.Sexp.Utf8)
+val alias_chain_crossing : (module Sexp) @ stateless nonportable -> unit =
+  <fun>
 |}]
 
 (* Abstract module types do not provide mode crossing. *)
@@ -763,12 +751,19 @@ Lines 9-11, characters 67-5:
 11 |   end...
 Error: Signature mismatch:
        Modules do not match:
-         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end
+         sig module Utf8 = Lib.Sexp.Utf8 @@ stateless nonportable end @ nonportable
        is not included in
-         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end
+         sig module Utf8 = Lib.Sexp.Utf8 @@ portable end @ nonportable
        In module "Utf8":
        Modules do not match:
-         (module Lib.Sexp.Utf8)
+         (module Lib.Sexp.Utf8) @ nonportable
        is not included in
-         (module Lib.Sexp.Utf8)
+         (module Lib.Sexp.Utf8) @ portable
+       In module "Utf8":
+       Values do not match:
+         val to_string : int -> string (* in a structure at nonportable *)
+       is not included in
+         val to_string : int -> string (* in a structure at portable *)
+       The first is "nonportable"
+       but the second is "portable".
 |}]
