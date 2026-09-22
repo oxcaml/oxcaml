@@ -1994,6 +1994,7 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
+(*
 let assert_mixed_block_shape_support loc mixed_product_kind shape =
   (* CR zeisbach: we should do a check for splice variables after slambda.
      This isn't currently present, but Joe has a PR that will do this. *)
@@ -2007,6 +2008,7 @@ let assert_mixed_block_shape_support loc mixed_product_kind shape =
       assert_mixed_product_support loc mixed_product_kind
         ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
   end
+*)
 
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)

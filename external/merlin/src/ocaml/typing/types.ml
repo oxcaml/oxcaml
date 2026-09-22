@@ -1043,11 +1043,6 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
-<<<<<<< Merlin:rtjoa.records-imply-addressability
-(* The scannable axes in the resulting  are always [max] *)
-||||||| Compiler:last-imported
-(* The scannable axes in the resulting [mixed_block_element] are always [max] *)
-=======
 let rec mixed_block_element_is_scannable (elt : mixed_block_element) =
   match elt with
   | Scannable _ -> true
@@ -1057,7 +1052,6 @@ let rec mixed_block_element_is_scannable (elt : mixed_block_element) =
   | Void -> false
 
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
->>>>>>> Compiler:HEAD
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
   (* CR layouts-scannable: since sorts do not store scannable axis information,

@@ -82,6 +82,15 @@ let placeholder = Ast_helper.Exp.hole ()
 
 let rec gen_patterns ?(recurse = true) env type_expr =
   let open Types in
+  let tuple_patterns lst =
+    List.map lst ~f:(fun (label, ty) ->
+        let sort : Jkind.Sort.t =
+          match Ctype.type_sort ~why:Tuple_element ~fixed:true env ty with
+          | Ok sort -> sort
+          | Error _ -> Var (Jkind.Sort.new_genvar ())
+        in
+        (label, Patterns.omega, sort))
+  in
   log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
       Format.fprintf fmt "Generating patterns for type %a"
         Printtyp.Compat.type_expr type_expr);
@@ -91,27 +100,9 @@ let rec gen_patterns ?(recurse = true) env type_expr =
   | Tarrow _ -> raise (Not_allowed "arrow type")
   | Tobject _ -> raise (Not_allowed "object type")
   | Tpackage _ -> raise (Not_allowed "modules")
-  | Ttuple lst ->
-    let patterns =
-      (* Both [List.map] and [Patterns.omega_list] are length-preserving,
-         so [combine] won't raise.
-      *)
-      List.combine (List.map ~f:fst lst) (Patterns.omega_list lst)
-    in
-    [ Tast_helper.Pat.tuple env type_expr patterns ]
+  | Ttuple lst -> [ Tast_helper.Pat.tuple env type_expr (tuple_patterns lst) ]
   | Tunboxed_tuple lst ->
-    let patterns =
-      List.map lst ~f:(fun (label, ty) ->
-          let sort : Jkind.Sort.t =
-            match
-              Ctype.type_sort ~why:Unboxed_tuple_element ~fixed:true env ty
-            with
-            | Ok sort -> sort
-            | Error _ -> Var (Jkind.Sort.new_genvar ())
-          in
-          (label, Patterns.omega, sort))
-    in
-    [ Tast_helper.Pat.unboxed_tuple env type_expr patterns ]
+    [ Tast_helper.Pat.unboxed_tuple env type_expr (tuple_patterns lst) ]
   | Tconstr (path, _params, _) ->
     begin match Env.find_type_descrs path env with
     | Type_record (labels, _, _) ->
@@ -397,7 +388,8 @@ let rec subst_patt initial ~by patt =
       { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
     | Tpat_tuple lst ->
       { patt with
-        pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
+        pat_desc =
+          Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
       }
     | Tpat_unboxed_tuple lst ->
       { patt with
@@ -445,7 +437,8 @@ let rec rm_sub patt sub =
     { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
   | Tpat_tuple lst ->
     { patt with
-      pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
+      pat_desc =
+        Tpat_tuple (List.map lst ~f:(fun (lbl, p, sort) -> (lbl, f p, sort)))
     }
   | Tpat_unboxed_tuple lst ->
     { patt with
@@ -514,7 +507,8 @@ let rec qualify_constructors ~unmangling_tables f pat =
       Tpat_alias { alias with pattern = qualify_constructors f p }
     | Tpat_tuple ps ->
       Tpat_tuple
-        (List.map ps ~f:(fun (lbl, p) -> (lbl, qualify_constructors f p)))
+        (List.map ps ~f:(fun (lbl, p, sort) ->
+             (lbl, qualify_constructors f p, sort)))
     | Tpat_unboxed_tuple ps ->
       Tpat_unboxed_tuple
         (List.map ps ~f:(fun (lbl, p, sort) ->
@@ -577,7 +571,7 @@ let find_branch patterns sub =
       | Tpat_variant (_, Some p, _)
       | Tpat_lazy p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
-        List.exists lst ~f:(fun (_lbl, p) -> is_sub_patt ~sub p)
+        List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
       | Tpat_unboxed_tuple lst ->
         List.exists lst ~f:(fun (_lbl, p, _sort) -> is_sub_patt ~sub p)
       | Tpat_construct (_, _, _, lst, _) ->
@@ -660,7 +654,7 @@ module Conv = struct
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
       | Tpat_alias { pattern = p; _ } -> loop p
       | Tpat_tuple lst ->
-        let lst = List.map ~f:(fun (lbl, p) -> (lbl, loop p)) lst in
+        let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
         mkpat (Ppat_tuple (lst, Closed))
       | Tpat_unboxed_tuple lst ->
         let lst = List.map ~f:(fun (lbl, p, _sort) -> (lbl, loop p)) lst in
