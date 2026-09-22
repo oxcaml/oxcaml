@@ -3,14 +3,11 @@
 #include "caml/mlvalues.h"
 #include "caml/alloc.h"
 
-/* Byte offsets occupy the low 52 bits of the offset word of a fat pointer;
-   the top 12 bits are reserved for the mixed-block gap and are ignored. */
-#define Offset_mask ((((uintnat)1) << 52) - 1)
-
+/* The offset is a plain byte offset (non-mixed pointee), added verbatim. */
 static char *decode_fat_pointer(value pair)
 {
   return (char *)Bytes_val(Field(pair, 0))
-         + ((uintnat)Int64_val(Field(pair, 1)) & Offset_mask);
+         + (intnat)Int64_val(Field(pair, 1));
 }
 
 value test_fill_native(char *p, intnat c, intnat n)

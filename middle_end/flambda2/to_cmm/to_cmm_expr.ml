@@ -116,29 +116,25 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       |> List.map K.With_subkind.kind)
   in
   (* Fuse each fat-pointer argument pair (base, byte offset) into a single raw
-     pointer, nested directly in the [Cextcall] argument list so that no later
-     pass can separate the pointer arithmetic from the call. [Cadda] gives the
-     result machtype [Addr], which prevents CSE from keeping the derived pointer
-     live across an allocation or poll point. *)
+     pointer [base + offset], nested directly in the [Cextcall] argument list so
+     that no later pass can separate the pointer arithmetic from the call.
+     [Cadda] gives the result machtype [Addr], which prevents CSE from keeping
+     the derived pointer live across an allocation or poll point.
+
+     The offset is added verbatim: [@raw_ptr] requires a plain byte offset (a
+     non-mixed pointee), so there are no mixed-block "gap" bits to strip. This
+     is the caller's contract; masking them here would be wrong for pointees
+     whose offset legitimately uses the full word (e.g. external pointers under
+     5-level paging). *)
   let args, ty_args =
     match raw_ptr_arg_starts with
     | [] -> args, ty_args
     | _ :: _ ->
-      let gap_bits =
-        (* Clear any mixed-block gap bits, which occupy the top bits of the
-           offset word (see [Mixed_product_bytes]). *)
-        64 - Mixed_product_bytes.block_index_offset_bits
-      in
       let rec fuse index args ty_args starts =
         match starts, args, ty_args with
         | [], _, _ -> args, ty_args
         | start :: starts', base :: offset :: args', _ :: _ :: ty_args'
           when start = index ->
-          let offset =
-            C.lsr_int
-              (C.lsl_int offset (C.int ~dbg gap_bits) dbg)
-              (C.int ~dbg gap_bits) dbg
-          in
           let ptr = C.add_int_ptr ~ptr_out_of_heap:false base offset dbg in
           let args'', ty_args'' = fuse (index + 2) args' ty_args' starts' in
           ptr :: args'', Cmm.XInt :: ty_args''

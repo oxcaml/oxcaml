@@ -12,7 +12,9 @@
 
 (* Tests for the [@raw_ptr] attribute on external arguments: a fat pointer
    (unboxed pair of a [value] base and a [bits64] byte offset) is passed to
-   C as a single raw pointer, base + offset. *)
+   C as a single raw pointer, base + offset.  The offset must be a plain byte
+   offset (a non-mixed pointee); it is added verbatim, with no gap-bit
+   handling. *)
 
 external unbox_int64 : (int64[@local_opt]) -> int64_u = "%unbox_int64"
 
@@ -61,11 +63,6 @@ let () =
   let b = Bytes.make 8 'A' in
   fill #(b, #2L) (Char.code 'x') 3;
   print_bytes "fill" b;
-  (* fill with garbage in the top 12 (gap) bits of the offset: they must be
-     ignored *)
-  let junk_off = unbox_int64 (Int64.logor (Int64.shift_left 0xFFFL 52) 5L) in
-  fill #(b, junk_off) (Char.code 'y') 2;
-  print_bytes "fill-gap-bits" b;
   (* memset directly from libc *)
   let (_ : nativeint_u) = memset #(b, #0L) (Char.code '.') 8 in
   print_bytes "memset" b;
@@ -83,10 +80,9 @@ let () =
   Printf.printf "cmp-self: %d\n" (cmp #(m, #0L) #(m, #2L) 3)
 
 (* Verify the address computation exactly, without dereferencing: [ptr_id]
-   returns the raw pointer the C function received.  The offsets are
-   dynamic ([Sys.opaque_identity]), so the mask and add cannot be
-   constant-folded; the 45-bit offset checks that only the top 12 (gap)
-   bits are cleared. *)
+   returns the raw pointer the C function received.  The offset is dynamic
+   ([Sys.opaque_identity]), so the add cannot be constant-folded; this confirms
+   the raw pointer is [base + offset], computed verbatim. *)
 
 external box_nativeint : nativeint_u -> (nativeint[@local_opt])
   = "%box_nativeint"
@@ -100,8 +96,5 @@ let () =
   let base = box_nativeint (ptr_id #(b, #0L)) in
   let off = Sys.opaque_identity 0x123_4567_89ABL in
   let p = box_nativeint (ptr_id #(b, unbox_int64 off)) in
-  Printf.printf "ptr-id-45bit: %b\n"
-    (p = Nativeint.add base (Int64.to_nativeint off));
-  let junk = Sys.opaque_identity (Int64.logor (Int64.shift_left 0xFFFL 52) 7L) in
-  let q = box_nativeint (ptr_id #(b, unbox_int64 junk)) in
-  Printf.printf "ptr-id-gap: %b\n" (Nativeint.sub q base = 7n)
+  Printf.printf "ptr-id: %b\n"
+    (p = Nativeint.add base (Int64.to_nativeint off))
