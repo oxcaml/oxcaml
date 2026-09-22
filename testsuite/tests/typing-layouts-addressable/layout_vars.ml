@@ -489,7 +489,7 @@ end
 module type Inherited_boxed_index =
   sig
     type t = { inherit i : int; }
-    val index : (t, int) idx_imm @@ stateless
+    val index : (t#, int) idx_imm @@ stateless
   end
 |}]
 

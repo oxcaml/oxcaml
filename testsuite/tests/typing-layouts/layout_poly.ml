@@ -35,8 +35,7 @@ Error: This expression has type "t_any" but an expression was expected of type
          because of the definition of t_any at line 3, characters 0-16.
        But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 type ('a : any) t
@@ -54,8 +53,7 @@ Error: This expression has type "t_any t"
          because of the definition of t_any at line 3, characters 0-16.
        But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 
@@ -137,8 +135,7 @@ Error: Signature mismatch:
          because of the definition of id at line 3, characters 2-54.
        But the layout of 'a must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 type ('a : any, 'b : any) s
@@ -182,8 +179,7 @@ Error: Signature mismatch:
          because of the definition of t_any at line 2, characters 0-16.
        But the layout of t_any must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 type ('a : any, 'b : any) s
@@ -341,8 +337,7 @@ Error: Signature mismatch:
          because of the definition of id at line 2, characters 2-31.
        But the layout of 'a must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 
@@ -545,8 +540,7 @@ Error: This expression has type "('a : float64)"
          because it is the primitive type int64_u.
        But the layout of int64_u must be a sublayout of float64
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 (* CR layouts v2.9: the default part is not quite correct *)
 
@@ -782,6 +776,5 @@ Error:
        But the kind of 'a -> 'b must be a subkind of
            value_maybe_null mod portable contended
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]

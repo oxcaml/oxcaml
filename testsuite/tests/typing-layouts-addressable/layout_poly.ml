@@ -49,8 +49,7 @@ Error: The value "x" has type "b8" but an expression was expected of type
          because of the definition of b8 at line 3, characters 0-15.
        But the layout of b8 must be addressable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 let bad (x : float#) = id_addressable x
@@ -64,8 +63,7 @@ Error: The value "x" has type "float#" but an expression was expected of type
          because it is the unboxed version of the primitive type float.
        But the layout of float# must be addressable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 (* Unboxed tuples make their components addressable. *)
@@ -136,8 +134,7 @@ Error: This expression has type "('a : bits8 addressable)"
          because of the definition of b8 at line 3, characters 0-15.
        But the layout of b8 must be a sublayout of bits8 addressable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 (* The sort really is shared between ['a] and ['b]: the argument sets it to
@@ -153,8 +150,7 @@ Error: This expression has type "('a : bits64)"
          because of the definition of b8a at line 1, characters 0-28.
        But the layout of b8a must be a sublayout of bits64
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 (* CR layouts: Meets for addressable are incomplete! See
@@ -181,8 +177,7 @@ Error: The value "y" has type "('a : bits8)"
          because of the definition of b8a at line 1, characters 0-28.
        But the layout of b8a must be a sublayout of bits8
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 (* okay if we constrain the kind earlier *)

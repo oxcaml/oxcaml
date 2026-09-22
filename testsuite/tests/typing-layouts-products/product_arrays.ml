@@ -2165,8 +2165,7 @@ Error: The value "x" has type "#(float# * a * int * int64_u) array"
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64_u) must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 let f_any_2 (type a : any mod separable) (x : #(string * a * bool option) array) =
@@ -2182,8 +2181,7 @@ Error: The value "x" has type "#(string * a * bool option) array"
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
@@ -2201,8 +2199,7 @@ Error: The value "x" has type "#(float# * a * int * int64_u) array"
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64_u) must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
 |}]
 
 let f_any_external_2 (type a : any mod separable mod external_)
@@ -2218,8 +2215,7 @@ Error: The value "x" has type "#(string * a * bool option) array"
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]

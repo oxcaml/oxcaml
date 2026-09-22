@@ -59,9 +59,9 @@ type t = ..
   (A/0 = (makeblock_unique 248 "A" (caml_fresh_oo_id 0))
    B/0 = (makeblock_unique 248 "B" (caml_fresh_oo_id 0))
    C/0 = (makeblock_unique 248 "C" (caml_fresh_oo_id 0)))
-  (seq (apply (field_imm 1 (global Toploop!)) "A/54" A/0)
-    (apply (field_imm 1 (global Toploop!)) "B/55" B/0)
-    (apply (field_imm 1 (global Toploop!)) "C/56" C/0)))
+  (seq (apply (field_imm 1 (global Toploop!)) "A/58" A/0)
+    (apply (field_imm 1 (global Toploop!)) "B/59" B/0)
+    (apply (field_imm 1 (global Toploop!)) "C/60" C/0)))
 type t += A | B of unit | C of bool * int
 |}]
 
@@ -75,9 +75,9 @@ let f = function
 ;;
 [%%expect{|
 (let
-  (C/0 =? (apply (field_imm 0 (global Toploop!)) "C/56")
-   B/0 =? (apply (field_imm 0 (global Toploop!)) "B/55")
-   A/0 =? (apply (field_imm 0 (global Toploop!)) "A/54")
+  (C/0 =? (apply (field_imm 0 (global Toploop!)) "C/60")
+   B/0 =? (apply (field_imm 0 (global Toploop!)) "B/59")
+   A/0 =? (apply (field_imm 0 (global Toploop!)) "A/58")
    f/0 =
      (function {nlocal = 0}
        param/2[value<

@@ -26,21 +26,21 @@ Static data:
     (closure ⟨env⟩ layout_18 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 1} closure/353[L]
-           (let (calls/350 =a (mixedfield 0  (*) closure/353))
-             (function {nlocal = 0} x/344[$layout_18] : $layout_18
-               (seq (+:=1 calls/350) x/344))))⟫ }))
+        ⟪(function {nlocal = 1} closure/357[L]
+           (let (calls/354 =a (mixedfield 0  (*) closure/357))
+             (function {nlocal = 0} x/348[$layout_18] : $layout_18
+               (seq (+:=1 calls/354) x/348))))⟫ }))
   (Cross_module_static_lib/id/0
     (closure ⟨env⟩ layout_2 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 1} closure/351[L]
-           (function {nlocal = 0} x/336[$layout_2] : $layout_2 x/336))⟫ }))
+        ⟪(function {nlocal = 1} closure/355[L]
+           (function {nlocal = 0} x/340[$layout_2] : $layout_2 x/340))⟫ }))
   (Cross_module_static_lib/pair/1
     (closure ⟨env⟩ layout_13 layout_14 ->
       { c = (missing)
       ; r =
-        ⟪(function {nlocal = 1} closure/352[L]
-           (function {nlocal = 0} x/339[$layout_13] y/340[$layout_14]
+        ⟪(function {nlocal = 1} closure/356[L]
+           (function {nlocal = 0} x/343[$layout_13] y/344[$layout_14]
              : #($layout_13, $layout_14)
-             (make_unboxed_product #($layout_13, $layout_14) x/339 y/340)))⟫ }))
+             (make_unboxed_product #($layout_13, $layout_14) x/343 y/344)))⟫ }))

@@ -215,12 +215,10 @@ type bad : value box = { mutable a : int [@atomic] }
 Line 1, characters 0-52:
 1 | type bad : value box = { mutable a : int [@atomic] }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "bad" is value non_float
+Error: The layout of type "bad" is any box non_float non_null
          because it's a boxed record type.
        But the layout of type "bad" must be a sublayout of value box
          because of the annotation on the declaration of the type bad.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
 |}]
 
 (* A component's box structure is checked on demand *)

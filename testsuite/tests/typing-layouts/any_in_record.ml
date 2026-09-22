@@ -273,7 +273,7 @@ type ('a : any) t = { i : int ; a : 'a }
 let foo t = (.a)
 [%%expect{|
 type ('a : any) t = { i : int; a : 'a; }
-val foo : 'a -> ('b t, 'b) idx_imm = <fun>
+val foo : 'a -> ('b t#, 'b) idx_imm = <fun>
 |}]
 
 (* Matching *)
@@ -291,7 +291,7 @@ type ('a : any) r = { t : 'a }
 let f = (.t)
 [%%expect{|
 type ('a : any) r = { t : 'a; }
-val f : ('a r, 'a) idx_imm = <abstr>
+val f : ('a r#, 'a) idx_imm = <abstr>
 |}]
 
 (* Any errors *)

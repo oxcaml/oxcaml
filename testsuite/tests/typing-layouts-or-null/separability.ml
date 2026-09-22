@@ -889,8 +889,7 @@ Error: The constant "5." has type "float" but an expression was expected of type
          because it is the primitive type float.
        But the layout of float must be a sublayout of value non_float
          because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
+         ([@layout_poly] requires this type to be representable at call sites).
        Note: The kinds mutable_data, immutable_data, and sync_data have
        the layout value non_float.
 |}]
