@@ -39,12 +39,18 @@ escape characters in string literals, so we use the revert-newlines script.
   type t0 = int
       ^
   With verbosity 0: "type t0 = int"
-  With verbosity 1: "type t0 : immediate = int"
+  With verbosity 1: "type t0
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ =
+      int"
   
   type t1 : immediate = int
       ^
   With verbosity 0: "type t1 = int"
-  With verbosity 1: "type t1 : immediate = int"
+  With verbosity 1: "type t1
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ =
+      int"
   
   type t2 : immediate = A | B | C
       ^
@@ -69,7 +75,11 @@ escape characters in string literals, so we use the revert-newlines script.
   type t6 : value = { v : int } [@@unboxed]
       ^
   With verbosity 0: "type t6 = { v : int; } [@@unboxed]"
-  With verbosity 1: "type t6 : immediate = { v : int; } [@@unboxed]"
+  With verbosity 1: "type t6
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ = {
+    v : int;
+  } [@@unboxed]"
   
 
 (II) Functions
@@ -185,18 +195,28 @@ escape characters in string literals, so we use the revert-newlines script.
   > run layouts.ml 16:13
   let f_int (x : int) = x
                  ^
-  With verbosity 0: "type int : immediate"
-  With verbosity 1: "type int : immediate"
+  With verbosity 0: "type int
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_"
+  With verbosity 1: "type int
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_"
   
   let f0 (x : t0) = x
               ^
   With verbosity 0: "type t0 = int"
-  With verbosity 1: "type t0 : immediate = int"
+  With verbosity 1: "type t0
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ =
+      int"
   
   let f1 (x : t1) = x
               ^
   With verbosity 0: "type t1 = int"
-  With verbosity 1: "type t1 : immediate = int"
+  With verbosity 1: "type t1
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ =
+      int"
   
   let f2 (x : t2) = x
               ^
@@ -221,7 +241,11 @@ escape characters in string literals, so we use the revert-newlines script.
   let f6 (x : t6) = x
               ^
   With verbosity 0: "type t6 = { v : int; } [@@unboxed]"
-  With verbosity 1: "type t6 : immediate = { v : int; } [@@unboxed]"
+  With verbosity 1: "type t6
+    : (untagged_immediate mod everything) box
+        mod global immutable unforkable yielding external_ = {
+    v : int;
+  } [@@unboxed]"
   
 
 (III) Polymorphic functions

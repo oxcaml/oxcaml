@@ -12,9 +12,10 @@
   $ run 1:9 <<EOF
   > type t = int
   > EOF
-  Verbosity 0: immediate
-  Verbosity 1: value non_pointer mod global many stateless immutable external_
-  Verbosity 2: value non_pointer non_null
+  Verbosity 0: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
+  Verbosity 1: untagged_immediate box mod global many stateless immutable external_
+  Verbosity 2: untagged_immediate box non_pointer non_null
     mod global
         many
         stateless

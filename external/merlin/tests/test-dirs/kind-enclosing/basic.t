@@ -7,17 +7,20 @@
   $ run 1:5 <<EOF
   > type t = int
   > EOF
-  1:0-1:12: immediate
+  1:0-1:12: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
 
   $ run 1:9 <<EOF
   > type 'a t = int
   > EOF
-  1:0-1:15: immediate
+  1:0-1:15: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
 
   $ run 1:9 <<EOF
   > type t = int option
   > EOF
-  1:9-1:12: immediate
+  1:9-1:12: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
   1:9-1:19: immutable_data
   1:0-1:19: immutable_data
 
@@ -68,13 +71,16 @@
   > let f (foo : int) =
   >   foo
   > EOF
-  1:13-1:16: immediate
-  1:13-1:16: immediate
+  1:13-1:16: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
+  1:13-1:16: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
   1:6-2:5: value non_float mod aliased immutable
 
   $ run 2:4 <<EOF
   > let f (foo : int) =
   >   foo
   > EOF
-  2:2-2:5: immediate
+  2:2-2:5: (untagged_immediate mod everything) box
+    mod global immutable unforkable yielding external_
   1:6-2:5: value non_float mod aliased immutable
