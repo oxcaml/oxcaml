@@ -16,7 +16,7 @@ external poll : unit -> unit = "%poll"
 let () =
   let ticks = Atomic.make 0 in
   set_tick_hook (fun () -> Atomic.incr ticks);
-  let child_pid = Domain.Tick.with_ ~interval_usec:1_000 (fun () ->
+  let wait_for_child = Domain.Tick.with_ ~interval_usec:1_000 (fun () ->
     match Unix.fork () with
     | 0 -> (* in child *)
       let start = Sys.time () in
@@ -25,10 +25,9 @@ let () =
         then failwith "Timed out"
         else poll ()
       done;
-      0
-    | child_pid -> child_pid
+      (fun () -> ())
+    | child_pid -> (* in parent *)
+      (fun () -> ignore (Unix.waitpid [ ] child_pid))
   ) in
-  if child_pid <> 0 then begin (* in parent *)
-    (* After releasing the tick in the parent, the child should still tick *)
-    ignore (Unix.waitpid [ ] child_pid)
-  end
+  (* After releasing the tick in the parent, the child should still tick *)
+  wait_for_child ()
