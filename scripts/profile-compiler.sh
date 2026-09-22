@@ -73,8 +73,8 @@ cp "$output/bin/ocamlopt" "$output/bin/ocamlopt.opt"
 sed \
   -e '/(bin_annot_cms true)/a\
     (ocamlopt_flags (:standard -O3))' \
-  -e "s|$root/_build/_bootinstall/bin|$output/bin\" \"$root/_install/bin|g" \
-  -e "s|$root/_build/_bootinstall/lib/ocaml|$root/_install/lib/ocaml|g" \
+  -e "s|\"[^\"]*/_build/_bootinstall/bin\"|\"$output/bin\" \"$root/_install/bin\"|g" \
+  -e "s|\"[^\"]*/_build/_bootinstall/lib/ocaml\"|\"$root/_install/lib/ocaml\"|g" \
   duneconf/runtime_stdlib.ws > "$output/stdlib.ws"
 
 # Build and collect profiling data:
