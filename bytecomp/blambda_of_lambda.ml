@@ -24,6 +24,10 @@ let is_nontail : Lambda.region_close -> bool = function
   | Rc_nontail -> true
   | Rc_normal | Rc_close_at_apply -> false
 
+let idx_boxed_root_tag : Lambda.idx_boxed_root -> int = function
+  | Other_block -> 0
+  | Singleton_record -> 1
+
 module Storer = Switch.Store (struct
   type t = Lambda.lambda
 
@@ -785,13 +789,15 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let copied_value = copy_mixed_block_element elt (comp_expr value) in
         Prim (Ccall "caml_set_ext_ptr_bytecode", [comp_expr ptr; copied_value])
       | _ -> wrong_arity ~expected:2)
-    | Pmake_idx_field pos ->
-      Const (Const_block (0, [Const_base (Const_int pos)]))
-    | Pmake_idx_mixed_field (_, pos, path) ->
+    | Pmake_idx_field (pos, root) ->
+      let tag = idx_boxed_root_tag root in
+      Const (Const_block (tag, [Const_base (Const_int pos)]))
+    | Pmake_idx_mixed_field (_, pos, path, root) ->
       let path_consts =
         List.map (fun x -> Const_base (Const_int x)) (pos :: path)
       in
-      Const (Const_block (0, path_consts))
+      let tag = idx_boxed_root_tag root in
+      Const (Const_block (tag, path_consts))
     | Pmake_idx_array (_, ik, _, path) -> (
       (* Make a block containing [ to_int index ] ++ path.
          See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
@@ -831,6 +837,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         Blambda.Prim
           (Ccall "caml_deepen_idx_bytecode", [path_prefix; path_suffix])
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
+    | Pidx_compose _ -> binary (Ccall "caml_compose_idx_bytecode")
     | Pfield_computed _sem -> binary Getvectitem
     | Psetfield (n, _ptr, _init) -> binary (Setfield n)
     | Psetfield_computed (_ptr, _init) -> ternary Setvectitem

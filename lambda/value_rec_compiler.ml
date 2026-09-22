@@ -516,6 +516,7 @@ let compute_static_size lam =
     | Parray_element_size_in_bytes _
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
     | Pidx_deepen _
+    | Pidx_compose _
     | Punbox_unit ->
         Constant
 

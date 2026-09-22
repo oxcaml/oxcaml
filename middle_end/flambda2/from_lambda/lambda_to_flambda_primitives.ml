@@ -2105,11 +2105,11 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         (Simple.const_int
            (Target_ocaml_int.of_int Target_system.Machine_width.Sixty_four
               num_bytes)) ]
-  | Pmake_idx_field pos, [] ->
+  | Pmake_idx_field (pos, _root), [] ->
     needs_64_bit_target prim dbg;
     let idx_raw_value = Int64.mul (Int64.of_int pos) 8L in
     [H.simple_i64_expr idx_raw_value]
-  | Pmake_idx_mixed_field (shape, pos, path), [] ->
+  | Pmake_idx_mixed_field (shape, pos, path, _root), [] ->
     needs_64_bit_target prim dbg;
     let counts = MPB.Wrt_path.count_shape shape pos path in
     let offset_and_gap =
@@ -2160,8 +2160,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         Int64.of_int
           (BC.on_64_bit_arch (BC.add counts.left.value counts.left.flat))
     in
-    [ compose_block_indices ~machine_width
-        ~intermediate ~target:counts.here idx (H.simple_i64 inner_bits) ]
+    [ compose_block_indices ~machine_width ~intermediate ~target:counts.here idx
+        (H.simple_i64 inner_bits) ]
+  | Pidx_compose { intermediate; target }, [[outer]; [inner]] ->
+    needs_64_bit_target prim dbg;
+    let count layout = MPB.count (L.mixed_block_element_of_layout layout) in
+    [ compose_block_indices ~machine_width ~intermediate:(count intermediate)
+        ~target:(count target) outer inner ]
   | Pmakefloatblock (mutability, mode), _ ->
     let args = List.flatten args in
     let mode =
@@ -3666,7 +3671,8 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_field _ | Patomic_set_mixed_field _ | Ppoke _
       | Pphys_equal _
       | Pscalar (Binary _)
-      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _ ),
+      | Patomic_load_idx _ | Pget_idx _ | Pset_ptr _ | Pset_ext_ptr _
+      | Pidx_compose _ ),
       ( []
       | [_]
       | _ :: _ :: _ :: _

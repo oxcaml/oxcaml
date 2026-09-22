@@ -24,6 +24,8 @@ type constant = Typedtree.constant
 (* Overriding Asttypes.mutable_flag *)
 type mutable_flag = Immutable | Immutable_unique | Mutable
 
+type idx_boxed_root = Singleton_record | Other_block
+
 type compile_time_constant =
   | Big_endian
   | Word_size
@@ -186,13 +188,15 @@ type primitive =
       (* the [layout list] is the layout of the whole product *)
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of int * idx_boxed_root
+  | Pmake_idx_mixed_field of
+      mixed_block_shape * int * int list * idx_boxed_root
     (** The lone int is the index into the mixed_block_shape, the int list is
         the path into that mixed_block_element *)
   | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
+  | Pidx_compose of { intermediate : layout; target : layout }
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_preemptible

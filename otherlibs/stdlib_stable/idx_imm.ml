@@ -22,6 +22,11 @@ external get
   = "%get_idx_imm"
 [@@layout_poly]
 
+external compose
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_imm -> ('b box, 'c) idx_imm -> ('a, 'c) idx_imm
+  = "%idx_compose"
+
 external unsafe_create_into_iarray
   : ('a : any mod non_float). int -> ('a iarray, 'a) idx_imm
   = "%unsafe_array_idx"

@@ -28,6 +28,16 @@ external set
   = "%set_idx"
 [@@layout_poly]
 
+external compose
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b box, 'c) idx_mut -> ('a, 'c) idx_mut
+  = "%idx_compose"
+
+external compose_imm
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b box, 'c) idx_imm -> ('a, 'c) idx_mut
+  = "%idx_compose"
+
 external unsafe_create_into_array
   : ('a : any mod non_float). int -> ('a array, 'a) idx_mut
   = "%unsafe_array_idx"

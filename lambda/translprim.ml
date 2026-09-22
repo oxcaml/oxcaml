@@ -37,6 +37,7 @@ type error =
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
   | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Unable_to_specialize_idx_compose_primitive of Types.type_expr
   | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
@@ -1260,6 +1261,8 @@ let lookup_primitive_unspecialized loc ~poly_mode ~poly_sort pos p =
     | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+    | "%idx_compose" ->
+      Primitive (Pidx_compose { intermediate = Ptop; target = Ptop }, 2)
     | "%unsafe_array_idx" ->
       Primitive(Pmake_idx_array
         (Punspecializedarray, Ptagged_int_index,
@@ -2010,6 +2013,30 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Pset_ext_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ext_ptr (l, m), arity))
+  | Primitive (Pidx_compose _, arity), [outer; inner] ->
+    let loc = to_location loc in
+    let element_layout idx_ty =
+      let err () =
+        raise (Error (loc,
+          Unable_to_specialize_idx_compose_primitive idx_ty))
+      in
+      let elt_ty =
+        let idx_ty = Btype.tpoly_get_mono idx_ty in
+        match Types.get_desc (Ctype.expand_head env idx_ty) with
+        | Tconstr (p, [_; elt_ty], _)
+          when Path.same p Predef.path_idx_mut
+            || Path.same p Predef.path_idx_imm -> elt_ty
+        | _ -> err ()
+      in
+      match Ctype.type_sort ~why:Idx_element ~fixed:true env elt_ty with
+      | Error _ -> err ()
+      | Ok sort ->
+        let sort = Jkind.Sort.default_for_transl_and_get sort in
+        Typeopt.layout env loc sort elt_ty
+    in
+    let intermediate = element_layout outer in
+    let target = element_layout inner in
+    Some (Primitive (Pidx_compose { intermediate; target }, arity))
   | Primitive (Pmake_idx_array (_, ik, _mbe, path), arity), _ ->
     let loc = to_location loc in
     let err () =
@@ -2713,6 +2740,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
+  | Pidx_compose _
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
@@ -2858,6 +2886,11 @@ let report_error_doc ppf = function
          whose first parameter is equal to %a or %a.@]"
         Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
         Style.inline_code "_ array" Style.inline_code "_ iarray"
+  | Unable_to_specialize_idx_compose_primitive ty ->
+      fprintf ppf
+        "@[Cannot compose the index of type %a:@ \
+         its element type must have a representable layout.@]"
+        Printtyp.Doc.type_expr ty
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays of unboxed products containing a@ \

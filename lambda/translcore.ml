@@ -2835,6 +2835,9 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pidx_deepen (mbe, uas_path), [idx], (of_location ~scopes loc))
     end
   | Baccess_field (_id, lbl, repres) ->
+    let root =
+      if Array.length lbl.lbl_all = 1 then Singleton_record else Other_block
+    in
     let repres = Typedecl.finalize_record_representation env loc repres in
     begin match repres with
     | Record_boxed
@@ -2846,7 +2849,7 @@ and transl_idx ~scopes loc env ba uas =
               Misc.fatal_error "Texp_idx: non-singleton unboxed record field \
                 in non-mixed boxed record")
         uas;
-      Lprim (Pmake_idx_field lbl.lbl_pos, [], (of_location ~scopes loc))
+      Lprim (Pmake_idx_field (lbl.lbl_pos, root), [], (of_location ~scopes loc))
     | Record_inlined _ | Record_unboxed ->
       Misc.fatal_error "Texp_idx: unexpected unboxed/inlined record"
     | Record_mixed shape ->
@@ -2860,7 +2863,7 @@ and transl_idx ~scopes loc env ba uas =
            (Mixed_product_bytes.Wrt_path.offset_and_gap cts)
       then
         raise (Error (loc, Block_index_gap_overflow_possible));
-      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
+      Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path, root), [],
              (of_location ~scopes loc))
     | Record_dummy _ ->
       fatal_error "transl_idx: unexpected dummy representation"

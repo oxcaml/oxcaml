@@ -1092,10 +1092,22 @@ CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
 /* In bytecode, an index is represented as a block containing a list of field
    positions. See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md].
 */
+enum idx_boxed_root {
+  IDX_OTHER_BLOCK = 0,
+  IDX_SINGLETON_RECORD = 1
+};
+
+Caml_inline void check_idx(value idx)
+{
+  CAMLassert (Tag_val(idx) == IDX_OTHER_BLOCK ||
+              Tag_val(idx) == IDX_SINGLETON_RECORD);
+  (void)idx;
+}
+
 CAMLprim value caml_get_idx_bytecode(value base, value idx)
 {
   CAMLparam2 (base, idx);
-  CAMLassert (Tag_val(idx) == 0);
+  check_idx(idx);
   value res;
   mlsize_t depth = Wosize_val(idx);
 #ifdef FLAT_FLOAT_ARRAY
@@ -1122,7 +1134,7 @@ CAMLprim value caml_get_idx_bytecode(value base, value idx)
 
 Caml_inline void check_atomic_idx(value base, value idx)
 {
-  CAMLassert (Tag_val(idx) == 0);
+  check_idx(idx);
   CAMLassert (Wosize_val(idx) == 1); /* Nested atomic accesses not supported */
   CAMLassert (Tag_val(base) != Double_array_tag);
   (void)base;
@@ -1132,7 +1144,7 @@ Caml_inline void check_atomic_idx(value base, value idx)
 CAMLprim value caml_set_idx_bytecode(value base, value idx, value v)
 {
   CAMLparam3 (base, idx, v);
-  CAMLassert (Tag_val(idx) == 0);
+  check_idx(idx);
   mlsize_t depth = Wosize_val(idx);
 #ifdef FLAT_FLOAT_ARRAY
   if (Tag_val(base) == Double_array_tag) {
@@ -1263,13 +1275,15 @@ CAMLprim value caml_set_ext_ptr_bytecode(value idx, value v)
   return Val_unit;
 }
 
-/* Concatenates idx_prefix and idx_suffix */
-CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
+static value append_idx(value idx_prefix, value idx_suffix,
+                        mlsize_t suffix_start)
+{
+  CAMLparam2 (idx_prefix, idx_suffix);
   mlsize_t prefix_depth = Wosize_val(idx_prefix);
   mlsize_t suffix_depth = Wosize_val(idx_suffix);
 
-  mlsize_t wosize = prefix_depth + suffix_depth;
-  tag_t tag = 0;
+  mlsize_t wosize = prefix_depth + suffix_depth - suffix_start;
+  tag_t tag = Tag_val(idx_prefix);
   value block;
   mlsize_t i = 0;
   if (wosize <= Max_young_wosize) {
@@ -1283,7 +1297,7 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
       Field(block, i) = jth;
       i++;
     }
-    for (mlsize_t j = 0; j < suffix_depth; j++) {
+    for (mlsize_t j = suffix_start; j < suffix_depth; j++) {
       value jth = Field(idx_suffix, j);
       Field(block, i) = jth;
       i++;
@@ -1294,12 +1308,26 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
       caml_initialize(&Field(block, i), Field(idx_prefix, j));
       i++;
     }
-    for (mlsize_t j = 0; j < suffix_depth; j++) {
+    for (mlsize_t j = suffix_start; j < suffix_depth; j++) {
       caml_initialize(&Field(block, i), Field(idx_suffix, j));
       i++;
     }
   }
-  return block;
+  CAMLreturn (block);
+}
+
+CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix)
+{
+  return append_idx(idx_prefix, idx_suffix, 0);
+}
+
+CAMLprim value caml_compose_idx_bytecode(value idx_prefix, value idx_suffix)
+{
+  check_idx(idx_prefix);
+  check_idx(idx_suffix);
+  /* Unboxing a singleton record erases its root field. */
+  mlsize_t suffix_start = Tag_val(idx_suffix) == IDX_SINGLETON_RECORD;
+  return append_idx(idx_prefix, idx_suffix, suffix_start);
 }
 
 /* generic [gather] functions for extraction and concatenation of sub-arrays */

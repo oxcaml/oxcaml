@@ -679,11 +679,11 @@ and eval_prim env prim =
     if new_layouts == old_layouts
     then prim
     else Punboxed_product_field (i, new_layouts)
-  | Pmake_idx_mixed_field (old_shape, i, path) ->
+  | Pmake_idx_mixed_field (old_shape, i, path, root) ->
     let new_shape = eval_mixed_block_shape env old_shape in
     if new_shape == old_shape
     then prim
-    else Pmake_idx_mixed_field (new_shape, i, path)
+    else Pmake_idx_mixed_field (new_shape, i, path, root)
   | Pmake_idx_array (kind, index_kind, old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element
@@ -692,6 +692,12 @@ and eval_prim env prim =
   | Pidx_deepen (old_element, path) ->
     let new_element = eval_mixed_block_element env old_element in
     if new_element == old_element then prim else Pidx_deepen (new_element, path)
+  | Pidx_compose { intermediate; target } ->
+    let new_intermediate = eval_layout env intermediate in
+    let new_target = eval_layout env target in
+    if new_intermediate == intermediate && new_target == target
+    then prim
+    else Pidx_compose { intermediate = new_intermediate; target = new_target }
   | Popaque old_layout ->
     let new_layout = eval_layout env old_layout in
     if new_layout == old_layout then prim else Popaque new_layout
@@ -849,10 +855,13 @@ let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
     Array.iter assert_mixed_block_element_contains_no_splices shape
   | Psetmixedfield (_, shape, _) ->
     assert_mixed_block_shape_contains_no_splices shape
-  | Pmake_idx_mixed_field (shape, _, _) ->
+  | Pmake_idx_mixed_field (shape, _, _, _) ->
     assert_mixed_block_shape_contains_no_splices shape
   | Pmake_idx_array (_, _, element, _) | Pidx_deepen (element, _) ->
     assert_mixed_block_element_contains_no_splices element
+  | Pidx_compose { intermediate; target } ->
+    assert_layout_contains_no_splices intermediate;
+    assert_layout_contains_no_splices target
   | _ -> ()
 
 let assert_function_contains_no_splices { Lambda.params; return; _ } =

@@ -35,6 +35,21 @@ external set
   = "%set_idx"
 [@@layout_poly]
 
+(** [compose outer inner] indexes a mutable part of the unboxed contents
+    indexed by [outer]. *)
+external compose
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b box, 'c) idx_mut -> ('a, 'c) idx_mut
+  = "%idx_compose"
+
+(** [compose_imm outer inner] indexes an immutable part of the unboxed contents
+    indexed by [outer]. The composed index remains mutable because [outer]
+    is mutable. *)
+external compose_imm
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_mut -> ('b box, 'c) idx_imm -> ('a, 'c) idx_mut
+  = "%idx_compose"
+
 (** [unsafe_create_into_array i] creates an index into the [i]th element of an
     array.
 

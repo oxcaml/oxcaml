@@ -563,14 +563,18 @@ let primitive ppf = function
         layouts
   | Parray_element_size_in_bytes ak ->
       fprintf ppf "array_element_size_in_bytes (%s)" (array_kind ak)
-  | Pmake_idx_field pos ->
-      fprintf ppf "idx_field %d" pos
-  | Pmake_idx_mixed_field (shape, pos, path) ->
+  | Pmake_idx_field (pos, root) ->
+      fprintf ppf "idx_field %d%s" pos
+        (match root with Singleton_record -> " singleton" | Other_block -> "")
+  | Pmake_idx_mixed_field (shape, pos, path, root) ->
       fprintf ppf "idx_mixed_field %a %a %a"
         (mixed_block_shape (fun _ _ -> ())) shape
         pp_print_int pos
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
-          path
+          path;
+      (match root with
+      | Singleton_record -> fprintf ppf " singleton"
+      | Other_block -> ())
   | Pmake_idx_array (ak, ik, mbe, path) ->
       fprintf ppf "idx_array %s %a %a %a"
         (array_kind ak) array_index_kind ik
@@ -582,6 +586,8 @@ let primitive ppf = function
         (mixed_block_element (fun _ppf () -> ())) mbe
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int)
           path
+  | Pidx_compose { intermediate; target } ->
+      fprintf ppf "idx_compose %a %a" layout intermediate layout target
   | Pccall p -> fprintf ppf "%s" p.prim_name
   | Praise k -> fprintf ppf "%s" (Lambda.raise_kind k)
   | Psequand -> fprintf ppf "&&"
@@ -1054,6 +1060,7 @@ let name_of_primitive = function
   | Pmake_idx_mixed_field _ -> "Pmake_idx_mixed_field"
   | Pmake_idx_array _ -> "Pmake_idx_array"
   | Pidx_deepen _ -> "Pidx_deepen"
+  | Pidx_compose _ -> "Pidx_compose"
   | Parray_element_size_in_bytes _ -> "Parray_element_size_in_bytes"
   | Pccall _ -> "Pccall"
   | Praise _ -> "Praise"

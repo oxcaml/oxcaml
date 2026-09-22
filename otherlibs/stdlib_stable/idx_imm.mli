@@ -24,6 +24,13 @@ external get
   = "%get_idx_imm"
 [@@layout_poly]
 
+(** [compose outer inner] indexes a part of the unboxed contents indexed by
+    [outer]. *)
+external compose
+  : ('a : value_or_null) ('b : any) ('c : any).
+  ('a, 'b) idx_imm -> ('b box, 'c) idx_imm -> ('a, 'c) idx_imm
+  = "%idx_compose"
+
 (** [unsafe_create_into_iarray i] creates an index into the [i]th element of an
     immutable array.
 

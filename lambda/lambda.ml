@@ -20,6 +20,8 @@ type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
 
+type idx_boxed_root = Singleton_record | Other_block
+
 type compile_time_constant =
   | Big_endian
   | Word_size
@@ -228,11 +230,13 @@ type primitive =
   | Punboxed_product_field of int * layout list
   | Parray_element_size_in_bytes of array_kind
   (* Block indices *)
-  | Pmake_idx_field of int
-  | Pmake_idx_mixed_field of mixed_block_shape * int * int list
+  | Pmake_idx_field of int * idx_boxed_root
+  | Pmake_idx_mixed_field of
+      mixed_block_shape * int * int list * idx_boxed_root
   | Pmake_idx_array of
       array_kind * array_index_kind * unit mixed_block_element * int list
   | Pidx_deepen of unit mixed_block_element * int list
+  | Pidx_compose of { intermediate : layout; target : layout }
   (* Context switches *)
   | Pwith_stack
   | Pwith_stack_preemptible
@@ -2980,6 +2984,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
+  | Pidx_compose _
   | Preinterpret_tagged_int63_as_unboxed_int64
   | Punbox _ ->
     if !Clflags.native_code then None
@@ -3178,6 +3183,7 @@ let primitive_can_raise prim =
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
   | Pidx_deepen _
+  | Pidx_compose _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
@@ -3540,7 +3546,7 @@ let primitive_result_layout (p : primitive) =
   | Pmake_unboxed_product layouts -> layout_unboxed_product layouts
   | Parray_element_size_in_bytes _ -> layout_int
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
-  | Pidx_deepen _ ->
+  | Pidx_deepen _ | Pidx_compose _ ->
     Punboxed_or_untagged_integer Unboxed_int64
   | Pfloatfield _ -> layout_boxed_float Boxed_float64
   | Pufloatfield _ -> Punboxed_float Unboxed_float64
