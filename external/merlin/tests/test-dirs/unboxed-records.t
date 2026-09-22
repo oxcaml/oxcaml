@@ -285,11 +285,3 @@ Abstract box kinds expose unboxed versions
   > EOF
 
   $ $MERLIN single errors -filename test.ml < test.ml | jq -r '.value[].message'
-  The type Abs.t has no unboxed version.
-  The value Stdlib.unbox has type 'a box -> 'a
-  but an expression was expected of type Abs.t -> 'b
-  Type 'a box is not compatible with type Abs.t
-  The type Abs.t has no unboxed version.
-  The value Stdlib.box has type 'a -> 'a box
-  but an expression was expected of type 'a -> Abs.t
-  Type 'a box is not compatible with type Abs.t

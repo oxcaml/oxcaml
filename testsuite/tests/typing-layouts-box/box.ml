@@ -1589,12 +1589,7 @@ end)
 module type S = sig type t end
 module F :
   functor (X : S) -> sig type x = X.t type y = X.t box type yu = y# end
-Lines 10-12, characters 11-4:
-10 | ...........F(struct
-11 |   type t
-12 | end)
-Error: In the signature of this functor application: The type "y"
-       has no unboxed version.
+module M : sig type x type y : value box type yu = y# end
 |}]
 
 (* Test 45: Abstract boxed kinds expose abstract unboxed versions. *)
@@ -1610,21 +1605,20 @@ module Concrete_box : sig type t = { i : int; f : float#; } end
 module Abstract_box : sig type t : (value & float64) box end
 |}]
 
-let unbox_abstract_bad : Abstract_box.t -> Abstract_box.t# = Stdlib.unbox
-let box_abstract_bad : Abstract_box.t# -> Abstract_box.t = Stdlib.box
+let unbox_abstract : Abstract_box.t -> Abstract_box.t# = Stdlib.unbox
+let box_abstract : Abstract_box.t# -> Abstract_box.t = Stdlib.box
 [%%expect{|
-Line 1, characters 43-58:
-1 | let unbox_abstract_bad : Abstract_box.t -> Abstract_box.t# = Stdlib.unbox
-                                               ^^^^^^^^^^^^^^^
-Error: The type "Abstract_box.t" has no unboxed version.
+val unbox_abstract : Abstract_box.t -> Abstract_box.t# = <fun>
+val box_abstract : Abstract_box.t# -> Abstract_box.t = <fun>
 |}]
 
 let bad_reveal_abstract (x : Abstract_box.t#) : Concrete_box.t# = x
 [%%expect{|
-Line 1, characters 29-44:
+Line 1, characters 66-67:
 1 | let bad_reveal_abstract (x : Abstract_box.t#) : Concrete_box.t# = x
-                                 ^^^^^^^^^^^^^^^
-Error: The type "Abstract_box.t" has no unboxed version.
+                                                                      ^
+Error: The value "x" has type "Abstract_box.t#"
+       but an expression was expected of type "Concrete_box.t#"
 |}]
 
 type public_box_alias = Abstract_box.t
@@ -1634,29 +1628,24 @@ type public_box_alias = Abstract_box.t
 type private_box_alias = private Abstract_box.t
 |}]
 
-let public_box_alias_bad (x : Abstract_box.t#) : public_box_alias# = x
+let public_box_alias (x : Abstract_box.t#) : public_box_alias# = x
 [%%expect{|
-Line 1, characters 30-45:
-1 | let public_box_alias_bad (x : Abstract_box.t#) : public_box_alias# = x
-                                  ^^^^^^^^^^^^^^^
-Error: The type "Abstract_box.t" has no unboxed version.
+val public_box_alias : Abstract_box.t# -> public_box_alias# = <fun>
 |}]
 
-let private_box_alias_bad (x : private_box_alias#) : Abstract_box.t# =
+let private_box_alias (x : private_box_alias#) : Abstract_box.t# =
   (x :> Abstract_box.t#)
 [%%expect{|
-Line 1, characters 31-49:
-1 | let private_box_alias_bad (x : private_box_alias#) : Abstract_box.t# =
-                                   ^^^^^^^^^^^^^^^^^^
-Error: The type "private_box_alias" has no unboxed version.
+val private_box_alias : private_box_alias# -> Abstract_box.t# = <fun>
 |}]
 
 let bad_private_box_alias (x : Abstract_box.t#) : private_box_alias# = x
 [%%expect{|
-Line 1, characters 31-46:
+Line 1, characters 71-72:
 1 | let bad_private_box_alias (x : Abstract_box.t#) : private_box_alias# = x
-                                   ^^^^^^^^^^^^^^^
-Error: The type "Abstract_box.t" has no unboxed version.
+                                                                           ^
+Error: The value "x" has type "Abstract_box.t#"
+       but an expression was expected of type "private_box_alias#"
 |}]
 
 module Parameterized_box : sig
@@ -1668,15 +1657,15 @@ end
 module Parameterized_box : sig type +'a t : value box end
 |}]
 
-let unbox_parameterized_bad (x : 'a Parameterized_box.t)
+let unbox_parameterized (x : 'a Parameterized_box.t)
     : 'a Parameterized_box.t# = Stdlib.unbox x
-let box_parameterized_bad (x : 'a Parameterized_box.t#)
+let box_parameterized (x : 'a Parameterized_box.t#)
     : 'a Parameterized_box.t = Stdlib.box x
 [%%expect{|
-Line 2, characters 9-29:
-2 |     : 'a Parameterized_box.t# = Stdlib.unbox x
-             ^^^^^^^^^^^^^^^^^^^^
-Error: The type "Parameterized_box.t" has no unboxed version.
+val unbox_parameterized : 'a Parameterized_box.t -> 'a Parameterized_box.t# =
+  <fun>
+val box_parameterized : 'a Parameterized_box.t# -> 'a Parameterized_box.t =
+  <fun>
 |}]
 
 type 'a constrained_box : value box constraint 'a = int
@@ -1684,20 +1673,17 @@ type 'a constrained_box : value box constraint 'a = int
 type 'a constrained_box : value box constraint 'a = int
 |}]
 
-type constrained_contents_bad = int constrained_box#
+type constrained_contents = int constrained_box#
 [%%expect{|
-Line 1, characters 36-52:
-1 | type constrained_contents_bad = int constrained_box#
-                                        ^^^^^^^^^^^^^^^^
-Error: The type "constrained_box" has no unboxed version.
+type constrained_contents = int constrained_box#
 |}]
 
 type bad_constrained_contents = string constrained_box#
 [%%expect{|
-Line 1, characters 39-55:
+Line 1, characters 32-38:
 1 | type bad_constrained_contents = string constrained_box#
-                                           ^^^^^^^^^^^^^^^^
-Error: The type "constrained_box" has no unboxed version.
+                                    ^^^^^^
+Error: This type "string" should be an instance of type "int"
 |}]
 
 module type Abstract_box_signature = sig
@@ -1705,51 +1691,53 @@ module type Abstract_box_signature = sig
   type contents = t#
 end
 [%%expect{|
-Line 3, characters 18-20:
-3 |   type contents = t#
-                      ^^
-Error: The type "t" has no unboxed version.
+module type Abstract_box_signature =
+  sig type t : (value & float64) box type contents = t# end
 |}]
 
-module type Abstract_box_equation_bad =
+module type Abstract_box_equation =
   Abstract_box_signature with type t = Concrete_box.t
-module type Abstract_box_substitution_bad =
+module type Abstract_box_substitution =
   Abstract_box_signature with type t := Concrete_box.t
 [%%expect{|
-Line 2, characters 2-24:
-2 |   Abstract_box_signature with type t = Concrete_box.t
-      ^^^^^^^^^^^^^^^^^^^^^^
-Error: Unbound module type "Abstract_box_signature"
+module type Abstract_box_equation =
+  sig type t = Concrete_box.t type contents = t# end
+module type Abstract_box_substitution =
+  sig type contents = Concrete_box.t# end
 |}]
 
-module Check_box_equation_bad (M : Abstract_box_equation_bad) = struct
+module Check_box_equation (M : Abstract_box_equation) = struct
   let contents (x : M.contents) : Concrete_box.t# = x
 end
-module Check_box_substitution_bad (M : Abstract_box_substitution_bad) = struct
+module Check_box_substitution (M : Abstract_box_substitution) = struct
   let contents (x : M.contents) : Concrete_box.t# = x
 end
 [%%expect{|
-Line 1, characters 35-60:
-1 | module Check_box_equation_bad (M : Abstract_box_equation_bad) = struct
-                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unbound module type "Abstract_box_equation_bad"
+module Check_box_equation :
+  functor (M : Abstract_box_equation) ->
+    sig val contents : M.contents -> Concrete_box.t# end
+module Check_box_substitution :
+  functor (M : Abstract_box_substitution) ->
+    sig val contents : M.contents -> Concrete_box.t# end
 |}]
 
-let unbox_locally_abstract_bad (type a : (value & float64) box)
+let unbox_locally_abstract (type a : (value & float64) box)
     (x : a) : a# = Stdlib.unbox x
-let box_locally_abstract_bad (type a : (value & float64) box)
+let box_locally_abstract (type a : (value & float64) box)
     (x : a#) : a = Stdlib.box x
-let both_locally_abstract_bad (type a : (value & float64) box)
+let both_locally_abstract (type a : (value & float64) box)
     (x : a) : #(a * a# * a#) =
   #(x, Stdlib.unbox x, Stdlib.unbox x)
-let portable_locally_abstract_bad
+let portable_locally_abstract
     (type a : (value & float64) box mod portable) (x : a) : a# =
   Stdlib.unbox x
 [%%expect{|
-Line 2, characters 14-16:
-2 |     (x : a) : a# = Stdlib.unbox x
-                  ^^
-Error: The type "a" has no unboxed version.
+val unbox_locally_abstract : ('a : value & float64). 'a box -> 'a = <fun>
+val box_locally_abstract : ('a : value & float64). 'a -> 'a box = <fun>
+val both_locally_abstract :
+  ('a : value & float64). 'a box -> #('a box * 'a * 'a) = <fun>
+val portable_locally_abstract :
+  ('a : value mod portable & float64 mod portable). 'a box -> 'a = <fun>
 |}]
 
 kind_ abstract_box_kind = (value & float64) box
@@ -1759,12 +1747,9 @@ kind_ abstract_box_kind = (value & float64) box
 type named_box : (value & float64) box
 |}]
 
-let unbox_named_kind_bad : named_box -> named_box# = Stdlib.unbox
+let unbox_named_kind : named_box -> named_box# = Stdlib.unbox
 [%%expect{|
-Line 1, characters 40-50:
-1 | let unbox_named_kind_bad : named_box -> named_box# = Stdlib.unbox
-                                            ^^^^^^^^^^
-Error: The type "named_box" has no unboxed version.
+val unbox_named_kind : named_box -> named_box# = <fun>
 |}]
 
 type nested_box : float64 box box
@@ -1772,20 +1757,14 @@ type nested_box : float64 box box
 type nested_box : float64 box box
 |}]
 
-type nested_contents_bad : float64 box = nested_box#
+type nested_contents : float64 box = nested_box#
 [%%expect{|
-Line 1, characters 41-52:
-1 | type nested_contents_bad : float64 box = nested_box#
-                                             ^^^^^^^^^^^
-Error: The type "nested_box" has no unboxed version.
+type nested_contents = nested_box#
 |}]
 
-type nested_leaf_bad : float64 = nested_contents_bad#
+type nested_leaf : float64 = nested_contents#
 [%%expect{|
-Line 1, characters 33-53:
-1 | type nested_leaf_bad : float64 = nested_contents_bad#
-                                     ^^^^^^^^^^^^^^^^^^^^
-Error: Unbound type constructor "nested_contents_bad"
+type nested_leaf = nested_contents#
 |}]
 
 type addressed_box : float64 addressable box
@@ -1793,20 +1772,20 @@ type addressed_box : float64 addressable box
 type addressed_box : float64 addressable box
 |}]
 
-type addressed_contents_bad : float64 addressable = addressed_box#
+type addressed_contents : float64 addressable = addressed_box#
 [%%expect{|
-Line 1, characters 52-66:
-1 | type addressed_contents_bad : float64 addressable = addressed_box#
-                                                        ^^^^^^^^^^^^^^
-Error: The type "addressed_box" has no unboxed version.
+type addressed_contents = addressed_box#
 |}]
 
 type bad_addressed_contents : float64 = addressed_box#
 [%%expect{|
-Line 1, characters 40-54:
+Line 1, characters 0-54:
 1 | type bad_addressed_contents : float64 = addressed_box#
-                                            ^^^^^^^^^^^^^^
-Error: The type "addressed_box" has no unboxed version.
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "addressed_box#" is float64 addressable
+         because of the definition of addressed_box at line 1, characters 0-44.
+       But the layout of type "addressed_box#" must be a sublayout of float64
+         because of the definition of bad_addressed_contents at line 1, characters 0-54.
 |}]
 
 type abstract_any_box : any box
@@ -1814,12 +1793,9 @@ type abstract_any_box : any box
 type abstract_any_box : any box
 |}]
 
-type any_contents_bad : any = abstract_any_box#
+type any_contents : any = abstract_any_box#
 [%%expect{|
-Line 1, characters 30-47:
-1 | type any_contents_bad : any = abstract_any_box#
-                                  ^^^^^^^^^^^^^^^^^
-Error: The type "abstract_any_box" has no unboxed version.
+type any_contents = abstract_any_box#
 |}]
 
 type ordinary_value : value
@@ -1835,24 +1811,24 @@ Line 1, characters 29-44:
 Error: The type "ordinary_value" has no unboxed version.
 |}]
 
-let abstract_unbox_slot_bad =
+let abstract_unbox_slot =
   fun (type a : value box) -> ref (None : (a -> a#) option)
 [%%expect{|
-val abstract_unbox_slot_bad : ('_weak1 box -> '_weak1) option ref =
+val abstract_unbox_slot : ('_weak1 box -> '_weak1) option ref =
   {contents = None}
 |}]
 
 let () =
-  abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : int))
+  abstract_unbox_slot := Some (fun x -> (Stdlib.unbox x : int))
 [%%expect{|
 |}]
 
 let () =
-  abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : string))
+  abstract_unbox_slot := Some (fun x -> (Stdlib.unbox x : string))
 [%%expect{|
-Line 2, characters 45-59:
-2 |   abstract_unbox_slot_bad := Some (fun x -> (Stdlib.unbox x : string))
-                                                 ^^^^^^^^^^^^^^
+Line 2, characters 41-55:
+2 |   abstract_unbox_slot := Some (fun x -> (Stdlib.unbox x : string))
+                                             ^^^^^^^^^^^^^^
 Error: This expression has type "int" but an expression was expected of type
          "string"
 |}]

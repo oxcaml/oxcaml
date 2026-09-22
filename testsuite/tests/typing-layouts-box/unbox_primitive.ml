@@ -469,17 +469,15 @@ module Abs :
   end
 |}]
 
-let unbox_abs_bad : Abs.t -> Abs.t# = unbox
-let box_abs_bad : Abs.t# -> Abs.t = box
+let unbox_abs : Abs.t -> Abs.t# = unbox
+let box_abs : Abs.t# -> Abs.t = box
 
 let () =
   let original = Abs.make 42 #3.25 in
-  let contents = unbox_abs_bad (Sys.opaque_identity original) in
-  let copy = box_abs_bad contents in
+  let contents = unbox_abs (Sys.opaque_identity original) in
+  let copy = box_abs contents in
   assert (Abs.get copy = (42, 3.25))
 [%%expect{|
-Line 1, characters 29-35:
-1 | let unbox_abs_bad : Abs.t -> Abs.t# = unbox
-                                 ^^^^^^
-Error: The type "Abs.t" has no unboxed version.
+val unbox_abs : Abs.t -> Abs.t# = <fun>
+val box_abs : Abs.t# -> Abs.t = <fun>
 |}]

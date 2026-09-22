@@ -1309,7 +1309,8 @@ let compose_mut = Idx_mut.compose
 Line 1, characters 18-33:
 1 | let compose_mut = Idx_mut.compose
                       ^^^^^^^^^^^^^^^
-Error: Unbound value "Idx_mut.compose"
+Error: Cannot compose the index of type ('a, 'b) idx_mut:
+       its element type must have a representable layout.
 |}]
 
 let compose_mut_imm = Idx_mut.compose_imm
@@ -1317,7 +1318,8 @@ let compose_mut_imm = Idx_mut.compose_imm
 Line 1, characters 22-41:
 1 | let compose_mut_imm = Idx_mut.compose_imm
                           ^^^^^^^^^^^^^^^^^^^
-Error: Unbound value "Idx_mut.compose_imm"
+Error: Cannot compose the index of type ('a, 'b) idx_mut:
+       its element type must have a representable layout.
 |}]
 
 let compose_imm = Idx_imm.compose
@@ -1325,7 +1327,8 @@ let compose_imm = Idx_imm.compose
 Line 1, characters 18-33:
 1 | let compose_imm = Idx_imm.compose
                       ^^^^^^^^^^^^^^^
-Error: Unbound value "Idx_imm.compose"
+Error: Cannot compose the index of type ('a, 'b) idx_imm:
+       its element type must have a representable layout.
 |}]
 
 module Composition_types = struct
@@ -1345,17 +1348,26 @@ module Composition_types :
 let immutable_to_mutable =
   Idx_imm.compose (.Composition_types.inner) (.Composition_types.item)
 [%%expect{|
-Line 2, characters 2-17:
+Line 2, characters 45-70:
 2 |   Idx_imm.compose (.Composition_types.inner) (.Composition_types.item)
-      ^^^^^^^^^^^^^^^
-Error: Unbound value "Idx_imm.compose"
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "(Composition_types.inner, int) idx_mut"
+       but an expression was expected of type
+         "(Composition_types.inner, 'a) idx_imm"
 |}]
 
 let boxed_intermediate =
   Idx_mut.compose (.Composition_types.boxed_inner) (.Composition_types.item)
 [%%expect{|
-Line 2, characters 2-17:
+Line 2, characters 53-75:
 2 |   Idx_mut.compose (.Composition_types.boxed_inner) (.Composition_types.item)
-      ^^^^^^^^^^^^^^^
-Error: Unbound value "Idx_mut.compose"
+                                                         ^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "Composition_types.inner box/2"
+       but an expression was expected of type "Composition_types.inner"
+       Type "Composition_types.inner" is not compatible with type
+         "Composition_types.inner#"
+       Line 1, characters 0-27:
+         Definition of type "box/1"
+       File "_none_", line 1:
+         Definition of type "box/2"
 |}]

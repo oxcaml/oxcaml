@@ -416,14 +416,17 @@ module Composition = struct
   }
   type immutable_outer = { prefix : string; middle : middle#; tail : string }
 
-  let middle =
+  let make_middle left =
     #{ before = #1.;
-       leaf = #{ left = "left"; flat = #2.; right = "right"; zero = void () };
+       leaf = #{ left; flat = #2.; right = "right"; zero = void () };
        after = "after" }
 
   let () =
     let r : outer =
-      { prefix = "prefix"; middle; suffix = #3L; tail = "tail" }
+      { prefix = "prefix";
+        middle = make_middle "left";
+        suffix = #3L;
+        tail = "tail" }
     in
     let middle : (outer, middle#) idx_mut = (.middle) in
     let leaf = Idx_mut.compose_imm middle (.leaf) in
@@ -446,7 +449,9 @@ module Composition = struct
     assert (Int64_u.to_int r.suffix = 3)
 
   let () =
-    let r : immutable_outer = { prefix = "prefix"; middle; tail = "tail" } in
+    let r : immutable_outer =
+      { prefix = "prefix"; middle = make_middle "left"; tail = "tail" }
+    in
     let leaf = Idx_imm.compose (.middle) (.leaf) in
     let left = Idx_imm.compose leaf (.left) in
     let before = Idx_imm.compose (.middle) (.before) in
@@ -466,7 +471,7 @@ module Composition = struct
     let second = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) field in
     Idx_mut.set a second 5;
     assert (Idx_mut.get a second = 5);
-    assert (a.(0).#second = 2 && a.(1).#first = 3)
+    assert ((get a 0).#second = 2 && (get a 1).#first = 3)
 
   let () =
     let a : floats# array = [| #{ first = #1.; second = #2. };
@@ -474,20 +479,22 @@ module Composition = struct
     let second = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) (.second) in
     Idx_mut.set a second #5.;
     assert (Float_u.to_float (Idx_mut.get a second) = 5.);
-    assert (Float_u.to_float a.(0).#second = 2.)
+    assert (Float_u.to_float (get a 0).#second = 2.)
 
   let () =
     let a : singleton# array = [| #{ item = 1 }; #{ item = 2 } |] in
     let item = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) (.item) in
     Idx_mut.set a item 3;
     assert (Idx_mut.get a item = 3);
-    assert (a.(0).#item = 1 && a.(1).#item = 3)
+    assert ((get a 0).#item = 1 && (get a 1).#item = 3)
 
   type wrapper = { payload : middle# }
   type holder = { mutable wrapper : wrapper#; tail : string }
 
   let () =
-    let r = { wrapper = #{ payload = middle }; tail = "tail" } in
+    let r =
+      { wrapper = #{ payload = make_middle "left" }; tail = "tail" }
+    in
     let leaf = Idx_imm.compose (.payload) (.leaf) in
     let leaf = Idx_mut.compose_imm (.wrapper) leaf in
     let flat = Idx_mut.compose leaf (.flat) in
