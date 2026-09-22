@@ -484,20 +484,22 @@ let () =
                ignore (Sys.opaque_identity t))
 
 external unsafe_set_or_null
-  : ('a : any) ('b : any).
-  'a box or_null @ local -> ('a, 'b) idx_mut @ local -> 'b -> unit
+  : 'base ('contents : any) ('data : any).
+  'base or_null @ local -> ('contents, 'data) idx_mut @ local -> 'data -> unit
   @@ portable
   = "%set_idx"
 [@@layout_poly]
 
 let () =
   let open struct
-    type ('base : any, 'data : any) impl =
-      #{ x : 'base box or_null
-      ; global_ idx : ('base, 'data) idx_mut
+    type ('base, 'contents : any, 'data : any) impl =
+      #{ x : 'base or_null
+      ; global_ idx : ('contents, 'data) idx_mut
       }
 
-    type ('data : any) t = T : ('base : any) ('data : any). ('base, 'data) impl -> 'data t
+    type ('data : any) t =
+      T : 'base ('contents : any) ('data : any).
+        ('base, 'contents, 'data) impl -> 'data t
     [@@unboxed]
 
     type 'a s = { mutable y : int or_null }
