@@ -56,7 +56,7 @@ module Simple = struct
     | `Constant of constant
     | `Unboxed_unit
     | `Unboxed_bool of bool
-    | `Tuple of (string option * pattern) list
+    | `Tuple of (string option * pattern * Jkind.sort) list
     | `Unboxed_tuple of (string option * pattern * Jkind.sort) list
     | `Construct of
         Longident.t loc * constructor_description * constructor_representation
@@ -181,7 +181,7 @@ module Head : sig
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -214,7 +214,7 @@ end = struct
     | Constant of constant
     | Unboxed_unit
     | Unboxed_bool of bool
-    | Tuple of string option list
+    | Tuple of (string option * Jkind.sort) list
     | Unboxed_tuple of (string option * Jkind.sort) list
     | Record of
         label_description list * record_representation
@@ -239,7 +239,9 @@ end = struct
       | `Unboxed_unit -> Unboxed_unit, []
       | `Unboxed_bool b -> Unboxed_bool b, []
       | `Tuple args ->
-          Tuple (List.map fst args), (List.map snd args)
+          let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
+          let pats = List.map (fun (_, p, _) -> p) args in
+          Tuple labels_and_sorts, pats
       | `Unboxed_tuple args ->
           let labels_and_sorts = List.map (fun (l, _, s) -> l, s) args in
           let pats = List.map (fun (_, p, _) -> p) args in
@@ -299,7 +301,7 @@ end = struct
       | Unboxed_unit -> Tpat_unboxed_unit
       | Unboxed_bool b -> Tpat_unboxed_bool b
       | Tuple lbls ->
-          Tpat_tuple (List.map (fun lbl -> lbl, omega) lbls)
+          Tpat_tuple (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls)
       | Unboxed_tuple lbls_and_sorts ->
           Tpat_unboxed_tuple
             (List.map (fun (lbl, sort) -> lbl, omega, sort) lbls_and_sorts)

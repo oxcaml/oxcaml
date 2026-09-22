@@ -194,8 +194,7 @@ let all_coherent column =
       end
     | Unboxed_unit, Unboxed_unit -> true
     | Unboxed_bool _, Unboxed_bool _ -> true
-    | Tuple l1, Tuple l2 ->
-      List.equal (Option.equal String.equal) l1 l2
+    | Tuple l1, Tuple l2
     | Unboxed_tuple l1, Unboxed_tuple l2 ->
       List.equal
         (fun (lbl1, _) (lbl2, _) -> Option.equal String.equal lbl1 lbl2) l1 l2
@@ -378,10 +377,9 @@ module Compat
       const_compare c1 c2 = 0
   | Tpat_unboxed_unit, Tpat_unboxed_unit -> true
   | Tpat_unboxed_bool b1, Tpat_unboxed_bool b2 -> Bool.equal b1 b2
-  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs ->
-      tuple_compat labeled_ps labeled_qs
+  | Tpat_tuple labeled_ps, Tpat_tuple labeled_qs
   | Tpat_unboxed_tuple labeled_ps, Tpat_unboxed_tuple labeled_qs ->
-      unboxed_tuple_compat labeled_ps labeled_qs
+      tuple_compat labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> compat p q
   | Tpat_record (l1,_,_),Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
@@ -404,18 +402,10 @@ module Compat
 
   and tuple_compat labeled_ps labeled_qs = match labeled_ps,labeled_qs with
   | [], [] -> true
-  | (p_label, p)::labeled_ps, (q_label, q)::labeled_qs ->
+  | (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
       Option.equal String.equal p_label q_label
       && compat p q && tuple_compat labeled_ps labeled_qs
   | _,_    -> false
-
-  and unboxed_tuple_compat labeled_ps labeled_qs =
-    match labeled_ps,labeled_qs with
-    | [], [] -> true
-    | (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
-        Option.equal String.equal p_label q_label
-        && compat p q && unboxed_tuple_compat labeled_ps labeled_qs
-    | _,_    -> false
 
 end
 
@@ -466,8 +456,7 @@ let simple_match d h =
   | Record_unboxed_product _, Record_unboxed_product _ -> true
   | Unboxed_unit, Unboxed_unit -> true
   | Unboxed_bool b1, Unboxed_bool b2 -> Bool.equal b1 b2
-  | Tuple lbls1, Tuple lbls2 ->
-    List.equal (Option.equal String.equal) lbls1 lbls2
+  | Tuple lbls1, Tuple lbls2
   | Unboxed_tuple lbls1, Unboxed_tuple lbls2 ->
     List.equal (fun (l1, _) (l2, _) -> Option.equal String.equal l1 l2)
       lbls1 lbls2
@@ -622,10 +611,14 @@ let rec read_args xs r = match xs,r with
     fatal_error "Parmatch.read_args"
 
 let set_args q r = match q with
-| {pat_desc = Tpat_tuple lbls_omegas} ->
-    let lbls, omegas = List.split lbls_omegas in
-    let args, rest = read_args omegas r in
-    make_pat (Tpat_tuple (List.combine lbls args)) q.pat_type q.pat_env :: rest
+| {pat_desc = Tpat_tuple omegas} ->
+    let args,rest =
+      read_args (List.map (fun (_, pat, _) -> pat) omegas) r
+    in
+    make_pat
+      (Tpat_tuple
+        (List.map2 (fun (lbl, _, sort) arg -> lbl, arg, sort) omegas args))
+      q.pat_type q.pat_env :: rest
 | {pat_desc = Tpat_unboxed_tuple omegas} ->
     let args,rest =
       read_args (List.map (fun (_, pat, _) -> pat) omegas) r
@@ -971,6 +964,7 @@ let fake_record_repr : record_representation =
 let fake_unboxed_record_repr : record_unboxed_product_representation =
   Record_unboxed_product
 
+
 (* build a pattern from a constructor description *)
 let pat_of_constr ex_pat cstr =
   {ex_pat with pat_desc =
@@ -1029,7 +1023,13 @@ let pats_of_type env ty =
   | Has_no_typedecl ->
       begin match get_desc (Ctype.expand_head env ty) with
         Ttuple tl ->
-          [make_pat (Tpat_tuple (List.map (fun (lbl, _) -> lbl, omega) tl))
+          let make_sort_var () =
+            Jkind.Sort.new_var ~level:(Ctype.get_current_level ())
+            |> Jkind.Sort.of_var
+          in
+          [make_pat
+            (Tpat_tuple
+              (List.map (fun (lbl, _) -> lbl, omega, make_sort_var ()) tl))
             ty env]
       | _ -> [omega]
       end
@@ -1307,7 +1307,7 @@ let rec has_instance p = match p.pat_desc with
       has_instances (List.map snd ps)
   | Tpat_array (_, _, ps) ->
       has_instances ps
-  | Tpat_tuple labeled_ps -> has_instances (List.map snd labeled_ps)
+  | Tpat_tuple labeled_ps
   | Tpat_unboxed_tuple labeled_ps ->
       has_instances (List.map (fun (_, p, _) -> p) labeled_ps)
   | Tpat_record (lps,_,_) -> has_instances (List.map (fun (_,_,x) -> x) lps)
@@ -1956,10 +1956,9 @@ let rec le_pat p q =
   | Tpat_variant(l1,None,_r1), Tpat_variant(l2,None,_) ->
       l1 = l2
   | Tpat_variant(_,_,_), Tpat_variant(_,_,_) -> false
-  | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs) ->
-      le_tuple_pats labeled_ps labeled_qs
+  | Tpat_tuple(labeled_ps), Tpat_tuple(labeled_qs)
   | Tpat_unboxed_tuple(labeled_ps), Tpat_unboxed_tuple(labeled_qs) ->
-      le_unboxed_tuple_pats labeled_ps labeled_qs
+      le_tuple_pats labeled_ps labeled_qs
   | Tpat_lazy p, Tpat_lazy q -> le_pat p q
   | Tpat_record (l1,_,_), Tpat_record (l2,_,_) ->
       let ps,qs = records_args l1 l2 in
@@ -1976,16 +1975,9 @@ and le_pats ps qs =
 
 and le_tuple_pats labeled_ps labeled_qs =
   match labeled_ps, labeled_qs with
-    (p_label, p)::labeled_ps, (q_label, q)::labeled_qs ->
-      Option.equal String.equal p_label q_label
-      && le_pat p q && le_tuple_pats labeled_ps labeled_qs
-  | _, _ -> true
-
-and le_unboxed_tuple_pats labeled_ps labeled_qs =
-  match labeled_ps, labeled_qs with
     (p_label, p, _)::labeled_ps, (q_label, q, _)::labeled_qs ->
       Option.equal String.equal p_label q_label
-      && le_pat p q && le_unboxed_tuple_pats labeled_ps labeled_qs
+      && le_pat p q && le_tuple_pats labeled_ps labeled_qs
   | _, _ -> true
 
 let get_mins le ps =
@@ -2018,7 +2010,7 @@ let rec lub p q = match p.pat_desc,q.pat_desc with
     let rs = tuple_lubs ps qs in
     make_pat (Tpat_tuple rs) p.pat_type p.pat_env
 | Tpat_unboxed_tuple ps, Tpat_unboxed_tuple qs ->
-    let rs = unboxed_tuple_lubs ps qs in
+    let rs = tuple_lubs ps qs in
     make_pat (Tpat_unboxed_tuple rs) p.pat_type p.pat_env
 | Tpat_lazy p, Tpat_lazy q ->
     let r = lub p q in
@@ -2074,16 +2066,9 @@ and record_lubs l1 l2 =
 
 and tuple_lubs ps qs = match ps,qs with
 | [], [] -> []
-| (p_label, p)::ps, (q_label, q)::qs
-      when Option.equal String.equal p_label q_label ->
-    (p_label, lub p q) :: tuple_lubs ps qs
-| _,_ -> raise Empty
-
-and unboxed_tuple_lubs ps qs = match ps,qs with
-| [], [] -> []
 | (p_label, p, sort)::ps, (q_label, q, _)::qs
       when Option.equal String.equal p_label q_label ->
-    (p_label, lub p q, sort) :: unboxed_tuple_lubs ps qs
+    (p_label, lub p q, sort) :: tuple_lubs ps qs
 | _,_ -> raise Empty
 
 and arg_lubs ps qs = match ps,qs with
@@ -2236,8 +2221,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
 | Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit|Tpat_unboxed_bool _
 | Tpat_fun_layout _
 | Tpat_variant (_,None,_) -> r
-| Tpat_tuple ps ->
-    List.fold_left (fun r (_, p) -> collect_paths_from_pat r p) r ps
+| Tpat_tuple ps
 | Tpat_unboxed_tuple ps ->
     List.fold_left (fun r (_, p, _) -> collect_paths_from_pat r p) r ps
 | Tpat_array (_, _, ps) ->
@@ -2391,8 +2375,7 @@ let inactive ~partial pat =
             | Const_untagged_int _ | Const_unboxed_nativeint _
             -> true
           end
-        | Tpat_tuple ps ->
-            List.for_all (fun (_,p) -> loop p) ps
+        | Tpat_tuple ps
         | Tpat_unboxed_tuple ps ->
             List.for_all (fun (_,p,_) -> loop p) ps
         | Tpat_construct (_, _, _, ps, _) ->

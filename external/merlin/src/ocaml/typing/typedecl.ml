@@ -54,12 +54,14 @@ module Mixed_product_kind = struct
     | Cstr_tuple
     | Cstr_record
     | Module
+    | Tuple
 
   let to_plural_string = function
     | Record -> "records"
     | Cstr_tuple -> "constructors"
     | Cstr_record -> "inline record arguments to constructors"
     | Module -> "modules"
+    | Tuple -> "tuples"
 end
 
 type mixed_product_violation =
@@ -1992,6 +1994,20 @@ let assert_mixed_product_support =
                      { value_prefix_len; max_value_prefix_len;
                        mixed_product_kind })))
 
+let assert_mixed_block_shape_support loc mixed_product_kind shape =
+  (* CR zeisbach: we should do a check for splice variables after slambda.
+     This isn't currently present, but Joe has a PR that will do this. *)
+  if not (Lambda.mixed_block_shape_has_splices shape) then begin
+    let mpb = Mixed_product_bytes.count (Product shape) in
+    (* All-value/void shapes compile to uniform blocks (products of values are
+       flattened), so the scannable prefix length limit doesn't apply.
+       We only want to do the check if we are in a mixed block. *)
+    if not (Mixed_product_bytes.all_value mpb)
+    then
+      assert_mixed_product_support loc mixed_product_kind
+        ~value_prefix_len:(Mixed_product_bytes.value_prefix_len mpb)
+  end
+
 (* Records and variants with a field or constructor argument of kind [any] get a
    variable representation, as oxcaml/oxcaml#5461. We gate this by extension. *)
 let assert_any_args_support loc =
@@ -2588,14 +2604,8 @@ let finalize_instantiated_shape env loc sorts_and_types kind =
      importantly, testing. *)
   if not (Array.for_all Jkind.Sort.Const.is_concrete consts) then
     raise (Error (loc, Layout_poly_variable_representation));
-  let all_scannable =
-    Array.for_all
-      (fun (const : Jkind.Sort.Const.t) ->
-         match const with
-         | Base Scannable -> true
-         | _ -> false)
-      consts
-  in
+  (* CR zeisbach: double-check this when rebasing *)
+  let all_scannable = Array.for_all Jkind.Sort.Const.is_scannable consts in
   let shape =
     if all_scannable then
       (* Optimization: the other branch would also compute [`Not_mixed] *)
@@ -4450,17 +4460,12 @@ let native_repr_of_type ~loc env kind ty sort_or_poly ~is_return =
     then Location.prerr_warning loc Warnings.Untagged_external_small_int_return;
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let rec sort_is_scannable : Jkind.Sort.Const.t -> bool = function
-      | Base Scannable -> true
-      | Base _ | Product _ -> false
-      | Addressable s -> sort_is_scannable s
-      | Univar _ -> Misc.fatal_error "typedecl: Univar in native repr"
-      | Genvar _ -> Misc.fatal_error "typedecl: Genvar in native repr"
-    in
     let is_scannable =
       match sort_or_poly with
       | Poly -> false
-      | Sort s -> sort_is_scannable s
+      (* CR zeisbach: technically this differs in fatal_error behavior from
+         previous helper. Not sure what is the trade-off to make... *)
+      | Sort s -> Jkind.Sort.Const.is_scannable s
     in
     if is_immediate && is_non_nullable && is_scannable
     then Some (Unboxed_or_untagged_integer Untagged_int)

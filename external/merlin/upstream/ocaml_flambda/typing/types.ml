@@ -1042,6 +1042,14 @@ let equal_record_unboxed_product_representation_up_to_scannable_axes r1 r2 =
          variable representation"
   | (Record_unboxed_product | Record_unboxed_product_undetermined), _ -> false
 
+let rec mixed_block_element_is_scannable (elt : mixed_block_element) =
+  match elt with
+  | Scannable _ -> true
+  | Addressable elt -> mixed_block_element_is_scannable elt
+  | Float_boxed | Float64 | Float32 | Bits8 | Bits16 | Untagged_immediate
+  | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Product _
+  | Void -> false
+
 (* The scannable axes in the resulting [mixed_block_element] are always [max] *)
 let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   match sort with
