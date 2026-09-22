@@ -11,9 +11,8 @@ external box : ('a : any). ('a [@local_opt]) -> ('a box [@local_opt])
   = "%box" [@@layout_poly]
 |}]
 
-(* TESTING INVARIANT: boxing a value of type [t] produces a block with the same
-   layout as a record with a single field of type [t]. When [t] is an unboxed
-   record, the block has the same layout as the boxed record. *)
+(* Addressable contents box like record fields. Inherited contents retain
+   their scalar boxing representation. *)
 
 (* comparison using [Obj] to avoid (busted) polymorphic compare *)
 
@@ -114,7 +113,6 @@ val check_value : 'a -> unit = <fun>
 
 (* Unboxed numbers stored in a whole word *)
 
-(* for now, we box [float#] as if they were not addressable. *)
 type f64rec = { f64 : float# }
 type i64rec = { i64 : int64_u }
 type nrec = { n : nativeint_u }
@@ -127,20 +125,18 @@ type irec = { i : int#; }
 |}]
 
 let () =
-  check_shape (box #3.25) { f64 = #3.25 };
+  check_shape (box #3.25) 3.25;
   check_shape (box #42L) { i64 = #42L };
   check_shape (box #42n) { n = #42n };
-  check_shape (box (untag_int 42)) { i = untag_int 42 };
-  assert (eq_f64 (Obj.magic (box #3.25) : f64rec).f64 #3.25);
+  assert (Obj.is_int (Obj.repr (box (untag_int 42))));
+  assert (Float.equal (box #3.25) 3.25);
   assert (eq_i64 (Obj.magic (box #42L) : i64rec).i64 #42L);
   assert (eq_n (Obj.magic (box #42n) : nrec).n #42n);
-  assert (eq_int (Obj.magic (box (untag_int 42)) : irec).i (untag_int 42))
+  assert ((Obj.magic (box (untag_int 42)) : int) = 42)
 [%%expect{|
 |}]
 
-(* Unboxed numbers narrower than a word. for now, these are treated as
-   addressable and boxed as tag-0 blocks, NOT as tagged immediates. eventually,
-   addressable kinds will allow expression of both behaviors. *)
+(* Scalars narrower than a word box as tagged immediates. *)
 
 type f32rec = { f32 : float32_u }
 type i32rec = { i32 : int32_u }
@@ -154,16 +150,34 @@ type i16rec = { i16 : int16#; }
 |}]
 
 let () =
-  check_shape (box #3.25s) { f32 = #3.25s };
-  check_shape (box #42l) { i32 = #42l };
-  check_shape (box #42s) { i8 = #42s };
-  check_shape (box #42S) { i16 = #42S };
-  assert (eq_f32 (Obj.magic (box #3.25s) : f32rec).f32 #3.25s);
-  assert (eq_i32 (Obj.magic (box #42l) : i32rec).i32 #42l);
-  assert (eq_i8 (Obj.magic (box #42s) : i8rec).i8 #42s);
-  assert (eq_i16 (Obj.magic (box #42S) : i16rec).i16 #42S)
+  assert (Obj.is_int (Obj.repr (box #3.25s)) = (Sys.word_size = 64));
+  assert (Obj.is_int (Obj.repr (box #42l)) = (Sys.word_size = 64));
+  assert (Obj.is_int (Obj.repr (box #42s)));
+  assert (Obj.is_int (Obj.repr (box #42S)));
+  assert (Obj.is_int (Obj.repr (box #())));
+  if Sys.word_size = 32 then begin
+    check_shape (box #3.25s) { f32 = #3.25s };
+    check_shape (box #42l) { i32 = #42l }
+  end
 [%%expect{|
 |}]
+
+type inherited_i8 = #{ inherit inherited_i8 : int8# }
+type inherited_f64 = #{ inherit inherited_f64 : float# }
+type addressable_void = #{ addressable_void : unit# }
+
+let () =
+  check_shape (box #{ i8 = #42s }) { i8 = #42s };
+  check_shape (box #{ i16 = #42S }) { i16 = #42S };
+  check_shape (box #{ i32 = #42l }) { i32 = #42l };
+  check_shape (box #{ f32 = #3.25s }) { f32 = #3.25s };
+  check_shape (box #{ f64 = #3.25 }) { f64 = #3.25 };
+  check_shape (box #{ i = untag_int 42 }) { i = untag_int 42 };
+  assert (Obj.is_int (Obj.repr (box #{ inherited_i8 = #42s })));
+  check_shape (box #{ inherited_f64 = #3.25 }) 3.25;
+  let empty = Obj.repr (box #{ addressable_void = #() }) in
+  assert (Obj.is_block empty && Obj.tag empty = 0 && Obj.size empty = 0)
+[%%expect{||}]
 
 (* Unboxed products *)
 
@@ -185,24 +199,18 @@ type p_many = { g : int64_u; h : float#; k : string; l : int; m : int64_u; }
 type p_nested = { n1 : #(int64_u * string); n2 : float#; }
 |}]
 
-(* CR zeisbach: add tests for mixed tuples after rebasing onto them *)
-
-(*
-external box_obj : ('a : any). 'a -> Obj.t = "%box" [@@layout_poly]
-
 let () =
-  check_shape (box_obj #(#42L, s)) { c = #42L; d = s };
-  check_shape (box_obj #(s, #42L)) { e = s; f = #42L };
-  check_shape (box_obj #(#1L, #2.5, s, 3, #4L))
+  check_shape (box #(#42L, s)) { c = #42L; d = s };
+  check_shape (box #(s, #42L)) { e = s; f = #42L };
+  check_shape (box #(#1L, #2.5, s, 3, #4L))
     { g = #1L; h = #2.5; k = s; l = 3; m = #4L };
-  check_shape (box_obj #(#(#42L, s), #2.5)) { n1 = #(#42L, s); n2 = #2.5 };
-  check_shape (box_obj #(#(#42L, s), #2.5)) { q1 = #42L; q2 = s; q3 = #2.5 };
-  let r : p_flat_first = Obj.obj (box_obj #(#42L, s)) in
+  check_shape (box #(#(#42L, s), #2.5)) { n1 = #(#42L, s); n2 = #2.5 };
+  let r : p_flat_first = Obj.magic (box #(#42L, s)) in
   assert (eq_i64 r.c #42L && r.d == s);
-  let r : p_many = Obj.obj (box_obj #(#1L, #2.5, s, 3, #4L)) in
+  let r : p_many = Obj.magic (box #(#1L, #2.5, s, 3, #4L)) in
   assert (eq_i64 r.g #1L && eq_f64 r.h #2.5 && r.k == s && r.l = 3
           && eq_i64 r.m #4L)
-*)
+[%%expect{||}]
 
 
 type ur = { u1 : int64_u; u2 : string; u3 : int }
@@ -229,19 +237,13 @@ let () =
 type ur = { u1 : int64_u; u2 : string; u3 : int; }
 |}]
 
-(* All-void records. Natively the block is empty, which requires it to be
-   statically allocated and hence immutable; in bytecode each void field is
-   an empty block, so the record is not. Either way it must match the directly
-   constructed record. *)
-
-type all_void = { x : unit#; kept : unit# }
+(* Void fields occupy no space natively. *)
 
 let () =
-  let boxed : all_void = box #{ x = #(); kept = #() } in
-  check_shape boxed { x = #(); kept = #() };
+  let boxed = box #(#(), #()) in
+  check_shape boxed (#(), #());
   assert ((not (native ())) || Obj.size (Obj.repr boxed) = 0)
 [%%expect{|
-type all_void = { x : unit#; kept : unit#; }
 |}]
 
 (* Local allocation. We have to globalize before passing to [Obj] helpers *)
@@ -254,7 +256,7 @@ external globalize : 'a @ local -> 'a = "%obj_dup"
 let () =
   let local_ value = box s in
   check_shape (globalize value) { v = s };
-  let local_ f = box #3.25 in
+  let local_ f = box #{ f64 = #3.25 } in
   check_shape (globalize f) { f64 = #3.25 };
   assert (eq_f64 (Obj.magic (globalize f) : f64rec).f64 #3.25);
   let local_ record : p_many = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
@@ -269,8 +271,6 @@ let () =
 (* Aliasing. This test would fail on bytecode if [box] did not deeply copy. *)
 
 type inner = #{ ix : int; iy : int }
-(* CR zeisbach: avoiding singleton unboxed record because it can be weird. \
-   check what the correct/intended behavior is. *)
 type outer = { mutable u : inner; tag : int }
 
 let () =
@@ -301,5 +301,3 @@ let () =
   assert (r1.u.#ix = 40 && r2.u.#ix = 1)
 [%%expect{|
 |}]
-
-(* CR zeisbach: singleton (unboxed) records, pre-inherit *)

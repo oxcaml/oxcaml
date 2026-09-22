@@ -38,6 +38,7 @@ external eq_i16 : int16# -> int16# -> bool = "%int16#_equal"
 external box_float : float# -> float = "%box_float"
 external box_float32 : float32_u -> float32 = "%box_float32"
 external box_int32 : int32_u -> int32 = "%box_int32"
+external unbox_int32 : int32 -> int32_u = "%unbox_int32"
 external box_int64 : int64_u -> int64 = "%box_int64"
 external box_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 
@@ -54,6 +55,7 @@ external eq_i16 : int16# -> int16# -> bool = "%int16#_equal"
 external box_float : float# -> float = "%box_float"
 external box_float32 : float32_u -> float32 = "%box_float32"
 external box_int32 : int32_u -> int32 = "%box_int32"
+external unbox_int32 : int32 -> int32_u = "%unbox_int32"
 external box_int64 : int64_u -> int64 = "%box_int64"
 external box_nativeint : nativeint_u -> nativeint = "%box_nativeint"
 val eq_f64 : float# -> float# -> bool = <fun>
@@ -102,14 +104,7 @@ val check_value : hide -> 'a -> unit = <fun>
 
 (* Unboxed numbers, both whole-word and narrower than a word *)
 
-(* CR zeisbach: these tests all (knowingly) fail because [box num# = num] yet
-   they are not laid out like [num], and instead are laid out like [{i : num}].
-   Once we have addressasbility properly, we can box these numbers by tagging,
-   which should allow these tests to pass.
-   Specifically, these will hit [Invalid] cases in
-   [simplify_immutable_block_load0], since the [num] type throws us down such
-   a branch. we could alternatively make it  *)
-(*= let () = both_ways (fun { hide } ->
+let () = both_ways (fun { hide } ->
   assert (eq_f64 (unbox (hide (box #3.25))) #3.25);
   assert (eq_i64 (unbox (hide (box #42L))) #42L);
   assert (eq_n (unbox (hide (box #42n))) #42n);
@@ -119,7 +114,41 @@ val check_value : hide -> 'a -> unit = <fun>
   assert (eq_i8 (unbox (hide (box #42s))) #42s);
   assert (eq_i16 (unbox (hide (box #42S))) #42S))
 [%%expect{|
-|}] *)
+|}]
+
+type addressed_i8 = #{ addressed_i8 : int8# }
+type inherited_i8 = #{ inherit inherited_i8 : int8# }
+type addressed_f64 = #{ addressed_f64 : float# }
+type inherited_f64 = #{ inherit inherited_f64 : float# }
+type addressed_void = #{ addressed_void : unit# }
+
+let () = both_ways (fun { hide } ->
+  let #{ addressed_i8 } = unbox (hide (box #{ addressed_i8 = -#42s })) in
+  assert (eq_i8 addressed_i8 (-#42s));
+  let #{ inherited_i8 } = unbox (hide (box #{ inherited_i8 = -#42s })) in
+  assert (eq_i8 inherited_i8 (-#42s));
+  let #{ addressed_f64 } = unbox (hide (box #{ addressed_f64 = #3.25 })) in
+  assert (eq_f64 addressed_f64 #3.25);
+  let #{ inherited_f64 } = unbox (hide (box #{ inherited_f64 = #3.25 })) in
+  assert (eq_f64 inherited_f64 #3.25);
+  let #{ addressed_void = _ } = unbox (hide (box #{ addressed_void = #() })) in
+  let #() = unbox (hide (box #())) in
+  ())
+[%%expect{||}]
+
+let () = both_ways (fun { hide } ->
+  List.iter (fun bits ->
+    let x = Stdlib_stable.Float32_u.of_float32
+        (Stdlib_stable.Float32.of_bits bits) in
+    let y = unbox (hide (box x)) in
+    assert (Int32.equal
+      (Stdlib_stable.Float32.to_bits (box_float32 y)) bits))
+    [0l; 0x80000000l; 0x7fc00001l; 0x7f800000l; 0xff800000l];
+  List.iter (fun x ->
+    let y = unbox_int32 x in
+    assert (eq_i32 (unbox (hide (box y))) y))
+    [Int32.min_int; Int32.max_int; -1l; 0l])
+[%%expect{||}]
 
 (* Local allocation. Unboxing a local box yields a local value. *)
 
@@ -153,8 +182,6 @@ let () = both_ways (fun { hide } ->
 [%%expect{|
 |}]
 
-(* CR zeisbach: add tests for mixed tuples after rebasing onto them *)
-(*
 (* Unboxed tuples mixing values and flat data, in various orders *)
 
 let () = both_ways (fun { hide } ->
@@ -192,7 +219,6 @@ let () = both_ways (fun { hide } ->
   assert (a = 1 && eq_i64 b #2L && eq_i64 c #3L && d = 4))
 [%%expect{|
 |}]
-*)
 
 (* Unboxed records. [t# box = t], so we can also unbox a directly constructed
    record. *)
@@ -254,12 +280,10 @@ let () = both_ways (fun { hide } ->
   let #{ w1; w2 = #(#{ ix; iy }, w2b); w3 } =
     unbox (hide (box #{ w1 = 1; w2 = #(#{ ix = #2L; iy = s }, #3l); w3 = s }))
   in
-  assert (w1 = 1 && eq_i64 ix #2L && iy == s && eq_i32 w2b #3l && w3 == s)
-  (* CR zeisbach: mixed tuple, enable after rebasing onto mixed tuples
-  ;
+  assert (w1 = 1 && eq_i64 ix #2L && iy == s && eq_i32 w2b #3l && w3 == s);
   let #(#{ ix; iy }, b) = unbox (hide (box #(#{ ix = #4L; iy = s }, #5.5))) in
   assert (eq_i64 ix #4L && iy == s && eq_f64 b #5.5)
-  *))
+  )
 [%%expect{|
 type inner_u = #{ ix : int64_u; iy : string; }
 type outer_u = #{ o1 : inner_u; o2 : float#; o3 : int; }
@@ -311,7 +335,6 @@ type two = { t1 : #(int * int64_u); t2 : #(int64_u * int); }
 (* Void components contribute no fields to the box and no data to the unboxed
    result. *)
 
-type all_void = { x : unit#; kept : unit# }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit# }
 
 let () = both_ways (fun { hide } ->
@@ -319,16 +342,12 @@ let () = both_ways (fun { hide } ->
     unbox (hide (box #{ v1 = #(#(), #1L); v2 = s; v3 = #() }))
   in
   assert (eq_i64 a #1L && b == s);
-  let #{ x = _; kept = _ } = unbox (hide (box #{ x = #(); kept = #() })) in
-  let #{ x = _; kept = _ } = unbox (hide { x = #(); kept = #() }) in
-  ()
-  (* CR zeisbach: mixed tuple, enable after rebasing onto mixed tuples
-  ;
+  let #(_, _) = unbox (hide (box #(#(), #()))) in
+  let #(_, _) = unbox (hide (#(), #())) in
   let #(#(_, a), b, _) = unbox (hide (box #(#(#(), #1L), s, #()))) in
   assert (eq_i64 a #1L && b == s)
-  *))
+  )
 [%%expect{|
-type all_void = { x : unit#; kept : unit#; }
 type void_mixed = { v1 : #(unit# * int64_u); v2 : string; v3 : unit#; }
 |}]
 
@@ -340,16 +359,13 @@ let () =
   assert (a = 42 && c == s);
   let local_ r = box #{ g = #1L; h = #2.5; k = s; l = 3; m = #4L } in
   let #{ g; h; k; l; m } = unbox r in
-  assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L)
-  (* CR zeisbach: mixed tuples, enable after rebasing onto mixed tuples
-  ;
+  assert (eq_i64 g #1L && eq_f64 h #2.5 && k == s && l = 3 && eq_i64 m #4L);
   let local_ b = box #(#1L, s) in
   let #(a, c) = unbox b in
   assert (eq_i64 a #1L && c == s);
   let local_ n = box #(s, #(#2L, #(3, #4.5s))) in
   let #(a, #(c, #(d, e))) = unbox n in
   assert (a == s && eq_i64 c #2L && d = 3 && eq_f32 e #4.5s)
-  *)
 [%%expect{|
 |}]
 
@@ -407,7 +423,6 @@ module M :
    deeply: *)
 
 type inner = #{ ix : int; iy : int }
-(* CR zeisbach: avoiding singleton unboxed record because it can be weird. *)
 type outer = { mutable u : inner; tag : int }
 
 let () =

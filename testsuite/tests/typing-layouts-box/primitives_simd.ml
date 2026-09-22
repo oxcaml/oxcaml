@@ -8,9 +8,7 @@
 external box : ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box" [@@layout_poly]
 external unbox : ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) = "%unbox" [@@layout_poly]
 
-(* TESTING INVARIANT: boxing a value of type [t] produces a block with the same
-   layout as a record with a single field of type [t], and unboxing gives back
-   the original value. See [box_primitive.ml] and [unbox_primitive.ml]. *)
+(* Vector kinds are addressable, so boxing matches a record field. *)
 
 (* Only the header is compared; contents are read back through the record
    type, as in [box_primitive.ml]. *)
@@ -42,6 +40,7 @@ let high (v : int64x2#) = int64_of_int64x2 (interleave_high_64 v v)
 
 type v128rec = { v128 : int64x2# }
 type v256rec = { v256 : int64x4# }
+type inherited_v128 = #{ inherit inherited_v128 : int64x2# }
 
 let () =
   let v = int64x2 43L 45L in
@@ -52,6 +51,10 @@ let () =
   let u = unbox (box v) in
   assert (Int64.equal (low u) 43L && Int64.equal (high u) 45L);
   let u = unbox (Sys.opaque_identity (box v)) in
+  assert (Int64.equal (low u) 43L && Int64.equal (high u) 45L);
+  let inherited = box #{ inherited_v128 = v } in
+  assert (same_shape (Obj.repr inherited) (Obj.repr { v128 = v }));
+  let #{ inherited_v128 = u } = unbox (Sys.opaque_identity inherited) in
   assert (Int64.equal (low u) 43L && Int64.equal (high u) 45L);
   print_endline "vec128: ok"
 
