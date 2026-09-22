@@ -248,8 +248,10 @@ Construct a module containing an inherited field
 
   $ cat > test.ml << EOF
   > module M : sig
-  >   type t = #{ inherit x : float# }
+  >   type t = #{ inherit x : int }
   > end = _
   > EOF
 
-  $ $MERLIN single construct -position 3:6 -filename test.ml < test.ml | jq -r '.value[1][]'
+  $ $MERLIN single construct -position 3:6 -filename test.ml < test.ml | revert-newlines | jq -r '.value[1][]'
+  struct type t = #{
+           inherit x: int } end
