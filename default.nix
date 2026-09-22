@@ -20,9 +20,6 @@
   withJsoo ? true,
   # Test-only sources for make jsoo-test; not needed to build the compiler.
   withJsooTestSources ? pkgs.lib.inNixShell,
-  # Overrides the stdenv selected below. Not named `stdenv`, since
-  # `callPackage` would then always fill it in with `pkgs.stdenv`.
-  stdenvOverride ? null,
 }:
 let
   inherit (pkgs) lib;
@@ -31,13 +28,7 @@ let
   needsPpxlibSources = withAstDependentLibs || withJsoo;
 
   # Select stdenv based on whether asan is enabled
-  stdenv =
-    if stdenvOverride != null then
-      stdenvOverride
-    else if addressSanitizer then
-      pkgs.clangStdenv
-    else
-      pkgs.stdenv;
+  stdenv = if addressSanitizer then pkgs.clangStdenv else pkgs.stdenv;
 
   # Build configure flags based on features
   configureFlags =
@@ -99,23 +90,26 @@ let
       doCheck = false;
     };
 
-  bootstrapOxcaml = import (pkgs.fetchFromGitHub {
+  # Always built with the plain pkgs.stdenv, whatever stdenv this derivation
+  # uses, so that every oxcaml variant shares one bootstrap closure. The
+  # pinned revision bootstraps itself the same way, recursively, down to a
+  # revision that bootstraps from upstream OCaml.
+  bootstrapCompiler = import (pkgs.fetchFromGitHub {
     owner = "oxcaml";
     repo = "oxcaml";
     rev = "11ae376f3e829ca475839554eb44a13313045f23";
     hash = "sha256-1Av5KD9gRf7NOPUgXc2EgHB34YuWm7xR1eVqHAjhaVU=";
-  });
+  }) { inherit pkgs; };
 
-  # The bootstrap compiler records its C compiler by name (`gcc` or `clang`)
-  # and invokes it when linking the boot workspace's executables, so it must
-  # be built with the same stdenv as this derivation: under clangStdenv (asan)
-  # there is no `gcc` on PATH. Only pass the override once the pinned revision
-  # accepts it.
-  bootstrapCompiler = bootstrapOxcaml (
-    { inherit pkgs; }
-    // lib.optionalAttrs (builtins.functionArgs bootstrapOxcaml ? stdenvOverride) {
-      stdenvOverride = stdenv;
-    }
+  # The bootstrap compiler records its C compiler by name (`gcc` with
+  # pkgs.stdenv on Linux) and both it and dune invoke that name to compile C
+  # stubs and link executables in the boot workspace. When this derivation
+  # uses clang (asan), no `gcc` is on PATH, so provide one that runs our cc.
+  # The flags the bootstrap compiler passes are accepted by clang.
+  bootstrapCcShim = lib.optional (stdenv.cc.isClang && !pkgs.stdenv.cc.isClang) (
+    pkgs.writeShellScriptBin "gcc" ''
+      exec ${stdenv.cc}/bin/cc "$@"
+    ''
   );
 
   # CR sspies: For the time being, we use dune built with the vanilla 4.14.2 compiler.
@@ -751,6 +745,9 @@ stdenv.mkDerivation {
     pkgs.autoconf
     menhir
     bootstrapCompiler
+  ]
+  ++ bootstrapCcShim
+  ++ [
     pkgs.ocaml-ng.ocamlPackages_5_4.ocaml-lsp
     dune
     pkgs.pkg-config
