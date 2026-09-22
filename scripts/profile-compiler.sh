@@ -15,20 +15,16 @@ set -euo pipefail
 # Navigate to the repository root:
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
-# Ensure this script is invoked in a Nix-provisioned shell with frame pointers:
-if [[ " ${configureFlags-} " != *" --enable-frame-pointers "* ]]
-then
-  echo 'Please run this in a compiler dev shell with frame pointers enabled.'
-fi
-
 # Note the source directory for later use:
 root="${PWD}"
 echo 'Building the compiler at `'"${root}"'`...'
 
 # Configure if necessary:
-if ! rg -qx 'WITH_FRAME_POINTERS[[:space:]]*=[[:space:]]*true' Makefile.config
+if [[ ! -f Makefile.config ]] ||
+   ! rg -qx 'WITH_FRAME_POINTERS[[:space:]]*=[[:space:]]*true' Makefile.config ||
+   ! rg -qx 'main_build_profile[[:space:]]*=[[:space:]]*main' Makefile.config
 then
-  autoconf
+  autoconf27
   ./configure --prefix="$PWD/_install" --enable-frame-pointers --disable-dev
 fi
 
