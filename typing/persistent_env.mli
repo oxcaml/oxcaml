@@ -74,7 +74,7 @@ module Persistent_signature : sig
       the .cmi file in the load path. This function can be overridden to load
       it from memory, for instance to build a self-contained toplevel. *)
   val load :
-    (allow_hidden:bool -> unit_name:CUI.t -> t option) ref
+    (allow_hidden:bool -> unit_name:CUI.Found.t -> t option) ref
 end
 
 type can_load_cmis =
@@ -137,8 +137,14 @@ val find : allow_hidden:bool -> 'a t -> 'a sig_reader
 
 val find_in_cache : 'a t -> Global_module.Name.t -> 'a option
 
+(* [check] is used for references that do not contribute a dependency on the
+   interface, such as module aliases under -no-alias-deps: it records a weak
+   dependency on [name] and, when warning 49 is active, checks that [name]'s
+   cmi is present and usable (warning otherwise) and returns the name with the
+   loaded cmi's path attached to its head. With the warning disabled, the cmi
+   is not searched for at all and [name] is returned unchanged. *)
 val check : allow_hidden:bool -> 'a t -> 'a sig_reader
-  -> loc:Location.t -> Global_module.Name.t -> unit
+  -> loc:Location.t -> Global_module.Name.t -> Global_module.Name.t
 
 (* Lets it be known that the given module is a parameter to this module and thus is
    expected to have been compiled as such. Raises an exception if the module has already
@@ -178,11 +184,60 @@ val global_of_global_name : 'a t
    loading any .cmi files necessary to do so. *)
 val normalize_global_name : 'a t -> Global_module.Name.t -> Global_module.Name.t
 
+(* A top-level member of a non-closed interface through which a mention rooted
+   at it can still be resolved. *)
+type member =
+  | Member_module_alias of Path.t
+    (* The member is a module alias: since the interface records it without an
+       attached cmi path, the mention must be rewritten to the target. *)
+  | Member_verified
+    (* The member is a type from which nothing escapes the interface except
+       through attached cmi paths reaching closed cmis: the mention may keep
+       resolving through it. *)
+
+(* Classification of the interface at the head of a path mentioned by the
+   signature being saved, used to decide [Cmi_format.Closed] and to normalize
+   the mention (see [Env.save_signature]). *)
+type mention_head =
+  | Head_closed of filepath
+    (* The cmi carries [Cmi_format.Closed] and was found at this path: a
+       mention may stay rooted at it. *)
+  | Head_open of filepath * (string -> member option)
+    (* The cmi does not carry [Cmi_format.Closed]: a mention rooted at it must
+       be resolved through its top-level members, which the function looks up
+       by name. *)
+  | Head_unavailable
+    (* The cmi is not loaded, and [may_load] was false or loading failed. *)
+
+(* Caches carried across the mentions of one signature being saved: member
+   verification results (including in-progress ones, to handle reference
+   cycles among mutually recursive declarations) and per-interface member
+   indexes. *)
+type mention_state
+
+val fresh_mention_state : unit -> mention_state
+
+val mention_head :
+  'a t -> may_load:bool -> state:mention_state -> CUI.t -> mention_head
+
+(* Whether [intf] is the interface of the unit being compiled. *)
+val is_current_unit : CUI.t -> bool
+
+(* Record [intf] as an import of the current unit without loading it or
+   recording a crc, like an alias reference does: used for the target of a
+   normalized mention. *)
+val add_weak_import : 'a t -> CUI.t -> unit
+
+(* [closed] asserts that every global module name mentioned by the signature
+   resolves, through its attached cmi path, to a cmi that itself carries
+   [Cmi_format.Closed]; it is further restricted here for parameterised
+   interfaces, and recorded as [Cmi_format.Closed]. *)
 val make_cmi : 'a t
   -> CUI.t
   -> Cmi_format.kind
   -> Subst.Lazy.signature * Mode.Staticity.Const.t
   -> alerts
+  -> closed:bool
   -> Cmi_format.cmi_infos_lazy
 
 val save_cmi : 'a t -> Persistent_signature.t -> unit
