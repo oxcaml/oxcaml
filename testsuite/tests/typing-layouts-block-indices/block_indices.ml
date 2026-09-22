@@ -404,3 +404,98 @@ let () =
     (Float_u.to_float i) (Float_u.to_float i2)
     (Float_u.to_float j) (Float_u.to_float j2);
   print_newline ()
+
+module Composition = struct
+  type leaf = { left : string; mutable flat : float#; right : string; zero : void }
+  type middle = { before : float#; leaf : leaf#; after : string }
+  type outer = {
+    prefix : string;
+    mutable middle : middle#;
+    suffix : int64_u;
+    tail : string;
+  }
+  type immutable_outer = { prefix : string; middle : middle#; tail : string }
+
+  let middle =
+    #{ before = #1.;
+       leaf = #{ left = "left"; flat = #2.; right = "right"; zero = void () };
+       after = "after" }
+
+  let () =
+    let r : outer =
+      { prefix = "prefix"; middle; suffix = #3L; tail = "tail" }
+    in
+    let middle : (outer, middle#) idx_mut = (.middle) in
+    let leaf = Idx_mut.compose_imm middle (.leaf) in
+    let flat = Idx_mut.compose leaf (.flat) in
+    let left = Idx_mut.compose_imm leaf (.left) in
+    let zero = Idx_mut.compose_imm leaf (.zero) in
+    assert (Float_u.to_float (Idx_mut.get r flat) = 2.);
+    assert (Idx_mut.get r left = "left");
+    assert (use_void (Idx_mut.get r zero) = "#()");
+    Idx_mut.set r flat #4.;
+    Idx_mut.set r left "changed";
+    Idx_mut.set r zero (void ());
+    assert (Float_u.to_float r.middle.#leaf.#flat = 4.);
+    assert (r.middle.#leaf.#left = "changed");
+    Idx_mut.set r leaf
+      #{ left = "new"; flat = #5.; right = "new right"; zero = void () };
+    assert (Float_u.to_float (Idx_mut.get r flat) = 5.);
+    assert (Idx_mut.get r left = "new");
+    assert (r.prefix = "prefix" && r.tail = "tail");
+    assert (Int64_u.to_int r.suffix = 3)
+
+  let () =
+    let r : immutable_outer = { prefix = "prefix"; middle; tail = "tail" } in
+    let leaf = Idx_imm.compose (.middle) (.leaf) in
+    let left = Idx_imm.compose leaf (.left) in
+    let before = Idx_imm.compose (.middle) (.before) in
+    let zero = Idx_imm.compose leaf (.zero) in
+    assert (Idx_imm.get r left = "left");
+    assert (Float_u.to_float (Idx_imm.get r before) = 1.);
+    assert (use_void (Idx_imm.get r zero) = "#()")
+
+  type ints = { first : int; mutable second : int }
+  type floats = { first : float#; mutable second : float# }
+  type singleton = { mutable item : int }
+
+  let () =
+    let a : ints# array = [| #{ first = 1; second = 2 };
+                            #{ first = 3; second = 4 } |] in
+    let field : (ints, int) idx_mut = (.second) in
+    let second = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) field in
+    Idx_mut.set a second 5;
+    assert (Idx_mut.get a second = 5);
+    assert (a.(0).#second = 2 && a.(1).#first = 3)
+
+  let () =
+    let a : floats# array = [| #{ first = #1.; second = #2. };
+                              #{ first = #3.; second = #4. } |] in
+    let second = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) (.second) in
+    Idx_mut.set a second #5.;
+    assert (Float_u.to_float (Idx_mut.get a second) = 5.);
+    assert (Float_u.to_float a.(0).#second = 2.)
+
+  let () =
+    let a : singleton# array = [| #{ item = 1 }; #{ item = 2 } |] in
+    let item = Idx_mut.compose (Idx_mut.unsafe_create_into_array 1) (.item) in
+    Idx_mut.set a item 3;
+    assert (Idx_mut.get a item = 3);
+    assert (a.(0).#item = 1 && a.(1).#item = 3)
+
+  type wrapper = { payload : middle# }
+  type holder = { mutable wrapper : wrapper#; tail : string }
+
+  let () =
+    let r = { wrapper = #{ payload = middle }; tail = "tail" } in
+    let leaf = Idx_imm.compose (.payload) (.leaf) in
+    let leaf = Idx_mut.compose_imm (.wrapper) leaf in
+    let flat = Idx_mut.compose leaf (.flat) in
+    let left = Idx_mut.compose_imm (.wrapper) (.payload.#leaf.#left) in
+    assert (Idx_mut.get r left = "left");
+    Idx_mut.set r flat #6.;
+    assert (Float_u.to_float r.wrapper.#payload.#leaf.#flat = 6.);
+    assert (r.tail = "tail")
+
+  let () = print_endline "Index composition"
+end

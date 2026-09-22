@@ -1303,3 +1303,59 @@ module M :
     val idx_mut : 'a ('b : bits64). ('a, 'b a#) idx_mut -> ('a, 'b) idx_mut
   end
 |}]
+
+let compose_mut = Idx_mut.compose
+[%%expect{|
+Line 1, characters 18-33:
+1 | let compose_mut = Idx_mut.compose
+                      ^^^^^^^^^^^^^^^
+Error: Unbound value "Idx_mut.compose"
+|}]
+
+let compose_mut_imm = Idx_mut.compose_imm
+[%%expect{|
+Line 1, characters 22-41:
+1 | let compose_mut_imm = Idx_mut.compose_imm
+                          ^^^^^^^^^^^^^^^^^^^
+Error: Unbound value "Idx_mut.compose_imm"
+|}]
+
+let compose_imm = Idx_imm.compose
+[%%expect{|
+Line 1, characters 18-33:
+1 | let compose_imm = Idx_imm.compose
+                      ^^^^^^^^^^^^^^^
+Error: Unbound value "Idx_imm.compose"
+|}]
+
+module Composition_types = struct
+  type inner = { mutable item : int }
+  type outer = { inner : inner# }
+  type boxed_outer = { mutable boxed_inner : inner }
+end
+[%%expect{|
+module Composition_types :
+  sig
+    type inner = { mutable item : int; }
+    type outer = { inner : inner#; }
+    type boxed_outer = { mutable boxed_inner : inner; }
+  end
+|}]
+
+let immutable_to_mutable =
+  Idx_imm.compose (.Composition_types.inner) (.Composition_types.item)
+[%%expect{|
+Line 2, characters 2-17:
+2 |   Idx_imm.compose (.Composition_types.inner) (.Composition_types.item)
+      ^^^^^^^^^^^^^^^
+Error: Unbound value "Idx_imm.compose"
+|}]
+
+let boxed_intermediate =
+  Idx_mut.compose (.Composition_types.boxed_inner) (.Composition_types.item)
+[%%expect{|
+Line 2, characters 2-17:
+2 |   Idx_mut.compose (.Composition_types.boxed_inner) (.Composition_types.item)
+      ^^^^^^^^^^^^^^^
+Error: Unbound value "Idx_mut.compose"
+|}]
