@@ -6827,14 +6827,32 @@ let rec mgen_fast env subst scope maxnodes variance t1 t2 =
     begin match variance with
     | None -> raise_notrace Complicated_moregen
     | Some v ->
-      (* bail out for mode variables to avoid copying them *)
+      (* Bail out for generic mode variables: the slow path instantiates
+         them (the pattern's as fresh copies, the subject's as rigid
+         ones) and we do not want to copy. *)
       if With_locality.check_generic a1
          || With_locality.check_generic r1
          || With_locality.check_generic a2
          || With_locality.check_generic r2
       then raise_notrace Complicated_moregen;
-      moregen_mode_fast (neg_variance v) a1 a2;
-      moregen_mode_fast v r1 r2;
+      let is_const m =
+        Option.is_some (With_locality.Guts.check_const_conservative m)
+      in
+      let mode_check ~is_ret ty v m1 m2 =
+        if is_const m1 && is_const m2
+        then moregen_mode_fast v m1 m2
+        else
+          (* A weak mode variable is involved, so a successful check
+             will constrain it, and those constraints must be exactly
+             the slow path's: they are visible to later checks (e.g. of
+             the value's own mode). That requires mode crossing on the
+             interface type with its paths substituted, so substitute
+             just this subtree. *)
+          moregen_mode_with_locality env (Subst.type_expr subst ty)
+            ~is_ret v m1 m2
+      in
+      mode_check ~is_ret:false t2 (neg_variance v) a1 a2;
+      mode_check ~is_ret:true u2 v r1 r2;
       mgen_fast env subst scope maxnodes (some_neg_variance v) t1 t2;
       mgen_fast env subst scope maxnodes variance u1 u2
     end
@@ -6895,7 +6913,8 @@ let moregeneral_fast env patt subst subj =
     let maxnodes = ref 200 in
     match mgen_fast env subst scope maxnodes (Some Covariant) patt subj with
     | () -> true
-    | exception Complicated_moregen -> backtrack snap; false)
+    | exception (Complicated_moregen | Moregen_trace _) ->
+      backtrack snap; false)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in
