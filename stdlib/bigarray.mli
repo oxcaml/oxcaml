@@ -712,9 +712,9 @@ module Array1 : sig
     : ('a : any) ('b : any) ('c : any).
       (('a, 'b, 'c) t[@local_opt]) @ immutable -> bool @@ stateless
     = "caml_ba_is_stack" [@@noalloc] [@@no_effects]
-  (** Whether the given Bigarray custom block is stack-allocated, independently of its
-      backing storage. Always [false] when stack allocation is disabled, including in
-      bytecode. *)
+  (** Whether the given Bigarray custom block is stack-allocated, independently
+      of its backing storage. Always [false] when stack allocation is disabled,
+      including in bytecode. *)
 
   external unsafe_smart_globalize
     : ('a : any) ('b : any) ('c : any).
@@ -778,9 +778,9 @@ module Array1 : sig
     : (char, int8_unsigned_elt, c_layout) t @ local -> int -> int
       -> ((char, int8_unsigned_elt, c_layout) t @ local -> 'a) @ local once
       -> 'a
-  (** [with_sub_local a ofs len f] calls [f] on a sub-array of the one-dimensional
-      Bigstring [a]. The sub-array cannot escape [f] and is allocated on the stack if
-      stack-allocation is enabled. *)
+  (** [with_sub_local a ofs len f] calls [f] on a sub-array of the
+      one-dimensional Bigstring [a]. The sub-array cannot escape [f] and is
+      allocated on the stack if stack-allocation is enabled. *)
 
   val slice
     : ('a : any) ('b : any) ('c : any).
