@@ -42,7 +42,8 @@ val id_stamp_counters : t -> Id_stamp_counters.t
 
 val participants : t -> Compilation_unit.t list
 
-(** The data about the identifiers and slots owned by a compilation unit,
-    importing its section on demand. Imported sections are shared across the
-    batch. Units that did not take part in the solve have empty data. *)
-val data_for_unit : t -> Compilation_unit.t -> Reaper.Staged.Rebuild_data.t
+(** Check that [members] participated in the solve and provide lookups that
+    import their owning compilation unit's section on demand. Imported sections
+    are shared across the batch. *)
+val solution_for_members :
+  t -> members:Compilation_unit.t list -> Reaper.Staged.Rebuild_solution.t

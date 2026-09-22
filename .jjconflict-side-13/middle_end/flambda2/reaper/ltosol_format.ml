@@ -130,17 +130,13 @@ let load filename =
     close_in_noerr ic;
     raise exn
 
-let analysis_scope t =
-  Analysis_scope.Lto_participants
-    (Compilation_unit.Set.of_list (participants t))
-
 let data_for_unit t cu =
   match Compilation_unit.Tbl.find_opt t.loaded cu with
   | Some data -> data
   | None ->
     let data =
       match Compilation_unit.Map.find_opt cu t.header.Header.index with
-      | None -> Rebuild_data.empty ~analysis_scope:(analysis_scope t)
+      | None -> Rebuild_data.empty
       | Some idx ->
         let shard : Shard.t =
           try Obj.obj (File_sections.get t.sections idx)
@@ -161,6 +157,19 @@ let data_for_unit t cu =
        batch. *)
     Compilation_unit.Tbl.add t.loaded cu data;
     data
+
+let solution_for_members t ~members =
+  let participants = Compilation_unit.Set.of_list (participants t) in
+  List.iter
+    (fun member ->
+      if not (Compilation_unit.Set.mem member participants)
+      then
+        Misc.fatal_errorf "Unit %a is not a participant in the LTO solution"
+          (Format_doc.compat Compilation_unit.print)
+          member)
+    members;
+  Reaper.Staged.Rebuild_solution.sharded
+    ~analysis_scope:(Lto_participants participants) (data_for_unit t)
 
 open Format_doc
 

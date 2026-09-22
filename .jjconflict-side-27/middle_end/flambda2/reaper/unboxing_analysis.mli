@@ -92,7 +92,22 @@ type calling_convention_change =
         return_decisions : param_decision list
       }
 
+(** The code changes of a set of code IDs, as computed by
+    [compute_code_changes_data] and stored in a solution. *)
+type code_changes_data
+
+(** The code changes as the rebuild queries them: the data about the code IDs of
+    the analysis scope, either all together or sharded by compilation unit. Code
+    IDs outside the scope have no changes. *)
 type code_changes
+
+val single_code_changes :
+  analysis_scope:Analysis_scope.t -> code_changes_data -> code_changes
+
+val sharded_code_changes :
+  analysis_scope:Analysis_scope.t ->
+  (Compilation_unit.t -> code_changes_data) ->
+  code_changes
 
 val get_calling_convention_change :
   code_changes -> Code_id.t -> calling_convention_change
@@ -108,23 +123,22 @@ val find_code_metadata : code_changes -> Code_id.t -> Code_metadata.t option
 
 val pp_result : Format.formatter -> result -> unit
 
-val analysis_scope : code_changes -> Analysis_scope.t
-
-val empty_code_changes : analysis_scope:Analysis_scope.t -> code_changes
+val empty_code_changes_data : code_changes_data
 
 val partition_code_changes_by_compilation_unit :
-  code_changes -> code_changes Compilation_unit.Map.t
+  code_changes_data -> code_changes_data Compilation_unit.Map.t
 
 val code_changes_ids_for_export :
-  code_changes -> Ids_for_export.t -> Ids_for_export.t
+  code_changes_data -> Ids_for_export.t -> Ids_for_export.t
 
-val code_changes_fields_for_export : code_changes -> Field.Set.t -> Field.Set.t
+val code_changes_fields_for_export :
+  code_changes_data -> Field.Set.t -> Field.Set.t
 
 val code_changes_apply_renaming :
-  code_changes ->
+  code_changes_data ->
   Renaming.t ->
   rename_field:(Field.t -> Field.t) ->
-  code_changes
+  code_changes_data
 
 val unboxed_fields_ids_for_export :
   unboxed Code_id_or_name.Map.t -> Ids_for_export.t -> Ids_for_export.t
@@ -160,6 +174,21 @@ val perform_analysis :
   analysis_scope:Analysis_scope.t ->
   result
 
+val compute_code_changes_data :
+  result ->
+  analysis_scope:Analysis_scope.t ->
+  rewrite_kind_with_subkind:
+    (Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t) ->
+  rewrite_result_types:
+    (my_closure:Variable.t ->
+    params:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    results:(Variable.t * Points_to_analysis.keep_or_delete) list ->
+    Result_types.t ->
+    Result_types.t Or_unknown_or_bottom.t) ->
+  code_deps:Traverse_acc.code_dep Code_id.Map.t ->
+  code_changes_data
+
+(** [compute_code_changes_data], as a single [code_changes]. *)
 val compute_code_changes :
   result ->
   analysis_scope:Analysis_scope.t ->

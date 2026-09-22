@@ -19,7 +19,7 @@ module Serialisation = Datalog_helpers.Serialisation
 
 (* We use unit maps instead of sets, because it allows reuse of the tables
    stored in the Datalog database without copying. *)
-type result =
+type data =
   { has_usage : unit Code_id_or_name.Map.t;
     has_source : unit Code_id_or_name.Map.t;
     field_of_constructor_is_used : unit Field.Map.t Code_id_or_name.Map.t;
@@ -30,6 +30,10 @@ type result =
     changed_representation :
       (UA.changed_representation * Code_id_or_name.t) Code_id_or_name.Map.t
   }
+
+type result =
+  | Single of data
+  | Sharded of (Compilation_unit.t -> data)
 
 let answer_call_queries db (applications : Traverse_acc.Applications.t) result =
   Code_id_or_name.Map.fold
@@ -65,7 +69,8 @@ let answer_call_queries db (applications : Traverse_acc.Applications.t) result =
         })
     applications result
 
-let fixpoint (graph : Global_flow_graph.graph) ~applications ~analysis_scope =
+let fixpoint_data (graph : Global_flow_graph.graph) ~applications
+    ~analysis_scope =
   let datalog = Global_flow_graph.to_datalog graph in
   let with_provenance = Flambda_features.debug_reaper "prov" in
   let stats = Datalog.Schedule.create_stats ~with_provenance datalog in
@@ -89,16 +94,31 @@ let fixpoint (graph : Global_flow_graph.graph) ~applications ~analysis_scope =
   in
   unboxing, answer_call_queries db applications result
 
+let fixpoint graph ~applications ~analysis_scope =
+  let unboxing, data = fixpoint_data graph ~applications ~analysis_scope in
+  unboxing, Single data
+
+let data_for_unit uses compilation_unit =
+  match uses with
+  | Single data -> data
+  | Sharded get_unit -> get_unit compilation_unit
+
+let data_for uses id = data_for_unit uses (Code_id_or_name.compilation_unit id)
+
 let get_unboxed_fields uses cn =
-  Code_id_or_name.Map.find_opt cn uses.unboxed_fields
+  Code_id_or_name.Map.find_opt cn (data_for uses cn).unboxed_fields
 
 let get_changed_representation uses cn =
-  Option.map fst (Code_id_or_name.Map.find_opt cn uses.changed_representation)
+  Option.map fst
+    (Code_id_or_name.Map.find_opt cn (data_for uses cn).changed_representation)
 
-let has_use uses v = Code_id_or_name.Map.mem v uses.has_usage
+let has_use uses v = Code_id_or_name.Map.mem v (data_for uses v).has_usage
 
 let field_used uses v f =
-  match Code_id_or_name.Map.find_opt v uses.field_of_constructor_is_used with
+  match
+    Code_id_or_name.Map.find_opt v
+      (data_for uses v).field_of_constructor_is_used
+  with
   | None -> false
   | Some fields -> Field.Map.mem f fields
 
@@ -110,7 +130,8 @@ let find_answer map callee query =
       Code_id_or_name.print callee
 
 let code_id_actually_directly_called uses closure =
-  find_answer uses.directly_called
+  let data = data_for_unit uses (Name.compilation_unit closure) in
+  find_answer data.directly_called
     (Code_id_or_name.name closure)
     "direct-call targets"
 
@@ -124,11 +145,15 @@ let rec apply_mask callee query mask args =
       query Code_id_or_name.print callee
 
 let arguments_used_by_known_arity_call uses callee args =
-  let mask = find_answer uses.known_masks callee "known-arity" in
+  let mask =
+    find_answer (data_for uses callee).known_masks callee "known-arity"
+  in
   apply_mask callee "known-arity" mask args
 
 let arguments_used_by_unknown_arity_call uses callee args =
-  let masks = find_answer uses.unknown_masks callee "unknown-arity" in
+  let masks =
+    find_answer (data_for uses callee).unknown_masks callee "unknown-arity"
+  in
   let rec apply_groups masks args =
     match args, masks with
     | [], _ -> []
@@ -141,7 +166,7 @@ let arguments_used_by_unknown_arity_call uses callee args =
   in
   apply_groups masks args
 
-let has_source uses v = Code_id_or_name.Map.mem v uses.has_source
+let has_source uses v = Code_id_or_name.Map.mem v (data_for uses v).has_source
 
 let empty =
   { has_usage = Code_id_or_name.Map.empty;

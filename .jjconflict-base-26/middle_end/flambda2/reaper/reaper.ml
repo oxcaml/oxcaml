@@ -189,14 +189,14 @@ module Staged = struct
 
   module Rebuild_data = struct
     type t =
-      { analysis : Analysis.result;
-        code_changes : Unboxing_analysis.code_changes;
+      { analysis : Analysis.data;
+        code_changes : Unboxing_analysis.code_changes_data;
         slot_offsets : Exported_offsets.t
       }
 
-    let empty ~analysis_scope =
+    let empty =
       { analysis = Analysis.empty;
-        code_changes = Unboxing_analysis.empty_code_changes ~analysis_scope;
+        code_changes = Unboxing_analysis.empty_code_changes_data;
         slot_offsets = Exported_offsets.empty
       }
 
@@ -218,7 +218,6 @@ module Staged = struct
       }
 
     let partition_by_compilation_unit { analysis; code_changes; slot_offsets } =
-      let analysis_scope = Unboxing_analysis.analysis_scope code_changes in
       let analysis = Analysis.partition_by_compilation_unit analysis in
       let code_changes =
         Unboxing_analysis.partition_code_changes_by_compilation_unit
@@ -248,8 +247,7 @@ module Staged = struct
             { analysis = find analysis compilation_unit ~default:Analysis.empty;
               code_changes =
                 find code_changes compilation_unit
-                  ~default:
-                    (Unboxing_analysis.empty_code_changes ~analysis_scope);
+                  ~default:Unboxing_analysis.empty_code_changes_data;
               slot_offsets =
                 find slot_offsets compilation_unit
                   ~default:Exported_offsets.empty
@@ -261,16 +259,61 @@ module Staged = struct
 
   module Solution = struct
     type t =
-      { analysis : Analysis.result;
-        code_changes : Unboxing_analysis.code_changes;
-        slot_offsets : Slot_offsets.result
+      { analysis_scope : Analysis_scope.t;
+        data : Rebuild_data.t
       }
 
+    let rebuild_data t = t.data
+  end
+
+  module Rebuild_solution = struct
+    type store =
+      | Single of Rebuild_data.t
+      | Sharded of (Compilation_unit.t -> Rebuild_data.t)
+
+    type t =
+      { analysis_scope : Analysis_scope.t;
+        store : store
+      }
+
+    let of_solution ({ analysis_scope; data } : Solution.t) =
+      { analysis_scope; store = Single data }
+
+    let sharded ~analysis_scope get_unit =
+      { analysis_scope; store = Sharded get_unit }
+
+    let data_for_unit t compilation_unit =
+      match t.store with
+      | Single data -> data
+      | Sharded get_unit -> get_unit compilation_unit
+
+    let analysis t : Analysis.result =
+      match t.store with
+      | Single data -> Single data.analysis
+      | Sharded get_unit ->
+        Sharded
+          (fun compilation_unit ->
+            (get_unit compilation_unit).Rebuild_data.analysis)
+
+    let code_changes t =
+      match t.store with
+      | Single data ->
+        Unboxing_analysis.single_code_changes ~analysis_scope:t.analysis_scope
+          data.code_changes
+      | Sharded get_unit ->
+        Unboxing_analysis.sharded_code_changes ~analysis_scope:t.analysis_scope
+          (fun compilation_unit ->
+            (get_unit compilation_unit).Rebuild_data.code_changes)
+
     let offsets_for_free_names t free_names =
-      let solved = t.slot_offsets.Slot_offsets.exported_offsets in
       let offsets =
         Function_slot.Set.fold
           (fun function_slot offsets ->
+            let solved =
+              (data_for_unit t
+                 (Function_slot.get_compilation_unit function_slot))
+                .slot_offsets
+            in
             match
               Exported_offsets.function_slot_offset solved function_slot
             with
@@ -285,6 +328,10 @@ module Staged = struct
       in
       Value_slot.Set.fold
         (fun value_slot offsets ->
+          let solved =
+            (data_for_unit t (Value_slot.get_compilation_unit value_slot))
+              .slot_offsets
+          in
           match Exported_offsets.value_slot_offset solved value_slot with
           | Some info ->
             Exported_offsets.add_value_slot_offset offsets value_slot info
@@ -293,12 +340,6 @@ module Staged = struct
               Value_slot.print value_slot)
         (Name_occurrences.all_value_slots_at_normal_mode free_names)
         offsets
-
-    let rebuild_data { analysis; code_changes; slot_offsets } =
-      { Rebuild_data.analysis;
-        code_changes;
-        slot_offsets = slot_offsets.Slot_offsets.exported_offsets
-      }
   end
 
   let traverse ~free_names ~cmx_loader ~all_code unit =
@@ -378,7 +419,7 @@ module Staged = struct
       solve_inputs;
     let solved_dep, analysis =
       Profile.record_call ~accumulate:true "solver" (fun () ->
-          Analysis.fixpoint deps ~applications ~analysis_scope)
+          Analysis.fixpoint_data deps ~applications ~analysis_scope)
     in
     let () =
       if Flambda_features.debug_reaper "print-solved"
@@ -386,22 +427,31 @@ module Staged = struct
         Format.printf "RESULT@ %a@." Unboxing_analysis.pp_result solved_dep;
         Dot_printer.print_solved_dep solved_dep deps)
     in
-    let code_changes =
-      Unboxing_analysis.compute_code_changes solved_dep ~analysis_scope
+    let code_changes_data =
+      Unboxing_analysis.compute_code_changes_data solved_dep ~analysis_scope
         ~rewrite_kind_with_subkind:(fun _name kind ->
           Types_rewriter.erase_subkind kind)
         ~rewrite_result_types:(fun ~my_closure:_ ~params:_ ~results:_ _types ->
           Or_unknown_or_bottom.Unknown)
         ~code_deps
     in
+    let code_changes =
+      Unboxing_analysis.single_code_changes ~analysis_scope code_changes_data
+    in
     let slot_offsets =
       Slot_offsets_analysis.compute ~inputs:slot_offsets_inputs ~analysis_scope
         ~code_changes solved_dep
     in
-    Solution.{ analysis; code_changes; slot_offsets }
+    { Solution.analysis_scope;
+      data =
+        { Rebuild_data.analysis;
+          code_changes = code_changes_data;
+          slot_offsets = slot_offsets.Slot_offsets.exported_offsets
+        }
+    }
 
-  let rebuild ~unit_metadata ~rebuild_inputs ~solution ~machine_width
-      ~cmx_loader ~all_code =
+  let rebuild ~unit_metadata ~rebuild_inputs ~(solution : Rebuild_solution.t)
+      ~machine_width ~cmx_loader ~all_code =
     let get_code_metadata = get_code_metadata ~cmx_loader ~all_code in
     let Rebuild_inputs.
           { toplevel_expr;
@@ -412,13 +462,14 @@ module Staged = struct
           } =
       rebuild_inputs
     in
-    let Solution.{ analysis; code_changes; _ } = solution in
     let Rebuild.{ body; all_code; code_ids_to_remember; free_names } =
       Rebuild.rebuild ~machine_width ~ordered_code_ids
         ~fixed_arity_continuations ~continuation_info ~final_typing_env:None
         ~rewrite_kind_with_subkind:(fun _ kind ->
           Types_rewriter.erase_subkind kind)
-        ~code_changes analysis get_code_metadata toplevel_expr code
+        ~code_changes:(Rebuild_solution.code_changes solution)
+        (Rebuild_solution.analysis solution)
+        get_code_metadata toplevel_expr code
     in
     let all_code =
       Exported_code.add_code
@@ -428,7 +479,7 @@ module Staged = struct
            (Flambda_cmx.get_imported_code cmx_loader ()))
     in
     let exported_offsets =
-      Solution.offsets_for_free_names solution free_names
+      Rebuild_solution.offsets_for_free_names solution free_names
     in
     ( Flambda_unit.create_of_metadata_and_body unit_metadata body,
       all_code,

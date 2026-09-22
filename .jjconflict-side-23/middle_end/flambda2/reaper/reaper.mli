@@ -55,7 +55,7 @@ module Staged : sig
     type t
 
     (** The data about units that did not take part in the solve. *)
-    val empty : analysis_scope:Analysis_scope.t -> t
+    val empty : t
 
     val ids_for_export : t -> Ids_for_export.t
 
@@ -76,6 +76,20 @@ module Staged : sig
 
     (** The answers of the solution in the form the rebuild consumes. *)
     val rebuild_data : t -> Rebuild_data.t
+  end
+
+  (** A solution as the rebuild consumes it: the data of one solve, or a
+      whole-program solution sharded by compilation unit, each unit's data
+      obtained on demand. *)
+  module Rebuild_solution : sig
+    type t
+
+    val of_solution : Solution.t -> t
+
+    val sharded :
+      analysis_scope:Analysis_scope.t ->
+      (Compilation_unit.t -> Rebuild_data.t) ->
+      t
   end
 
   (** Traverse the compilation unit. [free_names] are the free names of the
@@ -105,7 +119,7 @@ module Staged : sig
   val rebuild :
     unit_metadata:Flambda_unit.Metadata.t ->
     rebuild_inputs:Rebuild_inputs.t ->
-    solution:Solution.t ->
+    solution:Rebuild_solution.t ->
     machine_width:Target_system.Machine_width.t ->
     cmx_loader:Flambda_cmx.loader ->
     all_code:Exported_code.t ->

@@ -1001,9 +1001,15 @@ type code_change =
     code_metadata : Code_metadata.t
   }
 
+type code_changes_data = code_change Code_id.Map.t
+
+type changes =
+  | Single of code_changes_data
+  | Sharded of (Compilation_unit.t -> code_changes_data)
+
 type code_changes =
   { analysis_scope : Analysis_scope.t;
-    changes : code_change Code_id.Map.t
+    changes : changes
   }
 
 let arity_of_decisions params_decisions =
@@ -1061,7 +1067,7 @@ let get_arity_and_modes params_decisions =
            arity)),
     modes )
 
-let compute_code_changes0 uses ~analysis_scope ~rewrite_kind_with_subkind
+let compute_code_changes_data uses ~analysis_scope ~rewrite_kind_with_subkind
     ~rewrite_result_types ~code_deps =
   let get_unboxed_fields cn =
     Code_id_or_name.Map.find_opt cn uses.unboxed_fields
@@ -1254,16 +1260,25 @@ let compute_code_changes0 uses ~analysis_scope ~rewrite_kind_with_subkind
       { calling_convention_change; code_metadata })
     code_deps
 
+let single_code_changes ~analysis_scope data =
+  { analysis_scope; changes = Single data }
+
+let sharded_code_changes ~analysis_scope get_unit =
+  { analysis_scope; changes = Sharded get_unit }
+
 let compute_code_changes uses ~analysis_scope ~rewrite_kind_with_subkind
     ~rewrite_result_types ~code_deps =
-  { analysis_scope;
-    changes =
-      compute_code_changes0 uses ~analysis_scope ~rewrite_kind_with_subkind
-        ~rewrite_result_types ~code_deps
-  }
+  single_code_changes ~analysis_scope
+    (compute_code_changes_data uses ~analysis_scope ~rewrite_kind_with_subkind
+       ~rewrite_result_types ~code_deps)
+
+let changes_for t code_id =
+  match t.changes with
+  | Single data -> data
+  | Sharded get_unit -> get_unit (Code_id.get_compilation_unit code_id)
 
 let get_calling_convention_change t code_id =
-  match Code_id.Map.find_opt code_id t.changes with
+  match Code_id.Map.find_opt code_id (changes_for t code_id) with
   | None ->
     if
       Analysis_scope.contains_unit t.analysis_scope
@@ -1290,7 +1305,7 @@ let get_code_metadata t code_id =
     Misc.fatal_errorf
       "[get_code_metadata]: code_id %a is not in the analysis scope"
       Code_id.print code_id;
-  match Code_id.Map.find_opt code_id t.changes with
+  match Code_id.Map.find_opt code_id (changes_for t code_id) with
   | None ->
     Misc.fatal_errorf
       "[get_code_metadata]: code_id %a is in the analysis scope but missing in \
@@ -1299,7 +1314,7 @@ let get_code_metadata t code_id =
   | Some code_change -> code_change.code_metadata
 
 let find_code_metadata t code_id =
-  match Code_id.Map.find_opt code_id t.changes with
+  match Code_id.Map.find_opt code_id (changes_for t code_id) with
   | None ->
     if
       Analysis_scope.contains_unit t.analysis_scope
@@ -1312,12 +1327,9 @@ let find_code_metadata t code_id =
     else None
   | Some code_change -> Some code_change.code_metadata
 
-let analysis_scope t = t.analysis_scope
+let empty_code_changes_data = Code_id.Map.empty
 
-let empty_code_changes ~analysis_scope =
-  { analysis_scope; changes = Code_id.Map.empty }
-
-let partition_code_changes_by_compilation_unit { analysis_scope; changes } =
+let partition_code_changes_by_compilation_unit changes =
   Code_id.Map.fold
     (fun code_id code_change acc ->
       let cu = Code_id.get_compilation_unit code_id in
@@ -1327,7 +1339,6 @@ let partition_code_changes_by_compilation_unit { analysis_scope; changes } =
           Some (Code_id.Map.add code_id code_change part))
         acc)
     changes Compilation_unit.Map.empty
-  |> Compilation_unit.Map.map (fun changes -> { analysis_scope; changes })
 
 let code_changes_ids_for_export t ids =
   let decision_ids ids (decision : param_decision) =
@@ -1353,7 +1364,7 @@ let code_changes_ids_for_export t ids =
         in
         let ids = List.fold_left decision_ids ids params_decisions in
         List.fold_left decision_ids ids return_decisions)
-    t.changes ids
+    t ids
 
 let code_changes_fields_for_export t fields =
   let decision_fields fields (decision : param_decision) =
@@ -1375,7 +1386,7 @@ let code_changes_fields_for_export t fields =
         in
         let fields = List.fold_left decision_fields fields params_decisions in
         List.fold_left decision_fields fields return_decisions)
-    t.changes fields
+    t fields
 
 let code_changes_apply_renaming t renaming ~rename_field =
   let rename_var = Renaming.apply_variable renaming in
@@ -1387,34 +1398,31 @@ let code_changes_apply_renaming t renaming ~rename_field =
       Unbox
         (rename_unboxed_fields_tree tree ~rename_leaf:rename_var ~rename_field)
   in
-  let changes =
-    Code_id.Map.fold
-      (fun code_id { calling_convention_change; code_metadata } acc ->
-        let calling_convention_change =
-          match calling_convention_change with
-          | Not_changing_calling_convention -> Not_changing_calling_convention
-          | Changing_calling_convention
-              { my_closure_decision; params_decisions; return_decisions } ->
-            let my_closure_decision =
-              match my_closure_decision with
-              | Keep_my_closure -> Keep_my_closure
-              | Unbox_my_closure tree ->
-                Unbox_my_closure
-                  (rename_unboxed_fields_tree tree ~rename_leaf:rename_var
-                     ~rename_field)
-            in
-            Changing_calling_convention
-              { my_closure_decision;
-                params_decisions = List.map rename_decision params_decisions;
-                return_decisions = List.map rename_decision return_decisions
-              }
-        in
-        Code_id.Map.add
-          (Renaming.apply_code_id renaming code_id)
-          { calling_convention_change;
-            code_metadata = Code_metadata.apply_renaming code_metadata renaming
-          }
-          acc)
-      t.changes Code_id.Map.empty
-  in
-  { t with changes }
+  Code_id.Map.fold
+    (fun code_id { calling_convention_change; code_metadata } acc ->
+      let calling_convention_change =
+        match calling_convention_change with
+        | Not_changing_calling_convention -> Not_changing_calling_convention
+        | Changing_calling_convention
+            { my_closure_decision; params_decisions; return_decisions } ->
+          let my_closure_decision =
+            match my_closure_decision with
+            | Keep_my_closure -> Keep_my_closure
+            | Unbox_my_closure tree ->
+              Unbox_my_closure
+                (rename_unboxed_fields_tree tree ~rename_leaf:rename_var
+                   ~rename_field)
+          in
+          Changing_calling_convention
+            { my_closure_decision;
+              params_decisions = List.map rename_decision params_decisions;
+              return_decisions = List.map rename_decision return_decisions
+            }
+      in
+      Code_id.Map.add
+        (Renaming.apply_code_id renaming code_id)
+        { calling_convention_change;
+          code_metadata = Code_metadata.apply_renaming code_metadata renaming
+        }
+        acc)
+    t Code_id.Map.empty
