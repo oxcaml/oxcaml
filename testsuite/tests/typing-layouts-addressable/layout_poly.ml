@@ -48,6 +48,16 @@ Error: The value "x" has type "b8" but an expression was expected of type
        The layout of b8 is bits8
          because of the definition of b8 at line 3, characters 0-15.
        But the layout of b8 must be addressable
+         because we must know concretely how to return a function result.
+|}, Principal{|
+Line 1, characters 34-35:
+1 | let bad (x : b8) = id_addressable x
+                                      ^
+Error: The value "x" has type "b8" but an expression was expected of type
+         "('a : '_representable_layout_1 addressable)"
+       The layout of b8 is bits8
+         because of the definition of b8 at line 3, characters 0-15.
+       But the layout of b8 must be addressable
          because it's the layout polymorphic type in an external declaration
          ([@layout_poly] forces all variables of layout 'any' to be
          representable at call sites).
@@ -55,6 +65,16 @@ Error: The value "x" has type "b8" but an expression was expected of type
 
 let bad (x : float#) = id_addressable x
 [%%expect{|
+Line 1, characters 38-39:
+1 | let bad (x : float#) = id_addressable x
+                                          ^
+Error: The value "x" has type "float#" but an expression was expected of type
+         "('a : '_representable_layout_2 addressable)"
+       The layout of float# is float64
+         because it is the unboxed version of the primitive type float.
+       But the layout of float# must be addressable
+         because we must know concretely how to return a function result.
+|}, Principal{|
 Line 1, characters 38-39:
 1 | let bad (x : float#) = id_addressable x
                                           ^
@@ -71,6 +91,19 @@ Error: The value "x" has type "float#" but an expression was expected of type
 (* ...including at an unboxed product with an unaddressable component *)
 let bad (x : #(float# * string)) = id_addressable x
 [%%expect{|
+Line 1, characters 50-51:
+1 | let bad (x : #(float# * string)) = id_addressable x
+                                                      ^
+Error: The value "x" has type "#(float# * string)"
+       but an expression was expected of type
+         "('a : '_representable_layout_3 addressable)"
+       The layout of #(float# * string) is float64 & value non_float
+         because it is an unboxed tuple.
+       But the layout of #(float# * string) must be addressable
+         because we must know concretely how to return a function result.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}, Principal{|
 Line 1, characters 50-51:
 1 | let bad (x : #(float# * string)) = id_addressable x
                                                       ^
@@ -157,6 +190,18 @@ Error: This expression has type "('a : bits8 addressable)"
    [bits64], which does not unify with [b8a]'s [bits8 addressable] *)
 let bad (x : int64_u) : b8a = magic_to_addressable x
 [%%expect{|
+Line 1, characters 51-52:
+1 | let bad (x : int64_u) : b8a = magic_to_addressable x
+                                                       ^
+Error: The value "x" has type "int64_u" but an expression was expected of type
+         "('a : bits8)"
+       The layout of int64_u is bits64
+         because it is the primitive type int64_u.
+       But the layout of int64_u must be a sublayout of bits8
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 Line 1, characters 30-52:
 1 | let bad (x : int64_u) : b8a = magic_to_addressable x
                                   ^^^^^^^^^^^^^^^^^^^^^^
@@ -198,11 +243,25 @@ Error: The value "y" has type "('a : bits8)"
          representable at call sites).
 |}]
 
-(* okay if we constrain the kind earlier *)
+(* okay if we constrain the kind earlier. Propagating the expected result
+   into the application sets the shared sort first, which hits the same
+   incompleteness. *)
 let bad (y : b8a) =
   let _ : (_ : bits8 addressable) = magic_to_addressable y in
   (y : b8a)
 [%%expect{|
+Line 2, characters 57-58:
+2 |   let _ : (_ : bits8 addressable) = magic_to_addressable y in
+                                                             ^
+Error: The value "y" has type "b8a" but an expression was expected of type
+         "('a : bits8)"
+       The layout of b8a is bits8 addressable
+         because of the definition of b8a at line 1, characters 0-28.
+       But the layout of b8a must be a sublayout of bits8
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}, Principal{|
 val bad : b8a -> b8a = <fun>
 |}]
 
@@ -280,6 +339,19 @@ val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
 
 let bad (y : b8 mixed_pair) = id_addressable y
 [%%expect{|
+Line 1, characters 45-46:
+1 | let bad (y : b8 mixed_pair) = id_addressable y
+                                                 ^
+Error: The value "y" has type "b8 mixed_pair"
+       but an expression was expected of type
+         "('a : ('_representable_layout_5 & value_or_null) addressable)"
+       The layout of b8 mixed_pair is bits8 & value non_float
+         because of the definition of mixed_pair at line 1, characters 0-52.
+       But the layout of b8 mixed_pair must be addressable
+         because we must know concretely how to return a function result.
+       Note: The kinds mutable_data, immutable_data, and sync_data have
+       the layout value non_float.
+|}, Principal{|
 Line 1, characters 45-46:
 1 | let bad (y : b8 mixed_pair) = id_addressable y
                                                  ^
