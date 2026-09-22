@@ -1833,114 +1833,49 @@ Error: This expression has type "int" but an expression was expected of type
          "string"
 |}]
 
-type int8_box_bad : bits8 box = int8
+type int8_box : bits8 box = int8
 [%%expect{|
-Line 1, characters 0-36:
-1 | type int8_box_bad : bits8 box = int8
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int8" is value non_pointer
-         because it is the primitive type int8.
-       But the layout of type "int8" must be a sublayout of bits8 box
-         because of the definition of int8_box_bad at line 1, characters 0-36.
-       Note: The layout of immediate is value non_pointer.
+type int8_box = int8
 |}]
 
-type int16_box_bad : bits16 box = int16
+type int16_box : bits16 box = int16
 [%%expect{|
-Line 1, characters 0-39:
-1 | type int16_box_bad : bits16 box = int16
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int16" is value non_pointer
-         because it is the primitive type int16.
-       But the layout of type "int16" must be a sublayout of bits16 box
-         because of the definition of int16_box_bad at line 1, characters 0-39.
-       Note: The layout of immediate is value non_pointer.
+type int16_box = int16
 |}]
 
-type int_box_bad : untagged_immediate box = int
+type int_box : untagged_immediate box = int
 [%%expect{|
-Line 1, characters 0-47:
-1 | type int_box_bad : untagged_immediate box = int
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int" is value non_pointer
-         because it is the primitive type int.
-       But the layout of type "int" must be a sublayout of
-           untagged_immediate box
-         because of the definition of int_box_bad at line 1, characters 0-47.
-       Note: The layout of immediate is value non_pointer.
+type int_box = int
 |}]
 
-type char_box_bad : bits8 box = char
+type char_box : bits8 box = char
 [%%expect{|
-Line 1, characters 0-36:
-1 | type char_box_bad : bits8 box = char
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "char" is value non_pointer
-         because it is the primitive type char.
-       But the layout of type "char" must be a sublayout of bits8 box
-         because of the definition of char_box_bad at line 1, characters 0-36.
-       Note: The layout of immediate is value non_pointer.
+type char_box = char
 |}]
 
-type bool_box_bad : bits8 box = bool
+type bool_box : bits8 box = bool
 [%%expect{|
-Line 1, characters 0-36:
-1 | type bool_box_bad : bits8 box = bool
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "bool" is value non_pointer
-         because it is the primitive type bool.
-       But the layout of type "bool" must be a sublayout of bits8 box
-         because of the definition of bool_box_bad at line 1, characters 0-36.
-       Note: The layout of immediate is value non_pointer.
+type bool_box = bool
 |}]
 
-type unit_box_bad : void box = unit
+type unit_box : void box = unit
 [%%expect{|
-Line 1, characters 0-35:
-1 | type unit_box_bad : void box = unit
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "unit" is value non_pointer
-         because it is the primitive type unit.
-       But the layout of type "unit" must be a sublayout of void box
-         because of the definition of unit_box_bad at line 1, characters 0-35.
-       Note: The layout of immediate is value non_pointer.
+type unit_box = unit
 |}]
 
-type float_box_bad : float64 box = float
+type float_box : float64 box = float
 [%%expect{|
-Line 1, characters 0-40:
-1 | type float_box_bad : float64 box = float
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "float" is value
-         because it is the primitive type float.
-       But the layout of type "float" must be a sublayout of float64 box
-         because of the definition of float_box_bad at line 1, characters 0-40.
+type float_box = float
 |}]
 
-type vec128_box_bad : vec128 box = int8x16
+type vec128_box : vec128 box = int8x16
 [%%expect{|
-Line 1, characters 0-42:
-1 | type vec128_box_bad : vec128 box = int8x16
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int8x16" is value non_float
-         because it is the primitive type int8x16.
-       But the layout of type "int8x16" must be a sublayout of vec128 box
-         because of the definition of vec128_box_bad at line 1, characters 0-42.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type vec128_box = int8x16
 |}]
 
-type vec256_box_bad : vec256 box = int8x32
+type vec256_box : vec256 box = int8x32
 [%%expect{|
-Line 1, characters 0-42:
-1 | type vec256_box_bad : vec256 box = int8x32
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int8x32" is value non_float
-         because it is the primitive type int8x32.
-       But the layout of type "int8x32" must be a sublayout of vec256 box
-         because of the definition of vec256_box_bad at line 1, characters 0-42.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type vec256_box = int8x32
 |}]
 
 type int8_immediate : immediate = int8
@@ -1955,11 +1890,10 @@ type not_an_int8_box : bits8 box = int
 Line 1, characters 0-38:
 1 | type not_an_int8_box : bits8 box = int
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int" is value non_pointer
+Error: The layout of type "int" is untagged_immediate box
          because it is the primitive type int.
        But the layout of type "int" must be a sublayout of bits8 box
          because of the definition of not_an_int8_box at line 1, characters 0-38.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 type not_an_addressable_box : bits8 addressable box = int8
@@ -1967,15 +1901,14 @@ type not_an_addressable_box : bits8 addressable box = int8
 Line 1, characters 0-58:
 1 | type not_an_addressable_box : bits8 addressable box = int8
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "int8" is value non_pointer
+Error: The layout of type "int8" is bits8 box
          because it is the primitive type int8.
        But the layout of type "int8" must be a sublayout of
            bits8 addressable box
          because of the definition of not_an_addressable_box at line 1, characters 0-58.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
-module Abstract_int8_box_bad : sig
+module Abstract_int8_box : sig
   type t : bits8 box
   val of_int8 : int8 -> t
   val to_int8 : t -> int8
@@ -1985,47 +1918,19 @@ end = struct
   let to_int8 x = x
 end
 [%%expect{|
-Lines 5-9, characters 6-3:
-5 | ......struct
-6 |   type t = int8
-7 |   let of_int8 x = x
-8 |   let to_int8 x = x
-9 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = int8 val of_int8 : 'a -> 'a val to_int8 : 'a -> 'a end
-       is not included in
-         sig
-           type t : bits8 box
-           val of_int8 : int8 -> t
-           val to_int8 : t -> int8
-         end
-       Type declarations do not match:
-         type t = int8
-       is not included in
-         type t : bits8 box
-       The layout of the first is value non_pointer
-         because it is the primitive type int8.
-       But the layout of the first must be a sublayout of bits8 box
-         because of the definition of t at line 2, characters 2-20.
-       Note: The layout of immediate is value non_pointer.
+module Abstract_int8_box :
+  sig type t : bits8 box val of_int8 : int8 -> t val to_int8 : t -> int8 end
 |}]
 
-let round_trip_int8_box_bad x =
-  x |> Abstract_int8_box_bad.of_int8 |> Stdlib.unbox |> Stdlib.box
-    |> Abstract_int8_box_bad.to_int8
+let round_trip_int8_box x =
+  x |> Abstract_int8_box.of_int8 |> Stdlib.unbox |> Stdlib.box
+    |> Abstract_int8_box.to_int8
 [%%expect{|
-Line 3, characters 7-28:
-3 |     |> Abstract_int8_box_bad.to_int8
-           ^^^^^^^^^^^^^^^^^^^^^
-Error: Unbound module "Abstract_int8_box_bad"
+val round_trip_int8_box : int8 -> int8 = <fun>
 |}]
 
-let round_trip_results_bad =
-  round_trip_int8_box_bad (-128s), round_trip_int8_box_bad 127s
+let round_trip_results =
+  round_trip_int8_box (-128s), round_trip_int8_box 127s
 [%%expect{|
-Line 2, characters 2-25:
-2 |   round_trip_int8_box_bad (-128s), round_trip_int8_box_bad 127s
-      ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Unbound value "round_trip_int8_box_bad"
+val round_trip_results : int8 * int8 = (-128s, 127s)
 |}]
