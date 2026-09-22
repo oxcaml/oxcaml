@@ -1550,7 +1550,7 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
 
 let cu_of_impl (gm : Global_module.t) : Compilation_unit.t =
   let impl, _params, _sig =
-    Env.find_import ~chain:[] (Global_module.to_name gm).Global_module.Name.head
+    Env.find_import ~chain:[] gm.head
   in
   match impl with
   | Some cu -> cu

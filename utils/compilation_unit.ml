@@ -230,7 +230,7 @@ module T0 : sig
 
   val create_full : Prefix.t -> Name.t -> argument list -> t
 
-  val of_global_name : Global_module.Name.t -> t
+  val of_complete_global : Global_module.t -> t
 
   val compare : t -> t -> int
 end = struct
@@ -252,10 +252,13 @@ end = struct
         { name : Name.t;
           for_pack_prefix : Prefix.t
         }
-    | Global of Global_module.Name.t
+    | Instance of
+        { name : Name.t;
+          arguments : argument list
+        }
 
   (* type t = Bare_name of Name.t [@@unboxed] | With_prefix of with_prefix |
-     Global of Global_module.Name.t *)
+     Instance of instance *)
   and t = Obj.t
 
   (* Some manual inlining is done here to ensure good performance under
@@ -268,17 +271,6 @@ end = struct
   let of_plain_name name : t = Obj.repr (name : Name.t)
 
   let of_full full : t = Obj.repr (full : full)
-
-  let of_global_name (glob : Global_module.Name.t) =
-    match glob with
-    | { head; args = [] } -> of_plain_name (Name.of_intf head)
-    | _ -> of_full (Global glob)
-
-  let convert_arguments l =
-    ListLabels.map
-      ~f:(fun ({ param; value } : Global_module.Name.argument) ->
-        { param = Name.of_parameter_name param; value = of_global_name value })
-      l
 
   let descr t =
     let tag = Obj.tag t in
@@ -294,9 +286,7 @@ end = struct
       match full with
       | With_prefix { name; for_pack_prefix } ->
         { name; for_pack_prefix; arguments = [] }
-      | Global { head; args } ->
-        let name = Name.of_intf head in
-        let arguments = convert_arguments args in
+      | Instance { name; arguments } ->
         { name; arguments; for_pack_prefix = Prefix.empty }
 
   let name t =
@@ -306,9 +296,7 @@ end = struct
     then Sys.opaque_identity (Obj.obj t : Name.t)
     else
       let full = Sys.opaque_identity (Obj.obj t : full) in
-      match full with
-      | With_prefix { name; _ } -> name
-      | Global { head; _ } -> Name.of_intf head
+      match full with With_prefix { name; _ } | Instance { name; _ } -> name
 
   let for_pack_prefix t =
     let tag = Obj.tag t in
@@ -319,7 +307,7 @@ end = struct
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
       | With_prefix { for_pack_prefix; _ } -> for_pack_prefix
-      | Global _ -> Prefix.empty
+      | Instance _ -> Prefix.empty
 
   let instance_arguments t =
     let tag = Obj.tag t in
@@ -330,7 +318,7 @@ end = struct
       let full = Sys.opaque_identity (Obj.obj t : full) in
       match full with
       | With_prefix _ -> []
-      | Global { args; _ } -> convert_arguments args
+      | Instance { arguments; _ } -> arguments
 
   let rec compare t1 t2 =
     if t1 == t2
@@ -362,7 +350,7 @@ end = struct
 
   let compare_argument_by_name arg1 arg2 = Name.compare arg1.param arg2.param
 
-  let to_global_name_exn t =
+  let rec to_global_name_exn t =
     if is_plain_name t
     then
       let name = Sys.opaque_identity (Obj.obj t : Name.t) in
@@ -372,15 +360,47 @@ end = struct
       match full with
       | With_prefix { name; _ } ->
         raise (Error (Packed_instance { name = name |> Name.to_string }))
-      | Global glob -> glob
+      | Instance { name; arguments } ->
+        let arguments =
+          ListLabels.map
+            ~f:(fun { param; value } : Global_module.Name.argument ->
+              { param = Name.to_parameter_name param;
+                value = to_global_name_exn value
+              })
+            arguments
+        in
+        Global_module.Name.create_exn (Name.to_intf name) arguments
 
   let to_global_name t =
     try Some (to_global_name_exn t) with Error (Packed_instance _) -> None
 
-  let of_global_name (name : Global_module.Name.t) =
-    match name with
-    | { head; args = [] } -> of_plain_name (head |> Name.of_intf)
-    | _ -> of_full (Global name)
+  let rec of_complete_global (global : Global_module.t) =
+    let name = Name.of_intf global.head in
+    match global.visible_args with
+    | [] -> of_plain_name name
+    | args ->
+      let arguments =
+        ListLabels.map args
+          ~f:(fun ({ param; value } : Global_module.argument) ->
+            { param = Name.of_parameter_name param;
+              value = of_complete_global value
+            })
+      in
+      of_full (Instance { name; arguments })
+
+  let rec check_arguments = function
+    | [] -> ()
+    | { param; value } :: rest ->
+      if not (Prefix.is_empty (for_pack_prefix value))
+      then
+        raise (Error (Packed_instance { name = Name.to_string (name value) }));
+      (match rest with
+      | next :: _ when Name.equal param next.param ->
+        Misc.fatal_errorf
+          "Names of instance arguments must be unique: duplicate %a"
+          (Fmt.compat Name.print) param
+      | _ -> ());
+      check_arguments rest
 
   let create_full for_pack_prefix name arguments =
     let empty_prefix = Prefix.is_empty for_pack_prefix in
@@ -402,17 +422,9 @@ end = struct
     if empty_prefix && empty_arguments
     then of_plain_name name
     else if empty_prefix
-    then
-      let head = Name.to_intf name in
-      let arguments =
-        ListLabels.map
-          ~f:(fun { param; value } : Global_module.Name.argument ->
-            { param = Name.to_parameter_name param;
-              value = to_global_name_exn value
-            })
-          arguments
-      in
-      of_full (Global (Global_module.Name.create_exn head arguments))
+    then (
+      check_arguments arguments;
+      of_full (Instance { name; arguments }))
     else of_full (With_prefix { for_pack_prefix; name })
 end
 
@@ -454,7 +466,7 @@ let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)
   then
     Misc.fatal_errorf_doc "of_complete_global_exn@ %a" Global_module.print glob;
-  of_global_name (glob |> Global_module.to_name)
+  of_complete_global glob
 
 let dummy = create Prefix.empty (Name.of_string "*none*")
 

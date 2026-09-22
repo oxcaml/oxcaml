@@ -164,7 +164,9 @@ the type)
   }
 
 Look at the errors: With -I liba, none.  With -H liba, an error on the direct
-reference.  With no liba, we also can't see Libb.t is int.
+reference.  With no liba, Libb.t is still seen to be int - liba.cmi is found
+through the cmi path attached in libb.cmi - but the direct reference to Liba
+remains unbound.
 
   $ $MERLIN single errors -I ../libb -I ../liba \
   >   -filename "libc.ml" < "libc.ml"
@@ -214,20 +216,6 @@ reference.  With no liba, we also can't see Libb.t is int.
   {
     "class": "return",
     "value": [
-      {
-        "start": {
-          "line": 3,
-          "col": 8
-        },
-        "end": {
-          "line": 3,
-          "col": 9
-        },
-        "type": "typer",
-        "sub": [],
-        "valid": true,
-        "message": "The value x has type t = Liba.t but an expression was expected of type int"
-      },
       {
         "start": {
           "line": 4,

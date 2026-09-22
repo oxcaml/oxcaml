@@ -464,7 +464,8 @@ let instance_name global =
        always global (which is bad - but the syntax is currently bad anyway) *)
     let ({ head; args } : Global_module.Name.t) = global in
     String.concat ""
-      (Compilation_unit_intf.to_string head :: List.map string_of_arg args)
+      (Compilation_unit_intf.to_string (Compilation_unit_intf.Found.intf head)
+       :: List.map string_of_arg args)
   and string_of_arg arg =
     let ({ param; value } : Global_module.Name.argument) = arg in
     Printf.sprintf "(%s)(%s)"
@@ -686,7 +687,8 @@ let rec normalize_type_path ?(cache=false) env p =
         && List.for_all2 eq_type params tyl
         then normalize_type_path ~cache env p1
         else if cache || List.length params <= List.length tyl
-             || not (uniq (List.map get_id tyl)) then (p, Id)
+             || not (uniq (List.map get_id tyl))
+        then (Env.normalize_type_path None env p, Id)
         else
           let l1 = List.map (index params) tyl in
           let (p2, s2) = normalize_type_path ~cache env p1 in
