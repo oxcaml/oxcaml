@@ -204,6 +204,8 @@
   parsetree ; mli only file
   ;; DRIVER
   pparse
+  compenv
+  makedepend
   ;; TYPING (these depend only on utils/, so live here to let
   ;; compilation_unit and symbol reference them)
   ident
@@ -355,9 +357,7 @@
   symtable
   ;; some of COMP
   main_args
-  compenv
   compmisc
-  makedepend
   compile_common
   instantiator
   functorizer
