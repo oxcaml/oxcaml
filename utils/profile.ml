@@ -58,12 +58,12 @@ module Measure = struct
     top_heap_words : int;
     counters : Counters.t;
   }
-  let create ?(counters = Counters.create ()) () =
+  let create ?(counters = Counters.create ()) cheap =
     let stat = Gc.quick_stat () in
     {
-      time = cpu_time ();
+      time = cheap ();
       calls = !calls;
-      allocated_words = stat.minor_words +. stat.major_words;
+      allocated_words = stat.minor_words +. stat.major_words; (* XXX -. stat.promoted_words and elsewhere *)
       top_heap_words = stat.top_heap_words;
       counters = counters;
     }
@@ -79,14 +79,16 @@ module Measure_diff = struct
     allocated_words : float;
     top_heap_words_increase : int;
     counters : Counters.t;
+    cpu_time : unit -> float;
   }
-  let zero () = {
+  let zero cpu_time = {
     timestamp = timestamp ();
     calls = 0;
     duration = 0.;
     allocated_words = 0.;
     top_heap_words_increase = 0;
     counters = Counters.create ();
+    cpu_time;
   }
   let accumulate t (m1 : Measure.t) (m2 : Measure.t) = {
     timestamp = t.timestamp;
@@ -96,10 +98,11 @@ module Measure_diff = struct
       t.allocated_words +. (m2.allocated_words -. m1.allocated_words);
     top_heap_words_increase =
       t.top_heap_words_increase + (m2.top_heap_words - m1.top_heap_words);
-    counters = Counters.union t.counters m2.counters
+    counters = Counters.union t.counters m2.counters;
+    cpu_time = t.cpu_time
   }
   let of_diff m1 m2 =
-    accumulate (zero ()) m1 m2
+    accumulate (zero cpu_time) m1 m2
 end
 
 type hierarchy =
@@ -107,15 +110,14 @@ type hierarchy =
 [@@unboxed]
 
 let create () = E (Hashtbl.create 2)
-let hierarchy = ref (create ())
+let hierarchy = ref (cpu_time, create ())
 let initial_measure = ref None
-let reset () = hierarchy := create (); initial_measure := None
+let reset () = hierarchy := cpu_time, create (); initial_measure := None
 
-let record_call_internal ?(accumulate = false) ?counter_f name f =
+let record_call_internal ?(accumulate = false) ?cheap ?counter_f name f =
   if !Clflags.profile_columns = [] then f () else
-  let E prev_hierarchy = !hierarchy in
-  let start_measure = Measure.create () in
-  if !initial_measure = None then initial_measure := Some start_measure;
+  let last_time, E prev_hierarchy = !hierarchy in
+  let cpu_time = Option.value ~default:last_time cheap in
   let this_measure_diff, this_table =
     (* We allow the recording of multiple categories by the same name, for tools
        like ocamldoc that use the compiler libs but don't care about profile
@@ -123,13 +125,15 @@ let record_call_internal ?(accumulate = false) ?counter_f name f =
     if accumulate
     then
       match Hashtbl.find prev_hierarchy name with
-      | exception Not_found -> Measure_diff.zero (), Hashtbl.create 2
+      | exception Not_found -> Measure_diff.zero cpu_time, Hashtbl.create 2
       | measure_diff, E table ->
         Hashtbl.remove prev_hierarchy name;
         measure_diff, table
-    else Measure_diff.zero (), Hashtbl.create 2
+    else Measure_diff.zero cpu_time, Hashtbl.create 2
   in
-  hierarchy := E this_table;
+  let start_measure = Measure.create cpu_time in
+  if !initial_measure = None then initial_measure := Some start_measure;
+  hierarchy := cpu_time, E this_table;
   let counters = ref (Counters.create ()) in
   Misc.try_finally (
     match counter_f with
@@ -142,8 +146,8 @@ let record_call_internal ?(accumulate = false) ?counter_f name f =
     | None -> f
     )
     ~always:(fun () ->
-        hierarchy := E prev_hierarchy;
-        let end_measure = Measure.create ~counters:(!counters) () in
+        hierarchy := cpu_time, E prev_hierarchy;
+        let end_measure = Measure.create ~counters:(!counters) cpu_time in
         let measure_diff =
           Measure_diff.accumulate this_measure_diff start_measure end_measure in
         Hashtbl.add prev_hierarchy name (measure_diff, E this_table))
@@ -153,7 +157,7 @@ let record_call = record_call_internal ?counter_f:None
 let record_call_with_counters ?accumulate ~counter_f =
   record_call_internal ?accumulate ~counter_f
 
-let record ?accumulate pass f x = record_call ?accumulate pass (fun () -> f x)
+let record ?accumulate ?cheap pass f x = record_call ?accumulate ?cheap pass (fun () -> f x)
 
 let record_with_counters ?accumulate ~counter_f pass f x =
   record_call_internal ?accumulate ~counter_f pass (fun () -> f x)
@@ -254,6 +258,8 @@ let compute_other_category (E table : hierarchy) (total : Measure_diff.t) =
       top_heap_words_increase =
         p1.top_heap_words_increase - p2.top_heap_words_increase;
       counters = Counters.create ();
+      (* XXX This the wrong cpu_time - it should be threaded from hierarchy *)
+      cpu_time;
     }
   ) table;
   !r
@@ -395,8 +401,9 @@ let output_columns output_rows_f columns ~timings_precision =
        | Some v -> v
        | None -> Measure.zero
      in
-     let total = Measure_diff.of_diff Measure.zero (Measure.create ()) in
-     output_rows_f (rows_of_hierarchy !hierarchy total initial_measure columns timings_precision)
+     (* XXX This the wrong cpu_time - it should come from hierarchy *)
+     let total = Measure_diff.of_diff Measure.zero (Measure.create cpu_time) in
+     output_rows_f (rows_of_hierarchy (snd !hierarchy) total initial_measure columns timings_precision)
 
 let print ppf =
   output_rows
