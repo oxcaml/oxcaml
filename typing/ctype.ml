@@ -6637,14 +6637,14 @@ let path_same_normalized env p1 p2 =
 
 exception Complicated_moregen
 
-(* The fast-path counterpart of [moregen_mode_with_locality]. It performs the
-   same variance-directed submode checks but without mode crossing, so it
-   never needs to consult a type (the subject's types are unsubstituted here,
-   and looking their paths up in [env] would fail or do wasted work). Crossing
-   can only widen the subject's mode, so anything accepted here is accepted
-   by the slow path. On failure we neither tighten the modes nor build an
-   error: the slow path will do both. [submode] does not mutate on failure,
-   and its successful constraints are logged, so [backtrack] undoes them. *)
+(* The fast-path counterpart of [moregen_mode_with_locality] for the case
+   where both modes are constants. It performs the same variance-directed
+   submode checks but without mode crossing, so it never needs to consult a
+   type. Crossing can only widen the subject's mode, so anything accepted here
+   is accepted by the slow path; and as the modes are constants, a successful
+   check imposes no constraints, so it cannot differ from the slow path in
+   its effects either. On failure we neither tighten the modes nor build an
+   error: the slow path will do both. *)
 let moregen_mode_fast v a1 a2 =
   let ok =
     match v with
@@ -6710,14 +6710,32 @@ let moregeneral_fast env patt subst subj =
          begin match variance with
          | None -> raise_notrace Complicated_moregen
          | Some variance ->
-           (* bail out for mode variables to avoid copying them *)
+           (* Bail out for generic mode variables: the slow path instantiates
+              them (the pattern's as fresh copies, the subject's as rigid
+              ones) and we do not want to copy. *)
            if With_locality.check_generic a1
               || With_locality.check_generic r1
               || With_locality.check_generic a2
               || With_locality.check_generic r2
            then raise_notrace Complicated_moregen;
-           moregen_mode_fast (neg_variance variance) a1 a2;
-           moregen_mode_fast variance r1 r2;
+           let is_const m =
+             Option.is_some (With_locality.Guts.check_const_conservative m)
+           in
+           let mode_check ~is_ret ty v m1 m2 =
+             if is_const m1 && is_const m2
+             then moregen_mode_fast v m1 m2
+             else
+               (* A weak mode variable is involved, so a successful check
+                  will constrain it, and those constraints must be exactly
+                  the slow path's: they are visible to later checks (e.g. of
+                  the value's own mode). That requires mode crossing on the
+                  interface type with its paths substituted, so substitute
+                  just this subtree. *)
+               moregen_mode_with_locality env (Subst.type_expr subst ty)
+                 ~is_ret v m1 m2
+           in
+           mode_check ~is_ret:false t2 (neg_variance variance) a1 a2;
+           mode_check ~is_ret:true u2 variance r1 r2;
            mgen (Some (neg_variance variance)) t1 t2;
            mgen (Some variance) u1 u2
          end
@@ -6761,7 +6779,8 @@ let moregeneral_fast env patt subst subj =
     in
     match mgen (Some Covariant) patt subj with
     | () -> true
-    | exception Complicated_moregen -> backtrack snap; false)
+    | exception (Complicated_moregen | Moregen_trace _) ->
+      backtrack snap; false)
 
 let may_instantiate inst_nongen t1 =
   let level = get_level t1 in

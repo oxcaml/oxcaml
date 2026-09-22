@@ -1066,6 +1066,12 @@ module type S = sig
           [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)
       val check_const : (allowed * allowed) t -> Const.t option
 
+      (** Similar to [check_const] but doesn't run the further constraining
+          needed for precise bounds. As a result, it is inexpensive and returns
+          a conservative result. I.e., it might return [None] for
+          fully-constrained modes. *)
+      val check_const_conservative : ('l * 'r) t -> Const.t option
+
       (** Returns the precise ceiling of a mode. see notes on [get_ceil] in
           [solver_intf.mli] for cautions. *)
       val get_ceil : ('l * allowed) t -> Const.t
