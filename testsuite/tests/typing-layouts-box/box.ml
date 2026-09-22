@@ -1737,6 +1737,14 @@ Error: Unbound module type "Abstract_box_equation_bad"
 
 let unbox_locally_abstract_bad (type a : (value & float64) box)
     (x : a) : a# = Stdlib.unbox x
+let box_locally_abstract_bad (type a : (value & float64) box)
+    (x : a#) : a = Stdlib.box x
+let both_locally_abstract_bad (type a : (value & float64) box)
+    (x : a) : #(a * a# * a#) =
+  #(x, Stdlib.unbox x, Stdlib.unbox x)
+let portable_locally_abstract_bad
+    (type a : (value & float64) box mod portable) (x : a) : a# =
+  Stdlib.unbox x
 [%%expect{|
 Line 2, characters 14-16:
 2 |     (x : a) : a# = Stdlib.unbox x
