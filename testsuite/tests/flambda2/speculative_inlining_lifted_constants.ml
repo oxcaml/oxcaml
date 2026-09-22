@@ -4,12 +4,33 @@
 
    ocamlopt_flags += " -flambda2-inline-small-function-size 0";
    ocamlopt_flags += " -flambda2-inline-threshold 0";
-   ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants";
    ocamlopt_flags += " -no-flambda2-speculative-inlining-only-if-arguments-useful";
 
-   setup-ocamlopt.byte-build-env;
-   ocamlopt.byte with dump-raw, dump-simplify;
-   check-fexpr-dump;
+   {
+     ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functions";
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte with dump-raw, dump-simplify;
+     check-fexpr-dump;
+   }{
+     ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functors";
+     ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functions";
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte with dump-simplify;
+     check-fexpr-dump;
+   }{
+     ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functions";
+     ocamlopt_flags += " -flambda2-speculative-inlining-track-lifted-constants-for-functors";
+     ocamlopt_flags += " -no-flambda2-speculative-inlining-track-lifted-constants-for-functions";
+     fexpr_reference_suffix = "untracked.reference";
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte with dump-simplify;
+     check-fexpr-dump;
+   }{
+     fexpr_reference_suffix = "untracked.reference";
+     setup-ocamlopt.byte-build-env;
+     ocamlopt.byte with dump-simplify;
+     check-fexpr-dump;
+   }
  *)
 
 [@@@ocaml.flambda_o3]

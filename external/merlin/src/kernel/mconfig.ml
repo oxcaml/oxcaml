@@ -550,7 +550,8 @@ let ocaml_ignored_flags =
     "-flambda2-result-types-all-functions";
     "-flambda2-result-types-functors-only";
     "-flambda2-speculative-inlining-only-if-arguments-useful";
-    "-flambda2-speculative-inlining-track-lifted-constants";
+    "-flambda2-speculative-inlining-track-lifted-constants-for-functors";
+    "-flambda2-speculative-inlining-track-lifted-constants-for-functions";
     "-flambda2-unbox-along-intra-function-control-flow";
     "-flambda2-unicode";
     "-flambda2-kind-checks";
@@ -566,7 +567,8 @@ let ocaml_ignored_flags =
     "-no-flambda2-expert-phantom-lets";
     "-no-flambda2-join-points";
     "-no-flambda2-speculative-inlining-only-if-arguments-useful";
-    "-no-flambda2-speculative-inlining-track-lifted-constants";
+    "-no-flambda2-speculative-inlining-track-lifted-constants-for-functors";
+    "-no-flambda2-speculative-inlining-track-lifted-constants-for-functions";
     "-no-flambda2-unbox-along-intra-function-control-flow";
     "-ocamlcfg";
     "-no-ocamlcfg";

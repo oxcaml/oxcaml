@@ -1078,25 +1078,47 @@ let mk_no_flambda2_speculative_inlining_only_if_arguments_useful f =
          Flambda2.Inlining.Default.speculative_inlining_only_if_arguments_useful)
   )
 
-let mk_flambda2_speculative_inlining_track_lifted_constants f =
-  ( "-flambda2-speculative-inlining-track-lifted-constants",
+let mk_flambda2_speculative_inlining_track_lifted_constants_for_functors f =
+  ( "-flambda2-speculative-inlining-track-lifted-constants-for-functors",
     Arg.Unit f,
     Printf.sprintf
-      " Track the size of lifted constants when doing speculative inlining%s\n\
+      " Track the size of lifted constants when doing speculative\n\
+      \    inlining of functors%s\n\
       \    (Flambda 2 only)"
       (format_default
-         Flambda2.Inlining.Default.speculative_inlining_track_lifted_constants)
-  )
+         Flambda2.Inlining.Default
+         .speculative_inlining_track_lifted_constants_for_functors) )
 
-let mk_no_flambda2_speculative_inlining_track_lifted_constants f =
-  ( "-no-flambda2-speculative-inlining-track-lifted-constants",
+let mk_flambda2_speculative_inlining_track_lifted_constants_for_functions f =
+  ( "-flambda2-speculative-inlining-track-lifted-constants-for-functions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Track the size of lifted constants when doing speculative\n\
+      \    inlining of functions%s\n\
+      \    (Flambda 2 only)"
+      (format_default
+         Flambda2.Inlining.Default
+         .speculative_inlining_track_lifted_constants_for_functions) )
+
+let mk_no_flambda2_speculative_inlining_track_lifted_constants_for_functors f =
+  ( "-no-flambda2-speculative-inlining-track-lifted-constants-for-functors",
     Arg.Unit f,
     Printf.sprintf
       " Do not track the size of lifted constants when doing speculative\n\
-      \    inlining%s (Flambda 2 only)"
+      \    inlining of functors%s (Flambda 2 only)"
       (format_not_default
-         Flambda2.Inlining.Default.speculative_inlining_track_lifted_constants)
-  )
+         Flambda2.Inlining.Default
+         .speculative_inlining_track_lifted_constants_for_functors) )
+
+let mk_no_flambda2_speculative_inlining_track_lifted_constants_for_functions f =
+  ( "-no-flambda2-speculative-inlining-track-lifted-constants-for-functions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Do not track the size of lifted constants when doing speculative\n\
+      \    inlining of functions%s (Flambda 2 only)"
+      (format_not_default
+         Flambda2.Inlining.Default
+         .speculative_inlining_track_lifted_constants_for_functions) )
 
 let mk_flambda2_inlining_report_bin f =
   ( "-flambda2-inlining-report-bin",
@@ -1474,8 +1496,19 @@ module type Oxcaml_options = sig
   val flambda2_inline_threshold : string -> unit
   val flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
   val no_flambda2_speculative_inlining_only_if_arguments_useful : unit -> unit
-  val flambda2_speculative_inlining_track_lifted_constants : unit -> unit
-  val no_flambda2_speculative_inlining_track_lifted_constants : unit -> unit
+
+  val flambda2_speculative_inlining_track_lifted_constants_for_functors :
+    unit -> unit
+
+  val flambda2_speculative_inlining_track_lifted_constants_for_functions :
+    unit -> unit
+
+  val no_flambda2_speculative_inlining_track_lifted_constants_for_functors :
+    unit -> unit
+
+  val no_flambda2_speculative_inlining_track_lifted_constants_for_functions :
+    unit -> unit
+
   val flambda2_inlining_report_bin : unit -> unit
   val flambda2_unicode : unit -> unit
   val flambda2_kind_checks : unit -> unit
@@ -1701,10 +1734,14 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_speculative_inlining_only_if_arguments_useful;
       mk_no_flambda2_speculative_inlining_only_if_arguments_useful
         F.no_flambda2_speculative_inlining_only_if_arguments_useful;
-      mk_flambda2_speculative_inlining_track_lifted_constants
-        F.flambda2_speculative_inlining_track_lifted_constants;
-      mk_no_flambda2_speculative_inlining_track_lifted_constants
-        F.no_flambda2_speculative_inlining_track_lifted_constants;
+      mk_flambda2_speculative_inlining_track_lifted_constants_for_functors
+        F.flambda2_speculative_inlining_track_lifted_constants_for_functors;
+      mk_flambda2_speculative_inlining_track_lifted_constants_for_functions
+        F.flambda2_speculative_inlining_track_lifted_constants_for_functions;
+      mk_no_flambda2_speculative_inlining_track_lifted_constants_for_functors
+        F.no_flambda2_speculative_inlining_track_lifted_constants_for_functors;
+      mk_no_flambda2_speculative_inlining_track_lifted_constants_for_functions
+        F.no_flambda2_speculative_inlining_track_lifted_constants_for_functions;
       mk_flambda2_inlining_report_bin F.flambda2_inlining_report_bin;
       mk_flambda2_unicode F.flambda2_unicode;
       mk_flambda2_kind_checks F.flambda2_kind_checks;
@@ -2271,11 +2308,23 @@ module Oxcaml_options_impl = struct
   let no_flambda2_speculative_inlining_only_if_arguments_useful =
     clear' Flambda2.Inlining.speculative_inlining_only_if_arguments_useful
 
-  let flambda2_speculative_inlining_track_lifted_constants =
-    set' Flambda2.Inlining.speculative_inlining_track_lifted_constants
+  let flambda2_speculative_inlining_track_lifted_constants_for_functors =
+    set'
+      Flambda2.Inlining.speculative_inlining_track_lifted_constants_for_functors
 
-  let no_flambda2_speculative_inlining_track_lifted_constants =
-    clear' Flambda2.Inlining.speculative_inlining_track_lifted_constants
+  let flambda2_speculative_inlining_track_lifted_constants_for_functions =
+    set'
+      Flambda2.Inlining
+      .speculative_inlining_track_lifted_constants_for_functions
+
+  let no_flambda2_speculative_inlining_track_lifted_constants_for_functors =
+    clear'
+      Flambda2.Inlining.speculative_inlining_track_lifted_constants_for_functors
+
+  let no_flambda2_speculative_inlining_track_lifted_constants_for_functions =
+    clear'
+      Flambda2.Inlining
+      .speculative_inlining_track_lifted_constants_for_functions
 
   let flambda2_inlining_report_bin = set' Flambda2.Inlining.report_bin
   let flambda2_unicode = set Flambda2.unicode
@@ -2742,8 +2791,14 @@ module Extra_params = struct
         true
     | "flambda2-speculative-inlining-only-if-arguments-useful" ->
         set' Flambda2.Inlining.speculative_inlining_only_if_arguments_useful
-    | "flambda2-speculative-inlining-track-lifted-constants" ->
-        set' Flambda2.Inlining.speculative_inlining_track_lifted_constants
+    | "flambda2-speculative-inlining-track-lifted-constants-for-functors" ->
+        set'
+          Flambda2.Inlining
+          .speculative_inlining_track_lifted_constants_for_functors
+    | "flambda2-speculative-inlining-track-lifted-constants-for-functions" ->
+        set'
+          Flambda2.Inlining
+          .speculative_inlining_track_lifted_constants_for_functions
     | "flambda2-inlining-report-bin" -> set' Flambda2.Inlining.report_bin
     | "flambda2-expert-fallback-inlining-heuristic" ->
         set Flambda2.Expert.fallback_inlining_heuristic

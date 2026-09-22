@@ -43,7 +43,11 @@ module UE = Upwards_env
 module FT = Flambda2_types.Function_type
 
 let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
-    =
+    ~is_a_functor =
+  let track_lifted_constants =
+    Flambda_features.Inlining.speculative_inlining_track_lifted_constants
+      ~is_a_functor
+  in
   let dacc = DA.prepare_for_speculative_inlining dacc in
   (* CR-someday poechsel: [Inlining_transforms.inline] is preparing the body for
      inlining. Right know it may be called twice (once there and once in
@@ -119,12 +123,13 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
               return_arity
         in
         let uacc =
-          UA.create ~flow_result ~compute_slot_offsets:false uenv dacc
+          UA.create ~track_lifted_constants ~flow_result
+            ~compute_slot_offsets:false uenv dacc
         in
         rebuild uacc ~after_rebuild:(fun expr uacc -> expr, uacc))
   in
   let cost_metrics_of_lifted_constants =
-    if Flambda_features.Inlining.speculative_inlining_track_lifted_constants ()
+    if track_lifted_constants
     then
       (* If we are not at toplevel, there might still be lifted constants to be
          placed in the accumulator whose size must be taken into account for
@@ -287,7 +292,7 @@ let might_inline dacc ~apply ~code_metadata ~function_type ~simplify_expr
         else
           let cost_metrics =
             speculative_inlining ~apply dacc ~simplify_expr ~return_arity
-              ~function_type
+              ~function_type ~is_a_functor
           in
           let inlining_args =
             Inlining_arguments.combine
