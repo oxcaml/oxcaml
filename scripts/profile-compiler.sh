@@ -88,9 +88,11 @@ dune build \
   stdlib/.stdlib.objs/native/std_exit.cmx
 
 # Make memtrace data (machine-)readable:
+dune build --workspace duneconf/boot.ws external/memtrace/bin/dump_trace.exe
 for trace in "${output}"/alloc.*.ctf
 do
-  memtrace_dump_trace "$trace" > "${trace%.ctf}.txt"
+  "$root/_build/default/external/memtrace/bin/dump_trace.exe" "$trace" \
+    > "${trace%.ctf}.txt"
 done
 
 # Print a summary:
