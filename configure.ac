@@ -91,7 +91,20 @@ AS_IF([test x"$enable_optional_checks" != 'xno'], [
                                but $ocamlopt_version was found]))])
 ])
 
-AC_MSG_NOTICE([Using OCaml $ocamlopt_version])
+# Both compilers are used in the boot workspace, which requires OxCaml flags.
+for compiler in ocamlc ocamlopt; do
+  AC_MSG_CHECKING([whether $compiler supports the required extension universe])
+  AS_IF([PATH="$tool_search_path" "$compiler" \
+           -extension-universe upstream_compatible -version >/dev/null 2>&1],
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+     AC_MSG_ERROR(m4_normalize([
+       An OxCaml bootstrap compiler is required: $compiler must accept
+       -extension-universe upstream_compatible. Install the dependencies in
+       oxcaml-dev.opam and activate that switch, or use --with-opam-switch.]))])
+done
+
+AC_MSG_NOTICE([Using OxCaml $ocamlopt_version])
 
 AC_PATH_PROG([dune], [dune], [], [$tool_search_path])
 

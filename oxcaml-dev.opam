@@ -17,15 +17,16 @@ bug-reports: "https://github.com/oxcaml/oxcaml/issues"
 depends: [
   # The ocaml, dune and menhir constraints need to be kept in sync with
   # configure.ac and default.nix
-  "ocaml" {>= "5.4.0~~" & < "5.5.0~~"}
+  "oxcaml" {>= "5.4.0-ox8"}
 
   # This should match dune-project; the effective version will usually be higher
   "dune" {>= "3.23.0"}
   "menhir" {= "20231231"}
-  "ocamlformat" {= "0.29.0"}
 
-  "merlin"
-  "ocaml-lsp-server"
+  # CR mslater: reenable
+  # "ocamlformat" {= "0.29.0"}
+  # "merlin"
+  # "ocaml-lsp-server"
 ]
 # The upstream compiler used for building OxCaml should not be configured with
 # any of these options.

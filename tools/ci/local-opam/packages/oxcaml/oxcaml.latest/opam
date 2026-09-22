@@ -1,0 +1,19 @@
+opam-version: "2.0"
+synopsis: "OxCaml release selector for the CI bootstrap"
+maintainer: "oxcaml-team"
+authors: "Xavier Leroy and many contributors"
+license: "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception"
+homepage: "https://oxcaml.org"
+bug-reports: "https://github.com/oxcaml/oxcaml/issues"
+dev-repo: "git+https://github.com/oxcaml/oxcaml.git"
+# The public release selector does not yet allow this bootstrap release.
+depends: ["oxcaml-compiler" {= "5.4.0-ox8"}]
+install: [
+  ["sh" "./write-config.sh" name
+    "-v" "release:string" oxcaml-compiler:release
+    "-v" "commit:string" oxcaml-compiler:commit]
+]
+extra-source "write-config.sh" {
+  src: "https://raw.githubusercontent.com/dra27/mingw-w64-shims/refs/tags/1.0.1/write-config.sh"
+  checksum: "sha256=b6cc5f98c2cfc23a7bc7774038621a2e7e7b94ed3d3080db40bc455a2575fc7a"
+}

@@ -21,7 +21,8 @@ define dune_boot_context
   (name default)
   (profile dev)
   (env (_
-    (flags (:standard -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
+    (flags (:standard -warn-error +A -extension-universe upstream_compatible
+			-alert -unsafe_multidomain -alert -unsafe_effects))
     (env-vars
       ("OCAMLPARAM" "")
 
