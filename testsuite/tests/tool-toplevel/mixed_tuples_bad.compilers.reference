@@ -1,0 +1,26 @@
+val mixed : float# * string * int64_u * int * unit# * int8# * int16# =
+  <abstr>
+val numbers :
+  int32_u * nativeint_u * float32_u * float# * int64_u * int8# * int16# =
+  <abstr>
+val labeled : left:float# * name:string * empty:unit# * right:int64_u =
+  <abstr>
+val nested : (float# * string) * int64_u * (int * float32_u) = <abstr>
+val empty : unit# * unit# = <abstr>
+val one_slot : unit# * int64_u * unit# = <abstr>
+val boxed_float : int64_u * float * float# = <abstr>
+val nullable :
+  ('a : value_maybe_separable).
+    float# * 'a or_null * string or_null * int64_u =
+  <abstr>
+type singleton = #{ scalar : float#; }
+val singleton : singleton * string * int64_u = <abstr>
+val make_mixed : 'a -> float# * 'a * int64_u = <fun>
+- : float# * int list * int64_u = <abstr>
+type cycle = { mutable next : (float# * cycle) option; }
+val cycle : cycle = {next = None}
+- : unit = ()
+- : cycle = {next = Some <abstr>}
+- : (float# * string) * int64_u * (int * float32_u) = <abstr>
+- : float# * string * int64_u * int * unit# * int8# * int16# = <abstr>
+

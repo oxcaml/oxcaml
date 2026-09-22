@@ -1,0 +1,29 @@
+val mixed : float# * string * int64_u * int * unit# * int8# * int16# =
+  (#3.25, "middle", -#42L, 7, #(), -#12s, -#300S)
+val numbers :
+  int32_u * nativeint_u * float32_u * float# * int64_u * int8# * int16# =
+  (-#1l, #2n, #3.5s, -#4.5, #5L, -#6s, #7S)
+val labeled : left:float# * name:string * empty:unit# * right:int64_u =
+  (~left:#1.25, ~name:"tuple", ~empty:#(), ~right:#2L)
+val nested : (float# * string) * int64_u * (int * float32_u) =
+  ((#1.5, "inner"), #2L, (3, #4.5s))
+val empty : unit# * unit# = (#(), #())
+val one_slot : unit# * int64_u * unit# = (#(), #42L, #())
+val boxed_float : int64_u * float * float# = (#1L, 2.5, #3.5)
+val nullable :
+  ('a : value_maybe_separable).
+    float# * 'a or_null * string or_null * int64_u =
+  (#1.5, Null, This "value", #2L)
+type singleton = #{ scalar : float#; }
+val singleton : singleton * string * int64_u =
+  (#{scalar = #3.5}, "singleton", #4L)
+val make_mixed : 'a -> float# * 'a * int64_u = <fun>
+- : float# * int list * int64_u = (#1.5, [1; 2], #2L)
+type cycle = { mutable next : (float# * cycle) option; }
+val cycle : cycle = {next = None}
+- : unit = ()
+- : cycle = {next = Some (#1.5, <cycle>)}
+- : (float# * string) * int64_u * (int * float32_u) =
+((#1.5, "inner"), #2L, (3, #4.5s))
+- : float# * string * int64_u * int * unit# * int8# * int16# = (#3.25, ...)
+
