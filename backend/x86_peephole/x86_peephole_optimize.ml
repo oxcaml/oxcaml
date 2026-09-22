@@ -14,8 +14,8 @@ let optimize_from_cell start =
     (fun () ->
       let rec optimize cell_opt =
         match cell_opt with
-        | None -> ()
-        | Some cell -> (
+        | Misc.Or_null.Null -> ()
+        | Misc.Or_null.This cell -> (
           if U.is_hard_barrier (DLL.value cell)
           then optimize (DLL.next cell)
           else

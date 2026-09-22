@@ -38,9 +38,9 @@ let function_slots_to_be_built ~(uses : Unboxing_analysis.result) ~code_changes
         match function_slot_rewrites with
         | None -> slot
         | Some function_slot_rewrites -> (
-          match Function_slot.Map.find_opt slot function_slot_rewrites with
-          | Some function_slot -> function_slot
-          | None ->
+          match Function_slot.Map.find_or_null slot function_slot_rewrites with
+          | This function_slot -> function_slot
+          | Null ->
             Misc.fatal_errorf "Could not find rewritten function slot for %a"
               Function_slot.print slot)
       in

@@ -148,9 +148,9 @@ type 'a make_operation =
 let make_spill : type a. a make_operation =
  fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg =
-    match Reg.Tbl.find_or_null stack_subst old_reg with
-    | This stack_reg -> stack_reg
-    | Null ->
+    match Reg.Tbl.find stack_subst old_reg with
+    | stack_reg -> stack_reg
+    | exception Not_found ->
       let slots = State.stack_slots state in
       let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
@@ -184,11 +184,11 @@ let rec insert_spills_or_reloads_in_block :
     insert:(Instruction.t DLL.cell -> Instruction.t -> Reg.t -> unit) ->
     copy_default:Instruction.t ->
     add_default:(Instruction.t DLL.t -> Instruction.t -> Reg.t -> unit) ->
-    move_cell:(Instruction.t DLL.cell -> Instruction.t DLL.cell option) ->
+    move_cell:(Instruction.t DLL.cell -> Instruction.t DLL.cell Misc.Or_null.t) ->
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
-    Instruction.t DLL.cell option ->
+    Instruction.t DLL.cell Misc.Or_null.t ->
     Reg.Set.t ->
     unit =
  fun state ~instr_id ~make_spill_or_reload ~occur_check ~insert ~copy_default
@@ -198,7 +198,7 @@ let rec insert_spills_or_reloads_in_block :
   | true -> ()
   | false -> (
     match cell with
-    | None ->
+    | Misc.Or_null.Null ->
       Reg.Set.iter
         (fun old_reg ->
           let new_reg = Substitution.apply_reg block_subst old_reg in
@@ -208,7 +208,7 @@ let rec insert_spills_or_reloads_in_block :
           in
           add_default block.body spill_or_reload new_reg)
         live_at_interesting_point
-    | Some cell ->
+    | Misc.Or_null.This cell ->
       let live_at_interesting_point =
         Reg.Set.filter
           (fun old_reg ->
@@ -243,7 +243,7 @@ let insert_spills_in_block :
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
-    Instruction.t DLL.cell option ->
+    Instruction.t DLL.cell Misc.Or_null.t ->
     Reg.Set.t ->
     unit =
  fun state ~instr_id ~block_subst ~stack_subst block cell
@@ -255,8 +255,8 @@ let insert_spills_in_block :
       Insert_skipping_name_for_debugger.insert_after cell instr ~reg)
     ~copy_default:
       (match DLL.hd block.body with
-      | None -> dummy_instr_of_terminator block.terminator
-      | Some hd -> hd)
+      | Misc.Or_null.Null -> dummy_instr_of_terminator block.terminator
+      | Misc.Or_null.This hd -> hd)
     ~add_default:(fun list instr reg ->
       (* See comment before Insert_skipping_name_for_debugger *)
       Insert_skipping_name_for_debugger.add_begin list instr ~reg)
@@ -292,9 +292,9 @@ let insert_spills :
 let make_reload : type a. a make_operation =
  fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg : Reg.t =
-    match Reg.Tbl.find_or_null stack_subst old_reg with
-    | This stack_reg -> stack_reg
-    | Null ->
+    match Reg.Tbl.find stack_subst old_reg with
+    | stack_reg -> stack_reg
+    | exception Not_found ->
       let slots = State.stack_slots state in
       let slot = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack = Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg in
@@ -317,7 +317,7 @@ let insert_reloads_in_block :
     block_subst:Substitution.t ->
     stack_subst:Substitution.t ->
     Cfg.basic_block ->
-    Instruction.t DLL.cell option ->
+    Instruction.t DLL.cell Misc.Or_null.t ->
     Reg.Set.t ->
     unit =
  fun state ~instr_id ~block_subst ~stack_subst block cell

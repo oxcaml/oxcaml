@@ -13,7 +13,7 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val choose_and_remove : t -> e option
+  val choose_and_remove : t -> e Misc.Or_null.t
 
   val add : t -> e -> unit
 
@@ -122,11 +122,11 @@ module Make (T : OrderedTypeWithDummy) : S with type e = T.t = struct
 
   let choose_and_remove t =
     if Int.equal t.length 0
-    then None
+    then Misc.Or_null.Null
     else
       let idx = pred t.length in
       t.length <- idx;
-      let res = Some (Array.unsafe_get t.array idx) in
+      let res = Misc.Or_null.This (Array.unsafe_get t.array idx) in
       Array.unsafe_set t.array idx T.dummy;
       res
 

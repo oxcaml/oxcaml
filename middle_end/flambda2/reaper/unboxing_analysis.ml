@@ -1106,8 +1106,8 @@ let compute_code_changes uses ~rewrite_kind_with_subkind ~rewrite_result_types
     code_deps
 
 let get_calling_convention_change t code_id =
-  match Code_id.Map.find_opt code_id t with
-  | None ->
+  match Code_id.Map.find_or_null code_id t with
+  | Null ->
     if Current_unit.is_current (Code_id.get_compilation_unit code_id)
     then
       Misc.fatal_errorf
@@ -1115,7 +1115,7 @@ let get_calling_convention_change t code_id =
          missing in code changes"
         Code_id.print code_id
     else Not_changing_calling_convention
-  | Some code_change -> code_change.calling_convention_change
+  | This code_change -> code_change.calling_convention_change
 
 let is_changing_calling_convention t code_id =
   match get_calling_convention_change t code_id with
@@ -1128,10 +1128,10 @@ let get_code_metadata t code_id =
     Misc.fatal_errorf
       "[get_code_metadata]: code_id %a is not from the current unit"
       Code_id.print code_id;
-  match Code_id.Map.find_opt code_id t with
-  | None ->
+  match Code_id.Map.find_or_null code_id t with
+  | Null ->
     Misc.fatal_errorf
       "[get_code_metadata]: code_id %a is in current unit but missing in code \
        changes"
       Code_id.print code_id
-  | Some code_change -> code_change.code_metadata
+  | This code_change -> code_change.code_metadata

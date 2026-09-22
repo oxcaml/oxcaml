@@ -149,8 +149,8 @@ end
 
 let first_instruction_id (block : Cfg.basic_block) : InstructionId.t =
   match DLL.hd block.body with
-  | None -> block.terminator.id
-  | Some instr -> instr.id
+  | Misc.Or_null.Null -> block.terminator.id
+  | Misc.Or_null.This instr -> instr.id
 
 type cfg_infos =
   { arg : Reg.Set.t;
@@ -300,8 +300,8 @@ module Insert_skipping_name_for_debugger = struct
   let rec find_insertion_point_after (cell : Cfg.basic Cfg.instruction DLL.cell)
       (reg : Reg.t) : Cfg.basic Cfg.instruction DLL.cell =
     match DLL.next cell with
-    | None -> cell
-    | Some next_cell ->
+    | Misc.Or_null.Null -> cell
+    | Misc.Or_null.This next_cell ->
       let next_instr = DLL.value next_cell in
       if names_reg_at_location next_instr reg
       then find_insertion_point_after next_cell reg
@@ -319,8 +319,8 @@ module Insert_skipping_name_for_debugger = struct
   let add_begin (list : Cfg.basic_instruction_list)
       (instr : Cfg.basic Cfg.instruction) ~(reg : Reg.t) : unit =
     match DLL.hd_cell list with
-    | None -> DLL.add_begin list instr
-    | Some first_cell ->
+    | Misc.Or_null.Null -> DLL.add_begin list instr
+    | Misc.Or_null.This first_cell ->
       let first_instr = DLL.value first_cell in
       if names_reg_at_location first_instr reg
       then
@@ -385,11 +385,13 @@ module SpillCosts = struct
   let iter costs ~f = Reg.Tbl.iter f costs
 
   let for_reg costs reg =
-    match Reg.Tbl.find_or_null costs reg with Null -> 0 | This cost -> cost
+    match Reg.Tbl.find costs reg with exception Not_found -> 0 | cost -> cost
 
   let add_to_reg costs reg delta =
     let curr =
-      match Reg.Tbl.find_or_null costs reg with Null -> 0 | This cost -> cost
+      match Reg.Tbl.find costs reg with
+      | exception Not_found -> 0
+      | cost -> cost
     in
     Reg.Tbl.replace costs reg (curr + delta)
 
@@ -497,9 +499,10 @@ let is_spilled (map : spilled_map) (reg : Reg.t) : bool = Reg.Tbl.mem map reg
 let use_stack_operand (map : spilled_map) (regs : Reg.t array) (index : int) :
     unit =
   let reg = regs.(index) in
-  match Reg.Tbl.find_or_null map reg with
-  | Null -> fatal "register %a is missing from the map" Printreg.reg reg
-  | This spilled_reg -> regs.(index) <- spilled_reg
+  match Reg.Tbl.find map reg with
+  | exception Not_found ->
+    fatal "register %a is missing from the map" Printreg.reg reg
+  | spilled_reg -> regs.(index) <- spilled_reg
 
 let may_use_stack_operands_array : spilled_map -> Reg.t array -> unit =
  fun map regs ->

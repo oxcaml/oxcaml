@@ -9,9 +9,9 @@ let log_function = lazy (make_log_function ~label:"ls")
 let equal_list_dll eq list dll =
   let rec aux eq list cell =
     match list, cell with
-    | [], None -> true
-    | _ :: _, None | [], Some _ -> false
-    | hd :: tl, Some cell ->
+    | [], Misc.Or_null.Null -> true
+    | _ :: _, Misc.Or_null.Null | [], Misc.Or_null.This _ -> false
+    | hd :: tl, Misc.Or_null.This cell ->
       let value = DLL.value cell in
       eq hd value && aux eq tl (DLL.next cell)
   in
@@ -216,8 +216,8 @@ module Interval = struct
     let release_expired_fixed l ~pos =
       let rec aux curr ~pos =
         match curr with
-        | None -> ()
-        | Some cell ->
+        | Misc.Or_null.Null -> ()
+        | Misc.Or_null.This cell ->
           let value = DLL.value cell in
           if value.end_ >= pos
           then (
@@ -230,8 +230,8 @@ module Interval = struct
     let insert_sorted (l : t DLL.t) (interval : t) : unit =
       let rec aux l interval curr =
         match curr with
-        | None -> DLL.add_end l interval
-        | Some cell ->
+        | Misc.Or_null.Null -> DLL.add_end l interval
+        | Misc.Or_null.This cell ->
           let value = DLL.value cell in
           if value.end_ <= interval.end_
           then DLL.insert_before cell interval
@@ -279,8 +279,8 @@ module ClassIntervals = struct
         unit =
       let rec aux t ~pos curr : unit =
         match curr with
-        | None -> ()
-        | Some cell ->
+        | Misc.Or_null.Null -> ()
+        | Misc.Or_null.This cell ->
           let value = DLL.value cell in
           if value.Interval.end_ >= pos
           then (
@@ -300,8 +300,8 @@ module ClassIntervals = struct
         unit =
       let rec aux t ~pos curr =
         match curr with
-        | None -> ()
-        | Some cell ->
+        | Misc.Or_null.Null -> ()
+        | Misc.Or_null.This cell ->
           let value = DLL.value cell in
           if value.Interval.end_ >= pos
           then (

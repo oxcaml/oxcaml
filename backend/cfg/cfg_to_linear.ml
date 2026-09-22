@@ -518,8 +518,9 @@ let run cfg_with_layout =
       in
       let insn =
         match DLL.prev cell with
-        | None -> body (* Entry block of the function. Don't add label. *)
-        | Some prev_cell ->
+        | Misc.Or_null.Null ->
+          body (* Entry block of the function. Don't add label. *)
+        | Misc.Or_null.This prev_cell ->
           let body =
             if block.is_trap_handler
             then to_linear_instr Lentertrap ~next:body

@@ -32,7 +32,7 @@ module type S = sig
 
   val inverse : t -> t
 
-  val compose : t -> then_:t -> t option
+  val compose : t -> then_:t -> t Misc.Or_null.t
 
   val print : Format.formatter -> t -> unit
 
@@ -74,8 +74,8 @@ module Make (Rec_info_expr : Rec_info_expr0.S) :
 
   let compose t1 ~then_:t2 =
     match t1, t2 with
-    | Id, _ -> Some t2
-    | _, Id -> Some t1
+    | Id, _ -> Misc.Or_null.This t2
+    | _, Id -> Misc.Or_null.This t1
     | ( Change_depth { from = from1; to_ = to_1 },
         Change_depth { from = from2; to_ = to_2 } ) ->
       (* CR lmaurer: We would like to check that [to_1] equals [from_2], but we
@@ -84,7 +84,7 @@ module Make (Rec_info_expr : Rec_info_expr0.S) :
          problem. Perhaps there should be a Coercion kind for semantic
          operations? *)
       ignore (to_1, from2);
-      Some (change_depth ~from:from1 ~to_:to_2)
+      Misc.Or_null.This (change_depth ~from:from1 ~to_:to_2)
 
   let [@ocamlformat "disable"] print ppf = function
     | Id ->

@@ -608,8 +608,8 @@ let add_cse t prim ~bound_to ~name_mode =
         ( Comparison_result.create ~prim ~comparison_results:t.comparison_results,
           Simple.must_be_var bound_to )
       with
-      | None, _ | _, None -> t.comparison_results
-      | Some comp, Some (var, _) ->
+      | Misc.Or_null.Null, _ | _, None -> t.comparison_results
+      | Misc.Or_null.This comp, Some (var, _) ->
         Variable.Map.add var comp t.comparison_results
     in
     { t with cse; comparison_results }

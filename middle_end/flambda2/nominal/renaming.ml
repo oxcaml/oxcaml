@@ -116,13 +116,13 @@ end
 type t =
   { continuations : Continuations.t;
     variables : Variables.t;
-    import_map : Import_map.t option
+    import_map : Import_map.t Misc.Or_null.t
   }
 
 let empty =
   { continuations = Continuations.empty;
     variables = Variables.empty;
-    import_map = None
+    import_map = Misc.Or_null.Null
   }
 
 let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
@@ -131,12 +131,15 @@ let create_import_map ~symbols ~variables ~simples ~consts ~code_ids
     Import_map.create ~symbols ~variables ~simples ~consts ~code_ids
       ~continuations ~used_value_slots ~original_compilation_unit
   in
-  (* It's tempting to set [import_map] to [None] if everything is empty, but
-     this is incorrect: an import map of [None] is equivalent to having _all_
+  (* It's tempting to set [import_map] to [Null] if everything is empty, but
+     this is incorrect: an import map of [Null] is equivalent to having _all_
      value slots used, not none (see [value_slot_is_used]). *)
-  { empty with import_map = Some import_map }
+  { empty with import_map = Misc.Or_null.This import_map }
 
-let has_import_map t = Option.is_some t.import_map
+let has_import_map t =
+  match t.import_map with
+  | Misc.Or_null.Null -> false
+  | Misc.Or_null.This _ -> true
 
 let [@ocamlformat "disable"] print ppf
       { continuations; variables; import_map = _; } =
@@ -152,8 +155,8 @@ let is_identity { continuations; variables; import_map } =
   && Variables.is_empty variables
   &&
   match import_map with
-  | None -> true
-  | Some _ ->
+  | Misc.Or_null.Null -> true
+  | Misc.Or_null.This _ ->
     (* If there is any import map at all, then this renaming is not necessarily
        the identity: any value slots _not_ present in [used_value_slots] will be
        removed from closures. *)
@@ -178,13 +181,14 @@ let compose0
        ensure that only [first] (and not [second]) has an import map. *)
     import_map =
       (match import_map1, import_map2 with
-      | None, None -> None
-      | Some _, None -> import_map1
-      | (None | Some _), Some _ ->
-        Misc.fatal_errorf
-          "Cannot compose renamings; only the [first] renaming may have an \
-           import map.  first:@ %a@ second:@ %a"
-          print first print second)
+      | Misc.Or_null.Null, Misc.Or_null.Null -> Misc.Or_null.Null
+      | Misc.Or_null.This _, Misc.Or_null.Null -> import_map1
+      | (Misc.Or_null.Null | Misc.Or_null.This _), Misc.Or_null.This _ ->
+        Misc.Or_null.This
+          (Misc.fatal_errorf
+             "Cannot compose renamings; only the [first] renaming may have an \
+              import map.  first:@ %a@ second:@ %a"
+             print first print second))
   }
 
 let compose ~second ~first =
@@ -205,8 +209,8 @@ let add_fresh_variable t var1 ~guaranteed_fresh:var2 =
 let apply_variable t var =
   let var =
     match t.import_map with
-    | None -> var
-    | Some import_map -> Import_map.variable import_map var
+    | Misc.Or_null.Null -> var
+    | Misc.Or_null.This import_map -> Import_map.variable import_map var
   in
   Variables.apply t.variables var
 
@@ -219,8 +223,8 @@ let apply_variable_set t vars =
 
 let apply_symbol t symbol =
   match t.import_map with
-  | None -> symbol
-  | Some import_map -> Import_map.symbol import_map symbol
+  | Misc.Or_null.Null -> symbol
+  | Misc.Or_null.This import_map -> Import_map.symbol import_map symbol
 
 let apply_symbol_set t symbols =
   Symbol.Set.fold
@@ -247,24 +251,24 @@ let add_fresh_continuation t k1 ~guaranteed_fresh:k2 =
 let apply_continuation t k =
   let k =
     match t.import_map with
-    | None -> k
-    | Some import_map -> Import_map.continuation import_map k
+    | Misc.Or_null.Null -> k
+    | Misc.Or_null.This import_map -> Import_map.continuation import_map k
   in
   Continuations.apply t.continuations k
 
 let apply_code_id t code_id =
   match t.import_map with
-  | None -> code_id
-  | Some import_map -> Import_map.code_id import_map code_id
+  | Misc.Or_null.Null -> code_id
+  | Misc.Or_null.This import_map -> Import_map.code_id import_map code_id
 
 let apply_const t cst =
   match t.import_map with
-  | None -> cst
-  | Some import_map -> Import_map.const import_map cst
+  | Misc.Or_null.Null -> cst
+  | Misc.Or_null.This import_map -> Import_map.const import_map cst
 
 let apply_simple t simple =
   match t.import_map with
-  | None ->
+  | Misc.Or_null.Null ->
     (* Constants are never permuted, only freshened upon import. *)
     let[@inline always] const cst = Simple.const (apply_const t cst) in
     let[@inline always] name old_name ~coercion:old_coercion =
@@ -278,7 +282,7 @@ let apply_simple t simple =
       else Simple.with_coercion (Simple.name new_name) new_coercion
     in
     Simple.pattern_match simple ~name ~const
-  | Some import_map ->
+  | Misc.Or_null.This import_map ->
     (* This is a bit tricky -- we want to be able to use [apply_variable] here
        so the variables in [Import_map.simple] cannot have been imported yet. *)
     Import_map.simple import_map simple ~import_var:(fun var ->
@@ -286,5 +290,6 @@ let apply_simple t simple =
 
 let value_slot_is_used t value_slot =
   match t.import_map with
-  | None -> true (* N.B. not false! *)
-  | Some import_map -> Import_map.value_slot_is_used import_map value_slot
+  | Misc.Or_null.Null -> true (* N.B. not false! *)
+  | Misc.Or_null.This import_map ->
+    Import_map.value_slot_is_used import_map value_slot

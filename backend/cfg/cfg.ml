@@ -267,8 +267,8 @@ type 'a instr_mapper = { f : 'b. 'b instruction -> 'a } [@@unboxed]
 
 let map_first_instruction (block : basic_block) (t : 'a instr_mapper) =
   match DLL.hd block.body with
-  | None -> t.f block.terminator
-  | Some first_instr -> t.f first_instr
+  | Misc.Or_null.Null -> t.f block.terminator
+  | Misc.Or_null.This first_instr -> t.f first_instr
 
 let first_instruction_id (block : basic_block) : InstructionId.t =
   map_first_instruction block { f = (fun instr -> instr.id) }

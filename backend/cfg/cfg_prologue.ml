@@ -471,12 +471,12 @@ let add_prologue (cfg : Cfg.t) prologue_label =
     DLL.find_cell_opt ~f:not_param_name_for_debugger prologue_block.body
   in
   match next_instr with
-  | None ->
+  | Misc.Or_null.Null ->
     let prologue_instruction =
       make_prologue_instruction ~like:prologue_block.terminator
     in
     DLL.add_end prologue_block.body prologue_instruction
-  | Some next_instr ->
+  | Misc.Or_null.This next_instr ->
     let prologue_instruction =
       make_prologue_instruction ~like:(DLL.value next_instr)
     in

@@ -32,12 +32,12 @@ let create_renaming () =
   { left_renaming = Variable.Map.empty; right_renaming = Variable.Map.empty }
 
 let link_and_check renaming var1 var2 check =
-  match Variable.Map.find_opt var1 renaming.left_renaming with
-  | Some var1' -> Variable.equal var1' var2
-  | None -> (
-    match Variable.Map.find_opt var2 renaming.right_renaming with
-    | Some _ -> false
-    | None ->
+  match Variable.Map.find_or_null var1 renaming.left_renaming with
+  | This var1' -> Variable.equal var1' var2
+  | Null -> (
+    match Variable.Map.find_or_null var2 renaming.right_renaming with
+    | This _ -> false
+    | Null ->
       renaming.left_renaming
         <- Variable.Map.add var1 var2 renaming.left_renaming;
       renaming.right_renaming

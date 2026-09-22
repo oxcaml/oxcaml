@@ -85,7 +85,9 @@ let prev cell =
     assert false
   | Node cell_node -> (
     let prev = cell_node.prev in
-    match prev with Empty -> None | Node _ -> Some { node = prev; t = cell.t })
+    match prev with
+    | Empty -> Misc.Or_null.Null
+    | Node _ -> Misc.Or_null.This { node = prev; t = cell.t })
 
 let next cell =
   match cell.node with
@@ -94,7 +96,9 @@ let next cell =
     assert false
   | Node cell_node -> (
     let next = cell_node.next in
-    match next with Empty -> None | Node _ -> Some { node = next; t = cell.t })
+    match next with
+    | Empty -> Misc.Or_null.Null
+    | Node _ -> Misc.Or_null.This { node = next; t = cell.t })
 
 let cut_from cell =
   let t = cell.t in
@@ -122,13 +126,25 @@ let clear t =
   t.first <- Empty;
   t.last <- Empty
 
-let hd t = match t.first with Empty -> None | Node { value; _ } -> Some value
+let hd t =
+  match t.first with
+  | Empty -> Misc.Or_null.Null
+  | Node { value; _ } -> Misc.Or_null.This value
 
-let hd_cell t = match t.first with Empty -> None | node -> Some { node; t }
+let hd_cell t =
+  match t.first with
+  | Empty -> Misc.Or_null.Null
+  | node -> Misc.Or_null.This { node; t }
 
-let last t = match t.last with Empty -> None | Node { value; _ } -> Some value
+let last t =
+  match t.last with
+  | Empty -> Misc.Or_null.Null
+  | Node { value; _ } -> Misc.Or_null.This value
 
-let last_cell t = match t.last with Empty -> None | node -> Some { node; t }
+let last_cell t =
+  match t.last with
+  | Empty -> Misc.Or_null.Null
+  | node -> Misc.Or_null.This { node; t }
 
 let add_begin t value =
   match unattached_node value with
@@ -351,8 +367,8 @@ let fold_right t ~f ~init =
 
 let fold_right_range ~right_incl ~left_excl ~f ~init =
   match right_incl with
-  | None -> init
-  | Some { node = start; t = _ } ->
+  | Misc.Or_null.Null -> init
+  | Misc.Or_null.This { node = start; t = _ } ->
     let rec aux f curr ~stop acc =
       if curr == stop
       then acc
@@ -363,25 +379,30 @@ let fold_right_range ~right_incl ~left_excl ~f ~init =
     in
     aux f start
       ~stop:
-        (match left_excl with None -> Empty | Some { node = stop; _ } -> stop)
+        (match left_excl with
+        | Misc.Or_null.Null -> Empty
+        | Misc.Or_null.This { node = stop; _ } -> stop)
       init
 
 let find_cell_opt t ~f =
   let rec aux t f curr =
     match curr with
-    | Empty -> None
+    | Empty -> Misc.Or_null.Null
     | Node node ->
-      if f node.value then Some { node = curr; t } else aux t f node.next
+      if f node.value
+      then Misc.Or_null.This { node = curr; t }
+      else aux t f node.next
   in
   aux t f t.first
 
 let find_opt t ~f =
   match find_cell_opt t ~f with
-  | None -> None
-  | Some { node = Empty; _ } ->
+  | Misc.Or_null.Null -> Misc.Or_null.Null
+  | Misc.Or_null.This { node = Empty; _ } ->
     (* internal invariant: cell's nodes are not empty *)
     assert false
-  | Some { node = Node { value; prev = _; next = _ }; t = _ } -> Some value
+  | Misc.Or_null.This { node = Node { value; prev = _; next = _ }; t = _ } ->
+    Misc.Or_null.This value
 
 let exists t ~f =
   let rec aux t f curr =
@@ -411,13 +432,13 @@ let to_list t = fold_right t ~f:(fun hd tl -> hd :: tl) ~init:[]
 
 let range_to_list ~left_incl ~right_excl =
   match left_incl with
-  | None -> []
-  | Some left_incl ->
+  | Misc.Or_null.Null -> []
+  | Misc.Or_null.This left_incl ->
     fold_right_range
       ~right_incl:
         (match right_excl with
-        | None -> last_cell left_incl.t
-        | Some right_excl -> prev right_excl)
+        | Misc.Or_null.Null -> last_cell left_incl.t
+        | Misc.Or_null.This right_excl -> prev right_excl)
       ~left_excl:(prev left_incl)
       ~f:(fun hd tl -> hd :: tl)
       ~init:[]

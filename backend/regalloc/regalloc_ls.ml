@@ -36,18 +36,19 @@ let build_intervals : State.t -> Cfg_with_infos.t -> unit =
   let past_ranges : Interval.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let current_ranges : Range.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let add_range (reg : Reg.t) ({ begin_; end_ } as range : Range.t) : unit =
-    match Reg.Tbl.find_or_null past_ranges reg with
-    | Null ->
+    match Reg.Tbl.find past_ranges reg with
+    | exception Not_found ->
       Reg.Tbl.replace past_ranges reg
         { Interval.reg; begin_; end_; ranges = DLL.make_single range }
-    | This (interval : Interval.t) ->
+    | (interval : Interval.t) ->
       DLL.add_end interval.ranges range;
       interval.end_ <- end_
   in
   let update_range (reg : Reg.t) ~(begin_ : int) ~(end_ : int) : unit =
-    match Reg.Tbl.find_or_null current_ranges reg with
-    | Null -> Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
-    | This ({ begin_ = _; end_ = curr_end } as curr) ->
+    match Reg.Tbl.find current_ranges reg with
+    | exception Not_found ->
+      Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
+    | { begin_ = _; end_ = curr_end } as curr ->
       if (begin_ asr 1) - (curr_end asr 1) <= 1
       then curr.end_ <- end_
       else (
@@ -181,8 +182,8 @@ let allocate_free_register : State.t -> Interval.t -> spilling_reg =
       (* assigns the available register with the highest affinity *)
       let rec assign_affinity aff =
         match Regalloc_affinity.next aff with
-        | None -> assign_first 0
-        | Some { Regalloc_affinity.priority = _; phys_reg } ->
+        | Misc.Or_null.Null -> assign_first 0
+        | Misc.Or_null.This { Regalloc_affinity.priority = _; phys_reg } ->
           let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < num_available_registers && available.(idx)
           then do_assign ~phys_reg
@@ -197,7 +198,7 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
   let reg_class = Regs.Reg_class.of_machtype reg.typ in
   let intervals = State.active state ~reg_class in
   match DLL.hd_cell intervals.active_dll with
-  | Some hd_cell ->
+  | Misc.Or_null.This hd_cell ->
     let hd = DLL.value hd_cell in
     let chk r =
       assert (same_reg_class r.Interval.reg hd.Interval.reg);
@@ -221,7 +222,7 @@ let allocate_blocked_register : State.t -> Interval.t -> spilling_reg =
       Interval.DLL.insert_sorted intervals.active_dll interval;
       allocate_stack_slot hd.reg)
     else allocate_stack_slot reg
-  | None -> allocate_stack_slot reg
+  | Misc.Or_null.Null -> allocate_stack_slot reg
 
 let reg_reinit () =
   List.iter (Reg.all_relocatable_regs ()) ~f:(fun (reg : Reg.t) ->

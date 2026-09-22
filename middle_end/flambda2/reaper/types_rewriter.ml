@@ -637,9 +637,11 @@ module Rewriter = struct
     let can_be_source_for_this_type set_of_closures =
       Function_slot.Map.for_all
         (fun function_slot code_id_in_types ->
-          match Function_slot.Map.find_opt function_slot set_of_closures with
-          | None -> false
-          | Some (_, code_id_in_closure) -> (
+          match
+            Function_slot.Map.find_or_null function_slot set_of_closures
+          with
+          | Null -> false
+          | This (_, code_id_in_closure) -> (
             match code_id_in_types, code_id_in_closure with
             | Or_unknown.Unknown, _ | _, Or_unknown.Unknown -> true
             | ( Or_unknown.Known _code_id_in_types,

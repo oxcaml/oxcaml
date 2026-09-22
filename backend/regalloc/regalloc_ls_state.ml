@@ -131,24 +131,25 @@ let[@inline] get_ls_order state ~instruction_id =
 let ls_order_mapping state : InstructionId.t -> int =
  fun instruction_id -> get_ls_order state ~instruction_id
 
-let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell option) : int =
+let rec check_ranges (prev : Range.t) (cell : Range.t DLL.cell Misc.Or_null.t) :
+    int =
   if prev.begin_ > prev.end_
   then fatal "Regalloc_ls_state.check_ranges: prev.begin_ > prev.end_";
   match cell with
-  | None -> prev.end_
-  | Some cell ->
+  | Misc.Or_null.Null -> prev.end_
+  | Misc.Or_null.This cell ->
     let value = DLL.value cell in
     if prev.end_ >= value.begin_
     then fatal "Regalloc_ls_state.check_ranges: prev.end_ >= hd.begin_";
     check_ranges value (DLL.next cell)
 
-let rec check_intervals (prev : Interval.t) (rest : Interval.t DLL.cell option)
-    : unit =
+let rec check_intervals (prev : Interval.t)
+    (rest : Interval.t DLL.cell Misc.Or_null.t) : unit =
   if prev.begin_ > prev.end_
   then fatal "Regalloc_ls_state.check_intervals: prev.begin_ > prev.end_";
   (match DLL.hd_cell prev.ranges with
-  | None -> fatal "Regalloc_ls_state.check_intervals: no ranges"
-  | Some cell ->
+  | Misc.Or_null.Null -> fatal "Regalloc_ls_state.check_intervals: no ranges"
+  | Misc.Or_null.This cell ->
     let value = DLL.value cell in
     if value.begin_ <> prev.begin_
     then fatal "Regalloc_ls_state.check_intervals: hd.begin_ <> prev.begin_";
@@ -156,17 +157,17 @@ let rec check_intervals (prev : Interval.t) (rest : Interval.t DLL.cell option)
     if end_ <> prev.end_
     then fatal "Regalloc_ls_state.check_intervals: end_ <> prev.end_");
   match rest with
-  | None -> ()
-  | Some hd_rest ->
+  | Misc.Or_null.Null -> ()
+  | Misc.Or_null.This hd_rest ->
     let hd = DLL.value hd_rest in
     if prev.begin_ > hd.begin_
     then fatal "Regalloc_ls_state.check_intervals: prev.begin_ > hd.begin_";
     check_intervals hd (DLL.next hd_rest)
 
-let rec is_in_a_range ls_order (cell : Range.t DLL.cell option) : bool =
+let rec is_in_a_range ls_order (cell : Range.t DLL.cell Misc.Or_null.t) : bool =
   match cell with
-  | None -> false
-  | Some cell ->
+  | Misc.Or_null.Null -> false
+  | Misc.Or_null.This cell ->
     let value = DLL.value cell in
     (ls_order >= value.begin_ && ls_order <= value.end_)
     || is_in_a_range ls_order (DLL.next cell)
@@ -175,8 +176,9 @@ let[@inline] invariant_intervals state cfg_with_infos =
   if debug && Lazy.force invariants
   then (
     (match DLL.hd_cell state.interval_dll with
-    | None -> ()
-    | Some hd_cell -> check_intervals (DLL.value hd_cell) (DLL.next hd_cell));
+    | Misc.Or_null.Null -> ()
+    | Misc.Or_null.This hd_cell ->
+      check_intervals (DLL.value hd_cell) (DLL.next hd_cell));
     let interval_map : Interval.t Reg.Map.t =
       fold_intervals state ~init:Reg.Map.empty ~f:(fun acc interval ->
           Reg.Map.update interval.reg
@@ -226,8 +228,8 @@ let invariant_field_dll (reg_class : Regs.Reg_class.t) (field_name : string)
     (l : Interval.t DLL.t) =
   let rec is prev curr =
     match curr with
-    | None -> ()
-    | Some cell ->
+    | Misc.Or_null.Null -> ()
+    | Misc.Or_null.This cell ->
       let value = DLL.value cell in
       if value.Interval.end_ > prev.Interval.end_
       then
@@ -237,8 +239,8 @@ let invariant_field_dll (reg_class : Regs.Reg_class.t) (field_name : string)
       else is value (DLL.next cell)
   in
   match DLL.hd_cell l with
-  | None -> ()
-  | Some cell -> is (DLL.value cell) (DLL.next cell)
+  | Misc.Or_null.Null -> ()
+  | Misc.Or_null.This cell -> is (DLL.value cell) (DLL.next cell)
 
 let[@inline] invariant_active state =
   if debug && Lazy.force invariants

@@ -42,8 +42,8 @@ let apply_renaming t renaming =
 
 let compose_exn t1 ~then_:t2 =
   match compose t1 ~then_:t2 with
-  | Some t -> t
-  | None ->
+  | Misc.Or_null.This t -> t
+  | Misc.Or_null.Null ->
     Misc.fatal_errorf "Invalid composition: %a@ >>@ %a" print t1 print t2
 
 let ids_for_export t =

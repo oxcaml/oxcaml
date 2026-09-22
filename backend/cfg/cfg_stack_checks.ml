@@ -173,10 +173,12 @@ let insert_instruction (cfg : Cfg.t) (label : Label.t) ~max_frame_size =
      the next instruction (and their [arg] is empty). Since they neither use nor
      define registers, the block's live-in is the live-in of the first other
      instruction. *)
-  let rec live_in_from (cell : Cfg.basic Cfg.instruction DLL.cell option) =
+  let rec live_in_from
+      (cell : Cfg.basic Cfg.instruction DLL.cell Misc.Or_null.t) =
     match cell with
-    | None -> Reg.add_set_array block.terminator.live block.terminator.arg
-    | Some cell -> (
+    | Misc.Or_null.Null ->
+      Reg.add_set_array block.terminator.live block.terminator.arg
+    | Misc.Or_null.This cell -> (
       let instr = DLL.value cell in
       match instr.desc with
       | Prologue | Epilogue -> live_in_from (DLL.next cell)

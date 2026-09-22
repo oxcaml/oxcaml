@@ -19,19 +19,21 @@ type allocation =
    indicating where to continue the process. *)
 type compatible_allocations =
   { allocations : allocation list;
-    next_cell : cell option
+    next_cell : cell Misc.Or_null.t
   }
 
 (* [find_next_allocation cell] returns the first allocation found by iterating
    from [cell]. *)
-let rec find_next_allocation : cell option -> allocation option =
+let rec find_next_allocation : cell Misc.Or_null.t -> allocation Misc.Or_null.t
+    =
  fun cell ->
   match cell with
-  | None -> None
-  | Some cell -> (
+  | Misc.Or_null.Null -> Misc.Or_null.Null
+  | Misc.Or_null.This cell -> (
     let instr = DLL.value cell in
     match instr.desc with
-    | Op (Alloc { bytes; dbginfo; mode }) -> Some { bytes; dbginfo; mode; cell }
+    | Op (Alloc { bytes; dbginfo; mode }) ->
+      Misc.Or_null.This { bytes; dbginfo; mode; cell }
     | Op
         ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
@@ -58,20 +60,23 @@ let rec find_next_allocation : cell option -> allocation option =
    never raise; and no [Specific], [Intop_atomic], or [Store] op allocates or
    polls. *)
 let find_compatible_allocations :
-    cell option ->
+    cell Misc.Or_null.t ->
     curr_mode:Cmm.Alloc_mode.t ->
     curr_size:int ->
     compatible_allocations =
  fun cell ~curr_mode ~curr_size ->
-  let rec loop (allocations : allocation list) (cell : cell option)
+  let rec loop (allocations : allocation list) (cell : cell Misc.Or_null.t)
       ~(curr_mode : Cmm.Alloc_mode.t) ~(curr_size : int) :
       compatible_allocations =
     match cell with
-    | None -> { allocations = List.rev allocations; next_cell = None }
-    | Some cell -> (
+    | Misc.Or_null.Null ->
+      { allocations = List.rev allocations; next_cell = Misc.Or_null.Null }
+    | Misc.Or_null.This cell -> (
       let instr = DLL.value cell in
       let return () =
-        { allocations = List.rev allocations; next_cell = Some cell }
+        { allocations = List.rev allocations;
+          next_cell = Misc.Or_null.This cell
+        }
       in
       match instr.desc with
       | Op (Alloc { bytes; dbginfo; mode }) ->
@@ -87,7 +92,10 @@ let find_compatible_allocations :
           loop
             (allocation :: allocations)
             (DLL.next cell) ~curr_mode ~curr_size:(curr_size + bytes)
-        else { allocations = List.rev allocations; next_cell = Some cell }
+        else
+          { allocations = List.rev allocations;
+            next_cell = Misc.Or_null.This cell
+          }
       | Op (Begin_region | End_region) -> (
         match curr_mode with
         | Local -> return ()
@@ -97,7 +105,9 @@ let find_compatible_allocations :
       | Stack_check _ ->
         (* CR-soon xclerc for xclerc: is it too conservative? (note: only the
            `Pushtrap` case may be too conservative) *)
-        { allocations = List.rev allocations; next_cell = Some cell }
+        { allocations = List.rev allocations;
+          next_cell = Misc.Or_null.This cell
+        }
       | Op
           ( Move | Spill | Reload | Floatop _ | Reinterpret_cast _ | Opaque
           | Pause | Const_int _ | Const_float _ | Const_float32 _
@@ -136,12 +146,13 @@ let find_compatible_allocations :
     - the "first" allocation is made bigger to account for all allocations;
     - the other allocations are replaced with a reference to the result of the
       previous allocation, with a different offset. *)
-let rec combine : instr_id:InstructionId.sequence -> cell option -> unit =
+let rec combine : instr_id:InstructionId.sequence -> cell Misc.Or_null.t -> unit
+    =
  fun ~instr_id cell ->
   let first_allocation = find_next_allocation cell in
   match first_allocation with
-  | None -> ()
-  | Some { bytes; dbginfo; mode; cell } ->
+  | Misc.Or_null.Null -> ()
+  | Misc.Or_null.This { bytes; dbginfo; mode; cell } ->
     if List.length dbginfo <> 1
     then
       Misc.fatal_errorf

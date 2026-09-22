@@ -52,7 +52,7 @@ module type S = sig
 
   val inverse : t -> t
 
-  val compose : t -> then_:t -> t option
+  val compose : t -> then_:t -> t Misc.Or_null.t
 
   val print : Format.formatter -> t -> unit
 

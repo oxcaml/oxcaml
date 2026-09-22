@@ -12,9 +12,9 @@ val value : 'a cell -> 'a
 
 val set_value : 'a cell -> 'a -> unit
 
-val prev : 'a cell -> 'a cell option
+val prev : 'a cell -> 'a cell Misc.Or_null.t
 
-val next : 'a cell -> 'a cell option
+val next : 'a cell -> 'a cell Misc.Or_null.t
 
 (* Deletes the passed cell and all the cells after it. *)
 val cut_from : 'a cell -> unit
@@ -35,13 +35,13 @@ val of_array : 'a array -> 'a t
 
 val clear : 'a t -> unit
 
-val hd : 'a t -> 'a option
+val hd : 'a t -> 'a Misc.Or_null.t
 
-val hd_cell : 'a t -> 'a cell option
+val hd_cell : 'a t -> 'a cell Misc.Or_null.t
 
-val last : 'a t -> 'a option
+val last : 'a t -> 'a Misc.Or_null.t
 
-val last_cell : 'a t -> 'a cell option
+val last_cell : 'a t -> 'a cell Misc.Or_null.t
 
 val add_begin : 'a t -> 'a -> unit
 
@@ -84,18 +84,18 @@ val fold_left : 'a t -> f:('b -> 'a -> 'b) -> init:'b -> 'b
 val fold_right : 'a t -> f:('a -> 'b -> 'b) -> init:'b -> 'b
 
 (** Folding the range of cells from [right_incl] to [left_excl]. If [right_incl]
-    is [None], then the effective range is empty. Otherwise, if [left_excl] is
-    [None], then the range extends to the beginning of the list. *)
+    is [Null], then the effective range is empty. Otherwise, if [left_excl] is
+    [Null], then the range extends to the beginning of the list. *)
 val fold_right_range :
-  right_incl:'a cell option ->
-  left_excl:'a cell option ->
+  right_incl:'a cell Misc.Or_null.t ->
+  left_excl:'a cell Misc.Or_null.t ->
   f:('a -> 'b -> 'b) ->
   init:'b ->
   'b
 
-val find_cell_opt : 'a t -> f:('a -> bool) -> 'a cell option
+val find_cell_opt : 'a t -> f:('a -> bool) -> 'a cell Misc.Or_null.t
 
-val find_opt : 'a t -> f:('a -> bool) -> 'a option
+val find_opt : 'a t -> f:('a -> bool) -> 'a Misc.Or_null.t
 
 val exists : 'a t -> f:('a -> bool) -> bool
 
@@ -104,10 +104,12 @@ val for_all : 'a t -> f:('a -> bool) -> bool
 val for_alli : 'a t -> f:(int -> 'a -> bool) -> bool
 
 (** The range of cells from [left_incl] to [right_excl]. If [left_incl] is
-    [None], then the result is the empty list. Otherwise, if [right_excl] is
-    [None], then the range extends to the end of the list.*)
+    [Null], then the result is the empty list. Otherwise, if [right_excl] is
+    [Null], then the range extends to the end of the list.*)
 val range_to_list :
-  left_incl:'a cell option -> right_excl:'a cell option -> 'a list
+  left_incl:'a cell Misc.Or_null.t ->
+  right_excl:'a cell Misc.Or_null.t ->
+  'a list
 
 val to_list : 'a t -> 'a list
 

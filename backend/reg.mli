@@ -148,11 +148,7 @@ module Set : Set.S with type elt = t
 
 module Map : Map.S with type key = t
 
-module Tbl : sig
-  include Hashtbl.S with type key = t
-
-  val find_or_null : 'a t -> key -> 'a Flambda2_algorithms.Or_null.t
-end
+module Tbl : Hashtbl.S with type key = t
 
 val add_set_array : Set.t -> t array -> Set.t
 

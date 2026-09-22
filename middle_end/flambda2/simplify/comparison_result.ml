@@ -26,23 +26,25 @@ type t =
     tagged_or_untagged : tagged_or_untagged
   }
 
-let create ~(prim : P.t) ~comparison_results : t option =
+let create ~(prim : P.t) ~comparison_results : t Misc.Or_null.t =
   match[@warning "-fragile-match"] prim with
   | Binary
       (Int_comp (kind, Yielding_int_like_compare_functions signed), lhs, rhs) ->
-    Some { lhs; rhs; kind; signed; tagged_or_untagged = Untagged }
+    Misc.Or_null.This { lhs; rhs; kind; signed; tagged_or_untagged = Untagged }
   | Unary (Tag_immediate, arg) -> (
     match Simple.must_be_var arg with
-    | None -> None
+    | None -> Misc.Or_null.Null
     | Some (var, _) -> (
-      match Variable.Map.find_opt var comparison_results with
-      | None -> None
-      | Some { lhs; rhs; kind; signed; tagged_or_untagged = Untagged } ->
-        Some { lhs; rhs; kind; signed; tagged_or_untagged = Tagged }
-      | Some { tagged_or_untagged = Tagged; _ } ->
-        Misc.fatal_errorf "Tagging of an already tagged result %a"
-          Variable.print var))
-  | _ -> None
+      match Variable.Map.find_or_null var comparison_results with
+      | Null -> Misc.Or_null.Null
+      | This { lhs; rhs; kind; signed; tagged_or_untagged = Untagged } ->
+        Misc.Or_null.This
+          { lhs; rhs; kind; signed; tagged_or_untagged = Tagged }
+      | This { tagged_or_untagged = Tagged; _ } ->
+        Misc.Or_null.This
+          (Misc.fatal_errorf "Tagging of an already tagged result %a"
+             Variable.print var)))
+  | _ -> Misc.Or_null.Null
 
 let [@ocamlformat "disable"] print ppf
     { lhs; rhs; kind; signed; tagged_or_untagged } =

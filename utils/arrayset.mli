@@ -16,7 +16,7 @@ module type S = sig
 
   val is_empty : t -> bool
 
-  val choose_and_remove : t -> e option
+  val choose_and_remove : t -> e Misc.Or_null.t
 
   val add : t -> e -> unit
 

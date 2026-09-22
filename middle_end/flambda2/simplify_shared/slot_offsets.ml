@@ -902,9 +902,11 @@ end = struct
         if is_unboxed
         then
           let s =
-            match Value_slot.Map.find_opt value_slot state.unboxed_slots with
-            | None -> create_unboxed_slot set state value_slot size
-            | Some s ->
+            match
+              Value_slot.Map.find_or_null value_slot state.unboxed_slots
+            with
+            | Null -> create_unboxed_slot set state value_slot size
+            | This s ->
               s.sets <- set :: s.sets;
               update_set_for_slot s set;
               s
@@ -912,9 +914,9 @@ end = struct
           update_metadata_for_unboxed_slot set s
         else
           let s =
-            match Value_slot.Map.find_opt value_slot state.value_slots with
-            | None -> create_value_slot set state value_slot
-            | Some s ->
+            match Value_slot.Map.find_or_null value_slot state.value_slots with
+            | Null -> create_value_slot set state value_slot
+            | This s ->
               s.sets <- set :: s.sets;
               update_set_for_slot s set;
               s

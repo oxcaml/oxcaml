@@ -7,7 +7,7 @@ open X86_ast_utils
 
 type rule_result =
   | No_match
-  | Matched of asm_line DLL.cell option
+  | Matched of asm_line DLL.cell Misc.Or_null.t
 
 let is_control_flow = function
   | J _ | JMP _ | CALL _ | RET | HLT | UD2 -> true
@@ -39,10 +39,11 @@ let get_cells cell n =
     then List.rev acc
     else
       match current_opt with
-      | None -> List.rev acc
-      | Some current -> loop (current :: acc) (remaining - 1) (DLL.next current)
+      | Misc.Or_null.Null -> List.rev acc
+      | Misc.Or_null.This current ->
+        loop (current :: acc) (remaining - 1) (DLL.next current)
   in
-  loop [] n (Some cell)
+  loop [] n (Misc.Or_null.This cell)
 
 let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
@@ -218,8 +219,8 @@ let reads_from_reg64 target = function
 let reg64_is_never_read target start_cell =
   let rec loop cell_opt =
     match cell_opt with
-    | None -> false
-    | Some cell -> (
+    | Misc.Or_null.Null -> false
+    | Misc.Or_null.This cell -> (
       let value = DLL.value cell in
       if is_hard_barrier value
       then false
@@ -235,8 +236,8 @@ let reg64_is_never_read target start_cell =
 let flags_never_observed start_cell =
   let rec loop cell_opt =
     match cell_opt with
-    | None -> false
-    | Some cell -> (
+    | Misc.Or_null.Null -> false
+    | Misc.Or_null.This cell -> (
       let value = DLL.value cell in
       match value with
       | Directive _ ->

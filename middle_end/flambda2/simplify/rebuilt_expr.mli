@@ -34,7 +34,7 @@ val print : Are_rebuilding_terms.t -> Format.formatter -> t -> unit
 (** This function may only be used when rebuilding terms. *)
 val to_expr : t -> Are_rebuilding_terms.t -> Expr.t
 
-val to_apply_cont : t -> Apply_cont.t option
+val to_apply_cont : t -> Apply_cont.t Misc.Or_null.t
 
 val can_be_removed_as_invalid : t -> Are_rebuilding_terms.t -> bool
 

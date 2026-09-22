@@ -72,14 +72,17 @@ let terminator : Cfg.terminator -> int =
   | Prim _ -> 14
 
 let rec basic_instruction_cell :
-    Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
+    Cfg.basic Cfg.instruction DLL.cell Misc.Or_null.t ->
+    fuel:int ->
+    acc:int ->
+    int =
  fun cell ~fuel ~acc ->
   if fuel <= 0
   then acc
   else
     match cell with
-    | None -> acc
-    | Some cell ->
+    | Misc.Or_null.Null -> acc
+    | Misc.Or_null.This cell ->
       let instr_hash = basic (DLL.value cell).desc in
       basic_instruction_cell (DLL.next cell) ~fuel:(pred fuel)
         ~acc:(hash_combine acc instr_hash)

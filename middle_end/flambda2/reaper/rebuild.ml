@@ -1051,9 +1051,9 @@ let decide_whether_apply_needs_calling_convention_change env apply =
   match code_id_actually_called with
   | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
   | Some code_id -> (
-    match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> Unboxing_analysis.Not_changing_calling_convention, call_kind
-    | Some _ ->
+    match Code_id.Map.find_or_null code_id env.code_deps with
+    | Null -> Unboxing_analysis.Not_changing_calling_convention, call_kind
+    | This _ ->
       ( Unboxing_analysis.get_calling_convention_change env.code_changes code_id,
         call_kind ))
 

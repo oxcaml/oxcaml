@@ -6,7 +6,7 @@ module DLL = Doubly_linked_list
 (** Type for the result of applying a peephole rewrite rule *)
 type rule_result =
   | No_match
-  | Matched of asm_line DLL.cell option
+  | Matched of asm_line DLL.cell Misc.Or_null.t
 
 (** Navigation and inspection *)
 

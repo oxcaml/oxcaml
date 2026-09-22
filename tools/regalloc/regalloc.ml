@@ -271,9 +271,9 @@ let process_function (config : config) (cfg_with_layout : Cfg_with_layout.t)
     | GI -> Regalloc_gi.run cfg_with_infos, Regalloc_gi.For_testing.rounds
     | IRC ->
       begin match Regalloc_irc.run cfg_with_infos with
-      | Some res -> res, Regalloc_irc.For_testing.rounds
-      | None ->
-        fatal "IRC allocator returned None (function %S is likely too complex)"
+      | Misc.Or_null.This res -> res, Regalloc_irc.For_testing.rounds
+      | Misc.Or_null.Null ->
+        fatal "IRC allocator returned Null (function %S is likely too complex)"
           (Cfg_with_layout.cfg cfg_with_layout).fun_name
       end
     | LS -> Regalloc_ls.run cfg_with_infos, Regalloc_ls.For_testing.rounds

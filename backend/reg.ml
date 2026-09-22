@@ -217,13 +217,7 @@ end
 
 module Set = Set.Make (RegOrder)
 module Map = Map.Make (RegOrder)
-
-module Tbl = struct
-  include Hashtbl.Make (RegOrder)
-
-  let[@inline] find_or_null tbl key : _ Flambda2_algorithms.Or_null.t =
-    match find tbl key with data -> This data | exception Not_found -> Null
-end
+module Tbl = Hashtbl.Make (RegOrder)
 
 let add_set_array s v =
   match Array.length v with

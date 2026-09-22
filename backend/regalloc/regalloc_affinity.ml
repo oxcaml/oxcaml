@@ -21,9 +21,9 @@ let incr_move : moves -> temp:Reg.t -> phys_reg:Phys_reg.t -> delta:int -> unit
     =
  fun reg_tbl ~temp ~phys_reg ~delta ->
   let phys_reg_tbl =
-    match Reg.Tbl.find_or_null reg_tbl temp with
-    | This phys_reg_tbl -> phys_reg_tbl
-    | Null ->
+    match Reg.Tbl.find reg_tbl temp with
+    | phys_reg_tbl -> phys_reg_tbl
+    | exception Not_found ->
       let phys_reg_tbl = Phys_reg.Tbl.create 17 in
       Reg.Tbl.replace reg_tbl temp phys_reg_tbl;
       phys_reg_tbl
@@ -38,17 +38,17 @@ let incr_move : moves -> temp:Reg.t -> phys_reg:Phys_reg.t -> delta:int -> unit
 (* Returns a (temporary, physical register) pair if the passed instruction is a
    move between such registers, `None` otherwise *)
 let temp_and_phys_reg_of_instr :
-    Cfg.basic Cfg.instruction -> (Reg.t * Phys_reg.t) option =
+    Cfg.basic Cfg.instruction -> (Reg.t * Phys_reg.t) Misc.Or_null.t =
  fun instr ->
   match[@ocaml.warning "-fragile-match"] instr.desc with
   | Op Move -> (
     let src = instr.arg.(0) in
     let dst = instr.res.(0) in
     match src.loc, dst.loc with
-    | Reg phys_reg, Unknown -> Some (dst, phys_reg)
-    | Unknown, Reg phys_reg -> Some (src, phys_reg)
-    | _ -> None)
-  | _ -> None
+    | Reg phys_reg, Unknown -> Misc.Or_null.This (dst, phys_reg)
+    | Unknown, Reg phys_reg -> Misc.Or_null.This (src, phys_reg)
+    | _ -> Misc.Or_null.Null)
+  | _ -> Misc.Or_null.Null
 
 module Classes : sig
   type t
@@ -66,9 +66,9 @@ end = struct
 
   let rec find : t -> Reg.t -> Reg.t =
    fun t reg ->
-    match Reg.Tbl.find_or_null t reg with
-    | Null -> reg
-    | This parent -> if Reg.same reg parent then reg else find t parent
+    match Reg.Tbl.find t reg with
+    | exception Not_found -> reg
+    | parent -> if Reg.same reg parent then reg else find t parent
 
   let unite : t -> Reg.t -> Reg.t -> unit =
    fun t left right ->
@@ -108,8 +108,8 @@ let compute : Cfg_with_infos.t -> Regalloc_split.phi_move list -> t =
         let delta = Misc.power ~base:10 loop_depth in
         DLL.iter block.body ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
             match temp_and_phys_reg_of_instr instr with
-            | None -> ()
-            | Some (temp, phys_reg) ->
+            | Misc.Or_null.Null -> ()
+            | Misc.Or_null.This (temp, phys_reg) ->
               let temp = Classes.find classes temp in
               incr_move priorities ~temp ~phys_reg ~delta));
     (* CR-someday xclerc for xclerc: consider switching to a heap, since we are
@@ -137,9 +137,9 @@ let same_phi_class : t -> Reg.t -> Reg.t -> bool =
 let priority : t -> temp:Reg.t -> phys_reg:Phys_reg.t -> int =
  fun t ~temp ~phys_reg ->
   let temp = Classes.find t.classes temp in
-  match Reg.Tbl.find_or_null t.affinity temp with
-  | Null -> 0
-  | This affinities -> (
+  match Reg.Tbl.find t.affinity temp with
+  | exception Not_found -> 0
+  | affinities -> (
     match
       Array.find_opt
         (fun affinity -> Phys_reg.equal affinity.phys_reg phys_reg)
@@ -157,18 +157,18 @@ let get : t -> Reg.t -> affinities =
  fun t reg ->
   let reg = Classes.find t.classes reg in
   let affinities =
-    match Reg.Tbl.find_or_null t.affinity reg with
-    | Null -> [||]
-    | This array -> array
+    match Reg.Tbl.find t.affinity reg with
+    | exception Not_found -> [||]
+    | array -> array
   in
   { next_index = 0; affinities }
 
-let next : affinities -> affinity option =
+let next : affinities -> affinity Misc.Or_null.t =
  fun aff ->
   let idx = aff.next_index in
   if idx >= Array.length aff.affinities
-  then None
+  then Misc.Or_null.Null
   else
     let res = aff.affinities.(idx) in
     aff.next_index <- succ idx;
-    Some res
+    Misc.Or_null.This res

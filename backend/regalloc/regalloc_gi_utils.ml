@@ -287,18 +287,19 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
   let past_ranges : Interval.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let current_ranges : Range.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let add_range (reg : Reg.t) ({ begin_; end_ } as range : Range.t) : unit =
-    match Reg.Tbl.find_or_null past_ranges reg with
-    | Null ->
+    match Reg.Tbl.find past_ranges reg with
+    | exception Not_found ->
       Reg.Tbl.replace past_ranges reg
         { Interval.begin_ = Some begin_; end_ = Some end_; ranges = [range] }
-    | This (interval : Interval.t) ->
+    | (interval : Interval.t) ->
       interval.ranges <- range :: interval.ranges;
       interval.end_ <- Some end_
   in
   let update_range (reg : Reg.t) ~(begin_ : int) ~(end_ : int) : unit =
-    match Reg.Tbl.find_or_null current_ranges reg with
-    | Null -> Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
-    | This ({ begin_ = _; end_ = curr_end } as curr) ->
+    match Reg.Tbl.find current_ranges reg with
+    | exception Not_found ->
+      Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
+    | { begin_ = _; end_ = curr_end } as curr ->
       if (begin_ asr 1) - (curr_end asr 1) <= 1
       then curr.end_ <- end_
       else (
@@ -486,8 +487,8 @@ module Hardware_registers = struct
     let hardware_regs = Regs.Reg_class_tbl.find t reg_class in
     let rec find aff =
       match Regalloc_affinity.next aff with
-      | None -> None
-      | Some { Regalloc_affinity.priority = _; phys_reg } ->
+      | Misc.Or_null.Null -> None
+      | Misc.Or_null.This { Regalloc_affinity.priority = _; phys_reg } ->
         let reg_index_in_class : int = Regs.index_in_class phys_reg in
         let hardware_reg : Hardware_register.t =
           hardware_regs.(reg_index_in_class)
