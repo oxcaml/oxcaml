@@ -968,6 +968,12 @@ let prim_has_valid_reprs ~loc prim =
         any;
         is (Same_as_ocaml_repr C.scannable);
       ]
+    | "%idx_compose" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
     | "%unsafe_array_idx" ->
       check [
         is (Same_as_ocaml_repr C.scannable);

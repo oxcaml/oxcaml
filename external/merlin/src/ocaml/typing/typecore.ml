@@ -9621,7 +9621,6 @@ and type_newtype
           match Path.Map.find_opt unboxed_path !unboxed_vars with
           | Some ty -> Some ty
           | None ->
-            let level = get_level ty in
             let contents_decl = Env.find_type unboxed_path new_env in
             let context = mk_jkind_context_always_principal new_env in
             let contents_jkind =
@@ -9630,7 +9629,7 @@ and type_newtype
             in
             let contents = newgenvar contents_jkind in
             unify_exp_types name_loc env boxed_ty
-              (newty2 ~level (Tbox contents));
+              (newgenty (Tbox contents));
             unboxed_vars := Path.Map.add unboxed_path contents !unboxed_vars;
             Some contents
         end
