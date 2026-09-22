@@ -518,11 +518,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
      source and the result must never be considered interchangeable, since a
      moving GC updates [Val] registers but not [Int] ones, and the register
      allocator must not coalesce them (it does coalesce [Move]s between [Int]
-     and [Val] registers, but not reinterpret casts).
-
-     Unlike a load, such a cast is not considered pure by [Cfg_deadcode]: a load
-     whose result is dead thus leaves a stray move behind, which is rare enough
-     to be acceptable. *)
+     and [Val] registers, but not reinterpret casts). *)
   let sibling_word_load (op : Operation.t) (varg : valnum array)
       (res : Reg.t array) :
       (rhs * Cmm.machtype_component * Cmm.reinterpret_cast) option =
@@ -539,23 +535,14 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
       let result_typ : Cmm.machtype_component option =
         match res with [| r |] -> Some r.Reg.typ | _ -> None
       in
-      match memory_chunk, mutability, is_atomic, result_typ with
+      match[@ocaml.warning "-fragile-match"]
+        memory_chunk, mutability, is_atomic, result_typ
+      with
       | Word_val, Mutable, false, Some Val ->
         Some ((sibling Word_int, varg, [| Int |]), Int, Value_of_int)
       | Word_int, Mutable, false, Some Int ->
         Some ((sibling Word_val, varg, [| Val |]), Val, Int_of_value)
-      | ( ( Word_int | Word_val | Byte_unsigned | Byte_signed | Sixteen_unsigned
-          | Sixteen_signed | Thirtytwo_unsigned | Thirtytwo_signed | Word_mask
-          | Single _ | Double | Onetwentyeight_unaligned
-          | Onetwentyeight_aligned | Twofiftysix_unaligned | Twofiftysix_aligned
-          | Fivetwelve_unaligned | Fivetwelve_aligned ),
-          (Mutable | Immutable),
-          (true | false),
-          ( None
-          | Some
-              ( Val | Addr | Int | Float | Vec128 | Vec256 | Vec512 | Mask
-              | Float32 | Valx2 ) ) ) ->
-        None)
+      | _ -> None)
     | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
     | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
     | Const_mask _ | Stackoffset _ | Store _ | Intop _ | Int128op _
