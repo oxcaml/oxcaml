@@ -12,5 +12,5 @@ end
 let () =
   exit (Profile.record_action ~gettimeofday:Unix.gettimeofday ~name:"ocamlopt"
     (fun () ->
-      Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S) Sys.argv
-        Format.err_formatter ~flambda2:Flambda2.lambda_to_cmm))
+      Optmaindriver.main (module Unix_for_owee : Compiler_owee.Unix_intf.S)
+        Sys.argv Format.err_formatter ~flambda2:Flambda2.lambda_to_cmm))
