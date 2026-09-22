@@ -6,9 +6,11 @@
 (* Sort-polymorphic value declarations in module types *)
 module type S = sig
   val foo : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+  val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
 end
 [%%expect{|
-module type S = sig val poly_ foo : 'a -> 'b end
+module type S =
+  sig val poly_ foo : 'a -> 'b val poly_ bar : 'a * 'b -> unit end
 |}]
 
 (* The following is error, because the module type goes through inclusion check
@@ -83,17 +85,18 @@ Error: Module type declarations do not match:
 
 (* the layout variables are rigid and cannot be constrained *)
 module type T = sig
-  val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
+  type ('a : value) t
+  val bar : layout_ x y. ('a : x) ('b : y). 'a t * 'b t -> unit
 end
 [%%expect{|
-Line 2, characters 45-47:
-2 |   val bar : layout_ x y. ('a : x) ('b : y). ('a * 'b) -> unit
-                                                 ^^
-Error: Tuple element types must have layout value.
-       The layout of "'a" is the abstract kind x
+Line 3, characters 44-46:
+3 |   val bar : layout_ x y. ('a : x) ('b : y). 'a t * 'b t -> unit
+                                                ^^
+Error: This type "('a : x)" should be an instance of type "('b : value)"
+       The layout of 'a is the abstract kind x
          because of the annotation on the universal variable 'a.
-       But the layout of "'a" must overlap with value_or_null
-         because it's the type of a tuple element.
+       But the layout of 'a must overlap with value
+         because of the definition of t at line 2, characters 2-21.
 |}]
 
 (* CR-someday zqian: some of the following inclusion check might succeed in the future
