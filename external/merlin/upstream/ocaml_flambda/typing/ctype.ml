@@ -6557,7 +6557,15 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
         link_type t1 t2
-    | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
+    | (Tconstr (p1, [], _), Tconstr (p2, [], _))
+        when Path.same p1 p2 ||
+          (try
+             Path.same
+               (Env.normalize_type_path None env p1)
+               (Env.normalize_type_path None env p2)
+           with Not_found -> false) ->
+        (* Alias-equivalent paths need no structural comparison. In particular,
+           expanding recursive object types here can be very expensive. *)
         ()
     | _ ->
         let t1' = expand_head env t1 in
