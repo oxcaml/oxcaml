@@ -156,7 +156,7 @@ module Wrt_path = struct
       gap_bytes : Byte_count.t
     }
 
-  let offset_and_gap { here; left; right } =
+  let offset_and_gap_unchecked { here; left; right } =
     let offset_bytes =
       if Byte_count.is_zero here.value
       then
@@ -165,19 +165,27 @@ module Wrt_path = struct
         Byte_count.(add (add left.value left.flat) right.value)
       else left.value
     in
+    let gap_bytes =
+      if has_value_and_flat here
+      then Byte_count.add left.flat right.value
+      else Byte_count.zero
+    in
+    { offset_bytes; gap_bytes }
+
+  let offset_and_gap ({ here; _ } as counts) =
+    let result = offset_and_gap_unchecked counts in
     if has_value_and_flat here
     then
-      let gap_bytes = Byte_count.add left.flat right.value in
       (* Conservatively assumes that *all* values and flats in [here] can become
           part of the gap upon deepening (but really, if the deepened pointer
           still has a gap, it must have at least one value and one flat.) *)
       let deepened_gap_upper_bound =
-        Byte_count.(add (add gap_bytes here.value) here.flat)
+        Byte_count.(add (add result.gap_bytes here.value) here.flat)
       in
       if
         Byte_count.on_64_bit_arch deepened_gap_upper_bound
         >= lowest_invalid_gap_on_64_bit_arch
       then None
-      else Some { offset_bytes; gap_bytes }
-    else Some { offset_bytes; gap_bytes = Byte_count.zero }
+      else Some result
+    else Some result
 end

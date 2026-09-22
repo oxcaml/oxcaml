@@ -107,6 +107,8 @@ module Wrt_path : sig
       gap_bytes : Byte_count.t
     }
 
+  val offset_and_gap_unchecked : t -> offset_and_gap_bytes
+
   (** Compute the offset and gap in bytes for an index to [here]. Returns [None]
       if the index could lead to an "illegal" gap of 2^16 or greater bytes,
       which is the case if either:

@@ -1758,6 +1758,36 @@ let extract_block_index_offset ~machine_width idx =
   in
   H.Binary (Int_shift (Naked_int64, Lsr), H.Prim shifted_left, shift_amount)
 
+let extract_block_index_gap ~machine_width idx =
+  let shift =
+    H.simple_untagged_int ~machine_width MPB.block_index_offset_bits
+  in
+  H.Binary (Int_shift (Naked_int64, Lsr), idx, shift)
+
+let block_index_bits { MPB.Wrt_path.offset_bytes; gap_bytes } =
+  Int64.add
+    (Int64.shift_left
+       (Int64.of_int (BC.on_64_bit_arch gap_bytes))
+       MPB.block_index_offset_bits)
+    (Int64.of_int (BC.on_64_bit_arch offset_bytes))
+
+let compose_block_indices ~machine_width ~intermediate ~(target : MPB.t) outer
+    inner =
+  let add outer = H.Binary (Int_arith (Naked_int64, Add), outer, inner) in
+  match
+    ( MPB.has_value_and_flat intermediate,
+      (BC.is_zero target.value, BC.is_zero target.flat) )
+  with
+  | false, _ | true, (false, false) -> add outer
+  | true, (true, true) -> H.simple_i64_expr 0L
+  | true, (false, true) ->
+    add (H.Prim (extract_block_index_offset ~machine_width outer))
+  | true, (true, false) ->
+    let offset = extract_block_index_offset ~machine_width outer in
+    let gap = extract_block_index_gap ~machine_width outer in
+    add
+      (H.Prim (Binary (Int_arith (Naked_int64, Add), H.Prim offset, H.Prim gap)))
+
 (* Given an index that points to data of some layout, produce the list of
    offsets needed to access each element *)
 let block_index_access_offsets_and_kinds ~machine_width layout idx =
@@ -1771,12 +1801,7 @@ let block_index_access_offsets_and_kinds ~machine_width layout idx =
   if MPB.has_value_and_flat cts
   then
     let offset = extract_block_index_offset ~machine_width idx in
-    let gap =
-      let shift =
-        H.simple_untagged_int ~machine_width MPB.block_index_offset_bits
-      in
-      H.Binary (Int_shift (Naked_int64, Lsr), idx, shift)
-    in
+    let gap = extract_block_index_gap ~machine_width idx in
     let f (to_left : MPB.t) (mbe : unit L.mixed_block_element) =
       let add x y = H.Binary (Int_arith (Naked_int64, Add), Prim x, y) in
       let offset_from_offset : H.simple_or_prim =
@@ -2086,22 +2111,15 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     [H.simple_i64_expr idx_raw_value]
   | Pmake_idx_mixed_field (shape, pos, path), [] ->
     needs_64_bit_target prim dbg;
-    let module W = Mixed_product_bytes.Wrt_path in
-    let { W.offset_bytes; gap_bytes } =
-      match W.offset_and_gap (W.count_shape shape pos path) with
-      | Some { offset_bytes; gap_bytes } -> { W.offset_bytes; gap_bytes }
+    let counts = MPB.Wrt_path.count_shape shape pos path in
+    let offset_and_gap =
+      match MPB.Wrt_path.offset_and_gap counts with
+      | Some offset_and_gap -> offset_and_gap
       | None ->
         Misc.fatal_errorf "Illegal gap:@ %a@ %a" Printlambda.primitive prim
           Debuginfo.print_compact dbg
     in
-    let idx_raw_value =
-      Int64.add
-        (Int64.shift_left
-           (Int64.of_int (BC.on_64_bit_arch gap_bytes))
-           MPB.block_index_offset_bits)
-        (Int64.of_int (BC.on_64_bit_arch offset_bytes))
-    in
-    [H.simple_i64_expr idx_raw_value]
+    [H.simple_i64_expr (block_index_bits offset_and_gap)]
   | Pmake_idx_array (ak, ik, mbe, path), [[index]] ->
     needs_64_bit_target prim dbg;
     let module W = Mixed_product_bytes.Wrt_path in
@@ -2131,86 +2149,19 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
           index_in_bytes,
           H.simple_i64 (Int64.of_int (BC.on_64_bit_arch offset_after_index)) )
     ]
-  | Pidx_deepen (mbe, field_path), [[idx]] -> (
+  | Pidx_deepen (mbe, field_path), [[idx]] ->
     needs_64_bit_target prim dbg;
-    let module W = Mixed_product_bytes.Wrt_path in
-    (* See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md]. *)
-    let cts = W.count mbe field_path in
-    let open struct
-      type deepening_type =
-        | Mixed_product_to_mixed_product
-        | Mixed_product_to_all_values
-        | Mixed_product_to_all_flats
-        | Mixed_product_to_empty
-        | All_values_or_flats
-    end in
-    let deepening_type =
-      let outer_has_value_and_flat =
-        W.all cts |> Mixed_product_bytes.has_value_and_flat
-      in
-      if outer_has_value_and_flat
-      then
-        match
-          Mixed_product_bytes.Byte_count.(
-            is_zero cts.here.value, is_zero cts.here.flat)
-        with
-        | false, false -> Mixed_product_to_mixed_product
-        | false, true -> Mixed_product_to_all_values
-        | true, false -> Mixed_product_to_all_flats
-        | true, true -> Mixed_product_to_empty
-      else All_values_or_flats
+    let counts = MPB.Wrt_path.count mbe field_path in
+    let intermediate = MPB.Wrt_path.all counts in
+    let inner_bits =
+      if MPB.has_value_and_flat intermediate
+      then block_index_bits (MPB.Wrt_path.offset_and_gap_unchecked counts)
+      else
+        Int64.of_int
+          (BC.on_64_bit_arch (BC.add counts.left.value counts.left.flat))
     in
-    match deepening_type with
-    | All_values_or_flats ->
-      (* The initial index isn't mixed, so all 64 of its bits are an offset *)
-      (* increase this offset by left value + left flats *)
-      let to_add =
-        Int64.of_int
-          (BC.on_64_bit_arch cts.left.value + BC.on_64_bit_arch cts.left.flat)
-      in
-      [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
-    | Mixed_product_to_mixed_product ->
-      (* E.g. move index to a #(i64#, #(string, i32#), string) to the inner
-         product *)
-      (* offset += left value; gap += right value + left flat *)
-      let to_add =
-        Int64.add
-          (Int64.shift_left
-             (Int64.of_int
-                (BC.on_64_bit_arch cts.right.value
-                + BC.on_64_bit_arch cts.left.flat))
-             MPB.block_index_offset_bits)
-          (Int64.of_int (BC.on_64_bit_arch cts.left.value))
-      in
-      [Binary (Int_arith (Naked_int64, Add), idx, H.simple_i64 to_add)]
-    | Mixed_product_to_all_values ->
-      (* gap = 0; offset += left value *)
-      let gap_removed = extract_block_index_offset ~machine_width idx in
-      [ Binary
-          ( Int_arith (Naked_int64, Add),
-            H.Prim gap_removed,
-            H.simple_i64 (Int64.of_int (BC.on_64_bit_arch cts.left.value)) ) ]
-    | Mixed_product_to_all_flats ->
-      (* offset += gap + left value + right value + left flat; gap = 0 *)
-      let offset = extract_block_index_offset ~machine_width idx in
-      let shifter =
-        H.simple_untagged_int MPB.block_index_offset_bits ~machine_width
-      in
-      let gap = H.Binary (Int_shift (Naked_int64, Lsr), idx, shifter) in
-      let to_add =
-        Int64.of_int
-          (BC.on_64_bit_arch cts.left.value
-          + BC.on_64_bit_arch cts.right.value
-          + BC.on_64_bit_arch cts.left.flat)
-      in
-      [ Binary
-          ( Int_arith (Naked_int64, Add),
-            H.Prim
-              (Binary (Int_arith (Naked_int64, Add), H.Prim offset, H.Prim gap)),
-            H.simple_i64 to_add ) ]
-    | Mixed_product_to_empty ->
-      (* Accesses to an index to a product of voids will not actually access *)
-      [H.simple_i64_expr 0L])
+    [ compose_block_indices ~machine_width
+        ~intermediate ~target:counts.here idx (H.simple_i64 inner_bits) ]
   | Pmakefloatblock (mutability, mode), _ ->
     let args = List.flatten args in
     let mode =
