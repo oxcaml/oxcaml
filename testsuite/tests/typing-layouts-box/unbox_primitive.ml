@@ -481,3 +481,18 @@ let () =
 val unbox_abs : Abs.t -> Abs.t# = <fun>
 val box_abs : Abs.t# -> Abs.t = <fun>
 |}]
+
+type t = { i : int }
+
+let unbox_t : t -> t# = fun t -> unbox t
+let stdlib_unbox_t : t -> t# = fun t -> Stdlib.unbox t
+
+let () = both_ways (fun { hide } ->
+  let original = hide { i = 42 } in
+  assert ((unbox_t original).#i = 42);
+  assert ((stdlib_unbox_t original).#i = 42))
+[%%expect{|
+type t = { i : int; }
+val unbox_t : t -> t# = <fun>
+val stdlib_unbox_t : t -> t# = <fun>
+|}]
