@@ -16,6 +16,16 @@
 
 module Float_u = Stdlib_upstream_compatible.Float_u
 
+type inherited_float : float64 = #{ inherit x : float# }
+
+let[@inline never] inherit_float x = #{ x }
+
+let () =
+  let r = inherit_float #2.5 in
+  assert (Float_u.to_float r.#x = 2.5);
+  let #{ x } = r in
+  assert (Float_u.to_float x = 2.5)
+
 (* We cannot inhabit a made-addressable kind organically, but we can via
    magic; addressability does not change the runtime representation. *)
 module F64a : sig

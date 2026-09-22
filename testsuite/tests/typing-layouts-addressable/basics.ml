@@ -900,3 +900,164 @@ Error: The value "y" has type "#('b * 'c)" but an expression was expected of typ
            (float64 & value) addressable
          because of the annotation on the type variable 'a.
 |}]
+
+(**** Product kinds make their components addressable ****)
+
+module Product_components_bad : sig
+  type t : bits8 addressable & float64 addressable & void addressable
+end = struct
+  type t : bits8 & float64 & void
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8 & float64 & void
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : bits8 & float64 & void end
+       is not included in
+         sig
+           type t
+             : bits8 addressable & float64 addressable & void addressable
+         end
+       Type declarations do not match:
+         type t : bits8 & float64 & void
+       is not included in
+         type t : bits8 addressable & float64 addressable & void addressable
+       The layout of the first is bits8 & float64 & void
+         because of the definition of t at line 4, characters 2-33.
+       But the layout of the first must be a sublayout of
+           bits8 addressable & float64 addressable & void addressable
+         because of the definition of t at line 2, characters 2-69.
+|}]
+
+module Product_components_reverse_bad : sig
+  type t : bits8 & float64 & void
+end = struct
+  type t : bits8 addressable & float64 addressable & void addressable
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : bits8 addressable & float64 addressable & void addressable
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type t
+             : bits8 addressable & float64 addressable & void addressable
+         end
+       is not included in
+         sig type t : bits8 & float64 & void end
+       Type declarations do not match:
+         type t : bits8 addressable & float64 addressable & void addressable
+       is not included in
+         type t : bits8 & float64 & void
+       The layout of the first is
+           bits8 addressable & float64 addressable & void addressable
+         because of the definition of t at line 4, characters 2-69.
+       But the layout of the first must be a sublayout of
+           bits8 & float64 & void
+         because of the definition of t at line 2, characters 2-33.
+|}]
+
+module Product_addressable_bad : sig
+  type t : any addressable
+end = struct
+  type t : any & any
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t : any & any
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : any & any end
+       is not included in
+         sig type t : any addressable end
+       Type declarations do not match:
+         type t : any & any
+       is not included in
+         type t : any addressable
+       The layout of the first is any & any
+         because of the definition of t at line 4, characters 2-20.
+       But the layout of the first must be a sublayout of any addressable
+         because of the definition of t at line 2, characters 2-26.
+|}]
+
+kind_ small_product = bits8 & bits16
+module Nested_product_bad : sig
+  type t : (small_product & float64) addressable
+end = struct
+  type t : small_product & float64 addressable
+end
+[%%expect{|
+kind_ small_product = bits8 & bits16
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   type t : small_product & float64 addressable
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t : (bits8 & bits16) & float64 addressable end
+       is not included in
+         sig type t : ((bits8 & bits16) & float64) addressable end
+       Type declarations do not match:
+         type t : (bits8 & bits16) & float64 addressable
+       is not included in
+         type t : ((bits8 & bits16) & float64) addressable
+       The layout of the first is (bits8 & bits16) & float64 addressable
+         because of the definition of t at line 5, characters 2-46.
+       But the layout of the first must be a sublayout of
+           ((bits8 & bits16) & float64) addressable
+         because of the definition of t at line 3, characters 2-48.
+|}]
+
+type tuple_components_bad : bits8 & float64 = #(tb8 * float#)
+type tuple_addressable_bad = #(tb8 * float#) req
+[%%expect{|
+type tuple_components_bad = #(tb8 * float#)
+Line 2, characters 29-44:
+2 | type tuple_addressable_bad = #(tb8 * float#) req
+                                 ^^^^^^^^^^^^^^^
+Error: This type "#(tb8 * float#)" should be an instance of type
+         "('a : any addressable)"
+       The layout of #(tb8 * float#) is bits8 & float64
+         because it is an unboxed tuple.
+       But the layout of #(tb8 * float#) must be a sublayout of
+           any addressable
+         because of the definition of req at line 1, characters 0-31.
+|}]
+
+let tuple_projection_bad (x : tb8) (y : float#) =
+  let pair : ('a : bits8 & float64) = #(x, y) in
+  let #(x, _) = pair in
+  x
+[%%expect{|
+val tuple_projection_bad : tb8 -> float# -> tb8 = <fun>
+|}]
+
+type product_univars =
+  { f : ('a : bits8 & float64). 'a -> 'a }
+type explicit_product_univars =
+  { f : ('a : bits8 addressable & float64 addressable). 'a -> 'a }
+let product_unification_bad (x : product_univars)
+    : explicit_product_univars =
+  { f = x.f }
+[%%expect{|
+type product_univars = { f : ('a : bits8 & float64). 'a -> 'a; }
+type explicit_product_univars = {
+  f : ('a : bits8 addressable & float64 addressable). 'a -> 'a;
+}
+Line 7, characters 8-11:
+7 |   { f = x.f }
+            ^^^
+Error: The field access "x.f" has type "'a -> 'a"
+       but an expression was expected of type "'b -> 'b"
+       The layout of 'a is bits8 addressable & float64 addressable
+         because of the definition of explicit_product_univars at lines 3-4, characters 0-66.
+       But the layout of 'a must overlap with bits8 & float64
+         because of the definition of product_univars at lines 1-2, characters 0-42.
+|}]

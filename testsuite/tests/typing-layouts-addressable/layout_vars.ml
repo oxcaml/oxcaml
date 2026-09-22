@@ -7,6 +7,41 @@
    Translation of layout-polymorphic instantiations is not supported yet, so
    the uses are wrapped in [module type of] to only typecheck them. *)
 
+type inherited_float : float64 = #{ inherit x : float# }
+[%%expect{||}]
+
+type inherited_float_semi : float64 = #{ inherit x : float#; }
+[%%expect{||}]
+
+type ('a : any) inherited = #{ inherit x : 'a @@ portable }
+[%%expect{||}]
+
+type inherited_boxed = { inherit x : float# }
+[%%expect{||}]
+
+type inherited_multiple = #{ x : int; inherit y : float# }
+[%%expect{||}]
+
+type inherited_first = #{ inherit x : float#; y : int }
+[%%expect{||}]
+
+type inherited_mutable = #{ inherit mutable x : float# }
+[%%expect{||}]
+
+module Inherited_signature : sig
+  type t = #{ inherit x : int }
+end = struct
+  type t = #{ x : int }
+end
+[%%expect{||}]
+
+module Addressable_signature : sig
+  type t = #{ x : int }
+end = struct
+  type t = #{ inherit x : int }
+end
+[%%expect{||}]
+
 module type S = sig
   val f : layout_ x. ('a : x) ('b : x addressable). 'a -> 'b -> unit
 end
@@ -275,4 +310,3 @@ Error: Signature mismatch:
        the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
-
