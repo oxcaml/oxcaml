@@ -31,6 +31,9 @@ unsat
 (x >>u c) & m -> x >>u c if 0 <= c < 64 && (m | (-1 << (64 - c))) = -1
 unsat
 
+(x >>s c) & m -> x >>u c if 0 <= c < 64 && 0 < c && m = (-1 >>u c)
+unsat
+
 x | x -> x
 unsat
 
@@ -164,6 +167,12 @@ unsat
 unsat
 
 (x * c1) << c2 -> x * (c1 << c2) if 0 <= c2 < 64
+unsat
+
+(x >>u c) << c -> x & (-1 << c) if 0 <= c < 64 && 0 < c && c < 32
+unsat
+
+(x >>s c) << c -> x & (-1 << c) if 0 <= c < 64 && 1 < c && c < 32
 unsat
 
 (x << c) >>u c -> x & (-1 >>u c) if 0 <= c < 64 && 32 < c

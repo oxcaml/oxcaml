@@ -61,6 +61,8 @@ let ( <<: ) l r = Apply (Lsl, l, r)
 
 let ( >>: ) l r = Apply (Lsr, l, r)
 
+let asr_ l r = Apply (Asr, l, r)
+
 let not_ t = t ^: Lit (-1n)
 
 let neg t = Lit 0n -: t
@@ -100,6 +102,12 @@ let and_rules =
     create And
       ~cond:(Eq (m' |! (il (-1n) <<! word_bits -! c'), il (-1n)))
       (x >>: c, m)
+      (x >>: k c');
+    (* Masking off the bits an arithmetic shift copied from the sign makes it a
+       logical shift. *)
+    create And
+      ~cond:(All [Slt (il 0n, c'); Eq (m', il (-1n) >>! c')])
+      (asr_ x c, m)
       (x >>: k c') ]
 
 let or_rules =
@@ -155,7 +163,20 @@ let sub_rules =
 
 let lsl_rules =
   [ create Lsl ~cond:(Eq (m' <<! c', il (-1n) <<! c')) (x &: m, c) (x <<: k c');
-    create Lsl (x *: c1, c2) (x *: k (c1' <<! c2')) ]
+    create Lsl (x *: c1, c2) (x *: k (c1' <<! c2'));
+    (* Clearing the low bits with a pair of shifts is a mask. The mask [-1 << c]
+       only fits a sign-extended 32-bit immediate for shifts below 32; for
+       larger shifts the pair of shifts is cheaper. The arithmetic variant
+       excludes [c = 1]: [(x asr 1) lsl 1] followed by [+ 1] re-tags an integer,
+       and [asr_int] only recognises the untagging of that form. *)
+    create Lsl
+      ~cond:(All [Slt (il 0n, c'); Slt (c', il 32n)])
+      (x >>: c, c)
+      (x &: k (il (-1n) <<! c'));
+    create Lsl
+      ~cond:(All [Slt (il 1n, c'); Slt (c', il 32n)])
+      (asr_ x c, c)
+      (x &: k (il (-1n) <<! c')) ]
 
 (* For smaller shifts the mask does not fit an immediate operand, and the pair
    of shifts is cheaper. *)
