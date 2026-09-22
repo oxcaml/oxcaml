@@ -24,7 +24,7 @@ val two : int = 2
 ; r =
   ⟪(let (two_u =[int] #2m)
      (apply (field_imm 1 (global Toploop!)) "two_u" two_u))⟫ }
-val two_u : int# = <abstr>
+val two_u : int# = #2m
 { c = (missing); r = ⟪0⟫ }
 type t = { a : int; b : int; }
 { c = (missing); r = ⟪0⟫ }

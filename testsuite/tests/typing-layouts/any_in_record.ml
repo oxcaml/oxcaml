@@ -138,7 +138,7 @@ val make_test_block : unit -> int64_u t = <fun>
 
 let test_block = make_test_block ()
 [%%expect {|
-val test_block : int64_u t = {fst = <abstr>; snd = <abstr>}
+val test_block : int64_u t = {fst = #1L; snd = #2L}
 |}]
 
 let test_direct =
@@ -179,7 +179,7 @@ let test_unboxed_pair_block : #(int64_u * int64_u) t =
 |> Sys.opaque_identity
 [%%expect {|
 val test_unboxed_pair_block : #(int64_u * int64_u) t =
-  {fst = #(<abstr>, <abstr>); snd = #(<abstr>, <abstr>)}
+  {fst = #(#1L, #2L); snd = #(#3L, #4L)}
 |}]
 
 let test_unboxed_pair_direct =

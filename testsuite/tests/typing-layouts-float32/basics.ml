@@ -62,13 +62,13 @@ val x3_1 : t_float32 = <abstr>
 let x3_2_1 : 'a t_float32_id = #42.0s;;
 let x3_2_2 : 'a t_float32_id = of_f32 #42.0s;;
 [%%expect{|
-val x3_2_1 : float32_u t_float32_id = <abstr>
+val x3_2_1 : float32_u t_float32_id = #42.s
 val x3_2_2 : t_float32 t_float32_id = <abstr>
 |}];;
 
 let x3_3 : float32_u = #42.0s;;
 [%%expect{|
-val x3_3 : float32_u = <abstr>
+val x3_3 : float32_u = #42.s
 |}];;
 
 module M3_4 = struct
@@ -799,7 +799,7 @@ module FU :
   end
 type t14_1 = { x : float32_u; y : float32_u; }
 val f14_1 : t14_1 -> float32_u = <fun>
-val r14 : t14_1 = {x = <abstr>; y = <abstr>}
+val r14 : t14_1 = {x = #3.1400001s; y = #2.72000003s}
 val sum14_1 : float32 = 0.420000076s
 val f14_2 : t14_1 -> float32_u = <fun>
 val sum14_2 : float32 = 0.420000076s

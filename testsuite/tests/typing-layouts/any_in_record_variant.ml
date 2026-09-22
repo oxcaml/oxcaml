@@ -121,7 +121,7 @@ val test_block_with_value : (int, int) t = Yeah {fst = 1; snd = 2}
 
 let test_block = Yeah { fst = #1L; snd = #2L }
 [%%expect {|
-val test_block : (int64_u, int64_u) t = Yeah {fst = <abstr>; snd = <abstr>}
+val test_block : (int64_u, int64_u) t = Yeah {fst = #1L; snd = #2L}
 |}]
 
 type ('a : any) any_list = Nil | Cons of { head : 'a; tail : 'a any_list }
@@ -193,7 +193,7 @@ val test : string = "Ia"
 (* ... including when the inline record is mixed *)
 let v = Ib { x = #2.5; y = 7 }
 [%%expect{|
-val v : float# tagged = Ib {x = <abstr>; y = 7}
+val v : float# tagged = Ib {x = #2.5; y = 7}
 |}]
 
 let test (t : float# tagged) =

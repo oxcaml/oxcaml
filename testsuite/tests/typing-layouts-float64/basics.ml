@@ -62,13 +62,13 @@ val x3_1 : t_float64 = <abstr>
 let x3_2_1 : 'a t_float64_id = #42.0;;
 let x3_2_2 : 'a t_float64_id = of_f64 #42.0;;
 [%%expect{|
-val x3_2_1 : float# t_float64_id = <abstr>
+val x3_2_1 : float# t_float64_id = #42.
 val x3_2_2 : t_float64 t_float64_id = <abstr>
 |}];;
 
 let x3_3 : float# = #42.0;;
 [%%expect{|
-val x3_3 : float# = <abstr>
+val x3_3 : float# = #42.
 |}];;
 
 module M3_4 = struct
@@ -782,7 +782,7 @@ let f14_4 r =
 module FU = Stdlib_upstream_compatible.Float_u
 type t14_1 = { x : float#; y : float#; }
 val f14_1 : t14_1 -> FU.t = <fun>
-val r14 : t14_1 = {x = <abstr>; y = <abstr>}
+val r14 : t14_1 = {x = #3.14; y = #2.72}
 val sum14_1 : float = 0.419999999999999929
 val f14_2 : t14_1 -> FU.t = <fun>
 val sum14_2 : float = 0.419999999999999929

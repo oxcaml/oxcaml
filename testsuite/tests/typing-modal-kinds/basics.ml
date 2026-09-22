@@ -364,7 +364,7 @@ let float_u_record_duplicate =
   let (x @ once) : float_u_record = { x = #3.14; y = #2.718 } in Fun.id x
 
 [%%expect{|
-val float_u_record_duplicate : float_u_record = {x = <abstr>; y = <abstr>}
+val float_u_record_duplicate : float_u_record = {x = #3.14; y = #2.718}
 |}]
 
 let float_u_record_list_duplicate =

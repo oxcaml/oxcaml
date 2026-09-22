@@ -16,7 +16,7 @@ type t = { t : rec_t; x2 : float#; }
 let rec rec_t = { rec_t; x1 = #4.0 }
 
 [%%expect {|
-val rec_t : rec_t = {rec_t = <cycle>; x1 = <abstr>}
+val rec_t : rec_t = {rec_t = <cycle>; x1 = #4.}
 |}];;
 
 (* Error: the recursive variable itself cannot have a flat layout *)
@@ -39,7 +39,7 @@ Error: The value "x2" has type "('a : value_or_null)"
 let rec rec_t = let _ = { rec_t; x1 = #4.0 } in { rec_t; x1 = #4.0 };;
 
 [%%expect {|
-val rec_t : rec_t = {rec_t = <cycle>; x1 = <abstr>}
+val rec_t : rec_t = {rec_t = <cycle>; x1 = #4.}
 |}];;
 
 (* Constructor: tupled args *)
@@ -52,7 +52,7 @@ type cstr = A of cstr * float#
 (* OK: the recursive use is for a field in the value prefix. *)
 let rec rec_cstr = A (rec_cstr, #4.0)
 [%%expect {|
-val rec_cstr : cstr = A (<cycle>, <abstr>)
+val rec_cstr : cstr = A (<cycle>, #4.)
 |}];;
 
 (* Error: the recursive variable itself cannot have a flat layout *)
@@ -74,7 +74,7 @@ Error: The value "bad_flat" has type "('a : value_or_null)"
 let rec good_block = let _ = A (good_block, #4.0) in A (good_block, #4.0);;
 
 [%%expect {|
-val good_block : cstr = A (<cycle>, <abstr>)
+val good_block : cstr = A (<cycle>, #4.)
 |}];;
 
 (* Constructor: inline record args *)
@@ -87,7 +87,7 @@ type cstr = A of { cstr : cstr; flt : float#; }
 (* OK: the recursive use is for a field in the value prefix. *)
 let rec rec_cstr = A { cstr = rec_cstr; flt = #4.0 }
 [%%expect {|
-val rec_cstr : cstr = A {cstr = <cycle>; flt = <abstr>}
+val rec_cstr : cstr = A {cstr = <cycle>; flt = #4.}
 |}];;
 
 (* Error: the recursive variable itself cannot have a flat layout *)
@@ -110,7 +110,7 @@ let rec good_block = let _ = A { cstr = good_block; flt = #4.0 } in
                      A { cstr = good_block; flt = #4.0 };;
 
 [%%expect {|
-val good_block : cstr = A {cstr = <cycle>; flt = <abstr>}
+val good_block : cstr = A {cstr = <cycle>; flt = #4.}
 |}];;
 
 (* OK: the recursive variable is stored in the value prefix of a mixed block,
@@ -120,7 +120,7 @@ type t2 = { t2 : #(t2 option * float#); i : int }
 let rec t2 = { t2 = #(Some t2, #4.0); i = 0 };;
 [%%expect {|
 type t2 = { t2 : #(t2 option * float#); i : int; }
-val t2 : t2 = {t2 = #(Some <cycle>, <abstr>); i = 0}
+val t2 : t2 = {t2 = #(Some <cycle>, #4.); i = 0}
 |}];;
 
 type c2 = B of #(c2 option * float#)
@@ -134,14 +134,14 @@ type c3 = C of { c3 : #(c3 option * float#); i : int }
 let rec c3 = C { c3 = #(Some c3, #4.0); i = 0 };;
 [%%expect {|
 type c3 = C of { c3 : #(c3 option * float#); i : int; }
-val c3 : c3 = C {c3 = #(Some <cycle>, <abstr>); i = 0}
+val c3 : c3 = C {c3 = #(Some <cycle>, #4.); i = 0}
 |}];;
 
 type v2 = { v2 : #(v2 option * unit#) }
 let rec v2 = { v2 = #(Some v2, #()) };;
 [%%expect {|
 type v2 = { v2 : #(v2 option * unit#); }
-val v2 : v2 = {v2 = #(Some <cycle>, <abstr>)}
+val v2 : v2 = {v2 = #(Some <cycle>, #())}
 |}];;
 
 (* OK: a nested recursive mixed block *)
@@ -149,5 +149,5 @@ type n = { flt : float#; n : n option }
 let rec n = let rec inner = { flt = #0.; n = Some n } in inner;;
 [%%expect {|
 type n = { flt : float#; n : n option; }
-val n : n = {flt = <abstr>; n = Some <cycle>}
+val n : n = {flt = #0.; n = Some <cycle>}
 |}];;

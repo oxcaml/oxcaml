@@ -52,30 +52,30 @@ type ('a : float32) t6' = 'a iarray
 
 let v1 = [:  #1. :]
 [%%expect{|
-val v1 : float# iarray = [:<abstr>:]
+val v1 : float# iarray = [:#1.:]
 |}];;
 
 
 let v2 = [: #1l :]
 [%%expect{|
-val v2 : int32_u iarray = [:<abstr>:]
+val v2 : int32_u iarray = [:#1l:]
 |}];;
 
 
 let v3 = [: #1L :]
 [%%expect{|
-val v3 : int64_u iarray = [:<abstr>:]
+val v3 : int64_u iarray = [:#1L:]
 |}];;
 
 
 let v4 = [: #1n :]
 [%%expect{|
-val v4 : nativeint_u iarray = [:<abstr>:]
+val v4 : nativeint_u iarray = [:#1n:]
 |}];;
 
 let v5 = [: #1.s :]
 [%%expect{|
-val v5 : float32_u iarray = [:<abstr>:]
+val v5 : float32_u iarray = [:#1.s:]
 |}];;
 
 (****************************************)

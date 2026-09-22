@@ -64,13 +64,13 @@ val x3_1 : t_bits32 = <abstr>
 let x3_2_1 : 'a t_bits32_id = #42l;;
 let x3_2_2 : 'a t_bits32_id = of_i32 #42l;;
 [%%expect{|
-val x3_2_1 : int32_u t_bits32_id = <abstr>
+val x3_2_1 : int32_u t_bits32_id = #42l
 val x3_2_2 : t_bits32 t_bits32_id = <abstr>
 |}];;
 
 let x3_3 : int32_u = #42l;;
 [%%expect{|
-val x3_3 : int32_u = <abstr>
+val x3_3 : int32_u = #42l
 |}];;
 
 module M3_4 = struct

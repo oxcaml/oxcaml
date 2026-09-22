@@ -1177,7 +1177,7 @@ let float_0_unbox = unbox 0.
 val box_float : float# -> float = <fun>
 val unbox_float : float -> float# = <fun>
 val float_0_via_box : float = 0.
-val float_0_unbox : float# = <abstr>
+val float_0_unbox : float# = #0.
 |}]
 
 (* ref *)

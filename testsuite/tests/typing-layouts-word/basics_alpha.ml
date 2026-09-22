@@ -62,13 +62,13 @@ val x3_1 : t_word = <abstr>
 let x3_2_1 : 'a t_word_id = #42n;;
 let x3_2_2 : 'a t_word_id = of_isize #42n;;
 [%%expect{|
-val x3_2_1 : nativeint_u t_word_id = <abstr>
+val x3_2_1 : nativeint_u t_word_id = #42n
 val x3_2_2 : t_word t_word_id = <abstr>
 |}];;
 
 let x3_3 : nativeint_u = #42n;;
 [%%expect{|
-val x3_3 : nativeint_u = <abstr>
+val x3_3 : nativeint_u = #42n
 |}];;
 
 module M3_4 = struct

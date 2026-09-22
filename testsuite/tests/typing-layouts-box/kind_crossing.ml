@@ -394,7 +394,7 @@ val boxed_float : float = 3.5
 
 let unboxed_float : float# = Stdlib.unbox 3.5
 [%%expect{|
-val unboxed_float : float# = <abstr>
+val unboxed_float : float# = #3.5
 |}]
 
 let boxed_tuple : int * string = Stdlib.box #(7, "seven")

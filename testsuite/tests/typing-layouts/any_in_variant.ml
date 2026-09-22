@@ -114,7 +114,7 @@ val test_block_with_value : int t = Yeah 1
 
 let test_block = Yeah #1L
 [%%expect {|
-val test_block : int64_u t = Yeah <abstr>
+val test_block : int64_u t = Yeah #1L
 |}]
 
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
