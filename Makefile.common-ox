@@ -33,17 +33,53 @@ define dune_boot_context
       ("OC_CFLAGS_SEXP" "boot_oc_cflags.sexp"))))))
 endef
 
-ifneq ($(origin BUILD_OCAMLPARAM), undefined)
-ENV_VARS := (env-vars ("OCAMLPARAM" "$(BUILD_OCAMLPARAM)"))
-else
-ENV_VARS :=
-endif
 
 ifeq ($(main_build_profile),dev)
 main_ocamlopt_optimization_flags :=
 else
 main_ocamlopt_optimization_flags := -O3
 endif
+
+# With lto=yes, every native compilation in the main context records the
+# Reaper's link time optimisation information in its .cmx file, so that the
+# rules in oxcaml/lto/ can afterwards solve over the whole program and relink
+# it. lto_stdlib=yes does the same for the runtime stdlib, which makes the
+# stdlib a participant in that solve rather than an opaque external library.
+# Note that duneconf/*.ws are only generated when missing, and that Dune does
+# not re-run a compilation when only the environment has changed, so turning
+# either of these on or off requires
+#   rm -f duneconf/main.ws duneconf/runtime_stdlib.ws && rm -rf _build/main
+#
+# This goes through OCAMLPARAM rather than (ocamlopt_flags) because Dune
+# compiles the alias module of a wrapped library with its own reduced set of
+# flags, which drops everything coming from the context's environment. A
+# library whose alias module has no LTO information is of no use to the solve,
+# since the alias module's module block refers to every other unit of the
+# library.
+ifeq ($(lto),yes)
+lto_ocamlparam := support-lto=1
+else
+lto_ocamlparam :=
+endif
+
+ifeq ($(lto_stdlib),yes)
+lto_stdlib_ocamlparam := support-lto=1
+else
+lto_stdlib_ocamlparam :=
+endif
+
+# $(call ocamlparam,<extra params>) is the (env-vars) clause setting OCAMLPARAM
+# for a context, from BUILD_OCAMLPARAM together with the extra parameters
+# (each of the form "name=value") that the build itself needs. It expands to
+# nothing at all when there is neither, to keep the workspace file as it was.
+comma := ,
+empty :=
+space := $(empty) $(empty)
+ocamlparam_params = $(subst $(space),$(comma),$(strip $(BUILD_OCAMLPARAM) $1))
+ocamlparam = $(if $(call ocamlparam_params,$1),(env-vars ("OCAMLPARAM" "_$(comma)$(call ocamlparam_params,$1)")))
+
+MAIN_ENV_VARS := $(call ocamlparam,$(lto_ocamlparam))
+STDLIB_ENV_VARS := $(call ocamlparam,$(lto_stdlib_ocamlparam))
 
 define dune_runtime_stdlib_context
 (lang dune 3.23)
@@ -58,7 +94,11 @@ define dune_runtime_stdlib_context
   (env (_
     (bin_annot_cms true)
     (flags (:standard -directory stdlib -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
-    $(ENV_VARS)))))
+    ; Most, but not all, of the stdlib sources pin themselves to -O3 with an
+    ; [@@@ocaml.flambda_o3] attribute; ask for it here so that the ones that
+    ; do not are optimised like the rest of the distribution.
+    (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags)))
+    $(STDLIB_ENV_VARS)))))
 endef
 
 define dune_main_context
@@ -76,12 +116,12 @@ define dune_main_context
     (flags (:standard -directory compiler-distro -warn-error +A -alert -unsafe_multidomain -alert -unsafe_effects))
     ; We never want to build the compiler itself with AddressSanitizer enabled.
     (ocamlopt_flags (:standard $(main_ocamlopt_optimization_flags) -fno-asan))
-    $(ENV_VARS)))))
+    $(MAIN_ENV_VARS)))))
 endef
 
 
 .DEFAULT_GOAL := compiler
-.PHONY: boot-compiler boot-runtest runtime-stdlib compiler runtest runtest-llvmize runtest-dwarf
+.PHONY: boot-compiler boot-runtest runtime-stdlib compiler lto-compiler runtest runtest-llvmize runtest-dwarf
 
 boot_targets = \
   $(boot_ocamlc) \
@@ -158,6 +198,16 @@ minimize-stdlib: boot-minimizer boot-compiler
 # directories not in the dune workspace. (We can exclude external/ as a whole
 # since all the non-merlin directories in that folder are vendored anyways.)
 runtest_targets := $(sort $(addprefix @, $(addsuffix runtest, $(filter-out autom4te.cache/ build-aux/ external/ _%, $(dir $(wildcard */.))))))
+
+# Link time optimisation of the compiler itself; see oxcaml/lto/dune. This has
+# to go through make rather than a bare "dune build @oxcaml/lto/lto": the root
+# dune file picks the backend with (copy_files# "backend/%{env:ARCH=amd64}/..."),
+# so a dune command that does not inherit ARCH from here silently rebuilds the
+# compiler for the wrong target.
+lto-compiler: compiler
+	SYSTEM=$(SYSTEM) MODEL=$(MODEL) \
+          ASPP="$(ASPP)" ASPPFLAGS="$(ASPPFLAGS)" \
+          $(dune) build $(ws_main) @oxcaml/lto/lto
 
 # CR dkalinichenko: [runtest] is built using the main profile,
 # which uses the boot compiler. Use the final compiler for [runtest],
