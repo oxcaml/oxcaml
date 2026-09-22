@@ -124,6 +124,40 @@ type very_even = very_even even_list
 type very_odd = very_odd odd_list
 |}]
 
+(* Mutually recursive types - tying the knot *)
+type ('a, 'b [@rec]) maybe_empty_list =
+  | Nil
+  | Cons of 'a * 'b
+
+and ('a, 'b [@rec]) nonempty_list =
+  | NCons of 'a * 'b;;
+
+type 'a even_list = ('a, 'a odd_list) maybe_empty_list
+and 'a odd_list = ('a, 'a even_list) nonempty_list;;
+
+(* Check that everything works out across type abbreviations *)
+let rec map_even f = function Nil -> Nil | Cons (a, b) -> Cons (f a, map_odd f b)
+and map_odd f = function NCons (a, b) -> NCons (f a, map_even f b)
+
+let map_even : ('a -> 'b) -> 'a even_list -> 'b even_list = map_even
+let map_odd : ('a -> 'b) -> 'a odd_list -> 'b odd_list = map_odd
+[%%expect{|
+type ('a, 'b [@rec]) maybe_empty_list = Nil | Cons of 'a * 'b
+and ('a, 'b [@rec]) nonempty_list = NCons of 'a * 'b
+type 'a even_list = ('a, 'a odd_list) maybe_empty_list
+and 'a odd_list = ('a, 'a even_list) nonempty_list
+val map_even :
+  ('a -> 'b) ->
+  (('a, ('a, 'c) nonempty_list) maybe_empty_list as 'c) ->
+  (('b, ('b, 'd) nonempty_list) maybe_empty_list as 'd) = <fun>
+val map_odd :
+  ('a -> 'b) ->
+  (('a, ('a, 'c) maybe_empty_list) nonempty_list as 'c) ->
+  (('b, ('b, 'd) maybe_empty_list) nonempty_list as 'd) = <fun>
+val map_even : ('a -> 'b) -> 'a even_list -> 'b even_list = <fun>
+val map_odd : ('a -> 'b) -> 'a odd_list -> 'b odd_list = <fun>
+|}]
+
 (* Module with multiple contractive parameters *)
 module MultiParam : sig
   type ('a [@rec], 'b [@rec]) both_contractive
