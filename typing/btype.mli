@@ -761,7 +761,7 @@ module Jkind0 : sig
         jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
-        int ->
+        Asttypes.field_inheritance list ->
         jkind_l
     end
 
