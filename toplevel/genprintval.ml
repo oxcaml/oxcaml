@@ -925,9 +925,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               end
         in
         let cstr =
-          (* CR dkalinichenko: this is broken for unboxed variants:
-              unless the tag of the inner value just happens to be 0,
-              [Datarepr.find_constr_by_tag] will fail. *)
+          match rep, cstrs with
+          | Variant_unboxed, [((cstr, _locks), _use)] -> Some cstr
+          | Variant_unboxed, _ -> None
+          | (Variant_boxed _ | Variant_with_null | Variant_extensible), _ ->
           match Datarepr.find_constr_by_tag ~constant tag cstrs with
           | cstr -> Some cstr
           | exception Datarepr.Constr_not_found ->
