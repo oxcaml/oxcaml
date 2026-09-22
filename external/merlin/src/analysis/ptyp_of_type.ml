@@ -206,15 +206,18 @@ and value_description id
     pval_poly = false
   }
 
-and constructor_argument { ca_type; ca_loc; ca_modalities; ca_sort = _ } =
+and constructor_argument
+    { ca_type; ca_loc; ca_modalities; ca_inherit; ca_sort = _ } =
   { Parsetree.pca_type = core_type ca_type;
     pca_loc = ca_loc;
-    pca_modalities = const_modalities ~mut:Immutable ca_modalities
+    pca_modalities = const_modalities ~mut:Immutable ca_modalities;
+    pca_inherit = ca_inherit
   }
 
 and label_declaration
-    { ld_id; ld_mutable; ld_type; ld_attributes; ld_modalities; _ } =
-  Ast_helper.Type.field ~attrs:ld_attributes
+    { ld_id; ld_inherit; ld_mutable; ld_type; ld_attributes; ld_modalities; _ }
+    =
+  Ast_helper.Type.field ~attrs:ld_attributes ~inherit_:ld_inherit
     ~mut:
       (match ld_mutable with
       | Mutable _ -> Mutable

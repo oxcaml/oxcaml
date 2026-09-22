@@ -56,7 +56,11 @@ Types with kinds (kinds, not jkinds)
   Verbosity 0:
   type 'a t2 = 'a t1 = { foo : 'a; }
   Verbosity 1:
-  type 'a t2 : immutable_data with 'a = 'a t1 = { foo : 'a; }
+  type 'a t2
+    : (value mod everything) box mod immutable with 'a =
+    'a t1 = {
+    foo : 'a;
+  }
 
 Non-Tconstr types
   $ type_enclosing 2:11 <<EOF
@@ -66,7 +70,12 @@ Non-Tconstr types
   Verbosity 0:
   type t = int * string
   Verbosity 1:
-  type t : immutable_data with int with string = int * string
+  type t
+    : (value non_pointer & value non_float) box
+        mod forkable unyielding many stateless immutable
+        with int
+        with string =
+      int * string
 
   $ type_enclosing 2:11 <<EOF
   > type t = [\`Foo | \`Bar of int]

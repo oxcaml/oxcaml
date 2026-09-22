@@ -10487,6 +10487,7 @@ and type_label_access
         lbl_name = "";
         lbl_res = ty_exp;
         lbl_arg = newvar arg_kind;
+        lbl_inherit = Not_inherited;
         lbl_mut = Mutable { mode = Mode.Value.Comonadic.legacy; atomic = Nonatomic };
         lbl_modalities = Mode.Modality.Const.id;
         lbl_pos = 0;
