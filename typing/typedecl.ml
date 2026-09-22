@@ -85,6 +85,7 @@ type error =
   | Too_many_constructors
   | Duplicate_label of string
   | Unboxed_mutable_label
+  | Inherit_unsupported
   | Recursive_abbrev of string * Env.t * reaching_type_path
   | Cycle_in_def of string * Env.t * reaching_type_path
   | Unboxed_recursion of string * Env.t * reaching_type_path
@@ -567,8 +568,16 @@ let check_no_repr cty =
   | Ptyp_repr _ -> raise (Error (cty.ptyp_loc, Layout_poly_unsupported))
   | _ -> ()
 
+(* [inherit] is only supported where the field is stored unboxed on its own:
+   as the sole field of an unboxed record or of an [@@unboxed] type. *)
+let check_inherit ~inherit_allowed loc (inherit_ : inherit_flag) =
+  match inherit_ with
+  | Not_inherited -> ()
+  | Inherited ->
+    if not inherit_allowed then raise (Error (loc, Inherit_unsupported))
+
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
-      env univars closed lbls kloc ~extension =
+      ~inherit_allowed env univars closed lbls kloc ~extension =
   assert (lbls <> []);
   let all_labels = ref String.Set.empty in
   List.iter
@@ -577,10 +586,12 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          raise(Error(loc, Duplicate_label name));
        all_labels := String.Set.add name !all_labels)
     lbls;
-  let mk {pld_name=name;pld_mutable=mut;pld_modalities=modalities;
-          pld_type=arg;pld_loc=loc;pld_attributes=attrs} =
+  let mk {pld_name=name;pld_inherit=inherit_;pld_mutable=mut;
+          pld_modalities=modalities;pld_type=arg;pld_loc=loc;
+          pld_attributes=attrs} =
     Builtin_attributes.warning_scope attrs
       (fun () ->
+         check_inherit ~inherit_allowed loc inherit_;
          let is_atomic = Builtin_attributes.has_atomic attrs in
          let mut : mutability =
           match mut, is_atomic with
@@ -604,6 +615,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          {ld_id = Ident.create_local name.txt;
           ld_name = name;
           ld_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
+          ld_inherit = inherit_;
           ld_mutable = mut;
           ld_modalities = modalities;
           ld_type = cty; ld_loc = loc; ld_attributes = attrs}
@@ -621,6 +633,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
              env ld.ld_loc kloc ty
          end;
          {Types.ld_id = ld.ld_id;
+          ld_inherit = ld.ld_inherit;
           ld_mutable = ld.ld_mutable;
           ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = None;
@@ -634,8 +647,10 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       lbls in
   lbls, lbls'
 
-let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
+let transl_types_gf ~new_var_jkind ~inherit_allowed env loc univars closed cal
+      kloc ~extension =
   let mk arg =
+    check_inherit ~inherit_allowed arg.pca_loc arg.pca_inherit;
     let cty =
       transl_simple_type ~new_var_jkind env ?univars ~closed
         Mode.Alloc.Const.legacy arg.pca_type
@@ -643,7 +658,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
     let gf =
       Typemode.transl_modalities ~maturity:Stable Immutable arg.pca_modalities
     in
-    {ca_modalities = gf; ca_type = cty; ca_loc = arg.pca_loc}
+    {ca_inherit = arg.pca_inherit; ca_modalities = gf; ca_type = cty;
+     ca_loc = arg.pca_loc}
   in
   let tyl_gfl = List.map mk cal in
   let tyl_gfl' = List.mapi (fun idx (ca : Typedtree.constructor_argument) ->
@@ -653,7 +669,8 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc ~extension =
         env loc kloc ca.ca_type.ctyp_type
     end;
     {
-      Types.ca_modalities = ca.ca_modalities.moda_modalities;
+      Types.ca_inherit = ca.ca_inherit;
+      ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = None;
@@ -666,13 +683,14 @@ let transl_constructor_arguments ~new_var_jkind ~unboxed
   env loc univars closed ~extension = function
   | Pcstr_tuple l ->
       let flds, flds' =
-        transl_types_gf ~new_var_jkind ~extension
+        transl_types_gf ~new_var_jkind ~inherit_allowed:unboxed ~extension
           env loc univars closed l (Cstr_tuple { unboxed })
       in
       Types.Cstr_tuple flds', Cstr_tuple flds
   | Pcstr_record l ->
       let lbls, lbls' =
-        transl_labels ~record_form:Legacy ~new_var_jkind ~extension
+        transl_labels ~record_form:Legacy ~new_var_jkind
+          ~inherit_allowed:unboxed ~extension
           env univars closed l (Inlined_record { unboxed })
       in
       Types.Cstr_record lbls',
@@ -1188,6 +1206,7 @@ let transl_declaration env sdecl (id, uid) =
       | Ptype_record lbls ->
           let lbls, lbls' =
             transl_labels ~record_form:Legacy ~new_var_jkind:Any
+              ~inherit_allowed:unbox
               env None true lbls (Record { unboxed = unbox }) ~extension:false
           in
           let rep, jkind =
@@ -1205,6 +1224,7 @@ let transl_declaration env sdecl (id, uid) =
             Language_extension.Stable;
           let lbls, lbls' =
             transl_labels ~record_form:Unboxed_product ~new_var_jkind:Any
+              ~inherit_allowed:(List.compare_length_with lbls 1 = 0)
               env None true lbls Record_unboxed_product ~extension:false
           in
           (* The jkinds below, and the ones in [lbls], are dummy jkinds which
@@ -1414,6 +1434,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
       List.map
         (fun (ld : Types.label_declaration) ->
             { Types.ld_id = Ident.create_local (Ident.name ld.ld_id);
+            ld_inherit = Not_inherited;
             ld_mutable = Immutable;
             ld_modalities = ld.ld_modalities;
               (* Inherit modalities from the boxed version. Note that these
@@ -5698,6 +5719,10 @@ let report_error ~loc = function
       Location.errorf "Two labels are named %a" Style.inline_code s
   | Unboxed_mutable_label ->
       Location.errorf ~loc "Unboxed record labels cannot be mutable"
+  | Inherit_unsupported ->
+      Location.errorf ~loc
+        "inherit is only supported on the sole field or argument of@ \
+         an unboxed record or of an [@@@@unboxed] type"
   | Recursive_abbrev (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->

@@ -4357,9 +4357,10 @@ generalized_constructor_arguments:
 ;
 
 %inline constructor_argument:
-  gbl=global_flag cty=atomic_type m1=optional_atat_modalities_expr {
+  inh=inherit_flag gbl=global_flag cty=atomic_type
+  m1=optional_atat_modalities_expr {
     let modalities = gbl @ m1 in
-    Type.constructor_arg cty ~modalities ~loc:(make_loc $sloc)
+    Type.constructor_arg cty ~inherit_:inh ~modalities ~loc:(make_loc $sloc)
   }
 ;
 
@@ -4375,23 +4376,27 @@ label_declarations:
   | label_declaration_semi label_declarations   { $1 :: $2 }
 ;
 label_declaration:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
+    inh=inherit_flag mg=mutable_or_global_flag name=mkrhs(label) COLON
+    ty=poly_type_no_attr m1=optional_atat_modalities_expr attrs=attributes
       { let info = symbol_info $endpos in
-        let mut, m0 = $1 in
+        let mut, m0 = mg in
         let modalities = m0 @ m1 in
-        Type.field $2 $4 ~mut ~modalities ~attrs ~loc:(make_loc $sloc) ~info}
+        Type.field name ty ~inherit_:inh ~mut ~modalities ~attrs
+          ~loc:(make_loc $sloc) ~info}
 ;
 label_declaration_semi:
-    mutable_or_global_flag mkrhs(label) COLON poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
+    inh=inherit_flag mg=mutable_or_global_flag name=mkrhs(label) COLON
+    ty=poly_type_no_attr m1=optional_atat_modalities_expr attrs0=attributes
       SEMI attrs1=attributes
       { let info =
           match rhs_info $endpos(attrs0) with
           | Some _ as info_before_semi -> info_before_semi
           | None -> symbol_info $endpos
        in
-       let mut, m0 = $1 in
+       let mut, m0 = mg in
        let modalities = m0 @ m1 in
-       Type.field $2 $4 ~mut ~modalities ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
+       Type.field name ty ~inherit_:inh ~mut ~modalities
+         ~attrs:(attrs0 @ attrs1) ~loc:(make_loc $sloc) ~info}
 ;
 
 /* Type Extensions */
@@ -5367,6 +5372,10 @@ private_flag:
 mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
+;
+%inline inherit_flag:
+    /* empty */                                 { Not_inherited }
+  | INHERIT                                     { Inherited }
 ;
 poly_flag:
     /* empty */                                 { false }

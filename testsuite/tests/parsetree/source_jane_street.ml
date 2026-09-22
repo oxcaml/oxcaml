@@ -1830,3 +1830,17 @@ end
 [%%expect{|
 module type S = sig val poly_ f : 'a -> 'b end
 |}]
+
+(***********************)
+(* Inherit fields and arguments *)
+
+type t = #{ inherit i : int8# }
+type u = { inherit f : float# } [@@unboxed]
+type v = A of inherit int32_u [@@unboxed]
+type w = A of { inherit i : int32_u } [@@unboxed]
+[%%expect{|
+type t = #{ inherit i : int8#; }
+type u = { inherit f : float#; } [@@unboxed]
+type v = A of inherit int32_u [@@unboxed]
+type w = A of { inherit i : int32_u; } [@@unboxed]
+|}]

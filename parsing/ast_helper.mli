@@ -271,11 +271,12 @@ module Type:
       str ->
       constructor_declaration
 
-    val constructor_arg: ?loc:loc -> ?modalities:modality with_loc list -> core_type ->
-      constructor_argument
+    val constructor_arg: ?loc:loc -> ?inherit_:inherit_flag ->
+      ?modalities:modality with_loc list -> core_type -> constructor_argument
 
     val field: ?loc:loc -> ?attrs:attrs -> ?info:info ->
-      ?mut:mutable_flag -> ?modalities:modality with_loc list -> str -> core_type ->
+      ?inherit_:inherit_flag -> ?mut:mutable_flag ->
+      ?modalities:modality with_loc list -> str -> core_type ->
       label_declaration
   end
 

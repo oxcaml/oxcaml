@@ -140,6 +140,11 @@ let line i f s (*...*) =
   fprintf f s (*...*)
 ;;
 
+let inherit_flag i ppf = function
+  | Not_inherited -> ()
+  | Inherited -> line i ppf "Inherited\n"
+;;
+
 let list i f ppf l =
   match l with
   | [] -> line i ppf "[]\n";
@@ -1240,8 +1245,10 @@ and constructor_decl i ppf
   constructor_arguments (i+1) ppf pcd_args;
   option (i+1) core_type ppf pcd_res
 
-and constructor_argument i ppf {pca_modalities; pca_type; pca_loc} =
+and constructor_argument i ppf
+      {pca_inherit; pca_modalities; pca_type; pca_loc} =
   line i ppf "%a\n" fmt_location pca_loc;
+  inherit_flag (i+1) ppf pca_inherit;
   modalities (i+1) ppf pca_modalities;
   core_type (i+1) ppf pca_type
 
@@ -1249,10 +1256,11 @@ and constructor_arguments i ppf = function
   | Pcstr_tuple l -> list i constructor_argument ppf l
   | Pcstr_record l -> list i label_decl ppf l
 
-and label_decl i ppf {pld_name; pld_mutable; pld_type; pld_loc; pld_attributes;
-                      pld_modalities}=
+and label_decl i ppf {pld_name; pld_inherit; pld_mutable; pld_type; pld_loc;
+                      pld_attributes; pld_modalities}=
   line i ppf "%a\n" fmt_location pld_loc;
   attributes i ppf pld_attributes;
+  inherit_flag (i+1) ppf pld_inherit;
   line (i+1) ppf "%a\n" fmt_mutable_flag pld_mutable;
   modalities (i+1) ppf pld_modalities;
   line (i+1) ppf "%a" fmt_string_loc pld_name;

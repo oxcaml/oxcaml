@@ -640,17 +640,21 @@ module Type = struct
      pcd_attributes = add_info_attrs info attrs;
     }
 
-  let constructor_arg ?(loc = !default_loc) ?(modalities = []) typ =
+  let constructor_arg ?(loc = !default_loc) ?(inherit_ = Not_inherited)
+        ?(modalities = []) typ =
     {
+      pca_inherit = inherit_;
       pca_modalities = modalities;
       pca_type = typ;
       pca_loc = loc;
     }
 
   let field ?(loc = !default_loc) ?(attrs = []) ?(info = empty_info)
-        ?(mut = Immutable) ?(modalities = []) name typ =
+        ?(inherit_ = Not_inherited) ?(mut = Immutable) ?(modalities = [])
+        name typ =
     {
      pld_name = name;
+     pld_inherit = inherit_;
      pld_mutable = mut;
      pld_modalities = modalities;
      pld_type = typ;

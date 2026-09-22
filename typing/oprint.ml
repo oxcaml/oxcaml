@@ -27,6 +27,11 @@ let print_lident ppf = function
   | s when Lexer.is_keyword s -> fprintf ppf "\\#%s" s
   | s -> pp_print_string ppf s
 
+let print_inherit_flag ppf (inh : Asttypes.inherit_flag) =
+  match inh with
+  | Not_inherited -> ()
+  | Inherited -> pp_print_string ppf "inherit "
+
 let rec print_ident ppf =
   function
     Oide_ident s -> print_lident ppf s.printed_name
@@ -561,7 +566,7 @@ and print_typargs ppf =
       pp_close_box ppf ();
       pp_print_space ppf ()
 and print_out_label ppf
-    { olab_name; olab_mut; olab_type; olab_modalities } =
+    { olab_name; olab_inherit; olab_mut; olab_type; olab_modalities } =
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
     match olab_mut with
@@ -573,7 +578,8 @@ and print_out_label ppf
     | Nonatomic -> ()
     | Atomic -> fprintf ppf " [@@atomic]"
   in
-  fprintf ppf "@[<2>%s%a :@ %a%a%a@];"
+  fprintf ppf "@[<2>%a%s%a :@ %a%a%a@];"
+    print_inherit_flag olab_inherit
     mut
     print_lident olab_name
     print_out_type olab_type
@@ -1062,7 +1068,8 @@ and print_out_type_decl kwd ppf td =
     print_or_null_attr
     print_out_attrs td.otype_attributes
 
-and print_simple_out_gf_type ppf (ty, gf) =
+and print_simple_out_gf_type ppf (ty, gf, inh) =
+  print_inherit_flag ppf inh;
   print_simple_out_type ppf ty;
   print_out_modalities ppf gf
 

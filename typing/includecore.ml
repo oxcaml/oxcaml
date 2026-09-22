@@ -392,6 +392,7 @@ type kind_mismatch = type_kind * type_kind
 
 type label_mismatch =
   | Type of Errortrace.equality_error
+  | Inherit of position
   | Mutability of position
   | Atomicity of position
   | Modality of Modality.equate_error
@@ -415,6 +416,7 @@ type constructor_mismatch =
   | Inline_record of record_change list
   | Kind of position
   | Explicit_return_type of position
+  | Inherit_argument of int * position
   | Modality of int * Modality.equate_error
   | Fixed_representation of position
 
@@ -604,6 +606,10 @@ let report_label_mismatch first second env ppf err =
   match (err : label_mismatch) with
   | Type err ->
       report_type_inequality env ppf err
+  | Inherit ord ->
+      Format_doc.fprintf ppf "%s is inherit and %s is not."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second)
   | Mutability ord ->
       Format_doc.fprintf ppf "%s is mutable and %s is not."
         (String.capitalize_ascii (choose ord first second))
@@ -707,6 +713,10 @@ let report_constructor_mismatch first second decl env ppf err =
       pr "%s has explicit return type and %s doesn't."
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
+  | Inherit_argument (i, ord) ->
+      pr "Argument %i of %s is inherit and that of %s is not."
+        (i + 1) (choose ord first second) (choose_other ord first second)
+        (* argument position is one-based; more intuitive *)
   | Modality (i, err) ->
       pr "Modality mismatch at argument position %i:@ %a"
         (i + 1) (report_modality_equate_error first second) err
@@ -938,6 +948,10 @@ module Record_diffing = struct
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
         let err =
+          match ld1.ld_inherit, ld2.ld_inherit with
+          | Inherited, Not_inherited -> Some (Inherit First)
+          | Not_inherited, Inherited -> Some (Inherit Second)
+          | Inherited, Inherited | Not_inherited, Not_inherited ->
           match ld1.ld_mutable, ld2.ld_mutable with
           | Immutable, Immutable -> None
           | Mutable _, Immutable -> Some (Mutability First)
@@ -1215,6 +1229,20 @@ module Variant_diffing = struct
           (* Allow renaming: in the GADT case, these arguments are distinct from
              type parameters (which have been unified). See also
              Note [Contravariance of type parameter jkinds]. *)
+          let inherit_mismatch =
+            List.combine arg1 arg2
+            |> find_map_idx
+              (fun ((x : Types.constructor_argument),
+                    (y : Types.constructor_argument)) ->
+                match x.ca_inherit, y.ca_inherit with
+                | Inherited, Not_inherited -> Some First
+                | Not_inherited, Inherited -> Some Second
+                | Inherited, Inherited | Not_inherited, Not_inherited -> None)
+            |> Option.map (fun (i, ord) -> Inherit_argument (i, ord))
+          in
+          match inherit_mismatch with
+          | Some _ as err -> err
+          | None ->
           match Ctype.equal env true (params1 @ arg1_tys) (params2 @ arg2_tys) with
           | exception Ctype.Equality err -> Some (Type err)
           | () -> List.combine arg1_gfs arg2_gfs
