@@ -186,9 +186,9 @@ val operation_is_pure : specific_operation -> bool
 
 (** [true] iff the operation is guaranteed not to read from memory, not to
     raise (including via a hardware trap), and not to trigger the execution
-    of arbitrary code; it may write to memory. Used by dead store
+    of arbitrary code; it may store to memory. Used by dead store
     elimination ([Cfg_dse]); [false] is always a safe answer. *)
-val operation_is_pure_except_memory_writes : specific_operation -> bool
+val operation_is_pure_except_stores : specific_operation -> bool
 
 val operation_allocates : specific_operation -> bool
 

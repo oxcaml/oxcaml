@@ -587,14 +587,14 @@ let operation_is_pure = function
                          not using LLVM backend"
       intr
 
-(* Specific operations that are pure except possibly for writing to memory:
+(* Specific operations that are pure except possibly for storing to memory:
    guaranteed not to read from memory, not to raise (including via a hardware
    trap), and not to trigger the execution of arbitrary code (GC, finalizers,
    signal handlers). Used by dead store elimination ([Cfg_dse]) to step over
    such instructions; [false] is always a safe answer. Note that this is not
    implied by [operation_is_pure]: e.g. [Ifloatarithmem] is pure but reads
    memory. *)
-let operation_is_pure_except_memory_writes = function
+let operation_is_pure_except_stores = function
   | Ilea _ | Isextend32 | Izextend32 | Ineg | Ibswap _ | Ipackf32
   | Istore_int (_, _, _) -> true
   | Ioffset_loc _ | Ifloatarithmem _ | Irdtsc | Irdpmc | Ilfence | Imfence
