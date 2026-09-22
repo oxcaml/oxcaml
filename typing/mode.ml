@@ -5660,11 +5660,6 @@ module Comonadic_gen (Obj : Obj) = struct
       let ceil = get_ceil m in
       if C.le obj ceil floor then Some ceil else None
 
-    let check_const_conservative m =
-      let floor = get_loose_floor m in
-      let ceil = get_loose_ceil m in
-      if C.le obj ceil floor then Some ceil else None
-
     let in_bounds c m =
       let floor = get_floor m in
       let ceil = get_ceil m in
@@ -5858,11 +5853,6 @@ module Monadic_gen (Obj : Obj) = struct
     let check_const m =
       let floor = get_floor m in
       let ceil = get_ceil m in
-      if C.le obj floor ceil then Some ceil else None
-
-    let check_const_conservative m =
-      let floor = S.get_loose_ceil obj m in
-      let ceil = S.get_loose_floor obj m in
       if C.le obj floor ceil then Some ceil else None
 
     let in_bounds c m =
@@ -7557,12 +7547,6 @@ module Value_with (Areality : Areality) = struct
       let open Misc.Stdlib.Monad.Option.Syntax in
       let* monadic = Monadic.Guts.check_const monadic in
       let* comonadic = Comonadic.Guts.check_const comonadic in
-      Some (merge { comonadic; monadic })
-
-    let check_const_conservative { monadic; comonadic } =
-      let open Misc.Stdlib.Monad.Option.Syntax in
-      let* monadic = Monadic.Guts.check_const_conservative monadic in
-      let* comonadic = Comonadic.Guts.check_const_conservative comonadic in
       Some (merge { comonadic; monadic })
 
     let get_ceil { monadic; comonadic } =
