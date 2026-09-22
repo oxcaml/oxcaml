@@ -221,3 +221,35 @@ Destruct a record
 TODO (unboxed records): allow destruction
   $ $MERLIN single case-analysis -start 2:14 -end 2:15 -filename test.ml < test.ml | jq .value
   "Destruct not allowed on non-destructible type: t"
+
+Inherited fields preserve their contents' kind
+
+  $ cat > test.ml << EOF
+  > type t : float64 = #{ inherit x : float# }
+  > let f (r : t) = r.#x
+  > EOF
+
+  $ $MERLIN single errors -filename test.ml < test.ml | jq .value
+  []
+
+  $ $MERLIN single type-enclosing -position 2:19 -filename test.ml < test.ml | jq -r '.value[0].type'
+  float#
+
+Inherited fields require a singleton unboxed record
+
+  $ cat > test.ml << EOF
+  > type t = #{ x : int; inherit y : float# }
+  > EOF
+
+  $ $MERLIN single errors -filename test.ml < test.ml | jq -r '.value[].message'
+  Inherited labels are only supported in singleton unboxed records
+
+Construct a module containing an inherited field
+
+  $ cat > test.ml << EOF
+  > module M : sig
+  >   type t = #{ inherit x : float# }
+  > end = _
+  > EOF
+
+  $ $MERLIN single construct -position 3:6 -filename test.ml < test.ml | jq -r '.value[1][]'
