@@ -217,7 +217,16 @@ end
 
 module Set = Set.Make (RegOrder)
 module Map = Map.Make (RegOrder)
-module Tbl = Hashtbl.Make (RegOrder)
+
+module Tbl = struct
+  include Hashtbl.Make (RegOrder)
+
+  let find_or_null t reg =
+    (* [RegOrder]'s hashing and equality cannot raise [Not_found]. *)
+    match find t reg with
+    | value -> This value
+    | exception Not_found -> Null
+end
 
 let add_set_array s v =
   match Array.length v with

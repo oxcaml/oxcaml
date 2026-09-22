@@ -202,39 +202,40 @@ let[@inline] add_edge graph u v =
     | Unknown -> true
     | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
   in
-  let edge = Edge.make u.Reg.stamp v.Reg.stamp in
-  let[@inline] mem_edge () =
-    match graph.adj_set with
-    | EdgeSet set -> EdgeSet.mem set edge
-    | BitMatrix matrix -> BitMatrix.mem matrix edge
-  in
   if
     (not (Reg.same u v))
     && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
-    && not (mem_edge ())
-  then (
-    (match graph.adj_set with
-    | EdgeSet set -> EdgeSet.add set edge
-    | BitMatrix matrix -> BitMatrix.add matrix edge);
-    let add_adj_list x y =
-      Reg.Tbl.replace graph.adj_list x (y :: Reg.Tbl.find graph.adj_list x)
+  then
+    let edge = Edge.make u.Reg.stamp v.Reg.stamp in
+    let mem_edge =
+      match graph.adj_set with
+      | EdgeSet set -> EdgeSet.mem set edge
+      | BitMatrix matrix -> BitMatrix.mem matrix edge
     in
-    let incr_degree x =
-      let deg = Reg.Tbl.find graph.degree x in
-      if debug && deg = Degree.infinite
-      then fatal "trying to increment the degree of a precolored node";
-      Reg.Tbl.replace graph.degree x (succ deg)
-    in
-    let deg_u = Reg.Tbl.find graph.degree u in
-    let deg_v = Reg.Tbl.find graph.degree v in
-    if deg_u <> Degree.infinite
+    if not mem_edge
     then (
-      add_adj_list u v;
-      incr_degree u);
-    if deg_v <> Degree.infinite
-    then (
-      add_adj_list v u;
-      incr_degree v))
+      (match graph.adj_set with
+      | EdgeSet set -> EdgeSet.add set edge
+      | BitMatrix matrix -> BitMatrix.add matrix edge);
+      let add_adj_list x y =
+        Reg.Tbl.replace graph.adj_list x (y :: Reg.Tbl.find graph.adj_list x)
+      in
+      let incr_degree x =
+        let deg = Reg.Tbl.find graph.degree x in
+        if debug && deg = Degree.infinite
+        then fatal "trying to increment the degree of a precolored node";
+        Reg.Tbl.replace graph.degree x (succ deg)
+      in
+      let deg_u = Reg.Tbl.find graph.degree u in
+      let deg_v = Reg.Tbl.find graph.degree v in
+      if deg_u <> Degree.infinite
+      then (
+        add_adj_list u v;
+        incr_degree u);
+      if deg_v <> Degree.infinite
+      then (
+        add_adj_list v u;
+        incr_degree v))
 
 let[@inline] mem_edge graph reg1 reg2 =
   let edge = Edge.make reg1.Reg.stamp reg2.Reg.stamp in
@@ -257,9 +258,9 @@ let[@inline] for_all_adjacent_if graph reg ~should_visit ~f =
       if should_visit r then f r else true)
 
 let[@inline] degree graph reg =
-  match Reg.Tbl.find_opt graph.degree reg with
-  | None -> fatal "%a is not in the degree map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null graph.degree reg with
+  | This x -> x
+  | Null -> fatal "%a is not in the degree map" Printreg.reg reg
 
 let[@inline] set_degree graph reg d = Reg.Tbl.replace graph.degree reg d
 

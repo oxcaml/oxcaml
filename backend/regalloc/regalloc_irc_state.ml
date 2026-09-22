@@ -249,14 +249,14 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionId.Tbl.clear state.instr_work_list
 
 let[@inline] reg_work_list state reg =
-  match Reg.Tbl.find_opt state.reg_work_list reg with
-  | None -> fatal "%a is not in the work_list map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null state.reg_work_list reg with
+  | This x -> x
+  | Null -> fatal "%a is not in the work_list map" Printreg.reg reg
 
 let[@inline] color state reg =
-  match Reg.Tbl.find_opt state.reg_color reg with
-  | None -> fatal "%a is not in the color map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null state.reg_color reg with
+  | This x -> x
+  | Null -> fatal "%a is not in the color map" Printreg.reg reg
 
 let[@inline] set_color state reg color =
   Reg.Tbl.replace state.reg_color reg color

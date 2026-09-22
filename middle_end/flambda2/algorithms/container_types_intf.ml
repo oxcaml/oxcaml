@@ -166,8 +166,10 @@ module type Map = sig
   val union_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
   (** [union_total f m1 m2] is the same as
-      [union (fun k x y -> Some (f k x y)) m1 m2] *)
-  val union_total : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+      [union (fun k x y -> Some (f k x y)) m1 m2]. *)
+  val union_total :
+    (key -> 'a -> 'a -> 'a) ->
+    ('a t -> ('a t -> 'a t) @ local) @ local
 
   (** [union_total_shared f m1 m2] is a version of [union_total f m1 m2] that
       also exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
@@ -331,6 +333,10 @@ end
 
 module type Map_plus_iterator = sig
   include Map
+
+  (** The callback need not outlive the merge. *)
+  val union_total :
+    (key -> 'a -> 'a -> 'a) @ local -> 'a t -> 'a t -> 'a t
 
   module Mutable_iterator : sig
     (** An ['a iterator] iterates over the values in a ['a t] map in increasing

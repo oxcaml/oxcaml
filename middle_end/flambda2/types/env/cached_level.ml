@@ -64,13 +64,17 @@ let add_or_replace_binding t (name : Name.t) ty binding_time name_mode =
 let replace_variable_binding t var ty =
   let names_to_types =
     Name.Map.replace (Name.var var)
-      (function _old_ty, binding_time_and_mode -> ty, binding_time_and_mode)
+      (fun ((old_ty, binding_time_and_mode) as binding) ->
+        if ty == old_ty then binding else ty, binding_time_and_mode)
       t.names_to_types
   in
-  { names_to_types;
-    aliases = t.aliases;
-    symbol_projections = t.symbol_projections
-  }
+  if names_to_types == t.names_to_types
+  then t
+  else
+    { names_to_types;
+      aliases = t.aliases;
+      symbol_projections = t.symbol_projections
+    }
 
 let with_aliases t ~aliases = { t with aliases }
 
