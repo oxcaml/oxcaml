@@ -22,6 +22,9 @@ external marshal : 'a @ local -> Marshal.extern_flags list -> string
 
 let round_trip (v : 'a @ local) : 'a = Marshal.from_string (marshal v []) 0
 
+external physically_on_stack : bigstring @ local -> bool
+  = "caml_obj_is_stack" [@@noalloc]
+
 let check_owned a =
   assert (not (Array1.is_stack a) && owns_data a && has_finalizer a)
 
@@ -88,6 +91,35 @@ let test_marshal () =
   assert (marshal_shared_views "----------" 0 3
   = ("###-------", "AAA"  , "BBB"))
 
+let globalize_view s ofs len =
+  let a = of_string s in
+  let b = (Array1.with_sub_local [@inlined never]) a ofs len (fun view ->
+    let was_stack = Array1.is_stack view in
+    let b = Array1.unsafe_smart_globalize view in
+    assert ((b != view) = was_stack);
+    b) in
+  collect ();
+  assert (not (physically_on_stack b) && not (Array1.is_stack b));
+  Array1.fill b '#';
+  let result = to_string a, to_string b in
+  (* Globalizing the descriptor does not retain the backing owner. *)
+  ignore (Sys.opaque_identity a);
+  result
+
+let test_globalize () =
+  assert (globalize_view "----------" 4 5
+  = ("----#####-", "#####"));
+  assert (globalize_view "----------" 0 3
+  = ("###-------", "###"));
+  assert (globalize_view "----------" 10 0
+  = ("----------", ""));
+  (* globalizing a global bigstring returns the same bigstring *)
+  let a = of_string "----" in
+  let b = Array1.unsafe_smart_globalize a in
+  assert (a == b && a = b);
+  Array1.fill b '#';
+  assert (to_string a = "####")
+
 let[@inline never] make_backing weak =
   let a = of_string "abcdefg" in
   Weak.set weak 0 (Some a);
@@ -128,4 +160,5 @@ let () =
   test_views ();
   test_bounds ();
   test_marshal ();
+  test_globalize ();
   test_lifetime ()

@@ -1254,6 +1254,28 @@ CAMLprim value caml_ba_is_stack(value vb)
   return Val_bool((Caml_ba_array_val(vb)->flags & CAML_BA_STACK) != 0);
 }
 
+/* The caller must ensure that [vb] is stack-allocated. */
+
+CAMLprim value caml_ba_globalize_stack(value vb)
+{
+  CAMLparam1(vb);
+  CAMLlocal1(res);
+  uintnat asize = SIZEOF_BA_ARRAY
+                   + Caml_ba_array_val(vb)->num_dims * sizeof(intnat);
+
+  res = caml_alloc_custom(Custom_ops_val(vb), asize, 0, 1);
+  memcpy(Data_custom_val(res), Data_custom_val(vb), asize);
+  Caml_ba_array_val(res)->flags &= ~CAML_BA_STACK;
+  CAMLreturn(res);
+}
+
+CAMLprim value caml_ba_unsafe_smart_globalize(value vb)
+{
+  if (Caml_ba_array_val(vb)->flags & CAML_BA_STACK)
+    return caml_ba_globalize_stack(vb);
+  return vb;
+}
+
 /* Create / update proxy to indicate that b2 is a sub-array of b1 */
 
 static void caml_ba_update_proxy(struct caml_ba_array * b1,
