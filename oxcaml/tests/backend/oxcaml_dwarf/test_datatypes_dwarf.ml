@@ -54,8 +54,8 @@ let _ = f_mixed_record { a = 42; b = #3.14; c = true; d = 1000l }
 let _ = f_mixed_record { a = 0; b = #0.0; c = false; d = 0l }
 
 (* Unboxed variants *)
-type unboxed_variant_float = Simple of float# [@@unboxed]
-type unboxed_variant_int = Complex of int32_u [@@unboxed]
+type unboxed_variant_float = Simple of inherit float# [@@unboxed]
+type unboxed_variant_int = Complex of inherit int32_u [@@unboxed]
 
 let[@inline never] [@local never] f_unboxed_variant_float
     (x: unboxed_variant_float) = x

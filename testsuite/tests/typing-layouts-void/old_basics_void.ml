@@ -72,11 +72,11 @@ val r : '_weak1 list ref = {contents = []}
 val cons_r : '_weak1 -> unit = <fun>
 val id1 : baz -> baz = <fun>
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <void>}; a2 = {v = <void>}; x = 3; v = {v = <void>}; z = 42;
+   b1 = {v = <void>}; b2 = {v = <void>}}
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <void>}; a2 = {v = <void>}; x = 3; v = {v = <void>}; z = 42;
+   b1 = {v = <void>}; b2 = {v = <void>}}
 - : unit = ()
 |}]
 
@@ -101,8 +101,8 @@ let _ = assert (List.for_all2 (=) !r [12;11;10;9;8;7;6;5;4;3;2;1]);;
 [%%expect{|
 val id1' : baz -> baz = <fun>
 val b' : baz =
-  {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-   b2 = <void>}
+  {a1 = {v = <void>}; a2 = {v = <void>}; x = 3; v = {v = <void>}; z = 42;
+   b1 = {v = <void>}; b2 = {v = <void>}}
 - : unit = ()
 |}]
 
@@ -206,12 +206,12 @@ let _ = assert (List.for_all2 (=) !r [10;9;8;7;6;5;4;3;2;1]);;
 - : unit = ()
 val magic_D : void_variant =
   D
-   {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-    b2 = <void>}
+   {a1 = <void>; a2 = {v = <void>}; x = 3; v = {v = <void>}; z = 42;
+    b1 = {v = <void>}; b2 = <void>}
 val magic_D : void_variant =
   D
-   {a1 = <void>; a2 = <void>; x = 3; v = <void>; z = 42; b1 = <void>;
-    b2 = <void>}
+   {a1 = <void>; a2 = {v = <void>}; x = 3; v = {v = <void>}; z = 42;
+    b1 = {v = <void>}; b2 = <void>}
 - : unit = ()
 |}]
 
@@ -309,8 +309,8 @@ let _ = assert (List.for_all2 (=) !r [8;7;6;5;4;3;2;1]);;
 [%%expect{|
 val local_void_bindings_1 : void_holder -> baz = <fun>
 - : baz =
-{a1 = <void>; a2 = <void>; x = 12; v = <void>; z = 13; b1 = <void>;
- b2 = <void>}
+{a1 = {v = <void>}; a2 = {v = <void>}; x = 12; v = {v = <void>}; z = 13;
+ b1 = {v = <void>}; b2 = {v = <void>}}
 - : unit = ()
 |}]
 
@@ -531,7 +531,7 @@ let _ = assert (List.for_all2 (=) !r [7;6;5;4;3;2;1]);;
 type unboxed_inlined_void_rec = UIVR of { uivr_v : t_void; } [@@unboxed]
 type uivr_holder = { uivrh_x : int; uivrh_v : unboxed_inlined_void_rec; }
 val make_uivr_holder : void_holder -> uivr_holder = <fun>
-- : uivr_holder = {uivrh_x = 7; uivrh_v = <void>}
+- : uivr_holder = {uivrh_x = 7; uivrh_v = UIVR {uivr_v = <void>}}
 - : unit = ()
 |}]
 

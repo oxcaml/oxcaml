@@ -185,10 +185,10 @@ type 'a r = #{ i : 'a; }
 type int_r = int r
 |}]
 
-type ('a : float64) t = #{ i: 'a }
+type ('a : float64) t = #{ inherit i: 'a }
 type floatu_t : float64 = float# t
 [%%expect{|
-type ('a : float64) t = #{ i : 'a; }
+type ('a : float64) t = #{ inherit i : 'a; }
 type floatu_t = float# t
 |}]
 

@@ -556,7 +556,7 @@ Line 2, characters 54-78:
                                                           ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
-       The layout of void_unboxed_record is void
+       The layout of void_unboxed_record is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
          because it instantiates an unannotated type parameter of t,
@@ -603,7 +603,7 @@ Line 2, characters 31-50:
 2 |   type result = V of (string * void_unboxed_record) | I of int
                                    ^^^^^^^^^^^^^^^^^^^
 Error: Tuple element types must have layout value.
-       The layout of "void_unboxed_record" is void
+       The layout of "void_unboxed_record" is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of "void_unboxed_record" must be a value layout
          because it's the type of a tuple element.
@@ -623,7 +623,7 @@ Line 7, characters 13-14:
                  ^
 Error: The value "t" has type "void_unboxed_record"
        but an expression was expected of type "('a : value_or_null)"
-       The layout of void_unboxed_record is void
+       The layout of void_unboxed_record is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
          because it's the type of a tuple element.
@@ -641,7 +641,7 @@ Line 4, characters 7-21:
 Error: This pattern matches values of type "void_unboxed_record"
        but a pattern was expected which matches values of type
          "('a : value_or_null)"
-       The layout of void_unboxed_record is void
+       The layout of void_unboxed_record is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
          because it's the type of a tuple element.
@@ -672,7 +672,7 @@ Line 2, characters 34-58:
                                       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The type constraints are not consistent.
        Type "('a : value)" is not compatible with type "void_unboxed_record"
-       The layout of void_unboxed_record is void
+       The layout of void_unboxed_record is void addressable
          because of the definition of void_unboxed_record at line 12, characters 0-60.
        But the layout of void_unboxed_record must be a value layout
          because it instantiates an unannotated type parameter of t,
