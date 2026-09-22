@@ -34,6 +34,7 @@ let use_lexbuf ppf ~wrap_in_module lb ~modpath ~filename =
   Location.init lb filename;
   (* Skip initial #! line if any *)
   Lexer.skip_hash_bang lb;
+  Lexer.protect_syntax_mode @@ fun () ->
   Misc.protect_refs
     [ R (Location.input_name, filename);
       R (Location.input_lexbuf, Some lb); ]

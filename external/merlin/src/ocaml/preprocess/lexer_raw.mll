@@ -233,11 +233,23 @@ let at_beginning_of_line pos = (pos.pos_cnum = pos.pos_bol)
 
 (* Syntax mode configuration for the #syntax directive *)
 module Syntax_mode = struct
-  let quotations = ref Config.syntax_quotations
+  (* [None] while no [#syntax quotations] directive has been seen since the
+     last reset; the invocation default [!Clflags.syntax_quotations] then
+     applies. *)
+  let quotations : bool option ref = ref None
+
+  let quotations_enabled () =
+    match !quotations with
+    | Some enabled -> enabled
+    | None -> !Clflags.syntax_quotations
 end
 
-let _reset_syntax_mode () =
-  Syntax_mode.quotations := Config.syntax_quotations
+let reset_syntax_mode () =
+  Syntax_mode.quotations := None
+
+let _protect_syntax_mode f =
+  Misc.protect_refs
+    [ Misc.R (Syntax_mode.quotations, !Syntax_mode.quotations) ] f
 
 (* See the comment on the [directive] lexer. *)
 type directive_lexing_already_consumed =
@@ -881,7 +893,7 @@ rule token state = parse
   | ","  { return COMMA }
   | "->" { return MINUSGREATER }
   | "$" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         return DOLLAR
       else
         return (INFIXOP0 "$")
@@ -898,7 +910,7 @@ rule token state = parse
   | ";;" { return SEMISEMI }
   | "<"  { return LESS }
   | "<[" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         return LESSLBRACKET
       else
         (* Put back the '[' and return just LESS *)
@@ -913,7 +925,7 @@ rule token state = parse
   | "[>" { return LBRACKETGREATER }
   | "]"  { return RBRACKET }
   | "]>" {
-      if !(Syntax_mode.quotations) then
+      if Syntax_mode.quotations_enabled () then
         return RBRACKETGREATER
       else
         (* Put back the '>' and return just RBRACKET *)
@@ -1029,10 +1041,12 @@ and directive state already_consumed = parse
         in
         match mode with
         | "quotations" ->
-            Syntax_mode.quotations := toggle;
-            let tok = token state lexbuf in
-            enqueue_token_from_end_of_lexbuf_window lexbuf SEMISEMI ~len:0;
-            tok
+            Syntax_mode.quotations := Some toggle;
+            (* The compiler lexes the newline ending the directive as an [EOL]
+               token and defers the [SEMISEMI] until after it. Merlin's [token]
+               skips newlines itself, so deferring would place the [SEMISEMI]
+               after the next real token; return it directly instead. *)
+            return SEMISEMI
         | _ ->
             directive_error lexbuf ("unknown syntax mode " ^ mode)
               ~already_consumed ~directive:"syntax"
