@@ -304,6 +304,15 @@ jobs:
         run: |
           opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
+      - name: Set up the OxCaml bootstrap compiler
+        id: bootstrap
+        uses: ./.github/actions/setup-bootstrap
+
+      - name: Use the OxCaml bootstrap compiler
+        env:
+          BOOTSTRAP_BIN: ${{ steps.bootstrap.outputs.bin }}
+        run: echo "$BOOTSTRAP_BIN" >> "$GITHUB_PATH"
+
       - name: Disable any testcases
         env:
           DISABLE_TESTCASES: ${{ matrix.disable_testcases }}

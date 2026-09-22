@@ -1,0 +1,47 @@
+name: Set up the OxCaml bootstrap compiler
+description: Build a pinned OxCaml compiler using the upstream opam switch
+outputs:
+  bin:
+    description: Directory containing the bootstrap compiler executables
+    value: ${{ steps.build.outputs.bin }}
+runs:
+  using: composite
+  steps:
+    - name: Restore bootstrap compiler
+      id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/oxcaml-bootstrap/_install
+        # Keep the revision in sync with bootstrapCompiler in default.nix.
+        key: oxcaml-bootstrap-v1-${{ runner.os }}-${{ runner.arch }}-1c543884d56ec67ff52092942c66bf08610254c6
+
+    - name: Build bootstrap compiler
+      id: build
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: |
+        bootstrap="$RUNNER_TEMP/oxcaml-bootstrap"
+        if [[ "$CACHE_HIT" != true ]]; then
+          git init "$bootstrap"
+          git -C "$bootstrap" remote add origin https://github.com/oxcaml/oxcaml.git
+          git -C "$bootstrap" fetch --depth=1 origin \
+            1c543884d56ec67ff52092942c66bf08610254c6
+          git -C "$bootstrap" checkout --detach FETCH_HEAD
+          (
+            cd "$bootstrap"
+            eval "$(opam env)"
+            autoconf
+            ./configure --prefix="$bootstrap/_install"
+            make -s install
+          )
+        fi
+        "$bootstrap/_install/bin/ocamlopt" -version
+        echo "bin=$bootstrap/_install/bin" >> "$GITHUB_OUTPUT"
+
+    - name: Save bootstrap compiler
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/oxcaml-bootstrap/_install
+        key: ${{ steps.cache.outputs.cache-primary-key }}
