@@ -7,6 +7,59 @@
 
 open Stdlib_stable
 
+module Box_indices_bad = struct
+  type point = { x : int; y : int }
+  type line = { p : point#; q : point# }
+  let q : (line#, point#) idx_imm = (.q)
+  let y : (point#, int) idx_imm = (.y)
+  let q_y : (line#, int) idx_imm = Idx_imm.compose q y
+  let get_y (line : line) = Idx_imm.get line q_y
+end
+[%%expect{|
+Line 6, characters 11-16:
+6 |   let q : (line#, point#) idx_imm = (.q)
+               ^^^^^
+Error: This type "line#" should be an instance of type "('a : value_or_null)"
+       The layout of line# is
+           (value non_pointer & value non_pointer)
+           & (value non_pointer & value non_pointer)
+         because it is an unboxed record.
+       But the layout of line# must be a value layout
+         because the 1st type argument of idx_imm has layout value_or_null.
+       Note: The layout of immediate is value non_pointer.
+|}]
+
+module Atomic_box_indices_bad = struct
+  type t = { mutable value : int [@atomic] }
+  let value : (t#, int) idx_atomic = (.value)
+  let get (x : t) = Idx_atomic.get x value
+end
+[%%expect{|
+Line 3, characters 15-17:
+3 |   let value : (t#, int) idx_atomic = (.value)
+                   ^^
+Error: The type "t" has no unboxed version.
+Hint: Records with [@atomic] fields don't get unboxed versions.
+|}]
+
+module Array_box_indices_bad = struct
+  let mutable_index : (int array#, int) idx_mut =
+    Idx_mut.unsafe_create_into_array 0
+  let immutable_index : (int iarray#, int) idx_imm =
+    Idx_imm.unsafe_create_into_iarray 0
+end
+[%%expect{|
+Line 2, characters 23-33:
+2 |   let mutable_index : (int array#, int) idx_mut =
+                           ^^^^^^^^^^
+Error: This type "int array#" should be an instance of type
+         "('a : value_or_null)"
+       The layout of int array# is any
+         because it is the unboxed version of the primitive type array.
+       But the layout of int array# must be a value layout
+         because the 1st type argument of idx_mut has layout value_or_null.
+|}]
+
 (*********************************)
 (* Basic typechecking of indices *)
 
