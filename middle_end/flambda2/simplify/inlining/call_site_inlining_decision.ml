@@ -259,7 +259,7 @@ let ideal_configuration_may_differ ~is_a_functor =
         ~is_a_functor))
   || Option.is_some (Flambda_features.Inlining.ideal_large_functor_size ())
 
-let ideal_function_decl_decision ~inlining_args ~code_metadata =
+let ideal_function_decl_decision ~code_metadata =
   let decision = Code_metadata.inlining_decision code_metadata in
   match Flambda_features.Inlining.ideal_large_functor_size () with
   | None -> decision
@@ -267,6 +267,10 @@ let ideal_function_decl_decision ~inlining_args ~code_metadata =
     if not (Code_metadata.is_a_functor code_metadata)
     then decision
     else
+      (* Declaration decisions use the definition's arguments, which may differ
+         from the caller's when the functor comes from another compilation
+         unit. *)
+      let inlining_args = Code_metadata.inlining_arguments code_metadata in
       let make_decision ~inlining_arguments =
         Function_decl_inlining_decision.make_decision ~inlining_arguments
           ~inline:(Code_metadata.inline code_metadata)
@@ -282,10 +286,6 @@ let ideal_function_decl_decision ~inlining_args ~code_metadata =
             (Inlining_arguments.with_large_functor_size inlining_args
                ~large_functor_size:ideal_large_functor_size)
       in
-      (* [inlining_args] may differ from the arguments that were in force when
-         the decision recorded in [code_metadata] was taken, so [current] is
-         only used to detect whether the ideal large functor size changes the
-         decision. *)
       if Function_decl_inlining_decision_type.equal current ideal
       then decision
       else ideal
@@ -394,7 +394,7 @@ let describe_ideal_cannot_inline ~code_metadata
 
 let warn_if_ideal_configuration_differs ~apply ~code_metadata ~inlining_args
     ~threshold ~code_present ~actual_decision ~speculation ~speculate =
-  let ideal_decl = ideal_function_decl_decision ~inlining_args ~code_metadata in
+  let ideal_decl = ideal_function_decl_decision ~code_metadata in
   let ideal_would_inline, ideal =
     if Function_decl_inlining_decision_type.must_be_inlined ideal_decl
     then
