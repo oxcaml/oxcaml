@@ -703,6 +703,18 @@ let decl_of_type_constr type_constr =
         (mk_unboxed_version ~params:[] ~variance:[] ~separability:[])
         unboxed_jkind
     in
+    let jkind =
+      match type_unboxed_version with
+      | None -> jkind
+      | Some unboxed ->
+        let boxed =
+          Jkind.Base_and_axes.map_layout
+            (fun layout ->
+               Jkind_types.Layout.Box (layout, Jkind_types.Scannable_axes.max))
+            unboxed.type_jkind.jkind
+        in
+        { jkind with jkind = { jkind.jkind with base = boxed.base } }
+    in
     let type_jkind = Jkind.mark_best jkind in
     let type_ikind = ikind_of_jkind ~params:[] type_jkind in
     {type_params = [];
