@@ -13,8 +13,8 @@ depends: [
   # This version should be the same as in default.nix
   "dune" {= "3.23.1"}
   "re" {>= "1.10.0"}
-  # js_of_ocaml-compiler dependencies
-  "ppxlib" {>= "0.15"}
+  # js_of_ocaml-compiler and ppxlib_jane dependencies
+  "ppxlib" {>= "0.37"}
   "cmdliner" {>= "1.1.0"}
   "sedlex" {>= "3.3"}
   "menhirLib"

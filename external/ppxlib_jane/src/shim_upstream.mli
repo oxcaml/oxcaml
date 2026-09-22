@@ -2,29 +2,27 @@ open Astlib
 open Ppxlib_ast.Asttypes
 open Ppxlib_ast.Parsetree
 
+(** This file can have a different implementation in the Jane Street experimental compiler
+    and the upstream compiler, allowing ppxes to easily work with both versions *)
+
+(** When you change one of [shim_upstream.{ml,mli}], please also consider if you need to
+    make changes to the corresponding [shim_oxcaml.{ml,mli}]. *)
+
 module Longident : sig
-  type t = Astlib.Ast_500.Longident.t =
+  type t = Ast_504.Longident.t =
     | Lident of string
     | Ldot of t loc * string loc
     | Lapply of t loc * t loc
 
   val flatten : t -> string list
   val parse : string -> t
-  val to_parsetree : t -> Astlib.Longident.t
-  val of_parsetree : Astlib.Longident.t -> t
+  val to_parsetree : t -> Longident.t
+  val of_parsetree : Longident.t -> t
 end
-
-(** This file can have a different implementation in the Jane Street experimental compiler
-    and the upstream compiler, allowing ppxes to easily work with both versions *)
-
-(** When you change one of [shim.{ml,mli}], please also consider if you need to make
-    changes to the corresponding [shim_upstream.{ml,mli}]. A diff between the mli files is
-    automatically generated at [shim.mli.diff], so you'll find out if you change one but
-    not the other *)
 
 module Mode : sig
   (** The modes that can go on function arguments or return types *)
-  type t = mode = Mode of string [@@unboxed]
+  type t = Mode of string [@@unboxed]
 end
 
 module Modes : sig
@@ -36,7 +34,7 @@ end
 
 module Modality : sig
   (** The modalities that can go on constructor fields *)
-  type t = modality = Modality of string [@@unboxed]
+  type t = Modality of string [@@unboxed]
 end
 
 module Modalities : sig
@@ -47,7 +45,7 @@ module Modalities : sig
 end
 
 module Include_kind : sig
-  type t = include_kind =
+  type t =
     | Structure
     | Functor
 end
@@ -76,7 +74,7 @@ type arrow_result =
     [constructor_arguments]. With JS extensions, fields in constructors can contain
     modalities. *)
 module Pcstr_tuple_arg : sig
-  type t = constructor_argument
+  type t = core_type
 
   val extract_modalities : t -> Modalities.t * core_type
   val to_core_type : t -> core_type
@@ -115,7 +113,7 @@ module Value_description : sig
 end
 
 module Module_declaration : sig
-  type t = module_declaration =
+  type t =
     { pmd_name : string option loc
     ; pmd_type : module_type
     ; pmd_modalities : Modalities.t
@@ -138,7 +136,7 @@ module Value_binding : sig
     -> value_binding
 end
 
-type nonrec jkind_annotation_desc = jkind_annotation_desc =
+type jkind_annotation_desc =
   | Pjk_default
   | Pjk_abbreviation of Astlib.Longident.t loc
   | Pjk_operator of jkind_annotation * string loc list
@@ -147,12 +145,12 @@ type nonrec jkind_annotation_desc = jkind_annotation_desc =
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
 
-type nonrec jkind_annotation = jkind_annotation =
+and jkind_annotation =
   { pjka_loc : Location.t
   ; pjka_desc : jkind_annotation_desc
   }
 
-type nonrec jkind_declaration = jkind_declaration =
+and jkind_declaration =
   { pjkind_name : string loc
   ; pjkind_manifest : jkind_annotation option
   ; pjkind_attributes : attributes
@@ -160,7 +158,7 @@ type nonrec jkind_declaration = jkind_declaration =
   }
 
 module Type_declaration : sig
-  type t = type_declaration =
+  type t =
     { ptype_name : string loc
     ; ptype_params : (core_type * (variance * injectivity)) list
     ; ptype_cstrs : (core_type * core_type * Location.t) list
@@ -178,7 +176,7 @@ module Type_declaration : sig
 end
 
 module Constant : sig
-  type t = constant =
+  type t =
     | Pconst_integer of string * char option
     | Pconst_unboxed_integer of string * char
     | Pconst_char of char
@@ -193,11 +191,11 @@ end
 
 (** Match and construct [Pexp_function], as in the OCaml parsetree at or after 5.2. *)
 module Pexp_function : sig
-  type nonrec function_param_desc = function_param_desc =
+  type function_param_desc =
     | Pparam_val of arg_label * expression option * pattern
     | Pparam_newtype of string loc * jkind_annotation option
 
-  type nonrec function_param = function_param =
+  type function_param =
     { pparam_loc : Location.t
     ; pparam_desc : function_param_desc
     }
@@ -207,7 +205,7 @@ module Pexp_function : sig
     | Pcoerce of core_type option * core_type
 
   module Function_constraint : sig
-    type t = function_constraint =
+    type t =
       { mode_annotations : Modes.t
       ; ret_mode_annotations : Modes.t
       ; ret_type_constraint : type_constraint option
@@ -233,19 +231,19 @@ module Pexp_function : sig
     -> (function_param list * Function_constraint.t * function_body) option
 end
 
-type nonrec access_flag = access_flag =
+type nonrec access_flag =
   | Immutable_access
   | Mutable_access
   | Atomic_access
 
-type nonrec block_access = block_access =
+type block_access =
   | Baccess_field of Astlib.Longident.t loc
   | Baccess_block of access_flag * expression
 
-type nonrec unboxed_access = unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
+type unboxed_access = Uaccess_unboxed_field of Astlib.Longident.t loc
 
 module Core_type_desc : sig
-  type t = core_type_desc =
+  type t =
     | Ptyp_any of jkind_annotation option
     | Ptyp_var of string * jkind_annotation option
     | Ptyp_arrow of arg_label * core_type * core_type * Modes.t * Modes.t
@@ -270,7 +268,7 @@ module Core_type_desc : sig
 end
 
 module Core_type : sig
-  type t = core_type =
+  type t =
     { ptyp_desc : Core_type_desc.t
     ; ptyp_loc : Location.t
     ; ptyp_loc_stack : Location.t list
@@ -282,7 +280,7 @@ module Core_type : sig
 end
 
 module Pattern_desc : sig
-  type t = pattern_desc =
+  type t =
     | Ppat_any
     | Ppat_var of string loc
     | Ppat_alias of pattern * string loc
@@ -293,7 +291,8 @@ module Pattern_desc : sig
     | Ppat_tuple of (string option * pattern) list * closed_flag
     | Ppat_unboxed_tuple of (string option * pattern) list * closed_flag
     | Ppat_construct of
-        Astlib.Longident.t loc * ((string loc * jkind_annotation option) list * pattern) option
+        Astlib.Longident.t loc
+        * ((string loc * jkind_annotation option) list * pattern) option
     | Ppat_variant of label * pattern option
     | Ppat_record of (Astlib.Longident.t loc * pattern) list * closed_flag
     | Ppat_record_unboxed_product of (Astlib.Longident.t loc * pattern) list * closed_flag
@@ -312,7 +311,12 @@ module Pattern_desc : sig
 end
 
 module Expression_desc : sig
-  type t = expression_desc =
+  (* TODO: Fully support comprehensions upstream. *)
+  type comprehension_expression = private
+    | Pcomp_list_comprehension of unit
+    | Pcomp_array_comprehension of unit
+
+  type t =
     | Pexp_ident of Astlib.Longident.t loc
     | Pexp_constant of constant
     | Pexp_let of mutable_flag * rec_flag * value_binding list * expression
@@ -372,7 +376,7 @@ module Expression_desc : sig
 end
 
 module Type_kind : sig
-  type t = type_kind =
+  type t =
     | Ptype_abstract
     | Ptype_variant of constructor_declaration list
     | Ptype_record of label_declaration list
@@ -398,7 +402,7 @@ module Constructor_declaration : sig
 end
 
 module Include_infos : sig
-  type 'a t = 'a include_infos =
+  type 'a t =
     { pincl_kind : Include_kind.t
     ; pincl_mod : 'a
     ; pincl_loc : Location.t
@@ -410,7 +414,7 @@ module Include_infos : sig
 end
 
 module Signature_item_desc : sig
-  type t = signature_item_desc =
+  type t =
     | Psig_value of value_description
     | Psig_type of rec_flag * type_declaration list
     | Psig_typesubst of type_declaration list
@@ -434,7 +438,7 @@ module Signature_item_desc : sig
 end
 
 module Signature : sig
-  type t = signature =
+  type t =
     { psg_modalities : Modalities.t
     ; psg_items : signature_item list
     ; psg_loc : Location.t
@@ -445,7 +449,7 @@ module Signature : sig
 end
 
 module Structure_item_desc : sig
-  type t = structure_item_desc =
+  type t =
     | Pstr_eval of expression * attributes
     | Pstr_value of rec_flag * value_binding list
     | Pstr_primitive of value_description
@@ -468,7 +472,7 @@ module Structure_item_desc : sig
 end
 
 module Functor_parameter : sig
-  type t = functor_parameter =
+  type t =
     | Unit
     | Named of string option loc * module_type * Modes.t
 
@@ -477,7 +481,7 @@ module Functor_parameter : sig
 end
 
 module Module_type_desc : sig
-  type t = module_type_desc =
+  type t =
     | Pmty_ident of Astlib.Longident.t loc
     | Pmty_signature of signature
     | Pmty_functor of functor_parameter * module_type * Modes.t
@@ -492,7 +496,10 @@ module Module_type_desc : sig
 end
 
 module Module_expr_desc : sig
-  type t = module_expr_desc =
+  (* TODO: Fully support module instances upstream. *)
+  type module_instance = private Module_instance
+
+  type t =
     | Pmod_ident of Astlib.Longident.t loc
     | Pmod_structure of structure
     | Pmod_functor of functor_parameter * module_expr
@@ -508,13 +515,140 @@ module Module_expr_desc : sig
 end
 
 module Ast_traverse : sig
-  class virtual map : Ppxlib_ast.Ast.map
-  class virtual iter : Ppxlib_ast.Ast.iter
-  class virtual ['acc] fold : ['acc] Ppxlib_ast.Ast.fold
-  class virtual ['acc] fold_map : ['acc] Ppxlib_ast.Ast.fold_map
-  class virtual ['ctx] map_with_context : ['ctx] Ppxlib_ast.Ast.map_with_context
-  class virtual ['res] lift : ['res] Ppxlib_ast.Ast.lift
+  module Jane_street_extensions0 (T : sig
+      type 'a t
+    end) : sig
+    class type t = object
+      method jkind_declaration : jkind_declaration T.t
+      method jkind_annotation : jkind_annotation T.t
+      method jkind_annotation_desc : jkind_annotation_desc T.t
+      method function_body : function_body T.t
+      method function_constraint : Pexp_function.Function_constraint.t T.t
+      method type_constraint : type_constraint T.t
+      method mode : Mode.t T.t
+      method modes : Modes.t T.t
+      method modality : Modality.t T.t
+      method modalities : Modalities.t T.t
+      method signature_items : signature_item list T.t
+    end
+  end
 
-  class virtual ['ctx, 'res] lift_map_with_context :
-    ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
+  module Jane_street_extensions0_ctx (T : sig
+      type ('a, 'b) t
+    end) : sig
+    class type ['ctx] t = object
+      method jkind_declaration : ('ctx, jkind_declaration) T.t
+      method jkind_annotation : ('ctx, jkind_annotation) T.t
+      method jkind_annotation_desc : ('ctx, jkind_annotation_desc) T.t
+      method function_body : ('ctx, function_body) T.t
+      method function_constraint : ('ctx, Pexp_function.Function_constraint.t) T.t
+      method type_constraint : ('ctx, type_constraint) T.t
+      method mode : ('ctx, Mode.t) T.t
+      method modes : ('ctx, Modes.t) T.t
+      method modality : ('ctx, Modality.t) T.t
+      method modalities : ('ctx, Modalities.t) T.t
+      method signature_items : ('ctx, signature_item list) T.t
+    end
+  end
+
+  module Jane_street_extensions1 (T : sig
+      type ('a, 'b) t
+    end) : sig
+    class type ['a] t = object
+      method jkind_declaration : (jkind_declaration, 'a) T.t
+      method jkind_annotation : (jkind_annotation, 'a) T.t
+      method jkind_annotation_desc : (jkind_annotation_desc, 'a) T.t
+      method function_body : (function_body, 'a) T.t
+      method function_constraint : (Pexp_function.Function_constraint.t, 'a) T.t
+      method type_constraint : (type_constraint, 'a) T.t
+      method mode : (Mode.t, 'a) T.t
+      method modes : (Modes.t, 'a) T.t
+      method modality : (Modality.t, 'a) T.t
+      method modalities : (Modalities.t, 'a) T.t
+      method signature_items : (signature_item list, 'a) T.t
+    end
+  end
+
+  module Jane_street_extensions1_ctx (T : sig
+      type ('a, 'b, 'c) t
+    end) : sig
+    class type ['ctx, 'res] t = object
+      method jkind_declaration : ('ctx, jkind_declaration, 'res) T.t
+      method jkind_annotation : ('ctx, jkind_annotation, 'res) T.t
+      method jkind_annotation_desc : ('ctx, jkind_annotation_desc, 'res) T.t
+      method function_body : ('ctx, function_body, 'res) T.t
+      method function_constraint : ('ctx, Pexp_function.Function_constraint.t, 'res) T.t
+      method type_constraint : ('ctx, type_constraint, 'res) T.t
+      method mode : ('ctx, Mode.t, 'res) T.t
+      method modes : ('ctx, Modes.t, 'res) T.t
+      method modality : ('ctx, Modality.t, 'res) T.t
+      method modalities : ('ctx, Modalities.t, 'res) T.t
+      method signature_items : ('ctx, signature_item list, 'res) T.t
+    end
+  end
+
+  module Ts : sig
+    module Map : sig
+      type 'a t = 'a Ppxlib_traverse_builtins.T.map
+    end
+
+    module Iter : sig
+      type 'a t = 'a Ppxlib_traverse_builtins.T.iter
+    end
+
+    module Fold : sig
+      type ('a, 'b) t = ('b, 'a) Ppxlib_traverse_builtins.T.fold
+    end
+
+    module Fold_map : sig
+      type ('a, 'b) t = ('b, 'a) Ppxlib_traverse_builtins.T.fold_map
+    end
+
+    module Map_with_context : sig
+      type ('a, 'b) t = ('a, 'b) Ppxlib_traverse_builtins.T.map_with_context
+    end
+
+    module Lift : sig
+      type ('a, 'b) t = ('a, 'b) Ppxlib_traverse_builtins.T.lift
+    end
+
+    module Lift_map_with_context : sig
+      type ('a, 'b, 'c) t = ('a, 'b, 'c) Ppxlib_traverse_builtins.T.lift_map_with_context
+    end
+  end
+
+  class virtual map : object
+    inherit Ppxlib_ast.Ast.map
+    inherit Jane_street_extensions0(Ts.Map).t
+  end
+
+  class virtual iter : object
+    inherit Ppxlib_ast.Ast.iter
+    inherit Jane_street_extensions0(Ts.Iter).t
+  end
+
+  class virtual ['ctx] fold : object
+    inherit ['ctx] Ppxlib_ast.Ast.fold
+    inherit ['ctx] Jane_street_extensions0_ctx(Ts.Fold).t
+  end
+
+  class virtual ['ctx] fold_map : object
+    inherit ['ctx] Ppxlib_ast.Ast.fold_map
+    inherit ['ctx] Jane_street_extensions0_ctx(Ts.Fold_map).t
+  end
+
+  class virtual ['ctx] map_with_context : object
+    inherit ['ctx] Ppxlib_ast.Ast.map_with_context
+    inherit ['ctx] Jane_street_extensions0_ctx(Ts.Map_with_context).t
+  end
+
+  class virtual ['res] lift : object
+    inherit ['res] Ppxlib_ast.Ast.lift
+    inherit ['res] Jane_street_extensions1(Ts.Lift).t
+  end
+
+  class virtual ['ctx, 'res] lift_map_with_context : object
+    inherit ['ctx, 'res] Ppxlib_ast.Ast.lift_map_with_context
+    inherit ['ctx, 'res] Jane_street_extensions1_ctx(Ts.Lift_map_with_context).t
+  end
 end

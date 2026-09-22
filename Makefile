@@ -240,6 +240,17 @@ ocaml-compiler-libs-build-boot:
 	  --build-dir="$(CURDIR)/_build/ocaml-compiler-libs-boot" \
 	  @install
 
+.PHONY: ppxlib-jane-build-boot
+ppxlib-jane-build-boot:
+	mkdir -p _build
+	$(dune) build \
+	  --root=external/ppxlib_jane \
+	  --build-dir="$(CURDIR)/_build/ppxlib-jane-boot" \
+	  @default
+
+.PHONY: external-libs-build-boot
+external-libs-build-boot: ocaml-compiler-libs-build-boot ppxlib-jane-build-boot
+
 .PHONY: fmt
 fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
