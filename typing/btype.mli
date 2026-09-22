@@ -757,11 +757,11 @@ module Jkind0 : sig
       val product :
         why:Jkind_intf.History.product_creation_reason ->
         (type_expr * Mode.Modality.Const.t) list ->
-        Jkind_types.Sort.t Jkind_types.Layout.t list ->
+        Jkind_types.Sort.t Jkind_types.Layout.t ->
         jkind_l
       val product_of_any :
         why:Jkind_intf.History.product_creation_reason ->
-        int ->
+        Jkind_types.Sort.t Jkind_types.Layout.t ->
         jkind_l
     end
 

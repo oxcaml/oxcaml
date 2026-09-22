@@ -391,15 +391,15 @@ module Builtin : sig
   val product :
     why:History.product_creation_reason ->
     (Types.type_expr * Mode.Modality.Const.t) list ->
-    Sort.t Layout.t list ->
+    Sort.t Layout.t ->
     Types.jkind_l
 
-  (** Build a jkind of unboxed products, given only an arity. This jkind will
+  (** Build a jkind of unboxed products, given only the layout. This jkind will
       not mode-cross (and has kind [Not_best] accordingly), even though unboxed
       products generally should. This is useful when creating an initial jkind
       in Typedecl. *)
   val product_of_any :
-    why:History.product_creation_reason -> int -> Types.jkind_l
+    why:History.product_creation_reason -> Sort.t Layout.t -> Types.jkind_l
 end
 
 (** Forcibly change the mod- and with-bounds of a [t] based on the mod- and
@@ -519,10 +519,20 @@ val for_boxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.Const.t option) list ->
   Types.jkind_l
 
+(** The layout of an unboxed record with these labels and field layouts. *)
+val unboxed_record_layout :
+  Types.label_declaration list -> Sort.t Layout.t list -> Sort.t Layout.t
+
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record_with_updates :
   (Types.label_declaration * Types.type_expr * Sort.t Layout.t) list ->
   Types.jkind_l
+
+(** The jkind of an unboxed record whose field layouts are not yet known. This
+    jkind will not mode-cross (and has kind [Not_best] accordingly), even though
+    unboxed products generally should. This is useful when creating an initial
+    jkind in Typedecl. *)
+val for_unboxed_record_of_any : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type.
 
@@ -699,6 +709,26 @@ val get_nullability : Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t option
 
 (** Sets the layout in a jkind. *)
 val set_layout : 'd Types.jkind -> Sort.t Layout.t -> 'd Types.jkind
+
+(** The kind of a type of kind [k] made addressable, [k addressable]. *)
+val apply_addressable_l : 'd Types.jkind -> 'd Types.jkind
+
+(** The kind of a lone record field or [@@unboxed] argument of kind [k]: the
+    record makes it addressable unless it is [inherit]. *)
+val for_lone_field : Asttypes.inherit_flag -> 'd Types.jkind -> 'd Types.jkind
+
+(** When a type [t] made addressable is constrained by kind [k], we use
+    [apply_addressable_r] to reduce this to a constraint on [t].
+
+    Concretely, [apply_addressable_r env k] produces a kind [k'] such that
+    [t < k'] implies [t addressable < k]. Fails if no addressable kind is below
+    [k]. *)
+val apply_addressable_r : Env.t -> Types.jkind_r -> (Types.jkind_r, unit) result
+
+(** Drops a root [addressable] from a kind, if any. *)
+val strip_root_addressable : 'd Types.jkind -> 'd Types.jkind
+
+val has_root_addressable : 'd Types.jkind -> bool
 
 (** Change a jkind to be appropriate for a type that appears under a modality.
     This means that the jkind will definitely cross the axes modified by the

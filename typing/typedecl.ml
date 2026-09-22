@@ -1233,9 +1233,7 @@ let transl_declaration env sdecl (id, uid) =
           let rep : record_unboxed_product_representation =
             Record_unboxed_product
           in
-          let jkind =
-            Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
-          in
+          let jkind = Jkind.for_unboxed_record_of_any lbls' in
           Ttype_record_unboxed_product lbls,
           Type_record_unboxed_product(lbls', rep, None), jkind
       | Ptype_open ->
@@ -1451,9 +1449,7 @@ let derive_unboxed_version env path_in_group_has_unboxed_version decl =
     in
     let rep = Types.Record_unboxed_product in
     (* CR layouts v11: update type_jkind once we have [layout_of] layouts *)
-    let jkind =
-      Jkind.Builtin.product_of_any ~why:Unboxed_record (List.length lbls)
-    in
+    let jkind = Jkind.for_unboxed_record_of_any lbls_unboxed in
     let kind =
       Type_record_unboxed_product(lbls_unboxed, rep, umc)
     in
@@ -2412,7 +2408,7 @@ let compute_record_kind (type rep) env loc (form : rep record_form)
       if Option.is_none sort then assert_any_args_support loc;
       Record_unboxed
     in
-    [ld_sort], rep, jkind
+    [ld_sort], rep, Jkind.for_lone_field lbl.Types.ld_inherit jkind
   | Legacy, _, Record_dummy _
   | Unboxed_product, _, _ ->
     let types = List.map snd lbls in
@@ -2769,7 +2765,7 @@ let rec update_decl_jkind env dpath decl =
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
                            Cstr_tuple [{ arg with ca_sort }] }],
-            Variant_unboxed, jkind
+            Variant_unboxed, Jkind.for_lone_field arg.ca_inherit jkind
           end
         | Cstr_record [{ld_type} as lbl] -> begin
             let jkind = Ctype.type_jkind env ld_type in
@@ -2780,7 +2776,7 @@ let rec update_decl_jkind env dpath decl =
             if Option.is_none sort then assert_any_args_support loc;
             [{ cstr with Types.cd_args =
                            Cstr_record [{ lbl with ld_sort }] }],
-            Variant_unboxed, jkind
+            Variant_unboxed, Jkind.for_lone_field lbl.ld_inherit jkind
           end
         | (Cstr_tuple ([] | _ :: _ :: _) | Cstr_record ([] | _ :: _ :: _)) ->
           assert false

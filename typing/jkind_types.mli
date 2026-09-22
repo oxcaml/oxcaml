@@ -266,6 +266,9 @@ module Layout : sig
 
   val get_flat_const : Sort.Flat.t t -> Const.t option
 
+  (** The layout of an unboxed product: it makes its components addressable (see
+      Note [Addressable kinds]), so a lone component is made addressable rather
+      than being the product's layout itself. *)
   val product : 'a t list -> 'a t
 
   val apply_operator : 'a t -> Kind_operator.t -> 'a t

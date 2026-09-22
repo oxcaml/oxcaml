@@ -2845,13 +2845,29 @@ let of_type_decl_overapproximate_unknown ~context env
     ~transl:Context_with_transl.Overapproximate_to_top env decl
   |> Option.map fst
 
+(* A record makes its fields addressable (see Note [Addressable kinds]),
+   except a lone [inherit] field, which keeps its layout. *)
+let unboxed_record_layout (lbls : Types.label_declaration list) layouts =
+  match lbls, layouts with
+  | [{ ld_inherit = Inherited; _ }], [layout] -> layout
+  | _ -> Layout.product layouts
+
 let for_unboxed_record_with_updates lbls =
   let open Types in
   let tys_modalities =
     List.map (fun (lbl, ld_type, _) -> ld_type, lbl.ld_modalities) lbls
   in
-  let layouts = List.map (fun (_, _, layout) -> layout) lbls in
-  Builtin.product ~why:Unboxed_record tys_modalities layouts
+  let layout =
+    unboxed_record_layout
+      (List.map (fun (lbl, _, _) -> lbl) lbls)
+      (List.map (fun (_, _, layout) -> layout) lbls)
+  in
+  Builtin.product ~why:Unboxed_record tys_modalities layout
+
+let for_unboxed_record_of_any lbls =
+  Builtin.product_of_any ~why:Unboxed_record
+    (unboxed_record_layout lbls
+       (List.map (fun _ -> Layout.Any Scannable_axes.max) lbls))
 
 let for_abbreviation ~type_jkind_purely ~modality ty =
   (* CR layouts v2.8: This should really use layout_of. Internal ticket 2912. *)
@@ -3166,6 +3182,43 @@ let get_nullability env jk =
 
 let set_layout jk layout =
   { jk with jkind = { jk.jkind with base = Layout layout } }
+
+let map_base jk f = { jk with jkind = { jk.jkind with base = f jk.jkind.base } }
+
+let apply_addressable_l jk =
+  map_base jk (function
+    | Layout l -> Layout (Layout.apply_operator l Addressable)
+    | Kconstr (p, sa, op) ->
+      Kconstr (p, sa, Kind_operator.compose op Addressable))
+
+let for_lone_field (inherit_ : Asttypes.inherit_flag) jk =
+  match inherit_ with
+  | Inherited -> jk
+  | Not_inherited -> apply_addressable_l jk
+
+let strip_root_addressable jk =
+  map_base jk (function
+    | Layout l -> Layout (Layout.strip_head_addressable l)
+    | Kconstr (p, sa, _) -> Kconstr (p, sa, Id))
+
+let has_root_addressable jk =
+  match jk.jkind.base with
+  | Layout l -> Layout.strip_head_addressable l != l
+  | Kconstr (_, _, Addressable) -> true
+  | Kconstr (_, _, Id) -> false
+
+let apply_addressable_r env jkind =
+  let jkind =
+    { jkind with jkind = Base_and_axes.fully_expand_aliases env jkind.jkind }
+  in
+  match jkind.jkind.base with
+  | Kconstr (_, _, Id) -> Error ()
+  | Kconstr (p, sa, Addressable) ->
+    Ok (map_base jkind (fun _ -> Kconstr (p, sa, Id)))
+  | Layout l ->
+    if Layout.constrain_above_addressable ~allow_mutation:true l
+    then Ok (set_layout jkind (Layout.strip_head_addressable l))
+    else Error ()
 
 let apply_modality_l modality jk =
   let bounds_mask = Mod_bounds.mask_of_modality ~modality in

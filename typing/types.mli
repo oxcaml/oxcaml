@@ -1091,9 +1091,10 @@ and constructor_arguments =
 
 val tys_of_constr_args : constructor_arguments -> type_expr list
 
-(* Returns the inner type and its modalities, if unboxed. *)
+(* Returns the inner type, its modalities and whether it is [inherit], if
+   unboxed. *)
 val find_unboxed_type : type_declaration ->
-  (type_expr * Mode.Modality.Const.t) option
+  (type_expr * Mode.Modality.Const.t * inherit_flag) option
 
 type extension_constructor =
   {

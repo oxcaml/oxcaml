@@ -1558,7 +1558,7 @@ module Layout = struct
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
-    | [lay] -> lay
+    | [lay] -> Addressable lay
     | lays -> Product lays
 
   let apply_operator t : Kind_operator.t -> _ t = function

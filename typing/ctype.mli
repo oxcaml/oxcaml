@@ -676,6 +676,9 @@ val mcomp : Env.t -> type_expr -> type_expr -> unit
 type unwrapped_type_expr =
   { ty : type_expr
   ; modality : Mode.Modality.Const.t
+  ; addressable : bool
+    (* Whether a wrapper made [ty] addressable: a lone record field or
+       [@@unboxed] argument that is not [inherit] *)
   ; or_null : unwrapped_or_null option;
     (* We store the declaration and arguments rather than a bool to avoid
        re-writing the with-bounds of [or_null], and to be more robust for the

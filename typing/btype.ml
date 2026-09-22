@@ -1984,8 +1984,8 @@ module Jkind0 = struct
         of_const Const.Builtin.immediate_or_null.jkind
     end
 
-    let product tys_modalities layouts =
-      let base = Layout (Jkind_types.Layout.product layouts) in
+    let product tys_modalities layout =
+      let base = Layout layout in
       let mod_bounds = Mod_bounds.min in
       let with_bounds =
         List.fold_right
@@ -2224,20 +2224,15 @@ module Jkind0 = struct
           ~annotation:(mk_annot "immediate_or_null")
           ~why:(Immediate_or_null_creation why)
 
-      let product ~why tys_modalities layouts =
-        let desc = Jkind_desc.product tys_modalities layouts in
+      let product ~why tys_modalities layout =
+        let desc = Jkind_desc.product tys_modalities layout in
         fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
         (* [mark_best] is correct here because the with-bounds of a product
            jkind include all the components of the product. Accordingly, looking
            through the product, by one step, never loses any information. *)
         |> mark_best
 
-      let product_of_any ~why arity =
-        let layout =
-          Jkind_types.Layout.product
-            (List.init arity (fun _ ->
-               Jkind_types.Layout.Any Jkind_types.Scannable_axes.max))
-        in
+      let product_of_any ~why layout =
         let desc : _ jkind_desc =
           { base = Layout layout;
             mod_bounds = Mod_bounds.max;
