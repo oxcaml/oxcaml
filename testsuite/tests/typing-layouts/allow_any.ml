@@ -58,15 +58,16 @@ Error: The layout of type "t" is value non_float
 (* Can't change the layout for mutually recursive types. This *should*
    typecheck; i.e. allow_any_mode_crossing shouldn't replace [t]'s layout with
    [any]. *)
-type ('a : float64) require_f64
+type ('a : float64 addressable) require_f64
 
 type t : any = #{ f : float# }
 [@@unsafe_allow_any_mode_crossing]
 
 and s : value = t require_f64
 [%%expect{|
-type ('a : float64) require_f64
-type t : float64 = #{ f : float#; } [@@unsafe_allow_any_mode_crossing]
+type ('a : float64 addressable) require_f64
+type t : float64 addressable = #{ f : float#; }
+[@@unsafe_allow_any_mode_crossing]
 and s = t require_f64
 |}]
 

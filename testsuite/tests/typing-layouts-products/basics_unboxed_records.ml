@@ -186,7 +186,7 @@ type int_r = int r
 |}]
 
 type ('a : float64) t = #{ i: 'a }
-type floatu_t : float64 = float# t
+type floatu_t : float64 addressable = float# t
 [%%expect{|
 type ('a : float64) t = #{ i : 'a; }
 type floatu_t = float# t

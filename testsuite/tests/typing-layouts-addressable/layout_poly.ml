@@ -68,23 +68,10 @@ Error: The value "x" has type "float#" but an expression was expected of type
          representable at call sites).
 |}]
 
-(* ...including at an unboxed product with an unaddressable component *)
-let bad (x : #(float# * string)) = id_addressable x
+(* Unboxed tuples make their components addressable. *)
+let ok (x : #(float# * string)) = id_addressable x
 [%%expect{|
-Line 1, characters 50-51:
-1 | let bad (x : #(float# * string)) = id_addressable x
-                                                      ^
-Error: The value "x" has type "#(float# * string)"
-       but an expression was expected of type
-         "('a : '_representable_layout_3 addressable)"
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+val ok : #(float# * string) -> #(float# * string) = <fun>
 |}]
 
 (* We can constrain an unfilled variable to always be addressable *)
@@ -102,7 +89,7 @@ let bad x =
 Line 3, characters 3-4:
 3 |   (x : float#)
        ^
-Error: The value "x" has type "('a : '_representable_layout_4 addressable)"
+Error: The value "x" has type "('a : '_representable_layout_3 addressable)"
        but an expression was expected of type "float#"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
@@ -225,10 +212,7 @@ Error: "[@layout_poly]" on this external declaration has no
        variable for it to operate on.
 |}]
 
-(* Regression test for an intermediary version of [addressable]: Intersecting
-   [value & value] with [any addressable] wraps the internal representation of
-   the kind redundantly (a product of values is already addressable); [f] must
-   print and behave like [f_plain]. *)
+(* Intersecting a product with [any addressable] should not change its kind. *)
 type r = #{ a : string; b : string }
 
 let f_plain (x : ('a : value & value)) = x
@@ -258,9 +242,6 @@ val f_any : ('a : value_or_null & value_or_null). 'a -> 'a = <fun>
 val g_any : r -> r = <fun>
 |}]
 
-(* Applying [id_addressable] to the record directly: the component sorts are
-   not yet known addressable when the product is decomposed, and are
-   constrained only when the fields are checked. *)
 let d (y : r) = id_addressable y
 [%%expect{|
 val d : r -> r = <fun>
@@ -278,20 +259,7 @@ type ('a : any) mixed_pair = #{ a : 'a; b : string; }
 val ok : b8a mixed_pair -> b8a mixed_pair = <fun>
 |}]
 
-let bad (y : b8 mixed_pair) = id_addressable y
+let ok (y : b8 mixed_pair) = id_addressable y
 [%%expect{|
-Line 1, characters 45-46:
-1 | let bad (y : b8 mixed_pair) = id_addressable y
-                                                 ^
-Error: The value "y" has type "b8 mixed_pair"
-       but an expression was expected of type
-         "('a : ('_representable_layout_5 & value_or_null) addressable)"
-       The layout of b8 mixed_pair is bits8 & value non_float
-         because of the definition of mixed_pair at line 1, characters 0-52.
-       But the layout of b8 mixed_pair must be addressable
-         because it's the layout polymorphic type in an external declaration
-         ([@layout_poly] forces all variables of layout 'any' to be
-         representable at call sites).
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+val ok : b8 mixed_pair -> b8 mixed_pair = <fun>
 |}]

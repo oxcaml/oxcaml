@@ -16,12 +16,18 @@ type t : any addressable
 
 type t : (bits8 & bits16) addressable
 [%%expect{|
-type t : (bits8 & bits16) addressable
+Line 1, characters 26-37:
+1 | type t : (bits8 & bits16) addressable
+                              ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits16".
+
+type t : bits8 & bits16
 |}]
 
 type t : bits8 addressable & bits16
 [%%expect{|
-type t : bits8 addressable & bits16
+type t : bits8 & bits16
 |}]
 
 type t : void addressable
@@ -88,7 +94,7 @@ Line 1, characters 50-61:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-type t : bits8 addressable & bits16 addressable
+type t : bits8 & bits16
 |}]
 
 type t : (any mod portable) addressable addressable
@@ -115,7 +121,13 @@ type t : any addressable mod portable
 
 type t : (bits8 & bits16) addressable mod portable
 [%%expect{|
-type t : (bits8 & bits16) addressable mod portable
+Line 1, characters 26-37:
+1 | type t : (bits8 & bits16) addressable mod portable
+                              ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits16".
+
+type t : bits8 mod portable & bits16 mod portable
 |}]
 
 (**** Equalities: [k addressable = k] for addressable [k] ****)
@@ -223,7 +235,7 @@ Line 2, characters 52-63:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-module M : sig type t : bits8 addressable & bits16 addressable end
+module M : sig type t : bits8 & bits16 end
 |}]
 
 module M : sig
@@ -238,7 +250,7 @@ Line 4, characters 52-63:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & bits16 addressable".
 
-module M : sig type t : bits8 addressable & bits16 addressable end
+module M : sig type t : bits8 & bits16 end
 |}]
 
 (* ... also with a mix of intrinsically and made addressable components *)
@@ -254,7 +266,7 @@ Line 2, characters 38-49:
 Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
   is already implied by the kind "bits8 addressable & word".
 
-module M : sig type t : bits8 addressable & word end
+module M : sig type t : bits8 & word end
 |}]
 
 (**** Inequalities: [k addressable] and [k] are incomparable for
@@ -495,26 +507,15 @@ type ok = int64_u req
 type ok = int64_u req
 |}]
 
-(* An unboxed product is addressable iff all of its components are *)
+(* Unboxed tuples make their components addressable. *)
 type ok = #(int64_u * string) req
 [%%expect{|
 type ok = #(int64_u * string) req
 |}]
 
-type bad = #(float# * string) req
+type ok = #(float# * string) req
 [%%expect{|
-Line 1, characters 11-29:
-1 | type bad = #(float# * string) req
-               ^^^^^^^^^^^^^^^^^^
-Error: This type "#(float# * string)" should be an instance of type
-         "('a : any addressable)"
-       The layout of #(float# * string) is float64 & value non_float
-         because it is an unboxed tuple.
-       But the layout of #(float# * string) must be a sublayout of
-           any addressable
-         because of the definition of req at line 1, characters 0-31.
-       Note: The kinds mutable_data, immutable_data, and sync_data have
-       the layout value non_float.
+type ok = #(float# * string) req
 |}]
 
 type tb8 : bits8
@@ -641,7 +642,7 @@ end
 module M : sig type t : any end
 |}]
 
-(**** Addressability does not distribute through products ****)
+(**** Explicit addressability on products is redundant ****)
 
 module M : sig
   type t : bits8 addressable & bits8 addressable
@@ -649,24 +650,13 @@ end = struct
   type t : (bits8 & bits8) addressable
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
+Line 4, characters 27-38:
 4 |   type t : (bits8 & bits8) addressable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : (bits8 & bits8) addressable end
-       is not included in
-         sig type t : bits8 addressable & bits8 addressable end
-       Type declarations do not match:
-         type t : (bits8 & bits8) addressable
-       is not included in
-         type t : bits8 addressable & bits8 addressable
-       The layout of the first is (bits8 & bits8) addressable
-         because of the definition of t at line 4, characters 2-38.
-       But the layout of the first must be a sublayout of
-           bits8 addressable & bits8 addressable
-         because of the definition of t at line 2, characters 2-48.
+                               ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits8".
+
+module M : sig type t : bits8 & bits8 end
 |}]
 
 module M : sig
@@ -675,24 +665,13 @@ end = struct
   type t : bits8 addressable & bits8 addressable
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : bits8 addressable & bits8 addressable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 addressable & bits8 addressable end
-       is not included in
-         sig type t : (bits8 & bits8) addressable end
-       Type declarations do not match:
-         type t : bits8 addressable & bits8 addressable
-       is not included in
-         type t : (bits8 & bits8) addressable
-       The layout of the first is bits8 addressable & bits8 addressable
-         because of the definition of t at line 4, characters 2-48.
-       But the layout of the first must be a sublayout of
-           (bits8 & bits8) addressable
-         because of the definition of t at line 2, characters 2-38.
+Line 2, characters 27-38:
+2 |   type t : (bits8 & bits8) addressable
+                               ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits8".
+
+module M : sig type t : bits8 & bits8 end
 |}]
 
 (**** Representability: addressability does not change the representation of
@@ -829,13 +808,17 @@ type t : value addressable mod portable [@@warning "-183"]
 type t : value mod portable
 |}]
 
-(**** [@unpacked] looks through [addressable] on products ****)
+(**** Unpacking addressable types ****)
 
-(* Addressability does not change the out-of-block product representation,
-   so a made-addressable product can be unpacked into C stub arguments. *)
 type tup : (bits8 & bits16) addressable
 [%%expect{|
-type tup : (bits8 & bits16) addressable
+Line 1, characters 28-39:
+1 | type tup : (bits8 & bits16) addressable
+                                ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits16".
+
+type tup : bits8 & bits16
 |}]
 
 external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
@@ -843,7 +826,7 @@ external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
 external ext_unpack_addressable : (tup [@unpacked]) -> int = "foo" "bar"
 |}]
 
-(* ... but a made-addressable non-product still cannot be unpacked *)
+(* Addressability does not make non-products unpackable. *)
 external bad : (t8 [@unpacked]) -> int = "foo" "bar"
 [%%expect{|
 Line 1, characters 16-18:
@@ -881,183 +864,90 @@ type t : ka
 type t
 |}]
 
-(**** Printing of partially-solved sorts ****)
+(**** Inferring component sorts through product kinds ****)
 
-(* A wrapper made redundant by unification (here, the second component's
-   variable is filled with [value]) is not printed back. *)
-let bad (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
+let ok (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
   if true then x else y
 [%%expect{|
-Line 2, characters 22-23:
-2 |   if true then x else y
-                          ^
-Error: The value "y" has type "#('b * 'c)" but an expression was expected of type
-         "('a : (float64 & value) addressable)"
-       The layout of #('b * 'c) is
-           '_representable_layout_2 addressable & value_or_null
-         because it is an unboxed tuple.
-       But the layout of #('b * 'c) must be a sublayout of
-           (float64 & value) addressable
-         because of the annotation on the type variable 'a.
+Line 1, characters 36-47:
+1 | let ok (x : ('a : (float64 & value) addressable)) (y : #('b * 'c)) =
+                                        ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "float64 & value".
+
+val ok : ('b : float64) 'c. #('b * 'c) -> #('b * 'c) -> #('b * 'c) = <fun>
 |}]
 
 (**** Product kinds make their components addressable ****)
 
-module Product_components_bad : sig
+module Product_components : sig
   type t : bits8 addressable & float64 addressable & void addressable
 end = struct
   type t : bits8 & float64 & void
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : bits8 & float64 & void
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : bits8 & float64 & void end
-       is not included in
-         sig
-           type t
-             : bits8 addressable & float64 addressable & void addressable
-         end
-       Type declarations do not match:
-         type t : bits8 & float64 & void
-       is not included in
-         type t : bits8 addressable & float64 addressable & void addressable
-       The layout of the first is bits8 & float64 & void
-         because of the definition of t at line 4, characters 2-33.
-       But the layout of the first must be a sublayout of
-           bits8 addressable & float64 addressable & void addressable
-         because of the definition of t at line 2, characters 2-69.
+module Product_components : sig type t : bits8 & float64 & void end
 |}]
 
-module Product_components_reverse_bad : sig
+module Product_components_reverse : sig
   type t : bits8 & float64 & void
 end = struct
   type t : bits8 addressable & float64 addressable & void addressable
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : bits8 addressable & float64 addressable & void addressable
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig
-           type t
-             : bits8 addressable & float64 addressable & void addressable
-         end
-       is not included in
-         sig type t : bits8 & float64 & void end
-       Type declarations do not match:
-         type t : bits8 addressable & float64 addressable & void addressable
-       is not included in
-         type t : bits8 & float64 & void
-       The layout of the first is
-           bits8 addressable & float64 addressable & void addressable
-         because of the definition of t at line 4, characters 2-69.
-       But the layout of the first must be a sublayout of
-           bits8 & float64 & void
-         because of the definition of t at line 2, characters 2-33.
+module Product_components_reverse : sig type t : bits8 & float64 & void end
 |}]
 
-module Product_addressable_bad : sig
+module Product_addressable : sig
   type t : any addressable
 end = struct
   type t : any & any
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t : any & any
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : any & any end
-       is not included in
-         sig type t : any addressable end
-       Type declarations do not match:
-         type t : any & any
-       is not included in
-         type t : any addressable
-       The layout of the first is any & any
-         because of the definition of t at line 4, characters 2-20.
-       But the layout of the first must be a sublayout of any addressable
-         because of the definition of t at line 2, characters 2-26.
+module Product_addressable : sig type t : any addressable end
 |}]
 
 kind_ small_product = bits8 & bits16
-module Nested_product_bad : sig
+module Nested_product : sig
   type t : (small_product & float64) addressable
 end = struct
   type t : small_product & float64 addressable
 end
 [%%expect{|
 kind_ small_product = bits8 & bits16
-Lines 4-6, characters 6-3:
-4 | ......struct
-5 |   type t : small_product & float64 addressable
-6 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t : (bits8 & bits16) & float64 addressable end
-       is not included in
-         sig type t : ((bits8 & bits16) & float64) addressable end
-       Type declarations do not match:
-         type t : (bits8 & bits16) & float64 addressable
-       is not included in
-         type t : ((bits8 & bits16) & float64) addressable
-       The layout of the first is (bits8 & bits16) & float64 addressable
-         because of the definition of t at line 5, characters 2-46.
-       But the layout of the first must be a sublayout of
-           ((bits8 & bits16) & float64) addressable
-         because of the definition of t at line 3, characters 2-48.
+Line 3, characters 37-48:
+3 |   type t : (small_product & float64) addressable
+                                         ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "small_product & float64".
+
+module Nested_product : sig type t : (bits8 & bits16) & float64 end
 |}]
 
-type tuple_components_bad : bits8 & float64 = #(tb8 * float#)
-type tuple_addressable_bad = #(tb8 * float#) req
+type tuple_components : bits8 & float64 = #(tb8 * float#)
+type tuple_addressable = #(tb8 * float#) req
 [%%expect{|
-type tuple_components_bad = #(tb8 * float#)
-Line 2, characters 29-44:
-2 | type tuple_addressable_bad = #(tb8 * float#) req
-                                 ^^^^^^^^^^^^^^^
-Error: This type "#(tb8 * float#)" should be an instance of type
-         "('a : any addressable)"
-       The layout of #(tb8 * float#) is bits8 & float64
-         because it is an unboxed tuple.
-       But the layout of #(tb8 * float#) must be a sublayout of
-           any addressable
-         because of the definition of req at line 1, characters 0-31.
+type tuple_components = #(tb8 * float#)
+type tuple_addressable = #(tb8 * float#) req
 |}]
 
-let tuple_projection_bad (x : tb8) (y : float#) =
+let tuple_projection (x : tb8) (y : float#) =
   let pair : ('a : bits8 & float64) = #(x, y) in
   let #(x, _) = pair in
   x
 [%%expect{|
-val tuple_projection_bad : tb8 -> float# -> tb8 = <fun>
+val tuple_projection : tb8 -> float# -> tb8 = <fun>
 |}]
 
 type product_univars =
   { f : ('a : bits8 & float64). 'a -> 'a }
 type explicit_product_univars =
   { f : ('a : bits8 addressable & float64 addressable). 'a -> 'a }
-let product_unification_bad (x : product_univars)
+let product_unification (x : product_univars)
     : explicit_product_univars =
   { f = x.f }
 [%%expect{|
 type product_univars = { f : ('a : bits8 & float64). 'a -> 'a; }
-type explicit_product_univars = {
-  f : ('a : bits8 addressable & float64 addressable). 'a -> 'a;
-}
-Line 7, characters 8-11:
-7 |   { f = x.f }
-            ^^^
-Error: The field access "x.f" has type "'a -> 'a"
-       but an expression was expected of type "'b -> 'b"
-       The layout of 'a is bits8 addressable & float64 addressable
-         because of the definition of explicit_product_univars at lines 3-4, characters 0-66.
-       But the layout of 'a must overlap with bits8 & float64
-         because of the definition of product_univars at lines 1-2, characters 0-42.
+type explicit_product_univars = { f : ('a : bits8 & float64). 'a -> 'a; }
+val product_unification : product_univars -> explicit_product_univars = <fun>
 |}]

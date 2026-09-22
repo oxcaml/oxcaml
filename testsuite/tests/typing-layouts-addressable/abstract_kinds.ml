@@ -429,92 +429,56 @@ type ('a : bits8 addressable) addressable8
 type ('a : bits8) plain8
 |}]
 
-type good_record8_bad = record8# addressable8
+type good_record8 = record8# addressable8
 [%%expect{|
-Line 1, characters 24-32:
-1 | type good_record8_bad = record8# addressable8
-                            ^^^^^^^^
-Error: This type "record8#" should be an instance of type
-         "('a : bits8 addressable)"
-       The layout of record8# is bits8
+type good_record8 = record8# addressable8
+|}]
+
+type good_unboxed_record8 = unboxed_record8 addressable8
+[%%expect{|
+type good_unboxed_record8 = unboxed_record8 addressable8
+|}]
+
+type bad_record8 = record8# plain8
+[%%expect{|
+Line 1, characters 19-27:
+1 | type bad_record8 = record8# plain8
+                       ^^^^^^^^
+Error: This type "record8#" should be an instance of type "('a : bits8)"
+       The layout of record8# is bits8 addressable
          because it is an unboxed record.
-       But the layout of record8# must be a sublayout of bits8 addressable
-         because of the definition of addressable8 at line 3, characters 0-42.
+       But the layout of record8# must be a sublayout of bits8
+         because of the definition of plain8 at line 4, characters 0-24.
 |}]
 
-type good_unboxed_record8_bad = unboxed_record8 addressable8
+type bad_unboxed_record8 = unboxed_record8 plain8
 [%%expect{|
-Line 1, characters 32-47:
-1 | type good_unboxed_record8_bad = unboxed_record8 addressable8
-                                    ^^^^^^^^^^^^^^^
-Error: This type "unboxed_record8" should be an instance of type
-         "('a : bits8 addressable)"
-       The layout of unboxed_record8 is bits8
+Line 1, characters 27-42:
+1 | type bad_unboxed_record8 = unboxed_record8 plain8
+                               ^^^^^^^^^^^^^^^
+Error: This type "unboxed_record8" should be an instance of type "('a : bits8)"
+       The layout of unboxed_record8 is bits8 addressable
          because of the definition of unboxed_record8 at line 2, characters 0-37.
-       But the layout of unboxed_record8 must be a sublayout of
-           bits8 addressable
-         because of the definition of addressable8 at line 3, characters 0-42.
+       But the layout of unboxed_record8 must be a sublayout of bits8
+         because of the definition of plain8 at line 4, characters 0-24.
 |}]
 
-type bad_record8 = record8# plain8
-[%%expect{|
-type bad_record8 = record8# plain8
-|}]
-
-type bad_unboxed_record8 = unboxed_record8 plain8
-[%%expect{|
-type bad_unboxed_record8 = unboxed_record8 plain8
-|}]
-
-module Record8_bad : sig
+module Record8 : sig
   type t : bits8 addressable box
 end = struct
   type t = { x : int8# }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = { x : int8# }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { x : int8#; } end
-       is not included in
-         sig type t : bits8 addressable box end
-       Type declarations do not match:
-         type t = { x : int8#; }
-       is not included in
-         type t : bits8 addressable box
-       The layout of the first is bits8 box
-         because of the definition of t at line 4, characters 2-24.
-       But the layout of the first must be a sublayout of
-           bits8 addressable box
-         because of the definition of t at line 2, characters 2-32.
+module Record8 : sig type t : bits8 addressable box end
 |}]
 
-module Unboxed_record8_bad : sig
+module Unboxed_record8 : sig
   type t : bits8 addressable
 end = struct
   type t = #{ x : int8# }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = #{ x : int8# }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #{ x : int8#; } end
-       is not included in
-         sig type t : bits8 addressable end
-       Type declarations do not match:
-         type t = #{ x : int8#; }
-       is not included in
-         type t : bits8 addressable
-       The layout of the first is bits8
-         because it is the expansion of a type abbreviation.
-       But the layout of the first must be a sublayout of bits8 addressable
-         because of the definition of t at line 2, characters 2-28.
+module Unboxed_record8 : sig type t : bits8 addressable end
 |}]
 
 (* Making a field addressable does not change the type of its projection. *)
@@ -526,19 +490,10 @@ val project_unboxed_record8 : unboxed_record8 -> int8# = <fun>
 |}]
 
 type nested_record8 = #{ x : unboxed_record8 }
-type good_nested_record8_bad = nested_record8 addressable8
+type good_nested_record8 = nested_record8 addressable8
 [%%expect{|
 type nested_record8 = #{ x : unboxed_record8; }
-Line 2, characters 31-45:
-2 | type good_nested_record8_bad = nested_record8 addressable8
-                                   ^^^^^^^^^^^^^^
-Error: This type "nested_record8" should be an instance of type
-         "('a : bits8 addressable)"
-       The layout of nested_record8 is bits8
-         because of the definition of nested_record8 at line 1, characters 0-46.
-       But the layout of nested_record8 must be a sublayout of
-           bits8 addressable
-         because of the definition of addressable8 at line 3, characters 0-42.
+type good_nested_record8 = nested_record8 addressable8
 |}]
 
 (* An already-addressable field retains its kind. *)
@@ -553,169 +508,75 @@ type good_record64 = record64 plain64
 
 (* Kind checking must see through a record's type parameter. *)
 type ('a : bits8) param_record8 = #{ x : 'a }
-type good_param_record8_bad = int8# param_record8 addressable8
+type good_param_record8 = int8# param_record8 addressable8
 [%%expect{|
 type ('a : bits8) param_record8 = #{ x : 'a; }
-Line 2, characters 30-49:
-2 | type good_param_record8_bad = int8# param_record8 addressable8
-                                  ^^^^^^^^^^^^^^^^^^^
-Error: This type "int8# param_record8" should be an instance of type
-         "('a : bits8 addressable)"
-       The layout of int8# param_record8 is bits8
-         because of the definition of param_record8 at line 1, characters 0-45.
-       But the layout of int8# param_record8 must be a sublayout of
-           bits8 addressable
-         because of the definition of addressable8 at line 3, characters 0-42.
+type good_param_record8 = int8# param_record8 addressable8
 |}]
 
-module Param_record8_bad : sig
+module Param_record8 : sig
   type ('a : bits8) t : bits8 addressable
 end = struct
   type ('a : bits8) t = #{ x : 'a }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type ('a : bits8) t = #{ x : 'a }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a : bits8) t = #{ x : 'a; } end
-       is not included in
-         sig type ('a : bits8) t : bits8 addressable end
-       Type declarations do not match:
-         type ('a : bits8) t = #{ x : 'a; }
-       is not included in
-         type ('a : bits8) t : bits8 addressable
-       The layout of the first is bits8
-         because it is the expansion of a type abbreviation.
-       But the layout of the first must be a sublayout of bits8 addressable
-         because of the definition of t at line 2, characters 2-41.
+module Param_record8 : sig type ('a : bits8) t : bits8 addressable end
 |}]
 
 type unboxed_float_record = #{ x : float# }
 type ('a : float64 addressable) addressable_float
-type good_float_record_bad = unboxed_float_record addressable_float
+type good_float_record = unboxed_float_record addressable_float
 [%%expect{|
 type unboxed_float_record = #{ x : float#; }
 type ('a : float64 addressable) addressable_float
-Line 3, characters 29-49:
-3 | type good_float_record_bad = unboxed_float_record addressable_float
-                                 ^^^^^^^^^^^^^^^^^^^^
-Error: This type "unboxed_float_record" should be an instance of type
-         "('a : float64 addressable)"
-       The layout of unboxed_float_record is float64
-         because of the definition of unboxed_float_record at line 1, characters 0-43.
-       But the layout of unboxed_float_record must be a sublayout of
-           float64 addressable
-         because of the definition of addressable_float at line 2, characters 0-49.
+type good_float_record = unboxed_float_record addressable_float
 |}]
 
-module Float_record_bad : sig
+module Float_record : sig
   type t : float64 addressable box
 end = struct
   type t = { x : float# }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = { x : float# }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = { x : float#; } end
-       is not included in
-         sig type t : float64 addressable box end
-       Type declarations do not match:
-         type t = { x : float#; }
-       is not included in
-         type t : float64 addressable box
-       The layout of the first is float64 box non_float
-         because of the definition of t at line 4, characters 2-25.
-       But the layout of the first must be a sublayout of
-           float64 addressable box
-         because of the definition of t at line 2, characters 2-34.
+module Float_record : sig type t : float64 addressable box end
 |}]
 
 type unboxed_void_record = #{ x : unit# }
 type ('a : void addressable) addressable_void
-type good_void_record_bad = unboxed_void_record addressable_void
+type good_void_record = unboxed_void_record addressable_void
 [%%expect{|
 type unboxed_void_record = #{ x : unit#; }
 type ('a : void addressable) addressable_void
-Line 3, characters 28-47:
-3 | type good_void_record_bad = unboxed_void_record addressable_void
-                                ^^^^^^^^^^^^^^^^^^^
-Error: This type "unboxed_void_record" should be an instance of type
-         "('a : void addressable)"
-       The layout of unboxed_void_record is void
-         because of the definition of unboxed_void_record at line 1, characters 0-41.
-       But the layout of unboxed_void_record must be a sublayout of
-           void addressable
-         because of the definition of addressable_void at line 2, characters 0-45.
+type good_void_record = unboxed_void_record addressable_void
 |}]
 
 type ('a : any) any_record = #{ x : 'a }
-type good_any_record_bad = int8# any_record addressable8
+type good_any_record = int8# any_record addressable8
 [%%expect{|
 type ('a : any) any_record = #{ x : 'a; }
-Line 2, characters 27-43:
-2 | type good_any_record_bad = int8# any_record addressable8
-                               ^^^^^^^^^^^^^^^^
-Error: This type "int8# any_record" should be an instance of type
-         "('a : bits8 addressable)"
-       The layout of int8# any_record is bits8
-         because it is the unboxed version of the primitive type int8.
-       But the layout of int8# any_record must be a sublayout of
-           bits8 addressable
-         because of the definition of addressable8 at line 3, characters 0-42.
+type good_any_record = int8# any_record addressable8
 |}]
 
-module Any_record_bad : sig
+module Any_record : sig
   type ('a : any) t : any addressable
 end = struct
   type ('a : any) t = #{ x : 'a }
 end
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type ('a : any) t = #{ x : 'a }
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type ('a : any) t = #{ x : 'a; } end
-       is not included in
-         sig type ('a : any) t : any addressable end
-       Type declarations do not match:
-         type ('a : any) t = #{ x : 'a; }
-       is not included in
-         type ('a : any) t : any addressable
-       The layout of the first is any
-         because it is the expansion of a type abbreviation.
-       But the layout of the first must be a sublayout of any addressable
-         because of the definition of t at line 2, characters 2-37.
+module Any_record : sig type ('a : any) t : any addressable end
 |}]
 
 kind_ record_kind
 type abstract_field : record_kind
 type abstract_record = #{ x : abstract_field }
 type ('a : record_kind addressable) addressable_abstract
-type good_abstract_record_bad = abstract_record addressable_abstract
+type good_abstract_record = abstract_record addressable_abstract
 [%%expect{|
 kind_ record_kind
 type abstract_field : record_kind
 type abstract_record = #{ x : abstract_field; }
 type ('a : record_kind addressable) addressable_abstract
-Line 5, characters 32-47:
-5 | type good_abstract_record_bad = abstract_record addressable_abstract
-                                    ^^^^^^^^^^^^^^^
-Error: This type "abstract_record" should be an instance of type
-         "('a : record_kind addressable)"
-       The kind of abstract_record is record_kind
-         because of the definition of abstract_field at line 2, characters 0-33.
-       But the kind of abstract_record must be a subkind of
-           record_kind addressable
-         because of the definition of addressable_abstract at line 4, characters 0-56.
+type good_abstract_record = abstract_record addressable_abstract
 |}]
 
 (* Addressing an already-addressable field preserves its mode bounds. *)

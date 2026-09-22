@@ -250,13 +250,12 @@ let eq_ut (x : #(int * string) box) (y : ut box) = x = y;;
 val eq_ut : int * string -> ut box -> bool = <fun>
 |}]
 
-(* Test 14: Additional jkinds - bits32, bits64, word. The unboxed versions
-   of singleton mixed records have these layouts. *)
+(* Test 14: Box kinds for singleton mixed records with unboxed numbers. *)
 
-let check_bits32 : type (a : bits32). a -> a box -> unit =
+let check_bits32 : type (a : bits32 addressable). a -> a box -> unit =
   fun _ _ -> ();;
 [%%expect{|
-val check_bits32 : ('a : bits32). 'a -> 'a box -> unit = <fun>
+val check_bits32 : ('a : bits32 addressable). 'a -> 'a box -> unit = <fun>
 |}]
 
 type r32 = { i32 : int32_u }

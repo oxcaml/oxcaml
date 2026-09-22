@@ -8,39 +8,103 @@
    the uses are wrapped in [module type of] to only typecheck them. *)
 
 type inherited_float : float64 = #{ inherit x : float# }
-[%%expect{||}]
+[%%expect{|
+type inherited_float = #{ inherit x : float#; }
+|}]
 
 type inherited_float_semi : float64 = #{ inherit x : float#; }
-[%%expect{||}]
+[%%expect{|
+type inherited_float_semi = #{ inherit x : float#; }
+|}]
 
 type ('a : any) inherited = #{ inherit x : 'a @@ portable }
-[%%expect{||}]
+[%%expect{|
+type ('a : any) inherited = #{ inherit x : 'a @@ portable; }
+|}]
 
 type inherited_boxed = { inherit x : float# }
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 25-43:
+1 | type inherited_boxed = { inherit x : float# }
+                             ^^^^^^^^^^^^^^^^^^
+Error: Inherited labels are only supported in singleton unboxed records
+|}]
 
 type inherited_multiple = #{ x : int; inherit y : float# }
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 38-56:
+1 | type inherited_multiple = #{ x : int; inherit y : float# }
+                                          ^^^^^^^^^^^^^^^^^^
+Error: Inherited labels are only supported in singleton unboxed records
+|}]
 
 type inherited_first = #{ inherit x : float#; y : int }
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 26-45:
+1 | type inherited_first = #{ inherit x : float#; y : int }
+                              ^^^^^^^^^^^^^^^^^^^
+Error: Inherited labels are only supported in singleton unboxed records
+|}]
 
 type inherited_mutable = #{ inherit mutable x : float# }
-[%%expect{||}]
+[%%expect{|
+Line 1, characters 28-54:
+1 | type inherited_mutable = #{ inherit mutable x : float# }
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Unboxed record labels cannot be mutable
+|}]
 
 module Inherited_signature : sig
   type t = #{ inherit x : int }
 end = struct
   type t = #{ x : int }
 end
-[%%expect{||}]
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ x : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ x : int; } end
+       is not included in
+         sig type t = #{ inherit x : int; } end
+       Type declarations do not match:
+         type t = #{ x : int; }
+       is not included in
+         type t = #{ inherit x : int; }
+       Fields do not match:
+         "x : int;"
+       is not the same as:
+         "inherit x : int;"
+       The second is inherited and the first is not.
+|}]
 
 module Addressable_signature : sig
   type t = #{ x : int }
 end = struct
   type t = #{ inherit x : int }
 end
-[%%expect{||}]
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = #{ inherit x : int }
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = #{ inherit x : int; } end
+       is not included in
+         sig type t = #{ x : int; } end
+       Type declarations do not match:
+         type t = #{ inherit x : int; }
+       is not included in
+         type t = #{ x : int; }
+       Fields do not match:
+         "inherit x : int;"
+       is not the same as:
+         "x : int;"
+       The first is inherited and the second is not.
+|}]
 
 module type S = sig
   val f : layout_ x. ('a : x) ('b : x addressable). 'a -> 'b -> unit

@@ -202,7 +202,13 @@ type t : (bits8 & bits8) addressable box
 type ok = t nf_req
 type bad = t np_req
 [%%expect{|
-type t : (bits8 & bits8) addressable box
+Line 1, characters 25-36:
+1 | type t : (bits8 & bits8) addressable box
+                             ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "bits8 & bits8".
+
+type t : (bits8 & bits8) box
 type ok = t nf_req
 Line 3, characters 11-12:
 3 | type bad = t np_req
@@ -228,7 +234,13 @@ type ok = t nf_req
 type t : (float64 & float64) addressable box
 type ok = t nf_req
 [%%expect{|
-type t : (float64 & float64) addressable box
+Line 1, characters 29-40:
+1 | type t : (float64 & float64) addressable box
+                                 ^^^^^^^^^^^
+Warning 183 [redundant-kind-modifier]: This kind modifier, or a stronger one,
+  is already implied by the kind "float64 & float64".
+
+type t : (float64 & float64) box
 type ok = t nf_req
 |}]
 
