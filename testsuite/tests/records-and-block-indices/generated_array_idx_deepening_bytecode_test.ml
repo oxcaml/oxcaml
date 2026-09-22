@@ -80,9 +80,9 @@ let to_run () =
   (***************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (int64_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (int64_u array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (int64_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (int64_u array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 1;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -94,9 +94,9 @@ let to_run () =
   (***************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (int32_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (int32_u array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (int32_u array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (int32_u array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 2;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -108,9 +108,9 @@ let to_run () =
   (***********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t0 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t0 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 3;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -118,15 +118,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a0 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a0) in
+    let unboxed_path : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a0) in
     (* from array idx with path  *)
-    let shallow : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t0 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a0) in
     mark_test_run 4;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 4 failed";
     (* from array idx with path .#a0 *)
-    let shallow : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a0) in
+    let shallow : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a0) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 5;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -134,15 +134,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b0 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b0) in
+    let unboxed_path : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b0) in
     (* from array idx with path  *)
-    let shallow : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t0 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b0) in
     mark_test_run 6;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 6 failed";
     (* from array idx with path .#b0 *)
-    let shallow : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b0) in
+    let shallow : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b0) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 7;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -150,15 +150,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#c0 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c0) in
+    let unboxed_path : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c0) in
     (* from array idx with path  *)
-    let shallow : (t0 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t0 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#c0) in
     mark_test_run 8;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 8 failed";
     (* from array idx with path .#c0 *)
-    let shallow : (t0 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c0) in
+    let shallow : (t0 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c0) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 9;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -170,9 +170,9 @@ let to_run () =
   (****************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t1 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t1 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t1 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t1 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 10;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -180,15 +180,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a1 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t1 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a1) in
+    let unboxed_path : (t1 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a1) in
     (* from array idx with path  *)
-    let shallow : (t1 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t1 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a1) in
     mark_test_run 11;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 11 failed";
     (* from array idx with path .#a1 *)
-    let shallow : (t1 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a1) in
+    let shallow : (t1 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a1) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 12;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -196,15 +196,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b1 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t1 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b1) in
+    let unboxed_path : (t1 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b1) in
     (* from array idx with path  *)
-    let shallow : (t1 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t1 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b1) in
     mark_test_run 13;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 13 failed";
     (* from array idx with path .#b1 *)
-    let shallow : (t1 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b1) in
+    let shallow : (t1 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b1) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 14;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -216,9 +216,9 @@ let to_run () =
   (******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t2 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t2 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t2 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t2 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 15;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -226,15 +226,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a2 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t2 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a2) in
+    let unboxed_path : (t2 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a2) in
     (* from array idx with path  *)
-    let shallow : (t2 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t2 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a2) in
     mark_test_run 16;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 16 failed";
     (* from array idx with path .#a2 *)
-    let shallow : (t2 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a2) in
+    let shallow : (t2 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a2) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 17;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -242,15 +242,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b2 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t2 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b2) in
+    let unboxed_path : (t2 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b2) in
     (* from array idx with path  *)
-    let shallow : (t2 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t2 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b2) in
     mark_test_run 18;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 18 failed";
     (* from array idx with path .#b2 *)
-    let shallow : (t2 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b2) in
+    let shallow : (t2 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b2) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 19;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -262,9 +262,9 @@ let to_run () =
   (*******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t4 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t4 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t4 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t4 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 20;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -272,15 +272,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a4 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a4) in
+    let unboxed_path : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a4) in
     (* from array idx with path  *)
-    let shallow : (t4 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t4 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a4) in
     mark_test_run 21;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 21 failed";
     (* from array idx with path .#a4 *)
-    let shallow : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a4) in
+    let shallow : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a4) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 22;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -288,15 +288,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b4 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
+    let unboxed_path : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
     (* from array idx with path  *)
-    let shallow : (t4 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t4 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b4) in
     mark_test_run 23;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 23 failed";
     (* from array idx with path .#b4 *)
-    let shallow : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
+    let shallow : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 24;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -304,21 +304,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b4.#a3 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4.#a3) in
+    let unboxed_path : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4.#a3) in
     (* from array idx with path  *)
-    let shallow : (t4 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t4 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b4.#a3) in
     mark_test_run 25;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 25 failed";
     (* from array idx with path .#b4 *)
-    let shallow : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
+    let shallow : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4) in
     let deepened = (.idx_mut(shallow).#a3) in
     mark_test_run 26;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 26 failed";
     (* from array idx with path .#b4.#a3 *)
-    let shallow : (t4 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4.#a3) in
+    let shallow : (t4 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b4.#a3) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 27;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -330,9 +330,9 @@ let to_run () =
   (***********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t6 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t6 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 28;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -340,15 +340,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a6 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a6) in
+    let unboxed_path : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a6) in
     (* from array idx with path  *)
-    let shallow : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t6 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a6) in
     mark_test_run 29;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 29 failed";
     (* from array idx with path .#a6 *)
-    let shallow : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a6) in
+    let shallow : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a6) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 30;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -356,15 +356,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b6 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
+    let unboxed_path : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
     (* from array idx with path  *)
-    let shallow : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t6 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b6) in
     mark_test_run 31;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 31 failed";
     (* from array idx with path .#b6 *)
-    let shallow : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
+    let shallow : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 32;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -372,21 +372,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b6.#a5 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6.#a5) in
+    let unboxed_path : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6.#a5) in
     (* from array idx with path  *)
-    let shallow : (t6 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t6 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b6.#a5) in
     mark_test_run 33;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 33 failed";
     (* from array idx with path .#b6 *)
-    let shallow : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
+    let shallow : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6) in
     let deepened = (.idx_mut(shallow).#a5) in
     mark_test_run 34;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 34 failed";
     (* from array idx with path .#b6.#a5 *)
-    let shallow : (t6 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6.#a5) in
+    let shallow : (t6 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b6.#a5) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 35;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -398,9 +398,9 @@ let to_run () =
   (********************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 36;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -408,15 +408,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a8 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a8) in
+    let unboxed_path : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a8) in
     (* from array idx with path  *)
-    let shallow : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a8) in
     mark_test_run 37;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 37 failed";
     (* from array idx with path .#a8 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a8) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a8) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 38;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -424,15 +424,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b8 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
+    let unboxed_path : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
     (* from array idx with path  *)
-    let shallow : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b8) in
     mark_test_run 39;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 39 failed";
     (* from array idx with path .#b8 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 40;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -440,21 +440,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b8.#a7 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#a7) in
+    let unboxed_path : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#a7) in
     (* from array idx with path  *)
-    let shallow : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b8.#a7) in
     mark_test_run 41;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 41 failed";
     (* from array idx with path .#b8 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
     let deepened = (.idx_mut(shallow).#a7) in
     mark_test_run 42;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 42 failed";
     (* from array idx with path .#b8.#a7 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#a7) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#a7) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 43;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -462,21 +462,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b8.#b7 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#b7) in
+    let unboxed_path : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#b7) in
     (* from array idx with path  *)
-    let shallow : (t8 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t8 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b8.#b7) in
     mark_test_run 44;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 44 failed";
     (* from array idx with path .#b8 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8) in
     let deepened = (.idx_mut(shallow).#b7) in
     mark_test_run 45;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 45 failed";
     (* from array idx with path .#b8.#b7 *)
-    let shallow : (t8 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#b7) in
+    let shallow : (t8 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b8.#b7) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 46;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -488,9 +488,9 @@ let to_run () =
   (******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t9 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t9 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t9 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t9 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 47;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -498,15 +498,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a9 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t9 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a9) in
+    let unboxed_path : (t9 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a9) in
     (* from array idx with path  *)
-    let shallow : (t9 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t9 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a9) in
     mark_test_run 48;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 48 failed";
     (* from array idx with path .#a9 *)
-    let shallow : (t9 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a9) in
+    let shallow : (t9 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a9) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 49;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -514,15 +514,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b9 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t9 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b9) in
+    let unboxed_path : (t9 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b9) in
     (* from array idx with path  *)
-    let shallow : (t9 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t9 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b9) in
     mark_test_run 50;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 50 failed";
     (* from array idx with path .#b9 *)
-    let shallow : (t9 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b9) in
+    let shallow : (t9 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b9) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 51;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -534,9 +534,9 @@ let to_run () =
   (************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t11 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t11 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t11 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t11 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 52;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -544,15 +544,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a11 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t11 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a11) in
+    let unboxed_path : (t11 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a11) in
     (* from array idx with path  *)
-    let shallow : (t11 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t11 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a11) in
     mark_test_run 53;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 53 failed";
     (* from array idx with path .#a11 *)
-    let shallow : (t11 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a11) in
+    let shallow : (t11 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a11) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 54;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -560,15 +560,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b11 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t11 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b11) in
+    let unboxed_path : (t11 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b11) in
     (* from array idx with path  *)
-    let shallow : (t11 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t11 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b11) in
     mark_test_run 55;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 55 failed";
     (* from array idx with path .#b11 *)
-    let shallow : (t11 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b11) in
+    let shallow : (t11 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b11) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 56;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -580,9 +580,9 @@ let to_run () =
   (***************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t12 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t12 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t12 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t12 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 57;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -590,15 +590,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a12 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t12 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a12) in
+    let unboxed_path : (t12 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a12) in
     (* from array idx with path  *)
-    let shallow : (t12 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t12 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a12) in
     mark_test_run 58;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 58 failed";
     (* from array idx with path .#a12 *)
-    let shallow : (t12 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a12) in
+    let shallow : (t12 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a12) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 59;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -606,15 +606,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b12 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t12 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b12) in
+    let unboxed_path : (t12 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b12) in
     (* from array idx with path  *)
-    let shallow : (t12 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t12 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b12) in
     mark_test_run 60;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 60 failed";
     (* from array idx with path .#b12 *)
-    let shallow : (t12 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b12) in
+    let shallow : (t12 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b12) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 61;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -626,9 +626,9 @@ let to_run () =
   (**********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t7 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t7 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t7 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t7 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 62;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -636,15 +636,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a7 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t7 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a7) in
+    let unboxed_path : (t7 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a7) in
     (* from array idx with path  *)
-    let shallow : (t7 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t7 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a7) in
     mark_test_run 63;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 63 failed";
     (* from array idx with path .#a7 *)
-    let shallow : (t7 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a7) in
+    let shallow : (t7 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a7) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 64;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -652,15 +652,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b7 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t7 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b7) in
+    let unboxed_path : (t7 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b7) in
     (* from array idx with path  *)
-    let shallow : (t7 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t7 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b7) in
     mark_test_run 65;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 65 failed";
     (* from array idx with path .#b7 *)
-    let shallow : (t7 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b7) in
+    let shallow : (t7 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b7) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 66;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -672,9 +672,9 @@ let to_run () =
   (********************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t13 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t13 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 67;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -682,15 +682,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a13 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a13) in
+    let unboxed_path : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a13) in
     (* from array idx with path  *)
-    let shallow : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t13 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a13) in
     mark_test_run 68;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 68 failed";
     (* from array idx with path .#a13 *)
-    let shallow : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a13) in
+    let shallow : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a13) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 69;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -698,15 +698,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b13 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b13) in
+    let unboxed_path : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b13) in
     (* from array idx with path  *)
-    let shallow : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t13 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b13) in
     mark_test_run 70;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 70 failed";
     (* from array idx with path .#b13 *)
-    let shallow : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b13) in
+    let shallow : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b13) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 71;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -714,15 +714,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#c13 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c13) in
+    let unboxed_path : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c13) in
     (* from array idx with path  *)
-    let shallow : (t13 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t13 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#c13) in
     mark_test_run 72;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 72 failed";
     (* from array idx with path .#c13 *)
-    let shallow : (t13 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c13) in
+    let shallow : (t13 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#c13) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 73;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -734,9 +734,9 @@ let to_run () =
   (******************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t14 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t14 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t14 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t14 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 74;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -744,15 +744,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a14 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t14 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a14) in
+    let unboxed_path : (t14 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a14) in
     (* from array idx with path  *)
-    let shallow : (t14 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t14 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a14) in
     mark_test_run 75;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 75 failed";
     (* from array idx with path .#a14 *)
-    let shallow : (t14 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a14) in
+    let shallow : (t14 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a14) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 76;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -764,9 +764,9 @@ let to_run () =
   (*****************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t15 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t15 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t15 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t15 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 77;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -774,15 +774,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a15 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t15 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a15) in
+    let unboxed_path : (t15 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a15) in
     (* from array idx with path  *)
-    let shallow : (t15 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t15 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a15) in
     mark_test_run 78;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 78 failed";
     (* from array idx with path .#a15 *)
-    let shallow : (t15 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a15) in
+    let shallow : (t15 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a15) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 79;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -794,9 +794,9 @@ let to_run () =
   (********************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t16 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t16 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t16 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t16 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 80;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -804,15 +804,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a16 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
+    let unboxed_path : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
     (* from array idx with path  *)
-    let shallow : (t16 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t16 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a16) in
     mark_test_run 81;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 81 failed";
     (* from array idx with path .#a16 *)
-    let shallow : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
+    let shallow : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 82;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -820,15 +820,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b16 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b16) in
+    let unboxed_path : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b16) in
     (* from array idx with path  *)
-    let shallow : (t16 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t16 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b16) in
     mark_test_run 83;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 83 failed";
     (* from array idx with path .#b16 *)
-    let shallow : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b16) in
+    let shallow : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b16) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 84;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -836,21 +836,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a16.#a3 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16.#a3) in
+    let unboxed_path : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16.#a3) in
     (* from array idx with path  *)
-    let shallow : (t16 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t16 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a16.#a3) in
     mark_test_run 85;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 85 failed";
     (* from array idx with path .#a16 *)
-    let shallow : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
+    let shallow : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16) in
     let deepened = (.idx_mut(shallow).#a3) in
     mark_test_run 86;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 86 failed";
     (* from array idx with path .#a16.#a3 *)
-    let shallow : (t16 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16.#a3) in
+    let shallow : (t16 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a16.#a3) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 87;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -862,9 +862,9 @@ let to_run () =
   (**************************************)
   (* Deepening to array idx with path  *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t18 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let unboxed_path : (t18 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     (* from array idx with path  *)
-    let shallow : (t18 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t18 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 88;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -872,15 +872,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a18 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
+    let unboxed_path : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
     (* from array idx with path  *)
-    let shallow : (t18 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t18 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a18) in
     mark_test_run 89;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 89 failed";
     (* from array idx with path .#a18 *)
-    let shallow : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
+    let shallow : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 90;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -888,15 +888,15 @@ let to_run () =
   );
   (* Deepening to array idx with path .#b18 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b18) in
+    let unboxed_path : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b18) in
     (* from array idx with path  *)
-    let shallow : (t18 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t18 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#b18) in
     mark_test_run 91;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 91 failed";
     (* from array idx with path .#b18 *)
-    let shallow : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b18) in
+    let shallow : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#b18) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 92;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
@@ -904,21 +904,21 @@ let to_run () =
   );
   (* Deepening to array idx with path .#a18.#a17 *)
   iter indices_in_deepening_tests ~f:(fun i ->
-    let unboxed_path : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18.#a17) in
+    let unboxed_path : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18.#a17) in
     (* from array idx with path  *)
-    let shallow : (t18 array, _) idx_mut = Idx_mut.unsafe_create_into_array i in
+    let shallow : (t18 array#, _) idx_mut = Idx_mut.unsafe_create_into_array i in
     let deepened = (.idx_mut(shallow).#a18.#a17) in
     mark_test_run 93;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 93 failed";
     (* from array idx with path .#a18 *)
-    let shallow : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
+    let shallow : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18) in
     let deepened = (.idx_mut(shallow).#a17) in
     mark_test_run 94;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
     if not test then failwithf "test 94 failed";
     (* from array idx with path .#a18.#a17 *)
-    let shallow : (t18 array, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18.#a17) in
+    let shallow : (t18 array#, _) idx_mut = (.idx_mut(Idx_mut.unsafe_create_into_array i).#a18.#a17) in
     let deepened = (.idx_mut(shallow)) in
     mark_test_run 95;
     let test = Idx_repr.equal (Idx_repr.of_idx_mut unboxed_path) (Idx_repr.of_idx_mut deepened) in
