@@ -7525,7 +7525,14 @@ and type_expect_
             ~before_generalize:generalize_structure_exp
             (fun () -> type_exp env funct_expected_mode sfunct)
         in
-        let ty = instance funct.exp_type in
+        (* [ret_tvar] must lower shared variables, but expanding a local
+           equation for this inspection must not make the function's result
+           ambiguous. Copy the structure while preserving its variables. *)
+        let ty =
+          if Env.has_local_constraints env then duplicate_type funct.exp_type
+          else funct.exp_type
+        in
+        let ty = instance ty in
         let rt = wrap_trace_gadt_instances env (ret_tvar TypeSet.empty) ty in
         rt, funct
       in
