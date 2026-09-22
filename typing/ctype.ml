@@ -6660,40 +6660,33 @@ let moregeneral_fast env patt subst subj =
       match get_desc t1, get_desc t2 with
       | Tsubst (ty, _), _ when eq_type ty t2 -> ()
       | Tvar { jkind }, _ when get_level t1 = generic_level ->
-         (* As in [moregen], the subject must fit the variable's jkind. We
-            avoid [check_type_jkind] here: it may normalise with-bounds, which
-            looks up paths that are unsubstituted in [t2], and it may set sort
-            variables in the original schemes (the slow path only ever checks
-            instances). Instead we accept only a cheap, pure sufficient
-            condition: the variable's mod-bounds are maximal, so only the
-            layout matters, and the subject's constant layout is identical.
-            Anything else goes to the slow path. *)
-         if not (Jkind.mod_bounds_are_obviously_max jkind) then
-           raise_notrace Complicated_moregen;
-         let layout1 = Jkind.get_layout env jkind in
-         let layout2 =
-           match get_desc t2 with
-           | Tvar { jkind = jkind2 } -> begin
-               (* Do not let [get_layout] expand an abstract kind through
-                  [env]: its path is unsubstituted. *)
-               match jkind2.jkind.base with
-               | Kconstr _ -> None
-               | Layout _ -> Jkind.get_layout env jkind2
-             end
-           | Tconstr (p, _, _) -> begin
-               (* A constructor's layout is fixed by its declaration. Look it
-                  up through [subst], as the [Tconstr] case below does. *)
-               match Env.find_type (Subst.type_path subst p) env with
-               | decl -> Jkind.get_layout env decl.type_jkind
-               | exception (Not_found | Subst.Not_path) -> None
-             end
-           | Tarrow _ -> Jkind.get_layout env Jkind.for_arrow
-           | _ -> None
+         (* As in [moregen], the subject must fit the variable's jkind. The
+            general check ([check_type_jkind]) is expensive and looks up
+            paths, which are unsubstituted in [t2]. So we accept only two
+            cheap, pure sufficient conditions, which need neither the
+            environment nor the substitution: the jkind is the maximum one
+            (the first thing the general check tests too); or its mod-bounds
+            are maximal, so only the layout matters, and the subject is a
+            variable with the same constant layout. *)
+         let fits =
+           Jkind.is_obviously_max jkind
+           || (Jkind.mod_bounds_are_obviously_max jkind
+               && match get_desc t2 with
+                  | Tvar { jkind = jkind2 } -> begin
+                      (* [get_layout] only consults [env] for an abstract
+                         kind. The path in [jkind2] is unsubstituted, but
+                         looking it up either fails (and we bail out) or finds
+                         the same declaration, as identifiers are unique. *)
+                      match
+                        Jkind.get_layout env jkind, Jkind.get_layout env jkind2
+                      with
+                      | Some l1, Some l2 ->
+                        Jkind_types.Layout.Const.equal l1 l2
+                      | _ -> false
+                    end
+                  | _ -> false)
          in
-         begin match layout1, layout2 with
-         | Some l1, Some l2 when Jkind_types.Layout.Const.equal l1 l2 -> ()
-         | _ -> raise_notrace Complicated_moregen
-         end;
+         if not fits then raise_notrace Complicated_moregen;
          For_copy.redirect_desc scope t1 (Tsubst (t2, None))
       | Tarrow ((l1,a1,r1), t1, u1, _), Tarrow ((l2,a2,r2), t2, u2, _)
            when l1 = l2 ->
@@ -6703,7 +6696,7 @@ let moregeneral_fast env patt subst subj =
            let mode_check v m1 m2 =
              match With_locality.Guts.(check_const m1, check_const m2) with
              | Some c1, Some c2 -> moregen_mode_fast v c1 c2
-             | _, _ -> raise Complicated_moregen
+             | _, _ -> raise_notrace Complicated_moregen
            in
            mode_check (neg_variance variance) a1 a2;
            mode_check variance r1 r2;
