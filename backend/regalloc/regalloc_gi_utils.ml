@@ -287,18 +287,18 @@ let build_intervals : Cfg_with_infos.t -> Interval.t Reg.Tbl.t =
   let past_ranges : Interval.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let current_ranges : Range.t Reg.Tbl.t = Reg.Tbl.create 123 in
   let add_range (reg : Reg.t) ({ begin_; end_ } as range : Range.t) : unit =
-    match Reg.Tbl.find_opt past_ranges reg with
-    | None ->
+    match Reg.Tbl.find_or_null past_ranges reg with
+    | Null ->
       Reg.Tbl.replace past_ranges reg
         { Interval.begin_ = Some begin_; end_ = Some end_; ranges = [range] }
-    | Some (interval : Interval.t) ->
+    | This (interval : Interval.t) ->
       interval.ranges <- range :: interval.ranges;
       interval.end_ <- Some end_
   in
   let update_range (reg : Reg.t) ~(begin_ : int) ~(end_ : int) : unit =
-    match Reg.Tbl.find_opt current_ranges reg with
-    | None -> Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
-    | Some ({ begin_ = _; end_ = curr_end } as curr) ->
+    match Reg.Tbl.find_or_null current_ranges reg with
+    | Null -> Reg.Tbl.replace current_ranges reg { Range.begin_; end_ }
+    | This ({ begin_ = _; end_ = curr_end } as curr) ->
       if (begin_ asr 1) - (curr_end asr 1) <= 1
       then curr.end_ <- end_
       else (

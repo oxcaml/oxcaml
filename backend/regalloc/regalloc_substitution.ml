@@ -7,17 +7,17 @@ type t = Reg.t Reg.Tbl.t
 
 let apply_reg : t -> Reg.t -> Reg.t =
  fun subst old_reg ->
-  match Reg.Tbl.find_opt subst old_reg with
-  | None -> old_reg
-  | Some new_reg -> new_reg
+  match Reg.Tbl.find_or_null subst old_reg with
+  | Null -> old_reg
+  | This new_reg -> new_reg
 
 let apply_array_in_place : t -> Reg.t array -> unit =
  fun subst arr ->
   for i = 0 to pred (Array.length arr) do
     let old_reg = Array.unsafe_get arr i in
-    match Reg.Tbl.find_opt subst old_reg with
-    | None -> ()
-    | Some new_reg -> Array.unsafe_set arr i new_reg
+    match Reg.Tbl.find_or_null subst old_reg with
+    | Null -> ()
+    | This new_reg -> Array.unsafe_set arr i new_reg
   done
 
 let apply_array : t -> Reg.t array -> Reg.t array =

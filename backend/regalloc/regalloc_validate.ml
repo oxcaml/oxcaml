@@ -20,7 +20,7 @@ include Cfg_intf.S
 module Location : sig
   type t
 
-  val of_reg : Reg.t -> t option
+  val of_reg : Reg.t -> t or_null
 
   val of_reg_exn : Reg.t -> t
 
@@ -134,18 +134,21 @@ end = struct
     | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
 
-  let of_reg reg =
+  let of_reg reg : t or_null =
     match reg.Reg.loc with
-    | Reg.Unknown -> None
-    | Reg.Reg idx -> Some (Reg idx)
+    | Reg.Unknown -> Null
+    | Reg.Reg idx -> This (Reg idx)
     | Reg.Stack stack ->
-      Some
+      This
         (Stack
            (Stack.of_stack_loc
               ~stack_class:(Stack_class.of_machtype reg.Reg.typ)
               stack))
 
-  let of_reg_exn reg = of_reg reg |> Option.get
+  let of_reg_exn reg =
+    match of_reg reg with
+    | This location -> location
+    | Null -> invalid_arg "option is None"
 
   let of_regs_exn loc_arr = Array.map of_reg_exn loc_arr
 
@@ -193,15 +196,16 @@ end = struct
 
   let of_reg (reg : Reg.t) =
     let loc = Location.of_reg reg in
-    if not (Bool.equal (Option.is_some loc) (Reg.is_preassigned reg))
+    let has_location = match loc with Null -> false | This _ -> true in
+    if not (Bool.equal has_location (Reg.is_preassigned reg))
     then
       Regalloc_utils.fatal
         "Mismatch between register having location (%b) and register being a \
          preassigned register (%b)"
-        (Option.is_some loc) (Reg.is_preassigned reg);
+        has_location (Reg.is_preassigned reg);
     match loc with
-    | Some location -> Preassigned { location }
-    | None -> Named { stamp = reg.stamp }
+    | This location -> Preassigned { location }
+    | Null -> Named { stamp = reg.stamp }
 
   let to_loc_lossy t =
     match t with
@@ -483,12 +487,12 @@ end = struct
     Array.iter2
       (fun (reg_desc : Register.t) loc_reg ->
         match reg_desc.reg_id, Location.of_reg loc_reg with
-        | _, None ->
+        | _, Null ->
           Regalloc_utils.fatal "%s: location is still unknown after allocation"
             context
         | Named { stamp = _ }, _ -> ()
-        | Preassigned { location = l1 }, Some l2 when Location.equal l1 l2 -> ()
-        | Preassigned { location = prev_loc }, Some new_loc ->
+        | Preassigned { location = l1 }, This l2 when Location.equal l1 l2 -> ()
+        | Preassigned { location = prev_loc }, This new_loc ->
           Regalloc_utils.fatal
             "%s: changed preassigned register's location from %a to %a" context
             (Location.print (Register.typ reg_desc))

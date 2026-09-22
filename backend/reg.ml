@@ -217,7 +217,13 @@ end
 
 module Set = Set.Make (RegOrder)
 module Map = Map.Make (RegOrder)
-module Tbl = Hashtbl.Make (RegOrder)
+
+module Tbl = struct
+  include Hashtbl.Make (RegOrder)
+
+  let[@inline] find_or_null tbl key : _ or_null =
+    match find tbl key with data -> This data | exception Not_found -> Null
+end
 
 let add_set_array s v =
   match Array.length v with

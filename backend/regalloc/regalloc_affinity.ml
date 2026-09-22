@@ -21,9 +21,9 @@ let incr_move : moves -> temp:Reg.t -> phys_reg:Phys_reg.t -> delta:int -> unit
     =
  fun reg_tbl ~temp ~phys_reg ~delta ->
   let phys_reg_tbl =
-    match Reg.Tbl.find_opt reg_tbl temp with
-    | Some phys_reg_tbl -> phys_reg_tbl
-    | None ->
+    match Reg.Tbl.find_or_null reg_tbl temp with
+    | This phys_reg_tbl -> phys_reg_tbl
+    | Null ->
       let phys_reg_tbl = Phys_reg.Tbl.create 17 in
       Reg.Tbl.replace reg_tbl temp phys_reg_tbl;
       phys_reg_tbl
@@ -66,9 +66,9 @@ end = struct
 
   let rec find : t -> Reg.t -> Reg.t =
    fun t reg ->
-    match Reg.Tbl.find_opt t reg with
-    | None -> reg
-    | Some parent -> if Reg.same reg parent then reg else find t parent
+    match Reg.Tbl.find_or_null t reg with
+    | Null -> reg
+    | This parent -> if Reg.same reg parent then reg else find t parent
 
   let unite : t -> Reg.t -> Reg.t -> unit =
    fun t left right ->
@@ -137,9 +137,9 @@ let same_phi_class : t -> Reg.t -> Reg.t -> bool =
 let priority : t -> temp:Reg.t -> phys_reg:Phys_reg.t -> int =
  fun t ~temp ~phys_reg ->
   let temp = Classes.find t.classes temp in
-  match Reg.Tbl.find_opt t.affinity temp with
-  | None -> 0
-  | Some affinities -> (
+  match Reg.Tbl.find_or_null t.affinity temp with
+  | Null -> 0
+  | This affinities -> (
     match
       Array.find_opt
         (fun affinity -> Phys_reg.equal affinity.phys_reg phys_reg)
@@ -157,9 +157,9 @@ let get : t -> Reg.t -> affinities =
  fun t reg ->
   let reg = Classes.find t.classes reg in
   let affinities =
-    match Reg.Tbl.find_opt t.affinity reg with
-    | None -> [||]
-    | Some array -> array
+    match Reg.Tbl.find_or_null t.affinity reg with
+    | Null -> [||]
+    | This array -> array
   in
   { next_index = 0; affinities }
 

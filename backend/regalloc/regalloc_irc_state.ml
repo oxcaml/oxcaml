@@ -249,14 +249,14 @@ let[@inline] reset state ~new_inst_temporaries ~new_block_temporaries =
   InstructionId.Tbl.clear state.instr_work_list
 
 let[@inline] reg_work_list state reg =
-  match Reg.Tbl.find_opt state.reg_work_list reg with
-  | None -> fatal "%a is not in the work_list map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null state.reg_work_list reg with
+  | Null -> fatal "%a is not in the work_list map" Printreg.reg reg
+  | This x -> x
 
 let[@inline] color state reg =
-  match Reg.Tbl.find_opt state.reg_color reg with
-  | None -> fatal "%a is not in the color map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null state.reg_color reg with
+  | Null -> fatal "%a is not in the color map" Printreg.reg reg
+  | This x -> x
 
 let[@inline] set_color state reg color =
   Reg.Tbl.replace state.reg_color reg color
@@ -464,9 +464,9 @@ let[@inline] iter_edges state ~f =
   Regalloc_interf_graph.For_debug.iter_edges state.graph ~f
 
 let[@inline] is_empty_node_moves state reg =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None -> true
-  | Some move_list ->
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null -> true
+  | This move_list ->
     not
       (Instruction.Set.exists
          (fun (instr : Instruction.t) ->
@@ -476,9 +476,9 @@ let[@inline] is_empty_node_moves state reg =
          move_list)
 
 let[@inline] iter_node_moves state reg ~f =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None -> ()
-  | Some move_list ->
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null -> ()
+  | This move_list ->
     Instruction.Set.iter
       (fun (instr : Instruction.t) ->
         match get_instr_work_list state ~instruction_id:instr.id with
@@ -487,9 +487,9 @@ let[@inline] iter_node_moves state reg ~f =
       move_list
 
 let[@inline] is_move_related state reg =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None -> false
-  | Some move_list ->
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null -> false
+  | This move_list ->
     Instruction.Set.exists
       (fun (instr : Instruction.t) ->
         match get_instr_work_list state ~instruction_id:instr.id with
@@ -531,21 +531,21 @@ let[@inline] decr_degree state reg =
         RegWorkListSet.add state.simplify_work_list reg)))
 
 let[@inline] find_move_list state reg =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None -> Instruction.Set.empty
-  | Some res -> res
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null -> Instruction.Set.empty
+  | This res -> res
 
 let[@inline] add_move_list state reg instr =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None ->
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null ->
     Reg.Tbl.replace state.move_list reg (Instruction.Set.singleton instr)
-  | Some existing ->
+  | This existing ->
     Reg.Tbl.replace state.move_list reg (Instruction.Set.add instr existing)
 
 let[@inline] union_move_list state reg set =
-  match Reg.Tbl.find_opt state.move_list reg with
-  | None -> Reg.Tbl.replace state.move_list reg set
-  | Some existing ->
+  match Reg.Tbl.find_or_null state.move_list reg with
+  | Null -> Reg.Tbl.replace state.move_list reg set
+  | This existing ->
     Reg.Tbl.replace state.move_list reg (Instruction.Set.union existing set)
 
 let[@inline] rec find_alias state reg =

@@ -257,9 +257,9 @@ let[@inline] for_all_adjacent_if graph reg ~should_visit ~f =
       if should_visit r then f r else true)
 
 let[@inline] degree graph reg =
-  match Reg.Tbl.find_opt graph.degree reg with
-  | None -> fatal "%a is not in the degree map" Printreg.reg reg
-  | Some x -> x
+  match Reg.Tbl.find_or_null graph.degree reg with
+  | Null -> fatal "%a is not in the degree map" Printreg.reg reg
+  | This x -> x
 
 let[@inline] set_degree graph reg d = Reg.Tbl.replace graph.degree reg d
 

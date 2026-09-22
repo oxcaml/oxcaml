@@ -385,11 +385,11 @@ module SpillCosts = struct
   let iter costs ~f = Reg.Tbl.iter f costs
 
   let for_reg costs reg =
-    match Reg.Tbl.find_opt costs reg with None -> 0 | Some cost -> cost
+    match Reg.Tbl.find_or_null costs reg with Null -> 0 | This cost -> cost
 
   let add_to_reg costs reg delta =
     let curr =
-      match Reg.Tbl.find_opt costs reg with None -> 0 | Some cost -> cost
+      match Reg.Tbl.find_or_null costs reg with Null -> 0 | This cost -> cost
     in
     Reg.Tbl.replace costs reg (curr + delta)
 
@@ -497,9 +497,9 @@ let is_spilled (map : spilled_map) (reg : Reg.t) : bool = Reg.Tbl.mem map reg
 let use_stack_operand (map : spilled_map) (regs : Reg.t array) (index : int) :
     unit =
   let reg = regs.(index) in
-  match Reg.Tbl.find_opt map reg with
-  | None -> fatal "register %a is missing from the map" Printreg.reg reg
-  | Some spilled_reg -> regs.(index) <- spilled_reg
+  match Reg.Tbl.find_or_null map reg with
+  | Null -> fatal "register %a is missing from the map" Printreg.reg reg
+  | This spilled_reg -> regs.(index) <- spilled_reg
 
 let may_use_stack_operands_array : spilled_map -> Reg.t array -> unit =
  fun map regs ->

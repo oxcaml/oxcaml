@@ -148,9 +148,9 @@ type 'a make_operation =
 let make_spill : type a. a make_operation =
  fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg =
-    match Reg.Tbl.find_opt stack_subst old_reg with
-    | Some stack_reg -> stack_reg
-    | None ->
+    match Reg.Tbl.find_or_null stack_subst old_reg with
+    | This stack_reg -> stack_reg
+    | Null ->
       let slots = State.stack_slots state in
       let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
@@ -292,9 +292,9 @@ let insert_spills :
 let make_reload : type a. a make_operation =
  fun state ~instr_id ~stack_subst ~old_reg ~new_reg ~copy ->
   let stack_reg : Reg.t =
-    match Reg.Tbl.find_opt stack_subst old_reg with
-    | Some stack_reg -> stack_reg
-    | None ->
+    match Reg.Tbl.find_or_null stack_subst old_reg with
+    | This stack_reg -> stack_reg
+    | Null ->
       let slots = State.stack_slots state in
       let slot = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack = Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg in
