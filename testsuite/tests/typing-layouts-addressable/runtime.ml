@@ -225,3 +225,13 @@ let () =
   let ps = compose_mut_imm_idx (.product) ps in
   assert (get_mut_idx h ps = "payload");
   assert (h.after = "after")
+
+let[@inline never] inherited_float_array_get
+    (a : inherited_boxed_float array) i = a.(i)
+
+let () =
+  let a = Array.make 2 (make_inherited_float #1.25) in
+  check_inherited_float (inherited_float_array_get a 0) 1.25;
+  a.(1) <- make_inherited_float #2.5;
+  check_inherited_float (inherited_float_array_get a 1) 2.5;
+  check_inherited_float (inherited_float_array_get a 0) 1.25

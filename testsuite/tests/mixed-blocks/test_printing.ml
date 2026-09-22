@@ -278,3 +278,32 @@ let unit_arg_bad = Unit #()
 type unit_args = Unit of unit# [@immediate_all_void_constructor]
 val unit_arg_bad : unit_args = Unit <void>
 |}];;
+
+type inherited_float = { inherit f64 : float# }
+let inherited_float_bad = { f64 = -#3.5 }
+[%%expect {||}];;
+
+type inherited_int32 = { inherit i32 : int32_u }
+let inherited_int32_bad = { i32 = -#2147483648l }
+[%%expect {||}];;
+
+type inherited_float32 = { inherit f32 : float32_u }
+let inherited_float32_bad = { f32 = -#2.5s }
+[%%expect {||}];;
+
+type inherited_unit = { inherit u : unit# }
+let inherited_unit_bad = { u = #() }
+[%%expect {||}];;
+
+type inherited_string = { inherit s : string }
+let inherited_string_bad = { s = "inherited" }
+[%%expect {||}];;
+
+type addressable_float = #{ af : float# }
+type inherited_addressable = { inherit addressed : addressable_float }
+let inherited_addressable_bad = { addressed = #{ af = #5.25 } }
+[%%expect {||}];;
+
+type inherited_last = { before : string; inherit last : float# }
+let inherited_last_bad = { before = "before"; last = -#6.5 }
+[%%expect {||}];;
