@@ -758,7 +758,7 @@ let of_jkind_annotation_desc : Parsetree.jkind_annotation_desc -> _ =
     in
     of_jkind_annotation jkind ** of_core_type ct ** of_modalities modalities
   | Pjk_kind_of ct -> of_core_type ct
-  | Pjk_product jkinds -> list_fold of_jkind_annotation jkinds
+  | Pjk_product (jkinds, _) -> list_fold of_jkind_annotation jkinds
 
 let of_attribute (attr : attribute) =
   let name = attr.attr_name.txt in
