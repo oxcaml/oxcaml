@@ -374,3 +374,74 @@ Error: Signature mismatch:
        the first has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
+
+(* Inherited boxed fields retain the boxing representation of their contents. *)
+
+type inherited_boxed_float : float64 box = { inherit f : float# }
+[%%expect{| |}]
+
+type inherited_boxed_bits8 : bits8 box = { inherit i : int8# }
+[%%expect{| |}]
+
+type inherited_boxed_void : void box = { inherit v : unit# }
+[%%expect{| |}]
+
+type ('a : any) inherited_boxed_any = { inherit a : 'a }
+[%%expect{| |}]
+
+type inherited_last = { x : int; inherit f : float# }
+[%%expect{| |}]
+
+type inherited_after_mutable = { mutable x : int; inherit f : float# }
+[%%expect{| |}]
+
+type inherited_before_last = { inherit f : float#; x : int }
+[%%expect{| |}]
+
+type inherited_twice = { inherit x : int; inherit f : float# }
+[%%expect{| |}]
+
+type inherited_boxed_mutable = { inherit mutable x : int }
+[%%expect{| |}]
+
+module Inherited_boxed_signature : sig
+  type t = { inherit x : int }
+end = struct
+  type t = { x : int }
+end
+[%%expect{| |}]
+
+module Inherited_boxed_kinds : sig
+  type f : float64 box
+  type f_u : float64 = f#
+  type i : bits8 box
+  type v : void box
+  type mixed : (value & float64 inherit) box
+  type mixed_u : value & float64 inherit = mixed#
+end = struct
+  type f = { inherit f : float# }
+  type f_u = f#
+  type i = { inherit i : int8# }
+  type v = { inherit v : unit# }
+  type mixed = { x : int; inherit y : float# }
+  type mixed_u = mixed#
+end
+[%%expect{| |}]
+
+module type Inherited_boxed_index = module type of struct
+  type t = { inherit i : int }
+  let index : (t, int) idx_imm = (.i)
+end
+[%%expect{| |}]
+
+module type Inherited_boxed_float_index = module type of struct
+  type t = { inherit f : float# }
+  let index = (.f)
+end
+[%%expect{| |}]
+
+module type Inherited_last_float_index = module type of struct
+  type t = { i : int; inherit f : float# }
+  let index = (.f)
+end
+[%%expect{| |}]

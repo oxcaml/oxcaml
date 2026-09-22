@@ -102,3 +102,81 @@ let () =
   let #(a, b) = #(F64a.of_float_u #10.5, F64a.of_float_u #11.5) in
   check a 10.5;
   check b 11.5
+
+external box : ('a : any). 'a -> 'a box = "%box" [@@layout_poly]
+external unbox : ('a : any). 'a box -> 'a = "%unbox" [@@layout_poly]
+external equal_i8 : int8# -> int8# -> bool = "%int8#_equal"
+external equal_i64 : int64_u -> int64_u -> bool = "%int64_u_equal"
+
+type inherited_boxed_float : float64 box = { inherit bf : float# }
+type inherited_boxed_bits8 : bits8 box = { inherit bi : int8# }
+type inherited_boxed_void : void box = { inherit bv : unit# }
+type inherited_boxed_bits64 : bits64 box = { inherit bl : int64_u }
+type inherited_boxed_value = { inherit bs : string }
+type inherited_boxed_addressable = { inherit ba : F64a.t }
+type inherited_boxed_last = { mutable head : int; inherit tail : float# }
+
+let[@inline never] make_inherited_float bf = { bf }
+let[@inline never] make_inherited_bits8 bi = { bi }
+let[@inline never] make_inherited_void bv = { bv }
+let[@inline never] make_inherited_bits64 bl = { bl }
+let[@inline never] make_inherited_value bs = { bs }
+let[@inline never] make_inherited_addressable ba = { ba }
+let[@inline never] make_inherited_last head tail = { head; tail }
+
+let check_inherited_float r expected =
+  assert (Obj.tag (Obj.repr r) = Obj.double_tag);
+  assert (Float_u.to_float r.bf = expected);
+  let { bf } = r in
+  assert (Float_u.to_float bf = expected);
+  let u : inherited_boxed_float# = unbox r in
+  assert (Float_u.to_float u.#bf = expected)
+
+let () =
+  check_inherited_float (make_inherited_float #3.25) 3.25;
+  check_inherited_float (box #{ bf = #4.5 }) 4.5;
+  List.iter
+    (fun r ->
+      assert (Obj.is_int (Obj.repr r));
+      assert (equal_i8 r.bi #-42s);
+      let { bi } = r in
+      assert (equal_i8 bi #-42s);
+      let u : inherited_boxed_bits8# = unbox r in
+      assert (equal_i8 u.#bi #-42s))
+    [make_inherited_bits8 #-42s; box #{ bi = #-42s }];
+  let r = make_inherited_void #() in
+  assert (Obj.is_int (Obj.repr r));
+  let { bv = #() } = r in
+  let u : inherited_boxed_void# = unbox r in
+  let #() = u.#bv in
+  assert (Obj.is_int (Obj.repr (box #{ bv = #() })))
+
+let () =
+  let r = make_inherited_bits64 #42L in
+  assert (Obj.tag (Obj.repr r) = 0);
+  assert (equal_i64 r.bl #42L);
+  let { bl } = r in
+  assert (equal_i64 bl #42L);
+  let s = String.make 3 'x' in
+  let r = make_inherited_value s in
+  assert (Obj.tag (Obj.repr r) = 0);
+  assert (r.bs == s);
+  let r = make_inherited_addressable (F64a.of_float_u #5.25) in
+  assert (Obj.tag (Obj.repr r) = 0);
+  check r.ba 5.25;
+  let { ba } = r in
+  check ba 5.25
+
+let () =
+  let r = make_inherited_last 42 #6.25 in
+  assert (Obj.tag (Obj.repr r) = 0);
+  assert (r.head = 42 && Float_u.to_float r.tail = 6.25);
+  let { head; tail } = r in
+  assert (head = 42 && Float_u.to_float tail = 6.25);
+  r.head <- 43;
+  let r = { r with tail = #7.5 } in
+  assert (r.head = 43 && Float_u.to_float r.tail = 7.5);
+  let r : inherited_boxed_last = box #{ head = 44; tail = #8.75 } in
+  assert (r.head = 44 && Float_u.to_float r.tail = 8.75);
+  let u : inherited_boxed_last# = unbox r in
+  assert (u.#head = 44 && Float_u.to_float u.#tail = 8.75)
