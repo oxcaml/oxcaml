@@ -49,10 +49,13 @@ let singleton : type t k v. (t, k, v) id -> k -> v -> t =
   let Patricia_tree_repr = repr in
   Int.Map.singleton key value
 
-let union_total : type t k v. (t, k, v) id -> (v -> v -> v) -> t -> t -> t =
- fun { repr; _ } f t1 t2 ->
+let union_total (type t k v) ({ repr; _ } : (t, k, v) id) f (t1 : t)
+    (t2 : t) : t =
   let Patricia_tree_repr = repr in
-  Int.Map.union_total (fun _ v1 v2 -> f v1 v2) t1 t2
+  Int.Map.union_total
+    (fun _ (v1 : v) (v2 : v) -> (f v1 v2 : v))
+    t1 t2
+  [@nontail]
 
 let diff_or_null : type t k v.
     (t, k, v) id -> (v -> v -> v Or_null.t) -> t -> t -> t Or_null.t =

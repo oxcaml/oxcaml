@@ -800,7 +800,7 @@ let[@inline] free_vars ~init ~add_one ?env mark tys =
           let acc =
             match Env.find_type_expansion path env with
             | exception Not_found -> acc
-            | (_, body, _) ->
+            | #(_, body, _) ->
                 if get_level body = generic_level then acc
                 else add_one ty None kind acc
           in
@@ -1507,8 +1507,7 @@ let abbreviations = ref (ref Mnil)
 
 (* partial: we may not wish to copy the non generic types
    before we call type_pat *)
-let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
-  let copy = copy ?partial ?keep_names ~instantiate_modes copy_scope in
+let rec copy ?partial ?keep_names ~instantiate_modes copy_scope ty =
   match get_desc ty with
     Tsubst (ty, _) -> ty
   | desc ->
@@ -1531,6 +1530,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
       newty2 ~level:forget
         (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
     else
+    let copy ty = copy ?partial ?keep_names ~instantiate_modes copy_scope ty in
     let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
     For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
     let desc' =
@@ -1550,7 +1550,7 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
              ation can be released by changing the content of just
              one reference.
           *)
-              Tconstr (p, List.map copy tl,
+              Tconstr (p, Misc.Stdlib.List.map copy tl,
                        ref (match !(!abbreviations) with
                               Mcons _ -> Mlink !abbreviations
                             | abbrev  -> abbrev))
@@ -1626,14 +1626,18 @@ let rec copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
         let copy_mode =
           if instantiate_modes
           then
-            For_copy.mode_instantiate copy_scope
-              ~current_level:!current_level
+            let current_level = !current_level in
+            fun mode ->
+              For_copy.mode_instantiate copy_scope ~current_level mode
           else Fun.id
         in
         copy_type_desc ?keep_names copy copy_mode desc
     in
     Transient_expr.set_stub_desc t desc';
     t
+
+let copy ?partial ?keep_names ?(instantiate_modes = true) copy_scope ty =
+  copy ?partial ?keep_names ~instantiate_modes copy_scope ty
 
 (**** Variants of instantiations ****)
 
@@ -2437,7 +2441,7 @@ let expand_abbrev_gen kind find_type_expansion env ty =
           let path' = Env.normalize_type_path None env path in
           if Path.same path path' then raise Cannot_expand
           else newty2 ~level (Tconstr (path', args, abbrev))
-      | (params, body, lv) ->
+      | #(params, body, lv) ->
           (* prerr_endline
              ("add a "^string_of_kind kind^" expansion for "^Path.name path);*)
           let ty' =
@@ -3079,6 +3083,7 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
+  exclave_
   let lookup_type p =
     match Env.find_type p env with
     | decl -> Some decl
@@ -3344,10 +3349,12 @@ let estimate_type_jkind =
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
-  mk_jkind_context env (type_jkind_purely_if_principal env)
+  exclave_
+  mk_jkind_context env (fun ty -> type_jkind_purely_if_principal env ty)
 
 (* For cases where we always want Some (type_jkind_purely env ty) *)
 let mk_jkind_context_always_principal env =
+  exclave_
   mk_jkind_context env (fun ty -> Some (type_jkind_purely env ty))
 
 (**** checking jkind relationships ****)
@@ -3378,8 +3385,9 @@ let constrain_type_jkind ~fixed env ty jkind =
      Trying to apply the modality to the jkind extracted from [ty] would be
      wrong, as it would incorrectly change the jkind on a [Tvar] to mode-cross
      more than necessary.  *)
-  let rec loop ~fuel ~expanded env ty ty's_jkind jkind =
-    let type_equal = !type_equal' env in
+  let rec loop ~fixed ~fuel ~expanded env ty ty's_jkind jkind =
+    let type_equal = !type_equal' in
+    let type_equal ty1 ty2 = type_equal env ty1 ty2 in
     let context = mk_jkind_context_check_principal env in
     (* Just succeed if we're comparing against [any] *)
     if Jkind.is_obviously_max jkind then Ok () else
@@ -3430,17 +3438,17 @@ let constrain_type_jkind ~fixed env ty jkind =
 
          But if we ever choose to substitute min mod-bounds for [Tunivar]s, we
          must do so here. Internal ticket 5746. *)
-      loop ~fuel ~expanded:false env t ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded:false env t ty's_jkind jkind
 
     (* CR metaprogramming jbachurski: These should update the stage, which
        means this function should pass the context explicitly. *)
     (* CR quoted-kinds jbachurski: These quote/splice [ty's_jkind]. *)
     | Tquote ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
     | Tsplice ty ->
-      loop ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (decr_stage env) ty ty's_jkind jkind
     | Tquote_eval ty ->
-      loop ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
+      loop ~fixed ~fuel ~expanded (incr_stage env) ty ty's_jkind jkind
 
     | _ ->
        if !Clflags.ikinds_debug
@@ -3543,7 +3551,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                            field reveals one layer deeper of the layout tree. *)
                         (* CR-someday rtjoa: The above should be solved with
                            layout_of instead. *)
-                        estimate_jkind_and_loop ~fuel ~expanded:false env
+                        estimate_jkind_and_loop ~fixed ~fuel ~expanded:false env
                           unwrapped_ty.ty jkind
                       | _ ->
                         (* In this case, there's nothing to gain by
@@ -3551,7 +3559,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                            will successfully recurse into it, or it's not a
                            product and (because it's not [any]) re-estimating
                            won't change that. *)
-                        loop ~fuel ~expanded:false env unwrapped_ty.ty
+                        loop ~fixed ~fuel ~expanded:false env unwrapped_ty.ty
                           ty's_jkind jkind)
                    unwrapped_tys ty's_jkinds jkinds
                in
@@ -3605,7 +3613,7 @@ let constrain_type_jkind ~fixed env ty jkind =
              | Some ty's_jkinds, Some jkinds
                   when List.length ty's_jkinds = num_components
                        && List.length jkinds = num_components ->
-               recur ty's_jkinds jkinds
+               recur ty's_jkinds jkinds [@nontail]
              | Some ty's_jkinds, None
                   when Jkind.has_layout_any env jkind
                     && List.length ty's_jkinds = num_components ->
@@ -3613,6 +3621,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                   mode-crossing restrictions, so we recur, just duplicating
                   the jkind. *)
                recur ty's_jkinds (List.init num_components (fun _ -> jkind))
+               [@nontail]
              | _ ->
                (* Products don't line up. This is only possible if [ty] was
                   given a jkind annotation of the wrong product arity.
@@ -3632,7 +3641,8 @@ let constrain_type_jkind ~fixed env ty jkind =
             with
             | Ok jkind ->
               (match
-                estimate_jkind_and_loop ~fuel ~expanded:false env ty jkind
+                estimate_jkind_and_loop ~fixed ~fuel ~expanded:false
+                  env ty jkind
               with
               | Ok () -> Ok ()
               | Error _ ->
@@ -3641,19 +3651,19 @@ let constrain_type_jkind ~fixed env ty jkind =
                    type on the left, return the original error.
                    We could do something smarter here, updating the [loop]-ed
                    error to have correct jkinds. *)
-                error ())
+                error () [@nontail])
             | Error () ->
               (* CR or_null:
                  [_ or_null] fails against a non-null jkind.
                  We could still estimate the kind on the left better. *)
-              error ()
+              error () [@nontail]
           in
           match get_desc ty with
           | Tconstr _ ->
              if not expanded
              then
                let ty = expand_head_opt env ty in
-               estimate_jkind_and_loop ~fuel ~expanded:true env ty jkind
+               estimate_jkind_and_loop ~fixed ~fuel ~expanded:true env ty jkind
              else
                begin match unbox_once env (mk_unwrapped_type_expr ty) with
                | Missing path ->
@@ -3666,12 +3676,12 @@ let constrain_type_jkind ~fixed env ty jkind =
                       (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
                | Stepped { ty; modality; or_null = None } ->
                  let jkind = Jkind.apply_modality_r modality jkind in
-                 estimate_jkind_and_loop ~fuel:(fuel - 1) ~expanded:false env ty
-                    jkind
+                 estimate_jkind_and_loop ~fixed ~fuel:(fuel - 1)
+                   ~expanded:false env ty jkind
                | Stepped { ty; modality; or_null = Some _ } ->
-                 or_null ~fuel:(fuel - 1) ty modality
+                 or_null ~fuel:(fuel - 1) ty modality [@nontail]
                | Stepped_record_unboxed_product unwrapped_tys ->
-                 product ~fuel:(fuel - 1) unwrapped_tys
+                 product ~fuel:(fuel - 1) unwrapped_tys [@nontail]
                end
           | Tunboxed_tuple ltys ->
             (* Note: here we "duplicate" the fuel, which may seem like cheating.
@@ -3679,11 +3689,11 @@ let constrain_type_jkind ~fixed env ty jkind =
                infinitely expanding a recursive type. In a wide tuple, we many
                need to expand many types shallowly, and that's fine. *)
             product ~fuel (List.map (fun (_, ty) ->
-              mk_unwrapped_type_expr ty) ltys)
+              mk_unwrapped_type_expr ty) ltys) [@nontail]
           | _ ->
             Error (Jkind.Violation.of_ ~context env
                 (Not_a_subjkind (ty's_jkind, jkind, sub_failure_reasons)))
-  and estimate_jkind_and_loop ~fuel ~expanded env ty jkind : _ result =
+  and estimate_jkind_and_loop ~fixed ~fuel ~expanded env ty jkind : _ result =
     (* If [jkind]'s bound's are all max, then we immediately know that the
        mod-bounds already agree. But in such a case, we may still need to
        constrain layouts. So we still continue, but we avoid performing any
@@ -3693,9 +3703,9 @@ let constrain_type_jkind ~fixed env ty jkind =
     let jkind = Jkind.fully_expand_aliases env jkind in
     let ignore_mod_bounds = Jkind.mod_bounds_are_obviously_max jkind in
     let ty's_jkind = estimate_type_jkind ~ignore_mod_bounds env ty in
-    loop ~fuel ~expanded env ty ty's_jkind jkind
+    loop ~fixed ~fuel ~expanded env ty ty's_jkind jkind
   in
-  estimate_jkind_and_loop ~fuel:100 ~expanded:false env ty
+  estimate_jkind_and_loop ~fixed ~fuel:100 ~expanded:false env ty
     (Jkind.disallow_left jkind)
 
 let estimate_type_jkind = estimate_type_jkind ~ignore_mod_bounds:false
@@ -3815,6 +3825,7 @@ let rec intersect_type_jkind ~reason env ty1 jkind2 =
     match jkind1, jkind2 with
     | Some jkind1, Some jkind2 ->
       Jkind.intersection ~type_equal ~context ~reason env jkind1 jkind2
+      [@nontail]
     | _, _ -> Jkind.Unknown
 
 (* See comment on [jkind_unification_mode] *)
@@ -3885,7 +3896,7 @@ let full_expand ~may_forget_scope env ty =
 *)
 let generic_abbrev env path =
   try
-    let (_, body, _) = Env.find_type_expansion path env in
+    let #(_, body, _) = Env.find_type_expansion path env in
     get_level body = generic_level
   with
     Not_found ->
@@ -6463,7 +6474,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Ikind.crossing_of_jkind ~context env jkind
+  Ikind.crossing_of_jkind ~context env jkind [@nontail]
 
 let crossing_of_ty env ?modalities ty =
   let principal = is_principal ty in

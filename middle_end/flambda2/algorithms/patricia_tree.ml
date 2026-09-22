@@ -189,6 +189,8 @@ module type Tree = sig
     val of_func : 'a is_value -> (key -> 'a -> 'b) -> ('a, 'b) t
 
     val call : ('a, 'b) t -> key -> 'a -> 'b
+
+    val call_fold : ('a, 'b -> 'b) t -> key -> 'a -> 'b -> 'b
   end
 
   (* CR bclement: This module (and the modules below) are used as workarounds to
@@ -315,6 +317,8 @@ module Set0 = struct
       (f [@inlined hint]) key ()
 
     let[@inline always] call f key _ = f key
+
+    let[@inline always] call_fold f key _ acc = f key acc
   end
 
   module Merge_callback = struct
@@ -428,6 +432,8 @@ module Map0 = struct
 
     let[@inline always] call f i d = f i d
 
+    let[@inline always] call_fold f i d acc = f i d acc
+
     let[@inline always] of_func Any f = f
   end
 
@@ -489,7 +495,8 @@ module Tree_operations (Tree : Tree) : sig
 
   val union_shared : ('a, 'a, 'a) Merge_callback.t -> 'a t -> 'a t -> 'a t
 
-  val union_total : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val union_total :
+    (key -> 'a -> 'a -> 'a) @ local -> 'a t -> 'a t -> 'a t
 
   val union_total_shared : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
 
@@ -713,8 +720,9 @@ end = struct
       let key' = leaf_key l in
       if key = key'
       then
-        let datum = f (leaf_datum l) in
-        leaf iv key datum
+        let old_datum = leaf_datum l in
+        let datum = f old_datum in
+        if datum == old_datum then t else leaf iv key datum
       else t
     | Branch b ->
       let prefix_and_bit = branch_prefix_and_bit b in
@@ -724,8 +732,12 @@ end = struct
         let t0 = branch0 b in
         let t1 = branch1 b in
         if zero_bit key bit
-        then branch_non_empty prefix_and_bit (replace_tree key f t0) t1
-        else branch_non_empty prefix_and_bit t0 (replace_tree key f t1)
+        then
+          let t0' = replace_tree key f t0 in
+          if t0' == t0 then t else branch_non_empty prefix_and_bit t0' t1
+        else
+          let t1' = replace_tree key f t1 in
+          if t1' == t1 then t else branch_non_empty prefix_and_bit t0 t1'
       else t
 
   let replace key f t =
@@ -896,10 +908,11 @@ end = struct
           prefix1
           ((only_right [@inlined hint]) t1)
       in
-      let[@local] rebuild_branch prefix_and_bit t0' t1' =
+      let[@inline always] rebuild_branch prefix_and_bit t0' t1' =
         of_tree (branch_non_empty prefix_and_bit t0' t1')
       in
-      let[@local] rebuild_branch_share_right prefix_and_bit t0' t1' ~t10 ~t11 =
+      let[@inline always] rebuild_branch_share_right prefix_and_bit t0' t1'
+          ~t10 ~t11 =
         match
           (phys_eq_check_branch_right [@inlined hint]) ~orig_t:t1 ~orig_t0:t10
             ~orig_t1:t11 t0' t1'
@@ -998,8 +1011,8 @@ end = struct
         then
           let t10, t11 = branch0 b1, branch1 b1 in
           if zero_bit i bit
-          then branch_0x prefix_and_bit ~t00:t0 ~t10 ~t11
-          else branch_1x prefix_and_bit ~t01:t0 ~t10 ~t11
+          then (branch_0x prefix_and_bit ~t00:t0 ~t10 ~t11 [@nontail])
+          else (branch_1x prefix_and_bit ~t01:t0 ~t10 ~t11 [@nontail])
         else join i prefix
       | Branch b0, Leaf l1 ->
         let i = leaf_key l1 in
@@ -1009,8 +1022,8 @@ end = struct
         then
           let t00, t01 = branch0 b0, branch1 b0 in
           if zero_bit i bit
-          then branch_x0 prefix_and_bit ~t00 ~t01 ~t10:t1
-          else branch_x1 prefix_and_bit ~t00 ~t01 ~t11:t1
+          then (branch_x0 prefix_and_bit ~t00 ~t01 ~t10:t1 [@nontail])
+          else (branch_x1 prefix_and_bit ~t00 ~t01 ~t11:t1 [@nontail])
         else join prefix i
       (* Branch/Branch case *)
       | Branch b0, Branch b1 ->
@@ -1033,13 +1046,13 @@ end = struct
           if includes_prefix prefix0 bit0 prefix1 bit1
           then
             if zero_bit prefix1 bit0
-            then branch_x0 prefix_and_bit0 ~t00 ~t01 ~t10:t1
-            else branch_x1 prefix_and_bit0 ~t00 ~t01 ~t11:t1
+            then (branch_x0 prefix_and_bit0 ~t00 ~t01 ~t10:t1 [@nontail])
+            else (branch_x1 prefix_and_bit0 ~t00 ~t01 ~t11:t1 [@nontail])
           else if includes_prefix prefix1 bit1 prefix0 bit0
           then
             if zero_bit prefix0 bit1
-            then branch_0x prefix_and_bit1 ~t00:t0 ~t10 ~t11
-            else branch_1x prefix_and_bit1 ~t01:t0 ~t10 ~t11
+            then (branch_0x prefix_and_bit1 ~t00:t0 ~t10 ~t11 [@nontail])
+            else (branch_1x prefix_and_bit1 ~t01:t0 ~t10 ~t11 [@nontail])
           else join prefix0 prefix1)
 
   let pattern_match_pair_merge_total ~only_left ~only_right =
@@ -1064,6 +1077,7 @@ end = struct
 
   let toplevel_union_total nonempty_union t0 t1 =
     toplevel_union (fun[@inline] t0 t1 -> of_tree (nonempty_union t0 t1)) t0 t1
+    [@nontail]
   [@@inline always]
 
   let rec union_tree f t0 t1 =
@@ -1132,9 +1146,11 @@ end = struct
       iv
       (fun[@inline] k t t' -> Some (f k t t'))
       t0 t1
+    [@nontail]
 
   let union_total f t0 t1 =
     toplevel_union_total (fun[@inline] t0 t1 -> union_total_tree f t0 t1) t0 t1
+    [@nontail]
 
   let rec union_total_shared_tree f t0 t1 =
     let iv = is_value_of_tree t0 in
@@ -1432,7 +1448,7 @@ end = struct
 
   let rec unsigned_fold f t acc =
     match tree_descr t with
-    | Leaf l -> Callback.call f (leaf_key l) (leaf_datum l) acc
+    | Leaf l -> Callback.call_fold f (leaf_key l) (leaf_datum l) acc
     | Branch b -> unsigned_fold f (branch1 b) (unsigned_fold f (branch0 b) acc)
 
   let fold f t acc =
@@ -1440,7 +1456,7 @@ end = struct
     | Empty -> acc
     | Non_empty tree -> (
       match tree_descr tree with
-      | Leaf l -> Callback.call f (leaf_key l) (leaf_datum l) acc
+      | Leaf l -> Callback.call_fold f (leaf_key l) (leaf_datum l) acc
       | Branch b ->
         let t0, t1 = order_branches' b in
         unsigned_fold f t1 (unsigned_fold f t0 acc))
@@ -1477,7 +1493,7 @@ end = struct
         unsigned_exists p t0 || unsigned_exists p t1)
 
   let filter p t =
-    let rec loop tree =
+    let rec loop p tree =
       let iv = is_value_of_tree tree in
       match tree_descr tree with
       | Leaf leaf ->
@@ -1486,9 +1502,9 @@ end = struct
         else empty iv
       | Branch b ->
         let prefix_and_bit, t0, t1 = branch_descr b in
-        branch prefix_and_bit (loop t0) (loop t1)
+        branch prefix_and_bit (loop p t0) (loop p t1)
     in
-    match descr t with Empty -> t | Non_empty tree -> loop tree
+    match descr t with Empty -> t | Non_empty tree -> loop p tree
 
   let rec partition_tree p tree =
     let iv = is_value_of_tree tree in
@@ -1628,35 +1644,32 @@ end = struct
      are negative.
 
      [i] might be any value. *)
-  let same_sign_split ~found ~not_found i t =
-    let rec loop t =
-      match tree_descr t with
-      | Leaf l ->
-        let iv = is_value_of_tree t in
-        let j = leaf_key l in
-        if i = j
-        then empty iv, Split_callback.call found (leaf_datum l), empty iv
-        else if j < i
-        then of_tree t, not_found, empty iv
-        else empty iv, not_found, of_tree t
-      | Branch b ->
-        let prefix_and_bit = branch_prefix_and_bit b in
-        let prefix, bit = unpack prefix_and_bit in
-        if match_prefix i prefix bit
+  let rec same_sign_split ~found ~not_found i t =
+    match tree_descr t with
+    | Leaf l ->
+      let iv = is_value_of_tree t in
+      let j = leaf_key l in
+      if i = j
+      then #(empty iv, Split_callback.call found (leaf_datum l), empty iv)
+      else if j < i
+      then #(of_tree t, not_found, empty iv)
+      else #(empty iv, not_found, of_tree t)
+    | Branch b ->
+      let prefix_and_bit = branch_prefix_and_bit b in
+      let prefix, bit = unpack prefix_and_bit in
+      if match_prefix i prefix bit
+      then
+        let t0, t1 = branch0 b, branch1 b in
+        if zero_bit i bit
         then
-          let t0, t1 = branch0 b, branch1 b in
-          if zero_bit i bit
-          then
-            let lt, mem, gt = loop t0 in
-            lt, mem, of_tree (branch_right_nonempty prefix_and_bit gt t1)
-          else
-            let lt, mem, gt = loop t1 in
-            of_tree (branch_left_nonempty prefix_and_bit t0 lt), mem, gt
-        else if i < prefix
-        then empty (is_value_of_tree t), not_found, of_tree t
-        else of_tree t, not_found, empty (is_value_of_tree t)
-    in
-    loop t
+          let #(lt, mem, gt) = same_sign_split ~found ~not_found i t0 in
+          #(lt, mem, of_tree (branch_right_nonempty prefix_and_bit gt t1))
+        else
+          let #(lt, mem, gt) = same_sign_split ~found ~not_found i t1 in
+          #(of_tree (branch_left_nonempty prefix_and_bit t0 lt), mem, gt)
+      else if i < prefix
+      then #(empty (is_value_of_tree t), not_found, of_tree t)
+      else #(of_tree t, not_found, empty (is_value_of_tree t))
 
   let split ~found ~not_found i t =
     match descr t with
@@ -1668,13 +1681,16 @@ end = struct
         (* prefix is necessarily empty *)
         if i < 0
         then
-          let lt, mem, gt = same_sign_split ~found ~not_found i t1 in
+          let #(lt, mem, gt) = same_sign_split ~found ~not_found i t1 in
           lt, mem, of_tree (branch_left_nonempty prefix_and_bit t0 gt)
         else
-          let lt, mem, gt = same_sign_split ~found ~not_found i t0 in
+          let #(lt, mem, gt) = same_sign_split ~found ~not_found i t0 in
           of_tree (branch_right_nonempty prefix_and_bit lt t1), mem, gt
       | Leaf _ | Branch _ ->
-        (same_sign_split [@inlined hint]) ~found ~not_found i t)
+        let #(lt, mem, gt) =
+          (same_sign_split [@inlined hint]) ~found ~not_found i t
+        in
+        lt, mem, gt)
 
   let to_list t =
     let rec loop acc t =

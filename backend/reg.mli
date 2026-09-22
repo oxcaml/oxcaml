@@ -148,7 +148,11 @@ module Set : Set.S with type elt = t
 
 module Map : Map.S with type key = t
 
-module Tbl : Hashtbl.S with type key = t
+module Tbl : sig
+  include Hashtbl.S with type key = t
+
+  val find_or_null : 'a t -> key -> 'a or_null
+end
 
 val add_set_array : Set.t -> t array -> Set.t
 

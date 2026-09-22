@@ -90,9 +90,9 @@ module Make_tbl (SC : T) : Tbl with type stack_class = SC.t = struct
   let find : 'a t -> stack_class -> 'a =
    fun tbl stack_class ->
     match Tbl.find_opt tbl stack_class with
+    | Some x -> x
     | None ->
       Misc.fatal_errorf "stack class %a missing from table" SC.print stack_class
-    | Some x -> x
 
   let replace : 'a t -> stack_class -> 'a -> unit =
    fun tbl stack_class x -> Tbl.replace tbl stack_class x

@@ -319,11 +319,11 @@ let set_static_row_name decl path =
 
 let fold_row f init row =
   let result =
-    List.fold_left
+    Misc.Stdlib.List.fold_left
       (fun init (_, fi) ->
          match row_field_repr fi with
          | Rpresent(Some ty) -> f init ty
-         | Reither(_, tl, _) -> List.fold_left f init tl
+         | Reither(_, tl, _) -> Misc.Stdlib.List.fold_left f init tl
          | _ -> init)
       init
       (row_fields row)
@@ -333,16 +333,27 @@ let fold_row f init row =
     (* Tof_kind can appear in [row_more] in case the row's row variable was existentially
        quantified in a GADT *)
   | Tof_kind _ ->
-    begin match
-      Option.map (fun (_,l) -> List.fold_left f result l) (row_name row)
-    with
+    begin match row_name row with
     | None -> result
-    | Some result -> result
+    | Some (_, l) -> Misc.Stdlib.List.fold_left f result l
     end
   | _ -> assert false
 
 let iter_row f row =
-  fold_row (fun () v -> f v) () row
+  Misc.Stdlib.List.iter
+    (fun (_, fi) ->
+       match row_field_repr fi with
+       | Rpresent(Some ty) -> f ty
+       | Reither(_, tl, _) -> Misc.Stdlib.List.iter f tl
+       | _ -> ())
+    (row_fields row);
+  match get_desc (row_more row) with
+  | Tvar _ | Tunivar _ | Tsubst _ | Tconstr _ | Tnil | Tof_kind _ ->
+    begin match row_name row with
+    | None -> ()
+    | Some (_, l) -> Misc.Stdlib.List.iter f l
+    end
+  | _ -> assert false
 
 
 let fold_type_expr f fm init ty =
@@ -353,13 +364,13 @@ let fold_type_expr f fm init ty =
       let result = fm result m2 in
       let result = f result ty1 in
       f result ty2
-  | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
-  | Tunboxed_tuple l    -> List.fold_left (fun acc (_, t) -> f acc t) init l
-  | Tconstr (_, l, _)   -> List.fold_left f init l
+  | Ttuple l | Tunboxed_tuple l ->
+      Misc.Stdlib.List.fold_left (fun acc (_, t) -> f acc t) init l [@nontail]
+  | Tconstr (_, l, _)   -> Misc.Stdlib.List.fold_left f init l
   | Tmod (ty, _)        -> f init ty
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
-      List.fold_left f result p
+      Misc.Stdlib.List.fold_left f result p
   | Tobject (ty, _)     -> f init ty
   | Tvariant row        ->
       let result = fold_row f init row in
@@ -376,16 +387,45 @@ let fold_type_expr f fm init ty =
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
-    List.fold_left f result tyl
+    Misc.Stdlib.List.fold_left f result tyl
   | Trepr (ty, _sort_vars) ->
     f init ty
   | Tpackage pack ->
-    List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
+    Misc.Stdlib.List.fold_left (fun result (_n, ty) -> f result ty)
+      init pack.pack_cstrs [@nontail]
   | Tof_kind _ -> init
   | Tbox ty -> f init ty
 
+(* A direct iterator avoids adapter closures while preserving tail calls along
+   unary type spines. *)
 let iter_type_expr f fm ty =
-  fold_type_expr (fun () v -> f v) (fun () v -> fm v) () ty
+  match get_desc ty with
+  | Tvar _ | Tunivar _ | Tnil | Tof_kind _ -> ()
+  | Tarrow ((_, m1, m2), ty1, ty2, _) ->
+      fm m1;
+      fm m2;
+      f ty1;
+      f ty2
+  | Ttuple l | Tunboxed_tuple l ->
+      Misc.Stdlib.List.iter (fun (_, ty) -> f ty) l [@nontail]
+  | Tconstr (_, l, _) -> Misc.Stdlib.List.iter f l
+  | Tobject(ty, {contents = Some (_, p)}) ->
+      f ty;
+      Misc.Stdlib.List.iter f p
+  | Tmod (ty, _) | Tobject (ty, _) | Tquote ty | Tsplice ty
+  | Tquote_eval ty | Tsubst (ty, _) | Trepr (ty, _) | Tbox ty -> f ty
+  | Tvariant row ->
+      iter_row f row;
+      f (row_more row)
+  | Tfield (_, _, ty1, ty2) ->
+      f ty1;
+      f ty2
+  | Tlink _ -> assert false
+  | Tpoly (ty, tyl) ->
+      f ty;
+      Misc.Stdlib.List.iter f tyl
+  | Tpackage pack ->
+      Misc.Stdlib.List.iter (fun (_, ty) -> f ty) pack.pack_cstrs [@nontail]
 
 let rec iter_abbrev f = function
     Mnil                   -> ()
@@ -571,21 +611,21 @@ let type_iterators mark =
 let copy_row f fixed row keep more =
   let Row {fields = orig_fields; fixed = orig_fixed; closed; name = orig_name} =
     row_repr row in
-  let fields = List.map
+  let fields = Misc.Stdlib.List.map
       (fun (l, fi) -> l,
         match row_field_repr fi with
-        | Rpresent oty -> rf_present (Option.map f oty)
+        | Rpresent oty -> rf_present (Misc.Stdlib.Option.map f oty)
         | Reither(c, tl, m) ->
             let use_ext_of = if keep then Some fi else None in
             let m = if is_fixed row then fixed else m in
-            let tl = List.map f tl in
+            let tl = Misc.Stdlib.List.map f tl in
             rf_either tl ?use_ext_of ~no_arg:c ~matched:m
         | Rabsent -> rf_absent)
       orig_fields in
   let name =
     match orig_name with
     | None -> None
-    | Some (path, tl) -> Some (path, List.map f tl) in
+    | Some (path, tl) -> Some (path, Misc.Stdlib.List.map f tl) in
   let fixed = if fixed then orig_fixed else None in
   create_row ~fields ~more ~fixed ~closed ~name
 
@@ -596,13 +636,15 @@ let rec copy_type_desc ?(keep_names=false) f fm = function
      if keep_names then Tvar { name; jkind } else Tvar { name=None; jkind }
   | Tarrow ((p, m1, m2), ty1, ty2, c)->
     Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
-  | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
+  | Ttuple l            ->
+    Ttuple (Misc.Stdlib.List.map (fun (label, t) -> label, f t) l)
   | Tunboxed_tuple l    ->
-    Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
-  | Tconstr (p, l, _)   -> Tconstr (p, List.map f l, ref Mnil)
+    Tunboxed_tuple (Misc.Stdlib.List.map (fun (label, t) -> label, f t) l)
+  | Tconstr (p, l, _)   -> Tconstr (p, Misc.Stdlib.List.map f l, ref Mnil)
   | Tmod (ty, mod_bounds) -> Tmod (f ty, mod_bounds)
   | Tobject(ty, {contents = Some (p, tl)})
-                        -> Tobject (f ty, ref (Some(p, List.map f tl)))
+                        ->
+    Tobject (f ty, ref (Some(p, Misc.Stdlib.List.map f tl)))
   | Tobject (ty, _)     -> Tobject (f ty, ref None)
   | Tvariant _          -> assert false (* too ambiguous *)
   | Tquote ty           -> Tquote (f ty)
@@ -616,13 +658,14 @@ let rec copy_type_desc ?(keep_names=false) f fm = function
   | Tsubst _            -> assert false
   | Tunivar _ as ty     -> ty (* always keep the name *)
   | Tpoly (ty, tyl)     ->
-      let tyl = List.map f tyl in
+      let tyl = Misc.Stdlib.List.map f tyl in
       Tpoly (f ty, tyl)
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
   | Tpackage pack       ->
       Tpackage {pack with
-        pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
+        pack_cstrs =
+          Misc.Stdlib.List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
   | Tof_kind jk -> Tof_kind jk
   | Tbox ty -> Tbox (f ty)
 
