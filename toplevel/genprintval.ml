@@ -479,6 +479,20 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         let shape = Lambda.transl_mixed_product_shape shape in
         Some (Outval_record_mixed_block shape)
 
+    let outval_rep_of_tuple env labeled_tys =
+      if not !Clflags.native_code then Some Outval_record_boxed
+      else
+        let tys = Array.of_list (List.map snd labeled_tys) in
+        Option.map (fun sorts_and_types ->
+          let shape = Array.map (fun (sort, _) ->
+            sort
+            |> Jkind.Sort.default_for_transl_and_get
+            |> Lambda.layout_of_const_sort
+            |> Lambda.mixed_block_element_of_layout) sorts_and_types
+          in
+          Outval_record_mixed_block shape)
+          (sorts_of_types env tys)
+
     (* The position of the first field: an extension constructor's block
        starts with its extension slot. *)
     let first_field_pos : Types.variant_representation -> int = function
@@ -614,17 +628,16 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           | Tarrow _ ->
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
-              (* Mixed tuples are only represented as mixed blocks in native
-                 code. Using the [Obj] module here to check would let print out
-                 flattened mixed tuples as normal tuples. *)
-              if !Clflags.native_code
-                 && not (List.for_all (fun (_, ty) -> is_value ty) labeled_tys)
-              then Oval_stuff "<abstr>"
-              else
-                Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
+              begin match outval_rep_of_tuple env labeled_tys with
+              | None -> Oval_stuff "<abstr>"
+              | Some rep ->
+                  Oval_tuple
+                    (tree_of_labeled_val_list 0 depth obj labeled_tys rep)
+              end
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
-                (tree_of_labeled_val_list 0 depth obj labeled_tys)
+                (tree_of_labeled_val_list 0 depth obj labeled_tys
+                   Outval_record_boxed)
           | Tconstr(path, ty_list, _) -> begin
               match get_desc (Ctype.expand_head env ty) with
               | Tconstr(path, [ty_arg], _)
@@ -1072,11 +1085,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             | [] -> Oval_stuff "<variant>" in
           find (row_fields row)
 
-      and tree_of_labeled_val_list start depth obj labeled_tys =
+      and tree_of_labeled_val_list start depth obj labeled_tys rep =
         let rec tree_list i = function
           | [] -> []
           | (label, ty) :: labeled_tys ->
-              let tree = nest tree_of_val (depth - 1) (O.field obj i) ty in
+              let tree = tree_of_field rep obj i depth ty in
               (label, tree) :: tree_list (i + 1) labeled_tys in
       tree_list start labeled_tys
 
