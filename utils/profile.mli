@@ -67,10 +67,12 @@ Format.formatter -> Clflags.profile_column list -> timings_precision:int -> unit
 val record_action :
   gettimeofday:(unit -> float) -> name:string -> (unit -> 'a) -> 'a
 (** When Dune action tracing is enabled, record a span covering the call,
-    with the complete timing hierarchy in its arguments. Pass
-    [Unix.gettimeofday] as the clock; compiler-libs itself does not depend on
-    [Unix]. Timing values in the arguments are CPU seconds, as in [-dtimings];
-    the span uses wall-clock time. *)
+    with the complete [-dprofile] hierarchy in its [profile] argument,
+    regardless of the selected profile columns. The columns are [time] (CPU
+    seconds), [alloc], [top-heap], [absolute-top-heap] (all in bytes), and
+    [counters] (an object of integer counts). The span uses wall-clock time.
+    Pass [Unix.gettimeofday] as the clock; compiler-libs itself does not
+    depend on [Unix]. *)
 
 (** Command line flags *)
 

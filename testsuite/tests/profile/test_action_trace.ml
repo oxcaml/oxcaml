@@ -25,9 +25,14 @@ let print_trace () =
   let contents = really_input_string chan (in_channel_length chan) in
   close_in chan;
   Sys.remove path;
-  (* CPU timings vary, but their position in the hierarchy must not. *)
-  print_string (Str.global_replace
-    (Str.regexp "\"time\":[-+0-9.eE]+") "\"time\":<time>" contents)
+  (* Measurements vary, but their position in the hierarchy must not. *)
+  let contents = List.fold_left (fun contents column ->
+    let pattern = Str.regexp
+      ("\"" ^ column ^ "\":[-+0-9.eE]+") in
+    Str.global_replace pattern
+      ("\"" ^ column ^ "\":<" ^ column ^ ">") contents
+  ) contents ["time"; "alloc"; "top-heap"; "absolute-top-heap"] in
+  print_string contents
 
 let () =
   Trace.with_fresh_context ~name:"events" ~f:(fun context ->
@@ -82,24 +87,45 @@ let () =
   Profile.reset ();
   Clflags.profile_columns := [];
   let gettimeofday, calls = clock () in
+  let counter_calls = ref 0 in
+  let counter_f count =
+    incr counter_calls;
+    Profile.Counters.(set "nodes" count (create ()))
+  in
+  let record ?accumulate name count =
+    let result = Profile.record_call_with_counters ?accumulate ~counter_f
+      name (fun () -> count)
+    in
+    assert (result = count)
+  in
   let result = Profile.record_action ~gettimeofday ~name:"compiler" (fun () ->
     Profile.record_call "file=example.ml" (fun () ->
-      Profile.record_call "repeated" (fun () -> ());
-      Profile.record_call "repeated" (fun () -> ());
-      Profile.record_call ~accumulate:true "accumulated" (fun () -> ());
-      Profile.record_call ~accumulate:true "accumulated" (fun () -> ()));
+      record "repeated" 2;
+      record "repeated" 3;
+      record ~accumulate:true "accumulated" 5;
+      record ~accumulate:true "accumulated" 7);
     42)
   in
-  assert (result = 42 && !calls = 2);
+  assert (result = 42 && !calls = 2 && !counter_calls = 4);
+  assert (!Clflags.profile_columns = []);
   print_trace ()
 
 let () =
   Profile.reset ();
   let gettimeofday, calls = clock () in
   (match Profile.record_action ~gettimeofday ~name:"failed" (fun () ->
-     Profile.record_call "pass" (fun () -> raise Test_exception)) with
+     Profile.record_call_with_counters
+       ~counter_f:(fun _ -> failwith "Counters called after an exception")
+       "pass" (fun () -> raise Test_exception)) with
    | _ -> failwith "Unexpected success"
    | exception Test_exception -> ());
+  assert (!calls = 2);
+  print_trace ()
+
+let () =
+  Profile.reset ();
+  let gettimeofday, calls = clock () in
+  Profile.record_action ~gettimeofday ~name:"empty-profile" (fun () -> ());
   assert (!calls = 2);
   print_trace ();
   Sys.rmdir trace_dir

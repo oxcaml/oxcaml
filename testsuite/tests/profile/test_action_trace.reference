@@ -5,7 +5,9 @@
 ]
 [{"tid":0,"pid":0,"name":"exception","cat":"test","ts":0}
 ]
-[{"args":{"timings":[{"name":"file=example.ml","time":<time>,"children":[{"name":"repeated","time":<time>,"children":[]},{"name":"repeated","time":<time>,"children":[]},{"name":"accumulated","time":<time>,"children":[]},{"name":"other","time":<time>,"children":[]}]},{"name":"other","time":<time>,"children":[]}]},"tid":0,"pid":0,"name":"compiler","cat":"compiler","ts":1700000000000000,"dur":2000000}
+[{"args":{"profile":[{"name":"file=example.ml","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[{"name":"repeated","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":2},"children":[]},{"name":"repeated","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":3},"children":[]},{"name":"accumulated","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{"nodes":12},"children":[]},{"name":"other","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},{"name":"other","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"compiler","cat":"compiler","ts":1700000000000000,"dur":2000000}
 ]
-[{"args":{"timings":[{"name":"pass","time":<time>,"children":[]},{"name":"other","time":<time>,"children":[]}]},"tid":0,"pid":0,"name":"failed","cat":"compiler","ts":1700000000000000,"dur":2000000}
+[{"args":{"profile":[{"name":"pass","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]},{"name":"other","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"failed","cat":"compiler","ts":1700000000000000,"dur":2000000}
+]
+[{"args":{"profile":[{"name":"other","time":<time>,"alloc":<alloc>,"top-heap":<top-heap>,"absolute-top-heap":<absolute-top-heap>,"counters":{},"children":[]}]},"tid":0,"pid":0,"name":"empty-profile","cat":"compiler","ts":1700000000000000,"dur":2000000}
 ]
