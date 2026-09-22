@@ -271,3 +271,25 @@ Stdlib boxing and unboxing preserve record and scalar types
 
   $ $MERLIN single type-enclosing -position 3:6 -filename test.ml < test.ml | jq -r '.value[0].type'
   t#
+
+Abstract box kinds expose unboxed versions
+
+  $ cat > test.ml << EOF
+  > module Abs : sig
+  >   type t : (value & float64) box
+  > end = struct
+  >   type t = { i : int; f : float# }
+  > end
+  > let unbox_abs : Abs.t -> Abs.t# = Stdlib.unbox
+  > let box_abs : Abs.t# -> Abs.t = Stdlib.box
+  > EOF
+
+  $ $MERLIN single errors -filename test.ml < test.ml | jq -r '.value[].message'
+  The type Abs.t has no unboxed version.
+  The value Stdlib.unbox has type 'a box -> 'a
+  but an expression was expected of type Abs.t -> 'b
+  Type 'a box is not compatible with type Abs.t
+  The type Abs.t has no unboxed version.
+  The value Stdlib.box has type 'a -> 'a box
+  but an expression was expected of type 'a -> Abs.t
+  Type 'a box is not compatible with type Abs.t
