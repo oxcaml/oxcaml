@@ -497,6 +497,8 @@ type primitive =
      offset and behave as if the base were null. *)
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of Jkind.Sort.Const.t * locality_mode
+  | Punbox of Jkind.Sort.Const.t
 
 (** This is the same as [Primitive.native_repr] but with [Repr_poly]
     compiled away. *)
@@ -752,6 +754,18 @@ val generic_value : value_kind
    [layout_unboxed_float].
 *)
 val layout_of_extern_repr : extern_repr -> layout
+
+val layout_of_const_sort : Jkind.Sort.Const.t -> layout
+
+type boxed_representation =
+  | Block
+  | Float_block
+  | Immediate_box
+  | Immediate64_box
+
+(* [Immediate64_box] uses an immediate on 64-bit targets and a block
+   otherwise. *)
+val boxed_representation : Jkind.Sort.Const.t -> boxed_representation
 
 val element_layout_of_array_kind : array_kind -> layout
 
@@ -1034,7 +1048,7 @@ type lambda =
   | Lkindinstantiate of lkindinstantiate
 
 and slambda =
-  | SLlayout of layout
+  | SLsort of Jkind.Sort.Const.t
   | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
   | SLmissing
@@ -1107,7 +1121,7 @@ and lkindtemplate =
 
 and lkindinstantiate =
   { kinst_func: lambda;
-    kinst_args: layout list;
+    kinst_args: Jkind.Sort.Const.t list;
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;

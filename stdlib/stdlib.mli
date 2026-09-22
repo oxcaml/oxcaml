@@ -793,6 +793,20 @@ external fst : ('a * 'b[@local_opt]) -> ('a[@local_opt]) = "%field0_immut"
 external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) = "%field1_immut"
 (** Return the second component of a pair. *)
 
+(** {1 Boxing operations} *)
+
+external box :
+  ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) = "%box"
+[@@layout_poly]
+(** [box x] returns the boxed representation of [x].
+    Boxing a value with layout [value] adds an indirection. *)
+
+external unbox :
+  ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) = "%unbox"
+[@@layout_poly]
+(** [unbox x] returns the unboxed contents of [x].
+    For mutable records, the result contains the fields' current values. *)
+
 
 (** {1 List operations}
 

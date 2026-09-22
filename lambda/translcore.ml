@@ -466,11 +466,7 @@ and transl_exp0 ~in_new_scope ~scopes (layout : Lambda.layout) e =
   | Texp_apply_layout (func, args) ->
       Lkindinstantiate {
         kinst_func = (transl_exp ~scopes Lambda.layout_template_env func);
-        kinst_args = List.map
-          (fun var ->
-            let layout = Jkind.Sort.var_default_to_scannable_and_get var in
-            Typeopt.layout_of_sort e.exp_loc layout)
-          args;
+        kinst_args = List.map Jkind.Sort.var_default_to_scannable_and_get args;
         kinst_result_layout = layout;
         kinst_mode = maybe_alloc_stack;
         kinst_loc = (of_location ~scopes e.exp_loc);

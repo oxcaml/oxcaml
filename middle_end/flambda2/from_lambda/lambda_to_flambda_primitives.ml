@@ -1978,6 +1978,30 @@ let convert_block_creation ~machine_width ~prim_name tag (shape : L.block_shape)
     in
     [Variadic (Make_block (Mixed (tag, kind_shape), mutability, mode), args)]
 
+let boxed_block_shape sort =
+  let layouts =
+    match L.layout_of_const_sort sort with
+    | Punboxed_product layouts -> layouts
+    | ( Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
+      | Punboxed_vector _ | Punboxed_mask | Ptop | Pbottom | Psplicevar _ ) as
+      layout ->
+      [layout]
+  in
+  Array.of_list (List.map L.mixed_block_element_of_layout layouts)
+
+let immediate_box_contents_kind :
+    Jkind.Sort.Const.t -> K.Standard_int_or_float.t option = function
+  | Base Void -> None
+  | Base Bits8 -> Some Naked_int8
+  | Base Bits16 -> Some Naked_int16
+  | Base Bits32 -> Some Naked_int32
+  | Base Untagged_immediate -> Some Naked_immediate
+  | Base
+      ( Scannable | Float64 | Float32 | Word | Bits64 | Vec128 | Vec256 | Vec512
+      | Mask )
+  | Product _ | Addressable _ | Univar _ | Genvar _ ->
+    Misc.fatal_error "Invalid immediate box contents"
+
 (* Primitive conversion *)
 let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     (prim : L.primitive) (args : Simple.t list list) (dbg : Debuginfo.t)
@@ -1999,7 +2023,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         ~current_region
     in
     let tag = Tag.Scannable.create_exn tag in
-    let mutability = Mutability.from_lambda mutability in
+    (* Mutable zero-size blocks cannot be heap-allocated, so we treat them as
+       immutable. This is fine because their mutability is meaningless after
+       typechecking. *)
+    let mutability =
+      if List.is_empty args
+      then Mutability.Immutable
+      else Mutability.from_lambda mutability
+    in
     convert_block_creation ~machine_width ~prim_name:"Pmakeblock" tag shape
       mutability mode args
   | Pmakelazyblock lazy_tag, [[arg]] ->
@@ -3551,6 +3582,73 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
     let null_base = H.Simple (Simple.const Reg_width_const.const_null) in
     convert_pset_indirect ~machine_width ~dbg prim Into_block_or_off_heap layout
       mode ~ptr:null_base ~idx ~new_values
+  | Pbox (sort, mode), [args] ->
+    let mode =
+      Alloc_mode.For_allocations.from_lambda mode ~current_alloc_region
+        ~current_region
+    in
+    begin match L.boxed_representation sort, machine_width with
+    | Float_block, _ ->
+      begin match args with
+      | [arg] -> [Unary (Box_number (Naked_float, mode), arg)]
+      | _ -> Misc.fatal_error "Pbox: expected one float"
+      end
+    | (Immediate_box | Immediate64_box), Sixty_four
+    | Immediate_box, (Thirty_two | Thirty_two_no_gc_tag_bit) ->
+      begin match immediate_box_contents_kind sort, args with
+      | None, [] ->
+        [Simple (Simple.const_int (Target_ocaml_int.zero machine_width))]
+      | Some src, [arg] ->
+        [Unary (Num_conv { src; dst = Tagged_immediate }, arg)]
+      | None, _ :: _ | Some _, ([] | _ :: _ :: _) ->
+        Misc.fatal_error "Pbox: invalid immediate contents"
+      end
+    | Block, _ | Immediate64_box, (Thirty_two | Thirty_two_no_gc_tag_bit) ->
+      let shape = boxed_block_shape sort in
+      let mutability =
+        if List.is_empty args then Mutability.Immutable else Mutability.Mutable
+      in
+      convert_block_creation ~machine_width ~prim_name:"Pbox" Tag.Scannable.zero
+        (Shape shape) mutability mode args
+    end
+  | Punbox sort, [[arg]] ->
+    begin match L.boxed_representation sort, machine_width with
+    | Float_block, _ -> [Unary (Unbox_number Naked_float, arg)]
+    | (Immediate_box | Immediate64_box), Sixty_four
+    | Immediate_box, (Thirty_two | Thirty_two_no_gc_tag_bit) ->
+      begin match immediate_box_contents_kind sort with
+      | None -> []
+      | Some dst -> [Unary (Num_conv { src = Tagged_immediate; dst }, arg)]
+      end
+    | Block, _ | Immediate64_box, (Thirty_two | Thirty_two_no_gc_tag_bit) ->
+      let elements = boxed_block_shape sort in
+      let shape =
+        Mixed_block_shape.of_mixed_block_elements
+          ~print_locality:(fun ppf () -> Format.fprintf ppf "()")
+          elements
+      in
+      let fields = Mixed_block_shape.flattened_reordered_shape shape in
+      let kind_shape = K.Scannable_block_shape.from_mixed_block_shape shape in
+      let tag = Or_unknown.Known Tag.Scannable.zero in
+      let size =
+        Or_unknown.Known
+          (Target_ocaml_int.of_int machine_width (Array.length fields))
+      in
+      let indices =
+        List.init (Array.length elements) (fun i ->
+            Mixed_block_shape.lookup_path_producing_new_indexes shape [i])
+        |> List.concat
+      in
+      List.map
+        (fun index : H.expr_primitive ->
+          let field = Target_ocaml_int.of_int machine_width index in
+          let kind =
+            H.block_access_kind_of_mixed_field_element ~kind_shape ~tag ~size
+              fields.(index)
+          in
+          Unary (Block_load { kind; mut = Mutable; field }, arg))
+        indices
+    end
   | (Praise _ | Pccall _), _ ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Primitive %a (%a) shouldn't be \
@@ -3577,7 +3675,7 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
       | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
-      | Pget_ptr _ | Pget_ext_ptr _ ),
+      | Pget_ptr _ | Pget_ext_ptr _ | Pbox _ | Punbox _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->
     Misc.fatal_errorf
       "Closure_conversion.convert_primitive: Wrong arity for unary primitive \

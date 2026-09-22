@@ -1014,6 +1014,13 @@ let primitive ppf = function
       fprintf ppf "(set_ext_ptr%s@ %a)"
         (match mode with Modify_heap -> "" | Modify_maybe_stack -> "_local")
         layout l
+  | Pbox (sort, mode) ->
+      fprintf ppf "(box%s@ %a)"
+        (locality_kind mode)
+        (Format_doc.compat Jkind.Sort.Const.format) sort
+  | Punbox sort ->
+      fprintf ppf "(unbox@ %a)"
+        (Format_doc.compat Jkind.Sort.Const.format) sort
 
 let name_of_primitive = function
   | Pscalar i ->
@@ -1216,6 +1223,8 @@ let name_of_primitive = function
   | Pset_ptr _ -> "Pset_ptr"
   | Pget_ext_ptr _ -> "Pget_ext_ptr"
   | Pset_ext_ptr _ -> "Pset_ext_ptr"
+  | Pbox _ -> "Pbox"
+  | Punbox _ -> "Punbox"
 
 let zero_alloc_attribute ppf check =
   match check with
@@ -1589,13 +1598,16 @@ let rec lam ppf = function
         lam ktmpl_body
   | Lkindinstantiate {kinst_func; kinst_args; kinst_result_layout = _;
                       kinst_mode = _; kinst_loc = _} ->
-      let lams ppf largs =
-        List.iter (fun l -> fprintf ppf "@ %a" layout l) largs in
+      let sorts ppf args =
+        List.iter (fun sort ->
+          fprintf ppf "@ %a" (Format_doc.compat Jkind.Sort.Const.format) sort)
+          args in
       fprintf ppf "@[<2>(kinstantiate@ %a%a)]"
-        lam kinst_func lams kinst_args
+        lam kinst_func sorts kinst_args
 
 and slam ppf = function
-  | SLlayout l -> fprintf ppf "⟪layout %a⟫" layout l
+  | SLsort sort ->
+      fprintf ppf "⟪sort %a⟫" (Format_doc.compat Jkind.Sort.Const.format) sort
   | SLglobal cu ->
     fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
   | SLvar id -> Slambdaident.print ppf id

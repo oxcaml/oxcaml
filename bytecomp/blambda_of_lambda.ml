@@ -1174,7 +1174,117 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       match args with
       | [x; y] ->
         comp_binary_scalar_intrinsic binary (comp_expr x) (comp_expr y)
-      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2))
+      | [] | [_] | _ :: _ :: _ -> wrong_arity ~expected:2)
+    | Pbox (sort, _mode) ->
+      let arg =
+        match args with [arg] -> comp_expr arg | _ -> wrong_arity ~expected:1
+      in
+      let layout = Lambda.layout_of_const_sort sort in
+      let block arg =
+        match layout with
+        | Pvalue _ -> pseudo_event (Prim (Makeblock { tag = 0 }, [arg]))
+        | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+          pseudo_event
+            (Prim (Make_faux_mixedblock { total_len = 1; tag = 0 }, [arg]))
+        | Punboxed_product layouts ->
+          let shape =
+            Array.of_list
+              (List.map Lambda.mixed_block_element_of_layout layouts)
+          in
+          let make_block fields =
+            let prim : Blambda.primitive =
+              match Lambda.mixed_block_of_block_shape (Shape shape) with
+              | None -> Makeblock { tag = 0 }
+              | Some shape ->
+                Make_faux_mixedblock { total_len = Array.length shape; tag = 0 }
+            in
+            pseudo_event (Prim (prim, fields))
+          in
+          copy_product_fields shape arg ~make_block
+        | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+        | Ptop -> Misc.fatal_error "Blambda_of_lambda: Pbox: Ptop layout"
+        | Pbottom -> Misc.fatal_error "Blambda_of_lambda: Pbox: Pbottom layout"
+        | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+      in
+      begin match Lambda.boxed_representation sort with
+      | Block -> block arg
+      | Float_block -> arg
+      | Immediate_box ->
+        begin match sort with Base Void -> Sequence (arg, unit) | _ -> arg
+        end
+      | Immediate64_box ->
+        let id = Ident.create_local "box_arg" in
+        let value = Var id in
+        let bits =
+          match sort with
+          | Base Bits32 -> value
+          | Base Float32 -> Prim (Ccall "caml_float32_to_bits_bytecode", [value])
+          | _ ->
+            Misc.fatal_error "Blambda_of_lambda: Pbox: 32-bit sort expected"
+        in
+        let word_size = Prim (caml_sys_const Word_size, [unit]) in
+        Let
+          { id;
+            arg;
+            body =
+              Ifthenelse
+                { cond = Prim (Intcomp Eq, [word_size; tagged_immediate 64]);
+                  ifso = Prim (Ccall "caml_int32_to_int", [bits]);
+                  ifnot = block value
+                }
+          }
+      end
+    | Punbox sort ->
+      let arg =
+        match args with [arg] -> comp_expr arg | _ -> wrong_arity ~expected:1
+      in
+      let layout = Lambda.layout_of_const_sort sort in
+      let block arg =
+        match layout with
+        | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ ->
+          Prim (Getfield 0, [arg])
+        | Punboxed_product layouts ->
+          let shape =
+            Array.of_list
+              (List.map Lambda.mixed_block_element_of_layout layouts)
+          in
+          copy_product_fields shape arg ~make_block:(fun fields ->
+              pseudo_event (Prim (Makeblock { tag = 0 }, fields)))
+        | Punboxed_vector _ | Punboxed_mask -> simd_is_not_supported ()
+        | Ptop -> Misc.fatal_error "Blambda_of_lambda: Punbox: Ptop layout"
+        | Pbottom ->
+          Misc.fatal_error "Blambda_of_lambda: Punbox: Pbottom layout"
+        | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
+      in
+      begin match Lambda.boxed_representation sort with
+      | Block -> block arg
+      | Float_block -> arg
+      | Immediate_box ->
+        begin match sort with Base Void -> Sequence (arg, unit) | _ -> arg
+        end
+      | Immediate64_box ->
+        let id = Ident.create_local "unbox_arg" in
+        let value = Var id in
+        let bits = Prim (Ccall "caml_int32_of_int", [value]) in
+        let scalar =
+          match sort with
+          | Base Bits32 -> bits
+          | Base Float32 -> Prim (Ccall "caml_float32_of_bits_bytecode", [bits])
+          | _ ->
+            Misc.fatal_error "Blambda_of_lambda: Punbox: 32-bit sort expected"
+        in
+        let word_size = Prim (caml_sys_const Word_size, [unit]) in
+        Let
+          { id;
+            arg;
+            body =
+              Ifthenelse
+                { cond = Prim (Intcomp Eq, [word_size; tagged_immediate 64]);
+                  ifso = scalar;
+                  ifnot = block value
+                }
+          }
+      end)
 
 and comp_binary_scalar_intrinsic : type a.
     a Scalar.Operation.Binary.t -> blambda -> blambda -> blambda =

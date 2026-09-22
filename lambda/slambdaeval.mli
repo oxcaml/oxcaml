@@ -42,7 +42,7 @@ type halves =
 
 and value =
   | SLVhalves of halves
-  | SLVlayout of layout
+  | SLVsort of Jkind.Sort.Const.t
   | SLVrecord of value Or_missing.t array
   | SLVclosure of closure
 

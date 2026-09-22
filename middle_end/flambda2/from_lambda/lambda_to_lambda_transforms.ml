@@ -1004,8 +1004,29 @@ let ccall_involves_vec256 (desc : L.external_call_description) =
   repr_vec256 desc.prim_native_repr_res
   || List.exists repr_vec256 desc.prim_native_repr_args
 
+let float32_bitcast ~name ~src ~dst =
+  Primitive.make ~name:(name ^ "_bytecode") ~alloc:false ~c_builtin:true
+    ~effects:No_effects ~coeffects:No_coeffects ~native_name:name
+    ~native_repr_args:[Prim_global, L.Same_as_ocaml_repr src]
+    ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr dst)
+    ~is_layout_poly:false
+
 let transform_primitive0 env (prim : L.primitive) args loc =
   match prim, args with
+  | Pbox (Base Float32, mode), [arg]
+    when Target_system.Machine_width.is_64_bit (Env.machine_width env) ->
+    let cast =
+      float32_bitcast ~name:"caml_float32_to_bits" ~src:S.float32 ~dst:S.bits32
+    in
+    Transformed
+      (L.Lprim (Pbox (S.bits32, mode), [Lprim (Pccall cast, [arg], loc)], loc))
+  | Punbox (Base Float32), [arg]
+    when Target_system.Machine_width.is_64_bit (Env.machine_width env) ->
+    let cast =
+      float32_bitcast ~name:"caml_float32_of_bits" ~src:S.bits32 ~dst:S.float32
+    in
+    Transformed
+      (L.Lprim (Pccall cast, [Lprim (Punbox S.bits32, [arg], loc)], loc))
   (* For Psequor and Psequand, earlier passes (notably for region handling)
      assume that [b] is in tail-position, so we must keep it so. *)
   | Psequor, [a; b] ->

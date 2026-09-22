@@ -246,6 +246,16 @@ external ignore_contended : ('a : value_or_null).
 external fst : ('a * 'b[@local_opt]) -> ('a[@local_opt]) @@ portable = "%field0_immut"
 external snd : ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ portable = "%field1_immut"
 
+(* Boxing operations *)
+
+external box :
+  ('a : any). ('a[@local_opt]) -> ('a box[@local_opt]) @@ portable = "%box"
+[@@layout_poly]
+
+external unbox :
+  ('a : any). ('a box[@local_opt]) -> ('a[@local_opt]) @@ portable = "%unbox"
+[@@layout_poly]
+
 (* References *)
 
 type ('a : value_or_null) ref = { mutable contents : 'a }

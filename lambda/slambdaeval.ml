@@ -107,7 +107,7 @@ module rec Types : sig
 
   and value =
     | SLVhalves of halves
-    | SLVlayout of layout
+    | SLVsort of Jkind.Sort.Const.t
     | SLVrecord of value Or_missing.t array
     | SLVclosure of Template_id.t
 
@@ -128,7 +128,7 @@ end = struct
 
   and value =
     | SLVhalves of halves
-    | SLVlayout of layout
+    | SLVsort of Jkind.Sort.Const.t
     | SLVrecord of value Or_missing.t array
     | SLVclosure of Template_id.t
 
@@ -149,8 +149,7 @@ end = struct
         slv_comptime
         (Fmt.deprecated Printlambda.lambda)
         slv_runtime
-    | SLVlayout layout ->
-      Fmt.fprintf ppf "⟪%a⟫" (Fmt.deprecated Printlambda.layout) layout
+    | SLVsort sort -> Fmt.fprintf ppf "⟪%a⟫" Jkind.Sort.Const.format sort
     | SLVrecord fields ->
       let print_fields ppf =
         Array.iter
@@ -219,54 +218,18 @@ end
 module Mangling : sig
   val symbol_arg_of_value : Types.value -> string
 end = struct
-  let symbol_arg_of_value_kind_non_null = function
-    | Pintval -> "immediate"
-    | Pgenval | Pboxedfloatval _ | Pboxedintval _ | Pvariant _ | Parrayval _
-    | Pboxedvectorval _ | Pboxedmaskval ->
-      "value"
-
-  let rec symbol_arg_of_value_kind { raw_kind; nullable } =
-    let kind = symbol_arg_of_value_kind_non_null raw_kind in
-    let nullable =
-      match nullable with Nullable -> "_or_null" | Non_nullable -> ""
-    in
-    kind ^ nullable
-
-  and symbol_arg_of_unboxed_float = function
-    | Unboxed_float64 -> "float64"
-    | Unboxed_float32 -> "float32"
-
-  and symbol_arg_of_unboxed_or_untagged_integer = function
-    | Unboxed_int64 -> "int64"
-    | Unboxed_nativeint -> "nativeint"
-    | Unboxed_int32 -> "int32"
-    | Untagged_int16 -> "int16"
-    | Untagged_int8 -> "int8"
-    | Untagged_int -> "int"
-
-  and symbol_arg_of_unboxed_vector = function
-    | Unboxed_vec128 -> "vec128"
-    | Unboxed_vec256 -> "vec256"
-    | Unboxed_vec512 -> "vec512"
-
-  and symbol_arg_of_unboxed_product layouts =
-    (* CR layout poly: this should be synced up with unarize. *)
-    "(" ^ String.concat "_" (List.map symbol_arg_of_layout layouts) ^ ")"
-
-  and symbol_arg_of_layout = function
-    | Pvalue vk -> symbol_arg_of_value_kind vk
-    | Punboxed_float uf -> symbol_arg_of_unboxed_float uf
-    | Punboxed_or_untagged_integer ui ->
-      symbol_arg_of_unboxed_or_untagged_integer ui
-    | Punboxed_vector uv -> symbol_arg_of_unboxed_vector uv
-    | Punboxed_product layouts -> symbol_arg_of_unboxed_product layouts
-    | Punboxed_mask -> "mask"
-    | Ptop | Pbottom | Psplicevar _ ->
-      Misc.fatal_error "Slambda_types.symbol_arg_of_layout: unexpected layout"
+  let rec symbol_arg_of_sort (sort : Jkind.Sort.Const.t) =
+    match sort with
+    | Base _ -> Fmt.asprintf "%a" Jkind.Sort.Const.format sort
+    | Product sorts ->
+      "(" ^ String.concat "_" (List.map symbol_arg_of_sort sorts) ^ ")"
+    | Addressable sort -> "addressable(" ^ symbol_arg_of_sort sort ^ ")"
+    | Univar _ | Genvar _ ->
+      Misc.fatal_error "Slambda_types.symbol_arg_of_sort: unspecialized sort"
 
   let symbol_arg_of_value (v : Types.value) =
     match v with
-    | SLVlayout l -> symbol_arg_of_layout l
+    | SLVsort sort -> symbol_arg_of_sort sort
     | SLVhalves _ | SLVrecord _ | SLVclosure _ ->
       Misc.fatal_error "Slambda_types.symbol_arg_of_value: unexpected value"
 end
@@ -365,13 +328,13 @@ let errf fmt = Misc.fatal_errorf ("slambda eval: " ^^ fmt)
 
 type _ value_type =
   | Thalves : halves value_type
-  | Tlayout : layout value_type
+  | Tsort : Jkind.Sort.Const.t value_type
   | Trecord : value Or_missing.t array value_type
   | Tclosure : Template_id.t value_type
 
 let describe_value_type (type a) : a value_type -> string = function
   | Thalves -> "program"
-  | Tlayout -> "layout value"
+  | Tsort -> "sort"
   | Trecord -> "record"
   | Tclosure -> "template"
 
@@ -379,7 +342,7 @@ type value_type_packed = TP : _ value_type -> value_type_packed
 
 let typeof = function
   | SLVhalves _ -> TP Thalves
-  | SLVlayout _ -> TP Tlayout
+  | SLVsort _ -> TP Tsort
   | SLVrecord _ -> TP Trecord
   | SLVclosure _ -> TP Tclosure
 
@@ -397,7 +360,7 @@ let expect_err ?reason ~expected ~actual =
 let expect (type a) ?reason (vty : a value_type) (v : value) : a =
   match vty, v with
   | Thalves, SLVhalves halves -> halves
-  | Tlayout, SLVlayout layout -> layout
+  | Tsort, SLVsort sort -> sort
   | Trecord, SLVrecord record -> record
   | Tclosure, SLVclosure closure -> closure
   | _, _ ->
@@ -413,7 +376,7 @@ let rec eval_slam ?name (ctx : Ctx.t) env slam : value Or_missing.t =
     let slv_comptime = eval_slam ?name ctx env sval_comptime in
     let slv_runtime = eval_lam ctx env sval_runtime in
     Present (SLVhalves { slv_comptime; slv_runtime })
-  | SLlayout layout -> Present (SLVlayout (eval_layout env layout))
+  | SLsort sort -> Present (SLVsort (eval_sort env sort))
   | SLglobal cu -> Ctx.cu_static_data ctx cu
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
@@ -625,8 +588,8 @@ and eval_mixed_block_element :
  fun env element ->
   match element with
   | Splice_variable id ->
-    eval_var env id |> expect_not_missing |> expect Tlayout
-    |> mixed_block_element_of_layout
+    eval_var env id |> expect_not_missing |> expect Tsort
+    |> Lambda.layout_of_const_sort |> mixed_block_element_of_layout
   | Product old_elements ->
     let new_elements =
       Misc.Stdlib.Array.map_sharing (eval_mixed_block_element env) old_elements
@@ -636,9 +599,25 @@ and eval_mixed_block_element :
   | Bits64 | Vec128 | Vec256 | Vec512 | Mask | Word | Untagged_immediate ->
     element
 
+and eval_sort env (sort : Jkind.Sort.Const.t) =
+  match sort with
+  | Genvar var ->
+    eval_var env (Slambdaident.of_sort_var var)
+    |> expect_not_missing |> expect Tsort
+  | Product old_sorts ->
+    let new_sorts = Misc.Stdlib.List.map_sharing (eval_sort env) old_sorts in
+    if new_sorts == old_sorts then sort else Jkind.Sort.Const.product new_sorts
+  | Addressable old_sort ->
+    let new_sort = eval_sort env old_sort in
+    if new_sort == old_sort then sort else Jkind.Sort.Const.addressable new_sort
+  | Base _ -> sort
+  | Univar _ -> errf "unexpected universally quantified sort"
+
 and eval_layout env layout =
   match layout with
-  | Psplicevar id -> eval_var env id |> expect_not_missing |> expect Tlayout
+  | Psplicevar id ->
+    eval_var env id |> expect_not_missing |> expect Tsort
+    |> Lambda.layout_of_const_sort
   | Punboxed_product old_layouts ->
     let new_layouts =
       Misc.Stdlib.List.map_sharing (eval_layout env) old_layouts
@@ -762,6 +741,12 @@ and eval_prim env prim =
     if new_layout == old_layout
     then prim
     else Patomic_compare_set_idx { layout = new_layout; mode }
+  | Pbox (old_sort, mode) ->
+    let new_sort = eval_sort env old_sort in
+    if new_sort == old_sort then prim else Pbox (new_sort, mode)
+  | Punbox old_sort ->
+    let new_sort = eval_sort env old_sort in
+    if new_sort == old_sort then prim else Punbox new_sort
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetglobal _ | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _ | Pfield _
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
@@ -815,6 +800,13 @@ and eval_prim env prim =
 
 exception Found_a_splice
 
+let rec assert_sort_contains_no_splices (sort : Jkind.Sort.Const.t) =
+  match sort with
+  | Genvar _ -> raise Found_a_splice
+  | Base _ | Univar _ -> ()
+  | Product sorts -> List.iter assert_sort_contains_no_splices sorts
+  | Addressable sort -> assert_sort_contains_no_splices sort
+
 let rec assert_layout_contains_no_splices : Lambda.layout -> unit = function
   | Psplicevar _ -> raise Found_a_splice
   | Ptop | Pbottom | Pvalue _ | Punboxed_float _
@@ -837,6 +829,7 @@ let assert_mixed_block_shape_contains_no_splices shape =
 
 let assert_primitive_contains_no_splices (prim : Lambda.primitive) =
   match prim with
+  | Pbox (sort, _) | Punbox sort -> assert_sort_contains_no_splices sort
   | Popaque layout | Pobj_magic layout ->
     assert_layout_contains_no_splices layout
   | Pget_idx (layout, _)

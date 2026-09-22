@@ -431,7 +431,7 @@ let rec fracture_lam lambda : slambda =
         let app_id = Slambdaident.create_local "app" in
         let app_var = SLvar app_id in
         let sapp_args =
-          Misc.Stdlib.Array.of_list_map (fun arg -> SLlayout arg) kinst_args
+          Misc.Stdlib.Array.of_list_map (fun arg -> SLsort arg) kinst_args
         in
         SLlet
           { slet_name = app_id;
@@ -574,7 +574,7 @@ and fracture_prim lambda prim args loc =
   | Preinterpret_tagged_int63_as_unboxed_int64 | Parray_to_iarray
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax | Pget_idx _ | Pset_idx _ | Pget_ptr _
-  | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ ->
+  | Pset_ptr _ | Pget_ext_ptr _ | Pset_ext_ptr _ | Pbox _ | Punbox _ ->
     let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;

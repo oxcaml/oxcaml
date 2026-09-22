@@ -502,6 +502,8 @@ type primitive =
   | Pset_ptr of layout * modify_mode
   | Pget_ext_ptr of layout * Asttypes.mutable_flag
   | Pset_ext_ptr of layout * modify_mode
+  | Pbox of Jkind.Sort.Const.t * locality_mode
+  | Punbox of Jkind.Sort.Const.t
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -1205,7 +1207,7 @@ type lambda =
   | Lkindinstantiate of lkindinstantiate
 
 and slambda =
-  | SLlayout of layout
+  | SLsort of Jkind.Sort.Const.t
   | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
   | SLmissing
@@ -1272,7 +1274,7 @@ and lkindtemplate =
 
 and lkindinstantiate =
   { kinst_func: lambda;
-    kinst_args: layout list;
+    kinst_args: Jkind.Sort.Const.t list;
     kinst_result_layout: layout;
     kinst_mode: return_mode;
     kinst_loc: scoped_location;
@@ -2927,6 +2929,7 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Punbox_mask -> None
   | Pbox_mask m -> Some m
   | Punbox_unit -> None
+  | Pbox (_, m) -> Some m
   | Pjoin_vec256 | Psplit_vec256 ->
     (* Aborts in bytecode, unboxed in native code *)
     None
@@ -2977,7 +2980,8 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pmake_idx_mixed_field _
   | Pmake_idx_array _
   | Pidx_deepen _
-  | Preinterpret_tagged_int63_as_unboxed_int64 ->
+  | Preinterpret_tagged_int63_as_unboxed_int64
+  | Punbox _ ->
     if !Clflags.native_code then None
     else
       (* We don't provide a locally-allocating version of this primitive
@@ -3177,7 +3181,7 @@ let primitive_can_raise prim =
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
   | Pget_ext_ptr _ | Pset_ext_ptr _
-  | Ppeek _ | Ppoke _ ->
+  | Ppeek _ | Ppoke _ | Pbox _ | Punbox _ ->
     false
 
 let constant_layout: constant -> layout = function
@@ -3230,8 +3234,23 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
     layout_of_const_sort sort
   | Univar _ ->
     Misc.fatal_error "layout_of_const_sort: unexpected univar"
-  | Genvar _ ->
-    Misc.fatal_error "layout_of_const_sort: unexpected genvar"
+  | Genvar var -> Psplicevar (Slambdaident.of_sort_var var)
+
+type boxed_representation =
+  | Block
+  | Float_block
+  | Immediate_box
+  | Immediate64_box
+
+let boxed_representation (sort : Jkind.Sort.Const.t) =
+  match sort with
+  | Base (Void | Bits8 | Bits16 | Untagged_immediate) -> Immediate_box
+  | Base (Bits32 | Float32) -> Immediate64_box
+  | Base Float64 -> Float_block
+  | Base (Scannable | Bits64 | Word | Vec128 | Vec256 | Vec512 | Mask)
+  | Addressable _ | Product _ -> Block
+  | Univar _ | Genvar _ ->
+    Misc.fatal_error "boxed_representation: unspecialized sort"
 
 let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
@@ -3710,6 +3729,8 @@ let primitive_result_layout (p : primitive) =
   | Pset_ptr _ -> layout_unit
   | Pget_ext_ptr (layout, _) -> layout
   | Pset_ext_ptr _ -> layout_unit
+  | Pbox (_, _) -> layout_any_value
+  | Punbox sort -> layout_of_const_sort sort
 
 let array_ref_kind mode = function
   | Pgenarray -> Pgenarray_ref mode
