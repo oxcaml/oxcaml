@@ -9628,7 +9628,7 @@ and type_newtype
               Jkind.round_up ~context new_env contents_decl.type_jkind
               |> Option.value ~default:(Jkind.Builtin.any ~why:Dummy_jkind)
             in
-            let contents = newvar2 level contents_jkind in
+            let contents = newgenvar contents_jkind in
             unify_exp_types name_loc env boxed_ty
               (newty2 ~level (Tbox contents));
             unboxed_vars := Path.Map.add unboxed_path contents !unboxed_vars;
