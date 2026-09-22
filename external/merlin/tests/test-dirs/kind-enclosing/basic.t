@@ -1,5 +1,6 @@
   $ run() {
   >   $MERLIN single kind-enclosing -position $1 \
+  >   | revert-newlines \
   >   | jq -r '.value[] | "\(.start.line):\(.start.col)-\(.end.line):\(.end.col): \(.kind)"'
   > }
 
