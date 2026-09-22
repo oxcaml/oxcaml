@@ -39,10 +39,14 @@ set -euo pipefail
 
 # Configure memtrace:
 export MEMTRACE="$output/alloc.\$\$.ctf" # Note that $$ means "this shell's PID"
+export MEMTRACE_RATE='1e-4'
 printf '%q ' "\$@" > "$output/command.\$\$.txt" # Record the compiler's arguments
 exec "$root/_install/bin/ocamlopt.opt" \
-  -dtimings \
+  -dprofile \
+  -dgranularity func \
+  -dtimings-precision 6 \
   -dgc-timings \
+  -inlining-report \
   -dump-into-file \
   -dump-dir "${output}" \
   -dprofile-output "gc.\$\$.dump" \
